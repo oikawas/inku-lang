@@ -153,7 +153,8 @@ def test_persistence_lineage_owns_exact_imports_and_db_keeps_eight_facades() -> 
         ("import", 0, "", (("json", None),)),
         ("from", 0, "collections.abc", (("Callable", None),)),
         ("from", 0, "dataclasses", (("dataclass", None),)),
-        ("from", 0, "sqlalchemy", (("func", None), ("or_", None), ("text", None))),
+        ("from", 0, "sqlalchemy", (("LargeBinary", None), ("func", None), ("or_", None), ("text", None))),
+        ("from", 0, "sqlalchemy.orm", (("defer", None),)),
         ("from", 1, "", (("access", None),)),
         (
             "from",
@@ -215,7 +216,7 @@ def test_db_facades_keep_exact_signatures_and_resolve_dependencies_at_call_time(
         "_descendant_edge_ids": "(session, actor: 'dict', focus_node_id: 'str', depth: 'int', limit: 'int') -> 'list[str]'",
         "_lineage_node_payload": "(node: 'LineageNodeRow', readable: 'bool', child_counts: 'dict', history_by_id: 'dict', generations: 'dict') -> 'dict'",
         "_lineage_generations": "(session, actor: 'dict', node_ids: 'list[str]') -> 'dict[str, int]'",
-        "get_lineage": "(user_id: 'str', focus_node_id: 'str', descendant_depth: 'int' = 2, node_limit: 'int' = 200) -> 'dict | None'",
+        "get_lineage": "(user_id: 'str', focus_node_id: 'str', descendant_depth: 'int' = 2, node_limit: 'int' = 200, include_svg: 'bool' = True) -> 'dict | None'",
         "promote_lineage_node": "(user_id: 'str', node_id: 'str') -> 'dict | None'",
         "get_lineage_branch": "(user_id: 'str', target_node_id: 'str') -> 'dict | None'",
     }
@@ -226,15 +227,15 @@ def test_db_facades_keep_exact_signatures_and_resolve_dependencies_at_call_time(
         "row_to_dict_fn": object(),
     }
     initializations: list[dict[str, object]] = []
-    calls: list[tuple[str, tuple[object, ...]]] = []
+    calls: list[tuple[str, tuple[object, ...], dict[str, object]]] = []
 
     class RecordingStore:
         def __init__(self, **values: object) -> None:
             initializations.append(values)
 
         def __getattr__(self, name: str):
-            def call(*args: object) -> str:
-                calls.append((name, args))
+            def call(*args: object, **kwargs: object) -> str:
+                calls.append((name, args, kwargs))
                 return name
 
             return call
@@ -256,7 +257,10 @@ def test_db_facades_keep_exact_signatures_and_resolve_dependencies_at_call_time(
     assert db.promote_lineage_node("user", "node") == "promote_lineage_node"
     assert db.get_lineage_branch("user", "target") == "get_lineage_branch"
     assert initializations == [dependencies] * 8
-    assert [name for name, _ in calls] == list(signatures)
+    assert [name for name, _, _ in calls] == list(signatures)
+    assert calls[5] == ("get_lineage", ("user", "focus", 4, 5), {"include_svg": True})
+    assert db.get_lineage("user", "focus", include_svg=False) == "get_lineage"
+    assert calls[-1] == ("get_lineage", ("user", "focus", 2, 200), {"include_svg": False})
 
 
 def test_edge_metadata_and_node_redaction_payloads_are_exact() -> None:

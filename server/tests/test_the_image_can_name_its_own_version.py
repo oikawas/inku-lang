@@ -36,7 +36,9 @@ def _files_the_server_reads() -> set[str]:
             directory = match.group(1) or match.group(3)
             name = match.group(2) or match.group(4)
             if directory and name:
-                found.add(f"{directory}/{name}")
+                parents = re.match(r"parents\[(\d+)\]", match.group(0))
+                base = path.resolve().parents[int(parents[1])] if parents else ROOT
+                found.add((base / directory / name).relative_to(ROOT).as_posix())
     return found
 
 
@@ -79,6 +81,7 @@ def test_the_scan_finds_the_readers_it_is_meant_to_find():
     assert len(read) >= 2, f"the scan found only {sorted(read)}"
     assert "web/APP_VERSION" in read
     assert "web/BUILD_NUMBER" in read
+    assert "server/plugins/nature-leaves.inku-plugin.md" in read
 
 
 @pytest.mark.parametrize("relative", ["web/APP_VERSION", "web/BUILD_NUMBER"])

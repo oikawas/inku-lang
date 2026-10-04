@@ -117,12 +117,14 @@ def test_paint_409_exposes_persisted_compiler_failure_detail(
     Base.metadata.create_all(engine)
     store = VariationAuthorityStore(engine)
     effects = ProductPipelineEffects(binding, manifest)
+    rejected_action_ids = []
 
     class RejectedProvider:
         def __init__(self, _options, **_kwargs):
             pass
 
         def __call__(self, action):
+            rejected_action_ids.append(action["identity"]["action_id"])
             return {
                 "tag": "normalized_ddl_generated",
                 "identity": action["identity"],
@@ -169,6 +171,7 @@ def test_paint_409_exposes_persisted_compiler_failure_detail(
             "attempt": 1,
             "elapsed_ms": 7,
             "detail": "macro_resolution_missing_lock",
+            "action_id": rejected_action_ids[-1],
         }
         assert raised.value.status_code == 409
         assert detail["current_view"]["provider_failure"] == diagnostic

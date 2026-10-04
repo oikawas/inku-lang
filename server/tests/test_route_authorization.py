@@ -71,7 +71,8 @@ PUBLIC = {  # every entry needs a reason
 #   write (2026-09-30).
 #   +9 for owner-only ChatGPT state, authorization attempts, profile actions
 #   and the personal catalog (2026-10-02).
-EXPECTED_ROUTE_COUNT = 117
+#   +2 for GET/PUT /api/me/chatgpt/models/settings (2026-10-04).
+EXPECTED_ROUTE_COUNT = 119
 
 
 def _guard_names(dependant, seen=None) -> set[str]:
@@ -172,11 +173,8 @@ def test_only_stronger_admin_guards_remain_as_unused_route_arguments():
                     unused.add((path.name, function.name, ast.unparse(default.args[0])))
 
     assert unused == {
-        ("plugins.py", "api_plugin_content", "_admin_user"),
-        ("plugins.py", "api_plugin_create", "_admin_user"),
         ("plugins.py", "api_plugin_delete", "_admin_user"),
         ("plugins.py", "api_plugin_set_enabled", "_admin_user"),
-        ("plugins.py", "api_plugin_update", "_admin_user"),
         ("plugins.py", "api_plugins_reload", "_admin_user"),
         ("plugins.py", "api_plugins_validate", "_admin_user"),
     }

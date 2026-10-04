@@ -119,6 +119,7 @@ def test_init_db_builds_owner_from_live_dependencies_and_assigns_outcome(
 ) -> None:
     created = []
     ensured = []
+    statistics = []
     metadata = object()
     engine = object()
     session_factory = object()
@@ -151,6 +152,7 @@ def test_init_db_builds_owner_from_live_dependencies_and_assigns_outcome(
     monkeypatch.setattr(db, "Session", session_factory)
     monkeypatch.setattr(db, "sqlite_database_path", lambda *args, **kwargs: None)
     monkeypatch.setattr(db, "ensure_current_schema", ensure_current_schema)
+    monkeypatch.setattr(db, "_refresh_planner_statistics", lambda: statistics.append(db._HISTORY_FTS_ENABLED))
     monkeypatch.setattr(db, "_HISTORY_FTS_ENABLED", object())
     callback_names = (
         "_ensure_default_user_group",
@@ -174,6 +176,7 @@ def test_init_db_builds_owner_from_live_dependencies_and_assigns_outcome(
     assert owner["seed_fresh"] == instance.seed_fresh
     assert owner["apply_legacy"] == instance.apply_legacy
     assert db._HISTORY_FTS_ENABLED is enabled
+    assert statistics == [enabled]
 
 
 def test_moved_private_helpers_no_longer_remain_in_db_module() -> None:

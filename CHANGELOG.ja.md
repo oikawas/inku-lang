@@ -6,6 +6,10 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-04 — 現行契約に合わせてCIの試験とAndroidのデザイン資料を更新する
+
+ServerとCLIの試験が、単一DDL、Room14、本人ChatGPTの公開モデル設定、記述の編集ロック、両段に共通の描画モデルなどの取り込み前の期待値を保持していたため失敗していた。受け入れ済みの契約に合わせて期待値と試験用の依存を更新する。コンテナ同梱検査は各Pythonファイルから実際の親ディレクトリを解決し、同梱済みのプラグインを欠落と誤判定しない。Androidの色のデザイン用HTMLを現行トークンから生成し直す。検査の失敗を無効化せず、描画・保存・認証・DDL・Scoreの動作は変更しない。
+
 ### 2026-10-04 — API配布へSmall辞書のUniDic notice全文を保持する
 
 固定依存sudachidict-small 20260723.1のbinary wheelにはApacheライセンスだけがあり、UniDic由来のBSD copyright・条件・免責が欠けていた。公式のexact v20260723.1タグと同版PyPI source archiveで全byte一致するLEGAL全文をServerへ同梱し、THIRD_PARTY_NOTICESに出典とAPI内の所在を記す。API image buildは同梱ファイルの存在も確認する。依存・辞書本文・描画・版は変更しない。

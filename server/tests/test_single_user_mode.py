@@ -149,7 +149,7 @@ print(json.dumps(client.get('/api/info').json()))
     assert payload["single_user_mode"] is False
 
 
-def test_app_info_gained_exactly_one_field():
+def test_app_info_preserves_existing_fields_and_names_current_capabilities():
     """A set difference, not a count.
 
     The API-surface baseline compares counts as well as content, and its three
@@ -174,7 +174,10 @@ def test_app_info_gained_exactly_one_field():
     }
     # thumbnail_hidpi joined it with contract 2: the client asks for the second
     # thumbnail size only where the server keeps it, and this is how it learns.
-    assert current - before == {"single_user_mode", "thumbnail_hidpi"}
+    assert current - before == {
+        "single_user_mode", "thumbnail_hidpi",
+        "chatgpt_plan_available", "chatgpt_plan_unavailable_reason",
+    }
     assert before - current == set()
 
 

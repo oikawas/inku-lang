@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-04 — Align CI checks and Android design records with current contracts
+
+Server and CLI checks retained expectations from before single DDL, Room14, personal ChatGPT model publication, description locks and the shared drawing model for both stages. Their expectations and test dependencies now follow the accepted contracts. The image inclusion check resolves the actual parent directory of each Python source instead of reporting an already bundled plugin as absent. Android's colour design HTML is regenerated from the current tokens. Failure checks remain enabled; drawing, persistence, authentication, DDL and Score behaviour are unchanged.
+
 ### 2026-10-04 — Preserve the Small dictionary's full UniDic notice in API distributions
 
 The locked sudachidict-small 20260723.1 binary wheel contains Apache terms but omits the UniDic BSD copyright, conditions and disclaimer. The Server now bundles the complete LEGAL file, byte-identical in the exact v20260723.1 source tag and that version's PyPI source archive. THIRD_PARTY_NOTICES records its provenance and API location, and the API image build checks that it is present. Dependencies, dictionary contents, drawing and versions are unchanged.

@@ -11,6 +11,17 @@ from inku_server.persistence import history
 from inku_server.persistence.schema import HistoryAclRow, LineageEdgeRow, LineageNodeRow, PipelineHistoryLinkRow
 
 
+@pytest.fixture(autouse=True)
+def description_lock_projection(monkeypatch):
+    # SQL ownership of description locks has its own real-database checks.
+    # These fixtures isolate lineage projection while checking both lock values.
+    def locks(session, history_ids):
+        session.description_lock_ids = list(history_ids)
+        return {"root-work"} & set(history_ids)
+
+    monkeypatch.setattr(history, "locked_history_ids", locks)
+
+
 class _Query:
     def __init__(self, session: "_ProjectionSession", model: type) -> None:
         self._session = session
@@ -106,7 +117,9 @@ def test_history_list_projector_is_the_frozen_sole_owner_and_db_is_a_facade(monk
     monkeypatch.setattr(db, "_row_to_dict", lambda row: projected.append(row.id) or {"id": row.id})
     row = _row("ordinary", "owner", None)
 
-    assert db._rows_to_dicts_with_lineage(_ProjectionSession([], []), [row]) == [{"id": "ordinary"}]
+    assert db._rows_to_dicts_with_lineage(_ProjectionSession([], []), [row]) == [
+        {"id": "ordinary", "description_locked": False},
+    ]
     edge = _edge("node", "parent", "owner")
     lineage_row = _row("lineage", "owner", "node")
     edge_calls: list[tuple[str, str]] = []
@@ -145,14 +158,15 @@ def test_projector_keeps_order_shared_markers_and_no_node_fast_path():
 
     # The caller's own work states whether it is shared with anyone by name.
     assert projector.rows_to_dicts_with_lineage(session, rows, actor={"id": "owner"}) == [
-        {"id": "mine", "has_acl_shares": False},
-        {"id": "shared", "shared": True},
+        {"id": "mine", "has_acl_shares": False, "description_locked": False},
+        {"id": "shared", "shared": True, "description_locked": False},
     ]
     assert projector.rows_to_dicts_with_lineage(_ProjectionSession([], []), rows) == [
-        {"id": "mine"},
-        {"id": "shared"},
+        {"id": "mine", "description_locked": False},
+        {"id": "shared", "description_locked": False},
     ]
     assert session.calls == []
+    assert session.description_lock_ids == ["mine", "shared"]
 
 
 def test_projector_preserves_queries_generation_owner_gates_and_provenance():
@@ -195,6 +209,7 @@ def test_projector_preserves_queries_generation_owner_gates_and_provenance():
         "derivation_kind": "description_edit",
         "derivation_metadata": {"edge": "child"},
         "has_acl_shares": False,
+        "description_locked": False,
     }
     assert items[1] == {
         "id": "root-work",
@@ -202,8 +217,10 @@ def test_projector_preserves_queries_generation_owner_gates_and_provenance():
         "lineage_generation": 1,
         "lineage_state": "lineage_only",
         "has_acl_shares": False,
+        "description_locked": True,
     }
-    assert items[2] == {"id": "mismatch-work", "has_acl_shares": False}
+    assert items[2] == {"id": "mismatch-work", "has_acl_shares": False, "description_locked": False}
+    assert session.description_lock_ids == ["child-work", "root-work", "mismatch-work"]
     assert edge_calls == ["child"]
     assert [model for model, _ in session.calls] == [
         LineageNodeRow,
@@ -242,7 +259,7 @@ def test_projector_stops_on_missing_parents_and_cycles_without_attaching_missing
 
     items = projector.rows_to_dicts_with_lineage(session, [missing, cycle])
 
-    assert items[0] == {"id": "missing-work"}
+    assert items[0] == {"id": "missing-work", "description_locked": False}
     assert items[1] == {
         "id": "cycle-work",
         "lineage_root_node_id": "cycle",
@@ -251,5 +268,6 @@ def test_projector_stops_on_missing_parents_and_cycles_without_attaching_missing
         "lineage_parent_node_id": "cycle-parent",
         "derivation_kind": "touch_change",
         "derivation_metadata": {"kind": "touch_change"},
+        "description_locked": False,
     }
     assert len(session.calls) == 4

@@ -33,7 +33,7 @@ def test_physical_names_are_mappings_not_portable_authority():
     assert server["table"] == "history"
     assert android["table"] == "history_items"
     assert contract["hosts"]["android"]["source"] == (
-        "android/app/schemas/app.inku.mobile.data.db.InkuDatabase/13.json"
+        "android/app/schemas/app.inku.mobile.data.db.InkuDatabase/14.json"
     )
     assert server["fields"]["input"]["column"] == "input"
     assert android["fields"]["input"]["column"] == "original_input"

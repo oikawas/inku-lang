@@ -71,7 +71,9 @@ EXPECTED_TABLE_NAMES = {
     "app_settings",
     *AUTHORING_TABLE_NAMES,
 }
-PRE_EXTRACTION_SCHEMA_SHA256 = "6f95e2f40a2352bfbcdfad721259e2a480b93c27a876809c6c4f2f0681bf7186"
+# I-706 replaces expanded_ddl with nullable ddl_source_origin. All remaining
+# declarations and indexes stay frozen alongside that accepted schema change.
+SINGLE_DDL_SCHEMA_SHA256 = "53ed8b97069d2e1ac2164f6230df531f66c79075f1e84c6fa8093d398f831fd7"
 
 
 def _compiled_schema_payload(base, *, excluded_tables: set[str] | None = None) -> bytes:
@@ -115,7 +117,7 @@ def test_orm_schema_has_one_persistence_owner_and_creates_the_same_tables():
                 excluded_tables=AUTHORING_TABLE_NAMES,
             )
         ).hexdigest()
-        == PRE_EXTRACTION_SCHEMA_SHA256
+        == SINGLE_DDL_SCHEMA_SHA256
     )
 
     engine = create_engine("sqlite:///:memory:", future=True)

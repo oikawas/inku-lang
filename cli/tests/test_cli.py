@@ -103,7 +103,9 @@ def test_paint_payload_drops_none_values():
     assert payload["include_thinking"] is False
     assert payload["catalog_id"] == "default"
     assert "color_map" not in payload
-    assert "stage2_model" not in payload
+    assert payload["stage2_model"] == "gemma"
+    assert "stage1_provider" not in payload
+    assert "stage2_provider" not in payload
     assert "history_input" not in payload
 
 

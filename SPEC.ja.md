@@ -985,7 +985,9 @@ Stage 1、camera projection、hole補完は既存の共有grammar helperを使�
 
 設定「ChatGPTプラン」は独立したタブで、表示・操作などの既存設定を同時表示しない。自己ホストの「ChatGPTで続ける」はブラウザ側Macの専用アプリを開く。起動リンクにはinku本人ID・選択登録ID・明示同意・固定のブラウザ指定（Chrome／Brave）・表示言語（日本語／英語）を載せる。Braveは公開の`navigator.brave.isBrave()`で識別し、認証も同じブラウザで開く。開けない場合に別のブラウザへ自動で切り替えない。接続先確認・完了／失敗の案内とcallback画面も表示言語に合わせる。Macで接続先を確認してから認証し、保護された経路で一登録を移送する。OAuth code/tokenをLAN HTTPへ載せない。
 
-「モデル一覧を更新」は取得中の表示と、取得した件数・モデル名を同じ設定タブへ返す。空の一覧と通信・認可の失敗も表示する。取得後の「モデル選択」は既存の描画モデル選択画面を開き、Stage 1/2を共通のモデルとして明示選択する。一覧の表示はowner・選択登録・generationへ固定し、更新だけでモデルを自動選択しない。
+接続完了後は「モデル設定を開く」と案内し、設定「モデル」のChatGPTプランで、他providerと同じ「公開モデルを選択」から一覧を取得・選択・保存する。取得中、件数、モデル名、空の一覧と通信・認可の失敗を表示する。取得しただけでは公開せず、保存した公開モデルだけが本人の描画モデル選択に現れる。Stage 1/2は共通のモデルを明示選択する。公開設定はowner・登録ごとに暗号化保存し、登録の同一identityへの再認証・再importで保持する。普通の利用者にも本人のモデル設定だけを提供し、共有providerのAPIキー・接続・rate設定の管理者権限は維持する。共有registry、Vision候補、bare名所有へ混ぜない。一覧と保存はowner・選択登録・generationを照合し、画面を開くだけでは外部一覧取得しない。未公開・提供終了モデルの保存指定は利用不可として保持する。
+
+Responses/SSEは補助のassistant message・reasoningと、必要な一つの`inku` namespaceの`submit_pipeline_response`を区別する。描画には完了応答の関数引数だけを採用する。本文だけの応答、refusal、未知tool、複数関数・部分応答は拒否し、形式不一致では再接続を促さず診断を案内する。形式診断logはtype/name/namespaceだけで本文・引数を含めない。
 
 予約provider `chatgpt`（ChatGPTプラン）は本人OAuth・scope・本人catalogによる共有pipeline専用接続である。明示有効化、`developer_mode || single_user_mode`、検証済みlocal/self-hosted起動を要求し、管理者にも迂回を許さない。`chatgpt:<slug>`を共有APIキー接続やbare名の所有へ混ぜず、利用不可でも保存指定を保持する。両段共通の描画、写生文、カタログ選択、構図の読み、可視hole補完をResponses/SSEへ接続し、Rustのprompt/schema/retry・Score/SVGは変えない。構図の読みは観測をStage 1から分けて`composition`に記録し、読みが使えないときの既定fallbackは共有Rustへ委ねる。実行のowner/profile/generationを固定し、quota・cancel・sign-out・モード変更で追加通信と遅い結果を停止する。Vision・奥書・デモ指示生成・モデル検査へは提供しない。[接続・移送・復旧](docs/guide/chatgpt-plan.ja.md)を参照。
 

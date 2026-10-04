@@ -15,8 +15,11 @@ export const en: LangPack = {
 	chatgptRetry: 'Check usage and retry',
 	chatgptSignOut: 'Sign out',
 	chatgptRefreshModels: 'Refresh models',
-	chatgptModelsLoaded: (count) => `Loaded ${count} models. Choose a drawing model with Select model.`,
+	chatgptModelsLoaded: (count) => `Loaded ${count} models. Select models to publish and save.`,
 	chatgptModelsEmpty: 'No selectable models are offered for this account. Check the connection and plan usage permission.',
+	chatgptModelSettingsGuide: 'Connected. Open model settings, fetch the ChatGPT plan model list, select models to publish and save. You can then choose a drawing model.',
+	chatgptOpenModelSettings: 'Open model settings',
+	chatgptPersonalModels: 'These models belong to your connection. Use Select models to fetch the list, choose drawing models and save. They are not published to other users.',
 	chatgptUsingPlan: 'Using ChatGPT plan',
 	chatgptModelUnavailable: 'The selected ChatGPT model is unavailable. Check the connection or choose a model explicitly.',
 	chatgptStatus: (code) => ({
@@ -43,7 +46,8 @@ export const en: LangPack = {
 		subscription_sharing_user_unavailable: 'The account could not be checked. Try again later.',
 		chatgpt_transport_unavailable: 'The ChatGPT connection was interrupted. Try again later.',
 		chatgpt_response_incomplete: 'The response did not finish. Partial output was discarded.',
-		chatgpt_model_not_offered: 'The selected model is unavailable. Refresh the model list and choose explicitly.',
+		chatgpt_model_not_offered: 'The selected model is unavailable. Fetch the list in Model settings, select models to publish and save.',
+		chatgpt_unexpected_tool: 'The ChatGPT response did not match the drawing function-call format. Response diagnostics are needed.',
 		chatgpt_refused: 'ChatGPT declined the request. Revise your description.',
 		chatgpt_revocation_unconfirmed: 'Signed out locally. Remote revocation is unconfirmed. Check ChatGPT settings.',
 		chatgpt_cancelled: 'Connection cancelled.'

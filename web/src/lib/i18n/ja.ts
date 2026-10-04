@@ -15,8 +15,11 @@ export const ja: LangPack = {
 	chatgptRetry: '利用枠を確認して再試行',
 	chatgptSignOut: '接続を解除',
 	chatgptRefreshModels: 'モデル一覧を更新',
-	chatgptModelsLoaded: (count) => `${count}件のモデルを取得しました。「モデル選択」で描画モデルを選んでください。`,
+	chatgptModelsLoaded: (count) => `${count}件のモデルを取得しました。公開するモデルを選んで保存してください。`,
 	chatgptModelsEmpty: 'この登録で選択できるモデルはありません。接続とプラン利用の許可を確認してください。',
+	chatgptModelSettingsGuide: '接続が完了しました。モデル設定で「ChatGPTプラン」のモデル一覧を取得し、公開するモデルを選んで保存してください。その後、描画モデルを選択できます。',
+	chatgptOpenModelSettings: 'モデル設定を開く',
+	chatgptPersonalModels: 'この接続の本人用モデルです。「公開モデルを選択」で一覧を取得し、描画に使うモデルを選んで保存してください。他の利用者には公開されません。',
 	chatgptUsingPlan: 'ChatGPTプランを使用中',
 	chatgptModelUnavailable: '選択したChatGPTモデルは利用できません。接続状態を確認するか、モデルを明示的に選び直してください。',
 	chatgptStatus: (code) => ({
@@ -43,7 +46,8 @@ export const ja: LangPack = {
 		subscription_sharing_user_unavailable: 'アカウントを確認できませんでした。時間を置いて再試行してください。',
 		chatgpt_transport_unavailable: 'ChatGPTとの通信が途切れました。時間を置いて再試行してください。',
 		chatgpt_response_incomplete: '応答が完了しませんでした。途中の出力は採用していません。',
-		chatgpt_model_not_offered: '選択したモデルは利用できません。一覧を更新し、明示的に選び直してください。',
+		chatgpt_model_not_offered: '選択したモデルは利用できません。モデル設定で一覧を取得し、公開するモデルを選んで保存してください。',
+		chatgpt_unexpected_tool: 'ChatGPTの応答が描画用の関数呼出し形式と一致しませんでした。応答形式の診断が必要です。',
 		chatgpt_refused: 'ChatGPTが要求を拒否しました。記述を見直してください。',
 		chatgpt_revocation_unconfirmed: 'ローカル接続は解除しました。ChatGPT側の解除は未確認です。ChatGPT設定で確認してください。',
 		chatgpt_cancelled: '接続操作を中止しました。'

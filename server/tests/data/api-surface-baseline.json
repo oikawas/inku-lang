@@ -1,7 +1,7 @@
 {
-  "endpoint_count": 117,
-  "operation_count": 117,
-  "schema_count": 169,
+  "endpoint_count": 119,
+  "operation_count": 119,
+  "schema_count": 170,
   "operations": [
     {
       "path": "/api/admin/unread-words",
@@ -875,6 +875,34 @@
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Refresh Models Api Me Chatgpt Models Refresh Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/me/chatgpt/models/settings",
+      "method": "GET",
+      "operationId": "model_settings_api_me_chatgpt_models_settings_get",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Model Settings Api Me Chatgpt Models Settings Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/me/chatgpt/models/settings",
+      "method": "PUT",
+      "operationId": "publish_models_api_me_chatgpt_models_settings_put",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PublishedModelsBody\"}}},\"required\":true}",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Publish Models Api Me Chatgpt Models Settings Put\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
         "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
       }
     },
@@ -1834,6 +1862,7 @@
     "PolygonDimensions": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"polygon\",\"title\":\"Kind\",\"type\":\"string\"},\"radius\":{\"exclusiveMinimum\":0.0,\"title\":\"Radius\",\"type\":\"number\"},\"sides\":{\"maximum\":8.0,\"minimum\":5.0,\"title\":\"Sides\",\"type\":\"integer\"}},\"required\":[\"kind\",\"radius\",\"sides\"],\"title\":\"PolygonDimensions\",\"type\":\"object\"}",
     "Presence": "{\"additionalProperties\":false,\"properties\":{\"center\":{\"anyOf\":[{\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"}],\"type\":\"array\"},{\"type\":\"null\"}],\"description\":\"存在感の重心。省略時は画面中央付近\",\"title\":\"Center\"},\"contour_density\":{\"default\":\"low\",\"description\":\"輪郭密度。具象輪郭ではなく、短い弧や線片の密度として扱う\",\"enum\":[\"low\",\"medium\",\"high\"],\"title\":\"Contour Density\",\"type\":\"string\"},\"gaze_pressure\":{\"default\":\"none\",\"description\":\"視線の圧力。顔や目は描かず、細い線の収束や余白の圧として描く\",\"enum\":[\"none\",\"low\",\"medium\",\"high\"],\"title\":\"Gaze Pressure\",\"type\":\"string\"},\"intensity\":{\"default\":\"medium\",\"description\":\"存在感の強さ: low=弱い / medium=中程度 / high=強い\",\"enum\":[\"low\",\"medium\",\"high\"],\"title\":\"Intensity\",\"type\":\"string\"},\"kind\":{\"default\":\"none\",\"description\":\"存在の種類。none=なし / figure_like=人型の気配 / creature_like=動物的な気配 / group_like=群れや複数の気配。具象的な顔・身体・動物として描かない\",\"enum\":[\"none\",\"figure_like\",\"creature_like\",\"group_like\"],\"title\":\"Kind\",\"type\":\"string\"},\"symmetry\":{\"default\":\"none\",\"description\":\"対称性: none=なし / bilateral=左右対称の圧 / radial=放射的な圧\",\"enum\":[\"none\",\"bilateral\",\"radial\"],\"title\":\"Symmetry\",\"type\":\"string\"}},\"title\":\"Presence\",\"type\":\"object\"}",
     "ProviderRateLimitsPatch": "{\"additionalProperties\":false,\"properties\":{\"rpd\":{\"default\":0,\"maximum\":1000000000.0,\"minimum\":0.0,\"title\":\"Rpd\",\"type\":\"integer\"},\"rpm\":{\"default\":0,\"maximum\":1000000000.0,\"minimum\":0.0,\"title\":\"Rpm\",\"type\":\"integer\"},\"tpm\":{\"default\":0,\"maximum\":1000000000.0,\"minimum\":0.0,\"title\":\"Tpm\",\"type\":\"integer\"}},\"title\":\"ProviderRateLimitsPatch\",\"type\":\"object\"}",
+    "PublishedModelsBody": "{\"additionalProperties\":false,\"properties\":{\"generation\":{\"minimum\":1.0,\"title\":\"Generation\",\"type\":\"integer\"},\"profile_id\":{\"maxLength\":128,\"minLength\":1,\"title\":\"Profile Id\",\"type\":\"string\"},\"published_models\":{\"items\":{\"maxLength\":256,\"minLength\":1,\"type\":\"string\"},\"maxItems\":1024,\"title\":\"Published Models\",\"type\":\"array\"}},\"required\":[\"profile_id\",\"generation\",\"published_models\"],\"title\":\"PublishedModelsBody\",\"type\":\"object\"}",
     "RectangleFillTargetGeometry": "{\"additionalProperties\":false,\"properties\":{\"bounds\":{\"maxItems\":4,\"minItems\":4,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"},{\"type\":\"number\"},{\"type\":\"number\"}],\"title\":\"Bounds\",\"type\":\"array\"},\"kind\":{\"const\":\"rectangle\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"bounds\"],\"title\":\"RectangleFillTargetGeometry\",\"type\":\"object\"}",
     "RegularTriangleDimensions": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"regular_triangle\",\"title\":\"Kind\",\"type\":\"string\"},\"side\":{\"exclusiveMinimum\":0.0,\"title\":\"Side\",\"type\":\"number\"}},\"required\":[\"kind\",\"side\"],\"title\":\"RegularTriangleDimensions\",\"type\":\"object\"}",
     "Relation": "{\"additionalProperties\":false,\"properties\":{\"gap\":{\"default\":\"medium\",\"description\":\"関係解決時の距離目安: narrow / medium / wide。具体距離は Renderer が解決する\",\"enum\":[\"narrow\",\"medium\",\"wide\"],\"title\":\"Gap\",\"type\":\"string\"},\"position_authority\":{\"anyOf\":[{\"enum\":[\"named_movable\",\"numeric_fixed\"],\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"checked connected / touching current の位置出自。named_movable または numeric_fixed\",\"title\":\"Position Authority\"},\"target_anchor_index\":{\"anyOf\":[{\"minimum\":0.0,\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"checked relation が参照する非描画 Score anchor index。instruction target と排他的\",\"title\":\"Target Anchor Index\"},\"target_endpoint\":{\"anyOf\":[{\"enum\":[\"start\",\"end\"],\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Connected target Line/Arcの始点または終点。共通変形後も同じ端点を指す。Score 0.12で明示する\",\"title\":\"Target Endpoint\"},\"target_instruction_index\":{\"anyOf\":[{\"minimum\":0.0,\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"checked connected / touching が参照する元 Score instruction index。旧 relation では省略\",\"title\":\"Target Instruction Index\"},\"target_path_position\":{\"anyOf\":[{\"maximum\":1.0,\"minimum\":0.0,\"type\":\"number\"},{\"const\":\"interior\",\"type\":\"string\"},{\"type\":\"null\"}],\"description\":\"Connected接点。Score 0.11の数値0〜1はLine中心線の位置。Score 0.13のinteriorはLine/Arcの両端以外を演奏で選ぶ\",\"title\":\"Target Path Position\"},\"touching_constraints\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/TouchingConstraints\"},{\"type\":\"null\"}],\"description\":\"typed touching の明示寸法・向きの固定条件。省略normalとは区別する\"},\"type\":{\"description\":\"along=沿う / not_touching=触れない / cutting=切る / between=直前2要素の間に / touching=触れる / connected=つながる\",\"enum\":[\"along\",\"not_touching\",\"cutting\",\"between\",\"touching\",\"connected\"],\"title\":\"Type\",\"type\":\"string\"}},\"required\":[\"type\"],\"title\":\"Relation\",\"type\":\"object\"}",
@@ -1886,5 +1915,5 @@
     "VisionRefineAdviceBody": "{\"properties\":{\"direction\":{\"default\":\"\",\"maxLength\":2000,\"title\":\"Direction\",\"type\":\"string\"},\"enabled_kinds\":{\"items\":{\"type\":\"string\"},\"maxItems\":5,\"minItems\":1,\"title\":\"Enabled Kinds\",\"type\":\"array\"},\"history_id\":{\"maxLength\":200,\"minLength\":1,\"title\":\"History Id\",\"type\":\"string\"},\"instruction\":{\"maxLength\":100000,\"minLength\":1,\"title\":\"Instruction\",\"type\":\"string\"},\"language\":{\"default\":\"ja\",\"pattern\":\"^(ja|en)$\",\"title\":\"Language\",\"type\":\"string\"},\"model\":{\"anyOf\":[{\"maxLength\":200,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Model\"}},\"required\":[\"history_id\",\"instruction\",\"enabled_kinds\"],\"title\":\"VisionRefineAdviceBody\",\"type\":\"object\"}",
     "VisionRefineAdviceResponse": "{\"properties\":{\"model\":{\"title\":\"Model\",\"type\":\"string\"},\"next_direction\":{\"title\":\"Next Direction\",\"type\":\"string\"},\"observation\":{\"title\":\"Observation\",\"type\":\"string\"},\"suggested_kind\":{\"title\":\"Suggested Kind\",\"type\":\"string\"}},\"required\":[\"observation\",\"next_direction\",\"suggested_kind\",\"model\"],\"title\":\"VisionRefineAdviceResponse\",\"type\":\"object\"}"
   },
-  "digest": "8d24aef3d08760c37107fed9387af0a2ca0bac0a979107c84786331f93dd0b79"
+  "digest": "8d9ca3afc00268fc0705391292ba0b32fd0f3a758cfadf824e3aac965752a0fe"
 }

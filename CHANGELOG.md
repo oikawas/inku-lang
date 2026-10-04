@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-04 — Configure ChatGPT published models in Model settings and accept supplementary response messages
+
+ChatGPT plan list fetching and published-model selection now use the same Model settings dialog as other providers. After connecting, a guide opens that page. Only models explicitly selected and saved for the owner's registration enter the drawing picker; fetching alone publishes nothing. Shared API-key and rate administration retains its existing permissions.
+
+Responses/SSE previously rejected supplementary assistant messages as unknown tools. It now distinguishes them from the one required completed function call without using message text as drawing data. Refusals, unknown tools, multiple calls and partial responses remain failures. Format mismatches request diagnostics rather than reconnection, with tool-shape metadata logged without text or arguments.
+
 ### 2026-10-04 — Localize ChatGPT setup and retain Brave for authorization
 
 The Mac authorization CLI explicitly opened Chrome even when setup began in Brave, so sign-in and the return page used Chrome. Settings now pass the starting Chrome or Brave browser and display language to the dedicated helper, which opens that fixed browser. Japanese setup includes the Continue with ChatGPT label, usage and helper guidance, destination confirmation, completion and failure reasons and the callback page. A browser launch failure does not switch browsers; existing authorization and transfer contracts remain.

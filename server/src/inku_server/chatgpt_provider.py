@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 import time
 
@@ -12,6 +13,9 @@ import httpx
 from .chatgpt_auth import RESOURCE, access_token, read_limited
 from .chatgpt_runtime import check_session, guarded
 from .chatgpt_store import ChatGPTError, CredentialStore, canonical
+from .chatgpt_models import publication
+
+logger = logging.getLogger(__name__)
 
 EFFECTS = {"generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition", "complete_visible_ddl_holes"}
 PUBLIC_CODES = {
@@ -104,7 +108,26 @@ class SSEDecoder:
 
     def _function(self, item: dict) -> None:
         if item.get("type") != "function_call" or item.get("name") != "submit_pipeline_response" or item.get("namespace") != "inku":
-            raise ChatGPTError("chatgpt_unexpected_tool")
+            self._unexpected([item])
+
+    def _unexpected(self, items: list[dict]) -> None:
+        # Tool metadata explains protocol failures without logging text or arguments.
+        shapes = [{key: safe_identifier(item.get(key)) for key in ("type", "name", "namespace")}
+                  for item in items[:4]]
+        logger.warning("chatgpt_tool_shape %s", json.dumps(shapes, separators=(",", ":")))
+        raise ChatGPTError("chatgpt_unexpected_tool", action="diagnose")
+
+    def _auxiliary(self, item: dict) -> None:
+        if item.get("type") == "reasoning":
+            return
+        if item.get("type") != "message" or item.get("role") != "assistant":
+            self._unexpected([item])
+        # Assistant text can accompany a required call, but is never the result.
+        for part in item.get("content", []):
+            if part.get("type") == "refusal":
+                raise ChatGPTError("chatgpt_refused", action="edit")
+            if part.get("type") != "output_text":
+                self._unexpected([part])
 
     def event(self, event: dict) -> None:
         tag = event.get("type")
@@ -123,10 +146,10 @@ class SSEDecoder:
                 self._function(item)
                 key = item["id"]
                 if key not in self.items and self.items:
-                    raise ChatGPTError("chatgpt_unexpected_tool")
+                    self._unexpected([*self.items.values(), item])
                 self.items[key] = item
-            elif item.get("type") != "reasoning":
-                raise ChatGPTError("chatgpt_unexpected_tool")
+            else:
+                self._auxiliary(item)
         elif tag == "response.function_call_arguments.delta":
             key = event["item_id"]
             if key not in self.items:
@@ -147,9 +170,14 @@ class SSEDecoder:
             if response.get("status") != "completed":
                 raise ChatGPTError("chatgpt_response_incomplete")
             output = response["output"]
-            calls = [item for item in output if item.get("type") != "reasoning"]
+            calls = []
+            for item in output:
+                if item.get("type") == "function_call":
+                    calls.append(item)
+                else:
+                    self._auxiliary(item)
             if len(calls) != 1:
-                raise ChatGPTError("chatgpt_unexpected_tool")
+                self._unexpected(output)
             item = calls[0]
             self._function(item)
             arguments = item["arguments"]
@@ -176,7 +204,7 @@ async def catalog(owner: str, profile_id: str, generation: int, deadline: float,
     profile = check()
     cache = profile.get("catalog")
     if not force and cache and cache["expires_at"] > time.time():
-        return cache["models"]
+        return publication(profile, cache["models"])["models"]
     token = await access_token(owner, profile_id, generation, deadline, cancel)
     async with httpx.AsyncClient(follow_redirects=False) as client:
         stream = client.stream("GET", RESOURCE + "/models", headers={"Authorization": "Bearer " + token},
@@ -192,7 +220,7 @@ async def catalog(owner: str, profile_id: str, generation: int, deadline: float,
         if error.code == "subscription_sharing_usage_limit_exceeded":
             pause_quota(owner, profile_id, generation, deadline)
         raise error
-    models = [{"id": entry["slug"], "label": entry["display_name"], "purposes": ["llm"], "enabled": True}
+    models = [{"id": entry["slug"], "label": entry["display_name"], "purposes": ["llm"]}
               for entry in value["models"] if entry.get("visibility") == "list"
               and isinstance(entry.get("slug"), str) and isinstance(entry.get("display_name"), str)]
     store = CredentialStore()
@@ -203,7 +231,7 @@ async def catalog(owner: str, profile_id: str, generation: int, deadline: float,
         saved = store.read(owner)
         saved["profiles"][profile_id] = profile
         store.write(owner, saved)
-    return models
+    return publication(profile, models)["models"]
 
 
 async def request(owner: str, profile_id: str, generation: int, model: str, action: dict, deadline: float,
@@ -216,7 +244,7 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
     with store.lock("wire:" + owner + ":" + profile_id, deadline, check):
         try:
             models = await catalog(owner, profile_id, generation, deadline, cancel, _wire_held=True)
-            if not any(entry["id"] == model for entry in models):
+            if not any(entry["id"] == model and entry["enabled"] for entry in models):
                 raise ChatGPTError("chatgpt_model_not_offered", action="models")
             token = await access_token(owner, profile_id, generation, deadline, cancel)
             body = request_body(model, action["payload"]["prompt"])
@@ -276,6 +304,6 @@ def offered(owner: str, model: str, *, profile_id: str | None = None, generation
         if profile_id is None or generation is None:
             profile_id, generation = pin(owner)
         models = asyncio.run(catalog(owner, profile_id, generation, time.monotonic() + 15))
-        return any(entry["id"] == model for entry in models)
+        return any(entry["id"] == model and entry["enabled"] for entry in models)
     except (ChatGPTError, httpx.HTTPError, TimeoutError, ValueError, KeyError):
         return False

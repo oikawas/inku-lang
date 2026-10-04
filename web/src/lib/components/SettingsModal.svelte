@@ -337,9 +337,9 @@
 				</header>
 			<div class:limits-body={settingsTab === 'limits'} class="settings-body">
 			{#if settingsTab === 'chatgpt'}
-				{#if reaches('chatgpt')}<ChatGPTSettings connection={settings.chatgpt} {onOpenModelSelection} />{/if}
+				{#if reaches('chatgpt')}<ChatGPTSettings connection={settings.chatgpt} onOpenModelSettings={() => onSelectSettingsTab('models')} />{/if}
 			{:else if settingsTab === 'models'}
-				<ModelAdministrationSettings administration={settings.modelAdministration} {providerGroups} />
+				<ModelAdministrationSettings administration={settings.modelAdministration} {providerGroups} personalOnly={!isAdmin} />
 		{:else if settingsTab === 'db'}
 			<DatabaseAdministrationSettings
 				status={settingsStatus ? { database: settingsStatus.database, db_backup: settingsStatus.db_backup } : null}

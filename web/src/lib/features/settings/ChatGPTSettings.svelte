@@ -2,7 +2,9 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import type { ChatGPTSettingsController } from './chatgpt.svelte';
-	let { connection, onOpenModelSelection }: { connection: ChatGPTSettingsController; onOpenModelSelection: () => void } = $props();
+	let { connection, onOpenModelSettings }: { connection: ChatGPTSettingsController; onOpenModelSettings: () => void } = $props();
+	const connected = $derived(connection.state?.profiles.some((profile) => profile.id === connection.state?.active_profile_id
+		&& profile.state === 'connected' && profile.scopes.includes('chatgpt.tokens.use.direct')) === true);
 	onMount(() => { void connection.load(); });
 	onDestroy(() => { void connection.cancel(); });
 </script>
@@ -41,15 +43,9 @@
 			</div>
 		</section>
 	{/each}
-	<button class="ghost-btn" disabled={connection.busy || !connection.state?.active_profile_id} onclick={() => void connection.refreshModels()}>{connection.code === 'chatgpt_models_loading' ? t().chatgptStatus('chatgpt_models_loading') : t().chatgptRefreshModels}</button>
-	{#if connection.models !== null}
-		{#if connection.models.length > 0}
-			<p role="status">{t().chatgptModelsLoaded(connection.models.length)}</p>
-			<ul>{#each connection.models as model (model.id)}<li>{model.label}</li>{/each}</ul>
-			<button class="ghost-btn" disabled={connection.busy} onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
-		{:else}
-			<p role="status">{t().chatgptModelsEmpty}</p>
-		{/if}
+	{#if connected}
+		<p role="status">{t().chatgptModelSettingsGuide}</p>
+		<button class="ghost-btn" onclick={onOpenModelSettings}>{t().chatgptOpenModelSettings}</button>
 	{/if}
 </section>
 

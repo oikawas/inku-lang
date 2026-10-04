@@ -80,6 +80,7 @@ export function createSettingsController<TActor extends SettingsActor>(
 	const modelAdministration = createModelAdministration({
 		apiFetch: deps.apiFetch,
 		currentUser: deps.currentUser,
+		chatgptAvailable: deps.chatgptAvailable,
 		loadAvailableModels: deps.loadAvailableModels,
 		requestConfirmation: deps.requestConfirmation,
 		describeApiError: deps.describeApiError
@@ -141,6 +142,7 @@ export function createSettingsController<TActor extends SettingsActor>(
 		loadStatus: serverAdministration.loadStatus,
 		resetForLoggedOut() {
 			chatgpt.reset();
+			modelAdministration.resetForLoggedOut();
 			userAdministration.resetForLoggedOut();
 			serverAdministration.resetForLoggedOut();
 		},

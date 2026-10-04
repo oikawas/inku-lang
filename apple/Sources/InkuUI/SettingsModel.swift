@@ -23,7 +23,7 @@ public final class SettingsModel {
             discoveredModelCatalog = []
             modelCatalogProvider = nil
             credentialDraft = ""
-            credentialConfigured = false
+            credentialConfigured = selectedProviderID.flatMap { credentialStates[$0] } ?? false
             status = ""
         }
     }
@@ -34,35 +34,85 @@ public final class SettingsModel {
     public private(set) var isLoadingModels = false
     public private(set) var status = ""
     public private(set) var credentialConfigured = false
+    public private(set) var credentialStates: [String: Bool] = [:]
     public var error: String?
     private var discoveredModelCatalog: [ProviderModelInfo] = []
     private var modelCatalogProvider: ProviderSettings?
-    @ObservationIgnored private let credentials = KeychainCredentialStore()
-    @ObservationIgnored private var discovery: Task<Void, Never>?
-    public init() {}
+    @ObservationIgnored private let credentials: any ProviderCredentialStore
+    @ObservationIgnored private var discovery: Task<[ProviderModelInfo], Error>?
+    @ObservationIgnored private var discoveryID: UUID?
+    @ObservationIgnored private var isSaving = false
+    public init(credentials: any ProviderCredentialStore = KeychainCredentialStore()) { self.credentials = credentials }
 
     public var providerIndex: Int? { host.providers.firstIndex { $0.id == selectedProviderID && $0.kind != .chatGPTPlan } }
     public var selectedProvider: ProviderSettings? { providerIndex.map { host.providers[$0] } }
+    public var orderedProviders: [ProviderSettings] {
+        host.providers.enumerated().filter { $0.element.kind != .chatGPTPlan }.sorted {
+            func priority(_ provider: ProviderSettings) -> Int {
+                switch provider.id { case "ollama-cloud": return 0; case "ollama": return 1; default: return 2 }
+            }
+            let first = priority($0.element), second = priority($1.element)
+            return first == second ? $0.offset < $1.offset : first < second
+        }.map(\.element)
+    }
+
+    public func catalogModels(for provider: ProviderSettings) -> [ProviderModelSettings] {
+        provider.models ?? ModelGuidanceCatalog.bundled?.registeredModelSettings(for: provider) ?? []
+    }
+
+    public func publishedModels(for provider: ProviderSettings, purpose: String? = nil) -> [ProviderModelSettings] {
+        catalogModels(for: provider).filter { entry in
+            entry.isSelectable && provider.enabledModels?[entry.id] != false
+                && (purpose.map { entry.purposes.contains($0) } ?? true)
+        }
+    }
+
+    public func isModelAvailable(_ reference: String) -> Bool {
+        Self.isModelAvailable(reference, settings: host)
+    }
+
+    public nonisolated static func isModelAvailable(_ reference: String, settings: HostSettings) -> Bool {
+        guard let separator = reference.firstIndex(of: ":") else { return false }
+        let providerID = String(reference[..<separator])
+        let modelID = String(reference[reference.index(after: separator)...])
+        guard !modelID.isEmpty, let provider = settings.providers.first(where: { $0.id == providerID }) else { return false }
+        guard provider.enabledModels?[modelID] != false else { return false }
+        let models = provider.models ?? ModelGuidanceCatalog.bundled?.registeredModelSettings(for: provider) ?? []
+        guard let model = models.first(where: { $0.id == modelID }) else { return true }
+        return model.isSelectable && model.purposes.contains("llm")
+    }
 
     public func availableModels(for provider: ProviderSettings, configuredReferences: [String] = [],
                                 discoveredModels: [ProviderModelInfo]? = nil) -> [ProviderModelInfo] {
-        let catalog = ModelGuidanceCatalog.bundled
         let prefix = provider.id + ":"
         let configured = ([host.models.stage1Model, host.models.stage2Model] + configuredReferences)
             .filter { $0.hasPrefix(prefix) && $0.count > prefix.count }
-        let configuredIDs = Set(configured)
+        let savedModels = catalogModels(for: provider)
+        let published = publishedModels(for: provider, purpose: "llm")
+        let publishedIDs = Set(published.map(\.id))
         let discovered = discoveredModels ?? (modelCatalogProvider == provider ? discoveredModelCatalog : [])
         let offered = discovered.filter {
-            $0.id.hasPrefix(prefix) && $0.id.count > prefix.count
-                && (configuredIDs.contains($0.id) || catalog?.guidance(for: $0.id, providers: [provider])?.endOfLife != true)
+            guard $0.id.hasPrefix(prefix), $0.id.count > prefix.count else { return false }
+            let rawID = String($0.id.dropFirst(prefix.count))
+            if provider.models != nil { return publishedIDs.contains(rawID) }
+            return provider.enabledModels?[rawID] != false
+                && (savedModels.first(where: { $0.id == rawID }).map { $0.isSelectable && $0.purposes.contains("llm") } ?? true)
+        }.map { info in
+            let rawID = String(info.id.dropFirst(prefix.count))
+            return ProviderModelInfo(id: info.id, name: savedModels.first(where: { $0.id == rawID })?.label ?? info.name,
+                                     contextLimit: info.contextLimit, capabilities: info.capabilities)
         }
-        let retained = configured.map {
-            ProviderModelInfo(id: $0, name: catalog?.guidance(for: $0, providers: [provider])?.label ?? String($0.dropFirst(prefix.count)),
-                              contextLimit: nil, capabilities: [])
+        let registered = published.map {
+            ProviderModelInfo(id: prefix + $0.id, name: $0.label, contextLimit: nil, capabilities: [])
+        }
+        let retained = configured.map { reference in
+            let rawID = String(reference.dropFirst(prefix.count))
+            return ProviderModelInfo(id: reference, name: savedModels.first(where: { $0.id == rawID })?.label ?? rawID,
+                                     contextLimit: nil, capabilities: [])
         }
         var seen: Set<String> = []
-        // Advertised metadata takes precedence; saved references remain selectable.
-        return (offered + (catalog?.registeredModels(for: provider) ?? []) + retained)
+        // Saved references remain visible even when their use has been disabled.
+        return (offered + registered + retained)
             .filter { seen.insert($0.id).inserted }
     }
 
@@ -89,15 +139,203 @@ public final class SettingsModel {
 
     public func load(model: AppModel) async {
         host = await model.hostSettings()
-        if providerIndex == nil { selectedProviderID = host.providers.first(where: { $0.kind != .chatGPTPlan })?.id }
-        await inspectCredential()
+        if providerIndex == nil { selectedProviderID = orderedProviders.first?.id }
+        await inspectAllCredentials()
+    }
+    public func inspectAllCredentials() async {
+        let providers = orderedProviders
+        var states: [String: Bool] = [:]
+        credentialStates = [:]
+        credentialConfigured = false
+        do {
+            for provider in providers { states[provider.id] = try await credentials.isConfigured(for: provider.credentialID) }
+            guard providers == orderedProviders else { return }
+            credentialStates = states
+            credentialConfigured = selectedProviderID.flatMap { states[$0] } ?? false
+        } catch { self.error = "APIキーの状態を確認できません。" }
     }
     public func inspectCredential() async {
         credentialDraft = ""
         guard let provider = selectedProvider else { credentialConfigured = false; return }
-        do { credentialConfigured = try await credentials.key(for: provider.credentialID)?.isEmpty == false }
+        credentialStates.removeValue(forKey: provider.id)
+        credentialConfigured = false
+        do {
+            let configured = try await credentials.isConfigured(for: provider.credentialID)
+            guard selectedProvider?.id == provider.id, selectedProvider?.credentialID == provider.credentialID else { return }
+            credentialStates[provider.id] = configured
+            credentialConfigured = configured
+        }
         catch { self.error = "APIキーの状態を確認できません。" }
     }
+    public func saveProviderLabel(providerID: String, label: String, model: AppModel) async throws {
+        try await saveProvider(providerID: providerID, model: model) { $0.label = label.trimmingCharacters(in: .whitespacesAndNewlines) }
+        status = "サービス名を保存しました。"
+    }
+
+    public func saveProviderMemo(providerID: String, memo: String, model: AppModel) async throws {
+        try await saveProvider(providerID: providerID, model: model) { $0.memo = memo }
+        status = "メモを保存しました。"
+    }
+
+    public func saveProviderURL(providerID: String, value: String, model: AppModel) async throws {
+        let value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: value), !value.isEmpty else { throw HostError("provider_base_url_invalid") }
+        try await saveProvider(providerID: providerID, model: model) { $0.baseURL = url }
+        status = "接続設定を保存しました。"
+    }
+
+    public func saveProviderRateLimits(providerID: String, limits: ProviderRateLimits, model: AppModel) async throws {
+        try await saveProvider(providerID: providerID, model: model) { $0.rateLimits = limits }
+        status = "レート制限を保存しました。"
+    }
+
+    public func saveProviderModels(providerID: String, models: [ProviderModelSettings], enabled: [String: Bool], model: AppModel) async throws {
+        try await saveProvider(providerID: providerID, model: model) {
+            $0.models = models
+            $0.enabledModels = enabled
+        }
+        status = "使用するモデルを保存しました。"
+    }
+
+    public func addProvider(id: String, label: String, kind: ProviderKind, baseURL: String, apiProfile: String? = nil,
+                            apiKey: String = "", model: AppModel) async throws {
+        let id = id.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !id.isEmpty, id.range(of: "^[a-z0-9_-]+$", options: .regularExpression) != nil, id != "chatgpt"
+        else { throw HostError("provider_id_invalid") }
+        guard kind != .chatGPTPlan else { throw HostError("personal_plan_provider_settings_required") }
+        guard let url = URL(string: baseURL.trimmingCharacters(in: .whitespacesAndNewlines)) else { throw HostError("provider_base_url_invalid") }
+        let key = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let label = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        let provider = ProviderSettings(id: id, kind: kind, baseURL: url, apiProfile: apiProfile,
+                                        requiresAPIKey: !key.isEmpty, label: label.isEmpty ? id : label,
+                                        models: [], enabledModels: [:])
+        try provider.validate()
+        try beginSaving(model: model)
+        defer { isSaving = false }
+        var latest = await model.hostSettings()
+        guard !latest.providers.contains(where: { $0.id == id }) else { throw HostError("duplicate_provider") }
+        latest.providers.append(provider)
+        try latest.providers.forEach { try $0.validate() }
+        // Validate the settings change before writing its optional secret.
+        if !key.isEmpty { try await credentials.setKey(key, for: provider.credentialID) }
+        try await model.updateHostSettings(latest)
+        host = await model.hostSettings()
+        selectedProviderID = id
+        if !key.isEmpty {
+            credentialStates[id] = true
+            credentialConfigured = true
+        } else {
+            credentialStates.removeValue(forKey: id)
+            await inspectCredential()
+        }
+        credentialDraft = ""
+        status = "サービスを追加しました。"
+    }
+
+    public func deleteProvider(providerID: String, model: AppModel) async throws {
+        try await saveSettings(model: model) { settings in
+            _ = try Self.editableProviderIndex(providerID, in: settings)
+            settings.providers.removeAll { $0.id == providerID }
+            if settings.models.stage1Model.hasPrefix(providerID + ":") { settings.models.stage1Model = "" }
+            if settings.models.stage2Model.hasPrefix(providerID + ":") { settings.models.stage2Model = "" }
+        }
+        credentialStates.removeValue(forKey: providerID)
+        if selectedProviderID == providerID { selectedProviderID = orderedProviders.first?.id }
+        status = "サービスを削除しました。"
+    }
+
+    public func saveProviderCredential(providerID: String, key: String, model: AppModel) async throws {
+        let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { throw HostError("provider_credentials_missing") }
+        try beginSaving(model: model)
+        defer { isSaving = false; credentialDraft = "" }
+        var latest = await model.hostSettings()
+        let index = try Self.editableProviderIndex(providerID, in: latest)
+        latest.providers[index].requiresAPIKey = true
+        try latest.providers.forEach { try $0.validate() }
+        try await credentials.setKey(key, for: latest.providers[index].credentialID)
+        try await model.updateHostSettings(latest)
+        host = await model.hostSettings()
+        credentialStates[providerID] = true
+        if selectedProviderID == providerID { credentialConfigured = true }
+        status = "APIキーを保存しました。"
+    }
+
+    public func clearProviderCredential(providerID: String, model: AppModel) async throws {
+        try beginSaving(model: model)
+        defer { isSaving = false; credentialDraft = "" }
+        let latest = await model.hostSettings()
+        let index = try Self.editableProviderIndex(providerID, in: latest)
+        try await credentials.setKey(nil, for: latest.providers[index].credentialID)
+        host = latest
+        credentialStates[providerID] = false
+        if selectedProviderID == providerID { credentialConfigured = false }
+        status = "APIキーを削除しました。"
+    }
+
+    public func saveDrawingDefaults(models: ModelSelection, model: AppModel) async throws {
+        try await saveSettings(model: model) { $0.models = models }
+        status = "通常の描画モデルを保存しました。"
+    }
+
+    @discardableResult
+    public func fetchProviderModels(providerID: String, model: AppModel) async throws -> [ProviderModelSettings] {
+        guard !model.isBusy else { throw HostError("settings_busy_or_unavailable") }
+        let latest = await model.hostSettings()
+        let provider = latest.providers[try Self.editableProviderIndex(providerID, in: latest)]
+        let fetched = try await fetchModelCatalog(for: provider)
+        try Task.checkCancellation()
+        try await saveProvider(providerID: providerID, model: model) { current in
+            guard current.baseURL == provider.baseURL, current.kind == provider.kind,
+                  current.apiProfile == provider.apiProfile, current.credentialID == provider.credentialID
+            else { throw HostError("provider_configuration_changed") }
+            var merged = catalogModels(for: current)
+            var known = Set(merged.map(\.id))
+            let prefix = providerID + ":"
+            for model in fetched where model.id.hasPrefix(prefix) {
+                let id = String(model.id.dropFirst(prefix.count))
+                guard !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, known.insert(id).inserted else { continue }
+                merged.append(.init(id: id, label: model.name))
+            }
+            current.models = merged
+        }
+        guard let current = host.providers.first(where: { $0.id == providerID }) else { throw HostError("provider_missing") }
+        if selectedProviderID == providerID {
+            modelCatalogProvider = current
+            discoveredModelCatalog = fetched
+        }
+        status = "\(fetched.count)個のモデルを取得しました。"
+        return catalogModels(for: current)
+    }
+
+    private func beginSaving(model: AppModel) throws {
+        guard !isSaving, !model.isBusy else { throw HostError("settings_busy_or_unavailable") }
+        isSaving = true
+    }
+
+    private static func editableProviderIndex(_ providerID: String, in settings: HostSettings) throws -> Int {
+        guard let index = settings.providers.firstIndex(where: { $0.id == providerID }) else { throw HostError("provider_missing") }
+        guard settings.providers[index].kind != .chatGPTPlan else { throw HostError("personal_plan_provider_settings_required") }
+        return index
+    }
+
+    private func saveProvider(providerID: String, model: AppModel, update: (inout ProviderSettings) throws -> Void) async throws {
+        try await saveSettings(model: model) { settings in
+            let index = try Self.editableProviderIndex(providerID, in: settings)
+            try update(&settings.providers[index])
+            try settings.providers[index].validate()
+        }
+    }
+
+    private func saveSettings(model: AppModel, update: (inout HostSettings) throws -> Void) async throws {
+        try beginSaving(model: model)
+        defer { isSaving = false }
+        var latest = await model.hostSettings()
+        try update(&latest)
+        try await model.updateHostSettings(latest)
+        host = await model.hostSettings()
+    }
+
     public func addProvider() {
         let id = "service-" + UUID().uuidString.prefix(8).lowercased()
         host.providers.append(ProviderSettings(id: id, baseURL: URL(string: "http://localhost:8080/v1")!, requiresAPIKey: false))
@@ -119,19 +357,12 @@ public final class SettingsModel {
         credentialDraft = ""
     }
     public func save(model: AppModel) async {
-        guard !model.isBusy else { return }
         do {
-            try host.providers.forEach { try $0.validate() }
-            if let provider = selectedProvider, !credentialDraft.isEmpty {
-                try await credentials.setKey(credentialDraft, for: provider.credentialID)
-                credentialDraft = ""
+            let draft = host
+            try await saveSettings(model: model) { latest in
+                latest.providers = draft.providers.filter { $0.kind != .chatGPTPlan } + latest.providers.filter { $0.kind == .chatGPTPlan }
+                latest.models = draft.models
             }
-            var latest = await model.hostSettings()
-            latest.providers = host.providers.filter { $0.kind != .chatGPTPlan } + latest.providers.filter { $0.kind == .chatGPTPlan }
-            latest.models = host.models
-            try await model.updateHostSettings(latest)
-            host = latest
-            await inspectCredential()
             status = "接続設定を保存しました。"
         } catch {
             self.error = (error as? HostError)?.code == "invalid_provider_rate_limits"
@@ -144,75 +375,90 @@ public final class SettingsModel {
         do {
             try await credentials.setKey(nil, for: provider.credentialID)
             credentialDraft = ""
+            credentialStates[provider.id] = false
             credentialConfigured = false
         } catch { self.error = "APIキーを削除できませんでした。" }
     }
 
     public func discoverModels() async {
-        guard !isLoadingModels, let provider = selectedProvider else { return }
-        guard provider.kind != .chatGPTPlan else {
-            error = "Personal ChatGPTのモデルは専用の設定画面で取得してください。"
-            return
-        }
-        discoveredModelCatalog = []
-        modelCatalogProvider = nil
-        isLoadingModels = true
-        error = nil
-        let operation = Task { @MainActor [weak self] in
-            guard let self else { return }
-            do {
-                let url = try Self.modelCatalogURL(for: provider)
-                var request = URLRequest(url: url)
-                request.timeoutInterval = 30
-                let key = provider.requiresAPIKey ? try await self.credentials.key(for: provider.credentialID) : nil
-                if provider.requiresAPIKey && (key == nil || key?.isEmpty == true) { throw HostError("provider_credentials_missing") }
-                if let key, !key.isEmpty {
-                    switch provider.kind {
-                    case .gemini: request.setValue(key, forHTTPHeaderField: "x-goog-api-key")
-                    case .anthropic:
-                        request.setValue(key, forHTTPHeaderField: "x-api-key")
-                        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-                    case .openAICompatible: request.setValue("Bearer " + key, forHTTPHeaderField: "Authorization")
-                    case .chatGPTPlan: throw HostError("personal_plan_model_catalog_requires_runtime")
-                    }
-                }
-                let config = URLSessionConfiguration.ephemeral
-                config.timeoutIntervalForResource = 30
-                let session = URLSession(configuration: config, delegate: ModelCatalogRedirectPolicy(), delegateQueue: nil)
-                defer { session.invalidateAndCancel() }
-                let (bytes, response) = try await session.bytes(for: request)
-                guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { throw HostError("model_catalog_http_failure") }
-                var data = Data()
-                for try await byte in bytes {
-                    try Task.checkCancellation()
-                    guard data.count < 4 * 1024 * 1024 else { throw HostError("model_catalog_too_large") }
-                    data.append(byte)
-                }
-                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
-                let rows = (json["data"] ?? json["models"]) as? [[String: Any]] ?? []
-                let catalog = rows.compactMap { row -> ProviderModelInfo? in
-                    guard let raw = (row["id"] ?? row["name"]) as? String else { return nil }
-                    let slug = raw.hasPrefix("models/") ? String(raw.dropFirst(7)) : raw
-                    return ProviderModelInfo(id: provider.id + ":" + slug,
-                        name: (row["displayName"] ?? row["display_name"]) as? String ?? slug,
-                        contextLimit: row["inputTokenLimit"] as? Int,
-                        capabilities: row["supportedGenerationMethods"] as? [String] ?? [])
-                }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-                guard self.selectedProvider == provider, !Task.isCancelled else { return }
-                self.modelCatalogProvider = provider
-                self.discoveredModelCatalog = catalog
-                self.status = "\(catalog.count)個のモデルを取得しました。"
-            } catch {
-                guard self.selectedProvider == provider, !Task.isCancelled else { return }
-                self.error = "モデル一覧を取得できませんでした: \(error.localizedDescription)"
-            }
-        }
-        discovery = operation
-        await operation.value
-        isLoadingModels = false
-        discovery = nil
+        guard let provider = selectedProvider else { return }
+        do {
+            let models = try await fetchModelCatalog(for: provider)
+            guard selectedProvider == provider else { return }
+            modelCatalogProvider = provider
+            discoveredModelCatalog = models
+            status = "\(models.count)個のモデルを取得しました。"
+        } catch is CancellationError { }
+        catch { self.error = "モデル一覧を取得できませんでした。" }
     }
     public func cancelDiscovery() { discovery?.cancel() }
+
+    private func fetchModelCatalog(for provider: ProviderSettings) async throws -> [ProviderModelInfo] {
+        guard !isLoadingModels else { throw HostError("model_catalog_busy") }
+        guard provider.kind != .chatGPTPlan else { throw HostError("personal_plan_model_catalog_requires_runtime") }
+        let token = UUID()
+        isLoadingModels = true
+        discoveryID = token
+        error = nil
+        let operation = Task { @MainActor in try await self.requestModels(for: provider) }
+        discovery = operation
+        defer {
+            if discoveryID == token { isLoadingModels = false; discovery = nil; discoveryID = nil }
+        }
+        return try await withTaskCancellationHandler {
+            let models = try await operation.value
+            try Task.checkCancellation()
+            guard !operation.isCancelled else { throw CancellationError() }
+            return models
+        } onCancel: {
+            operation.cancel()
+        }
+    }
+
+    private func requestModels(for provider: ProviderSettings) async throws -> [ProviderModelInfo] {
+        try Task.checkCancellation()
+        let url = try Self.modelCatalogURL(for: provider)
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 30
+        let key = provider.requiresAPIKey ? try await credentials.key(for: provider.credentialID) : nil
+        try Task.checkCancellation()
+        if provider.requiresAPIKey && (key == nil || key?.isEmpty == true) { throw HostError("provider_credentials_missing") }
+        if let key, !key.isEmpty {
+            switch provider.kind {
+            case .gemini: request.setValue(key, forHTTPHeaderField: "x-goog-api-key")
+            case .anthropic:
+                request.setValue(key, forHTTPHeaderField: "x-api-key")
+                request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+            case .openAICompatible: request.setValue("Bearer " + key, forHTTPHeaderField: "Authorization")
+            case .chatGPTPlan: throw HostError("personal_plan_model_catalog_requires_runtime")
+            }
+        }
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForResource = 30
+        let session = URLSession(configuration: config, delegate: ModelCatalogRedirectPolicy(), delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+        let (bytes, response) = try await session.bytes(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { throw HostError("model_catalog_http_failure") }
+        var data = Data()
+        for try await byte in bytes {
+            try Task.checkCancellation()
+            guard data.count < 4 * 1024 * 1024 else { throw HostError("model_catalog_too_large") }
+            data.append(byte)
+        }
+        try Task.checkCancellation()
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+        let rows = (json["data"] ?? json["models"]) as? [[String: Any]] ?? []
+        var seen: Set<String> = []
+        return rows.compactMap { row -> ProviderModelInfo? in
+            guard let raw = (row["id"] ?? row["name"]) as? String else { return nil }
+            let slug = raw.hasPrefix("models/") ? String(raw.dropFirst(7)) : raw
+            guard !slug.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, seen.insert(slug).inserted else { return nil }
+            return ProviderModelInfo(id: provider.id + ":" + slug,
+                                     name: (row["displayName"] ?? row["display_name"]) as? String ?? slug,
+                                     contextLimit: row["inputTokenLimit"] as? Int,
+                                     capabilities: row["supportedGenerationMethods"] as? [String] ?? [])
+        }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
 }
 
 private final class ModelCatalogRedirectPolicy: NSObject, URLSessionTaskDelegate, @unchecked Sendable {

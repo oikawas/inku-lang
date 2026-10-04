@@ -46,6 +46,9 @@ public struct ProviderSettings: Codable, Sendable, Equatable, Identifiable {
     public var requiresAPIKey: Bool
     public var credentialID: String
     public var rateLimits: ProviderRateLimits?
+    public var models: [ProviderModelSettings]?
+    public var enabledModels: [String: Bool]?
+    public var memo: String?
     public var displayName: String {
         if let label, !label.isEmpty { return label }
         return id
@@ -55,11 +58,13 @@ public struct ProviderSettings: Codable, Sendable, Equatable, Identifiable {
     }
     public init(id: String, kind: ProviderKind = .openAICompatible, baseURL: URL,
                 apiProfile: String? = nil, requiresAPIKey: Bool = true,
-                credentialID: String? = nil, rateLimits: ProviderRateLimits? = nil, label: String? = nil) {
+                credentialID: String? = nil, rateLimits: ProviderRateLimits? = nil, label: String? = nil,
+                models: [ProviderModelSettings]? = nil, enabledModels: [String: Bool]? = nil, memo: String? = nil) {
         self.id = id; self.kind = kind; self.baseURL = baseURL; self.apiProfile = apiProfile
         self.requiresAPIKey = requiresAPIKey; self.credentialID = credentialID ?? id
         self.rateLimits = rateLimits
         self.label = label
+        self.models = models; self.enabledModels = enabledModels; self.memo = memo
     }
 
     public func validate() throws {
@@ -69,7 +74,8 @@ public struct ProviderSettings: Codable, Sendable, Equatable, Identifiable {
                 throw HostError("chatgpt_provider_settings_invalid")
             }
         }
-        guard !id.isEmpty, !credentialID.isEmpty,
+        guard !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !credentialID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               let parts = URLComponents(url: baseURL, resolvingAgainstBaseURL: false),
               let host = parts.host, !host.isEmpty,
               parts.user == nil, parts.password == nil, parts.query == nil, parts.fragment == nil,
@@ -78,6 +84,14 @@ public struct ProviderSettings: Codable, Sendable, Equatable, Identifiable {
         if let limits = rateLimits {
             guard [limits.requestsPerMinute, limits.tokensPerMinute, limits.requestsPerDay].compactMap({ $0 }).allSatisfy({ (0...1_000_000_000).contains($0) })
             else { throw HostError("invalid_provider_rate_limits") }
+        }
+        if let models {
+            guard Set(models.map(\.id)).count == models.count else { throw HostError("duplicate_provider_model") }
+            try models.forEach { try $0.validate() }
+        }
+        if let enabledModels {
+            guard enabledModels.keys.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+            else { throw HostError("provider_model_settings_invalid") }
         }
     }
     public static var personalPlan: ProviderSettings {
@@ -89,9 +103,22 @@ public protocol CredentialStore: Sendable {
     func key(for credentialID: String) async throws -> String?
 }
 
-public actor KeychainCredentialStore: CredentialStore {
+public protocol ProviderCredentialStore: CredentialStore {
+    func isConfigured(for credentialID: String) async throws -> Bool
+    func setKey(_ key: String?, for credentialID: String) async throws
+}
+
+public actor KeychainCredentialStore: ProviderCredentialStore {
     private let service: String
     public init(service: String = "app.inku.provider-credentials") { self.service = service }
+    public func isConfigured(for credentialID: String) throws -> Bool {
+        var query = baseQuery(credentialID)
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        let status = SecItemCopyMatching(query as CFDictionary, nil)
+        if status == errSecItemNotFound { return false }
+        guard status == errSecSuccess else { throw HostError("credentials_unavailable") }
+        return true
+    }
     public func key(for credentialID: String) throws -> String? {
         var query = baseQuery(credentialID)
         query[kSecReturnData as String] = true

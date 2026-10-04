@@ -143,7 +143,8 @@ public final class AppModel {
     public var canRegenerateDescription: Bool { !isBusy && !sourceLocked && currentExecutionID != nil && !settings.providers.isEmpty && !descriptionText.isEmpty }
     public var canGenerate: Bool {
         database != nil && !isBusy && !isPreview && !(inputMode == "ddl" ? ddlText : descriptionText).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && (inputMode == "ddl" || (hasNextDrawingModel && !(selectedWorkID != nil && sourceLocked)))
+            && (inputMode == "ddl" || (hasNextDrawingModel && SettingsModel.isModelAvailable(nextDrawingModelReference, settings: settings)
+                && !(selectedWorkID != nil && sourceLocked)))
     }
 
     public func initialize() async {
@@ -387,7 +388,7 @@ public final class AppModel {
     public func nextGenerationSettings() async -> HostSettings { nextGenerationHostSettings }
 
     public func selectNextDrawingModel(_ reference: String) {
-        guard !isBusy, settings.providers.contains(where: { reference.hasPrefix($0.id + ":") && reference.count > $0.id.count + 1 }) else { return }
+        guard !isBusy, SettingsModel.isModelAvailable(reference, settings: settings) else { return }
         nextDrawingModelReference = reference
     }
 
@@ -568,6 +569,9 @@ public final class AppModel {
                                       parentWorkID: String? = nil, derivationKind: String = "new") throws -> GenerationRequest {
         guard let bootstrap else { throw HostError("installation_unavailable") }
         let mode = inputMode ?? self.inputMode
+        if mode == "description", !SettingsModel.isModelAvailable(nextDrawingModelReference, settings: settings) {
+            throw HostError("drawing_model_not_available")
+        }
         if parentWorkID != nil && mode == "description" && (selectedContext?.authority == "ddl_authoritative" || sourceLocked) { throw HostError("description_source_locked") }
         let sketch: SketchRequest = sketchMode == "on" ? .on : sketchMode == "supplied" ? .supplied(sketchText) : .off
         let savedConfig = parentWorkID == selectedWorkID && parentWorkID != nil ? selectedContext?.configuration : nil

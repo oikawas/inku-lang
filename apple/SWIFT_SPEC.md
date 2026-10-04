@@ -14,6 +14,18 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-04 Web-aligned model settings UI
+
+Model settings use service cards followed by the selected name and ID, enabled-model count, LLM/Vision chips, model selection, folded rate limits and connection settings, and service addition. Ollama Cloud and Ollama appear first. This is a single-user local client, so Web publication is labeled as models in use. Rename, memo, and addition use separate sheets; deletion confirms a captured service ID. URLs, rate limits, API keys, and drawing defaults each save independently without committing other drafts.
+
+The model sheet provides search, usage and LLM/Vision filters, bulk changes to visible models, purpose and recommendation/speed/Japanese/English comment editing, cancel, and save. Search and cancellation do not change settings, and a sheet closes only after successful saving. Model catalogs, usage flags, and service memos use backward-compatible optional fields in `providers.json`. A saved catalog is authoritative for its connection; unsaved standard connections use the bundled catalog for the same ID and kind. Explicit model-list fetching merges and saves new candidates at that time while retaining existing metadata and usage flags. Fetching is disabled while edits are unsaved.
+
+Disabled, non-LLM, end-of-life, and subscription-only registered models are excluded from new drawing choices. Saved references and work records remain intact, but description drawing cannot start after disabling its model until an enabled LLM model is selected. Unknown manually entered model IDs remain custom references for configured connections without guessed suitability. Direct DDL drawing does not depend on these usage flags.
+
+API-key presence is checked without retrieving secret values. Configured keys are hidden; replacement requires confirmed removal followed by saving a new key. Ordinary connection/model/name/memo/rate saves do not read or write Keychain. Service deletion also retains its Keychain item and clears only that service's default drawing references. Keys and settings JSON are separate resources: if settings saving fails after a key write, the Keychain item may remain. Recheck its status and complete the same operation. Startup does not automatically fetch models, run inference, or initiate OAuth.
+
+Use `InkuAppCheck --model-settings-ui-only` for the bounded check. Temporary settings/SQLite and mocks that handle no secret values check scoped saves, rejected invalid URLs, legacy loading, discarded drafts, persisted purposes/evaluation/usage, drawing eligibility, and keyless addition/deletion. Real API keys, model fetching, inference, and native visual acceptance remain separate. Shared Rust and the work database schema are unchanged.
+
 ## 2026-10-04 Server-aligned default providers
 
 The same checkout's public Server definitions supply six bundled connections: OpenAI API Platform, Claude API, Gemini API, NVIDIA NIM, Ollama, and Ollama Cloud. Display names, connection kinds, default URLs, and API-key requirements are generated from Server source without reading environment variables, installation settings, or credentials. Personal ChatGPT remains an explicit opt-in through its dedicated settings.

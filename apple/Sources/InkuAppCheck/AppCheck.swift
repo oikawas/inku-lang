@@ -8,6 +8,9 @@ import InkuHost
 struct AppCheck {
     @MainActor
     static func main() async throws {
+        if CommandLine.arguments.contains("--model-settings-ui-only") {
+            try await runModelSettingsUIChecks(); return
+        }
         if CommandLine.arguments.contains("--provider-defaults-only") {
             try await runProviderDefaultsChecks(); return
         }

@@ -31,8 +31,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     @State private var settings = SettingsModel()
     @Binding var section: SettingsSection
     @State private var confirmRestore = false
-    @State private var confirmClearKey = false
-    @State private var rateHelp: String?
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -40,23 +38,29 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 Label(model.display.localized(item.title), systemImage: item.symbol).tag(item)
             }.listStyle(.sidebar).frame(width: 190)
             Divider()
-            Form {
-                switch section {
-                case .display: appearance
-                case .making: making
-                case .models: providers
-                case .personalPlan: ChatGPTPlanSettingsView(model: model)
-                case .database: database
-                case .export: ExportSettingsView(model: model)
-                case .clipboard: clipboard
-                case .plugins:
-                    PluginSettingsView(model: model)
-                    Section(model.display.localized("歳時記")) { SaijikiView(model: model).frame(minHeight: 480) }
-                case .unread: Section { UnreadWordsView(model: model) }
-                case .limits: OperationalLimitsView(model: model)
-                case .about: about
+            Group {
+                if section == .models {
+                    ModelSettingsView(model: model, settings: settings)
+                } else {
+                    Form {
+                        switch section {
+                        case .display: appearance
+                        case .making: making
+                        case .models: EmptyView()
+                        case .personalPlan: ChatGPTPlanSettingsView(model: model)
+                        case .database: database
+                        case .export: ExportSettingsView(model: model)
+                        case .clipboard: clipboard
+                        case .plugins:
+                            PluginSettingsView(model: model)
+                            Section(model.display.localized("歳時記")) { SaijikiView(model: model).frame(minHeight: 480) }
+                        case .unread: Section { UnreadWordsView(model: model) }
+                        case .limits: OperationalLimitsView(model: model)
+                        case .about: about
+                        }
+                    }.formStyle(.grouped)
                 }
-            }.formStyle(.grouped).frame(maxWidth: .infinity, maxHeight: .infinity)
+            }.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .task(id: section) { await settings.load(model: model) }
         .onDisappear { settings.cancelDiscovery() }
@@ -73,10 +77,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             #endif
             Button(model.display.localized("キャンセル"), role: .cancel) {}
         } message: { Text(model.display.localized("現在のデータを残す場合は、先にバックアップを保存してください。")) }
-        .confirmationDialog(model.display.localized("この接続のAPIキーを削除します"), isPresented: $confirmClearKey, titleVisibility: .visible) {
-            Button(model.display.localized("APIキーを削除"), role: .destructive) { Task { await settings.clearCredential() } }
-            Button(model.display.localized("キャンセル"), role: .cancel) {}
-        }
     }
 
     private var appearance: some View {
@@ -142,73 +142,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             }
         }
     }
-    private var providers: some View {
-        @Bindable var state = settings
-        let availableModels = state.selectedProvider.map { state.availableModels(for: $0) } ?? []
-        return Group {
-            Section(model.display.localized("AIサービス接続")) {
-                Picker(model.display.localized("サービス"), selection: $state.selectedProviderID) {
-                    Text(model.display.localized("選択してください")).tag(String?.none)
-                    ForEach(state.host.providers.filter { $0.kind != .chatGPTPlan }) { provider in Text(provider.displayName).tag(Optional(provider.id)) }
-                }.onChange(of: state.selectedProviderID) { _, _ in Task { await state.inspectCredential() } }
-                HStack {
-                    Button(model.display.localized("サービス追加")) { state.addProvider() }
-                    Button(model.display.localized("削除"), role: .destructive) { state.removeProvider() }.disabled(state.selectedProvider == nil)
-                }
-                if let index = state.providerIndex {
-                    Text(model.display.localizedFormat("サービスID: %@", state.host.providers[index].id)).font(.caption).foregroundStyle(.secondary)
-                    Picker(model.display.localized("接続方式"), selection: $state.host.providers[index].kind) {
-                        Text(model.display.localized("OpenAI互換 / Ollama / MLX")).tag(ProviderKind.openAICompatible)
-                        Text("Claude API").tag(ProviderKind.anthropic); Text("Gemini API").tag(ProviderKind.gemini)
-                    }
-                    TextField(model.display.localized("接続先URL"), text: Binding(get: { state.host.providers[index].baseURL.absoluteString }, set: { if let url = URL(string: $0) { state.host.providers[index].baseURL = url } }))
-                        .autocorrectionDisabled()
-                    if state.host.providers[index].kind == .openAICompatible {
-                        Toggle("MLX JSON schema profile", isOn: Binding(get: { state.host.providers[index].apiProfile == "mlx" }, set: { state.host.providers[index].apiProfile = $0 ? "mlx" : nil }))
-                    }
-                    Toggle(model.display.localized("APIキーを使用"), isOn: $state.host.providers[index].requiresAPIKey)
-                    SecureField(model.display.localized(state.credentialConfigured ? "APIキーを更新（設定済み）" : "APIキー"), text: $state.credentialDraft)
-                    if state.credentialConfigured { Button(model.display.localized("APIキーを削除…"), role: .destructive) { confirmClearKey = true } }
-                    DisclosureGroup(model.display.localized("レート制限")) {
-                        limitField("毎分の要求数（RPM）", help: "このアプリが同じ接続先へ送る要求数です。写生文・解釈・辞書選択・構図・補完・再試行を含みます。0は上限なしです。", index: index, key: \.requestsPerMinute)
-                        limitField("毎分の入力トークン数（TPM）", help: "指示・記述・応答の型を含む入力の上限です。Geminiは送る前に計測し、ほかの接続先は安全側に見積もります。0は上限なしです。", index: index, key: \.tokensPerMinute)
-                        limitField("日次の要求数（RPD）", help: "再試行を含む1日当たりの要求数です。Geminiは太平洋時間、ほかの接続先はUTCの0時にリセットします。0は上限なしです。", index: index, key: \.requestsPerDay)
-                        Text(model.display.localized("0は上限なし。毎分の枠を待ち、日次上限では生成を開始しません。"))
-                            .font(.caption).foregroundStyle(.secondary)
-                        Text(model.display.localized("未設定の標準Gemini接続は30／16,000／14,400、ほかの接続先は0が初期値です。契約の利用枠に合わせて設定してください。"))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-            }
-            Section(model.display.localized("描画モデル")) {
-                TextField(model.display.localized("サービスID:モデルID"), text: $state.host.models.stage1Model).autocorrectionDisabled()
-                Button(model.display.localized(state.isLoadingModels ? "取得中…" : "接続先からモデル一覧を取得")) { Task { await state.discoverModels() } }
-                    .disabled(state.selectedProvider == nil || state.isLoadingModels)
-                if !availableModels.isEmpty {
-                    Picker(model.display.localized("モデル"), selection: $state.host.models.stage1Model) {
-                        Text(model.display.localized("選択してください")).tag("")
-                        if !state.host.models.stage1Model.isEmpty, !availableModels.contains(where: { $0.id == state.host.models.stage1Model }) {
-                            Text(state.host.models.stage1Model).tag(state.host.models.stage1Model)
-                        }
-                        ForEach(availableModels) { item in Text(item.name).tag(item.id) }
-                    }
-                }
-                if !state.host.models.stage1Model.isEmpty {
-                    ModelGuidanceView(reference: state.host.models.stage1Model, providers: state.host.providers,
-                                      discovered: state.modelCatalog.first { $0.id == state.host.models.stage1Model }, display: model.display)
-                }
-                Stepper(model.display.localizedFormat("解釈の出力上限: %ld", state.host.models.stage1MaxTokens), value: $state.host.models.stage1MaxTokens, in: 256...65536, step: 256)
-                Stepper(model.display.localizedFormat("補完の出力上限: %ld", state.host.models.holeMaxTokens), value: $state.host.models.holeMaxTokens, in: 256...65536, step: 256)
-                Text(model.display.localized("解釈と構造化に同じモデルを使います。接続設定の保存では生成を開始しません。"))
-                    .font(.callout).foregroundStyle(.secondary)
-                Button(model.display.localized("接続設定を保存")) {
-                    state.host.models.stage2Model = state.host.models.stage1Model
-                    Task { await state.save(model: model) }
-                }.disabled(model.isBusy)
-                if !state.status.isEmpty { Text(model.display.message(state.status)).foregroundStyle(.secondary) }
-            }
-        }
-    }
     private var database: some View {
         @Bindable var display = model.display
         return Group {
@@ -249,39 +182,5 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             if enabled && next.count < maximum { next.insert(item) } else if !enabled { next.remove(item) }
             selection.wrappedValue = next
         })
-    }
-    private func limitField(_ title: String, help: String, index: Int,
-                            key: WritableKeyPath<ProviderRateLimits, Int?>) -> some View {
-        let providerID = settings.host.providers[index].id
-        return HStack {
-            HStack(spacing: 6) {
-                Text(model.display.localized(title))
-                Button { rateHelp = title } label: { Image(systemName: "info.circle") }
-                    .buttonStyle(.plain).foregroundStyle(.secondary)
-                    .accessibilityLabel(model.display.localizedFormat("%@の説明", model.display.localized(title)))
-                    .help(model.display.preferences.showTooltips ? model.display.localized(help) : "")
-                    .popover(isPresented: Binding(get: { rateHelp == title }, set: { if !$0 { rateHelp = nil } })) {
-                        Text(model.display.localized(help)).font(.callout).padding()
-                            .frame(maxWidth: 320).fixedSize(horizontal: false, vertical: true)
-                    }
-            }
-            Spacer(minLength: 16)
-            TextField(model.display.localized(title), value: Binding(get: {
-                guard settings.host.providers.indices.contains(index),
-                      settings.host.providers[index].id == providerID else { return 0 }
-                let provider = settings.host.providers[index]
-                return (provider.rateLimits ?? ProviderRateLimits.defaults(providerID: provider.id))[keyPath: key] ?? 0
-            }, set: { value in
-                guard settings.host.providers.indices.contains(index),
-                      settings.host.providers[index].id == providerID else { return }
-                let provider = settings.host.providers[index]
-                var limits = provider.rateLimits ?? ProviderRateLimits.defaults(providerID: provider.id)
-                limits[keyPath: key] = value
-                settings.host.providers[index].rateLimits = limits
-            }), format: .number)
-            .labelsHidden().multilineTextAlignment(.trailing).frame(maxWidth: 180)
-            .accessibilityLabel(model.display.localized(title))
-            .accessibilityHint(model.display.localized(help))
-        }
     }
 }

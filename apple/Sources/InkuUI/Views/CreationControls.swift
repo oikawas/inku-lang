@@ -50,7 +50,9 @@ struct CreationModelPicker: View {
                     set: { model.selectNextDrawingModel($0) }
                 )) {
                     Text(model.display.localized("選択してください")).tag("")
-                    ForEach(models) { item in Text(item.name).tag(item.id) }
+                    ForEach(models) { item in
+                        Text(item.name).tag(item.id).disabled(!settings.isModelAvailable(item.id))
+                    }
                 }
                 .disabled(model.isBusy || loading || models.isEmpty)
                 .help(tip("解釈と構造化に使うモデルを選びます。"))

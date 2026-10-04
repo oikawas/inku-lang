@@ -14,6 +14,18 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-04 モデル設定UIのWebへの追随
+
+モデル設定はサービスcardから接続を選び、名前とID、使用モデル数、LLM／Vision別のmodel chips、モデル選択、折りたたみのレート制限と接続設定、サービス追加の順に表示する。Ollama CloudとOllamaを優先して並べる。単一利用者の端末設定なので、Webの公開設定は「使用するモデル」と表示する。名前変更・メモ・追加は独立sheet、削除は対象IDを保持した確認操作とする。URL、レート制限、APIキー、描画の既定値はそれぞれ個別に保存し、他の未保存draftを含めない。
+
+モデル選択sheetは検索、使用／不使用・LLM／Visionの絞り込み、表示中の一括使用／解除、用途と評価・速度・日英commentの編集、取消・保存を持つ。検索と取消は設定を変更せず、保存成功時だけ閉じる。モデル一覧と使用設定・サービスメモは`providers.json`の後方互換optional fieldへ保存する。保存済みcatalogをその接続の正本とし、未保存の標準接続は同じIDと方式の同梱catalogを使用する。明示したモデルリスト取得は新しい候補をその時点で併合・保存し、既存metadataと使用設定を保持する。未保存の編集がある間は取得を抑止する。
+
+非使用、LLM用途を持たない、提供終了、契約専用の登録モデルを新しい描画候補から除く。保存済みモデル参照と作品の記録は保持するが、そのモデルを非使用にした後の記述描画は別の使用中LLMモデルを選ぶまで開始しない。未登録の手入力model IDは登録済み接続のcustom参照として保持し、適性を推測しない。直接DDLの描画はこの使用設定に依存しない。
+
+APIキーの存在は秘密値を取得せず照会する。設定済みキーを表示・再入力せず、変更は明示した削除確認後に新しいキーを保存する。接続・model・名前・メモ・rateの通常保存はKeychainを読み書きしない。サービス削除もKeychain項目を削除せず、そのサービスの描画既定参照だけを解除する。APIキーと設定JSONは別資源なので、キー書込後に設定保存が失敗した場合はKeychain項目だけ残りうる。状態を再確認して同じ操作を完了する。取得・推論・OAuthを起動時に自動実行しない。
+
+限定確認は`InkuAppCheck --model-settings-ui-only`を使用する。一時設定／SQLiteと秘密値を扱わないmockで個別保存、invalid URLの拒否、旧設定の読込、draftの破棄、用途・評価・使用設定の再読込、描画候補の制御、keyなし追加・削除を確認する。実APIキー・モデル取得・推論とnative画面の目視受入は別に行う。共有Rustと作品DB schemaは変更しない。
+
 ## 2026-10-04 Server準拠の標準providerセット
 
 同じcheckoutのServerの公開provider定義から、OpenAI API Platform、Claude API、Gemini API、NVIDIA NIM、Ollama、Ollama Cloudの6接続を同梱する。表示名、接続方式、default URLとAPIキー要否はServer sourceから生成し、環境変数やServerの実設定・credentialは取り込まない。Personal ChatGPTは専用設定で明示して有効にする。

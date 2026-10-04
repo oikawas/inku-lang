@@ -1,8 +1,7 @@
 import Foundation
 import InkuHost
 
-/// Versioned Server evaluations, independent of discovered service capabilities
-/// and the user's editable connection or model defaults.
+/// Versioned Server evaluations provide defaults until a service saves its own catalog.
 public struct ModelGuidanceCatalog: Decodable, Sendable {
     public let schema: String
     public let version: String
@@ -23,10 +22,17 @@ public struct ModelGuidanceCatalog: Decodable, Sendable {
     }
 
     public func registeredModels(for connection: ProviderSettings) -> [ProviderModelInfo] {
-        guard let provider = providers.first(where: { $0.id == connection.id && $0.kind == connection.kind.rawValue }) else { return [] }
-        return provider.models.filter { $0.eol != true }.map {
+        registeredModelSettings(for: connection).filter {
+            $0.isSelectable && $0.purposes.contains("llm") && connection.enabledModels?[$0.id] != false
+        }.map {
             ProviderModelInfo(id: connection.id + ":" + $0.id, name: $0.label, contextLimit: nil, capabilities: [])
         }
+    }
+
+    public func registeredModelSettings(for connection: ProviderSettings) -> [ProviderModelSettings] {
+        if let models = connection.models { return models }
+        guard let provider = providers.first(where: { $0.id == connection.id && $0.kind == connection.kind.rawValue }) else { return [] }
+        return provider.models.map(\.settings)
     }
 
     public func guidance(for reference: String, providers configured: [ProviderSettings]) -> ModelGuidance? {
@@ -35,16 +41,16 @@ public struct ModelGuidanceCatalog: Decodable, Sendable {
         let modelID = String(reference[reference.index(after: separator)...])
         guard !modelID.isEmpty,
               let connection = configured.first(where: { $0.id == providerID }),
-              let provider = providers.first(where: { $0.id == providerID && $0.kind == connection.kind.rawValue }),
-              let model = provider.models.first(where: { $0.id == modelID }) else { return nil }
+              let model = registeredModelSettings(for: connection).first(where: { $0.id == modelID }) else { return nil }
+        let speedHidden = providers.first(where: { $0.id == providerID && $0.kind == connection.kind.rawValue })?.speedHidden ?? false
         return ModelGuidance(providerID: providerID, modelID: modelID, label: model.label,
-                             purposes: model.purposes ?? ["llm"],
+                             purposes: model.purposes,
                              stage1: model.recommendationStage1, stage2: model.recommendationStage2,
                              llm: model.recommendationLLM ?? model.recommendationLevel,
                              vision: model.recommendationVision ?? model.recommendationLevel,
-                             speedLabel: provider.speedHidden ? nil : model.speedLabel,
-                             speedClass: provider.speedHidden ? nil : model.speedClass,
-                             speedHidden: provider.speedHidden,
+                             speedLabel: speedHidden ? nil : model.speedLabel,
+                             speedClass: speedHidden ? nil : model.speedClass,
+                             speedHidden: speedHidden,
                              japaneseComment: model.commentJA, englishComment: model.commentEN,
                              endOfLife: model.eol ?? false, endOfLifeDate: model.eolDate,
                              requiresSubscription: model.requiresSubscription ?? false)
@@ -138,6 +144,14 @@ private struct GuidanceModel: Decodable, Sendable {
     let eol: Bool?
     let eolDate: String?
     let requiresSubscription: Bool?
+    var settings: ProviderModelSettings {
+        .init(id: id, label: label, purposes: purposes ?? ["llm"],
+              recommendationLevel: recommendationLevel, recommendationLLM: recommendationLLM,
+              recommendationVision: recommendationVision, recommendationStage1: recommendationStage1,
+              recommendationStage2: recommendationStage2, speedClass: speedClass, speedLabel: speedLabel,
+              commentJA: commentJA, commentEN: commentEN, eol: eol, eolDate: eolDate,
+              requiresSubscription: requiresSubscription)
+    }
     enum CodingKeys: String, CodingKey {
         case id, label, purposes, eol
         case recommendationLLM = "recommendation_llm", recommendationVision = "recommendation_vision"

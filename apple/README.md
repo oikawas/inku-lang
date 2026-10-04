@@ -71,6 +71,8 @@ The database is not copied or moved. Its path is retained in the `InkuDatabasePa
 
 ## Normal use and an isolated trial
 
+In Batch, enter one description or DDL work per line and choose the model, color catalog, sketch, Wild, and canvas in Drawing conditions for the next batch before painting. Blank lines still count toward original line numbers, and long lines scroll horizontally on macOS. Explicit history restore replaces only the editor input. Review the pending count and starting conditions before resuming an interrupted batch; completed works are skipped. The running row and the displayed successful work have separate line numbers. Review history before choosing retry or skip for an ambiguous outcome.
+
 The initial input is direct English DDL, so generation can be tried without a model connection. For description input, save a provider type, base URL, model, and any required API key in Settings, then select description mode in the creation screen. Multiple API services can be registered; Stage1/Stage2 share the drawing model. Model discovery uses an explicit button. Saving a connection does not send an LLM request.
 
 Choose the next service/model in the creation screen's next drawing conditions. This does not change saved Settings defaults or running batch/demo requests. Compact conditions and a details popover are separate from This work's provenance, and Paint/Stop remain outside the input scroll area. Edit opens an independent DDL draft; Cancel leaves the shown work unchanged. Command-N creates a new work, Command-O imports DDL, Command-comma opens Settings, Command-1 through 4 navigate screens, and Shift-Command-E opens export. Library checkboxes are distinct from the displayed work; creation exports its displayed saved work.

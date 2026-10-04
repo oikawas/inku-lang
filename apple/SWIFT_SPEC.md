@@ -14,6 +14,18 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-04 Batch UI parity with Web
+
+Batch exposes the next drawing model, color catalog, sketch, Wild, and canvas. It shares the upcoming conditions and existing choosers with Paint, including explicit apply/cancel and model discovery. On macOS the input/conditions column sits beside the work canvas, with a vertical layout at narrow widths. Full row results are a disclosure, keeping a long result list from pushing the drawing actions down.
+
+The macOS native editor shows original physical line numbers, including blank lines. Long input scrolls horizontally without soft wrapping; text and line numbers scroll vertically together. CRLF counts as one break. CR, LF, NEL, and Unicode line/paragraph separators normalize to the same physical lines for execution. The existing maximum of 1,000 nonblank works and original line numbers remains.
+
+Local batch description history is atomically stored in `batch-prompt-history.json`. It keeps the latest 50 distinct entries, excluding empty input and text longer than 20,000 UTF-16 code units. History trims surrounding whitespace and normalizes line breaks. Explicit restore changes only the editor, leaving works and the resume journal intact. New journals add optional original-input and starting-condition fields, preserving blank lines while retaining older-journal compatibility.
+
+While running, a compact card identifies the current original line. The last successful work's line number, SVG, DDL, and sketch use a separate observed snapshot and never take the next row's identity. Provider progress uses existing actual elapsed time and usage; missing usage is not inferred as zero. Resume shows the next original line, pending count, and starting model/catalog/canvas conditions. It skips successful rows and reuses frozen requests, while failed counts and original lines retain their reasons. Ambiguous outcomes still require history review and an explicit retry/skip decision, never automatic resend. Preparation also disables screen navigation and other work actions.
+
+The focused `InkuAppCheck --batch-ui-only` check uses just two inputs with temporary SQLite and an offline provider mock: original rows 2/4, frozen model/catalog/canvas, separate active/observed rows, reopened history and editor-only restore, and failed-only resume from an older journal. Native gutter alignment, IME, two-axis scrolling, layout, and actual provider acceptance remain separate. Shared Rust, the work database schema, and Demo generation behavior do not change.
+
 ## 2026-10-04 Align creation, library, and lineage with the Web UI
 
 Ordinary creation groups description/DDL, compact summaries of the next model, catalog, Sketch from life, Wild, and canvas, and a fixed Paint action. Language and seeds move to a details popover; saved instructions, conditions, and measurements move to This work's provenance. A short read-only DDL display opens a separate editor. Cancel preserves the creation input, shown SVG, revision, and history. Only confirmation uses existing authority/revision validation to paint a child work.

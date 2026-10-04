@@ -106,7 +106,7 @@ public struct ContentView: View {
         }
         #if os(macOS)
         .ddlImportDropTarget(model: model,
-                             enabled: !model.isBusy && !automation.running && dialog == nil && !presentation,
+                             enabled: !model.isBusy && !automation.isOccupied && dialog == nil && !presentation,
                              onImported: { section = .create })
         .environment(importer)
         .onDisappear { importer.cancel() }
@@ -125,7 +125,7 @@ public struct ContentView: View {
                 await maintenance.log(work: work, enabled: model.display.preferences.saveResultLog)
             }
             while !Task.isCancelled {
-                await maintenance.checkBackup(app: model, automationRunning: automation.running || dialog != nil)
+                await maintenance.checkBackup(app: model, automationRunning: automation.isOccupied || dialog != nil)
                 do { try await Task.sleep(for: .seconds(60)) } catch { return }
             }
         }
@@ -149,11 +149,11 @@ public struct ContentView: View {
 
     @ViewBuilder private var detail: some View {
         switch section ?? .create {
-        case .create: CreationView(model: model, history: history, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay).disabled(automation.running || importing)
-        case .library: LibraryView(model: model, preview: libraryPreview, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay).disabled(automation.running || importing)
-        case .lineage: LineageView(model: model, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay).disabled(automation.running || importing)
+        case .create: CreationView(model: model, history: history, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay).disabled(automation.isOccupied || importing)
+        case .library: LibraryView(model: model, preview: libraryPreview, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay).disabled(automation.isOccupied || importing)
+        case .lineage: LineageView(model: model, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay).disabled(automation.isOccupied || importing)
         case .automation: AutomationView(model: model, automation: automation).disabled(importing)
-        case .settings: SettingsView(model: model, section: $settingsSection).disabled(automation.running || importing)
+        case .settings: SettingsView(model: model, section: $settingsSection).disabled(automation.isOccupied || importing)
         }
     }
 
@@ -164,8 +164,8 @@ public struct ContentView: View {
         false
         #endif
     }
-    private var canNavigateSections: Bool { !automation.running && !importing && dialog == nil && !presentation }
-    private var canUseWork: Bool { !model.isBusy && !automation.running && !importing && dialog == nil && !presentation }
+    private var canNavigateSections: Bool { !automation.isOccupied && !importing && dialog == nil && !presentation }
+    private var canUseWork: Bool { !model.isBusy && !automation.isOccupied && !importing && dialog == nil && !presentation }
     private var hasSavedWork: Bool { !model.isPreview && model.selectedWork?.trashed == false }
     private var canCopyImage: Bool { canUseWork && !model.currentSVG.isEmpty && [.create, .lineage].contains(section ?? .create) }
     private var canExport: Bool {

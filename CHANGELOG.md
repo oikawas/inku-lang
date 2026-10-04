@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-04 — Align Swift Batch UI with Web
+
+Batch now offers drawing-model, color-catalog, sketch, Wild, and canvas selection, with a numbered native input column beside the work canvas on macOS. It adds explicit input-history restore, separate current and last-successful line identities, starting-condition resume details, and failed-line reasons. CRLF preserves original line numbers; history restore affects only the editor. Frozen resume conditions, completed works, and explicit ambiguous-outcome choices remain intact. The [Swift specification](apple/SWIFT_SPEC.md) and [usage guide](apple/README.md) are synchronized with Japanese.
+
 ### 2026-10-04 — Align Swift creation, library, lineage, and supporting UI with Web
 
 Creation now separates compact conditions from details and provides read-only DDL, a separate editor, and cancellation. The library preserves creation inputs through independent preview, aligned list columns, role-specific models, and comment drafts. Lineage adds parent-child lines, favorite paths, dashed deleted nodes, focus-preserving branch expansion, and a map that restores normal browsing.

@@ -217,7 +217,6 @@ import app.inku.mobile.data.lineage.LineageGraphResult
 import app.inku.mobile.data.refinement.ComparisonPlanner
 import app.inku.mobile.data.refinement.RefinementElement
 import app.inku.mobile.data.refinement.RefinementPlanner
-import app.inku.mobile.data.refinement.VariationAmplitude
 import app.inku.mobile.data.model.CatalogSelection
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.DerivationKindRegistry
@@ -3730,8 +3729,7 @@ internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
  * lineage card (S.refinementElements). The comparison sub-views beside it there belong to
  * other contracts.
  *
- * The radio is the whole of the exclusivity the SPEC asks for: one element at a
- * time, with the amplitude appearing under the variation choice and nowhere else.
+ * The radio selects one of the four active elements at a time.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -3937,7 +3935,7 @@ private fun RefinementProgressLanes(
     }
 }
 
-/** 調整: the five elements, the amplitude under the variation, the touch words. */
+/** 調整: the four elements and the touch words. */
 @Composable
 private fun RefinementAdjustControls(
     state: InkuUiState,
@@ -3952,25 +3950,6 @@ private fun RefinementAdjustControls(
                 onClick = { viewModel.setRefinementElement(element) },
             )
         }
-    }
-
-    // 「変奏を選択したときだけ強度をラジオ直下に表示」. No section of its own.
-    if (state.refinementElement == RefinementElement.Variation) {
-        WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
-            VariationAmplitude.entries.forEach { amplitude ->
-                ChipButton(
-                    text = LocalStrings.current.variationAmplitudeLabel(amplitude.id),
-                    selected = state.refinementAmplitude == amplitude,
-                    onClick = { viewModel.setRefinementAmplitude(amplitude) },
-                )
-            }
-        }
-        // The author's ruling: keep the choice, and say that it moves nothing.
-        Text(
-            LocalStrings.current.refinementVariationNotice,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 
     if (state.refinementElement == RefinementElement.Touch) {
@@ -6101,10 +6080,14 @@ internal fun generationInfoSections(item: HistoryItemEntity): List<GenerationInf
         ),
         GenerationInfoSection(
             GenerationInfoSectionId.Performance,
-            listOf(
+            listOfNotNull(
                 GenerationInfoRow(GenerationInfoField.Stage2Model, value(item.stage2Model)),
-                GenerationInfoRow(GenerationInfoField.VariationAmplitude, value(item.variationAmplitude)),
-                GenerationInfoRow(GenerationInfoField.VariationSeed, value(item.variationSeed)),
+                item.variationAmplitude?.takeIf { it.isNotBlank() }?.let {
+                    GenerationInfoRow(GenerationInfoField.VariationAmplitude, value(it))
+                },
+                item.variationSeed?.takeIf { it.isNotBlank() }?.let {
+                    GenerationInfoRow(GenerationInfoField.VariationSeed, value(it))
+                },
                 GenerationInfoRow(GenerationInfoField.CompositionSeed, value(item.compositionSeed)),
                 GenerationInfoRow(GenerationInfoField.RenderSeed, columnOrMetadata(item.renderSeed, "render_seed")),
                 GenerationInfoRow(GenerationInfoField.SeedText, value(item.seedText)),

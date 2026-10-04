@@ -30,6 +30,14 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
 
+## 2026-10-04 変奏の廃止
+
+推敲はタッチ・配置・読み取り・色カタログの4要素とする。変奏の選択、注記、強度とseedの採番・入力を外し、新しい描画の要求・結果・保存へ変奏値を渡さない。組み立ての設定へ `stage15_variation` を送らず、`variation_pair_required` の確認も行わない。保存済み設定から新しい作品を作る場合は、設定のコピーから旧欄を除く。元の保存済み設定は書き換えない。
+
+Room schema 14の `variation_amplitude`・`variation_seed` の列と既存値、過去のschemaと移行は保持し、この廃止のためのDB移行を行わない。新しい作品の旧列はNULLとする。保存済みの系譜の `variation` は「変奏（旧）／Variation (retired)」として読めるままにし、新規保存ではこの種別の辺を作らない。旧作品の生成情報は、記録済みの強度とseedだけを同じ旧札で表示する。値がない作品にはその行を出さない。
+
+DDLの正本と記述からの新規作成を説明する画面文言は「作品／work」とする。作品の版を識別する `pipeline_variation_id` やauthority、Scoreの線の揺れを表すvariationは変更しない。以前の推敲要素の設定が `variation` なら、タッチへ戻して表示する。旧設定の値や保存作品を削除しない。2026-09-27の、動かない変奏の選択と注記を残す判断は、この廃止に置き換わる。
+
 ## 2026-10-04 ChatGPTプランの本人接続
 
 Androidは端末で本人が使うsingle-user hostとして、Serverを介さずChatGPTプランへ直接接続する。設定の独立した「ChatGPTプラン」から「ChatGPTで続ける」を押し、端末のChromeで本人認証を行う。Macの移送アプリやAPIキーは使わない。接続が完了したらinkuへ戻り、初回の利用枠の案内を確認して「モデル設定を開く」へ進む。
@@ -329,7 +337,7 @@ Rust authoring pipelineとraster presentationを導入済みである。以下�
   - 設定の表示項目で文字サイズを100%、115%、130%、150%から選ぶ。選択はRoomへ保存し、端末の文字倍率に加えてCompose文字を拡大する
 - saved-work result はcanvas全画面表示、JSON / Prompt表示、作品情報sheet、系譜への移動を保持する。従来のcanvas下thumbnail stripは表示しない。
 - 作品画面の選択 item に対する Star／解除、soft trash、Android `FileProvider` 経由のJSON共有。
-- 保存済み作品の生成情報sheetは、写生、モデルと言語、seedと変奏、色カタログと色map、
+- 保存済み作品の生成情報sheetは、写生、モデルと言語、seedと記録済みの変奏（旧）、色カタログと色map、
   canvas、render hash / engine、作成日時、処理時間を読み取り専用で表示する。
 - DDLはWebと同じく「指示書」と呼ぶ（「解釈」は記述を指示書へ読み解くStage 1の行為だけを指す、2026-09-28）。制作の指示書の見出し、作品を見ているときに「指示書を見る」で開いた指示書、推敲の候補のDDLの見出しを、Webの`ddlLabelIn`と同じ「指示書（日本語DDL）」「指示書（英語DDL）」とし、長押しでWebと同じ説明を出す（押せそうに見える小札にはしない）。保存した作品のDDLのままならその作品の`instruction_lang_resolved`、編集したDDLはServerの`auto`と同じ規則（仮名・漢字が1字でもあれば日本語）で決める。
 - 系譜cardは保存済みDDLの編集とStar／解除を持ち、focus外cardの操作でも現在focusを変えない。

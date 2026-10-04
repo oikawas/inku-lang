@@ -94,7 +94,7 @@ class LineageWiringReferenceTest {
             nodeId = "n-grand", historyId = "h-grand", at = 3000L,
             declaration = LineageDeclaration(
                 parentNodeId = child.node.id,
-                derivationKind = "variation",
+                derivationKind = "layout_change",
             ),
             parentNode = child.node,
         )
@@ -232,6 +232,19 @@ class LineageWiringReferenceTest {
             plan(
                 nodeId = "n", historyId = "h", at = 1L,
                 declaration = LineageDeclaration(parentNodeId = "p"),
+                parentNode = LineageNodeEntity(id = "p", rootNodeId = "p"),
+            )
+        }
+        assertEquals(LineagePlanner.INVALID_KIND, message)
+    }
+
+    @Test
+    fun aNewVariationEdgeIsRejectedWhileTheOldKindRemainsReadable() {
+        assertTrue(app.inku.mobile.data.model.DerivationKindRegistry.KINDS.contains("variation"))
+        val message = rejection {
+            plan(
+                nodeId = "n", historyId = "h", at = 1L,
+                declaration = LineageDeclaration(parentNodeId = "p", derivationKind = "variation"),
                 parentNode = LineageNodeEntity(id = "p", rootNodeId = "p"),
             )
         }

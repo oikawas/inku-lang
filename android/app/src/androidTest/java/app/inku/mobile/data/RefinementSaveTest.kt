@@ -9,7 +9,6 @@ import app.inku.mobile.data.refinement.PaintSeeds
 import app.inku.mobile.data.refinement.RefinementElement
 import app.inku.mobile.data.refinement.RefinementParent
 import app.inku.mobile.data.refinement.RefinementPlanner
-import app.inku.mobile.data.refinement.VariationAmplitude
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ModelResponse
@@ -124,7 +123,6 @@ class RefinementSaveTest {
         val plan = RefinementPlanner.plan(
             element = element,
             parent = parent,
-            amplitude = VariationAmplitude.Large,
             newCatalogId = newCatalogId,
             seedText = seedText,
         )
@@ -198,7 +196,7 @@ class RefinementSaveTest {
     // ── T-8 ────────────────────────────────────────────────
 
     /**
-     * Each of the five elements writes one edge, and the edge says which
+     * Each of the four elements writes one edge, and the edge says which
      * intervention it was. The metadata is read back from the row, not from the
      * plan, so a declaration dropped between the two is visible here.
      */
@@ -209,7 +207,6 @@ class RefinementSaveTest {
             Triple(RefinementElement.Color, "catalog_change", null),
             Triple(RefinementElement.Layout, "layout_change", null),
             Triple(RefinementElement.Reading, "reinterpretation", null),
-            Triple(RefinementElement.Variation, "variation", null),
         )
 
         cases.forEachIndexed { index, (element, expectedKind, words) ->
@@ -242,10 +239,6 @@ class RefinementSaveTest {
                 }
                 RefinementElement.Layout -> assertTrue(metadata.has("composition_seed"))
                 RefinementElement.Reading -> assertTrue(metadata.has("interpretation_seed"))
-                RefinementElement.Variation -> {
-                    assertEquals("large", metadata.getString("variation_amplitude"))
-                    assertTrue(metadata.has("variation_seed"))
-                }
             }
         }
     }
@@ -275,7 +268,6 @@ class RefinementSaveTest {
         val plan = RefinementPlanner.plan(
             element = RefinementElement.Layout,
             parent = parent,
-            amplitude = VariationAmplitude.Large,
         )
         val result = repository.renderRefinementCandidate(parent, plan)
         assertEquals(
@@ -350,47 +342,6 @@ class RefinementSaveTest {
         assertEquals("and none of it was saved", rowsBefore, countRows("history_items"))
         assertEquals(1, countRows("lineage_nodes"))
         assertEquals(0, countRows("lineage_edges"))
-    }
-
-    /**
-     * T-11, on the wiring rather than on the layer.
-     *
-     * The JVM test beside this one calls `WebDdlExpander` directly and would
-     * stay green if nothing on the request ever reached it -- which is exactly
-     * the shape of [I-142]. This goes in through `PaintRequest`, so the two
-     * variation fields have to survive the whole way to Stage 1.5.
-     *
-     * `composeFromDdl` is the entry that carries them, and it logs, so it can
-     * only be run on a device.
-     */
-    @Test
-    fun t11_theVariationPairReachesTheWorkButMovesNothing() = runBlocking {
-        // Since draw-system05 `中心` is the middle of the canvas, and the
-        // variation, which moved only the focus, has no axis left. The pair still
-        // travels from the request to the saved work; the Score is the unvaried
-        // one. The composition and render seeds are held so that only the pair
-        // could move it.
-        val ddl = "中心に、鉛筆の細い線をひとつ置く。"
-
-        suspend fun workOf(amplitude: String?, seed: Long?) = repository.composeFromDdl(
-            description = "変奏 $amplitude $seed",
-            ddl = ddl,
-            catalogId = "default",
-            canvasAspect = "square",
-            stage1ModelId = "s1",
-            stage2ModelId = "s2",
-            autoRepair = true,
-            seeds = PaintSeeds(renderSeed = 4242L, compositionSeed = 0L, variationAmplitude = amplitude, variationSeed = seed),
-        )
-
-        val none = workOf(null, null)
-        val small7 = workOf("small", 7L)
-        val large8 = workOf("large", 8L)
-
-        assertEquals("small", small7.variationAmplitude)
-        assertEquals("7", small7.variationSeed)
-        assertEquals("a variation moves nothing", none.scoreJson, small7.scoreJson)
-        assertEquals("whatever its amplitude and seed", none.scoreJson, large8.scoreJson)
     }
 
     /** The touch seed reaches the renderer through the request, not only the Score. */

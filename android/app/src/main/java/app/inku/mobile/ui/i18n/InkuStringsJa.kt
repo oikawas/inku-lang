@@ -96,9 +96,9 @@ object InkuStringsJa : InkuStrings {
     override val pipelineApprove = "変更を承認して描画"
     override val pipelineDecline = "変更しない"
     override val pipelineResume = "描画を続ける"
-    override val pipelineDdlAuthority = "この変奏はDDLをもとに描画します。"
-    override val pipelineNewDescription = "記述から新しい変奏を作る"
-    override val pipelineNewDescriptionNotice = "次の描画は、新しい変奏として保存します。"
+    override val pipelineDdlAuthority = "この作品はDDLをもとに描画します。"
+    override val pipelineNewDescription = "記述から新しい作品を作る"
+    override val pipelineNewDescriptionNotice = "次の描画は、新しい作品として保存します。"
     override val pipelineCheckDdl = "DDLと描画の診断を確認してください。"
     override val pipelineDiagnostics = "描画の診断"
     override fun pipelinePluginDiagnostic(reason: String, name: String, suggestion: String?) = when (reason) {
@@ -159,7 +159,6 @@ object InkuStringsJa : InkuStrings {
             "layout" -> "配置"
             "reading" -> "読み取り"
             "color" -> "色カタログ"
-            "variation" -> "変奏"
             else -> id
         }
     }
@@ -171,7 +170,6 @@ object InkuStringsJa : InkuStrings {
             else -> id
         }
     }
-    override val refinementVariationNotice = "変奏は、いまは動かすものがありません。候補は元の作品と同じ絵になります。"
 
     override val comparisonModelSelectPrompt = "比較するモデルを1つ以上選択してください。"
     override val comparisonModelChoiceBlocked = "対象作品を描いたモデルは選べません。"
@@ -210,7 +208,7 @@ object InkuStringsJa : InkuStrings {
             "replay" -> "再描画"
             "sketch_grain_change" -> "写生の有無"
             "touch_change" -> "タッチ"
-            "variation" -> "変奏"
+            "variation" -> "変奏（旧）"
             else -> derivationUnknown
         }
     }
@@ -518,8 +516,8 @@ object InkuStringsJa : InkuStrings {
     override val generationInfoLanguageRequested = "要求した言語"
     override val generationInfoLanguageResolved = "解決した言語"
     override val generationInfoInterpretationSeed = "解釈 seed"
-    override val generationInfoVariationAmplitude = "変奏"
-    override val generationInfoVariationSeed = "変奏 seed"
+    override val generationInfoVariationAmplitude = "変奏（旧）"
+    override val generationInfoVariationSeed = "変奏（旧） seed"
     override val generationInfoCompositionSeed = "配置 seed"
     override val generationInfoRenderSeed = "render seed"
     override val generationInfoSeedText = "種テキスト"

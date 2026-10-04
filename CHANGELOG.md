@@ -10,6 +10,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 Following the author's retirement of variation, refinement now has four operations: touch, placement, reading and color catalog. Variation amplitude, seed allocation, new-request and empty drawing-response fields, CLI flags and the old compiler option are removed. Saved database columns, values, lineage and configurations remain without migration; new works record neither variation metadata nor new variation edges. History reads and old-work provenance retain Variation (retired), while UI wording for an edition becomes work. Pipeline work IDs, authority and paths, and Score variation remain unchanged.
 
+### 2026-10-04 — Retire Android variation refinement
+
+Refinement now offers touch, layout, reading and color catalog. The variation choice, notice, amplitude, seed and `stage15_variation` submission are removed, including inheritance when creating a new work from an old one. Room columns, saved values and original saved configurations remain without a migration. Old lineage edges and recorded amplitude/seed values use “変奏（旧） / Variation (retired)”; works without these values have no retired information rows, and new saves cannot create variation edges. Work-version messages use “work”. Score line tremor and work-version identifiers are unchanged.
+
 ### v2.15.85 — Keep cookies from blocking single-user entry (Build 1161, 2026-10-04)
 
 Single-user mode now reaches its pinned owner even when an invalid session cookie or another account's cookie is present. Explicit Bearer, ordinary sign-in and CSRF boundaries remain, and cookies need not be deleted. DDL engine 57, render engine 73, Score 0.19.0, saved works and registrations are unchanged.

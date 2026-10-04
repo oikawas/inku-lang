@@ -26,6 +26,40 @@ import org.junit.Test
 
 class SharedPipelineHostTest {
     @Test
+    fun newRunOmitsRetiredVariationSettingsAndStoredConfigRemainsReadable() = runBlocking {
+        val binding = object : SharedPipelineBinding by ScriptedBinding() {
+            override fun canvasRegistry() = """{"digest":"registry-digest","registry":{"schema":"inku.canvas-format-registry.v1","formats":[{"id":"square","width_units":1,"height_units":1}]}}"""
+            override fun resolvePalette(inputBytes: ByteArray) = "{}".encodeToByteArray()
+            override fun resolveMacroCatalog(inputBytes: ByteArray) =
+                """{"schema":"inku.macro-catalog-resolution.v1","entries":[],"locks":[],"diagnostics":[]}""".encodeToByteArray()
+        }
+        val builder = SharedPipelineConfigBuilder(binding)
+        val prepared = builder.build(
+            SharedPipelineConfigRequest("ja", "square", "default", bundledPluginsEnabled = false),
+        )
+        assertFalse(JSONObject(prepared.configJson).getJSONObject("compiler").has("stage15_variation"))
+
+        val host = host(binding, RecordingEffectProvider(), RecordingCommitStore(), MemoryExecutionStore())
+        val view = SharedAuthoringPipeline(host, builder).startDirectDdlView(
+            SharedPipelineRunRequest(
+                ownerId = OWNER, text = "place one circle.", config = prepared,
+                models = MODELS, context = AuthoringContext("one circle"),
+            ),
+        )
+        val resultOptions = JSONObject(host.executionContext(OWNER, view.executionId).hostContextJson)
+            .getJSONObject("result_options")
+        assertFalse(resultOptions.has("variation_amplitude"))
+        assertFalse(resultOptions.has("variation_seed"))
+
+        val oldConfig = JSONObject(prepared.configJson).also {
+            it.getJSONObject("compiler").put("stage15_variation", JSONObject().put("amplitude", "large").put("seed", "7"))
+        }.toString()
+        val restored = builder.fromSavedConfig(oldConfig, prepared.renderColorMaps)
+        assertEquals(oldConfig, restored.configJson)
+        assertEquals("7", JSONObject(oldConfig).getJSONObject("compiler").getJSONObject("stage15_variation").getString("seed"))
+    }
+
+    @Test
     fun chatGptRegistrationIsPinnedAcrossProviderEffectsAndHostReloadWithoutCredentials() = runBlocking {
         val ref = app.inku.mobile.llm.ChatGptSessionRef("personal-registration", 7)
         val executions = MemoryExecutionStore()

@@ -109,7 +109,6 @@ class RefinementPlanTest {
             RefinementElement.Touch to "しずかに",
             RefinementElement.Layout to null,
             RefinementElement.Reading to null,
-            RefinementElement.Variation to null,
         ).forEach { (element, words) ->
             val plan = RefinementPlanner.plan(element, parent, seedText = words)
             assertEquals("$element keeps the parent's catalogue", parent.catalogId, plan.catalogId)
@@ -162,8 +161,11 @@ class RefinementPlanTest {
      * be recorded and never read again.
      */
     @Test
-    fun t5_allFiveElementsDeclareTheirEdgeAndItsMetadata() {
-        val parent = parent()
+    fun t5_allFourElementsDeclareTheirEdgeWithoutInheritingRetiredVariation() {
+        val oldItem = parentItem().copy(variationAmplitude = "large", variationSeed = "7")
+        val parent = parent(oldItem)
+        assertEquals(listOf("touch", "layout", "reading", "color"), RefinementElement.entries.map { it.id })
+        assertNull(RefinementElement.byId("variation"))
 
         val touch = RefinementPlanner.plan(RefinementElement.Touch, parent, seedText = "しずかに")
         assertEquals("touch_change", touch.derivationKind)
@@ -188,21 +190,22 @@ class RefinementPlanTest {
         assertEquals("ink_season", color.derivationMetadata["catalog_id_from"])
         assertEquals("vivid_material", color.derivationMetadata["catalog_id_to"])
 
-        val variation = RefinementPlanner.plan(RefinementElement.Variation, parent, amplitude = VariationAmplitude.Large)
-        assertEquals("variation", variation.derivationKind)
-        assertEquals(setOf("variation_amplitude", "variation_seed"), variation.derivationMetadata.keys)
-        assertEquals("large", variation.derivationMetadata["variation_amplitude"])
-        assertEquals(variation.seeds.variationSeed, variation.derivationMetadata["variation_seed"])
+        listOf(touch, layout, reading, color).forEach { plan ->
+            assertFalse(plan.derivationMetadata.containsKey("variation_amplitude"))
+            assertFalse(plan.derivationMetadata.containsKey("variation_seed"))
+        }
+        assertEquals("large", oldItem.variationAmplitude)
+        assertEquals("7", oldItem.variationSeed)
     }
 
     /** Every kind named above is one the server registers. */
     @Test
-    fun t5_theFiveKindsAreTheServersOwn() {
+    fun t5_theFourKindsAreTheServersOwn() {
         val registered = app.inku.mobile.data.model.DerivationKindRegistry.KINDS
         RefinementElement.entries.forEach { element ->
             assertTrue("${element.derivationKind} is a server kind", registered.contains(element.derivationKind))
         }
-        assertEquals("five elements, five distinct kinds", 5, RefinementElement.entries.map { it.derivationKind }.toSet().size)
+        assertEquals("four elements, four distinct kinds", 4, RefinementElement.entries.map { it.derivationKind }.toSet().size)
     }
 
     // ── the reading is upstream ────────────────────────────

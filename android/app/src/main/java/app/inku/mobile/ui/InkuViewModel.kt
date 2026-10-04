@@ -37,7 +37,6 @@ import app.inku.mobile.data.refinement.RefinementElement
 import app.inku.mobile.data.refinement.RefinementParent
 import app.inku.mobile.data.refinement.RefinementPlan
 import app.inku.mobile.data.refinement.RefinementPlanner
-import app.inku.mobile.data.refinement.VariationAmplitude
 import app.inku.mobile.llm.DefaultModelDownloads
 import app.inku.mobile.llm.ModelProviderHttpException
 import app.inku.mobile.llm.CameraDescriptionRequest
@@ -266,7 +265,6 @@ data class InkuUiState(
     val refinementOpen: Boolean = false,
     val refinementParent: HistoryItemEntity? = null,
     val refinementElement: RefinementElement = RefinementElement.Touch,
-    val refinementAmplitude: VariationAmplitude = VariationAmplitude.Default,
     val refinementTouchWords: String = "",
     val refinementCount: Int = 1,
     val refinementBusy: Boolean = false,
@@ -3003,11 +3001,6 @@ class InkuViewModel @JvmOverloads constructor(
         persistSetting(SETTING_KEY_REFINEMENT_ELEMENT, JSONObject().put("value", element.id).toString())
     }
 
-    fun setRefinementAmplitude(amplitude: VariationAmplitude) {
-        if (localState.value.refinementBusy) return
-        localState.value = localState.value.copy(refinementAmplitude = amplitude)
-    }
-
     fun setRefinementTouchWords(value: String) {
         localState.value = localState.value.copy(refinementTouchWords = value, refinementStatus = null)
     }
@@ -3072,7 +3065,6 @@ class InkuViewModel @JvmOverloads constructor(
                 plan = RefinementPlanner.plan(
                     element = element,
                     parent = parent,
-                    amplitude = current.refinementAmplitude,
                     newCatalogId = catalogIds.getOrNull(index),
                     seedText = current.refinementTouchWords.takeIf { element == RefinementElement.Touch },
                 ),
@@ -3285,8 +3277,6 @@ class InkuViewModel @JvmOverloads constructor(
             renderSeed = candidate.plan.seeds.renderSeed ?: renderSeedOf(candidate.renderMetadataJson),
             compositionSeed = candidate.plan.seeds.compositionSeed,
             interpretationSeed = candidate.plan.seeds.interpretationSeed,
-            variationAmplitude = candidate.plan.seeds.variationAmplitude,
-            variationSeed = candidate.plan.seeds.variationSeed,
             seedText = candidate.plan.seeds.seedText,
             instructionLangRequested = candidate.instructionLangRequested,
             instructionLangResolved = candidate.instructionLangResolved,

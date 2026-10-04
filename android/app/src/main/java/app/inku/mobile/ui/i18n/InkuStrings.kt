@@ -143,12 +143,8 @@ interface InkuStrings {
     val refinementNoOtherCatalog: String
     val refinementTouchFanoutRefusal: String
     val refinementElementLabel: (String) -> String
+    /** Formats only the amplitude recorded on a legacy history row. */
     val variationAmplitudeLabel: (String) -> String
-    /**
-     * Under the variation's amplitudes: since draw-system05 `中心` is the middle
-     * and the variation, which moved only the focus, has nothing left to move.
-     */
-    val refinementVariationNotice: String
 
     // --- Comparison ---------------------------------------------------------
     val comparisonModelSelectPrompt: String

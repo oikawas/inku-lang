@@ -102,9 +102,9 @@ object InkuStringsEn : InkuStrings {
     override val pipelineApprove = "Approve changes and draw"
     override val pipelineDecline = "Keep current DDL"
     override val pipelineResume = "Continue drawing"
-    override val pipelineDdlAuthority = "This variation is drawn from its DDL."
-    override val pipelineNewDescription = "Create a new variation from the description"
-    override val pipelineNewDescriptionNotice = "The next drawing will be saved as a new variation."
+    override val pipelineDdlAuthority = "This work is drawn from its DDL."
+    override val pipelineNewDescription = "Create a new work from the description"
+    override val pipelineNewDescriptionNotice = "The next drawing will be saved as a new work."
     override val pipelineCheckDdl = "Check the DDL and drawing diagnostics."
     override val pipelineDiagnostics = "Drawing diagnostics"
     override fun pipelinePluginDiagnostic(reason: String, name: String, suggestion: String?) = when (reason) {
@@ -160,19 +160,17 @@ object InkuStringsEn : InkuStrings {
     override val refinementTouchFanoutRefusal =
         "The same words give the same performance (seed). Only one option can be made."
     override val refinementElementLabel: (String) -> String = { id ->
-        // The nouns of the five "Another …" operations (GLOSSARY §3).
+        // The nouns of the four refinement operations.
         when (id) {
             "touch" -> "Performance"
             "layout" -> "Composition"
             "reading" -> "Reading"
             "color" -> "Color catalog"
-            "variation" -> "Variation"
             else -> id
         }
     }
     override val variationAmplitudeLabel: (String) -> String = { id ->
-        // Fixed values (GLOSSARY §3, ruling 2026-07-25). `Moderate` is reserved
-        // for the middle amplitude and is not used for speed.
+        // Keep the recorded legacy amplitudes readable; these are not controls.
         when (id) {
             "small" -> "Subtle"
             "medium" -> "Moderate"
@@ -180,7 +178,6 @@ object InkuStringsEn : InkuStrings {
             else -> id
         }
     }
-    override val refinementVariationNotice = "Variation has nothing to move for now; its options draw the same picture as the work."
 
     override val comparisonModelSelectPrompt = "Select one or more models to compare."
     override val comparisonModelChoiceBlocked =
@@ -227,7 +224,7 @@ object InkuStringsEn : InkuStrings {
             "replay" -> "Replay"
             "sketch_grain_change" -> "Sketch from life"
             "touch_change" -> "Touch"
-            "variation" -> "Variation"
+            "variation" -> "Variation (retired)"
             else -> derivationUnknown
         }
     }
@@ -548,8 +545,8 @@ object InkuStringsEn : InkuStrings {
     override val generationInfoLanguageRequested = "Language requested"
     override val generationInfoLanguageResolved = "Language used"
     override val generationInfoInterpretationSeed = "Interpretation seed"
-    override val generationInfoVariationAmplitude = "Variation"
-    override val generationInfoVariationSeed = "Variation seed"
+    override val generationInfoVariationAmplitude = "Variation (retired)"
+    override val generationInfoVariationSeed = "Variation (retired) seed"
     override val generationInfoCompositionSeed = "Composition seed"
     override val generationInfoRenderSeed = "Render seed"
     override val generationInfoSeedText = "Seed text"

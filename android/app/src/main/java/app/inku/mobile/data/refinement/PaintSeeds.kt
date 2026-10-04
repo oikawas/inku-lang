@@ -7,22 +7,19 @@ import java.security.SecureRandom
 /**
  * What a caller asks a drawing to be made with.
  *
- * The five names and types are the server's request body
- * (`api_core/models.py:14-15`, `:42-45`); [seedText] is the sixth field the
- * touch refinement sends (`render.py:442`), from which the server derives the
- * render seed. Every one of them is `null` by default, which is the server's
+ * The render, composition, and interpretation seeds are the active request
+ * values; [seedText] supplies the words from which touch derives its render
+ * seed. Every one of them is `null` by default, which is the server's
  * `None`: a caller that says nothing leaves every decision where it was.
  *
- * They travel together rather than as six parameters because every entry point
- * in the repository takes all six, and a partial set at one of them would be a
+ * They travel together because every drawing entry point accepts the same
+ * values, and a partial set at one of them would be a
  * silent sender.
  */
 data class PaintSeeds(
     val renderSeed: Long? = null,
     val compositionSeed: Long? = null,
     val interpretationSeed: String? = null,
-    val variationAmplitude: String? = null,
-    val variationSeed: Long? = null,
     val seedText: String? = null,
 ) {
     companion object {
@@ -38,8 +35,6 @@ data class PaintSeeds(
             renderSeed = item.renderSeed?.let { parseSeed(it) },
             compositionSeed = item.compositionSeed?.let { parseSeed(it) },
             interpretationSeed = item.interpretationSeed,
-            variationAmplitude = item.variationAmplitude,
-            variationSeed = item.variationSeed?.let { parseSeed(it) },
             seedText = item.seedText,
         )
 
@@ -57,11 +52,9 @@ data class PaintSeeds(
 /**
  * Where new seeds come from.
  *
- * On the server this is two pieces: `new_render_seed()` (`render_engines/seeds.py`) and
- * the `/api/variation/seeds` endpoint (`render.py:1288`), which exists so that
- * "seed 空間の管理と重複回避を UI に持ち込まない". There is no server here, so the
- * device allocates; what is ported is how the numbers are made, not who makes
- * them. All three use a cryptographic source, as `secrets` does.
+ * The device allocates render and composition seeds from a cryptographic
+ * source, and interpretation seeds as UUIDs. Retired variation seeds are
+ * retained only in saved history, and are never allocated or inherited here.
  */
 object SeedFactory {
 
@@ -77,18 +70,6 @@ object SeedFactory {
             if (seed !in excluded) return seed
         }
         error("Could not allocate a unique seed")
-    }
-
-    /**
-     * `secrets.randbelow(2**31 - 1) + 1`, with the endpoint's own rule that the
-     * seeds it hands back in one call are distinct.
-     */
-    fun newVariationSeeds(count: Int): List<Long> {
-        val seeds = LinkedHashSet<Long>()
-        while (seeds.size < count) {
-            seeds.add(1L + (random.nextLong().toULong() % 2147483646UL).toLong())
-        }
-        return seeds.toList()
     }
 
     /** `createInterpretationSeed` -- an opaque uuid4, never read as a number. */

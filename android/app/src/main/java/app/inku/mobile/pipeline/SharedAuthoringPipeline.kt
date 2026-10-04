@@ -10,8 +10,6 @@ data class SharedPipelineRunRequest(
     val renderSeed: Long? = null,
     val wild: Boolean = false,
     val interpretationSeed: String? = null,
-    val variationAmplitude: String? = null,
-    val variationSeed: Long? = null,
     val seedText: String? = null,
     val instructionLangRequested: String? = null,
     val instructionLangResolved: String? = null,
@@ -187,8 +185,6 @@ class SharedAuthoringPipeline(
                 org.json.JSONObject()
                     .put("original_input", request.originalInput)
                     .put("interpretation_seed", request.interpretationSeed)
-                    .put("variation_amplitude", request.variationAmplitude)
-                    .put("variation_seed", request.variationSeed?.let(java.lang.Long::toUnsignedString))
                     .put("seed_text", request.seedText)
                     .put("instruction_lang_requested", request.instructionLangRequested)
                     .put("instruction_lang_resolved", request.instructionLangResolved)

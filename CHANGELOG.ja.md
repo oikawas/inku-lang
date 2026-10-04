@@ -6,6 +6,10 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-04 — 単独利用モードの入口を別portのCookieで塞がない
+
+単独利用モードでもsession Cookieを先に照合していたため、無効Cookieがあると固定ownerへ進まず401になり、Webがログイン画面を出した。明示Bearerの照合を先に保ち、その後は単独利用の固定owner、通常モードではCookieを使う。別の利用者の有効Cookieでも単独利用のownerは切り替わらない。無効Bearer・固定owner不在の拒否、通常のsession認証、CSRF境界と本人ChatGPTのbindingを保持する。Cookie削除や他portログアウト、保存済み作品・認証登録の移行は行わない。
+
 ### v2.15.84 — 現行契約に合わせてCIを修正する（Build 1160、2026-10-04）
 
 v2.15.83の公開時に残ったServer・CLIの試験の期待値と試験用データ、Androidのデザイン資料を訂正した版。描画・保存・認証の動作とDDL engine 57・render engine 73・Score 0.19.0を保持する。既存の公開tagを変更せず、修正版として公開する。

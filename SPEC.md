@@ -3884,6 +3884,14 @@ nobody knows, so that is the only way back from single-user operation to
 ordinary operation.  The server reports whether the mode is on through the same
 public response that carries the version and build number.
 
+In single-user mode, browser requests resolve to the recorded owner regardless
+of the presence or validity of a session cookie. A cookie from another port on
+the same host cannot close the entry or switch it to a different account.
+An explicit Bearer is checked as a session first and gets 401 when invalid;
+requests also get 401 if the pinned owner cannot be resolved. Ordinary
+multi-user mode keeps Cookie/Bearer session authentication. Cookies are not
+deleted, other ports are not signed out, and cross-site write rejection remains.
+
 The app rail user menu opens a profile dialog for the signed-in user.  The
 dialog can update the user's email address and password through
 `PATCH /api/auth/me/profile`.  Password changes require the current password,

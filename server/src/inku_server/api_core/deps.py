@@ -18,7 +18,7 @@ _SESSION_COOKIE_NAME = "inku_session"
 
 
 # Stands in for a session token when single-user mode answers for a request
-# that carried no credentials.  Minted per process and never stored, so a
+# without an explicit Bearer session.  Minted per process and never stored, so a
 # client cannot present it: only _session_token can put it into circulation.
 _SINGLE_USER_TOKEN = "single-user:" + secrets.token_urlsafe(32)
 
@@ -29,14 +29,15 @@ def _session_token(
 ) -> str:
     if authorization and authorization.startswith("Bearer "):
         return authorization.removeprefix("Bearer ").strip()
-    if session_cookie:
-        return session_cookie
     if _db.single_user_mode_enabled():
-        # This server belongs to one person, so an unauthenticated request is
-        # theirs.  Resolution can still fail -- a database whose accounts
-        # include no administrator has nobody to hand it to -- and
+        # Cookies are shared across ports and may belong to another server on
+        # this host. This installation uses its pinned owner; an explicit
+        # Bearer above still has to authenticate. Resolution can still fail:
+        # a database with no administrator has nobody to hand it to, and
         # _current_user turns that back into the 401 this line used to raise.
         return _SINGLE_USER_TOKEN
+    if session_cookie:
+        return session_cookie
     raise HTTPException(status_code=401, detail="authentication required")
 
 

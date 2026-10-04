@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-04 — Keep another port's cookie from closing single-user entry
+
+Session cookies were checked before the pinned single-user owner, so an invalid cookie produced 401 and opened the Web sign-in form. Explicit Bearer authentication stays first; otherwise single-user mode uses its pinned owner and ordinary mode uses the session cookie. A valid cookie for another account cannot switch the single-user owner either. Invalid Bearer and missing-owner rejection, ordinary session authentication, CSRF boundaries and personal ChatGPT binding remain. The fix does not delete cookies, sign out other ports or migrate saved works and registrations.
+
 ### v2.15.84 — Align CI with current contracts (Build 1160, 2026-10-04)
 
 This version corrects Server and CLI test expectations and fixtures, and the Android design record left inconsistent when v2.15.83 was published. Drawing, persistence and authentication behaviour, DDL engine 57, render engine 73 and Score 0.19.0 are retained. It is a new corrective release; the preceding public tag remains unchanged.

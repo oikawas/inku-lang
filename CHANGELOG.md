@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### v2.15.86 — Retire variation (Build 1162, 2026-10-04)
+
+This version aligns variation retirement across the core, Server, Web, CLI, Android and their documentation. Refinement has four operations: touch, placement, reading and color catalog. Saved values, configurations and lineage remain; only old-work records display Variation (retired). DDL engine 57, render engine 73 and Score 0.19.0 are retained.
+
 ### 2026-10-04 — Remove variation controls from Server, Web and CLI
 
 Following the author's retirement of variation, refinement now has four operations: touch, placement, reading and color catalog. Variation amplitude, seed allocation, new-request and empty drawing-response fields, CLI flags and the old compiler option are removed. Saved database columns, values, lineage and configurations remain without migration; new works record neither variation metadata nor new variation edges. History reads and old-work provenance retain Variation (retired), while UI wording for an edition becomes work. Pipeline work IDs, authority and paths, and Score variation remain unchanged.

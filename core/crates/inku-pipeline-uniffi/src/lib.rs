@@ -36,6 +36,21 @@ pub fn provider_attempt(snapshot_bytes: Vec<u8>) -> Vec<u8> {
     .unwrap_or_else(|_| br#"{"error":"invalid_snapshot"}"#.to_vec())
 }
 
+/// Another composition read from a work's visible instructions (draw-system05):
+/// the request names the pipeline configuration, the source, the mode
+/// (`principled` or `chance`), the seed and the work. The answer carries the
+/// schema `inku.composition-recompose.v1` and either the recomposed source with
+/// the moves or the reason the work stays as it is; an unreadable request is
+/// `{"error": "invalid_request"}` and a panic `{"error": "internal_invariant"}`.
+/// The binding version is unchanged: this only adds a call.
+#[uniffi::export]
+pub fn recompose(input_bytes: Vec<u8>) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::recompose::recompose_json(&input_bytes)
+    }))
+    .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
+}
+
 /// Report the fixed binding and byte-protocol versions as stable JSON.
 #[uniffi::export]
 pub fn version_report() -> String {

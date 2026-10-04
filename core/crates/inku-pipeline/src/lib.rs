@@ -11,6 +11,7 @@ mod hole_completion;
 pub mod machine;
 pub mod prompts;
 pub mod protocol;
+pub mod recompose;
 pub mod replay;
 
 #[cfg(test)]

@@ -727,6 +727,30 @@ pub struct ComposedRange {
 }
 
 impl ComposedRange {
+    /// The range as the visible DDL writes it, from the composition mark to the
+    /// closing parenthesis (the printer writes the same text).
+    #[must_use]
+    pub fn written(&self, language: ResolvedInstructionLanguage) -> String {
+        match language {
+            ResolvedInstructionLanguage::Ja => format!(
+                "{COMPOSITION_MARK_JA}{}（横{}〜{}、縦{}〜{}）",
+                self.words_ja,
+                self.bound(0),
+                self.bound(2),
+                self.bound(1),
+                self.bound(3)
+            ),
+            ResolvedInstructionLanguage::En => format!(
+                "{COMPOSITION_MARK_EN} {} (horizontal {} to {}, vertical {} to {})",
+                self.words_en,
+                self.bound(0),
+                self.bound(2),
+                self.bound(1),
+                self.bound(3)
+            ),
+        }
+    }
+
     fn bound(&self, index: usize) -> String {
         let (numerator, denominator) = self.bounds[index];
         if denominator == 1 {
@@ -876,6 +900,132 @@ fn print_layer_en(layer: &WorkPlanLayer, range: Option<&ComposedRange>) -> Strin
     }
     out.push('.');
     out
+}
+
+/// The plan words a printed value came from, keyed by the semantic ID the
+/// compiler reads back, for the slots an alternate composition reads.
+fn plan_ids_by_semantic_id() -> &'static BTreeMap<WorkPlanSlot, BTreeMap<String, String>> {
+    static TABLES: OnceLock<BTreeMap<WorkPlanSlot, BTreeMap<String, String>>> = OnceLock::new();
+    TABLES.get_or_init(|| {
+        let mut tables = BTreeMap::new();
+        for (slot, key) in [
+            (WorkPlanSlot::Shape, "katachi"),
+            (WorkPlanSlot::Proportion, "wariai"),
+            (WorkPlanSlot::Action, "ugoki"),
+            (WorkPlanSlot::Position, "basho"),
+            (WorkPlanSlot::Color, "iro"),
+            (WorkPlanSlot::Surface, "omote"),
+            (WorkPlanSlot::LineUpDirection, "katamuki"),
+        ] {
+            let table: &mut BTreeMap<String, String> = tables.entry(slot).or_default();
+            for (canonical, term) in saijiki_terms(key) {
+                table.insert(canonical, term.id);
+            }
+        }
+        tables
+    })
+}
+
+fn plan_id(slot: WorkPlanSlot, term: &crate::SemanticTerm) -> Option<String> {
+    plan_ids_by_semantic_id()
+        .get(&slot)?
+        .get(&term.identity.id)
+        .cloned()
+}
+
+/// The plan's size word for a parsed relative scale (its English surface).
+fn plan_size_id(value: CoreModifierValue) -> Option<String> {
+    core_modifier_surface_forms(ResolvedInstructionLanguage::En)
+        .relative_scale
+        .iter()
+        .find(|(_, candidate)| *candidate == value)
+        .map(|(surface, _)| canonical_wire_id(surface))
+        .filter(|id| {
+            work_plan_vocabulary()
+                .terms(WorkPlanSlot::Size)
+                .iter()
+                .any(|term| term.id == *id)
+        })
+}
+
+/// The layer a compiled instruction was printed from, limited to what the
+/// composition reads: form, action, count, place, size, colour, surface and
+/// line-up direction. An alternate composition reads these from the visible
+/// instructions alone (draw-system05, 2026-10-04). `None` for an instruction a
+/// plan does not write: a Macro word, a relation, a sequence, a fill of a
+/// shape, a numeric point, or a value outside the plan's words.
+#[must_use]
+pub fn composition_layer(instruction: &crate::SemanticInstruction) -> Option<WorkPlanLayer> {
+    let entity = &instruction.entity;
+    let crate::SemanticHead::Primitive(head) = &entity.head else {
+        return None;
+    };
+    if instruction.relation.is_some()
+        || instruction.sequence.is_some()
+        || instruction.fill_target.is_some()
+        || entity.numeric_position.is_some()
+        || !entity.additional_relative_scales.is_empty()
+    {
+        return None;
+    }
+    let shape = plan_id(WorkPlanSlot::Shape, head)?;
+    let action = plan_id(WorkPlanSlot::Action, instruction.action.as_ref()?)?;
+    let proportions: Vec<&crate::SemanticTerm> = [
+        entity.proportion.aspect.as_ref(),
+        entity.proportion.width_extent.as_ref(),
+        entity.proportion.arc_form.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    let proportion = match proportions.as_slice() {
+        [] => None,
+        [term] => Some(plan_id(WorkPlanSlot::Proportion, term)?),
+        _ => return None,
+    };
+    let count = match &entity.quantity {
+        Some(quantity) => u32::try_from(quantity.value).ok()?,
+        None => 1,
+    };
+    let mut attributes = BTreeMap::new();
+    if let Some(place) = &instruction.position {
+        attributes.insert(
+            WorkPlanSlot::Position,
+            plan_id(WorkPlanSlot::Position, place)?,
+        );
+    }
+    if let Some(scale) = &entity.relative_scale {
+        attributes.insert(WorkPlanSlot::Size, plan_size_id(scale.value)?);
+    }
+    if let Some(color) = &entity.color {
+        attributes.insert(WorkPlanSlot::Color, plan_id(WorkPlanSlot::Color, color)?);
+    }
+    if let Some(surface) = &entity.surface.quality {
+        attributes.insert(
+            WorkPlanSlot::Surface,
+            plan_id(WorkPlanSlot::Surface, surface)?,
+        );
+    }
+    if let Some(direction) = &instruction.layout_direction {
+        attributes.insert(
+            WorkPlanSlot::LineUpDirection,
+            plan_id(WorkPlanSlot::LineUpDirection, direction)?,
+        );
+    }
+    Some(WorkPlanLayer {
+        shape,
+        proportion,
+        action,
+        count,
+        attributes,
+    })
+}
+
+/// The plan's colour word for a compiled background (the field a composition
+/// weighs marks against).
+#[must_use]
+pub fn composition_background(background: &crate::SemanticBackground) -> Option<String> {
+    plan_id(WorkPlanSlot::Color, &background.color)
 }
 
 /// Print a normalized plan as visible DDL in the requested language.

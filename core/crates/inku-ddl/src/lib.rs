@@ -255,8 +255,8 @@ pub use semantic_instruction::{
 };
 pub use stage15_transform::{
     STAGE15_TRANSFORMATION_SCHEMA_ID, Stage15TransformError, Stage15TransformationInput,
-    Stage15TransformationResult, Stage15Variation, Stage15VariationAmplitude,
-    VerifiedStage15EffectiveView, stage15_transformation_input, transform_stage15,
+    Stage15TransformationResult, VerifiedStage15EffectiveView, stage15_transformation_input,
+    transform_stage15,
 };
 pub use visible_patch::{
     VISIBLE_DDL_PATCH_SCHEMA_ID, ValidatedVisibleDdlCandidate, VisibleDdlPatch,

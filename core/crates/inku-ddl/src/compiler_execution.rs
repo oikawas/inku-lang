@@ -8,7 +8,7 @@ use crate::{
     MacroExpansionLimits, MaterializedRelationOmission, NormalizedDdlDocument, PlanResourceError,
     PlanResourceOmission, ScoreAnchorOrigin, ScoreErrorPolicy, ScoreInstructionOrigin,
     ScoreLoweringContext, ScoreLoweringDiagnostic, ScoreLoweringOutcome, ScoreMaterializationError,
-    Stage15TransformationInput, Stage15Variation, TypedDdlCompilation, compile_typed_ddl,
+    Stage15TransformationInput, TypedDdlCompilation, compile_typed_ddl,
     execution_projection::{
         ExecutionProjectionResult, project_compilation_for_execution, stopped_diagnostics,
     },
@@ -181,7 +181,6 @@ pub fn compile_ddl_to_score(
     composition_seed: Option<u64>,
     limits: MacroExpansionLimits,
     context: ScoreLoweringContext,
-    variation: Option<Stage15Variation>,
     error_policy: ScoreErrorPolicy,
 ) -> CompilerExecutionResult {
     let compilation = compile_typed_ddl(document, definitions, composition_seed, limits);
@@ -191,7 +190,6 @@ pub fn compile_ddl_to_score(
         composition_seed,
         limits,
         context,
-        variation,
         error_policy,
     )
 }
@@ -204,7 +202,6 @@ pub fn compile_ddl_to_score_with_resources(
     composition_seed: Option<u64>,
     limits: MacroExpansionLimits,
     context: ScoreLoweringContext,
-    variation: Option<Stage15Variation>,
     error_policy: ScoreErrorPolicy,
     hard_policy: HardResourcePolicy,
     operational_budget: OperationalResourceBudget,
@@ -216,7 +213,6 @@ pub fn compile_ddl_to_score_with_resources(
         composition_seed,
         limits,
         context,
-        variation,
         error_policy,
         hard_policy,
         operational_budget,
@@ -235,7 +231,6 @@ fn prepare_stage15_execution(
     composition_seed: Option<u64>,
     limits: MacroExpansionLimits,
     context: ScoreLoweringContext,
-    variation: Option<Stage15Variation>,
 ) -> Result<PreparedStage15Execution, Vec<CompilerExecutionDiagnostic>> {
     let canonical_ready = compilation
         .compiler_lock
@@ -255,7 +250,6 @@ fn prepare_stage15_execution(
         composition_seed,
         limits,
         context,
-        variation,
     ) {
         ExecutionProjectionResult::Stopped(diagnostics) => Err(diagnostics),
         ExecutionProjectionResult::Ready(ready) => Ok(PreparedStage15Execution {
@@ -272,7 +266,6 @@ fn execute_compilation(
     composition_seed: Option<u64>,
     limits: MacroExpansionLimits,
     context: ScoreLoweringContext,
-    variation: Option<Stage15Variation>,
     error_policy: ScoreErrorPolicy,
 ) -> CompilerExecutionResult {
     let prepared = match prepare_stage15_execution(
@@ -281,7 +274,6 @@ fn execute_compilation(
         composition_seed,
         limits,
         context,
-        variation,
     ) {
         Ok(prepared) => prepared,
         Err(upstream_diagnostics) => {
@@ -289,7 +281,7 @@ fn execute_compilation(
         }
     };
     let execution_pre_expansion_digest = Some(prepared.input.pre_expansion_digest().to_owned());
-    let transformed = match transform_stage15(prepared.input, variation) {
+    let transformed = match transform_stage15(prepared.input) {
         Ok(value) => value,
         Err(_) => return stopped(compilation, error_policy),
     };
@@ -346,7 +338,6 @@ fn execute_compilation_with_resources(
     composition_seed: Option<u64>,
     limits: MacroExpansionLimits,
     context: ScoreLoweringContext,
-    variation: Option<Stage15Variation>,
     error_policy: ScoreErrorPolicy,
     hard_policy: HardResourcePolicy,
     operational_budget: OperationalResourceBudget,
@@ -357,7 +348,6 @@ fn execute_compilation_with_resources(
         composition_seed,
         limits,
         context,
-        variation,
     ) {
         Ok(prepared) => prepared,
         Err(upstream_diagnostics) => {
@@ -365,7 +355,7 @@ fn execute_compilation_with_resources(
         }
     };
     let execution_pre_expansion_digest = Some(prepared.input.pre_expansion_digest().to_owned());
-    let transformed = match transform_stage15(prepared.input, variation) {
+    let transformed = match transform_stage15(prepared.input) {
         Ok(value) => value,
         Err(_) => {
             let upstream_diagnostics = stopped_diagnostics(&compilation);

@@ -77,7 +77,6 @@ fn execute(source: &str) -> CompilerResourceExecutionResult {
         Some(37),
         LIMITS,
         ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-        None,
         ScoreErrorPolicy::OmitAndContinue,
         hard_policy(),
         OperationalResourceBudget(budget()),

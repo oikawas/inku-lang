@@ -36,7 +36,7 @@ fn stage(source: &str) -> Stage15TransformationResult {
             compiled.conflicts, compiled.blocking_diagnostics
         )
     });
-    transform_stage15(input, None).unwrap()
+    transform_stage15(input).unwrap()
 }
 
 fn context() -> ScoreLoweringContext {

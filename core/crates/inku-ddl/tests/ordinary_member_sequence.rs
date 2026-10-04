@@ -328,7 +328,6 @@ fn execute(
             ),
         )
         .unwrap(),
-        None,
         policy,
         HardResourcePolicy {
             identity: "ordinary-member-sequence-test.v1".into(),

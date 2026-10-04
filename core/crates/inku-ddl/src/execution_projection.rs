@@ -8,7 +8,7 @@ use crate::{
     CompilerExecutionDiagnostic, CompilerExecutionDisposition, CompilerExecutionIssueKind,
     CompilerExecutionOmissionUnit, ExpandedMacroInvocation, MacroDefinition, MacroExpansionLimits,
     MacroInvocation, ScoreLoweringContext, SemanticDocumentAst, SemanticHead,
-    SemanticPreviousReference, Stage15Variation, TypedDdlCompilation,
+    SemanticPreviousReference, TypedDdlCompilation,
     compiler_lock::{
         SemanticMacroExecutionOwners, compiler_seed_identity,
         expanded_meaning_canonical_bytes_with_owners, semantic_macro_execution_owners,
@@ -50,7 +50,6 @@ pub(crate) fn project_compilation_for_execution(
     composition_seed: Option<u64>,
     limits: MacroExpansionLimits,
     _context: ScoreLoweringContext,
-    _variation: Option<Stage15Variation>,
 ) -> ExecutionProjectionResult {
     let Some(lock) = compilation.compiler_lock.as_ref() else {
         return ExecutionProjectionResult::Stopped(stopped_diagnostics(compilation));

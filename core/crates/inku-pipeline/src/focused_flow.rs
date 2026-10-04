@@ -85,7 +85,6 @@ fn config() -> PipelineConfig {
                 max_nodes_per_invocation: DecimalU64::new(100),
                 max_total_nodes: DecimalU64::new(500),
             },
-            stage15_variation: None,
             error_policy: ScoreErrorPolicy::OmitAndContinue,
             hard_resource_policy: HardResourcePolicy {
                 identity: "pipeline-fixture.v1".into(),
@@ -1875,4 +1874,24 @@ fn a_run_without_composition_commits_the_plan_as_printed() {
             .iter()
             .any(|tag| tag.starts_with("composition"))
     );
+}
+
+#[test]
+fn saved_compiler_options_with_the_retired_variation_still_read() {
+    // The explicit variation was retired on 2026-10-04, but saved fork contexts
+    // and older hosts still carry `stage15_variation`, as null or as an
+    // amplitude and seed pair. Both read as the options without it, and the
+    // retired key is not written again.
+    let options = config().compiler;
+    let written = serde_json::to_value(&options).unwrap();
+    assert!(written.get("stage15_variation").is_none());
+    for retired in [
+        serde_json::Value::Null,
+        json!({"amplitude": "large", "seed": "9"}),
+    ] {
+        let mut saved = written.clone();
+        saved["stage15_variation"] = retired;
+        let read: CompilerOptions = serde_json::from_value(saved).unwrap();
+        assert_eq!(read, options);
+    }
 }

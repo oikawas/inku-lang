@@ -234,7 +234,6 @@ fn over_budget_sequence_draws_the_safe_prefix_and_keeps_the_later_drawing() {
         Some(17),
         LIMITS,
         ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-        None,
         ScoreErrorPolicy::OmitAndContinue,
         HardResourcePolicy {
             identity: "color-sequence-test.v1".into(),
@@ -303,7 +302,6 @@ fn execute_with_policy(
         Some(17),
         LIMITS,
         ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-        None,
         error_policy,
         HardResourcePolicy {
             identity: "color-sequence-test.v1".into(),

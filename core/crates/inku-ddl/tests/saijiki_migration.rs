@@ -144,7 +144,6 @@ fn a_migrated_pale_ink_wash_draws_as_a_faint_sweep() {
                 max_total_nodes: 128,
             },
             ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-            None,
             ScoreErrorPolicy::Stop,
         );
         assert_eq!(

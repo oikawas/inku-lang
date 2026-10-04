@@ -54,7 +54,6 @@ fn resource_fill_reaches_svg_and_local_clip_refusal_preserves_later_drawing() {
             max_total_nodes: 64,
         },
         ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-        None,
         ScoreErrorPolicy::OmitAndContinue,
         hard.clone(),
         operational,

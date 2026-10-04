@@ -16,9 +16,14 @@ use crate::types::{ArcForm, Point, Primitive, Score, Seed};
 #[derive(Clone, Debug)]
 pub(crate) struct TypedPlacementScope {
     /// Exact final center for each dense member, in canvas-short-edge units.
+    /// A cells group keeps only the domain center here; its centers wait for
+    /// the performed copies.
     pub member_centers: Vec<Point>,
     /// Nested fill targets translated with each complete member body.
     pub member_fill_scope_indices: Vec<Vec<usize>>,
+    /// The placement seed of a cells group, which sizes its cells from the
+    /// performed copies and draws their order.
+    pub cells_seed: Option<Seed>,
 }
 
 #[derive(Clone, Debug)]
@@ -506,6 +511,8 @@ impl<'a> Builder<'a> {
                     0,
                     self.request.canvas,
                 );
+                let cells_seed = matches!(resolved.recipe, ResolvedPlacementRecipe::Cells)
+                    .then_some(placement_seed);
                 let (members, fragment, member_fill_scope_indices, source_member_indices) =
                     if let Some(cycle) = &group.cycle_members {
                         self.expand_cycle_members(
@@ -535,6 +542,7 @@ impl<'a> Builder<'a> {
                     execution: TypedPlacementScope {
                         member_centers: centers,
                         member_fill_scope_indices,
+                        cells_seed,
                     },
                     fill_scopes: fragment.scopes,
                     source_placement_group_index: Some(index),
@@ -635,6 +643,7 @@ impl<'a> Builder<'a> {
                     execution: TypedPlacementScope {
                         member_centers: centers,
                         member_fill_scope_indices,
+                        cells_seed: None,
                     },
                     fill_scopes: fragment.scopes,
                     source_placement_group_index: None,
@@ -1308,6 +1317,9 @@ fn recipe_centers(
                 Point::new(sampled.x * domain.x, sampled.y * domain.y)
             })
             .collect(),
+        // The cells fit the performed copies, so execution places each copy;
+        // until then every copy waits at the domain center.
+        ResolvedPlacementRecipe::Cells => vec![Point::new(domain.x / 2.0, domain.y / 2.0); count],
     };
     match (recipe, anchor, target) {
         (
@@ -1329,7 +1341,8 @@ fn recipe_centers(
             ResolvedPlacementRecipe::Grid {
                 translate_to_numeric_anchor: false,
                 ..
-            },
+            }
+            | ResolvedPlacementRecipe::Cells,
             ResolvedPlacementAnchor::Named { region },
             _,
         ) => {

@@ -455,8 +455,12 @@ fn macro_members_preserve_complete_bodies_and_source_quantity_authority() {
             .collect::<Vec<_>>(),
         [2, 1]
     );
-    assert!(repeated.placement_groups().is_empty());
-    let envelope = &repeated.standalone_macro_repetitions()[0];
+    // Several copies of a word are one member of a cells group (I-708).
+    assert!(repeated.standalone_macro_repetitions().is_empty());
+    let cells = &repeated.placement_groups()[0];
+    assert_eq!(cells.placement().layout, inku_score::GroupLayout::Cells);
+    assert_eq!(cells.recipe(), &PlacementRecipe::Cells);
+    let envelope = &cells.members()[0];
     assert_eq!(envelope.logical_count(), 3);
     assert_eq!(envelope.body_repeat_count(), 3);
     assert_eq!((envelope.member().start, envelope.member().end), (0, 2));

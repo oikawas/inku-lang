@@ -624,10 +624,11 @@ pub enum ScoreEdition {
     V0_16,
     V0_17,
     V0_18,
+    V0_19,
 }
 
 impl ScoreEdition {
-    pub const ALL: [Self; 18] = [
+    pub const ALL: [Self; 19] = [
         Self::V0_1,
         Self::V0_2,
         Self::V0_3,
@@ -646,6 +647,7 @@ impl ScoreEdition {
         Self::V0_16,
         Self::V0_17,
         Self::V0_18,
+        Self::V0_19,
     ];
 
     /// The edition a version string names.
@@ -677,6 +679,7 @@ impl ScoreEdition {
             Self::V0_16 => "0.16.0",
             Self::V0_17 => "0.17.0",
             Self::V0_18 => "0.18.0",
+            Self::V0_19 => "0.19.0",
         }
     }
 }
@@ -908,6 +911,11 @@ pub enum ResolvedPlacementRecipe {
         translate_to_numeric_anchor: bool,
     },
     ScatterUniformWithCentroidTranslation,
+    /// Performance cuts the domain into cells at least the size of the largest
+    /// performed copy, gives each copy its own cell in an order the seed draws,
+    /// and shifts it inside the cell without leaving it. Copies overlap only
+    /// after every cell holds one. Only a cells placement group uses it.
+    Cells,
 }
 
 /// Placement authority retained independently from sampled performance points.
@@ -1395,6 +1403,8 @@ pub enum GroupLayout {
     HorizontalSourceOrder,
     Scatter,
     Tile,
+    /// One copy per cell sized to the copy, shifted inside its cell (Score 0.19).
+    Cells,
 }
 
 /// One source head's complete body, placed without changing its internal geometry.
@@ -1735,7 +1745,8 @@ impl Score {
         let positive = |value: f64| value.is_finite() && value > 0.0;
         match recipe {
             ResolvedPlacementRecipe::Place
-            | ResolvedPlacementRecipe::ScatterUniformWithCentroidTranslation => Ok(()),
+            | ResolvedPlacementRecipe::ScatterUniformWithCentroidTranslation
+            | ResolvedPlacementRecipe::Cells => Ok(()),
             ResolvedPlacementRecipe::HorizontalLine { cell_width } if positive(*cell_width) => {
                 Ok(())
             }
@@ -2079,6 +2090,9 @@ impl Score {
                 return Err("template_single requires one enclosing-group-owned template");
             }
             Self::validate_resolved_recipe(&resolved.recipe, u64::from(arrangement.count))?;
+            if matches!(resolved.recipe, ResolvedPlacementRecipe::Cells) {
+                return Err("cells recipes belong to cells placement_groups");
+            }
         }
 
         let mut repetition_end = 0;
@@ -2244,7 +2258,18 @@ impl Score {
                 {
                     return Err("scatter and tile placement_groups require Score version 0.8.0");
                 }
+                GroupLayout::Cells if !self.edition_at_least(ScoreEdition::V0_19) => {
+                    return Err("cells placement_groups require Score version 0.19.0");
+                }
                 _ => {}
+            }
+            // Cells exist only as resolved recipes; the layout and the recipe go together.
+            if (group.layout == GroupLayout::Cells)
+                != group.resolved.as_ref().is_some_and(|resolved| {
+                    matches!(resolved.recipe, ResolvedPlacementRecipe::Cells)
+                })
+            {
+                return Err("cells placement_groups require the resolved cells recipe");
             }
             if group.start < previous_end
                 || group.start > group.end

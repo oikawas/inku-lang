@@ -79,7 +79,7 @@ Description requestでは、Stage 1が受け取れるのは上限付きsignature
 
 ## 語の個数を受ける引数
 
-語に書いた個数（`Nature.若葉を10枚`、`Place 10 Nature.YoungLeaves`）は、定義が受けると宣言しない限り、語全体の外側の繰り返しになる。中の個数として受けるには、整数のparameterに`receives: "count"`、範囲、書かれなかったときの候補を宣言し、本体の`repeat`の`count`でそのparameterを読む。
+語に書いた個数（`Nature.若葉を10枚`、`Place 10 Nature.YoungLeaves`）は、定義が受けると宣言しない限り、語全体の外側の繰り返しになる。その写しは同じ場所に重ねず、呼出しの動作で一度だけ置く。動作なし・置く・散らす・引くは、描いた写しの大きさの区画に1枚ずつseedで置き、並べる・敷き詰めるはその動作どおりに置く（I-708）。中の個数として受けるには、整数のparameterに`receives: "count"`、範囲、書かれなかったときの候補を宣言し、本体の`repeat`の`count`でそのparameterを読む。
 
 ```json
 "leaf_count": {"type": "integer", "receives": "count", "minimum": 1, "maximum": 12, "omitted": [4, 5, 6], "counter": "flat"}
@@ -167,11 +167,11 @@ previewの出典として使われ、その展開の散文は定義として解�
 lockした定義を使うので、切り替えの影響を受けない。どれも語彙macroのauthoring APIまたは
 loading APIではない。
 
-Score 0.9の`placement_groups.members`はMacro bodyを順序付きdrawable範囲とAnchor所有として原子的に運ぶ。Macro authoring operatorや反復個体化を追加せず、group head countと内部Emit countを分ける。standalone Macroの外側反復もsymbolic planへ保持し、個体化はStep11で行う。
+Score 0.9の`placement_groups.members`はMacro bodyを順序付きdrawable範囲とAnchor所有として原子的に運ぶ。Macro authoring operatorや反復個体化を追加せず、group head countと内部Emit countを分ける。個数を受けないstandalone Macroに2以上の個数を書いた呼出しは、呼出しの動作で置く成員1つの配置groupになる。動作なし・置く・散らす・引くは`cells`（Score 0.19.0）、並べる・敷き詰めるは`horizontal_source_order`・`tile`である（I-708）。個数1と、位置・埋める・順序・関係を持つ呼出し、鏡写しの対象になる呼出しは、外側反復をsymbolic planへ保持する。
 
 memberの`transform_group_indices`はsource-owned内部transformを配置前に保つ。先行drawableの後にAnchor-only Transform memberが続く場合も、validなmember範囲はそのAnchorを含む。unlistedの同範囲transformはouterとして後に実行する。
 
-`CompositionPlanResult.standalone_macro_repetitions`は既存body位置、range、Anchor、内部transform、source head repeat countをsymbolicに保持し、outer placementやactual Score instanceを作らない。
+`CompositionPlanResult.standalone_macro_repetitions`は既存body位置、range、Anchor、内部transform、source head repeat countをsymbolicに保持し、outer placementやactual Score instanceを作らない。ここに残るのは外側反復を保つ呼出しだけで、ほかの個数付きの呼出しは配置groupの成員になる（I-708）。
 
 Compatibility importerは`legacy_plugin_format`を報告し、macroごとに`Imported`または
 `Omitted` outcomeを返す。既存作品は、保存済みScoreまたは展開済みartifactを優先する。

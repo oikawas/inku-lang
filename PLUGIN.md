@@ -208,7 +208,7 @@ Flat Emit fields with those names accept exact values. `width`+`height`, `chord`
 
 ## A Parameter That Receives the Word's Count
 
-A count written on a word (`Nature.若葉を10枚`, `Place 10 Nature.YoungLeaves`) repeats the whole word from outside unless the definition declares that it receives it. To take it as the inner count, declare an integer parameter with `receives: "count"`, its bounds, and the choices for a call that writes no count, and read that parameter as the `count` of a body `repeat`.
+A count written on a word (`Nature.若葉を10枚`, `Place 10 Nature.YoungLeaves`) repeats the whole word from outside unless the definition declares that it receives it. The copies are not stacked in one place: the call's action lays them out once. No action, placing, scattering, and drawing put one copy in each cell sized to the drawn copy, by the seed; lining up and tiling follow their actions (I-708). To take it as the inner count, declare an integer parameter with `receives: "count"`, its bounds, and the choices for a call that writes no count, and read that parameter as the `count` of a body `repeat`.
 
 ```json
 "leaf_count": {"type": "integer", "receives": "count", "minimum": 1, "maximum": 12, "omitted": [4, 5, 6], "counter": "flat"}
@@ -297,11 +297,11 @@ remains unfinished. The Server's settings screen no longer creates or edits docu
 saved works use their locked definitions and are unaffected. None of these is an
 authoring or loading API for vocabulary macros.
 
-Score 0.9 `placement_groups.members` carries one Macro body as atomic ordered drawable ranges and Anchor ownership. It does not create a Macro authoring operator or materialize individual repetitions; group-head count and internal Emit count remain separate. A standalone Macro also retains its outer repetitions symbolically; instance materialization belongs to Step11.
+Score 0.9 `placement_groups.members` carries one Macro body as atomic ordered drawable ranges and Anchor ownership. It does not create a Macro authoring operator or materialize individual repetitions; group-head count and internal Emit count remain separate. A standalone Macro written with a count of two or more that it does not receive becomes one member of a placement group laid out by the call's action: `cells` (Score 0.19.0) for no action, placing, scattering, and drawing, and `horizontal_source_order` or `tile` for lining up and tiling (I-708). A count of one, and a call with a position, a fill, an order, or a relation, or one that a mirror takes as its target, keeps its outer repetitions symbolically.
 
 Member `transform_group_indices` retains source-owned internal transforms before placement. Their valid member range contains their Anchors even when an Anchor-only transformed member follows an earlier drawable member; unlisted equal-range transforms remain outer and run afterward.
 
-`CompositionPlanResult.standalone_macro_repetitions` retains the existing body positions, range, Anchors, internal transforms, and source-head repeat count symbolically; it creates no outer placement or actual Score instances.
+`CompositionPlanResult.standalone_macro_repetitions` retains the existing body positions, range, Anchors, internal transforms, and source-head repeat count symbolically; it creates no outer placement or actual Score instances. It holds only the calls that keep the outer repetition; other counted calls are placement-group members (I-708).
 
 A compatibility importer reports `legacy_plugin_format` and returns a
 per-macro `Imported` or `Omitted` outcome. Existing works prefer their stored

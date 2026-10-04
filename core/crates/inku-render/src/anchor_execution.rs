@@ -1922,6 +1922,10 @@ impl Execution<'_> {
                     (ordinal % columns) as f64 * domain.x / columns as f64,
                     (ordinal / columns) as f64 * domain.y / rows as f64,
                 ),
+                // Cells exist only as resolved recipes, which the typed path performs.
+                inku_score::GroupLayout::Cells => {
+                    return Err(ScoreExecutionReason::InvalidCompactPerformance);
+                }
             };
             let delta = Point::new(target.x - center.x, target.y - center.y);
             for instruction in member.start..member.end {
@@ -1999,6 +2003,77 @@ impl Execution<'_> {
         self.correct_external_relations(scope_index)
     }
 
+    /// The bounds of one placement member as performed, before its placement:
+    /// its drawn instructions and its anchors.
+    fn performed_member_bounds(
+        &self,
+        member: &inku_score::PlacementMember,
+    ) -> Result<Bounds, ScoreExecutionReason> {
+        let mut bounds = None;
+        for instruction in member.start..member.end {
+            for value in &self.sources[instruction].performed {
+                merge_bounds(
+                    &mut bounds,
+                    crate::affine_geometry::bounds(
+                        &value.instruction,
+                        self.request.performance_seed,
+                        value.ordinal,
+                        self.request.canvas,
+                        value.seed_override,
+                        self.sources[instruction].transform,
+                    )
+                    .ok_or(ScoreExecutionReason::UnsupportedTransformGroupRelation)?,
+                );
+            }
+        }
+        for &anchor in &member.anchor_indices {
+            let point =
+                self.anchors[anchor].ok_or(ScoreExecutionReason::ConnectedReferenceOmitted)?;
+            merge_bounds(
+                &mut bounds,
+                Bounds {
+                    min: point,
+                    max: point,
+                },
+            );
+        }
+        bounds.ok_or(ScoreExecutionReason::UnsupportedTransformGroupRelation)
+    }
+
+    /// One cell per copy of a cells group, each cell at least the size of the
+    /// largest performed copy, which relations inside the body may have moved.
+    fn cells_member_centers(
+        &self,
+        group: &inku_score::PlacementGroup,
+        seed: crate::types::Seed,
+    ) -> Result<Vec<Point>, ScoreExecutionReason> {
+        let Some(inku_score::ResolvedPlacementGroup {
+            domain,
+            anchor: inku_score::ResolvedPlacementAnchor::Named { region },
+            ..
+        }) = group.resolved.as_ref()
+        else {
+            return Err(ScoreExecutionReason::InvalidCompactPerformance);
+        };
+        let mut copy = Point::new(0.0, 0.0);
+        for member in &group.members {
+            let bounds = self.performed_member_bounds(member)?;
+            copy.x = copy.x.max(bounds.max.x - bounds.min.x);
+            copy.y = copy.y.max(bounds.max.y - bounds.min.y);
+        }
+        let [x0, y0, _, _] =
+            crate::placement::region_in_short_side_units(*region, self.request.canvas);
+        let origin =
+            crate::geometry::point_to_short_side_units(Point::new(x0, y0), self.request.canvas);
+        Ok(crate::placement::cells_centers(
+            *domain,
+            origin,
+            copy,
+            group.members.len(),
+            seed,
+        ))
+    }
+
     fn perform_typed_placement(
         &mut self,
         scope_index: usize,
@@ -2016,43 +2091,17 @@ impl Execution<'_> {
         {
             return Err(ScoreExecutionReason::InvalidCompactPerformance);
         }
+        let member_centers = match placement.cells_seed {
+            Some(seed) => self.cells_member_centers(&group, seed)?,
+            None => placement.member_centers,
+        };
         for ((member, target), fill_scopes) in group
             .members
             .iter()
-            .zip(placement.member_centers)
+            .zip(member_centers)
             .zip(placement.member_fill_scope_indices)
         {
-            let mut bounds = None;
-            for instruction in member.start..member.end {
-                for value in &self.sources[instruction].performed {
-                    merge_bounds(
-                        &mut bounds,
-                        crate::affine_geometry::bounds(
-                            &value.instruction,
-                            self.request.performance_seed,
-                            value.ordinal,
-                            self.request.canvas,
-                            value.seed_override,
-                            self.sources[instruction].transform,
-                        )
-                        .ok_or(ScoreExecutionReason::UnsupportedTransformGroupRelation)?,
-                    );
-                }
-            }
-            for &anchor in &member.anchor_indices {
-                let point =
-                    self.anchors[anchor].ok_or(ScoreExecutionReason::ConnectedReferenceOmitted)?;
-                merge_bounds(
-                    &mut bounds,
-                    Bounds {
-                        min: point,
-                        max: point,
-                    },
-                );
-            }
-            let center = bounds
-                .ok_or(ScoreExecutionReason::UnsupportedTransformGroupRelation)?
-                .center();
+            let center = self.performed_member_bounds(member)?.center();
             let translation =
                 AffineTransform::translation(Point::new(target.x - center.x, target.y - center.y));
             for instruction in member.start..member.end {

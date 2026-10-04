@@ -25,6 +25,64 @@ pub fn scatter_position(index: usize, seed: Seed, margin: f64) -> Point {
     )
 }
 
+/// Centers for `count` copies no larger than `copy`, one per cell of `domain`
+/// starting at `origin` (canvas-short-edge units). Each axis has as many cells
+/// as fit the copy, at least one and at most `count`, so every cell holds a
+/// copy. The seed draws distinct cells for the first copies (a partial
+/// Fisher-Yates shuffle, whose work follows the copies, not the cells); later
+/// copies take the same cells again in the same order. Each copy shifts inside
+/// its cell by at most the room the copy leaves there.
+#[must_use]
+pub fn cells_centers(
+    domain: Point,
+    origin: Point,
+    copy: Point,
+    count: usize,
+    seed: Seed,
+) -> Vec<Point> {
+    if count == 0 {
+        return Vec::new();
+    }
+    let fit = |extent: f64, copy: f64| {
+        let cells = extent / copy;
+        if !(copy > 0.0 && cells.is_finite()) || cells >= count as f64 {
+            count
+        } else {
+            (cells.floor() as usize).max(1)
+        }
+    };
+    let columns = fit(domain.x, copy.x);
+    let rows = fit(domain.y, copy.y);
+    let cell = Point::new(domain.x / columns as f64, domain.y / rows as f64);
+    let room = Point::new((cell.x - copy.x).max(0.0), (cell.y - copy.y).max(0.0));
+    let cells = columns.saturating_mul(rows);
+    let distinct = count.min(cells);
+    let mut moved = std::collections::HashMap::new();
+    let mut order = Vec::with_capacity(distinct);
+    for index in 0..distinct {
+        let span = cells - index;
+        let pick = index
+            + ((hash01(index as i64, seed, "cells-order") * span as f64) as usize).min(span - 1);
+        let chosen = moved.get(&pick).copied().unwrap_or(pick);
+        moved.insert(pick, moved.get(&index).copied().unwrap_or(index));
+        order.push(chosen);
+    }
+    (0..count)
+        .map(|index| {
+            let cell_index = order[index % distinct];
+            let (column, row) = (cell_index % columns, cell_index / columns);
+            Point::new(
+                origin.x
+                    + (column as f64 + 0.5) * cell.x
+                    + (hash01(index as i64, seed, "cells-shift-x") - 0.5) * room.x,
+                origin.y
+                    + (row as f64 + 0.5) * cell.y
+                    + (hash01(index as i64, seed, "cells-shift-y") - 0.5) * room.y,
+            )
+        })
+        .collect()
+}
+
 #[must_use]
 pub fn rhythm_parameter(index: usize, count: usize, seed: Seed, spacing: RhythmSpacing) -> f64 {
     if count <= 1 {

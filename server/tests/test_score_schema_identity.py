@@ -121,13 +121,13 @@ def test_checked_in_score_schema_matches_the_live_pydantic_model() -> None:
     assert {"version", "canvas", "background", "presence", "instructions", "anchors", "transform_groups", "placement_groups", "repetition_groups", "fill_groups", "mirror_relations", "resource_policy"} <= properties.keys()
 
     assert properties["version"]["default"] == "0.9.0"
-    assert properties["version"]["enum"] == ["0.18.0", "0.17.0", "0.16.0", "0.15.0", "0.14.0", "0.13.0", "0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
+    assert properties["version"]["enum"] == ["0.19.0", "0.18.0", "0.17.0", "0.16.0", "0.15.0", "0.14.0", "0.13.0", "0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
     transform_group = schema["$defs"]["TransformGroup"]["properties"]
     assert {"start", "end", "rotation_degrees", "scale_x", "scale_y", "translate_x", "translate_y", "fixed_position_indices", "anchor_indices"} <= transform_group.keys()
     placement_group = schema["$defs"]["PlacementGroup"]["properties"]
     assert {"start", "end", "layout", "at", "members", "resolved", "cycle_members"} == placement_group.keys()
     assert placement_group["layout"]["enum"] == [
-        "overlap", "horizontal_source_order", "scatter", "tile"
+        "overlap", "horizontal_source_order", "scatter", "tile", "cells"
     ]
     placement_member = schema["$defs"]["PlacementMember"]["properties"]
     assert {"start", "end", "anchor_indices", "transform_group_indices", "symbolic"} == placement_member.keys()
@@ -227,6 +227,36 @@ def test_score18_records_a_fill_range_written_in_numbers() -> None:
     assert score.fill_groups[0].target.owner.kind == "numeric_range"
     with pytest.raises(ValueError, match="fill target numeric_range requires Score version 0.18.0"):
         Score.model_validate({**_NUMERIC_FILL_RANGE_SCORE, "version": "0.17.0"})
+
+
+# Compiled by core (DDL engine 57) from 「Nature.紅葉を3枚置く。」: the three
+# copies of the maple leaf are one member of a cells placement group (I-708).
+_CELLS_SCORE = json.loads(
+    (Path(__file__).parent / "data" / "score-0.19-maple-leaves-in-cells.json").read_text(encoding="utf-8")
+)
+
+
+def test_score19_places_the_copies_of_a_word_in_cells() -> None:
+    from copy import deepcopy
+
+    score = Score.model_validate(_CELLS_SCORE)
+    assert score.version == "0.19.0"
+    group = score.placement_groups[0]
+    assert group.layout == "cells"
+    assert group.resolved.recipe.kind == "cells"
+    assert group.members[0].symbolic.instance_count == 3
+    with pytest.raises(ValueError, match="cells placement_groups require Score version 0.19.0"):
+        Score.model_validate({**_CELLS_SCORE, "version": "0.18.0"})
+    unpaired = deepcopy(_CELLS_SCORE)
+    unpaired["placement_groups"][0]["resolved"]["recipe"] = {
+        "kind": "scatter_uniform_with_centroid_translation"
+    }
+    with pytest.raises(ValueError, match="cells placement_groups require the resolved cells recipe"):
+        Score.model_validate(unpaired)
+    template = deepcopy(_CELLS_SCORE)
+    template["instructions"][0]["arrangement"]["resolved"]["recipe"] = {"kind": "cells"}
+    with pytest.raises(ValueError, match="cells recipes belong to cells placement_groups"):
+        Score.model_validate(template)
 
 
 def test_score010_compact_recipe_reads_without_changing_the_default_edition() -> None:

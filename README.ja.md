@@ -109,6 +109,8 @@ DDLは簡単な日本語（または、英語）で書かれており、誰で�
 
 ## Quick Start
 
+Android端末では、[GitHubのAPKをインストールする手順](docs/guide/android-apk.ja.md)を使えます。Android 15以降・arm64端末向けです。
+
 ### 0. Docker Desktop で始める（ChatGPTプラン・シングルユーザー）
 
 自分の Mac の Docker Desktop で inku のコンテナを動かし、本人の ChatGPT サブスクリプションの利用枠で描きます。シングルユーザーモードなので、ログイン画面もパスワードもありません。Docker Desktop・Git・[`uv`](https://docs.astral.sh/uv/)・Chrome（または Brave）を用意します。Windows は WSL 2 の中で同じ手順を使えますが、ChatGPT の認証は未確認です。

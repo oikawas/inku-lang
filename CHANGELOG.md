@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### Android 2.1.4-android.88 — Publish a signed APK on GitHub (Build 148372, 2026-10-04)
+
+Distribute the current Android app, including the ChatGPT plan, shared composition, cell placement for counts and variation retirement, as a public APK for Android 15 or newer on arm64. A dedicated distribution signature means debug installations cannot update directly. A reproducible-release option uses the finalized Build while retaining ordinary automatic increments. Bundle the resolved runtime LICENSE and NOTICE files, LiteRT-LM's complete upstream JNI notices and the shared Rust license inventory. Japanese and English guides cover installation, updates and preservation of existing works. Other application versions and deployments are unchanged.
+
 ### v2.15.86 — Retire variation (Build 1162, 2026-10-04)
 
 This version aligns variation retirement across the core, Server, Web, CLI, Android and their documentation. Refinement has four operations: touch, placement, reading and color catalog. Saved values, configurations and lineage remain; only old-work records display Variation (retired). DDL engine 57, render engine 73 and Score 0.19.0 are retained.

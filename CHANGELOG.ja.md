@@ -6,6 +6,10 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### Android 2.1.4-android.88 — GitHubで署名付きAPKを配布する（Build 148372、2026-10-04）
+
+ChatGPTプラン・共有構図・個数の区画配置と変奏廃止を含む現行Androidを、Android 15以降・arm64向けの公開APKとして配布する。専用の公開署名を使い、debug版からの直接更新はできない。確定したBuildでreleaseを再現する指定を追加し、通常の自動採番を保持した。実際のruntime依存のLICENSE・NOTICE、LiteRT-LM JNIの上流全文、共有Rustのライセンス集をAPKへ同梱し、導入・更新と既存作品の保全条件を日英で案内する。Android以外の版・配備は変更しない。
+
 ### v2.15.86 — 変奏を廃止する（Build 1162、2026-10-04）
 
 変奏の廃止をcore・Server・Web・CLI・Androidの実装と文書で揃えた版。推敲はタッチ・配置・読み取り・色カタログの4操作となる。保存済みの値・設定・系譜は保持し、旧作品の記録だけを「変奏（旧）」として読む。DDL engine 57、render engine 73、Score 0.19.0は維持する。

@@ -136,6 +136,8 @@ All three were generated on Build 667 with render engine 10, using `nvidia:googl
 
 ## Quick Start
 
+On Android, follow [Install the GitHub APK](docs/guide/android-apk.md). It supports Android 15 or newer on arm64 devices.
+
 ### 0. Docker Desktop (ChatGPT plan, single user)
 
 Run inku in containers on Docker Desktop on your own Mac and paint with your ChatGPT subscription's allowance. Single-user mode means no login screen and no password. You need Docker Desktop, Git, [`uv`](https://docs.astral.sh/uv/), and Chrome (or Brave). Windows can follow the same steps inside WSL 2, but the ChatGPT sign-in there has not been verified.

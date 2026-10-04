@@ -76,6 +76,7 @@ PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
     ("docs/guide/revision.ja.md", "docs/guide/revision.md", "shape", None),
     ("docs/guide/chatgpt-plan.ja.md", "docs/guide/chatgpt-plan.md", "shape", None),
     ("docs/guide/docker-desktop.ja.md", "docs/guide/docker-desktop.md", "shape", None),
+    ("docs/guide/android-apk.ja.md", "docs/guide/android-apk.md", "shape", None),
     # Public architecture documentation. The Japanese files preserve the
     # design account; the English files follow the project glossary. All pairs
     # are maintained section for section.

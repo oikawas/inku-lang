@@ -48,6 +48,12 @@ fun nextAndroidBuildNumber(): Int {
     val buildNumberFile = rootProject.file("BUILD_NUMBER")
     val current = buildNumberFile.readText().trim().toInt()
     if (!shouldIncrementAndroidBuildNumber()) return current
+    if (providers.gradleProperty("inkuAndroidReproducibleRelease").orNull == "true") {
+        check(gradle.startParameter.taskNames.all {
+            it.substringAfterLast(':') in setOf("assembleRelease", "bundleRelease")
+        }) { "A reproducible release must request only assembleRelease or bundleRelease." }
+        return current
+    }
     // Build number is intentionally incremented only for package-producing tasks.
     // Avoid invoking assemble/install from unrelated checks when a clean worktree is required.
     // A role checkout can lag behind an APK already on the test device.
@@ -206,6 +212,29 @@ val syncRustAndroidArm64 = tasks.register<Sync>("syncRustAndroidArm64") {
     dependsOn(buildRustAndroidArm64)
     from(rustLibrary)
     into(rustGeneratedJniLibsDirectory.map { it.dir("arm64-v8a") })
+}
+
+val releaseNoticeDirectory = layout.buildDirectory.dir("generated/releaseNotices")
+android.sourceSets.getByName("release").assets.srcDir(releaseNoticeDirectory)
+val generateReleaseNotices = tasks.register<Exec>("generateReleaseNotices") {
+    group = "build"
+    description = "Bundle exact Android runtime and native dependency notices into release APKs."
+    doFirst {
+        val artifacts = configurations.getByName("releaseRuntimeClasspath")
+            .resolvedConfiguration.resolvedArtifacts.map {
+                mapOf("group" to it.moduleVersion.id.group, "name" to it.moduleVersion.id.name,
+                    "version" to it.moduleVersion.id.version, "file" to it.file.absolutePath)
+            }.sortedBy { "${it["group"]}:${it["name"]}:${it["version"]}" }
+        val inventory = layout.buildDirectory.file("release-notice-inventory.json").get().asFile
+        inventory.parentFile.mkdirs()
+        inventory.writeText(groovy.json.JsonOutput.toJson(artifacts))
+        commandLine("python3", rootProject.file("scripts/build_release_notices.py"),
+            "--inventory", inventory, "--gradle-cache", gradle.gradleUserHomeDir.resolve("caches/modules-2/files-2.1"),
+            "--output", releaseNoticeDirectory.get().asFile)
+    }
+}
+tasks.configureEach {
+    if (name == "mergeReleaseAssets") dependsOn(generateReleaseNotices)
 }
 
 val checkRustNativePackagingInput = tasks.register("checkRustNativePackagingInput") {

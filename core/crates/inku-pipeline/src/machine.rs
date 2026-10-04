@@ -1147,6 +1147,10 @@ impl PipelineSnapshot {
         description: Option<String>,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
+        // A kept candidate answers only a returned Stage 1 request; once Stage 1
+        // settles it ends, also when the composition reading comes next.
+        self.stage1_fallback = None;
+        self.stage1_fallback_plan = None;
         let (Some(config), Some(plan)) = (
             self.config.composition,
             plan.filter(|plan| !plan.layers.is_empty()),

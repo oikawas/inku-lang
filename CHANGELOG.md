@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-04 — A returned Stage 1 no longer stops at the composition reading
+
+When an underdrawing's layers are drawn only in the ground's colour, Stage 1 keeps the candidate and asks once more. When the answer to that request settled and the run went on to the composition reading, the kept candidate outlived Stage 1, and passing the reading result stopped at the state check with `invalid_state` (seen on Pentala 5173 with ChatGPT's GPT-6-Astra; any model on the same path could hit it). The kept candidate belongs to the returned request only, and it now ends when Stage 1 settles. Taking the kept candidate when the returned request fails, the default reading when no composition reading can be used, and the prompt, response schema and retry rules are unchanged. A test walks the return, the settled second answer, the composition reading and the commit. Saved works are unchanged.
+
 ### v2.15.82 — Draw tall underdrawing shapes upright (Build 1158, 2026-10-04)
 
 This version includes the shared-core fix that prevents tall underdrawing shapes from taking the angle vertical (I-710). It retains the ChatGPT settings, published-model, drawing failure display and streamed-response fixes. The angle semantics of directly written DDL, saved works, and DDL, Score and render engine versions are unchanged. The entries for this date and October 3 give each fix's rules and checks.

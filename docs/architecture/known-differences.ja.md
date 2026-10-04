@@ -25,7 +25,7 @@
 ### F-04 Stage 1.5の長い旧説明（解消）
 
 - 旧snapshotでは `SPEC.ja.md` §12.11が、数学・音楽・絵画候補を追加する旧設計を詳述していた。
-- 現行の§12.11は、`CanonicalReady`のtyped meaningだけを受けて焦点と明示変奏だけを変えるtyped transformationとして書き直されている。
+- 現行の§12.11は、`CanonicalReady`のtyped meaningだけを受けて入力を検証し、effective meaningの同一性だけを担うtyped transformationとして書き直されている（焦点は2026-09-27、明示変奏は2026-10-04に外した）。
 - 判定: **解消済み**。
 
 ### F-05 Project Contextに残る古い記述（解消）

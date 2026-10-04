@@ -138,7 +138,7 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 - **あいだカテゴリは観察可能な関係のみ**：「沿う」「触れない」は外部から観察できる位置関係。「寄り添う」「呼応する」のような意図・擬人の語は排除（詳細は Section 14）。語彙（名詞）ではなく述語（統語）の追加であり、プラグイン原則1と矛盾しない
 - **おもてカテゴリは面や痕の技法を言う状態の名詞**：動作の「塗る」ではなく「塗り」を使う。語は面の質（空・塗り・刷き・粒・点描・平行線・交差線・アクアチント）だけを言い、濃さはさばきが言う。紙目は支持体（じカテゴリ）が引き取る。`粒`と`刷き`は線・弧にも残し、痕の在り方として読む。粒は支持体の吸い方・歯を上げ、刷きは紙の性質を変えず、幅3.0倍の帯を作る。刷きは自らの淡さを持たない（線の帯は道具の不透明度の0.8倍、閉じた面の掃きは0.5。作者が比較シートで選んだ、2026-09-29）。淡さはさばきの「薄い」が持つ。保存済みScoreの`wash`（v1の薄墨）は、幅3.0倍・不透明度0.35倍の淡い帯のまま描く。移行で薄墨は薄い刷きになり、少し濃く描かれる（線0.44・面0.275に対し、薄墨は0.35・0.22）。残る6種は直前の閉じた図形へ移し、対象がなければ落とす。閉じた図形に明示した刷き・粒・点描・平行線・交差線・アクアチントは、それ自体がその面の演奏であり、下に平塗りを重ねない（DDL engine 46）。平塗りは「塗り」を明示した場合と、面を省略した閉じた図形の既定だけに使う。現行のにじみは独立したゆらぎであり、おもての質には含めない。背景を埋める指示は面の指定ではなく、documentの`background`へ届く。
 
-現行の `点描` はおもての `stipple`、`にじみ` はゆらぎの `bleeding` である。にじみは `ink_spread:"bleed"` として Wave / Perlin と独立に併用でき、単独では Perlin を加えず、強度語を増やさない通常の広がりを作る。v1 が入力として読んだ旧い語（点描の意味の`点`、`滲む` / `blurring`、`震える` / `trembling` / `trembles`、`中央` / `middle`）は、歳時記 v2 の移行で今の語へ書き換え、v2 は読まない（§3.3）。形の`点`は形の点だけを言う。保存済みScoreの`surface.texture="bleed"`と`variation.quality="pink"`は旧描画の意味を保持する。編集または再生成は新しい変奏へ進む。
+現行の `点描` はおもての `stipple`、`にじみ` はゆらぎの `bleeding` である。にじみは `ink_spread:"bleed"` として Wave / Perlin と独立に併用でき、単独では Perlin を加えず、強度語を増やさない通常の広がりを作る。v1 が入力として読んだ旧い語（点描の意味の`点`、`滲む` / `blurring`、`震える` / `trembling` / `trembles`、`中央` / `middle`）は、歳時記 v2 の移行で今の語へ書き換え、v2 は読まない（§3.3）。形の`点`は形の点だけを言う。保存済みScoreの`surface.texture="bleed"`と`variation.quality="pink"`は旧描画の意味を保持する。編集または再生成は新しいvariationへ進む。
 - **さばきカテゴリは墨や絵具の置き方を言う語**（歳時記 v2、2026-09-29）：濃い・程よい・薄いの3語で、面の質とは別の次元として、どの痕（線・弧・質感の面・平らな塗り）にも付けられる。道具ごとの相対指定であり、絶対の濃さではない。程よい（2026-09-30 作者裁定）は道具の本来の濃さで置く語で、さばきの語の無い痕と同じに描く（Score の `normal`）。下絵（Stage 1）は、さばきを層ごとに必ず選ぶ（応答の型の必須の欄、2026-09-30）。任意の欄のままでは読み手が層の半分ほどでさばきを書かず、記述が言った淡さが落ちたためである。筆の運び（速さなど）を言う語は、このカテゴリに加えてよい（§2の5）。
 - **じカテゴリは支持体の名前のみ**（2026-08-15 新設・render engine 34）：**紙・和紙・薄墨地・木炭地・カンバス・画用紙・メゾチント の 7 語**で、`canvas.ground.material` の値になる。**おもてが閉じた図形の内側を言うのに対し、じはキャンバスそのものを言う** —— 記述では地の名を一文として「和紙。」「薄墨地。」のように書く。見出しを付けた「地: ...」「面: ...」の書き方は受理しない（2026-09-24）。面の質は「刷きの円」のように図形の修飾語として書く。**7 種は `<pattern>` のタイルとして敷かれ、`<filter>` を 1 つも使わないので、3 つの SVG profile が同じ地を出す。****費用の歯止めは要素数ではなく地の層のバイト数である**（24 KB）。
 - **「ランダム」は記述者の入力としては禁止しない**。禁止されるのは Score / 正規化DDL の内部表現に無秩序を残すことであり、記述者が「ランダムに散らす」と書いた場合は Stage 1 が「画面全体に点々と」「ばらつく」「散らす」などの観察可能な配置へ解釈する。
@@ -172,7 +172,7 @@ Webの歳時記previewも現行カテゴリに合わせる。おもて8語は同
 - **一語一意**：歳時記の一つの語は一つの意味だけを持ち、文の中の位置や前後の語で意味を読み分けない。日本語と英語の両方で守り、構文の修飾語（太さ・大きさ）とも同じ語を別の意味で使わない。読み手（Stage 1）が読み書きする下絵の応答の型の値と欄の名も語として扱い、同じ原則に従う。多義や掛詞は記述（§5.1の詩歌の層）の自由であり、読み手がそれを可視DDLの一つの語へ読み解く。
 - **語はその性質のカテゴリに置き、名は意味を言う**：おもては面の技法を、ゆらぎは痕の揺れの形を言う。
 - **構造で伝える**：語は持ち主（歳時記の共有assetと構文の修飾語の表）で変え、下絵の語の一覧・受理行列・応答の型へ投影して読み手に届ける。指示文の説明だけを変えて済ませない。
-- **版を上げて移行する**：語の形・意味・カテゴリを変えるときは、歳時記の版（資料のid。現行は`inku.saijiki.v2`）を上げる。DDLの文書は、読んだ歳時記の版を記録する。pipelineの文書と作品の保存に資料のidを書き、欄の無い文書は`inku.saijiki.v1`で書かれたものとする。pipelineは欄の無い文書と、移行でしか通らない定義を`saijiki_migration_required`で止め、hostが移行して上書きで保存する（2026-09-29 作者裁定）。保存済みの文書は旧い版の文法で読み、語の意味ごとに新しい版の語へ一度だけ上書きで書き換える。保存済みのMacro定義も同じく書き換え、作品が持つMacroのlockは新しい定義へ移す（2026-09-29 作者裁定）。文字列は置換しない。保存済みのScoreとSVGは書き換えない。旧い版の読み方は残さず、旧い語を隠れた別名として残したり、位置で読み分けたりして互換を取らない。この移行は語の意味を変えないので新しい変奏を作らず、§12.8の再正規化（作者のDDLを書き換えない）とは別の操作である。
+- **版を上げて移行する**：語の形・意味・カテゴリを変えるときは、歳時記の版（資料のid。現行は`inku.saijiki.v2`）を上げる。DDLの文書は、読んだ歳時記の版を記録する。pipelineの文書と作品の保存に資料のidを書き、欄の無い文書は`inku.saijiki.v1`で書かれたものとする。pipelineは欄の無い文書と、移行でしか通らない定義を`saijiki_migration_required`で止め、hostが移行して上書きで保存する（2026-09-29 作者裁定）。保存済みの文書は旧い版の文法で読み、語の意味ごとに新しい版の語へ一度だけ上書きで書き換える。保存済みのMacro定義も同じく書き換え、作品が持つMacroのlockは新しい定義へ移す（2026-09-29 作者裁定）。文字列は置換しない。保存済みのScoreとSVGは書き換えない。旧い版の読み方は残さず、旧い語を隠れた別名として残したり、位置で読み分けたりして互換を取らない。この移行は語の意味を変えないので新しいvariationを作らず、§12.8の再正規化（作者のDDLを書き換えない）とは別の操作である。
 
 歳時記 v2（2026-09-29）で、v1 の例外は改めた：英語の`large`の二義、おもての`濃い`・`薄い`（形容詞）と`薄墨`（素材の名）、ゆらぎの`ゆっくり`・`速く`（波の数）、下絵の応答の型の値`fine`・`large`・`solid`と欄の名`place`。今は例外を持たない。
 
@@ -231,7 +231,7 @@ Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であ�
 
 全domainは一つのversioned `inku.macro-definition.v1`を使う。Tree / human / water等のdomain固有grammar、plugin別parser、plugin codeは作らない。Compilerはvisible invocationをlock解決し、closed typed parameterをbindingした後、attested composition seedとcaller-owned finite boundsでLLMなしにsemantic nodeへlate expansionし、通常のtyped loweringへ合流させる。Rendererはpluginを理解せず、後続の通常Scoreだけを受け取る。Description pathでStage 1へ渡せるのはbounded signature、parameter schema、short summaryだけであり、MacroDefinition本文やexpanded DDLをStage 1 / Stage 2 promptへ渡さない。Direct DDLのunknown / ambiguous qualified termをhidden LLM fallbackで補わない。その文だけを省略して描き切り、理由を作者に示す（§4.12）。
 
-同じ対象と明示指示へ一意に解決されたinlineとcontinuationは、文章の分割や照応の表面形から独立した同じcanonical meaningを持つ。したがって同じdrawing condition、policy / definition identity、attested seed、明示変奏なら、surface syntaxだけでmacro seed、effective meaningを変えない。unknown、ambiguity、conflictを等価と推測せず、関係・順序・数量・属性・action・parameter、または真正の複数macro invocationを消さない。この規則は一般の文順交換やgraph isomorphismを保証しない。
+同じ対象と明示指示へ一意に解決されたinlineとcontinuationは、文章の分割や照応の表面形から独立した同じcanonical meaningを持つ。したがって同じdrawing condition、policy / definition identity、attested seedなら、surface syntaxだけでmacro seed、effective meaningを変えない。unknown、ambiguity、conflictを等価と推測せず、関係・順序・数量・属性・action・parameter、または真正の複数macro invocationを消さない。この規則は一般の文順交換やgraph isomorphismを保証しない。
 
 宣言済みparameterへbindingされたmeaningは展開結果から読む。呼出し外側に残った属性はparameter bindingを再実装せずsource-owned診断とし、OmitAndContinueで未結合appearance fieldだけを省略した場合もMacroDefinition内の既存配色・touch・continuity・surfaceを保持する。未使用parameterは従来どおり受け入れ、parameter default / optionalや呼出し全体の新しい変換意味を追加しない。ただし語の個数を受けるparameter（§4.6）だけは、個数を書かない呼出しで定義が決める。
 
@@ -621,15 +621,15 @@ Web実装では、`+page.svelte`をroute composition shellとし、route lifecyc
 
 短い英語のタブ・ボタン・ラベルは `docs/i18n/glossary.md` の対応表と `web/src/lib/i18n/GLOSSARY.md` の文体規則に従う（2026-08-17 に対応表を前者へ統合した）。後者の規則を `npm run lint:i18n`（v2.7.1）が強制する。狭い画面や文字の拡大時には Canvas のタブと作品条件を折り返し、項目名と値のまとまりを保つ。左パネルもビューポートに合わせて伸縮する。
 
-Web アプリが現行の参照インターフェースである。v1.72 で推敲とモデル比較を一級の制作面にした。`推敲` タブはタッチ・配置・読み取り・色カタログ・変奏（§12.13）の変更をラジオ選択として提供する — **1 回の推敲で選べる介入はちょうど 1 つ**であり、系譜の各辺は 1 つの原因に帰属できる。
+Web アプリが現行の参照インターフェースである。v1.72 で推敲とモデル比較を一級の制作面にした。`推敲` タブはタッチ・配置・読み取り・色カタログの変更をラジオ選択として提供する — **1 回の推敲で選べる介入はちょうど 1 つ**であり、系譜の各辺は 1 つの原因に帰属できる。
 
-変奏を選ぶとそのラジオの直下に強度（控えめ／中庸／大胆、既定は中庸）が現れる。候補 1 案はサーバー採番の新しい seed を 1 つ、4 案は 4 つ使う。変奏のための独立した節やボタンは置かない。選んだ推敲要素はブラウザが記憶する。
+変奏（強度と変奏 seed で選ぶ推敲要素）は 2026-10-04 に廃止した（§12.13）。選んだ推敲要素はブラウザが記憶する。
 
 読み取りは上流の介入 1 つで、下流の配置とタッチは再生成される。候補 1 案または 4 案は選ばれた要素だけを振り、同じ選択・保存の手順を使い、2 列のグリッド（1 案なら全幅）でダイアログに収まる大きさで表示する。**ただしタッチは、利用者が「タッチへ託す言葉」を入力して 1 案だけ生成する。同じ言葉は同じタッチ seed になるため、4 案は提供しない。**
 
 選んだ推敲候補の保存は、自動でスターを付けずに通常の履歴へ入れる。保存操作は未保存・保存中・保存済みを区別し、保存済みの候補は二度保存できない。候補生成中は他の生成・描画操作を止め、3 秒後に共有の停止操作を出す（要求の中断で裏打ちする）。進捗の文言は実際に行っている作業を名指しする。読み取り候補は画像のホバーで正規化 DDL を出す。
 
-描画 seed と変奏 seed は独立した JavaScript 安全な乱整数で、初回生成から候補・履歴・再演まで持ち回る。タッチ候補は利用者が託した言葉から seed を決める。表示の描画は、正本の構図座標を変えずにタッチ seed の変化を見せる。
+描画 seed は JavaScript 安全な乱整数で、初回生成から候補・履歴・再演まで持ち回る。変奏 seed は 2026-10-04 に廃止し、保存済みの値は読むだけにした（§12.13）。タッチ候補は利用者が託した言葉から seed を決める。表示の描画は、正本の構図座標を変えずにタッチ seed の変化を見せる。
 
 色カタログの推敲は DDL・Score・キャンバス・配置 seed・描画 seed を固定したまま親と異なるカタログを当て、4 案は可能なかぎり異なるカタログを使う。色以外のすべての推敲は、次回描画の操作ではなく**表示中の親作品の実効カタログとキャンバスを継承する**。色の辺は `catalog_change` を使い、前後のカタログ ID を記録する。
 
@@ -731,13 +731,13 @@ PNG 書き出しの選択肢は、設定モーダルのエクスポートタブ�
 | 演奏 | 別の演奏 | performance seed による領域・関係・配置位相の解決（§13.8 / §14.4） | LLM 呼び出しなし（再レンダリングのみ） |
 | 構図 | 別の構図 | composition seed による、作者が明示したかたむきの具体角度選択・隅の四候補選択（§12.11 / §18） | LLM 呼び出しなし（保存済み正規化 DDL から組み直す） |
 
-別の構図が選び直すのは、記述にかたむきがあるときの具体角度と、`隅`の四候補である。`中心`は画面中央の領域で選び直さないので、かたむきも隅も無い作品では同じ絵になる。角度の数値化は共有lowererが`composition_seed`から行う。構図族、技法、色、タッチ、relation、要素数を発明・再選択してはならない。別の演奏と明示変奏は確定した角度を保つ。明示変奏（強度 小・中・大と variation seed）は受け取って記録するが、今は動かす軸が無く、effective meaningを変えない。以前は`中心`を六つの焦点候補の一つへ読み替え、変奏がその焦点を動かしていたが、作者が書いた位置を別の意味に読み替えないため、2026-09-27に外した。構図を決める機能は別に設計する。記述、正規化 DDL、明示属性は変えない。
+別の構図が選び直すのは、記述にかたむきがあるときの具体角度と、`隅`の四候補である。`中心`は画面中央の領域で選び直さないので、かたむきも隅も無い作品では同じ絵になる。角度の数値化は共有lowererが`composition_seed`から行う。構図族、技法、色、タッチ、relation、要素数を発明・再選択してはならない。別の演奏は確定した角度を保つ。以前は`中心`を六つの焦点候補の一つへ読み替え、変奏がその焦点を動かしていたが、作者が書いた位置を別の意味に読み替えないため、2026-09-27に外した。動かす軸の無くなった変奏は、2026-10-04に廃止した（§12.13）。構図を決める機能は別に設計する。記述、正規化 DDL、明示属性は変えない。
 
 この二段が §8.2 の「事後選択を中心にする」の実体である。分散の広い生成系では外れも増えるが、外れの処理は governor による事前の平均化ではなく、並んだものから選ぶという人間の行為に委ねる。選ぶことは記述を推敲することと並ぶ創作の一部である。品質の最終判定もこの事後選択に属し、judge metric は受け入れゲートではなく回帰検知の参考値として扱う。
 
 **UIラベル方針**: SPEC と内部設計では、記述 → 楽譜 → 演奏という音楽メタファーを維持する。一方、主要な操作ボタンでは、初めて触るユーザーが押した結果を予測しやすいように、メタファー語を直感的な操作語へ置き換える。UI上では `演奏` を `タッチ`、`構図` を `配置`、`解釈` を `読み取り` として扱う。現在画像から候補を作って選ぶ操作は Canvas 側の `推敲` タブに集約する。
 
-系譜の各辺を単一の介入として説明可能にするため、推敲要素はタッチ・配置・読み取り・色カタログ・変奏（§12.13）の5種類から一度に1種類だけを選択する。変奏を選択したときだけ強度（小・中・大、既定は中）をラジオ直下に表示し、1案は新規seed 1つ、4案は新規seed 4つの候補を生成する（独立した変奏セクションと専用ボタンは持たない）。タッチでは利用者が託す言葉から同じ seed が決まるため、1案だけを生成する。
+系譜の各辺を単一の介入として説明可能にするため、推敲要素はタッチ・配置・読み取り・色カタログの4種類から一度に1種類だけを選択する（変奏は2026-10-04に廃止した、§12.13）。タッチでは利用者が託す言葉から同じ seed が決まるため、1案だけを生成する。
 
 推敲要素の選択は前回値をブラウザに記憶する。UIはラジオ式の排他的選択とし、単一選択である旨を明記する。読み取りは一つの上流介入として扱い、その結果として配置とタッチを下流工程で再生成する。**読み取りの候補は、同じ記述で Stage 1 を候補ごとに呼び直して作り、候補の違いはモデルの標本化から生まれる。** `interpretation_seed` はその再解釈を識別する不透明な値で、履歴と系譜に残すが Stage 1 の入力には入れない。したがって同じ seed を渡しても同じ読みは再現しない（2026-09-26 に確認した現行の扱いで、Server と Android で同じ）。
 
@@ -1057,7 +1057,7 @@ Stage 2 LLMは、保存済み可視DDLにcompilerが明示したknown holeがあ
 
 回復可能な不成立は、旧Stop／OmitAndContinue入力にかかわらず、最小のfieldまたは実行単位を診断付きで省略して独立した描画を続ける。届かない意味を別のScore fieldへ補正せず、元ownerと順序を保つ。描画単位の全省略やintegrity失敗は停止し、完全成功、省略付き成功、停止を区別する。
 
-作者が明示したかたむきは、元meaningとtag付き`composition_seed`、logical occurrence、angle identityに束縛した共通resolverで、direct instructionとflat Macro Emitから一度だけ`Score.rotation`へ届く。共有lowererはvariation seed、render seed、source spellingをこの選択へ混ぜない。
+作者が明示したかたむきは、元meaningとtag付き`composition_seed`、logical occurrence、angle identityに束縛した共通resolverで、direct instructionとflat Macro Emitから一度だけ`Score.rotation`へ届く。共有lowererはrender seed、source spellingをこの選択へ混ぜない。
 
 ### 12.7.1 共有authoring state machine
 
@@ -1077,7 +1077,7 @@ Variationの作成元は`stage1_generated`または`user_authored_ddl`として�
 
 系譜からの編集はhistory rowのownerを判別して対応するlinked forkを選び、旧forkを更新も置換もせず保持する。Activeな`/executions/{id}/author-ddl`はsource、revision、optionsを受ける。同じ設定でsourceが変わる場合はrecord metadataを保存し、既存のCAS、origin、DDL authority lockを保つ。canvas／wildなど設定が変わる場合は、元のsource・config・authorityを変えず親関係を持つDDL authorityのdirect-DDL variationを新設する。sourceが不変でrecord metadataだけが変わる場合も既存resultを捨てずnew editionとして保存する。history sidecar v2はcoreの4診断、renderer診断、`resource_execution`を当該revision／sourceに不変保存し、通常の履歴表示へ戻す。v1には診断記録がない。sidecarが壊れていてもその作品だけにwarningを示し、保存DDL、Score、SVGの表示を続け、latestの推測や再compileをしない。
 
-DDL authorityのvariationの作品、`ddl_edit`で保存した作品、およびそれらから記述を読み直さない派生（タッチ、配置、色、変奏、再描画など）で作った作品を「記述固定」とし、history itemと系譜nodeの`description_locked`で示す。記述を読み直す派生（`reinterpretation`、`description_edit`、`sketch_grain_change`、`model_comparison`、`language_comparison`、`canvas_aspect_change`）で作った作品は固定しない。`replay`は派生の種別でなくDDLで判定する。親とDDLが違う`replay`は記述を読み直した描き直し（記述タブで記述を変えずに描いた作品は`replay`として保存されてきた）として固定せず、親とDDLが同じ`replay`はDDLを編集せずに描き直したものとして、自分のvariationがDDL authorityでも親が固定のときだけ固定する。記述固定の作品を親とする記述からの描き直しは、`/api/paint`・`/api/paint/stream`、記述を読み直す派生の`POST /api/history`、記述を書き換えたpipelineのforkのいずれも409 `description_locked`で断る。記述をそのまま使う新しいvariationへのforkだけを記述へ戻る道として残す。Webは記述タブを固定の表示にして描画を明示のforkに置き換え、記述を読み直す操作を理由付きで押せなくし、AI自律推敲は読み取りとVisionを外して各世代を親のDDLから描く。
+DDL authorityのvariationの作品、`ddl_edit`で保存した作品、およびそれらから記述を読み直さない派生（タッチ、配置、色、再描画、廃止した変奏など）で作った作品を「記述固定」とし、history itemと系譜nodeの`description_locked`で示す。記述を読み直す派生（`reinterpretation`、`description_edit`、`sketch_grain_change`、`model_comparison`、`language_comparison`、`canvas_aspect_change`）で作った作品は固定しない。`replay`は派生の種別でなくDDLで判定する。親とDDLが違う`replay`は記述を読み直した描き直し（記述タブで記述を変えずに描いた作品は`replay`として保存されてきた）として固定せず、親とDDLが同じ`replay`はDDLを編集せずに描き直したものとして、自分のvariationがDDL authorityでも親が固定のときだけ固定する。記述固定の作品を親とする記述からの描き直しは、`/api/paint`・`/api/paint/stream`、記述を読み直す派生の`POST /api/history`、記述を書き換えたpipelineのforkのいずれも409 `description_locked`で断る。記述をそのまま使う新しいvariationへのforkだけを記述へ戻る道として残す。Webは記述タブを固定の表示にして描画を明示のforkに置き換え、記述を読み直す操作を理由付きで押せなくし、AI自律推敲は読み取りとVisionを外して各世代を親のDDLから描く。
 
 Typed Stage 1 requestは、Saijikiから導出した有限語彙、解決済みcatalog/canvas identity、検証済みMacroのqualified name・version・definition digest・parameter・host提供のlocalized summaryだけをbounded projectionとして持ち、応答schemaは§12.6の下絵だけを許し、LLMが可視DDLの文字列を直接書くことはない。保存済みvisible DDLのparseが補完可能なknown holeを検出したら、共通pipelineが補完要求を自動で作る。別のユーザー補完操作は要求せず、holeがなければStage2 LLMを呼ばない。ただし§12.8のStage 1残部採用では追加LLM要求を始めず、保存ACK後に決定的な残部配送へ進む。有限文法外の語を含むclauseでも、compilerがexactな描画head、ground、またはbackground anchorとclause境界を確定できる場合は、そのclauseだけをknown holeにできる。Exactな境界を持たないUnknown、conflict、integrityエラーは補完対象にしない。後続の継続clauseがpatch可能な上流holeだけを原因として未確定なら、その継続診断はpatch後の再compileまで保留し、後続clause自体を書換え対象へ広げない。
 
@@ -1129,7 +1129,7 @@ Shared compiler consumerでは、StopとOmitAndContinueはLLM fallbackではな�
 
 ### 12.11 中間フィルタ（Stage 1.5）
 
-Stage 1.5 は LLM を使わない決定的な typed transformation である。入力は lock 検証済みの `CanonicalReady` typed meaning とし、自由 prose は受け取らない。出力は共有lowererが読むeffective DDL / typed meaningである。2026-09-27に`place:center`の焦点への読み替えと変奏の軸を外し、Stage 1.5は入力の検証とeffective meaningの同一性だけを担う。
+Stage 1.5 は LLM を使わない決定的な typed transformation である。入力は lock 検証済みの `CanonicalReady` typed meaning とし、自由 prose は受け取らない。出力は共有lowererが読むeffective DDL / typed meaningである。2026-09-27に`place:center`の焦点への読み替えと変奏の軸を外し、2026-10-04に明示変奏を廃止した。Stage 1.5は入力の検証とeffective meaningの同一性だけを担う。
 
 - 原文、正規化 DDL、元の typed meaning、effective meaning、source / generated provenance を別々に保ち、元の意味や明示属性を上書きしない
 - 新しい sentence、entity、relation、technique、color、touch、primitive、content を発明しない
@@ -1137,9 +1137,9 @@ Stage 1.5 は LLM を使わない決定的な typed transformation である。�
 - verified viewをactual Scoreへ下ろすときは、direct `Instruction { instruction_index }`は元のtyped instructionと同じindexのinstructionだけを所有する。direct coordinated groupはその規則を変えず、別の`placement_groups`範囲としてmemberを配送する。`GroupPredicate` / `MacroEmit`を同じindexのownerとしない
 - effective meaningの同一性はlockで検証されたpre-expansion meaning digest、expanded meaning digest、attested optional `composition_seed`に束縛する。seedの不在と`Some(0)`の存在は別であり、full compiler-lock digestはsource integrityのattestationであって同一性の材料ではない
 - 明示placeは共有lowererが§18の領域へ解決する。隅の四候補選択も構図側の責務で、元meaningとattested optional seedおよび元logical occurrenceを使う。
-- 明示angleは元のtyped meaningのまま通し、変奏軸へ追加しない。具体角度は共有lowererが同じverified pre / expanded meaning、tag付きoptional `composition_seed`、directの元logical ordinal、またはMacroのsemantic ordinal / expansion path / generated ordinalから選ぶ
+- 明示angleは元のtyped meaningのまま通す。具体角度は共有lowererが同じverified pre / expanded meaning、tag付きoptional `composition_seed`、directの元logical ordinal、またはMacroのsemantic ordinal / expansion path / generated ordinalから選ぶ
 - Stage 1.5の入力を切り離す前に、実際のvisible DDLのUTF-8 bytes、semantic source occurrenceに残る言語証跡、未使用分を含む全macro sidecarの三項、実行macroのresolved / binding / semantic head identityをcompiler lockと照合する。SourceOccurrenceがない入力へ新しい言語条件を課さず、未使用sidecarにresolutionや実行を要求しない。Sourceとprovenanceは入場時のintegrity証拠であり、meaningの材料ではない
-- 明示変奏は amplitude（`small` / `medium` / `large`）と `variation_seed` の組として受け取るが、今は動かす軸が無く、effective meaningを変えない。不完全な指定は変奏なしとする
+- 明示変奏は2026-10-04に廃止した。保存済みの設定や古いhostが送る`stage15_variation`（nullでも、強度とseedの組でも）は読んで捨て、新しく書かない
 - output の canonical bytes、schema identity、digest、provenance は同じ意味を再現し、別 schema の bytes を同じ identity と偽らない
 
 sealed Rust Stage 1.5 v5 のtyped foundationとR1 / R2 / D1、direct instructionのnormal / explicit geometry、finite flat Macro Emit、および両者へ共通の局所回復error policyはactual Scoreまで実装され、通常Server／Web／Androidの共有pipelineから使用される。`compile_ddl_to_score` facadeは元の`NormalizedDdlDocument`を一度だけcompileし、そのsource / state / lock / issuesを保持する。旧StopとContinueの入力は、同じcompilationのtyped owner / dependencyに従うsealed projectionを使う。回復可能な上流hole / conflictは確立済みの局所単位を省略して独立命令を届け、描画単位の全省略はstoppedとする。Canonical pre-meaningでは成功済みmacro outputを元binding / source ordinal / semantic ordinal / seed / provenanceのexact subsetとして再利用し、再seed・再展開しない。NonCanonical pre-expansion projectionでは省略単位を先に確定した後、一度だけseedを導出して展開し、local failure後のretry drawを行わない。Global budgetおよびsource / lock / owner / definition / provenance整合性不良は両modeを止める。Public Stage 1.5 APIは`CanonicalReady`専用のままで、任意のmutable compilationを回復しない。D1のmeaning / seed、source ordinal欠番、generated provenanceは保ち、寸法規則の追加はgeometry policy digestへ記録し、Score 0.2.0で新しい月形を表す。通常APIは旧URLを保ちながらこの共有経路へ接続し、保存済みcompact Scoreの再演もLinuxで確認済みである。
@@ -1162,11 +1162,11 @@ Stage 1の共有grammar projectionは、歳時記のわりあいにある弧形�
 
 現行生成に添景レベルはない。共有compilerとlowererは記述にない要素を足さず、明示内容を配達する限定回復だけを行う。明示angleの数値解決も新しい添景や視覚要素を足す処理ではなく、元のtyped identityを既存`rotation`へ配達する処理である。過去作品の `history.tenkei` と API の `tenkei` は読み取り互換のため残るが、新しい作品の生成契約には作用しない。導入・廃止の経緯と件数は [CHANGELOG.ja.md](CHANGELOG.ja.md) と [公開履歴アーカイブ](docs/history/changelog-v1.72-v2.4.ja.md) に置く。
 
-### 12.13 変奏（Stage 1.5）
+### 12.13 構図の同一性と変奏の廃止
 
 構図の同一性はattested optional `composition_seed`とlockで検証されたpre-expansion meaning・expanded meaningが担う。full compiler-lock digestはsource integrityを検証するattestationであり、同じmeaningの別表現へ同一lockを要求しない。「別の構図」は保存済み正規化 DDL を再利用し、明示angleがあれば同じidentity材料から具体角度を、明示cornerがあれば専用domainで隅を選び直す。現行入力に `vary_seed` はない。
 
-明示変奏は amplitude（小・中・大）と `variation_seed` の組である。今は動かす軸が無く、揃っていてもeffective meaningを変えない。構図族、色、タッチ、技法、relation、要素数は動かさない。
+明示変奏（強度 小・中・大と `variation_seed` の組）と、推敲の要素としての変奏は、2026-10-04 に廃止した（作者の判断）。2026-09-27 に焦点を外してから動かす軸が無く、語が推敲と紛らわしかったためである。保存済みの作品の記録（系譜の辺 `variation`、履歴の変奏 seed・強度・焦点）は書き換えず、読むためだけに残す。系譜の辺の札は「変奏（旧）」とし、古い作品の生成情報にだけ変奏 seed と強度を示す。新しい作品には書かない。core は、保存済みの設定や古い host が送る `stage15_variation` を読んで捨て、新しく書かない。作品の版を指す pipeline の variation（`variation_id` など）と、Score の `variation`（揺らぎ）は、この語とは別である。
 
 Score と描画同一性の現行 domain は `rh3` である。`rh2` は保存済み作品を読むための legacy domain であり、新規生成の current identity として書かない。七軸から一軸へ畳んだ履歴は [CHANGELOG.ja.md](CHANGELOG.ja.md) に置く。
 
@@ -1404,7 +1404,7 @@ typed identityとして保持し、対応範囲のdirect instructionとflat Macr
 - **道具の癖に掛かる倍率であって、癖を作るものではない**。揺れ項が 0 の道具（`rotring`）は
   暴れさせても動かない。**機械には暴れる余地がない**
 
-**これは変奏（Stage 1.5）とは層が違う。** 変奏は楽譜を書き換える決定的な工程で、
+**これは楽譜の層とは違う。** 楽譜は compiler と Stage 1.5 が決定的に決め、
 暴れるは楽譜を変えずに演奏の幅を変える Renderer 層のノブである（層の責任は本書 §12、版の扱いは §2.1 に記す）。
 
 ### 13.5 weight による揺らぎの質
@@ -1555,7 +1555,7 @@ JSON Score の `variation` フィールドは、次元ごとに分離した構�
 - `pink`: 境界のぼかし。歳時記 v2 のDDLの語からは届かず、保存済みScoreに残る
 - `white`: 粗いノイズ的なばらつき
 
-Shared compilerの明示揺らぎは常に`dimensions=["position_x","position_y"]`を使う。Lineは既存の直交方向、Arcとcircle / ellipse / square / cloudform / triangle / polygonは既存の内外方向のconsumerで演奏する。短線threshold、noise、seed、geometry、位置、angle、thinness、material、関係端点の契約を変更しない。Pointと未対応shapeへの明示variationは拒否する。Stage 1.5のfocus-only変奏とは別である。
+Shared compilerの明示揺らぎは常に`dimensions=["position_x","position_y"]`を使う。Lineは既存の直交方向、Arcとcircle / ellipse / square / cloudform / triangle / polygonは既存の内外方向のconsumerで演奏する。短線threshold、noise、seed、geometry、位置、angle、thinness、material、関係端点の契約を変更しない。Pointと未対応shapeへの明示variationは拒否する。
 
 スキーマレベルでは variation は保持するが、DDLテキスト層のインターフェースからは見えない。プラグインや素材を実装する人だけがこの次元を扱う。
 
@@ -1703,7 +1703,7 @@ v2.0.5 で wave 品質の揺らぎに演奏 seed 由来の位相を導入した�
 
 v2.1.0 でレンダリングの px 絶対値を比例系へ全面改修した。揺らぎ振幅語彙（fine / medium / broad）の意味を 1000px キャンバス基準の絶対 px（7 / 12 / 30px）から**図形の代表寸法に対する比率**（0.025 / 0.08 / 0.18）へ変更した。代表寸法は circle / polygon / arc = 半径、ellipse = 半径の相乗平均、square / triangle / cloudform = 短辺の 1/2、line = 線長。小さな図形は細かく、大きな図形は大きく揺れる。滲み（pink）の stdDeviation も同様に比率化（0.009 / 0.03 / 0.07）。輪郭の分割数とストロークの標本数は固定値（80 / 49）から長さ比例（クランプ付き）へ変更した。材質層（線幅・dasharray・質感 filter・材質輪郭・speck）と display filter は `canvas.unit` 相対化し、`unit=1000` では従来と一致する（speck 個数の周長比例化と stroke 標本数の長さ比例化を除く）。あわせて作者キャリブレーションにより材質輪郭と speck の強度を下限方式で引き上げた（強度段 s1: 輪郭 offset / opacity と speck opacity / 個数に下限を設定、質感 filter は据え置き）。材質輪郭には `class="material-outline"` を付与し、主線と機械的に区別できるようにした。同一 Score + 同一 seed の演奏結果が変わるため render engine version を 7 へ更新した。
 
-v2.2.0 で閉図形（circle / ellipse / square / triangle / polygon）の輪郭を手描きストローク（筆致エンジン）で描くようにした。`stroke_engine` に任意中心線へのストローク合成 `synthesize_along` を追加し（道具文法は line 用と同一、追従目標だけを差し替え。意図の歩幅をフィードフォワードし、ばねには残差だけを担わせる積分器で曲率による半径方向の歪みを排除）、輪郭は外周・内周 2 サブパスの塗り帯（`class="contour-stroke-v1"`、fill-rule evenodd）として描く。角は理想位置に固定して筆の継ぎ目とし、角のない閉輪郭は継ぎ目を線形ランプで閉合させる。対象 weight は rotring を除く手描き系全種（rotring は幾何輪郭のまま）。帯の中心線は変奏を演奏した後の輪郭で、材質輪郭・speck は帯と併存する。破線・点線は線種そのものが記述なので、細めた幾何輪郭を残す。本体要素は幾何のまま維持され（実線では `stroke="none"` で塗りのみ）、bbox・touching 契約は不変。line と弧の出力は v2.1 とバイト一致（弧のストローク化は touching 検査の弧抽出器の再設計を伴うため次契約へ）。同一 Score + 同一 seed の演奏結果が変わるため render engine version を 8 へ更新した。
+v2.2.0 で閉図形（circle / ellipse / square / triangle / polygon）の輪郭を手描きストローク（筆致エンジン）で描くようにした。`stroke_engine` に任意中心線へのストローク合成 `synthesize_along` を追加し（道具文法は line 用と同一、追従目標だけを差し替え。意図の歩幅をフィードフォワードし、ばねには残差だけを担わせる積分器で曲率による半径方向の歪みを排除）、輪郭は外周・内周 2 サブパスの塗り帯（`class="contour-stroke-v1"`、fill-rule evenodd）として描く。角は理想位置に固定して筆の継ぎ目とし、角のない閉輪郭は継ぎ目を線形ランプで閉合させる。対象 weight は rotring を除く手描き系全種（rotring は幾何輪郭のまま）。帯の中心線は揺らぎを演奏した後の輪郭で、材質輪郭・speck は帯と併存する。破線・点線は線種そのものが記述なので、細めた幾何輪郭を残す。本体要素は幾何のまま維持され（実線では `stroke="none"` で塗りのみ）、bbox・touching 契約は不変。line と弧の出力は v2.1 とバイト一致（弧のストローク化は touching 検査の弧抽出器の再設計を伴うため次契約へ）。同一 Score + 同一 seed の演奏結果が変わるため render engine version を 8 へ更新した。
 
 v2.3.0 で閉図形の塗りを領域 fill から**素材の筆致で内側を埋めるストローク塗り**へ変更し、`filled` の意味論を復権した（`True` = 素材の筆致で内部を埋める / `False` = 輪郭のみ。従来は閉図形が `filled` に関わらず常に塗りつぶされる死にフィールドだった）。
 
@@ -1717,7 +1717,7 @@ rotring は領域 fill を維持し（`True` = ベタ塗り / `False` = 輪郭�
 
 **⚠ v2.13.24（render engine 35）で hatch / crosshatch の行は輪郭で切られるようになった** —— 塗りと同じ交点の機構を通すので、行は図形の中だけに残り、凹形では区間ごとに 1 本ずつ描いて空洞をまたがず、輪郭と交わらない行は 1 本も描かない。`clipPath` は使わないので `compat` でも同じ形に収まる。**切る前の層は動かない** —— 角度・間隔・`spacing_gradient`・1 行ごとの揺らぎはそのままで、間隔クラスの値も前の版と同じである（減るのは輪郭の外に出ていた行の本数だけ）。
 
-v2.3.1 で弧（arc）も手描きストロークの帯（`class="arc-stroke-v1"`）で演奏するようにし、v2.2.0 で残されていた最後の対象外を解消した。対象 weight は rotring を除く手描き系全種（rotring と非手描き weight は幾何の弧のまま）。帯の中心線は変奏を演奏した後の弧で、両端は意図値に固定される。**幾何の弧は不可視の意図要素（`stroke="none"`）として残し**、touching（接点契約）の検査は描画 SVG からこの意図弧を読み戻して座標で担保する（弧抽出器は無改変。帯は `M..L..Z` の塗りポリゴンで弧コマンドを持たないため二重計上されない）。**接点端も taper のまま**とする（ストローク合成の envelope は両端でゼロへ収束する。接点契約は意図弧が座標で担保するため、帯は自由端と同じく端で柔らかく消えてよい。葉の先端・付け根は柔らかく消える見た目になる）。破線・点線は意図弧そのものを細い破線 / 点線で可視化する（線種は記述なので読めるまま残す。line・閉図形と対称）。drypoint は演奏後の中心線に沿って burr を出し、材質輪郭・speck は帯と併存する。同一 Score + 同一 seed の演奏結果が変わるため render engine version を 10 へ更新した。
+v2.3.1 で弧（arc）も手描きストロークの帯（`class="arc-stroke-v1"`）で演奏するようにし、v2.2.0 で残されていた最後の対象外を解消した。対象 weight は rotring を除く手描き系全種（rotring と非手描き weight は幾何の弧のまま）。帯の中心線は揺らぎを演奏した後の弧で、両端は意図値に固定される。**幾何の弧は不可視の意図要素（`stroke="none"`）として残し**、touching（接点契約）の検査は描画 SVG からこの意図弧を読み戻して座標で担保する（弧抽出器は無改変。帯は `M..L..Z` の塗りポリゴンで弧コマンドを持たないため二重計上されない）。**接点端も taper のまま**とする（ストローク合成の envelope は両端でゼロへ収束する。接点契約は意図弧が座標で担保するため、帯は自由端と同じく端で柔らかく消えてよい。葉の先端・付け根は柔らかく消える見た目になる）。破線・点線は意図弧そのものを細い破線 / 点線で可視化する（線種は記述なので読めるまま残す。line・閉図形と対称）。drypoint は演奏後の中心線に沿って burr を出し、材質輪郭・speck は帯と併存する。同一 Score + 同一 seed の演奏結果が変わるため render engine version を 10 へ更新した。
 
 ---
 
@@ -1958,7 +1958,7 @@ PoC と初期機能の完了記録は [CHANGELOG.ja.md](CHANGELOG.ja.md) と [�
 digest、NoneとSome(0)を区別するtag付きcomposition seed、directの元logical ordinalまたはMacroのsemantic
 ordinal / expansion path / generated ordinalをframeし、SHA-256先頭byteのmodulo 4を左上・右上・左下・右下へ写す。
 四択なので異なる構図seedでも同じ隅になり得る。選んだ隅をsource / canonical meaning / provenanceへ書き戻さず、
-隅内のanchorは既存Rendererのrender seedが選ぶ。別の演奏・明示変奏は隅を変えない。
+隅内のanchorは既存Rendererのrender seedが選ぶ。別の演奏は隅を変えない。
 Tableはpolicyの有理数定義から最後にだけScore f64へ変換する。Policy IDは同じでも内容digestは変わり、
 semantic schemaの新versionを意味しない。未指定位置は補わず、named/numeric conflict、numeric must-fitを保つ。
 
@@ -1998,7 +1998,7 @@ Explicit numeric geometryはdimension、basis、canonical base-10 coefficient / 
 
 Sizeとpositionを解決するcanonical policyの単一ownerは`inku-ddl`で、そのidentity / digestは`inku.geometry-resolution-policy.v1`である。Compiler lockはこのidentity / digestを参照・attestし、`ddl_engine_version`はactivation metadataに限定する。`size_rule_version`や二重ownerを作らない。
 
-同じpolicyは明示angleも所有する。`horizontal=0`、`vertical=90`、`diagonal`は`45 / 135 / 225 / 315`、`rising` / `falling`はそれぞれ整数度`[-37,-23]` / `[23,37]`、`left_rising` / `left_falling`は`[203,217]` / `[143,157]`、`rotated`は各45度境界から5度を超えて離れた整数度を有限一様に選ぶ。SHA-256のangle専用domainへ、lock検証済みoriginal pre / expanded meaning digest、tag付きoptional `composition_seed`、logical occurrence、angle identityをframeして選ぶ。同じmeaningのinline / continuationは同じ選択になり、真の別occurrenceは別keyを持つ。variation seed、render seed、raw source bytes、full-lock digestは材料にしない。
+同じpolicyは明示angleも所有する。`horizontal=0`、`vertical=90`、`diagonal`は`45 / 135 / 225 / 315`、`rising` / `falling`はそれぞれ整数度`[-37,-23]` / `[23,37]`、`left_rising` / `left_falling`は`[203,217]` / `[143,157]`、`rotated`は各45度境界から5度を超えて離れた整数度を有限一様に選ぶ。SHA-256のangle専用domainへ、lock検証済みoriginal pre / expanded meaning digest、tag付きoptional `composition_seed`、logical occurrence、angle identityをframeして選ぶ。同じmeaningのinline / continuationは同じ選択になり、真の別occurrenceは別keyを持つ。render seed、raw source bytes、full-lock digestは材料にしない。
 
 CircleとPointの回転extentは同じ半径、ellipseは理想楕円、cloudformとsquareは宣言width / heightの矩形envelope、LineとArcは最終的な有限端点・弧を使う。数値配置では短辺単位の宣言寸法を物理空間で回してcanvas各軸へ戻し、回転後extentだけをmust-fit判定する。回転前bboxで先に拒否せず、位置移動、縮小、count削減、別角度retryを行わない。Named位置は従来どおりmust-fitを追加せず寸法と`at.region`を保つ。Line / Arc / Squareのangleはdirectとflat Macro Emitの両方で同じresolverを通って`Score.rotation`へ届く。丸いPointの明示angleはunsupportedであり、別の回転形へ読み替えない。
 
@@ -2088,7 +2088,7 @@ Shared typed compilerで揺らぎが不成立なら、旧Stop / Continue入力�
 
 同じ `DDL から描画` の操作は解釈ボックスの下にもあり、ダイアログを開かずに素早く再演できる。候補の metadata は、当てはまるところで render、composition、variation、interpretation の seed を示す。DDL編集ダイアログの`描画`は、編集したDDLをauthoring authorityとして保存し、共有compiler／lowererとrendererを走らせ、自然言語の記述を解釈し直さない。
 
-描画タブは明示の再生成操作を 2 つ出す。**別の演奏**は同じ Score を保ち、renderer にだけ新しい演奏 seed を求める。**別の構図**は保存済み正規化 DDL を保って `composition_seed` を進め、明示angleがあれば共有lowererで具体角度を、明示cornerがあれば隅を選び直す。構図族、技法、色、タッチ、relation、要素数は変えない。同じlock検証済みmeaningとattested `composition_seed`なら同じeffective meaningと角度・隅を再現する。別の演奏と明示変奏は確定角度と隅を保つ。保存済みScore / expanded artifactを優先し、原文を保存し、silent backfillを行わず、恒久的なold/new runtime switchを作らない。semantic schema / identityは変更bytesを旧identityと偽らない。通常Server／Web／Androidは§12.11のtyped v5からresource-awareなcompact Score演奏coreまで同じ共有経路を使用する。保存済みScoreとhistoryの読取・再演には必要な形式互換を保持する。
+描画タブは明示の再生成操作を 2 つ出す。**別の演奏**は同じ Score を保ち、renderer にだけ新しい演奏 seed を求める。**別の構図**は保存済み正規化 DDL を保って `composition_seed` を進め、明示angleがあれば共有lowererで具体角度を、明示cornerがあれば隅を選び直す。構図族、技法、色、タッチ、relation、要素数は変えない。同じlock検証済みmeaningとattested `composition_seed`なら同じeffective meaningと角度・隅を再現する。別の演奏は確定角度と隅を保つ。保存済みScore / expanded artifactを優先し、原文を保存し、silent backfillを行わず、恒久的なold/new runtime switchを作らない。semantic schema / identityは変更bytesを旧identityと偽らない。通常Server／Web／Androidは§12.11のtyped v5からresource-awareなcompact Score演奏coreまで同じ共有経路を使用する。保存済みScoreとhistoryの読取・再演には必要な形式互換を保持する。
 
 通常UIは共有pipelineの実行状態から可視DDL、補完候補、保存済み結果を表示する。互換用の`POST /api/paint/stream`は、同じ共有pipelineの最終結果を一つの`done` NDJSON recordとして返す。補完patchの承認待ちはstream開始前にHTTP 409で返す。旧`sketch`／`stage1`／`score`の四段階streamを新作の進捗契約にはしない。`POST /api/paint`も同じ共有経路の互換入口として維持する。
 
@@ -2313,12 +2313,12 @@ inku-lang/                 # github.com/oikawas/inku-lang
 
 系譜の「AIに自律推敲させる」は、世代数を1〜10に限定した反復操作であり、最終作品の判定は人間が行う。ユーザーは実行前に次の方式を選ぶ。
 
-- `ランダムな自動推敲`: 有効にした読み取り・色カタログ・配置・タッチ・変奏から世代ごとの変動対象をランダムに選ぶ。Visionは使用しない。方向性テキストは読み取り世代の描画テキストにだけ反映されるため、その条件をランダム方式のUIに明示する。
+- `ランダムな自動推敲`: 有効にした読み取り・色カタログ・配置・タッチから世代ごとの変動対象をランダムに選ぶ。Visionは使用しない。方向性テキストは読み取り世代の描画テキストにだけ反映されるため、その条件をランダム方式のUIに明示する。
 - `AI Visionによる自動推敲`: ユーザーがVisionモデルを接続先別一覧から明示選択する。選んだモデルは、その実行中、Stage 1・Stage 2の生成とVisionの助言のいずれにも使うが、三つの役割と各promptは分けたままにする。各世代の保存画像をサーバーでPNG化し、元の指示、ユーザーの方向性、許可された推敲要素とともにVisionへ渡す。Visionは見える事実、次に試す一つの方向、許可範囲内の変動対象を返し、その助言を次世代生成へ渡す。
 
 写生（§12.6.1）は各世代の親に合わせ、記述タブの写生の設定は使わない。親が写生文を持ち、その世代の描画テキストが親と同じなら、親の写生文を渡して写生を呼ばない（推敲の候補の「読み取りも変える」と同じ扱い）。方向性を足して描画テキストが変わった世代は写生を書き直す。親が写生文を持たなければ写生なしで描く。
 
-どちらの方式でも変奏（§12.13）を有効な推敲要素に含められる（有効要素の上限は5）。変奏を有効にしたときだけ強度（小・中・大、既定は中）の選択を表示し、選んだ強度は実行中の全変奏世代に適用される。seedはサーバーが採番する。
+どちらの方式でも、有効にできる推敲要素は読み取り・色カタログ・配置・タッチの4つである（変奏は2026-10-04に廃止した、§12.13）。
 
 Vision方式は有限の助言ループだが、品質最適化や自動受け入れではない。Visionは点数・順位・合否・称賛・否定を返さず、生成済み世代を棄却しない。途中世代を`lineage_only`、最終世代を通常履歴として全世代を系譜へ保存する。使用方式、Visionモデル、観察、次に試す方向は派生metadataへ記録し、モーダルにも最新所見を表示する。モデルは実行ごとに切り替えられるが、一回の実行中は固定する。最終的な保存・昇格・スター付与・採否は人間だけが行う。
 
@@ -2333,7 +2333,7 @@ Vision方式は有限の助言ループだが、品質最適化や自動受け�
 - 「良い」「美しい」「成功」「洗練」等の日英評価語と数値評価はwarning-onlyの語彙検査対象とする。検出しても自動修正、再生成、保存拒否は行わない。
 - 署名は本文生成とは別にサーバーが読み手モデルと日付から機械付与する。言語はUIまたはCLIの明示設定に従う。
 - 奥書は対象lineage node、読んだ時点のnode ID列、モデル、日時、言語、本文、warning、事実シートを本人スコープの不変レコードとして追記する。更新APIと編集UIは持たず、削除だけを許す。同じ枝を別モデルや別日に読めば古い順に連なる。Idempotency-Keyは同じ読みの二重保存を防ぐ。
-- 奥書は dh1、現行 rh3、legacy rh2、生成、変奏、推敲候補、受け入れ、品質関数、枝推薦へ接続しない。系譜タブの「奥書を読む」または`inku-cli colophon`からだけ明示実行し、`--dry-run`は保存せず標準出力する。
+- 奥書は dh1、現行 rh3、legacy rh2、生成、推敲候補、受け入れ、品質関数、枝推薦へ接続しない。系譜タブの「奥書を読む」または`inku-cli colophon`からだけ明示実行し、`--dry-run`は保存せず標準出力する。
 
 ---
 

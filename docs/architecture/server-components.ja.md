@@ -173,7 +173,7 @@ flowchart LR
     SEM["semantic_association / semantic_instruction\nsemantic_document / composition\ngeometry / shape_constraint / fluctuation"]
     LOCK["compiler_lock\ncanonical meaning・4状態のlock"]
     PROJ["execution_projection\n非canonical時のsealed projection"]
-    S15["stage15_transform\n焦点・明示変奏"]
+    S15["stage15_transform\n意味の確定"]
     PLAN["composition_plan / group_quantity\nplan_reference_extent"]
     RES["plan_resources\nhard policy + operational budget"]
     MAT["score_materialization / score_lowering\nscore_angle → compact Score"]

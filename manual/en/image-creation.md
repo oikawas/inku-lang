@@ -4,10 +4,10 @@ The Web instructions in this guide apply to inku v2.15.15 (Build 1091). A descri
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
-            -> plugin expansion -> expansion and variation (Stage 1.5) -> JSON Score (Stage 2) -> SVG
+            -> plugin expansion -> settling (Stage 1.5) -> JSON Score (Stage 2) -> SVG
 ```
 
-The description is the work's score; the SVG is one performance. The same description may produce a different work when its models, sketch, variation, composition seed, or render seed change.
+The description is the work's score; the SVG is one performance. The same description may produce a different work when its models, sketch, composition seed, or render seed change.
 
 The vocabulary used in the UI is as follows.
 
@@ -191,11 +191,11 @@ A `namespace.word` such as `Nature.青葉` is marked in the plugin color only wh
 
 A work whose instructions (DDL) were edited follows its DDL, not its description. Drawing it again from the description would lose the edits, so **its description is held**.
 
-- The Describe tab heading shows `Held (DDL edited)` and the description cannot be changed. In place of `Paint`, `Start a new variation from this description` appears: it draws the description as it stands as a new variation (the work stays as it is, and the description can be changed in the new variation).
+- The Describe tab heading shows `Held (DDL edited)` and the description cannot be changed. In place of `Paint`, `Start a new work from this description` appears: it draws the description as it stands as a new work (this work stays as it is, and the description can be changed in the new work).
 - In the work's edit menu, `Change the description`, `Redraw with or without sketch from life` and `Change the model` are shown but not offered, with the reason. `Another reading` in refinement is not offered either.
-- A child made by touch, layout, color or variation carries the DDL and is held as well. A child made by reading the description again is not.
+- A child made by touch, layout or color carries the DDL and is held as well. A child made by reading the description again is not.
 - The history strip shows a lock mark, and a lineage card shows `Held (DDL edited)`.
-- Autonomous refinement uses no reading rounds and no Vision method, and draws each color, layout, touch or variation round from the DDL.
+- Autonomous refinement uses no reading rounds and no Vision method, and draws each color, layout or touch round from the DDL.
 
 ## 7. Choose Model, Color Catalog, Sketch, Wild, and Canvas
 
@@ -245,16 +245,15 @@ In the refinement area of the work tab, choose exactly one element to change at 
 |---|---|---|
 | Another composition | Picks again the tilt angles and corners the instructions name. A work placed only at the center gives the same picture for every option | Fast (the Stage 2 LLM only when the instructions still have gaps to fill) |
 | Another reading | Reads again from Stage 1 and regenerates the instructions, composition, and performance | Slow (LLM and API) |
-| Variation | Moves nothing now (8.1) | Medium |
 | Another performance | Derives only the renderer's performance seed from your words, changing line quality, weight sway, and bleed | Very fast (no LLM) |
 
 You may choose `Make one option` or `Make four options`. `Another performance` is deterministic, the same words giving the same touch seed, so it makes one option only. The words do not act on the work's meaning, reading, DDL, JSON Score, or composition.
 
 The color catalog is changed from the work-editing menu instead (8.3).
 
-### 8.1 Variation
+### 8.1 Variation (retired)
 
-`Variation` used to move the focus, where elements placed at the center are drawn. Center and middle now mean the middle of the canvas, so a variation moves nothing. You can still choose and record a strength (Subtle, Moderate, Sweeping), but nothing moves, the instructions, color, touch, and element count included, and the option shows `Moved: nothing`. The choice stays until a separate composition feature takes its place.
+Variation was retired on 2026-10-04. Once the focus reinterpretation was removed it had nothing left to move, and the word was confusing next to refinement. Works made by an earlier variation keep a "Variation (retired)" edge in their lineage, and their provenance shows the variation seed and amplitude of that time.
 
 ### 8.2 Save Options
 
@@ -281,7 +280,7 @@ You choose the number of generations and which refinement elements to use. A dir
 
 **The model chosen for autonomous refinement with Vision is used to draw each generation, not only to observe it** (the running display names the model it is drawing with). Random autonomous refinement chooses no model, so it draws with the model selected on the page.
 
-The dialog remembers the method, number of generations, refinement elements, variation amplitude and direction you chose last time, and opens with them next time (kept in this browser). The wild switch is not remembered; it starts from the work being refined.
+The dialog remembers the method, number of generations, refinement elements and direction you chose last time, and opens with them next time (kept in this browser). The wild switch is not remembered; it starts from the work being refined.
 
 `Sketch from life` follows the work you start from. From a work drawn with it, each generation is drawn from that work's sketch prose and the layer is not run again; only a generation whose text gained a direction goes through the layer again, because its text has changed. From a work drawn without it, the generations are drawn without it too. The setting on the `Describe` tab is not used.
 
@@ -305,7 +304,7 @@ Open the provenance drawer at the bottom of the work tab to see the record of th
 |---|---|
 | Sketch | The sketch record and the paper grain (**the record of the work on screen**, not the setting for the next painting) |
 | Interpretation | Stage 1 model, Stage 1 language, requested language, interpretation seed, interpretation fallback |
-| Performance | Stage 2 model, Stage 2 language, focus, variation and variation seed, composition seed, render seed, seed text, Wild, the colour words this work was drawn in, the colour catalogue, the canvas and its ratio, Score fallback, and **three rows for how heavy the drawing is** (`SVG size` / `SVG objects` / `SVG points`) |
+| Performance | Stage 2 model, Stage 2 language, focus, Variation (retired) and its seed (old works only), composition seed, render seed, seed text, Wild, the colour words this work was drawn in, the colour catalogue, the canvas and its ratio, Score fallback, and **three rows for how heavy the drawing is** (`SVG size` / `SVG objects` / `SVG points`) |
 | Identity | render hash, description hash, render engine, DDL specification, transform layer, prompt digests, Build |
 | Origin | generation, derivation, batch run ID and line number, comment, UI language |
 | Run | elapsed time, token counts |
@@ -324,7 +323,7 @@ If Stage 1 does not answer in time, returns an empty answer, or fails, a stock s
 
 ## 12. Follow the Lineage
 
-The `Lineage` tab shows which explicit action a work was derived from. Performance, composition, reading, variation, model, language, instruction edits, description edits, repaints, canvas changes, and changes of sketch-from-life grain are recorded as parent-child relations.
+The `Lineage` tab shows which explicit action a work was derived from. Performance, composition, reading, model, language, instruction edits, description edits, repaints, canvas changes, and changes of sketch-from-life grain are recorded as parent-child relations. Works made by an earlier variation keep a "Variation (retired)" edge.
 
 - Parentage is never inferred from visual similarity, an identical description, or timing alone.
 - Intermediate works stay in the lineage as `lineage_only` and do not appear in ordinary history. Promoting one moves it into ordinary history.
@@ -530,7 +529,7 @@ Flags you omit fall back to the server defaults, and the server defaults are not
 |---|---|
 | Not what you meant | Read the instructions and make place, count, shape, and material concrete |
 | The description is read too coarsely | Set the sketch grain to `Fine`. If it is already fine, try `Coarse` |
-| The picture is monotonous | Add one of touch, sway, composition, or color. Or try `Variation` at `Subtle` |
+| The picture is monotonous | Add one of touch, sway, composition, or color. Or try `Another composition` |
 | The lines are too tidy | Turn `Wild` on |
 | Too many elements | State the count explicitly, as in `three lines` or `twelve` |
 | A stated count is reduced | Check the literal ceiling under `Limits` in the settings |

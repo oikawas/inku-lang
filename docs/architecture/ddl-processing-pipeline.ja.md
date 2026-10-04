@@ -15,7 +15,7 @@
 | CAS保存 | DDL候補 + revision → 保存済みvisible DDL | 一致するatomic save acknowledgment後だけsourceとauthorityを進め、exact saved bytesを再parseする | authority store / pipeline host |
 | Typed compiler | visible DDL + definition locks → verified meaning + diagnostics | source、provenance、Macro definitionをlock検証し、bounded expansionする。曖昧さをfirst/nearest/lastで推測しない。lockは`canonical_ready` / `incomplete_known_hole` / `blocked_conflict` / `blocked_diagnostic`のいずれか | `core/crates/inku-ddl` |
 | Hole補完（Stage 2） | known hole → patch候補 → 作者承認 | known holeだけをspanとdigestに閉じて自動要求する。HoleなしではStage 2 LLMを呼ばない。承認patchもCAS保存後に再parseする。辞退・失敗は保存済みDDLを保って作者の編集を待つ | shared state machine + host provider/store |
-| Typed Stage 1.5 | verified meaning + composition/variation seed → effective meaning | LLMを使わずfocusと明示変奏だけを決定的に変換する。原文の意味や明示属性を上書きしない | `core/crates/inku-ddl` |
+| Typed Stage 1.5 | verified meaning + composition seed → effective meaning | LLMを使わずに入力を検証し、effective meaningの同一性を固定する（focusの読み替えは2026-09-27、明示変奏は2026-10-04に外した）。原文の意味や明示属性を上書きしない | `core/crates/inku-ddl` |
 | Plan・資源選択・materialize | verified effective meaning → symbolic Plan → compact Score recipe | 一度だけ下ろし、個体化前にhard policyとoperational budgetで需要を検査する。表現に必要な最小Score版を選び、compact基準は0.10、鏡写しrelationを持つ作品だけが0.15を必要とする | `core/crates/inku-ddl`; `core/crates/inku-score` |
 | Render Engine | Score + 保存policy + seeds + 解決済みhost option → SVG + metadata | compileに使ったoptionと一致するときだけ演奏する。recipeからsamplingし、clip不能な単位は元source全体を省略して再演奏する。同じScore、seed、条件は同じ演奏を再現する | `core/crates/inku-render` |
 | 履歴・系譜 | DDL / Score / SVG / authority context → DB row/node/edge + history link | Historyは当該revisionのsource、config、seed、catalog、budget、definition lock、4種の診断を保持し、親子を類似性から推測しない | Server DB / Android Room |
@@ -114,7 +114,6 @@ ServerのPython adapterとAndroidのKotlin/JNI adapterはhost処理を行う薄�
 | DDL編集 | authoring origin、CAS、元history | 同じ設定なら作者DDLのCAS保存後にcompilerへ再入。設定が変わるなら親付きのdirect-DDL variation |
 | 補完案の承認・辞退 | base revisionとproposal digest | 承認はbaseを再検証してCAS保存。辞退は保存済みDDLのまま |
 | 別の構図 | 保存済みvisible DDL、元meaning、描画属性 | 新しい`composition_seed`でtyped Stage 1.5／lowerer |
-| 明示変奏 | 保存済みvisible DDL、構図族、色、タッチ、個数 | amplitude + `variation_seed`でtyped Stage 1.5／lowerer |
 | 別の演奏 | 保存Scoreとauthoring revision | 新しい`render_seed`でrendererだけ |
 | catalog / canvas変更 | 元variationを変更しない | 現在optionsを持つ親付きnew variation |
 | 旧作品からの派生 | 元history行を変更しない | `legacy/{history_id}/fork`で`legacy_description_fork` / `legacy_ddl_fork`の新variation |

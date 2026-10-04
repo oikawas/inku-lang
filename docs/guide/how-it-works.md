@@ -96,7 +96,7 @@ From description to SVG, the layers run in this order. Only the layers marked us
 | Printing | Writes the underdrawing out as instructions (normalized DDL) | |
 | Typed Compiler | Turns the instructions into verified meaning; plugin words expand into core vocabulary here | |
 | Stage 2 completion (only when needed) | Proposes a completion for a phrase that cannot be read through, and waits for the author's approval | ● |
-| Stage 1.5 focus and variation | Chooses the focus for elements placed at the center from six fixed candidates, and moves it only for an explicit variation | |
+| Stage 1.5 settling | Settles the verified meaning as the input to scoring (the focus reinterpretation and variation were removed) | |
 | Scoring | Checks the resource limits and makes the score (JSON Score) | |
 | Renderer performance | Draws the score as SVG according to the seed, resolving sway, regions, and relations | |
 

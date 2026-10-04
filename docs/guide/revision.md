@@ -1,16 +1,11 @@
 # Revision, in detail
 
-This continues "Pursuing the work through revision" in [README.md](../../README.md). How
-**variation** works, the two ways of handing the work to the AI, and the handling of lineage
-and editions are collected here.
+This continues "Pursuing the work through revision" in [README.md](../../README.md). The two
+ways of handing the work to the AI, and the handling of lineage and editions are collected here.
 
-## Variation
+## Variation (retired)
 
-*Variation* moves the focus to a different candidate. The focus is where the elements the instructions place at the center are actually drawn, chosen from six fixed candidates: upper right, upper left, lower right, lower left, upper edge, and right half. It does not move the instructions, the frame of the composition, technique, color, touch, or element count, and it calls no LLM.
-
-The strength (Subtle, Moderate, Sweeping) tells the destinations apart: for the same variation seed, the three strengths each choose a different candidate. It is not a scale on which a larger strength moves further or moves more axes.
-
-*Another composition* also rechooses the focus, and when the description has a slant or a corner it rechooses the concrete angle and the position in the corner as well. Variation keeps the angle and corner that another composition settled.
+Variation was retired on 2026-10-04. Once the focus reinterpretation was removed on 2026-09-27 it had nothing left to move, and the word was confusing next to refinement. Works made by an earlier variation keep a "Variation (retired)" edge in their lineage, and their provenance shows the variation seed and amplitude of that time.
 
 ## Letting the AI carry it
 
@@ -27,4 +22,4 @@ Candidates can be made one at a time or as a grid of four. Keep the ones you lik
 
 <table><tr><td><img src="../assets/ui/lineage-dark.en.png" width="900" alt="The lineage tab: two arrows descend from the first-generation work card to two second-generation candidates, while the description and instructions remain on the left"></td></tr></table>
 
-What you keep becomes the next parent. Another performance from there, another catalog, a variation — the whole back and forth is recorded in the **lineage**, so you can trace later which generation you redrew what from to arrive at the drawing in front of you. History stores seeds and an edition ID, so any generation along the way can be reproduced exactly as it was.
+What you keep becomes the next parent. Another performance from there, another catalog, another composition — the whole back and forth is recorded in the **lineage**, so you can trace later which generation you redrew what from to arrive at the drawing in front of you. History stores seeds and an edition ID, so any generation along the way can be reproduced exactly as it was.

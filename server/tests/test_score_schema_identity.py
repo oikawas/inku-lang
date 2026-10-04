@@ -229,6 +229,36 @@ def test_score18_records_a_fill_range_written_in_numbers() -> None:
         Score.model_validate({**_NUMERIC_FILL_RANGE_SCORE, "version": "0.17.0"})
 
 
+# Compiled by core (DDL engine 57) from 「Nature.紅葉を3枚置く。」: the three
+# copies of the maple leaf are one member of a cells placement group (I-708).
+_CELLS_SCORE = json.loads(
+    (Path(__file__).parent / "data" / "score-0.19-maple-leaves-in-cells.json").read_text(encoding="utf-8")
+)
+
+
+def test_score19_places_the_copies_of_a_word_in_cells() -> None:
+    from copy import deepcopy
+
+    score = Score.model_validate(_CELLS_SCORE)
+    assert score.version == "0.19.0"
+    group = score.placement_groups[0]
+    assert group.layout == "cells"
+    assert group.resolved.recipe.kind == "cells"
+    assert group.members[0].symbolic.instance_count == 3
+    with pytest.raises(ValueError, match="cells placement_groups require Score version 0.19.0"):
+        Score.model_validate({**_CELLS_SCORE, "version": "0.18.0"})
+    unpaired = deepcopy(_CELLS_SCORE)
+    unpaired["placement_groups"][0]["resolved"]["recipe"] = {
+        "kind": "scatter_uniform_with_centroid_translation"
+    }
+    with pytest.raises(ValueError, match="cells placement_groups require the resolved cells recipe"):
+        Score.model_validate(unpaired)
+    template = deepcopy(_CELLS_SCORE)
+    template["instructions"][0]["arrangement"]["resolved"]["recipe"] = {"kind": "cells"}
+    with pytest.raises(ValueError, match="cells recipes belong to cells placement_groups"):
+        Score.model_validate(template)
+
+
 def test_score010_compact_recipe_reads_without_changing_the_default_edition() -> None:
     maximum = {
         "logical_objects": 400,

@@ -1123,3 +1123,10 @@
 "APIキーを削除しました。" = "API key removed.";
 "通常の描画モデルを保存しました。" = "Drawing defaults saved.";
 "drawing_model_not_available" = "Choose an enabled LLM model before drawing.";
+"履歴から選択" = "Select from history";
+"新しいバッチ" = "New batch";
+"新しいバッチを描く" = "Draw new batch";
+"%@を変更" = "Change %@";
+"記述から自動選択" = "Automatically select from description";
+"新規作成" = "New";
+"詳細" = "Details";

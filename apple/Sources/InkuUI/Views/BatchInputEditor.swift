@@ -19,6 +19,7 @@ struct BatchInputEditor: View {
         BatchNativeInputEditor(text: $text, isEditable: isEditable && isEnabled,
                                accessibilityLabel: accessibilityLabel,
                                textScale: display.preferences.textScale, colorScheme: colorScheme)
+            .clipped()
     }
 }
 
@@ -124,8 +125,12 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
+        // AppKit no longer clips ordinary views to their bounds by default.
+        scroll.clipsToBounds = true
+        scroll.contentView.clipsToBounds = true
         scroll.documentView = editor
         let ruler = BatchEditorRuler(scrollView: scroll, orientation: .verticalRuler)
+        ruler.clipsToBounds = true
         ruler.clientView = editor
         ruler.reservedThicknessForMarkers = 0
         ruler.reservedThicknessForAccessoryView = 0
@@ -324,21 +329,29 @@ private final class BatchEditorRuler: NSRulerView {
     override var isFlipped: Bool { true }
 
     override func drawHashMarksAndLabels(in rect: NSRect) {
+        guard let scroll = scrollView, let context = NSGraphicsContext.current?.cgContext else { return }
+        let viewport = convert(scroll.contentView.bounds, from: scroll.contentView)
+        let gutter = NSRect(x: bounds.minX, y: viewport.minY, width: bounds.width, height: viewport.height)
+        let drawingRect = rect.intersection(bounds).intersection(visibleRect).intersection(gutter)
+        guard !drawingRect.isEmpty else { return }
+        context.saveGState()
+        defer { context.restoreGState() }
+        context.clip(to: drawingRect)
         NSColor.controlBackgroundColor.setFill()
-        rect.fill()
+        drawingRect.fill()
         NSColor.separatorColor.setStroke()
         let separator = NSBezierPath()
-        separator.move(to: NSPoint(x: bounds.maxX - 0.5, y: rect.minY))
-        separator.line(to: NSPoint(x: bounds.maxX - 0.5, y: rect.maxY))
+        separator.move(to: NSPoint(x: bounds.maxX - 0.5, y: drawingRect.minY))
+        separator.line(to: NSPoint(x: bounds.maxX - 0.5, y: drawingRect.maxY))
         separator.stroke()
         guard let editor = clientView as? NSTextView, let layout = editor.layoutManager,
-              let container = editor.textContainer, let context = NSGraphicsContext.current?.cgContext else { return }
+              let container = editor.textContainer else { return }
         layout.ensureLayout(for: container)
         let textOrigin = editor.textContainerOrigin
         // Gutter visibility depends only on vertical position, including short rows when scrolled right.
-        let viewport = editor.visibleRect
-        let visible = NSRect(x: 0, y: viewport.minY - textOrigin.y,
-                             width: max(1, layout.usedRect(for: container).maxX), height: viewport.height)
+        let editorRect = editor.convert(drawingRect, from: self)
+        let visible = NSRect(x: 0, y: editorRect.minY - textOrigin.y,
+                             width: max(1, layout.usedRect(for: container).maxX), height: editorRect.height)
         let glyphs = layout.glyphRange(forBoundingRect: visible, in: container)
         let first = glyphs.length > 0
             ? lineIndex.line(containing: layout.characterIndexForGlyph(at: glyphs.location))
@@ -360,8 +373,8 @@ private final class BatchEditorRuler: NSRulerView {
                 baseline = fragment.minY + offset
             }
             let point = convert(NSPoint(x: textOrigin.x, y: textOrigin.y + baseline), from: editor)
-            if point.y > rect.maxY + fragment.height { break }
-            guard point.y >= rect.minY - fragment.height else { continue }
+            if point.y > drawingRect.maxY + fragment.height { break }
+            guard point.y >= drawingRect.minY - fragment.height else { continue }
             let number = batchNumberLine(index + 1, font: numberFont, color: NSColor.secondaryLabelColor.cgColor)
             let width = CGFloat(CTLineGetTypographicBounds(number, nil, nil, nil))
             batchDrawNumber(number, baseline: CGPoint(x: bounds.maxX - width - 8, y: point.y), context: context)

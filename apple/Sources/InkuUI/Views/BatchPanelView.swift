@@ -10,36 +10,48 @@ struct BatchPanelView: View {
     @State private var issuesExpanded = false
     @State private var conditionsExpanded = false
     @State private var workspaceTab = "work"
+    @State private var selectedHistoryPrompt = ""
 
     private var controlsDisabled: Bool { automation.isOccupied || model.isBusy }
+    private var canStartNewBatch: Bool {
+        !controlsDisabled && automation.nonEmptyBatchCount > 0
+            && (model.inputMode == "ddl" || model.hasAvailableNextDrawingModel)
+    }
     private var issueRows: [BatchRow] { automation.rows.filter { $0.state == .failed || $0.state == .uncertain } }
     private var displayedWork: SavedWork? {
-        automation.observedWork ?? (!automation.running && automation.rows.isEmpty ? model.selectedWork : nil)
+        automation.observedWork ?? model.selectedWork
+    }
+    private var workspaceMinimumHeight: CGFloat {
+        automation.running && conditionsExpanded ? 620 : 500
     }
 
     var body: some View {
         GeometryReader { geometry in
             if geometry.size.width >= 840 {
                 HStack(alignment: .top, spacing: 16) {
-                    inputPane.frame(width: 390)
+                    inputPane.frame(width: 410)
                     Divider()
-                    workspace
+                    workspacePane(height: geometry.size.height)
                 }
+                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         inputContent
-                        actions
                         Divider()
-                        workspace.frame(height: max(500, geometry.size.height * 0.85))
-                    }.padding(.bottom, 12)
+                        workspace.frame(height: max(workspaceMinimumHeight, geometry.size.height * 0.85))
+                    }
+                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 12)
                 }
+                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
             }
         }
+        .clipped()
         .confirmationDialog(model.display.localized("前回のバッチ記録を新しいバッチで置き換えます"),
                             isPresented: $replaceBatch, titleVisibility: .visible) {
-            Button(model.display.localized("新しいバッチを開始")) { Task { await automation.startBatch(app: model) } }
-                .disabled(controlsDisabled)
+            Button(model.display.localized("新しいバッチを描く")) { startNewBatch() }
+                .disabled(!canStartNewBatch)
             Button(model.display.localized("キャンセル"), role: .cancel) {}
         } message: {
             Text(model.display.localized("保存済み作品は残ります。未処理の行を再開する場合は「前回のバッチを再開」を選んでください。"))
@@ -54,32 +66,33 @@ struct BatchPanelView: View {
     }
 
     private var inputPane: some View {
-        VStack(spacing: 12) {
-            ScrollView {
-                inputContent.padding(.trailing, 2)
-            }
-            Divider()
-            actions
+        ScrollView {
+            inputContent.padding(.trailing, 2).padding(.bottom, 12)
         }
-        .frame(maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .clipped()
     }
 
     private var inputContent: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             input
+            if automation.canResume && !automation.running { resumeCard }
             Divider()
             BatchConditionsView(model: model, automation: automation)
-            if automation.canResume && !automation.running { resumeCard }
+            actions
             if !automation.rows.isEmpty { resultSummary }
             if !issueRows.isEmpty { issueResults }
             if !automation.rows.isEmpty { allResults }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
     }
 
     private var input: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(model.display.localized("1行に1つの記述またはDDLを入力")).font(.headline)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) { inputHeading }
+                VStack(alignment: .leading, spacing: 4) { inputHeading }
+            }
             if automation.running, let row = automation.activeRow {
                 VStack(alignment: .leading, spacing: 6) {
                     Label(model.display.localizedFormat("処理中: %ld行", row.line), systemImage: "play.fill")
@@ -91,15 +104,16 @@ struct BatchPanelView: View {
             } else {
                 BatchInputEditor(text: $automation.batchText, isEditable: !controlsDisabled,
                                  accessibilityLabel: model.display.localized("バッチ入力"))
-                    .frame(height: 170)
+                    .frame(height: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(.quaternary))
-                HStack {
+                if automation.nonEmptyBatchCount > 0 {
                     Text(model.display.localizedFormat("空行を除く入力: %ld件", automation.nonEmptyBatchCount))
                         .font(.caption).foregroundStyle(.secondary).monospacedDigit()
-                    Spacer(minLength: 0)
+                }
+                if !automation.batchPromptHistory.isEmpty {
                     inputHistory
                 }
-                .controlSize(.small)
             }
             Text(model.display.localized("空行を除き、元の行番号を保持して順に描きます。"))
                 .font(.caption).foregroundStyle(.secondary)
@@ -109,18 +123,41 @@ struct BatchPanelView: View {
         }
     }
 
+    @ViewBuilder private var inputHeading: some View {
+        Text(model.display.localized("バッチ")).font(.callout.weight(.semibold))
+        Text(model.display.localized("1行に1つの記述またはDDLを入力"))
+            .font(.caption).foregroundStyle(.secondary)
+    }
+
     private var inputHistory: some View {
         Menu {
             ForEach(Array(automation.batchPromptHistory.enumerated()), id: \.offset) { _, text in
                 Button(historyLabel(text)) {
                     guard !controlsDisabled else { return }
+                    selectedHistoryPrompt = text
                     automation.restoreBatchInput(text)
                 }
             }
         } label: {
-            Label(model.display.localized("入力履歴"), systemImage: "clock.arrow.circlepath")
+            HStack(spacing: 6) {
+                Text(selectedHistoryPrompt.isEmpty ? model.display.localized("履歴から選択") : historyLabel(selectedHistoryPrompt))
+                    .lineLimit(1).truncationMode(.tail)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.down").font(.caption2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 8).padding(.vertical, 6)
+            .contentShape(Rectangle())
         }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
+        .controlSize(.small)
         .disabled(controlsDisabled || automation.batchPromptHistory.isEmpty)
+        .accessibilityLabel(model.display.localized("入力履歴"))
+        .accessibilityValue(selectedHistoryPrompt.isEmpty ? model.display.localized("履歴から選択") : historyLabel(selectedHistoryPrompt))
         .help(tip("選んだ履歴をバッチ入力欄へ復元します。実行記録と保存作品は変わりません。"))
     }
 
@@ -146,6 +183,7 @@ struct BatchPanelView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Button(model.display.localized("前回のバッチを再開")) { Task { await automation.resumeBatch(app: model) } }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .disabled(controlsDisabled || automation.uncertainCount > 0)
                 .help(tip("前回の開始時の条件で、未処理の行と失敗した行を再開します。"))
         }
@@ -168,19 +206,12 @@ struct BatchPanelView: View {
                 .buttonStyle(.bordered).disabled(automation.stopping)
                 .help(tip("実行中のバッチを停止します。未処理の行は後で再開できます。"))
             } else {
-                Button {
-                    if automation.canResume { replaceBatch = true }
-                    else { Task { await automation.startBatch(app: model) } }
-                } label: {
-                    Label(model.display.localized("新しいバッチを開始"), systemImage: "play.fill")
-                        .frame(maxWidth: .infinity)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) { newBatchLabel; newBatchButton }
+                    VStack(alignment: .leading, spacing: 6) { newBatchLabel; newBatchButton }
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(controlsDisabled || automation.nonEmptyBatchCount == 0
-                    || (model.inputMode == "description" && !model.hasNextDrawingModel))
-                .help(tip("入力欄と次のバッチの描画条件で、各行を独立した作品として描きます。"))
-                if model.inputMode == "description", !model.hasNextDrawingModel {
-                    Text(model.display.localized("記述から生成するには、設定で接続先とモデルを指定してください。"))
+                if model.inputMode == "description", !model.hasAvailableNextDrawingModel {
+                    Text(model.display.message("drawing_model_not_available"))
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -194,6 +225,30 @@ struct BatchPanelView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .controlSize(.large)
+    }
+
+    private var newBatchLabel: some View {
+        Text(model.display.localized("新しいバッチ")).font(.caption).foregroundStyle(.secondary)
+            .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private var newBatchButton: some View {
+        Button {
+            guard canStartNewBatch else { return }
+            if automation.canResume { replaceBatch = true }
+            else { startNewBatch() }
+        } label: {
+            Label(model.display.localized("新しいバッチを描く"), systemImage: "play.fill")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(!canStartNewBatch)
+        .help(tip("入力欄と次のバッチの描画条件で、各行を独立した作品として描きます。"))
+    }
+
+    private func startNewBatch() {
+        guard canStartNewBatch else { return }
+        Task { await automation.startBatch(app: model) }
     }
 
     private var resultSummary: some View {
@@ -269,7 +324,18 @@ struct BatchPanelView: View {
             }
             observation
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    @ViewBuilder private func workspacePane(height: CGFloat) -> some View {
+        if height < workspaceMinimumHeight {
+            ScrollView {
+                workspace.frame(height: workspaceMinimumHeight)
+            }
+            .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        } else {
+            workspace
+        }
     }
 
     private var runProgress: some View {

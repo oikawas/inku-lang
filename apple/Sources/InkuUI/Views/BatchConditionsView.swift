@@ -13,46 +13,45 @@ struct BatchConditionsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(model.display.localized("次のバッチの描画条件"), systemImage: "slider.horizontal.3")
-                .font(.subheadline.weight(.semibold))
-            Picker(model.display.localized("入力"), selection: inputMode) {
-                Text(model.display.localized("記述")).tag("description")
-                Text("DDL").tag("ddl")
+            HStack(alignment: .center, spacing: 12) {
+                Text(model.display.localized("次のバッチの描画条件"))
+                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                Picker(model.display.localized("入力"), selection: inputMode) {
+                    Text(model.display.localized("記述")).tag("description")
+                    Text("DDL").tag("ddl")
+                }
+                .pickerStyle(.segmented).labelsHidden().frame(width: 120)
+                .help(tip("各行を記述として解釈するか、DDLとして描くかを選びます。"))
             }
-            .pickerStyle(.segmented)
-            .help(tip("各行を記述として解釈するか、DDLとして描くかを選びます。"))
-            Button { showModelPicker = true } label: {
-                conditionRow("モデル", value: model.nextDrawingModelReference.isEmpty
-                    ? model.display.localized("選択してください") : model.nextDrawingModelReference)
-            }
-            .buttonStyle(.plain)
+            conditionRow("モデル", value: modelSummary) { showModelPicker = true }
             .help(tip("次のバッチで使う描画モデルを選びます。"))
             .popover(isPresented: $showModelPicker) {
                 CreationModelPicker(model: model)
                     .padding(16).frame(width: 380).environment(model.display).disabled(disabled)
             }
-            Button { showColorCatalogs = true } label: {
-                conditionRow("色カタログ", value: catalogSummary)
-            }
-            .buttonStyle(.plain).disabled(model.catalogs.isEmpty)
-            .accessibilityLabel(model.display.localized("色カタログを開く"))
-            .accessibilityValue(catalogSummary)
+            Divider()
+            conditionRow("色カタログ", value: catalogSummary) { showColorCatalogs = true }
+            .disabled(model.catalogs.isEmpty)
             .help(tip("次のバッチで使う配色を選びます。"))
             Divider()
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { compactControls }
+                HStack(spacing: 6) { compactControls }.fixedSize(horizontal: true, vertical: false)
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) { sketchControl; wildControl }
                     HStack(spacing: 8) { paperControl; clearControl }
                 }
             }
             .controlSize(.small)
-            Button(model.display.localized("生成条件の詳細"), systemImage: "ellipsis.circle") { showDetails = true }
-                .controlSize(.small)
-                .help(tip("言語・シード・指定する写生を確認して変更します。"))
-                .popover(isPresented: $showDetails) { details }
-            Text(model.display.localized("描画条件はバッチ開始時に固定します。再開には前回の条件を使います。"))
-                .font(.caption).foregroundStyle(.secondary)
+            HStack(alignment: .top, spacing: 8) {
+                Text(model.display.localized("描画条件はバッチ開始時に固定します。再開には前回の条件を使います。"))
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                Button(model.display.localized("詳細"), systemImage: "ellipsis") { showDetails = true }
+                    .controlSize(.small)
+                    .help(tip("言語・シード・指定する写生を確認して変更します。"))
+                    .popover(isPresented: $showDetails) { details }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .disabled(disabled)
@@ -78,19 +77,30 @@ struct BatchConditionsView: View {
     private var catalogSummary: String {
         model.catalogMode == "fixed"
             ? model.catalogs.first { $0.id == model.catalogID }?.name ?? model.catalogID
-            : model.display.localized(model.catalogMode == "random" ? "ランダム" : "記述から選択")
+            : model.display.localized(model.catalogMode == "random" ? "ランダム" : "記述から自動選択")
     }
 
-    private func conditionRow(_ key: String, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(model.display.localized(key)).font(.caption).foregroundStyle(.secondary)
-                Text(value).font(.callout).lineLimit(2).truncationMode(.middle)
-            }
-            Spacer(minLength: 0)
-            Text(model.display.localized("変更")).font(.caption).foregroundStyle(.secondary)
+    private var modelSummary: String {
+        let reference = model.nextDrawingModelReference
+        guard let separator = reference.firstIndex(of: ":") else {
+            return reference.isEmpty ? model.display.localized("選択してください") : reference
         }
-        .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+        return String(reference[..<separator]) + " / " + String(reference[reference.index(after: separator)...])
+    }
+
+    private func conditionRow(_ key: String, value: String, action: @escaping () -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .center, spacing: 12) {
+                Text(model.display.localized(key)).font(.caption).foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                Button(model.display.localized("変更"), action: action)
+                    .controlSize(.small)
+                    .accessibilityLabel(model.display.localizedFormat("%@を変更", model.display.localized(key)))
+                    .accessibilityValue(value)
+            }
+            Text(value).font(.callout).lineLimit(2).truncationMode(.middle).textSelection(.enabled)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder private var compactControls: some View {
@@ -128,8 +138,7 @@ struct BatchConditionsView: View {
 
     private var paperControl: some View {
         Button { showPaperPicker = true } label: {
-            Label(model.display.localized("用紙") + ": " + (model.canvases.first { $0.id == model.canvasID }?.label ?? model.canvasID),
-                  systemImage: "rectangle.portrait")
+            Text(model.display.localized("キャンバス") + ": " + (model.canvases.first { $0.id == model.canvasID }?.label ?? model.canvasID))
                 .lineLimit(1)
         }
         .help(tip("用紙の形と意図を見て、次の作品の用紙を選びます。"))
@@ -140,7 +149,7 @@ struct BatchConditionsView: View {
     }
 
     private var clearControl: some View {
-        Button(model.display.localized("入力をクリア"), systemImage: "xmark") {
+        Button(model.display.localized("新規作成")) {
             guard !disabled else { return }
             automation.restoreBatchInput("")
         }

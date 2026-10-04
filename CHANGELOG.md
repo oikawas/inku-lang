@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-04 — Repair Swift batch editor clipping and layout
+
+- Clip the native batch editor and line-number ruler to their viewport, preventing long input from painting over the settings below.
+- Align the input column, full-width history, resume card, model/catalog controls, compact conditions, and new-batch action with Web. Keep selected saved works visible until a batch work is observed, and require an available model for new description batches.
+- Preserve original line numbers, two-axis scrolling, frozen run conditions, resume, and ambiguous-outcome review. See [SWIFT_SPEC.md](apple/SWIFT_SPEC.md) for the native host behavior.
+
 ### 2026-10-04 — Align Swift model settings with Web
 
 Model settings now use service cards, model summaries, and a separate model-selection sheet. Search, filters, bulk usage changes, purposes, recommendations, speed, and Japanese/English comments can be edited and saved. Rename, memo, service addition/deletion, and folded rate/connection settings use scoped saves that retain other drafts. Backward-compatible optional fields persist model settings; disabled, Vision-only, end-of-life, and subscription-only models cannot be newly selected for LLM drawing. Existing references and works remain intact. Configured API keys are hidden and can be replaced after explicit removal. Synchronized the Japanese/English [Swift specification](apple/SWIFT_SPEC.md) and [usage guide](apple/README.md).

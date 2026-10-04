@@ -71,7 +71,9 @@ The database is not copied or moved. Its path is retained in the `InkuDatabasePa
 
 ## Normal use and an isolated trial
 
-In Batch, enter one description or DDL work per line and choose the model, color catalog, sketch, Wild, and canvas in Drawing conditions for the next batch before painting. Blank lines still count toward original line numbers, and long lines scroll horizontally on macOS. Explicit history restore replaces only the editor input. Review the pending count and starting conditions before resuming an interrupted batch; completed works are skipped. The running row and the displayed successful work have separate line numbers. Review history before choosing retry or skip for an ambiguous outcome.
+Batch takes one description or DDL work per line. Full-width history, previous-run resume information, next conditions, and the new-batch action follow the editor. Use each model/catalog row's Change button, check sketch from life, Wild, and canvas, then choose Draw new batch. Description batches require an enabled LLM model. Language, seed, and supplied sketch are under Details. The start action sits immediately after conditions; narrow layouts scroll through the work area as well. Blank lines retain original numbering, long lines scroll horizontally, and ruler numbers stay inside the editor.
+
+Explicit history restoration replaces only editor text. Interrupted-run cards show remaining rows and frozen starting conditions; resuming preserves completed works. Distinguish the currently processed line from the displayed successful work, and inspect history before explicitly retrying or skipping ambiguous rows. When no batch work has been observed, the selected saved work remains on the right.
 
 The initial input is direct English DDL, so generation can be tried without a model connection. OpenAI API Platform, Claude API, Gemini API, NVIDIA NIM, Ollama, and Ollama Cloud are supplied as default connections, with missing entries added once to older settings. Existing URLs and model selections are preserved, and deleted default connections stay deleted after restarting.
 

@@ -141,9 +141,12 @@ public final class AppModel {
     public var canEditCurrentDDL: Bool { !isBusy && !isPreview && (currentExecutionID != nil || selectedContext != nil) }
     public var canCompleteHoles: Bool { !isBusy && currentExecutionID != nil && !holeIDs.isEmpty && !settings.providers.isEmpty && ddlText == visibleDDL }
     public var canRegenerateDescription: Bool { !isBusy && !sourceLocked && currentExecutionID != nil && !settings.providers.isEmpty && !descriptionText.isEmpty }
+    public var hasAvailableNextDrawingModel: Bool {
+        hasNextDrawingModel && SettingsModel.isModelAvailable(nextDrawingModelReference, settings: settings)
+    }
     public var canGenerate: Bool {
         database != nil && !isBusy && !isPreview && !(inputMode == "ddl" ? ddlText : descriptionText).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && (inputMode == "ddl" || (hasNextDrawingModel && SettingsModel.isModelAvailable(nextDrawingModelReference, settings: settings)
+            && (inputMode == "ddl" || (hasAvailableNextDrawingModel
                 && !(selectedWorkID != nil && sourceLocked)))
     }
 

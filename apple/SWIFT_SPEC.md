@@ -14,6 +14,14 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-04 Batch clipping and layout repair
+
+The macOS editor explicitly clips its scroll view, content view, ruler, and SwiftUI host to the viewport. Ruler background and line numbers draw only within the intersection of the dirty region and visible gutter. This prevents long inputs from painting over the conditions below. Physical numbering, UTF-16 editing, undo/IME, and two-axis scrolling retain their existing contracts.
+
+At ordinary widths, a 410-point input column contains a 220-point editor followed by the count, full-width history selector, previous-run resume card when present, next conditions, new-batch action, and results. The start action immediately follows conditions. Model and catalog rows put their label and Change button above the value; sketch from life, Wild, canvas, and New form a compact row, with language, seed, and supplied sketch under Details. Narrow layouts scroll as one page through the work area, and short wide windows allow the work area to scroll.
+
+When no batch work has been observed, the selected saved work remains visible without a batch line number. New description batches and replacement confirmation require an available enabled LLM model; direct DDL remains independent of models. Frozen requests, resume, and ambiguous-outcome decisions remain unchanged. Compare the actual native and Web screens for this presentation repair without making a provider request or generating a work.
+
 ## 2026-10-04 Web-aligned model settings UI
 
 Model settings use service cards followed by the selected name and ID, enabled-model count, LLM/Vision chips, model selection, folded rate limits and connection settings, and service addition. Ollama Cloud and Ollama appear first. This is a single-user local client, so Web publication is labeled as models in use. Rename, memo, and addition use separate sheets; deletion confirms a captured service ID. URLs, rate limits, API keys, and drawing defaults each save independently without committing other drafts.

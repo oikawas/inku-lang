@@ -49,11 +49,16 @@ struct CreationPaperPicker: View {
                     }
                 }.padding(6)
             }.frame(maxHeight: 520)
-        }.frame(width: 390)
+        }
+        #if os(macOS)
+        .frame(width: 390)
+        #else
+        .frame(maxWidth: 390)
+        #endif
     }
 
     private func tip(_ key: String) -> String {
-        model.display.preferences.showTooltips ? model.display.localized(key) : ""
+        model.display.tooltip(key)
     }
 }
 

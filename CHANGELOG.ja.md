@@ -6,6 +6,20 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-04 — Swiftを現行Serverのcore・保存作品・全体操作へ追随
+
+Stage 1確定後のfallback清掃、構図prompt v2と明示した隅、Cells・DDLエンジン57／Score 0.19.0／描画エンジン73、日本語修飾語と縦長角度の共通semanticを取り込んだ。Swift facade・meter・native rasterを保持し、新variationを退役した。旧作品・来歴は読めるままとし、既存不正snapshotの自動修復・pending要求の自動再送は追加しない。
+
+新操作のモデルを入口別に正規化し、DDL／配置では親のStage 1来歴を保持してStage 2既定だけを保存する。作品別prompt・diagnostics・eventsをsave ACKのimmutable presentationへ固定し、正式authoring origin、空記述、nullable composition seedとcancel後の保存境界を揃えた。専用DDL／固定作品の共通操作、履歴の幅、library preview・系譜focusと制作選択、Vision助言、生成後追記する奥書、model比較最大4件、demoの時間・保存・未記録usage、export今回だけ／PNG template個別保存、clipboardと表示設定を整理した。
+
+TipsのJA/EN全静的text・動的template/keyとsource SHA／digestを同梱し、単数形tooltipと実consumerを接続。group共有はlocal書出し印へ適応し、account／ACLを追加しない。通常buildはcommit済み正本snapshotを使い、別Server sourceは明示更新する。自動backupの世代／時刻／容量と読込原因、描画logの再読込／error閉じる／前回記録保持を追加した。
+
+macOS buildはresource／core／app変更前に現在ユーザーの既知Inku instanceをbundle／実行fileとPID identityで検証し、SIGKILLで停止する。最大10秒で停止を確認できなければbuildを中止し、停止結果を記録する。DB復元成功後はpreview・観測作品・一時snapshotを破棄し、library／世代／選択位置を復元DBから読み直す。
+
+canvas下の固定作品操作と写生／DDL表示、保存時と現在の再現比較、固定作品の生成情報「詳細／プロンプト／Score」を追加した。新規requestのoptional版・build・UI言語・batch来歴をACKへ保持し、旧未記録を現在値で補わない。nativeのStage 1 prompt基底digestは未記録として明示する。プレゼンテーションは固定作品と独立した履歴表示を使い、制作の選択とview階層を保持する。hashは最初の区切り以降のdigest全体をコピーし、未読語の再読込失敗は前回一覧と原因を保持する。AI方針は160 UTF16単位まで、観察と明示再開を分け、奥書は固定経路を確認する。ごみ箱移動は件数を確認して実行する。この最後のUI／来歴追加はsource実装で、最終build・実画面は別に確認する。
+
+具体失敗に対応するRust5 selector、作品別snapshotを保存・Host再作成・cancel後に読むHost1 caseと最新appの型検査が成功。最終native／CLI、実provider／OAuth、iOS、Intel／macOS14実機と作者受入は別に確認する。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[利用手順](apple/README.ja.md)の日英を同期した。
+
 ### 2026-10-04 — macOSの描画開始と処理エラー表示の競合を回避
 
 全体の処理エラーを閉じられる画面内表示へ変更し、描画開始時のエラー解除・再設定がNSAlert sheetの更新を起こさないようにした。本文の選択・scroll、開いている作品dialog内での表示に対応する。iOSの警告、削除・復元の確認、描画と保存の契約を保持する。[Swift仕様](apple/SWIFT_SPEC.ja.md)の日英を同期した。

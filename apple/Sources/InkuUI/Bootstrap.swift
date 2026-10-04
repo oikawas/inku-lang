@@ -163,7 +163,11 @@ struct Bootstrap {
                  settings: HostSettings, parentWorkID: String? = nil, derivationKind: String = "new",
                  catalogMode: String = "fixed", sketch: SketchRequest = .off,
                  variationAmplitude: String? = nil, variationSeed: String? = nil,
-                 savedConfiguration: Data? = nil, importedPlugins: [ImportedMacroDefinition] = []) throws -> GenerationRequest {
+                 savedConfiguration: Data? = nil, importedPlugins: [ImportedMacroDefinition] = [],
+                 compositionSeed: String? = nil) throws -> GenerationRequest {
+        guard derivationKind != "variation", variationAmplitude == nil, variationSeed == nil else {
+            throw HostError("variation_retired")
+        }
         let selectedID: String
         if catalogMode == "random" {
             guard let option = catalogs.filter({ $0.id != catalogID }).randomElement() else { throw HostError("catalog_selection_unavailable") }
@@ -188,6 +192,9 @@ struct Bootstrap {
         }
         let actualSeed = seed.isEmpty ? String(UInt64.random(in: 0...((UInt64(1) << 53) - 1))) : seed
         guard let parsedSeed = UInt64(actualSeed), String(parsedSeed) == actualSeed else { throw HostError("invalid_seed") }
+        if let compositionSeed {
+            guard let parsed = UInt64(compositionSeed), String(parsed) == compositionSeed else { throw HostError("invalid_composition_seed") }
+        }
         var config = originalPipeline
         var compiler = originalCompiler
         var host = originalHost
@@ -201,7 +208,7 @@ struct Bootstrap {
             "background": host["background"] ?? "white",
         ])))
         compiler["host"] = host
-        compiler["composition_seed"] = actualSeed
+        compiler["composition_seed"] = compositionSeed.map { $0 as Any } ?? NSNull()
         if saved == nil, let selectedLimits = settings.operationalLimits {
             let bounds = try operationalLimitDefaults()
             guard selectedLimits.allSatisfy({ key, value in bounds[key].map { value <= $0 } ?? false }) else { throw HostError("invalid_operational_limits") }
@@ -230,13 +237,7 @@ struct Bootstrap {
             compiler["hard_resource_policy"] = hardPolicy
             compiler["operational_resource_budget"] = operational
         }
-        if (variationAmplitude == nil) != (variationSeed == nil) { throw HostError("variation_pair_required") }
-        compiler["stage15_variation"] = NSNull()
-        if let variationAmplitude, let variationSeed {
-            guard ["small", "medium", "large"].contains(variationAmplitude),
-                  let seed = UInt64(variationSeed), String(seed) == variationSeed else { throw HostError("invalid_variation") }
-            compiler["stage15_variation"] = ["amplitude": variationAmplitude, "seed": variationSeed]
-        }
+        compiler.removeValue(forKey: "stage15_variation")
         config["language"] = language
         config["compiler"] = compiler
         let exactCatalog = saved == nil ? try macroCatalogValue(language: language, settings: settings, importedPlugins: importedPlugins) : nil
@@ -260,7 +261,7 @@ struct Bootstrap {
             "resolved_color_map": colorMap, "catalog_id": selectedID,
             "canvas": ["width": baseWidth, "height": height],
             "canvas_aspect_id": canvasID, "svg_profile": "display",
-            "render_seed": actualSeed, "composition_seed": actualSeed,
+            "render_seed": actualSeed, "composition_seed": compositionSeed.map { $0 as Any } ?? NSNull(),
             "wild": wild, "error_policy": compiler["error_policy"] ?? "omit_and_continue",
         ]
         let authoring: GenerationAuthoring = inputMode == "ddl"
@@ -278,7 +279,14 @@ struct Bootstrap {
             renderOptions: try Self.bytes(options), clipPolicy: try Self.bytes(clip),
             models: settings.models, providers: settings.providers, renderColorMaps: colorMaps,
             description: description, parentWorkID: parentWorkID,
-            derivationKind: derivationKind)
+            derivationKind: derivationKind,
+            disabledPluginNames: pluginWords.filter {
+                $0.packageID.map { settings.plugins?.disabledPackageIDs.contains($0) == true } ?? false
+            }.flatMap { [$0.id] + $0.aliases },
+            provenance: GenerationProvenance(ddlVersion: productReference.versions["ddlSpec"],
+                ddlEngineVersion: productReference.versions["ddlEngine"],
+                build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
+                referenceBuild: productReference.build))
     }
 
     func macroCatalog(language: String, settings: HostSettings = .init(), importedPlugins: [ImportedMacroDefinition] = []) throws -> [String: Any] {

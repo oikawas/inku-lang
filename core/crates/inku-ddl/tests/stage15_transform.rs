@@ -3,10 +3,9 @@ use inku_ddl::{
     MacroExpansionDiagnosticKind, MacroExpansionLimits, MacroInvocationProvenance, MacroLock,
     NormalizedDdlDocument, ResolvedInstructionLanguage, STAGE15_TRANSFORMATION_SCHEMA_ID,
     SemanticContinuationTarget, SemanticHead, SemanticIdentity, Stage15TransformError,
-    Stage15Variation, Stage15VariationAmplitude, compile_typed_ddl, compiler_lock_hash_input,
-    expanded_generated_provenance_canonical_bytes, expanded_meaning_canonical_bytes,
-    geometry_resolution_policy_digest, semantic_source_provenance_canonical_bytes,
-    stage15_transformation_input, transform_stage15,
+    compile_typed_ddl, compiler_lock_hash_input, expanded_generated_provenance_canonical_bytes,
+    expanded_meaning_canonical_bytes, geometry_resolution_policy_digest,
+    semantic_source_provenance_canonical_bytes, stage15_transformation_input, transform_stage15,
 };
 use sha2::{Digest, Sha256};
 
@@ -96,8 +95,7 @@ fn verified_stage15_view_preserves_finite_size_identity_and_source_provenance() 
         None,
         LIMITS,
     );
-    let result =
-        transform_stage15(stage15_transformation_input(&compilation).unwrap(), None).unwrap();
+    let result = transform_stage15(stage15_transformation_input(&compilation).unwrap()).unwrap();
     let scale = result.original_semantic_document().instructions[0]
         .entity
         .relative_scale
@@ -134,9 +132,8 @@ fn step9i_input_boundary_rejects_visible_source_replacement() {
         LIMITS,
     );
 
-    let red_result = transform_stage15(stage15_transformation_input(&red).unwrap(), None).unwrap();
-    let blue_result =
-        transform_stage15(stage15_transformation_input(&blue).unwrap(), None).unwrap();
+    let red_result = transform_stage15(stage15_transformation_input(&red).unwrap()).unwrap();
+    let blue_result = transform_stage15(stage15_transformation_input(&blue).unwrap()).unwrap();
     assert_ne!(
         red_result.effective_canonical_bytes(),
         blue_result.effective_canonical_bytes()
@@ -159,7 +156,7 @@ fn verified_stage15_input_rejects_a_self_consistent_foreign_geometry_policy() {
         LIMITS,
     );
     let transformed =
-        transform_stage15(stage15_transformation_input(&compilation).unwrap(), None).unwrap();
+        transform_stage15(stage15_transformation_input(&compilation).unwrap()).unwrap();
     let plan = inku_ddl::plan_verified_stage15(
         transformed.verified_effective_view(),
         inku_ddl::ScoreLoweringContext::resolve("square", inku_score::Color::White).unwrap(),
@@ -195,7 +192,7 @@ fn step9i_input_boundary_checks_language_evidence_but_allows_empty_source() {
 
     let empty = compile("", ResolvedInstructionLanguage::En, &[], Some(0), LIMITS);
     let input = stage15_transformation_input(&empty).unwrap();
-    let result = transform_stage15(input, None).unwrap();
+    let result = transform_stage15(input).unwrap();
     assert_eq!(result.composition_seed(), Some(0));
 }
 
@@ -386,9 +383,9 @@ fn step9i_input_boundary_checks_all_sidecars_and_consumed_definition_identity() 
 }
 
 #[test]
-fn explicit_variation_never_changes_effective_meaning() {
+fn effective_meaning_keeps_the_original_semantic_document() {
     // Stage 1.5 no longer has a focus to move, so `center` behaves like every
-    // other meaning: an explicit variation is accepted and changes nothing.
+    // other meaning: the effective view keeps the original semantic document.
     for source in [
         "thin circle",
         "place eight circle at left-edge.",
@@ -402,22 +399,16 @@ fn explicit_variation_never_changes_effective_meaning() {
             LIMITS,
         );
         let original_semantic = compilation.semantic_document.as_ref().unwrap().ast.clone();
-        let without_variation =
-            transform_stage15(stage15_transformation_input(&compilation).unwrap(), None).unwrap();
+        let transformed =
+            transform_stage15(stage15_transformation_input(&compilation).unwrap()).unwrap();
         assert_eq!(
             STAGE15_TRANSFORMATION_SCHEMA_ID,
             "inku.typed-stage15-transformation.v7"
         );
-        assert_eq!(
-            without_variation.schema_id(),
-            STAGE15_TRANSFORMATION_SCHEMA_ID
-        );
-        assert_eq!(
-            without_variation.original_semantic_document(),
-            &original_semantic
-        );
+        assert_eq!(transformed.schema_id(), STAGE15_TRANSFORMATION_SCHEMA_ID);
+        assert_eq!(transformed.original_semantic_document(), &original_semantic);
         let canonical: serde_json::Value =
-            serde_json::from_slice(without_variation.effective_canonical_bytes()).unwrap();
+            serde_json::from_slice(transformed.effective_canonical_bytes()).unwrap();
         assert_eq!(
             canonical.as_object().unwrap().keys().collect::<Vec<_>>(),
             [
@@ -429,18 +420,6 @@ fn explicit_variation_never_changes_effective_meaning() {
             ],
             "{source}"
         );
-        for amplitude in Stage15VariationAmplitude::ALL {
-            let with_variation = transform_stage15(
-                stage15_transformation_input(&compilation).unwrap(),
-                Some(Stage15Variation { amplitude, seed: 9 }),
-            )
-            .unwrap();
-            assert_eq!(
-                with_variation.effective_canonical_bytes(),
-                without_variation.effective_canonical_bytes(),
-                "a variation entered effective meaning for {source}"
-            );
-        }
     }
 }
 #[test]
@@ -453,44 +432,29 @@ fn attested_seed_passthrough_is_lossless_and_identity_bound() {
             composition_seed,
             LIMITS,
         );
-        let without_variation =
-            transform_stage15(stage15_transformation_input(&compilation).unwrap(), None).unwrap();
-        let with_variation = transform_stage15(
-            stage15_transformation_input(&compilation).unwrap(),
-            Some(Stage15Variation {
-                amplitude: Stage15VariationAmplitude::Large,
-                seed: 9,
-            }),
-        )
-        .unwrap();
+        let transformed =
+            transform_stage15(stage15_transformation_input(&compilation).unwrap()).unwrap();
 
-        assert_eq!(without_variation.composition_seed(), composition_seed);
+        assert_eq!(transformed.composition_seed(), composition_seed);
         assert_eq!(
-            without_variation
-                .verified_effective_view()
-                .composition_seed(),
+            transformed.verified_effective_view().composition_seed(),
             composition_seed
         );
         let candidate =
-            inku_ddl::lower_verified_stage15_view(without_variation.verified_effective_view());
+            inku_ddl::lower_verified_stage15_view(transformed.verified_effective_view());
         assert_eq!(
             candidate.verified_effective_view().composition_seed(),
             composition_seed
         );
-        assert_eq!(
-            without_variation.effective_canonical_bytes(),
-            with_variation.effective_canonical_bytes(),
-            "a no-op variation changed effective identity for {composition_seed:?}"
-        );
         let canonical: serde_json::Value =
-            serde_json::from_slice(without_variation.effective_canonical_bytes()).unwrap();
+            serde_json::from_slice(transformed.effective_canonical_bytes()).unwrap();
         assert_eq!(
             canonical["composition_seed"],
             serde_json::json!(composition_seed)
         );
         assert_eq!(count_json_key(&canonical, "composition_seed"), 1);
 
-        without_variation
+        transformed
     });
 
     assert_ne!(
@@ -559,9 +523,9 @@ fn omitted_and_explicit_zero_composition_seeds_keep_distinct_seed_provenance() {
         explicit_zero.compiler_lock.as_ref().unwrap().full_digest
     );
     let omitted_result =
-        transform_stage15(stage15_transformation_input(&omitted).unwrap(), None).unwrap();
+        transform_stage15(stage15_transformation_input(&omitted).unwrap()).unwrap();
     let explicit_result =
-        transform_stage15(stage15_transformation_input(&explicit_zero).unwrap(), None).unwrap();
+        transform_stage15(stage15_transformation_input(&explicit_zero).unwrap()).unwrap();
     assert_eq!(omitted_result.composition_seed(), None);
     assert_eq!(explicit_result.composition_seed(), Some(0));
     assert_eq!(
@@ -585,11 +549,7 @@ fn omitted_and_explicit_zero_composition_seeds_keep_distinct_seed_provenance() {
 }
 
 #[test]
-fn ja_and_en_variation_keep_the_same_effective_identity_and_expanded_schema_owner() {
-    let variation = Some(Stage15Variation {
-        amplitude: Stage15VariationAmplitude::Medium,
-        seed: 0,
-    });
+fn ja_and_en_keep_the_same_effective_identity_and_expanded_schema_owner() {
     let results = [
         (
             "中心に、鉛筆の細い線をひとつ置く。",
@@ -602,11 +562,7 @@ fn ja_and_en_variation_keep_the_same_effective_identity_and_expanded_schema_owne
     ]
     .map(|(source, language)| {
         let compilation = compile(source, language, &[], None, LIMITS);
-        transform_stage15(
-            stage15_transformation_input(&compilation).unwrap(),
-            variation,
-        )
-        .unwrap()
+        transform_stage15(stage15_transformation_input(&compilation).unwrap()).unwrap()
     });
 
     assert_eq!(
@@ -678,7 +634,7 @@ fn noun_introduction_reaches_stage15_with_distinct_entity_and_macro_provenance()
         );
     }
     let transformed =
-        transform_stage15(stage15_transformation_input(&compilation).unwrap(), None).unwrap();
+        transform_stage15(stage15_transformation_input(&compilation).unwrap()).unwrap();
     assert_eq!(transformed.original_semantic_document(), &semantic.ast);
 
     let definition = center_emit_definition();
@@ -706,11 +662,8 @@ fn noun_introduction_reaches_stage15_with_distinct_entity_and_macro_provenance()
         &macro_source[head.provenance.source.span.start_byte..head.provenance.source.span.end_byte],
         "Focus.Center"
     );
-    let macro_transformed = transform_stage15(
-        stage15_transformation_input(&macro_compilation).unwrap(),
-        None,
-    )
-    .unwrap();
+    let macro_transformed =
+        transform_stage15(stage15_transformation_input(&macro_compilation).unwrap()).unwrap();
     assert_eq!(
         macro_transformed.original_semantic_document(),
         &macro_semantic.ast
@@ -742,29 +695,12 @@ fn primitive_inline_and_continuation_share_effective_identity() {
         compilations[1].pre_expansion_canonical_bytes()
     );
     let baseline = compilations.each_ref().map(|compilation| {
-        transform_stage15(stage15_transformation_input(compilation).unwrap(), None).unwrap()
+        transform_stage15(stage15_transformation_input(compilation).unwrap()).unwrap()
     });
     assert_eq!(
         baseline[0].effective_canonical_bytes(),
         baseline[1].effective_canonical_bytes()
     );
-
-    for amplitude in Stage15VariationAmplitude::ALL {
-        let varied = compilations.each_ref().map(|compilation| {
-            transform_stage15(
-                stage15_transformation_input(compilation).unwrap(),
-                Some(Stage15Variation {
-                    amplitude,
-                    seed: 13,
-                }),
-            )
-            .unwrap()
-        });
-        assert_eq!(
-            varied[0].effective_canonical_bytes(),
-            varied[1].effective_canonical_bytes()
-        );
-    }
 }
 
 #[test]
@@ -784,14 +720,7 @@ fn macro_source_gap_keeps_one_effective_identity() {
         )
     });
     let transformed = compilations.each_ref().map(|compilation| {
-        transform_stage15(
-            stage15_transformation_input(compilation).unwrap(),
-            Some(Stage15Variation {
-                amplitude: Stage15VariationAmplitude::Large,
-                seed: 7,
-            }),
-        )
-        .unwrap()
+        transform_stage15(stage15_transformation_input(compilation).unwrap()).unwrap()
     });
     assert_eq!(
         transformed[0].effective_canonical_bytes(),

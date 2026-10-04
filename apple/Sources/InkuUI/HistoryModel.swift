@@ -8,9 +8,23 @@ public final class HistoryModel {
     public private(set) var generations: [String: Int] = [:]
     public private(set) var generationLoading = true
     public private(set) var generationError: String?
+    public private(set) var selectedIndex: Int?
     @ObservationIgnored private var database: InkuDatabase?
     @ObservationIgnored private var generationToken = UUID()
+    @ObservationIgnored private var locationToken = UUID()
+    @ObservationIgnored private var navigationToken = UUID()
     public init() { library.pageSize = 20 }
+
+    public var canMoveNewer: Bool { (selectedIndex ?? 0) > 0 }
+    public var canMoveOlder: Bool { library.total > 0 && (selectedIndex ?? 0) < library.total - 1 }
+
+    public func updateCapacity(_ value: Int, app: AppModel) async {
+        let capacity = max(1, value)
+        guard library.pageSize != capacity else { return }
+        library.pageSize = capacity
+        await locate(app: app)
+        await library.setPage(library.page)
+    }
     public func connect(app: AppModel) async {
         guard database == nil else { return }
         do {
@@ -44,26 +58,40 @@ public final class HistoryModel {
         }
     }
 
-    public func locate(app: AppModel) async {
-        guard let database, let id = app.selectedWorkID else { return }
+    public func locate(app: AppModel, workID: String? = nil) async {
+        let token = UUID(); locationToken = token
+        guard let database, let id = workID ?? app.selectedWorkID else { selectedIndex = nil; return }
         do {
-            guard let position = try await database.libraryIndex(id: id, query: library.filter), app.selectedWorkID == id else { return }
+            let position = try await database.libraryIndex(id: id, query: library.filter)
+            guard locationToken == token, workID != nil || app.selectedWorkID == id else { return }
+            selectedIndex = position
+            guard let position else { return }
             if library.page != position / library.pageSize { await library.setPage(position / library.pageSize) }
-        } catch { app.errorText = error.localizedDescription }
+        } catch { if locationToken == token { app.errorText = error.localizedDescription } }
     }
-    public func navigate(app: AppModel, delta: Int = 0, boundary: String? = nil) async {
-        guard let database, !app.isBusy, library.total > 0 else { return }
+    @discardableResult
+    public func navigate(app: AppModel, fromWorkID: String? = nil, delta: Int = 0, boundary: String? = nil,
+                         selectWork: Bool = true) async -> SavedWork? {
+        guard let database, !app.isBusy, library.total > 0 else { return nil }
+        let token = UUID(); navigationToken = token
+        let initialSelection = app.selectedWorkID
+        let query = library.filter
         do {
             let current: Int?
-            if let id = app.selectedWorkID { current = try await database.libraryIndex(id: id, query: library.filter) }
+            if let id = fromWorkID ?? app.selectedWorkID { current = try await database.libraryIndex(id: id, query: library.filter) }
             else { current = nil }
+            guard navigationToken == token, app.selectedWorkID == initialSelection, library.filter == query else { return nil }
             let index: Int
             if boundary == "latest" { index = 0 }
             else if boundary == "oldest" { index = library.total - 1 }
             else { index = min(library.total - 1, max(0, (current ?? 0) + delta)) }
             await library.setPage(index / library.pageSize)
-            guard library.works.indices.contains(index % library.pageSize) else { return }
-            await app.selectWork(library.works[index % library.pageSize])
-        } catch { app.errorText = error.localizedDescription }
+            guard navigationToken == token, app.selectedWorkID == initialSelection, library.filter == query else { return nil }
+            guard library.works.indices.contains(index % library.pageSize) else { return nil }
+            let work = library.works[index % library.pageSize]
+            if selectWork { await app.selectWork(work) }
+            selectedIndex = index
+            return work
+        } catch { if navigationToken == token { app.errorText = error.localizedDescription }; return nil }
     }
 }

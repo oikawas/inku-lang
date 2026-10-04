@@ -38,7 +38,7 @@ public typealias ColophonDraft = ColophonRecord
 
 /// The auxiliary reader never mutates a work or selects a preferred generation.
 public actor AuxiliaryProvider {
-    public static let allowedKinds = ["reinterpretation", "catalog_change", "layout_change", "touch_change", "variation"]
+    public static let allowedKinds = ["reinterpretation", "catalog_change", "layout_change", "touch_change"]
     private let transport: any AuxiliaryTransport
     private let credentials: any CredentialStore
     private var observationsCache: [(key: String, at: Date, response: String)] = []
@@ -155,6 +155,7 @@ public actor AuxiliaryProvider {
     private static func imageURL(_ png: Data) -> String { "data:image/png;base64," + png.base64EncodedString() }
 
     public static func parseAdvice(_ raw: String, kinds: [String], model: String) throws -> AuxiliaryAdvice {
+        guard kinds.allSatisfy(Self.allowedKinds.contains) else { throw HostError("invalid_refinement_advice") }
         let body: Substring
         if let first = raw.firstIndex(of: "{"), let last = raw.lastIndex(of: "}"), first < last { body = raw[first...last] }
         else { body = Substring(raw) }

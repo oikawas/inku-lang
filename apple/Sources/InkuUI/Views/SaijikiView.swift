@@ -88,7 +88,10 @@ public struct SaijikiView: View {
     }
 
     private func wordChip(_ title: String, selection value: Selection) -> some View {
-        Button { selection = value } label: {
+        Button {
+            selection = value
+            if let onInsertWord, let preview = selectedPreview, preview.insertable, !model.isBusy { onInsertWord(preview.title) }
+        } label: {
             Text(title).font(.callout).multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 8).padding(.vertical, 5)
@@ -99,7 +102,7 @@ public struct SaijikiView: View {
         .buttonStyle(.plain)
         .focused($focusedSelection, equals: value)
         .onHover { hovering in if hovering { selection = value } }
-        .help(model.display.preferences.showTooltips ? copy?.text("saijikiHint") ?? "" : "")
+        .help(model.display.tooltip("語彙を選ぶと、描画への効き方と作例を表示します。", serverKey: "saijikiHint"))
         .accessibilityAddTraits(selection == value ? .isSelected : [])
     }
 
@@ -168,7 +171,7 @@ public struct SaijikiView: View {
     }
     private func matches(_ text: String) -> Bool { search.isEmpty || text.localizedCaseInsensitiveContains(search) }
     private func tip(_ key: String) -> String {
-        model.display.preferences.showTooltips ? model.display.localized(key) : ""
+        model.display.tooltip(key)
     }
 
     private enum Selection: Hashable { case builtin(String), plugin(String) }

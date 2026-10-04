@@ -41,7 +41,7 @@ struct ColorCatalogView: View {
                     .buttonStyle(.plain)
                     .disabled(!canConfirm)
                     .accessibilityLabel(model.display.localized("閉じる"))
-                    .help(model.display.preferences.showTooltips ? model.display.localized("閉じる") : "")
+                    .help(model.display.tooltip("閉じる"))
             }
             .padding(.horizontal, 18).padding(.vertical, 14).background(.bar)
             Divider()

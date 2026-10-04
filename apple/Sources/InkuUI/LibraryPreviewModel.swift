@@ -49,9 +49,12 @@ public final class LibraryPreviewModel {
         do {
             let value = try await read(id)
             guard selectionToken == selection, readToken == token, work?.id == id, !Task.isCancelled else { return }
-            let refreshedWork = try await readWork?(id)
-            guard selectionToken == selection, readToken == token, work?.id == id, !Task.isCancelled else { return }
-            if let refreshedWork, refreshedWork.id == id { work = refreshedWork }
+            if let readWork {
+                let refreshedWork = try await readWork(id)
+                guard selectionToken == selection, readToken == token, work?.id == id, !Task.isCancelled else { return }
+                guard let refreshedWork, refreshedWork.id == id else { close(); return }
+                work = refreshedWork
+            }
             annotationState = .available(value)
         } catch {
             guard selectionToken == selection, readToken == token, work?.id == id, !Task.isCancelled else { return }

@@ -12,7 +12,8 @@ usage() {
     printf 'usage: apple/scripts/build-macos.sh [Debug|Release] [--install]\n' >&2
     printf 'Default: Release application and release Rust archives.\n' >&2
     printf 'Set INKU_APPLE_PROFILE=debug to explicitly select debug Rust archives.\n' >&2
-    printf 'With --install, update the fixed ~/Applications/Inku.app after quitting it.\n' >&2
+    printf 'Existing Inku instances owned by this user are force-stopped before building.\n' >&2
+    printf 'With --install, update the fixed ~/Applications/Inku.app.\n' >&2
 }
 
 configuration_selected=false
@@ -35,8 +36,13 @@ python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else "Python 3
 node --input-type=module -e 'import { stripTypeScriptTypes } from "node:module"; stripTypeScriptTypes("const value: number = 1;");'
 
 mkdir -p "$BUILD"
+python3 "$APPLE/scripts/stop-existing-macos.py" --report "$BUILD/stop-existing.json"
 xcrun swift -module-cache-path "$BUILD/IconModuleCache" "$APPLE/scripts/prepare-macos-icon.swift"
-python3 "$APPLE/scripts/export-server-resources.py"
+# Normal builds use the reviewed, committed resource snapshot. Following a newer
+# Server checkout is an explicit source operation, independent of a rebuild.
+if [[ -n "${INKU_APPLE_REFERENCE_ROOT:-}" ]]; then
+    python3 "$APPLE/scripts/export-server-resources.py" --source-root "$INKU_APPLE_REFERENCE_ROOT"
+fi
 uv sync --project "$ROOT/server" --frozen
 python3 "$APPLE/scripts/prepare-meter-resources.py"
 "$APPLE/scripts/build-core.sh" macos

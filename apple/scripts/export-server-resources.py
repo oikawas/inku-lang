@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import argparse
 import json
 import runpy
 import shutil
@@ -14,6 +15,7 @@ from types import SimpleNamespace
 from typing import ClassVar
 
 ROOT = Path(__file__).resolve().parents[2]
+DESTINATION_ROOT = ROOT
 SERVER = ROOT / "server/src/inku_server"
 OUTPUT = ROOT / "apple/Sources/InkuUI/Resources"
 
@@ -104,6 +106,12 @@ class BindingPlaceholder:
 
 
 def main() -> None:
+    global ROOT, SERVER
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source-root", type=Path, default=ROOT, help="Product checkout containing the canonical Server/Web resources")
+    arguments = parser.parse_args()
+    ROOT = arguments.source_root.resolve()
+    SERVER = ROOT / "server/src/inku_server"
     catalogs = literal_assignment(SERVER / "color_catalogs.py", "_CATALOG_DEFINITIONS")
     source = ast.parse((SERVER / "pipeline_defaults.py").read_text())
     constants = {"ADDITIONAL_RESOURCE_LIMITS", "HOST_LIMITS"}
@@ -201,7 +209,7 @@ def main() -> None:
                         ("macro-sources.json", macro_sources), ("plugin-words.json", plugin_words),
                         ("saijiki.json", saijiki)]:
         (OUTPUT / name).write_text(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
-    subprocess.run(["node", str(ROOT / "apple/scripts/export-web-reference.mjs")], check=True)
+    subprocess.run(["node", str(DESTINATION_ROOT / "apple/scripts/export-web-reference.mjs"), "--source-root", str(ROOT)], check=True)
     print(f"Generated Server defaults, {len(catalogs)} catalogs, {len(plugin_words)} plugin words and canonical Saijiki.")
 
 

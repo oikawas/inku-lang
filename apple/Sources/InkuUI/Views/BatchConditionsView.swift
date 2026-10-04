@@ -27,7 +27,7 @@ struct BatchConditionsView: View {
                 HStack(spacing: 6) { compactControls }.fixedSize(horizontal: true, vertical: false)
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) { sketchControl; wildControl }
-                    HStack(spacing: 8) { paperControl; clearControl }
+                    paperControl
                 }
             }
             .controlSize(.small)
@@ -90,7 +90,6 @@ struct BatchConditionsView: View {
         sketchControl
         wildControl
         paperControl
-        clearControl
     }
 
     private var sketchControl: some View {
@@ -188,6 +187,9 @@ struct BatchConditionsView: View {
     }
 
     private func tip(_ key: String) -> String {
-        model.display.preferences.showTooltips ? model.display.localized(key) : ""
+        let serverKeys = ["次のバッチで使う描画モデルを選びます。": "tooltipInputModel", "次のバッチで使う配色を選びます。": "tooltipInputCatalog",
+                          "次の作品で写生を使うかを選びます。": "tooltipInputSketch", "次の作品の筆致を規則から外します。": "tooltipInputWild",
+                          "用紙の形と意図を見て、次の作品の用紙を選びます。": "tooltipInputCanvas"]
+        return model.display.tooltip(key, serverKey: serverKeys[key])
     }
 }

@@ -373,7 +373,6 @@ fn execute(
         Some(23),
         LIMITS,
         context,
-        None,
         ScoreErrorPolicy::Stop,
     )
 }
@@ -471,7 +470,6 @@ fn stage1_background_with_surface_in_color_slot_keeps_local_diagnostics_and_draw
         Some(23),
         LIMITS,
         context(),
-        None,
         ScoreErrorPolicy::OmitAndContinue,
         HardResourcePolicy {
             identity: "background-diagnostic-test.v1".into(),
@@ -729,8 +727,7 @@ fn direct_and_macro_draw_share_geometry_and_repeated_plan() {
         Some(23),
         LIMITS,
     );
-    let stage =
-        transform_stage15(stage15_transformation_input(&compilation).unwrap(), None).unwrap();
+    let stage = transform_stage15(stage15_transformation_input(&compilation).unwrap()).unwrap();
     let plan = plan_verified_stage15(stage.verified_effective_view(), context());
     let objects = plan
         .objects()
@@ -791,8 +788,7 @@ fn omitted_position_is_a_shared_execution_default_with_explicit_position_priorit
         Some(23),
         LIMITS,
     );
-    let stage =
-        transform_stage15(stage15_transformation_input(&compilation).unwrap(), None).unwrap();
+    let stage = transform_stage15(stage15_transformation_input(&compilation).unwrap()).unwrap();
     let plan = plan_verified_stage15(stage.verified_effective_view(), context());
     let object = &plan.objects().unwrap()[0];
     assert_eq!(object.count(), 3);
@@ -818,7 +814,7 @@ fn omitted_position_is_a_shared_execution_default_with_explicit_position_priorit
             Some(23),
             LIMITS,
         );
-        transform_stage15(stage15_transformation_input(&compilation).unwrap(), None).unwrap()
+        transform_stage15(stage15_transformation_input(&compilation).unwrap()).unwrap()
     };
     let direct_stage = stage("tile three red circles.", &[]);
     let direct_tile = plan_verified_stage15(direct_stage.verified_effective_view(), context());

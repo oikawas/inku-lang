@@ -1,4 +1,5 @@
 import InkuPersistence
+import InkuHost
 import SwiftUI
 #if os(macOS)
 import AppKit
@@ -14,7 +15,7 @@ enum AppSection: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .create: "制作"; case .library: "ライブラリ"; case .lineage: "系譜"
-        case .automation: "バッチ・デモ"; case .settings: "設定"
+        case .automation: "デモ"; case .settings: "設定"
         }
     }
     var symbol: String {
@@ -30,6 +31,7 @@ private struct ExportSession {
     let id = UUID()
     let works: [SavedWork]
     let preserveOrder: Bool
+    var directCard = false
 }
 
 private struct WorkEditSession {
@@ -48,17 +50,32 @@ private struct ReplaySession {
     let work: SavedWork
 }
 
+private struct ComparisonSession {
+    let id = UUID()
+    let work: SavedWork
+    let kind: ComparisonKind
+}
+
+private struct NewDdlSession {
+    let id = UUID()
+    let imported: InkuHost.DDLPackageImport
+}
+
 private enum WorkDialog: Identifiable {
-    case export(ExportSession), edit(WorkEditSession), refinement(RefinementSession), replay(ReplaySession), comparison, advice, colophon, drawingLogs
+    case export(ExportSession), edit(WorkEditSession), refinement(RefinementSession), replay(ReplaySession)
+    case ddl(DdlEditingSession), newDDL(NewDdlSession), comparison(ComparisonSession), advice(RefinementSession), colophon(RefinementSession), information(RefinementSession), drawingLogs
     var id: String {
         switch self {
         case .export(let session): session.id.uuidString
         case .edit(let session): session.id.uuidString
         case .refinement(let session): session.id.uuidString
         case .replay(let session): session.id.uuidString
-        case .comparison: "comparison"
-        case .advice: "advice"
-        case .colophon: "colophon"
+        case .ddl(let session): session.id.uuidString
+        case .newDDL(let session): session.id.uuidString
+        case .comparison(let session): session.id.uuidString
+        case .advice(let session): session.id.uuidString
+        case .colophon(let session): session.id.uuidString
+        case .information(let session): session.id.uuidString
         case .drawingLogs: "drawingLogs"
         }
     }
@@ -71,9 +88,13 @@ public struct ContentView: View {
     @State private var automation = AutomationModel()
     @State private var history = HistoryModel()
     @State private var libraryPreview = LibraryPreviewModel()
+    @State private var workspaceWork: SavedWork?
     @State private var maintenance = LocalMaintenance()
     @State private var dialog: WorkDialog?
     @State private var presentation = false
+    @State private var presentationWork: SavedWork?
+    @State private var presentationHistory = HistoryModel()
+    @State private var presentationLoadID = UUID()
     @State private var presentationWasFullScreen = false
     @State private var settingsSection = SettingsSection.display
     #if os(macOS)
@@ -83,9 +104,7 @@ public struct ContentView: View {
     public init(model: AppModel) { self.model = model }
 
     public var body: some View {
-        Group {
-            if presentation { presentationView }
-            else {
+        ZStack {
                 NavigationSplitView {
                     List(AppSection.allCases.filter { $0 != .automation || model.display.visible("automation") }, selection: $section) { item in
                         NavigationLink(value: item) { Label(model.display.localized(item.title), systemImage: item.symbol) }
@@ -101,14 +120,17 @@ public struct ContentView: View {
                         statusBar
                     }
                     .navigationTitle(model.display.localized((section ?? .create).title))
-                    .toolbar { toolbar }
+                    .toolbar { if !presentation { toolbar } }
                 }
-            }
+                .opacity(presentation ? 0 : 1)
+                .accessibilityHidden(presentation)
+                .allowsHitTesting(!presentation)
+            if presentation { presentationView }
         }
         #if os(macOS)
         .ddlImportDropTarget(model: model,
                              enabled: !model.isBusy && !automation.isOccupied && dialog == nil && !presentation,
-                             onImported: { section = .create })
+                             onImported: openImportedDDL)
         .environment(importer)
         .onDisappear { importer.cancel() }
         #endif
@@ -136,6 +158,19 @@ public struct ContentView: View {
         }
         .onChange(of: model.selectedWorkID) { _, _ in Task { await history.locate(app: model) } }
         .onChange(of: model.works) { _, _ in Task { await history.library.refresh() } }
+        .onChange(of: model.restorationRevision) { _, revision in
+            libraryPreview.close()
+            automation.invalidateWorkObservationsAfterRestore()
+            workspaceWork = nil
+            presentationLoadID = UUID()
+            presentationWork = nil
+            Task {
+                await history.library.resetAfterRestore()
+                guard model.restorationRevision == revision else { return }
+                await history.refreshGenerations()
+                await history.locate(app: model)
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .inkuOpenSection)) { message in
             if let raw = message.object as? String, let target = AppSection(rawValue: raw), canNavigateSections {
                 if target == .settings, let raw = message.userInfo?["settingsSection"] as? String,
@@ -191,11 +226,11 @@ public struct ContentView: View {
 
     @ViewBuilder private var detail: some View {
         switch section ?? .create {
-        case .create: CreationView(model: model, history: history, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay).disabled(automation.isOccupied || importing)
-        case .library: LibraryView(model: model, preview: libraryPreview, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay).disabled(automation.isOccupied || importing)
-        case .lineage: LineageView(model: model, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay).disabled(automation.isOccupied || importing)
-        case .automation: AutomationView(model: model, automation: automation).disabled(importing)
-        case .settings: SettingsView(model: model, section: $settingsSection).disabled(automation.isOccupied || importing)
+        case .create: CreationView(model: model, history: history, automation: automation, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay, onWorkAction: openWorkAction, onLineageExport: openLineageExport, onWorkspaceWorkChange: { workspaceWork = $0 }).disabled(importing)
+        case .library: LibraryView(model: model, preview: libraryPreview, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay, onWorkAction: openWorkAction).disabled(automation.isOccupied || importing)
+        case .lineage: LineageView(model: model, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay, onWorkAction: openWorkAction, onExport: openLineageExport).disabled(automation.isOccupied || importing)
+        case .automation: AutomationView(model: model, automation: automation, demoOnly: true).disabled(importing)
+        case .settings: SettingsView(model: model, automation: automation, maintenance: maintenance, section: $settingsSection).disabled(importing)
         }
     }
 
@@ -208,8 +243,16 @@ public struct ContentView: View {
     }
     private var canNavigateSections: Bool { !automation.isOccupied && !importing && dialog == nil && !presentation }
     private var canUseWork: Bool { !model.isBusy && !automation.isOccupied && !importing && dialog == nil && !presentation }
-    private var hasSavedWork: Bool { !model.isPreview && model.selectedWork?.trashed == false }
-    private var canCopyImage: Bool { canUseWork && !model.currentSVG.isEmpty && [.create, .lineage].contains(section ?? .create) }
+    private var workTarget: SavedWork? {
+        switch section ?? .create {
+        case .library: libraryPreview.work
+        case .lineage: model.library.graph?.nodes.first(where: { $0.id == model.library.graph?.focusNodeID })?.work
+        case .create: workspaceWork
+        case .automation, .settings: nil
+        }
+    }
+    private var hasSavedWork: Bool { (section != .create || workTarget?.id != model.previewWork?.id) && workTarget?.trashed == false }
+    private var canCopyImage: Bool { canUseWork && workTarget?.svg.isEmpty == false }
     private var canExport: Bool {
         guard canUseWork else { return false }
         switch section ?? .create {
@@ -246,7 +289,7 @@ public struct ContentView: View {
         case .openDDL:
             #if os(macOS)
             section = .create
-            importer.read(app: model)
+            importer.read(app: model, onImported: openImportedDDL)
             #endif
         case .settings: section = .settings
         case .creation: section = .create
@@ -254,8 +297,8 @@ public struct ContentView: View {
         case .lineage: section = .lineage
         case .automation: section = .automation
         case .export: Task { await openExport() }
-        case .copyImage: Task { await model.copyImage() }
-        case .presentation: enterPresentation()
+        case .copyImage: if let work = workTarget { Task { await model.copyImage(work: work) } }
+        case .presentation: Task { await preparePresentation() }
         }
     }
 
@@ -282,51 +325,40 @@ public struct ContentView: View {
         ToolbarItemGroup(placement: .primaryAction) {
             Button(model.display.localized("描画ログ"), systemImage: "list.bullet.rectangle") { dialog = .drawingLogs }
                 .disabled(dialog != nil || importing)
-                .help(model.display.preferences.showTooltips ? model.display.localized("成功・失敗・停止した描画の記録を確認します。") : "")
+                .help(model.display.tooltip("成功・失敗・停止した描画の記録を確認します。"))
             Button {
                 model.display.preferences.showTooltips.toggle()
             } label: {
                 Image(systemName: model.display.preferences.showTooltips ? "text.bubble.fill" : "text.bubble")
             }
             .accessibilityLabel(model.display.localized(model.display.preferences.showTooltips ? "ツールチップを非表示" : "ツールチップを表示"))
-            .help(model.display.preferences.showTooltips ? model.display.localized("ツールチップを非表示") : "")
+            .help(model.display.tooltip("ツールチップを非表示", serverKey: "tooltipsHide"))
             if model.isBusy && !automation.running {
                 Button(model.display.localized("停止"), systemImage: "stop.fill") { Task { await model.cancel() } }.keyboardShortcut(.escape, modifiers: [])
-            } else if section == .create {
-                Button(model.display.localized("生成"), systemImage: "play.fill") { Task { await model.generate() } }
-                    .disabled(!model.canGenerate || !canUseWork).keyboardShortcut(.return, modifiers: .command)
-                    .help(model.display.preferences.showTooltips ? model.display.localized("生成") : "")
+            } else if section == .create, automation.workspaceInputMode != "batch" {
+                Button(model.display.localized("生成"), systemImage: "play.fill") { Task { await model.generateDescription() } }
+                    .disabled(!model.canGenerateDescription || !canUseWork).keyboardShortcut(.return, modifiers: .command)
+                    .help(model.display.tooltip("入力と次の生成条件から作品を描きます。", serverKey: "tooltipSubmit"))
             }
             if section == .create || section == .library || section == .lineage {
-                Button(model.display.localized("画像をコピー"), systemImage: "doc.on.doc") { Task { await model.copyImage() } }
+                Button(model.display.localized("画像をコピー"), systemImage: "doc.on.doc") { if let work = workTarget { Task { await model.copyImage(work: work) } } }
                     .disabled(!canCopyImage)
-                    .help(model.display.preferences.showTooltips ? model.display.localized("画像をコピー") : "")
+                    .help(model.display.tooltip("画像をコピー"))
                 Button(model.display.localized("書き出す"), systemImage: "square.and.arrow.up") { Task { await openExport() } }
                     .disabled(!canExport)
-                    .help(model.display.preferences.showTooltips ? model.display.localized("書き出す") : "")
+                    .help(model.display.tooltip("書き出す"))
                 Menu(model.display.localized("作品の操作"), systemImage: "ellipsis.circle") {
                     Button(model.display.localized("再演奏"), systemImage: "arrow.clockwise") {
-                        if let work = model.selectedWork { openReplay(work) }
+                        if let work = workTarget { openReplay(work) }
                     }.disabled(!hasSavedWork)
-                    Button(model.display.localized("描画パラメータの編集"), systemImage: "slider.horizontal.3") {
-                        if let work = model.selectedWork { openRefinement(work) }
-                    }.disabled(!hasSavedWork)
-                    Button(model.display.localized("記述を変える"), systemImage: "text.cursor") {
-                        if let work = model.selectedWork { openWorkEdit(work, .description) }
-                    }.disabled(!hasSavedWork || model.sourceLocked)
-                    Button(model.display.localized("写生なし／ありで描き直す"), systemImage: "pencil.and.outline") {
-                        if let work = model.selectedWork { openWorkEdit(work, .sketch) }
-                    }.disabled(!hasSavedWork || model.sourceLocked)
+                    if let work = workTarget { SavedWorkRefinementActions(model: model, work: work, onAction: openWorkAction) }
+                    Button(model.display.localized("系譜の奥書")) { if let work = workTarget { openWorkAction(work, "colophon") } }.disabled(!hasSavedWork)
+                    Button(model.display.localized("系譜を開く")) { if let work = workTarget { openWorkAction(work, "lineage") } }.disabled(!hasSavedWork)
                     Divider()
-                    Button(model.display.localized("配色・モデルを比較")) { dialog = .comparison }.disabled(!hasSavedWork)
-                    Button(model.display.localized("AIの助言・自律推敲")) { dialog = .advice }.disabled(!hasSavedWork)
-                    Button(model.display.localized("系譜の奥書")) { dialog = .colophon }.disabled(!hasSavedWork)
-                    Button(model.display.localized("系譜を開く")) { section = .lineage }.disabled(!hasSavedWork)
-                    Divider()
-                    Button(model.display.localized("全画面で表示")) { enterPresentation() }
-                        .disabled(model.currentSVG.isEmpty).keyboardShortcut("f", modifiers: [.command, .shift])
-                }.disabled(section == .library || !canUseWork || (model.currentSVG.isEmpty && !hasSavedWork))
-                    .help(model.display.preferences.showTooltips ? model.display.localized("作品の操作") : "")
+                    Button(model.display.localized("全画面で表示")) { Task { await preparePresentation() } }
+                        .disabled(!canCopyImage).keyboardShortcut("f", modifiers: [.command, .shift])
+                }.disabled(!canUseWork || !hasSavedWork)
+                    .help(model.display.tooltip("作品の操作"))
             }
         }
     }
@@ -335,7 +367,7 @@ public struct ContentView: View {
         switch item {
         case .export(let session):
             #if os(macOS)
-            ExportView(model: model, works: session.works, preserveOrder: session.preserveOrder)
+            ExportView(model: model, works: session.works, preserveOrder: session.preserveOrder, directCard: session.directCard)
                 .id(session.id)
                 .environment(model.display)
             #else
@@ -357,16 +389,29 @@ public struct ContentView: View {
             ReplayComparisonView(model: model, work: session.work)
                 .id(session.id)
                 .environment(model.display)
-        case .comparison:
-            ComparisonView(model: model).environment(model.display)
-        case .advice:
-            AuxiliaryView(model: model, mode: .advice).environment(model.display)
-        case .colophon:
-            AuxiliaryView(model: model, mode: .colophon).environment(model.display)
+        case .ddl(let session):
+            DdlAuthoringEditorSheet(model: model, session: session).id(session.id).environment(model.display)
+        case .newDDL(let session):
+            NewDdlAuthoringSheet(model: model, initialImport: session.imported).id(session.id).environment(model.display)
+        case .comparison(let session):
+            ComparisonView(model: model, work: session.work, kind: session.kind).id(session.id).environment(model.display)
+        case .advice(let session):
+            AuxiliaryView(model: model, mode: .advice, work: session.work).id(session.id).environment(model.display)
+        case .colophon(let session):
+            AuxiliaryView(model: model, mode: .colophon, work: session.work).id(session.id).environment(model.display)
+        case .information(let session):
+            CreationWorkInfoView(model: model, work: session.work).id(session.id).environment(model.display)
         case .drawingLogs:
             DrawingLogView(model: model).environment(model.display)
         }
     }
+
+    #if os(macOS)
+    private func openImportedDDL() {
+        guard let imported = importer.importedDocument, dialog == nil else { return }
+        dialog = .newDDL(NewDdlSession(imported: imported))
+    }
+    #endif
 
     private func openWorkEdit(_ work: SavedWork, _ mode: WorkEditMode) {
         guard canUseWork, !work.trashed else { return }
@@ -383,6 +428,48 @@ public struct ContentView: View {
         dialog = .replay(ReplaySession(work: work))
     }
 
+    private func openWorkAction(_ work: SavedWork, _ action: String) {
+        guard canUseWork, !work.trashed else { return }
+        switch action {
+        case "info": dialog = .information(RefinementSession(work: work))
+        case "presentation": Task { await preparePresentation(work: work) }
+        case "copy-hash": model.library.copyHash(work.renderHash)
+        case "export-card": dialog = .export(ExportSession(works: [work], preserveOrder: false, directCard: true))
+        case "draw-ddl":
+            guard let source = work.ddl, DDLSource.hasBody(source) else { return }
+            Task { await model.drawEditedDDL(work: work, source: source) }
+        case "ddl": dialog = .ddl(DdlEditingSession(work: work))
+        case "color": dialog = .comparison(ComparisonSession(work: work, kind: .catalog))
+        case "model": dialog = .comparison(ComparisonSession(work: work, kind: .model))
+        case "ai": dialog = .advice(RefinementSession(work: work))
+        case "colophon": dialog = .colophon(RefinementSession(work: work))
+        case "export": dialog = .export(ExportSession(works: [work], preserveOrder: false))
+        case "parameters": openRefinement(work)
+        case "description": openWorkEdit(work, .description)
+        case "sketch": openWorkEdit(work, .sketch)
+        case "create": Task { await model.selectWork(work); section = .create }
+        case "lineage": Task { await model.library.loadLineage(work: work); section = .lineage }
+        default: break
+        }
+    }
+
+    private func openLineageExport(_ scope: String) {
+        guard canUseWork, let graph = model.library.graph else { return }
+        let focus = graph.focusNodeID
+        let center = graph.nodes.first(where: { $0.id == focus })?.work
+        let checked = model.library.selectedIDs.sorted()
+        Task {
+            do {
+                let works: [SavedWork]
+                if scope == "path" { works = try await model.library.lineagePathWorks(focusNodeID: focus) }
+                else if scope == "checked" { works = try await model.auxiliaryDatabase().exportWorks(ids: checked) }
+                else { works = center.map { [$0] } ?? [] }
+                guard canUseWork, !works.isEmpty else { return }
+                dialog = .export(ExportSession(works: works, preserveOrder: scope == "path"))
+            } catch { model.errorText = error.localizedDescription }
+        }
+    }
+
     private func openExport() async {
         guard canExport else { return }
         let sourceSection = section ?? .create
@@ -390,12 +477,12 @@ public struct ContentView: View {
             let preserveOrder = sourceSection == .lineage
             let works: [SavedWork]
             if sourceSection == .lineage {
-                works = try await model.library.lineagePathWorks()
+                works = workTarget.map { [$0] } ?? []
             } else if sourceSection == .library && !model.library.selectedIDs.isEmpty {
                 works = try await model.library.selectedWorks()
             } else if sourceSection == .library {
                 works = try await libraryPreview.exportWorks(app: model)
-            } else { works = model.selectedWork.map { [$0] } ?? [] }
+            } else { works = workTarget.map { [$0] } ?? [] }
             guard canExport, section == sourceSection else { return }
             if !works.isEmpty { dialog = .export(ExportSession(works: works, preserveOrder: preserveOrder)) }
         } catch { model.errorText = error.localizedDescription }
@@ -403,20 +490,43 @@ public struct ContentView: View {
 
     private var presentationView: some View {
         VStack(spacing: 8) {
-            ArtworkCanvas(svg: model.currentSVG, renderer: model.renderer, caption: model.displayedWork?.effectiveSourceText ?? "")
+            ArtworkCanvas(svg: presentationWork?.svg ?? "", renderer: model.renderer, caption: presentationWork?.effectiveSourceText ?? "")
             HStack {
-                Button(model.display.localized("最新")) { Task { await history.navigate(app: model, boundary: "latest") } }
-                Button(model.display.localized("新しい作品"), systemImage: "chevron.left") { Task { await history.navigate(app: model, delta: -1) } }
-                Button(model.display.localized("古い作品"), systemImage: "chevron.right") { Task { await history.navigate(app: model, delta: 1) } }
-                Button(model.display.localized("最古")) { Task { await history.navigate(app: model, boundary: "oldest") } }
-                if let work = model.displayedWork { Text(work.renderHash.map { String($0.suffix(4)) } ?? "").font(.caption.monospaced()) }
+                Button(model.display.localized("最新")) { navigatePresentation(boundary: "latest") }
+                    .disabled(!presentationHistory.canMoveNewer || model.isBusy)
+                Button(model.display.localized("新しい作品"), systemImage: "chevron.left") { navigatePresentation(delta: -1) }
+                    .disabled(!presentationHistory.canMoveNewer || model.isBusy)
+                Button(model.display.localized("古い作品"), systemImage: "chevron.right") { navigatePresentation(delta: 1) }
+                    .disabled(!presentationHistory.canMoveOlder || model.isBusy)
+                Button(model.display.localized("最古")) { navigatePresentation(boundary: "oldest") }
+                    .disabled(!presentationHistory.canMoveOlder || model.isBusy)
+                if let work = presentationWork { Text(work.renderHash.map { String($0.suffix(4)) } ?? "").font(.caption.monospaced()) }
                 Spacer()
                 Button(model.display.localized("表示を終了")) { exitPresentation() }.keyboardShortcut(.escape, modifiers: [])
             }
         }.padding(16).frame(maxWidth: .infinity, maxHeight: .infinity).background(.background)
     }
+    private func preparePresentation(work target: SavedWork? = nil) async {
+        guard canUseWork, let work = target ?? workTarget, !work.svg.isEmpty else { return }
+        let token = UUID(); presentationLoadID = token
+        let sourceSection = section
+        let viewer = HistoryModel()
+        await viewer.connect(app: model)
+        await viewer.locate(app: model, workID: work.id)
+        guard canUseWork, section == sourceSection, presentationLoadID == token else { return }
+        presentationWork = work; presentationHistory = viewer
+        enterPresentation()
+    }
+    private func navigatePresentation(delta: Int = 0, boundary: String? = nil) {
+        let workID = presentationWork?.id
+        Task {
+            if let work = await presentationHistory.navigate(app: model, fromWorkID: workID, delta: delta,
+                                                             boundary: boundary, selectWork: false),
+               presentation, presentationWork?.id == workID { presentationWork = work }
+        }
+    }
     private func enterPresentation() {
-        guard !model.currentSVG.isEmpty else { return }
+        guard presentationWork?.svg.isEmpty == false else { return }
         #if os(macOS)
         presentationWasFullScreen = NSApp.keyWindow?.styleMask.contains(.fullScreen) == true
         if !presentationWasFullScreen { NSApp.keyWindow?.toggleFullScreen(nil) }

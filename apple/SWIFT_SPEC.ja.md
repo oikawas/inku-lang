@@ -14,6 +14,54 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-04 現行Serverの共通core・保存作品・全体操作への追随
+
+本更新は現行Serverの意味処理を共通Rustへ取り込み、SwiftのUniFFI、音数判定、native rasterの境界を保持する。更新時点のScoreは0.19、描画エンジンは73。Stage 1が応答を確定した時に保持fallbackを清掃してから構図読みに進み、構図prompt v2、明示した隅、Cellsの反復配置、日本語修飾語と縦長の角度制約へ追随する。既に保存された不正なsnapshotを自動修復したり、pending要求を自動再送するmigrationは設けない。
+
+### 新しい操作のモデル・origin・seed
+
+新規記述と再解釈は、今回選ぶStage 1モデルを両段へ使う。新規の独立DDLはStage 2モデルを優先する。保存DDLの編集と配置変更は親のStage 1来歴を保ち、今回選ぶStage 2だけを使う。DDL／配置のモデルchooserで確定した値はStage 2の既定へ保存し、Stage 1既定を変更しない。通常制作の次モデル、保存既定、開始済みbatch／demoの凍結requestは別に保持する。
+
+共通coreのauthoring originは正式な `stage1_generated`／`user_authored_ddl` を使い、portable欄 `ddl_source_origin` の移行情報とは混同しない。render seedはcanonicalなUInt64十進文字列、composition seedは独立したnullable文字列として境界を渡す。保存時の未設定をrender seedで埋めず、新操作のcompilerとrenderのcomposition seedが違う場合は拒否する。旧保存requestや作品本文はこの入口正規化で書き直さない。
+
+「思考を表示」はmodel dialogのdraftと表示設定へ保存する。閉じる／取消しでは元へ戻し、確定したrequestへoptional値を保持する。現行Serverと同じくprovider reasoningへの接続はなく、この選択が推論結果や実token数を変えるとは表示しない。
+
+### 保存作品を開くときの固定情報
+
+新作品の送信prompt、compile delivery、render metadata、diagnostics、eventsを保存effectのACKへimmutableなpresentationとして入れる。作品の再選択はその作品のACKを読み、同じexecutionに後から保存したchildの情報や現在の設定で置き換えない。空配列は当該段を送っていない新記録、欠落は旧記録の未記録として区別する。構図・写生・自動配色のprivate requestをStage 1／穴補完のauthor向けpromptへ混ぜない。保存前の取消しを確認し、commit後の取消し通知で保存済み作品とACKを消さない。
+
+生成情報は開いた保存作品を固定し、「詳細」「プロンプト」「Score (JSON)」のtabで読む。詳細は写生、両段のmodel／言語、seed、色の対応、canvas、SVGのbyte／object／point数、hash、版、由来、batch ID／元行、保存comment、日時／時間と実usageを表示する。送信記録の欠落と空配列、読込中と取得失敗を区別し、promptの開閉・コピーとScoreの行番号・コピーを提供する。読込みやtab変更で制作の選択、現在設定、provider送信を変えない。
+
+新規requestのoptional `GenerationProvenance` はDDL／DDL engine、native Bundle build、参照資料build、UI言語とbatch ID／行番号をsave ACKへ保持する。旧作品の欠落を現在値で補わず、再演は元のprovenanceを保つ。Stage 1 promptの基底digestはnativeでは未記録として示す。意味が異なる `base_source_digest` を代用しない。usageの部分記録から完全な総tokenを作らない。この生成情報UIの最終追加はsource実装であり、以下の途中の型検査や過去画面確認を最終build／実画面受入と読み替えない。
+
+保存記述の空文字列を保持し、DDL作品の表示名だけに保存DDLの先頭行を使う。専用DDL editorは保存親とdraftを固定し、取消しで本文・表示作品・revision・履歴を変えない。確定DDLの記述ロックと直接DDLを区別し、保存条件の読込中／未記録も操作不可の理由として表示する。制作・library・系譜・previewの共通作品menuは同じ固定した保存対象へ接続し、直接DDLでは記述・写生・model再解釈を隠す。確定DDL編集では理由を添えて再解釈を抑止し、配置・タッチ・配色・DDL編集を残す。
+
+新しいvariationの生成・採用・自動推敲・AI助言を退役し、旧保存variation/seedと系譜の読取表示を保持する。推敲は言葉によるタッチ1案、配置／読み取り1案または4案を区別する。直接DDLでは読み取りを選べない。model比較は使用中登録LLM最大4件、catalog比較は元のcatalogを除く候補を使う。Vision助言と自動推敲は画像を扱える登録modelを明示選択し、対象作品を固定する。奥書は生成成功時に原文を新recordとして保存し、後の編集で上書きしない。旧採用本文は互換読取を保持する。
+
+AIへ渡す方針はWebと同じ160 UTF-16 code unitまでとし、表示counterと上限を揃え、見える文字を途中で切らない。自律推敲の保存世代は「観察」で読むだけでは親を変更せず、「この作品から再開」で明示したときにだけ保存作品と条件を読み直して次の親を変える。読込失敗は元の親と原因を保持する。奥書は起点から対象作品までの固定経路を読み、その世代数を表示する。経路を読み直せない状態で新しい奥書を生成しない。
+
+### 履歴・画面・書出しの対象
+
+履歴stripは作品領域の幅から表示件数を決め、空白を埋めるため別の入力や表示作品を変更しない。libraryの検索・印・page・複数選択、previewと「制作で開く」を分ける。系譜の中心変更、枝開閉、保存情報previewと制作選択も別操作とする。書出し候補は開いている画面と固定targetからsnapshotにし、他画面のcheckboxを混ぜない。
+
+presentationは開いた保存作品と独立した履歴viewerを使い、前後移動で制作の入力・選択作品・履歴状態を変更しない。開閉で制作のview階層を作り直さず、開く前の全画面状態を保持する。生成情報・library・canvasのhashコピーは、正本どおり先頭のdomain prefixだけを分離したdigest全体を使う。未読語台帳の再読込失敗は前の一覧と原因を保持し、記録が空だったと表示しない。
+
+export dialog内の形式・resolution・card／animation条件は「今回だけ」のdraftで、保存defaultとPNG templateを変更しない。default／templateは設定画面で明示保存する。SVG用途の説明、単作品card、animationの150／300／500／1080／2160／4320とcustom、PNG templateの個別保存／resetを用意する。clipboardは画像／card形式と高さ256〜4096px・64px刻みを持ち、cardは保存作品を対象とする。full／simple／customの7項目、標準／詳細設定と文字倍率sliderはlocal表示設定として保持する。
+
+demoは開始時条件を固定し、生成記述・描画中記述・完成指示書、経過／残時間・次回待ち・記録済み描画tokenを分ける。記述生成のusageを取得していないため総tokenの完全性を主張しない。間隔はiteration開始から測り、期限は次のiteration開始を止める。進行中の共通core処理をdemo期限で別timeoutへ置換しない。停止は処理の終了と保存結果を待ち、結果不明を成功・未送信と推定しない。
+
+### Tips・同梱正本・保守状態
+
+Tipsはbundle内のcurrent Server JA/EN辞書をsource keyから読込む。全静的textと動的template/key、source commitと対象fileのSHA-256を同梱し、単数形 `tooltip*` も落とさない。native固有のtarget／取消し／保存境界は専用fallbackを使い、group共有の説明をlocal書出し印へ明示適応する。account／ACL／server管理を実装したとみなさない。印は現在値別の付ける／外す、子buttonは個別説明とし、Tips offは空。作品本文と保存metadataは翻訳せず表示する。
+
+通常のbuildはcommit済み `ui-reference.json`、provider default、model catalogのreview済みsnapshotを使う。別のServer sourceへ追随する場合だけ `INKU_APPLE_REFERENCE_ROOT` またはexporterの `--source-root` を指定して明示更新し、差分をreviewする。rebuildだけで同梱正本を取り直さない。Swift packageの直接buildも同じsnapshotを使い、音数辞書とRust artifactは別に準備する。
+
+`build-macos.sh`は必要toolの確認後、resource／core／buildの変更前に[停止helper](scripts/stop-existing-macos.py)を呼ぶ。現在UIDの既知bundle IDと実行fileを検証し、PID identityを再確認してSIGKILLで停止する。最大10秒の再確認で実行中instanceが残ればbuildを中止する。未知のInku類似processはsignalを送らず検証errorとし、停止結果を`apple/build/macOS/stop-existing.json`へ記録する。
+
+自動backupは保存先、最新成功、次回予定、保持世代・各日時／容量を読み出す。状態再読込はbackupを新規作成せず、失敗理由を保持する。描画logも失敗表示を閉じる／もう一度読む操作を分け、読込失敗時に以前の記録を消さない。読込前を「記録なし」と認定せず、再読込でdriver再開やprovider再送を行わない。
+
+今回の限定確認はStage 1保持fallback、明示した隅、日本語修飾語、縦長角度、Cellsの各1 Rust selectorと、作品別presentationを保存・Host再作成・cancel後に読む1 Host caseが成功した。最新appの型検査も成功。CLI同入力比較、最終native操作、実provider／OAuth、iOS、Intel実機、macOS14実機と作者受入は別の証拠を要する。過去の画面確認と旧variation checkを今回の完成根拠へ流用しない。
+
 ## 2026-10-04 macOSの処理エラー表示
 
 macOSでは全体の処理エラーを画面下の閉じられる表示へ出す。本文を選択・縦scrollでき、同時に開いている作品dialogがある場合はその内側に表示する。エラー状態のownerはAppModelだけで、閉じる操作または次の操作開始で解除する。描画開始時の解除と直後の失敗でNSAlert sheetを閉じて再表示する経路を使わない。iOSの警告と、削除・復元等の明示確認は従来のまま。
@@ -92,19 +140,19 @@ macOSの入力欄はnative editorを使い、空行を含む元の行番号を�
 
 macOSのキャンバス上の縦ホイールは1回0.15の倍率変更を行い、25–1000%に丸める。pinch・drag・倍率buttonと同じ状態を使い、100%以下では移動を中央へ戻す。処理はキャンバスをhostするnative view内に限定する。保存SVGとraster予算は変更しない。
 
-用紙chooserは名前・形・分類・意図を表示する。候補・順序・比率はRust registryを使用し、表示metadataは同じcheckoutのWebからbuild時に取り込む。選択は次のcanvasだけへ適用し、閉じる操作と保存作品のcanvasを分ける。歳時記はcompactな語一覧と選んだ1語のpreview・効果・説明・例を表示する。通常は参照のみとし、DDL editorから明示して開いた場合だけeditor draftへ語を挿入する。同梱定義のないplugin語は参照のみとする。
+用紙chooserは名前・形・分類・意図を表示する。候補・順序・比率はRust registryを使用し、表示metadataはreview済みのWeb正本snapshotを同梱し、更新は明示したsource exportで行う。選択は次のcanvasだけへ適用し、閉じる操作と保存作品のcanvasを分ける。歳時記はcompactな語一覧と選んだ1語のpreview・効果・説明・例を表示する。通常は参照のみとし、DDL editorから明示して開いた場合だけeditor draftへ語を挿入する。同梱定義のないplugin語は参照のみとする。
 
 対象画面の主要操作へTipsを補い、設定の`showTooltips`とtoolbarの表示切替に従う。「inkuについて」は同じcheckoutのWebの概念説明、5項目の用語表、作者情報とrepositoryリンクを取り込む。製品版・build・build日時とDDL／render層の版を生成resourceから、binding protocolは同梱coreのreportから表示する。
 
 描画の制限値はServerの9項目、3分類、既定値と相互上限ルールをbuild resourceとして使用する。1–100000の整数を独立draftで編集し、保存・取消・再読込を分ける。既定値への復帰も保存するまで適用しない。新作品の要求ではServerと同じ4項目をhard／operational両budgetへ写し、適用値からbudget identityを作る。保存作品のconfigurationと既存の構造資源設定は保持する。DDLの意味・展開・描画は共有Rustのままとし、DB schemaを変えない。
 
-表示resourceは`export-server-resources.py`と`export-web-reference.mjs`で同じcheckoutの正本から生成する。Swift packageでも先にresourceを生成する。限定確認selectorは`--library-browsing-only`、`--lineage-presentation-only`、`--ddl-editor-cancel-only`、`--drawing-limits-editing-only`、`--canvas-wheel-only`で、具体差分に必要なものだけを選ぶ。nativeの配置・操作感・実ホイールイベント、Intel／最低OS実機、実provider、iOSの受入は別に確認する。
+表示resourceは`export-server-resources.py`と`export-web-reference.mjs`で明示したServer／Web正本から更新し、通常buildとSwift packageはcommit済みsnapshotを使う。限定確認selectorは`--library-browsing-only`、`--lineage-presentation-only`、`--ddl-editor-cancel-only`、`--drawing-limits-editing-only`、`--canvas-wheel-only`で、具体差分に必要なものだけを選ぶ。nativeの配置・操作感・実ホイールイベント、Intel／最低OS実機、実provider、iOSの受入は別に確認する。
 
 ## 2026-10-04 macOSアプリアイコンと固定install
 
 macOSアプリアイコンは既存[incu画像](../docs/assets/incu-icon-512.png)から生成する。pixelの配色、暗い背景と透明な角を保持したicnsをbundle resourceへ含め、Info.plistから参照する。通常のbuild手順で再生成する。
 
-`build-macos.sh --install`は成功したappを`~/Applications/Inku.app`へ更新する。既存のbundle IDとDB指定を保持し、固定app directoryの中身を更新するため、Dockの登録をrebuildごとにやり直さない。実行中appや未知の既存appは上書きせず、先に終了または対象の確認を求める。作品DBをapp bundleへ移さない。
+`build-macos.sh --install`は成功したappを`~/Applications/Inku.app`へ更新する。既存のbundle IDとDB指定を保持し、固定app directoryの中身を更新するため、Dockの登録をrebuildごとにやり直さない。build前の停止helperとは別に、installerは実行中appや未知の既存appを上書きしない。作品DBをapp bundleへ移さない。
 
 DB指定は`--database`、任意のbundle設定`InkuDatabasePath`、従来のApplication Support defaultの順に解決し、AppModelを1回だけ作成する。bundle設定は絶対file pathを使う。既存の試行DBをinstall時に指定すれば、Dockの引数なし起動でも同じDBと隣接設定を使える。共有Rustの意味処理と保存契約は変更しない。
 
@@ -118,13 +166,13 @@ DB指定は`--database`、任意のbundle設定`InkuDatabasePath`、従来のApp
 
 ### 制作と保存作品の表示
 
-制作画面は左に記述／直接DDLと次に描く条件、右に表示中作品の条件と作品／系譜canvasを置く。生成／停止は入力のscroll領域の外へ固定する。保存作品の写生・指示書・詳細な生成情報は明示して開く別paneへ分ける。狭い幅では縦配置へ切り替える。保存作品のmodel、色catalog、用紙、サイズはcompactな要約と詳細popoverで読み、次の入力条件と区別する。画面上の記述caption、縦書き／横書き、配置、pan／zoom、プレゼンテーションは表示合成であり、保存SVGを変更しない。「用紙に合わせる」はzoomと移動を初期位置へ戻す。
+制作画面は左に記述／直接DDLと次に描く条件、右に表示中作品の条件と作品／系譜canvasを置く。生成／停止は入力のscroll領域の外へ固定する。canvas下の操作列に詞書と書字方向、保存作品の星／推敲印／書出し印、full hashコピー、再現比較、生成情報、歳時記、書出し、clipboard、presentationを置く。表示中作品の写生と指示書はcanvas下に表示し、写生編集・DDL編集・指示書からの描画はその保存作品を対象とする。写生の開閉はlocal表示設定に保存する。狭い幅では縦配置へ切り替える。保存作品のmodel、色catalog、用紙、サイズはcompactな要約と詳細popoverで読み、次の入力条件と区別する。画面上の記述caption、縦書き／横書き、配置、pan／zoom、プレゼンテーションは表示合成であり、保存SVGを変更しない。「用紙に合わせる」はzoomと移動を初期位置へ戻す。
 
 制作画面で登録済みのserviceと描画modelを選択する。設定したmodelと明示取得したmodel一覧を表示し、一覧取得は利用者のbutton操作だけで始める。選択した次のmodelは記述解釈と構造化の両段へ渡し、設定画面の保存defaultや親作品のmodelを書き換えない。新しい生成要求・推敲・比較の初期選択は次のmodelを使い、開始済みbatch／demoのmodelはそのsnapshotへ固定する。未接続時はモデル設定へ案内する。
 
-制作とモデル設定の「モデルの適性・用途」はServerの登録資料をbuild時に取り込み、用途、解釈／構造化と両段の評価、Visionの評価、日英comment、更新日時と提供状態を表示する。両段の評価は弱い段階の値、段階別評価がない場合はLLM評価を使う。正確なcatalog service ID・接続方式・model IDで照合し、Ollama tagの`:`を保持する。custom serviceや未登録modelを名前やURLから推測で評価しない。Serverのdeveloper専用速度情報は公開環境と同じく表示しない。登録資料と接続先から明示取得した入力上限・対応機能は別欄にし、案内を読むだけで選択・保存default・開始時snapshotを変更しない。
+制作とモデル設定の「モデルの適性・用途」はreview済みServer登録資料snapshotを同梱し、用途、解釈／構造化と両段の評価、Visionの評価、日英comment、更新日時と提供状態を表示する。両段の評価は弱い段階の値、段階別評価がない場合はLLM評価を使う。正確なcatalog service ID・接続方式・model IDで照合し、Ollama tagの`:`を保持する。custom serviceや未登録modelを名前やURLから推測で評価しない。Serverのdeveloper専用速度情報は公開環境と同じく表示しない。登録資料と接続先から明示取得した入力上限・対応機能は別欄にし、案内を読むだけで選択・保存default・開始時snapshotを変更しない。
 
-状態欄は共通coreの試行回数とhostの開始時刻を用い、providerの段階、固定要求の呼出しmodel、試行／再試行、段階全体と今回の経過時間を表示する。同じ段階の再試行は段階の時計を保持し、今回の時計を開始し直す。完了・失敗・確認待ち・停止で時計を確定し、停止は遅い応答の終了を待つ。入力／出力token数はproviderが返した実usageを使い、未取得は「記録なし」、明示0は0と表示する。文字数や予算用の推定tokenを実usageへ置き換えない。通常生成と比較候補は同じ表示を使い、古いtokenの応答を除外する。新規・保存作品の選択・新しい処理開始は古い表示を消し、provider不要の再現比較へ持ち込まない。
+状態欄は共通coreの試行回数とhostの開始時刻を用い、providerの段階、固定要求の呼出しmodel、試行／再試行、段階全体と今回の経過時間を表示する。同じ段階の再試行は段階の時計を保持し、今回の時計を開始し直す。完了・失敗・確認待ち・停止で時計を確定し、停止は遅い応答の終了を待つ。入力／出力token数はproviderが返した実usageを使い、未取得は「記録なし」、明示0は0と表示する。文字数や予算用の推定tokenを実usageへ置き換えない。通常生成と比較候補は同じ表示を使い、古いtokenの応答を除外する。新規・新しい処理開始は古い表示を消す。保存作品の選択とprovider不要の再現比較は、当該作品の保存時recordを読む。
 
 新規生成の設定はServerから生成した`composition: {read: true}`を使用する。構造化した下絵の後、共通Rustが要求する`read_composition`を通常API／Personal ChatGPTへ渡し、同じaction identityの`composition_read`を返す。構図の読みは下絵と同じStage 1 modelと上限を使い、再試行・既定値へのfallback・可視DDLへの構図反映は共通Rustが所有する。構図の意味と`［構図］`／`[composition]`の規則は[製品仕様](../SPEC.ja.md)に従う。
 
@@ -142,7 +190,7 @@ macOS menuはactive sceneの操作可否を使う。⌘Nは新規制作、⌘O�
 
 同梱の歳時記、13色catalog、11用紙と7語のMacro／plugin定義はServer sourceから生成し、共通Rustで定義とdigest lockを解決する。pluginの有効切替は新作品へ適用し、保存作品の定義を置き換えない。DDL packageのimportは`inku.ddl-export.v1`の本文・付属定義・lock・整数表現を検証し、次の新作品へ添える。4MiB／64定義を超える入力や不完全な定義は拒否し、途中結果を採用しない。
 
-色カタログのnative chooserはID、言語に応じた説明、順序付き色見本、HEXと日英の色名を表示する。固定／random／記述から自動選択をdraftとして編集し、「決定」で次の条件だけへ適用する。取消し・closeでは条件を保持する。直接DDLでは記述からの自動選択を使わず、入力をDDLへ切り替えた時に既存auto選択をfixedへ戻す。
+色カタログのnative chooserはID、言語に応じた説明、順序付き色見本、HEXと日英の色名を表示する。固定／記述から自動選択をdraftとして編集し、決定・×で次の条件だけへ適用、キャンセル・Escapeで破棄する。新しいrandom選択は用意しない。直接DDLでは自動選択を使わず、入力をDDLへ切り替えた時に既存auto選択をfixedへ戻す。
 
 macOSでは1つのDDL fileをwindowへdropでき、標準panelと同じURL読込・検証を通す。読込中の生成／batch開始を抑止し、取消し、scene終了、制作内容の変更後に遅い結果を採用しない。成功後に制作を表示し、定義を伴うimportの表示は現在のdraftへ結び付ける。「新規」または保存作品を開いた後は古い完了表示を消す。
 
@@ -158,7 +206,7 @@ DDLのdraft確認は読出しだけとし、変更確定を共通coreのrevision
 
 ### 履歴・library・系譜
 
-履歴はSQLite全件を対象とする20件page、libraryは独立した30件pageである。最新100件のapp内一覧を検索や作品移動の母集団にしない。最新／新しい／古い／最古への移動、全文記述・全文hash・末尾4桁の検索、star・推敲・export markのAND絞込、thumbnail／listと時系列／系譜groupの独立選択を提供する。
+履歴stripはSQLite全件を対象に作品領域の幅からpage容量を決め、libraryは独立したpage容量を持つ。最新100件のapp内一覧を検索や作品移動の母集団にしない。最新／新しい／古い／最古への移動、全文記述・全文hash・末尾4桁の検索、star・推敲・export markのAND絞込、thumbnail／listと時系列／系譜groupの独立選択を提供する。
 
 comment、mark、trash／復元、明示した完全削除、複数選択、系譜graph／pathをSQLiteへ接続する。完全削除後は作品本文を消し、nodeのidentity、root、日時と親子関係をtombstoneとして保持する。ACL、group利用者やServerの共有権限は追加しない。
 
@@ -168,25 +216,25 @@ Swift物理schemaはv3で、v2の作品・系譜・execution、local annotation�
 
 ### 比較・推敲・奥書と自動実行
 
-「描画パラメータの編集」は、明示した保存親を固定し、配置・読み取り・変奏・言葉によるタッチを別操作として選ぶ。生成前に1案／4案の全条件を固定し、候補を通常履歴・系譜へ入れずに比較する。拡大はdialog内だけで行い、制作の表示作品を替えない。選択した候補だけを子として原子的・idempotentに保存し、残りは破棄する。途中で保存を停止した場合は保存済みの印を保持し、再試行で二重保存しない。停止／closeは所有Taskと遅い応答の終了を待つ。採用後と再表示後のDDL変更も、新しい保存childを作る。
+「描画パラメータの編集」は明示した保存親を固定し、配置・読み取りの1案／4案と言葉によるタッチ1案を別操作として選ぶ。生成前に全条件を固定し、候補を通常履歴・系譜へ入れず比較する。拡大はdialog内だけで行い、制作の表示作品を替えない。選択した候補だけを子として原子的・idempotentに保存し、残りは破棄する。途中で保存を停止した場合は保存済みの印を保持し、再試行で二重保存しない。停止／closeは所有Taskと遅い応答の終了を待つ。採用後と再表示後のDDL変更も、新しい保存childを作る。
 
-配置は親の保存DDL、定義・lock・配色・タッチを保持し、新しい配置seedで共通coreから描く。dialogの描画model指定は構造化側にだけ適用し、親の読み取りmodelを保持する。読み取りは開始時の制作の次modelを両段へ固定し、元の記述と保存された写生文から新しいDDLを生成する。確定DDL権限では読み取りを拒否する。dialogのmodel選択で設定defaultを変更しない。
+配置は親の保存DDL、定義・lock・配色・タッチを保持し、新しい配置seedで共通coreから描く。dialogの描画model指定は構造化側にだけ適用し、親の読み取りmodelを保持する。読み取りは開始時の制作の次modelを両段へ固定し、元の記述と保存された写生文から新しいDDLを生成する。確定DDL権限では読み取りを拒否する。DDL／配置のdialogでmodelを確定するとStage 2の設定defaultへ保存し、Stage 1 defaultは保持する。
 
 言葉によるタッチは1案だけで、保存Score・DDL・配色・配置・ワイルドとmodel記録を保持し、providerを呼ばずに再描画する。語句のseedはRust共通境界が既存Serverと同じPython `str.strip()`の空白を除き、残るUTF-8のSHA256先頭8byteをunsigned big-endian UInt64として導く。Unicodeの正規化はせず、Swift／Pythonへtrim・hashを複製しない。seedは正確な十進文字列で境界を渡し、保存edgeのseed前後・語句にも整数の値を保持する。空の語句は共通coreが拒否する。
 
-現行の変奏は共通Stage1.5が無変更のため、保存Score・色・配置・タッチ・要素数と親modelを保ったprovider不要の再演奏とする。「変奏（いまは何も動かない）」「動いたもの: なし」を表示し、振幅と割当seedだけを来歴へ保存する。ワイルドを明示変更した場合は、そのrender条件の変更を表示する。
+新しい変奏は共通coreとHost入口で退役しており、生成・採用・助言の選択肢を用意しない。過去に保存されたvariation amplitude／seed、Score・SVGと系譜は読み出せる。旧記録を新しい操作や別の推敲要素へ変換しない。
 
-catalog／model比較は開始時の作品・Score・設定を固定する。候補は採用前に通常履歴／系譜へ保存せず、選択した候補だけをidempotentに保存する。選べる候補の総数を4に制限せず、Swiftでは逐次生成する。停止とdialogのcloseは処理の終了を待ち、遅れて届いた候補を混入させない。
+catalog／model比較は開始時の作品・Score・設定を固定する。候補は採用前に通常履歴／系譜へ保存せず、選択した候補だけをidempotentに保存する。model比較は使用中の登録LLMを最大4件選び、catalog比較は元を除くcatalog候補を使う。Swiftでは逐次生成する。停止とdialogのcloseは処理の終了を待ち、遅れて届いた候補を混入させない。
 
-model助言、random／Vision推敲、奥書は通常生成と同じprovider transportを使う。通常pipeline外の補助要求はServerと同じく描画pipelineの共有rate予算へ加算しない。記述の編集採用と新variation生成を分け、DDL権限の作品へ記述を上書きしない。中間の推敲作品は`lineage_only`として保持する。自動推敲の各child edgeはWebと同じ`autonomous_refine_mode`を記録し、Visionではその世代の`vision_model`／`vision_observation`／`vision_next_direction`も記録する。randomの来歴へ以前の画面上のVision助言を混ぜない。奥書は生成した原文と採用本文を別に保存し、DB backupへ含める。
+model助言、random／Vision推敲、奥書は通常生成と同じprovider transportを使う。通常pipeline外の補助要求はServerと同じく描画pipelineの共有rate予算へ加算しない。記述の編集採用と4種類の推敲操作を分け、新variationは許可せず、DDL権限の作品へ記述を上書きしない。中間の推敲作品は`lineage_only`として保持する。自動推敲の各child edgeはWebと同じ`autonomous_refine_mode`を記録し、Visionではその世代の`vision_model`／`vision_observation`／`vision_next_direction`も記録する。randomの来歴へ以前の画面上のVision助言を混ぜない。奥書は生成した原文を成功時にimmutable recordとして追記し、既存本文を上書きしない。旧採用本文は互換読取を保持し、DB backupへ含める。
 
-batchは空行を除く最大1000入力を受け、元の行番号とmodel、provider、定義、seed等を開始時に固定する。一巡後の失敗行だけを既定0／最大5回再実行する。明示した再開でも固定条件を保持する。再起動時に実行結果が不明な行は利用者の再試行／省略選択を待ち、自動再送しない。demoは開始時の設定を固定し、生成記述と作品を表示する。保存は既定で無効、間隔1〜3600秒、実行時間60〜86400秒で、停止・満了後の処理を継続しない。
+batchは空行を除く最大1000入力を受け、元の行番号とmodel、provider、定義、seed等を開始時に固定する。一巡後の失敗行だけを既定0／最大5回再実行する。明示した再開でも固定条件を保持する。再起動時に実行結果が不明な行は利用者の再試行／省略選択を待ち、自動再送しない。demoは開始時の設定を固定し、生成記述と作品を表示する。履歴保存は既定で無効、間隔1〜3600秒、実行時間60〜86400秒。間隔はiteration開始から測り、満了は次の開始を止める。停止は実行と保存結果の終了を待つ。
 
 ### 辞書・表示・接続設定
 
 日本語はServerと同じSudachi small辞書、英語は同じCMUdictの読みを使用し、Rustの薄い境界で音数・音節を数える。辞書・設定・license・hashを[resource manifest](scripts/description-meter-resources.json)で固定し、build時に生成する。Python runtimeはアプリへ含めない。4000文字までの判定を300ms debounceし、未読語の頻度・日時・文脈をSQLiteへ保存する。判定を無効にした場合は文字数／行数を表示する。
 
-日本語／英語、theme、5段階text倍率、full／simple／custom、caption、履歴情報最大3項目、tooltip、mascot、clipboard、描画制限、export template／保存先をlocal設定とする。複数APIサービスの設定、用途共通の描画model、明示したmodel一覧取得とRPM／入力TPM／RPDを提供する。通常設定は隣接JSON、API keyはKeychainであり、接続設定を保存するだけでは生成しない。
+日本語／英語、theme、5段階にsnapする文字倍率slider、full／simple／customの7項目、標準／詳細設定、caption、履歴情報最大3項目、tooltip、mascot、画像／card clipboard、描画制限、export template／保存先をlocal設定とする。clipboard高さは256〜4096px・64px刻み。複数APIサービスの設定、入口別の描画model、明示したmodel一覧取得とRPM／入力TPM／RPDを提供する。通常設定は隣接JSON、API keyはKeychainであり、接続設定を保存するだけでは生成しない。
 
 通常APIのrate制限は[製品仕様](../SPEC.ja.md)とServerの共有描画pipelineへ従う。同じservice IDの写生文、解釈、辞書選択、構図、補完と各再試行を集計し、送信前に作品DBのSQLite transactionで要求数・入力token予算を予約する。複数Host・接続・processからの要求も同じDBの状態を使い、待機中はtransactionを保持しない。旧`provider-usage.json`の該当serviceの予約・待機期限を一度だけ原子的に取り込み、原本を変更しない。読めない状態や保存失敗は送信前に拒否する。旧Gemini記録からPacific日次の残量を証明できない場合は、次のPacific午前0時まで日次上限を消費済みとして扱う。
 
@@ -293,9 +341,9 @@ provider requestの開始前にpending claimを保存し、旧responseが取消�
 
 manual backupはSQLite Backup APIでWALを含む整合snapshotを作り、schema／integrity／保存値を検証した単一SQLiteファイルを新規保存先へ公開する。既存backupを上書きしない。DB本体だけのfile copyをbackupとしない。
 
-restoreは生成中のUIから開始できず、hostの実行を停止してから行う。原backupを読み取り専用に保ち、隔離snapshotを検証してBackup APIでactive DBを置き換える。成功後はapp modelのexecutionと選択・表示をresetし、作品を再読出しする。DB backupには作品・系譜・execution／snapshot／ACKが入り、隣接provider JSONとKeychain credentialは含まれない。
+restoreは生成中のUIから開始できず、hostの実行を停止してから行う。原backupを読み取り専用に保ち、隔離snapshotを検証してBackup APIでactive DBを置き換える。成功後はapp modelのexecutionと選択・表示をresetし、作品を再読出しする。Contentの復元revisionでlibrary previewを閉じ、demo／batchの観測作品、制作・プレゼンテーションの一時snapshotを破棄し、library状態・世代一覧・選択位置を復元DBから読み直す。DB backupには作品・系譜・execution／snapshot／ACKが入り、隣接provider JSONとKeychain credentialは含まれない。
 
-自動backup世代管理、FTS、旧Server／Android DBや旧JSONのimportは未実装である。固定Unicode空白集合による旧本文選択helperは、import機能の完成を意味しない。
+自動backup世代管理は上記の端末保守機能で扱う。FTS、旧Server／Android DBや旧JSONのimportは未実装である。固定Unicode空白集合による旧本文選択helperは、import機能の完成を意味しない。
 
 ### rasterとnative表示
 

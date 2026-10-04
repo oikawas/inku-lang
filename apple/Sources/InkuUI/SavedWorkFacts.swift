@@ -21,4 +21,14 @@ public enum SavedWorkFacts {
     }
 
     public static func svgBytes(_ work: SavedWork) -> Int64 { Int64(work.svg.utf8.count) }
+
+    public static func hashDigest(_ value: String) -> String {
+        guard let colon = value.firstIndex(of: ":") else { return value }
+        return String(value[value.index(after: colon)...])
+    }
+
+    public static func hashLabel(_ family: String, value: String?) -> String {
+        guard let value, let colon = value.firstIndex(of: ":") else { return family }
+        return family + " (" + value[..<colon] + ")"
+    }
 }

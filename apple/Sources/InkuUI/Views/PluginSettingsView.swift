@@ -24,7 +24,7 @@ struct PluginSettingsView: View {
                             Spacer()
                             Toggle(model.display.localized("有効"), isOn: Binding(get: { settings.preferences.isEnabled(package.id) }, set: { value in
                                 Task { await settings.setEnabled(value, packageID: package.id, model: model) }
-                            })).fixedSize()
+                            })).fixedSize().disabled(package.versions.isEmpty)
                         }
                         DisclosureGroup(model.display.localizedFormat("収録語（%ld）", package.words.count)) {
                             ForEach(package.words) { word in
@@ -33,7 +33,7 @@ struct PluginSettingsView: View {
                                     VStack(alignment: .leading, spacing: 4) {
                                         HStack { Text(word.id).font(.callout.bold()); Text(model.display.localized(package.drawnNames.contains(word.id) ? "描画に使用" : "描画定義なし")).font(.caption).foregroundStyle(.secondary) }
                                         if !word.aliases.isEmpty { Text(word.aliases.joined(separator: ", ")).font(.caption) }
-                                        Text((model.language == "en" ? word.english : word.japanese).joined(separator: " | ")).font(.callout)
+                                        Text((model.display.preferences.language == "en" ? word.english : word.japanese).joined(separator: " | ")).font(.callout)
                                         Text(word.note).font(.caption).foregroundStyle(.secondary)
                                     }
                                 }.padding(.vertical, 4)

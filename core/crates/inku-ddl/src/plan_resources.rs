@@ -1204,7 +1204,7 @@ mod tests {
                 max_total_nodes: 64,
             },
         );
-        transform_stage15(stage15_transformation_input(&compiled).unwrap(), None).unwrap()
+        transform_stage15(stage15_transformation_input(&compiled).unwrap()).unwrap()
     }
 
     fn plan(stage: &Stage15TransformationResult) -> CompositionPlanResult<'_> {
@@ -1306,15 +1306,17 @@ mod tests {
     #[test]
     fn macro_internal_counts_and_outer_occurrences_are_separate() {
         let definition = motif(2);
-        for (source, logical, marks, placement, fill) in [
-            ("Test.Pair", 1, 4, 0, 0),
-            ("three Test.Pair", 3, 12, 0, 0),
+        // Three copies alone are one member of a cells group (I-708).
+        for (source, logical, marks, placement, fill, nodes) in [
+            ("Test.Pair", 1, 4, 0, 0, 3),
+            ("three Test.Pair", 3, 12, 1, 0, 4),
             (
                 "scatter three Test.Pair and five blue circles at center.",
                 8,
                 17,
                 1,
                 0,
+                5,
             ),
             (
                 "fill with three Test.Pair and five blue circles.",
@@ -1322,6 +1324,7 @@ mod tests {
                 17,
                 0,
                 1,
+                5,
             ),
         ] {
             let stage = stage(source, std::slice::from_ref(&definition));
@@ -1341,7 +1344,7 @@ mod tests {
                 (exact.placement_instances, exact.fill_instances),
                 (placement, fill)
             );
-            assert_eq!(exact.template_nodes, if logical <= 3 { 3 } else { 5 });
+            assert_eq!(exact.template_nodes, nodes, "{source}");
         }
     }
 
@@ -1539,6 +1542,7 @@ mod tests {
                 "position_y":{"expr":"exact_decimal","value":"0.5"}
             }}]
         }).to_string()).unwrap();
+        // Three copies are one member of a cells group, its own template node (I-708).
         let stage = stage("three Test.Anchor", &[definition]);
         let mut plan = plan(&stage);
         let exact = demand(&plan);
@@ -1549,9 +1553,9 @@ mod tests {
                 exact.anchor_instances,
                 exact.template_nodes
             ),
-            (3, 0, 3, 1)
+            (3, 0, 3, 2)
         );
-        plan.standalone_macro_repetitions[0].member.anchor_indices[0] = usize::MAX;
+        plan.placement_groups[0].members[0].member.anchor_indices[0] = usize::MAX;
         let error =
             preflight_composition_plan(&plan, hard(100), OperationalResourceBudget(budget(100)))
                 .err()
@@ -1700,7 +1704,8 @@ mod tests {
             selected.omissions()[0].cause.reason,
             PlanResourceFailure::ArithmeticOverflow(ResourceDimension::PrimitiveMarks)
         ));
-        plan.standalone_macro_repetitions[0].member.end = usize::MAX;
+        // The counted word is one member of a cells group (I-708).
+        plan.placement_groups[0].members[0].member.end = usize::MAX;
         let error =
             select_composition_plan_resources(&plan, hard(0), OperationalResourceBudget(budget(0)))
                 .err()

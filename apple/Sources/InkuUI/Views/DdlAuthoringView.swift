@@ -111,7 +111,7 @@ struct DdlAuthoringView: View {
     }
 
     private func tip(_ key: String) -> String {
-        model.display.preferences.showTooltips ? model.display.localized(key) : ""
+        model.display.tooltip(key)
     }
 
     @ViewBuilder private var regenerateButton: some View {

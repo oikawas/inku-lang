@@ -503,7 +503,7 @@ A vocabulary plugin is a data-only macro that gives a name to a combination of c
 
 Every domain uses the single versioned `inku.macro-definition.v1`. There are no domain-specific Tree / human / water grammars, per-plugin parsers, or plugin code. The compiler resolves and locks the visible invocation, binds closed typed parameters, then performs late expansion without an LLM into semantic nodes from the attested composition seed and caller-owned finite bounds, rejoining ordinary typed lowering. The Renderer does not understand plugins; it receives only the later ordinary Score. On the Description path, Stage 1 may receive only a bounded signature, parameter schema, and short summary; MacroDefinition bodies and expanded DDL are not sent to Stage 1 or Stage 2 prompts. An unknown or ambiguous qualified term in direct DDL is never filled by a hidden LLM fallback; that sentence alone is omitted, the rest is drawn, and the author is told why (§4.12).
 
-Inline and continuation forms that resolve uniquely to the same subject and explicit instructions have the same source-independent canonical meaning. With the same drawing conditions, policy / definition identity, attested seed, and explicit variation, surface sentence splitting or anaphoric syntax alone does not change a macro seed or effective meaning. Unknown, ambiguity, and conflict are not guessed equivalent; meaning-bearing relations, order, quantity, attributes, actions, parameters, and genuine multiple macro invocations remain. This rule does not guarantee general word-order exchange or graph isomorphism.
+Inline and continuation forms that resolve uniquely to the same subject and explicit instructions have the same source-independent canonical meaning. With the same drawing conditions, policy / definition identity, and attested seed, surface sentence splitting or anaphoric syntax alone does not change a macro seed or effective meaning. Unknown, ambiguity, and conflict are not guessed equivalent; meaning-bearing relations, order, quantity, attributes, actions, parameters, and genuine multiple macro invocations remain. This rule does not guarantee general word-order exchange or graph isomorphism.
 
 Meaning bound to a declared parameter is read from the expansion result. Attributes left on the outside of an invocation become source-owned diagnostics without reimplementing parameter binding. When OmitAndContinue omits only an unbound appearance field, existing color, touch, continuity, and surface values in the MacroDefinition remain. Unused parameters stay accepted; this adds no parameter defaults, optional parameters, or new whole-invocation conversion semantics. The one exception is a parameter that receives the word's count (§4.6): the definition decides it when a call writes no count.
 
@@ -533,7 +533,7 @@ The legacy `variation:trembling`, `variation:blurring`, and `place:middle` IDs v
 
 Every declared parameter remains required. Declaring three parameters and supplying only one value produces a binding error such as MissingCompatibleFact. Declaring only an amplitude parameter and delivering it to Emit lets the same resolver in §13.6 resolve the other two slots. Undeclared caller overlays, guessing three slots from one generic variation field, and optional parameters are not introduced.
 
-The only exception is a parameter that receives the word's count (author decision 2026-09-28, I-702). A count written on a word (`Nature.若葉を10枚`, `Place 10 Nature.YoungLeaves`) stays an outer repetition of the whole word unless the definition declares that it receives it. A definition takes it as its inner count by declaring an integer parameter such as `{"type":"integer","receives":"count","minimum":1,"maximum":12,"omitted":[4,5,6]}`. Only one top-level parameter may declare it, never a component parameter. `minimum` is at least 1 and at most `maximum`; `omitted` is a nonempty list of distinct integers inside the bounds. An integer parameter without `receives` carries none of these fields, and its canonical bytes stay the bare `{"type":"integer"}`. Only a standalone number written on the call binds to it, never a sides modifier, and the parameter then owns that count, so it does not also repeat the word. A call that writes no count takes one of the `omitted` choices, selected deterministically from the call's attested seed and the parameter name. A count outside the bounds omits only that call with the `macro_binding_count_out_of_range` diagnostic and draws the rest; it is never clamped silently. This diagnostic is not a hole offered to LLM completion. In bundled `Nature.leaves` 2.1.0 every word but AutumnLeaves declares it (author decision 2026-10-01). YoungLeaves, FallenLeaves, and WitheredLeaves take their leaf count (1–12, 1–16, and 1–8; 4–6, 8–12, and 2–4 when omitted), SummerLeaves the leaves on its branch (1–12; 6–8 when omitted), and Undergrowth and WitheredGrass their number of clumps of three to five blades (1–3; one or two when omitted; each clump's blade count comes from the seed). AutumnLeaves draws the lobes of one maple leaf, so it declares none, and a written count stays the number of maple leaves through the outer repetition. The optional `counter` (`flat`, `long`, or `general`) names the kind of thing counted and decides only the Japanese counter a printed count takes (枚, 本, 個); it never changes what the count means. Stage 1's underdrawing passes a count written in a description to its plugin (§12.6).
+The only exception is a parameter that receives the word's count (author decision 2026-09-28, I-702). A count written on a word (`Nature.若葉を10枚`, `Place 10 Nature.YoungLeaves`) stays an outer repetition of the whole word unless the definition declares that it receives it. A definition takes it as its inner count by declaring an integer parameter such as `{"type":"integer","receives":"count","minimum":1,"maximum":12,"omitted":[4,5,6]}`. Only one top-level parameter may declare it, never a component parameter. `minimum` is at least 1 and at most `maximum`; `omitted` is a nonempty list of distinct integers inside the bounds. An integer parameter without `receives` carries none of these fields, and its canonical bytes stay the bare `{"type":"integer"}`. Only a standalone number written on the call binds to it, never a sides modifier, and the parameter then owns that count, so it does not also repeat the word. A call that writes no count takes one of the `omitted` choices, selected deterministically from the call's attested seed and the parameter name. A count outside the bounds omits only that call with the `macro_binding_count_out_of_range` diagnostic and draws the rest; it is never clamped silently. This diagnostic is not a hole offered to LLM completion. In bundled `Nature.leaves` 2.1.0 every word but AutumnLeaves declares it (author decision 2026-10-01). YoungLeaves, FallenLeaves, and WitheredLeaves take their leaf count (1–12, 1–16, and 1–8; 4–6, 8–12, and 2–4 when omitted), SummerLeaves the leaves on its branch (1–12; 6–8 when omitted), and Undergrowth and WitheredGrass their number of clumps of three to five blades (1–3; one or two when omitted; each clump's blade count comes from the seed). AutumnLeaves draws the lobes of one maple leaf, so it declares none, and a written count stays the number of maple leaves through the outer repetition. The copies of an outer repetition are not stacked in one place: they become one member of a placement group that lays them out once (author decision 2026-10-04, I-708). No action, placing, scattering, and drawing use `cells` (Score 0.19.0, recipe `{"kind":"cells"}`), which cuts the canvas into cells sized to the largest performed copy. Each axis has as many cells as fit the copy, at least one and at most the number of copies. The performance seed gives each copy a cell of its own and shifts it inside its cell without leaving it. Only when there are more copies than cells are the cells used again in the same order, so copies overlap. A copy's size follows its shape after relations have moved its parts, so it is not resolved at compile time. Lining up and tiling use the group layouts `horizontal_source_order` and `tile`. A call with a position, a fill, an order, or a relation, and a call that a mirror takes as its target, keeps the outer repetition as before. The optional `counter` (`flat`, `long`, or `general`) names the kind of thing counted and decides only the Japanese counter a printed count takes (枚, 本, 個); it never changes what the count means. Stage 1's underdrawing passes a count written in a description to its plugin (§12.6).
 
 `inku.macro-definition.v1` has closed typed parameters, definition-local `components`, and only the shared operators `emit`, `use`, `group`, `anchor`, `relation`, bounded `repeat`, typed `transform`, and deterministic bounded `vary`. It forbids arbitrary code, I/O, unbounded loops, recursion / component cycles, filesystem / network / clock / environment access, external-macro dependencies, and generation of raw SVG / Score / Renderer instructions. Expansion is effect-free and returns deterministic semantic nodes with source / generated typed provenance from the attested composition seed and explicit bounds.
 
@@ -549,7 +549,7 @@ The current finite consumer that reaches an actual Score projects each complete 
 
 The macro head is joined exactly across its source instruction slot, source invocation ordinal, locked definition, and expanded invocation. An Emit's `place:center` resolves to the same central region as in ordinary DDL. Multiple complete Emits replace the head in their existing order as ordinary instructions; an origin through `use`, bounded `repeat`, or `vary` is not itself a rejection. Output instructions correspond in order to either a direct source slot or generated provenance. Adjacent bound Emits in the same Macro and original generated order deliver `connected` / `touching` through the same checked relation rules as ordinary DDL, preserving original reference order, ownership, and numeric-fixed or named-movable position authority. Touching joins both Line / Arc endpoints with the existing Arc reconstruction and fixes explicit relative scale (including normal), dimensions, and chord direction. `not_touching` and `between` also reach the shared checked performer from adjacent bound Emits in the same Macro. NotTouching retains the existing Medium gap, while Between retains the existing recipe using the bounding-box centers of the current Emit's immediately preceding Emit and the Emit before it. Named and noncenter placement is movable; numeric placement is fixed and is never overwritten. Between's `from` is the immediately preceding Emit, with the one before it retained as its second reference and with both owners preserved. `along` / `cutting` also reach the same checked performer from adjacent bound Line Emits, using named-movable or numeric-fixed position authority and the direction/dimension rules in §14.4. Adjacency includes unbound Emits in the original order, and an omitted from or either Between reference never retargets to a survivor. Regardless of legacy Stop or OmitAndContinue input, an incomplete Emit, unknown key, category or type mismatch, unbound caller fact, or expanded unsupported Transform axes / an unpositioned `anchor` / unsupported `relation` omits its established minimum field, Emit, subtree, or invocation with a diagnostic and continues the remaining Score. Unrelated siblings, including those inside Groups, remain in source and generated-provenance order. A missing reference omits only the relation while retaining its original dependency and any independently drawable Emit; it never retargets to a survivor. No child Emit is extracted from an unsupported structural subtree, and adjacency is not created across an unsupported subtree. An unused parameter or unreferenced Emit binding ID alone is not rejected.
 
-An unbound caller action does not omit the entire Macro invocation. Only the outer action is omitted as `macro_caller_field { field: action }`, retaining its original owner, spans, and reason while preserving the definition's Emits, transforms, counts, order, seed, and provenance. The outer action is neither distributed into the body nor interpreted as a different action. This does not grant unconditional recovery for other unbound caller fields; exact-join integrity failures and the absence of drawable residual content still stop execution.
+An unbound caller action does not omit the entire Macro invocation. Only the outer action is omitted as `macro_caller_field { field: action }`, retaining its original owner, spans, and reason while preserving the definition's Emits, transforms, counts, order, seed, and provenance. The outer action is neither distributed into the body nor interpreted as a different action. A word repeated as a whole (a count of two or more) is the exception: its caller action lays out the copies' placement group and is not omitted (§4.6, I-708). This does not grant unconditional recovery for other unbound caller fields; exact-join integrity failures and the absence of drawable residual content still stop execution.
 
 Repeated Direct and Macro plans retain checked Connected, Touching, Along, and Cutting intents symbolically, including the verified original target and position authority. This does not materialize instances.
 
@@ -1094,15 +1094,15 @@ latter's rules are enforced by `npm run lint:i18n` (v2.7.1). On narrow screens o
 with enlarged text, Canvas tabs and work conditions wrap while keeping each
 label with its value. The left panel also scales with the viewport.
 
-The web app is the current reference interface. v1.72 makes refinement and model comparison first-class authoring surfaces. The `Refine` tab offers touch, layout, reading, color-catalog, and variation (§12.13) changes as a radio-style choice: exactly one intervention may be selected per refinement step, so each lineage edge remains attributable to one cause.
+The web app is the current reference interface. v1.72 makes refinement and model comparison first-class authoring surfaces. The `Refine` tab offers touch, layout, reading, and color-catalog changes as a radio-style choice: exactly one intervention may be selected per refinement step, so each lineage edge remains attributable to one cause.
 
-Selecting variation reveals an amplitude choice (subtle/moderate/sweeping, default moderate) directly under its radio; one candidate uses one fresh server-issued seed and four candidates use four, with no separate variation section or button. The chosen refine element is remembered in the browser.
+Variation, the refine element chosen with an amplitude and a variation seed, was retired on 2026-10-04 (§12.13). The chosen refine element is remembered in the browser.
 
 Reading is one upstream intervention whose downstream layout and touch are regenerated. **Reading candidates are made by calling Stage 1 again, once per candidate, on the same description; what sets them apart is the model's sampling.** `interpretation_seed` is an opaque value that identifies the re-interpretation and is kept in history and lineage, but it is not an input to Stage 1, so passing the same seed again does not reproduce the same reading (the current handling, confirmed on 2026-09-26, and the same on the Server and on Android). One or four candidates vary only the selected element, use the same selection-and-save workflow, and are displayed in a two-column grid (a single candidate fills the full width) sized to fit within the dialog. **Touch is an exception: the writer enters words for the touch and receives one candidate only. The same words produce the same touch seed, so four touch candidates are not offered.**
 
 Saving selected refinement candidates keeps them in ordinary history without automatically starring them; the save control distinguishes unsaved, saving, and saved states, and a saved candidate cannot be saved again. Candidate generation disables other generation and drawing actions; after three seconds it exposes the shared Stop control, backed by request abortion. Progress copy names the work actually being performed. Reading candidates expose normalized DDL on image hover.
 
-Render and vary seeds are independent JavaScript-safe random integers carried from initial generation through candidates, history, and replay. A touch candidate derives its seed from the words the writer enters; that seed takes 64 bits. JSON answers carry `render_seed` and `composition_seed` as decimal strings, so a seed past 2^53 reaches a JavaScript client exact, and requests take either a number or a decimal string. Display rendering makes touch-seed changes visible without changing canonical composition coordinates.
+Render seeds are JavaScript-safe random integers carried from initial generation through candidates, history, and replay. The vary seed was retired on 2026-10-04, and saved values are only read (§12.13). A touch candidate derives its seed from the words the writer enters; that seed takes 64 bits. JSON answers carry `render_seed` and `composition_seed` as decimal strings, so a seed past 2^53 reaches a JavaScript client exact, and requests take either a number or a decimal string. Display rendering makes touch-seed changes visible without changing canonical composition coordinates.
 
 A color-catalog refinement keeps DDL, Score, canvas, layout seed, and render seed fixed while applying a catalog other than the parent's; four options use distinct catalogs when possible. All non-color refinements inherit the displayed parent work's effective catalog and canvas rather than the next-drawing controls. Color edges use `catalog_change` and record the before/after catalog IDs.
 
@@ -1300,13 +1300,11 @@ angle, and the corner among its four candidates. `center` is the canvas-center
 region and is not reselected, so a work with neither an angle nor a corner
 redraws the same. The shared lowerer resolves the angle from `composition_seed`.
 It must not invent or reselect a composition family, technique, color, touch,
-relation, or element count. Another performance and explicit variation preserve
-the resolved angle. Explicit variation (amplitude small, medium, or large and a
-variation seed) is accepted and recorded, but it currently has no axis to move
-and does not change effective meaning. Stage 1.5 used to reinterpret `center` as
-one of six focus candidates and let variation move that focus; on 2026-09-27
-this was removed so an author's position word is never read as another
-position. A feature that decides composition is to be designed separately. The
+relation, or element count. Another performance preserves the resolved angle.
+Stage 1.5 used to reinterpret `center` as one of six focus candidates and let
+variation move that focus; on 2026-09-27 this was removed so an author's
+position word is never read as another position, and variation, left with
+nothing to move, was retired on 2026-10-04 (§12.13). A feature that decides composition is to be designed separately. The
 description, normalized DDL, and explicit attributes remain unchanged.
 
 These two stages are the substance of §8.2's "put the weight on the choices made
@@ -1322,7 +1320,7 @@ musical figure — description, score, performance.  The main action buttons
 replace those figures with plain operational words, so that someone touching the
 app for the first time can predict what a button does: performance is shown as
 touch, composition as layout, and interpretation as reading.  How the Refine tab
-realizes this — the five refinement kinds, model comparison, and the Lineage
+realizes this — the four refinement kinds, model comparison, and the Lineage
 card menu — is in §7.8, "The Reference Web
 Application."
 
@@ -1671,6 +1669,9 @@ written (spaces and hyphens become `_`), and field names say their meaning
 proportion word) accepts come from the capability matrix
 `inku.work-plan-capabilities.v2`, generated by compiling one sentence per value,
 and shared-Rust validation is authoritative rather than provider-side decoding.
+A tall shape does not take the angle `vertical` even though it compiles: the
+angle turns the shape 90°, so a tall shape would lie down against the two words
+that each say upright (I-710).
 An out-of-range value becomes unspecified for that field, a layer without a
 shape is removed alone, and nothing stops the drawing. The normalized underdrawing is
 printed deterministically as visible DDL in the request language, and only that
@@ -1693,6 +1694,10 @@ its canonical name in English DDL (`Nature.YoungLeaves.`) (§4.13). The underdra
 list is canonical, and a response naming an alias is read as its canonical name. Without installed plugins
 neither the list nor its prompt section appears, and schema and prompt are
 unchanged. Core vocabulary is primary and Macros are an optional extension.
+
+When printing a Japanese underdrawing, a modifier already ending in `な`, `い`,
+or `の` attaches directly to its shape; other forms receive `の`. The printer
+does not add another `の` to `特大の` and produce `特大のの` (I-709).
 
 Initial interpretation condenses the whole description's roles, contrasts,
 repetition, density, empty space, and texture into a short visual composition.
@@ -1751,10 +1756,14 @@ In the shared pipeline the sketch is the optional effect `generate_sketch` befor
 
 In a run that composes, a **composition** step runs once after the underdrawing settles and before the commit. It places the layers whose place the description does not state on ranges along the canvas thirds (28 kinds and the four corners). A layer whose place the description states in words keeps those words.
 
+Stage 1 fallback candidates belong only to its response wait. When Stage 1
+settles, both its candidate document and underdrawing are cleared; neither
+survives into the following composition-reading wait.
+
 - Underdrawing: in a run that composes, Stage 1 chooses a place only for a layer whose place the description states in words and leaves the other layers unspecified (principle 8 of the underdrawing). A run that does not compose keeps the earlier principle (do not gather every layer at the center; use position, size and count to create a center of weight and open areas).
-- Reading: the shared pipeline effect `read_composition` (result `composition_read`, prompt `inku.composition-reading-prompt.v1`). It reads the description and the underdrawing's layers printed without places (the places the underdrawing set are added as notes), and returns, in fixed values only, each layer's role, the relations between layers, the tension (motion, focus, vertical, balance, symmetry, void), the places the description states (the words quoted from it and a place value) and a one-sentence thesis. It returns no coordinates or numbers. Its response schema names each object's property order in `propertyOrdering` and is not appended to the system prompt; it travels only as the transport's structured output. The reading is sent with Stage 1's model and limits. Its retry budget is `composition_retry` (the catalog selection budget when absent).
+- Reading: the shared pipeline effect `read_composition` (result `composition_read`, prompt `inku.composition-reading-prompt.v2`). It reads the description and the underdrawing's layers printed without places (the places the underdrawing set are added as notes), and returns, in fixed values only, each layer's role, the relations between layers, the tension (motion, focus, vertical, balance, symmetry, void), the places the description states (the words quoted from it and a place value) and a one-sentence thesis. It returns no coordinates or numbers. Its response schema names each object's property order in `propertyOrdering` and is not appended to the system prompt; it travels only as the transport's structured output. The reading is sent with Stage 1's model and limits. Its retry budget is `composition_retry` (the catalog selection budget when absent).
 - Check: the reading is checked against the underdrawing; values the canvas cannot show are dropped and findings recorded (the `composition_read` event carries only the finding codes). A stated place is kept only when the quoted words occur in the description and hold a word of position (in Japanese 上・下・中央・中心・真ん中・左・右・隅・端 as substrings; in English top, bottom, center, centre, middle, left, right, corner(s), edge(s), above, below, upper, lower as words).
-- Solving: every combination of the layers' ranges is searched (up to 3,000,000) and scored against the reading and the author's defaults (dynamic balance, generous empty space, left and right alike). Among the answers within 1.03 times the best score plus 0.02, the work's `composition_seed` (1 when absent) and the digest of the document before composition pick one. A layer the description says is in a "corner" is placed on one of the four corner ranges; which corner the description names (bottom right and so on) is not read yet.
+- Solving: every combination of the layers' ranges is searched (up to 3,000,000) and scored against the reading and the author's defaults (dynamic balance, generous empty space, left and right alike). Among the answers within 1.03 times the best score plus 0.02, the work's `composition_seed` (1 when absent) and the digest of the document before composition pick one. A layer the description puts in a "corner" without saying which is placed on one of the four corner ranges. A corner the description names (the bottom right corner and so on) is returned by the reading as the place value `top_left_corner`, `top_right_corner`, `bottom_left_corner` or `bottom_right_corner`; when the quoted words occur in the description and hold a word of position, and the underdrawing has no place for the layer, says "corner", or names a side the corner lies on (top, top edge or left edge for the top left corner), it is placed on that corner's range instead of the underdrawing's place, which cannot say which corner (finding `stated_corner_from_reading`, I-712). When the underdrawing names another place (the center and so on), that place stays, since a reader may tie the words to the wrong layer (finding `stated_corner_conflict`).
 - Printing: a layer the composition places is written as a numeric range (§18) with the mark `［構図］` (`[composition]` in English) before it (`［構図］右下（横2/3〜1、縦2/3〜1）に、…`, `… at the [composition] bottom right (horizontal 2/3 to 1, vertical 2/3 to 1)`). A layer whose place the description states keeps that place word. The composed document is committed with Stage 1's reason once it compiles with no diagnostic.
 - When the reading is unavailable: when the reading request uses up its budget, when unreadable replies exhaust the retries, or when the request cannot be built, the default reading (no relations, the author's defaults, every underdrawing place kept) is used (event `composition_fallback`). When the combinations exceed the limit, no range fits, or the composed document does not compile, Stage 1's printed document is committed without composition (event `composition_skipped`). The residual path (`stage1_residual_execution`) and the replay of a saved response that carries `normalized_ddl` are not composed.
 - Setting: `PipelineConfig.composition` (`{read}`). Without it there is no composition. `read: false` sends no reading and uses the default reading. The Server's default manifest sets `{read: true}`; a work redrawn under its saved settings keeps them. New Android configurations set `read: true` for cloud models and `read: false` for on-device LiteRT Gemma 4 E2B.
@@ -1767,7 +1776,7 @@ The Stage 2 LLM returns a span-bounded patch candidate only for known holes expl
 
 A recoverable failure omits the smallest affected field or execution unit with a diagnostic and continues independent drawing, for either legacy Stop or OmitAndContinue input. It does not correct undeliverable meaning into a different Score field, and retains original owners and order. An entirely omitted drawing or an integrity failure stops. Results distinguish complete, complete with omissions, and stopped.
 
-An explicitly authored angle reaches `Score.rotation` exactly once through one shared resolver for direct instructions and flat Macro Emits. Its selection is bound to original meaning, tagged `composition_seed`, logical occurrence, and angle identity; variation seed, render seed, and source spelling are excluded.
+An explicitly authored angle reaches `Score.rotation` exactly once through one shared resolver for direct instructions and flat Macro Emits. Its selection is bound to original meaning, tagged `composition_seed`, logical occurrence, and angle identity; render seed and source spelling are excluded.
 
 ### 12.7.1 Shared Authoring State Machine
 
@@ -1787,7 +1796,7 @@ A variation preserves its origin as either `stage1_generated` or `user_authored_
 
 Lineage editing identifies the history-row owner and selects its linked fork, without updating or replacing the old fork. Active `/executions/{id}/author-ddl` receives source, revision, and options. With unchanged settings and changed source it saves record metadata while preserving CAS, origin, and the DDL-authority lock. A changed canvas, wild setting, or other option creates a parent-linked direct-DDL variation under DDL authority without changing the original source, config, or authority. An unchanged source with changed record metadata also saves a new edition instead of discarding the existing result. History sidecar v2 immutably records the four core diagnostics, renderer diagnostics, and `resource_execution` for the matching revision and source, and normal history display restores them. V1 has no diagnostic record. A corrupt sidecar warns only for that work while saved DDL, Score, and SVG remain visible; it neither infers latest state nor recompiles.
 
-A work is description-locked when its variation is DDL-authoritative, when it was saved as `ddl_edit`, or when it was derived from such a work without reading the description again (touch, layout, color, variation, replay and the like); history items and lineage nodes carry `description_locked`. A work derived by reading the description again (`reinterpretation`, `description_edit`, `sketch_grain_change`, `model_comparison`, `language_comparison`, `canvas_aspect_change`) is not locked. A `replay` is judged by its DDL, not by its kind: one whose DDL differs from its parent's read the description again (the Describe tab saved an unchanged description drawn again as `replay`) and is not locked, and one whose DDL is its parent's was drawn again without an edit and is locked only when its parent is, even though its own variation is DDL-authoritative. A redraw from the description whose parent is locked is refused 409 `description_locked` on `/api/paint`, `/api/paint/stream`, a `POST /api/history` of a description-reading derivation, and a pipeline fork with changed words; a fork to a new variation from the description as it stands remains the way back. The Web shows the Describe tab as held and replaces its draw with the explicit fork, shows description-reading actions as not offered with the reason, and draws each autonomous refinement generation of a locked work from the parent's DDL without reading or Vision.
+A work is description-locked when its variation is DDL-authoritative, when it was saved as `ddl_edit`, or when it was derived from such a work without reading the description again (touch, layout, color, replay, retired variation and the like); history items and lineage nodes carry `description_locked`. A work derived by reading the description again (`reinterpretation`, `description_edit`, `sketch_grain_change`, `model_comparison`, `language_comparison`, `canvas_aspect_change`) is not locked. A `replay` is judged by its DDL, not by its kind: one whose DDL differs from its parent's read the description again (the Describe tab saved an unchanged description drawn again as `replay`) and is not locked, and one whose DDL is its parent's was drawn again without an edit and is locked only when its parent is, even though its own variation is DDL-authoritative. A redraw from the description whose parent is locked is refused 409 `description_locked` on `/api/paint`, `/api/paint/stream`, a `POST /api/history` of a description-reading derivation, and a pipeline fork with changed words; a fork to a new variation from the description as it stands remains the way back. The Web shows the Describe tab as held and replaces its draw with the explicit fork, shows description-reading actions as not offered with the reason, and draws each autonomous refinement generation of a locked work from the parent's DDL without reading or Vision.
 
 A typed Stage 1 request carries bounded projections of the finite vocabulary derived from the Saijiki, resolved catalog and canvas identities, and only each validated Macro's qualified name, version, definition digest, parameters, and host-supplied localized summary. Its response schema permits only the underdrawing of §12.6; the LLM never writes visible DDL text directly. When parsing committed visible DDL identifies completable known holes, the shared pipeline automatically creates the completion request without a separate user operation. With no holes it does not call the Stage 2 LLM. The Stage 1 residual-adoption path in §12.8 is an exception: after its save acknowledgment it delivers the deterministic remainder without another LLM request. A clause containing words outside the finite grammar may become a known hole only when the compiler can establish its exact clause boundary and an exact drawing head, ground, or background anchor; unknowns without that exact boundary, conflicts, and integrity errors are not completion targets. When a following continuation clause is unresolved only because of a patchable upstream hole, its continuation diagnostic is deferred until recompilation after the patch; the following clause does not become an additional rewrite target.
 
@@ -1909,8 +1918,8 @@ Stage 1.5 is a deterministic typed transformation that uses no LLM. Its input
 is lock-verified `CanonicalReady` typed meaning, never free prose. Its output
 is the effective DDL / typed meaning consumed by the shared lowerer. On
 2026-09-27 the focus reinterpretation of `place:center` and the variation axis
-were removed; Stage 1.5 now only verifies its input and fixes the identity of
-effective meaning.
+were removed, and explicit variation was retired on 2026-10-04; Stage 1.5 now
+only verifies its input and fixes the identity of effective meaning.
 
 - source text, normalized DDL, original typed meaning, effective meaning, and
   source / generated provenance remain distinct; original meaning and explicit
@@ -1930,8 +1939,8 @@ effective meaning.
   seed and present `Some(0)` differ, and the full compiler-lock digest is a
   source-integrity attestation rather than identity material
 - the shared lowerer resolves an explicit place to the regions in §18. Corner selection belongs to composition, using original meaning, attested optional seed, and original logical occurrence
-- an explicit angle passes through as original typed meaning and does not join
-  the variation axis. The shared lowerer selects its concrete
+- an explicit angle passes through as original typed meaning. The shared
+  lowerer selects its concrete
   angle from the same verified pre- and expanded-meaning digests, tagged
   optional `composition_seed`, and either the direct original logical ordinal
   or the Macro semantic ordinal, expansion path, and generated ordinal
@@ -1942,9 +1951,9 @@ effective meaning.
   lock. An input with no `SourceOccurrence` gains no language condition, and
   an unused sidecar need not resolve or execute. Source and provenance are
   admission-integrity evidence, not meaning material
-- explicit variation is accepted as the pair of amplitude (`small`, `medium`,
-  or `large`) and `variation_seed`, but it currently has no axis to move and
-  does not change effective meaning; an incomplete request means no variation
+- explicit variation was retired on 2026-10-04. A `stage15_variation` that a
+  saved configuration or an older host still carries, null or an amplitude and
+  seed pair, is read and ignored, and it is never written
 - output canonical bytes, schema identity, digest, and provenance reproduce the
   same meaning and never present bytes from another schema under the same
   identity
@@ -2001,7 +2010,7 @@ introduction, retirement, and historical counts live in
 [CHANGELOG.md](CHANGELOG.md) and the [public history
 archive](docs/history/changelog-v1.72-v2.4.md).
 
-### 12.13 Variation (Stage 1.5)
+### 12.13 Composition Identity and the Retirement of Variation
 
 Lock-verified pre-expansion meaning, expanded meaning, and an attested optional
 `composition_seed` carry composition identity. The full compiler-lock digest
@@ -2011,10 +2020,18 @@ the concrete angle when an explicit angle identity is present, or the corner
 when corner is explicit. There is no current `vary_seed`
 input.
 
-Explicit variation is the pair of amplitude (small, medium, or large) and
-`variation_seed`. It currently has no axis to move, so even a complete pair
-leaves effective meaning unchanged. Composition family, color, touch, technique, relation,
-and element count do not move.
+Explicit variation (the pair of amplitude small, medium, or large and
+`variation_seed`) and variation as a refine element were retired on 2026-10-04
+by the author's decision: after the focus was removed on 2026-09-27 it had no
+axis to move, and the word was confusing next to refinement. Saved records of
+works (lineage edges of kind `variation`, and the variation seed, amplitude, and
+focus in history) are not rewritten and are kept only for reading. Their lineage
+edge label is "Variation (retired)", and only old works show the variation seed
+and amplitude in their provenance. New works do not write them. The core reads
+and ignores a `stage15_variation` that a saved configuration or an older host
+still carries, and never writes it. The pipeline variation that names a work's
+edition (`variation_id` and the like) and the Score `variation` (sway) are
+different things from this word.
 
 The current Score and render identity domain is `rh3`. `rh2` is a legacy
 domain for reading saved works and is not the current identity for new
@@ -2305,7 +2322,7 @@ Note that **`thinness` is not a Saijiki word** (author's ruling, 2026-07-29). St
 - **It is recorded and replayed.** Stored as `render_wild` beside `render_seed`, and included in the edition identity (`rh3`). **The same Score performed wild and performed plainly are different works**
 - **It is a multiplier on a tool's habit, not a source of one.** A tool whose wobble terms are zero (`rotring`) does not move when it is on. **A machine has nothing to unleash**
 
-This sits in a different layer from variation (Stage 1.5). Variation is a deterministic transform of the score; wild leaves the score alone and widens the performance. (Layer responsibilities are in §12, and version rules are in §2.1.)
+This sits in a different layer from the score. The compiler and Stage 1.5 fix the score deterministically; wild leaves the score alone and widens the performance. (Layer responsibilities are in §12, and version rules are in §2.1.)
 
 ### 13.5 Weight Decides the Quality of Sway
 
@@ -2505,7 +2522,7 @@ Explicit sway in the shared compiler always uses `dimensions=["position_x","posi
 Line uses its existing perpendicular performer; Arc and circle / ellipse / square / cloudform
 use their existing inward/outward contour consumers. Short-line thresholds, noise, seeds,
 geometry, placement, angle, thinness, material, and relation endpoint contracts remain unchanged.
-Point and unsupported shapes reject explicit variation. This is separate from the Stage 1.5 explicit variation request.
+Point and unsupported shapes reject explicit variation.
 
 The schema keeps `variation`, but it is invisible from the DDL text interface.
 Only those implementing plugins or materials handle these dimensions.
@@ -3238,8 +3255,8 @@ pre- and expanded-meaning digests, a composition seed tagged to distinguish None
 original direct logical ordinal or the Macro semantic ordinal, expansion path, and generated ordinal.
 The first SHA-256 byte modulo four selects upper-left, upper-right, lower-left, then lower-right.
 Different composition seeds may select the same corner. Source, canonical meaning, and provenance never receive the
-selected corner; the existing Renderer render seed chooses its anchor within that region. Another performance and
-explicit variation preserve the corner. One rational policy table converts to Score f64 only at the final boundary.
+selected corner; the existing Renderer render seed chooses its anchor within that region. Another performance
+preserves the corner. One rational policy table converts to Score f64 only at the final boundary.
 The policy ID stays unchanged while its content digest changes; this does not introduce a semantic schema version.
 Unspecified position remains unsupported; named/numeric conflicts and numeric must-fit remain enforced.
 
@@ -3321,8 +3338,7 @@ The angle-specific SHA-256 domain frames the lock-verified original pre- and
 expanded-meaning digests, tagged optional `composition_seed`, logical
 occurrence, and angle identity. Equivalent inline and continuation meaning
 selects the same angle; distinct true occurrences have distinct keys.
-Variation seed, render seed, raw source bytes, and the full lock digest are
-excluded.
+Render seed, raw source bytes, and the full lock digest are excluded.
 
 A circle or point keeps the same radial extent under rotation. An ellipse uses its ideal
 rotated ellipse extent, cloudform and square use the rotated rectangular envelope of
@@ -3544,7 +3560,7 @@ advances `composition_seed`, and reselects the concrete angle or corner in the
 shared lowerer when that meaning is explicitly present. It changes no composition family, technique, color, touch,
 relation, or element count. The same lock-verified meaning and attested
 `composition_seed` reproduce the same effective meaning, angle, and corner. Another
-performance and explicit variation preserve the resolved angle and corner. Saved Score / expanded
+performance preserves the resolved angle and corner. Saved Score / expanded
 artifacts take precedence, source text remains saved, silent backfill does not
 occur, and no permanent old/new runtime switch is introduced. Semantic schema /
 identity never presents changed bytes as an old identity. The normal Server, Web, and Android
@@ -4191,12 +4207,12 @@ archive](docs/history/changelog-v1.72-v2.4.md).
 
 Lineage's autonomous refinement is a bounded run of 1–10 generations whose final judgment remains human. Before starting, the user chooses one method:
 
-- `Random automatic refinement` randomly chooses each generation's variation kind from the enabled reading, color-catalog, layout, touch, and variation elements. It does not use Vision. Because the direction text only reaches the drawing text of reading generations, the random-method UI states that condition explicitly.
-- `AI Vision automatic refinement` lets the user explicitly choose a Vision model from provider-grouped cards. During that run, the selected model serves both Stage 1 / Stage 2 generation and Vision advice, while those three roles and their prompts remain separate. The server rasterizes each saved generation to PNG and sends it with the original instruction, user direction, and allowed refinement kinds. Vision returns visible observations, one direction to try next, and one allowed variation kind; that advice becomes input to the next generation.
+- `Random automatic refinement` randomly chooses each generation's refinement kind from the enabled reading, color-catalog, layout, and touch elements. It does not use Vision. Because the direction text only reaches the drawing text of reading generations, the random-method UI states that condition explicitly.
+- `AI Vision automatic refinement` lets the user explicitly choose a Vision model from provider-grouped cards. During that run, the selected model serves both Stage 1 / Stage 2 generation and Vision advice, while those three roles and their prompts remain separate. The server rasterizes each saved generation to PNG and sends it with the original instruction, user direction, and allowed refinement kinds. Vision returns visible observations, one direction to try next, and one allowed refinement kind; that advice becomes input to the next generation.
 
 Sketch from life (§12.6.1) follows each generation's parent; the Describe tab's Sketch from life setting is not used. When the parent has sketch prose and the generation's drawing text equals the parent's, the parent's prose is passed and the layer is not run (as the refinement candidates' `Another reading too` does). A generation whose drawing text changed because a direction was added goes through the layer again. A parent without sketch prose gives a generation drawn without the layer.
 
-Either method may include variation (§12.13) among the enabled refinement elements (up to five). Only while variation is enabled, an amplitude choice (small/medium/large, default medium) is shown; the chosen amplitude applies to every variation generation in the run, and seeds are server-issued.
+Either method can enable four refinement elements: reading, color catalog, layout, and touch (variation was retired on 2026-10-04, §12.13).
 
 The Vision method is a finite advisory loop, not quality optimization or automatic acceptance. Vision must not score, rank, accept, reject, praise, condemn, or discard a generated work. Intermediate generations remain `lineage_only`, the final generation enters regular history, and all generations remain in lineage. Derivation metadata records the method, Vision model, observation, and next direction, while the modal shows the latest advice. The model may be changed between runs but remains fixed during one run. Only the human may save, promote, star, or finally choose a work.
 
@@ -4213,7 +4229,7 @@ A colophon is an append-only, first-person reading attached to one lineage branc
 - Japanese and English evaluation terms are scanned as warnings only. A warning never forces rewriting, regeneration, or rejection.
 - The server appends the reader model and date as a mechanical signature. Records store the target node, branch snapshot, model, time, language, body, warnings, and fact sheet in the current user's scope.
 - Records can be appended or deleted, but never edited. Idempotency keys prevent duplicate saves, and lists are displayed oldest first.
-- The colophon is available only through the explicit Lineage action or `inku-cli colophon`; `--dry-run` generates without saving. It affects neither dh1, current rh3, legacy rh2, generation, variation, refinement selection, acceptance, quality functions, nor branch recommendation.
+- The colophon is available only through the explicit Lineage action or `inku-cli colophon`; `--dry-run` generates without saving. It affects neither dh1, current rh3, legacy rh2, generation, refinement selection, acceptance, quality functions, nor branch recommendation.
 
 ---
 

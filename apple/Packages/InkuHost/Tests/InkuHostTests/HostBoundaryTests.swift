@@ -68,6 +68,55 @@ final class HostBoundaryTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(after.count, 2)
     }
 
+    // Failure: reading work A shows diagnostics or prompts from its execution's newer work B.
+    func testSavedPresentationStaysWithEachWork() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-host-presentation-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let db = try InkuDatabase(url: folder.appendingPathComponent("works.sqlite"))
+        let host = PipelineHost(database: db, transport: ImmediateProvider(), credentials: EmptyCredentials())
+        var request = try fixture(.description("a red circle", autoCatalog: false))
+        request.provenance = GenerationProvenance(ddlVersion: "16", ddlEngineVersion: "57", build: "42", uiLanguage: "ja",
+                                                batchRunID: "fixture-batch", batchLineNumber: 3)
+        let first = try await host.generate(request)
+        let firstID = try XCTUnwrap(first.savedWorkID)
+        let before = try await host.savedWorkPresentation(workID: firstID)
+        let firstDelivery = try ExactJSON(data: XCTUnwrap(before.deliveryJSON))
+        let firstPrompts = try ExactJSON(data: XCTUnwrap(before.promptJSON))
+        XCTAssertEqual(firstPrompts.array?.count, 1)
+        let second = try await host.perform(executionID: first.executionID,
+            command: .commitUserDDL(expectedRevision: first.revision, source: "place one blue circle at center."))
+        let secondID = try XCTUnwrap(second.savedWorkID)
+        XCTAssertNotEqual(firstID, secondID)
+        let newer = try await host.savedWorkPresentation(workID: secondID)
+        XCTAssertNotEqual(firstDelivery, try ExactJSON(data: XCTUnwrap(newer.deliveryJSON)))
+        let reopened = PipelineHost(database: db, credentials: EmptyCredentials())
+        let after = try await reopened.savedWorkPresentation(workID: firstID)
+        XCTAssertEqual(before.deliveryJSON, after.deliveryJSON)
+        XCTAssertEqual(before.promptJSON, after.promptJSON)
+        XCTAssertEqual(before.diagnosticsJSON, after.diagnosticsJSON)
+        XCTAssertEqual(before.renderedJSON, after.renderedJSON)
+        XCTAssertEqual(before.eventsJSON, after.eventsJSON)
+        XCTAssertEqual(after.provenance?.ddlVersion, "16")
+        XCTAssertEqual(after.provenance?.ddlEngineVersion, "57")
+        XCTAssertEqual(after.provenance?.build, "42")
+        XCTAssertEqual(after.provenance?.uiLanguage, "ja")
+        XCTAssertEqual(after.provenance?.batchRunID, "fixture-batch")
+        XCTAssertEqual(after.provenance?.batchLineNumber, 3)
+        let firstOrigin = try await reopened.savedAuthoringContext(workID: firstID).originKind
+        let secondOrigin = try await reopened.savedAuthoringContext(workID: secondID).originKind
+        XCTAssertEqual(firstOrigin, .stage1Generated)
+        // Editing changes authority. Its original Stage 1 provenance remains a recorded fact.
+        XCTAssertEqual(secondOrigin, .stage1Generated)
+        let secondAuthority = try await reopened.savedAuthoringContext(workID: secondID).authority
+        XCTAssertEqual(secondAuthority, "ddl_authoritative")
+        // A cancel after the durable save does not lose or repeat either save.
+        _ = try await host.cancel(executionID: second.executionID)
+        let rows = try await db.list()
+        XCTAssertEqual(rows.count, 2)
+        let afterCancel = try await reopened.savedWorkPresentation(workID: firstID)
+        XCTAssertEqual(afterCancel.deliveryJSON, before.deliveryJSON)
+    }
+
     // Failure: replay copies the old SVG or overwrites its parent instead of rendering the saved Score.
     func testSavedScoreReplayCreatesChildWithoutMutatingOriginal() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-host-replay-\(UUID().uuidString)")

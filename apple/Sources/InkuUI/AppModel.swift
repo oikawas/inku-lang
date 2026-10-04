@@ -31,9 +31,9 @@ public struct DrawingAdjustmentPlan: Sendable {
 @MainActor
 @Observable
 public final class AppModel {
-    public var inputMode = "ddl"
+    public var inputMode = "description"
     public var descriptionText = ""
-    public var ddlText = "place one red circle at center."
+    public var ddlText = ""
     public var language = "en"
     public var catalogID = "default"
     public var canvasID = "square"
@@ -46,6 +46,7 @@ public final class AppModel {
     public var variationSeedText = ""
     public var selectedHoleIDs: Set<String> = []
     public private(set) var works: [SavedWork] = []
+    public private(set) var restorationRevision: UInt64 = 0
     public private(set) var selectedWorkID: String?
     public private(set) var selectedWork: SavedWork?
     public private(set) var previewWork: SavedWork?
@@ -84,6 +85,7 @@ public final class AppModel {
     public private(set) var patchProposalJSON = ""
     public private(set) var patchCandidate = ""
     public private(set) var unreadOutputs: Set<String> = []
+    private var workActionStates: [String: SavedWorkActionState] = [:]
     public let library = LibraryModel()
     public let display = DisplaySettings()
     public let descriptionMeter = DescriptionMeterModel()
@@ -138,7 +140,7 @@ public final class AppModel {
     public var hasNextDrawingModel: Bool {
         settings.providers.contains { nextDrawingModelReference.hasPrefix($0.id + ":") && nextDrawingModelReference.count > $0.id.count + 1 }
     }
-    public var canCommitDDL: Bool { !isBusy && !isPreview && !ddlText.isEmpty && ddlText != visibleDDL && (currentExecutionID != nil || selectedContext != nil) }
+    public var canCommitDDL: Bool { !isBusy && !isPreview && !ddlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (currentExecutionID != nil || selectedContext != nil) }
     public var canEditCurrentDDL: Bool { !isBusy && !isPreview && (currentExecutionID != nil || selectedContext != nil) }
     public var canCompleteHoles: Bool { !isBusy && currentExecutionID != nil && !holeIDs.isEmpty && !settings.providers.isEmpty && ddlText == visibleDDL }
     public var canRegenerateDescription: Bool { !isBusy && !sourceLocked && currentExecutionID != nil && !settings.providers.isEmpty && !descriptionText.isEmpty }
@@ -155,6 +157,17 @@ public final class AppModel {
         database != nil && !isBusy && !isPreview && !(inputMode == "ddl" ? ddlText : descriptionText).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && (inputMode == "ddl" || (hasAvailableNextDrawingModel
                 && !(selectedWorkID != nil && sourceLocked)))
+    }
+    public var canGenerateDescription: Bool {
+        database != nil && !isBusy && !isPreview && hasAvailableNextDrawingModel
+            && !descriptionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !(selectedWorkID != nil && sourceLocked)
+    }
+
+    public func generateDescription() async {
+        guard canGenerateDescription else { return }
+        inputMode = "description"
+        await generate()
     }
 
     public func initialize() async {
@@ -292,15 +305,12 @@ public final class AppModel {
             authoringOrigin = context.origin
             authoringRevision = context.revision
             authoringPhase = "completed"
-            let location = work.id.split(separator: "_").dropLast().joined(separator: "_")
-            let restored = try? await host.restore(executionID: location)
+            let presentation = try await host.savedWorkPresentation(workID: work.id)
             guard selectedWorkID == work.id, !isBusy else { return }
-            if let view = restored, view.savedWorkID == work.id {
-                apply(view)
-            } else {
-                // A later save on this execution is not the selected work's output record.
-                promptAvailability = .unavailable
-            }
+            promptJSON = try presentation.promptJSON.map(Self.pretty) ?? ""
+            promptAvailability = presentation.promptJSON == nil ? .notRecorded : .recorded
+            diagnosticsJSON = try presentation.diagnosticsJSON.map(Self.pretty) ?? ""
+            eventsJSON = try presentation.eventsJSON.map(Self.pretty) ?? ""
         } catch {
             guard selectedWorkID == work.id, !isBusy else { return }
             promptAvailability = .unavailable
@@ -403,6 +413,37 @@ public final class AppModel {
         nextDrawingModelReference = reference
     }
 
+    public func selectSharedDrawingModel(_ reference: String) async throws {
+        guard SettingsModel.isModelAvailable(reference, settings: settings) else { throw HostError("drawing_model_not_available") }
+        var changed = settings
+        changed.models.stage1Model = reference
+        changed.models.stage2Model = reference
+        try await updateHostSettings(changed)
+        nextDrawingModelReference = reference
+    }
+
+    /// The DDL and adjustment pickers save Stage 2 immediately; the shared next-work picker is a draft.
+    public func selectDdlDrawingModel(_ reference: String) async throws {
+        guard SettingsModel.isModelAvailable(reference, settings: settings) else { throw HostError("drawing_model_not_available") }
+        let next = nextDrawingModelReference
+        var changed = settings
+        changed.models.stage2Model = reference
+        try await updateHostSettings(changed)
+        nextDrawingModelReference = next
+    }
+
+    public func selectDemoDrawingModel(stage: Int, reference: String) async throws {
+        guard [1, 2].contains(stage), SettingsModel.isBatchModelAvailable(reference, settings: settings) else {
+            throw HostError("drawing_model_not_available")
+        }
+        let next = nextDrawingModelReference
+        var changed = settings
+        if stage == 1 { changed.models.stage1Model = reference }
+        else { changed.models.stage2Model = reference }
+        try await updateHostSettings(changed)
+        nextDrawingModelReference = next
+    }
+
     private var nextGenerationHostSettings: HostSettings {
         var next = settings
         next.models.stage1Model = nextDrawingModelReference
@@ -495,9 +536,13 @@ public final class AppModel {
         var freshPin: ChatGPTPlanSession?
         var pinned: [GenerationRequest] = []
         for var request in requests {
+            if request.provenance?.uiLanguage == nil {
+                request.provenance?.uiLanguage = display.preferences.language
+            }
             if request.captureProviderIO == nil {
                 request.captureProviderIO = developerModeEnabled && display.preferences.captureProviderIO == true
             }
+            if request.models.includeThinking == nil { request.models.includeThinking = display.preferences.includeThinking }
             if request.captureProviderIO == true, !developerModeEnabled {
                 throw HostError("developer_provider_observations_not_available")
             }
@@ -558,7 +603,41 @@ public final class AppModel {
 
     public func savedConfiguration(workID: String) async throws -> SavedAuthoringContext {
         guard let host else { throw HostError("pipeline_unavailable") }
-        return try await host.savedAuthoringContext(workID: workID)
+        let context = try await host.savedAuthoringContext(workID: workID)
+        workActionStates[workID] = SavedWorkActionState(context)
+        return context
+    }
+
+    func savedGenerationInformation(work: SavedWork) async throws -> SavedGenerationInformation {
+        guard let host, let database else { throw HostError("pipeline_unavailable") }
+        var presentation: SavedWorkPresentation?
+        var context: SavedAuthoringContext?
+        var metrics: [ProviderAttemptMetric] = []
+        do {
+            presentation = try await host.savedWorkPresentation(workID: work.id)
+            metrics = try await host.savedProviderMetrics(workID: work.id)
+            context = try await host.savedAuthoringContext(workID: work.id)
+        } catch let error as HostError where ["saved_performance_context_unavailable", "saved_authoring_context_unavailable"].contains(error.code) {
+            // Old work can retain its own Score/SVG without a compiler/prompt journal.
+        }
+        let nodeID = work.lineageNodeID ?? work.id
+        let generations = try await database.lineageGenerations(nodeIDs: [nodeID])
+        let edge = try await database.edge(childNodeID: nodeID)
+        let annotation = try await database.libraryAnnotation(id: work.id)
+        return SavedGenerationInformation(presentation: presentation, context: context, metrics: metrics,
+            generation: generations[nodeID], edge: edge, annotation: annotation)
+    }
+
+    public func workActionState(for work: SavedWork) -> SavedWorkActionState? {
+        if let state = workActionStates[work.id] { return state }
+        if selectedWorkID == work.id, let selectedContext { return SavedWorkActionState(selectedContext) }
+        return nil
+    }
+
+    public func loadWorkActionState(_ work: SavedWork) async {
+        guard workActionStates[work.id] == nil else { return }
+        do { _ = try await savedConfiguration(workID: work.id) }
+        catch { workActionStates[work.id] = .unavailable }
     }
 
     public func applyDDLImport(_ value: DDLPackageImport) throws {
@@ -578,7 +657,8 @@ public final class AppModel {
 
     public func requestForCurrentInput(inputMode: String? = nil, source: String? = nil, description: String? = nil,
                                       parentWorkID: String? = nil, derivationKind: String = "new",
-                                      catalogModeOverride: String? = nil, sketchOverride: SketchRequest? = nil) throws -> GenerationRequest {
+                                      catalogModeOverride: String? = nil, sketchOverride: SketchRequest? = nil,
+                                      wildOverride: Bool? = nil) throws -> GenerationRequest {
         guard let bootstrap else { throw HostError("installation_unavailable") }
         let mode = inputMode ?? self.inputMode
         if mode == "description", !SettingsModel.isModelAvailable(nextDrawingModelReference, settings: settings) {
@@ -589,7 +669,7 @@ public final class AppModel {
         let savedConfig = parentWorkID == selectedWorkID && parentWorkID != nil ? selectedContext?.configuration : nil
         var request = try bootstrap.request(inputMode: mode, source: source ?? ddlText,
             description: description ?? descriptionText, language: language, catalogID: catalogID,
-            canvasID: canvasID, seed: seedText, wild: wild, settings: nextGenerationHostSettings,
+            canvasID: canvasID, seed: seedText, wild: wildOverride ?? wild, settings: mode == "ddl" ? settings : nextGenerationHostSettings,
             parentWorkID: parentWorkID, derivationKind: derivationKind, catalogMode: catalogModeOverride ?? catalogMode,
             sketch: sketch, savedConfiguration: savedConfig,
             importedPlugins: mode == "ddl" && parentWorkID == nil ? importedDDL?.plugins ?? [] : [])
@@ -605,6 +685,85 @@ public final class AppModel {
             sketchOverride: sketchMode == "on" ? .on : .off)
     }
 
+    public func requestForDemoDescription(_ description: String, sketchMode: String) throws -> GenerationRequest {
+        guard let bootstrap, ["off", "on"].contains(sketchMode),
+              SettingsModel.isBatchModelAvailable(settings.models.stage1Model, settings: settings) else {
+            throw HostError("drawing_model_not_available")
+        }
+        return try bootstrap.request(inputMode: "description", source: "", description: description,
+            language: language, catalogID: catalogID, canvasID: canvasID, seed: seedText, wild: wild,
+            settings: settings, parentWorkID: nil, derivationKind: "new",
+            catalogMode: catalogMode == "auto" ? "auto" : "fixed", sketch: sketchMode == "on" ? .on : .off)
+    }
+
+    public func drawNewDDL(_ source: String, imported: DDLPackageImport? = nil) async -> Bool {
+        guard !isBusy, let bootstrap, !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        do {
+            var request = try bootstrap.request(inputMode: "ddl", source: source, description: "",
+                language: imported?.language ?? language, catalogID: catalogID, canvasID: canvasID,
+                seed: seedText, wild: wild, settings: settings, parentWorkID: nil, derivationKind: "new",
+                importedPlugins: imported?.plugins ?? [])
+            request = try await pinPersonalPlanRequests([request])[0]
+            return await runAutomation(request: request) != nil
+        } catch { report(error); return false }
+    }
+
+    public func drawEditedDDL(work: SavedWork, source: String, wildOverride: Bool? = nil) async -> Bool {
+        guard !isBusy, !work.trashed, !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        do {
+            _ = try await checkedSavedAdjustmentParent(work)
+            let saved = try await savedConfiguration(workID: work.id)
+            var options = try ExactJSON(data: saved.renderOptions)
+            if let wildOverride { options["wild"] = .bool(wildOverride) }
+            guard let catalog = options["catalog_id"].string, options["resolved_color_map"].object != nil else {
+                throw HostError("saved_refinement_options_unavailable")
+            }
+            var models = settings.models
+            models.stage1Model = work.stage1Model ?? ""
+            if models.stage2Model.isEmpty { models.stage2Model = work.stage2Model ?? "" }
+            var request = GenerationRequest(authoring: .directDDL(source), configuration: saved.configuration,
+                renderOptions: options.data, clipPolicy: saved.clipPolicy, models: models, providers: settings.providers,
+                renderColorMaps: [catalog: options["resolved_color_map"].data], description: work.effectiveSourceText,
+                parentWorkID: work.id, derivationKind: "ddl_edit")
+            request = try await pinPersonalPlanRequests([request])[0]
+            return await runAutomation(request: request) != nil
+        } catch { report(error); return false }
+    }
+
+    /// Demo files are independent of the history checkbox and never open a save panel per iteration.
+    public func saveDemoFiles(_ work: SavedWork) async -> Bool {
+        guard let directory = localDataDirectory()?.appendingPathComponent("demo-output", isDirectory: true) else { return false }
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            var options = display.preferences.exportDefaults.options
+            options.format = .png
+            options.pixelHeight = display.preferences.exportDefaults.resolution == 0
+                ? display.preferences.exportDefaults.customHeight : display.preferences.exportDefaults.resolution
+            let artifacts = try await ExportService.prepare(sources: [ExportSource(work: work)], options: options)
+            for artifact in artifacts { try artifact.data.write(to: directory.appendingPathComponent(artifact.name), options: .atomic) }
+            let name = "inku-" + work.id
+            try Data(work.svg.utf8).write(to: directory.appendingPathComponent(name + ".svg"), options: .atomic)
+            status = "デモの画像を保存しました: " + directory.path
+            return true
+        } catch { report(error); return false }
+    }
+
+    public func saveDemoCandidate(_ work: SavedWork) async -> SavedWork? {
+        guard !isBusy, previewWork?.id == work.id, let executionID = currentExecutionID, let host else { return nil }
+        var result: SavedWork?
+        _ = await performSerialized(status: "候補を保存中") { [weak self] _ in
+            guard let self else { return }
+            let saved = try await host.saveCandidate(executionID: executionID)
+            guard saved.id == work.id else { throw HostError("candidate_identity_changed") }
+            await self.notifySavedWork(saved)
+            try await self.reloadWorks()
+            self.displayWork(saved)
+            self.selectedContext = try await host.savedAuthoringContext(workID: saved.id)
+            result = saved
+        }
+        return result
+    }
+
     /// Allocate the entire round before any drawing, keeping saved colors, locks, policies and source authority.
     public func makeDrawingAdjustmentPlans(work: SavedWork, kind: String, count: Int, words: String = "",
                                            amplitude: String = "medium", wildOverride: Bool? = nil,
@@ -612,7 +771,7 @@ public final class AppModel {
         guard !isPreview, !stopping, let host else { throw HostError("authoring_busy_or_unavailable") }
         guard ["layout_change", "reinterpretation", "variation", "touch_change"].contains(kind) else { throw HostError("unknown_refinement_kind") }
         guard [1, 4].contains(count), kind != "touch_change" || count == 1 else { throw HostError("invalid_adjustment_count") }
-        let drawing = nextGenerationHostSettings
+        let drawing = settings
         let source = try await checkedSavedAdjustmentParent(work)
         let saved = try await host.savedAuthoringContext(workID: source.id)
         try Task.checkCancellation()
@@ -1109,15 +1268,20 @@ public final class AppModel {
         eventsJSON = ""
         errorText = nil
         unreadOutputs = []
+        inputMode = "description"
+        descriptionText = ""
+        ddlText = ""
     }
 
-    public func commitDDL() async {
-        guard !isBusy, ddlText != visibleDDL else { return }
-        if let id = currentExecutionID {
+    public func commitDDL(wildOverride: Bool? = nil) async {
+        guard canCommitDDL else { return }
+        if let work = displayedWork, ddlText == visibleDDL || wildOverride != nil {
+            _ = await drawEditedDDL(work: work, source: ddlText, wildOverride: wildOverride)
+        } else if let id = currentExecutionID, wildOverride == nil {
             await performCommand(executionID: id, command: .commitUserDDL(expectedRevision: authoringRevision, source: ddlText), kind: "ddl_edit")
         } else if selectedContext != nil {
             do {
-                let request = try requestForCurrentInput(inputMode: "ddl", parentWorkID: selectedWorkID, derivationKind: "ddl_edit")
+                let request = try requestForCurrentInput(inputMode: "ddl", parentWorkID: selectedWorkID, derivationKind: "ddl_edit", wildOverride: wildOverride)
                 _ = await runAutomation(request: request)
             } catch { report(error) }
         }
@@ -1318,7 +1482,6 @@ public final class AppModel {
             try await database.restore(from: url)
             currentExecutionID = nil
             generationToken = nil
-            try await reloadWorks()
             currentSVG = ""
             visibleDDL = ""
             scoreJSON = ""
@@ -1328,6 +1491,10 @@ public final class AppModel {
             importedDDL = nil; importedMacroNames = []
             selectedContext = nil
             currentView = nil
+            workActionStates = [:]
+            await library.resetAfterRestore()
+            restorationRevision &+= 1
+            try await reloadWorks()
             status = "復元しました"
         } catch { report(error) }
     }
@@ -1358,16 +1525,16 @@ public final class AppModel {
         } catch { report(error) }
     }
 
-    public func copyImage() async {
+    public func copyImage(work target: SavedWork? = nil) async {
         #if os(macOS)
-        guard !isBusy, let work = selectedWork, !work.svg.isEmpty else { return }
+        guard !isBusy, let work = target ?? displayedWork, !work.svg.isEmpty else { return }
         let executionID = currentExecutionID
-        let height = display.preferences.clipboardHeight
+        let height = min(4096, max(256, display.preferences.clipboardHeight))
         _ = await performSerialized(status: "コピー画像を準備中") { [weak self] _ in
             guard let self else { return }
             defer { self.currentExecutionID = executionID }
-            var options = ExportOptions()
-            options.format = .png
+            var options = self.display.preferences.exportDefaults.options
+            options.format = self.display.preferences.clipboardFormat == "card" ? .shareCard : .png
             options.pixelHeight = height
             let artifacts = try await ExportService.prepare(sources: [ExportSource(work: work)], options: options)
             try Task.checkCancellation()

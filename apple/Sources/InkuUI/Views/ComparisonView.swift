@@ -1,21 +1,28 @@
+import InkuHost
+import InkuPersistence
 import SwiftUI
 
 @MainActor
 public struct ComparisonView: View {
     @Bindable var model: AppModel
-    @State private var comparison = ComparisonModel()
+    @State private var comparison: ComparisonModel
     @Environment(\.dismiss) private var dismiss
 
-    public init(model: AppModel) { self.model = model }
+    public init(model: AppModel, work: SavedWork? = nil, kind: ComparisonKind = .catalog) {
+        self.model = model
+        _comparison = State(initialValue: ComparisonModel(work: work, kind: kind))
+    }
 
     public var body: some View {
         @Bindable var comparison = comparison
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack {
-                    Text(model.display.localized("候補を比較")).font(.title2.weight(.semibold))
+                    Text(model.display.localized(comparison.kind == .catalog ? "色カタログを変える" : "モデルを変える")).font(.title2.weight(.semibold))
                     Spacer()
-                    Button(model.display.localized("閉じる")) { Task { await comparison.stop(app: model); dismiss() } }
+                    Button(model.display.localized(comparison.hasUnsaved ? "破棄して閉じる" : "閉じる")) {
+                        Task { await comparison.stop(app: model); comparison.discardCandidates(); dismiss() }
+                    }.keyboardShortcut(.cancelAction)
                         .disabled(comparison.stopping || model.isBusy && !comparison.running)
                 }
                 if let work = comparison.original {
@@ -30,10 +37,6 @@ public struct ComparisonView: View {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
-                    Picker(model.display.localized("比較する条件"), selection: $comparison.kind) {
-                        Text(model.display.localized("配色")).tag(ComparisonKind.catalog)
-                        Text(model.display.localized("モデル")).tag(ComparisonKind.model)
-                    }.pickerStyle(.segmented).frame(maxWidth: 300).disabled(comparison.running || model.isBusy)
                     if comparison.kind == .catalog { catalogChoices }
                     else { modelChoices }
                     HStack {
@@ -47,9 +50,14 @@ public struct ComparisonView: View {
                             }.buttonStyle(.borderedProminent).disabled(!comparison.canGenerate || model.isBusy)
                         }
                         Spacer()
-                        Button(model.display.localizedFormat("選択した%ld件を保存", comparison.selectedCount), systemImage: "square.and.arrow.down") {
-                            Task { await comparison.saveSelected(app: model) }
+                        Button(model.display.localizedFormat("選択した%ld案を採用して閉じる", comparison.selectedCount), systemImage: "checkmark.circle") {
+                            Task { if await comparison.saveSelected(app: model) { dismiss() } }
                         }.disabled(comparison.selectedCount == 0 || comparison.running || model.isBusy)
+                            .buttonStyle(.borderedProminent)
+                    }
+                    if comparison.hasUnsaved {
+                        Button(model.display.localized("候補を破棄"), role: .destructive) { comparison.discardCandidates() }
+                            .disabled(comparison.running || model.isBusy)
                     }
                     if !comparison.candidates.isEmpty { candidateGrid }
                 } else {
@@ -62,39 +70,74 @@ public struct ComparisonView: View {
                 }
             }.padding(20)
         }
+        #if os(macOS)
         .frame(minWidth: 540, idealWidth: 850, minHeight: 550)
-        .task { await comparison.initialize(app: model) }
-        .interactiveDismissDisabled(comparison.running || model.isBusy)
-        .onDisappear { Task { await comparison.stop(app: model) } }
+        #endif
+        .task {
+            await comparison.initialize(app: model)
+            if comparison.kind == .catalog, comparison.canGenerate { await comparison.generate(app: model) }
+        }
+        .interactiveDismissDisabled(comparison.running || comparison.hasUnsaved || model.isBusy)
+        .onDisappear { Task { await comparison.stop(app: model); comparison.discardCandidates() } }
     }
 
     private var catalogChoices: some View {
         GroupBox(model.display.localized("同じScoreを別の配色で描く")) {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 145))], alignment: .leading, spacing: 10) {
-                ForEach(model.catalogs.filter { $0.id != comparison.original?.renderColorCatalogID && $0.id != comparison.original?.catalogID }, id: \.id) { catalog in
-                    Toggle(catalog.name, isOn: Binding(get: { comparison.selectedCatalogIDs.contains(catalog.id) },
-                        set: { comparison.selectCatalog(catalog.id, selected: $0) }))
-                        .disabled(comparison.running || model.isBusy)
+                ForEach(model.catalogs.filter { $0.id != (comparison.original?.renderColorCatalogID ?? comparison.original?.catalogID) }, id: \.id) { catalog in
+                    Text(catalog.name).font(.callout)
                 }
             }.padding(6)
         }
     }
 
     private var modelChoices: some View {
-        @Bindable var comparison = comparison
         return GroupBox(model.display.localized("記述を各モデルで読み直す")) {
             VStack(alignment: .leading, spacing: 8) {
-                Text(model.display.localized("サービスID:モデルIDを1行に1件入力します。各候補では同じモデルを描画の両段階に使います。"))
+                Text(model.display.localized("使用中のLLMモデルを4件まで選択してください。"))
                     .font(.caption).foregroundStyle(.secondary)
-                TextEditor(text: $comparison.modelReferencesText).font(.system(.body, design: .monospaced)).frame(minHeight: 95)
-                    .disabled(comparison.running || model.isBusy || comparison.sourceIsLocked)
-                    .accessibilityLabel(model.display.localized("比較するモデル"))
+                ForEach(comparison.modelProviders) { provider in
+                    Text(provider.displayName).font(.caption.weight(.semibold))
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 190))], alignment: .leading) {
+                        ForEach(SettingsModel.batchModels(for: provider)) { entry in
+                            comparisonModelCard(entry, provider: provider)
+                        }
+                    }
+                }
+                Text(model.display.localizedFormat("選択中: %ld / 4", comparison.modelReferences.count)).font(.caption).monospacedDigit()
+                if comparison.modelProviders.isEmpty {
+                    Text(model.display.localized("選べるモデルがありません。設定 → モデル設定 で使用するモデルを選択してください。"))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 if comparison.sourceIsLocked {
                     Text(model.display.localized("DDLを編集した作品は記述を読み直せません。配色の比較を選択してください。"))
                         .font(.callout).foregroundStyle(.secondary)
                 }
             }.padding(6)
         }
+    }
+
+    private func comparisonModelCard(_ entry: ProviderModelSettings, provider: ProviderSettings) -> some View {
+        let reference = provider.id + ":" + entry.id
+        let selected = comparison.selectedModelReferences.contains(reference)
+        let target = reference == comparison.targetModelReference
+        let full = !selected && comparison.modelReferences.count >= 4
+        return VStack(alignment: .leading, spacing: 6) {
+            Toggle(entry.label.isEmpty ? entry.id : entry.label, isOn: Binding(
+                get: { selected }, set: { comparison.selectModel(reference, selected: $0) }))
+                .disabled(comparison.running || model.isBusy || comparison.hasUnsaved || comparison.sourceIsLocked || target || full || !entry.isSelectable)
+                .strikethrough(entry.eol == true)
+            if target { Text(model.display.localized("元の作品のモデル")).font(.caption).foregroundStyle(.secondary) }
+            if entry.eol == true {
+                Text(model.display.localized("提供終了") + (entry.eolDate.map { " (\($0))" } ?? "")).font(.caption).foregroundStyle(.secondary)
+            } else if entry.requiresSubscription == true {
+                Text(model.display.localized("有料プラン限定")).font(.caption).foregroundStyle(.secondary)
+            }
+            if comparison.failedModelReferences.contains(reference) { Text(model.display.localized("このモデルの候補を用意できませんでした。")).font(.caption).foregroundStyle(.red) }
+            DisclosureGroup(model.display.localized("モデルの適性・用途")) {
+                RegisteredModelMetadataView(entry: entry, provider: provider, display: model.display)
+            }.font(.caption)
+        }.padding(10).background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 8))
     }
 
     private var candidateGrid: some View {

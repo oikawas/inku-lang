@@ -16,9 +16,14 @@ public enum AuxiliaryMode: String, CaseIterable, Sendable { case advice, colopho
 @MainActor
 @Observable
 public final class AuxiliaryModel {
+    public static let directionLimit = 160
     public var modelReference = ""
     public var language = "ja"
-    public var direction = ""
+    private var directionValue = ""
+    public var direction: String {
+        get { directionValue }
+        set { directionValue = Self.boundedDirection(newValue) }
+    }
     public var generations = 5
     public var visionMode = false
     public var amplitude = "medium"
@@ -37,28 +42,47 @@ public final class AuxiliaryModel {
     public private(set) var errorText: String?
     public private(set) var sourceIsLocked = false
     public private(set) var sourceWorkID: String?
+    public private(set) var sourceWork: SavedWork?
+    public private(set) var colophonPathCount: Int?
+    public private(set) var loadingColophonPath = false
+    public private(set) var selectingSource = false
     @ObservationIgnored private var provider: AuxiliaryProvider?
     @ObservationIgnored private var database: InkuDatabase?
+    @ObservationIgnored private var colophonPath: LineageGraph?
+    @ObservationIgnored private var colophonPathToken = UUID()
     @ObservationIgnored private var token: UUID?
     @ObservationIgnored private var task: Task<Void, Never>?
 
     public init(provider: AuxiliaryProvider? = nil) { self.provider = provider }
 
-    public func initialize(app: AppModel) async {
-        guard !running else { return }
+    public func initialize(app: AppModel, work: SavedWork? = nil, mode: AuxiliaryMode = .advice) async {
+        guard !running, !selectingSource else { return }
         if provider == nil {
             do { provider = try app.auxiliaryProvider() }
             catch { errorText = error.localizedDescription; return }
         }
-        if sourceWorkID != app.selectedWorkID {
+        let work = work ?? app.selectedWork
+        if sourceWorkID != work?.id {
             advice = nil; colophonDraft = nil; draftText = ""; errorText = nil
+            colophonPathToken = UUID(); colophonPath = nil; colophonPathCount = nil; loadingColophonPath = false
         }
-        sourceWorkID = app.selectedWorkID
-        let settings = await app.nextGenerationSettings()
-        if modelReference.isEmpty { modelReference = settings.models.stage1Model }
+        sourceWorkID = work?.id
+        sourceWork = work
+        let settings = await app.hostSettings()
+        let savedReference = mode == .colophon ? app.display.preferences.colophonModelReference : app.display.preferences.visionModelReference
+        if modelReference.isEmpty {
+            if let savedReference, SettingsModel.isRegisteredModelAvailable(savedReference, purpose: "vision", settings: settings) {
+                modelReference = savedReference
+            } else {
+                modelReference = settings.providers.lazy.compactMap { provider in
+                    SettingsModel.registeredModels(for: provider, purpose: "vision").first(where: \.isSelectable).map { provider.id + ":" + $0.id }
+                }.first ?? ""
+            }
+        }
+        language = app.display.preferences.language
         do { database = try app.auxiliaryDatabase() }
         catch { errorText = error.localizedDescription; return }
-        if let work = app.selectedWork {
+        if let work {
             do {
                 let context = try await app.savedConfiguration(workID: work.id)
                 sourceIsLocked = context.authority == "ddl_authoritative"
@@ -68,18 +92,73 @@ public final class AuxiliaryModel {
             }
             if sourceIsLocked { visionMode = false; enabledKinds.remove("reinterpretation") }
         }
+        guard sourceWorkID == work?.id else { return }
+        if mode == .colophon { await refreshColophonPath() }
         await reloadStored(app: app)
     }
 
+    /// Match the Web textarea's UTF-16 maximum without splitting a visible character.
+    public static func boundedDirection(_ value: String) -> String {
+        var end = value.startIndex
+        var length = 0
+        for character in value {
+            let nextLength = length + String(character).utf16.count
+            guard nextLength <= directionLimit else { break }
+            length = nextLength
+            end = value.index(after: end)
+        }
+        return String(value[..<end])
+    }
+
+    /// The displayed count and the reading use the same fixed root-to-target snapshot.
+    public func refreshColophonPath() async {
+        guard !running else { return }
+        let readToken = UUID()
+        colophonPathToken = readToken
+        colophonPath = nil; colophonPathCount = nil
+        guard let database, let work = sourceWork, let nodeID = work.lineageNodeID else {
+            loadingColophonPath = false
+            errorText = "系譜を持つ保存作品を選択してください。"
+            return
+        }
+        loadingColophonPath = true
+        defer { if colophonPathToken == readToken { loadingColophonPath = false } }
+        do {
+            guard let path = try await database.lineage(focusNodeID: nodeID, pathOnly: true), path.pathOnly,
+                  path.focusNodeID == nodeID, path.nodes.last?.id == nodeID, !path.nodes.isEmpty else {
+                throw HostError("colophon_requires_root_path")
+            }
+            guard colophonPathToken == readToken, sourceWorkID == work.id, !Task.isCancelled else { return }
+            colophonPath = path; colophonPathCount = path.nodes.count
+            errorText = nil
+        } catch {
+            guard colophonPathToken == readToken, sourceWorkID == work.id, !Task.isCancelled else { return }
+            errorText = error.localizedDescription
+        }
+    }
+
+    public func selectModel(_ reference: String, app: AppModel, mode: AuxiliaryMode) async throws {
+        guard !running, !selectingSource, SettingsModel.isRegisteredModelAvailable(reference, purpose: "vision", settings: await app.hostSettings()) else {
+            throw HostError("vision_model_not_available")
+        }
+        modelReference = reference
+        if mode == .colophon { app.display.preferences.colophonModelReference = reference }
+        else { app.display.preferences.visionModelReference = reference }
+    }
+
     public func requestAdvice(app: AppModel) async {
+        guard !selectingSource else { return }
         guard let provider else { errorText = "補助モデルの接続がありません。"; return }
-        guard let work = app.selectedWork, !work.trashed, !sourceIsLocked else {
+        guard let work = sourceWork, !work.trashed, !sourceIsLocked else {
             errorText = "画像助言には記述から描いた保存作品が必要です。"; return
         }
         let direction = direction
         let reference = modelReference
         let language = language
         let kinds = orderedKinds
+        guard SettingsModel.isRegisteredModelAvailable(reference, purpose: "vision", settings: await app.hostSettings()) else {
+            errorText = "画像を扱える登録モデルを選択してください。"; return
+        }
         await run(app: app, message: "モデルが作品を観察しています") { [self] runToken in
             let settings = await app.hostSettings()
             guard let png = try await Self.png(svgs: [work.svg], visionAdvice: true) else {
@@ -97,30 +176,36 @@ public final class AuxiliaryModel {
 
     public func generateColophon(app: AppModel) async {
         guard let provider else { errorText = "補助モデルの接続がありません。"; return }
-        guard let work = app.selectedWork, let nodeID = work.lineageNodeID else {
+        guard let work = sourceWork, let nodeID = work.lineageNodeID else {
             errorText = "系譜を持つ保存作品を選択してください。"; return
+        }
+        guard !loadingColophonPath, let path = colophonPath, path.focusNodeID == nodeID else {
+            errorText = "奥書の対象経路を再読込してください。"; return
         }
         let reference = modelReference
         let language = language
+        guard SettingsModel.isRegisteredModelAvailable(reference, purpose: "vision", settings: await app.hostSettings()) else {
+            errorText = "画像を扱える登録モデルを選択してください。"; return
+        }
         await run(app: app, message: "奥書を読む準備をしています") { [self] runToken in
             let settings = await app.hostSettings()
-            app.library.lineagePathOnly = true
-            await app.library.loadLineage(nodeID: nodeID)
-            guard let path = app.library.graph, path.pathOnly, path.focusNodeID == nodeID else {
+            guard let database else {
                 throw HostError("colophon_requires_root_path")
             }
             let draft = try await provider.colophon(branch: path, modelReference: reference,
                 language: language, settings: settings, png: { svgs in try await Self.png(svgs: svgs) })
             try Task.checkCancellation()
             guard token == runToken else { return }
+            try await database.insertColophon(draft)
             colophonDraft = draft; draftText = draft.generatedBody
-            status = "奥書の草稿を生成しました。編集して保存してください。"
+            await reloadStored(app: app)
+            status = "奥書を追記しました。"
         }
     }
 
     /// A user adopts a direction into a new child, leaving the parent document intact.
     public func adoptAdvice(app: AppModel) async {
-        guard let work = app.selectedWork, !app.isBusy, !running, !draftText.isEmpty else { return }
+        guard let work = sourceWork, !app.isBusy, !running, !selectingSource, !draftText.isEmpty else { return }
         do {
             let kind = advice?.suggestedKind ?? "reinterpretation"
             let catalog = kind == "catalog_change" ? randomCatalog(app: app, parent: work) : nil
@@ -137,12 +222,15 @@ public final class AuxiliaryModel {
 
     public func startRefinement(app: AppModel) async {
         guard let provider else { errorText = "補助モデルの接続がありません。"; return }
-        guard let first = app.selectedWork, !first.trashed, !running, !app.isBusy else { return }
+        guard let first = sourceWork, !first.trashed, !running, !selectingSource, !app.isBusy else { return }
         let count = min(10, max(1, generations))
         let useVision = visionMode && !sourceIsLocked
         let kinds = orderedKinds.filter { !sourceIsLocked || $0 != "reinterpretation" }
         guard !kinds.isEmpty else { errorText = "少なくとも1つの推敲要素を選んでください。"; return }
         let model = modelReference
+        if useVision, !SettingsModel.isRegisteredModelAvailable(model, purpose: "vision", settings: await app.hostSettings()) {
+            errorText = "画像を扱える登録モデルを選択してください。"; return
+        }
         let language = language
         let userDirection = direction
         let amplitude = amplitude
@@ -231,17 +319,44 @@ public final class AuxiliaryModel {
         if token == runToken { token = nil; running = false; stopping = false; task = nil }
     }
 
-    public func saveColophon(app: AppModel) async {
-        guard let database, var record = colophonDraft, !draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+    /// Explicitly choose a saved generation as the next parent without changing the main canvas.
+    @discardableResult public func selectRefinementSource(_ work: SavedWork, app: AppModel) async -> Bool {
+        guard !running, !stopping, !selectingSource, !app.isBusy,
+              generatedWorks.contains(where: { $0.id == work.id }) else { return false }
+        selectingSource = true
+        defer { selectingSource = false }
+        let previousSourceID = sourceWorkID
         do {
-            record.adoptedBody = draftText
-            try await database.saveColophon(record)
-            colophonDraft = record; status = "編集した奥書を保存しました。"
+            let database = try app.auxiliaryDatabase()
+            guard let saved = try await database.work(id: work.id), !saved.trashed, saved.lineageNodeID != nil else {
+                throw HostError("保存された世代を読み込めません。")
+            }
+            let context = try await app.savedConfiguration(workID: saved.id)
+            guard !Task.isCancelled, !running, !stopping, !app.isBusy, sourceWorkID == previousSourceID else { return false }
+            sourceWork = saved; sourceWorkID = saved.id
+            sourceIsLocked = context.authority == "ddl_authoritative"
+            advice = nil; colophonDraft = nil; draftText = ""; direction = ""
+            inheritWild = true; wildOverride = saved.renderWild ?? false
+            colophonPathToken = UUID(); colophonPath = nil; colophonPathCount = nil; loadingColophonPath = false
+            storedColophons = []
+            if sourceIsLocked { visionMode = false; enabledKinds.remove("reinterpretation") }
+            errorText = nil; status = "自律推敲の親作品を変更しました。"
+            return true
+        } catch {
+            if !Task.isCancelled, sourceWorkID == previousSourceID { errorText = error.localizedDescription }
+            return false
+        }
+    }
+
+    public func saveColophon(app: AppModel) async {
+        guard let database, let record = colophonDraft else { return }
+        do {
+            guard draftText == record.generatedBody else { throw HostError("colophon_is_immutable") }
+            try await database.insertColophon(record)
+            status = "奥書を追記しました。"
             await reloadStored(app: app)
         } catch { errorText = error.localizedDescription }
     }
-
-    public func editColophon(_ record: ColophonDraft) { colophonDraft = record; draftText = record.adoptedBody ?? record.generatedBody }
 
     public func deleteColophon(_ id: String, app: AppModel) async {
         do { try await database?.deleteColophon(id: id); await reloadStored(app: app) }
@@ -249,7 +364,7 @@ public final class AuxiliaryModel {
     }
 
     private func reloadStored(app: AppModel) async {
-        do { storedColophons = try await database?.colophons(targetNodeID: app.selectedWork?.lineageNodeID) ?? [] }
+        do { storedColophons = try await database?.colophons(targetNodeID: sourceWork?.lineageNodeID) ?? [] }
         catch { errorText = error.localizedDescription }
     }
 

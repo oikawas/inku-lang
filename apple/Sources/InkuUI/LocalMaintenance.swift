@@ -9,6 +9,19 @@ private struct BackupManifest: Codable, Sendable {
     var files: [String] = []
 }
 
+public struct LocalBackupGeneration: Identifiable, Sendable {
+    public let name: String
+    public let modifiedAt: Date?
+    public let byteCount: Int64
+    public var id: String { name }
+}
+
+private struct BackupSnapshot: Sendable {
+    let lastSuccess: Date?
+    let generations: [LocalBackupGeneration]
+    let totalBytes: Int64
+}
+
 private actor LocalMaintenanceStore {
     private let directory: URL
     init(directory: URL) { self.directory = directory }
@@ -21,6 +34,28 @@ private actor LocalMaintenanceStore {
         let folder = directory.appendingPathComponent("automatic-backups", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         return folder.appendingPathComponent("inku-auto-\(Int64(Date().timeIntervalSince1970 * 1000))-\(UUID().uuidString).sqlite")
+    }
+    func snapshot() throws -> BackupSnapshot {
+        let record = try manifest()
+        let folder = directory.appendingPathComponent("automatic-backups", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: folder.path) else {
+            return BackupSnapshot(lastSuccess: record.lastSuccess, generations: [], totalBytes: 0)
+        }
+        let keys: Set<URLResourceKey> = [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey]
+        let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: Array(keys), options: [.skipsHiddenFiles])
+        var generations: [LocalBackupGeneration] = []
+        var totalBytes: Int64 = 0
+        for file in files where file.lastPathComponent.hasPrefix("inku-auto-") && file.pathExtension == "sqlite" {
+            let metadata = try file.resourceValues(forKeys: keys)
+            guard metadata.isRegularFile == true, metadata.isSymbolicLink != true else { continue }
+            let bytes = Int64(max(0, metadata.fileSize ?? 0))
+            let sum = totalBytes.addingReportingOverflow(bytes)
+            guard !sum.overflow else { throw HostError("backup_size_out_of_range") }
+            totalBytes = sum.partialValue
+            generations.append(LocalBackupGeneration(name: file.lastPathComponent, modifiedAt: metadata.contentModificationDate, byteCount: bytes))
+        }
+        generations.sort { $0.name > $1.name }
+        return BackupSnapshot(lastSuccess: record.lastSuccess, generations: generations, totalBytes: totalBytes)
     }
     func completed(url: URL, retention: Int) throws {
         var record = try manifest()
@@ -66,14 +101,41 @@ private actor LocalMaintenanceStore {
 public final class LocalMaintenance {
     public private(set) var backupStatus = ""
     public private(set) var logStatus = ""
+    public private(set) var backupDirectory: URL?
+    public private(set) var backupLastSuccess: Date?
+    public private(set) var backupGenerations: [LocalBackupGeneration] = []
+    public private(set) var backupTotalBytes: Int64 = 0
+    public private(set) var backupInfoLoaded = false
+    public private(set) var backupInfoError: String?
+    public private(set) var backupError: String?
     @ObservationIgnored private var store: LocalMaintenanceStore?
     public init() {}
 
     public func connect(app: AppModel) {
         guard store == nil, let directory = app.localDataDirectory() else { return }
         store = LocalMaintenanceStore(directory: directory)
+        backupDirectory = directory.appendingPathComponent("automatic-backups", isDirectory: true)
+    }
+    public func nextBackupDate(preferences: DisplayPreferences) -> Date? {
+        guard preferences.automaticBackup, backupInfoLoaded else { return nil }
+        return backupLastSuccess.map { $0.addingTimeInterval(TimeInterval(min(168, max(1, preferences.backupIntervalHours)) * 3600)) } ?? Date()
+    }
+    public func refreshBackupInfo(app: AppModel) async {
+        connect(app: app)
+        guard let store else { backupInfoError = "バックアップの保存先を利用できません。"; return }
+        do {
+            let snapshot = try await store.snapshot()
+            try Task.checkCancellation()
+            backupLastSuccess = snapshot.lastSuccess
+            backupGenerations = snapshot.generations
+            backupTotalBytes = snapshot.totalBytes
+            backupInfoLoaded = true
+            backupInfoError = nil
+        } catch is CancellationError { }
+        catch { backupInfoError = "バックアップの状態を読み込めませんでした: \(error.localizedDescription)" }
     }
     public func checkBackup(app: AppModel, automationRunning: Bool) async {
+        await refreshBackupInfo(app: app)
         guard let store, app.display.preferences.automaticBackup, !app.isBusy, !automationRunning else { return }
         do {
             let preferences = app.display.preferences
@@ -82,10 +144,19 @@ public final class LocalMaintenance {
             guard manifest.lastSuccess.map({ Date().timeIntervalSince($0) >= interval }) ?? true else { return }
             try Task.checkCancellation()
             let url = try await store.nextBackupURL()
-            guard await app.backup(to: url) else { backupStatus = "自動バックアップを保存できませんでした。"; return }
+            guard await app.backup(to: url) else {
+                backupError = app.errorText ?? "自動バックアップを保存できませんでした。"
+                backupStatus = "自動バックアップを保存できませんでした。"
+                return
+            }
             try await store.completed(url: url, retention: preferences.backupGenerations)
             backupStatus = "自動バックアップを保存しました。"
-        } catch is CancellationError {} catch { backupStatus = "自動バックアップ: \(error.localizedDescription)" }
+            backupError = nil
+            await refreshBackupInfo(app: app)
+        } catch is CancellationError {} catch {
+            backupError = error.localizedDescription
+            backupStatus = "自動バックアップ: \(error.localizedDescription)"
+        }
     }
     public func log(work: SavedWork?, enabled: Bool) async {
         guard let store, enabled, let work, work.lineageNodeID != nil else { return }

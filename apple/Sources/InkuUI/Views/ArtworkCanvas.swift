@@ -30,7 +30,7 @@ struct ArtworkCanvas: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(.quaternary))
-                    .help(display.preferences.showTooltips ? display.localized("マウスホイールで拡大・縮小、ドラッグで移動します。") : "")
+                    .help(display.tooltip("マウスホイールで拡大・縮小、ドラッグで移動します。"))
                     .task(id: requestKey(size: geometry.size)) { await render(size: geometry.size) }
             }
             .frame(minHeight: 280, maxHeight: .infinity)
@@ -39,15 +39,15 @@ struct ArtworkCanvas: View {
                 Spacer(minLength: 12)
                 Button { setScale(scale / 1.25) } label: { Image(systemName: "minus.magnifyingglass") }
                     .accessibilityLabel(display.localized("縮小"))
-                    .help(display.preferences.showTooltips ? display.localized("縮小") : "")
+                    .help(display.tooltip("縮小", serverKey: "tooltipCanvasZoomOut"))
                     .disabled(scale <= CanvasInteraction.minimumScale)
                 Text(Double(scale).formatted(.percent.precision(.fractionLength(0)))).font(.caption.monospacedDigit())
                 Button { setScale(scale * 1.25) } label: { Image(systemName: "plus.magnifyingglass") }
                     .accessibilityLabel(display.localized("拡大"))
-                    .help(display.preferences.showTooltips ? display.localized("拡大") : "")
+                    .help(display.tooltip("拡大", serverKey: "tooltipCanvasZoomIn"))
                     .disabled(scale >= CanvasInteraction.maximumScale)
                 Button(display.localized("用紙に合わせる")) { reset() }
-                    .help(display.preferences.showTooltips ? display.localized("拡大率と位置をリセット") : "")
+                    .help(display.tooltip("拡大率と位置をリセット", serverKey: "tooltipCanvasZoomReset"))
             }
             .buttonStyle(.borderless)
             .controlSize(.small)
@@ -135,7 +135,7 @@ struct ArtworkCanvas: View {
         HStack(alignment: .bottom) {
             if display.preferences.captionPosition == "right" { Spacer(minLength: 0) }
             Group {
-                if display.preferences.captionVertical {
+                if display.preferences.captionVertical && CanvasInteraction.supportsVerticalCaption(caption) {
                     VerticalCaption(text: caption)
                         .frame(width: min(170, size.width * 0.28), height: min(320, size.height * 0.8))
                 } else {

@@ -36,9 +36,40 @@ public struct ModelSelection: Codable, Sendable, Equatable {
     public var stage2Model: String
     public var stage1MaxTokens: Int
     public var holeMaxTokens: Int
-    public init(stage1Model: String = "", stage2Model: String = "", stage1MaxTokens: Int = 2048, holeMaxTokens: Int = 2048) {
+    /// Compatibility display preference; the current Server does not request reasoning.
+    public var includeThinking: Bool?
+    public init(stage1Model: String = "", stage2Model: String = "", stage1MaxTokens: Int = 2048, holeMaxTokens: Int = 2048,
+                includeThinking: Bool? = nil) {
         self.stage1Model = stage1Model; self.stage2Model = stage2Model
         self.stage1MaxTokens = stage1MaxTokens; self.holeMaxTokens = holeMaxTokens
+        self.includeThinking = includeThinking
+    }
+
+    /// Current Server: Stage 1 wins for a description; a DDL-only entry names Stage 2.
+    /// This applies to a new execution, never to a historical execution snapshot.
+    public func normalizedForNewWork(stage2Only: Bool = false) -> Self {
+        var result = self
+        let model = stage2Only ? (stage2Model.isEmpty ? stage1Model : stage2Model)
+            : (stage1Model.isEmpty ? stage2Model : stage1Model)
+        result.stage1Model = model; result.stage2Model = model
+        return result
+    }
+}
+
+public struct GenerationProvenance: Codable, Sendable {
+    public var ddlVersion: String?
+    public var ddlEngineVersion: String?
+    public var build: String?
+    public var referenceBuild: String?
+    public var uiLanguage: String?
+    public var batchRunID: String?
+    public var batchLineNumber: Int?
+    public init(ddlVersion: String? = nil, ddlEngineVersion: String? = nil, build: String? = nil,
+                referenceBuild: String? = nil, uiLanguage: String? = nil, batchRunID: String? = nil,
+                batchLineNumber: Int? = nil) {
+        self.ddlVersion = ddlVersion; self.ddlEngineVersion = ddlEngineVersion
+        self.build = build; self.referenceBuild = referenceBuild; self.uiLanguage = uiLanguage
+        self.batchRunID = batchRunID; self.batchLineNumber = batchLineNumber
     }
 }
 
@@ -62,13 +93,16 @@ public struct GenerationRequest: Codable, Sendable {
     public var chatGPTSession: ChatGPTPlanSession?
     /// Independent developer opt-in. Missing and false preserve ordinary requests.
     public var captureProviderIO: Bool?
+    public var disabledPluginNames: [String]?
+    public var provenance: GenerationProvenance?
     public init(authoring: GenerationAuthoring, configuration: Data, renderOptions: Data, clipPolicy: Data,
                 models: ModelSelection = .init(), providers: [ProviderSettings] = [],
                 renderColorMaps: [String: Data] = [:],
                 description: String = "", parentWorkID: String? = nil, derivationKind: String = "new",
                 saveHistory: Bool = true, historyVisibility: String = "normal",
                 retainedDocument: Data? = nil, retainedAuthority: Data? = nil, chatGPTSession: ChatGPTPlanSession? = nil,
-                derivationMetadata: Data? = nil, interpretationSeed: String? = nil, captureProviderIO: Bool? = nil) {
+                derivationMetadata: Data? = nil, interpretationSeed: String? = nil, captureProviderIO: Bool? = nil,
+                disabledPluginNames: [String]? = nil, provenance: GenerationProvenance? = nil) {
         self.authoring = authoring; self.configuration = configuration; self.renderOptions = renderOptions
         self.clipPolicy = clipPolicy; self.models = models; self.providers = providers
         self.renderColorMaps = renderColorMaps
@@ -80,6 +114,8 @@ public struct GenerationRequest: Codable, Sendable {
         self.retainedDocument = retainedDocument; self.retainedAuthority = retainedAuthority
         self.chatGPTSession = chatGPTSession
         self.captureProviderIO = captureProviderIO
+        self.disabledPluginNames = disabledPluginNames
+        self.provenance = provenance
     }
 }
 
@@ -179,6 +215,11 @@ public struct SavedScoreReplayPlan: Sendable {
 }
 
 /// Owned saved input data. Export and derivation never receive a mutable database handle.
+public enum AuthoringOrigin: String, Sendable {
+    case stage1Generated = "stage1_generated"
+    case userAuthoredDDL = "user_authored_ddl"
+}
+
 public struct SavedAuthoringContext: Sendable {
     public let configuration: Data
     public let renderOptions: Data
@@ -188,6 +229,7 @@ public struct SavedAuthoringContext: Sendable {
     public let origin: String
     public let revision: String
     public let authorityJSON: Data
+    public var originKind: AuthoringOrigin? { AuthoringOrigin(rawValue: origin) }
 }
 
 public struct ReplayOptions: Sendable {

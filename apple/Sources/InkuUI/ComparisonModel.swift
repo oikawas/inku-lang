@@ -22,6 +22,9 @@ public final class ComparisonModel {
     public var kind = ComparisonKind.catalog
     public var selectedCatalogIDs: Set<String> = []
     public var modelReferencesText = ""
+    public private(set) var selectedModelReferences: Set<String> = []
+    public private(set) var modelProviders: [ProviderSettings] = []
+    public private(set) var failedModelReferences: Set<String> = []
     public private(set) var original: SavedWork?
     public private(set) var sourceIsLocked = false
     public private(set) var contextAvailable = false
@@ -35,25 +38,30 @@ public final class ComparisonModel {
     @ObservationIgnored private var initialized = false
     @ObservationIgnored private var runID: UUID?
     @ObservationIgnored private var completionWaiters: [CheckedContinuation<Void, Never>] = []
+    private let requestedWork: SavedWork?
 
-    public init() {}
+    public init(work: SavedWork? = nil, kind: ComparisonKind = .catalog) {
+        requestedWork = work
+        self.kind = kind
+    }
 
     public var modelReferences: [String] {
-        var seen: Set<String> = []
-        return modelReferencesText.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty && seen.insert($0).inserted }
+        selectedModelReferences.sorted()
     }
     public var selectedCount: Int { candidates.filter { $0.selected && $0.savedWork == nil }.count }
     public var requestedCount: Int { kind == .catalog ? selectedCatalogIDs.count : modelReferences.count }
     public var canGenerate: Bool {
         contextAvailable && !running && requestedCount > 0
+            && !hasUnsaved && (kind != .model || modelReferences.count <= 4)
             && !(kind == .model && sourceIsLocked)
     }
+    public var hasUnsaved: Bool { candidates.contains { $0.savedWork == nil } }
+    public var targetModelReference: String { original?.stage1Model ?? original?.stage2Model ?? "" }
 
     public func initialize(app: AppModel) async {
         guard !initialized else { return }
         initialized = true
-        guard !app.isPreview, let work = app.selectedWork else {
+        guard !app.isPreview, let work = requestedWork ?? app.selectedWork else {
             errorText = "比較の元になる保存作品を選択してください。"
             return
         }
@@ -63,9 +71,8 @@ public final class ComparisonModel {
             sourceIsLocked = context.authority == "ddl_authoritative"
             contextAvailable = true
             let settings = await app.nextGenerationSettings()
-            var seen: Set<String> = []
-            modelReferencesText = [settings.models.stage1Model, settings.models.stage2Model]
-                .filter { !$0.isEmpty && seen.insert($0).inserted }.joined(separator: "\n")
+            modelProviders = settings.providers.filter { !SettingsModel.batchModels(for: $0).isEmpty }
+            selectedCatalogIDs = Set(app.catalogs.filter { $0.id != (work.renderColorCatalogID ?? work.catalogID) }.map(\.id))
             status = "元の作品の条件を固定しました。比較する配色またはモデルを選択してください。"
         } catch {
             errorText = "この作品には比較用の保存設定がありません: \(error.localizedDescription)"
@@ -73,9 +80,26 @@ public final class ComparisonModel {
     }
 
     public func selectCatalog(_ id: String, selected: Bool) {
-        guard !running else { return }
+        guard !running, !hasUnsaved else { return }
         if !selected { selectedCatalogIDs.remove(id) }
         else { selectedCatalogIDs.insert(id) }
+    }
+
+    public func selectModel(_ reference: String, selected: Bool) {
+        guard !running, !hasUnsaved, !sourceIsLocked else { return }
+        if !selected { selectedModelReferences.remove(reference); return }
+        guard selectedModelReferences.count < 4, reference != targetModelReference,
+              modelProviders.contains(where: { provider in
+                  SettingsModel.batchModels(for: provider).contains { provider.id + ":" + $0.id == reference && $0.isSelectable }
+              }) else { return }
+        selectedModelReferences.insert(reference)
+    }
+
+    public func discardCandidates() {
+        guard !running else { return }
+        candidates.removeAll { $0.savedWork == nil }
+        failures = []; failedModelReferences = []
+        errorText = nil
     }
 
     public func selectCandidate(_ id: String, selected: Bool) {
@@ -95,17 +119,17 @@ public final class ComparisonModel {
         }
         if comparisonKind == .model {
             let settings = await app.hostSettings()
-            guard labels.allSatisfy({ reference, _ in
-                settings.providers.contains { reference.hasPrefix($0.id + ":") && reference.count > $0.id.count + 1 }
+            guard labels.count <= 4, labels.allSatisfy({ reference, _ in
+                reference != targetModelReference && SettingsModel.isBatchModelAvailable(reference, settings: settings)
             }) else {
-                errorText = "設定済みのサービスID:モデルIDを指定してください。"
+                errorText = "使用中のLLMモデルを4件まで選択してください。"
                 return
             }
         }
         let run = UUID()
         runID = run
         running = true; saving = false; stopping = false
-        errorText = nil; failures = []; candidates = []
+        errorText = nil; failures = []; failedModelReferences = []; candidates = []
         let succeeded = await app.performComparison(status: "比較候補を生成中") { token in
             var requests: [GenerationRequest] = []
             if comparisonKind == .model {
@@ -132,6 +156,7 @@ public final class ComparisonModel {
                     try Task.checkCancellation()
                     guard self.runID == run, !self.stopping else { throw CancellationError() }
                     self.failures.append("\(entry.1): \(error.localizedDescription)")
+                    if comparisonKind == .model { self.failedModelReferences.insert(entry.0) }
                 }
             }
         }
@@ -142,8 +167,8 @@ public final class ComparisonModel {
         finish()
     }
 
-    public func saveSelected(app: AppModel) async {
-        guard !running, !app.isBusy, selectedCount > 0 else { return }
+    @discardableResult public func saveSelected(app: AppModel) async -> Bool {
+        guard !running, !app.isBusy, selectedCount > 0 else { return false }
         let selection = candidates.filter { $0.selected && $0.savedWork == nil }
         let run = UUID()
         runID = run; running = true; saving = true; stopping = false; errorText = nil
@@ -165,7 +190,10 @@ public final class ComparisonModel {
         if stopping { status = "保存を停止しました。保存済み \(savedCount)件は履歴と系譜に残ります。" }
         else if succeeded { status = "選択した\(savedCount)件を保存しました。" }
         else { status = "保存済み \(savedCount)件"; errorText = app.errorText }
+        let committedAll = succeeded && !stopping && savedCount == selection.count
+        if committedAll { candidates.removeAll { $0.savedWork == nil } }
         finish()
+        return committedAll
     }
 
     public func stop(app: AppModel) async {

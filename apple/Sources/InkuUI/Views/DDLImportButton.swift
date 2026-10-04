@@ -11,6 +11,7 @@ final class DDLImportController {
     private(set) var isReading = false
     private(set) var isCancelling = false
     private(set) var message = ""
+    private(set) var importedDocument: DDLPackageImport?
     @ObservationIgnored private var operation: Task<Void, Never>?
     @ObservationIgnored private var openPanel: NSOpenPanel?
     @ObservationIgnored private var importedSource: String?
@@ -57,7 +58,8 @@ final class DDLImportController {
                 let imported = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
                 try Task.checkCancellation()
                 guard context == ImportContext(app: model) else { throw HostError("ddl_import_context_changed") }
-                try model.applyDDLImport(imported)
+                if onImported == nil { try model.applyDDLImport(imported) }
+                self.importedDocument = imported
                 self.importedSource = imported.source
                 self.importedNames = imported.names
                 self.appliedNames = Set(model.importedMacroNames)
@@ -100,6 +102,7 @@ final class DDLImportController {
 
     func clearMessage() {
         message = ""; importedSource = nil; importedNames = []; appliedNames = []
+        importedDocument = nil
     }
 
     func visibleMessage(app model: AppModel) -> String {

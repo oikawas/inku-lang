@@ -5,6 +5,8 @@ import SwiftUI
 struct BatchPanelView: View {
     @Bindable var model: AppModel
     @Bindable var automation: AutomationModel
+    var inputOnly = false
+    var onObserveWork: (() -> Void)? = nil
     @State private var replaceBatch = false
     @State private var resultsExpanded = false
     @State private var issuesExpanded = false
@@ -26,6 +28,10 @@ struct BatchPanelView: View {
     }
 
     var body: some View {
+        Group {
+          if inputOnly {
+            inputContent
+          } else {
         GeometryReader { geometry in
             if geometry.size.width >= 840 {
                 HStack(alignment: .top, spacing: 16) {
@@ -46,6 +52,8 @@ struct BatchPanelView: View {
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
             }
+        }
+          }
         }
         .clipped()
         .confirmationDialog(model.display.localized("前回のバッチ記録を新しいバッチで置き換えます"),
@@ -78,13 +86,23 @@ struct BatchPanelView: View {
             input
             if automation.canResume && !automation.running { resumeCard }
             Divider()
-            BatchConditionsView(model: model, automation: automation)
+            if inputOnly && automation.running {
+                runProgress
+                DisclosureGroup(model.display.localized("開始時の描画条件"), isExpanded: $conditionsExpanded) {
+                    frozenConditions.padding(.top, 4)
+                }.font(.caption)
+            } else if model.display.visible("drawing_settings") {
+                BatchConditionsView(model: model, automation: automation)
+            }
             actions
             if !automation.rows.isEmpty { resultSummary }
             if !issueRows.isEmpty { issueResults }
             if !automation.rows.isEmpty { allResults }
         }
         .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+        .onChange(of: automation.batchText) { _, text in
+            if text != selectedHistoryPrompt { selectedHistoryPrompt = "" }
+        }
     }
 
     private var input: some View {
@@ -111,9 +129,7 @@ struct BatchPanelView: View {
                     Text(model.display.localizedFormat("空行を除く入力: %ld件", automation.nonEmptyBatchCount))
                         .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 }
-                if !automation.batchPromptHistory.isEmpty {
-                    inputHistory
-                }
+                inputHistory
             }
             Text(model.display.localized("空行を除き、元の行番号を保持して順に描きます。"))
                 .font(.caption).foregroundStyle(.secondary)
@@ -127,15 +143,22 @@ struct BatchPanelView: View {
         Text(model.display.localized("バッチ")).font(.callout.weight(.semibold))
         Text(model.display.localized("1行に1つの記述を入力"))
             .font(.caption).foregroundStyle(.secondary)
+        Button(model.display.localized("新規作成")) { automation.restoreBatchInput("") }
+            .controlSize(.small).disabled(controlsDisabled)
     }
 
     private var inputHistory: some View {
         Menu {
             ForEach(Array(automation.batchPromptHistory.enumerated()), id: \.offset) { _, text in
-                Button(historyLabel(text)) {
+                Button {
                     guard !controlsDisabled else { return }
                     selectedHistoryPrompt = text
                     automation.restoreBatchInput(text)
+                } label: {
+                    HStack {
+                        Text(historyLabel(text))
+                        if automation.batchText == text { Image(systemName: "checkmark") }
+                    }
                 }
             }
         } label: {
@@ -296,6 +319,17 @@ struct BatchPanelView: View {
                 Text(model.display.localizedFormat("%ld回", row.attempts)).font(.caption).monospacedDigit().foregroundStyle(.secondary)
             }
             Text(row.input).font(.callout).textSelection(.enabled)
+            if row.state == .succeeded, row.workID != nil {
+                Button(model.display.localized(automation.observedRow?.id == row.id ? "表示中の作品" : "作品を表示"), systemImage: "paintpalette") {
+                    Task {
+                        let selectedWorkID = model.selectedWorkID
+                        await automation.observeBatchRow(id: row.id, app: model)
+                        guard !controlsDisabled, model.selectedWorkID == selectedWorkID,
+                              automation.observedRow?.id == row.id, automation.observedWork?.id == row.workID else { return }
+                        onObserveWork?()
+                    }
+                }.font(.caption).disabled(controlsDisabled)
+            }
             if let error = row.error {
                 Text(model.display.message(error)).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
             }
@@ -349,6 +383,13 @@ struct BatchPanelView: View {
                 if automation.currentRetryRound > 0 {
                     Text(model.display.localizedFormat("再試行 %ld巡目", automation.currentRetryRound))
                         .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                }
+            }
+            if let startedAt = automation.batchRowStartedAt {
+                TimelineView(.periodic(from: startedAt, by: 0.5)) { context in
+                    Text(model.display.localizedFormat("この行の経過 %.1f秒", max(0, context.date.timeIntervalSince(startedAt))))
+                        .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                        .help(tip("この行を描き始めてからの時間です。写生・色カタログ・指示書生成と各応答待ちを含みます。"))
                 }
             }
             ProviderProgressView(model: model)
@@ -408,6 +449,10 @@ struct BatchPanelView: View {
             .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 300)
             .accessibilityLabel(model.display.localized("表示する内容"))
             if let work = displayedWork {
+                if automation.observedWork == nil {
+                    Text(model.display.localized("このバッチの成功作品はまだありません。前に表示した保存作品を表示しています。"))
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
                 Text(savedSummary(work)).font(.caption).foregroundStyle(.secondary)
                     .lineLimit(2).textSelection(.enabled)
                 if workspaceTab == "work" {
@@ -458,6 +503,6 @@ struct BatchPanelView: View {
     }
 
     private func tip(_ key: String) -> String {
-        model.display.preferences.showTooltips ? model.display.localized(key) : ""
+        model.display.tooltip(key)
     }
 }

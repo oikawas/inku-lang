@@ -19,18 +19,23 @@ struct ExportView: View {
     @State private var error: String?
     @State private var operation: Task<Void, Never>?
     @State private var exportedURLs: [URL] = []
+    @State private var svgHelpOpen = false
     private let preserveOrder: Bool
+    private let directCard: Bool
 
-    init(model: AppModel, works: [SavedWork]? = nil, preserveOrder: Bool = false) {
+    init(model: AppModel, works: [SavedWork]? = nil, preserveOrder: Bool = false, directCard: Bool = false) {
         self.model = model
         let candidates = works ?? model.works.filter { !$0.trashed }
         _candidates = State(initialValue: candidates)
         _selectedIDs = State(initialValue: works == nil ? Set(model.selectedWorkID.map { [$0] } ?? []) : Set(candidates.map(\.id)))
         let defaults = model.display.preferences.exportDefaults
-        _options = State(initialValue: defaults.options)
+        var initialOptions = defaults.options
+        if directCard { initialOptions.format = .shareCard }
+        _options = State(initialValue: initialOptions)
         _resolution = State(initialValue: defaults.resolution)
         _customHeight = State(initialValue: defaults.customHeight)
         self.preserveOrder = preserveOrder
+        self.directCard = directCard
     }
 
     private var selection: [SavedWork] {
@@ -42,11 +47,12 @@ struct ExportView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text(model.display.localized("保存作品を書き出す")).font(.title2.bold())
+                Text(model.display.localized(directCard ? "共有カードを書き出す" : "保存作品を書き出す")).font(.title2.bold())
                 Spacer()
                 Text(model.display.localizedFormat("%ld作品", selectedIDs.count)).foregroundStyle(.secondary)
             }
-            HStack(alignment: .top, spacing: 20) {
+            if !directCard {
+              HStack(alignment: .top, spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Button(model.display.localized("すべて選択")) { selectedIDs = Set(candidates.map(\.id)) }
@@ -70,11 +76,17 @@ struct ExportView: View {
                         ForEach(SavedExportFormat.allCases, id: \.self) { format in Text(model.display.localized(format.title)).tag(format) }
                     }
                     if options.format == .svg {
-                        Picker(model.display.localized("プロファイル"), selection: $options.svgProfile) {
-                            Text(model.display.localized("保存済みの表示SVG")).tag("display")
-                            Text(model.display.localized("編集用")).tag("editable")
-                            Text(model.display.localized("互換用")).tag("compat")
-                            Text(model.display.localized("ライブ用")).tag("live")
+                        HStack {
+                            Picker(model.display.localized("プロファイル"), selection: $options.svgProfile) {
+                                Text(copy("svgExportDisplayName", "表示用")).tag("display")
+                                Text(copy("svgExportEditableName", "編集用")).tag("editable")
+                                Text(copy("svgExportCompatName", "互換用")).tag("compat")
+                                Text(copy("svgExportLiveName", "ライブ用")).tag("live")
+                            }
+                            Button { svgHelpOpen.toggle() } label: { Image(systemName: "questionmark.circle") }
+                                .buttonStyle(.borderless).accessibilityLabel(copy("svgExportHelpAria", "SVGの用途と特徴"))
+                                .help(model.display.tooltip("SVGの用途と特徴", serverKey: "svgExportHelpAria"))
+                                .popover(isPresented: $svgHelpOpen) { svgHelp }
                         }
                         Text(model.display.localized("表示用は保存時の記述をSVGへ添えます。ほかのプロファイルは作品の保存条件で描画します。"))
                             .font(.caption).foregroundStyle(.secondary)
@@ -84,7 +96,10 @@ struct ExportView: View {
                             if animation {
                                 Text("150px").tag(150); Text("300px").tag(300); Text("500px").tag(500)
                             }
-                            Text("1080px").tag(1080); Text("2160px").tag(2160); Text("4320px").tag(4320); Text(model.display.localized("カスタム")).tag(0)
+                            Text(animation ? "1K（1080px）" : "1080px").tag(1080)
+                            Text(animation ? "4K（2160px）" : "2160px").tag(2160)
+                            Text(animation ? "8K（4320px）" : "4320px").tag(4320)
+                            Text(model.display.localized("カスタム")).tag(0)
                             if resolution != 0, ![150, 300, 500, 1080, 2160, 4320].contains(resolution) { Text("\(resolution)px").tag(resolution) }
                         }
                         if resolution == 0 { TextField("64〜12000px", value: $customHeight, format: .number) }
@@ -100,6 +115,7 @@ struct ExportView: View {
                         Toggle(model.display.localized("透明部分を白にする"), isOn: $options.pngAlphaWhite)
                     }
                     if options.format == .shareCard {
+                        if selection.count != 1 { Text(model.display.localized("共有カードは1作品を選択してください。")).foregroundStyle(.red) }
                         Picker(model.display.localized("用紙"), selection: $options.cardLayout) {
                             Text(model.display.localized("正方形（1:1）")).tag("square"); Text(model.display.localized("縦長（4:5）")).tag("portrait")
                         }
@@ -129,6 +145,7 @@ struct ExportView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }.formStyle(.grouped).frame(minWidth: 370).disabled(isBusy)
+              }
             }
             if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
             if !status.isEmpty { Text(model.display.message(status)).font(.callout).foregroundStyle(.secondary) }
@@ -140,29 +157,44 @@ struct ExportView: View {
                 }
                 Spacer()
                 Button(model.display.localized("閉じる")) { dismiss() }.disabled(isBusy).keyboardShortcut(.cancelAction)
-                Button(model.display.localized("書き出す")) { begin() }.disabled(isBusy || model.isBusy || selection.isEmpty).keyboardShortcut(.defaultAction)
+                Button(model.display.localized("書き出す")) { begin() }.disabled(isBusy || model.isBusy || selection.isEmpty || (options.format == .shareCard && selection.count != 1)).keyboardShortcut(.defaultAction)
             }
         }
-        .padding(24).frame(minWidth: 760, minHeight: 520)
+        .padding(24).frame(minWidth: directCard ? 440 : 760, minHeight: directCard ? 220 : 520)
         .interactiveDismissDisabled(isBusy)
         .onChange(of: options.format) { _, _ in
             if !animation, [150, 300, 500].contains(resolution) { resolution = 1080 }
         }
-        .onChange(of: options) { _, _ in persistDefaults() }
-        .onChange(of: resolution) { _, _ in persistDefaults() }
-        .onChange(of: customHeight) { _, _ in persistDefaults() }
         .onDisappear { operation?.cancel() }
+        .task { if directCard { begin() } }
     }
 
-    private func persistDefaults() {
-        var defaults = model.display.preferences.exportDefaults
-        defaults.options = options; defaults.resolution = resolution; defaults.customHeight = customHeight
-        model.display.preferences.exportConfiguration = defaults.normalized()
-        model.display.preferences.exportHeight = resolution == 0 ? min(12000, max(64, customHeight)) : resolution
-        model.display.preferences.exportProfile = options.svgProfile
+    private func copy(_ key: String, _ fallback: String) -> String {
+        model.productReference?.localized(language: model.display.preferences.language)?.texts[key] ?? model.display.localized(fallback)
+    }
+
+    private var svgHelp: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(copy("svgExportHelpTitle", "SVGの用途と特徴")).font(.headline)
+            Grid(alignment: .topLeading, horizontalSpacing: 14, verticalSpacing: 12) {
+                GridRow {
+                    Text(copy("svgExportTableFormat", "形式")).bold()
+                    Text(copy("svgExportTableUse", "用途")).bold()
+                    Text(copy("svgExportTableFeature", "特徴")).bold()
+                }
+                ForEach(["Display", "Editable", "Compat", "Live"], id: \.self) { profile in
+                    GridRow {
+                        Text(copy("svgExport" + profile + "Name", profile)).fontWeight(.medium)
+                        Text(copy("svgExport" + profile + "Use", "")).frame(width: 140, alignment: .leading)
+                        Text(copy("svgExport" + profile + "Feature", "")).frame(width: 220, alignment: .leading)
+                    }
+                }
+            }.font(.callout).fixedSize(horizontal: false, vertical: true)
+        }.padding(20).frame(width: 530)
     }
 
     private func begin() {
+        guard !selection.isEmpty, options.format != .shareCard || selection.count == 1 else { return }
         let capturedWorks = selection
         var capturedOptions = options
         capturedOptions.pixelHeight = resolution == 0 ? customHeight : resolution

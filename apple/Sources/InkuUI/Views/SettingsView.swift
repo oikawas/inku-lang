@@ -2,11 +2,12 @@ import InkuHost
 import SwiftUI
 
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case display, making, models, personalPlan, database, export, clipboard, plugins, unread, limits, about
+    case display, making, demo, models, personalPlan, database, export, clipboard, plugins, unread, limits, about
     var id: String { rawValue }
     var title: String {
         switch self {
         case .display: "表示と操作"; case .making: "制作"; case .models: "モデル設定"
+        case .demo: "デモ"
         case .personalPlan: "Personal ChatGPT"
         case .database: "DB設定"; case .clipboard: "クリップボード"; case .plugins: "プラグイン・歳時記"
         case .export: "エクスポート"
@@ -17,6 +18,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .display: "slider.horizontal.3"; case .making: "paintbrush.pointed"
+        case .demo: "play.rectangle"
         case .models: "cpu"; case .personalPlan: "person.crop.circle"
         case .database: "externaldrive"; case .export: "square.and.arrow.up"
         case .clipboard: "doc.on.clipboard"; case .plugins: "puzzlepiece.extension"
@@ -28,24 +30,39 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
 @MainActor struct SettingsView: View {
     @Bindable var model: AppModel
+    @Bindable var automation: AutomationModel
+    @Bindable var maintenance: LocalMaintenance
     @State private var settings = SettingsModel()
     @Binding var section: SettingsSection
     @State private var confirmRestore = false
+    private var detailed: Bool { model.display.preferences.settingsDetail == "detailed" }
+    private var sections: [SettingsSection] {
+        SettingsSection.allCases.filter { detailed || ![.plugins, .unread, .limits].contains($0) }
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            List(SettingsSection.allCases, selection: $section) { item in
-                Label(model.display.localized(item.title), systemImage: item.symbol).tag(item)
-            }.listStyle(.sidebar).frame(width: 190)
+            VStack(spacing: 0) {
+                Toggle(model.display.localized(detailed ? "詳細" : "標準"), isOn: Binding(get: { detailed }, set: { enabled in
+                    model.display.preferences.settingsDetail = enabled ? "detailed" : "standard"
+                    if !enabled && [.plugins, .unread, .limits].contains(section) { section = .display }
+                })).padding(12)
+                List(sections, selection: $section) { item in
+                    Label(model.display.localized(item.title), systemImage: item.symbol).tag(item)
+                }.listStyle(.sidebar)
+            }.frame(width: 190).disabled(automation.isOccupied)
             Divider()
             Group {
                 if section == .models {
-                    ModelSettingsView(model: model, settings: settings)
+                    ModelSettingsView(model: model, settings: settings).disabled(automation.isOccupied)
+                } else if section == .demo {
+                    AutomationView(model: model, automation: automation, demoOnly: true)
                 } else {
                     Form {
                         switch section {
                         case .display: appearance
                         case .making: making
+                        case .demo: EmptyView()
                         case .models: EmptyView()
                         case .personalPlan: ChatGPTPlanSettingsView(model: model)
                         case .database: database
@@ -58,11 +75,17 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                         case .limits: OperationalLimitsView(model: model)
                         case .about: about
                         }
-                    }.formStyle(.grouped)
+                    }.formStyle(.grouped).disabled(automation.isOccupied)
                 }
             }.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .task(id: section) { await settings.load(model: model) }
+        .onAppear {
+            if [.plugins, .unread, .limits].contains(section) { model.display.preferences.settingsDetail = "detailed" }
+        }
+        .onChange(of: section) { _, value in
+            if [.plugins, .unread, .limits].contains(value) { model.display.preferences.settingsDetail = "detailed" }
+        }
         .onDisappear { settings.cancelDiscovery() }
         .alert(model.display.localized("設定を変更できませんでした"), isPresented: Binding(get: { settings.error != nil }, set: { if !$0 { settings.error = nil } })) {
             Button(model.display.localized("閉じる"), role: .cancel) { settings.error = nil }
@@ -87,15 +110,26 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                     Text(model.display.localized("システム")).tag("system"); Text(model.display.localized("ライト")).tag("light"); Text(model.display.localized("ダーク")).tag("dark")
                 }
                 Picker(model.display.localized("表示言語"), selection: $display.preferences.language) { Text(model.display.localized("日本語")).tag("ja"); Text("English").tag("en") }
-                Picker(model.display.localized("文字サイズ"), selection: $display.preferences.textSizeStep) {
-                    ForEach(0..<5) { step in Text("\(Int([0.9, 1, 1.1, 1.2, 1.3][step] * 100))%").tag(step) }
+                HStack {
+                    Text(model.display.localized("文字サイズ"))
+                    Slider(value: Binding(get: { Double(display.preferences.textSizeStep) }, set: { display.previewTextSize(Int($0)) }),
+                           in: 0...4, step: 1, onEditingChanged: { editing in if !editing { display.saveTextSize() } })
+                    Text("\(Int(display.preferences.textScale * 100))%").monospacedDigit().frame(width: 48)
+                    Button(model.display.localized("リセット")) { display.resetTextSize() }
                 }
                 Picker(model.display.localized("UIモード"), selection: $display.preferences.uiMode) {
                     Text(model.display.localized("シンプル")).tag("simple"); Text(model.display.localized("カスタム")).tag("custom"); Text(model.display.localized("フル")).tag("full")
                 }
                 if display.preferences.uiMode == "custom" {
-                    ForEach([("history", "履歴"), ("diagnostics", "指示書と生成情報"), ("automation", "バッチ・デモ"), ("saijiki", "歳時記")], id: \.0) { feature in
-                        Toggle(display.localized(feature.1), isOn: membership(feature.0, in: $display.preferences.customFeatures))
+                    ForEach([("input_modes", "入力の切り替え"), ("drawing_settings", "描画条件"), ("ddl_tools", "指示書の操作"),
+                             ("detail_status", "指示書と生成情報"), ("work_tools", "作品の操作"), ("history", "履歴"), ("auxiliary", "付帯文")], id: \.0) { feature in
+                        Toggle(display.localized(feature.1), isOn: Binding(get: { display.visible(feature.0) }, set: { enabled in
+                            var next = display.preferences.customFeatures
+                            let legacy = ["detail_status": "diagnostics", "input_modes": "automation", "auxiliary": "saijiki"]
+                            if let alias = legacy[feature.0] { next.remove(alias) }
+                            if enabled { next.insert(feature.0) } else { next.remove(feature.0) }
+                            display.preferences.customFeatures = next
+                        }))
                     }
                 }
                 Toggle(model.display.localized("ツールチップ"), isOn: $display.preferences.showTooltips)
@@ -114,7 +148,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 Toggle(model.display.localized("作品を切り替えても生成情報を開いたままにする"), isOn: $display.preferences.keepGenerationInfo)
                 Picker(model.display.localized("描画中のマスコット"), selection: $display.preferences.mascot) { Text(model.display.localized("Incu（立方体）")).tag("incu"); Text(model.display.localized("Yuragi（蟹）")).tag("yuragi") }
             }
-            if let error = display.saveError { Text(display.message(error)).foregroundStyle(.red) }
+            if let error = display.saveError {
+                Text(display.message(error)).foregroundStyle(.red).textSelection(.enabled)
+                Button(model.display.localized("もう一度保存")) { display.retrySave() }
+            }
         }
     }
     private var making: some View {
@@ -161,18 +198,60 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 Stepper(display.localizedFormat("保持: %ld世代", display.preferences.backupGenerations), value: $display.preferences.backupGenerations, in: 1...30)
                 Text(model.display.localized("アプリの起動中に実行し、生成中・復元中は待ちます。"))
                     .font(.callout).foregroundStyle(.secondary)
+                backupInformation
             }
             #endif
         }
     }
+    private var backupInformation: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let directory = maintenance.backupDirectory {
+                Text(model.display.localized("保存先") + ": " + directory.path).font(.caption).textSelection(.enabled)
+            }
+            if maintenance.backupInfoLoaded {
+                Text(model.display.localized("最新の成功") + ": " + (maintenance.backupLastSuccess?.formatted(date: .numeric, time: .shortened) ?? model.display.localized("未実行")))
+                Text(model.display.localized("次回予定") + ": " + (maintenance.nextBackupDate(preferences: model.display.preferences)?.formatted(date: .numeric, time: .shortened)
+                    ?? model.display.localized(model.display.preferences.automaticBackup ? "状態の読込待ち" : "無効")))
+                Text(model.display.localizedFormat("保持済み: %ld世代", maintenance.backupGenerations.count)
+                     + " · " + ByteCountFormatter.string(fromByteCount: maintenance.backupTotalBytes, countStyle: .file))
+                if !maintenance.backupGenerations.isEmpty {
+                    DisclosureGroup(model.display.localized("保持中の世代")) {
+                        ForEach(maintenance.backupGenerations) { generation in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(generation.name).font(.caption.monospaced()).textSelection(.enabled)
+                                Text(ByteCountFormatter.string(fromByteCount: generation.byteCount, countStyle: .file)
+                                     + (generation.modifiedAt.map { " · " + $0.formatted(date: .numeric, time: .shortened) } ?? ""))
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }.padding(.vertical, 3)
+                        }
+                    }
+                }
+            } else { Text(model.display.localized("状態の読込待ち")).font(.caption).foregroundStyle(.secondary) }
+            if !maintenance.backupStatus.isEmpty { Text(model.display.message(maintenance.backupStatus)).font(.caption).textSelection(.enabled) }
+            if let error = maintenance.backupInfoError { Text(model.display.message(error)).foregroundStyle(.red).textSelection(.enabled) }
+            if let error = maintenance.backupError { Text(model.display.message(error)).foregroundStyle(.red).textSelection(.enabled) }
+            Button(model.display.localized("状態を再読込")) { Task { await maintenance.refreshBackupInfo(app: model) } }
+                .help(model.display.tooltip("自動バックアップの状態と保存済みファイルの情報を読み直します。バックアップは作成しません。"))
+        }.font(.callout).task { await maintenance.refreshBackupInfo(app: model) }
+    }
     private var clipboard: some View {
         @Bindable var display = model.display
         return Section(model.display.localized("画像コピー")) {
-            Picker(model.display.localized("Y軸の高さ"), selection: $display.preferences.clipboardHeight) {
-                Text("1080 px").tag(1080); Text("2160 px").tag(2160); Text("4320 px").tag(4320)
+            Picker(model.display.localized("形式"), selection: Binding(get: { display.preferences.clipboardFormat ?? "image" },
+                  set: { display.preferences.clipboardFormat = $0 })) {
+                Text(model.display.localized("画像")).tag("image")
+                Text(model.display.localized("カード")).tag("card")
             }
+            Stepper(display.localizedFormat("Y軸の高さ: %ld px", display.preferences.clipboardHeight),
+                    value: $display.preferences.clipboardHeight, in: 256...4096, step: 64)
             Text(model.display.localized("表示中作品の保存SVGから画像を作り、OSのクリップボードへコピーします。"))
                 .font(.callout).foregroundStyle(.secondary)
+            Text(model.display.localized("カードは保存済みの作品に使えます。カードのレイアウトと印はエクスポート設定に従います。"))
+                .font(.caption).foregroundStyle(.secondary)
+            if let error = display.saveError {
+                Text(display.message(error)).foregroundStyle(.red).textSelection(.enabled)
+                Button(model.display.localized("もう一度保存")) { display.retrySave() }
+            }
         }
     }
     private var about: some View {

@@ -3,7 +3,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const EXPECTED_SCHEMA_DIGEST: &str =
-    "5ac213f8c10db78ccad7816527f3c0351655b28d3b99b29436d1bd9d2b71d425";
+    "893dc2b64c06af44af54721fb939649a5f6e87329074f1400eafdaf9332c9c49";
 
 #[test]
 fn canonical_score_schema_identity_is_stable() {
@@ -45,7 +45,13 @@ fn canonical_score_schema_identity_is_stable() {
     }
     assert_eq!(
         placement_group["layout"]["enum"],
-        serde_json::json!(["overlap", "horizontal_source_order", "scatter", "tile"])
+        serde_json::json!([
+            "overlap",
+            "horizontal_source_order",
+            "scatter",
+            "tile",
+            "cells"
+        ])
     );
     let placement_member = schema["$defs"]["PlacementMember"]["properties"]
         .as_object()

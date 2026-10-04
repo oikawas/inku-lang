@@ -389,6 +389,10 @@ pub enum PlacementRecipe {
     /// renderer sampler and existing performance seed with this owner's instance ordinal,
     /// then translates the sampled centroid to the semantic anchor. No RNG runs here.
     ScatterUniformWithCentroidTranslation,
+    /// One copy per cell of the domain. Performance sizes the cells from the
+    /// performed copies, which relations may move, so no size is resolved here.
+    /// Only the placement group of a word repeated as a whole uses it.
+    Cells,
     /// Exactly object.count independent uniform centers in the target region;
     /// clip each complete drawable at the target contour. No centroid translation,
     /// fit, resizing, grid or materialization occurs in Step 10. The enclosing

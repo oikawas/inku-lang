@@ -17,7 +17,10 @@ struct ModelSettingsView: View {
     private var drawingModels: ModelSelection { drawingDraft ?? settings.host.models }
     private var drawingChoices: [DrawingChoice] {
         settings.orderedProviders.flatMap { provider in
-            settings.availableModels(for: provider).map { DrawingChoice(provider: provider, model: $0) }
+            SettingsModel.batchModels(for: provider).map {
+                DrawingChoice(provider: provider, model: ProviderModelInfo(id: provider.id + ":" + $0.id,
+                    name: $0.label, contextLimit: nil, capabilities: []))
+            }
         }
     }
 
@@ -292,20 +295,18 @@ struct ModelSettingsView: View {
     private var drawingDefaults: some View {
         DisclosureGroup(model.display.localized("描画の既定値")) {
             VStack(alignment: .leading, spacing: 12) {
-                TextField(model.display.localized("サービスID:モデルID"), text: drawingBinding(\.stage1Model))
-                    .textFieldStyle(.roundedBorder).autocorrectionDisabled()
                 if !drawingChoices.isEmpty {
-                    Picker(model.display.localized("描画モデル"), selection: drawingBinding(\.stage1Model)) {
+                    Picker(model.display.localized("描画モデル"), selection: Binding(
+                        get: { drawingChoices.contains(where: { $0.id == drawingModels.stage1Model }) ? drawingModels.stage1Model : "" },
+                        set: { drawingBinding(\.stage1Model).wrappedValue = $0 })) {
                         Text(model.display.localized("選択してください")).tag("")
-                        if !drawingModels.stage1Model.isEmpty,
-                           !drawingChoices.contains(where: { $0.id == drawingModels.stage1Model }) {
-                            Text(drawingModels.stage1Model).tag(drawingModels.stage1Model)
-                        }
                         ForEach(drawingChoices) { choice in
                             Text("\(choice.provider.displayName) / \(choice.model.name)").tag(choice.id)
                                 .disabled(!settings.isModelAvailable(choice.id))
                         }
                     }
+                } else {
+                    Text(model.display.localized("使用中のLLMモデルを設定してください。")).font(.caption).foregroundStyle(.secondary)
                 }
                 if !drawingModels.stage1Model.isEmpty {
                     ModelGuidanceView(reference: drawingModels.stage1Model, providers: settings.host.providers,
@@ -320,8 +321,9 @@ struct ModelSettingsView: View {
                     .font(.callout).foregroundStyle(.secondary)
                 HStack {
                     Spacer()
+                    Button(model.display.localized("取消")) { drawingDraft = settings.host.models }.disabled(!drawingChanged)
                     Button(model.display.localized("既定値を保存")) { saveDrawingDefaults() }
-                        .disabled(!drawingChanged)
+                        .disabled(!drawingChanged || !SettingsModel.isBatchModelAvailable(drawingModels.stage1Model, settings: settings.host))
                 }
             }
             .padding(.top, 10)

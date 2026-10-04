@@ -14,16 +14,16 @@ public struct UnreadWordsView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(model.display.localized("未読語台帳")).font(.headline)
-                Image(systemName: "questionmark.circle").help(model.display.preferences.showTooltips ? model.display.localized("固有名詞・専門語・造語など、記述からDDLへの直接の対応を確認できなかった語を集めます。頻度と文脈を人間が確認し、語彙追加を判断します。辞書への自動追加は行いません。") : "")
+                Image(systemName: "questionmark.circle").help(model.display.tooltip("固有名詞・専門語・造語など、記述からDDLへの直接の対応を確認できなかった語を集めます。頻度と文脈を人間が確認し、語彙追加を判断します。辞書への自動追加は行いません。"))
                 Spacer()
                 Button(model.display.localized("再読込")) { Task { await reload() } }.disabled(loading)
             }
             Text(model.display.localized("記述からDDLへの解釈で直接対応を確認できなかった語の集計です。この台帳から辞書へ自動昇格することはありません。"))
                 .font(.caption).foregroundStyle(.secondary)
             if loading { ProgressView(model.display.localized("読み込み中")) }
-            else if let error { Text(model.display.localized("未読語台帳を読み込めませんでした: ") + error).foregroundStyle(.red) }
-            else if items.isEmpty { Text(model.display.localized("記録された未読語はありません。")).foregroundStyle(.secondary) }
-            else {
+            if let error { Text(model.display.localized("未読語台帳を読み込めませんでした: ") + error).foregroundStyle(.red).textSelection(.enabled) }
+            if items.isEmpty, !loading, error == nil { Text(model.display.localized("記録された未読語はありません。")).foregroundStyle(.secondary) }
+            if !items.isEmpty {
                 Text(model.display.localizedFormat("%ld語（最大500語）", items.count)).font(.caption).foregroundStyle(.secondary)
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 14) {
@@ -35,7 +35,7 @@ public struct UnreadWordsView: View {
                                     Spacer()
                                     Text(date(item.lastAt), style: .date).font(.caption)
                                     Text(date(item.lastAt), style: .time).font(.caption)
-                                }.help(model.display.preferences.showTooltips ? model.display.localized("初回記録: ") + date(item.firstAt).formatted(date: .abbreviated, time: .standard) : "")
+                                }.help(model.display.tooltipValue(model.display.localized("初回記録: ") + date(item.firstAt).formatted(date: .abbreviated, time: .standard)))
                                 ForEach(item.contexts, id: \.self) { context in Text(context).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
                             }
                             Divider()
@@ -48,14 +48,14 @@ public struct UnreadWordsView: View {
 
     private func date(_ milliseconds: Int64) -> Date { Date(timeIntervalSince1970: Double(milliseconds) / 1000) }
     private func reload() async {
-        let current = UUID(); requestID = current; loading = true; error = nil
+        let current = UUID(); requestID = current; loading = true
         do {
             let result = try await model.auxiliaryDatabase().unreadWords()
             guard requestID == current, !Task.isCancelled else { return }
-            items = result
+            items = result; error = nil
         } catch {
             guard requestID == current, !Task.isCancelled else { return }
-            items = []; self.error = error.localizedDescription
+            self.error = error.localizedDescription
         }
         if requestID == current { loading = false }
     }

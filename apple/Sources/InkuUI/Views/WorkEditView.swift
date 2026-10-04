@@ -17,8 +17,13 @@ public struct WorkEditView: View {
     public var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 8) {
+                HStack {
                 Text(model.display.localized(editor.mode == .description ? "記述を変える" : "写生なし／ありで描き直す"))
                     .font(.title2.weight(.semibold))
+                    Spacer()
+                    Button { dismiss() } label: { Image(systemName: "xmark") }
+                        .accessibilityLabel(model.display.localized("閉じる")).disabled(editor.running || model.isBusy)
+                }
                 Text(model.display.localized(editor.mode == .description
                     ? "変更した記述から、選択した作品の子を描画します。"
                     : "写生を外すか付けるかを選んで描き直し、選択した作品の子として系譜へ保存します。"))
@@ -68,14 +73,19 @@ public struct WorkEditView: View {
                     .disabled(editor.running)
                 DescriptionMeterView(model: model, text: editor.draftText)
                 HStack {
-                    Toggle(model.display.localized("元のワイルド設定を引き継ぐ"), isOn: $editor.inheritWild)
-                    if !editor.inheritWild { Toggle(model.display.localized("ワイルド"), isOn: $editor.wildOverride) }
-                }.disabled(editor.running)
+                    Text(model.display.localized(editor.inheritWild ? "筆致制限（継承）" : "筆致制限")).font(.caption).foregroundStyle(.secondary)
+                    Button(model.display.localized("暴れる") + " " + model.display.localized((editor.inheritWild ? editor.work.renderWild ?? false : editor.wildOverride) ? "入" : "切")) {
+                        editor.wildOverride = !(editor.inheritWild ? editor.work.renderWild ?? false : editor.wildOverride)
+                        editor.inheritWild = false
+                    }.buttonStyle(.bordered).tint((editor.inheritWild ? editor.work.renderWild ?? false : editor.wildOverride) ? Color.accentColor : Color.secondary)
+                }.disabled(editor.running || model.isBusy)
             } else {
                 Picker(model.display.localized("写生"), selection: $editor.sketchMode) {
                     Text(model.display.localized("なし")).tag("off")
                     Text(model.display.localized("あり")).tag("on")
                 }.pickerStyle(.segmented).frame(maxWidth: 280).disabled(editor.running)
+                    .help(model.display.tooltip(editor.sketchMode == "on"
+                        ? "記述の横に、場所の広がりや季節・時刻の光を補って描く" : "写生を通さず、記述だけで描く"))
                 Text(model.display.localized("親の写生")).font(.headline)
                 if let prose = editor.work.sketchText, !prose.isEmpty {
                     Text(prose).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
@@ -107,13 +117,8 @@ public struct WorkEditView: View {
                 }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
                     .disabled(!editor.canDraw || model.isBusy || model.isPreview || !model.hasNextDrawingModel)
             }
-            Button(model.display.localized("閉じる")) {
-                Task {
-                    await editor.stop(app: model)
-                    guard !editor.running, !model.isBusy else { return }
-                    dismiss()
-                }
-            }.disabled(editor.stopping || (model.isBusy && !editor.running)).keyboardShortcut(.cancelAction)
+            Button(model.display.localized("取消")) { dismiss() }
+                .disabled(editor.running || model.isBusy).keyboardShortcut(.cancelAction)
         }
     }
 
@@ -124,6 +129,7 @@ public struct WorkEditView: View {
         case "not_needed": "写生を通したが、補うものがなかった"
         case "fallback": "写生を試みたが届かず、記述のまま解釈した"
         case "not_applicable": "この経路は写生を通らない"
+        case "supplemented": "記述に足りない場所の広がりや季節・時刻の光を補って描いた"
         case "fine": "過去の写生: 細かく"
         case "coarse": "過去の写生: 大きく"
         default: "この作品には保存された写生がありません。"

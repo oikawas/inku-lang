@@ -368,18 +368,36 @@ public actor InkuDatabase {
                 guard prior == record else { throw PersistenceError.invalidRecord("colophon source is immutable") }
                 try db.execute(sql: "UPDATE auxiliary_colophons SET adopted_body = ? WHERE id = ?", arguments: [record.adoptedBody, record.id])
             } else {
-                let encoder = JSONEncoder()
-                let branch = String(decoding: try encoder.encode(record.branchSnapshot), as: UTF8.self)
-                let warnings = String(decoding: try encoder.encode(record.warnings), as: UTF8.self)
-                try db.execute(sql: """
-                    INSERT INTO auxiliary_colophons
-                    (id, target_node_id, branch_snapshot, model, at, language, generated_body, adopted_body,
-                     signature, warnings_json, fact_sheet_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, arguments: [record.id, record.targetNodeID, branch, record.model, record.at,
-                                       record.language, record.generatedBody, record.adoptedBody, record.signature,
-                                       warnings, record.factSheetJSON])
+                try Self.insertColophon(record, into: db)
             }
         }
+    }
+
+    /// New colophons are immutable. A repeated adoption of the same result is idempotent.
+    public func insertColophon(_ record: ColophonRecord) throws {
+        try Self.validate(record)
+        try queue.write { db in
+            if let row = try Row.fetchOne(db, sql: "SELECT * FROM auxiliary_colophons WHERE id = ?", arguments: [record.id]) {
+                guard try Self.colophon(row) == record else {
+                    throw PersistenceError.invalidRecord("colophon is immutable")
+                }
+                return
+            }
+            try Self.insertColophon(record, into: db)
+        }
+    }
+
+    private static func insertColophon(_ record: ColophonRecord, into db: Database) throws {
+        let encoder = JSONEncoder()
+        let branch = String(decoding: try encoder.encode(record.branchSnapshot), as: UTF8.self)
+        let warnings = String(decoding: try encoder.encode(record.warnings), as: UTF8.self)
+        try db.execute(sql: """
+            INSERT INTO auxiliary_colophons
+            (id, target_node_id, branch_snapshot, model, at, language, generated_body, adopted_body,
+             signature, warnings_json, fact_sheet_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, arguments: [record.id, record.targetNodeID, branch, record.model, record.at,
+                               record.language, record.generatedBody, record.adoptedBody, record.signature,
+                               warnings, record.factSheetJSON])
     }
 
     public func deleteColophon(id: String) throws {

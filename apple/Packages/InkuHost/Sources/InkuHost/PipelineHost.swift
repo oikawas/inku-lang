@@ -18,6 +18,7 @@ public actor PipelineHost {
     }
 
     public func generate(_ request: GenerationRequest, progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {
+        let request = try request.normalizedForNewWork()
         if request.captureProviderIO == true, !ProviderObservationPolicy.developerModeEnabled {
             throw HostError("developer_provider_observations_not_available")
         }
@@ -42,6 +43,7 @@ public actor PipelineHost {
     public func perform(executionID: String, command: PipelineCommand, parentWorkID: String? = nil, derivationKind: String? = nil,
                         derivationMetadata: Data? = nil,
                         progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {
+        guard derivationKind != "variation" else { throw HostError("variation_retired") }
         let driver = try await execution(executionID)
         return try await withTaskCancellationHandler {
             try await driver.perform(command, parentWorkID: parentWorkID, derivationKind: derivationKind,
@@ -102,6 +104,10 @@ public actor PipelineHost {
 
     public func savedProviderMetrics(workID: String) async throws -> [ProviderAttemptMetric] {
         try metrics(in: await savedPerformanceContext(workID: workID))
+    }
+
+    public func savedWorkPresentation(workID: String) async throws -> SavedWorkPresentation {
+        try SavedWorkPresentation(context: await savedPerformanceContext(workID: workID))
     }
 
     public func providerObservations(executionID: String) async throws -> [ProviderAttemptObservation] {
@@ -214,6 +220,9 @@ public actor PipelineHost {
                                         derivationKind: String = "touch_change", derivationMetadata: Data? = nil,
                                         seedText: String? = nil, variationAmplitude: String? = nil,
                                         variationSeed: String? = nil) async throws -> SavedScoreReplayPlan {
+        guard derivationKind != "variation", variationAmplitude == nil, variationSeed == nil else {
+            throw HostError("variation_retired")
+        }
         let source = try await restoreSavedWork(workID: workID)
         let location = try WorkIdentity.location(workID)
         guard let acknowledgement = try await database.acknowledgement(executionID: location.executionID, effectID: location.effectID) else { throw HostError("saved_performance_context_unavailable") }
@@ -224,10 +233,6 @@ public actor PipelineHost {
         let request = try SavedPerformance.renderRequest(work: source, context: context, renderSeed: renderSeed, wild: wild,
                                                         replayOptions: replayOptions, compositionSeed: compositionSeed)
         _ = try metadataText(derivationMetadata)
-        if variationAmplitude != nil || variationSeed != nil {
-            guard let amplitude = variationAmplitude, ["small", "medium", "large"].contains(amplitude),
-                  let seed = variationSeed, let number = UInt64(seed), String(number) == seed else { throw HostError("invalid_variation") }
-        }
         try Task.checkCancellation()
         return SavedScoreReplayPlan(work: source, parentNode: parentNode, context: context.data, renderRequest: request.data,
             derivationKind: derivationKind, derivationMetadata: derivationMetadata, seedText: seedText,
@@ -235,6 +240,9 @@ public actor PipelineHost {
     }
 
     public func previewSavedScoreReplay(_ plan: SavedScoreReplayPlan) async throws -> PreparedCandidate {
+        guard plan.derivationKind != "variation", plan.variationAmplitude == nil, plan.variationSeed == nil else {
+            throw HostError("variation_retired")
+        }
         let began = Date()
         let source = plan.work
         guard let stored = try await database.work(id: source.id), !stored.trashed,
@@ -261,9 +269,7 @@ public actor PipelineHost {
         work.renderSeed = options["render_seed"].number ?? options["render_seed"].string
         work.compositionSeed = options["composition_seed"].number ?? options["composition_seed"].string
         if let seedText = plan.seedText { work.seedText = seedText }
-        if let amplitude = plan.variationAmplitude, let seed = plan.variationSeed {
-            work.variationAmplitude = amplitude; work.variationSeed = seed
-        }
+        work.variationAmplitude = nil; work.variationSeed = nil
         work.renderWild = options["wild"].bool
         work.catalogID = options["catalog_id"].string
         work.renderColorCatalogID = options["catalog_id"].string
@@ -285,9 +291,11 @@ public actor PipelineHost {
         var stringOptions = options
         for key in ["render_seed", "composition_seed"] { if let number = options[key].number { stringOptions[key] = .string(number) } }
         nextContext["options"] = stringOptions
-        if let amplitude = plan.variationAmplitude, let seed = plan.variationSeed {
-            nextContext["configuration"]["compiler"]["stage15_variation"] = .object(["amplitude": .string(amplitude), "seed": .string(seed)])
+        if var compiler = nextContext["configuration"]["compiler"].object {
+            compiler.removeValue(forKey: "stage15_variation")
+            nextContext["configuration"]["compiler"] = .object(compiler)
         }
+        nextContext["presentation"] = try SavedPresentation.replay(context: context, rendered: rendered)
         let candidate = StoredCandidate(work: work, node: node, edge: edge, context: nextContext.data)
         return try await prepareCandidate(executionID: executionID, candidate: candidate)
     }
@@ -387,6 +395,9 @@ public actor PipelineHost {
             derivationKind: request.derivationKind, metadataJSON: try metadataText(request.derivationMetadata), at: now)
         var context = SavedPerformance.context(score: score, options: options, compiler: compiler, clip: clip)
         context["configuration"] = config; context["document"] = document; context["authority"] = authority
+        context["presentation"] = try SavedPresentation.capture(delivery: delivery, rendered: rendered,
+            prompts: nil, events: Data("[]".utf8), configuration: config, document: document,
+            disabledPluginNames: request.disabledPluginNames ?? [], provenance: request.provenance)
         let candidate = try await prepareCandidate(executionID: executionID,
             candidate: StoredCandidate(work: work, node: node, edge: edge, context: context.data))
         let savedID: String?
@@ -441,6 +452,8 @@ private struct StoredExecution: Codable, Sendable {
     var candidate: StoredCandidate? = nil
     var chatGPTSession: ChatGPTPlanSession? = nil
     var captureProviderIO: Bool? = nil
+    var disabledPluginNames: [String]? = nil
+    var provenance: GenerationProvenance? = nil
     var providerObservations: [ProviderAttemptObservation]? = nil
     var startedAt: Date
 }
@@ -508,6 +521,8 @@ private actor ExecutionDriver {
         self.state.historyVisibility = request.historyVisibility
         self.state.chatGPTSession = request.chatGPTSession
         self.state.captureProviderIO = request.captureProviderIO
+        self.state.disabledPluginNames = request.disabledPluginNames
+        self.state.provenance = request.provenance
         self.state.providerObservations = []
         if let metadata = request.derivationMetadata {
             guard try ExactJSON(data: metadata).object != nil else { throw HostError("invalid_derivation_metadata") }
@@ -941,6 +956,9 @@ private actor ExecutionDriver {
         performance["configuration"] = snapshot["config"]
         performance["document"] = snapshot["document"]
         performance["authority"] = snapshot["authority"]
+        performance["presentation"] = try SavedPresentation.capture(delivery: delivery, rendered: rendered,
+            prompts: state.prompts, events: state.events, configuration: snapshot["config"], document: snapshot["document"],
+            disabledPluginNames: state.disabledPluginNames ?? [], provenance: state.provenance)
         // Freeze only public metrics at this save identity. Raw stays in the private execution snapshot.
         performance["provider_metrics"] = try ExactJSON(data: JSONEncoder().encode(state.providerObservations?.map(\.metric) ?? []))
         performance["provider_observation_execution_id"] = .string(try executionID())
@@ -949,6 +967,7 @@ private actor ExecutionDriver {
                 "profile_id": .string(session.profileID), "generation": .string(String(session.generation))])
         }
         savedState.candidate = StoredCandidate(work: work, node: node, edge: edge, context: performance.data)
+        try Task.checkCancellation()
         if state.saveHistory == false {
             savedState.savedWorkID = nil
             let acknowledgement: ExactJSON = .object(["tag": .string("rendered_candidate_prepared"), "candidate_id": .string(try executionID())])

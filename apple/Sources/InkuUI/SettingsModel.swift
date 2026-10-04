@@ -78,14 +78,26 @@ public final class SettingsModel {
         guard !modelID.isEmpty, let provider = settings.providers.first(where: { $0.id == providerID }) else { return false }
         guard provider.enabledModels?[modelID] != false else { return false }
         let models = provider.models ?? ModelGuidanceCatalog.bundled?.registeredModelSettings(for: provider) ?? []
-        guard let model = models.first(where: { $0.id == modelID }) else { return true }
+        guard let model = models.first(where: { $0.id == modelID }) else { return false }
         return model.isSelectable && model.purposes.contains("llm")
     }
 
     /// Batch pickers offer only registered, enabled LLM entries; saved custom references are not candidates.
     public nonisolated static func batchModels(for provider: ProviderSettings) -> [ProviderModelSettings] {
+        registeredModels(for: provider, purpose: "llm")
+    }
+
+    public nonisolated static func registeredModels(for provider: ProviderSettings, purpose: String) -> [ProviderModelSettings] {
         let models = provider.models ?? ModelGuidanceCatalog.bundled?.registeredModelSettings(for: provider) ?? []
-        return models.filter { $0.purposes.contains("llm") && provider.enabledModels?[$0.id] != false }
+        return models.filter { $0.purposes.contains(purpose) && provider.enabledModels?[$0.id] != false }
+    }
+
+    public nonisolated static func isRegisteredModelAvailable(_ reference: String, purpose: String, settings: HostSettings) -> Bool {
+        guard let separator = reference.firstIndex(of: ":") else { return false }
+        let providerID = String(reference[..<separator])
+        let modelID = String(reference[reference.index(after: separator)...])
+        guard let provider = settings.providers.first(where: { $0.id == providerID }) else { return false }
+        return registeredModels(for: provider, purpose: purpose).contains { $0.id == modelID && $0.isSelectable }
     }
 
     public nonisolated static func isBatchModelAvailable(_ reference: String, settings: HostSettings) -> Bool {
@@ -288,6 +300,10 @@ public final class SettingsModel {
     }
 
     public func saveDrawingDefaults(models: ModelSelection, model: AppModel) async throws {
+        let latest = await model.hostSettings()
+        guard Self.isBatchModelAvailable(models.stage1Model, settings: latest), models.stage2Model == models.stage1Model else {
+            throw HostError("drawing_model_unavailable")
+        }
         try await saveSettings(model: model) { $0.models = models }
         status = "通常の描画モデルを保存しました。"
     }

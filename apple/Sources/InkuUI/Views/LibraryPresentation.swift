@@ -48,7 +48,7 @@ struct LibraryModelFactsView: View {
                         .lineLimit(compact ? 1 : nil)
                         .textSelection(.enabled)
                 }
-                .help(display.preferences.showTooltips ? display.localized(fact.label) + ": " + (fact.reference ?? display.localized("未記録")) : "")
+                .help(display.tooltipValue(display.localized(fact.label) + ": " + (fact.reference ?? display.localized("未記録"))))
             }
         }.font(compact ? .caption2 : .caption)
     }
@@ -67,7 +67,8 @@ struct LibraryWorkMarks: View {
                     .foregroundStyle(work.starred ? Color.accentColor : Color.secondary)
             }
             .accessibilityLabel(model.display.localized(work.starred ? "お気に入りを解除" : "お気に入り"))
-            .help(model.display.preferences.showTooltips ? model.display.localized("お気に入り") : "")
+            .help(model.display.tooltip(work.starred ? "スターを外す" : "スターを付ける",
+                                        serverKey: work.starred ? "starOn" : "starOff"))
             LibraryAnnotationMarkButton(model: model, work: work, mark: .revision)
             LibraryAnnotationMarkButton(model: model, work: work, mark: .share)
         }
@@ -109,6 +110,18 @@ struct LibraryAnnotationMarkButton: View {
         return marked ? "オン" : "オフ"
     }
 
+    private var markTooltip: String {
+        guard !loading, let marked else { return model.display.tooltip(accessibilityState) }
+        switch mark {
+        case .revision:
+            return model.display.tooltip(marked ? "推敲マークを外す" : "推敲マークを付ける",
+                                         serverKey: marked ? "forRevisionOn" : "forRevisionOff")
+        case .share:
+            return model.display.tooltip(marked ? "書き出しの印を外す" : "書き出しの印を付ける",
+                                         serverKey: marked ? "shareTargetOn" : "shareTargetOff")
+        }
+    }
+
     var body: some View {
         Button {
             Task {
@@ -127,7 +140,7 @@ struct LibraryAnnotationMarkButton: View {
         }
         .accessibilityLabel(model.display.localized(title))
         .accessibilityValue(model.display.localized(accessibilityState))
-        .help(model.display.preferences.showTooltips ? model.display.localized(title) : "")
+        .help(markTooltip)
         .disabled(loading || marked == nil || library.mutating || model.isBusy)
     }
 }

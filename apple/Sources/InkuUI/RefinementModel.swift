@@ -10,6 +10,8 @@ public enum RefinementKind: String, CaseIterable, Hashable, Sendable {
     case variation
     case touch = "touch_change"
 
+    public static var availableKinds: [Self] { [.layout, .reading, .touch] }
+
     public var titleKey: String {
         switch self {
         case .layout: "配置を変える"
@@ -89,9 +91,11 @@ public final class RefinementModel {
 
     public func canGenerate(count: Int) -> Bool {
         initialized && !running && !closed && !work.trashed && !hasUnsaved
-            && [1, 4].contains(count) && !(kind == .reading && sourceIsLocked)
+            && Self.isAvailable(kind) && [1, 4].contains(count) && !(kind == .reading && sourceIsLocked)
             && !(kind == .touch && (count != 1 || !hasTouchWords))
     }
+
+    private static func isAvailable(_ kind: RefinementKind) -> Bool { RefinementKind.availableKinds.contains(kind) }
 
     public func initialize(app: AppModel) async {
         guard !initialized, !initializing, !closed else { return }
@@ -107,7 +111,12 @@ public final class RefinementModel {
             sourceIsLocked = context.authority != "description_authoritative"
             sourceIsDDLOrigin = context.origin == "direct_ddl"
             if sourceIsLocked && kind == .reading { kind = .touch }
-            if modelReference.isEmpty { modelReference = app.nextDrawingModelReference }
+            if modelReference.isEmpty {
+                let settings = await app.hostSettings()
+                if SettingsModel.isBatchModelAvailable(settings.models.stage2Model, settings: settings) {
+                    modelReference = settings.models.stage2Model
+                }
+            }
             initialized = true
             errorText = nil
             status = "変更条件を固定しました。候補を用意してください。"
@@ -140,7 +149,7 @@ public final class RefinementModel {
         let selectedWords = words
         let selectedAmplitude = amplitude
         let selectedWild: Bool? = selectedKind == .touch || inheritWild ? nil : wildOverride
-        let selectedModel: String? = selectedKind == .layout && !modelReference.isEmpty ? modelReference : nil
+        let selectedModel: String? = [.layout, .reading].contains(selectedKind) && !modelReference.isEmpty ? modelReference : nil
         let run = UUID()
         runID = run; running = true; saving = false; stopping = false
         candidates = []; previewID = nil; errorText = nil

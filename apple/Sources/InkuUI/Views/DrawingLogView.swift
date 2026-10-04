@@ -8,7 +8,8 @@ struct DrawingLogView: View {
     @State private var records: [DrawingLogRecord] = []
     @State private var selectedID: String?
     @State private var loading = false
-    @State private var loadFailed = false
+    @State private var loadError: String?
+    @State private var hasLoaded = false
 
     private var selected: DrawingLogRecord? { records.first { $0.id == selectedID } }
 
@@ -18,14 +19,26 @@ struct DrawingLogView: View {
                 Text(model.display.localized("描画ログ")).font(.title2.weight(.semibold))
                 Spacer()
                 Button(model.display.localized("記録を更新")) { Task { await load() } }.disabled(loading)
+                    .help(model.display.tooltip("描画ログを読み直します。生成や再送信は行いません。"))
                 Button(model.display.localized("閉じる")) { dismiss() }.keyboardShortcut(.cancelAction)
             }.padding()
             Divider()
+            if let loadError {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(model.display.localized("描画ログを読み込めませんでした。") + "\n" + model.display.message(loadError))
+                        .foregroundStyle(.red).textSelection(.enabled)
+                    HStack {
+                        Button(model.display.localized("もう一度読み込む")) { Task { await load() } }.disabled(loading)
+                        Button(model.display.localized("エラーを閉じる")) { self.loadError = nil }
+                    }
+                    if hasLoaded { Text(model.display.localized("前回読み込めた記録を表示しています。")).font(.caption).foregroundStyle(.secondary) }
+                }.padding().frame(maxWidth: .infinity, alignment: .leading)
+                Divider()
+            }
             if loading && records.isEmpty { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
-            else if loadFailed {
-                Text(model.display.localized("描画ログを読み込めませんでした。")).frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if records.isEmpty {
-                Text(model.display.localized("描画の実行記録はまだありません。")).frame(maxWidth: .infinity, maxHeight: .infinity)
+            else if records.isEmpty {
+                Text(model.display.localized(hasLoaded ? "描画の実行記録はまだありません。" : "記録を更新して描画ログを読み込んでください。"))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 HStack(spacing: 0) {
                     ScrollView {
@@ -58,7 +71,9 @@ struct DrawingLogView: View {
             Text(model.display.localized("直近100件の実行記録です。開いても描画や再送信は行いません。"))
                 .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(12)
         }
+        #if os(macOS)
         .frame(minWidth: 760, idealWidth: 1040, minHeight: 480, idealHeight: 700)
+        #endif
         .task { await load() }
     }
 
@@ -128,12 +143,17 @@ struct DrawingLogView: View {
 
     private func load() async {
         guard !loading else { return }
-        loading = true; loadFailed = false
+        loading = true
         defer { loading = false }
         do {
-            records = try await model.drawingLogs()
+            let latest = try await model.drawingLogs()
+            try Task.checkCancellation()
+            records = latest
+            hasLoaded = true
+            loadError = nil
             if !records.contains(where: { $0.id == selectedID }) { selectedID = records.first?.id }
-        } catch { loadFailed = true }
+        } catch is CancellationError { }
+        catch { loadError = error.localizedDescription }
     }
 
     private func phase(_ value: String) -> String {

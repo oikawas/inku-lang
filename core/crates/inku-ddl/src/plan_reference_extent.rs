@@ -291,10 +291,13 @@ fn object_footprint(
         PlacementRecipe::DiagonalLine { step } => {
             symmetric(intervals * step[0].to_f64()?, intervals * step[1].to_f64()?)
         }
-        PlacementRecipe::ScatterUniformWithCentroidTranslation if object.count == 1 => {
+        PlacementRecipe::ScatterUniformWithCentroidTranslation | PlacementRecipe::Cells
+            if object.count == 1 =>
+        {
             footprint.centers
         }
-        PlacementRecipe::ScatterUniformWithCentroidTranslation => {
+        // Cells, like a scatter, spread the copies over the whole domain.
+        PlacementRecipe::ScatterUniformWithCentroidTranslation | PlacementRecipe::Cells => {
             symmetric(object.domain[0].to_f64()?, object.domain[1].to_f64()?)
         }
         PlacementRecipe::Grid {

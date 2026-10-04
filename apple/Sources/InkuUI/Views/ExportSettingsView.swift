@@ -18,16 +18,29 @@ struct ExportSettingsView: View {
     @Bindable var model: AppModel
     @State private var configuration: ExportConfiguration
     @State private var templates: [ExportTemplate]
+    @State private var savedTemplates: [ExportTemplate]
+    @State private var page = "destination"
     @State private var templateError: String?
+    @State private var pendingSavedTemplateID: String?
 
     init(model: AppModel) {
         self.model = model
         _configuration = State(initialValue: model.display.preferences.exportDefaults)
         _templates = State(initialValue: ExportTemplate.normalized(model.display.preferences.exportTemplates))
+        _savedTemplates = State(initialValue: ExportTemplate.normalized(model.display.preferences.exportTemplates))
     }
 
     var body: some View {
         Group {
+            Section {
+                Picker(model.display.localized("エクスポート"), selection: $page) {
+                    Text(model.display.localized("保存先")).tag("destination")
+                    Text(model.display.localized("PNGテンプレート")).tag("png")
+                    Text(model.display.localized("アニメーション")).tag("animation")
+                    Text(model.display.localized("共有カード")).tag("card")
+                }.pickerStyle(.segmented)
+            }
+            if page == "destination" {
             #if os(macOS)
             Section(model.display.localized("保存先")) {
                 Text(configuration.destinationName.map { model.display.localizedFormat("保存先: %@", $0) } ?? model.display.localized("書き出すときに保存先を選択します。"))
@@ -39,7 +52,13 @@ struct ExportSettingsView: View {
                     }
                 }
             }
+            #else
+            Section(model.display.localized("保存先")) {
+                Text(model.display.localized("書き出すときに保存先を選択します。"))
+            }
             #endif
+            }
+            if page == "png" {
             Section(model.display.localized("書き出しの初期設定")) {
                 Text(model.display.localized("この端末で使う書き出し条件です。作品の保存内容は変わりません。"))
                     .font(.callout).foregroundStyle(.secondary)
@@ -63,13 +82,24 @@ struct ExportSettingsView: View {
                         TextField(model.display.localized("名前"), text: $template.name)
                         TextField(model.display.localized("説明"), text: $template.description)
                         TextField(model.display.localized("Y軸（64〜12000px）"), value: $template.pixelHeight, format: .number)
-                        Button(model.display.localized("削除"), role: .destructive) { templates.removeAll { $0.id == template.id } }
+                        HStack {
+                            if templateIsDirty(template) {
+                                Button(model.display.localized("保存")) { saveTemplate(template) }.disabled(templateValidation(template) != nil)
+                                Button(model.display.localized("リセット")) { resetTemplate(template.id) }
+                            } else {
+                                Button(model.display.localized("削除"), role: .destructive) { removeTemplate(template.id) }
+                            }
+                        }
+                        if templateIsDirty(template) {
+                            Text(model.display.localized(templateValidation(template) ?? "未保存"))
+                                .font(.caption).foregroundStyle(templateValidation(template) == nil ? Color.secondary : Color.red)
+                        }
                     }
                 }
-                Button(model.display.localized("テンプレートを追加")) { templates.append(.init()) }.disabled(templates.count >= 20)
-                Button(model.display.localized("テンプレートを保存")) { saveTemplates() }
-                if let templateError { Text(model.display.message(templateError)).foregroundStyle(.red) }
+                Button(model.display.localized("テンプレートを追加")) { addTemplate() }.disabled(templates.count >= 20)
             }
+            }
+            if page == "animation" {
             Section(model.display.localized("アニメーション")) {
                 Picker(model.display.localized("作品の切り替え"), selection: $configuration.options.transition) {
                     Text(model.display.localized("カット")).tag("cut"); Text(model.display.localized("クロスフェード")).tag("crossfade"); Text(model.display.localized("白へフェード")).tag("fade_white"); Text(model.display.localized("スライド")).tag("slide")
@@ -81,11 +111,21 @@ struct ExportSettingsView: View {
                     Text(model.display.localized("最初から繰り返し")).tag("restart"); Text(model.display.localized("往復")).tag("reverse"); Text(model.display.localized("1回のみ")).tag("once")
                 }
             }
+            }
+            if page == "card" {
             Section(model.display.localized("共有カード")) {
                 Picker(model.display.localized("用紙"), selection: $configuration.options.cardLayout) { Text(model.display.localized("正方形（1:1）")).tag("square"); Text(model.display.localized("縦長（4:5）")).tag("portrait") }
                 Toggle(model.display.localized("inkuの署名"), isOn: $configuration.options.cardSeal)
             }
-            if let error = model.display.saveError { Text(model.display.message(error)).foregroundStyle(.red) }
+            }
+            if let templateError { Text(model.display.message(templateError)).foregroundStyle(.red).textSelection(.enabled) }
+            if let error = model.display.saveError {
+                Text(model.display.message(error)).foregroundStyle(.red).textSelection(.enabled)
+                Button(model.display.localized("もう一度保存")) {
+                    model.display.retrySave()
+                    if model.display.saveError == nil { synchronizeTemplates() }
+                }
+            }
         }
         .onChange(of: configuration) { _, _ in
             let defaults = configuration.normalized()
@@ -95,12 +135,47 @@ struct ExportSettingsView: View {
         }
     }
 
-    private func saveTemplates() {
-        guard templates.count <= 20, templates.allSatisfy({ !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (64...12000).contains($0.pixelHeight) }) else {
-            templateError = "名前と64〜12000pxのY軸を指定してください。テンプレートは20件までです。"; return
-        }
-        templates = ExportTemplate.normalized(templates)
-        model.display.preferences.exportTemplates = templates
+    private func templateIsDirty(_ template: ExportTemplate) -> Bool {
+        savedTemplates.first(where: { $0.id == template.id }) != template
+    }
+    private func templateValidation(_ template: ExportTemplate) -> String? {
+        if template.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "名前を入力してください。" }
+        return (64...12000).contains(template.pixelHeight) ? nil : "Y軸は64〜12000pxで指定してください。"
+    }
+    private func saveTemplate(_ template: ExportTemplate) {
+        if let validation = templateValidation(template) { templateError = validation; return }
+        var next = ExportTemplate.normalized(model.display.preferences.exportTemplates)
+        guard let index = next.firstIndex(where: { $0.id == template.id }) else { return }
+        next[index] = template
+        writeTemplates(next, savedID: template.id)
+    }
+    private func resetTemplate(_ id: String) {
+        guard let saved = savedTemplates.first(where: { $0.id == id }), let index = templates.firstIndex(where: { $0.id == id }) else { return }
+        templates[index] = saved
+        templateError = nil
+    }
+    private func addTemplate() {
+        var next = ExportTemplate.normalized(model.display.preferences.exportTemplates)
+        guard next.count < 20 else { return }
+        next.append(.init())
+        writeTemplates(next)
+    }
+    private func removeTemplate(_ id: String) {
+        writeTemplates(ExportTemplate.normalized(model.display.preferences.exportTemplates).filter { $0.id != id })
+    }
+    private func writeTemplates(_ next: [ExportTemplate], savedID: String? = nil) {
+        pendingSavedTemplateID = savedID
+        model.display.preferences.exportTemplates = ExportTemplate.normalized(next)
+        guard model.display.saveError == nil else { templateError = model.display.saveError; return }
+        synchronizeTemplates()
+        templateError = nil
+    }
+    private func synchronizeTemplates() {
+        let next = ExportTemplate.normalized(model.display.preferences.exportTemplates)
+        let dirty = templates.filter { $0.id != pendingSavedTemplateID && templateIsDirty($0) }
+        savedTemplates = next
+        templates = next.map { saved in dirty.first(where: { $0.id == saved.id }) ?? saved }
+        pendingSavedTemplateID = nil
         templateError = nil
     }
 

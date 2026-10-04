@@ -94,12 +94,12 @@ public struct RefinementView: View {
         return VStack(alignment: .leading, spacing: 14) {
             Text(model.display.localized("変更する要素を1つ選択")).font(.headline)
             LazyVGrid(columns: [GridItem(.flexible(minimum: 120)), GridItem(.flexible(minimum: 120))], alignment: .leading, spacing: 10) {
-                ForEach(RefinementKind.allCases.filter { !self.refinement.sourceIsDDLOrigin || $0 != .reading }, id: \.self) { kind in
+                ForEach(RefinementKind.availableKinds.filter { !self.refinement.sourceIsDDLOrigin || $0 != .reading }, id: \.self) { kind in
                     kindButton(kind)
                 }
             }
             if self.refinement.sourceIsLocked {
-                Label(model.display.localized("この作品はDDLが確定しているため、記述を読み直せません。配置・変奏・タッチの候補は用意できます。"), systemImage: "lock")
+                Label(model.display.localized("この作品はDDLが確定しているため、記述を読み直せません。配置・タッチの候補は用意できます。"), systemImage: "lock")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Text(model.display.localized(kindDescription)).font(.callout).foregroundStyle(.secondary)
@@ -111,49 +111,19 @@ public struct RefinementView: View {
                 Text(model.display.localized("タッチの変更では、元の配色・配置・ワイルド設定を保ちます。"))
                     .font(.caption).foregroundStyle(.secondary)
             }
-            if self.refinement.kind == .variation {
-                Picker(model.display.localized("変奏の幅"), selection: $refinement.amplitude) {
-                    Text(model.display.preferences.language == "en" ? model.display.localized("控えめな変奏") : model.display.localized("小")).tag("small")
-                    Text(model.display.preferences.language == "en" ? model.display.localized("中程度の変奏") : model.display.localized("中")).tag("medium")
-                    Text(model.display.preferences.language == "en" ? model.display.localized("大きな変奏") : model.display.localized("大")).tag("large")
-                }.pickerStyle(.segmented).frame(maxWidth: 360).disabled(controlsDisabled)
-                Text(model.display.localized("小・中・大のどれを選んでも、いまの変奏で動くものはありません。"))
+            HStack {
+                Text(model.display.localized(self.refinement.inheritWild ? "筆致制限（継承）" : "筆致制限"))
                     .font(.caption).foregroundStyle(.secondary)
-            }
-            if self.refinement.kind != .touch {
-                Toggle(model.display.localized("元のワイルド設定を引き継ぐ"), isOn: $refinement.inheritWild)
-                    .disabled(controlsDisabled)
-                if !self.refinement.inheritWild {
-                    Toggle(model.display.localized("ワイルド"), isOn: $refinement.wildOverride).disabled(controlsDisabled)
-                    if self.refinement.kind == .variation {
-                        Text(model.display.localized("変奏で動くものはありませんが、ワイルド設定は元の作品から変更します。"))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-            }
+                Button(model.display.localized("暴れる") + " " + model.display.localized(effectiveWild ? "入" : "切")) {
+                    refinement.wildOverride = !effectiveWild
+                    refinement.inheritWild = false
+                }.buttonStyle(.bordered).tint(effectiveWild ? Color.accentColor : Color.secondary)
+            }.disabled(controlsDisabled)
             Divider()
-            if self.refinement.kind == .reading {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(model.display.localized("描画モデル")).font(.subheadline.weight(.semibold))
-                    Text(model.display.localizedFormat("次のモデル: %@", readingModel.isEmpty ? model.display.localized("未設定") : readingModel))
-                        .font(.callout).textSelection(.enabled)
-                    Text(model.display.localized("制作で選んだ次の描画モデルを、読み取りと構造化の両方に使います。"))
-                        .font(.caption).foregroundStyle(.secondary)
-                    if !model.hasNextDrawingModel { settingsButton }
-                }
-            } else if self.refinement.kind == .layout {
-                RefinementDrawingModelPicker(model: model, reference: $refinement.modelReference, disabled: controlsDisabled,
-                    configurationDisabled: controlsDisabled || self.refinement.hasUnsaved,
-                    onConfigureModels: { section in Task { await configureModels(section) } })
-            } else if self.refinement.kind == .variation {
-                Text(model.display.localized("変奏では元の作品のモデルを保ちます。"))
-                    .font(.caption).foregroundStyle(.secondary)
-            }
+            RefinementDrawingModelPicker(model: model, reference: $refinement.modelReference, disabled: controlsDisabled,
+                configurationDisabled: controlsDisabled || self.refinement.hasUnsaved,
+                onConfigureModels: { section in Task { await configureModels(section) } })
         }.refinementPanel()
-    }
-
-    private var readingModel: String {
-        refinement.running || !refinement.candidates.isEmpty ? refinement.capturedStage1Model ?? "" : model.nextDrawingModelReference
     }
 
     private var kindDescription: String {
@@ -162,6 +132,16 @@ public struct RefinementView: View {
         case .reading: "元の記述を読み直して描きます。"
         case .variation: "いまの変奏では、指示書・配色・タッチ・要素数は変わりません。"
         case .touch: "同じ言葉は同じタッチ（シード）になります。1案だけ用意できます。"
+        }
+    }
+
+    private var effectiveWild: Bool { refinement.inheritWild ? refinement.work.renderWild ?? false : refinement.wildOverride }
+    private var costDescription: String {
+        switch refinement.kind {
+        case .touch: "超高速（LLM不要）"
+        case .layout: "高速（補完の穴があるときだけLLM）"
+        case .reading: "低速（LLM・API使用）"
+        case .variation: "この操作は現在使用できません。"
         }
     }
 
@@ -190,6 +170,7 @@ public struct RefinementView: View {
                 HStack(spacing: 12) { generateButton(count: 1); generateButton(count: 4) }.fixedSize(horizontal: true, vertical: false)
                 VStack(alignment: .leading, spacing: 10) { generateButton(count: 1); generateButton(count: 4) }
             }
+            Label(model.display.localized(costDescription), systemImage: "clock").font(.caption).foregroundStyle(.secondary)
             if refinement.kind == .reading && !model.hasNextDrawingModel {
                 Text(model.display.localized("描画モデルが未設定です。設定でAIサービスとモデルを選択してください。"))
                     .font(.caption).foregroundStyle(.secondary)
@@ -375,7 +356,7 @@ private extension View {
     }
 }
 
-/// The sheet's Stage 2 choice is local; Settings remain authoritative.
+/// Selecting a drawing model saves the Stage 2 default immediately.
 @MainActor
 private struct RefinementDrawingModelPicker: View {
     @Bindable var model: AppModel
@@ -383,93 +364,28 @@ private struct RefinementDrawingModelPicker: View {
     let disabled: Bool
     let configurationDisabled: Bool
     let onConfigureModels: @MainActor (String) -> Void
-    @State private var settings = SettingsModel()
-    @State private var providerID: String?
-    @State private var personalModels: [ProviderModelInfo] = []
-    @State private var loadingPersonalModels = false
-    @State private var catalogError: String?
-    @State private var discovery: Task<Void, Never>?
-
-    private var provider: ProviderSettings? { settings.host.providers.first { $0.id == providerID } }
-    private var loading: Bool { settings.isLoadingModels || loadingPersonalModels }
-    private var models: [ProviderModelInfo] {
-        guard let provider else { return [] }
-        var seen: Set<String> = []
-        let configured = [reference, model.nextDrawingModelReference, settings.host.models.stage1Model, settings.host.models.stage2Model]
-            .filter { $0.hasPrefix(provider.id + ":") && $0.count > provider.id.count + 1 }
-            .map { ProviderModelInfo(id: $0, name: String($0.dropFirst(provider.id.count + 1)), contextLimit: nil, capabilities: []) }
-        return ((provider.kind == .chatGPTPlan ? personalModels : settings.modelCatalog) + configured)
-            .filter { $0.id.hasPrefix(provider.id + ":") && seen.insert($0.id).inserted }
-    }
+    @State private var showModels = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(model.display.localized("描画モデル")).font(.subheadline.weight(.semibold))
-            Text(model.display.localized("この操作では、選んだモデルを構造化に使います。"))
+            Button { showModels = true } label: {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(model.display.localized("描画モデル")).font(.subheadline.weight(.semibold))
+                    Text(reference.isEmpty ? model.display.localized("選択してください") : reference)
+                        .font(.callout).textSelection(.enabled)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+            }.buttonStyle(.bordered).disabled(disabled)
+            Text(model.display.localized("選択したモデルを構造化の既定モデルとして保存します。読み取りの既定モデルは変わりません。"))
                 .font(.caption).foregroundStyle(.secondary)
-            if !settings.host.providers.isEmpty {
-                Picker(model.display.localized("サービス"), selection: Binding(get: { providerID }, set: { selectProvider($0) })) {
-                    ForEach(settings.host.providers) { item in Text(item.id).tag(Optional(item.id)) }
-                }.disabled(disabled || loading)
-                Picker(model.display.localized("モデル"), selection: Binding(
-                    get: { models.contains(where: { $0.id == reference }) ? reference : "" }, set: { reference = $0 })) {
-                    Text(model.display.localized("制作で選んだ次のモデルを使う")).tag("")
-                    ForEach(models) { item in Text(item.name).tag(item.id) }
-                }.disabled(disabled || loading || models.isEmpty)
-                Text(model.display.localizedFormat("次のモデル: %@", reference.isEmpty ? model.nextDrawingModelReference : reference))
-                    .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-                Button {
-                    discovery = Task { await discoverModels() }
-                } label: {
-                    Label(model.display.localized(loading ? "取得中…" : "接続先からモデル一覧を取得"), systemImage: "arrow.clockwise").font(.caption)
-                }.disabled(disabled || loading || provider == nil)
-            }
             Button(model.display.localized("モデル設定"), systemImage: "gearshape") {
-                onConfigureModels(provider?.kind == .chatGPTPlan ? "personalPlan" : "models")
+                onConfigureModels("models")
             }.disabled(configurationDisabled)
-            if let catalogError { Text(model.display.message(catalogError)).font(.caption).foregroundStyle(.red) }
         }
-        .task(id: model.providerSettingsRevision) {
-            discovery?.cancel(); settings.cancelDiscovery()
-            let revision = model.providerSettingsRevision
-            let snapshot = await model.hostSettings()
-            guard !Task.isCancelled, revision == model.providerSettingsRevision else { return }
-            let refreshed = SettingsModel()
-            refreshed.host = snapshot
-            settings = refreshed; personalModels = []; catalogError = nil
-            if !reference.isEmpty && !snapshot.providers.contains(where: { reference.hasPrefix($0.id + ":") }) { reference = "" }
-            providerID = snapshot.providers.first(where: { reference.hasPrefix($0.id + ":") })?.id ?? snapshot.providers.first?.id
-        }
-        .onDisappear { discovery?.cancel(); settings.cancelDiscovery() }
-    }
-
-    private func selectProvider(_ id: String?) {
-        guard !disabled, !loading else { return }
-        discovery?.cancel(); settings.cancelDiscovery()
-        providerID = id; personalModels = []; catalogError = nil
-        if let id, !reference.hasPrefix(id + ":") { reference = "" }
-    }
-
-    private func discoverModels() async {
-        guard !disabled, !model.isBusy, !loading, let provider else { return }
-        let revision = model.providerSettingsRevision
-        catalogError = nil
-        if provider.kind == .chatGPTPlan {
-            loadingPersonalModels = true
-            defer { loadingPersonalModels = false }
-            do {
-                let offered = try await model.personalPlanRuntime().models(force: true)
-                guard !Task.isCancelled, providerID == provider.id, revision == model.providerSettingsRevision else { return }
-                personalModels = offered.map { ProviderModelInfo(id: provider.id + ":" + $0.id, name: $0.label, contextLimit: nil, capabilities: []) }
-            } catch {
-                guard !Task.isCancelled, revision == model.providerSettingsRevision else { return }
-                catalogError = error.localizedDescription
-            }
-        } else {
-            settings.selectedProviderID = provider.id
-            await settings.discoverModels()
-            guard !Task.isCancelled, providerID == provider.id, revision == model.providerSettingsRevision else { return }
-            catalogError = settings.error
+        .sheet(isPresented: $showModels) {
+            BatchModelPickerView(model: model, initialReference: reference, immediateSelection: true, title: "描画モデル") { value in
+                try await model.selectDdlDrawingModel(value)
+                reference = value
+            }.disabled(disabled)
         }
     }
 }

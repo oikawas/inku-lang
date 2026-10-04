@@ -7,6 +7,7 @@ public enum InkuLocalization {
         string(key, language: locale.language.languageCode?.identifier ?? "ja")
     }
     public static func string(_ key: String, language: String) -> String {
+        if let shared = ServerTips.localizedCopy(key, language: language) { return shared }
         guard language == "en", let englishBundle else { return key }
         return englishBundle.localizedString(forKey: key, value: key, table: "Localizable")
     }
@@ -52,6 +53,7 @@ public enum InkuLocalization {
         .init(pattern: #"^([0-9]+) / ([0-9]+)（元の([0-9]+)行目）$"#, key: "%@ / %@（元の%@行目）"),
         .init(pattern: #"^バッチ完了: ([0-9]+)件成功・([0-9]+)件失敗$"#, key: "バッチ完了: %@件成功・%@件失敗"),
         .init(pattern: #"^([0-9]+)作品を表示しました。次の生成まで([0-9]+)秒$"#, key: "%@作品を表示しました。次の生成まで%@秒"),
+        .init(pattern: #"^([0-9]+)作品を表示しました。$"#, key: "%@作品を表示しました。"),
         .init(pattern: #"^([0-9]+) / ([0-9]+) 世代: モデルが観察しています$"#, key: "%@ / %@ 世代: モデルが観察しています"),
         .init(pattern: #"^([0-9]+) / ([0-9]+) 世代: (.+)を生成中$"#, key: "%@ / %@ 世代: %@を生成中", localizedArguments: [3]),
         .init(pattern: #"^([0-9]+) 世代の推敲を完了しました。作品の選択は利用者が行います。$"#, key: "%@ 世代の推敲を完了しました。作品の選択は利用者が行います。"),
@@ -68,6 +70,10 @@ public enum InkuLocalization {
         .init(pattern: #"^([0-9]+) 件を完全に削除しました$"#, key: "%@ 件を完全に削除しました"),
         .init(pattern: #"^この新しい作品に定義を持ち込みます: (.+)$"#, key: "この新しい作品に定義を持ち込みます: %@"),
         .init(pattern: #"^自動バックアップ: (.+)$"#, key: "自動バックアップ: %@"),
+        .init(pattern: #"^バックアップの状態を読み込めませんでした: (.+)$"#, key: "バックアップの状態を読み込めませんでした: %@"),
+        .init(pattern: #"^作品は生成されましたが、未読語の記録に失敗しました: (.+)$"#, key: "作品は生成されましたが、未読語の記録に失敗しました: %@"),
+        .init(pattern: #"^バッチの記録を読み込めませんでした: (.+)$"#, key: "バッチの記録を読み込めませんでした: %@"),
+        .init(pattern: #"^この作品には比較用の保存設定がありません: (.+)$"#, key: "この作品には比較用の保存設定がありません: %@"),
         .init(pattern: #"^生成結果のログを保存できませんでした: (.+)$"#, key: "生成結果のログを保存できませんでした: %@"),
         .init(pattern: #"^表示設定を読み込めませんでした: (.+)$"#, key: "表示設定を読み込めませんでした: %@"),
         .init(pattern: #"^表示設定を保存できませんでした: (.+)$"#, key: "表示設定を保存できませんでした: %@"),
@@ -81,6 +87,10 @@ public extension DisplaySettings {
     func localized(_ key: String) -> String { InkuLocalization.string(key, language: preferences.language) }
     func message(_ value: String) -> String { InkuLocalization.message(value, language: preferences.language) }
     func localizedFormat(_ key: String, _ arguments: CVarArg...) -> String {
-        String(format: localized(key), locale: Locale(identifier: preferences.language), arguments: arguments)
+        // The Server's confirmTrashMessage inflects item/items by the count.
+        let template = preferences.language == "en" && key == "%ld件をごみ箱に移動しますか？"
+            && arguments.count == 1 && (arguments.first as? Int) == 1
+            ? "Move %ld item to trash?" : localized(key)
+        return String(format: template, locale: Locale(identifier: preferences.language), arguments: arguments)
     }
 }

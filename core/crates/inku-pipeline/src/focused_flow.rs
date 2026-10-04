@@ -85,7 +85,6 @@ fn config() -> PipelineConfig {
                 max_nodes_per_invocation: DecimalU64::new(100),
                 max_total_nodes: DecimalU64::new(500),
             },
-            stage15_variation: None,
             error_policy: ScoreErrorPolicy::OmitAndContinue,
             hard_resource_policy: HardResourcePolicy {
                 identity: "pipeline-fixture.v1".into(),
@@ -1791,6 +1790,75 @@ fn a_failed_reading_composes_from_the_default_reading() {
     assert!(committed_source(&state).contains(" at the [composition] "));
 }
 
+/// A white circle on the white ground sends the plan back to Stage 1 once,
+/// keeping the candidate in case the returned request fails. The second plan
+/// settles and is read for composition; the kept candidate belongs to the
+/// returned request only (Pentala 2026-10-04: passing the reading failed with
+/// invalid_state because the kept candidate outlived Stage 1).
+#[test]
+fn a_returned_stage1_settles_into_the_composition_reading() {
+    let answer = |state: &PipelineSnapshot, plan: serde_json::Value| {
+        let action = state.action.as_ref().unwrap();
+        assert_eq!(action.tag, "generate_normalized_ddl");
+        let result = PipelineInput::EffectResult {
+            result: EffectResult::NormalizedDdlGenerated {
+                identity: action.identity.clone(),
+                response: plan.to_string(),
+                elapsed_ms: DecimalU64::new(20),
+            },
+        };
+        run(Some(state), &envelope(Some(state), result))
+    };
+    let pending = composition_start(Some(CompositionConfig { read: true }));
+    let white_on_white = json!({"ground": "paper", "background": "white", "plugins": [], "layers": [
+        plan_layer("place", "circle", 1, "unspecified", "small", "white"),
+        plan_layer("place", "square", 1, "unspecified", "small", "black"),
+    ]});
+    let returned = answer(&pending, white_on_white);
+    assert!(
+        tags(&returned).contains(&"stage1_returned"),
+        "{:?}",
+        tags(&returned)
+    );
+    assert!(returned.snapshot.stage1_fallback.is_some());
+    let settled = answer(&returned.snapshot, composed_plan_response()).snapshot;
+    let action = settled.action.as_ref().unwrap();
+    assert_eq!(action.tag, "read_composition");
+    assert!(settled.stage1_fallback.is_none() && settled.stage1_fallback_plan.is_none());
+    let reading = json!({
+        "thesis": "a lone circle above a floor of dots",
+        "roles": ["field", "focal", "scattered"],
+        "relations": [{"type": "above", "layers": [1, 2], "side": "unspecified", "toward": "unspecified"}],
+        "tension": {"motion": "still", "focus": "unspecified", "vertical": "unspecified",
+                    "balance": "unspecified", "symmetry": "unspecified", "void": "unspecified"},
+        "stated_places": [{"layer": 2, "words": "at the bottom", "place": "bottom"}]
+    });
+    let result = PipelineInput::EffectResult {
+        result: EffectResult::CompositionRead {
+            identity: action.identity.clone(),
+            response: reading.to_string(),
+            elapsed_ms: DecimalU64::new(30),
+        },
+    };
+    let read = run(Some(&settled), &envelope(Some(&settled), result));
+    assert!(
+        tags(&read).contains(&"composition_read"),
+        "{:?}",
+        tags(&read)
+    );
+    assert!(committed_source(&read.snapshot).contains(" at the [composition] "));
+    let committed = run(
+        Some(&read.snapshot),
+        &envelope(Some(&read.snapshot), ack(&read.snapshot)),
+    )
+    .snapshot;
+    assert!(
+        matches!(committed.phase, PipelinePhase::ScoreReady),
+        "{:?}",
+        committed.phase
+    );
+}
+
 #[test]
 fn a_run_without_composition_commits_the_plan_as_printed() {
     let pending = composition_start(None);
@@ -1806,4 +1874,24 @@ fn a_run_without_composition_commits_the_plan_as_printed() {
             .iter()
             .any(|tag| tag.starts_with("composition"))
     );
+}
+
+#[test]
+fn saved_compiler_options_with_the_retired_variation_still_read() {
+    // The explicit variation was retired on 2026-10-04, but saved fork contexts
+    // and older hosts still carry `stage15_variation`, as null or as an
+    // amplitude and seed pair. Both read as the options without it, and the
+    // retired key is not written again.
+    let options = config().compiler;
+    let written = serde_json::to_value(&options).unwrap();
+    assert!(written.get("stage15_variation").is_none());
+    for retired in [
+        serde_json::Value::Null,
+        json!({"amplitude": "large", "seed": "9"}),
+    ] {
+        let mut saved = written.clone();
+        saved["stage15_variation"] = retired;
+        let read: CompilerOptions = serde_json::from_value(saved).unwrap();
+        assert_eq!(read, options);
+    }
 }

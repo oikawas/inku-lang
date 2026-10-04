@@ -55,7 +55,6 @@ fn compile(source: &str, language: ResolvedInstructionLanguage) -> CompilerResou
         Some(17),
         LIMITS,
         ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-        None,
         ScoreErrorPolicy::OmitAndContinue,
         hard.clone(),
         OperationalResourceBudget(hard.budget),

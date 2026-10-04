@@ -8,6 +8,13 @@ import InkuHost
 struct AppCheck {
     @MainActor
     static func main() async throws {
+        if CommandLine.arguments.contains("--app-parity-contract-only") {
+            let folder: URL?
+            if let index = CommandLine.arguments.firstIndex(of: "--parity-native-fixture"), CommandLine.arguments.indices.contains(index + 1) {
+                folder = URL(fileURLWithPath: CommandLine.arguments[index + 1])
+            } else { folder = nil }
+            try await runAppParityContractChecks(fixtureDirectory: folder); return
+        }
         if CommandLine.arguments.contains("--drawing-failure-log-only") {
             try await runDrawingFailureLogChecks(); return
         }

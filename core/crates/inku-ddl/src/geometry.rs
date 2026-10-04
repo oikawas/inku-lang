@@ -380,7 +380,7 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
                     "\"omitted_members_exceed_total\":\"each_one_higher_total\",",
                     "\"target\":\"resolve_once_first_original_member_occurrence\",\"pivot\":\"combined_geometry_bbox_center\",",
                     "\"repetition\":\"symbolic_plan_materialization_deferred\"},",
-                    "\"placement_members\":{\"source_head\":\"atomic_logical_slot\",\"primitive\":{\"logical_count\":\"object_count\",\"body_repeat_count\":1,\"recipe\":\"local_place_only\"},\"macro\":{\"logical_count\":\"outer_count\",\"body_repeat_count\":\"outer_count\",\"internal\":\"emit_counts_positions_recipes_preserved\"},\"bbox\":\"drawables_else_anchor_points\",\"owned_internal_transforms\":\"before_member_placement\",\"unowned_outer_transforms\":\"after_placement_including_equal_range\",\"standalone_repeats\":\"body_scopes_preserved_no_group_layout_target\"},",
+                    "\"placement_members\":{\"source_head\":\"atomic_logical_slot\",\"primitive\":{\"logical_count\":\"object_count\",\"body_repeat_count\":1,\"recipe\":\"local_place_only\"},\"macro\":{\"logical_count\":\"outer_count\",\"body_repeat_count\":\"outer_count\",\"internal\":\"emit_counts_positions_recipes_preserved\"},\"bbox\":\"drawables_else_anchor_points\",\"owned_internal_transforms\":\"before_member_placement\",\"unowned_outer_transforms\":\"after_placement_including_equal_range\",\"standalone_repeats\":{\"unplaced_macro_caller\":\"one_member_group\",\"cells\":\"no_action_place_scatter_draw\",\"cells_size\":\"largest_performed_copy_bbox_floor_per_axis_one_to_count\",\"cells_order\":\"seeded_partial_fisher_yates_then_same_order\",\"cells_shift\":\"seeded_inside_cell_room\",\"line_up\":\"horizontal_source_order\",\"tile\":\"tile\",\"position_fill_order_relation_mirror\":\"body_scopes_preserved_no_group_layout_target\"}},",
                     "\"size_basis\":\"canvas_short_edge_independent_of_count\",",
                     "\"supported_geometry\":[\"line\",\"circle\",\"ellipse\",\"square\",\"arc\",\"cloudform\",\"point\"],",
                     "\"geometry_gap\":[\"triangle\",\"polygon\"],",
@@ -1157,7 +1157,7 @@ mod tests {
         );
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "7cbef1c97b2552b0b610a11d131878076069dc1c6bce8c8efe436066896ac84c"
+            "db954d1dcf37b4fa33d49c01d1b0cd720fc1e869ccb9761e42b9c49730e720b1"
         );
         assert_eq!(
             payload["object_placement"]["layout_direction"]["vertical"],

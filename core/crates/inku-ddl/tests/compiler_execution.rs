@@ -344,7 +344,6 @@ fn relation_association_failure_keeps_valid_neighbors_under_legacy_stop() {
         Some(23),
         LIMITS,
         ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-        None,
         ScoreErrorPolicy::Stop,
         inku_score::HardResourcePolicy {
             identity: "relation-recovery-test.v1".to_owned(),
@@ -1034,7 +1033,6 @@ fn background_does_not_admit_an_omitted_macro_without_drawable_residual() {
             Some(23),
             LIMITS,
             ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-            None,
             ScoreErrorPolicy::OmitAndContinue,
             inku_score::HardResourcePolicy {
                 identity: "empty-residual-test.v1".to_owned(),
@@ -1174,7 +1172,6 @@ fn resource_overage_draws_the_safe_prefix_and_reports_the_unexecuted_suffix() {
             Some(23),
             LIMITS,
             ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-            None,
             ScoreErrorPolicy::Stop,
             inku_score::HardResourcePolicy {
                 identity: "all-resource-omitted-test.v1".to_owned(),
@@ -1315,7 +1312,6 @@ fn undelivered_occurrences_preserve_accepted_drawables_in_the_same_clause() {
         Some(23),
         LIMITS,
         ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-        None,
         ScoreErrorPolicy::Stop,
         inku_score::HardResourcePolicy {
             identity: "occurrence-recovery-test.v1".to_owned(),
@@ -1366,7 +1362,6 @@ fn ja_unresolved_predicate_fragment_preserves_typed_drawing_in_both_resource_mod
             Some(23),
             LIMITS,
             ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-            None,
             policy,
             inku_score::HardResourcePolicy {
                 identity: "ja-predicate-recovery-test.v1".to_owned(),
@@ -1446,7 +1441,6 @@ fn ja_unresolved_layout_modifier_keeps_the_typed_line_up() {
         Some(23),
         LIMITS,
         ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-        None,
         ScoreErrorPolicy::OmitAndContinue,
         inku_score::HardResourcePolicy {
             identity: "ja-unresolved-layout-recovery-test.v1".to_owned(),
@@ -1491,7 +1485,6 @@ fn ja_unknown_fragment_and_unsupported_layout_keep_line_and_count() {
         Some(23),
         LIMITS,
         ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-        None,
         ScoreErrorPolicy::OmitAndContinue,
         inku_score::HardResourcePolicy {
             identity: "ja-local-field-recovery-test.v1".to_owned(),
@@ -2517,7 +2510,6 @@ fn execute(
         Some(23),
         limits,
         ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-        None,
         policy,
     )
 }
@@ -2534,7 +2526,6 @@ fn execute_language(
         Some(23),
         LIMITS,
         ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-        None,
         policy,
     )
 }
@@ -2552,7 +2543,6 @@ fn execute_locked(
         Some(23),
         limits,
         ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-        None,
         policy,
     )
 }

@@ -1,4 +1,5 @@
 import InkuHost
+import InkuPersistence
 import SwiftUI
 
 extension View {
@@ -13,124 +14,250 @@ extension View {
 @MainActor
 struct CreationModelPicker: View {
     @Bindable var model: AppModel
-    @State private var settings = SettingsModel()
-    @State private var providerID: String?
-    @State private var personalModels: [ProviderModelInfo] = []
-    @State private var loadingPersonalModels = false
-    @State private var catalogError: String?
-    @State private var discovery: Task<Void, Never>?
+    var body: some View { BatchModelPickerView(model: model) }
+}
 
-    private var provider: ProviderSettings? { settings.host.providers.first { $0.id == providerID } }
-    private var loading: Bool { settings.isLoadingModels || loadingPersonalModels }
-    private var models: [ProviderModelInfo] {
-        guard let provider else { return [] }
-        return settings.availableModels(for: provider, configuredReferences: [model.nextDrawingModelReference],
-                                        discoveredModels: provider.kind == .chatGPTPlan ? personalModels : nil)
+/// Every action receives the same work that supplies the canvas image and caption.
+@MainActor
+struct CreationCanvasControls: View {
+    @Bindable var model: AppModel
+    let work: SavedWork?
+    let saved: Bool
+    let disabled: Bool
+    let onReplayWork: (SavedWork) -> Void
+    let onWorkAction: (SavedWork, String) -> Void
+    let onShowSaijiki: () -> Void
+    @State private var starTargetID: String?
+    @State private var starredOverride: Bool?
+
+    private var caption: String { work?.effectiveSourceText.trimmingCharacters(in: .whitespacesAndNewlines) ?? "" }
+    private var verticalCaptionAvailable: Bool {
+        caption.unicodeScalars.contains { (0x3040...0x30ff).contains($0.value) || (0x3400...0x9fff).contains($0.value) }
+    }
+    private var starred: Bool {
+        guard let work else { return false }
+        return model.library.works.first(where: { $0.id == work.id })?.starred ?? starredOverride ?? work.starred
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(model.display.localized("描画モデル")).font(.subheadline.weight(.semibold))
-                Spacer()
-                Button { openSettings() } label: { Image(systemName: "gearshape") }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(model.display.localized("モデル設定"))
-                    .help(model.display.preferences.showTooltips ? model.display.localized("モデル設定") : "")
-                    .disabled(model.isBusy)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                captionAndMarks
+                Spacer(minLength: 12)
+                outputControls
             }
-            if !settings.host.providers.isEmpty {
-                Picker(model.display.localized("サービス"), selection: $providerID) {
-                    ForEach(settings.host.providers) { item in Text(item.displayName).tag(Optional(item.id)) }
+            VStack(alignment: .leading, spacing: 10) {
+                captionAndMarks
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack { Spacer(minLength: 0); outputControls }
                 }
-                .disabled(model.isBusy || loading)
-                .help(tip("次の作品のモデルを提供するサービスを選びます。"))
-                Picker(model.display.localized("モデル"), selection: Binding(
-                    get: { models.contains(where: { $0.id == model.nextDrawingModelReference }) ? model.nextDrawingModelReference : "" },
-                    set: { model.selectNextDrawingModel($0) }
-                )) {
-                    Text(model.display.localized("選択してください")).tag("")
-                    ForEach(models) { item in
-                        Text(item.name).tag(item.id).disabled(!settings.isModelAvailable(item.id))
-                    }
-                }
-                .disabled(model.isBusy || loading || models.isEmpty)
-                .help(tip("解釈と構造化に使うモデルを選びます。"))
-                Button {
-                    discovery = Task { await discoverModels() }
-                } label: {
-                    Label(model.display.localized(loading ? "取得中…" : "接続先からモデル一覧を取得"), systemImage: "arrow.clockwise")
-                        .font(.caption)
-                }
-                .disabled(model.isBusy || loading || provider == nil)
-                .help(tip("接続先が提供するモデル一覧を取得します。"))
-                if !model.nextDrawingModelReference.isEmpty {
-                    Text(model.display.localizedFormat("次のモデル: %@", model.nextDrawingModelReference))
-                        .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-                    ModelGuidanceView(reference: model.nextDrawingModelReference, providers: settings.host.providers,
-                                      discovered: models.first { $0.id == model.nextDrawingModelReference }, display: model.display)
-                }
+            }
+        }
+        .buttonStyle(.borderless).controlSize(.small)
+        .padding(.horizontal, 4).padding(.vertical, 6)
+        .onChange(of: work?.id, initial: true) { _, id in
+            starTargetID = id; starredOverride = nil
+        }
+    }
+
+    @ViewBuilder private var captionAndMarks: some View {
+      if model.display.visible("work_tools") {
+        HStack(spacing: 10) {
+            Button { model.display.preferences.captionVisible.toggle() } label: {
+                Image(systemName: model.display.preferences.captionVisible ? "text.bubble.fill" : "text.bubble")
+            }
+            .accessibilityLabel(model.display.localized("詞書の表示"))
+            .accessibilityValue(model.display.localized(model.display.preferences.captionVisible ? "オン" : "オフ"))
+            .help(model.display.tooltip("詞書（入力テキスト）の表示/非表示", serverKey: "tooltipCanvasCaption"))
+            .disabled(caption.isEmpty)
+            if verticalCaptionAvailable {
+                Picker(model.display.localized("詞書きの書字方向"), selection: Binding(
+                    get: { model.display.preferences.captionVertical },
+                    set: { model.display.preferences.captionVertical = $0 })) {
+                    Text(model.display.localized("横書き")).tag(false)
+                    Text(model.display.localized("縦書き")).tag(true)
+                }.pickerStyle(.menu).labelsHidden().fixedSize()
+                    .accessibilityLabel(model.display.localized("詞書きの書字方向"))
+                    .help(model.display.tooltip("詞書きの書字方向"))
+                    .disabled(!model.display.preferences.captionVisible || caption.isEmpty)
+            }
+            Button { toggleStar() } label: {
+                Image(systemName: starred ? "star.fill" : "star")
+                    .foregroundStyle(starred ? Color.accentColor : Color.secondary)
+            }
+            .accessibilityLabel(model.display.localized(starred ? "スターを外す" : "スターを付ける"))
+            .accessibilityValue(model.display.localized(starred ? "オン" : "オフ"))
+            .help(model.display.tooltip(starred ? "スターを外す" : "スターを付ける", serverKey: starred ? "starOn" : "starOff"))
+            .disabled(!saved || disabled)
+            if let work, saved {
+                LibraryAnnotationMarkButton(model: model, work: work, mark: .revision).disabled(disabled)
+                LibraryAnnotationMarkButton(model: model, work: work, mark: .share).disabled(disabled)
             } else {
-                Button(model.display.localized("モデル設定"), systemImage: "plus.circle") { openSettings() }
-                    .disabled(model.isBusy)
+                Button {} label: { Image(systemName: "pencil.circle") }
+                    .accessibilityLabel(model.display.localized("推敲の印"))
+                    .disabled(true)
             }
-            if let catalogError {
-                Text(model.display.message(catalogError)).font(.caption).foregroundStyle(.red)
+        }.fixedSize(horizontal: true, vertical: false)
+      }
+    }
+
+    private var outputControls: some View {
+        HStack(spacing: 12) {
+            if model.display.visible("detail_status"), let hash = work?.renderHash, !hash.isEmpty {
+                Button { perform("copy-hash") } label: { Text("#").font(.caption.monospaced().weight(.semibold)) }
+                    .accessibilityLabel(model.display.localized("full hash をコピー"))
+                    .help(model.display.tooltip("クリックでfull hashをコピーします"))
+                    .disabled(disabled)
             }
-            Text(model.display.localized("解釈と構造化に同じモデルを使います。"))
-                .font(.caption).foregroundStyle(.secondary)
-        }
-        .task(id: model.providerSettingsRevision) {
-            discovery?.cancel()
-            settings.cancelDiscovery()
-            let refreshed = SettingsModel()
-            await refreshed.load(model: model)
-            guard !Task.isCancelled else { return }
-            settings = refreshed
-            personalModels = []
-            catalogError = nil
-            providerID = refreshed.host.providers.first(where: { model.nextDrawingModelReference.hasPrefix($0.id + ":") })?.id
-                ?? refreshed.host.providers.first?.id
-            settings.selectedProviderID = providerID
-        }
-        .onChange(of: providerID) { _, id in
-            discovery?.cancel()
-            settings.selectedProviderID = id
-            personalModels = []
-            catalogError = nil
-        }
-        .onDisappear { discovery?.cancel(); settings.cancelDiscovery() }
+            if model.display.visible("work_tools") {
+                Button { if let work { onReplayWork(work) } } label: { Image(systemName: "arrow.clockwise") }
+                    .accessibilityLabel(model.display.localized("再現を比較"))
+                    .help(model.display.tooltip("保存時のSVGと、同じ保存条件を現行エンジンで描いた結果を比較します。作品・履歴・系譜は変わりません。"))
+                    .disabled(!saved || disabled)
+            }
+            if model.display.visible("detail_status") {
+                Button { perform("info") } label: { Image(systemName: "info.circle") }
+                    .accessibilityLabel(model.display.localized("生成情報"))
+                    .help(model.display.tooltip("選択中作品の生成情報を表示"))
+                    .disabled(work == nil || disabled)
+            }
+            if model.display.visible("work_tools") {
+                Button(action: onShowSaijiki) { Image(systemName: "book") }
+                    .accessibilityLabel(model.display.localized("歳時記を開く"))
+                    .help(model.display.tooltip("歳時記の語と説明を参照します。", serverKey: "tooltipSaijikiToggle"))
+            }
+            Button { perform(model.display.visible("work_tools") ? "export" : "export-card") } label: {
+                Image(systemName: "square.and.arrow.down")
+            }
+            .accessibilityLabel(model.display.localized(model.display.visible("work_tools") ? "書き出す" : "共有カード"))
+            .help(model.display.tooltip(saved ? (model.display.visible("work_tools") ? "書き出す" : "表示中の作品を共有カードとして書き出します。版面と刻印は設定に従います。")
+                : "書き出すには、先に作品を保存してください。", serverKey: saved && !model.display.visible("work_tools") ? "tooltipCanvasDownloadCard" : nil))
+            .disabled(!saved || disabled)
+            Button {
+                guard let work, !disabled else { return }
+                Task { await model.copyImage(work: work) }
+            } label: { Image(systemName: "doc.on.clipboard") }
+            .accessibilityLabel(model.display.localized("クリップボードにコピー"))
+            .help(model.display.tooltip("クリップボードにコピー", serverKey: "canvasCopyToClipboard"))
+            .disabled(work?.svg.isEmpty != false || disabled)
+            if model.display.visible("work_tools") {
+                Button { perform("presentation") } label: { Image(systemName: "arrow.up.left.and.arrow.down.right") }
+                    .accessibilityLabel(model.display.localized("プレゼンテーションモードを開く"))
+                    .help(model.display.tooltip("プレゼンテーションモード (全画面表示)", serverKey: "tooltipCanvasPresentation"))
+                    .disabled(work?.svg.isEmpty != false || disabled)
+            }
+        }.fixedSize(horizontal: true, vertical: false)
     }
 
-    private func openSettings() {
-        NotificationCenter.default.post(name: .inkuOpenSection, object: "settings",
-            userInfo: ["settingsSection": provider?.kind == .chatGPTPlan ? "personalPlan" : "models"])
+    private func perform(_ action: String) {
+        guard let work, !disabled else { return }
+        onWorkAction(work, action)
     }
 
-    private func tip(_ key: String) -> String {
-        model.display.preferences.showTooltips ? model.display.localized(key) : ""
-    }
-
-    private func discoverModels() async {
-        guard !model.isBusy, !loading, let provider else { return }
-        let revision = model.providerSettingsRevision
-        catalogError = nil
-        if provider.kind == .chatGPTPlan {
-            loadingPersonalModels = true
-            defer { loadingPersonalModels = false }
+    private func toggleStar() {
+        guard var target = work, saved, !disabled else { return }
+        target.starred = starred
+        let pinnedTarget = target
+        Task {
+            await model.library.toggleStar(pinnedTarget)
             do {
-                let offered = try await model.personalPlanRuntime().models(force: true)
-                guard !Task.isCancelled, providerID == provider.id, revision == model.providerSettingsRevision else { return }
-                personalModels = offered.map { ProviderModelInfo(id: provider.id + ":" + $0.id, name: $0.label, contextLimit: nil, capabilities: []) }
+                let value = try await model.auxiliaryDatabase().work(id: pinnedTarget.id)
+                guard starTargetID == pinnedTarget.id, !Task.isCancelled else { return }
+                starredOverride = value?.starred
             } catch {
-                guard !Task.isCancelled, revision == model.providerSettingsRevision else { return }
-                catalogError = error.localizedDescription
+                guard starTargetID == pinnedTarget.id, !Task.isCancelled else { return }
+                model.errorText = error.localizedDescription
             }
-        } else {
-            settings.selectedProviderID = provider.id
-            await settings.discoverModels()
-            guard !Task.isCancelled, providerID == provider.id, revision == model.providerSettingsRevision else { return }
-            catalogError = settings.error
+        }
+    }
+}
+
+/// Saved process text is independent of the model's current authoring session.
+@MainActor
+struct CreationDisplayedProcess: View {
+    @Bindable var model: AppModel
+    let work: SavedWork
+    let saved: Bool
+    let disabled: Bool
+    let onWorkAction: (SavedWork, String) -> Void
+
+    private var sketch: String? { work.sketchText.flatMap { $0.isEmpty ? nil : $0 } }
+    private var ddl: String { work.ddl ?? "" }
+    private var hasDDL: Bool { !ddl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    private var canEditSketch: Bool { saved && model.workActionState(for: work)?.canReadDescription == true }
+    private var ddlHeading: String {
+        let language: String
+        if let recorded = work.instructionLangResolved, ["ja", "en"].contains(recorded) {
+            language = recorded
+        } else if ddl.unicodeScalars.contains(where: { (0x3040...0x30ff).contains($0.value) || (0x3400...0x9fff).contains($0.value) }) {
+            language = "ja"
+        } else if ddl.unicodeScalars.contains(where: { (0x41...0x5a).contains($0.value) || (0x61...0x7a).contains($0.value) }) {
+            language = "en"
+        } else { language = model.display.preferences.language == "en" ? "en" : "ja" }
+        return language == "ja" ? "指示書（日本語DDL）" : "指示書（英語DDL）"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Divider()
+            Text(model.display.localized("表示中作品の写生と指示書")).font(.subheadline.weight(.semibold))
+            HStack {
+                DisclosureGroup(model.display.localized("写生 (Stage 0.5)"), isExpanded: Binding(
+                    get: { model.display.preferences.sketchExpanded ?? false },
+                    set: { model.display.preferences.sketchExpanded = $0 })) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if !sketchNote.isEmpty {
+                            Text(model.display.localized(sketchNote)).font(.caption).foregroundStyle(.secondary)
+                        }
+                        if let sketch { Text(sketch).font(.callout).textSelection(.enabled) }
+                        if let grain = work.sketchGrain {
+                            Text(model.display.localizedFormat("旧写生の区切り: %@（保存記録）", grain))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }.padding(.top, 6)
+                }
+                .help(model.display.tooltip("写生層が書いた文章を表示します。", serverKey: "tooltipSketchToggle"))
+                if sketch != nil {
+                    Button(model.display.localized("編集")) {
+                        model.display.preferences.sketchExpanded = true
+                        onWorkAction(work, "sketch")
+                    }.disabled(!canEditSketch || disabled)
+                        .help(model.display.tooltip("表示中作品の写生を編集します。"))
+                }
+            }
+            if model.display.visible("ddl_tools"), work.ddl != nil {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(model.display.localized(ddlHeading)).font(.caption.weight(.semibold))
+                        .help(model.display.tooltip("指示書はこの言語の文法で読みます。", serverKey: "tooltipDdlLang"))
+                    Spacer(minLength: 4)
+                    Button(model.display.localized("指示書を編集")) { onWorkAction(work, "ddl") }
+                        .disabled(!saved || !hasDDL || disabled)
+                        .help(model.display.tooltip("表示中の作品の指示書を編集して、その子として描き直します", serverKey: "tooltipDdlEdit"))
+                }
+                ScrollView {
+                    Text(ddl).font(.system(.callout, design: .monospaced)).textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 10)
+                }.frame(minHeight: 100, maxHeight: 220)
+                    .overlay(alignment: .leading) { Rectangle().fill(.quaternary).frame(width: 2) }
+                HStack {
+                    Spacer(minLength: 0)
+                    Button(model.display.localized("指示書から描画"), systemImage: "arrow.clockwise") { onWorkAction(work, "draw-ddl") }
+                        .disabled(!saved || !hasDDL || disabled)
+                        .help(model.display.tooltip("表示中の指示書（正規化DDL）をそのままStage 2へ渡して描き直します。Stage 1は走らないので解釈は変わりません。", serverKey: "tooltipDdlPaint"))
+                }
+            }
+        }.controlSize(.small)
+    }
+
+    private var sketchNote: String {
+        switch work.sketchState {
+        case "fine", "coarse": ""
+        case "supplemented": "記述に足りない場所の広がりや季節・時刻の光を補って描いた"
+        case "not_needed": "写生を通したが、補うものがなかった"
+        case "fallback": "写生を試みたが届かず、記述のまま解釈した"
+        case "off": "写生を通さずに描いた"
+        case "not_applicable": "この経路は写生を通らない"
+        default: "写生が記録される前に描かれた（切って描いたのではない）"
         }
     }
 }

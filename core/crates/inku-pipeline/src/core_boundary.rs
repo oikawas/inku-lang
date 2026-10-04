@@ -5,8 +5,8 @@ use std::fmt;
 use inku_ddl::{
     MacroDefinition, MacroExpansionLimits, NormalizedDdlDocument,
     RESOURCE_COMPILER_EXECUTION_SCHEMA_ID, ScoreInstructionOrigin, ScoreLoweringContext,
-    ScoreLoweringOutcome, SourceSpan, Stage15Variation, Stage15VariationAmplitude,
-    TYPED_DDL_COMPILATION_SCHEMA_ID, compile_ddl_to_score_with_resources,
+    ScoreLoweringOutcome, SourceSpan, TYPED_DDL_COMPILATION_SCHEMA_ID,
+    compile_ddl_to_score_with_resources,
 };
 use inku_render::{
     compat_clip::ClipLimits,
@@ -257,30 +257,12 @@ impl MacroExpansionLimitsDto {
     }
 }
 
-/// One explicit Stage 1.5 request; absence and seed zero remain distinct.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct Stage15VariationDto {
-    pub amplitude: Stage15VariationAmplitude,
-    pub seed: DecimalU64,
-}
-
-impl Stage15VariationDto {
-    const fn resolved(self) -> Stage15Variation {
-        Stage15Variation {
-            amplitude: self.amplitude,
-            seed: self.seed.get(),
-        }
-    }
-}
-
 /// Every compile authority is supplied by the caller. This type defines no defaults.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct CompilerOptions {
     pub host: ResolvedHostOptions,
     pub composition_seed: Option<DecimalU64>,
     pub macro_expansion_limits: MacroExpansionLimitsDto,
-    pub stage15_variation: Option<Stage15VariationDto>,
     pub error_policy: ScoreErrorPolicy,
     pub hard_resource_policy: HardResourcePolicy,
     pub operational_resource_budget: OperationalResourceBudget,
@@ -292,7 +274,11 @@ struct UnvalidatedCompilerOptions {
     host: ResolvedHostOptions,
     composition_seed: Option<DecimalU64>,
     macro_expansion_limits: MacroExpansionLimitsDto,
-    stage15_variation: Option<Stage15VariationDto>,
+    /// The explicit Stage 1.5 variation was retired on 2026-10-04. Saved and
+    /// older host configurations still carry this key, as null or as an
+    /// amplitude and seed pair, so it is read and ignored, and never written.
+    #[serde(default, rename = "stage15_variation")]
+    _retired_stage15_variation: Option<de::IgnoredAny>,
     error_policy: ScoreErrorPolicy,
     hard_resource_policy: HardResourcePolicy,
     operational_resource_budget: OperationalResourceBudget,
@@ -314,11 +300,6 @@ impl CompilerOptions {
         self.validate()?;
         Ok(self.composition_seed.map(DecimalU64::get))
     }
-
-    pub fn stage15_variation(&self) -> Result<Option<Stage15Variation>, BoundaryError> {
-        self.validate()?;
-        Ok(self.stage15_variation.map(Stage15VariationDto::resolved))
-    }
 }
 
 impl<'de> Deserialize<'de> for CompilerOptions {
@@ -331,7 +312,6 @@ impl<'de> Deserialize<'de> for CompilerOptions {
             host: wire.host,
             composition_seed: wire.composition_seed,
             macro_expansion_limits: wire.macro_expansion_limits,
-            stage15_variation: wire.stage15_variation,
             error_policy: wire.error_policy,
             hard_resource_policy: wire.hard_resource_policy,
             operational_resource_budget: wire.operational_resource_budget,
@@ -444,7 +424,6 @@ pub fn compile_committed(
         options.composition_seed()?,
         options.macro_limits()?,
         options.host.lowering_context()?,
-        options.stage15_variation()?,
         options.error_policy,
         options.hard_resource_policy.clone(),
         options.operational_resource_budget,
@@ -524,7 +503,6 @@ pub(crate) fn ground_coloured_sentences(
         options.composition_seed()?,
         options.macro_limits()?,
         options.host.lowering_context()?,
-        options.stage15_variation()?,
         options.error_policy,
         options.hard_resource_policy.clone(),
         options.operational_resource_budget,

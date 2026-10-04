@@ -26,6 +26,8 @@ public struct ReferenceVocabulary: Decodable, Sendable {
 
 public struct ProductReferenceCopy: Decodable, Sendable {
     public let texts: [String: String]
+    public let dynamicTexts: [String: String]?
+    public let dynamicKeys: [String]?
     public let vocabulary: [ReferenceVocabulary]
     public let limitLabels: [String: String]
     public let limitHints: [String: String]
@@ -34,6 +36,9 @@ public struct ProductReferenceCopy: Decodable, Sendable {
     public let limitGroupTooltips: [String: String]
     public let limitUnits: [String: String]
     public func text(_ key: String) -> String { texts[key] ?? key }
+    public func formatted(_ key: String, _ arguments: CVarArg...) -> String {
+        String(format: dynamicTexts?[key] ?? texts[key] ?? key, arguments: arguments)
+    }
 }
 
 public struct ProductReference: Decodable, Sendable {

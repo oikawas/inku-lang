@@ -20,24 +20,25 @@ import SwiftUI
                 Spacer()
                 Button { Task { await library.setPage(0) } } label: { Image(systemName: "backward.end") }.accessibilityLabel(model.display.localized("最新の履歴"))
                     .disabled(library.page == 0)
-                    .help(tip("最新の履歴"))
-                Button { Task { await library.setPage(library.page - 1) } } label: { Image(systemName: "chevron.left") }.accessibilityLabel(model.display.localized("新しい20件"))
+                    .help(model.display.tooltip("先頭ページ", serverKey: "tooltipHistoryLatestPage"))
+                Button { Task { await library.setPage(library.page - 1) } } label: { Image(systemName: "chevron.left") }.accessibilityLabel(newerLabel)
                     .disabled(library.page == 0)
-                    .help(tip("新しい20件"))
+                    .help(model.display.tooltip("前のページ", serverKey: "tooltipHistoryNewerPage"))
                 Text("\(library.page + 1) / \(library.pageCount)").font(.caption.monospacedDigit())
-                Button { Task { await library.setPage(library.page + 1) } } label: { Image(systemName: "chevron.right") }.accessibilityLabel(model.display.localized("古い20件"))
+                Button { Task { await library.setPage(library.page + 1) } } label: { Image(systemName: "chevron.right") }.accessibilityLabel(olderLabel)
                     .disabled(library.page + 1 >= library.pageCount)
-                    .help(tip("古い20件"))
+                    .help(model.display.tooltip("次のページ", serverKey: "tooltipHistoryOlderPage"))
                 Button { Task { await library.setPage(library.pageCount - 1) } } label: { Image(systemName: "forward.end") }.accessibilityLabel(model.display.localized("最古の履歴"))
                     .disabled(library.page + 1 >= library.pageCount)
-                    .help(tip("最古の履歴"))
+                    .help(model.display.tooltip("最終ページ", serverKey: "tooltipHistoryOldestPage"))
             }.controlSize(.small)
             if let error = library.errorText { Text(error).font(.caption).foregroundStyle(.red) }
             if let error = history.generationError {
                 Text(model.display.localizedFormat("世代を読み込めませんでした: %@", error)).font(.caption).foregroundStyle(.red)
             }
-            ScrollView(.horizontal) {
-                LazyHStack(spacing: 10) {
+            GeometryReader { geometry in
+                let capacity = max(1, Int((geometry.size.width + 10) / 110))
+                HStack(spacing: 10) {
                     ForEach(library.works, id: \.id) { work in
                         Button { Task { await model.selectWork(work) } } label: {
                             VStack(alignment: .leading, spacing: 4) {
@@ -47,9 +48,11 @@ import SwiftUI
                             }.font(.caption2).frame(width: 90, alignment: .leading).padding(5)
                                 .background(model.selectedWorkID == work.id ? Color.accentColor.opacity(0.15) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
                                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(model.selectedWorkID == work.id ? Color.accentColor : .clear))
-                        }.buttonStyle(.plain).help(model.display.preferences.showTooltips ? detailsTip(work) : "").accessibilityLabel(model.display.localizedFormat("作品を開く: %@", title(work)))
+                        }.buttonStyle(.plain).help(model.display.tooltipValue(detailsTip(work))).accessibilityLabel(model.display.localizedFormat("作品を開く: %@", title(work)))
                     }
+                    Spacer(minLength: 0)
                 }
+                .task(id: capacity) { await history.updateCapacity(capacity, app: model) }
             }
             .frame(height: CGFloat(84 + min(3, model.display.preferences.historyFields.count) * 13))
         }.disabled(model.isBusy || library.loading).padding(.horizontal, 16).padding(.vertical, 10)
@@ -57,7 +60,10 @@ import SwiftUI
                 guard !library.loading else { return }
                 await history.refreshGenerations()
             }
+            .task(id: model.selectedWorkID) { await history.locate(app: model) }
     }
+    private var newerLabel: String { model.display.label("新しい\(library.pageSize)件", "\(library.pageSize) newer works") }
+    private var olderLabel: String { model.display.label("古い\(library.pageSize)件", "\(library.pageSize) older works") }
     private func metadata(_ work: SavedWork) -> [String] {
         let fields = model.display.preferences.historyFields
         var output: [String] = []
@@ -83,7 +89,7 @@ import SwiftUI
         return work.id
     }
 
-    private func tip(_ key: String) -> String { model.display.preferences.showTooltips ? model.display.localized(key) : "" }
+    private func tip(_ key: String) -> String { model.display.tooltip(key) }
 
     private func detailsTip(_ work: SavedWork) -> String {
         let models = SavedWorkFacts.models(work).map {

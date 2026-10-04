@@ -34,7 +34,9 @@ pub fn par_map<T: Sync, R: Send>(items: &[T], map: impl Fn(&T) -> R + Sync) -> V
         for worker in workers {
             match worker.join() {
                 Ok(part) => done.extend(part),
-                Err(payload) => failure = failure.or(Some(payload)),
+                Err(payload) => {
+                    failure.get_or_insert(payload);
+                }
             }
         }
     });

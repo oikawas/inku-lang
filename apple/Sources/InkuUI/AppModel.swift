@@ -144,6 +144,12 @@ public final class AppModel {
     public var hasAvailableNextDrawingModel: Bool {
         hasNextDrawingModel && SettingsModel.isModelAvailable(nextDrawingModelReference, settings: settings)
     }
+    public var hasAvailableBatchDrawingModel: Bool {
+        SettingsModel.isBatchModelAvailable(nextDrawingModelReference, settings: settings)
+    }
+    public var nextBatchDrawingModelReference: String {
+        hasAvailableBatchDrawingModel ? nextDrawingModelReference : ""
+    }
     public var canGenerate: Bool {
         database != nil && !isBusy && !isPreview && !(inputMode == "ddl" ? ddlText : descriptionText).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && (inputMode == "ddl" || (hasAvailableNextDrawingModel
@@ -569,23 +575,32 @@ public final class AppModel {
     }
 
     public func requestForCurrentInput(inputMode: String? = nil, source: String? = nil, description: String? = nil,
-                                      parentWorkID: String? = nil, derivationKind: String = "new") throws -> GenerationRequest {
+                                      parentWorkID: String? = nil, derivationKind: String = "new",
+                                      catalogModeOverride: String? = nil, sketchOverride: SketchRequest? = nil) throws -> GenerationRequest {
         guard let bootstrap else { throw HostError("installation_unavailable") }
         let mode = inputMode ?? self.inputMode
         if mode == "description", !SettingsModel.isModelAvailable(nextDrawingModelReference, settings: settings) {
             throw HostError("drawing_model_not_available")
         }
         if parentWorkID != nil && mode == "description" && (selectedContext?.authority == "ddl_authoritative" || sourceLocked) { throw HostError("description_source_locked") }
-        let sketch: SketchRequest = sketchMode == "on" ? .on : sketchMode == "supplied" ? .supplied(sketchText) : .off
+        let sketch: SketchRequest = sketchOverride ?? (sketchMode == "on" ? .on : sketchMode == "supplied" ? .supplied(sketchText) : .off)
         let savedConfig = parentWorkID == selectedWorkID && parentWorkID != nil ? selectedContext?.configuration : nil
         var request = try bootstrap.request(inputMode: mode, source: source ?? ddlText,
             description: description ?? descriptionText, language: language, catalogID: catalogID,
             canvasID: canvasID, seed: seedText, wild: wild, settings: nextGenerationHostSettings,
-            parentWorkID: parentWorkID, derivationKind: derivationKind, catalogMode: catalogMode,
+            parentWorkID: parentWorkID, derivationKind: derivationKind, catalogMode: catalogModeOverride ?? catalogMode,
             sketch: sketch, savedConfiguration: savedConfig,
             importedPlugins: mode == "ddl" && parentWorkID == nil ? importedDDL?.plugins ?? [] : [])
         request.captureProviderIO = developerModeEnabled && display.preferences.captureProviderIO == true
         return request
+    }
+
+    public func requestForBatchDescription(_ description: String, sketchMode: String) throws -> GenerationRequest {
+        guard hasAvailableBatchDrawingModel else { throw HostError("drawing_model_not_available") }
+        guard ["off", "on"].contains(sketchMode) else { throw HostError("invalid_batch_sketch_mode") }
+        return try requestForCurrentInput(inputMode: "description", source: "", description: description,
+            parentWorkID: nil, derivationKind: "new", catalogModeOverride: catalogMode == "auto" ? "auto" : "fixed",
+            sketchOverride: sketchMode == "on" ? .on : .off)
     }
 
     /// Allocate the entire round before any drawing, keeping saved colors, locks, policies and source authority.

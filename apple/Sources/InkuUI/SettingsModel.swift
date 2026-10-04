@@ -82,6 +82,20 @@ public final class SettingsModel {
         return model.isSelectable && model.purposes.contains("llm")
     }
 
+    /// Batch pickers offer only registered, enabled LLM entries; saved custom references are not candidates.
+    public nonisolated static func batchModels(for provider: ProviderSettings) -> [ProviderModelSettings] {
+        let models = provider.models ?? ModelGuidanceCatalog.bundled?.registeredModelSettings(for: provider) ?? []
+        return models.filter { $0.purposes.contains("llm") && provider.enabledModels?[$0.id] != false }
+    }
+
+    public nonisolated static func isBatchModelAvailable(_ reference: String, settings: HostSettings) -> Bool {
+        guard let separator = reference.firstIndex(of: ":") else { return false }
+        let providerID = String(reference[..<separator])
+        let modelID = String(reference[reference.index(after: separator)...])
+        guard !modelID.isEmpty, let provider = settings.providers.first(where: { $0.id == providerID }) else { return false }
+        return batchModels(for: provider).contains { $0.id == modelID && $0.isSelectable }
+    }
+
     public func availableModels(for provider: ProviderSettings, configuredReferences: [String] = [],
                                 discoveredModels: [ProviderModelInfo]? = nil) -> [ProviderModelInfo] {
         let prefix = provider.id + ":"

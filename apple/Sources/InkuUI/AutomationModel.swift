@@ -92,6 +92,7 @@ private enum BatchPromptHistory {
 @MainActor @Observable
 public final class AutomationModel {
     public var batchText = ""
+    public var batchSketchMode = "off"
     public var demoSeedPhrase = "日本の四季を感じさせる文章を40語以内で生成"
     public var demoModel = ""
     public var demoInterval = 30
@@ -176,16 +177,15 @@ public final class AutomationModel {
         defer { preparing = false }
         do {
             let originalText = batchText
-            let catalogMode = app.catalogMode
+            let catalogMode = app.catalogMode == "auto" ? "auto" : "fixed"
+            let sketchMode = batchSketchMode
             let entries = BatchInputLines.entries(in: originalText)
             guard !entries.isEmpty else { throw HostError("empty_batch") }
             guard entries.count <= 1000 else { throw HostError("batch_exceeds_1000_rows") }
             let retries = min(5, max(0, app.display.preferences.batchRetries))
             var captured = try entries.map { line, input in
                 BatchRow(line: line, input: input,
-                    request: try app.requestForCurrentInput(inputMode: app.inputMode, source: input,
-                                                           description: app.inputMode == "description" ? input : "",
-                                                           parentWorkID: nil, derivationKind: "new"))
+                    request: try app.requestForBatchDescription(input, sketchMode: sketchMode))
             }
             let pinned = try await app.pinPersonalPlanRequests(captured.map(\.request))
             guard pinned.count == captured.count else { throw HostError("personal_plan_batch_pin_incomplete") }

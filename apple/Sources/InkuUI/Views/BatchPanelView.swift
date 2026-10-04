@@ -15,7 +15,7 @@ struct BatchPanelView: View {
     private var controlsDisabled: Bool { automation.isOccupied || model.isBusy }
     private var canStartNewBatch: Bool {
         !controlsDisabled && automation.nonEmptyBatchCount > 0
-            && (model.inputMode == "ddl" || model.hasAvailableNextDrawingModel)
+            && model.hasAvailableBatchDrawingModel
     }
     private var issueRows: [BatchRow] { automation.rows.filter { $0.state == .failed || $0.state == .uncertain } }
     private var displayedWork: SavedWork? {
@@ -125,7 +125,7 @@ struct BatchPanelView: View {
 
     @ViewBuilder private var inputHeading: some View {
         Text(model.display.localized("バッチ")).font(.callout.weight(.semibold))
-        Text(model.display.localized("1行に1つの記述またはDDLを入力"))
+        Text(model.display.localized("1行に1つの記述を入力"))
             .font(.caption).foregroundStyle(.secondary)
     }
 
@@ -210,7 +210,7 @@ struct BatchPanelView: View {
                     HStack(spacing: 8) { newBatchLabel; newBatchButton }
                     VStack(alignment: .leading, spacing: 6) { newBatchLabel; newBatchButton }
                 }
-                if model.inputMode == "description", !model.hasAvailableNextDrawingModel {
+                if !model.hasAvailableBatchDrawingModel {
                     Text(model.display.message("drawing_model_not_available"))
                         .font(.caption).foregroundStyle(.secondary)
                 }
@@ -378,8 +378,8 @@ struct BatchPanelView: View {
             ?? model.display.localized("未記録")
         let reference = conditions.inputMode == "ddl" ? "DDL" : conditions.stage1Model == conditions.stage2Model
             ? conditions.stage1Model : [conditions.stage1Model, conditions.stage2Model].joined(separator: " / ")
-        let sketch = model.display.localized(conditions.sketchMode == "on" ? "オン" : conditions.sketchMode == "supplied" ? "指定" : "オフ")
-        let wild = conditions.wild.map { model.display.localized($0 ? "オン" : "オフ") } ?? model.display.localized("未記録")
+        let sketch = model.display.localized(conditions.sketchMode == "on" ? "あり" : conditions.sketchMode == "supplied" ? "指定" : "なし")
+        let wild = conditions.wild.map { model.display.localized($0 ? "入" : "切") } ?? model.display.localized("未記録")
         return [model.display.localized("入力") + ": " + model.display.localized(conditions.inputMode == "ddl" ? "DDL" : "記述"),
                 model.display.localized("モデル") + ": " + reference,
                 model.display.localized("色カタログ") + ": " + catalog,

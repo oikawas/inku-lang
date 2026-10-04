@@ -10,16 +10,36 @@ import InkuUI
     let provider = BatchUIPresentationProvider()
     let app = AppModel(databaseURL: directory.appendingPathComponent("works.sqlite"), transport: provider)
     await app.initialize()
-    let service = ProviderSettings(id: "check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false)
+    let service = ProviderSettings(id: "check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false,
+                                   models: [.init(id: "pinned")])
     try await app.updateHostSettings(HostSettings(providers: [service], models: ModelSelection(stage1Model: "check:pinned", stage2Model: "check:pinned")))
     guard let catalog = app.catalogs.first(where: { $0.id != "default" }),
           let otherCatalog = app.catalogs.first(where: { $0.id != catalog.id }),
           let canvas = app.canvases.first, let otherCanvas = app.canvases.first(where: { $0.id != canvas.id }) else {
         throw CheckFailure.message("Batch UI check requires the bundled catalog and paper choices")
     }
-    app.inputMode = "description"; app.language = "en"; app.seedText = "42"
-    app.catalogMode = "fixed"; app.catalogID = catalog.id; app.canvasID = canvas.id
-    app.sketchMode = "off"; app.wild = false; app.display.preferences.batchRetries = 0
+    app.inputMode = "ddl"; app.language = "en"; app.seedText = "42"
+    app.catalogMode = "auto"; app.catalogID = catalog.id; app.canvasID = canvas.id
+    app.sketchMode = "supplied"; app.sketchText = "Creation sketch must not enter a batch"
+    app.wild = false; app.display.preferences.batchRetries = 0
+    // Failure: a saved unregistered fixture reference became a selectable new batch model.
+    app.selectNextDrawingModel("check:mock-ui")
+    guard !app.hasAvailableBatchDrawingModel, app.nextBatchDrawingModelReference.isEmpty,
+          SettingsModel.batchModels(for: service).map(\.id) == ["pinned"] else {
+        throw CheckFailure.message("Unregistered batch model leaked into choices or summary")
+    }
+    do {
+        _ = try app.requestForBatchDescription("must not run", sketchMode: "off")
+        throw CheckFailure.message("Unregistered batch model was accepted")
+    } catch let error as HostError where error.code == "drawing_model_not_available" {}
+    app.selectNextDrawingModel("check:pinned")
+    let sketchRequest = try app.requestForBatchDescription("A moon over a hill", sketchMode: "on")
+    guard case .description("A moon over a hill", true, .on) = sketchRequest.authoring,
+          sketchRequest.parentWorkID == nil, sketchRequest.derivationKind == "new",
+          app.inputMode == "ddl", app.sketchMode == "supplied", app.catalogMode == "auto" else {
+        throw CheckFailure.message("Batch sketch/auto choice adopted or modified Creation conditions")
+    }
+    app.catalogMode = "random"
     let batch = AutomationModel()
     await batch.connect(app: app)
     let original = "\r\n  A red circle above black dots scattered at the bottom  \r\n\r\nA second red circle above black dots\r\n"
@@ -36,6 +56,10 @@ import InkuUI
           let firstWork = batch.observedWork, firstWork.id == batch.rows[0].workID,
           firstWork.ddl?.isEmpty == false, firstWork.svg.isEmpty == false,
           batch.batchConditions?.stage1Model == "check:pinned",
+          batch.batchConditions?.inputMode == "description", batch.batchConditions?.sketchMode == "off",
+          batch.batchConditions?.catalogMode == "fixed", batch.batchConditions?.wild == false,
+          case .description(_, false, .off) = batch.rows[0].request.authoring,
+          batch.rows[0].request.parentWorkID == nil, batch.rows[0].request.derivationKind == "new",
           batch.batchConditions?.catalogID == catalog.id, batch.batchConditions?.canvasID == canvas.id else {
         await provider.releaseSecondRow(); await operation.value
         throw CheckFailure.message("Batch observer/current row or captured choices changed: \(app.errorText ?? batch.status)")
@@ -91,7 +115,7 @@ import InkuUI
           !app.isBusy, !recovered.isOccupied else {
         throw CheckFailure.message("Resume repainted a success, adopted next conditions, lost observation or invented usage: \(app.errorText ?? recovered.status)")
     }
-    print("Batch UI passed: CRLF input rows 2/4; frozen model/catalog/paper; active row4 keeps row2 observation; latest input history reopens and restores editor only; old journal resumes only failed row with original conditions; missing usage remains unknown. Real shared Rust, temporary SQLite and offline provider mock only.")
+    print("Batch UI passed: unregistered model rejected; description-only batch ignores Creation DDL/supplied sketch/random; explicit on/auto captured without changing Creation; CRLF rows 2/4; frozen model/catalog/paper/wild; row4 keeps row2 observation; history restores editor only; old journal resumes failed row with original conditions; missing usage stays unknown. Real shared Rust, temporary SQLite and offline provider mock only.")
 }
 
 private actor BatchUIPresentationProvider: ProviderTransport {

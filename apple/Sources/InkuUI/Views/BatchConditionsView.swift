@@ -6,6 +6,7 @@ struct BatchConditionsView: View {
     @Bindable var automation: AutomationModel
     @State private var showModelPicker = false
     @State private var showColorCatalogs = false
+    @State private var showSketchPicker = false
     @State private var showPaperPicker = false
     @State private var showDetails = false
 
@@ -13,23 +14,10 @@ struct BatchConditionsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 12) {
-                Text(model.display.localized("次のバッチの描画条件"))
-                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                Picker(model.display.localized("入力"), selection: inputMode) {
-                    Text(model.display.localized("記述")).tag("description")
-                    Text("DDL").tag("ddl")
-                }
-                .pickerStyle(.segmented).labelsHidden().frame(width: 120)
-                .help(tip("各行を記述として解釈するか、DDLとして描くかを選びます。"))
-            }
+            Text(model.display.localized("次のバッチの描画条件"))
+                .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             conditionRow("モデル", value: modelSummary) { showModelPicker = true }
             .help(tip("次のバッチで使う描画モデルを選びます。"))
-            .popover(isPresented: $showModelPicker) {
-                CreationModelPicker(model: model)
-                    .padding(16).frame(width: 380).environment(model.display).disabled(disabled)
-            }
             Divider()
             conditionRow("色カタログ", value: catalogSummary) { showColorCatalogs = true }
             .disabled(model.catalogs.isEmpty)
@@ -49,39 +37,34 @@ struct BatchConditionsView: View {
                 Spacer(minLength: 0)
                 Button(model.display.localized("詳細"), systemImage: "ellipsis") { showDetails = true }
                     .controlSize(.small)
-                    .help(tip("言語・シード・指定する写生を確認して変更します。"))
+                    .help(tip("言語とシードを確認して変更します。"))
                     .popover(isPresented: $showDetails) { details }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .disabled(disabled)
+        .sheet(isPresented: $showModelPicker) {
+            BatchModelPickerView(model: model).environment(model.display).disabled(disabled)
+        }
         .sheet(isPresented: $showColorCatalogs) {
-            ColorCatalogView(model: model).environment(model.display).disabled(disabled)
+            ColorCatalogView(model: model, descriptionOnly: true).environment(model.display).disabled(disabled)
         }
         .onChange(of: disabled) { _, busy in
             if busy {
                 showModelPicker = false; showColorCatalogs = false
-                showPaperPicker = false; showDetails = false
+                showSketchPicker = false; showPaperPicker = false; showDetails = false
             }
         }
     }
 
-    private var inputMode: Binding<String> {
-        Binding(get: { model.inputMode }, set: { mode in
-            guard !disabled else { return }
-            model.inputMode = mode
-            if mode == "ddl", model.catalogMode == "auto" { model.catalogMode = "fixed" }
-        })
-    }
-
     private var catalogSummary: String {
-        model.catalogMode == "fixed"
-            ? model.catalogs.first { $0.id == model.catalogID }?.name ?? model.catalogID
-            : model.display.localized(model.catalogMode == "random" ? "ランダム" : "記述から自動選択")
+        model.catalogMode == "auto"
+            ? model.display.localized("記述から自動選択")
+            : model.catalogs.first { $0.id == model.catalogID }?.name ?? model.catalogID
     }
 
     private var modelSummary: String {
-        let reference = model.nextDrawingModelReference
+        let reference = model.nextBatchDrawingModelReference
         guard let separator = reference.firstIndex(of: ":") else {
             return reference.isEmpty ? model.display.localized("選択してください") : reference
         }
@@ -110,30 +93,64 @@ struct BatchConditionsView: View {
         clearControl
     }
 
-    @ViewBuilder private var sketchControl: some View {
-        if model.inputMode == "description" {
-            Menu {
-                Button(model.display.localized("使わない")) { if !disabled { model.sketchMode = "off" } }
-                Button(model.display.localized("生成する")) { if !disabled { model.sketchMode = "on" } }
-                Button(model.display.localized("指定する")) {
-                    guard !disabled else { return }
-                    model.sketchMode = "supplied"; showDetails = true
-                }
-            } label: {
-                Text(model.display.localized("写生") + ": " + model.display.localized(
-                    model.sketchMode == "on" ? "オン" : model.sketchMode == "supplied" ? "指定" : "オフ"))
-            }
-            .help(tip("次の作品で写生を使うかを選びます。"))
+    private var sketchControl: some View {
+        Button { showSketchPicker = true } label: {
+            Text(model.display.localized("写生") + ": " + model.display.localized(automation.batchSketchMode == "on" ? "あり" : "なし"))
         }
+        .help(tip("次の作品で写生を使うかを選びます。"))
+        .accessibilityLabel(model.display.localized("写生"))
+        .accessibilityValue(model.display.localized(automation.batchSketchMode == "on" ? "あり" : "なし"))
+        .popover(isPresented: $showSketchPicker) { sketchPicker }
+    }
+
+    private var sketchPicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(model.display.localized("写生")).font(.caption).foregroundStyle(.secondary)
+            ForEach(["off", "on"], id: \.self) { mode in
+                Button {
+                    guard !disabled else { return }
+                    automation.batchSketchMode = mode
+                    showSketchPicker = false
+                } label: {
+                    HStack(alignment: .top, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(model.display.localized(mode == "on" ? "あり" : "なし")).font(.callout.weight(.medium))
+                            Text(model.display.localized(mode == "on"
+                                ? "記述の横に、場所の広がりや季節・時刻の光を補って描く"
+                                : "写生を通さず、記述だけで描く"))
+                                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                        if automation.batchSketchMode == mode {
+                            Image(systemName: "checkmark").foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(8).frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .background(automation.batchSketchMode == mode ? Color.secondary.opacity(0.08) : .clear,
+                            in: RoundedRectangle(cornerRadius: 6))
+            }
+        }
+        .padding(10).frame(width: 310).disabled(disabled)
     }
 
     private var wildControl: some View {
-        Button(model.display.localized("暴れる") + ": " + model.display.localized(model.wild ? "オン" : "オフ")) {
+        Button {
             guard !disabled else { return }
             model.wild.toggle()
+        } label: {
+            Text(model.display.localized("暴れる") + " " + model.display.localized(model.wild ? "入" : "切"))
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                .background(model.wild ? Color.accentColor.opacity(0.20) : Color.secondary.opacity(0.06),
+                            in: RoundedRectangle(cornerRadius: 4))
+                .overlay(RoundedRectangle(cornerRadius: 4).stroke(model.wild ? Color.accentColor : Color.secondary.opacity(0.25)))
         }
+        .buttonStyle(.plain)
         .help(tip("次の作品の筆致を規則から外します。"))
-        .accessibilityValue(model.display.localized(model.wild ? "オン" : "オフ"))
+        .accessibilityLabel(model.display.localized("暴れる"))
+        .accessibilityValue(model.display.localized(model.wild ? "入" : "切"))
     }
 
     private var paperControl: some View {
@@ -166,12 +183,6 @@ struct BatchConditionsView: View {
             .help(tip("次の作品の指示書に使う言語を選びます。"))
             TextField(model.display.localized("シード（空欄で新規）"), text: $model.seedText).textFieldStyle(.roundedBorder)
                 .help(tip("空欄なら次の描画で新しいシードを使います。"))
-            if model.inputMode == "description", model.sketchMode == "supplied" {
-                Text(model.display.localized("場所と光を補う写生")).font(.caption).foregroundStyle(.secondary)
-                TextEditor(text: $model.sketchText).frame(height: 110)
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
-                    .accessibilityLabel(model.display.localized("場所と光を補う写生"))
-            }
         }
         .padding(16).frame(width: 340).disabled(disabled)
     }

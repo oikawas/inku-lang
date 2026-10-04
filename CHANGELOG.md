@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### v2.15.83 — Place whole-word copies in cells (Build 1159, 2026-10-04)
+
+This version includes I-708, placing the copies of a count written on a word that receives none without stacking them. DDL engine 57, render engine 73, Score 0.19.0. It retains the preceding ChatGPT fixes and release-container support. Saved works are unchanged; the entries for this date give each change's rules and checks.
+
 ### 2026-10-04 — Explicitly enable ChatGPT plan in released containers
 
 Released containers with ordinary account sign-in and no developer mode can explicitly enable ChatGPT plan and self-hosted startup, using one verified worker without reload. UID 10001 independently owns credentials in `/data/chatgpt` on the API volume with 0700/0600 permissions; host ID and dedicated key survive recreation. Recipient/import CLI calls verify the owner without claiming a serving API. Only the fixed container helper target enters the Mac launch URI. Documentation covers new Mac OAuth and secure transfer of one registration, after which only the container owns refresh. Account sign-in, the source default helper link, core and inference semantics remain unchanged.

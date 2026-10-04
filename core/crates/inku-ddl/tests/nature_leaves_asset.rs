@@ -1,3 +1,5 @@
+mod common;
+
 use std::collections::{BTreeMap, HashSet};
 
 use inku_ddl::{
@@ -606,7 +608,12 @@ fn every_bundled_word_expands_without_omission_at_many_placement_seeds() {
         max_nodes_per_invocation: 128,
         max_total_nodes: 128,
     };
-    for definition in &definitions {
+    // Every count and slot a vary can choose must stay inside the canvas.
+    let runs: Vec<(&MacroDefinition, u64)> = definitions
+        .iter()
+        .flat_map(|definition| (0..32).map(move |seed| (definition, seed)))
+        .collect();
+    common::par_map(&runs, |&(definition, seed)| {
         let identity = definition.identity().unwrap();
         let lock = MacroLock::new(
             identity.qualified_name(),
@@ -614,30 +621,27 @@ fn every_bundled_word_expands_without_omission_at_many_placement_seeds() {
             format!("sha256:{}", identity.full_digest_hex()),
         )
         .unwrap();
-        // Every count and slot a vary can choose must stay inside the canvas.
-        for seed in 0..32 {
-            let execution = compile_ddl_to_score(
-                NormalizedDdlDocument::new(
-                    identity.qualified_name(),
-                    ResolvedInstructionLanguage::Ja,
-                    vec![lock.clone()],
-                )
-                .unwrap(),
-                &definitions,
-                Some(seed),
-                limits,
-                ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-                ScoreErrorPolicy::Stop,
-            );
-            assert_eq!(
-                execution.outcome(),
-                ScoreLoweringOutcome::Complete,
-                "{} at seed {seed}: {:?}",
+        let execution = compile_ddl_to_score(
+            NormalizedDdlDocument::new(
                 identity.qualified_name(),
-                execution.downstream_diagnostics()
-            );
-        }
-    }
+                ResolvedInstructionLanguage::Ja,
+                vec![lock],
+            )
+            .unwrap(),
+            &definitions,
+            Some(seed),
+            limits,
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+            ScoreErrorPolicy::Stop,
+        );
+        assert_eq!(
+            execution.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{} at seed {seed}: {:?}",
+            identity.qualified_name(),
+            execution.downstream_diagnostics()
+        );
+    });
 }
 
 #[test]
@@ -761,38 +765,42 @@ fn every_counted_word_expands_without_omission_at_its_maximum_count() {
             .unwrap()
         })
         .collect::<Vec<_>>();
-    for definition in &definitions {
-        let Some(count) = definition
-            .parameters
-            .iter()
-            .find_map(|(_, schema)| schema.count_parameter())
-        else {
-            continue;
-        };
-        // The form Stage 1 prints, which carries no action word.
-        let source = format!(
-            "{}{}の{}。",
-            count.maximum,
-            count.counter.japanese(),
-            definition.alias_qualified_names()[0]
+    // The form Stage 1 prints, which carries no action word.
+    let sources: Vec<String> = definitions
+        .iter()
+        .filter_map(|definition| {
+            let count = definition
+                .parameters
+                .iter()
+                .find_map(|(_, schema)| schema.count_parameter())?;
+            Some(format!(
+                "{}{}の{}。",
+                count.maximum,
+                count.counter.japanese(),
+                definition.alias_qualified_names()[0]
+            ))
+        })
+        .collect();
+    let runs: Vec<(&String, u64)> = sources
+        .iter()
+        .flat_map(|source| (0..32).map(move |seed| (source, seed)))
+        .collect();
+    common::par_map(&runs, |&(source, seed)| {
+        let execution = compile_ddl_to_score(
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, locks.clone())
+                .unwrap(),
+            &definitions,
+            Some(seed),
+            MIGRATION_LIMITS,
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+            ScoreErrorPolicy::Stop,
         );
-        for seed in 0..32 {
-            let execution = compile_ddl_to_score(
-                NormalizedDdlDocument::new(&source, ResolvedInstructionLanguage::Ja, locks.clone())
-                    .unwrap(),
-                &definitions,
-                Some(seed),
-                MIGRATION_LIMITS,
-                ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-                ScoreErrorPolicy::Stop,
-            );
-            assert_eq!(
-                execution.outcome(),
-                ScoreLoweringOutcome::Complete,
-                "{source} at seed {seed}: upstream={:?}, downstream={:?}",
-                execution.upstream_diagnostics(),
-                execution.downstream_diagnostics()
-            );
-        }
-    }
+        assert_eq!(
+            execution.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{source} at seed {seed}: upstream={:?}, downstream={:?}",
+            execution.upstream_diagnostics(),
+            execution.downstream_diagnostics()
+        );
+    });
 }

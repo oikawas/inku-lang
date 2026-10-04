@@ -1035,10 +1035,38 @@ const AVOIDED_ANGLES: [(&str, &str); 1] = [("tall", "vertical")];
 
 /// Derive the per-form capability matrix by compiling one printed sentence per
 /// value, leaving out the angles in [`AVOIDED_ANGLES`]. The embedded asset must
-/// equal this derivation for the current vocabulary and compiler.
+/// equal this derivation for the current vocabulary and compiler. Each shape
+/// compiles its own few hundred sentences, so the shapes are derived side by
+/// side on their own threads; the matrix is keyed by form, whatever finishes first.
 #[must_use]
 pub fn derive_work_plan_capabilities() -> WorkPlanCapabilities {
     let vocabulary = work_plan_vocabulary();
+    let forms = std::thread::scope(|scope| {
+        let shapes: Vec<_> = vocabulary
+            .terms(WorkPlanSlot::Shape)
+            .iter()
+            .map(|shape| scope.spawn(move || derive_shape_capabilities(vocabulary, shape)))
+            .collect();
+        shapes
+            .into_iter()
+            .flat_map(|shape| {
+                shape
+                    .join()
+                    .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+            })
+            .collect()
+    });
+    WorkPlanCapabilities {
+        asset_id: WORK_PLAN_CAPABILITIES_ASSET_ID.to_owned(),
+        forms,
+    }
+}
+
+/// The capability rows of one shape: alone and with each proportion.
+fn derive_shape_capabilities(
+    vocabulary: &WorkPlanVocabulary,
+    shape: &WorkPlanTerm,
+) -> Vec<(String, BTreeMap<WorkPlanSlot, Vec<String>>)> {
     let ja = ResolvedInstructionLanguage::Ja;
     let accepted = |layer: &WorkPlanLayer| {
         let plan = WorkPlan {
@@ -1047,91 +1075,85 @@ pub fn derive_work_plan_capabilities() -> WorkPlanCapabilities {
         };
         work_plan_source_compiles_cleanly(&print_work_plan(&plan, ja), ja)
     };
-    let mut forms = BTreeMap::new();
-    for shape in vocabulary.terms(WorkPlanSlot::Shape) {
-        let proportions = std::iter::once(None).chain(
-            vocabulary
-                .terms(WorkPlanSlot::Proportion)
-                .iter()
-                .map(|term| Some(term.id.clone())),
-        );
-        for proportion in proportions {
-            let base_action = vocabulary
-                .terms(WorkPlanSlot::Action)
-                .iter()
-                .find_map(|action| {
-                    let layer = WorkPlanLayer {
-                        shape: shape.id.clone(),
-                        proportion: proportion.clone(),
-                        action: action.id.clone(),
-                        count: 1,
-                        attributes: BTreeMap::new(),
+    let mut forms = Vec::new();
+    let proportions = std::iter::once(None).chain(
+        vocabulary
+            .terms(WorkPlanSlot::Proportion)
+            .iter()
+            .map(|term| Some(term.id.clone())),
+    );
+    for proportion in proportions {
+        let base_action = vocabulary
+            .terms(WorkPlanSlot::Action)
+            .iter()
+            .find_map(|action| {
+                let layer = WorkPlanLayer {
+                    shape: shape.id.clone(),
+                    proportion: proportion.clone(),
+                    action: action.id.clone(),
+                    count: 1,
+                    attributes: BTreeMap::new(),
+                };
+                accepted(&layer).then_some(layer)
+            });
+        let Some(base) = base_action else {
+            continue;
+        };
+        let mut slots = BTreeMap::new();
+        for slot in WorkPlanSlot::LAYER_ATTRIBUTES {
+            let mut values = Vec::new();
+            for term in vocabulary.terms(slot) {
+                if slot == WorkPlanSlot::Angle
+                    && proportion
+                        .as_deref()
+                        .is_some_and(|value| AVOIDED_ANGLES.contains(&(value, term.id.as_str())))
+                {
+                    continue;
+                }
+                let mut layer = base.clone();
+                if slot == WorkPlanSlot::Action {
+                    layer.action = term.id.clone();
+                    layer.count = 5;
+                } else if slot == WorkPlanSlot::LineUpDirection {
+                    // Direction exists only on line-up and must print in both languages.
+                    layer.action = "line_up".to_owned();
+                    layer.count = 5;
+                    layer.attributes.insert(slot, term.id.clone());
+                    let plan = WorkPlan {
+                        layers: vec![layer.clone()],
+                        ..WorkPlan::default()
                     };
-                    accepted(&layer).then_some(layer)
-                });
-            let Some(base) = base_action else {
-                continue;
-            };
-            let mut slots = BTreeMap::new();
-            for slot in WorkPlanSlot::LAYER_ATTRIBUTES {
-                let mut values = Vec::new();
-                for term in vocabulary.terms(slot) {
-                    if slot == WorkPlanSlot::Angle
-                        && proportion.as_deref().is_some_and(|value| {
-                            AVOIDED_ANGLES.contains(&(value, term.id.as_str()))
-                        })
+                    let en = ResolvedInstructionLanguage::En;
+                    if accepted(&layer)
+                        && work_plan_source_compiles_cleanly(&print_work_plan(&plan, en), en)
                     {
-                        continue;
-                    }
-                    let mut layer = base.clone();
-                    if slot == WorkPlanSlot::Action {
-                        layer.action = term.id.clone();
-                        layer.count = 5;
-                    } else if slot == WorkPlanSlot::LineUpDirection {
-                        // Direction exists only on line-up and must print in both languages.
-                        layer.action = "line_up".to_owned();
-                        layer.count = 5;
-                        layer.attributes.insert(slot, term.id.clone());
-                        let plan = WorkPlan {
-                            layers: vec![layer.clone()],
-                            ..WorkPlan::default()
-                        };
-                        let en = ResolvedInstructionLanguage::En;
-                        if accepted(&layer)
-                            && work_plan_source_compiles_cleanly(&print_work_plan(&plan, en), en)
-                        {
-                            values.push(term.id.clone());
-                        }
-                        continue;
-                    } else {
-                        if matches!(
-                            slot,
-                            WorkPlanSlot::MotionAmplitude | WorkPlanSlot::MotionSpacing
-                        ) {
-                            let Some(quality) =
-                                vocabulary.terms(WorkPlanSlot::MotionQuality).first()
-                            else {
-                                continue;
-                            };
-                            layer
-                                .attributes
-                                .insert(WorkPlanSlot::MotionQuality, quality.id.clone());
-                        }
-                        layer.attributes.insert(slot, term.id.clone());
-                    }
-                    if accepted(&layer) {
                         values.push(term.id.clone());
                     }
+                    continue;
+                } else {
+                    if matches!(
+                        slot,
+                        WorkPlanSlot::MotionAmplitude | WorkPlanSlot::MotionSpacing
+                    ) {
+                        let Some(quality) = vocabulary.terms(WorkPlanSlot::MotionQuality).first()
+                        else {
+                            continue;
+                        };
+                        layer
+                            .attributes
+                            .insert(WorkPlanSlot::MotionQuality, quality.id.clone());
+                    }
+                    layer.attributes.insert(slot, term.id.clone());
                 }
-                slots.insert(slot, values);
+                if accepted(&layer) {
+                    values.push(term.id.clone());
+                }
             }
-            let key = proportion
-                .map_or_else(|| shape.id.clone(), |value| format!("{}/{value}", shape.id));
-            forms.insert(key, slots);
+            slots.insert(slot, values);
         }
+        let key =
+            proportion.map_or_else(|| shape.id.clone(), |value| format!("{}/{value}", shape.id));
+        forms.push((key, slots));
     }
-    WorkPlanCapabilities {
-        asset_id: WORK_PLAN_CAPABILITIES_ASSET_ID.to_owned(),
-        forms,
-    }
+    forms
 }

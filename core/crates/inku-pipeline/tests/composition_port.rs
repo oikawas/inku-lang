@@ -6,6 +6,8 @@
 //! description text, quote or thesis: a stated place keeps only whether the
 //! description holds its words and whether they name a position.
 
+mod common;
+
 use std::collections::BTreeMap;
 
 use inku_ddl::work_plan::WorkPlanLayer;
@@ -237,69 +239,85 @@ fn fixture_cases() -> Vec<Case> {
         .collect()
 }
 
+/// What one work adds to the outcome.
+#[derive(Default)]
+struct CaseOutcome {
+    checked: bool,
+    solved: bool,
+    skipped_as_expected: bool,
+    left_for_the_full_run: bool,
+    failure: Option<String>,
+}
+
 fn run(limit: Option<u64>) -> Outcome {
     let cases = fixture_cases();
     let mut outcome = Outcome {
         cases: cases.len(),
         ..Outcome::default()
     };
-    for case in &cases {
-        let (checked, findings) = match checked_reading(case) {
-            Ok(value) => value,
-            Err(error) => {
-                outcome.failures.push(format!("{}: {error}", case.id));
-                continue;
-            }
-        };
-        let mut differences = compare_check(case, &checked, &findings);
-        outcome.checked += 1;
-        // Larger works are searched only by the full run: an unoptimised exhaustive
-        // search of every work takes minutes.
-        if case.solve.skipped.is_none()
-            && limit.is_some_and(|limit| case.solve.combinations.unwrap_or(0) > limit)
-        {
-            outcome.left_for_the_full_run += 1;
-            if !differences.is_empty() {
-                outcome
-                    .failures
-                    .push(format!("{}: {}", case.id, differences.join("; ")));
-            }
-            continue;
+    for case in common::par_map(&cases, |case| run_case(case, limit)) {
+        outcome.checked += usize::from(case.checked);
+        outcome.solved += usize::from(case.solved);
+        outcome.skipped_as_expected += usize::from(case.skipped_as_expected);
+        outcome.left_for_the_full_run += usize::from(case.left_for_the_full_run);
+        outcome.failures.extend(case.failure);
+    }
+    outcome
+}
+
+fn run_case(case: &Case, limit: Option<u64>) -> CaseOutcome {
+    let mut outcome = CaseOutcome::default();
+    let (checked, findings) = match checked_reading(case) {
+        Ok(value) => value,
+        Err(error) => {
+            outcome.failure = Some(format!("{}: {error}", case.id));
+            return outcome;
         }
-        match (
-            &case.solve.skipped,
-            composition::search(&case.layers, &checked, &case.background),
-        ) {
-            (Some(reason), Err(Unsolved::Combinations(n))) if reason == "combinations" => {
-                if Some(n) == case.solve.combinations {
-                    outcome.skipped_as_expected += 1;
-                } else {
-                    differences.push(format!("combinations {n} != {:?}", case.solve.combinations));
-                }
-            }
-            (None, Ok(searched)) => {
-                if Some(searched.combinations) != case.solve.combinations {
-                    differences.push(format!(
-                        "combinations {} != {:?}",
-                        searched.combinations, case.solve.combinations
-                    ));
-                }
-                for (seed, expected) in [(1, &case.solve.s1), (2, &case.solve.s2)] {
-                    let expected = expected.as_ref().expect("a solved case has both seeds");
-                    differences.extend(compare_seed(case, &checked, &searched, seed, expected));
-                }
-                outcome.solved += 1;
-            }
-            (expected, got) => differences.push(format!(
-                "solve {expected:?} but {:?}",
-                got.map(|s| s.combinations)
-            )),
-        }
+    };
+    let mut differences = compare_check(case, &checked, &findings);
+    outcome.checked = true;
+    // Larger works are searched only by the full run: an unoptimised exhaustive
+    // search of every work takes minutes.
+    if case.solve.skipped.is_none()
+        && limit.is_some_and(|limit| case.solve.combinations.unwrap_or(0) > limit)
+    {
+        outcome.left_for_the_full_run = true;
         if !differences.is_empty() {
-            outcome
-                .failures
-                .push(format!("{}: {}", case.id, differences.join("; ")));
+            outcome.failure = Some(format!("{}: {}", case.id, differences.join("; ")));
         }
+        return outcome;
+    }
+    match (
+        &case.solve.skipped,
+        composition::search(&case.layers, &checked, &case.background),
+    ) {
+        (Some(reason), Err(Unsolved::Combinations(n))) if reason == "combinations" => {
+            if Some(n) == case.solve.combinations {
+                outcome.skipped_as_expected = true;
+            } else {
+                differences.push(format!("combinations {n} != {:?}", case.solve.combinations));
+            }
+        }
+        (None, Ok(searched)) => {
+            if Some(searched.combinations) != case.solve.combinations {
+                differences.push(format!(
+                    "combinations {} != {:?}",
+                    searched.combinations, case.solve.combinations
+                ));
+            }
+            for (seed, expected) in [(1, &case.solve.s1), (2, &case.solve.s2)] {
+                let expected = expected.as_ref().expect("a solved case has both seeds");
+                differences.extend(compare_seed(case, &checked, &searched, seed, expected));
+            }
+            outcome.solved = true;
+        }
+        (expected, got) => differences.push(format!(
+            "solve {expected:?} but {:?}",
+            got.map(|s| s.combinations)
+        )),
+    }
+    if !differences.is_empty() {
+        outcome.failure = Some(format!("{}: {}", case.id, differences.join("; ")));
     }
     outcome
 }

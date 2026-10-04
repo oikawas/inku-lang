@@ -31,3 +31,18 @@ serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = { version = "=1.0.151", features = ["float_roundtrip"] }
 sha2 = "=0.11.0"
 uniffi = { version = "=0.32.0", default-features = false }
+
+# The raster tests draw full-size images; unoptimized, the drawing dependencies
+# took half a minute of the Linux test run. They are optimized in test builds
+# only. `resvg` names both the vendored renderer and the pinned upstream one.
+[profile.test.package.resvg]
+opt-level = 3
+
+[profile.test.package.usvg]
+opt-level = 3
+
+[profile.test.package.tiny-skia]
+opt-level = 3
+
+[profile.test.package.tiny-skia-path]
+opt-level = 3

@@ -69,6 +69,7 @@ public struct ContentView: View {
     @State private var section: AppSection? = .create
     @State private var automation = AutomationModel()
     @State private var history = HistoryModel()
+    @State private var libraryPreview = LibraryPreviewModel()
     @State private var maintenance = LocalMaintenance()
     @State private var dialog: WorkDialog?
     @State private var presentation = false
@@ -149,7 +150,7 @@ public struct ContentView: View {
     @ViewBuilder private var detail: some View {
         switch section ?? .create {
         case .create: CreationView(model: model, history: history, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay).disabled(automation.running || importing)
-        case .library: LibraryView(model: model, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay).disabled(automation.running || importing)
+        case .library: LibraryView(model: model, preview: libraryPreview, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay).disabled(automation.running || importing)
         case .lineage: LineageView(model: model, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay).disabled(automation.running || importing)
         case .automation: AutomationView(model: model, automation: automation).disabled(importing)
         case .settings: SettingsView(model: model, section: $settingsSection).disabled(automation.running || importing)
@@ -166,12 +167,12 @@ public struct ContentView: View {
     private var canNavigateSections: Bool { !automation.running && !importing && dialog == nil && !presentation }
     private var canUseWork: Bool { !model.isBusy && !automation.running && !importing && dialog == nil && !presentation }
     private var hasSavedWork: Bool { !model.isPreview && model.selectedWork?.trashed == false }
-    private var canCopyImage: Bool { canUseWork && !model.currentSVG.isEmpty && [.create, .library, .lineage].contains(section ?? .create) }
+    private var canCopyImage: Bool { canUseWork && !model.currentSVG.isEmpty && [.create, .lineage].contains(section ?? .create) }
     private var canExport: Bool {
         guard canUseWork else { return false }
         switch section ?? .create {
         case .create: return hasSavedWork
-        case .library: return !model.library.isTrash && (!model.library.selectedIDs.isEmpty || hasSavedWork)
+        case .library: return !model.library.isTrash && (!model.library.selectedIDs.isEmpty || libraryPreview.work?.trashed == false)
         case .lineage: return !model.library.lineageLoading && model.library.graph?.nodes.contains(where: { $0.work?.trashed == false }) == true
         case .automation, .settings: return false
         }
@@ -237,6 +238,13 @@ public struct ContentView: View {
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
+            Button {
+                model.display.preferences.showTooltips.toggle()
+            } label: {
+                Image(systemName: model.display.preferences.showTooltips ? "text.bubble.fill" : "text.bubble")
+            }
+            .accessibilityLabel(model.display.localized(model.display.preferences.showTooltips ? "ツールチップを非表示" : "ツールチップを表示"))
+            .help(model.display.preferences.showTooltips ? model.display.localized("ツールチップを非表示") : "")
             if model.isBusy && !automation.running {
                 Button(model.display.localized("停止"), systemImage: "stop.fill") { Task { await model.cancel() } }.keyboardShortcut(.escape, modifiers: [])
             } else if section == .create {
@@ -272,7 +280,7 @@ public struct ContentView: View {
                     Divider()
                     Button(model.display.localized("全画面で表示")) { enterPresentation() }
                         .disabled(model.currentSVG.isEmpty).keyboardShortcut("f", modifiers: [.command, .shift])
-                }.disabled(!canUseWork || (model.currentSVG.isEmpty && !hasSavedWork))
+                }.disabled(section == .library || !canUseWork || (model.currentSVG.isEmpty && !hasSavedWork))
                     .help(model.display.preferences.showTooltips ? model.display.localized("作品の操作") : "")
             }
         }
@@ -338,6 +346,8 @@ public struct ContentView: View {
                 works = try await model.library.lineagePathWorks()
             } else if sourceSection == .library && !model.library.selectedIDs.isEmpty {
                 works = try await model.library.selectedWorks()
+            } else if sourceSection == .library {
+                works = try await libraryPreview.exportWorks(app: model)
             } else { works = model.selectedWork.map { [$0] } ?? [] }
             guard canExport, section == sourceSection else { return }
             if !works.isEmpty { dialog = .export(ExportSession(works: works, preserveOrder: preserveOrder)) }

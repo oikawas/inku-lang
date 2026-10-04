@@ -26,6 +26,45 @@ struct ArtworkCanvas: View {
     var body: some View {
         VStack(spacing: 8) {
             GeometryReader { geometry in
+                interactiveCanvas(size: geometry.size)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(.quaternary))
+                    .help(display.preferences.showTooltips ? display.localized("マウスホイールで拡大・縮小、ドラッグで移動します。") : "")
+                    .task(id: requestKey(size: geometry.size)) { await render(size: geometry.size) }
+            }
+            .frame(minHeight: 280, maxHeight: .infinity)
+
+            HStack(spacing: 12) {
+                Spacer(minLength: 12)
+                Button { setScale(scale / 1.25) } label: { Image(systemName: "minus.magnifyingglass") }
+                    .accessibilityLabel(display.localized("縮小"))
+                    .help(display.preferences.showTooltips ? display.localized("縮小") : "")
+                    .disabled(scale <= CanvasInteraction.minimumScale)
+                Text(Double(scale).formatted(.percent.precision(.fractionLength(0)))).font(.caption.monospacedDigit())
+                Button { setScale(scale * 1.25) } label: { Image(systemName: "plus.magnifyingglass") }
+                    .accessibilityLabel(display.localized("拡大"))
+                    .help(display.preferences.showTooltips ? display.localized("拡大") : "")
+                    .disabled(scale >= CanvasInteraction.maximumScale)
+                Button(display.localized("用紙に合わせる")) { reset() }
+                    .help(display.preferences.showTooltips ? display.localized("拡大率と位置をリセット") : "")
+            }
+            .buttonStyle(.borderless)
+            .controlSize(.small)
+            .disabled(image == nil)
+        }
+        .onChange(of: svg) { _, _ in image = nil; error = nil; reset() }
+    }
+
+    @ViewBuilder private func interactiveCanvas(size: CGSize) -> some View {
+        #if os(macOS)
+        CanvasWheelSurface(onScroll: applyWheel) { canvasContent(size: size) }
+        #else
+        canvasContent(size: size)
+        #endif
+    }
+
+    private func canvasContent(size: CGSize) -> some View {
               ZStack {
                 RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.quaternary.opacity(0.3))
                 if let image {
@@ -35,10 +74,14 @@ struct ArtworkCanvas: View {
                         .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
                         .scaleEffect(scale).offset(offset)
                         .gesture(MagnificationGesture()
-                            .onChanged { value in scale = bounded(gestureScale * value) }
+                            .onChanged { value in
+                                scale = bounded(gestureScale * value)
+                                clearPanWhenFitted()
+                            }
                             .onEnded { _ in gestureScale = scale })
                         .simultaneousGesture(DragGesture()
                             .onChanged { value in
+                                guard scale > 1 else { clearPanWhenFitted(); return }
                                 offset = CGSize(width: dragOrigin.width + value.translation.width,
                                                 height: dragOrigin.height + value.translation.height)
                             }
@@ -52,35 +95,16 @@ struct ArtworkCanvas: View {
                     ContentUnavailableView(display.localized("作品"), systemImage: "paintpalette", description: Text(display.localized("生成した作品や保存作品をここに表示します。")))
                 }
                 if image != nil, display.preferences.captionVisible, !caption.isEmpty {
-                    captionOverlay(size: geometry.size)
+                    captionOverlay(size: size)
                 }
                 if loading && image != nil { ProgressView().controlSize(.small).padding(12).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing) }
               }
-              .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-              .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(.quaternary))
-              .task(id: requestKey(size: geometry.size)) { await render(size: geometry.size) }
-            }
-            .frame(minHeight: 280, maxHeight: .infinity)
+    }
 
-            HStack(spacing: 12) {
-                Spacer(minLength: 12)
-                Button { setScale(scale / 1.25) } label: { Image(systemName: "minus.magnifyingglass") }
-                    .accessibilityLabel(display.localized("縮小"))
-                    .help(display.preferences.showTooltips ? display.localized("縮小") : "")
-                    .disabled(scale <= 0.25)
-                Text(Double(scale).formatted(.percent.precision(.fractionLength(0)))).font(.caption.monospacedDigit())
-                Button { setScale(scale * 1.25) } label: { Image(systemName: "plus.magnifyingglass") }
-                    .accessibilityLabel(display.localized("拡大"))
-                    .help(display.preferences.showTooltips ? display.localized("拡大") : "")
-                    .disabled(scale >= 8)
-                Button(display.localized("用紙に合わせる")) { reset() }
-                    .help(display.preferences.showTooltips ? display.localized("拡大率と位置をリセット") : "")
-            }
-            .buttonStyle(.borderless)
-            .controlSize(.small)
-            .disabled(image == nil)
-        }
-        .onChange(of: svg) { _, _ in image = nil; error = nil; reset() }
+    private func applyWheel(_ deltaY: CGFloat) -> Bool {
+        guard image != nil, deltaY != 0 else { return false }
+        setScale(CanvasInteraction.wheelScale(from: scale, deltaY: deltaY))
+        return true
     }
 
     private struct RequestKey: Hashable { let svg: String; let width: UInt32; let height: UInt32 }
@@ -125,10 +149,42 @@ struct ArtworkCanvas: View {
         }.padding(24).frame(maxHeight: .infinity, alignment: .bottom)
     }
 
-    private func bounded(_ value: CGFloat) -> CGFloat { min(8, max(0.25, value)) }
-    private func setScale(_ value: CGFloat) { scale = bounded(value); gestureScale = scale }
+    private func bounded(_ value: CGFloat) -> CGFloat { CanvasInteraction.boundedScale(value) }
+    private func clearPanWhenFitted() {
+        offset = CanvasInteraction.offset(for: scale, current: offset)
+        if scale <= 1 { dragOrigin = .zero }
+    }
+    private func setScale(_ value: CGFloat) { scale = bounded(value); gestureScale = scale; clearPanWhenFitted() }
     private func reset() { scale = 1; gestureScale = 1; offset = .zero; dragOrigin = .zero }
 }
+
+#if os(macOS)
+@MainActor private struct CanvasWheelSurface<Content: View>: NSViewRepresentable {
+    let onScroll: (CGFloat) -> Bool
+    let content: Content
+    init(onScroll: @escaping (CGFloat) -> Bool, @ViewBuilder content: () -> Content) {
+        self.onScroll = onScroll; self.content = content()
+    }
+    func makeNSView(context: Context) -> CanvasWheelHostingView {
+        let view = CanvasWheelHostingView(rootView: AnyView(content.environment(\.self, context.environment)))
+        view.sizingOptions = []
+        view.onScroll = onScroll
+        return view
+    }
+    func updateNSView(_ view: CanvasWheelHostingView, context: Context) {
+        view.rootView = AnyView(content.environment(\.self, context.environment))
+        view.onScroll = onScroll
+    }
+    static func dismantleNSView(_ view: CanvasWheelHostingView, coordinator: ()) { view.onScroll = nil }
+}
+
+@MainActor private final class CanvasWheelHostingView: NSHostingView<AnyView> {
+    var onScroll: ((CGFloat) -> Bool)?
+    override func scrollWheel(with event: NSEvent) {
+        if onScroll?(event.scrollingDeltaY) != true { super.scrollWheel(with: event) }
+    }
+}
+#endif
 
 private struct VerticalCaption: View {
     let text: String

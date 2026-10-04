@@ -33,6 +33,28 @@ struct LibraryWorkTitle: View {
 }
 
 @MainActor
+struct LibraryModelFactsView: View {
+    let work: SavedWork
+    let display: DisplaySettings
+    var compact = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ForEach(SavedWorkFacts.models(work)) { fact in
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Text(display.localized(fact.label)).foregroundStyle(.secondary)
+                    Text(fact.reference ?? display.localized("未記録"))
+                        .foregroundStyle(fact.reference == nil ? Color.secondary : Color.primary)
+                        .lineLimit(compact ? 1 : nil)
+                        .textSelection(.enabled)
+                }
+                .help(display.preferences.showTooltips ? display.localized(fact.label) + ": " + (fact.reference ?? display.localized("未記録")) : "")
+            }
+        }.font(compact ? .caption2 : .caption)
+    }
+}
+
+@MainActor
 struct LibraryWorkMarks: View {
     @Bindable var model: AppModel
     let work: SavedWork

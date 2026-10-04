@@ -10,11 +10,11 @@ struct CreationView: View {
     let onReplayWork: (SavedWork) -> Void
     @State private var showSaijiki = false
     @State private var workspaceTab = "artwork"
-    @State private var sketchExpanded = false
-    @State private var outputExpanded = false
-    @State private var conditionsExpanded = false
     @State private var showWorkInfo = false
     @State private var showColorCatalogs = false
+    @State private var showModelPicker = false
+    @State private var showConditionDetails = false
+    @State private var showPaperPicker = false
     #if os(macOS)
     @Environment(DDLImportController.self) private var importer
     #endif
@@ -26,13 +26,13 @@ struct CreationView: View {
                 HStack(alignment: .top, spacing: 0) {
                     VStack(spacing: 0) {
                         ScrollView {
-                            VStack(alignment: .leading, spacing: 16) { input; nextConditions; authoringInspector }
-                                .padding(16)
+                            VStack(alignment: .leading, spacing: 14) { input; nextConditions }
+                                .padding(12)
                         }
                         Divider()
-                        generationAction.padding(16).background(.bar)
+                        generationAction.padding(12).background(.bar)
                     }
-                    .frame(width: 340)
+                    .frame(width: 360)
                     .background(.quaternary.opacity(0.16))
                     Divider()
                     workspace.padding(16)
@@ -43,7 +43,6 @@ struct CreationView: View {
                         VStack(spacing: 16) {
                             input
                             nextConditions
-                            authoringInspector
                             workspace.frame(height: max(480, geometry.size.height * 0.85))
                         }
                         .padding(16)
@@ -62,21 +61,17 @@ struct CreationView: View {
             }.frame(minWidth: 560, minHeight: 620)
         }
         .sheet(isPresented: $showColorCatalogs) { ColorCatalogView(model: model) }
+        .sheet(isPresented: $showWorkInfo) { CreationWorkInfoView(model: model).environment(model.display) }
         .onAppear {
             if model.inputMode == "ddl", model.catalogMode == "auto" { model.catalogMode = "fixed" }
         }
         .onChange(of: model.inputMode) { _, mode in
             if mode == "ddl", model.catalogMode == "auto" { model.catalogMode = "fixed" }
         }
-        .onChange(of: model.displayedWork?.id) { _, _ in
-            if !model.display.preferences.keepGenerationInfo {
-                sketchExpanded = false; outputExpanded = false; conditionsExpanded = false
-            }
-        }
     }
 
     private var input: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(model.display.localized("作品を作る")).font(.title2.weight(.semibold))
                 Spacer()
@@ -86,6 +81,7 @@ struct CreationView: View {
                     #endif
                     model.newWork()
                 }.disabled(model.isBusy)
+                    .help(tip("入力をクリアして、新しい作品を始めます。"))
             }
             Picker(model.display.localized("入力"), selection: $model.inputMode) {
                 Text(model.display.localized("記述")).tag("description")
@@ -93,9 +89,11 @@ struct CreationView: View {
             }
             .pickerStyle(.segmented)
             .disabled(model.isBusy)
+            .help(tip("記述から描くか、DDLから描くかを選びます。"))
 
             if model.inputMode == "description" {
-                editor(text: $model.descriptionText, placeholder: "描きたいものや情景を記述", height: 170)
+                editor(text: $model.descriptionText, placeholder: "描きたいものや情景を記述", height: 120,
+                       readOnly: model.sourceLocked && model.selectedWork != nil)
                 DescriptionMeterView(model: model, text: model.descriptionText)
                 if model.sourceLocked && model.selectedWork != nil {
                     Text(model.display.localized("この作品の記述はロックされています。別の記述で生成するには「新規」を選んでください。"))
@@ -103,9 +101,9 @@ struct CreationView: View {
                 }
             } else {
                 if !model.visibleDDL.isEmpty && !model.isPreview {
-                    DdlAuthoringView(model: model)
+                    DdlAuthoringView(model: model, showsDiagnostics: false)
                 } else {
-                    editor(text: $model.ddlText, placeholder: "DDLを入力", monospaced: true, height: 220)
+                    editor(text: $model.ddlText, placeholder: "DDLを入力", monospaced: true, height: 140)
                 }
                 PluginReferenceView(model: model, text: model.ddlText)
                 #if os(macOS)
@@ -113,56 +111,106 @@ struct CreationView: View {
                 #endif
             }
         }
-        .creationPanel()
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var nextConditions: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             Label(model.display.localized("次の生成条件"), systemImage: "slider.horizontal.3")
-                .font(.headline)
-            CreationModelPicker(model: model)
-            Divider()
-            Picker(model.display.localized("言語"), selection: $model.language) {
-                Text(model.display.localized("日本語")).tag("ja")
-                Text("English").tag("en")
+                .font(.subheadline.weight(.semibold))
+            Button { showModelPicker = true } label: {
+                conditionRow("モデル", value: model.nextDrawingModelReference.isEmpty ? model.display.localized("選択してください") : model.nextDrawingModelReference)
             }
-            .disabled(model.isBusy)
+            .buttonStyle(.plain).disabled(model.isBusy)
+            .help(tip("次の作品の描画モデルを選びます。"))
+            .popover(isPresented: $showModelPicker) {
+                CreationModelPicker(model: model).padding(16).frame(width: 380).environment(model.display)
+            }
+            Button { showColorCatalogs = true } label: {
+                conditionRow("色カタログ", value: catalogSummary)
+            }
+            .buttonStyle(.plain).disabled(model.isBusy || model.catalogs.isEmpty)
+            .accessibilityLabel(model.display.localized("色カタログを開く"))
+            .accessibilityValue(catalogSummary)
+            .help(tip("次の作品の配色を選びます。"))
+            Divider()
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) { compactConditionControls }
+                VStack(alignment: .leading, spacing: 8) { compactConditionControls }
+            }
+            .controlSize(.small).disabled(model.isBusy)
+            HStack {
+                Button(model.display.localized("生成条件の詳細"), systemImage: "ellipsis.circle") { showConditionDetails = true }
+                    .help(tip("言語・シード・配色の選び方を確認して変更します。"))
+                    .popover(isPresented: $showConditionDetails) { conditionDetails }
+                Spacer(minLength: 0)
+                if model.display.visible("saijiki") {
+                    Button { showSaijiki = true } label: { Image(systemName: "book") }
+                        .accessibilityLabel(model.display.localized("歳時記を開く"))
+                        .help(tip("歳時記の語と説明を参照します。"))
+                }
+            }
+            .controlSize(.small).disabled(model.isBusy)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var catalogSummary: String {
+        model.catalogMode == "fixed" ? model.catalogs.first { $0.id == model.catalogID }?.name ?? model.catalogID
+            : model.display.localized(model.catalogMode == "random" ? "ランダム" : "記述から選択")
+    }
+
+    private func conditionRow(_ key: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(model.display.localized(key)).font(.caption).foregroundStyle(.secondary)
+                Text(value).font(.callout).lineLimit(1).truncationMode(.middle)
+            }
+            Spacer(minLength: 0)
+            Text(model.display.localized("変更")).font(.caption).foregroundStyle(.secondary)
+        }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+    }
+
+    @ViewBuilder private var compactConditionControls: some View {
+        if model.inputMode == "description" {
+            Menu {
+                Button(model.display.localized("使わない")) { model.sketchMode = "off" }
+                Button(model.display.localized("生成する")) { model.sketchMode = "on" }
+                Button(model.display.localized("指定する")) { model.sketchMode = "supplied"; showConditionDetails = true }
+            } label: {
+                Text(model.display.localized("写生") + ": " + model.display.localized(model.sketchMode == "on" ? "オン" : model.sketchMode == "supplied" ? "指定" : "オフ"))
+            }.help(tip("次の作品で写生を使うかを選びます。"))
+        }
+        Button(model.display.localized("暴れる") + ": " + model.display.localized(model.wild ? "オン" : "オフ")) { model.wild.toggle() }
+            .help(tip("次の作品の筆致を規則から外します。"))
+        Button { showPaperPicker = true } label: {
+            Label(model.display.localized("用紙") + ": " + (model.canvases.first { $0.id == model.canvasID }?.label ?? model.canvasID),
+                  systemImage: "rectangle.portrait")
+        }
+        .help(tip("用紙の形と意図を見て、次の作品の用紙を選びます。"))
+        .popover(isPresented: $showPaperPicker) {
+            CreationPaperPicker(model: model) { showPaperPicker = false }.environment(model.display)
+        }
+        .accessibilityValue(model.canvases.first { $0.id == model.canvasID }?.name ?? model.canvasID)
+    }
+
+    private var conditionDetails: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(model.display.localized("生成条件の詳細")).font(.headline)
+            Picker(model.display.localized("言語"), selection: $model.language) {
+                Text(model.display.localized("日本語")).tag("ja"); Text("English").tag("en")
+            }.help(tip("次の作品の指示書に使う言語を選びます。"))
             Picker(model.display.localized("配色の選び方"), selection: $model.catalogMode) {
                 Text(model.display.localized("指定")).tag("fixed")
                 Text(model.display.localized("ランダム")).tag("random")
                 if model.inputMode == "description" { Text(model.display.localized("記述から選択")).tag("auto") }
-            }.disabled(model.isBusy)
-            Button { showColorCatalogs = true } label: {
-                ColorCatalogPreview(catalog: model.catalogs.first { $0.id == model.catalogID }, mode: model.catalogMode, display: model.display)
+            }.help(tip("指定した配色・ランダム・記述からの選択を切り替えます。"))
+            TextField(model.display.localized("シード（空欄で新規）"), text: $model.seedText).textFieldStyle(.roundedBorder)
+                .help(tip("空欄なら次の描画で新しいシードを使います。"))
+            if model.inputMode == "description", model.sketchMode == "supplied" {
+                editor(text: $model.sketchText, placeholder: "場所と光を補う写生", height: 110)
             }
-            .buttonStyle(.plain)
-            .disabled(model.isBusy || model.catalogs.isEmpty)
-            .accessibilityLabel(model.display.localized("色カタログを開く"))
-            .accessibilityValue(model.catalogMode == "fixed" ? model.catalogs.first { $0.id == model.catalogID }?.name ?? model.catalogID : model.display.localized(model.catalogMode == "random" ? "ランダム" : "記述から選択"))
-            .help(model.display.preferences.showTooltips ? model.display.localized("色カタログを開く") : "")
-            Picker(model.display.localized("用紙"), selection: $model.canvasID) {
-                ForEach(model.canvases, id: \.id) { item in Text(item.name).tag(item.id) }
-            }
-            .disabled(model.isBusy)
-            TextField(model.display.localized("シード（空欄で新規）"), text: $model.seedText)
-                .textFieldStyle(.roundedBorder)
-                .disabled(model.isBusy)
-            Toggle(model.display.localized("暴れる"), isOn: $model.wild).disabled(model.isBusy)
-            if model.inputMode == "description" {
-                Picker(model.display.localized("写生"), selection: $model.sketchMode) {
-                    Text(model.display.localized("使わない")).tag("off")
-                    Text(model.display.localized("生成する")).tag("on")
-                    Text(model.display.localized("指定する")).tag("supplied")
-                }.disabled(model.isBusy)
-                if model.sketchMode == "supplied" {
-                    editor(text: $model.sketchText, placeholder: "場所と光を補う写生", height: 110)
-                }
-            }
-            if model.display.visible("saijiki") {
-                Button(model.display.localized("歳時記を開く"), systemImage: "book") { showSaijiki = true }
-            }
-        }
-        .creationPanel()
+        }.padding(16).frame(width: 360).disabled(model.isBusy)
     }
 
     private var generationAction: some View {
@@ -184,6 +232,7 @@ struct CreationView: View {
                 }
                     .buttonStyle(.bordered)
                     .frame(maxWidth: .infinity)
+                    .help(tip("実行中の描画を停止します。"))
             } else {
                 Button { Task { await model.generate() } } label: {
                     Label(model.display.localized("生成"), systemImage: "play.fill").frame(maxWidth: .infinity)
@@ -191,18 +240,19 @@ struct CreationView: View {
                     .buttonStyle(.borderedProminent)
                     .frame(maxWidth: .infinity)
                     .disabled(!model.canGenerate)
+                    .help(tip("入力と次の生成条件から作品を描きます。"))
             }
         }
         .controlSize(.large)
     }
 
-    private func editor(text: Binding<String>, placeholder: String, monospaced: Bool = false, height: CGFloat) -> some View {
+    private func editor(text: Binding<String>, placeholder: String, monospaced: Bool = false, height: CGFloat, readOnly: Bool = false) -> some View {
         ZStack(alignment: .topLeading) {
             TextEditor(text: text)
                 .font(monospaced ? .system(.body, design: .monospaced) : .body)
                 .scrollContentBackground(.hidden)
                 .padding(6)
-                .disabled(model.isBusy)
+                .disabled(model.isBusy || readOnly)
             if text.wrappedValue.isEmpty {
                 Text(model.display.localized(placeholder)).foregroundStyle(.tertiary).padding(12).allowsHitTesting(false)
             }
@@ -221,14 +271,13 @@ struct CreationView: View {
                     .pickerStyle(.segmented).labelsHidden().frame(width: 150)
                     .accessibilityLabel(model.display.localized("表示"))
                 Spacer()
-                if let work = model.displayedWork {
+                if model.displayedWork != nil {
                     Button { showWorkInfo = true } label: {
-                        Label(model.display.localized("表示中の作品"), systemImage: "info.circle")
+                        Label(model.display.localized("生成情報"), systemImage: "info.circle")
                             .font(.caption)
                     }
                     .buttonStyle(.plain)
-                    .help(model.display.preferences.showTooltips ? model.display.localized("保存条件") : "")
-                    .popover(isPresented: $showWorkInfo) { savedFacts(work).padding(20).frame(width: 320) }
+                    .help(tip("表示中作品の指示書と保存条件を表示します。"))
                 }
               }
               if let work = model.displayedWork {
@@ -270,18 +319,6 @@ struct CreationView: View {
          work.renderCanvasAspectID ?? "—", ByteCountFormatter.string(fromByteCount: Int64(work.svg.utf8.count), countStyle: .file)].joined(separator: " · ")
     }
 
-    private func savedFacts(_ work: SavedWork) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(model.display.localized("表示中の作品")).font(.headline)
-            LabeledContent(model.display.localized("モデル"), value: work.stage1Model ?? "DDL")
-            LabeledContent(model.display.localized("配色"), value: work.renderColorCatalogName ?? work.renderColorCatalogID ?? work.catalogID ?? "—")
-            LabeledContent(model.display.localized("用紙"), value: work.renderCanvasAspectID ?? "—")
-            LabeledContent(model.display.localized("ファイル容量"), value: ByteCountFormatter.string(fromByteCount: Int64(work.svg.utf8.count), countStyle: .file))
-            Text(model.display.localizedFormat("シード: %@ · 暴れる: %@", work.renderSeed ?? model.display.localized("未記録"), model.display.localized(work.renderWild == true ? "オン" : "オフ")))
-                .font(.caption).foregroundStyle(.secondary)
-        }.textSelection(.enabled)
-    }
-
     private func workActions(_ work: SavedWork) -> some View {
         HStack(spacing: 8) {
             Menu(model.display.localized("推敲する")) {
@@ -314,39 +351,8 @@ struct CreationView: View {
         }
     }
 
-    @ViewBuilder private var authoringInspector: some View {
-        if let work = model.displayedWork {
-          VStack(alignment: .leading, spacing: 14) {
-            Text(model.display.localized("表示中作品の写生と指示書")).font(.headline)
-            if model.display.visible("diagnostics"), model.authoringOrigin == "stage1_generated", let ddl = work.ddl {
-                DescriptionFeedbackView(description: work.effectiveSourceText, ddl: ddl)
-            }
-            if let sketch = work.sketchText, !sketch.isEmpty {
-                DisclosureGroup(model.display.localized("写生 (Stage 0.5)"), isExpanded: $sketchExpanded) { Text(sketch).font(.callout).textSelection(.enabled) }
-            }
-            if let grain = work.sketchGrain { Text(model.display.localizedFormat("旧写生の区切り: %@（保存記録）", grain)).font(.caption).foregroundStyle(.secondary) }
-            if model.inputMode == "description", !model.visibleDDL.isEmpty && !model.isPreview { DdlAuthoringView(model: model) }
-            if model.display.visible("diagnostics") {
-                ProviderObservationView(model: model, metrics: model.providerMetrics, workID: work.id)
-                DisclosureGroup(model.display.localized("指示書・Score"), isExpanded: $outputExpanded) { OutputView(ddl: model.visibleDDL, score: model.scoreJSON).frame(height: 230) }
-                DisclosureGroup(model.display.localized("保存条件"), isExpanded: $conditionsExpanded) {
-                    savedFacts(work).padding(.top, 8)
-                }
-            }
-            if !model.isPreview {
-                Button(model.display.localized("次の条件で再演奏")) { Task { await model.replayWithCurrentOptions() } }.disabled(model.isBusy)
-                DisclosureGroup(model.display.localized("変奏（いまは何も動かない）")) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(model.display.localized("動いたもの: なし")).font(.callout).foregroundStyle(.secondary)
-                        Picker(model.display.localized("変奏の幅"), selection: $model.variationAmplitude) { Text(model.display.localized("小")).tag("small"); Text(model.display.localized("中")).tag("medium"); Text(model.display.localized("大")).tag("large") }
-                        TextField(model.display.localized("変奏シード（空欄で新規）"), text: $model.variationSeedText).textFieldStyle(.roundedBorder)
-                        Button(model.display.localized("変奏を保存")) { Task { await model.varySelectedWork() } }
-                    }.disabled(model.isBusy || work.ddl == nil)
-                }
-            }
-          }
-          .creationPanel()
-        }
+    private func tip(_ key: String) -> String {
+        model.display.preferences.showTooltips ? model.display.localized(key) : ""
     }
 }
 

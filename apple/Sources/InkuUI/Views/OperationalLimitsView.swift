@@ -2,51 +2,121 @@ import SwiftUI
 
 @MainActor struct OperationalLimitsView: View {
     @Bindable var model: AppModel
-    @State private var maximum: [String: UInt32] = [:]
-    @State private var values: [String: UInt32] = [:]
+    @State private var draft: [String: String] = [:]
+    @State private var saved: [String: UInt32] = [:]
+    @State private var saving = false
     @State private var message = ""
+    @State private var helpGroup: String?
+
+    private var changed: Bool { draft != saved.mapValues(String.init) }
 
     var body: some View {
-        Section(model.display.localized("描画の運用上限")) {
-            Text(model.display.localized("新しい作品の処理量を調整します。保存作品は保存時の条件で再演奏します。"))
-                .font(.callout).foregroundStyle(.secondary)
-            ForEach(maximum.keys.sorted(), id: \.self) { key in
-                HStack {
-                    Text(model.display.localized(title(key)))
-                    Spacer()
-                    TextField(model.display.localized("上限"), value: Binding(get: { values[key] ?? maximum[key] ?? 0 }, set: { values[key] = min($0, maximum[key] ?? 0) }), format: .number)
-                        .multilineTextAlignment(.trailing).frame(width: 110)
-                    Text("/ \(maximum[key] ?? 0)").foregroundStyle(.secondary).frame(width: 90, alignment: .trailing)
+        Group {
+            if let definition = model.drawingLimitDefinition,
+               let copy = model.productReference?.localized(language: model.display.preferences.language) {
+                Section(copy.text("settingsRenderLimitsTitle")) {
+                    Text(copy.text("settingsRenderLimitsIntro")).font(.callout).foregroundStyle(.secondary)
                 }
+                ForEach(definition.groups, id: \.id) { group in
+                    Section {
+                        if let summary = copy.limitGroupSummaries[group.id], !summary.isEmpty {
+                            Text(summary).font(.callout).foregroundStyle(.secondary)
+                        }
+                        ForEach(group.fields, id: \.self) { key in
+                            limitRow(key, definition: definition, copy: copy)
+                        }
+                    } header: {
+                        HStack(spacing: 6) {
+                            Text(copy.limitGroups[group.id] ?? group.id)
+                            if let tip = copy.limitGroupTooltips[group.id], !tip.isEmpty {
+                                Button { helpGroup = group.id } label: { Image(systemName: "info.circle") }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel(model.display.localizedFormat("%@の説明", copy.limitGroups[group.id] ?? group.id))
+                                    .help(model.display.preferences.showTooltips ? tip : "")
+                                    .popover(isPresented: Binding(get: { helpGroup == group.id }, set: { if !$0 { helpGroup = nil } })) {
+                                        Text(tip).font(.callout).textSelection(.enabled).padding(16).frame(width: 380)
+                                    }
+                            }
+                        }
+                    }
+                }
+                Section {
+                    Text(copy.text("settingsRenderLimitsRounding")).font(.callout).foregroundStyle(.secondary)
+                    HStack {
+                        Button(model.display.localized("再読込")) { load() }.disabled(changed)
+                        Button(copy.text("settingsRenderLimitsReset")) { draft = definition.defaults.mapValues(String.init); message = "" }
+                            .help(model.display.preferences.showTooltips ? model.display.localized("既定値を入力欄に戻します。変更を保存するまで適用しません。") : "")
+                        Spacer()
+                        if changed {
+                            Button(model.display.localized("取消")) { draft = saved.mapValues(String.init); message = "" }
+                            Button(model.display.localized("変更を保存")) { Task { await save(definition: definition) } }
+                                .buttonStyle(.borderedProminent)
+                                .disabled((try? definition.parsedDraft(draft)) == nil)
+                        }
+                    }.disabled(saving || model.isBusy)
+                    if changed, (try? definition.parsedDraft(draft)) == nil {
+                        Text(model.display.localized("制限値には整数を入力してください。"))
+                            .font(.caption).foregroundStyle(.red)
+                    }
+                    if !message.isEmpty { Text(model.display.message(message)).font(.caption).textSelection(.enabled) }
+                }
+            } else {
+                Section { ProgressView(model.display.localized("準備中")) }
             }
-            HStack {
-                Button(model.display.localized("上限を保存")) { Task { await save(defaults: false) } }
-                Button(model.display.localized("標準値に戻す")) { Task { await save(defaults: true) } }
-            }.disabled(model.isBusy || maximum.isEmpty)
-            if !message.isEmpty { Text(model.display.message(message)).font(.caption).textSelection(.enabled) }
-        }
-        .task {
-            do { maximum = try model.operationalLimitDefaults(); values = try model.operationalLimits() }
-            catch { message = error.localizedDescription }
-        }
+        }.task { load() }
     }
 
-    private func save(defaults: Bool) async {
-        do {
-            try await model.updateOperationalLimits(defaults ? nil : values)
-            values = try model.operationalLimits()
-            message = "描画の上限を保存しました。"
-        } catch { message = error.localizedDescription }
+    private func limitRow(_ key: String, definition: DrawingLimitDefinition, copy: ProductReferenceCopy) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(copy.limitLabels[key] ?? key)
+                    Text(copy.limitHints[key] ?? "").font(.caption).foregroundStyle(.secondary)
+                    if ["max_expanded_primitives", "max_expanded_per_instruction"].contains(key),
+                       let value = Int(draft[key] ?? ""), let low = definition.bytesPerMark["pen"],
+                       let high = definition.bytesPerMark["brush_thick"] {
+                        Text(String(format: copy.text("limitWeightFormat"),
+                                    String(format: "%.1f", Double(max(1, value)) * Double(low) / 1_000_000),
+                                    String(format: "%.1f", Double(max(1, value)) * Double(high) / 1_000_000)))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 5) {
+                    Button { step(key, by: -1, definition: definition) } label: { Image(systemName: "minus") }
+                    TextField(copy.limitLabels[key] ?? key, text: Binding(get: { draft[key] ?? "" }, set: { draft[key] = $0; message = "" }))
+                        .textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing).frame(width: 100)
+                        .accessibilityLabel(copy.limitLabels[key] ?? key)
+                        .help(model.display.preferences.showTooltips ? copy.limitHints[key] ?? "" : "")
+                    Button { step(key, by: 1, definition: definition) } label: { Image(systemName: "plus") }
+                }.buttonStyle(.borderless).disabled(saving || model.isBusy)
+            }
+            HStack(spacing: 16) {
+                Text(model.display.localizedFormat("現在: %ld", Int(saved[key] ?? 0)))
+                Text(model.display.localizedFormat("既定: %ld", Int(definition.defaults[key] ?? 0)))
+                if let unit = copy.limitUnits[key] { Text(unit) }
+            }.font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+        }.padding(.vertical, 4)
     }
-    private func title(_ key: String) -> String {
-        switch key {
-        case "logical_objects": "図形の数"
-        case "anchor_instances": "アンカーの数"
-        case "fill_instances": "塗りの数"
-        case "stroke_instances": "線の数"
-        case "surface_instances": "表面効果の数"
-        case "render_nodes": "描画要素の数"
-        default: key.replacingOccurrences(of: "_", with: " ")
-        }
+
+    private func load() {
+        do { saved = try model.drawingLimits(); draft = saved.mapValues(String.init); message = "" }
+        catch { message = error.localizedDescription }
+    }
+
+    private func step(_ key: String, by amount: Int64, definition: DrawingLimitDefinition) {
+        let value = Int64((draft[key] ?? "").replacingOccurrences(of: ",", with: "")) ?? Int64(saved[key] ?? 1)
+        let bounded = min(Int64(definition.absoluteMaximum), max(1, value))
+        draft[key] = String(min(Int64(definition.absoluteMaximum), max(1, bounded + amount)))
+        message = ""
+    }
+
+    private func save(definition: DrawingLimitDefinition) async {
+        saving = true
+        defer { saving = false }
+        do {
+            try await model.updateDrawingLimits(definition.parsedDraft(draft))
+            saved = try model.drawingLimits(); draft = saved.mapValues(String.init)
+            message = model.productReference?.localized(language: model.display.preferences.language)?.text("settingsRenderLimitsSaved") ?? "制限値を保存しました"
+        } catch { message = (try? definition.parsedDraft(draft)) == nil ? "制限値には整数を入力してください。" : error.localizedDescription }
     }
 }

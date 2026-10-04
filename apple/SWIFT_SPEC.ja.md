@@ -14,6 +14,24 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-04 制作・ライブラリ・系譜のWeb UIへの追随
+
+制作の通常表示は記述／DDL、次のモデル・色カタログ・写生・Wild・用紙の要約、固定した描画操作をまとめる。言語・シード等は詳細popoverへ、保存作品の指示書・条件・計測は「表示中作品の生成情報」へ分ける。DDLは短い読取表示から独立editorを開き、取消しでは制作入力・表示SVG・revision・履歴を変更しない。確定時だけ既存のauthorityとrevision検証を通して子作品を描く。
+
+ライブラリの選択は専用previewを開き、制作中の入力と作品を保持する。「制作で開く」を明示した場合だけ制作の選択を切り替える。previewを閉じると一覧の幅を戻し、書出しはチェックした作品、またはpreview作品を対象とする。一覧は保存日時、記述、役割別モデル、印と操作を列で揃える。未記録の解釈モデルをDDL入力と推定しない。コメントは読込状態・対象ID・編集draftを分け、未取得時の保存と遅い取得による編集中の上書きを防ぐ。
+
+系譜は親子の矢印、お気に入りへ至る経路、削除節点へ接続する破線を表示し、既定は縦方向とする。枝の開閉は中心節点を保持し、未知の子だけを読み出す。全体図は40–140%で拡縮し、閉じると通常の枝の開閉、中心、方向とスクロール位置へ戻る。通常表示と全体図のsnapshotを分け、最大200節点の読出し境界を維持する。
+
+macOSのキャンバス上の縦ホイールは1回0.15の倍率変更を行い、25–1000%に丸める。pinch・drag・倍率buttonと同じ状態を使い、100%以下では移動を中央へ戻す。処理はキャンバスをhostするnative view内に限定する。保存SVGとraster予算は変更しない。
+
+用紙chooserは名前・形・分類・意図を表示する。候補・順序・比率はRust registryを使用し、表示metadataは同じcheckoutのWebからbuild時に取り込む。選択は次のcanvasだけへ適用し、閉じる操作と保存作品のcanvasを分ける。歳時記はcompactな語一覧と選んだ1語のpreview・効果・説明・例を表示する。通常は参照のみとし、DDL editorから明示して開いた場合だけeditor draftへ語を挿入する。同梱定義のないplugin語は参照のみとする。
+
+対象画面の主要操作へTipsを補い、設定の`showTooltips`とtoolbarの表示切替に従う。「inkuについて」は同じcheckoutのWebの概念説明、5項目の用語表、作者情報とrepositoryリンクを取り込む。製品版・build・build日時とDDL／render層の版を生成resourceから、binding protocolは同梱coreのreportから表示する。
+
+描画の制限値はServerの9項目、3分類、既定値と相互上限ルールをbuild resourceとして使用する。1–100000の整数を独立draftで編集し、保存・取消・再読込を分ける。既定値への復帰も保存するまで適用しない。新作品の要求ではServerと同じ4項目をhard／operational両budgetへ写し、適用値からbudget identityを作る。保存作品のconfigurationと既存の構造資源設定は保持する。DDLの意味・展開・描画は共有Rustのままとし、DB schemaを変えない。
+
+表示resourceは`export-server-resources.py`と`export-web-reference.mjs`で同じcheckoutの正本から生成する。Swift packageでも先にresourceを生成する。限定確認selectorは`--library-browsing-only`、`--lineage-presentation-only`、`--ddl-editor-cancel-only`、`--drawing-limits-editing-only`、`--canvas-wheel-only`で、具体差分に必要なものだけを選ぶ。nativeの配置・操作感・実ホイールイベント、Intel／最低OS実機、実provider、iOSの受入は別に確認する。
+
 ## 2026-10-04 macOSアプリアイコンと固定install
 
 macOSアプリアイコンは既存[incu画像](../docs/assets/incu-icon-512.png)から生成する。pixelの配色、暗い背景と透明な角を保持したicnsをbundle resourceへ含め、Info.plistから参照する。通常のbuild手順で再生成する。
@@ -32,7 +50,7 @@ DB指定は`--database`、任意のbundle設定`InkuDatabasePath`、従来のApp
 
 ### 制作と保存作品の表示
 
-制作画面は左に記述／直接DDLと次に描く条件、保存作品の写生・指示書を置き、右に表示中作品の条件と作品／系譜canvasを置く。入力・次の条件・保存情報をpanelにまとめ、生成／停止は入力のscroll領域の外へ固定する。狭い幅では縦配置へ切り替える。保存作品のmodel、色catalog、用紙、サイズはcompactな要約と詳細popoverで読み、次の入力条件と区別する。画面上の記述caption、縦書き／横書き、配置、pan／zoom、プレゼンテーションは表示合成であり、保存SVGを変更しない。「用紙に合わせる」はzoomと移動を初期位置へ戻す。
+制作画面は左に記述／直接DDLと次に描く条件、右に表示中作品の条件と作品／系譜canvasを置く。生成／停止は入力のscroll領域の外へ固定する。保存作品の写生・指示書・詳細な生成情報は明示して開く別paneへ分ける。狭い幅では縦配置へ切り替える。保存作品のmodel、色catalog、用紙、サイズはcompactな要約と詳細popoverで読み、次の入力条件と区別する。画面上の記述caption、縦書き／横書き、配置、pan／zoom、プレゼンテーションは表示合成であり、保存SVGを変更しない。「用紙に合わせる」はzoomと移動を初期位置へ戻す。
 
 制作画面で登録済みのserviceと描画modelを選択する。設定したmodelと明示取得したmodel一覧を表示し、一覧取得は利用者のbutton操作だけで始める。選択した次のmodelは記述解釈と構造化の両段へ渡し、設定画面の保存defaultや親作品のmodelを書き換えない。新しい生成要求・推敲・比較の初期選択は次のmodelを使い、開始済みbatch／demoのmodelはそのsnapshotへ固定する。未接続時はモデル設定へ案内する。
 

@@ -6,6 +6,7 @@ import ast
 import json
 import runpy
 import shutil
+import subprocess
 import sys
 from copy import deepcopy
 from pathlib import Path
@@ -114,6 +115,28 @@ def main() -> None:
     exec(compile(module, "server/pipeline_defaults.py", "exec"), environment)  # noqa: S102
     manifest = environment["default_manifest"](BindingPlaceholder())
     manifest["model_guidance"] = model_guidance()
+    rules = []
+    normalization = next(node for node in limit_source.body if isinstance(node, ast.FunctionDef)
+                         and node.name == "normalize_limits")
+    for node in normalization.body:
+        if (isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Subscript)
+                and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name)
+                and node.value.func.id == "min"):
+            rules.append({"target": ast.literal_eval(node.targets[0].slice),
+                          "ceiling": ast.literal_eval(node.value.args[1].slice)})
+    settings_source = ast.parse((SERVER / "pipeline_settings.py").read_text())
+    budget_mapping = next(ast.literal_eval(node.value) for node in ast.walk(settings_source)
+                          if isinstance(node, ast.Assign) and any(
+                              isinstance(target, ast.Name) and target.id == "mapping" for target in node.targets))
+    manifest["drawing_limits"] = {
+        "defaults": limits,
+        "absoluteMaximum": literal_assignment(SERVER / "limits.py", "LIMIT_ABSOLUTE_MAX"),
+        "groups": [{"id": name, "fields": list(fields)}
+                   for name, fields in literal_assignment(SERVER / "limits.py", "LIMIT_GROUPS")],
+        "normalization": rules,
+        "budgetMapping": budget_mapping,
+        "bytesPerMark": literal_assignment(SERVER / "limits.py", "BYTES_PER_MARK"),
+    }
     # Parse versioned documents with the Server's data-only parser. Never load
     # user installations or execute the Markdown expansion prose.
     sys.path.insert(0, str(ROOT / "server/src"))
@@ -155,6 +178,7 @@ def main() -> None:
                         ("macro-sources.json", macro_sources), ("plugin-words.json", plugin_words),
                         ("saijiki.json", saijiki)]:
         (OUTPUT / name).write_text(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+    subprocess.run(["node", str(ROOT / "apple/scripts/export-web-reference.mjs")], check=True)
     print(f"Generated Server defaults, {len(catalogs)} catalogs, {len(plugin_words)} plugin words and canonical Saijiki.")
 
 

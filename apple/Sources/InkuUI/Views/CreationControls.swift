@@ -48,6 +48,7 @@ struct CreationModelPicker: View {
                     ForEach(settings.host.providers) { item in Text(item.id).tag(Optional(item.id)) }
                 }
                 .disabled(model.isBusy || loading)
+                .help(tip("次の作品のモデルを提供するサービスを選びます。"))
                 Picker(model.display.localized("モデル"), selection: Binding(
                     get: { models.contains(where: { $0.id == model.nextDrawingModelReference }) ? model.nextDrawingModelReference : "" },
                     set: { model.selectNextDrawingModel($0) }
@@ -56,6 +57,7 @@ struct CreationModelPicker: View {
                     ForEach(models) { item in Text(item.name).tag(item.id) }
                 }
                 .disabled(model.isBusy || loading || models.isEmpty)
+                .help(tip("解釈と構造化に使うモデルを選びます。"))
                 Button {
                     discovery = Task { await discoverModels() }
                 } label: {
@@ -63,6 +65,7 @@ struct CreationModelPicker: View {
                         .font(.caption)
                 }
                 .disabled(model.isBusy || loading || provider == nil)
+                .help(tip("接続先が提供するモデル一覧を取得します。"))
                 if !model.nextDrawingModelReference.isEmpty {
                     Text(model.display.localizedFormat("次のモデル: %@", model.nextDrawingModelReference))
                         .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
@@ -98,6 +101,10 @@ struct CreationModelPicker: View {
     private func openSettings() {
         NotificationCenter.default.post(name: .inkuOpenSection, object: "settings",
             userInfo: ["settingsSection": provider?.kind == .chatGPTPlan ? "personalPlan" : "models"])
+    }
+
+    private func tip(_ key: String) -> String {
+        model.display.preferences.showTooltips ? model.display.localized(key) : ""
     }
 
     private func discoverModels() async {

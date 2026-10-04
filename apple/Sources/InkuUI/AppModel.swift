@@ -68,6 +68,8 @@ public final class AppModel {
     public private(set) var canvases: [CanvasOption] = []
     public private(set) var saijiki: [SaijikiCategory] = []
     public private(set) var pluginWords: [PluginWord] = []
+    public private(set) var productReference: ProductReference?
+    public private(set) var drawingLimitDefinition: DrawingLimitDefinition?
     public private(set) var importedMacroNames: [String] = []
     public private(set) var macroDiagnostics = ""
     public private(set) var authoringRevision = "0"
@@ -136,6 +138,7 @@ public final class AppModel {
         settings.providers.contains { nextDrawingModelReference.hasPrefix($0.id + ":") && nextDrawingModelReference.count > $0.id.count + 1 }
     }
     public var canCommitDDL: Bool { !isBusy && !isPreview && !ddlText.isEmpty && ddlText != visibleDDL && (currentExecutionID != nil || selectedContext != nil) }
+    public var canEditCurrentDDL: Bool { !isBusy && !isPreview && (currentExecutionID != nil || selectedContext != nil) }
     public var canCompleteHoles: Bool { !isBusy && currentExecutionID != nil && !holeIDs.isEmpty && !settings.providers.isEmpty && ddlText == visibleDDL }
     public var canRegenerateDescription: Bool { !isBusy && !sourceLocked && currentExecutionID != nil && !settings.providers.isEmpty && !descriptionText.isEmpty }
     public var canGenerate: Bool {
@@ -165,6 +168,8 @@ public final class AppModel {
             self.settings = settings
             synchronizeNextDrawingModel(previousSettings: nil)
             self.bootstrap = bootstrap
+            self.productReference = bootstrap.productReference
+            self.drawingLimitDefinition = bootstrap.drawingLimitDefinition
             display.connect(directory: url.deletingLastPathComponent())
             descriptionMeter.connect(directory: url.deletingLastPathComponent())
             self.catalogs = bootstrap.catalogs
@@ -403,6 +408,11 @@ public final class AppModel {
 
     public func updateHostSettings(_ settings: HostSettings) async throws {
         guard !isBusy, let settingsStore else { throw HostError("settings_busy_or_unavailable") }
+        var settings = settings
+        if let limits = settings.drawingLimits {
+            guard let drawingLimitDefinition else { throw HostError("installation_unavailable") }
+            settings.drawingLimits = drawingLimitDefinition.normalized(limits)
+        }
         if let limits = settings.operationalLimits {
             let maximum = try operationalLimitDefaults()
             guard limits.allSatisfy({ key, value in maximum[key].map { value <= $0 } ?? false }) else {
@@ -432,6 +442,17 @@ public final class AppModel {
     public func updateOperationalLimits(_ limits: [String: UInt32]?) async throws {
         var changed = settings
         changed.operationalLimits = limits
+        try await updateHostSettings(changed)
+    }
+
+    public func drawingLimits() throws -> [String: UInt32] {
+        guard let drawingLimitDefinition else { throw HostError("installation_unavailable") }
+        return drawingLimitDefinition.normalized(settings.drawingLimits)
+    }
+
+    public func updateDrawingLimits(_ limits: [String: UInt32]) async throws {
+        var changed = settings
+        changed.drawingLimits = limits
         try await updateHostSettings(changed)
     }
 

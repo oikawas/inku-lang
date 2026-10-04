@@ -3,13 +3,21 @@ import SwiftUI
 @MainActor
 struct DdlAuthoringView: View {
     @Bindable var model: AppModel
+    var showsDiagnostics = true
     @State private var output = "diagnostics"
     @State private var detailsExpanded = false
+    @State private var editingSession: DdlEditingSession?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(model.display.localized("DDLを編集")).font(.headline)
+                HStack {
+                    Text(model.display.localized("指示書")).font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Button(model.display.localized("DDLを編集")) { editingSession = DdlEditingSession(model: model) }
+                        .disabled(!model.canEditCurrentDDL)
+                        .help(tip("独立した編集画面でDDLを変更します。"))
+                }
                 if !model.authoringAuthority.isEmpty {
                     Label(model.display.localized(model.sourceLocked ? "DDL確定・記述ロック" : "記述から生成可能"),
                           systemImage: model.sourceLocked ? "lock.fill" : "pencil")
@@ -20,26 +28,19 @@ struct DdlAuthoringView: View {
                 Text(model.display.localizedFormat("改訂 %@", model.authoringRevision))
                     .font(.caption.monospaced()).textSelection(.enabled)
             }
-            TextEditor(text: $model.ddlText)
-                .font(.system(.body, design: .monospaced))
-                .scrollContentBackground(.hidden)
-                .padding(6)
-                .frame(height: 210)
-                .disabled(model.isBusy)
-                .background(.background, in: RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(.quaternary))
-                .accessibilityLabel(model.display.localized("DDL編集"))
-            VStack(alignment: .leading, spacing: 8) {
-                Button { Task { await model.commitDDL() } } label: {
-                    Text(model.display.localized("変更を確定・描画")).frame(maxWidth: .infinity)
-                }.buttonStyle(.borderedProminent).disabled(!model.canCommitDDL)
+            Text(model.visibleDDL).font(.system(.caption, design: .monospaced))
+                .lineLimit(5).textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 10)
+                .overlay(alignment: .leading) { Rectangle().fill(.quaternary).frame(width: 2) }
+            if showsDiagnostics {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 8) { checkButton; regenerateButton }.fixedSize(horizontal: true, vertical: false)
                     VStack(alignment: .leading, spacing: 8) { checkButton; regenerateButton }
                 }
+                .controlSize(.small)
             }
-            .controlSize(.small)
-            if model.sourceLocked {
+            if showsDiagnostics && model.sourceLocked {
                 Text(model.display.localized("確定したDDLの変更後は、この作品の記述を生成元へ戻せません。新規作品では別の記述を使えます。"))
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -80,7 +81,7 @@ struct DdlAuthoringView: View {
                 }
                 .padding(12).background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 8))
             }
-            if model.display.visible("diagnostics") {
+            if showsDiagnostics && model.display.visible("diagnostics") {
               DisclosureGroup(model.display.localized("診断・プロンプト・処理記録"), isExpanded: $detailsExpanded) {
                 VStack(alignment: .leading, spacing: 8) {
                     Picker(model.display.localized("表示"), selection: $output) {
@@ -98,11 +99,19 @@ struct DdlAuthoringView: View {
         .onChange(of: model.displayedWork?.id) { _, _ in
             if !model.display.preferences.keepGenerationInfo { detailsExpanded = false }
         }
+        .sheet(item: $editingSession) { session in
+            DdlAuthoringEditorSheet(model: model, session: session).environment(model.display)
+        }
     }
 
     private var checkButton: some View {
         Button(model.display.localized("検査")) { Task { await model.checkDDL() } }
             .disabled(model.isBusy || model.ddlText.isEmpty)
+            .help(tip("保存せずに、現在の指示書を検査します。"))
+    }
+
+    private func tip(_ key: String) -> String {
+        model.display.preferences.showTooltips ? model.display.localized(key) : ""
     }
 
     @ViewBuilder private var regenerateButton: some View {

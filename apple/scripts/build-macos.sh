@@ -28,10 +28,11 @@ for argument in "$@"; do
     esac
 done
 [[ "$(uname -s)" == Darwin ]] || { printf 'The macOS application build requires macOS and Xcode.\n' >&2; exit 2; }
-for tool in python3 uv xcodegen xcodebuild xcrun; do
+for tool in python3 node uv xcodegen xcodebuild xcrun; do
     command -v "$tool" >/dev/null || { printf 'Missing build prerequisite: %s\n' "$tool" >&2; exit 2; }
 done
 python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else "Python 3.11 or newer is required")'
+node --input-type=module -e 'import { stripTypeScriptTypes } from "node:module"; stripTypeScriptTypes("const value: number = 1;");'
 
 mkdir -p "$BUILD"
 xcrun swift -module-cache-path "$BUILD/IconModuleCache" "$APPLE/scripts/prepare-macos-icon.swift"
@@ -58,7 +59,9 @@ xcodebuild \
 
 APP="$BUILD/DerivedData/Build/Products/$CONFIGURATION/Inku.app"
 # A successful build for only the active architecture is insufficient here.
-xcrun lipo -verify_arch arm64 x86_64 "$APP/Contents/MacOS/Inku"
+for architecture in arm64 x86_64; do
+    xcrun lipo "$APP/Contents/MacOS/Inku" -verify_arch "$architecture"
+done
 printf 'Built unsigned Universal application: %s\n' "$APP"
 if [[ "$INSTALL_APP" == true ]]; then
     python3 "$APPLE/scripts/install-macos.py" --app "$APP"

@@ -17,22 +17,24 @@ struct LineageView: View {
         VStack(spacing: 0) {
             toolbar.padding(16)
             Divider()
-            if let graph = library.graph, !graph.nodes.isEmpty {
-                ScrollViewReader { proxy in
-                    ScrollView([.horizontal, .vertical]) {
-                        if library.lineageVertical {
-                            VStack(alignment: .leading, spacing: 24) {
-                                ForEach(generations(graph), id: \.self) { generation in generationRow(graph, generation: generation) }
-                            }.padding(24)
-                        } else {
-                            HStack(alignment: .top, spacing: 24) {
-                                ForEach(generations(graph), id: \.self) { generation in generationColumn(graph, generation: generation) }
-                            }.padding(24)
+            if let graph = library.lineageDisplayGraph, !graph.nodes.isEmpty {
+                GeometryReader { viewport in
+                    ScrollViewReader { proxy in
+                        ScrollView([.horizontal, .vertical]) {
+                            let scale = library.lineageBrowsing.overviewOpen ? library.lineageBrowsing.overviewScale : 1
+                            LineageScaleLayout(scale: scale) {
+                                treePlot(graph, width: max(210, (viewport.size.width - 48) / scale), scale: scale)
+                                    .scaleEffect(scale, anchor: .topLeading)
+                            }
+                            .padding(24)
+                            .background(scrollBridge)
                         }
+                        .focusSection()
+                        .onChange(of: graph.focusNodeID, initial: true) { _, _ in
+                            if !library.lineageBrowsing.overviewOpen { proxy.scrollTo(graph.focusNodeID, anchor: .center) }
+                        }
+                        .onChange(of: scrollToFocus) { _, _ in withAnimation { proxy.scrollTo(graph.focusNodeID, anchor: .center) } }
                     }
-                    .focusSection()
-                    .onChange(of: viewportKey(graph), initial: true) { _, _ in proxy.scrollTo(graph.focusNodeID, anchor: .center) }
-                    .onChange(of: scrollToFocus) { _, _ in withAnimation { proxy.scrollTo(graph.focusNodeID, anchor: .center) } }
                 }
                 graphSummary(graph).padding(.horizontal, 16).padding(.vertical, 10).background(.bar)
             } else if library.lineageLoading {
@@ -68,18 +70,17 @@ struct LineageView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 Text(model.display.localized("系譜")).font(.title2.weight(.semibold))
-                if let graph = library.graph {
+                if let graph = library.lineageDisplayGraph {
                     Text(model.display.localizedFormat("%ld 節点 · %ld 接続", graph.nodes.count, graph.edges.count)).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 8)
                 Button(model.display.localized("中心へ"), systemImage: "scope") { scrollToFocus += 1 }.disabled(library.graph == nil)
+                    .help(tip("表示中の中心節点へスクロールします。"))
                 Button(model.display.localized("更新"), systemImage: "arrow.clockwise") { Task { await library.reloadLineage() } }
                     .disabled(library.graph == nil || library.lineageLoading)
+                    .help(tip("系譜と保存情報を読み直します。"))
             }
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 20) { navigation; Spacer(minLength: 8); depthControls }
-                VStack(alignment: .leading, spacing: 10) { navigation; depthControls }
-            }
+            navigation
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 14) { selectionControls; Spacer(minLength: 0); selectionLegend }
                 VStack(alignment: .leading, spacing: 8) { selectionControls; selectionLegend }
@@ -103,28 +104,44 @@ struct LineageView: View {
         return HStack(spacing: 8) {
             Toggle(isOn: Binding(get: { library.lineagePathOnly }, set: { value in
                 library.lineagePathOnly = value; Task { await library.reloadLineage() }
-            })) { Label(model.display.localized("起点からの道筋"), systemImage: "point.topleft.down.to.point.bottomright.curvepath") }.toggleStyle(.button)
-            Toggle(model.display.localized("縦に並べる"), isOn: $library.lineageVertical).toggleStyle(.button)
-            Button(model.display.localized("全体"), systemImage: "point.3.connected.trianglepath.dotted") { Task { await library.loadLineageOverview() } }
-                .help(model.display.preferences.showTooltips ? model.display.localized("起点から分岐を含む系譜全体を表示します。最大200節点。") : "")
-        }.controlSize(.small).fixedSize().disabled(library.graph == nil || library.lineageLoading)
-    }
-
-    private var depthControls: some View {
-        Stepper(model.display.localizedFormat("子孫 %ld 世代", library.lineageDepth), value: Binding(get: { library.lineageDepth }, set: { value in
-            library.lineageDepth = value; Task { await library.reloadLineage() }
-        }), in: 0...200)
-        .fixedSize().disabled(library.lineagePathOnly || library.graph == nil || library.lineageLoading)
-        .help(model.display.preferences.showTooltips ? model.display.localized("中心の節点から表示する子孫の深さ。親への道筋も表示します。") : "")
+            })) { Label(model.display.localized("起点からの道筋"), systemImage: "point.topleft.down.to.point.bottomright.curvepath") }
+                .toggleStyle(.button).disabled(library.lineageBrowsing.overviewOpen)
+                .help(tip("中心の作品へ至る親の道筋だけを表示します。"))
+            Picker(model.display.localized("系譜の方向"), selection: $library.lineageVertical) {
+                Text(model.display.localized("縦")).tag(true)
+                Text(model.display.localized("横")).tag(false)
+            }.pickerStyle(.segmented).frame(width: 110)
+                .help(tip("親子のつながりを縦または横に並べます。"))
+            if library.lineageBrowsing.overviewOpen {
+                Button { changeMapScale(-0.1) } label: {
+                    Image(systemName: "minus")
+                }.accessibilityLabel(model.display.localized("縮小"))
+                    .disabled(library.lineageBrowsing.overviewScale <= 0.4).help(tip("全体図を縮小します。最小40%。"))
+                Text(library.lineageBrowsing.overviewScale, format: .percent.precision(.fractionLength(0)))
+                    .font(.caption).monospacedDigit().frame(minWidth: 42)
+                Button { changeMapScale(0.1) } label: {
+                    Image(systemName: "plus")
+                }.accessibilityLabel(model.display.localized("拡大"))
+                    .disabled(library.lineageBrowsing.overviewScale >= 1.4).help(tip("全体図を拡大します。最大140%。"))
+                Button(model.display.localized("全体図を閉じる")) { library.closeLineageOverview() }
+                    .help(tip("枝の開閉とスクロール位置を保った通常表示に戻ります。"))
+            } else {
+                Button(model.display.localized("全体図"), systemImage: "point.3.connected.trianglepath.dotted") { Task { await library.loadLineageOverview() } }
+                    .help(tip("起点から分岐を含む系譜全体を表示します。最大200節点。"))
+            }
+        }.controlSize(.small).disabled(library.graph == nil || library.lineageLoading)
     }
 
     private var selectionControls: some View {
         HStack(spacing: 10) {
             Label(model.display.localizedFormat("チェックした作品: %ld 件", library.selectedIDs.count), systemImage: "checkmark.square")
                 .font(.caption.weight(.medium)).monospacedDigit().fixedSize()
-            Button(model.display.localized("表示中を選択")) { library.selectedIDs.formUnion(library.graph?.nodes.compactMap { $0.work?.id } ?? []) }
-                .disabled(library.graph?.nodes.contains(where: { $0.work != nil }) != true)
+            Button(model.display.localized("表示中を選択")) {
+                if let graph = library.lineageDisplayGraph { library.selectedIDs.formUnion(visibleNodes(graph).compactMap { $0.work?.id }) }
+            }.disabled(library.lineageDisplayGraph?.nodes.contains(where: { $0.work != nil }) != true)
+                .help(tip("今見えている作品を複数選択に追加します。"))
             Button(model.display.localized("解除")) { library.selectedIDs.removeAll() }.disabled(library.selectedIDs.isEmpty)
+                .help(tip("作品の複数選択を解除します。"))
         }.controlSize(.small).disabled(library.mutating || model.isBusy || library.lineageLoading)
     }
 
@@ -133,46 +150,103 @@ struct LineageView: View {
             .font(.caption).foregroundStyle(.secondary)
     }
 
-    private func graphSummary(_ graph: LineageGraph) -> some View {
+    private func graphSummary(_ graph: LineageSnapshot) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: graph.truncated ? "ellipsis.circle" : "scope").foregroundStyle(.secondary)
             Text(model.display.localized(graph.truncated
-                                         ? "表示範囲の外にも節点があります。深さを増やすか、節点を中心に表示して続きを確認できます。最大200節点。"
+                                         ? "表示範囲の外にも節点があります。子作品を開くか、節点を中心に表示して続きを確認できます。最大200節点。"
                                          : "節点を中心に表示して、親や子の分岐をたどれます。"))
                 .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    private struct ViewportKey: Equatable { let focus: String; let nodes: [String]; let vertical: Bool }
-    private func viewportKey(_ graph: LineageGraph) -> ViewportKey { ViewportKey(focus: graph.focusNodeID, nodes: graph.nodes.map(\.id), vertical: library.lineageVertical) }
+    private func tip(_ key: String) -> String { model.display.preferences.showTooltips ? model.display.localized(key) : "" }
 
-    private func generations(_ graph: LineageGraph) -> [Int] { Set(graph.nodes.map(\.generation)).sorted() }
-
-    private func generationColumn(_ graph: LineageGraph, generation: Int) -> some View {
-        LazyVStack(alignment: .leading, spacing: 12) {
-            generationHeading(graph, generation: generation)
-            ForEach(graph.nodes.filter { $0.generation == generation }) { item in nodeCard(item, graph: graph) }
-        }.frame(width: 250)
+    private func changeMapScale(_ delta: Double) {
+        let value = library.lineageBrowsing.overviewScale + delta
+        library.lineageBrowsing.setOverviewScale(value)
     }
 
-    private func generationRow(_ graph: LineageGraph, generation: Int) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            generationHeading(graph, generation: generation)
-            LazyHStack(alignment: .top, spacing: 12) {
-                ForEach(graph.nodes.filter { $0.generation == generation }) { item in nodeCard(item, graph: graph).frame(width: 250) }
+    private var scrollBridge: some View {
+        let overview = library.lineageBrowsing.overviewOpen
+        let key = LineageViewportKey(treeID: library.lineageBrowsing.treeID, overview: overview, vertical: library.lineageVertical)
+        return LineageScrollBridge(revision: key, position: library.lineageBrowsing.scroll) { position in
+            if overview { library.lineageBrowsing.overviewScroll = position }
+            else { library.lineageBrowsing.normalScroll = position }
+        }
+    }
+
+    private func visibleNodes(_ graph: LineageSnapshot) -> [LineageItem] {
+        let ids = LineagePresentation.visibleIDs(graph, browsing: library.lineageBrowsing)
+        return graph.nodes.filter { ids.contains($0.id) }
+    }
+
+    private func treePlot(_ graph: LineageSnapshot, width: CGFloat, scale: CGFloat) -> some View {
+        Group {
+            if library.lineageVertical {
+                VStack(alignment: .leading, spacing: 58) {
+                    ForEach(generations(graph), id: \.self) { generation in generationRow(graph, generation: generation) }
+                }.frame(width: width)
+            } else {
+                HStack(alignment: .top, spacing: 58) {
+                    ForEach(generations(graph), id: \.self) { generation in generationColumn(graph, generation: generation) }
+                }.fixedSize(horizontal: true, vertical: true)
+            }
+        }
+        .backgroundPreferenceValue(LineageCardBounds.self) { anchors in
+            GeometryReader { geometry in
+                Canvas { context, _ in
+                    let visible = LineagePresentation.visibleIDs(graph, browsing: library.lineageBrowsing)
+                    for edge in LineagePresentation.edges(graph, visibleIDs: visible) {
+                        guard let parent = anchors[edge.parentID], let child = anchors[edge.childID] else { continue }
+                        let line = LineagePresentation.connection(parent: geometry[parent], child: geometry[child], vertical: library.lineageVertical)
+                        var path = Path(); path.move(to: line.start)
+                        path.addCurve(to: line.end, control1: line.control1, control2: line.control2)
+                        let color = edge.starredPath ? Color.orange : Color.secondary.opacity(0.72)
+                        context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: (edge.starredPath ? 2 : 1.5) / scale,
+                                                                                  dash: edge.tombstone ? [5 / scale, 4 / scale] : []))
+                        var head = Path(); head.move(to: line.end)
+                        if library.lineageVertical {
+                            head.addLine(to: CGPoint(x: line.end.x - 3.5, y: line.end.y - 7))
+                            head.addLine(to: CGPoint(x: line.end.x + 3.5, y: line.end.y - 7))
+                        } else {
+                            head.addLine(to: CGPoint(x: line.end.x - 7, y: line.end.y - 3.5))
+                            head.addLine(to: CGPoint(x: line.end.x - 7, y: line.end.y + 3.5))
+                        }
+                        head.closeSubpath(); context.fill(head, with: .color(color))
+                    }
+                }.allowsHitTesting(false).accessibilityHidden(true)
             }
         }
     }
 
-    private func generationHeading(_ graph: LineageGraph, generation: Int) -> some View {
+    private func generations(_ graph: LineageSnapshot) -> [Int] { Set(visibleNodes(graph).map(\.generation)).sorted() }
+
+    private func generationColumn(_ graph: LineageSnapshot, generation: Int) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            generationHeading(graph, generation: generation)
+            ForEach(visibleNodes(graph).filter { $0.generation == generation }) { item in nodeCard(item, graph: graph) }
+        }.frame(width: 210)
+    }
+
+    private func generationRow(_ graph: LineageSnapshot, generation: Int) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            generationHeading(graph, generation: generation)
+            LineageWrappingRow {
+                ForEach(visibleNodes(graph).filter { $0.generation == generation }) { item in nodeCard(item, graph: graph).frame(width: 210) }
+            }
+        }
+    }
+
+    private func generationHeading(_ graph: LineageSnapshot, generation: Int) -> some View {
         HStack(spacing: 8) {
             Text(model.display.localizedFormat("第 %ld 世代", generation)).font(.caption.weight(.semibold))
-            Text("\(graph.nodes.filter { $0.generation == generation }.count)").font(.caption.monospacedDigit())
+            Text("\(visibleNodes(graph).filter { $0.generation == generation }.count)").font(.caption.monospacedDigit())
                 .padding(.horizontal, 6).padding(.vertical, 2).background(.quaternary, in: Capsule())
         }.foregroundStyle(.secondary)
     }
 
-    private func nodeCard(_ item: LineageItem, graph: LineageGraph) -> some View {
+    private func nodeCard(_ item: LineageItem, graph: LineageSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 if let work = item.work {
@@ -232,10 +306,11 @@ struct LineageView: View {
             HStack {
                 Button { focusNode(item.id) } label: { Label(model.display.localized("中心に表示"), systemImage: "scope") }
                     .disabled(item.id == graph.focusNodeID || library.lineageLoading)
+                    .help(tip("この節点を中心に系譜を表示します。"))
                 Spacer(minLength: 0)
                 Button { details = item } label: { Image(systemName: "info.circle") }
                     .accessibilityLabel(model.display.localized("保存情報・コメント"))
-                    .help(model.display.preferences.showTooltips ? model.display.localized("保存情報・コメント") : "")
+                    .help(tip("作品の保存情報とコメントを開きます。"))
             }
             .font(.caption).buttonStyle(.borderless)
         }
@@ -253,10 +328,11 @@ struct LineageView: View {
             library.toggleSelection(work.id); return .handled
         }
         .accessibilityHint(model.display.localized("Returnで作品を表示、Spaceで複数選択のチェックを切り替えます。"))
+        .anchorPreference(key: LineageCardBounds.self, value: .bounds) { [item.id: $0] }
         .id(item.id)
     }
 
-    private func branchNavigation(_ item: LineageItem, graph: LineageGraph) -> some View {
+    private func branchNavigation(_ item: LineageItem, graph: LineageSnapshot) -> some View {
         HStack(alignment: .top, spacing: 10) {
             if let parent = graph.edges.first(where: { $0.childNodeID == item.id }) {
                 Button { focusNode(parent.parentNodeID) } label: {
@@ -270,26 +346,14 @@ struct LineageView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
-            if item.childCount > 0 {
-                Menu {
-                    Button(model.display.localized("子の節点を表示")) { focusNode(item.id, revealChildren: true) }
-                    Divider()
-                    ForEach(graph.edges.filter { $0.parentNodeID == item.id }, id: \.childNodeID) { edge in
-                        Button(childTitle(edge.childNodeID, graph: graph)) { focusNode(edge.childNodeID) }
-                    }
-                } label: {
-                    Label(model.display.localizedFormat("子の節点 (%ld)", item.childCount), systemImage: "arrow.right")
-                }
+            if item.childCount > 0, !library.lineageBrowsing.overviewOpen, !graph.pathOnly {
+                let expanded = library.lineageBrowsing.expandedNodeIDs.contains(item.id)
+                Button { Task { await library.toggleLineageBranch(item.id) } } label: {
+                    Label(model.display.localizedFormat("子作品 %ld 件", item.childCount), systemImage: expanded ? "chevron.down" : "chevron.right")
+                }.accessibilityValue(model.display.localized(expanded ? "展開中" : "折りたたみ中"))
+                    .help(tip("中心の作品を変えずに子作品の枝を開閉します。"))
             }
         }.font(.caption).buttonStyle(.borderless).disabled(library.lineageLoading)
-    }
-
-    private func childTitle(_ id: String, graph: LineageGraph) -> String {
-        guard let item = graph.nodes.first(where: { $0.id == id }) else { return "…" + String(id.suffix(6)) }
-        let title = item.work.map { LibraryWorkPresentation.title($0, untitled: model.display.localized("無題")) }
-            ?? model.display.localized(item.node.state == "tombstone" ? "削除された作品" : "保存作品がありません")
-        let firstLine = title.split(whereSeparator: \.isNewline).first.map(String.init) ?? title
-        return String(firstLine.prefix(60)) + " · …" + String(id.suffix(6))
     }
 
     private func openWork(_ item: LineageItem) {
@@ -297,22 +361,27 @@ struct LineageView: View {
         Task { await model.selectWork(work); await library.loadLineage(nodeID: item.id) }
     }
 
-    private func focusNode(_ id: String, revealChildren: Bool = false) {
-        if revealChildren { library.lineagePathOnly = false; library.lineageDepth = max(1, library.lineageDepth) }
+    private func focusNode(_ id: String) {
         Task { await library.loadLineage(nodeID: id) }
     }
 
     @ViewBuilder
-    private func nodeMenu(_ item: LineageItem, graph: LineageGraph) -> some View {
+    private func nodeMenu(_ item: LineageItem, graph: LineageSnapshot) -> some View {
         Button(model.display.localized("この節点を中心に表示"), systemImage: "scope") { focusNode(item.id) }.disabled(library.lineageLoading)
+            .help(tip("この節点を中心に系譜を表示します。"))
         if let root = item.node.rootNodeID, root != item.id {
             Button(model.display.localized("起点を中心に表示"), systemImage: "arrow.up.backward") { focusNode(root) }.disabled(library.lineageLoading)
         }
         if let parent = graph.edges.first(where: { $0.childNodeID == item.id }) {
             Button(model.display.localized("親の節点"), systemImage: "arrow.left") { focusNode(parent.parentNodeID) }.disabled(library.lineageLoading)
         }
-        if item.childCount > 0 { Button(model.display.localized("子の節点を表示"), systemImage: "arrow.right") { focusNode(item.id, revealChildren: true) }.disabled(library.lineageLoading) }
+        if item.childCount > 0, !library.lineageBrowsing.overviewOpen, !graph.pathOnly {
+            Button(model.display.localized("子の節点を表示"), systemImage: "arrow.right") {
+                if !library.lineageBrowsing.expandedNodeIDs.contains(item.id) { Task { await library.toggleLineageBranch(item.id) } }
+            }.disabled(library.lineageLoading).help(tip("中心の作品を変えずに子作品の枝を開閉します。"))
+        }
         Button(model.display.localized("保存情報・コメント"), systemImage: "info.circle") { details = item }
+            .help(tip("作品の保存情報とコメントを開きます。"))
         if let work = item.work {
             Divider()
             Button(model.display.localized("作品を開く"), systemImage: "eye") { openWork(item) }.disabled(model.isBusy)
@@ -384,5 +453,12 @@ struct LineageView: View {
                       "canvas_aspect_change": "キャンバス変更", "variation": "変奏", "sketch_grain_change": "写生の有無",
                       "render_engine_change": "描画エンジン", "external_seed_change": "シード", "renga_reply": "連歌"]
         return model.display.localized(kind.flatMap { labels[$0] ?? $0 } ?? "起点")
+    }
+}
+
+private struct LineageCardBounds: PreferenceKey {
+    static var defaultValue: [String: Anchor<CGRect>] { [:] }
+    static func reduce(value: inout [String: Anchor<CGRect>], nextValue: () -> [String: Anchor<CGRect>]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
     }
 }

@@ -51,7 +51,11 @@ public final class LibraryModel {
     public private(set) var lineageError: String?
     public var lineageDepth = 2
     public var lineagePathOnly = false
-    public var lineageVertical = false
+    public var lineageVertical = true
+    public var lineageBrowsing = LineageBrowsingState()
+    public var lineageDisplayGraph: LineageSnapshot? {
+        lineageBrowsing.overviewOpen ? lineageOverviewGraph : lineageNormalGraph
+    }
     @ObservationIgnored public var onMutation: (@MainActor () async -> Void)?
     @ObservationIgnored private var database: InkuDatabase?
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
@@ -59,13 +63,16 @@ public final class LibraryModel {
     @ObservationIgnored private var selectedAnnotationToken = UUID()
     @ObservationIgnored private var lineageToken = UUID()
     @ObservationIgnored private var lineageFocusID: String?
-    @ObservationIgnored private var lineageOverviewRequested = false
+    @ObservationIgnored private var lineageReader: (any LineageReading)?
+    private var lineageNormalGraph: LineageSnapshot?
+    private var lineageOverviewGraph: LineageSnapshot?
 
-    public init() {}
+    public init(lineageReader: (any LineageReading)? = nil) { self.lineageReader = lineageReader }
 
     public func connect(database: InkuDatabase) async {
         refreshTask?.cancel()
         self.database = database
+        if lineageReader == nil { lineageReader = DatabaseLineageReader(database: database) }
         await refresh()
     }
 
@@ -310,22 +317,46 @@ public final class LibraryModel {
     }
 
     public func loadLineage(work: SavedWork) async {
-        guard let id = work.lineageNodeID else { graph = nil; lineageFocusID = nil; return }
+        guard let id = work.lineageNodeID else {
+            lineageToken = UUID(); graph = nil; lineageFocusID = nil
+            lineageNormalGraph = nil; lineageOverviewGraph = nil; lineageBrowsing = LineageBrowsingState()
+            lineageLoading = false; lineageError = nil
+            return
+        }
         await loadLineage(nodeID: id)
     }
 
     public func loadLineage(nodeID: String) async {
-        guard let database else { return }
-        lineageOverviewRequested = false
+        guard let lineageReader else { return }
         let token = UUID()
         lineageToken = token; lineageFocusID = nodeID
         lineageLoading = true; lineageError = nil
         do {
-            let result = try await database.lineage(focusNodeID: nodeID, descendantDepth: lineageDepth,
-                                                   nodeLimit: 200, pathOnly: lineagePathOnly)
-            guard lineageToken == token else { return }
-            graph = result; lineageLoading = false
-            for item in result?.nodes ?? [] { if let work = item.work { annotations[work.id] = item.annotation } }
+            let result = try await lineageReader.read(focusNodeID: nodeID, depth: lineageDepth, pathOnly: lineagePathOnly)
+            guard lineageToken == token, !Task.isCancelled else { return }
+            graph = result
+            guard let result else {
+                lineageNormalGraph = nil; lineageOverviewGraph = nil; lineageBrowsing = LineageBrowsingState()
+                lineageLoading = false
+                return
+            }
+            var snapshot = LineageSnapshot(result)
+            // Refresh expanded branches from SQLite, without retaining stale work or mark values.
+            if !lineagePathOnly {
+                for id in lineageBrowsing.expandedNodeIDs.sorted() {
+                    guard let item = snapshot.nodes.first(where: { $0.id == id }),
+                          item.childCount > snapshot.edges.filter({ $0.parentNodeID == id }).count else { continue }
+                    if let branch = try await lineageReader.readBranch(nodeID: id) {
+                        guard lineageToken == token, !Task.isCancelled else { return }
+                        snapshot = snapshot.merging(branch)
+                    }
+                }
+            }
+            lineageNormalGraph = snapshot; lineageBrowsing.reconcile(snapshot)
+            if lineagePathOnly { lineageBrowsing.closeOverview() }
+            rememberLineageAnnotations(snapshot)
+            lineageLoading = false
+            if lineageBrowsing.overviewOpen { await loadLineageOverview() }
         } catch {
             guard lineageToken == token else { return }
             lineageLoading = false; lineageError = error.localizedDescription
@@ -333,16 +364,19 @@ public final class LibraryModel {
     }
 
     public func loadLineageOverview() async {
-        guard let database, let id = lineageFocusID else { return }
+        guard let lineageReader, let id = lineageFocusID else { return }
         let token = UUID()
-        lineageToken = token; lineageOverviewRequested = true
-        lineagePathOnly = false; lineageDepth = 200
+        lineageToken = token
         lineageLoading = true; lineageError = nil
         do {
-            let result = try await database.lineageOverview(focusNodeID: id)
-            guard lineageToken == token, lineageFocusID == id else { return }
-            graph = result; lineageLoading = false
-            for item in result?.nodes ?? [] { if let work = item.work { annotations[work.id] = item.annotation } }
+            let result = try await lineageReader.readOverview(focusNodeID: id)
+            guard lineageToken == token, lineageFocusID == id, !Task.isCancelled else { return }
+            if let result {
+                let snapshot = LineageSnapshot(result, focusNodeID: id)
+                lineageOverviewGraph = snapshot; lineageBrowsing.openOverview()
+                rememberLineageAnnotations(snapshot)
+            }
+            lineageLoading = false
         } catch {
             guard lineageToken == token, lineageFocusID == id else { return }
             lineageLoading = false; lineageError = error.localizedDescription
@@ -350,8 +384,40 @@ public final class LibraryModel {
     }
 
     public func reloadLineage() async {
-        if lineageOverviewRequested && !lineagePathOnly && lineageDepth == 200 { await loadLineageOverview() }
-        else if let id = lineageFocusID { await loadLineage(nodeID: id) }
+        if let id = lineageFocusID { await loadLineage(nodeID: id) }
+    }
+
+    public func closeLineageOverview() { lineageBrowsing.closeOverview() }
+
+    public func toggleLineageBranch(_ nodeID: String) async {
+        guard let lineageReader, let snapshot = lineageNormalGraph,
+              !lineageLoading, !lineageBrowsing.overviewOpen, !snapshot.pathOnly,
+              let item = snapshot.nodes.first(where: { $0.id == nodeID }), item.childCount > 0 else { return }
+        if lineageBrowsing.expandedNodeIDs.contains(nodeID) {
+            lineageBrowsing.expandedNodeIDs.remove(nodeID)
+            return
+        }
+        if item.childCount > snapshot.edges.filter({ $0.parentNodeID == nodeID }).count {
+            let token = UUID()
+            lineageToken = token; lineageLoading = true; lineageError = nil
+            do {
+                let branch = try await lineageReader.readBranch(nodeID: nodeID)
+                guard lineageToken == token, lineageFocusID == snapshot.focusNodeID, !Task.isCancelled else { return }
+                guard let branch else { lineageLoading = false; return }
+                let merged = snapshot.merging(branch)
+                lineageNormalGraph = merged; rememberLineageAnnotations(merged)
+                lineageLoading = false
+            } catch {
+                guard lineageToken == token else { return }
+                lineageLoading = false; lineageError = error.localizedDescription
+                return
+            }
+        }
+        lineageBrowsing.expandedNodeIDs.insert(nodeID)
+    }
+
+    private func rememberLineageAnnotations(_ snapshot: LineageSnapshot) {
+        for item in snapshot.nodes { if let work = item.work { annotations[work.id] = item.annotation } }
     }
 
     public func promote(_ nodeID: String) async {

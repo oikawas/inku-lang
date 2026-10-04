@@ -124,11 +124,13 @@ public struct HostSettings: Codable, Sendable, Equatable {
     public var models: ModelSelection
     public var operationalLimits: [String: UInt32]?
     public var plugins: PluginPreferences?
+    public var drawingLimits: [String: UInt32]?
     public init(providers: [ProviderSettings] = [], models: ModelSelection = .init(), operationalLimits: [String: UInt32]? = nil,
-                plugins: PluginPreferences? = nil) {
+                plugins: PluginPreferences? = nil, drawingLimits: [String: UInt32]? = nil) {
         self.providers = providers; self.models = models
         self.operationalLimits = operationalLimits
         self.plugins = plugins
+        self.drawingLimits = drawingLimits
     }
 }
 

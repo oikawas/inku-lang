@@ -18,7 +18,7 @@ Personal ChatGPT is explicitly enabled and connected in its dedicated settings p
 
 Minimum deployment versions are macOS 14 and iOS 17. SDK versions are independent of deployment minimums. The checked environment uses Xcode 27.0/Swift 6.4, Rust 1.95.0, and XcodeGen 2.46.0. Swift packages require tools 6.1, and the project requires XcodeGen 2.44.0 or newer.
 
-Building requires macOS, Xcode command-line tools, XcodeGen, Python 3.11 or newer, uv, and official rustup. Python/uv generate Server-derived build resources and pinned dictionaries, and are not embedded in the app. The first build needs network access for pinned Cargo, SwiftPM, and Server uv.lock dependencies.
+Building requires macOS, Xcode command-line tools, XcodeGen, Python 3.11 or newer, Node.js 22.13 or newer, uv, and official rustup. Node.js [`stripTypeScriptTypes`](https://nodejs.org/download/release/v22.14.0/docs/api/module.html#modulestriptypescripttypescode-options) extracts Web text, canvas metadata, and Saijiki previews from the same checkout into build resources. Python/uv prepare Server data and pinned dictionaries; none of these runtimes is embedded in the app. The first build needs network access for pinned Cargo, SwiftPM, and Server uv.lock dependencies.
 
 Key pinned dependencies are UniFFI 0.32.0 and GRDB 7.11.1. Rust versions are governed by `core/rust-toolchain.toml` and `core/Cargo.lock`; GRDB is governed by `Packages/InkuPersistence/Package.swift` and SwiftPM resolution records. The UniFFI generator is built from the same checkout's Cargo.lock and reads metadata from that Rust archive.
 
@@ -73,7 +73,9 @@ The database is not copied or moved. Its path is retained in the `InkuDatabasePa
 
 The initial input is direct English DDL, so generation can be tried without a model connection. For description input, save a provider type, base URL, model, and any required API key in Settings, then select description mode in the creation screen. Multiple API services can be registered; Stage1/Stage2 share the drawing model. Model discovery uses an explicit button. Saving a connection does not send an LLM request.
 
-Choose the next service/model in the creation screen's Next generation settings. This does not change saved Settings defaults or running batch/demo requests. Generate/Stop remains outside the input scroll area. Command-N creates a new work, Command-O imports DDL, Command-comma opens Settings, Command-1 through 4 navigate screens, and Shift-Command-E opens export. Library checkboxes are distinct from the displayed work; creation exports its displayed saved work.
+Choose the next service/model in the creation screen's next drawing conditions. This does not change saved Settings defaults or running batch/demo requests. Compact conditions and a details popover are separate from This work's provenance, and Paint/Stop remain outside the input scroll area. Edit opens an independent DDL draft; Cancel leaves the shown work unchanged. Command-N creates a new work, Command-O imports DDL, Command-comma opens Settings, Command-1 through 4 navigate screens, and Shift-Command-E opens export. Library checkboxes are distinct from the displayed work; creation exports its displayed saved work.
+
+Library preview preserves inputs in Paint. Open in Paint explicitly switches works, and closing preview returns to the full-width list. Lineage supports branch expansion and a map that restores the normal browsing position when closed. The canvas mouse wheel zooms, recentering at 100% or less. Choose the next canvas by shape and intent; ordinary Saijiki browsing is reference-only. Tooltips have a toolbar toggle. Edit drawing limits in Settings and choose Save changes to apply them to new works.
 
 Open Model suitability and use in Creation or model settings to read Server evaluations/purposes/comments separately from service-discovered information. Unregistered services/models receive no guessed rating. During a call, stage, requested model, attempts, and elapsed time appear; unavailable usage is Not recorded. Stop freezes time, and New clears the previous card.
 
@@ -123,6 +125,8 @@ python3 apple/scripts/export-server-resources.py
 uv sync --project server --frozen
 python3 apple/scripts/prepare-meter-resources.py
 ```
+
+Focused UI-difference selectors are `--library-browsing-only`, `--lineage-presentation-only`, `--ddl-editor-cancel-only`, `--drawing-limits-editing-only`, and `--canvas-wheel-only`. They use isolated databases for previews, comments, lineage restoration, cancellation, and saved limits. The wheel check covers scale and position calculations only; actual native events and appearance require separate review.
 
 Additional AppCheck selectors are `--provider-progress-only` and `--model-guidance-only`. The former uses mocks/shared Rust for retry presentation, clocks, Stop, and late callbacks. The latter uses generated Server evaluations and temporary SQLite for suitability, unknown boundaries, and preserved selections/snapshots. Neither calls a real provider.
 

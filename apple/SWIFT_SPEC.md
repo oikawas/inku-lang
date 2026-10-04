@@ -14,6 +14,24 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-04 Align creation, library, and lineage with the Web UI
+
+Ordinary creation groups description/DDL, compact summaries of the next model, catalog, Sketch from life, Wild, and canvas, and a fixed Paint action. Language and seeds move to a details popover; saved instructions, conditions, and measurements move to This work's provenance. A short read-only DDL display opens a separate editor. Cancel preserves the creation input, shown SVG, revision, and history. Only confirmation uses existing authority/revision validation to paint a child work.
+
+Library selection opens an independent preview, retaining the work and inputs in Paint. Only Open in Paint changes the creation selection. Closing the preview restores the list width. Export targets checked works or the previewed work. List columns align saved dates, descriptions, role-specific models, marks, and actions. A missing interpretation model is not inferred to mean DDL input. Comment load state, target ID, and draft remain separate, preventing saves before loading and late reads from overwriting edits.
+
+Lineage shows parent-child arrows, paths to favorites, and dashed connections to deleted nodes. Vertical is the default direction. Branch expansion preserves focus and reads only unknown children. The map zooms from 40–140%; closing it restores normal expansion, focus, direction, and scroll position. Normal and map snapshots remain separate, with a maximum of 200 nodes per read.
+
+Vertical mouse-wheel events on the macOS canvas change scale by 0.15, bounded to 25–1000%. Wheel, pinch, drag, and scale buttons share state. Scaling to 100% or less recenters the canvas. Events are handled inside the native view hosting the canvas. Saved SVG and raster budgets remain unchanged.
+
+The canvas chooser shows names, shapes, categories, and intent. Candidates, order, and ratios come from the Rust registry; display metadata is extracted from the same checkout's Web source during the build. Selection affects the next canvas only; closing and saved-work canvas facts remain separate. Saijiki shows compact word lists and one selected preview, effect, explanation, and example. Ordinary use is reference-only. Explicit use from the DDL editor inserts into its draft. Plugin words without a bundled definition remain reference-only.
+
+Major actions gain tooltips controlled by the saved showTooltips preference and toolbar toggle. About inku uses the same checkout's Web concept text, five-row vocabulary table, creator information, and repository link. Product version, build, build date, and DDL/render layer versions come from generated resources; the bundled core report supplies the binding protocol.
+
+Drawing limits use Server's nine fields, three groups, defaults, and interdependent ceilings as build data. Whole numbers from 1–100000 are edited in an independent draft, with Save, Cancel, and Reload. Restoring defaults affects the draft until saved. New-work requests map the same four Server fields into both hard and operational budgets and derive budget identity from the applied values. Saved configurations and existing structural resource settings are retained. Shared Rust still owns DDL meaning, expansion, and painting; the DB schema is unchanged.
+
+The export-server-resources.py and export-web-reference.mjs scripts generate display resources from the same checkout's canonical source. Generate resources before direct Swift package builds as well. Focused selectors are --library-browsing-only, --lineage-presentation-only, --ddl-editor-cancel-only, --drawing-limits-editing-only, and --canvas-wheel-only; select only those needed for a concrete change. Native layout, interaction and actual wheel delivery, Intel/minimum-OS hardware, real providers, and iOS acceptance require separate evidence.
+
 ## 2026-10-04 macOS app icon and a fixed installation
 
 The macOS app icon is generated from the existing [incu image](../docs/assets/incu-icon-512.png). Its pixel colors, dark background, and transparent corners are retained in an icns bundle resource referenced by Info.plist. The standard build procedure regenerates it.
@@ -32,7 +50,7 @@ The sent-prompt pane distinguishes loading, recorded, not recorded, and unavaila
 
 ### Creation and saved-work display
 
-The left column contains description/direct DDL, upcoming generation conditions, and the saved sketch/DDL inspector. Displayed-work facts and work/lineage occupy the right. Input, upcoming conditions, and saved information use grouped panels; Generate/Stop remain outside the input scroll area. Narrow widths switch to a vertical arrangement. A compact summary and detail popover distinguish saved model, catalog, canvas, and size from upcoming settings. Captions, vertical/horizontal writing, placement, pan/zoom, and presentation are native display composition and do not alter saved SVG. Fit canvas resets zoom and position.
+The left column contains description/direct DDL and upcoming drawing conditions. Displayed-work facts and work/lineage occupy the right. Paint/Stop remain outside the input scroll area. Saved sketch, instructions, and detailed provenance use a separate pane opened explicitly. Narrow widths switch to a vertical arrangement. A compact summary and detail popover distinguish saved model, catalog, canvas, and size from upcoming settings. Captions, vertical/horizontal writing, placement, pan/zoom, and presentation are native display composition and do not alter saved SVG. Fit canvas resets zoom and position.
 
 Creation offers registered services and drawing models. It includes configured models and explicitly discovered catalogs; only a user button starts discovery. The next model is passed to both interpretation and structure stages without changing saved Settings defaults or the parent work's models. Fresh generation, refinement, and initial comparison choices use it; running batch/demo models remain pinned to their starting snapshots. An unconfigured connection leads to Model settings.
 

@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 struct LibraryView: View {
     @Bindable var model: AppModel
+    @Bindable var preview: LibraryPreviewModel
     let onEditWork: (SavedWork, WorkEditMode) -> Void
     let onAdjustWork: (SavedWork) -> Void
     let onReplayWork: (SavedWork) -> Void
@@ -27,25 +28,21 @@ struct LibraryView: View {
             controls.padding(16)
             selectionControls.padding(.horizontal, 16).padding(.vertical, 10).background(.bar)
             Divider()
-            GeometryReader { geometry in
-                if geometry.size.width >= 900 {
-                    HStack(spacing: 0) {
-                        listing.frame(width: min(560, max(360, geometry.size.width * 0.42)))
-                        Divider()
-                        selected.padding(20).frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                } else {
-                    ScrollView {
-                        VStack(spacing: 16) {
-                            listing.frame(height: 380)
-                            Divider()
-                            selected.padding(16).frame(minHeight: 580)
-                        }
-                    }
-                }
-            }
+            listing
             Divider()
             pagination.padding(.horizontal, 16).padding(.vertical, 10).background(.bar)
+        }
+        .inspector(isPresented: Binding(get: { preview.work != nil }, set: { if !$0 { preview.close() } })) {
+            previewContent
+                #if os(macOS)
+                .inspectorColumnWidth(min: 300, ideal: 360, max: 460)
+                #endif
+        }
+        .task(id: PreviewReadKey(workID: preview.work?.id, mutating: library.mutating)) {
+            guard !library.mutating else { return }
+            await preview.loadAnnotation(using: { id in
+                try await model.auxiliaryDatabase().libraryAnnotation(id: id)
+            }, readWork: { id in try await model.auxiliaryDatabase().work(id: id) })
         }
         .searchable(text: Binding(get: { library.query }, set: { library.query = $0 }), prompt: model.display.localized("記述・DDL・モデル・色・ハッシュを検索"))
         .alert(item: $deletion) { request in
@@ -66,8 +63,10 @@ struct LibraryView: View {
                 Toggle(isOn: $library.isTrash) {
                     Label(model.display.localizedFormat("ごみ箱 (%ld)", library.trashTotal), systemImage: "trash")
                 }.toggleStyle(.button).fixedSize()
+                    .help(tip("ごみ箱の作品を表示・復元できます。"))
                 Button(model.display.localized("更新"), systemImage: "arrow.clockwise") { Task { await library.refresh() } }
                     .disabled(library.loading)
+                    .help(tip("ライブラリを読み直します。"))
             }
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 20) { displayControls; Spacer(minLength: 12); filters }
@@ -101,12 +100,14 @@ struct LibraryView: View {
             Label(model.display.localized("サムネイル"), systemImage: "square.grid.2x2").tag(LibraryLayout.grid)
             Label(model.display.localized("一覧"), systemImage: "list.bullet").tag(LibraryLayout.list)
         }.pickerStyle(.segmented).frame(width: 250)
+            .help(tip("サムネイルと、保存情報を整列した一覧を切り替えます。"))
     }
 
     private var groupingToggle: some View {
         @Bindable var library = library
         return Toggle(isOn: $library.grouped) { Label(model.display.localized("系譜ごと"), systemImage: "point.3.connected.trianglepath.dotted") }
             .toggleStyle(.button).fixedSize()
+            .help(tip("同じ系譜の作品をまとめて表示します。"))
     }
 
     private var filters: some View {
@@ -131,7 +132,7 @@ struct LibraryView: View {
         return Picker(model.display.localized("順序"), selection: $library.order) {
             Text(model.display.localized("新しい順")).tag(LibraryOrder.newest)
             Text(model.display.localized("古い順")).tag(LibraryOrder.oldest)
-        }.fixedSize()
+        }.fixedSize().help(tip("保存日時の順序を切り替えます。"))
     }
 
     private var selectionControls: some View {
@@ -147,7 +148,9 @@ struct LibraryView: View {
                 .font(.caption.weight(.medium)).monospacedDigit().fixedSize()
             Button(model.display.localized(allVisibleSelected ? "表示中のチェックを外す" : "表示中を選択")) { library.selectVisible() }
                 .disabled(visibleIDs.isEmpty || library.loading)
+                .help(tip("現在のページに表示された作品のチェックを切り替えます。"))
             Button(model.display.localized("解除")) { library.selectedIDs.removeAll() }.disabled(library.selectedIDs.isEmpty)
+                .help(tip("ページをまたいでチェックした作品をすべて解除します。"))
         }
     }
 
@@ -181,6 +184,9 @@ struct LibraryView: View {
             }
         } else if library.total == 0 {
             emptyLibrary
+        } else if !library.isGrouped && library.layout == .list {
+            alignedList
+                .overlay(alignment: .topTrailing) { loadingIndicator }
         } else {
             ScrollView {
                 if library.isGrouped {
@@ -191,16 +197,66 @@ struct LibraryView: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 12)], spacing: 12) {
                         ForEach(library.works, id: \.id) { work in workCard(work, grid: true) }
                     }.padding(16)
-                } else {
-                    LazyVStack(spacing: 10) {
-                        ForEach(library.works, id: \.id) { work in workCard(work, grid: false) }
-                    }.padding(16)
                 }
             }.focusSection()
-                .overlay(alignment: .topTrailing) {
-                    if library.loading { ProgressView().controlSize(.small).padding(10).background(.regularMaterial, in: Capsule()).padding(12) }
-                }
+                .overlay(alignment: .topTrailing) { loadingIndicator }
         }
+    }
+
+    @ViewBuilder private var loadingIndicator: some View {
+        if library.loading { ProgressView().controlSize(.small).padding(10).background(.regularMaterial, in: Capsule()).padding(12) }
+    }
+
+    @ViewBuilder private var alignedList: some View {
+        #if os(macOS)
+        Table(library.works.map { LibraryTableRow(work: $0) }, selection: Binding<String?>(
+            get: { preview.work?.id },
+            set: { id in if let work = library.works.first(where: { $0.id == id }) { openWork(work) } }
+        )) {
+            TableColumn(model.display.localized("チェック")) { row in selectionCheck(row.work) }.width(44)
+            TableColumn(model.display.localized("作品")) { row in
+                HStack(spacing: 10) {
+                    ArtworkThumbnail(work: row.work, renderer: model.renderer).frame(width: 54, height: 48)
+                    VStack(alignment: .leading, spacing: 4) {
+                        LibraryWorkTitle(work: row.work, untitled: model.display.localized("無題"), lineLimit: 2)
+                        if let note = library.loadedAnnotation(for: row.id)?.note {
+                            Text(note).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                    }
+                }.padding(.vertical, 4)
+            }.width(min: 170, ideal: 250)
+            TableColumn(model.display.localized("保存日時")) { row in
+                Text(Date(timeIntervalSince1970: Double(row.work.at) / 1000), format: .dateTime.year().month().day().hour().minute())
+                    .font(.caption).foregroundStyle(.secondary)
+            }.width(min: 105, ideal: 130)
+            TableColumn(model.display.localized("モデル")) { row in
+                LibraryModelFactsView(work: row.work, display: model.display, compact: true)
+            }.width(min: 150, ideal: 190)
+            TableColumn(model.display.localized("色")) { row in
+                Text(row.work.renderColorCatalogName ?? row.work.catalogID ?? model.display.localized("未記録"))
+                    .font(.caption).lineLimit(1)
+            }.width(min: 70, ideal: 100)
+            TableColumn(model.display.localized("SVG容量")) { row in
+                Text(ByteCountFormatter.string(fromByteCount: SavedWorkFacts.svgBytes(row.work), countStyle: .file))
+                    .font(.caption.monospacedDigit())
+            }.width(80)
+            TableColumn(model.display.localized("印")) { row in LibraryWorkMarks(model: model, work: row.work) }.width(85)
+            TableColumn(model.display.localized("操作")) { row in
+                Menu { workMenu(row.work) } label: { Image(systemName: "ellipsis") }
+                    .menuStyle(.borderlessButton).menuIndicator(.hidden)
+                    .help(tip("作品の操作"))
+            }.width(36)
+        }
+        .contextMenu(forSelectionType: String.self) { ids in
+            if let id = ids.first, let work = library.works.first(where: { $0.id == id }) { workMenu(work) }
+        }
+        #else
+        ScrollView {
+            LazyVStack(spacing: 10) {
+                ForEach(library.works, id: \.id) { work in workCard(work, grid: false) }
+            }.padding(16)
+        }
+        #endif
     }
 
     private var emptyLibrary: some View {
@@ -228,7 +284,7 @@ struct LibraryView: View {
                 if LibraryWorkPresentation.usesDDLTitle(work) { Text("DDL").font(.caption2.monospaced()).foregroundStyle(.secondary) }
                 Spacer(minLength: 0)
                 if model.selectedWorkID == work.id {
-                    Label(model.display.localized("表示中"), systemImage: "eye")
+                    Label(model.display.localized("制作で表示中"), systemImage: "eye")
                         .font(.caption2.weight(.medium)).foregroundStyle(Color.accentColor)
                         .fixedSize(horizontal: true, vertical: false)
                 }
@@ -237,6 +293,7 @@ struct LibraryView: View {
                     .menuStyle(.borderlessButton).menuIndicator(.hidden)
                     #endif
                     .fixedSize().accessibilityLabel(model.display.localized("作品の操作"))
+                    .help(tip("作品の操作"))
             }
             Button { openWork(work) } label: {
                 if grid {
@@ -253,6 +310,7 @@ struct LibraryView: View {
                 }
             }.buttonStyle(.plain).disabled(model.isBusy)
                 .accessibilityLabel(model.display.localizedFormat("%@ を開く", LibraryWorkPresentation.title(work, untitled: model.display.localized("無題"))))
+                .help(tip("作品をプレビューします。制作中の内容は変わりません。"))
             if let note = library.annotation(for: work.id).note {
                 Label { Text(note).lineLimit(2) } icon: { Image(systemName: "text.bubble") }.font(.caption).foregroundStyle(.secondary)
             }
@@ -266,11 +324,12 @@ struct LibraryView: View {
                 if work.lineageNodeID != nil {
                     Button { openLineage(work) } label: { Image(systemName: "point.3.connected.trianglepath.dotted") }
                         .accessibilityLabel(model.display.localized("系譜")).disabled(model.isBusy)
+                        .help(tip("系譜"))
                 }
             }.font(.caption).buttonStyle(.borderless)
         }
         .padding(12)
-        .modifier(LibraryCardSurface(current: model.selectedWorkID == work.id, focused: focusedWorkID == work.id))
+        .modifier(LibraryCardSurface(current: preview.work?.id == work.id, focused: focusedWorkID == work.id))
         .contextMenu { workMenu(work) }
         .focusable().focused($focusedWorkID, equals: work.id)
         .onKeyPress(.return) {
@@ -299,12 +358,28 @@ struct LibraryView: View {
             LibraryWorkTitle(work: work, untitled: model.display.localized("無題"))
             Text(Date(timeIntervalSince1970: Double(work.at) / 1000), format: .dateTime.year().month().day().hour().minute())
                 .font(.caption).foregroundStyle(.secondary)
-            Text([work.renderColorCatalogName ?? work.catalogID, work.stage1Model, work.stage2Model].compactMap { $0 }.joined(separator: " · "))
-                .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+            LibraryModelFactsView(work: work, display: model.display, compact: true)
+            HStack(spacing: 8) {
+                Text(work.renderColorCatalogName ?? work.catalogID ?? model.display.localized("未記録")).lineLimit(1)
+                Spacer(minLength: 0)
+                Text(ByteCountFormatter.string(fromByteCount: SavedWorkFacts.svgBytes(work), countStyle: .file)).fixedSize()
+                    .help(tip("SVG容量"))
+            }.font(.caption2).foregroundStyle(.secondary)
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func openWork(_ work: SavedWork) { Task { await model.selectWork(work) } }
+    private func openWork(_ work: SavedWork) { preview.show(work) }
+
+    private func openInCreate(_ work: SavedWork) {
+        guard preview.work?.id == work.id, !model.isBusy else { return }
+        Task {
+            do {
+                if try await preview.openInCreate(app: model) {
+                    NotificationCenter.default.post(name: .inkuOpenSection, object: "create")
+                }
+            } catch { model.errorText = error.localizedDescription }
+        }
+    }
 
     private func openLineage(_ work: SavedWork) {
         Task {
@@ -315,9 +390,9 @@ struct LibraryView: View {
 
     @ViewBuilder
     private func workMenu(_ work: SavedWork) -> some View {
-        Button(model.display.localized("作品を開く"), systemImage: "eye") { openWork(work) }.disabled(model.isBusy)
-        Button(model.display.localized("制作で編集"), systemImage: "pencil") {
-            Task { await model.selectWork(work); NotificationCenter.default.post(name: .inkuOpenSection, object: "create") }
+        Button(model.display.localized("作品プレビュー"), systemImage: "eye") { openWork(work) }.disabled(model.isBusy)
+        Button(model.display.localized("制作で開く"), systemImage: "pencil") {
+            openWork(work); openInCreate(work)
         }.disabled(model.isBusy || work.trashed)
         Button(model.display.localized("描画パラメータの編集"), systemImage: "slider.horizontal.3") { onAdjustWork(work) }
             .disabled(model.isBusy || work.trashed)
@@ -417,13 +492,39 @@ struct LibraryView: View {
     }
 
     @ViewBuilder
-    private var selected: some View {
-        if let work = model.selectedWork { LibraryWorkDetails(model: model, work: work, onReplayWork: onReplayWork).id(work.id) }
-        else {
-            ContentUnavailableView(model.display.localized("表示する作品を選択"), systemImage: "photo",
-                                   description: Text(model.display.localized("作品をクリックすると詳細を表示します。チェックは書き出しやごみ箱への複数選択に使います。")))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+    private var previewContent: some View {
+        if let work = preview.work {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Text(model.display.localized("作品プレビュー")).font(.headline)
+                        Spacer()
+                        Button { preview.close() } label: { Image(systemName: "xmark") }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel(model.display.localized("プレビューを閉じる"))
+                            .help(tip("プレビューを閉じる"))
+                    }
+                    LibraryWorkDetails(model: model, work: work, onReplayWork: onReplayWork,
+                                       annotationSource: preview.annotationState,
+                                       onAnnotationSaved: { id, value in preview.adoptAnnotation(value, workID: id) },
+                                       onOpenInCreate: openInCreate)
+                        .id(work.id)
+                    if let error = preview.errorText {
+                        Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+                        Button(model.display.localized("再試行")) {
+                            Task { await preview.loadAnnotation(using: { id in try await model.auxiliaryDatabase().libraryAnnotation(id: id) }) }
+                        }
+                    }
+                }.padding(16)
+            }
         }
+    }
+
+    private func tip(_ key: String) -> String { model.display.preferences.showTooltips ? model.display.localized(key) : "" }
+
+    private struct PreviewReadKey: Equatable {
+        let workID: String?
+        let mutating: Bool
     }
 
     private var pagination: some View {
@@ -440,7 +541,7 @@ struct LibraryView: View {
                 .font(.caption.monospacedDigit()).fixedSize()
             Picker(model.display.localized("件数"), selection: $library.pageSize) {
                 ForEach([12, 24, 30, 48, 96], id: \.self) { Text(model.display.localizedFormat("%ld 件", $0)).tag($0) }
-            }.fixedSize()
+            }.fixedSize().help(tip("1ページに表示する件数を変えます。"))
         }
     }
 
@@ -448,13 +549,17 @@ struct LibraryView: View {
         HStack(spacing: 12) {
             Button { Task { await library.setPage(0) } } label: { Image(systemName: "backward.end") }.accessibilityLabel(model.display.localized("先頭ページ"))
                 .disabled(library.page == 0)
+                .help(tip("先頭ページ"))
             Button { Task { await library.setPage(library.page - 1) } } label: { Image(systemName: "chevron.left") }.accessibilityLabel(model.display.localized("前のページ"))
                 .disabled(library.page == 0)
+                .help(tip("前のページ"))
             Text("\(library.page + 1) / \(library.pageCount)").font(.caption.monospacedDigit())
             Button { Task { await library.setPage(library.page + 1) } } label: { Image(systemName: "chevron.right") }.accessibilityLabel(model.display.localized("次のページ"))
                 .disabled(library.page + 1 >= library.pageCount)
+                .help(tip("次のページ"))
             Button { Task { await library.setPage(library.pageCount - 1) } } label: { Image(systemName: "forward.end") }.accessibilityLabel(model.display.localized("最終ページ"))
                 .disabled(library.page + 1 >= library.pageCount)
+                .help(tip("最終ページ"))
         }.buttonStyle(.borderless)
     }
 }
@@ -465,14 +570,27 @@ private struct LibraryDeletion: Identifiable {
     var empty = false
 }
 
+private struct LibraryTableRow: Identifiable {
+    let work: SavedWork
+    var id: String { work.id }
+}
+
 @MainActor
 struct LibraryWorkDetails: View {
     @Bindable var model: AppModel
     let work: SavedWork
     let onReplayWork: (SavedWork) -> Void
-    @State private var note = ""
-    @State private var savedNote = ""
+    var annotationSource: LibraryAnnotationState? = nil
+    var onAnnotationSaved: ((String, LibraryAnnotation) -> Void)? = nil
+    var onOpenInCreate: ((SavedWork) -> Void)? = nil
+    @State private var comment = LibraryNoteEditorModel()
     private var library: LibraryModel { model.library }
+    private var annotationState: LibraryAnnotationState {
+        if let annotationSource { return annotationSource }
+        if library.isAnnotationLoading(for: work.id) { return .loading }
+        if let value = library.loadedAnnotation(for: work.id) { return .available(value) }
+        return .unavailable
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -481,17 +599,29 @@ struct LibraryWorkDetails: View {
                 VStack(alignment: .leading, spacing: 10) { heading; workActions }
             }
             ArtworkCanvas(svg: work.svg, renderer: model.renderer, caption: work.effectiveSourceText)
-                .frame(minHeight: 280, maxHeight: .infinity)
+                .frame(height: 280)
+            LibraryModelFactsView(work: work, display: model.display)
+            LabeledContent(model.display.localized("SVG容量"), value: ByteCountFormatter.string(fromByteCount: SavedWorkFacts.svgBytes(work), countStyle: .file))
+                .font(.caption).foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Label(model.display.localized("コメント"), systemImage: "text.bubble").font(.caption.weight(.medium))
                     Spacer()
-                    Text("\(note.unicodeScalars.count) / 240").font(.caption.monospacedDigit()).foregroundStyle(note.unicodeScalars.count > 240 ? Color.red : Color.secondary)
+                    Text("\(comment.text.unicodeScalars.count) / 240").font(.caption.monospacedDigit()).foregroundStyle(comment.text.unicodeScalars.count > 240 ? Color.red : Color.secondary)
                     Button(model.display.localized("保存")) { saveNote() }
-                        .disabled(library.mutating || note.unicodeScalars.count > 240 || note == savedNote)
+                        .disabled(library.mutating || !comment.canSave)
+                        .help(model.display.preferences.showTooltips ? model.display.localized("この作品のコメントを保存します。") : "")
                 }
-                TextField(model.display.localized("コメント（240文字まで）"), text: $note, axis: .vertical)
+                TextField(model.display.localized("コメント（240文字まで）"), text: $comment.text, axis: .vertical)
                     .lineLimit(2...4).textFieldStyle(.roundedBorder)
+                    .disabled(annotationState.annotation == nil || comment.saving)
+                if annotationState == .loading {
+                    HStack(spacing: 6) { ProgressView().controlSize(.small); Text(model.display.localized("コメントを読み込み中")) }
+                        .font(.caption).foregroundStyle(.secondary)
+                } else if annotationState == .unavailable {
+                    Text(model.display.localized("コメントを取得できません")).font(.caption).foregroundStyle(.secondary)
+                }
+                if let error = comment.errorText { Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled) }
             }
             DisclosureGroup(model.display.localized("DDL・Score・保存情報")) {
                 ScrollView {
@@ -503,8 +633,6 @@ struct LibraryWorkDetails: View {
                         Text(model.display.localizedFormat("作品 ID: %@", work.id)).font(.caption.monospaced()).textSelection(.enabled)
                         Text(model.display.localizedFormat("用紙: %@ · シード: %@", work.renderCanvasAspectID ?? "—", work.renderSeed ?? "—"))
                             .font(.caption).textSelection(.enabled)
-                        Text(model.display.localizedFormat("モデル: %@", [work.stage1Model, work.stage2Model].compactMap { $0 }.joined(separator: " / ")))
-                            .font(.caption).textSelection(.enabled)
                         Text(model.display.localizedFormat("色: %@ · 描画: %@ %@", work.renderColorCatalogName ?? work.catalogID ?? "—", work.renderEngineID ?? "—", work.renderEngineVersion ?? ""))
                             .font(.caption).textSelection(.enabled)
                         Text(model.display.localizedFormat("SVG: %ld bytes · 生成: %@", work.svg.utf8.count, work.elapsedMS.map { model.display.localizedFormat("%.3f 秒", Double($0) / 1000) } ?? "—"))
@@ -515,19 +643,16 @@ struct LibraryWorkDetails: View {
                 }.frame(maxHeight: 260).padding(.top, 8)
             }
         }.task(id: work.id) {
-            savedNote = library.annotation(for: work.id).note ?? ""; note = savedNote
+            comment.receive(workID: work.id, state: annotationState)
         }
-        .onChange(of: library.annotation(for: work.id).note) { _, value in
-            // A different page may omit this displayed work from its annotations.
-            guard library.annotations[work.id] != nil else { return }
-            if note == savedNote { note = value ?? "" }
-            savedNote = value ?? ""
+        .onChange(of: annotationState) { _, value in
+            comment.receive(workID: work.id, state: value)
         }
     }
 
     private var heading: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label(model.display.localized(work.trashed ? "ごみ箱の作品" : "表示中の作品"), systemImage: work.trashed ? "trash" : "eye")
+            Label(model.display.localized(work.trashed ? "ごみ箱の作品" : annotationSource == nil ? "表示中の作品" : "作品プレビュー"), systemImage: work.trashed ? "trash" : "eye")
                 .font(.caption.weight(.medium)).foregroundStyle(.secondary)
             LibraryWorkTitle(work: work, untitled: model.display.localized("無題"))
         }
@@ -535,20 +660,27 @@ struct LibraryWorkDetails: View {
 
     private var workActions: some View {
         HStack(spacing: 10) {
-            Button(model.display.localized("制作で編集"), systemImage: "pencil") {
-                Task { await model.selectWork(work); NotificationCenter.default.post(name: .inkuOpenSection, object: "create") }
+            Button(model.display.localized(onOpenInCreate == nil ? "制作で編集" : "制作で開く"), systemImage: "pencil") {
+                if let onOpenInCreate { onOpenInCreate(work) }
+                else { Task { await model.selectWork(work); NotificationCenter.default.post(name: .inkuOpenSection, object: "create") } }
             }.disabled(model.isBusy || work.trashed)
+                .help(model.display.preferences.showTooltips ? model.display.localized("保存作品を制作に開きます。制作中の内容が置き換わります。") : "")
             Button(model.display.localized("再演奏"), systemImage: "arrow.clockwise") { onReplayWork(work) }.disabled(model.isBusy || work.trashed)
+                .help(model.display.preferences.showTooltips ? model.display.localized("保存時と現行の描画を比較します。") : "")
         }.controlSize(.small).fixedSize()
     }
 
     private func saveNote() {
-        let submitted = note
         Task {
-            await library.saveNote(id: work.id, note: submitted)
-            guard library.errorText == nil else { return }
-            savedNote = library.annotations[work.id]?.note ?? submitted.trimmingCharacters(in: .whitespacesAndNewlines)
-            if note == submitted { note = savedNote }
+            let id = work.id
+            let value = await comment.save { id, submitted in
+                await library.saveNote(id: id, note: submitted)
+                if let error = library.errorText {
+                    throw NSError(domain: "InkuLibraryNote", code: 1, userInfo: [NSLocalizedDescriptionKey: error])
+                }
+                return try await model.auxiliaryDatabase().libraryAnnotation(id: id)
+            }
+            if let value { onAnnotationSaved?(id, value) }
         }
     }
 

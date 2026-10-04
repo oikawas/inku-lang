@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import InkuCore
 import InkuHost
 
@@ -25,6 +26,16 @@ public struct CanvasOption: Identifiable, Sendable {
     public let name: String
     public let widthRatio: UInt32
     public let heightRatio: UInt32
+    public let category: String
+    public let intentJa: String
+    public let intentEn: String
+    public var label: String { name }
+
+    public init(id: String, name: String, widthRatio: UInt32, heightRatio: UInt32,
+                category: String = "Other", intentJa: String = "", intentEn: String = "") {
+        self.id = id; self.name = name; self.widthRatio = widthRatio; self.heightRatio = heightRatio
+        self.category = category; self.intentJa = intentJa; self.intentEn = intentEn
+    }
 }
 
 public struct SaijikiWord: Identifiable, Sendable {
@@ -33,12 +44,15 @@ public struct SaijikiWord: Identifiable, Sendable {
     public let english: String?
     public let detail: String
     public let isDefault: Bool
+    public let englishDetail: String?
+    public let preview: SaijikiPreview?
 }
 
 public struct SaijikiCategory: Identifiable, Sendable {
     public let id: String
     public let name: String
     public let words: [SaijikiWord]
+    public let englishName: String?
 }
 
 public struct PluginWord: Identifiable, Sendable {
@@ -49,6 +63,13 @@ public struct PluginWord: Identifiable, Sendable {
     public let note: String
     public let previewURL: URL?
     public let packageID: String?
+    public let englishNote: String?
+    public let firesOnJapanese: [String]
+    public let firesOnEnglish: [String]
+
+    public func displayName(language: String) -> String {
+        (language == "ja" ? aliases.first : nil) ?? id
+    }
 }
 
 struct Bootstrap {
@@ -58,6 +79,8 @@ struct Bootstrap {
     private let macroSources: [String: Any]
     let saijiki: [SaijikiCategory]
     let pluginWords: [PluginWord]
+    let productReference: ProductReference
+    let drawingLimitDefinition: DrawingLimitDefinition
 
     init() throws {
         func resource(_ name: String) throws -> Data {
@@ -67,6 +90,12 @@ struct Bootstrap {
             return try Data(contentsOf: url)
         }
         manifest = try Self.object(resource("server-defaults"))
+        let reference = try JSONDecoder().decode(ProductReference.self, from: resource("ui-reference"))
+        productReference = reference
+        guard reference.schema == "inku.apple-ui-reference.v1", let drawingLimits = manifest["drawing_limits"] else {
+            throw HostError("installation_defaults_invalid")
+        }
+        drawingLimitDefinition = try JSONDecoder().decode(DrawingLimitDefinition.self, from: Self.bytes(drawingLimits))
         guard let records = try JSONSerialization.jsonObject(with: resource("color-catalogs")) as? [[String: Any]] else {
             throw HostError("color_catalogs_invalid")
         }
@@ -87,8 +116,9 @@ struct Bootstrap {
                 let description = word["physical_description"] as? [String: String]
                 return SaijikiWord(id: id + ":" + japanese, japanese: japanese,
                     english: word["surface_en"] as? String, detail: description?["ja"] ?? "",
-                    isDefault: word["default"] as? Bool ?? false)
-            })
+                    isDefault: word["default"] as? Bool ?? false, englishDetail: description?["en"],
+                    preview: reference.saijikiPreviews[id + ":" + japanese])
+            }, englishName: category["name_en"] as? String)
         }
         pluginWords = try plugins.map { item in
             guard let id = item["id"] as? String, let surfaces = item["surfaces"] as? [String: [String]],
@@ -97,7 +127,9 @@ struct Bootstrap {
                 Bundle.module.url(forResource: $0, withExtension: nil, subdirectory: "plugin-previews")
             }
             return PluginWord(id: id, aliases: item["aliases"] as? [String] ?? [], japanese: surfaces["ja"] ?? [],
-                english: surfaces["en"] ?? [], note: notes["ja"] ?? "", previewURL: preview, packageID: item["package_id"] as? String)
+                english: surfaces["en"] ?? [], note: notes["ja"] ?? "", previewURL: preview, packageID: item["package_id"] as? String,
+                englishNote: notes["en"], firesOnJapanese: (item["fires_on"] as? [String: [String]])?["ja"] ?? [],
+                firesOnEnglish: (item["fires_on"] as? [String: [String]])?["en"] ?? [])
         }
     }
 
@@ -119,7 +151,10 @@ struct Bootstrap {
         return records.compactMap { item in
             guard let id = item["id"] as? String, let width = item["width_units"] as? UInt32,
                   let height = item["height_units"] as? UInt32 else { return nil }
-            return CanvasOption(id: id, name: id, widthRatio: width, heightRatio: height)
+            let display = productReference.canvasMetadata[id]
+            return CanvasOption(id: id, name: display?.label ?? id, widthRatio: width, heightRatio: height,
+                                category: display?.category ?? "Other", intentJa: display?.intentJa ?? id,
+                                intentEn: display?.intentEn ?? id)
         }
     }
 
@@ -175,6 +210,25 @@ struct Bootstrap {
             for (key, value) in selectedLimits { maximum[key] = value }
             budget["maximum"] = maximum
             compiler["operational_resource_budget"] = budget
+        }
+        if saved == nil, let selected = settings.drawingLimits {
+            let limits = drawingLimitDefinition.normalized(selected)
+            var hardPolicy = compiler["hard_resource_policy"] as? [String: Any] ?? [:]
+            var hardBudget = hardPolicy["budget"] as? [String: Any] ?? [:]
+            var hardMaximum = hardBudget["maximum"] as? [String: Any] ?? [:]
+            var operational = compiler["operational_resource_budget"] as? [String: Any] ?? [:]
+            var operationalMaximum = operational["maximum"] as? [String: Any] ?? [:]
+            for (field, setting) in drawingLimitDefinition.budgetMapping {
+                hardMaximum[field] = limits[setting]
+                operationalMaximum[field] = limits[setting]
+            }
+            hardBudget["maximum"] = hardMaximum
+            hardPolicy["budget"] = hardBudget
+            let digest = SHA256.hash(data: try JSONSerialization.data(withJSONObject: hardBudget, options: [.sortedKeys, .withoutEscapingSlashes]))
+            hardPolicy["identity"] = "host-settings:" + digest.map { String(format: "%02x", $0) }.joined()
+            operational["maximum"] = operationalMaximum
+            compiler["hard_resource_policy"] = hardPolicy
+            compiler["operational_resource_budget"] = operational
         }
         if (variationAmplitude == nil) != (variationSeed == nil) { throw HostError("variation_pair_required") }
         compiler["stage15_variation"] = NSNull()

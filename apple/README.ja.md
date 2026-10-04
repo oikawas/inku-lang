@@ -18,7 +18,7 @@ Personal ChatGPTは設定の専用画面で明示して有効化・接続し、�
 
 最低OSはmacOS 14／iOS 17です。SDKの版は最低OSとは別です。確認した環境はXcode 27.0／Swift 6.4、Rust 1.95.0、XcodeGen 2.46.0です。Swift packageはtools 6.1、projectはXcodeGen 2.44.0以上を要求します。
 
-buildにはmacOS、XcodeのCLI tools、XcodeGen、Python 3.11以上、uv、公式rustupが必要です。PythonとuvはServer正本からbuild用resourceと固定辞書を生成するためにだけ使い、アプリへ組み込みません。初回はCargo、SwiftPMとServerのuv.lock依存を取得するnetwork接続が必要です。
+buildにはmacOS、XcodeのCLI tools、XcodeGen、Python 3.11以上、Node.js 22.13以上、uv、公式rustupが必要です。Node.jsの[`stripTypeScriptTypes`](https://nodejs.org/download/release/v22.14.0/docs/api/module.html#modulestriptypescripttypescode-options)で同じcheckoutのWeb文言・用紙情報・歳時記previewをbuild resourceへ抽出します。PythonとuvはServer正本と固定辞書の準備に使い、いずれのruntimeもアプリへ組み込みません。初回はCargo、SwiftPMとServerのuv.lock依存を取得するnetwork接続が必要です。
 
 主な固定依存はUniFFI 0.32.0、GRDB 7.11.1です。Rustのtoolchain／依存は`core/rust-toolchain.toml`と`core/Cargo.lock`、GRDBは`Packages/InkuPersistence/Package.swift`とSwiftPMの解決記録で管理します。UniFFI generatorは同じcheckoutのCargo.lockからbuildし、そのRust archiveのmetadataを読みます。
 
@@ -73,7 +73,9 @@ DBのcopyや移動は行いません。指定はbundleの`InkuDatabasePath`へ�
 
 初期入力は英語の直接DDLです。モデル接続なしで生成を試せます。記述から生成する場合は「設定」でprovider方式、base URL、model、必要なAPI keyを保存してから制作画面の記述modeを使います。複数のAPIサービスを登録でき、Stage1／Stage2は共通の描画modelを使用します。model一覧の取得は明示したボタン操作で行います。接続を保存するだけではLLM requestを送りません。
 
-制作画面の「次の生成条件」で次に使うservice／modelを選びます。この選択は設定の保存defaultや開始済みbatch／demoを変えません。生成／停止buttonは入力のscroll領域の外にあります。⌘Nで新規、⌘OでDDL読込、⌘,で設定、⌘1〜4で画面移動、⇧⌘Eで書出しを開けます。libraryのcheckboxと表示作品を区別し、制作からの書出しは表示中の保存作品を使います。
+制作画面の「次の生成条件」で次に使うservice／modelを選びます。この選択は設定の保存defaultや開始済みbatch／demoを変えません。条件は要約と詳細popover、保存情報は「表示中作品の生成情報」へ分け、生成／停止buttonは入力のscroll領域の外にあります。DDLは「編集」から独立draftを開き、取消しでは表示作品を変更しません。⌘Nで新規、⌘OでDDL読込、⌘,で設定、⌘1〜4で画面移動、⇧⌘Eで書出しを開けます。libraryのcheckboxと表示作品を区別し、制作からの書出しは表示中の保存作品を使います。
+
+ライブラリは作品をpreviewしても制作中の入力を保持します。「制作で開く」で明示的に切り替え、previewは閉じて一覧へ戻れます。系譜は枝の開閉と全体図を使用でき、全体図を閉じると通常の閲覧位置へ戻ります。canvasのマウスホイールで拡縮し、100%以下で中央へ戻します。用紙は形と意図を見て次の条件へ選び、通常の歳時記は参照のみです。toolbarのTips切替と設定の描画制限値を使用できます。制限値は編集後に「変更を保存」を押すと新作品へ適用します。
 
 制作とモデル設定で「モデルの適性・用途」を開くと、Serverの登録評価・用途・commentと接続先から取得した情報を別々に読めます。未登録のservice／modelは推測で評価しません。処理中は段階・呼出しmodel・試行回数・経過時間を表示し、未取得token数は「記録なし」とします。停止で時間が確定し、新規制作で前の進行表示を消します。
 
@@ -123,6 +125,8 @@ python3 apple/scripts/export-server-resources.py
 uv sync --project server --frozen
 python3 apple/scripts/prepare-meter-resources.py
 ```
+
+UI差分の限定確認は`--library-browsing-only`、`--lineage-presentation-only`、`--ddl-editor-cancel-only`、`--drawing-limits-editing-only`、`--canvas-wheel-only`です。隔離DBでpreview・コメント・系譜復帰・取消・制限値の保存を確認し、ホイールは倍率と位置の計算だけを確認します。nativeの実イベントや見た目は別に確認してください。
 
 追加のAppCheck選択は`--provider-progress-only`と`--model-guidance-only`です。前者はmock／共通Rustで再試行の表示・時計・停止と遅いcallback、後者は生成したServer評価資料と一時DBで適性・未登録境界・選択とsnapshotの保持を確認します。実providerへの呼出しは行いません。
 

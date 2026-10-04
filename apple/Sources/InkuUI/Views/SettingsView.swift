@@ -237,14 +237,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         }
     }
     private var about: some View {
-        Section("inku") {
-            Text(model.display.localized("視覚的な短歌を書く")).font(.title3)
-            Text(model.versionSummary).textSelection(.enabled)
-            Text(model.display.localized("macOS 14以降 · Universal · 単一利用者のローカルアプリ"))
-            Link(model.display.localized("画像作成マニュアル"), destination: URL(string: "https://github.com/oikawas/inku-lang/blob/main/manual/ja/image-creation.md")!)
-            Text(model.display.localized("Serverを開発の正本とし、描画・指示書に同じRust coreを使用します。"))
-                .font(.callout).foregroundStyle(.secondary)
-        }
+        AboutInkuView(model: model)
     }
     private func membership(_ item: String, in selection: Binding<Set<String>>, maximum: Int = .max) -> Binding<Bool> {
         Binding(get: { selection.wrappedValue.contains(item) }, set: { enabled in

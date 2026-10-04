@@ -6,6 +6,12 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-04 — Swiftの制作・ライブラリ・系譜と周辺UIをWebへ揃える
+
+制作の条件を要約と詳細へ分け、DDLの読取表示・独立編集・取消を用意した。ライブラリは制作入力を保持した専用preview、整列した一覧、役割別モデルとコメントdraftを使用する。系譜は親子線・お気に入り経路・削除節点の破線、中心を保つ枝の開閉と復帰できる全体図を追加した。
+
+macOSキャンバスのホイール拡縮、用紙の形と意図を示すchooser、参照中心の歳時記preview、主要操作のTipsを追加した。描画の制限値はServerの9項目を編集・保存でき、新作品へ適用し、保存作品の条件を保持する。「inkuについて」の概念説明・用語表・作者情報は同じcheckoutのWebから取り込む。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[手順](apple/README.ja.md)の日英を同期した。
+
 ### 2026-10-04 — macOSのincuアイコンとDock用の固定アプリを追加
 
 既存incu画像からmacOS用アイコンを生成してappへ割り当て、固定install先をrebuild後も更新できるようにした。app directory、bundle IDとDB指定を保持し、Dock登録を継続利用する。既存の試行DBはbundle設定で指定でき、Dockの引数なし起動でも同じ作品を開く。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[build・install手順](apple/README.ja.md)の日英を同期した。

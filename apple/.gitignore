@@ -6,4 +6,5 @@ Inku.xcodeproj/
 xcuserdata/
 Sources/InkuUI/Resources/server-defaults.json
 Sources/InkuUI/Resources/color-catalogs.json
+Sources/InkuUI/Resources/ui-reference.json
 Packages/InkuHost/Sources/InkuHost/Resources/description-meter/

@@ -294,7 +294,11 @@ struct LineageView: View {
                 }
                 Text(operation(graph.edges.first { $0.childNodeID == item.id }?.derivationKind)).font(.caption.weight(.semibold)).lineLimit(1)
                 Spacer(minLength: 0)
-                if item.id == graph.focusNodeID { Label(model.display.localized("中心"), systemImage: "scope").font(.caption2).foregroundStyle(Color.accentColor) }
+                if item.id == graph.focusNodeID {
+                    Label(model.display.localized("中心"), systemImage: "scope")
+                        .font(.caption2).foregroundStyle(Color.accentColor)
+                        .lineLimit(1).fixedSize(horizontal: true, vertical: false)
+                }
                 Menu { nodeMenu(item, graph: graph) } label: { Image(systemName: "ellipsis") }
                     .fixedSize().accessibilityLabel(model.display.localized("節点の操作"))
             }

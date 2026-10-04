@@ -12,6 +12,8 @@ Absent drawing-limit settings now normalize all nine defaults and always derive 
 
 Rendering maps now add `palette:<name>` aliases for all named catalog colors alongside base colors, aligning seeded selection of entries such as `Deep Red` with Server. Selected, automatic, rendering-catalog, and explicitly selected replay maps share this expansion; older saved maps, history, and export conditions remain intact. A focused check confirmed retention of older nine-color maps. The red-square/seed43 CLI comparison matched Server1162 on all 13 checks, including Score, SVG, the 19-color map, and render conditions. This compares rendering of the same Score; provider quality and full UI acceptance require separate verification.
 
+Live observation found the center marker wrapping vertically in a lineage card. It now stays on one line, keeping the title and node operations within the same card and preserving the separation between the graph center and the work displayed in creation.
+
 ### 2026-10-04 — Follow current Server core, saved works, and app operations in Swift
 
 Ported Stage 1 fallback cleanup, composition prompt v2/named corners, Cells/DDL engine 57/Score 0.19.0/render engine 73, Japanese modifiers, and tall-shape angle semantics while retaining Swift facades, the meter, and native raster. New variation is retired; old works/provenance remain readable. Invalid older snapshots are not automatically repaired and pending requests are not resent.

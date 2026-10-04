@@ -12,6 +12,8 @@
 
 描画用mapに基本色だけでなくcatalog全named色の `palette:<name>` 別名を加え、`Deep Red`等のseedによる候補選択をServerへ揃えた。選択／自動配色／render catalog／明示replay用の新mapを共通展開し、旧作品の保存map・履歴・書出し条件を保持する。限定checkで旧9色mapの保持を確認し、赤い正方形・seed43のCLI比較ではServer1162とScore・SVG・19色map・描画条件の13項目が一致した。同Scoreのrender比較であり、provider品質や全UIの受入は別に確認する。
 
+実画面で系譜cardの「中心」が縦に折り返される問題を確認し、中心の印を1行で保つ。作品名と節点操作を同じcard内へ収め、中心と制作の表示作品を分ける挙動は保持する。
+
 ### 2026-10-04 — Swiftを現行Serverのcore・保存作品・全体操作へ追随
 
 Stage 1確定後のfallback清掃、構図prompt v2と明示した隅、Cells・DDLエンジン57／Score 0.19.0／描画エンジン73、日本語修飾語と縦長角度の共通semanticを取り込んだ。Swift facade・meter・native rasterを保持し、新variationを退役した。旧作品・来歴は読めるままとし、既存不正snapshotの自動修復・pending要求の自動再送は追加しない。

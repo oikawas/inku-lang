@@ -1454,7 +1454,6 @@
       ],
       "angle": [
         "horizontal",
-        "vertical",
         "diagonal",
         "rising",
         "falling",
@@ -1984,7 +1983,6 @@
       ],
       "angle": [
         "horizontal",
-        "vertical",
         "diagonal",
         "rising",
         "falling",
@@ -3062,7 +3060,6 @@
       ],
       "angle": [
         "horizontal",
-        "vertical",
         "diagonal",
         "rising",
         "falling",
@@ -3592,7 +3589,6 @@
       ],
       "angle": [
         "horizontal",
-        "vertical",
         "diagonal",
         "rising",
         "falling",

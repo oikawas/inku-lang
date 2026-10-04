@@ -1,3 +1,5 @@
+mod common;
+
 use inku_ddl::ResolvedInstructionLanguage;
 use inku_ddl::work_plan::{
     WorkPlan, WorkPlanLayer, WorkPlanSlot, derive_work_plan_capabilities, normalize_work_plan,
@@ -144,6 +146,7 @@ fn random_layer(rng: &mut SplitMix) -> WorkPlanLayer {
 fn random_plans_inside_the_matrix_compile_cleanly_in_both_languages() {
     let vocabulary = work_plan_vocabulary();
     let mut rng = SplitMix(20_260_924);
+    let mut plans = Vec::new();
     for _ in 0..120 {
         let layers = (0..1 + rng.next() % 5)
             .map(|_| random_layer(&mut rng))
@@ -165,17 +168,20 @@ fn random_plans_inside_the_matrix_compile_cleanly_in_both_languages() {
             plugins: Vec::new(),
             layers,
         };
+        plans.push(plan);
+    }
+    common::par_map(&plans, |plan| {
         for language in [
             ResolvedInstructionLanguage::Ja,
             ResolvedInstructionLanguage::En,
         ] {
-            let source = print_work_plan(&plan, language);
+            let source = print_work_plan(plan, language);
             assert!(
                 work_plan_source_compiles_cleanly(&source, language),
                 "{language:?}: {source}"
             );
         }
-    }
+    });
 }
 
 #[test]

@@ -38,51 +38,58 @@ fn optimized_turbulence_preserves_upstream_images() {
         ),
     ];
 
-    for (name, svg, side) in cases {
-        let started = Instant::now();
-        let tree = usvg::Tree::from_str(svg, &usvg::Options::default()).expect("upstream parse");
-        let intrinsic = tree.size();
-        let scale = (f64::from(side) / f64::from(intrinsic.width()))
-            .min(f64::from(side) / f64::from(intrinsic.height()));
-        let width = (f64::from(intrinsic.width()) * scale).round().max(1.0) as u32;
-        let height = (f64::from(intrinsic.height()) * scale).round().max(1.0) as u32;
-        let mut expected = tiny_skia::Pixmap::new(width, height).expect("upstream pixels");
-        resvg_upstream::render(
-            &tree,
-            tiny_skia::Transform::from_scale(scale as f32, scale as f32),
-            &mut expected.as_mut(),
-        );
-        let upstream_ms = started.elapsed().as_secs_f64() * 1000.0;
+    // Each image is drawn and compared on its own thread.
+    std::thread::scope(|scope| {
+        for (name, svg, side) in cases {
+            scope.spawn(move || compare(name, svg, side));
+        }
+    });
+}
 
-        let started = Instant::now();
-        let actual = rasterize(
-            svg,
-            RasterOptions {
-                target_width: Some(side),
-                target_height: Some(side),
-            },
-        )
-        .expect("optimized raster");
-        let optimized_ms = started.elapsed().as_secs_f64() * 1000.0;
-        assert_eq!((actual.width, actual.height), (width, height), "{name}");
-        assert_eq!(actual.stride, width * 4, "{name}");
-        assert_eq!(actual.pixels.len(), expected.data().len(), "{name}");
-        let changed_pixels = actual
-            .pixels
-            .chunks_exact(4)
-            .zip(expected.data().chunks_exact(4))
-            .filter(|(a, b)| a != b)
-            .count();
-        let digest: String = Sha256::digest(&actual.pixels)
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
-        println!(
-            "{name}: {width}x{height} upstream_ms={upstream_ms:.3} optimized_ms={optimized_ms:.3} changed_pixels={changed_pixels} sha256={digest}"
-        );
-        assert_eq!(
-            changed_pixels, 0,
-            "{name}: output changed from resvg 0.48.1"
-        );
-    }
+fn compare(name: &str, svg: &str, side: u32) {
+    let started = Instant::now();
+    let tree = usvg::Tree::from_str(svg, &usvg::Options::default()).expect("upstream parse");
+    let intrinsic = tree.size();
+    let scale = (f64::from(side) / f64::from(intrinsic.width()))
+        .min(f64::from(side) / f64::from(intrinsic.height()));
+    let width = (f64::from(intrinsic.width()) * scale).round().max(1.0) as u32;
+    let height = (f64::from(intrinsic.height()) * scale).round().max(1.0) as u32;
+    let mut expected = tiny_skia::Pixmap::new(width, height).expect("upstream pixels");
+    resvg_upstream::render(
+        &tree,
+        tiny_skia::Transform::from_scale(scale as f32, scale as f32),
+        &mut expected.as_mut(),
+    );
+    let upstream_ms = started.elapsed().as_secs_f64() * 1000.0;
+
+    let started = Instant::now();
+    let actual = rasterize(
+        svg,
+        RasterOptions {
+            target_width: Some(side),
+            target_height: Some(side),
+        },
+    )
+    .expect("optimized raster");
+    let optimized_ms = started.elapsed().as_secs_f64() * 1000.0;
+    assert_eq!((actual.width, actual.height), (width, height), "{name}");
+    assert_eq!(actual.stride, width * 4, "{name}");
+    assert_eq!(actual.pixels.len(), expected.data().len(), "{name}");
+    let changed_pixels = actual
+        .pixels
+        .chunks_exact(4)
+        .zip(expected.data().chunks_exact(4))
+        .filter(|(a, b)| a != b)
+        .count();
+    let digest: String = Sha256::digest(&actual.pixels)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    println!(
+        "{name}: {width}x{height} upstream_ms={upstream_ms:.3} optimized_ms={optimized_ms:.3} changed_pixels={changed_pixels} sha256={digest}"
+    );
+    assert_eq!(
+        changed_pixels, 0,
+        "{name}: output changed from resvg 0.48.1"
+    );
 }

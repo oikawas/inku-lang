@@ -6,6 +6,8 @@
 //! (`tools/recompose_fixture.py`, seed 1, the case as the work). Only the marked
 //! ranges change, and a work the instructions cannot recompose stays as it is.
 
+mod common;
+
 use std::collections::BTreeMap;
 
 use inku_ddl::{MacroDefinition, MacroExpansionLimits, ResolvedInstructionLanguage};
@@ -61,7 +63,7 @@ fn the_instructions_give_back_the_layers_the_composition_reads() {
     let cases = data["cases"].as_array().expect("cases");
     assert_eq!(cases.len(), 49);
     let definitions = definitions();
-    for case in cases {
+    common::par_map(cases, |case| {
         let id = text(case, "id");
         let (layers, background) =
             composition_layers(text(case, "source"), language(case), &definitions, LIMITS)
@@ -95,7 +97,7 @@ fn the_instructions_give_back_the_layers_the_composition_reads() {
                 .collect();
             assert_eq!(attributes, wanted, "{id} layer {index}");
         }
-    }
+    });
 }
 
 fn check(case: &Value, definitions: &[MacroDefinition], mode: RecomposeMode, key: &str) {
@@ -149,55 +151,59 @@ fn check(case: &Value, definitions: &[MacroDefinition], mode: RecomposeMode, key
 #[test]
 fn a_principled_recomposition_gives_the_prototypes_other_answer() {
     let definitions = definitions();
-    for case in fixture()["cases"].as_array().expect("cases") {
+    common::par_map(fixture()["cases"].as_array().expect("cases"), |case| {
         check(case, &definitions, RecomposeMode::Principled, "principled");
-    }
+    });
 }
 
 #[test]
 fn a_chance_recomposition_gives_the_prototypes_chance_ranges() {
     let definitions = definitions();
-    for case in fixture()["cases"].as_array().expect("cases") {
+    common::par_map(fixture()["cases"].as_array().expect("cases"), |case| {
         check(case, &definitions, RecomposeMode::Chance, "chance");
-    }
+    });
 }
 
 #[test]
 fn only_the_marked_ranges_change() {
-    let mut recomposed = 0;
     let definitions = definitions();
-    for case in fixture()["cases"].as_array().expect("cases") {
-        let id = text(case, "id");
-        let source = text(case, "source");
-        for mode in [RecomposeMode::Principled, RecomposeMode::Chance] {
-            let Recomposition::Recomposed { source: after, .. } =
-                recompose(source, language(case), &definitions, LIMITS, mode, 1, id)
-            else {
-                continue;
-            };
-            recomposed += 1;
-            let (before, after): (Vec<&str>, Vec<&str>) =
-                (source.lines().collect(), after.lines().collect());
-            assert_eq!(before.len(), after.len(), "{id}");
-            for (old, new) in before.iter().zip(&after) {
-                let cut = |line: &str| {
-                    MARKS
-                        .iter()
-                        .find_map(|mark| line.find(mark))
-                        .map_or(line.len(), |at| at)
+    let recomposed: usize =
+        common::par_map(fixture()["cases"].as_array().expect("cases"), |case| {
+            let id = text(case, "id");
+            let source = text(case, "source");
+            let mut recomposed = 0;
+            for mode in [RecomposeMode::Principled, RecomposeMode::Chance] {
+                let Recomposition::Recomposed { source: after, .. } =
+                    recompose(source, language(case), &definitions, LIMITS, mode, 1, id)
+                else {
+                    continue;
                 };
-                // Before the mark nothing changes; after it, only the range.
-                assert_eq!(&old[..cut(old)], &new[..cut(new)], "{id}");
-                let tail = |line: &str| {
-                    let after_range = line.rfind(['）', ')']).map_or(line.len(), |at| at);
-                    line[after_range..]
-                        .trim_start_matches(['）', ')'])
-                        .to_owned()
-                };
-                assert_eq!(tail(old), tail(new), "{id}");
+                recomposed += 1;
+                let (before, after): (Vec<&str>, Vec<&str>) =
+                    (source.lines().collect(), after.lines().collect());
+                assert_eq!(before.len(), after.len(), "{id}");
+                for (old, new) in before.iter().zip(&after) {
+                    let cut = |line: &str| {
+                        MARKS
+                            .iter()
+                            .find_map(|mark| line.find(mark))
+                            .map_or(line.len(), |at| at)
+                    };
+                    // Before the mark nothing changes; after it, only the range.
+                    assert_eq!(&old[..cut(old)], &new[..cut(new)], "{id}");
+                    let tail = |line: &str| {
+                        let after_range = line.rfind(['）', ')']).map_or(line.len(), |at| at);
+                        line[after_range..]
+                            .trim_start_matches(['）', ')'])
+                            .to_owned()
+                    };
+                    assert_eq!(tail(old), tail(new), "{id}");
+                }
             }
-        }
-    }
+            recomposed
+        })
+        .into_iter()
+        .sum();
     assert!(recomposed >= 80, "{recomposed} recompositions");
 }
 

@@ -1,14 +1,13 @@
 // Run with: npm run test:unit  (node:test, no test dependency)
 //
-// Acceptance for the surface half of the saijiki panels. おもて was the only
-// one of the eleven built-in categories with no preview of its own: all ten
-// of its words fell through to the generic fallback -- one wavy line and the
-// sentence "記述の解釈に影響する語彙です。" -- so the panel said nothing about
-// what any of them does.
+// Acceptance for the surface and handling saijiki panels. Each current word
+// needs its own preview instead of the generic fallback's wavy line and
+// "記述の解釈に影響する語彙です。". Saijiki v2 replaces 薄墨 with 刷き and
+// gives 濃い / 程よい / 薄い their own handling category.
 //
 // T-30 (every word of the category has its own preview, and the page reads it),
-// T-31 (the copy is there in both UI languages), T-32 (ten drawings, not one
-// drawing ten times), T-33 (they share one contour, so only the face
+// T-31 (the copy is there in both UI languages), T-32 (one drawing per word),
+// T-33 (they share one contour, so only the face
 // changes), T-34 (空 is the empty one, and it is the only empty one),
 // T-35 (the drawings carry the engine's own counts: one line set for 平行線,
 // two for 交差線, three tone steps for アクアチント).
@@ -17,12 +16,13 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { GENERATED_SAIJIKI } from './saijiki.generated.ts';
-import { SURFACE_BOX, SURFACE_PREVIEWS } from './saijiki-surface.ts';
+import { SURFACE_BOX, SURFACE_PREVIEWS, HANDLING_PREVIEWS } from './saijiki-surface.ts';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
 /** The words the server's saijiki table puts in the category, not a copy. */
 const OMOTE = GENERATED_SAIJIKI.find((cat) => cat.key === 'omote')?.words ?? [];
+const SABAKI = GENERATED_SAIJIKI.find((cat) => cat.key === 'sabaki')?.words ?? [];
 
 /** The sentence any word without an entry of its own gets instead. */
 const FALLBACK = '記述の解釈に影響する語彙です。';
@@ -41,6 +41,12 @@ test('T-30  the previews are the category, and nothing besides', () => {
 	assert.deepEqual(Object.keys(SURFACE_PREVIEWS).sort(), [...OMOTE].sort());
 });
 
+test('T-30  handling has exactly its three current words and distinct previews', () => {
+	assert.equal(SABAKI.length, 3);
+	assert.deepEqual(Object.keys(HANDLING_PREVIEWS).sort(), [...SABAKI].sort());
+	assert.equal(new Set(SABAKI.map((word) => HANDLING_PREVIEWS[word].svg)).size, SABAKI.length);
+});
+
 test('T-30  the page reads them, so a hover reaches the entries', () => {
 	const page = read('../routes/+page.svelte');
 	assert.match(page, /import \{[^}]*SURFACE_PREVIEWS[^}]*\} from '\$lib\/saijiki-surface'/);
@@ -48,13 +54,14 @@ test('T-30  the page reads them, so a hover reaches the entries', () => {
 	const table = page.slice(page.indexOf('const previews: Record<string, PreviewEntry>'));
 	const body = table.slice(0, table.indexOf('\n\t\t};'));
 	assert.match(body, /\.\.\.SURFACE_PREVIEWS,/);
+	assert.match(body, /\.\.\.HANDLING_PREVIEWS,/);
 });
 
 // ------------------------------------------------------------------- T-31
 
 test('T-31  each word says what it does, in both UI languages', () => {
-	for (const word of OMOTE) {
-		const entry = SURFACE_PREVIEWS[word];
+	for (const word of [...OMOTE, ...SABAKI]) {
+		const entry = SURFACE_PREVIEWS[word] ?? HANDLING_PREVIEWS[word];
 		for (const field of ['effect', 'example', 'effectEn', 'exampleEn'] as const) {
 			assert.ok(entry[field].trim().length > 0, `${word}: ${field} is empty`);
 		}
@@ -67,7 +74,7 @@ test('T-31  each word says what it does, in both UI languages', () => {
 
 // ------------------------------------------------------------------- T-32
 
-test('T-32  ten words, ten different drawings', () => {
+test('T-32  every surface word has a different drawing', () => {
 	const drawings = OMOTE.map((word) => SURFACE_PREVIEWS[word].svg);
 	assert.equal(new Set(drawings).size, OMOTE.length, 'two surface words share a drawing');
 	for (const [index, svg] of drawings.entries()) {
@@ -78,7 +85,7 @@ test('T-32  ten words, ten different drawings', () => {
 
 // ------------------------------------------------------------------- T-33
 
-test('T-33  the contour is the same in all ten; the face is what changes', () => {
+test('T-33  the contour is the same for every surface; the face is what changes', () => {
 	for (const word of OMOTE) {
 		const svg = SURFACE_PREVIEWS[word].svg;
 		assert.ok(
@@ -93,8 +100,8 @@ test('T-33  the contour is the same in all ten; the face is what changes', () =>
 // ------------------------------------------------------------------- T-34
 
 /** What a drawing puts inside the contour, with the contour itself removed. */
-function interior(word: string): string {
-	const svg = SURFACE_PREVIEWS[word].svg;
+function interior(word: string, previews = SURFACE_PREVIEWS): string {
+	const svg = previews[word].svg;
 	const start = svg.indexOf('<g clip-path="url(#surface-clip)">');
 	const end = svg.indexOf('</g>', start);
 	return svg.slice(start + '<g clip-path="url(#surface-clip)">'.length, end);
@@ -137,20 +144,37 @@ test('T-35  aquatint is drawn in three tone steps, the engine default', () => {
 	assert.ok(mean(1) < mean(2), 'the third step is not darker than the second');
 });
 
-test('T-35  the relative words move a density instead of being one', () => {
-	// 濃い and 薄い are not textures. Each shows the same stipple twice -- the
-	// default on the left, the value the word asks for on the right -- so the
-	// dense one must carry more marks than the default and the faint one fewer.
-	const dabs = (word: string) =>
-		[...interior(word).matchAll(/cx="([\d.]+)"/g)].map((m) => Number(m[1]));
-	for (const [word, compare] of [
-		['濃い', (left: number, right: number) => right > left],
-		['薄い', (left: number, right: number) => right < left]
+test('T-35  刷き sweeps twice at half the tool opacity without a flat underfill', () => {
+	const svg = SURFACE_PREVIEWS['刷き'].svg;
+	assert.equal([...svg.matchAll(/<g opacity="0\.5"/g)].length, 2);
+	assert.match(svg, /rotate\(6 90 46\)/);
+	assert.doesNotMatch(interior('刷き'), /<rect[^>]*fill="#2b2b2b"/);
+	assert.match(SURFACE_PREVIEWS['刷き'].exampleEn, /\bsweep\b/);
+});
+
+test('T-35  handling changes opacity relative to the tool and keeps the marks', () => {
+	// The left half is temperate pencil; the right has the chosen handling.
+	// V2 changes opacity, so each word keeps the same number, shape and placement
+	// of stipple marks. 程よい keeps the tool's opacity, rather than making it 1.
+	for (const [word, factor] of [
+		['濃い', 1.35],
+		['程よい', 1],
+		['薄い', 0.55]
 	] as const) {
-		const xs = dabs(word);
-		const left = xs.filter((x) => x < 90).length;
-		const right = xs.filter((x) => x >= 90).length;
-		assert.ok(left > 0 && right > 0, `${word}: one half of the comparison is missing`);
-		assert.ok(compare(left, right), `${word}: the two halves do not differ the way it says`);
+		const marks = [...interior(word, HANDLING_PREVIEWS).matchAll(
+			/<circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)" fill="#2b2b2b" opacity="([\d.]+)"/g
+		)].map((m) => m.slice(1).map(Number));
+		const left = marks.filter(([x]) => x < 90);
+		const right = marks.filter(([x]) => x >= 90);
+		assert.ok(left.length > 0 && right.length > 0, `${word}: one half is missing`);
+		assert.equal(left.length, right.length, `${word}: changed the density`);
+		assert.deepEqual(
+			left.map(([x, y, r]) => [Number((x + 40).toFixed(1)), y, r]),
+			right.map(([x, y, r]) => [x, y, r]),
+			`${word}: changed the marks instead of their opacity`
+		);
+		const mean = (dabs: number[][]) => dabs.reduce((sum, m) => sum + m[3], 0) / dabs.length;
+		assert.ok(Math.abs(mean(right) / mean(left) - factor) < 0.02, `${word}: wrong opacity factor`);
+		if (word === '程よい') assert.deepEqual(left.map((m) => m[3]), right.map((m) => m[3]));
 	}
 });

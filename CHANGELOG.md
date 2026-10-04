@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-04 — Align surface and handling previews with Saijiki v2
+
+Sweep fell through to a generic Web preview, while dense and faint still described the old surface density. The eight surface words and three handling words now have current bilingual explanations and drawings. Sweep shows two passes at half the tool opacity; handling shows opacity relative to the tool, with temperate retaining its own opacity. Comparison marks keep their count, shape and positions. One drawing per word, the shared contour, only empty being unmarked, and hatch, crosshatch and aquatint meaning checks are preserved. Vocabulary, core, saved works and versions are unchanged.
+
 ### 2026-10-04 — Getting started with Docker Desktop and the ChatGPT plan
 
 The README Quick Start now opens with running source-built containers on Docker Desktop on your own Mac in single-user mode and painting with your ChatGPT subscription's allowance. The full steps are in [Getting started with Docker Desktop](docs/guide/docker-desktop.md): sign in to ChatGPT on the PC and import the sealed sign-in into the container. Windows can follow the same steps inside WSL 2, and the guide states that the ChatGPT sign-in there has not been verified. The release-image and API-key steps remain as step 1. Product behavior is unchanged.

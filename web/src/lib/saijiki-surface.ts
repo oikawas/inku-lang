@@ -1,16 +1,14 @@
-// The saijiki previews for the surface words (おもて / surfaces).
+// The saijiki previews for surfaces (おもて) and handling (さばき).
 //
-// The other ten categories say what to place; this one says how a face is --
-// saijiki.py marks it as carrying no closure marker for exactly that reason.
+// Surfaces say how a face is; handling says how ink or paint is laid down.
 // So every drawing here is the same rectangle with a different interior. The
 // contour never changes, and hovering across the row shows only the face
 // changing, which is what the category means.
 //
-// What each word does is the server's, not this file's: the mapping from word
-// to `instruction.surface` is fixed in composer.py, and the marks are drawn by
-// renderer.py's `_render_surface_vectors`. The drawings below follow those two
-// -- the hatch angle, the two wash sweeps, the three aquatint steps and the
-// density figures behind 濃い / 薄い are all read from there, not invented.
+// These explanatory drawings follow SPEC §3.3 and the shared Rust renderer's
+// surfaces.rs / marks.rs: two sweeps at 0.5, one or two hatch sets, three
+// aquatint steps, and handling relative to the tool's opacity. They are stable
+// illustrations, not performances of a Score.
 
 import type { ResolvedInstructionLang } from './instructionLang';
 
@@ -46,7 +44,7 @@ export function localizePreview(
 export const shapeSvg = (shape: string) =>
 	`<svg viewBox="0 0 180 92" aria-hidden="true"><rect width="180" height="92" rx="6" fill="#fffdf8"/>${shape}</svg>`;
 
-/** The one contour all ten surface drawings share. */
+/** The one contour all surface drawings share. */
 export const SURFACE_BOX = 'x="50" y="20" width="80" height="52" rx="2"';
 
 /**
@@ -107,45 +105,42 @@ export const surfaceHatch = (
 		.join('');
 
 /**
- * The drawing for a relative word. 濃い and 薄い are not textures: they move
- * the density and the opacity of a texture that is already there. So each half
- * of the box holds the same stipple, the left at the default (density 0.35)
- * and the right at what the word asks for, and the drawing shows the change
- * rather than a texture of its own. The counts follow the renderer's own
- * 22 + density * 120, taken down to a half box.
+ * Handling changes the tool's opacity, not the surface's density. Both halves
+ * keep the same stipple geometry. The left is temperate pencil (opacity 0.66),
+ * the right the selected handling: ×1.35 / ×1 / ×0.55 from marks.rs.
  */
-export const surfaceRelative = (count: number, opacity: number): string =>
-	surfaceDabs(21, 2.1, 0.28, 4.5, 51, 89) +
-	surfaceDabs(count, 2.1, opacity, 8.5, 91, 129) +
+const handlingRelative = (opacity: number): string =>
+	surfaceDabs(21, 2.1, 0.66, 4.5, 51, 89) +
+	surfaceDabs(21, 2.1, opacity, 4.5, 91, 129) +
 	'<path d="M90 20 V72" stroke="#d7d1c4" stroke-width="1.5"/>';
 
 /** Keyed by the Japanese surface, the way the rest of the preview table is. */
 export const SURFACE_PREVIEWS: Record<string, PreviewEntry> = {
 	空: {
-		effect: '面に何も置かない。輪郭だけが残る既定の状態。',
+		effect: '面には何も置かず、輪郭を残す。',
 		example: '空の四角を置く',
-		effectEn: 'Leaves the face untouched. The default, where only the contour remains.',
+		effectEn: 'Leaves the face untouched, keeping the contour.',
 		exampleEn: 'Place an empty square',
 		svg: surfaceSvg('')
 	},
 	塗り: {
-		effect: '質感ではなく、面を一様に塗りつぶす。',
-		example: '中を塗った四角を置く',
-		effectEn: 'Not a texture: fills the face evenly.',
-		exampleEn: 'Place a filled square',
+		effect: '面を一様に塗りつぶす。',
+		example: '塗りの四角を置く',
+		effectEn: 'Fills the face evenly.',
+		exampleEn: 'Place a flat square',
 		svg: surfaceSvg(`<rect ${SURFACE_BOX} fill="#2b2b2b"/>`)
 	},
-	薄墨: {
-		effect: '同じ面を角度をわずかに変えて二度掃く。重なった所だけが濃くなる。',
-		example: '薄墨で四角を塗る',
+	刷き: {
+		effect: '少し角度を変えて面を二度掃く。各掃きは道具の不透明度の半分で、薄いを添えると淡くなる。線や弧では幅広い帯を作る。',
+		example: '刷きの四角を置く',
 		effectEn:
-			'Sweeps the same face twice at slightly different angles; only the overlaps darken.',
-		exampleEn: 'Wash a square with pale ink',
+			'Sweeps the face twice at slightly different angles, each at half the tool opacity. Faint handling makes it paler. On a line or arc it makes a broad band.',
+		exampleEn: 'Place a sweep square',
 		svg: surfaceSvg(
-			'<defs><filter id="surface-wash"><feGaussianBlur stdDeviation="2.4"/></filter></defs>' +
-				'<g filter="url(#surface-wash)" stroke="#2b2b2b" stroke-width="15" stroke-linecap="round">' +
-				'<g><path d="M44 26 H136" opacity="0.2"/><path d="M44 39 H136" opacity="0.26"/><path d="M44 52 H136" opacity="0.18"/><path d="M44 65 H136" opacity="0.24"/></g>' +
-				'<g transform="rotate(6 90 46)"><path d="M44 22 H136" opacity="0.22"/><path d="M44 35 H136" opacity="0.17"/><path d="M44 48 H136" opacity="0.25"/><path d="M44 61 H136" opacity="0.19"/><path d="M44 74 H136" opacity="0.22"/></g>' +
+			'<defs><filter id="surface-sweep"><feGaussianBlur stdDeviation="2.4"/></filter></defs>' +
+				'<g filter="url(#surface-sweep)" stroke="#2b2b2b" stroke-width="15" stroke-linecap="round">' +
+				'<g opacity="0.5"><path d="M44 26 H136"/><path d="M44 39 H136"/><path d="M44 52 H136"/><path d="M44 65 H136"/></g>' +
+				'<g opacity="0.5" transform="rotate(6 90 46)"><path d="M44 22 H136"/><path d="M44 35 H136"/><path d="M44 48 H136"/><path d="M44 61 H136"/><path d="M44 74 H136"/></g>' +
 				'</g>'
 		)
 	},
@@ -187,21 +182,32 @@ export const SURFACE_PREVIEWS: Record<string, PreviewEntry> = {
 				surfaceDabs(26, 1.5, 0.56, 6.1, 77, 103) +
 				surfaceDabs(26, 1.5, 0.84, 9.7, 104, 129)
 		)
-	},
+	}
+};
+
+/** Handling applies to lines, arcs, textured surfaces and flat fills. */
+export const HANDLING_PREVIEWS: Record<string, PreviewEntry> = {
 	濃い: {
-		effect: '他の面の語に添えて、その質感を濃くする。単独の質感ではない。',
-		example: '濃い薄墨で塗る',
+		effect: '道具の本来の濃さより濃く置く。線・弧・質感の面・塗りに添えられる。図は左が程よい鉛筆の点描、右が濃い点描。',
+		example: '鉛筆で濃い点描の四角を置く',
 		effectEn:
-			'Attaches to another surface word and makes that texture denser. Not a texture of its own.',
-		exampleEn: 'Wash densely with pale ink',
-		svg: surfaceSvg(surfaceRelative(31, 0.5))
+			'Lays ink or paint more densely relative to the tool, on lines, arcs, textured faces or flat fills. Left: temperate pencil stipple; right: dense stipple.',
+		exampleEn: 'Place a dense stipple square with a pencil',
+		svg: surfaceSvg(handlingRelative(0.66 * 1.35))
+	},
+	程よい: {
+		effect: '道具の本来の濃さで置く。さばきを省略した痕と同じ。図は左右とも程よい鉛筆の点描。',
+		example: '鉛筆で程よい点描の四角を置く',
+		effectEn: 'Lays ink or paint at the tool’s own opacity, as when handling is omitted. Both halves show temperate pencil stipple.',
+		exampleEn: 'Place a temperate stipple square with a pencil',
+		svg: surfaceSvg(handlingRelative(0.66))
 	},
 	薄い: {
-		effect: '他の面の語に添えて、その質感を淡くする。単独の質感ではない。',
-		example: '薄い平行線で埋める',
+		effect: '道具の本来の濃さより淡く置く。線・弧・質感の面・塗りに添えられる。図は左が程よい鉛筆の点描、右が薄い点描。',
+		example: '鉛筆で薄い点描の四角を置く',
 		effectEn:
-			'Attaches to another surface word and makes that texture fainter. Not a texture of its own.',
-		exampleEn: 'Fill with a faint hatch',
-		svg: surfaceSvg(surfaceRelative(15, 0.15))
+			'Lays ink or paint more faintly relative to the tool, on lines, arcs, textured faces or flat fills. Left: temperate pencil stipple; right: faint stipple.',
+		exampleEn: 'Place a faint stipple square with a pencil',
+		svg: surfaceSvg(handlingRelative(0.66 * 0.55))
 	}
 };

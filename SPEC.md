@@ -389,6 +389,14 @@ Saijiki words and the grammar's modifiers are shared by the writer, the reader
 (Stage 1), the compiler, and the renderer. A word is added, moved, or changed
 under these principles (author's ruling, 2026-09-29).
 
+The Web Saijiki previews follow the current categories too. The eight surface
+words each draw a distinct face inside the same contour; only empty leaves it
+unmarked. Sweep shows two passes, each at 0.5 of the tool opacity. Bilingual
+handling previews compare the same pencil stipple: temperate on the left,
+dense, temperate or faint on the right, relative to that tool. Mark counts and
+positions stay fixed so density is not confused with opacity. These are
+explanatory drawings and do not change performances of saved Scores.
+
 - **Draw what is written**: every word of the visible DDL is drawn as written.
   The compiler, lowerer, and renderer never reread a word as another word or
   value because of its pairing or its neighbors (for example, a surface given

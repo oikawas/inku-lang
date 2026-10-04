@@ -109,7 +109,19 @@ DDLは簡単な日本語（または、英語）で書かれており、誰で�
 
 ## Quick Start
 
-### 0. Docker（リリースイメージ・最速）
+### 0. Docker Desktop で始める（ChatGPTプラン・シングルユーザー）
+
+自分の Mac の Docker Desktop で inku のコンテナを動かし、本人の ChatGPT サブスクリプションの利用枠で描きます。シングルユーザーモードなので、ログイン画面もパスワードもありません。Docker Desktop・Git・[`uv`](https://docs.astral.sh/uv/)・Chrome（または Brave）を用意します。Windows は WSL 2 の中で同じ手順を使えますが、ChatGPT の認証は未確認です。
+
+```sh
+git clone https://github.com/oikawas/inku-lang.git && cd inku-lang
+printf 'INKU_CHATGPT_PLAN_ENABLED=1\nINKU_CHATGPT_SELF_HOSTED=1\n' > .env
+docker compose up -d --build   # → http://localhost:5173
+```
+
+起動したら、PC 側で ChatGPT にサインインして、その認証をコンテナへ取り込みます。続けてモデルを選びます。この部分の手順は [Docker Desktop で始める](docs/guide/docker-desktop.ja.md) にあります。
+
+### 1. Docker（リリースイメージ・API キー）
 
 リリース版は GHCR のコンテナイメージ（`ghcr.io/oikawas/inku-api` / `inku-web`、amd64 / arm64）で配布しています。
 
@@ -122,7 +134,7 @@ docker compose up -d   # → http://localhost:5173
 
 初回アカウント・データ永続・版固定・HTTPS の詳細は [`deploy/README.md`](deploy/README.md) を参照してください。
 
-### 1. ソースから動かす
+### 2. ソースから動かす
 
 API サーバーは、描画の判断を担う Rust の共有コアを native wheel として読み込みます。wheel が無いと起動できないので、最初に作って入れます。Python 3.12 以上、`uv`、Rust（版は `core/rust-toolchain.toml` の指定に従う）が要ります。
 
@@ -142,7 +154,7 @@ cd web && npm install && npm run dev      # → http://localhost:5173
 
 環境変数の一覧、provider ごとの設定、CLI（`inku-cli`）の使い方は [SETUP.ja.md](SETUP.ja.md) にあります。
 
-本人のChatGPT利用枠を使う[ChatGPTプラン接続](docs/guide/chatgpt-plan.ja.md)も選べます。明示有効化とデベロッパー／シングルユーザーモード、本人OAuthが必要です。APIキー版とは別の接続で、Stage 1/2共通のモデルを選びます。
+本人のChatGPT利用枠を使う[ChatGPTプラン接続](docs/guide/chatgpt-plan.ja.md)も選べます。明示有効化とデベロッパー／シングルユーザーモード（コンテナでは自己ホストの有効化）、本人OAuthが必要です。APIキー版とは別の接続で、Stage 1/2共通のモデルを選びます。コンテナでの手順は上の 0. にあります。
 
 ---
 

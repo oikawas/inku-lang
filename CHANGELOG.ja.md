@@ -6,6 +6,10 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-04 — Docker DesktopとChatGPTプランで始める手順
+
+READMEのQuick Startの最初に、自分のMacのDocker Desktopで、ソースからビルドしたコンテナをシングルユーザーモードで動かし、本人のChatGPTサブスクリプションの利用枠で描く手順を置いた。詳しい手順は[Docker Desktop で始める](docs/guide/docker-desktop.ja.md)に分けた。PC側でChatGPTにサインインし、封印した認証をコンテナへ取り込む。WindowsはWSL 2で同じ手順を使えるが、ChatGPTの認証は未確認と明記した。リリース版イメージとAPIキーの手順は1.として残した。製品の動作は変えていない。
+
 ### v2.15.83 — 語全体の写しを区画に置く（Build 1159、2026-10-04）
 
 個数を受けない語に書いた個数の写しを、重ねずに配置するI-708を含む版。DDL engine 57、render engine 73、Score 0.19.0。先行のChatGPT修正とリリース版コンテナ対応も保持する。保存済み作品は変わらず、各変更の決まりと確認は同日の記録に示す。

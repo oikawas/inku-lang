@@ -136,7 +136,19 @@ All three were generated on Build 667 with render engine 10, using `nvidia:googl
 
 ## Quick Start
 
-### 0. Docker (release images, fastest)
+### 0. Docker Desktop (ChatGPT plan, single user)
+
+Run inku in containers on Docker Desktop on your own Mac and paint with your ChatGPT subscription's allowance. Single-user mode means no login screen and no password. You need Docker Desktop, Git, [`uv`](https://docs.astral.sh/uv/), and Chrome (or Brave). Windows can follow the same steps inside WSL 2, but the ChatGPT sign-in there has not been verified.
+
+```sh
+git clone https://github.com/oikawas/inku-lang.git && cd inku-lang
+printf 'INKU_CHATGPT_PLAN_ENABLED=1\nINKU_CHATGPT_SELF_HOSTED=1\n' > .env
+docker compose up -d --build   # → http://localhost:5173
+```
+
+Once it is up, sign in to ChatGPT on the PC, import that sign-in into the container, and choose a model. Those steps are in [Getting started with Docker Desktop](docs/guide/docker-desktop.md).
+
+### 1. Docker (release images, API key)
 
 Releases are distributed as container images on GHCR (`ghcr.io/oikawas/inku-api` / `inku-web`, amd64 / arm64).
 
@@ -149,7 +161,7 @@ docker compose up -d   # → http://localhost:5173
 
 See [`deploy/README.md`](deploy/README.md) for the first account, data persistence, version pinning, and HTTPS.
 
-### 1. Running from source
+### 2. Running from source
 
 The API server loads inku's shared Rust core, which makes the drawing decisions, as a native wheel. It cannot start without the wheel, so build and install it first. You need Python 3.12 or later, `uv`, and Rust (the version pinned in `core/rust-toolchain.toml`).
 
@@ -169,7 +181,7 @@ Once you are logged in, write a short description. After generating, consult the
 
 The full environment variable list, per-provider configuration, and the CLI (`inku-cli`) are covered in [SETUP.md](SETUP.md).
 
-The [ChatGPT plan connection](docs/guide/chatgpt-plan.md) uses your account's allowance. It requires explicit enablement, developer or single-user mode and account OAuth. It is separate from the API-key connection and uses one model shared by Stage 1/2.
+The [ChatGPT plan connection](docs/guide/chatgpt-plan.md) uses your account's allowance. It requires explicit enablement, developer or single-user mode (self-hosted enablement in containers) and account OAuth. It is separate from the API-key connection and uses one model shared by Stage 1/2. Step 0 above covers containers.
 
 ---
 

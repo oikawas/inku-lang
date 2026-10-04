@@ -571,7 +571,6 @@ mod tests {
                 Some(5),
                 LIMITS,
                 ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-                None,
                 policy,
             );
             assert_eq!(result.outcome(), ScoreLoweringOutcome::Stopped);

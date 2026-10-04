@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
 
 [[package]]
@@ -379,7 +379,7 @@ requires-dist = [
 
 [[package]]
 name = "inku-server"
-version = "2.15.33"
+version = "2.15.83"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },

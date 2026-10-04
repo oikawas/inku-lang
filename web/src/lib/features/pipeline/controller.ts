@@ -122,6 +122,8 @@ export class PipelineController {
 		const options = { ...this.options(), ...override };
 		this.assertAuthoringStillCurrent(authoringOrdinal, signal);
 		return this.run(() => {
+			// Hide the preceding status, retaining the parent until the new request succeeds.
+			this.observe(null);
 			if (linked) return this.api.forkHistory(linked, 'description', description, options, signal);
 			if (legacy) return this.api.forkLegacy(legacy, 'description', description, options, signal);
 			if (!active) return this.api.start('description', description, options, signal);
@@ -137,6 +139,7 @@ export class PipelineController {
 		const options = { ...this.options(), ...override };
 		this.assertAuthoringStillCurrent(authoringOrdinal, signal);
 		return this.run(() => {
+			this.observe(null);
 			if (linked) return this.api.forkHistory(linked, 'direct_ddl', source, options, signal);
 			if (legacy) return this.api.forkLegacy(legacy, 'direct_ddl', source, options, signal);
 			if (!active) return this.api.start('direct_ddl', source, options, signal);

@@ -20,6 +20,33 @@ function view(overrides: Partial<PipelineView> = {}): PipelineView {
 	};
 }
 
+test('new authoring clears a failed view while retaining its parent and the newly selected model', async () => {
+	let model = 'chatgpt:luna';
+	const failed = view({ phase: { tag: 'failed', reason: 'stage1_failed' },
+		provider_failure: { failure: 'provider_rejected', stage: 'stage1', attempt: 1 } });
+	const observed: Array<PipelineView | null> = [];
+	let rejectStart = true;
+	const api = {
+		forkDescription: async (parent: PipelineView, description: string, options: { stage1_model: string }) => {
+			assert.equal(observed.at(-1), null);
+			assert.equal(parent, failed);
+			assert.equal(options.stage1_model, 'openai:other');
+			if (rejectStart) throw new Error('request unavailable');
+			return view({ execution_id: 'new-execution', variation_id: 'new-variation', description, phase: { tag: 'ready' } });
+		},
+	};
+	const controller = new PipelineController(api as never, () => ({ stage1_model: model }), (next) => observed.push(next));
+	controller.adopt(failed);
+	model = 'openai:other';
+	await assert.rejects(controller.fromDescription('red circle'), /request unavailable/);
+	assert.equal(controller.current, failed);
+	assert.equal(observed.at(-1), null);
+	rejectStart = false;
+	const next = await controller.fromDescription('red circle');
+	assert.equal(controller.current, next);
+	assert.equal(controller.current?.provider_failure, undefined);
+});
+
 test('normal authoring keeps approval, fork, stale CAS, and legacy parent on the shared pipeline', async () => {
 	const calls: Array<{ method: string; value?: unknown }> = [];
 	const patch = view({ busy: false, document: { source: 'circle', language: 'ja' }, phase: {
@@ -257,4 +284,3 @@ test('a plugin explanation replaces the generic compiler entry for the same sent
 	assert.deepEqual(listed.map((item) => item.channel), ['plugin', 'upstream']);
 	assert.equal((listed[1].value as { reason: string }).reason, 'unresolved_clause');
 });
-

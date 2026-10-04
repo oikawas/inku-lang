@@ -81,6 +81,7 @@ class SSEDecoder:
         self.wire_size = 0
         self.buffer = bytearray()
         self.items: dict[str, dict] = {}
+        self.finalized_items: dict[str, dict] = {}
         self.arguments: dict[str, str] = {}
         self.completed: str | None = None
         self.terminal = None
@@ -114,7 +115,8 @@ class SSEDecoder:
         # Tool metadata explains protocol failures without logging text or arguments.
         shapes = [{key: safe_identifier(item.get(key)) for key in ("type", "name", "namespace")}
                   for item in items[:4]]
-        logger.warning("chatgpt_tool_shape %s", json.dumps(shapes, separators=(",", ":")))
+        logger.warning("chatgpt_tool_shape %s streamed_calls=%d finalized_calls=%d",
+                       json.dumps(shapes, separators=(",", ":")), len(self.items), len(self.finalized_items))
         raise ChatGPTError("chatgpt_unexpected_tool", action="diagnose")
 
     def _auxiliary(self, item: dict) -> None:
@@ -148,6 +150,15 @@ class SSEDecoder:
                 if key not in self.items and self.items:
                     self._unexpected([*self.items.values(), item])
                 self.items[key] = item
+                if tag == "response.output_item.done":
+                    if item.get("status") not in {None, "completed"}:
+                        raise ChatGPTError("chatgpt_response_incomplete")
+                    arguments = item.get("arguments")
+                    if not isinstance(arguments, str) or self.arguments.get(key, arguments) != arguments:
+                        raise ChatGPTError("chatgpt_response_invalid")
+                    if len(arguments.encode()) > self.argument_limit:
+                        raise ChatGPTError("chatgpt_response_too_large")
+                    self.finalized_items[key] = item
             else:
                 self._auxiliary(item)
         elif tag == "response.function_call_arguments.delta":
@@ -169,7 +180,13 @@ class SSEDecoder:
             response = event["response"]
             if response.get("status") != "completed":
                 raise ChatGPTError("chatgpt_response_incomplete")
-            output = response["output"]
+            output = response.get("output")
+            # Some streams finish with an empty summary. The finalized item
+            # events contain the result; deltas alone never count as completion.
+            if output is None or output == []:
+                output = list(self.finalized_items.values())
+            if not isinstance(output, list):
+                raise ChatGPTError("chatgpt_response_invalid")
             calls = []
             for item in output:
                 if item.get("type") == "function_call":
@@ -181,7 +198,9 @@ class SSEDecoder:
             item = calls[0]
             self._function(item)
             arguments = item["arguments"]
-            if item["id"] not in self.items or (self.arguments.get(item["id"], arguments) != arguments):
+            finalized = self.finalized_items.get(item["id"])
+            if (item["id"] not in self.items or self.arguments.get(item["id"], arguments) != arguments
+                    or (finalized is not None and finalized["arguments"] != arguments)):
                 raise ChatGPTError("chatgpt_response_invalid")
             if len(arguments.encode()) > self.argument_limit:
                 raise ChatGPTError("chatgpt_response_too_large")

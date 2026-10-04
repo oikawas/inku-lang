@@ -105,3 +105,36 @@ test('a batch drops the old single-work failure and retains its own line failure
 	assert.equal(work.pipelineView?.description, 'single failure');
 	assert.equal(pipelineAttentionReason(work.pipelineView?.phase), 'stage1_failed');
 });
+
+test('a new drawing uses the changed model and clears the preceding failure without reloading', async () => {
+	let model = 'chatgpt:luna';
+	let work: ReturnType<typeof createWorkState>;
+	const models: string[] = [];
+	const apiFetch: WorkStateDeps['apiFetch'] = async (path, init) => {
+		assert.equal(path, '/api/paint/stream');
+		const body = JSON.parse(String(init?.body)) as { description: string; stage1_model: string; stage2_model: string };
+		models.push(body.stage1_model);
+		assert.equal(body.stage2_model, model);
+		if (models.length === 1) return failureResponse(body.description);
+		assert.equal(pipelineAttentionReason(work.pipelineView?.phase), null);
+		return new Response(`${JSON.stringify({
+			event: 'done', ddl: 'red circle', thinking: null, svg: '<svg><circle/></svg>', score: { instructions: [] },
+			elapsed_stage1_ms: 1, elapsed_stage2_ms: 0, elapsed_total_ms: 1,
+			tokens_in_stage1: 2, tokens_out_stage1: 3, tokens_in_stage2: null, tokens_out_stage2: null
+		})}\n`, { headers: { 'Content-Type': 'application/x-ndjson' } });
+	};
+	work = createWorkState({
+		apiFetch, batch: {}, describeApiError: () => 'the previous model failed',
+		session: { updateGenerationCount: () => {} }, demo: { latestResult: null }, refinementSession: { gridBusy: false },
+		canvasViewport: { fit: () => {} }, history: () => ({}),
+		models: { stage1Provider: () => null, stage2Provider: () => null, stage1Model: () => model,
+			stage2Model: () => model, includeThinking: () => false, available: () => [] },
+		canvasAspectId: () => 'square', resetTargetScopedState: () => {}, showCanvas: () => {},
+	} as unknown as WorkStateDeps);
+	await assert.rejects(work.paintOne('red circle', { saveHistory: false }), /previous model failed/);
+	assert.equal(pipelineAttentionReason(work.pipelineView?.phase), 'stage1_failed');
+	model = 'openai:other';
+	assert.equal((await work.paintOne('red circle', { saveHistory: false })).svg, '<svg><circle/></svg>');
+	assert.equal(work.pipelineView, null);
+	assert.deepEqual(models, ['chatgpt:luna', 'openai:other']);
+});

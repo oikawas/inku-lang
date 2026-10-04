@@ -468,6 +468,9 @@ export function createWorkState(deps: WorkStateDeps) {
 	}
 
 	async function paintOne(text: string, options: PaintOptions = {}): Promise<{ ddl: string; thinking: string | null; } & PaintResult> {
+		// This compatibility request starts its own execution. Its result must not
+		// be accompanied by a stopped view belonging to an earlier drawing.
+		if (!options.batchRunId) pipelineController.clear();
 		return runCurrentWork(
 			text,
 			options,

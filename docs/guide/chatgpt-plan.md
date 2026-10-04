@@ -61,6 +61,8 @@ After connecting, follow the guide to Open Model settings. Select ChatGPT plan i
 
 Then open the drawing model picker and choose one ChatGPT plan model for Stage 1/2. Fetching alone neither publishes nor selects models. Ordinary users manage only their own ChatGPT models; administrators also retain shared provider administration.
 
+After a drawing fails, select another model and draw again. Starting the new drawing clears the previous failure display without reloading the page.
+
 Settings show your registration label, state, scopes and active profile. Tokens, PKCE verifiers and ID tokens never enter screens, logs or browser storage. Limits are eight profiles, one pending authorization per owner and four overall. Storage defaults to `~/.config/ddl-server/chatgpt`, overridden by `INKU_CHATGPT_AUTH_DIR`, with a 0700 directory and 0600 files. A dedicated `credential.key` encrypts `enc:v1:` records. Plaintext compatibility and silently ignored decryption failures are unsupported. Existing API-key encryption is unchanged.
 
 Models with `models[].visibility=list` retain OpenAI's order and `display_name`; published models can be selected as `chatgpt:<slug>`. inku publication is separate from OpenAI visibility and is encrypted per owner/profile. Reauthorization and recipient-host reimport of the same verified identity retain these choices. Models do not enter shared API-key providers or bare-name ownership. External catalogs have a five-minute cache per owner/profile/generation; opening settings or the drawing picker reads the saved list without fetching externally. Disconnecting, switching profiles or changing modes discards candidates. Missing or unpublished selections stay unavailable; another provider requires an explicit choice.

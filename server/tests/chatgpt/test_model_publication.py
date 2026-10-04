@@ -118,3 +118,37 @@ def test_completed_function_with_assistant_message_is_accepted_without_using_tex
         ]}})
     with pytest.raises(ChatGPTError, match="unexpected_tool"):
         SSEDecoder(4096).event({"type": "response.output_item.added", "item": {**call, "namespace": "other"}})
+
+
+def test_finalized_streamed_call_survives_an_empty_terminal_output_but_not_an_unfinished_or_failed_response():
+    arguments = canonical({"normalized_ddl": "赤い円を置く。"}).decode()
+    call = {"type": "function_call", "id": "fc_fixture", "call_id": "call_fixture",
+            "name": "submit_pipeline_response", "namespace": "inku", "arguments": arguments, "status": "completed"}
+    events = [
+        {"type": "response.output_item.added", "item": {**call, "arguments": "", "status": "in_progress"}},
+        {"type": "response.function_call_arguments.delta", "item_id": call["id"], "delta": arguments},
+        {"type": "response.function_call_arguments.done", "item_id": call["id"], "arguments": arguments},
+        {"type": "response.output_item.done", "item": call},
+    ]
+    for response in ({"status": "completed", "output": []}, {"status": "completed", "output": None}, {"status": "completed"}):
+        decoder = SSEDecoder(4096)
+        for event in [*events, {"type": "response.completed", "response": response}]:
+            decoder.feed(b"data: " + canonical(event) + b"\n\n")
+        assert decoder.finish() == arguments
+    unfinished = SSEDecoder(4096)
+    for event in events[:-1]:
+        unfinished.event(event)
+    with pytest.raises(ChatGPTError, match="unexpected_tool"):
+        unfinished.event({"type": "response.completed", "response": {"status": "completed", "output": []}})
+    failed = SSEDecoder(4096)
+    for event in events:
+        failed.event(event)
+    with pytest.raises(ChatGPTError, match="response_failed"):
+        failed.event({"type": "response.failed", "response": {"status": "failed", "error": {"code": "unknown"}}})
+    mismatched = SSEDecoder(4096)
+    for event in events:
+        mismatched.event(event)
+    with pytest.raises(ChatGPTError, match="response_invalid"):
+        mismatched.event({"type": "response.completed", "response": {"status": "completed", "output": [
+            {**call, "arguments": "{}"},
+        ]}})

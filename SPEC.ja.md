@@ -989,6 +989,8 @@ Stage 1、camera projection、hole補完は既存の共有grammar helperを使�
 
 Responses/SSEは補助のassistant message・reasoningと、必要な一つの`inku` namespaceの`submit_pipeline_response`を区別する。描画には完了応答の関数引数だけを採用する。本文だけの応答、refusal、未知tool、複数関数・部分応答は拒否し、形式不一致では再接続を促さず診断を案内する。形式診断logはtype/name/namespaceだけで本文・引数を含めない。
 
+完了イベントのoutputが空・NULL・省略の場合は、先行する`response.output_item.done`で確定した一つの関数を使う。deltaだけでは採用せず、`response.completed`の成功状態と引数の一致・サイズ上限を要求する。形式診断にはstream中と確定済みの関数件数も含める。新しい描画の開始時は前の失敗表示を外し、現在の選択モデルで実行する。共有pipelineの親作品とauthorityは保持する。
+
 予約provider `chatgpt`（ChatGPTプラン）は本人OAuth・scope・本人catalogによる共有pipeline専用接続である。明示有効化、`developer_mode || single_user_mode`、検証済みlocal/self-hosted起動を要求し、管理者にも迂回を許さない。`chatgpt:<slug>`を共有APIキー接続やbare名の所有へ混ぜず、利用不可でも保存指定を保持する。両段共通の描画、写生文、カタログ選択、構図の読み、可視hole補完をResponses/SSEへ接続し、Rustのprompt/schema/retry・Score/SVGは変えない。構図の読みは観測をStage 1から分けて`composition`に記録し、読みが使えないときの既定fallbackは共有Rustへ委ねる。実行のowner/profile/generationを固定し、quota・cancel・sign-out・モード変更で追加通信と遅い結果を停止する。Vision・奥書・デモ指示生成・モデル検査へは提供しない。[接続・移送・復旧](docs/guide/chatgpt-plan.ja.md)を参照。
 
 MLXの`mlx-vlm`サーバーはサービス種別`mlx`（管理画面の「MLX (mlx-vlm)」）で登録する。接続先・キー・モデル一覧はOpenAI互換APIとして扱い、描画の応答は共有コアが渡すJSON Schemaをそのまま`response_format`へ渡して制約する。関数ツールは送らず、`enable_thinking: false`を明示する。コアによる応答検証と再試行の権限は継続する。登録済みサービスは種別だけを変更でき、キー・URL・公開モデルを保持する。

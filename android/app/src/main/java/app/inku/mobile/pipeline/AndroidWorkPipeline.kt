@@ -1017,7 +1017,7 @@ class AndroidWorkPipeline(
             .put("render_wild", metadata.optBoolean("render_wild", metadata.optBoolean("wild", false)))
             .put("score", score)
             .put("version", "rh3")
-        return "rh3:" + sha256(canonicalJson(payload))
+        return "rh3:" + sha256(PythonJson.canonical(payload))
     }
 
     private fun canonicalSeed(value: Any?): Any? = when (value) {
@@ -1028,23 +1028,6 @@ class AndroidWorkPipeline(
         is Number -> value
         is String -> value.toBigIntegerOrNull() ?: value
         else -> value
-    }
-
-    private fun canonicalJson(value: Any?): String = when (value) {
-        null, JSONObject.NULL -> "null"
-        is JSONObject -> value.keys().asSequence().toList().sorted().joinToString(
-            separator = ",",
-            prefix = "{",
-            postfix = "}",
-        ) { key -> JSONObject.quote(key) + ":" + canonicalJson(value.opt(key)) }
-        is JSONArray -> (0 until value.length()).joinToString(
-            separator = ",",
-            prefix = "[",
-            postfix = "]",
-        ) { index -> canonicalJson(value.opt(index)) }
-        is String -> JSONObject.quote(value)
-        is Number, is Boolean -> value.toString()
-        else -> JSONObject.quote(value.toString())
     }
 
     private fun JSONObject.optionalString(name: String): String? =

@@ -801,14 +801,15 @@ class InkuRepository(
     /**
      * The work as an SVG file in one of the three profiles the server offers.
      *
-     * Display is the saved SVG itself. Editable and compat are drawn again from
+     * Display is the saved SVG with the description it was drawn from in a
+     * `<desc>`, as web's download writes it. Editable and compat are drawn again from
      * the saved Score with the work's own colors, seeds and Wild, as the
      * server's `GET /api/history/{id}/svg?profile=` does; they used to be the
      * display SVG with a new title, so neither carried the groups and ids the
      * editable file promises nor the compat file's simplified effects.
      */
     suspend fun exportSvg(item: HistoryItemEntity, profile: String): String {
-        if (profile == "display") return item.displaySvg
+        if (profile == "display") return withDescription(item.displaySvg, item.sourceText ?: item.originalInput)
         val seeds = PaintSeeds.of(item)
         val description = item.sourceText ?: item.originalInput
         return pipeline.renderExportSvg(

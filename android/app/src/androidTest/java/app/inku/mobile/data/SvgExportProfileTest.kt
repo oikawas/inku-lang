@@ -50,7 +50,11 @@ class SvgExportProfileTest {
             stage2ModelId = "test-stage2",
         )
 
-        assertEquals(item.displaySvg, repository.exportSvg(item, "display"))
+        // The display file is the saved SVG with its description in a <desc>,
+        // as web's download writes it.
+        val display = repository.exportSvg(item, "display")
+        assertEquals(withDescription(item.displaySvg, "書き出しの形"), display)
+        assertTrue(display.contains("<desc>書き出しの形</desc>"))
         val editable = repository.exportSvg(item, "editable")
         val compat = repository.exportSvg(item, "compat")
         assertTrue(editable.startsWith("<svg"))

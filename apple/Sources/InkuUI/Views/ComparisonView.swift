@@ -79,11 +79,12 @@ public struct ComparisonView: View {
         #endif
         .task {
             await comparison.initialize(app: model)
-            // Web `model_inspection_selected_models`: the last choice, less models no longer offered (at most 4).
-            if comparison.kind == .model {
-                for reference in model.display.preferences.comparisonModels ?? [] {
-                    comparison.selectModel(reference, selected: true)
-                }
+            // Web `model_inspection_selected_models`: the last choice, less models no longer offered (at most 4). Those
+            // leave the saved choice at once, as the Web's effect writes the filtered list back.
+            if comparison.kind == .model, comparison.contextAvailable, let saved = model.display.preferences.comparisonModels {
+                let kept = Array(saved.filter(comparison.isModelChoice).prefix(4))
+                if kept != saved { model.display.preferences.comparisonModels = kept }
+                for reference in kept { comparison.selectModel(reference, selected: true) }
             }
             if comparison.kind == .catalog, comparison.canGenerate { await comparison.generate(app: model) }
         }

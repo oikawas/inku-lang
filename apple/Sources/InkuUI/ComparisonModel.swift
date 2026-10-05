@@ -85,6 +85,15 @@ public final class ComparisonModel {
         else { selectedCatalogIDs.insert(id) }
     }
 
+    /// Web `isModelInspectionChoiceBlocked` and the offered choices: a model the work was drawn with, or one no longer
+    /// offered, is not a comparison choice.
+    public func isModelChoice(_ reference: String) -> Bool {
+        reference != targetModelReference && reference != original?.stage2Model
+            && modelProviders.contains { provider in
+                SettingsModel.batchModels(for: provider).contains { provider.id + ":" + $0.id == reference && $0.isSelectable }
+            }
+    }
+
     public func selectModel(_ reference: String, selected: Bool) {
         guard !running, !hasUnsaved, !sourceIsLocked else { return }
         if !selected { selectedModelReferences.remove(reference); return }

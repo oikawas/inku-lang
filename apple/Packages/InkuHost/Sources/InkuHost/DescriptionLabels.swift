@@ -1,6 +1,6 @@
 import Foundation
 
-/// Web `lib/description-labels.ts`: the ranges of a description the drawing does not read.
+/// Web `lib/description-labels.ts` (Server `pipeline_description`): the ranges of a description the drawing does not read.
 /// The author's leading numbers and bracketed comments are painted grey in the editors, left out of the meter,
 /// and a description made only of them cannot be drawn. Offsets are UTF-16, as in the Web and in NSTextView.
 public enum DescriptionLabels {
@@ -58,5 +58,14 @@ public enum DescriptionLabels {
     /// Web `canSubmit` (state.svelte.ts:363): a description is drawable when something is left to read.
     public static func hasDrawableText(_ text: String) -> Bool {
         !pipelineDescription(text).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Server `_rewords` (pipeline_api.py:59-64): whether the words read differ, labels and spacing aside.
+    /// A held work refuses a description that rewords it; its own description may still start a new work.
+    public static func rewords(_ text: String, _ description: String) -> Bool {
+        func read(_ value: String) -> String {
+            pipelineDescription(value).split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+        }
+        return read(text) != read(description)
     }
 }

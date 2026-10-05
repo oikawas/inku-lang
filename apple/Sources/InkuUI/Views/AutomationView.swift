@@ -89,7 +89,7 @@ private enum DemoModelPicker: String, Identifiable {
                             }
                         }.padding(6)
                     }
-                    Stepper(model.display.localizedFormat("描画間隔: %ld秒", automation.demoInterval), value: $automation.demoInterval, in: 1...999)
+                    Stepper(model.display.localizedFormat("描画間隔: %ld秒", automation.demoInterval), value: $automation.demoInterval, in: 1...3600)
                     Stepper(model.display.localizedFormat("実行時間: %ld分", automation.demoDuration / 60), value: Binding(
                         get: { automation.demoDuration / 60 }, set: { automation.demoDuration = $0 * 60 }), in: 1...1440)
                     Toggle(model.display.localized("生成作品をライブラリへ保存"), isOn: $automation.demoSaveWorks)

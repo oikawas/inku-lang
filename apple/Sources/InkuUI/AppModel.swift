@@ -81,6 +81,8 @@ public final class AppModel {
     /// Browsing may continue during an explicitly backgrounded batch row; writers still use isBusy.
     public var isBrowsingLocked: Bool { isBusy && !backgroundDrawing }
     public var errorText: String?
+    /// The ChatGPT plan diagnostic each execution reported last, for its failure text.
+    @ObservationIgnored private var chatGPTFailureCodes: [String: String] = [:]
     /// Web CanvasPanel `clipboardMessage`: the copy button names the result, 2.5 s after success and 8 s after a failure.
     public private(set) var clipboardMessageKey: String?
     public var providerURL = "http://localhost:8080/v1"
@@ -202,12 +204,13 @@ public final class AppModel {
             && DescriptionLabels.hasDrawableText(descriptionText) && selectedWorkID != nil && sourceLocked
     }
 
-    /// The Server forks the held variation (`fork-description`) as a `description_fork` child; this host refuses a
-    /// description request under a held parent, so the description starts an independent new work instead.
+    /// Web `forkPipelineDescription` → Server `fork_linked_history`: the held work's own description, unchanged, starts
+    /// a child of it (`description_fork`, edge `description_edit`) from its saved configuration and the next conditions.
+    /// The edited DDL is not carried over, and the held work itself is untouched.
     public func forkDescription() async {
-        guard canForkDescription else { return }
+        guard canForkDescription, let parent = selectedWorkID else { return }
         inputMode = "description"
-        await generate(parentWorkID: nil)
+        await generate(parentWorkID: parent, fork: true)
     }
 
     /// R6: the next drawing model's service needs an API key and none is stored. Read only when a screen asks,
@@ -246,6 +249,7 @@ public final class AppModel {
             self.settingsStore = store
             self.settings = settings
             synchronizeNextDrawingModel(previousSettings: nil)
+            pruneComparisonModels()
             self.bootstrap = bootstrap
             self.productReference = bootstrap.productReference
             self.drawingLimitDefinition = bootstrap.drawingLimitDefinition
@@ -281,8 +285,8 @@ public final class AppModel {
 
     public func generate() async { await generate(parentWorkID: selectedWorkID) }
 
-    private func generate(parentWorkID: String?) async {
-        guard canGenerate || (parentWorkID == nil && canForkDescription), let host, let bootstrap else { return }
+    private func generate(parentWorkID: String?, fork: Bool = false) async {
+        guard fork ? canForkDescription : canGenerate, let host, let bootstrap else { return }
         let token = UUID()
         generationToken = token
         providerProgress = nil
@@ -529,6 +533,14 @@ public final class AppModel {
         return next
     }
 
+    /// Web model-inspection `$effect`: a saved comparison model that is no longer offered leaves the saved choice at once,
+    /// not at the next tick of a checkbox.
+    func pruneComparisonModels() {
+        guard let saved = display.preferences.comparisonModels else { return }
+        let kept = Array(saved.filter { SettingsModel.isBatchModelAvailable($0, settings: settings) }.prefix(4))
+        if kept != saved { display.preferences.comparisonModels = kept }
+    }
+
     private func synchronizeNextDrawingModel(previousSettings: HostSettings?) {
         if previousSettings == nil || previousSettings?.models != settings.models || !hasNextDrawingModel {
             nextDrawingModelReference = settings.models.stage1Model
@@ -557,6 +569,7 @@ public final class AppModel {
         let previousSettings = self.settings
         self.settings = settings
         synchronizeNextDrawingModel(previousSettings: previousSettings)
+        pruneComparisonModels()
         if let bootstrap {
             pluginWords = bootstrap.pluginWords.filter { settings.plugins?.isEnabled($0.packageID ?? "") ?? true }
             macroDiagnostics = diagnostics ?? ""
@@ -744,7 +757,12 @@ public final class AppModel {
         if mode == "description", !SettingsModel.isModelAvailable(nextDrawingModelReference, settings: settings) {
             throw HostError("drawing_model_not_available")
         }
-        if parentWorkID != nil && mode == "description" && (selectedContext?.authority == "ddl_authoritative" || sourceLocked) { throw HostError("description_source_locked") }
+        // Server `_refuse_if_locked` after `_rewords`: a held parent takes only its own description back (the fork).
+        if parentWorkID != nil && mode == "description" && (selectedContext?.authority == "ddl_authoritative" || sourceLocked),
+           parentWorkID != selectedWorkID
+            || DescriptionLabels.rewords(description ?? descriptionText, selectedWork?.effectiveSourceText ?? "") {
+            throw HostError("description_source_locked")
+        }
         let sketch: SketchRequest = sketchOverride
             ?? editedSketch(parentWorkID: parentWorkID, mode: mode, description: description ?? descriptionText)
             ?? (sketchMode == "on" ? .on : sketchMode == "supplied" ? .supplied(sketchText) : .off)
@@ -783,8 +801,9 @@ public final class AppModel {
               SettingsModel.isBatchModelAvailable(settings.models.stage1Model, settings: settings) else {
             throw HostError("drawing_model_not_available")
         }
+        // Web work/state.svelte.ts:636-641: the demo follows the catalog choice but has no wild setting (`wildOverride(false)`).
         return try bootstrap.request(inputMode: "description", source: "", description: description,
-            language: instructionLanguage(for: description), catalogID: catalogID, canvasID: canvasID, seed: seedText, wild: wild,
+            language: instructionLanguage(for: description), catalogID: catalogID, canvasID: canvasID, seed: seedText, wild: false,
             settings: settings, parentWorkID: nil, derivationKind: "new",
             catalogMode: catalogMode == "auto" ? "auto" : "fixed", sketch: sketchMode == "on" ? .on : .off)
     }
@@ -1313,13 +1332,13 @@ public final class AppModel {
             }
             if self.generationToken == token, !self.stopping {
                 self.activeExecutionID = view.executionID
-                if let message = DrawingFailureMessage.text(for: view, language: self.display.preferences.language) {
+                if let message = self.drawingFailureText(view) {
                     self.automationFailureMessage = message
                     if self.errorText == nil { self.errorText = message }
                 }
                 if allowsBrowsing {
                     self.finishProviderStage(view)
-                    self.status = Self.phaseStatus(view.phase)
+                    self.status = self.statusText(for: view)
                 }
             }
             await self.recordDescriptionFeedback(request: request, view: view)
@@ -1726,13 +1745,13 @@ public final class AppModel {
         receiveProviderProgress(progress, models: models, comparison: false)
         switch progress {
         case .changed(let view):
-            if backgroundDrawing { status = Self.phaseStatus(view.phase) }
+            if backgroundDrawing { status = statusText(for: view) }
             else { apply(view) }
         case .providerAttempt(_, _, _, let deadline):
             status = providerProgress?.stage == .composition ? "構図を読んでいます" : "モデルの応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）"
         case .transportBytes(_, let count):
             status = providerProgress?.stage == .composition ? "構図の応答を受信中" : "応答を受信中（\(count) bytes）"
-        case .providerDiagnostic(_, let diagnostic): errorText = "ChatGPTプラン: \(diagnostic.code)（\(diagnostic.action)）"
+        case .providerDiagnostic(let id, let diagnostic): receive(diagnostic, executionID: id)
         case .providerMetric: break
         case .saved(_, _): status = "作品を保存しました"
         }
@@ -1749,10 +1768,15 @@ public final class AppModel {
         case .transportBytes(_, let count):
             if providerProgress?.stage == .composition { status = comparison ? "比較候補の構図の応答を受信中" : "構図の応答を受信中" }
             else { status = comparison ? "比較候補を受信中（\(count) bytes）" : "応答を受信中（\(count) bytes）" }
-        case .providerDiagnostic(_, let diagnostic): errorText = "ChatGPTプラン: \(diagnostic.code)（\(diagnostic.action)）"
+        case .providerDiagnostic(let id, let diagnostic): receive(diagnostic, executionID: id)
         case .providerMetric: break
         case .saved: break
         }
+    }
+    /// Web words a ChatGPT plan failure with `chatgptStatus(code)`.
+    private func receive(_ diagnostic: ChatGPTPlanDiagnostic, executionID: String) {
+        chatGPTFailureCodes[executionID] = diagnostic.code
+        errorText = ChatGPTStatusCopy.text(diagnostic.code, language: display.preferences.language)
     }
     private func receiveProviderProgress(_ progress: PipelineProgress, models: ModelSelection?, comparison: Bool) {
         switch progress {
@@ -1856,7 +1880,15 @@ public final class AppModel {
             unreadOutputs.remove("prompt")
         }
         eventsJSON = (try? Self.pretty(view.eventsJSON)) ?? String(decoding: view.eventsJSON, as: UTF8.self)
-        status = Self.phaseStatus(view.phase)
+        status = statusText(for: view)
+    }
+    /// Web PipelineStatus prints `pipelineAttentionText` for a failed run, not a bare "failed".
+    private func statusText(for view: PipelineView) -> String {
+        drawingFailureText(view) ?? Self.phaseStatus(view.phase)
+    }
+    func drawingFailureText(_ view: PipelineView) -> String? {
+        DrawingFailureMessage.text(for: view, language: display.preferences.language,
+                                   chatGPTCode: chatGPTFailureCodes[view.executionID])
     }
     private static func phaseStatus(_ phase: String) -> String {
         [

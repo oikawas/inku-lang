@@ -284,7 +284,7 @@ public final class AutomationModel {
             let originalText = batchText
             let catalogMode = app.catalogMode == "auto" ? "auto" : "fixed"
             let sketchMode = batchSketchMode
-            let entries = BatchInputLines.entries(in: originalText)
+            let entries = BatchInputLines.paintableEntries(in: originalText)
             guard !entries.isEmpty else { throw HostError("empty_batch") }
             guard entries.count <= 1000 else { throw HostError("batch_exceeds_1000_rows") }
             let retries = min(5, max(0, app.display.preferences.batchRetries))

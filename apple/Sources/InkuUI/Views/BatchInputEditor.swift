@@ -1,4 +1,5 @@
 import CoreText
+import InkuHost
 import SwiftUI
 #if os(macOS)
 import AppKit

@@ -337,9 +337,9 @@ struct ProviderModelsSheet: View {
                 Button(model.display.localized(isFetching ? "取得中…" : "モデルリスト取得")) { Task { await fetch() } }
                     .disabled(isWorking || model.isBrowsingLocked || settings.isLoadingModels || draft.isDirty || provider == nil)
                     .inkuTooltip(draft.isDirty ? model.display.tooltip("未保存の変更を保存または取り消してからモデルリストを取得してください。", serverKey: "settingsModelFetchDisabledWhileDirty") : "")
-                Button(model.display.localized("表示中を全て使用")) { draft.setVisible(models: visibleModels, enabled: true) }
+                Button(model.display.webCopy("settingsModelSelectVisible", "表示中を全て選択")) { draft.setVisible(models: visibleModels, enabled: true) }
                     .disabled(isWorking || visibleModels.isEmpty)
-                Button(model.display.localized("表示中を全て解除")) { draft.setVisible(models: visibleModels, enabled: false) }
+                Button(model.display.webCopy("settingsModelClearVisible", "表示中を全て解除")) { draft.setVisible(models: visibleModels, enabled: false) }
                     .disabled(isWorking || visibleModels.isEmpty)
                 Spacer()
                 Text(model.display.localizedFormat("%ld / %ld モデルを表示", visibleModels.count, draft.models.count))
@@ -512,7 +512,9 @@ struct ProviderModelsSheet: View {
             try await settings.fetchProviderModels(providerID: providerID, model: model)
             guard let latest = provider else { throw HostError("provider_not_found") }
             draft = ProviderModelsDraft(models: settings.catalogModels(for: latest), enabled: latest.enabledModels ?? [:])
-            statusMessage = "\(draft.models.count)個のモデルを取得しました。"
+            // model-administration.svelte.ts:278: the Web says only that the list was fetched. Fetched models arrive
+            // off; the checkboxes or "select all shown" turn them on, and saving keeps them.
+            statusMessage = model.display.webCopy("settingsModelFetchModelsSaved", "モデルリストを取得しました。")
         } catch {
             errorMessage = "モデル一覧を取得できませんでした。"
         }

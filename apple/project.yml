@@ -1,0 +1,42 @@
+name: Inku
+options:
+  minimumXcodeGenVersion: 2.44.0
+  deploymentTarget:
+    macOS: "14.0"
+    iOS: "17.0"
+packages:
+  InkuApple:
+    path: .
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    ONLY_ACTIVE_ARCH: NO
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+targets:
+  InkuMac:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Sources/InkuMac
+      - path: Resources/AppIcon.icns
+        buildPhase: resources
+    dependencies:
+      - package: InkuApple
+        product: InkuUI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.inku.macos
+        PRODUCT_NAME: Inku
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Configuration/Info-Mac.plist
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        ARCHS: arm64 x86_64
+        ONLY_ACTIVE_ARCH: NO
+schemes:
+  InkuMac:
+    build:
+      targets:
+        InkuMac: all

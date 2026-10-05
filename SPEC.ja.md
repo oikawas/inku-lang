@@ -298,7 +298,7 @@ Render Engine は、`JSON Score + render options + server-owned color metadata` 
 `SVG + render metadata` を返す境界である。現行serverの`renderer.py`はdefault engineへのSVG-only互換facadeであり、
 薄いadapterが検証済みScoreと解決済みoptionを1個のrequestにしてnative `inku_render` bindingを呼ぶ。
 
-決定的な描画coreはRust crate `core/crates/inku-render`である。Serverはnative wheel、AndroidはJNIを通して同じcoreを使う。iOSのhost接続は別途pendingである。
+決定的な描画coreはRust crate `core/crates/inku-render`である。Serverはnative wheel、AndroidはJNI、Swiftクライアントの初期基盤はUniFFIを通して同じcoreを使う。SwiftはmacOS先行の単一利用者standalone hostとしてprovider、SQLite、OSのUIを所有し、ServerのDDL意味・retry判断を複製しない。Swift固有の仕様・現在の実装範囲と更新ルールの正本は[`apple/SWIFT_SPEC.ja.md`](apple/SWIFT_SPEC.ja.md)、build手順は[`apple/README.ja.md`](apple/README.ja.md)とする。共有coreの意味は本書、Swiftの仕様・履歴はAndroid同様に日本語正本と対応英語版へ記録する。
 
 履歴、JSONタブ、CLI、ベンチマークが読む正規メタデータ形式は安定させる。`render_hash` は作品エディションIDで、SVG本文・入力文・正規化DDL・LLM応答本文は hash の主材料に含めない。
 
@@ -1015,6 +1015,8 @@ Stage 1 は自由記述を、書き手が観察・編集できる正規化 DDL �
 
 **下絵（Stage 1 prompt `inku.typed-stage1-work-plan-prompt.v1`。実装の識別子は`work_plan`、2026-09-25より前の文書では「作品計画」）**：初回生成のLLMは可視DDLの文字列を書かず、閉じた型の下絵JSONを返す。下絵は単独図形命令の層（最大8）と地・背景からなり、各値は歳時記asset、parserの有限修飾語形、揺らぎの分類、Scoreの濃淡値から投影したenumである。値はその語の英語をそのまま使い（空白とハイフンは`_`）、欄の名も意味を言う（`position`・`handling`・`motion_spacing`など。下絵の型`inku.work-plan.v2`、歳時記 v2）。形（と比率語）ごとに使える値は、compilerへ一文ずつ問い合わせて生成した受理行列`inku.work-plan-capabilities.v2`が定め、共有Rustの検証が正本になる（providerのdecoding強制には依存しない）。ただし縦長の形には、組み立ては通っても角度「垂直」を入れない。「垂直」は形を90°回す語なので、縦長の形が横に寝て、どちらも立った形を言う二つの語と逆の向きになるためである（I-710）。範囲外の値はfield単位で未指定、形の無い層はその層だけを除き、描画を止めない。正規化した下絵は要求言語の可視DDLへ決定的に印字され、その文字列だけが既存compilerへ渡る。受理行列と日英の性質試験により印字DDLは全層が診断なしでcompileされるので、初回生成の句が捨てられることはない。応答schemaはobject・array・string enum・有界integerだけを使い、既存の全provider輸送がそのまま運ぶ。保存済み実行の再生のため、`normalized_ddl`を持つ旧応答はそのまま読む。下絵は一時物で、正本は可視DDLとScoreである。作者の直接DDLと編集DDLは従来どおり全文法で解析し、下絵の型の部分集合に制限しない。登録プラグインがあるとき、下絵は任意の`plugins`（その要求で登録済みの修飾名だけの閉じた列挙`name`と、記述が書いたその物の数`count`の組、最大4）を持てる。`count`は記述が数を書いていなければ0とする。Stage 1のsystem promptは登録プラグインの名前と要約を示し、記述にプラグイン名の見出しの語かその言い換えが書かれたときだけ選び、季節・場所・似た物からの連想では選ばない規則を与える。選んだプラグインは動作の語を持たない名前の文として背景の後・層の前に印字する（診断の出ない形）。語の個数を受けるプラグイン（§4.6）に正の`count`があれば、その数を名前の前に書く（`10枚のNature.若葉。`、`10 Nature.YoungLeaves.`）。助数詞は宣言の`counter`で決まる。個数を受けないプラグインの`count`は診断を記録して捨て、範囲外の数はcompilerが§4.6のとおり診断して語を外す。旧い名前だけの項目も読む。日本語のDDLでは別名（`Nature.若葉。`）、英語のDDLでは正式名（`Nature.YoungLeaves.`）で書く（§4.13）。下絵の列挙は正式名で、応答が別名を返しても正式名として受ける。登録が無い環境では`plugins`もその節も出さず、schemaとpromptは従来と同じになる。コア語彙が主で、Macroは付加機能である。
 
+日本語の下絵印字では、修飾語がすでに「な」「い」「の」で終わるときはそのまま図形へつなぎ、それ以外には「の」を付ける。「特大の」へさらに「の」を付けて「特大のの」にしない（I-709）。
+
 初回の解釈では、記述全体の役割、対比、反復、疎密、余白、質感を短い視覚的構成へまとめる。短さを、必要な複数の役割を中央の一要素へ縮めることや、各名詞を一図形へ対応させることと混同しない。明示数量を最優先し、数量が明示されていない反復は文脈から数量を選んで可視DDLへ記す。単語と数量帯の対応表、決め打ちの最低数、一律の増量は使わず、数や文の多さ自体を品質目標にしない。
 
 原文から解釈して選んだ配置・画材等は可視DDLに記し、明示指定を保持する。中央または端への一律配置、固定画材、紙地や背景の一律追加は行わない。明示された色は可視性を理由に変更せず、支持体や背景を必要な描画対象の代用にしない。対象語から図形・素材・構図を引く表や対象別の誘導例は持たない。この初回生成方針は日英で共有し、現行の有限語彙・構文・応答schema、camera projection、hole補完、compiler、保存済み作品の意味を変更しない。
@@ -1040,6 +1042,8 @@ Stage 1 は自由記述を、書き手が観察・編集できる正規化 DDL �
 ### 12.6.2 構図（下絵の後の置き場所、draw-system05）
 
 構図を行う実行では、下絵が決まった後、commitの前に**構図**を一度だけ置く。構図は、記述が場所を言わない層を、画面の三分割に沿った範囲（28種と四隅）へ置く。記述が言葉で場所を言う層は、その言葉のまま残す。
+
+Stage 1のfallback候補はStage 1の応答待ちにだけ属する。Stage 1が確定したときに候補の文書と下絵をともに外し、続く構図の読み取り待ちへ持ち越さない。
 
 - 下絵: 構図を行う実行のStage 1は、位置を、記述が場所を言葉で言う層にだけ選び、ほかの層を未指定にする（下絵の決まり8）。構図を行わない実行は、前の決まり（全層を中心に集めず、位置・大きさ・個数で重心と空いた部分を作る）のままである。
 - 読み: 共有pipelineのeffect `read_composition`（結果`composition_read`、prompt `inku.composition-reading-prompt.v2`）。記述と、場所を外して印字した下絵の層（下絵が付けた場所は添え書き）を読み、層ごとの役割、層どうしの関係、張り（動き・焦点・上下・均衡・対称・余白）、記述が言う場所（記述から引いた言葉と場所の値）、一文の命題を、決まった値だけで返す。座標や数は返さない。応答schemaは各objectの項目の順を`propertyOrdering`で名指し、system promptには書き足さない（schemaは輸送の構造化出力だけで渡す）。読みはStage 1と同じmodel・上限で送る。再試行の予算は`composition_retry`（無ければ色カタログ選択の予算）。
@@ -2216,7 +2220,7 @@ App rail のユーザーメニューは、ログイン中の利用者のプロ�
 
 **起動時にサーバーへつながらないときは、サインインを求めない（2026-09-26）。** Webは起動時の`/api/auth/me`が401か403のときだけサインイン画面を出す。通信の失敗や5xx（APIの再起動中、中継の502）では「サーバーに接続できません」と出し、3秒ごとに問い合わせ直して、つながったらページを開き直す。以前はこれもサインイン画面になり、単独利用モードでは誰も知らないパスワードを求めていた。
 
-Serverの正本永続化はSQLAlchemy上のSQLiteだけを使う。`INKU_DB_URL`と派生thumbnail DB設定はSQLite URLだけを受け付け、両方を検証してからどちらのengineも作る。非SQLite URLを拒否したあと空の既定DBへ黙って切り替えることはしない。Server SQLAlchemy/SQLiteとAndroid Room/SQLiteはそれぞれ自身の物理schemaを持ち、将来iOS adapterを作る場合も同じ論理契約へ別の物理mappingを持つ。同じDB file、table名、column配置を共有するという意味ではない。論理契約とhost mappingの正本は[`persistence/README.md`](persistence/README.md)と[`persistence/contract.json`](persistence/contract.json)である。Server専用の認証・管理tableと端末専用のprovider・model・cache tableはhost extensionであってparity gapではない。このmappingは保存済みSVG、Score、hash、NULLの意味を変えない。
+Serverの正本永続化はSQLAlchemy上のSQLiteだけを使う。`INKU_DB_URL`と派生thumbnail DB設定はSQLite URLだけを受け付け、両方を検証してからどちらのengineも作る。非SQLite URLを拒否したあと空の既定DBへ黙って切り替えることはしない。Server SQLAlchemy/SQLite、Android Room/SQLite、Swift GRDB/SQLiteはそれぞれ自身の物理schemaを持ち、同じ論理契約v2へmappingする。同じDB file、table名、column配置を共有するという意味ではない。Swiftの物理schemaはversion 1であり、ServerやRoomのschema版を流用しない。論理契約とhost mappingの正本は[`persistence/README.ja.md`](persistence/README.ja.md)と[`persistence/contract.json`](persistence/contract.json)である。Server専用の認証・管理tableと端末専用のprovider・model・cache tableはhost extensionであってparity gapではない。このmappingは保存済みSVG、Score、hash、NULLの意味を変えない。
 
 リリースAPIイメージのSQLiteはengine 3.37.2・Ubuntu修正版`3.37.2-2ubuntu0.8`に固定する。正本は[`server/runtime/sqlite.json`](server/runtime/sqlite.json)。Debian系のPython土台は維持し、Ubuntuのライブラリを`/opt/inku-sqlite`に独立配置する。同じCPython 3.12.15の検証済みsourceから未変更の`_sqlite3`だけをそのheaderで組み直し、新しいSQLiteのsymbolを使うstock moduleの下で古いlibraryへ単に差し替えない。amd64・arm64の両ビルドで、実際のPythonが読み込むlibraryとmoduleの版・checksum・配布noticeを検証し、APIのvenvでも再検証する。指定packageを取得できない場合や版・artifactの不一致はbuildを止め、別revisionやDebian版へfallbackしない。compilerは配布しない。この固定はDB schema・既存作品・hostやAndroidのSQLiteを変更しない。
 
@@ -2305,7 +2309,8 @@ inku-lang/                 # github.com/oikawas/inku-lang
 ├── cli/                               # inku-cli (HTTP API クライアント、uv 管理)
 ├── shared/                            # server と CLI が共有する解析パッケージ (inku_analysis)
 ├── core/                              # 共有 Rust core（DDL compiler / render engine / score / SVG raster）
-├── persistence/                       # Server と Android が共有する論理 SQLite 永続化契約
+├── persistence/                       # Server・Android・Swiftの論理 SQLite 永続化契約
+├── apple/                             # macOS先行のSwiftUI・共有Rust・GRDBクライアント基盤
 ├── docs/                              # 公開文書（architecture / spec / guide / history / i18n）
 ├── manual/ja|en/                      # 利用者マニュアル（日英 7 対）
 └── android/                           # ネイティブ Android 実装（正本: android/ANDROID_SPEC.ja.md）

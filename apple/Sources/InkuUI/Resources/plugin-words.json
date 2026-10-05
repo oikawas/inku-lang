@@ -1,0 +1,258 @@
+[
+  {
+    "aliases": [
+      "Nature.若葉"
+    ],
+    "fires_on": {
+      "en": [
+        "young leaves",
+        "new leaves",
+        "budding leaves"
+      ],
+      "ja": [
+        "若葉",
+        "新芽",
+        "芽吹き"
+      ]
+    },
+    "id": "Nature.YoungLeaves",
+    "notes": {
+      "en": "Early summer. Still small, turning toward the light.",
+      "ja": "初夏。まだ小さく、光の方へ向く。"
+    },
+    "package_id": "Nature.leaves",
+    "preview": "Nature-YoungLeaves.png",
+    "source_id": "bundled:Nature.leaves",
+    "surfaces": {
+      "en": [
+        "young leaves",
+        "new leaves"
+      ],
+      "ja": [
+        "若葉",
+        "わかば"
+      ]
+    }
+  },
+  {
+    "aliases": [
+      "Nature.下草"
+    ],
+    "fires_on": {
+      "en": [
+        "undergrowth",
+        "grasses",
+        "iris leaves",
+        "kakitsubata",
+        "pampas grass"
+      ],
+      "ja": [
+        "下草",
+        "草むら",
+        "菖蒲",
+        "あやめ",
+        "燕子花",
+        "かきつばた",
+        "薄",
+        "すすき"
+      ]
+    },
+    "id": "Nature.Undergrowth",
+    "notes": {
+      "en": "Early summer, the sword of the iris. The ground is never drawn — when the roots align, the ground appears in the viewer's mind.",
+      "ja": "初夏、菖蒲の剣。地面は描かない——根元が揃うとき、見る人の中に地が生まれる。"
+    },
+    "package_id": "Nature.leaves",
+    "preview": "Nature-Undergrowth.png",
+    "source_id": "bundled:Nature.leaves",
+    "surfaces": {
+      "en": [
+        "undergrowth",
+        "grasses"
+      ],
+      "ja": [
+        "下草",
+        "したくさ"
+      ]
+    }
+  },
+  {
+    "aliases": [
+      "Nature.青葉"
+    ],
+    "fires_on": {
+      "en": [
+        "summer leaves",
+        "green foliage",
+        "leafy branch"
+      ],
+      "ja": [
+        "青葉",
+        "茂み",
+        "枝葉"
+      ]
+    },
+    "id": "Nature.SummerLeaves",
+    "notes": {
+      "en": "High summer. Heavy on the branch, holding shade. Open arc chains resemble ferns — noted as a future word candidate.",
+      "ja": "盛夏。枝に重く、影を持つ。開いた弧の連なりは羊歯にも見える——将来の語彙候補として記す。"
+    },
+    "package_id": "Nature.leaves",
+    "preview": "Nature-SummerLeaves.png",
+    "source_id": "bundled:Nature.leaves",
+    "surfaces": {
+      "en": [
+        "summer leaves",
+        "green leaves"
+      ],
+      "ja": [
+        "青葉",
+        "あおば"
+      ]
+    }
+  },
+  {
+    "aliases": [
+      "Nature.紅葉"
+    ],
+    "fires_on": {
+      "en": [
+        "autumn leaves",
+        "maple",
+        "momiji"
+      ],
+      "ja": [
+        "紅葉",
+        "もみじ",
+        "カエデ"
+      ]
+    },
+    "id": "Nature.AutumnLeaves",
+    "notes": {
+      "en": "Late autumn. Ranged like a palm, red on the verge of leaving the branch.",
+      "ja": "晩秋。掌のかたちに並び、枝を離れる直前の赤。"
+    },
+    "package_id": "Nature.leaves",
+    "preview": "Nature-AutumnLeaves.png",
+    "source_id": "bundled:Nature.leaves",
+    "surfaces": {
+      "en": [
+        "autumn leaves",
+        "maple leaves"
+      ],
+      "ja": [
+        "紅葉",
+        "もみじ"
+      ]
+    }
+  },
+  {
+    "aliases": [
+      "Nature.落葉"
+    ],
+    "fires_on": {
+      "en": [
+        "fallen leaves",
+        "falling leaves",
+        "scattering leaves"
+      ],
+      "ja": [
+        "落葉",
+        "落ち葉",
+        "散る葉"
+      ]
+    },
+    "id": "Nature.FallenLeaves",
+    "notes": {
+      "en": "Late autumn into winter. Drifting diagonally, gathering where the ground is low.",
+      "ja": "晩秋から初冬。斜めに流れ、低いところに集まる。"
+    },
+    "package_id": "Nature.leaves",
+    "preview": "Nature-FallenLeaves.png",
+    "source_id": "bundled:Nature.leaves",
+    "surfaces": {
+      "en": [
+        "fallen leaves",
+        "falling leaves"
+      ],
+      "ja": [
+        "落葉",
+        "おちば",
+        "落ち葉"
+      ]
+    }
+  },
+  {
+    "aliases": [
+      "Nature.枯草"
+    ],
+    "fires_on": {
+      "en": [
+        "withered grass",
+        "dry grass",
+        "dead grasses",
+        "withered pampas"
+      ],
+      "ja": [
+        "枯草",
+        "枯れ草",
+        "枯尾花",
+        "枯れ薄"
+      ]
+    },
+    "id": "Nature.WitheredGrass",
+    "notes": {
+      "en": "Winter. The memory of what stood. The folded blade cannot yet be written — noted as a retrial candidate for touching (one end) or continuing.",
+      "ja": "冬。立っていたものの記憶。折れた葉(中折れ)はまだ書けない——「触れる(片端)」または「続きから」の再試験候補として記す。"
+    },
+    "package_id": "Nature.leaves",
+    "preview": "Nature-WitheredGrass.png",
+    "source_id": "bundled:Nature.leaves",
+    "surfaces": {
+      "en": [
+        "withered grass",
+        "dry grass"
+      ],
+      "ja": [
+        "枯草",
+        "枯れ草"
+      ]
+    }
+  },
+  {
+    "aliases": [
+      "Nature.枯葉"
+    ],
+    "fires_on": {
+      "en": [
+        "withered leaves",
+        "dry leaves",
+        "dead leaves"
+      ],
+      "ja": [
+        "枯葉",
+        "枯れ葉",
+        "朽ち葉"
+      ]
+    },
+    "id": "Nature.WitheredLeaves",
+    "notes": {
+      "en": "Winter. Only the memory of a form remains. Dried and curled, its edges crumbling, it still reads as a leaf. The former cloudform edition (1.0.1) did not look like a leaf, so 1.1.0 draws curled two-arc leaves.",
+      "ja": "冬。かたちの記憶だけが残る。乾いて縮れ、縁は崩れかけても、まだ葉として読める。以前の雲形（1.0.1）は葉に見えなかったため、1.1.0で縮れた二弧の葉へ改めた。"
+    },
+    "package_id": "Nature.leaves",
+    "preview": "Nature-WitheredLeaves.png",
+    "source_id": "bundled:Nature.leaves",
+    "surfaces": {
+      "en": [
+        "withered leaves",
+        "dry leaves"
+      ],
+      "ja": [
+        "枯葉",
+        "かれは",
+        "枯れ葉"
+      ]
+    }
+  }
+]

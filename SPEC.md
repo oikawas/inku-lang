@@ -582,8 +582,15 @@ the default engine; a thin adapter sends one request containing the validated
 Score and resolved options to the native `inku_render` binding.
 
 The deterministic rendering core is the Rust crate `core/crates/inku-render`.
-Server uses the native wheel and Android uses JNI to reach the same core.
-The iOS host connection remains separately pending.
+Server uses the native wheel, Android uses JNI, and the initial Swift client
+foundation uses UniFFI to reach the same core. Swift is a macOS-first,
+single-user standalone host that owns providers, SQLite, and native UI without
+duplicating Server DDL meaning or retry decisions. Swift-specific behavior,
+current implementation scope, and update rules are defined by
+[`apple/SWIFT_SPEC.md`](apple/SWIFT_SPEC.md); the build guide is
+[`apple/README.md`](apple/README.md). This document owns shared-core meaning.
+Swift specifications and history follow Android's Japanese-canonical and
+maintained-English workflow.
 
 The canonical metadata format read by history, the JSON tab, the CLI, and the
 benchmarks stays stable.  `render_hash` is the work-edition identifier; SVG
@@ -1709,6 +1716,10 @@ list is canonical, and a response naming an alias is read as its canonical name.
 neither the list nor its prompt section appears, and schema and prompt are
 unchanged. Core vocabulary is primary and Macros are an optional extension.
 
+When printing a Japanese underdrawing, a modifier already ending in `な`, `い`,
+or `の` attaches directly to its shape; other forms receive `の`. The printer
+does not add another `の` to `特大の` and produce `特大のの` (I-709).
+
 Initial interpretation condenses the whole description's roles, contrasts,
 repetition, density, empty space, and texture into a short visual composition.
 Brevity does not mean collapsing necessary roles into one central element or
@@ -1765,6 +1776,10 @@ In the shared pipeline the sketch is the optional effect `generate_sketch` befor
 ### 12.6.2 Composition (Placing the Layers After the Underdrawing, draw-system05)
 
 In a run that composes, a **composition** step runs once after the underdrawing settles and before the commit. It places the layers whose place the description does not state on ranges along the canvas thirds (28 kinds and the four corners). A layer whose place the description states in words keeps those words.
+
+Stage 1 fallback candidates belong only to its response wait. When Stage 1
+settles, both its candidate document and underdrawing are cleared; neither
+survives into the following composition-reading wait.
 
 - Underdrawing: in a run that composes, Stage 1 chooses a place only for a layer whose place the description states in words and leaves the other layers unspecified (principle 8 of the underdrawing). A run that does not compose keeps the earlier principle (do not gather every layer at the center; use position, size and count to create a center of weight and open areas).
 - Reading: the shared pipeline effect `read_composition` (result `composition_read`, prompt `inku.composition-reading-prompt.v2`). It reads the description and the underdrawing's layers printed without places (the places the underdrawing set are added as notes), and returns, in fixed values only, each layer's role, the relations between layers, the tension (motion, focus, vertical, balance, symmetry, void), the places the description states (the words quoted from it and a place value) and a one-sentence thesis. It returns no coordinates or numbers. Its response schema names each object's property order in `propertyOrdering` and is not appended to the system prompt; it travels only as the transport's structured output. The reading is sent with Stage 1's model and limits. Its retry budget is `composition_retry` (the catalog selection budget when absent).
@@ -3965,10 +3980,11 @@ The Server's canonical persistence uses SQLite through SQLAlchemy only.
 `INKU_DB_URL` and the derived thumbnail-store setting accept SQLite URLs only;
 both are validated before either engine is created. Rejection of a non-SQLite
 URL never falls through to a new empty default database. Server
-SQLAlchemy/SQLite and Android Room/SQLite each own a
-physical schema; a possible future iOS adapter would map another physical
-schema to the same logical contract. This does not mean sharing one database
-file, table names, or column layout. Canonical logical meaning and host mappings
+SQLAlchemy/SQLite, Android Room/SQLite, and Swift GRDB/SQLite each own a
+physical schema mapped to the same version 2 logical contract. This does not mean
+sharing one database file, table names, or column layout. Swift starts at physical
+schema version 1 and does not reuse the Server or Room schema version.
+Canonical logical meaning and host mappings
 live in [`persistence/README.md`](persistence/README.md) and
 [`persistence/contract.json`](persistence/contract.json). Server-only
 authentication and administration tables and device-only provider, model, and
@@ -4199,7 +4215,8 @@ inku-lang/                 # github.com/oikawas/inku-lang
 ├── cli/                               # inku-cli (an HTTP API client, managed with uv)
 ├── shared/                            # the analysis package the server and CLI share (inku_analysis)
 ├── core/                              # shared Rust core (DDL compiler / render engine / score / SVG raster)
-├── persistence/                       # logical SQLite persistence contract shared by Server and Android
+├── persistence/                       # logical SQLite persistence contract for Server, Android, and Swift
+├── apple/                             # macOS-first SwiftUI/shared-Rust/GRDB client foundation
 ├── docs/                              # published documents (architecture / spec / guide / history / i18n)
 ├── manual/ja|en/                      # the user manual (seven Japanese/English pairs)
 └── android/                           # the native Android implementation (canonical: android/ANDROID_SPEC.ja.md)

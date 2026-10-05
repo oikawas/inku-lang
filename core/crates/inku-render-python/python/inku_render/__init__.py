@@ -18,6 +18,7 @@ from ._native import (
     render,
     render_engine_id,
     render_engine_version,
+    render_seed_from_text,
     render_with_resources,
     renderer_reference_json,
 )
@@ -40,6 +41,7 @@ __all__ = (
     "render",
     "render_engine_id",
     "render_engine_version",
+    "render_seed_from_text",
     "render_with_resources",
     "renderer_reference_json",
 )

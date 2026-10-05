@@ -1,0 +1,1151 @@
+{
+  "drawing_limits": {
+    "absoluteMaximum": 100000,
+    "budgetMapping": {
+      "maximum_per_template_primitive_marks": "max_expanded_per_instruction",
+      "maximum_resolved_count": "schema_count_max",
+      "object_templates": "max_instructions",
+      "primitive_marks": "max_expanded_primitives"
+    },
+    "bytesPerMark": {
+      "brush_thick": 16138,
+      "pen": 12924
+    },
+    "defaults": {
+      "ddl_count_max": 1000,
+      "ddl_count_max_grid": 2000,
+      "literal_count_threshold": 240,
+      "max_expanded_per_instruction": 240,
+      "max_expanded_primitives": 400,
+      "max_instructions": 64,
+      "represented_count_max": 120,
+      "represented_count_min": 80,
+      "schema_count_max": 2000
+    },
+    "groups": [
+      {
+        "fields": [
+          "max_expanded_primitives",
+          "max_expanded_per_instruction"
+        ],
+        "id": "capability"
+      },
+      {
+        "fields": [
+          "literal_count_threshold",
+          "represented_count_min",
+          "represented_count_max"
+        ],
+        "id": "legibility"
+      },
+      {
+        "fields": [
+          "max_instructions",
+          "ddl_count_max",
+          "ddl_count_max_grid",
+          "schema_count_max"
+        ],
+        "id": "safety"
+      }
+    ],
+    "normalization": [
+      {
+        "ceiling": "literal_count_threshold",
+        "target": "represented_count_max"
+      },
+      {
+        "ceiling": "represented_count_max",
+        "target": "represented_count_min"
+      },
+      {
+        "ceiling": "max_expanded_primitives",
+        "target": "max_expanded_per_instruction"
+      }
+    ]
+  },
+  "host_limits": {
+    "max_effect_steps": 32,
+    "max_retained_runs": 8,
+    "max_workers": 4
+  },
+  "model_guidance": {
+    "providers": [
+      {
+        "id": "openai",
+        "kind": "openai_compatible",
+        "label": "OpenAI API Platform",
+        "models": [
+          {
+            "id": "gpt-5.1",
+            "label": "GPT-5.1"
+          },
+          {
+            "id": "gpt-5.1-mini",
+            "label": "GPT-5.1 mini"
+          },
+          {
+            "id": "gpt-4.1",
+            "label": "GPT-4.1"
+          },
+          {
+            "id": "gpt-4.1-mini",
+            "label": "GPT-4.1 mini"
+          }
+        ],
+        "speed_hidden": false
+      },
+      {
+        "id": "anthropic",
+        "kind": "anthropic",
+        "label": "Claude API",
+        "models": [
+          {
+            "id": "claude-opus-4-7",
+            "label": "Claude Opus 4.7"
+          },
+          {
+            "id": "claude-sonnet-4-6",
+            "label": "Claude Sonnet 4.6"
+          },
+          {
+            "id": "claude-haiku-4-5-20251001",
+            "label": "Claude Haiku 4.5"
+          }
+        ],
+        "speed_hidden": false
+      },
+      {
+        "id": "gemini",
+        "kind": "gemini",
+        "label": "Gemini API",
+        "models": [
+          {
+            "id": "gemini-3.5-flash-lite",
+            "label": "Gemini 3.5 Flash-Lite"
+          },
+          {
+            "id": "gemma-4-31b-it",
+            "label": "Gemma 4 31B Instruct"
+          }
+        ],
+        "speed_hidden": false
+      },
+      {
+        "id": "nvidia",
+        "kind": "openai_compatible",
+        "label": "NVIDIA NIM",
+        "models": [
+          {
+            "comment_en": "9 of 9 attempts succeeded; no schema violations; 5.0 corrections on average; median response midday 121s / evening 10s / late night 8s.",
+            "comment_ja": "実測 9/9 成功。スキーマ違反なし。補正発火 平均 5.0。応答中央値 昼 121s / 夕 10s / 深夜 8s。",
+            "id": "mistralai/mistral-nemotron",
+            "label": "mistralai/mistral-nemotron",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 4,
+            "speed_class": "ultra-fast",
+            "speed_label": "昼 121s / 夕 10s / 深夜 8s"
+          },
+          {
+            "comment_en": "9 of 9 attempts succeeded; no schema violations; 5.8 corrections on average; median response midday 52s / evening 29s / late night 64s.",
+            "comment_ja": "実測 9/9 成功。スキーマ違反なし。補正発火 平均 5.8。応答中央値 昼 52s / 夕 29s / 深夜 64s。",
+            "id": "meta/llama-3.1-70b-instruct",
+            "label": "meta/llama-3.1-70b-instruct",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 4,
+            "speed_class": "fast",
+            "speed_label": "昼 52s / 夕 29s / 深夜 64s"
+          },
+          {
+            "comment_en": "9 of 9 attempts succeeded; no schema violations; 5.9 corrections on average; median response midday 121s / evening 13s / late night 121s.",
+            "comment_ja": "実測 9/9 成功。スキーマ違反なし。補正発火 平均 5.9。応答中央値 昼 121s / 夕 13s / 深夜 121s。",
+            "id": "meta/llama-3.2-3b-instruct",
+            "label": "meta/llama-3.2-3b-instruct",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 4,
+            "speed_class": "fast",
+            "speed_label": "昼 121s / 夕 13s / 深夜 121s"
+          },
+          {
+            "comment_en": "9 of 9 attempts succeeded; no schema violations; 6.0 corrections on average; median response midday 7s / evening 7s / late night 8s.",
+            "comment_ja": "実測 9/9 成功。スキーマ違反なし。補正発火 平均 6.0。応答中央値 昼 7s / 夕 7s / 深夜 8s。",
+            "id": "qwen/qwen3-next-80b-a3b-instruct",
+            "label": "qwen/qwen3-next-80b-a3b-instruct",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 4,
+            "speed_class": "ultra-fast",
+            "speed_label": "昼 7s / 夕 7s / 深夜 8s"
+          },
+          {
+            "comment_en": "9 of 9 attempts succeeded; no schema violations; 7.2 corrections on average; median response midday 4s / evening 4s / late night 4s.",
+            "comment_ja": "実測 9/9 成功。スキーマ違反なし。補正発火 平均 7.2。応答中央値 昼 4s / 夕 4s / 深夜 4s。",
+            "id": "poolside/laguna-xs-2.1",
+            "label": "poolside/laguna-xs-2.1",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 4,
+            "speed_class": "ultra-fast",
+            "speed_label": "昼 4s / 夕 4s / 深夜 4s"
+          },
+          {
+            "comment_en": "9 of 9 attempts succeeded; no schema violations; 14.4 corrections on average; median response midday 12s / evening 22s / late night 13s.",
+            "comment_ja": "実測 9/9 成功。スキーマ違反なし。補正発火 平均 14.4。応答中央値 昼 12s / 夕 22s / 深夜 13s。",
+            "id": "nvidia/ising-calibration-1-35b-a3b",
+            "label": "nvidia/ising-calibration-1-35b-a3b",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 3,
+            "speed_class": "fast",
+            "speed_label": "昼 12s / 夕 22s / 深夜 13s"
+          },
+          {
+            "comment_en": "8 of 8 attempts succeeded; no schema violations; 4.6 corrections on average; Stage 1 silent once under load; median response midday 24s / evening 57s / late night 44s.",
+            "comment_ja": "実測 8/8 成功。スキーマ違反なし。補正発火 平均 4.6。混雑時の Stage 1 無応答 1 回。応答中央値 昼 24s / 夕 57s / 深夜 44s。",
+            "id": "nvidia/llama-3.3-nemotron-super-49b-v1",
+            "label": "nvidia/llama-3.3-nemotron-super-49b-v1",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 5,
+            "speed_class": "fast",
+            "speed_label": "昼 24s / 夕 57s / 深夜 44s"
+          },
+          {
+            "comment_en": "8 of 8 attempts succeeded; no schema violations; 8.4 corrections on average; median response midday 19s / evening 29s / late night 16s; Vision recall 0.89.",
+            "comment_ja": "実測 8/8 成功。スキーマ違反なし。補正発火 平均 8.4。応答中央値 昼 19s / 夕 29s / 深夜 16s。Vision 再現率 0.89。",
+            "id": "nvidia/nemotron-nano-12b-v2-vl",
+            "label": "nvidia/nemotron-nano-12b-v2-vl",
+            "purposes": [
+              "llm",
+              "vision"
+            ],
+            "recommendation_llm": 3,
+            "recommendation_vision": 4,
+            "speed_class": "fast",
+            "speed_label": "昼 19s / 夕 29s / 深夜 16s"
+          },
+          {
+            "comment_en": "7 of 7 attempts succeeded; no schema violations; 5.9 corrections on average; Stage 1 silent once under load; median response midday 221s / evening 114s / late night 199s; Vision recall 1.00.",
+            "comment_ja": "実測 7/7 成功。スキーマ違反なし。補正発火 平均 5.9。混雑時の Stage 1 無応答 1 回。応答中央値 昼 221s / 夕 114s / 深夜 199s。Vision 再現率 1.00。",
+            "id": "google/gemma-4-31b-it",
+            "label": "Google Gemma 4 31B Instruct",
+            "purposes": [
+              "llm",
+              "vision"
+            ],
+            "recommendation_llm": 4,
+            "recommendation_vision": 5,
+            "speed_class": "medium",
+            "speed_label": "昼 221s / 夕 114s / 深夜 199s"
+          },
+          {
+            "comment_en": "6 of 6 attempts succeeded; no schema violations; 6.7 corrections on average; Stage 1 silent 2 times under load; median response midday 174s / evening 149s / late night 180s.",
+            "comment_ja": "実測 6/6 成功。スキーマ違反なし。補正発火 平均 6.7。混雑時の Stage 1 無応答 2 回。応答中央値 昼 174s / 夕 149s / 深夜 180s。",
+            "id": "meta/llama-3.3-70b-instruct",
+            "label": "Meta Llama 3.3 70B Instruct",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 4,
+            "speed_class": "slow",
+            "speed_label": "昼 174s / 夕 149s / 深夜 180s"
+          },
+          {
+            "comment_en": "6 of 6 attempts succeeded; no schema violations; 8.0 corrections on average; Stage 1 silent 3 times under load; median response midday 165s / evening 156s / late night 158s.",
+            "comment_ja": "実測 6/6 成功。スキーマ違反なし。補正発火 平均 8.0。混雑時の Stage 1 無応答 3 回。応答中央値 昼 165s / 夕 156s / 深夜 158s。",
+            "id": "mistralai/mistral-large-3-675b-instruct-2512",
+            "label": "mistralai/mistral-large-3-675b-instruct-2512",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 3,
+            "speed_class": "slow",
+            "speed_label": "昼 165s / 夕 156s / 深夜 158s"
+          },
+          {
+            "comment_en": "5 of 5 attempts succeeded; no schema violations; 3.8 corrections on average; Stage 1 silent 4 times under load; median response midday 190s / late night 162s.",
+            "comment_ja": "実測 5/5 成功。スキーマ違反なし。補正発火 平均 3.8。混雑時の Stage 1 無応答 4 回。応答中央値 昼 190s / 深夜 162s。",
+            "id": "qwen/qwen3.5-397b-a17b",
+            "label": "qwen/qwen3.5-397b-a17b",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 5,
+            "speed_class": "slow",
+            "speed_label": "昼 190s / 深夜 162s"
+          },
+          {
+            "comment_en": "5 of 5 attempts succeeded; no schema violations; 4.2 corrections on average; Stage 1 silent once under load; median response evening 148s / late night 110s.",
+            "comment_ja": "実測 5/5 成功。スキーマ違反なし。補正発火 平均 4.2。混雑時の Stage 1 無応答 1 回。応答中央値 夕 148s / 深夜 110s。",
+            "id": "z-ai/glm-5.2",
+            "label": "z-ai/glm-5.2",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 5,
+            "speed_class": "medium",
+            "speed_label": "夕 148s / 深夜 110s"
+          },
+          {
+            "comment_en": "4 of 4 attempts succeeded; no schema violations; 7.8 corrections on average; median response midday 119s / evening 70s / late night 153s; Vision recall 0.89.",
+            "comment_ja": "実測 4/4 成功。スキーマ違反なし。補正発火 平均 7.8。応答中央値 昼 119s / 夕 70s / 深夜 153s。Vision 再現率 0.89。",
+            "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+            "label": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+            "purposes": [
+              "llm",
+              "vision"
+            ],
+            "recommendation_llm": 3,
+            "recommendation_vision": 4,
+            "speed_class": "medium",
+            "speed_label": "昼 119s / 夕 70s / 深夜 153s"
+          },
+          {
+            "comment_en": "3 of 3 attempts succeeded; no schema violations; 9.3 corrections on average; median response midday 16s / late night 101s.",
+            "comment_ja": "実測 3/3 成功。スキーマ違反なし。補正発火 平均 9.3。応答中央値 昼 16s / 深夜 101s。",
+            "id": "deepseek-ai/deepseek-v4-flash",
+            "label": "deepseek-ai/deepseek-v4-flash",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 3,
+            "speed_class": "fast",
+            "speed_label": "昼 16s / 深夜 101s"
+          },
+          {
+            "comment_en": "6 of 7 attempts succeeded; 1 score schema violations; 3.5 corrections on average; Stage 1 silent 2 times under load; median response midday 13s / evening 10s / late night 11s.",
+            "comment_ja": "実測 6/7 成功。スキーマ違反 1 回。補正発火 平均 3.5。混雑時の Stage 1 無応答 2 回。応答中央値 昼 13s / 夕 10s / 深夜 11s。",
+            "id": "openai/gpt-oss-120b",
+            "label": "openai/gpt-oss-120b",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 2,
+            "speed_class": "ultra-fast",
+            "speed_label": "昼 13s / 夕 10s / 深夜 11s"
+          },
+          {
+            "comment_en": "1 of 1 attempts succeeded; no schema violations; 1.0 corrections on average; Stage 1 silent once under load; median response midday 136s.",
+            "comment_ja": "実測 1/1 成功。スキーマ違反なし。補正発火 平均 1.0。混雑時の Stage 1 無応答 1 回。応答中央値 昼 136s。",
+            "id": "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+            "label": "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 4,
+            "speed_class": "slow",
+            "speed_label": "昼 136s"
+          },
+          {
+            "comment_en": "6 of 9 attempts succeeded; 3 malformed tool calls; 6.3 corrections on average; median response midday 132s / evening 53s.",
+            "comment_ja": "実測 6/9 成功。tool calling の引数不正 3 回。補正発火 平均 6.3。応答中央値 昼 132s / 夕 53s。",
+            "id": "minimaxai/minimax-m3",
+            "label": "minimaxai/minimax-m3",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 2,
+            "speed_class": "medium",
+            "speed_label": "昼 132s / 夕 53s"
+          },
+          {
+            "comment_en": "6 of 9 attempts succeeded; 3 score schema violations; 6.3 corrections on average; median response midday 122s / evening 122s / late night 122s; Vision recall 0.67.",
+            "comment_ja": "実測 6/9 成功。スキーマ違反 3 回。補正発火 平均 6.3。応答中央値 昼 122s / 夕 122s / 深夜 122s。Vision 再現率 0.67。",
+            "id": "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
+            "label": "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
+            "purposes": [
+              "llm",
+              "vision"
+            ],
+            "recommendation_llm": 2,
+            "recommendation_vision": 3,
+            "speed_class": "slow",
+            "speed_label": "昼 122s / 夕 122s / 深夜 122s"
+          },
+          {
+            "comment_en": "6 of 9 attempts succeeded; 3 malformed tool calls; 7.8 corrections on average; median response midday 16s / evening 28s.",
+            "comment_ja": "実測 6/9 成功。tool calling の引数不正 3 回。補正発火 平均 7.8。応答中央値 昼 16s / 夕 28s。",
+            "id": "deepseek-ai/deepseek-v4-pro",
+            "label": "deepseek-ai/deepseek-v4-pro",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 2,
+            "speed_class": "fast",
+            "speed_label": "昼 16s / 夕 28s"
+          },
+          {
+            "comment_en": "6 of 9 attempts succeeded; 3 score schema violations; 8.5 corrections on average; median response midday 22s / evening 74s / late night 33s.",
+            "comment_ja": "実測 6/9 成功。スキーマ違反 3 回。補正発火 平均 8.5。応答中央値 昼 22s / 夕 74s / 深夜 33s。",
+            "id": "minimaxai/minimax-m2.7",
+            "label": "minimaxai/minimax-m2.7",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 2,
+            "speed_class": "fast",
+            "speed_label": "昼 22s / 夕 74s / 深夜 33s"
+          },
+          {
+            "comment_en": "5 of 9 attempts succeeded; 4 score schema violations; 10.4 corrections on average; median response midday 21s / evening 35s / late night 23s.",
+            "comment_ja": "実測 5/9 成功。スキーマ違反 4 回。補正発火 平均 10.4。応答中央値 昼 21s / 夕 35s / 深夜 23s。",
+            "id": "nvidia/nemotron-3-super-120b-a12b",
+            "label": "nvidia/nemotron-3-super-120b-a12b",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 2,
+            "speed_class": "fast",
+            "speed_label": "昼 21s / 夕 35s / 深夜 23s"
+          },
+          {
+            "comment_en": "1 of 2 attempts succeeded; 1 malformed tool calls; 10.0 corrections on average; Stage 1 silent 5 times under load; median response midday 95s.",
+            "comment_ja": "実測 1/2 成功。tool calling の引数不正 1 回。補正発火 平均 10.0。混雑時の Stage 1 無応答 5 回。応答中央値 昼 95s。",
+            "id": "bytedance/seed-oss-36b-instruct",
+            "label": "bytedance/seed-oss-36b-instruct",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 2,
+            "speed_class": "medium",
+            "speed_label": "昼 95s"
+          },
+          {
+            "comment_en": "2 of 4 attempts succeeded; 2 malformed tool calls; 2.5 corrections on average; median response midday 73s / late night 40s.",
+            "comment_ja": "実測 2/4 成功。tool calling の引数不正 2 回。補正発火 平均 2.5。応答中央値 昼 73s / 深夜 40s。",
+            "id": "nvidia/nvidia-nemotron-nano-9b-v2",
+            "label": "nvidia/nvidia-nemotron-nano-9b-v2",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 2,
+            "speed_class": "fast",
+            "speed_label": "昼 73s / 深夜 40s"
+          },
+          {
+            "comment_en": "4 of 9 attempts succeeded; 5 score schema violations; 3.5 corrections on average; median response midday 3s / evening 4s / late night 13s.",
+            "comment_ja": "実測 4/9 成功。スキーマ違反 5 回。補正発火 平均 3.5。応答中央値 昼 3s / 夕 4s / 深夜 13s。",
+            "id": "meta/llama-3.1-8b-instruct",
+            "label": "meta/llama-3.1-8b-instruct",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 2,
+            "speed_class": "ultra-fast",
+            "speed_label": "昼 3s / 夕 4s / 深夜 13s"
+          },
+          {
+            "comment_en": "4 of 9 attempts succeeded; 5 score schema violations; 3.8 corrections on average; median response midday 128s / evening 168s / late night 92s; Vision recall 0.94.",
+            "comment_ja": "実測 4/9 成功。スキーマ違反 5 回。補正発火 平均 3.8。応答中央値 昼 128s / 夕 168s / 深夜 92s。Vision 再現率 0.94。",
+            "id": "mistralai/mistral-medium-3.5-128b",
+            "label": "mistralai/mistral-medium-3.5-128b",
+            "purposes": [
+              "llm",
+              "vision"
+            ],
+            "recommendation_llm": 2,
+            "recommendation_vision": 4,
+            "speed_class": "medium",
+            "speed_label": "昼 128s / 夕 168s / 深夜 92s"
+          },
+          {
+            "comment_en": "4 of 9 attempts succeeded; 5 score schema violations; 5.5 corrections on average; median response midday 3s / evening 6s / late night 4s; Vision recall 0.94.",
+            "comment_ja": "実測 4/9 成功。スキーマ違反 5 回。補正発火 平均 5.5。応答中央値 昼 3s / 夕 6s / 深夜 4s。Vision 再現率 0.94。",
+            "id": "mistralai/mistral-small-4-119b-2603",
+            "label": "mistralai/mistral-small-4-119b-2603",
+            "purposes": [
+              "llm",
+              "vision"
+            ],
+            "recommendation_llm": 2,
+            "recommendation_vision": 4,
+            "speed_class": "ultra-fast",
+            "speed_label": "昼 3s / 夕 6s / 深夜 4s"
+          },
+          {
+            "comment_en": "3 of 7 attempts succeeded; 4 score schema violations; 10.3 corrections on average; median response midday 40s / evening 95s / late night 38s.",
+            "comment_ja": "実測 3/7 成功。スキーマ違反 4 回。補正発火 平均 10.3。応答中央値 昼 40s / 夕 95s / 深夜 38s。",
+            "id": "nvidia/nemotron-3-ultra-550b-a55b",
+            "label": "nvidia/nemotron-3-ultra-550b-a55b",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 2,
+            "speed_class": "fast",
+            "speed_label": "昼 40s / 夕 95s / 深夜 38s"
+          },
+          {
+            "comment_en": "3 of 9 attempts succeeded; 6 score schema violations; 1.0 corrections on average; median response midday 125s / evening 236s / late night 125s.",
+            "comment_ja": "実測 3/9 成功。スキーマ違反 6 回。補正発火 平均 1.0。応答中央値 昼 125s / 夕 236s / 深夜 125s。",
+            "id": "mistralai/mixtral-8x7b-instruct-v0.1",
+            "label": "mistralai/mixtral-8x7b-instruct-v0.1",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 2,
+            "speed_class": "slow",
+            "speed_label": "昼 125s / 夕 236s / 深夜 125s"
+          },
+          {
+            "comment_en": "1 of 5 attempts succeeded; 4 score schema violations; 1.0 corrections on average; Stage 1 silent 4 times under load; median response late night 14s.",
+            "comment_ja": "実測 1/5 成功。スキーマ違反 4 回。補正発火 平均 1.0。混雑時の Stage 1 無応答 4 回。応答中央値 深夜 14s。",
+            "id": "openai/gpt-oss-20b",
+            "label": "openai/gpt-oss-20b",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 2,
+            "speed_class": "fast",
+            "speed_label": "深夜 14s"
+          },
+          {
+            "comment_en": "1 of 6 attempts succeeded; 5 score schema violations; 3.0 corrections on average; Stage 1 silent 3 times under load; median response evening 43s.",
+            "comment_ja": "実測 1/6 成功。スキーマ違反 5 回。補正発火 平均 3.0。混雑時の Stage 1 無応答 3 回。応答中央値 夕 43s。",
+            "id": "stepfun-ai/step-3.7-flash",
+            "label": "stepfun-ai/step-3.7-flash",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 2,
+            "speed_class": "medium",
+            "speed_label": "夕 43s"
+          },
+          {
+            "comment_en": "0 of 9 attempts succeeded; 9 malformed tool calls; median response Vision 12s; Vision recall 0.94.",
+            "comment_ja": "実測 0/9 成功。tool calling の引数不正 9 回。応答中央値 Vision 12s。Vision 再現率 0.94。",
+            "id": "google/gemma-3n-e2b-it",
+            "label": "google/gemma-3n-e2b-it",
+            "purposes": [
+              "vision"
+            ],
+            "recommendation_vision": 4,
+            "speed_class": "unknown",
+            "speed_label": "Vision 12s"
+          },
+          {
+            "comment_en": "0 of 9 attempts succeeded; 9 malformed tool calls; median response Vision 15s; Vision recall 0.94.",
+            "comment_ja": "実測 0/9 成功。tool calling の引数不正 9 回。応答中央値 Vision 15s。Vision 再現率 0.94。",
+            "id": "google/gemma-3n-e4b-it",
+            "label": "google/gemma-3n-e4b-it",
+            "purposes": [
+              "vision"
+            ],
+            "recommendation_vision": 4,
+            "speed_class": "unknown",
+            "speed_label": "Vision 15s"
+          },
+          {
+            "comment_en": "0 of 9 attempts succeeded; 9 score schema violations; median response Vision 9s; Vision recall 0.94.",
+            "comment_ja": "実測 0/9 成功。スキーマ違反 9 回。応答中央値 Vision 9s。Vision 再現率 0.94。",
+            "id": "meta/llama-3.2-11b-vision-instruct",
+            "label": "meta/llama-3.2-11b-vision-instruct",
+            "purposes": [
+              "vision"
+            ],
+            "recommendation_vision": 4,
+            "speed_class": "unknown",
+            "speed_label": "Vision 9s"
+          },
+          {
+            "comment_en": "0 of 9 attempts succeeded; 9 score schema violations.",
+            "comment_ja": "実測 0/9 成功。スキーマ違反 9 回。",
+            "id": "nvidia/nemotron-3-nano-30b-a3b",
+            "label": "nvidia/nemotron-3-nano-30b-a3b",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 1,
+            "speed_class": "unknown",
+            "speed_label": "未計測"
+          },
+          {
+            "comment_en": "Still offered. In both 2026-07-20 runs Stage 1 did not answer within 120 seconds, so nothing about its quality was measured. Consistent with provider load.",
+            "comment_ja": "提供は継続中。2026-07-20 の 2 回の計測では 9 回とも Stage 1 が 120 秒以内に応答せず、品質を測定できなかった。混雑の影響とみられる。",
+            "id": "meta/llama-3.2-1b-instruct",
+            "label": "meta/llama-3.2-1b-instruct",
+            "purposes": [
+              "llm"
+            ],
+            "speed_class": "unknown",
+            "speed_label": "未計測"
+          },
+          {
+            "comment_en": "Still offered. In both 2026-07-20 runs Stage 1 did not answer within 120 seconds, so nothing about its quality was measured. Consistent with provider load.",
+            "comment_ja": "提供は継続中。2026-07-20 の 2 回の計測では 9 回とも Stage 1 が 120 秒以内に応答せず、品質を測定できなかった。混雑の影響とみられる。",
+            "id": "meta/llama-3.2-90b-vision-instruct",
+            "label": "Llama 3.2 90B Vision Instruct",
+            "purposes": [
+              "vision"
+            ],
+            "speed_class": "unknown",
+            "speed_label": "未計測"
+          },
+          {
+            "comment_en": "Still offered. In both 2026-07-20 runs Stage 1 did not answer within 120 seconds, so nothing about its quality was measured. Consistent with provider load.",
+            "comment_ja": "提供は継続中。2026-07-20 の 2 回の計測では 9 回とも Stage 1 が 120 秒以内に応答せず、品質を測定できなかった。混雑の影響とみられる。",
+            "id": "meta/llama-4-maverick-17b-128e-instruct",
+            "label": "meta/llama-4-maverick-17b-128e-instruct",
+            "purposes": [
+              "llm"
+            ],
+            "speed_class": "unknown",
+            "speed_label": "未計測"
+          },
+          {
+            "comment_en": "Still offered. In both 2026-07-20 runs Stage 1 did not answer within 120 seconds, so nothing about its quality was measured. Consistent with provider load.",
+            "comment_ja": "提供は継続中。2026-07-20 の 2 回の計測では 9 回とも Stage 1 が 120 秒以内に応答せず、品質を測定できなかった。混雑の影響とみられる。",
+            "id": "mistralai/ministral-14b-instruct-2512",
+            "label": "mistralai/ministral-14b-instruct-2512",
+            "purposes": [
+              "llm"
+            ],
+            "speed_class": "unknown",
+            "speed_label": "未計測"
+          },
+          {
+            "comment_en": "Still offered. In both 2026-07-20 runs Stage 1 did not answer within 120 seconds, so nothing about its quality was measured. Consistent with provider load.",
+            "comment_ja": "提供は継続中。2026-07-20 の 2 回の計測では 9 回とも Stage 1 が 120 秒以内に応答せず、品質を測定できなかった。混雑の影響とみられる。",
+            "id": "nvidia/llama-3.1-nemotron-nano-8b-v1",
+            "label": "nvidia/llama-3.1-nemotron-nano-8b-v1",
+            "purposes": [
+              "llm"
+            ],
+            "speed_class": "unknown",
+            "speed_label": "未計測"
+          },
+          {
+            "comment_en": "Still offered. In both 2026-07-20 runs Stage 1 did not answer within 120 seconds, so nothing about its quality was measured. Consistent with provider load.",
+            "comment_ja": "提供は継続中。2026-07-20 の 2 回の計測では 9 回とも Stage 1 が 120 秒以内に応答せず、品質を測定できなかった。混雑の影響とみられる。",
+            "id": "stepfun-ai/step-3.5-flash",
+            "label": "stepfun-ai/step-3.5-flash",
+            "purposes": [
+              "llm"
+            ],
+            "speed_class": "unknown",
+            "speed_label": "未計測"
+          },
+          {
+            "comment_en": "Still offered. In both 2026-07-20 runs Stage 1 did not answer within 120 seconds, so nothing about its quality was measured. Consistent with provider load.",
+            "comment_ja": "提供は継続中。2026-07-20 の 2 回の計測では 9 回とも Stage 1 が 120 秒以内に応答せず、品質を測定できなかった。混雑の影響とみられる。",
+            "id": "thinkingmachines/inkling",
+            "label": "thinkingmachines/inkling",
+            "purposes": [
+              "llm"
+            ],
+            "speed_class": "unknown",
+            "speed_label": "未計測"
+          },
+          {
+            "comment_en": "Retired by the provider. Existing artworks still render from their stored score and SVG, but cannot be redrawn.",
+            "comment_ja": "提供終了。過去の作品は保存済みの Score と SVG で閲覧できるが、再描画はできない。",
+            "eol": true,
+            "eol_date": "2026-07-20",
+            "id": "qwen/qwen3.5-122b-a10b",
+            "label": "qwen/qwen3.5-122b-a10b",
+            "purposes": [
+              "llm"
+            ],
+            "speed_class": "unknown",
+            "speed_label": "提供終了"
+          },
+          {
+            "comment_en": "Retired by the provider. Existing artworks still render from their stored score and SVG, but cannot be redrawn.",
+            "comment_ja": "提供終了。過去の作品は保存済みの Score と SVG で閲覧できるが、再描画はできない。",
+            "eol": true,
+            "eol_date": "2026-07-20",
+            "id": "qwen/qwen3-coder-480b-a35b-instruct",
+            "label": "qwen/qwen3-coder-480b-a35b-instruct",
+            "purposes": [
+              "llm"
+            ],
+            "speed_class": "unknown",
+            "speed_label": "提供終了"
+          }
+        ],
+        "speed_hidden": false
+      },
+      {
+        "id": "ollama",
+        "kind": "openai_compatible",
+        "label": "Ollama",
+        "models": [
+          {
+            "comment_en": "Recommended for Stage 1. The only small model whose 6 Japanese and 6 English attempts all came back as usable normalized DDL, and the smallest candidate at that; zero explicit-rule violations in English. Its Stage 2 coverage is 9 of 28, so leave that stage to another model. Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over.",
+            "comment_ja": "第一段階の推奨。日本語・英語とも 6/6 が正規化 DDL として成立した唯一の小型モデルで、しかも候補中の最小。明文規則の違反は英語 6 件中 0 件。第二段階では被覆 9/28 と低いので、そちらは別のモデルに任せる。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+            "id": "qwen3.5:4b-q4_K_M",
+            "label": "qwen3.5:4b-q4_K_M (3.4GB)",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_stage1": 5,
+            "recommendation_stage2": 2
+          },
+          {
+            "comment_en": "Recommended for Stage 2. Its coverage of 20 of 28 is the highest measured, and all eight cases produced a Score. It has no thinking capability, so it cannot fail the way models do when thinking eats the whole token budget. Stage 1 holds up in Japanese but breaks down in English, where it writes raw coordinates. Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over.",
+            "comment_ja": "第二段階の推奨。被覆 20/28 は計測した中で最も高く、8 件とも Score になった。思考する機能を持たないので、思考が予算を食い切って何も返らない失敗を構造的に踏まない。第一段階は日本語 6/6 が成立するが、英語で座標を直書きして崩れる。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+            "id": "ministral-3:8b-instruct-2512-q4_K_M",
+            "label": "ministral-3:8b-instruct-2512-q4_K_M (6.0GB)",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_stage1": 3,
+            "recommendation_stage2": 5
+          },
+          {
+            "comment_en": "Stage 2 coverage 18 of 28, all eight cases producing a Score, and the shortest times measured. Stage 1 holds up in Japanese but in English it adds explanatory sentences in 5 of 6 cases and drops counts (\"seven\" becomes \"several\"). Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over.",
+            "comment_ja": "第二段階の被覆 18/28。8 件とも Score になり、所要は計測した中で最も短い。第一段階は日本語 6/6 が成立するが、英語で説明の文を 5 件付け、数量が落ちる（「七つ」が several になる）。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+            "id": "gemma4:e4b-it-q4_K_M",
+            "label": "gemma4:e4b-it-q4_K_M (9.6GB)",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_stage1": 3,
+            "recommendation_stage2": 4
+          },
+          {
+            "comment_en": "The best Stage 1 measured in either language: no explanatory sentences, no gray background, and the only model that uses the fixed ground form correctly. Its Stage 2 coverage of 18 of 28 was taken on the path that preceded Build 748 and 749, so it is not comparable with the other entries here. Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over.",
+            "comment_ja": "第一段階は日本語・英語とも計測した中で最良。説明の文も灰背景の指示も 0 件で、「地: 生成りの紙。」の固定形を正しく使う唯一のモデル。第二段階の被覆 18/28 は Build 748/749 より前の経路で採った数字で、他の行とは条件が違う。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+            "id": "gemma4:31b-it-q4_K_M",
+            "label": "gemma4:31b-it-q4_K_M (19GB)",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_stage1": 5,
+            "recommendation_stage2": 4
+          },
+          {
+            "comment_en": "Stage 2 coverage 14 of 28, all eight cases producing a Score. Its English Stage 1 is clean across all 6 cases with no explanatory sentences, but its Japanese breaks grammatically and mangles a numeral. Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over.",
+            "comment_ja": "第二段階の被覆 14/28。8 件とも Score になった。第一段階は英語が 6/6 成立して説明の文も 0 件だが、日本語で助詞が壊れる（「水たまりを楕円を七つ並べる」・「三ひゃく七十本」）。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+            "id": "gemma4:12b-it-q4_K_M",
+            "label": "gemma4:12b-it-q4_K_M (7.6GB)",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_stage1": 3,
+            "recommendation_stage2": 3
+          },
+          {
+            "comment_en": "Stage 1 holds up across all 6 Japanese and all 6 English cases. Its Stage 2 coverage of 10 of 28 is barely above qwen3.5:4b at 9 of 28, a model a fifth its size: within this family, size buys time rather than coverage. Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over.",
+            "comment_ja": "第一段階は日本語 6/6・英語 6/6 が成立する。第二段階の被覆は 10/28 で、5 分の 1 の大きさの qwen3.5:4b（9/28）とほとんど変わらない。同じ系統では規模を上げても被覆が伸びず、所要だけが伸びる。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+            "id": "qwen3.5:27b-q4_K_M",
+            "label": "qwen3.5:27b-q4_K_M (17GB)",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_stage1": 4,
+            "recommendation_stage2": 2
+          },
+          {
+            "comment_en": "Stage 2 coverage of 8 of 28 falls below qwen3.5:4b at 9 of 28, half its size; on four of the five complex cases it emits a single instruction. Stage 1 holds up in Japanese but adds explanatory sentences in 4 English cases. Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over.",
+            "comment_ja": "第二段階の被覆 8/28 は、半分の大きさの qwen3.5:4b（9/28）を下回る。複雑な 5 件のうち 4 件で指示を 1 本しか出さない。第一段階は日本語 6/6 が成立するが、英語で説明の文を 4 件付ける。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+            "id": "qwen3.5:9b-q4_K_M",
+            "label": "qwen3.5:9b-q4_K_M (6.6GB)",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_stage1": 3,
+            "recommendation_stage2": 2
+          },
+          {
+            "comment_en": "Stage 1 fails on 4 of 6 Japanese cases: an emotional adverb survives, three forbidden verbs appear, and one case produces no shape instruction at all through misuse of the surface form. Stage 2 was not measured. Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over.",
+            "comment_ja": "第一段階が日本語 6 件中 4 件で成立しない。感情語「静かに」が残り、禁止された動詞を 3 回使い、1 件は「面:」の誤用で図形の指示が 1 つも出ない。第二段階は測っていない。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+            "id": "granite4.1:8b-q4_K_M",
+            "label": "granite4.1:8b-q4_K_M (5.3GB)",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_stage1": 1
+          },
+          {
+            "comment_en": "Stage 1 fails on 3 of 6 Japanese cases: one repeats the same paragraph three times, two list placements with the shape word missing. Stage 2 was not measured. Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over.",
+            "comment_ja": "第一段階が日本語 6 件中 3 件で成立しない。同じ段落を 3 回繰り返す 1 件と、図形を表す語が抜けて配置の句だけが並ぶ 2 件。第二段階は測っていない。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+            "id": "qwen3.5:2b-q4_K_M",
+            "label": "qwen3.5:2b-q4_K_M (1.9GB)",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_stage1": 1
+          },
+          {
+            "comment_en": "Stage 1 fails on 3 of 6 Japanese cases: a fragment with no predicate, and two that copy the scenic nouns of the input straight through without normalizing them. Stage 2 was not measured. Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over.",
+            "comment_ja": "第一段階が日本語 6 件中 3 件で成立しない。述語のない断片（「中央付近に。」）と、入力の情景語をそのまま写した 2 件。第二段階は測っていない。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+            "id": "qwen3.5:0.8b-q8_0",
+            "label": "qwen3.5:0.8b-q8_0 (1.0GB)",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_stage1": 1
+          }
+        ],
+        "speed_hidden": true
+      },
+      {
+        "id": "ollama-cloud",
+        "kind": "openai_compatible",
+        "label": "Ollama Cloud (ollama.com)",
+        "models": [
+          {
+            "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Completed all four runs with no schema violations. Its correction load averaged 10.0, among the heavier of the eight measured.",
+            "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。4 実行すべて完走し、スキーマ違反は無かった。補正の発火は平均 10.0 で、計測した 8 本の中では多い側。",
+            "id": "nemotron-3-ultra",
+            "label": "nemotron-3-ultra",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 4
+          },
+          {
+            "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Completed three of four runs; the fourth came back empty. Correction load averaged 8.0.",
+            "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。4 実行のうち 3 回完走し、1 回は空の応答が返った。補正の発火は平均 8.0。",
+            "id": "minimax-m2.5",
+            "label": "minimax-m2.5",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 2
+          },
+          {
+            "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Completed three of four runs; the fourth wrote a variation the schema does not accept. Correction load averaged 8.7. Among the faster of the eight measured.",
+            "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。4 実行のうち 3 回完走し、1 回は変奏の指定がスキーマに合わなかった。補正の発火は平均 8.7。計測した 8 本の中では所要が速い側。",
+            "id": "nemotron-3-super",
+            "label": "nemotron-3-super",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 2
+          },
+          {
+            "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Completed two of four runs: one came back empty, and one named a colour the Score has no word for (yellow; the Score vocabulary held six colours on 2026-07-29, while the current vocabulary has nine colours including yellow). Correction load averaged 11.5, the heaviest measured.",
+            "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。4 実行のうち 2 回完走。1 回は空の応答、1 回は色語彙に無い色 (黄) を書いた（2026-07-29当時のScore語彙は6語だったが、現在は黄を含む9色）。補正の発火は平均 11.5 で最も多い。",
+            "id": "gemma4:31b",
+            "label": "gemma4:31b",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 2
+          },
+          {
+            "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. One of four runs completed; the other three wrote instruction lists the schema rejects. Correction load averaged 11.0.",
+            "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。4 実行のうち完走は 1 回。3 回は命令の並びがスキーマに合わなかった。補正の発火は平均 11.0。",
+            "id": "nemotron-3-nano:30b",
+            "label": "nemotron-3-nano:30b",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 2
+          },
+          {
+            "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. None of the three judged runs completed; two wrote a background the schema rejects. A fourth run is not counted: Stage 1 did not answer within 120 seconds.",
+            "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。判定できた 3 実行で完走は 0。2 回は背景の指定がスキーマに合わなかった。残り 1 実行は第一段階が 120 秒応答せず、判定から外した。",
+            "id": "gpt-oss:120b",
+            "label": "gpt-oss:120b",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 1
+          },
+          {
+            "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. All three judged runs came back empty. Suppressing this model's thinking costs it the tool call outright (measured 2026-07-29), and leaving the thinking on did not produce a valid Score either. A fourth run is not counted: Stage 1 did not answer within 120 seconds.",
+            "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。判定できた 3 実行すべてで応答が空だった。このモデルは思考を止めると道具呼び出し自体を返さなくなる (2026-07-29 実測) が、止めない場合も Score は妥当にならなかった。残り 1 実行は第一段階が 120 秒応答せず、判定から外した。",
+            "id": "gpt-oss:20b",
+            "label": "gpt-oss:20b",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 1
+          },
+          {
+            "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. All four runs came back empty. This model cannot reach an answer at all unless its thinking is suppressed, and with it suppressed no Score came back either.",
+            "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。4 実行すべてで応答が空だった。思考を止めないと答えに辿り着かないモデルで、止めた状態でも Score は返らなかった。",
+            "id": "minimax-m3",
+            "label": "minimax-m3",
+            "purposes": [
+              "llm"
+            ],
+            "recommendation_llm": 1
+          },
+          {
+            "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not available on the free tier (403; the provider's paid plan is required), so its quality has not been measured.",
+            "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。無料枠では選べない (403・提供元の有料プランが要る)。そのため品質は未計測。",
+            "id": "deepseek-v4-flash",
+            "label": "deepseek-v4-flash",
+            "purposes": [
+              "llm"
+            ],
+            "requires_subscription": true
+          },
+          {
+            "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not available on the free tier (403; the provider's paid plan is required), so its quality has not been measured.",
+            "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。無料枠では選べない (403・提供元の有料プランが要る)。そのため品質は未計測。",
+            "id": "deepseek-v4-pro",
+            "label": "deepseek-v4-pro",
+            "purposes": [
+              "llm"
+            ],
+            "requires_subscription": true
+          },
+          {
+            "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not available on the free tier (403; the provider's paid plan is required), so its quality has not been measured.",
+            "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。無料枠では選べない (403・提供元の有料プランが要る)。そのため品質は未計測。",
+            "id": "glm-5.1",
+            "label": "glm-5.1",
+            "purposes": [
+              "llm"
+            ],
+            "requires_subscription": true
+          },
+          {
+            "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not available on the free tier (403; the provider's paid plan is required), so its quality has not been measured.",
+            "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。無料枠では選べない (403・提供元の有料プランが要る)。そのため品質は未計測。",
+            "id": "glm-5.2",
+            "label": "glm-5.2",
+            "purposes": [
+              "llm"
+            ],
+            "requires_subscription": true
+          },
+          {
+            "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not available on the free tier (403; the provider's paid plan is required), so its quality has not been measured.",
+            "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。無料枠では選べない (403・提供元の有料プランが要る)。そのため品質は未計測。",
+            "id": "kimi-k2.5",
+            "label": "kimi-k2.5",
+            "purposes": [
+              "llm"
+            ],
+            "requires_subscription": true
+          },
+          {
+            "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not available on the free tier (403; the provider's paid plan is required), so its quality has not been measured.",
+            "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。無料枠では選べない (403・提供元の有料プランが要る)。そのため品質は未計測。",
+            "id": "kimi-k2.6",
+            "label": "kimi-k2.6",
+            "purposes": [
+              "llm"
+            ],
+            "requires_subscription": true
+          },
+          {
+            "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not available on the free tier (403; the provider's paid plan is required), so its quality has not been measured.",
+            "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。無料枠では選べない (403・提供元の有料プランが要る)。そのため品質は未計測。",
+            "id": "kimi-k2.7-code",
+            "label": "kimi-k2.7-code",
+            "purposes": [
+              "llm"
+            ],
+            "requires_subscription": true
+          },
+          {
+            "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not available on the free tier (403; the provider's paid plan is required), so its quality has not been measured.",
+            "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。無料枠では選べない (403・提供元の有料プランが要る)。そのため品質は未計測。",
+            "id": "minimax-m2.7",
+            "label": "minimax-m2.7",
+            "purposes": [
+              "llm"
+            ],
+            "requires_subscription": true
+          },
+          {
+            "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not available on the free tier (403; the provider's paid plan is required), so its quality has not been measured.",
+            "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。無料枠では選べない (403・提供元の有料プランが要る)。そのため品質は未計測。",
+            "id": "mistral-large-3:675b",
+            "label": "mistral-large-3:675b",
+            "purposes": [
+              "llm"
+            ],
+            "requires_subscription": true
+          },
+          {
+            "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not available on the free tier (403; the provider's paid plan is required), so its quality has not been measured.",
+            "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。無料枠では選べない (403・提供元の有料プランが要る)。そのため品質は未計測。",
+            "id": "qwen3.5:397b",
+            "label": "qwen3.5:397b",
+            "purposes": [
+              "llm"
+            ],
+            "requires_subscription": true
+          }
+        ],
+        "speed_hidden": true
+      }
+    ],
+    "schema": "inku.model-guidance.v1",
+    "updated": "2026-07-30T01:00:00Z",
+    "version": "2.5.0"
+  },
+  "pipeline": {
+    "catalog_retry": {
+      "attempt_timeout_ms": "120000",
+      "max_attempts": 4,
+      "retry_delay_ms": "2000",
+      "total_timeout_ms": "120000"
+    },
+    "catalogs": [],
+    "compiler": {
+      "composition_seed": null,
+      "error_policy": "omit_and_continue",
+      "hard_resource_policy": {
+        "budget": {
+          "maximum": {
+            "anchor_instances": 4096,
+            "fill_instances": 64,
+            "logical_objects": 4096,
+            "maximum_per_template_primitive_marks": 240,
+            "maximum_resolved_count": 2000,
+            "object_templates": 64,
+            "placement_instances": 64,
+            "primitive_marks": 400,
+            "template_nodes": 128,
+            "transform_instances": 4096
+          }
+        },
+        "identity": "installation-default.v1"
+      },
+      "host": {
+        "background": "white",
+        "canvas_format_id": "square",
+        "canvas_format_registry_digest": "",
+        "canvas_format_registry_id": "",
+        "catalog_mode": "default",
+        "palette": {},
+        "resolved_catalog_id": "default"
+      },
+      "macro_expansion_limits": {
+        "max_depth": "16",
+        "max_evaluation_steps": "8192",
+        "max_invocations": "64",
+        "max_nodes_per_invocation": "128",
+        "max_total_nodes": "128"
+      },
+      "operational_resource_budget": {
+        "maximum": {
+          "anchor_instances": 4096,
+          "fill_instances": 64,
+          "logical_objects": 4096,
+          "maximum_per_template_primitive_marks": 240,
+          "maximum_resolved_count": 2000,
+          "object_templates": 64,
+          "placement_instances": 64,
+          "primitive_marks": 400,
+          "template_nodes": 128,
+          "transform_instances": 4096
+        }
+      }
+    },
+    "composition": {
+      "read": true
+    },
+    "definitions": [],
+    "envelope_limits": {
+      "max_input_bytes": 16777216,
+      "max_output_bytes": 67108864,
+      "max_snapshot_bytes": 33554432
+    },
+    "hole_retry": {
+      "attempt_timeout_ms": "120000",
+      "max_attempts": 4,
+      "retry_delay_ms": "2000",
+      "total_timeout_ms": "120000"
+    },
+    "language": "en",
+    "macro_summaries": [],
+    "prompt_limits": {
+      "max_catalog_entries": 64,
+      "max_catalog_serialized_bytes": 1048576,
+      "max_response_bytes": 1048576,
+      "max_source_bytes": 400000,
+      "max_summary_bytes": 8192
+    },
+    "stage1_retry": {
+      "attempt_timeout_ms": "300000",
+      "max_attempts": 4,
+      "retry_delay_ms": "2000",
+      "total_timeout_ms": "540000"
+    }
+  },
+  "provider": {
+    "max_tokens": 2048,
+    "stage1_max_tokens": 2048,
+    "stage1_model": "nvidia:google/gemma-4-31b-it",
+    "stage2_model": "nvidia:google/gemma-4-31b-it"
+  },
+  "provider_defaults": {
+    "providers": [
+      {
+        "baseURL": "https://api.openai.com/v1",
+        "credentialID": "openai",
+        "id": "openai",
+        "kind": "openai_compatible",
+        "label": "OpenAI API Platform",
+        "requiresAPIKey": true
+      },
+      {
+        "baseURL": "https://api.anthropic.com",
+        "credentialID": "anthropic",
+        "id": "anthropic",
+        "kind": "anthropic",
+        "label": "Claude API",
+        "requiresAPIKey": true
+      },
+      {
+        "baseURL": "https://generativelanguage.googleapis.com",
+        "credentialID": "gemini",
+        "id": "gemini",
+        "kind": "gemini",
+        "label": "Gemini API",
+        "requiresAPIKey": true
+      },
+      {
+        "baseURL": "https://integrate.api.nvidia.com/v1",
+        "credentialID": "nvidia",
+        "id": "nvidia",
+        "kind": "openai_compatible",
+        "label": "NVIDIA NIM",
+        "requiresAPIKey": true
+      },
+      {
+        "baseURL": "http://localhost:11434/v1",
+        "credentialID": "ollama",
+        "id": "ollama",
+        "kind": "openai_compatible",
+        "label": "Ollama",
+        "requiresAPIKey": false
+      },
+      {
+        "baseURL": "https://ollama.com/v1",
+        "credentialID": "ollama-cloud",
+        "id": "ollama-cloud",
+        "kind": "openai_compatible",
+        "label": "Ollama Cloud (ollama.com)",
+        "requiresAPIKey": true
+      }
+    ],
+    "schema": "inku.provider-defaults.v1"
+  },
+  "render": {
+    "clip": {
+      "max_flattened_points": "200000",
+      "max_nodes": "50000",
+      "max_output_vertices": "200000",
+      "max_path_elements": "200000",
+      "max_work": "10000000",
+      "tolerance_pixels": 0.1
+    },
+    "options": {
+      "canvas": {
+        "height": 1000,
+        "width": 1000
+      },
+      "svg_profile": "display"
+    }
+  },
+  "schema": "inku.pipeline-host.v1"
+}

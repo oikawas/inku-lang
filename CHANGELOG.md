@@ -6,6 +6,123 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-05 — Move macOS About inku to the app menu
+
+Moved About inku from Settings to the app menu, displaying existing version information, concept text, vocabulary, and creator information in a dedicated window. Repeated selection uses the same window, sharing the app's language, theme, and text scale. The iOS Settings entry remains available. Synchronized both languages of the [Swift specification](apple/SWIFT_SPEC.md) and [usage guide](apple/README.md).
+
+### 2026-10-05 — Build and install the Swift updates as a Universal app
+
+Built a Release app containing connection-loss diagnostics, browsing/settings/displayed-work stars during background batches, and the preceding shared Rust changes. Verified arm64/x86_64 and minimum macOS 14 on both architectures. Regenerated Rust artifacts and bindings while retaining the fixed Server reference snapshot, then updated the same fixed app. Preserved saved data before launch and its existing bundle ID, database path, outer directory, incu icon, and Dock registration. Confirmed one normal app instance using the same database. Synchronized both languages of the [Swift specification](apple/SWIFT_SPEC.md) and [usage guide](apple/README.md). No new drawing, batch resend, real-provider communication, or test execution was performed; connection-loss resolution, concurrent operations, and screen acceptance remain unverified.
+
+### 2026-10-05 — Handle Swift batch connection loss and retain detailed row failures
+
+Matched Server by creating an ephemeral HTTP session per pipeline attempt, sharing it between token counting and generation and discarding it after completion. Rate budgets, deadlines, and core retries remain intact without adding independent resends. Terminal failures now pass the stage, safe cause, attempt number, and code to row errors independently of browsing errors. New diagnostics optionally record the failed operation; older records remain unknown, and unobserved HTTP responses show an unknown send state. Synchronized both languages of the [Swift specification](apple/SWIFT_SPEC.md) and [usage guide](apple/README.md). The underlying disconnection cause and resolution remain unconfirmed. Work stops before building; compilation, test execution, real API calls, and app updates have not been performed.
+
+### 2026-10-05 — Enable navigation, history, details, and settings during Swift batches
+
+Separated browsing from the batch execution lock, enabling Creation tabs, screen navigation, history, saved-work generation information, and Settings. Background execution IDs are independent of the displayed work, so another completed row does not replace a browsed history or previous batch work, its prompts, or details. The displayed saved work can also be starred or unstarred, with the target pinned at the click. New drawing, batch input, work mutations other than that star action, and pinned run conditions remain protected. Ordinary settings saves apply to future runs; key changes, plugins, database restore, and other operations affecting execution remain restricted. Synchronized both languages of the [Swift specification](apple/SWIFT_SPEC.md) and [usage guide](apple/README.md). Source and documentation updates stop immediately before building; compilation, test execution, and native interaction have not been performed.
+
+### 2026-10-05 — Port shared Rust parallelism and test-profile optimizations to Swift
+
+Ported Server's additional changes for capability-matrix derivation by shape and parallel execution of existing corpus/raster comparisons. Input/result order and Swift's bounded fixtures and case selector are retained without adding test cases. `opt-level = 3` for four drawing dependencies applies only to the test profile; release profiles, shared protocols, and normal rendering semantics are unchanged. Synchronized both languages of the [Swift specification](apple/SWIFT_SPEC.md). Source and documentation updates stop immediately before building; compilation, test execution, performance measurement, and validation of a new binary have not been performed.
+
+### 2026-10-05 — Align drawing policies and color maps for new Swift requests
+
+Absent drawing-limit settings now normalize all nine defaults and always derive the `host-settings:SHA256` identity from the effective hard budget, as current Server does. This fixes identical limits producing different authority, Score, and render hashes when defaults were absent versus explicitly saved. Custom limits apply to new requests; frozen policies and replay conditions on older saved works remain unchanged. The focused check confirmed equivalent absent/explicit defaults and retained saved conditions. Updated both languages of the [Swift specification](apple/SWIFT_SPEC.md).
+
+Rendering maps now add `palette:<name>` aliases for all named catalog colors alongside base colors, aligning seeded selection of entries such as `Deep Red` with Server. Selected, automatic, rendering-catalog, and explicitly selected replay maps share this expansion; older saved maps, history, and export conditions remain intact. A focused check confirmed retention of older nine-color maps. The red-square/seed43 CLI comparison matched Server1162 on all 13 checks, including Score, SVG, the 19-color map, and render conditions. This compares rendering of the same Score; provider quality and full UI acceptance require separate verification.
+
+Live observation found the center marker wrapping vertically in a lineage card. It now stays on one line, keeping the title and node operations within the same card and preserving the separation between the graph center and the work displayed in creation.
+
+### 2026-10-04 — Follow current Server core, saved works, and app operations in Swift
+
+Ported Stage 1 fallback cleanup, composition prompt v2/named corners, Cells/DDL engine 57/Score 0.19.0/render engine 73, Japanese modifiers, and tall-shape angle semantics while retaining Swift facades, the meter, and native raster. New variation is retired; old works/provenance remain readable. Invalid older snapshots are not automatically repaired and pending requests are not resent.
+
+New requests normalize models by operation; DDL/composition retains parent Stage 1 provenance and saves only the Stage 2 default. Work-specific prompts/diagnostics/events are immutable inside save ACKs, with formal authoring origins, empty descriptions, nullable composition seeds, and cancellation/persistence boundaries preserved. Updated dedicated DDL/fixed-work actions, width-based history, library preview/lineage focus versus Creation, Vision advice, immediately appended colophons, up-to-four model comparison, demo timing/saving/unrecorded usage, export-only drafts/individual PNG template saves, clipboard, and display settings.
+
+Bundled all Japanese/English static copy, dynamic templates/keys, and source SHA/digests, reconnecting singular tooltip keys and actual consumers. Group sharing is adapted to a local export mark without adding accounts/ACL. Normal builds use committed source snapshots; another Server source requires explicit refresh. Backup generations/times/sizes and read failures are visible; drawing logs support retrying reads, dismissing errors, and retaining previously loaded records.
+
+Before changing resources, core artifacts, or the app, macOS builds validate the current user's known Inku instances by bundle/executable and PID identity, then stop them with SIGKILL. The build stops if shutdown cannot be confirmed within ten seconds, and records stop results. Successful DB restoration discards previews, work observations, and temporary snapshots, then rereads library state, generations, and the selection position from the restored DB.
+
+Added fixed-work actions and sketch/instructions beneath the canvas, saved/current replay comparison, and fixed-work Details/Prompts/Score information. Optional versions/build/UI-language/batch provenance from new requests stay in ACKs; older missing values are not filled from current settings. The native Stage 1 prompt base digest is explicitly Not recorded. Presentation uses a fixed work and independent history viewer while retaining Creation selection and its view hierarchy. Hash copying takes the full digest after the first separator, and failed unread-word reloads retain the previous list and cause. AI directions allow up to 160 UTF16 units, viewing is separate from explicit continuation, and colophons confirm a fixed lineage path. Moving works to trash confirms the count before execution. This final UI/provenance addition is source implementation, with final build and native interaction checked separately.
+
+Five concrete-failure Rust selectors, one Host work-snapshot save/recreation/cancellation case, and the latest app typecheck passed. Final native/CLI, real providers/OAuth, iOS, physical Intel/macOS14, and author acceptance need separate evidence. Synchronized the Japanese/English [Swift specification](apple/SWIFT_SPEC.md) and [usage guide](apple/README.md).
+
+### 2026-10-04 — Avoid macOS drawing-start and error-presentation conflicts
+
+Global operation errors now use a dismissible inline notice, preventing error clearing and replacement at drawing start from updating an NSAlert sheet. Messages support selection and scrolling, including within an open work dialog. iOS alerts, deletion/restoration confirmations, and drawing/persistence contracts remain intact. Synchronized the Japanese/English [Swift specification](apple/SWIFT_SPEC.md).
+
+### 2026-10-04 — Add Swift drawing failure diagnostics and readable execution logs
+
+Drawing log can reopen failed or stopped SQLite executions even when no work was saved. It shows descriptions, pinned models, failed stages, attempts, retries and fallbacks. Ordinary API metrics retain connection errors and HTTP refusal reasons with secrets removed, and the result-log setting also writes accumulated failure/cancellation files. Reading neither resends requests nor changes works. Older records and shared core failure/retry contracts remain intact. Synchronized the Japanese/English [Swift specification](apple/SWIFT_SPEC.md) and [usage guide](apple/README.md).
+
+### 2026-10-04 — Align Swift batch choices and dialogs with Web
+
+New batches use descriptions only, removing direct DDL and supplied-sketch choices. Sketch from life offers Off/On with explanations, and Wild uses Off/On. Model selection now uses a shared Stage 1/2 dialog with service cards, draft selection, and confirmation, without inserting unknown mock references as candidates or next values. Color selection uses an automatic card and catalog rows with ten samples; new random selection is removed. Saved settings, works, and frozen legacy resume conditions remain intact. Synchronized the Japanese/English [Swift specification](apple/SWIFT_SPEC.md) and [usage guide](apple/README.md).
+
+### 2026-10-04 — Repair Swift batch editor clipping and layout
+
+- Clip the native batch editor and line-number ruler to their viewport, preventing long input from painting over the settings below.
+- Align the input column, full-width history, resume card, model/catalog controls, compact conditions, and new-batch action with Web. Keep selected saved works visible until a batch work is observed, and require an available model for new description batches.
+- Preserve original line numbers, two-axis scrolling, frozen run conditions, resume, and ambiguous-outcome review. See [SWIFT_SPEC.md](apple/SWIFT_SPEC.md) for the native host behavior.
+
+### 2026-10-04 — Align Swift model settings with Web
+
+Model settings now use service cards, model summaries, and a separate model-selection sheet. Search, filters, bulk usage changes, purposes, recommendations, speed, and Japanese/English comments can be edited and saved. Rename, memo, service addition/deletion, and folded rate/connection settings use scoped saves that retain other drafts. Backward-compatible optional fields persist model settings; disabled, Vision-only, end-of-life, and subscription-only models cannot be newly selected for LLM drawing. Existing references and works remain intact. Configured API keys are hidden and can be replaced after explicit removal. Synchronized the Japanese/English [Swift specification](apple/SWIFT_SPEC.md) and [usage guide](apple/README.md).
+
+### 2026-10-04 — Add Server-aligned default providers to Swift
+
+Six connections and display names are bundled from the public Server definitions and added once for missing IDs in new or older settings. Existing connections, models, and other settings are preserved; deleted connections stay deleted after restarting. The author supplies keys through Keychain settings, and installation or launch sends no requests. Bundled model candidates appear in Settings, Creation, and Batch, and Claude/Gemini discovery URLs follow their connection kinds. The Japanese/English [Swift specification](apple/SWIFT_SPEC.md) and [usage guide](apple/README.md) are synchronized.
+
+### 2026-10-04 — Align Swift Batch UI with Web
+
+Batch now offers drawing-model, color-catalog, sketch, Wild, and canvas selection, with a numbered native input column beside the work canvas on macOS. It adds explicit input-history restore, separate current and last-successful line identities, starting-condition resume details, and failed-line reasons. CRLF preserves original line numbers; history restore affects only the editor. Frozen resume conditions, completed works, and explicit ambiguous-outcome choices remain intact. The [Swift specification](apple/SWIFT_SPEC.md) and [usage guide](apple/README.md) are synchronized with Japanese.
+
+### 2026-10-04 — Align Swift creation, library, lineage, and supporting UI with Web
+
+Creation now separates compact conditions from details and provides read-only DDL, a separate editor, and cancellation. The library preserves creation inputs through independent preview, aligned list columns, role-specific models, and comment drafts. Lineage adds parent-child lines, favorite paths, dashed deleted nodes, focus-preserving branch expansion, and a map that restores normal browsing.
+
+Added macOS canvas wheel zoom, a canvas chooser showing shape and intent, reference-oriented Saijiki previews, and major-action tooltips. Server's nine drawing limits can be edited and saved for new works while retaining saved-work conditions. About inku takes concept text, vocabulary, and creator information from the same checkout's Web source. Synchronized the Japanese/English [Swift specification](apple/SWIFT_SPEC.md) and [guide](apple/README.md).
+
+### 2026-10-04 — Add the macOS incu icon and a fixed Dock application
+
+The existing incu image now supplies the macOS app icon. Rebuilds can update a fixed installation while retaining its app directory, bundle ID, and database choice, keeping one Dock entry. A bundle setting points to an existing trial database so an argument-free Dock launch opens the same works. Synchronized the Japanese/English [Swift specification](apple/SWIFT_SPEC.md) and [build/install guide](apple/README.md).
+
+### 2026-10-03 — Fix Swift off-page marks and historical prompt display
+
+Revision/export marks are read from saved values even outside the current library page, so one toggle can remove an existing mark. SQLite performs the toggle atomically, and page refresh retains the selected work's annotation.
+
+The prompt pane distinguishes loading, recorded, not recorded, and unavailable. It does not reuse a newer child's output for a parent in the same execution or describe an unavailable record as a request that was never sent. Synchronized the Japanese/English [Swift specification](apple/SWIFT_SPEC.md).
+
+### 2026-10-03 — Include the saved description in Swift Display SVG
+
+Display SVG exports now include the selected work's saved description as XML, following Server while retaining the stored drawing content and using its saved text. Empty descriptions are retained. Updated the export explanation and the Japanese/English [Swift specification](apple/SWIFT_SPEC.md).
+
+### 2026-10-03 — Reduce high-resolution SVG texture rendering time on macOS
+
+Raised the shared resvg texture-filter pool cap to four on macOS while preserving calculation order and output. A focused Release comparison of one public pencil SVG at 4320 pixels with nine tiles reduced the warm mean from about 3.75 to 3.04 seconds, a 19% reduction. The combined raw-pixel digest of all nine tiles in fixed order matched, as did every pixel in the selected independent upstream comparison. Android's sequential rendering and other platforms' caps remain unchanged; the same gain is not promised for every work or native-screen operation. Updated the [Swift specification](apple/SWIFT_SPEC.md).
+
+### 2026-10-03 — Align and persist Swift request budgets
+
+Ordinary API drawing stages, including composition and retries, share each service's 62-second/90% budget through SQLite reservations committed before sending. Gemini daily accounting uses Pacific time, other services UTC. Unknown input usage, 429 Retry-After/RetryInfo, and finite attempt deadlines follow Server, as does the exclusion of auxiliary requests.
+
+Swift physical schema migrates nondestructively to v3 and imports legacy JSON accounting once. Restoring older backups conservatively retains live request budgets/cooldowns. Native Settings distinguishes the standard Gemini defaults of 30/16,000/14,400 from explicit zero and absent values in legacy objects, with explanations beside each field. Updated the [Swift specification](apple/SWIFT_SPEC.md), [usage guide](apple/README.md), and [persistence contract](persistence/README.md).
+
+One selected XCTest and the persistence-contract check passed. The updated isolated Universal app also confirmed opening/closing explanations, zero save/reopening, and negative-value refusal while retaining every existing work/lineage/execution row. Actual provider quota/OAuth acceptance was not performed.
+
+### 2026-10-03 — Separate Swift composition and underdrawing measurements
+
+Ordinary APIs and Personal ChatGPT record call time, reported tokens, and outcomes per action, with composition separate from Stage 1. Missing usage and explicit zero remain distinct. Creation, comparison options, and reopened works show metrics frozen at save time; replay comparison sends no additional provider request.
+
+Only explicit opt-in in developer mode stores provider bodies in private executions for a dedicated disclosure. Capture defaults off. A pre-send save failure prevents HTTP, and a post-send save failure cannot become a normal retry. Partial/truncated replies are identified, and endpoints, headers, and credentials are excluded. Updated the [Swift specification](apple/SWIFT_SPEC.md) and [usage guide](apple/README.md).
+
+Selected mock/real-Rust/temporary-DB save/reopen checks and one transport XCTest passed. An isolated window of the updated Universal app also confirmed separate underdrawing/composition time and tokens, IO bodies, clearing with New, and reopened metrics while retaining every existing work/lineage/execution row. Real-provider/OAuth acceptance was not performed.
+
+### 2026-10-03 — Adopt composition reading in Swift
+
+Generated Server defaults now connect the shared Rust `read_composition`/`composition_read` effects to ordinary APIs and Personal ChatGPT. The underdrawing's Stage 1 model/cap and action identity are retained; shared Rust owns retries, fallback, and placement. Composition has a separate progress stage and stage clock. Its prompt remains in durable snapshots and is excluded from the work's Stage 1/2 prompt history.
+
+Focused real-Rust/mock/temporary-DB checks confirmed composition saves, finite fallback, retained legacy settings/saved-Score replay, progress, and unconnected Personal ChatGPT refusal. A separate isolated window of the updated Release Universal app also confirmed loopback-mock composition/DDL/work saves while retaining existing DB rows. Actual provider/OAuth acceptance and Server-style per-stage usage/raw SSE observations remain incomplete. The [Swift specification](apple/SWIFT_SPEC.md) records behavior and verification scope.
 ## v2.15.89 — 2026-10-05
 
 ### 2026-10-05 — Accept hyphens in Web numeric range edits
@@ -207,6 +324,68 @@ Description drawing reads the composition with the same model after the underdra
 ### 2026-10-03 — Composition after the underdrawing (the composition reading)
 
 When drawing from a description, the composition is now decided after the underdrawing (Stage 1) settles (author's decision, 2026-10-02). The underdrawing sets a place only for a layer whose place the description states. The composition reading (a new LLM request, `read_composition`, sent to the underdrawing's model) returns, in fixed values, the roles, relations, tension and stated places it reads from the description and the underdrawing's layers, and the composition places the layers whose place the description does not state on ranges along the canvas thirds. A placed layer is written as a numeric range with the mark `［構図］` (`[composition]` in English) before it; a stated place keeps its words. Without a reading the author's defaults alone place the layers, and a work that cannot be composed is drawn from the underdrawing as printed. The Server composes by default and times the reading apart from Stage 1. Android stays as it is until it adopts the step, and a run that does not compose keeps the earlier underdrawing principle. Compiling DDL to a Score is unchanged, and the Scores of 450 production typed works stayed the same (the DDL engine, DDL, Score and render engine versions are not raised). For acceptance, the product's reading request was sent twice for 49 production descriptions; the readings and compositions fell within the same ranges as the prototype's reading, and the author reviewed the comparison sheet. A corner the description names (bottom right and so on) is not read yet; the composition picks one of the four. Saved works are unchanged.
+
+### 2026-10-03 — Confirm Swift DDL import by dropping from Finder
+
+The author dropped one DDL file from Finder onto Creation in the latest Release Universal app and confirmed the expected input change. Read-only screen inspection matched the DDL and import-complete notice, and the isolated DB retained its pre-import history/lineage-node/lineage-edge counts of 2/2/1. Recorded acceptance of the import gesture before generation in the [Swift specification](apple/SWIFT_SPEC.md).
+
+### 2026-10-03 — Swift retry progress and model guidance
+
+Generation and comparison now show provider stage, pinned requested model, attempt counts, and elapsed time. Retry keeps the stage clock and resets the attempt clock; Stop/completion freeze time, old callbacks are excluded, and New clears the card. Unavailable token counts remain Not recorded.
+
+Creation and model settings now use generated Server purposes, stage suitability, Japanese/English comments, and public speed visibility. Registered evaluation is separate from service-discovered facts; custom/unregistered models receive no guessed rating. Choices, saved defaults, and captured requests stay unchanged. Selected mock/shared-core checks, Release Universal builds, native evaluation display and retry/Stop after a mock 429 passed with unchanged history/lineage rows. Finder drop and real-provider acceptance remain incomplete. Updated the [Swift specification](apple/SWIFT_SPEC.md).
+
+### 2026-10-03 — Swift read-only replay comparison, refinement provenance, and Mac Release builds
+
+Ordinary Replay now compares stored SVG with current-engine output without changing work, history, or lineage. Creation, library, lineage, and work menus share the comparison with render-engine versions and provisional-seed notices. Replay with next conditions still saves a new child. Autonomous refinement records each generation's Vision/random provenance without copying stale advice into random mode.
+
+Saved-parent edit dialogs place the image/source inside scrolling content; reopening description/sketch and cancelling drafts passed. Avoided Rust 1.95's host proc-macro stripping failure while keeping target optimization. Selected mock/shared-core checks, Release Universal builds, and native images/version display with unchanged saved rows after closing passed. Finder drop was retried from scratch, but successful import remains unverified. Real providers, every width, VoiceOver, and author acceptance remain separate. Updated the [Swift specification](apple/SWIFT_SPEC.md) and [build guide](apple/README.md).
+
+### 2026-10-03 — Compare and adopt unsaved Swift drawing-element options
+
+Added a native flow for one/four composition, reading, or variation options and one word-based touch option from a pinned saved parent. Conditions freeze before preparation; comparison/enlargement and explicit adoption are separate, and only selected options become saved lineage children. Options scroll into view automatically, and preparation status does not linger on the creation screen. Idempotent adoption, DDL edits after adoption/reopening, and drained late responses are covered. Current variation clearly states that nothing moves while retaining saved Score and actual model facts.
+
+Shared Rust now owns the word seed used by both Server's Python helper and Swift, preserving existing trim/UTF-8 hashing and exact UInt64 values. Edit edges retain Server's optional metadata without breaking old pinned requests. Selected mock/real-core checks, Debug Universal builds, native touch-option discard, and saving exactly two selected options from four composition options passed. Reopened parent-header clipping, real providers, every width, VoiceOver, and author acceptance remain incomplete. Updated the [Swift specification](apple/SWIFT_SPEC.md) and [instructions](apple/README.md).
+
+### 2026-10-03 — Add Swift saved-work editing, color catalogs, and shared DDL import
+
+Creation, library, and lineage now open description editing or redraw with/without sketch for a reopened saved work. The parent's saved conditions, definitions, locks, and startup drawing model stay pinned while shared core saves a new child. Cancellation drains late responses and preserves the displayed work. Subsequent DDL edits create another saved child. New sketch results use Server's canonical off/supplemented states while historical records remain intact.
+
+Added a native chooser for 13 color catalogs with swatches, HEX values, English/Japanese names, and descriptions; cancellation is separate from applying upcoming conditions. The file panel and window drop share a single-URL DDL reader, disabling drawing/batch starts and excluding results after cancellation or changed draft context. New clears stale import messages and status. Selected mock/shared-core editing checks, updated Universal build, and native dialog cancellation, color selection, and standard-panel import passed. Reliable reopened parent headers, one/four-candidate drawing-element selection, actual file-drop gestures, real providers, and author acceptance remain incomplete. Updated the [Swift specification](apple/SWIFT_SPEC.md).
+
+### 2026-10-03 — Refine Swift creation views and standard macOS actions
+
+Grouped creation input, upcoming conditions, and saved information into panels, with Generate/Stop outside scrolling. Compact saved facts and a detail popover leave more room for the canvas. Registered service/model choices reach both interpretation and structure stages while preserving saved defaults and running batch/demo snapshots. Added active-scene New, DDL import, Settings, navigation, copy, and export menus/shortcuts plus system-sidebar Settings categories.
+
+Distinguished library display from checkbox selection and lineage display from focus; improved DDL titles, hashes, comments, marks, and parent/child actions. History now shows actual primary-parent generations instead of variation amplitude, with generation/model as new defaults. Export uses creation's displayed work, library selection, or the lineage path without mixing another screen's checkboxes. Universal build, selected model/generation checks, and isolated native checks confirmed menus, generations one/two, two versus one export candidates, and two window sizes. Actual model discovery/provider calls, every width, VoiceOver, and author design acceptance remain separate. Updated the [Swift specification](apple/SWIFT_SPEC.md) and [build guide](apple/README.md).
+
+### 2026-10-03 — Align Swift macOS views, whole-database history and export with Server
+
+Connected creation inputs and independent saved-work facts, DDL editing and patch approval, Saijiki/plugins, whole-database history/library, marks/comments/Trash/restore, lineage graphs, explicit comparison saves, model advice/colophons, batch/demo and display/language/export/backup settings. Swift schema v2 has nine tables; known-v1 migration and backup restoration preserve source text, Score/SVG and ACKs. Native shared boundaries use the Sudachi Japanese dictionary and English CMUdict without a runtime Python dependency.
+
+Added four SVG profiles, PNG templates/custom sizes, DDL/plugins, cards/contact sheets and APNG/GIF. Immutable prepared SVG scenes from shared Rust are reused for native display and export tiles without changing saved rendering semantics. Bounded Release measurements reduced 6000-path/four-size work by about 20% including preparation; filter-heavy artwork showed no comparable improvement. Personal ChatGPT adds explicit enablement, encrypted credentials, one drawing model, startup connection pins, quota handling and cancellation. Actual personal OAuth/inference require separate acceptance.
+
+Unsigned Universal native checks confirmed DDL generation/an edited child, comments/stars, Trash/restore/restart, Japanese/English switching, lineage and PNG2160 saving of two selected works. Fixed startup recursion, incorrect revision formatting, empty export selection and a fatal Mac write-option combination. Real providers, other native export recipes/performance, author acceptance, Intel/macOS14, signing/distribution and iOS app/camera remain unaccepted. Updated the [Swift specification](apple/SWIFT_SPEC.md) and [build guide](apple/README.md).
+
+### 2026-10-02 — Initial macOS foundation for Swift clients
+
+Added a SwiftUI Universal macOS app, UniFFI/XCFramework access to the same Rust
+core, a standalone host, and a GRDB/SQLite adapter. Minimum systems are macOS 14
+and iOS 17. Direct DDL reaches Score/SVG generation, saving, restoration,
+saved-Score replay with a new lineage child, native image display, SVG/PNG export,
+and manual database backup/restore. The host also implements provider transport,
+Keychain credentials, opaque snapshots, CAS/ACK, cancellation, and local-only
+resumption. Server remains the development source of truth, clients are
+single-user, and macOS has no camera.
+
+Both macOS architectures linked, and generation, history, and replay were
+checked in a native Apple Silicon window. iOS Rust slices were built; the iOS
+app and camera, full macOS UI parity, and SVG performance acceptance follow
+later. This initial acceptance does not cover live provider calls, Intel runtime
+or performance, or public distribution. Swift follows Android's documentation
+workflow: Japanese canonical [SWIFT_SPEC.ja.md](apple/SWIFT_SPEC.ja.md), a
+maintained [English specification](apple/SWIFT_SPEC.md), and product history in
+this paired root CHANGELOG. See [`apple/README.md`](apple/README.md) for building.
 
 ### 2026-10-02 — Connect personal ChatGPT plan usage to drawing
 

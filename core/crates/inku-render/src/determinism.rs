@@ -13,6 +13,28 @@ fn sha256(payload: &[u8]) -> [u8; 32] {
     Sha256::digest(payload).into()
 }
 
+/// Derive the Server-compatible word-touch seed and its recorded text.
+///
+/// Only leading and trailing Python `str.strip()` whitespace is removed. The
+/// remaining UTF-8 bytes are hashed unchanged; the first eight SHA-256 bytes
+/// form an unsigned big-endian seed. Empty text leaves seed issuance to the host.
+#[must_use]
+pub fn render_seed_from_text(seed_text: &str) -> Option<(u64, &str)> {
+    let normalized = seed_text.trim_matches(|character| {
+        matches!(character,
+            '\u{0009}'..='\u{000d}' | '\u{001c}'..='\u{0020}' | '\u{0085}' |
+            '\u{00a0}' | '\u{1680}' | '\u{2000}'..='\u{200a}' | '\u{2028}' |
+            '\u{2029}' | '\u{202f}' | '\u{205f}' | '\u{3000}'
+        )
+    });
+    if normalized.is_empty() {
+        return None;
+    }
+    let digest = sha256(normalized.as_bytes());
+    let seed = u64::from_be_bytes(digest[..8].try_into().expect("eight digest bytes"));
+    Some((seed, normalized))
+}
+
 /// The `Display` text of one integer, written into a stack buffer.
 ///
 /// Seeded hashes are defined over decimal text. Writing the digits directly
@@ -378,6 +400,19 @@ pub fn instruction_seed(instruction: &Instruction, performance_seed: Option<Seed
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn word_touch_seed_keeps_server_trim_and_unsigned_identity() {
+        // A combining accent and zero-width space remain bytes of the words;
+        // Python also strips U+001C/U+001F, beyond Rust's Unicode whitespace.
+        let words = "春風e\u{0301}\u{200b}";
+        let padded = "\u{001c}\u{3000}春風e\u{0301}\u{200b}\u{00a0}\u{001f}";
+        let expected = Some((14_859_340_650_796_947_346, words));
+        assert_eq!(render_seed_from_text(padded), expected);
+        assert_eq!(render_seed_from_text(words), expected);
+        assert_eq!(render_seed_from_text(padded), render_seed_from_text(padded));
+        assert_eq!(render_seed_from_text("\u{001c}\u{3000}\u{00a0}\u{001f}"), None);
+    }
 
     #[test]
     fn streamed_seed_digest_hashes_the_formatted_text() {

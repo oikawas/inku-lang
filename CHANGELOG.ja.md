@@ -6,6 +6,121 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-05 — macOSの「inkuについて」をアプリメニューへ移動
+
+設定一覧の「inkuについて」をアプリメニューへ移し、既存の版情報・概念説明・用語表・作者情報を専用ウインドウで表示する。繰り返し選択しても同じウインドウを使い、表示言語・テーマ・文字倍率を共有する。iOSの設定内の導線は維持。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[利用手順](apple/README.ja.md)の日英を同期した。
+
+### 2026-10-05 — Swift追加改修のUniversalビルド・固定アプリ更新
+
+接続断診断、背景バッチ中の閲覧・設定・表示作品のスターと、先行共通Rust改修を含むRelease版を生成し、arm64／x86_64・両最低macOS14を確認した。Server参照snapshotを固定したままRust artifactとbindingを再生成し、同じ固定アプリへ更新。起動前の保存データと既存bundle ID・DB指定・外側directory・incuアイコン・Dock登録を保持し、通常起動1件と同じDB接続を確認した。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[利用手順](apple/README.ja.md)の日英を同期。新規描画・バッチ再送・実provider通信と試験実行は行わず、接続断解消・同時操作と画面の受入は未確認。
+
+### 2026-10-05 — Swiftバッチの接続断対策と行エラーの詳細化
+
+Serverに合わせpipeline試行ごとにephemeral HTTP sessionを作成し、token計数と生成で共有して終了後に破棄する。レート予算・期限・coreの再試行を保持し、独自再送を追加しない。終端失敗の段階・安全な原因・試行番号・codeを行エラーへ渡し、閲覧エラーと分けた。新しい診断へ失敗操作をoptionalで記録し、旧記録は不明、HTTP応答未観測は送信状態不明と表示する。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[利用手順](apple/README.ja.md)の日英を同期。接続断の根本原因と解消は未確定で、build直前で停止。compile・試験実行・実API・app更新は未実施。
+
+### 2026-10-05 — Swiftのバッチ中に画面移動・履歴・詳細・設定を許可
+
+バッチ実行lockから閲覧操作を分け、制作tab、画面移動、履歴帯、保存作品の生成情報と設定panelを使えるようにした。背景描画の実行IDを表示作品から分離し、履歴や過去の成功作品を見ている途中に次の行の完了が表示・prompt・詳細を上書きしない。表示中の保存作品へのスター付与・解除も、押した時の対象を固定して許可する。新規描画とバッチ入力・スター以外の作品変更のlock、開始済み条件の固定を維持する。次回用の通常設定保存を許可し、キー変更・plugin・DB復元など実行へ影響する操作は制限する。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[利用手順](apple/README.ja.md)の日英を同期。sourceと文書の更新後、build直前で停止し、compile・試験実行・native操作は未実施。
+
+### 2026-10-05 — Swiftへ共通Rustの並列処理と試験用最適化を反映
+
+Serverの追加変更から、shape単位のcapability matrix再導出と既存corpus／raster比較の並列実行を取り込んだ。入力・結果の順序とSwiftの限定fixture／case指定を保持し、試験ケースを追加しない。描画依存4packageの `opt-level = 3` はtest profileだけへ適用し、release profile・共有protocol・通常描画の意味は変更しない。[Swift仕様](apple/SWIFT_SPEC.ja.md)の日英を同期した。sourceと文書の更新後、build直前で停止し、compile・試験実行・速度測定・新binaryの確認は未実施。
+
+### 2026-10-05 — Swift新規requestの描画policyと配色mapを整合
+
+描画制限の設定が未記録の場合も9項目を既定値へ正規化し、現行Serverと同じく実効hard budgetから `host-settings:SHA256` のidentityを常に作る。未記録と明示した既定値で同じ制限なのにauthority／Score／描画hashが異なる分岐を修正した。custom制限は新規requestへ適用し、旧保存作品の凍結policy／再演条件は変更しない。限定checkで未記録／明示保存の一致と保存条件の保持を確認した。[Swift仕様](apple/SWIFT_SPEC.ja.md)の日英へ反映した。
+
+描画用mapに基本色だけでなくcatalog全named色の `palette:<name>` 別名を加え、`Deep Red`等のseedによる候補選択をServerへ揃えた。選択／自動配色／render catalog／明示replay用の新mapを共通展開し、旧作品の保存map・履歴・書出し条件を保持する。限定checkで旧9色mapの保持を確認し、赤い正方形・seed43のCLI比較ではServer1162とScore・SVG・19色map・描画条件の13項目が一致した。同Scoreのrender比較であり、provider品質や全UIの受入は別に確認する。
+
+実画面で系譜cardの「中心」が縦に折り返される問題を確認し、中心の印を1行で保つ。作品名と節点操作を同じcard内へ収め、中心と制作の表示作品を分ける挙動は保持する。
+
+### 2026-10-04 — Swiftを現行Serverのcore・保存作品・全体操作へ追随
+
+Stage 1確定後のfallback清掃、構図prompt v2と明示した隅、Cells・DDLエンジン57／Score 0.19.0／描画エンジン73、日本語修飾語と縦長角度の共通semanticを取り込んだ。Swift facade・meter・native rasterを保持し、新variationを退役した。旧作品・来歴は読めるままとし、既存不正snapshotの自動修復・pending要求の自動再送は追加しない。
+
+新操作のモデルを入口別に正規化し、DDL／配置では親のStage 1来歴を保持してStage 2既定だけを保存する。作品別prompt・diagnostics・eventsをsave ACKのimmutable presentationへ固定し、正式authoring origin、空記述、nullable composition seedとcancel後の保存境界を揃えた。専用DDL／固定作品の共通操作、履歴の幅、library preview・系譜focusと制作選択、Vision助言、生成後追記する奥書、model比較最大4件、demoの時間・保存・未記録usage、export今回だけ／PNG template個別保存、clipboardと表示設定を整理した。
+
+TipsのJA/EN全静的text・動的template/keyとsource SHA／digestを同梱し、単数形tooltipと実consumerを接続。group共有はlocal書出し印へ適応し、account／ACLを追加しない。通常buildはcommit済み正本snapshotを使い、別Server sourceは明示更新する。自動backupの世代／時刻／容量と読込原因、描画logの再読込／error閉じる／前回記録保持を追加した。
+
+macOS buildはresource／core／app変更前に現在ユーザーの既知Inku instanceをbundle／実行fileとPID identityで検証し、SIGKILLで停止する。最大10秒で停止を確認できなければbuildを中止し、停止結果を記録する。DB復元成功後はpreview・観測作品・一時snapshotを破棄し、library／世代／選択位置を復元DBから読み直す。
+
+canvas下の固定作品操作と写生／DDL表示、保存時と現在の再現比較、固定作品の生成情報「詳細／プロンプト／Score」を追加した。新規requestのoptional版・build・UI言語・batch来歴をACKへ保持し、旧未記録を現在値で補わない。nativeのStage 1 prompt基底digestは未記録として明示する。プレゼンテーションは固定作品と独立した履歴表示を使い、制作の選択とview階層を保持する。hashは最初の区切り以降のdigest全体をコピーし、未読語の再読込失敗は前回一覧と原因を保持する。AI方針は160 UTF16単位まで、観察と明示再開を分け、奥書は固定経路を確認する。ごみ箱移動は件数を確認して実行する。この最後のUI／来歴追加はsource実装で、最終build・実画面は別に確認する。
+
+具体失敗に対応するRust5 selector、作品別snapshotを保存・Host再作成・cancel後に読むHost1 caseと最新appの型検査が成功。最終native／CLI、実provider／OAuth、iOS、Intel／macOS14実機と作者受入は別に確認する。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[利用手順](apple/README.ja.md)の日英を同期した。
+
+### 2026-10-04 — macOSの描画開始と処理エラー表示の競合を回避
+
+全体の処理エラーを閉じられる画面内表示へ変更し、描画開始時のエラー解除・再設定がNSAlert sheetの更新を起こさないようにした。本文の選択・scroll、開いている作品dialog内での表示に対応する。iOSの警告、削除・復元の確認、描画と保存の契約を保持する。[Swift仕様](apple/SWIFT_SPEC.ja.md)の日英を同期した。
+
+### 2026-10-04 — Swiftの描画失敗を診断・再表示できるログを追加
+
+成功作品がない失敗・停止もSQLiteの実行記録から「描画ログ」で再表示できるようにした。記述、固定model、失敗段階と各試行、再試行・fallbackの経過を表示し、通常APIのmetricに秘密を除いた通信error／HTTP拒否理由を保存する。結果ログ設定は失敗・停止の累積file logにも適用する。読出しで再送信や作品変更を行わず、旧記録と共有coreの失敗・再試行契約を保持する。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[利用手順](apple/README.ja.md)の日英を同期した。
+
+### 2026-10-04 — Swiftバッチの選択肢とdialogをWebへ揃える
+
+新規バッチを記述専用にし、DDL入力と指定写生の選択を撤去した。写生は「なし／あり」と説明、暴れるは「切／入」へ揃える。モデルはStage 1/2共通のサービス別cardを仮選択して決定するdialogへ変更し、登録外のmock参照を候補や次の値へ補わない。色は自動選択cardとカタログ・10色見本の行へ変更し、ランダムの新選択肢を撤去した。保存設定・作品と旧バッチの凍結再開条件を保持し、[Swift仕様](apple/SWIFT_SPEC.ja.md)と[利用手順](apple/README.ja.md)の日英を同期した。
+
+### 2026-10-04 — Swiftバッチ入力の描画漏れと画面配置を修正
+
+macOSの行番号と入力背景が下の条件欄へ重なる表示崩れを、native viewとrulerのviewport clippingで修正した。入力・履歴・再開・条件・新バッチ操作をWebの順へ揃え、条件のlabel／変更button／値、幅いっぱいの履歴と狭幅／低い画面のscrollを整理した。バッチの観測作品がない場合も選択中の保存作品を表示し、成功行の番号を流用しない。新バッチと置換確認は使用可能なモデルを要求する。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[利用手順](apple/README.ja.md)の日英を同期した。
+
+### 2026-10-04 — Swiftのモデル設定UIをWebへ揃える
+
+モデル設定をサービスcardと使用モデル概要、独立したモデル選択sheetへ変更した。検索・絞り込み・表示分の一括使用、用途・評価・速度・日英commentを編集・保存できる。名前・メモ・サービス追加／削除、折りたたみのrate／接続設定を整理し、各保存で他のdraftを保持する。モデル設定は旧設定と互換のoptional fieldへ保存し、非使用・Vision専用・提供終了・契約専用の新しいLLM選択を抑止する。既存参照と作品は保持し、設定済みAPIキーは値を表示せず明示削除後に変更する。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[利用手順](apple/README.ja.md)の日英を同期した。
+
+### 2026-10-04 — SwiftへServer準拠の標準providerを追加
+
+Serverの公開定義から6接続と表示名を同梱し、新規・旧設定へ不足IDだけを一度追加する。既存の接続・モデル・その他設定を保持し、削除した接続を再起動で復活させない。APIキーは作者がKeychainへ設定し、追加や起動で通信しない。同梱モデル候補を設定・制作・バッチへ表示し、Claude／Geminiの一覧取得URLを接続方式へ揃えた。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[利用手順](apple/README.ja.md)の日英を同期した。
+
+### 2026-10-04 — SwiftのバッチUIをWebへ揃える
+
+バッチ画面で描画モデル・色カタログ・写生・Wild・用紙を選べるようにし、macOSの行番号付き入力と作品表示を左右へ配置した。入力履歴の明示復元、処理中と直前の成功作品の行番号の分離、開始時条件を示す再開情報、失敗行の理由を追加した。CRLFの元行番号を修正し、履歴復元は入力欄だけへ適用する。再開時の固定条件・成功行の保持・不明行の明示選択を維持し、[Swift仕様](apple/SWIFT_SPEC.ja.md)と[利用手順](apple/README.ja.md)の日英を同期した。
+
+### 2026-10-04 — Swiftの制作・ライブラリ・系譜と周辺UIをWebへ揃える
+
+制作の条件を要約と詳細へ分け、DDLの読取表示・独立編集・取消を用意した。ライブラリは制作入力を保持した専用preview、整列した一覧、役割別モデルとコメントdraftを使用する。系譜は親子線・お気に入り経路・削除節点の破線、中心を保つ枝の開閉と復帰できる全体図を追加した。
+
+macOSキャンバスのホイール拡縮、用紙の形と意図を示すchooser、参照中心の歳時記preview、主要操作のTipsを追加した。描画の制限値はServerの9項目を編集・保存でき、新作品へ適用し、保存作品の条件を保持する。「inkuについて」の概念説明・用語表・作者情報は同じcheckoutのWebから取り込む。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[手順](apple/README.ja.md)の日英を同期した。
+
+### 2026-10-04 — macOSのincuアイコンとDock用の固定アプリを追加
+
+既存incu画像からmacOS用アイコンを生成してappへ割り当て、固定install先をrebuild後も更新できるようにした。app directory、bundle IDとDB指定を保持し、Dock登録を継続利用する。既存の試行DBはbundle設定で指定でき、Dockの引数なし起動でも同じ作品を開く。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[build・install手順](apple/README.ja.md)の日英を同期した。
+
+### 2026-10-03 — Swiftのページ外作品の印と過去プロンプト表示を修正
+
+libraryの現在pageにない保存作品でも推敲／書き出し用の印を保存値から読み、1回の操作で解除できるようにした。印の反転をSQLiteで原子的に行い、選択作品の注釈をpage更新後も保持する。
+
+送信プロンプト欄は読込み・記録・記録なし・取得不能を区別する。同じexecutionの過去親へ最新childの出力を流用せず、取得できない記録を「送信していません」と誤表示しない。[Swift仕様](apple/SWIFT_SPEC.ja.md)の日英を同期した。
+
+### 2026-10-03 — Swiftの表示用SVGへ保存時の記述を添える
+
+Display SVGの書き出しに、対象作品の保存時の記述をXML形式で添えるようにした。Serverと同じく、保存SVGの描画内容を保ち、現在編集中の入力を使わない。空の記述も保持し、書き出し画面の説明と[Swift仕様](apple/SWIFT_SPEC.ja.md)の日英を同期した。
+
+### 2026-10-03 — macOSの高解像度SVG質感描画を短縮
+
+macOSの共通resvg描画で質感処理の共有pool上限を4へ広げ、描画計算順と出力を保持した。公開pencilの4320px書き出しを9tileで描く限定Release比較では、warm平均が約3.75秒から約3.04秒へ19%短縮。全tileを固定順に連結したraw pixel digestと、選択した独立upstream比較の全pixelが一致した。Androidの逐次描画と他OSの上限を保持し、全作品・実画面の同率改善は保証しない。[Swift仕様](apple/SWIFT_SPEC.ja.md)を同期した。
+
+### 2026-10-03 — Swiftの送信予算をServerへ揃えて耐久化
+
+通常APIの描画pipelineを同じserviceの62秒／90%予算へ統合し、構図を含む各段階と再試行の予約をSQLiteへ送信前に保存する。Geminiの日次切替は太平洋時間、ほかはUTCを使用し、不明な入力usage、429のRetry-After／RetryInfoと有限の試行期限を扱う。補助要求の集計範囲もServerへ揃えた。
+
+Swift物理schemaをv3へ非破壊移行し、旧JSONの送信記録を一度だけ取り込む。古い作品backupを復元しても、現在の送信予算・待機時間を保守的に保持する。設定は標準Geminiの未設定時の30／16,000／14,400、明示0と旧objectの欠落値を区別し、各項目の説明をnative画面へ追加した。[Swift仕様](apple/SWIFT_SPEC.ja.md)、[利用手順](apple/README.ja.md)、[保存契約](persistence/README.ja.md)を同期した。
+
+限定XCTest1件と保存契約照合が成功。更新Universalアプリの隔離画面でも説明の開閉、0保存と再表示、負値の保存拒否を確認し、既存作品・系譜・executionの全行を保持した。実providerの利用枠・OAuthの受入は未実施。
+
+### 2026-10-03 — Swiftの構図・下絵の実測記録を分離
+
+通常APIとPersonal ChatGPTの呼出し時間・実token数・結果をactionごとに記録し、構図をStage 1と分けた。未取得と明示0を区別し、制作・比較候補・保存作品の再表示で記録を読む。保存時の生成情報を固定し、再演奏比較へ新たなprovider要求を加えない。
+
+開発者モードで明示した場合だけ、送受信本文をprivate executionへ保存し、専用の折りたたみ欄から読む。既定は無効、送信前の保存失敗はHTTPを出さず、送信後の保存失敗は通常retryへ変えない。不完全な応答と省略を示し、接続先・header・認証情報を除く。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[利用手順](apple/README.ja.md)へ反映した。
+
+限定mock／実Rust／一時DBの保存・再読込と通信XCTest1件が成功。更新Universalアプリの隔離画面でも下絵／構図の異なる時間・token数、通信本文、新規での解除と保存作品の再表示を確認し、既存作品・系譜・execution全行を保持した。実provider／OAuthの受入は未実施。
+
+### 2026-10-03 — Swiftへ構図の読みを反映
+
+Serverの新規生成既定を取り込み、共通Rustの`read_composition`／`composition_read`を通常APIとPersonal ChatGPTへ接続した。下絵と同じStage 1 model・上限とaction identityを保持し、retry／fallbackと配置は共通Rustが担当する。構図を独立した進行段階として表示し、段階時計を切り替える。構図promptは耐久snapshotへ保持し、作品のStage 1／2 prompt履歴へ混ぜない。
+
+実Rust・mock・一時DBによる構図保存、有限fallback、旧設定／保存Score再生の保持、進行表示とPersonal ChatGPTの未接続拒否を限定確認した。更新したRelease Universalの別隔離画面でもloopback mockによる構図・DDL・作品保存を確認し、既存DB行を保持した。実provider／OAuthの受入、Server相当の段階別usage・raw SSE観測保存は残る。[Swift仕様](apple/SWIFT_SPEC.ja.md)に実装と確認範囲を記した。
 ## v2.15.89 — 2026-10-05
 
 ### 2026-10-05 — Webの数値範囲入力もハイフンを受ける
@@ -207,6 +322,54 @@ ChatGPTのeffectに`read_composition`を登録し、構図の読みを`compositi
 ### 2026-10-03 — 下絵の後に構図を決める（構図の読み）
 
 記述から描くとき、下絵（Stage 1）が決まった後に構図を決めるようにした（作者の判断、2026-10-02）。下絵は位置を、記述が場所を言う層にだけ付ける。構図の読み（新しいLLMの要求`read_composition`、下絵と同じモデル）が、記述と下絵の層から、役割・関係・張り・記述が言う場所を決まった値で返し、構図がそれをもとに、記述が場所を言わない層を画面の三分割に沿った範囲へ置く。置いた層は数値の範囲で書き、範囲の前に印「［構図］」（英語は`[composition]`）を置く。記述が言う場所は、その言葉のまま残す。読みが使えないときは作者の既定だけで解き、構図を入れられない作品は下絵のまま描く。Serverは既定で構図を行い、読みの時間はStage 1と分けて記録する。Androidは取り込むまで今のままで、構図を行わない実行は下絵の決まりも前のままである。DDLからScoreへの組み立ては変わらず、本番のtypedの作品450件のScoreは変わらなかった（DDL engine・DDLの版・Scoreの版・render engineは上げない）。受入では、製品と同じ読みの要求を本番の記述49件に2巡送り、読みと構図の数が試作の読みと同じ幅に入ることを確かめ、比較シートを作者が見た。記述が名指す隅（右下など）はまだ読まず、構図が四隅から選ぶ。保存済みの作品は変わらない。
+
+### 2026-10-03 — SwiftのFinderからのDDLドロップ読込を確認
+
+作者が最新Release Universalアプリの制作画面へFinderから単一DDLファイルをdropし、期待した入力への変化を確認した。画面の読取確認でもDDLと読込完了通知が一致し、隔離DBのhistory・系譜node・edgeの行数は読込前の2・2・1を保持した。生成前の読込操作を受入済みとして[Swift仕様](apple/SWIFT_SPEC.ja.md)へ反映した。
+
+### 2026-10-03 — Swiftの再試行進行表示とモデル用途の案内
+
+通常生成と比較候補に、段階・固定要求の呼出しmodel・試行回数・経過時間の状態cardを追加した。再試行では段階の時計を保ち、今回の時計を開始し直す。停止・完了で時間を確定し、古いcallbackを除外、新規制作で表示を消す。境界が取得しないtoken数は「記録なし」とする。
+
+制作とモデル設定へ、Serverから生成した用途・段階別適性・日英comment・速度の公開範囲を接続した。登録資料と接続先の取得情報を分け、custom／未登録modelを推測で評価しない。選択と保存default・開始済みsnapshotは保持する。限定mock／共通core確認、Release Universal build、nativeの評価表示・模擬429後の再試行と停止、履歴／系譜全行の保持を確認した。Finder dropと実provider等の受入は残る。[Swift仕様](apple/SWIFT_SPEC.ja.md)へ反映した。
+
+### 2026-10-03 — Swiftの読出し専用再現比較と推敲来歴、Mac Release build
+
+通常の再演奏は保存SVGと現行エンジンの描き直しを比較し、作品・履歴・系譜を変えない操作に揃えた。制作・library・系譜・作品menuから同じ比較へ接続し、描画エンジンの版と暫定seedの注意を表示する。新しいchildを作る「次の条件で再演奏」は維持する。自動推敲は世代ごとのVision／random来歴を保存し、古い助言をrandomへ混ぜない。
+
+保存親の編集dialogは画像・記述をscroll領域へ移し、記述／写生の再表示とdraft取消しを確認した。Rust 1.95のhost proc-macro stripによるMac link失敗を、target最適化を保って回避した。限定mock／共通core確認、Release Universal build、nativeの両画像・版表示とclose後の保存全行保持が成功した。Finder dropは最初から再試行したが読み込み成功は未確認。実provider・全幅・VoiceOver・作者受入は残る。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[build手順](apple/README.ja.md)を更新した。
+
+### 2026-10-03 — Swiftの描画要素を未保存候補として比較・採用
+
+保存親から配置・読み取り・変奏の1案／4案、言葉によるタッチの1案を用意するnative画面を追加した。条件を先に固定し、候補の比較・拡大と明示保存を分け、選択した候補だけを系譜childへ保存する。候補へ自動scrollし、準備後の制作画面へ進行表示を残さない。二重採用、採用後・再表示後のDDL編集、停止の遅い応答を扱う。現在の変奏は無変更であることを表示し、保存Scoreと実model記録を保持する。
+
+語句seedをRust共通処理へまとめ、ServerのPython helperとSwiftが同じ境界を使う。既存のtrim・UTF-8 hashの意味とUInt64の正確な値を保持した。編集edgeへServerの補助metadataを追加し、旧固定requestを壊さない。限定mock／実core確認とDebug Universal build、nativeのタッチ候補破棄、配置4案から選択2案だけの保存を確認した。親見出しの再表示不具合、実provider・全幅・VoiceOverと作者受入は残る。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[手順](apple/README.ja.md)へ反映した。
+
+### 2026-10-03 — Swiftの保存作品編集・色カタログ・DDL読込を追加
+
+再表示した保存作品から記述を変え、写生なし／ありで描き直すdialogを制作・library・系譜へ追加した。親の保存条件・定義・lockと開始時の描画modelを固定し、新しい子を共通coreから保存する。取消しは遅い応答の終了を待って表示作品を保持する。編集後のDDL変更も保存した子を親とする別の子になる。新しい描画結果の写生状態をServer同様のoff／supplemented等へ保存し、過去の記録は保持する。
+
+色見本、HEX、日英の色名と説明を持つ13色カタログのnative chooserを追加し、取消しと次回条件への確定を分けた。DDLのpanelとwindow dropを同じ単一URL読込へ接続し、読込中の生成・batchを抑止、取消し・制作内容変更後の採用を防ぐ。新規時の古い読込表示と状態文言も解除する。保存作品編集の限定mock／共通core確認、更新Universal build、nativeのdialog取消し・配色選択・標準panel読込を確認した。親見出しの再表示、描画要素の1案／4案選択、dropの実操作、実providerと作者受入は残る。[Swift仕様](apple/SWIFT_SPEC.ja.md)へ反映した。
+
+### 2026-10-03 — Swiftの制作画面とmacOS標準操作を整える
+
+制作の入力・次の条件・保存情報をpanelへまとめ、生成／停止をscrollの外へ固定した。保存条件をcompactな要約と詳細へ移し、canvasを広げた。登録済みservice／modelの選択を記述解釈・構造化の両段へ渡し、保存defaultと開始済みbatch／demoの固定条件を保持する。active sceneに従う新規・DDL読込・設定・画面移動・copy・書出しmenuとshortcut、system sidebarの設定categoryを追加した。
+
+libraryの表示作品とcheckbox、系譜の表示作品とfocusを明示し、DDL作品名・hash・comment・mark・親子移動を整えた。履歴の世代欄をvariation幅から実際のprimary-parent世代へ修正し、初期表示を世代＋modelに合わせた。書出し対象は制作の表示作品、libraryの選択、系譜pathへ分け、他画面のcheckbox混入を防ぐ。Universal build、model選択と世代の限定確認、隔離DBでのnative menu・世代1／2・書出し対象2件／1件と2種類のwindowサイズを確認した。実model一覧取得・provider送信、全幅・VoiceOver・作者のデザイン受入は別の確認とする。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[build手順](apple/README.ja.md)を更新した。
+
+### 2026-10-03 — SwiftのmacOS画面・全件履歴・書き出しをServerに合わせる
+
+制作の入力と表示作品の条件を分け、DDL編集・補完案の承認、歳時記／plugin、SQLite全件の履歴とlibrary、印・comment・trash／復元、系譜graph、比較候補の明示保存、model助言・奥書、batch／demo、表示／言語／export／backup設定を接続した。Swift schemaをv2／9tableへ進め、既知v1の移行とbackup復元で保存本文・Score／SVG・ACKを保持する。日本語のSudachi辞書と英語のCMUdictをnative共通境界で読み、runtimeにPythonを要求しない。
+
+SVGの4方式、PNG template／custom、DDL＋plugin、共有カード・contact sheet、APNG／GIFを追加した。共通Rustのimmutable prepared SVGをnative表示とexport tileで再利用し、保存画像の意味を変えずにparseを省く。限定Release計測で6000path・4サイズは準備込み約20%短縮したが、filter主体の作品では同じ改善を示していない。Personal ChatGPTは明示有効化、暗号化資格情報、同じ描画model、開始時の接続固定とquota／取消しを実装した。本人OAuth・実推論は別の受入とする。
+
+unsigned Universalの実画面でDDL生成・編集child、comment／star、trash／復元・restart、日英切替・系譜、複数選択2作品のPNG2160保存を確認した。起動再帰、改訂番号の誤表示、空の書き出し選択、Mac保存optionの終了を修正した。実provider、他exportのnative・性能、作者通常受入、Intel／macOS14、署名・配布、iOS app／cameraは引き続き未受入。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[build手順](apple/README.ja.md)を同期した。
+
+### 2026-10-02 — SwiftクライアントのmacOS初期基盤
+
+SwiftUIのmacOS Universalアプリと、同じRustを呼ぶUniFFI／XCFramework、standalone host、GRDB／SQLite adapterを追加した。最低OSはmacOS 14／iOS 17。直接DDLからScore／SVGを作り、保存・再表示・再演奏と新しい系譜childの保存、native画像表示、SVG／PNG書出し、手動DB backup／restoreを接続する。provider通信・Keychain・opaque snapshot・CAS／ACK・取消しとlocal-only再開もhostに実装した。Serverが開発正本であること、単一利用者であること、macOSにcameraを設けないことを維持する。
+
+macOSの両CPU向けlinkとApple Siliconのnative画面で生成・履歴・再演奏を確認した。iOS用Rust sliceを生成したが、iOSアプリ、camera、macOSの全機能UIとSVG性能受入は後続である。実provider通信、Intel実機の起動・性能、公開配布の受入をこの初期実装の確認へ読み替えない。Swiftの仕様はAndroid同様に[`SWIFT_SPEC.ja.md`](apple/SWIFT_SPEC.ja.md)を正本として英語を同期し、製品履歴は本CHANGELOGの日英対へ記録する。build手順は[`apple/README.ja.md`](apple/README.ja.md)を参照。
 
 ### 2026-10-02 — 本人のChatGPTプランを描画へ接続する
 

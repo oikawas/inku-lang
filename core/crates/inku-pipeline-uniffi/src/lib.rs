@@ -5,12 +5,18 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use inku_pipeline::protocol::{ProtocolError, error_bytes};
 
 mod macro_catalog;
+mod description_meter;
 mod plugin_diagnostics;
+mod raster;
 mod saijiki_migration;
+mod standalone;
 
 pub use macro_catalog::resolve_macro_catalog;
+pub use description_meter::count_description_meter;
 pub use plugin_diagnostics::explain_plugin_diagnostics;
+pub use raster::{RasterFailure, RasterFrame, RasterScene, prepare_raster_scene, raster_api_version, rasterize_svg, rasterize_svg_region};
 pub use saijiki_migration::migrate_saijiki_v1;
+pub use standalone::{compile_document, render_compiled};
 
 const BINDING_VERSION: &str = "1.1.0";
 const PROTOCOL_VERSION: &str = "1.0.0";
@@ -64,6 +70,24 @@ pub fn composition_ranges() -> String {
 #[uniffi::export]
 pub fn version_report() -> String {
     format!(r#"{{"binding_version":"{BINDING_VERSION}","protocol_version":"{PROTOCOL_VERSION}"}}"#)
+}
+
+/// Exact word-touch identity, carried as decimal text across every host boundary.
+#[derive(uniffi::Record)]
+pub struct TextRenderSeed {
+    pub render_seed: String,
+    pub seed_text: String,
+}
+
+/// Derive a saved-Score performance seed without interpreting the words as DDL.
+#[uniffi::export]
+pub fn render_seed_from_text(seed_text: String) -> Option<TextRenderSeed> {
+    inku_render::determinism::render_seed_from_text(&seed_text).map(|(seed, normalized)| {
+        TextRenderSeed {
+            render_seed: seed.to_string(),
+            seed_text: normalized.to_owned(),
+        }
+    })
 }
 
 /// Share the canonical registry with host settings and compatibility adapters.

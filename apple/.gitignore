@@ -1,0 +1,7 @@
+.build/
+build/
+DerivedData/
+Inku.xcodeproj/
+*.xcuserstate
+xcuserdata/
+Packages/InkuHost/Sources/InkuHost/Resources/description-meter/

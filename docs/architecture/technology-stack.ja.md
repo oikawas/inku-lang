@@ -1,6 +1,6 @@
 # 付録：技術スタック
 
-この付録は、現行実装が直接使う言語、framework、主要component、build/test toolを1か所で俯瞰する。2026-09-25の実装baseline `46f17da8c5b438511f9bd915395763262b55fb72`を対象とし、transitive dependencyの完全な一覧ではない。版の正本は各manifestとlock fileであり、本書の数字はarchitecture snapshotである。
+この付録は、現行実装が直接使う言語、framework、主要component、build/test toolを1か所で俯瞰する。従来componentの2026-09-25 baseline `46f17da8c5b438511f9bd915395763262b55fb72`に、2026-10-02のSwift初期基盤を追記した。transitive dependencyの完全な一覧ではない。版の正本は各manifestとlock fileであり、本書の数字はarchitecture snapshotである。
 
 ## 実行component
 
@@ -19,6 +19,7 @@
 | Python binding | Rust / Python | PyO3、maturin | Serverからrender coreと共有pipelineへの粗いCPython wheel境界 | `core/crates/inku-render-python/`; `server/Dockerfile` |
 | Android binding | Rust / Kotlin | JNI、`resvg` | Androidから共有pipeline、render core、SVG raster coreを呼ぶ | `core/crates/inku-render-android/`; `core/crates/inku-svg-raster/` |
 | Android app | Kotlin、Gradle Kotlin DSL | Jetpack Compose、Room 2.8.4、KSP、AndroidX | 端末UI、共有pipelineのhost、Room履歴、provider/model管理 | `android/app/build.gradle.kts`; `android/app/src/` |
+| Swift client foundation | Swift 6、SQL | SwiftUI、Observation、UniFFI、GRDB 7.11.1、system SQLite、URLSession、Keychain、CoreGraphics | macOS先行のnative UI、共有pipeline host、保存、provider、owned raster表示 | `apple/Package.swift`; `apple/Packages/`; `apple/Sources/` |
 | CLI | Python 3.12 | 標準HTTP client、Pillow、`inku-analysis` | 公開HTTP API操作、batch、artifact保存、機能検査 | `cli/pyproject.toml`; `cli/src/inku_cli/` |
 | Shared analysis | Python 3.12 | `resvg-py`、Pillow | read-only composition mirror、SVG raster/measurement、thumbnail | `shared/pyproject.toml`; `shared/src/inku_analysis/` |
 | Distribution | Dockerfile、YAML | Docker Compose、GHCR、GitHub Actions | API/Web image、persistent volume、CI/release | `deploy/compose.yaml`; Dockerfiles; `.github/workflows/` |
@@ -30,6 +31,7 @@
 | Python | `server/`, `cli/`, `shared/` | API、pipeline host、provider通信、persistence、CLI、analysis |
 | TypeScript / JavaScript | `web/` | Svelte component、browser state、Node runtime、unit test |
 | Kotlin / Kotlin DSL | `android/` | Android production code、Compose UI、pipeline host、Gradle build |
+| Swift | `apple/` | Apple native UI、pipeline host、provider通信、GRDB保存、OS lifecycle |
 | Rust | `core/` | 共有authoring pipeline、typed compiler、Score型、render engine、CPython/JNI binding、SVG raster |
 | SQL / SQLite DDL | `persistence/`, Server migration、Room export | portable論理制約、物理schema、migration検証 |
 | HTML / CSS / Svelte markup | `web/src/` | browser presentation |
@@ -68,18 +70,21 @@
 
 ## Build・test・quality gate
 
+Swift初期基盤はmacOS 14／iOS 17を最低OSとし、Swift tools 6.1、UniFFI 0.32.0、GRDB 7.11.1を使用する。macOSはarm64／x86_64 Universal appをXcodeGen／Xcodeで作り、Rustはplatform別XCFrameworkへpackagingする。iOSはdevice／simulator Rust sliceまでで、アプリ画面とcameraは後続。PythonはServer正本からresourceを生成するbuild時だけ必要で、アプリに組み込まない。[build手順と現在の範囲](../../apple/README.ja.md)を参照。
+
 | 対象 | Build / package | 主な検査 |
 |---|---|---|
 | Server / CLI / shared | `uv`, `uv_build`, CPython wheel | pytest、Ruff、portable persistence verifier |
 | Web | npm、Vite、adapter-node | Node test runner、`svelte-check`、i18n/model lint |
 | Rust | pinned rustup/Cargo、maturin、UniFFI | `cargo test`、fmt、clippy、wheel/import smoke、binding・protocol版の一致 |
 | Android | Gradle、KSP、Room schema export、NDK | JVM unit、Compose/Room instrumentation、共有pipelineの端末受入、native parity |
+| Swift | SwiftPM、XcodeGen、Xcode、UniFFI／XCFramework | 変更に必要なcore・host・DB境界確認、AppCheck、Universal link、native画面 |
 | Documentation | Markdown、Mermaid、JSON | bilingual checker、link/path検査、portable mapping検査 |
 | Distribution | Docker Buildx、Compose、GitHub Actions | multi-arch image build、health、release gate |
 
 ## 意図した非共有
 
-- ServerとAndroidが共有するのはRust core（authoring pipeline、typed compiler、Score型、render、raster）とportable persistenceの論理意味であり、DB file、ORM/DAO、UI framework、provider transportは共有しない。
+- Server・Android・Swiftが共有するのはRust core（authoring pipeline、typed compiler、Score型、render、raster）とportable persistenceの論理意味であり、DB file、ORM/DAO、UI framework、provider transportは共有しない。
 - WebとCLIは公開HTTP APIだけを使い、ServerのPython moduleをruntime importしない。
-- 将来iOS adapterは設計可能だが、Swift、SwiftUI、iOS DB frameworkは現行stackに含まれない。
+- Swift／SwiftUI／GRDBはmacOS先行の初期基盤として現行stackに含む。iPad／iPhoneアプリのUI・camera・実機受入は未完了である。
 - PostgreSQL互換層、過去Render Engine runtime、旧Python / KotlinのStage 1・Stage 1.5・Stage 2・coerceは現行architectureに含まれない。

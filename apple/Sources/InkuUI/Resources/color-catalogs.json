@@ -1,0 +1,899 @@
+[
+  {
+    "id": "default",
+    "map": {
+      "black": "#111111",
+      "blue": "#2c3e91",
+      "gray": "#888888",
+      "green": "#2f6b3a",
+      "orange": "#b9671e",
+      "purple": "#6a4d94",
+      "red": "#a2342a",
+      "white": "#ffffff",
+      "yellow": "#b8901f"
+    },
+    "name": "inku Default",
+    "palette": [
+      {
+        "code": "#111111",
+        "name": "Black",
+        "name_ja": "黒"
+      },
+      {
+        "code": "#ffffff",
+        "name": "White",
+        "name_ja": "白"
+      },
+      {
+        "code": "#888888",
+        "name": "Gray",
+        "name_ja": "灰"
+      },
+      {
+        "code": "#a2342a",
+        "name": "Red",
+        "name_ja": "赤"
+      },
+      {
+        "code": "#2f6b3a",
+        "name": "Green",
+        "name_ja": "緑"
+      },
+      {
+        "code": "#2c3e91",
+        "name": "Blue",
+        "name_ja": "青"
+      },
+      {
+        "code": "#b8901f",
+        "name": "Yellow",
+        "name_ja": "黄"
+      },
+      {
+        "code": "#b9671e",
+        "name": "Orange",
+        "name_ja": "橙"
+      },
+      {
+        "code": "#6a4d94",
+        "name": "Purple",
+        "name_ja": "紫"
+      },
+      {
+        "code": "#7c2f26",
+        "name": "Deep Red",
+        "name_ja": "深い赤"
+      }
+    ],
+    "sub": "neutral baseline",
+    "sub_ja": "ニュートラルな基準値"
+  },
+  {
+    "id": "ink_season",
+    "map": {
+      "black": "#141210",
+      "blue": "#165e83",
+      "gray": "#595857",
+      "green": "#007b43",
+      "orange": "#ffb61e",
+      "purple": "#a591c5",
+      "red": "#d3381c",
+      "white": "#fffffb",
+      "yellow": "#847a2e"
+    },
+    "name": "Ink & Season",
+    "palette": [
+      {
+        "code": "#141210",
+        "name": "Pine Soot",
+        "name_ja": "松煙"
+      },
+      {
+        "code": "#fffffb",
+        "name": "Warm Paper",
+        "name_ja": "胡粉"
+      },
+      {
+        "code": "#595857",
+        "name": "Soft Soot",
+        "name_ja": "消墨"
+      },
+      {
+        "code": "#d3381c",
+        "name": "Vermilion Accent",
+        "name_ja": "朱"
+      },
+      {
+        "code": "#007b43",
+        "name": "Evergreen",
+        "name_ja": "常磐"
+      },
+      {
+        "code": "#165e83",
+        "name": "Indigo Shade",
+        "name_ja": "藍"
+      },
+      {
+        "code": "#847a2e",
+        "name": "Uguisu",
+        "name_ja": "鶯"
+      },
+      {
+        "code": "#ffb61e",
+        "name": "Golden Flower",
+        "name_ja": "山吹"
+      },
+      {
+        "code": "#a591c5",
+        "name": "Pale Violet",
+        "name_ja": "藤紫"
+      },
+      {
+        "code": "#8c2d1d",
+        "name": "Madder",
+        "name_ja": "茜"
+      }
+    ],
+    "sub": "ink, paper, seasonal accents",
+    "sub_ja": "墨、紙、季節の差し色"
+  },
+  {
+    "id": "fresco_study",
+    "map": {
+      "black": "#4a342e",
+      "blue": "#1f4e8c",
+      "gray": "#8a8178",
+      "green": "#4f7942",
+      "orange": "#b06a2f",
+      "purple": "#71487c",
+      "red": "#c7432f",
+      "white": "#f5f1e8",
+      "yellow": "#c39a2b"
+    },
+    "name": "Fresco Study",
+    "palette": [
+      {
+        "code": "#4a342e",
+        "name": "Umber Shadow",
+        "name_ja": "アンバーの影"
+      },
+      {
+        "code": "#f5f1e8",
+        "name": "Plaster White",
+        "name_ja": "漆喰の白"
+      },
+      {
+        "code": "#8a8178",
+        "name": "Warm Stone",
+        "name_ja": "温かい石"
+      },
+      {
+        "code": "#c7432f",
+        "name": "Red Earth",
+        "name_ja": "赤土"
+      },
+      {
+        "code": "#4f7942",
+        "name": "Green Earth",
+        "name_ja": "緑土"
+      },
+      {
+        "code": "#1f4e8c",
+        "name": "Deep Blue Pigment",
+        "name_ja": "深い青顔料"
+      },
+      {
+        "code": "#c39a2b",
+        "name": "Yellow Ocher",
+        "name_ja": "黄土"
+      },
+      {
+        "code": "#b06a2f",
+        "name": "Raw Sienna",
+        "name_ja": "シエナ土"
+      },
+      {
+        "code": "#71487c",
+        "name": "Manganese Violet",
+        "name_ja": "マンガン紫"
+      },
+      {
+        "code": "#a0522d",
+        "name": "Burnt Earth",
+        "name_ja": "焼けた土"
+      }
+    ],
+    "sub": "sunlit wall, dry earth, warm shadow",
+    "sub_ja": "日なたの壁、乾いた土、温かい陰"
+  },
+  {
+    "id": "open_air_light",
+    "map": {
+      "black": "#43474e",
+      "blue": "#82c7de",
+      "gray": "#afa6bd",
+      "green": "#4e8372",
+      "orange": "#f0b184",
+      "purple": "#4b4a78",
+      "red": "#ee8fa2",
+      "white": "#fdfeff",
+      "yellow": "#a3bd5b"
+    },
+    "name": "Open-Air Light",
+    "palette": [
+      {
+        "code": "#43474e",
+        "name": "River Stone",
+        "name_ja": "川石"
+      },
+      {
+        "code": "#fdfeff",
+        "name": "Zinc White",
+        "name_ja": "亜鉛華"
+      },
+      {
+        "code": "#afa6bd",
+        "name": "Lilac Gray",
+        "name_ja": "ライラック灰"
+      },
+      {
+        "code": "#ee8fa2",
+        "name": "Rose Light",
+        "name_ja": "薔薇色の光"
+      },
+      {
+        "code": "#4e8372",
+        "name": "Outdoor Green",
+        "name_ja": "戸外の緑"
+      },
+      {
+        "code": "#82c7de",
+        "name": "Sky Blue",
+        "name_ja": "空色"
+      },
+      {
+        "code": "#a3bd5b",
+        "name": "Young Grass",
+        "name_ja": "若草"
+      },
+      {
+        "code": "#f0b184",
+        "name": "Apricot Shade",
+        "name_ja": "杏の陰"
+      },
+      {
+        "code": "#4b4a78",
+        "name": "Violet Gray Shade",
+        "name_ja": "菫灰の陰"
+      },
+      {
+        "code": "#ffce00",
+        "name": "Sunlit Yellow",
+        "name_ja": "陽だまりの黄"
+      }
+    ],
+    "sub": "soft light, sky, reflected shade",
+    "sub_ja": "柔らかな光、空、反射する陰"
+  },
+  {
+    "id": "ink_porcelain",
+    "map": {
+      "black": "#1a1a1b",
+      "blue": "#0057a8",
+      "gray": "#4b4b4f",
+      "green": "#00896c",
+      "orange": "#b5642c",
+      "purple": "#6a4c8c",
+      "red": "#c91f24",
+      "white": "#fffdfa",
+      "yellow": "#d6a01d"
+    },
+    "name": "Ink & Porcelain",
+    "palette": [
+      {
+        "code": "#1a1a1b",
+        "name": "Ink Black",
+        "name_ja": "墨の黒"
+      },
+      {
+        "code": "#fffdfa",
+        "name": "Porcelain White",
+        "name_ja": "磁器の白"
+      },
+      {
+        "code": "#4b4b4f",
+        "name": "Kiln Soot",
+        "name_ja": "窯の煤"
+      },
+      {
+        "code": "#c91f24",
+        "name": "Cinnabar Red",
+        "name_ja": "辰砂の赤"
+      },
+      {
+        "code": "#00896c",
+        "name": "Jade Green",
+        "name_ja": "翡翠の緑"
+      },
+      {
+        "code": "#0057a8",
+        "name": "Porcelain Blue",
+        "name_ja": "磁器の青"
+      },
+      {
+        "code": "#d6a01d",
+        "name": "Mineral Gold",
+        "name_ja": "鉱物の金"
+      },
+      {
+        "code": "#b5642c",
+        "name": "Copper Overglaze",
+        "name_ja": "銅の上絵"
+      },
+      {
+        "code": "#6a4c8c",
+        "name": "Mineral Violet",
+        "name_ja": "鉱物の紫"
+      },
+      {
+        "code": "#ff4d00",
+        "name": "Bright Vermilion",
+        "name_ja": "明るい朱"
+      }
+    ],
+    "sub": "clear light, ink, sharp mineral accents",
+    "sub_ja": "澄んだ光、墨、冴えた鉱物の差し色"
+  },
+  {
+    "id": "cool_material",
+    "map": {
+      "black": "#26282a",
+      "blue": "#4f8fb8",
+      "gray": "#95a5a6",
+      "green": "#3a544a",
+      "orange": "#a98467",
+      "purple": "#575168",
+      "red": "#6f4340",
+      "white": "#fcfcfc",
+      "yellow": "#4b5d43"
+    },
+    "name": "Cool Material",
+    "palette": [
+      {
+        "code": "#26282a",
+        "name": "Graphite",
+        "name_ja": "石墨"
+      },
+      {
+        "code": "#fcfcfc",
+        "name": "Snow Light",
+        "name_ja": "雪の光"
+      },
+      {
+        "code": "#95a5a6",
+        "name": "Granite Gray",
+        "name_ja": "花崗岩の灰"
+      },
+      {
+        "code": "#6f4340",
+        "name": "Rowan Berry",
+        "name_ja": "ナナカマドの実"
+      },
+      {
+        "code": "#3a544a",
+        "name": "Spruce",
+        "name_ja": "唐檜"
+      },
+      {
+        "code": "#4f8fb8",
+        "name": "Muted Sea",
+        "name_ja": "鈍い海色"
+      },
+      {
+        "code": "#4b5d43",
+        "name": "Moss Wood",
+        "name_ja": "苔むした木"
+      },
+      {
+        "code": "#a98467",
+        "name": "Clay Brown",
+        "name_ja": "粘土の茶"
+      },
+      {
+        "code": "#575168",
+        "name": "Slate Violet",
+        "name_ja": "粘板岩の紫"
+      },
+      {
+        "code": "#2c3e50",
+        "name": "Midnight Blue",
+        "name_ja": "真夜中の青"
+      }
+    ],
+    "sub": "cool light, wood, stone",
+    "sub_ja": "冷たい光、木、石"
+  },
+  {
+    "id": "dye_earth",
+    "map": {
+      "black": "#2b2736",
+      "blue": "#006c8f",
+      "gray": "#8d7f73",
+      "green": "#33684a",
+      "orange": "#e8862e",
+      "purple": "#d83fb1",
+      "red": "#b7285f",
+      "white": "#fffaf0",
+      "yellow": "#d6b72a"
+    },
+    "name": "Dye & Earth",
+    "palette": [
+      {
+        "code": "#2b2736",
+        "name": "Iron Mordant",
+        "name_ja": "鉄媒染"
+      },
+      {
+        "code": "#fffaf0",
+        "name": "Warm Cotton",
+        "name_ja": "温かな綿"
+      },
+      {
+        "code": "#8d7f73",
+        "name": "Wet Earth",
+        "name_ja": "濡れた土"
+      },
+      {
+        "code": "#b7285f",
+        "name": "Deep Rose Dye",
+        "name_ja": "深い薔薇染め"
+      },
+      {
+        "code": "#33684a",
+        "name": "Indigo-Leaf Green",
+        "name_ja": "藍葉の緑"
+      },
+      {
+        "code": "#006c8f",
+        "name": "Peacock Blue",
+        "name_ja": "孔雀青"
+      },
+      {
+        "code": "#d6b72a",
+        "name": "Yellow Dye",
+        "name_ja": "黄色の染料"
+      },
+      {
+        "code": "#e8862e",
+        "name": "Saffron Dye",
+        "name_ja": "サフラン染め"
+      },
+      {
+        "code": "#d83fb1",
+        "name": "Bright Pink",
+        "name_ja": "明るい桃色"
+      },
+      {
+        "code": "#6b7d3a",
+        "name": "Leaf Dye",
+        "name_ja": "葉の染料"
+      }
+    ],
+    "sub": "textile dye, earth, rain shade",
+    "sub_ja": "布の染料、土、雨の陰"
+  },
+  {
+    "id": "vivid_material",
+    "map": {
+      "black": "#1c1c1c",
+      "blue": "#73c2fb",
+      "gray": "#7d6f66",
+      "green": "#008f39",
+      "orange": "#ff9800",
+      "purple": "#8a4fc9",
+      "red": "#f50087",
+      "white": "#f4f4f4",
+      "yellow": "#c7a000"
+    },
+    "name": "Vivid Material",
+    "palette": [
+      {
+        "code": "#1c1c1c",
+        "name": "Volcanic Black",
+        "name_ja": "火山の黒"
+      },
+      {
+        "code": "#f4f4f4",
+        "name": "Lime White",
+        "name_ja": "ライムの白"
+      },
+      {
+        "code": "#7d6f66",
+        "name": "Urban Stone",
+        "name_ja": "都市の石"
+      },
+      {
+        "code": "#f50087",
+        "name": "Vivid Rose",
+        "name_ja": "鮮やかな薔薇色"
+      },
+      {
+        "code": "#008f39",
+        "name": "Fresh Green",
+        "name_ja": "新鮮な緑"
+      },
+      {
+        "code": "#73c2fb",
+        "name": "Bright Blue",
+        "name_ja": "明るい青"
+      },
+      {
+        "code": "#c7a000",
+        "name": "Deep Cadmium Yellow",
+        "name_ja": "深いカドミウム黄"
+      },
+      {
+        "code": "#ff9800",
+        "name": "Orange Marigold",
+        "name_ja": "橙の花"
+      },
+      {
+        "code": "#8a4fc9",
+        "name": "Cobalt Violet",
+        "name_ja": "コバルト紫"
+      },
+      {
+        "code": "#fff200",
+        "name": "Sun Yellow",
+        "name_ja": "太陽の黄"
+      }
+    ],
+    "sub": "vivid pigment, lime, stone",
+    "sub_ja": "鮮やかな顔料、ライム、石"
+  },
+  {
+    "id": "weathered_heritage",
+    "map": {
+      "black": "#1f2933",
+      "blue": "#4169e1",
+      "gray": "#708090",
+      "green": "#004225",
+      "orange": "#9e6428",
+      "purple": "#7b6293",
+      "red": "#b93a32",
+      "white": "#dcdcdc",
+      "yellow": "#9b8342"
+    },
+    "name": "Weathered Heritage",
+    "palette": [
+      {
+        "code": "#1f2933",
+        "name": "Charcoal",
+        "name_ja": "木炭"
+      },
+      {
+        "code": "#dcdcdc",
+        "name": "Fog Light",
+        "name_ja": "霧の光"
+      },
+      {
+        "code": "#708090",
+        "name": "Slate Gray",
+        "name_ja": "粘板岩の灰"
+      },
+      {
+        "code": "#b93a32",
+        "name": "Brick Red",
+        "name_ja": "煉瓦の赤"
+      },
+      {
+        "code": "#004225",
+        "name": "Deep Green",
+        "name_ja": "深い緑"
+      },
+      {
+        "code": "#4169e1",
+        "name": "Rain Blue",
+        "name_ja": "雨の青"
+      },
+      {
+        "code": "#9b8342",
+        "name": "Tarnished Brass",
+        "name_ja": "くすんだ真鍮"
+      },
+      {
+        "code": "#9e6428",
+        "name": "Iron Rust",
+        "name_ja": "鉄錆"
+      },
+      {
+        "code": "#7b6293",
+        "name": "Heather",
+        "name_ja": "ヒース"
+      },
+      {
+        "code": "#48684d",
+        "name": "Wet Moss",
+        "name_ja": "濡れた苔"
+      }
+    ],
+    "sub": "fog, brick, wool, rain",
+    "sub_ja": "霧、煉瓦、羊毛、雨"
+  },
+  {
+    "id": "sea_stone",
+    "map": {
+      "black": "#10141a",
+      "blue": "#005bae",
+      "gray": "#b2beb5",
+      "green": "#2e613b",
+      "orange": "#c97a45",
+      "purple": "#191970",
+      "red": "#e2725b",
+      "white": "#f2f7f7",
+      "yellow": "#808000"
+    },
+    "name": "Sea & Stone",
+    "palette": [
+      {
+        "code": "#10141a",
+        "name": "Abyss Dark",
+        "name_ja": "深海の闇"
+      },
+      {
+        "code": "#f2f7f7",
+        "name": "Sea Foam White",
+        "name_ja": "泡の白"
+      },
+      {
+        "code": "#b2beb5",
+        "name": "Stone Gray",
+        "name_ja": "石の灰"
+      },
+      {
+        "code": "#e2725b",
+        "name": "Clay Red",
+        "name_ja": "粘土の赤"
+      },
+      {
+        "code": "#2e613b",
+        "name": "Sea Kelp Green",
+        "name_ja": "海藻の緑"
+      },
+      {
+        "code": "#005bae",
+        "name": "Deep Sea",
+        "name_ja": "深い海"
+      },
+      {
+        "code": "#808000",
+        "name": "Dry Olive",
+        "name_ja": "乾いたオリーブ"
+      },
+      {
+        "code": "#c97a45",
+        "name": "Coral Orange",
+        "name_ja": "珊瑚の橙"
+      },
+      {
+        "code": "#191970",
+        "name": "Night Sea",
+        "name_ja": "夜の海"
+      },
+      {
+        "code": "#89cff0",
+        "name": "Pale Sea",
+        "name_ja": "淡い海"
+      }
+    ],
+    "sub": "sea light, stone, dry earth",
+    "sub_ja": "海の光、石、乾いた土"
+  },
+  {
+    "id": "moss_bark",
+    "map": {
+      "black": "#181a17",
+      "blue": "#43798a",
+      "gray": "#9ba39e",
+      "green": "#3e5a41",
+      "orange": "#7d5531",
+      "purple": "#57355f",
+      "red": "#9c3330",
+      "white": "#f2efe8",
+      "yellow": "#d5ae43"
+    },
+    "name": "Moss & Bark",
+    "palette": [
+      {
+        "code": "#181a17",
+        "name": "Forest Dark",
+        "name_ja": "森の闇"
+      },
+      {
+        "code": "#f2efe8",
+        "name": "Birch Bark",
+        "name_ja": "白樺の肌"
+      },
+      {
+        "code": "#9ba39e",
+        "name": "Morning Fog",
+        "name_ja": "朝霧の灰"
+      },
+      {
+        "code": "#9c3330",
+        "name": "Ripe Berry",
+        "name_ja": "熟した実"
+      },
+      {
+        "code": "#3e5a41",
+        "name": "Moss",
+        "name_ja": "苔"
+      },
+      {
+        "code": "#43798a",
+        "name": "Ravine Water",
+        "name_ja": "沢の水"
+      },
+      {
+        "code": "#d5ae43",
+        "name": "Dappled Light",
+        "name_ja": "木漏れ日"
+      },
+      {
+        "code": "#7d5531",
+        "name": "Bark",
+        "name_ja": "樹皮"
+      },
+      {
+        "code": "#57355f",
+        "name": "Wild Grape",
+        "name_ja": "山葡萄"
+      },
+      {
+        "code": "#5da55f",
+        "name": "New Leaf",
+        "name_ja": "若葉"
+      }
+    ],
+    "sub": "bark, leaf, moss, dappled light",
+    "sub_ja": "樹皮、葉、苔、木漏れ日"
+  },
+  {
+    "id": "neon_plate",
+    "map": {
+      "black": "#0d0d10",
+      "blue": "#2f52d9",
+      "gray": "#777c82",
+      "green": "#00c853",
+      "orange": "#ff8514",
+      "purple": "#7a2fd0",
+      "red": "#e5004b",
+      "white": "#f4f8fb",
+      "yellow": "#e3b800"
+    },
+    "name": "Neon & Plate",
+    "palette": [
+      {
+        "code": "#0d0d10",
+        "name": "Unlit Pixel",
+        "name_ja": "消灯画素"
+      },
+      {
+        "code": "#f4f8fb",
+        "name": "Diffuser White",
+        "name_ja": "拡散板の白"
+      },
+      {
+        "code": "#777c82",
+        "name": "Housing Gray",
+        "name_ja": "筐体の灰"
+      },
+      {
+        "code": "#e5004b",
+        "name": "Signal Red",
+        "name_ja": "標識の赤"
+      },
+      {
+        "code": "#00c853",
+        "name": "Emitter Green",
+        "name_ja": "発光体の緑"
+      },
+      {
+        "code": "#2f52d9",
+        "name": "Discharge Blue",
+        "name_ja": "放電の青"
+      },
+      {
+        "code": "#e3b800",
+        "name": "Halftone Yellow",
+        "name_ja": "網点の黄"
+      },
+      {
+        "code": "#ff8514",
+        "name": "Safety Coating",
+        "name_ja": "安全被膜"
+      },
+      {
+        "code": "#7a2fd0",
+        "name": "Tube Violet",
+        "name_ja": "放電管の菫"
+      },
+      {
+        "code": "#00b7eb",
+        "name": "Cyan Plate",
+        "name_ja": "シアン版"
+      }
+    ],
+    "sub": "discharge tube, printing plate, coating",
+    "sub_ja": "放電管、印刷版、被膜"
+  },
+  {
+    "id": "lantern_dew",
+    "map": {
+      "black": "#121216",
+      "blue": "#1e2e52",
+      "gray": "#4d4e54",
+      "green": "#2b4234",
+      "orange": "#c78c33",
+      "purple": "#453a6e",
+      "red": "#6d2a23",
+      "white": "#e6e8ec",
+      "yellow": "#c9b34a"
+    },
+    "name": "Lantern & Dew",
+    "palette": [
+      {
+        "code": "#121216",
+        "name": "New Moon",
+        "name_ja": "新月の黒"
+      },
+      {
+        "code": "#e6e8ec",
+        "name": "Dew White",
+        "name_ja": "露の白"
+      },
+      {
+        "code": "#4d4e54",
+        "name": "Night Air",
+        "name_ja": "夜気の灰"
+      },
+      {
+        "code": "#6d2a23",
+        "name": "Ember",
+        "name_ja": "熾火の赤"
+      },
+      {
+        "code": "#2b4234",
+        "name": "Night Moss",
+        "name_ja": "夜の苔"
+      },
+      {
+        "code": "#1e2e52",
+        "name": "Night Indigo",
+        "name_ja": "夜の藍"
+      },
+      {
+        "code": "#c9b34a",
+        "name": "Firefly",
+        "name_ja": "蛍の黄"
+      },
+      {
+        "code": "#c78c33",
+        "name": "Lantern Amber",
+        "name_ja": "灯火の琥珀"
+      },
+      {
+        "code": "#453a6e",
+        "name": "Twilight Violet",
+        "name_ja": "薄明の菫"
+      },
+      {
+        "code": "#402445",
+        "name": "Mulberry",
+        "name_ja": "桑の実"
+      }
+    ],
+    "sub": "night air, lantern, dew",
+    "sub_ja": "夜気、灯火、露"
+  }
+]

@@ -17,6 +17,15 @@ def _native_binding() -> ModuleType:
     return importlib.import_module("inku_render")
 
 
+def render_seed_from_text(seed_text: str) -> tuple[int, str] | None:
+    """Lift the portable word-touch identity without host hashing or trimming."""
+    derived = _native_binding().render_seed_from_text(seed_text)
+    if derived is None:
+        return None
+    seed, normalized = derived
+    return int(seed), normalized
+
+
 def _default_color_map(native: ModuleType) -> dict[str, str]:
     payload = json.loads(native.default_color_map_json())
     if not isinstance(payload, dict) or not all(

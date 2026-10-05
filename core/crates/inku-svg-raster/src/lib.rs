@@ -31,6 +31,18 @@ pub struct RasterOptions {
     pub target_height: Option<u32>,
 }
 
+/// A bounded tile on a larger export canvas. The original SVG remains intact.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RasterRegionOptions {
+    pub full_width: u32,
+    pub full_height: u32,
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
 /// Explicit host-neutral raster payload.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RasterOutput {
@@ -97,6 +109,91 @@ impl fmt::Display for RasterError {
 }
 
 impl std::error::Error for RasterError {}
+
+/// Immutable parsed SVG data owned by a host, with no global scene registry.
+pub struct PreparedScene {
+    tree: usvg::Tree,
+    source_bytes: u64,
+    cache_cost_bytes: u64,
+}
+
+impl PreparedScene {
+    pub fn source_bytes(&self) -> u64 { self.source_bytes }
+    pub fn intrinsic_width(&self) -> f64 { f64::from(self.tree.size().width()) }
+    pub fn intrinsic_height(&self) -> f64 { f64::from(self.tree.size().height()) }
+
+    /// Conservative cache admission weight, not allocator accounting or RSS.
+    pub fn cache_cost_bytes(&self) -> u64 { self.cache_cost_bytes }
+
+    pub fn rasterize(&self, options: RasterOptions) -> Result<RasterOutput, RasterError> {
+        rasterize_tree(&self.tree, options)
+    }
+
+    pub fn region(&self, region: RasterRegionOptions) -> Result<RasterOutput, RasterError> {
+        rasterize_tree_region(&self.tree, region)
+    }
+}
+
+/// Reuse exactly the same parser options as the one-shot display/export calls.
+pub fn prepare_scene(svg: &str) -> Result<PreparedScene, RasterError> {
+    let tree = parse_tree(svg)?;
+    let source_bytes = svg.len() as u64;
+    // Count expanded geometry too: repeated <use> nodes can outgrow source text.
+    let cache_cost_bytes = scene_cost(&tree).saturating_add(source_bytes.saturating_mul(16));
+    Ok(PreparedScene { tree, source_bytes, cache_cost_bytes })
+}
+
+fn validate_svg(svg: &str) -> Result<(), RasterError> {
+    if svg.is_empty() { return Err(RasterError::EmptySvg); }
+    if svg.len() > MAX_SVG_BYTES {
+        return Err(RasterError::SvgTooLarge { actual: svg.len(), maximum: MAX_SVG_BYTES });
+    }
+    Ok(())
+}
+
+fn parse_tree(svg: &str) -> Result<usvg::Tree, RasterError> {
+    validate_svg(svg)?;
+    usvg::Tree::from_str(svg, &usvg::Options { resources_dir: None, ..usvg::Options::default() })
+        .map_err(|error| RasterError::Parse(error.to_string()))
+}
+
+fn scene_cost(tree: &usvg::Tree) -> u64 {
+    fn group_cost(group: &usvg::Group) -> u64 {
+        let mut bytes = (std::mem::size_of::<usvg::Group>() + group.id().len()
+            + group.children().len() * 2 * std::mem::size_of::<usvg::Node>()) as u64;
+        for node in group.children() {
+            let cost = match node {
+                usvg::Node::Group(group) => group_cost(group),
+                usvg::Node::Path(path) => {
+                    let dash = path.stroke().and_then(|stroke| stroke.dasharray()).map_or(0, |values| values.len() * 8);
+                    (std::mem::size_of::<usvg::Path>() + path.id().len() + dash
+                        + path.data().points().len() * 16 + path.data().verbs().len() * 2) as u64
+                }
+                usvg::Node::Image(image) => {
+                    let data = match image.kind() {
+                        usvg::ImageKind::SVG(svg) => scene_cost(svg),
+                        usvg::ImageKind::JPEG(data) | usvg::ImageKind::PNG(data)
+                        | usvg::ImageKind::GIF(data) | usvg::ImageKind::WEBP(data) => data.len() as u64,
+                    };
+                    data.saturating_add(std::mem::size_of::<usvg::Image>() as u64)
+                }
+                // Text is disabled in this crate. Source weight also covers metadata.
+                usvg::Node::Text(_) => 2048,
+            };
+            bytes = bytes.saturating_add(cost);
+        }
+        bytes
+    }
+    let mut bytes = group_cost(tree.root());
+    for pattern in tree.patterns() { bytes = bytes.saturating_add(group_cost(pattern.root())); }
+    for clip in tree.clip_paths() { bytes = bytes.saturating_add(group_cost(clip.root())); }
+    for mask in tree.masks() { bytes = bytes.saturating_add(group_cost(mask.root())); }
+    for filter in tree.filters() {
+        bytes = bytes.saturating_add((std::mem::size_of::<usvg::filter::Filter>()
+            + filter.primitives().len() * 2 * std::mem::size_of::<usvg::filter::Primitive>()) as u64);
+    }
+    bytes
+}
 
 /// Report the raster boundary version independently from Render Engine identity.
 #[must_use]
@@ -197,22 +294,10 @@ fn output_geometry(
 /// features. `resources_dir` remains unset, so this boundary neither discovers
 /// host fonts nor resolves SVG resources from the filesystem or network.
 pub fn rasterize(svg: &str, options: RasterOptions) -> Result<RasterOutput, RasterError> {
-    if svg.is_empty() {
-        return Err(RasterError::EmptySvg);
-    }
-    if svg.len() > MAX_SVG_BYTES {
-        return Err(RasterError::SvgTooLarge {
-            actual: svg.len(),
-            maximum: MAX_SVG_BYTES,
-        });
-    }
+    rasterize_tree(&parse_tree(svg)?, options)
+}
 
-    let parser_options = usvg::Options {
-        resources_dir: None,
-        ..usvg::Options::default()
-    };
-    let tree = usvg::Tree::from_str(svg, &parser_options)
-        .map_err(|error| RasterError::Parse(error.to_string()))?;
+fn rasterize_tree(tree: &usvg::Tree, options: RasterOptions) -> Result<RasterOutput, RasterError> {
     let intrinsic = tree.size();
     let (width, height, scale) = output_geometry(
         f64::from(intrinsic.width()),
@@ -224,7 +309,7 @@ pub fn rasterize(svg: &str, options: RasterOptions) -> Result<RasterOutput, Rast
         .ok_or(RasterError::ByteLengthOverflow)?;
     let mut pixmap = Pixmap::new(width, height).ok_or(RasterError::AllocationFailed)?;
     resvg::render(
-        &tree,
+        tree,
         Transform::from_scale(scale, scale),
         &mut pixmap.as_mut(),
     );
@@ -236,6 +321,54 @@ pub fn rasterize(svg: &str, options: RasterOptions) -> Result<RasterOutput, Rast
         stride,
         pixel_format: PIXEL_FORMAT_RGBA8_PREMULTIPLIED,
         pixels,
+    })
+}
+
+/// Render a tile from the original tree rather than wrapping or clipping its SVG.
+/// Each output tile obeys the display raster budget; the full export canvas is
+/// limited to 144 million pixels and 120,000 pixels on either side.
+pub fn rasterize_region(
+    svg: &str,
+    region: RasterRegionOptions,
+) -> Result<RasterOutput, RasterError> {
+    validate_svg(svg)?;
+    validate_region(region)?;
+    rasterize_tree_region(&parse_tree(svg)?, region)
+}
+
+fn validate_region(region: RasterRegionOptions) -> Result<(), RasterError> {
+    if region.full_width == 0 || region.full_height == 0
+        || region.full_width > 120_000 || region.full_height > 120_000
+        || region.width == 0 || region.height == 0
+        || region.x.checked_add(region.width).is_none_or(|end| end > region.full_width)
+        || region.y.checked_add(region.height).is_none_or(|end| end > region.full_height)
+    { return Err(RasterError::InvalidTargetDimension); }
+    validate_requested_dimension(Some(region.width))?;
+    validate_requested_dimension(Some(region.height))?;
+    let full_pixels = u64::from(region.full_width) * u64::from(region.full_height);
+    if full_pixels > 144_000_000 {
+        return Err(RasterError::PixelCountTooLarge { actual: full_pixels, maximum: 144_000_000 });
+    }
+    let pixels = u64::from(region.width) * u64::from(region.height);
+    if pixels > MAX_RASTER_PIXELS {
+        return Err(RasterError::PixelCountTooLarge { actual: pixels, maximum: MAX_RASTER_PIXELS });
+    }
+    Ok(())
+}
+
+fn rasterize_tree_region(tree: &usvg::Tree, region: RasterRegionOptions) -> Result<RasterOutput, RasterError> {
+    validate_region(region)?;
+    let intrinsic = tree.size();
+    let scale = (region.full_width as f32 / intrinsic.width())
+        .min(region.full_height as f32 / intrinsic.height());
+    if !scale.is_finite() || scale <= 0.0 { return Err(RasterError::InvalidIntrinsicSize); }
+    let stride = region.width.checked_mul(4).ok_or(RasterError::ByteLengthOverflow)?;
+    let mut pixmap = Pixmap::new(region.width, region.height).ok_or(RasterError::AllocationFailed)?;
+    let transform = Transform::from_scale(scale, scale).post_translate(-(region.x as f32), -(region.y as f32));
+    resvg::render(tree, transform, &mut pixmap.as_mut());
+    Ok(RasterOutput {
+        width: region.width, height: region.height, stride,
+        pixel_format: PIXEL_FORMAT_RGBA8_PREMULTIPLIED, pixels: pixmap.take(),
     })
 }
 

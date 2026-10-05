@@ -1,0 +1,28 @@
+{
+  "schema": "inku.apple-description-meter-resources.v1",
+  "sudachi_engine": {
+    "version": "0.7.0",
+    "source": "https://github.com/WorksApplications/sudachi.rs",
+    "revision": "5de0410b6edfd428fc510cc9763440772e9619d5",
+    "license": "Apache-2.0"
+  },
+  "japanese_dictionary": {
+    "edition": "small",
+    "version": "20260723.1",
+    "source": "https://github.com/WorksApplications/SudachiDict",
+    "license": "Apache-2.0"
+  },
+  "english_dictionary": {
+    "source": "https://github.com/cmusphinx/cmudict",
+    "revision": "74790861f652b15e4ac49015a90074ad62a27690",
+    "license": "CMU BSD-style"
+  },
+  "sha256": {
+    "system.dic": "222ae103b62ff2ba976bc1390f05f6e51f502e6c9d0031a7ddb7bf6013af9889",
+    "sudachi.json": "5ef3d0c95ab6f9261ec75411947d90a837ac56556b3e242fb6351b1417582395",
+    "char.def": "3fcb45c133b9f59d77ed052931f3a19dbcf884a91289e546071a826038342d5d",
+    "rewrite.def": "a62bb6af22136331225d05fbcf95b97939e3f236feeda2240ed59641a0470d1c",
+    "unk.def": "4e8c4c15e18af6a9fc5d636e3dc73fde55d50941b93a6c8835d4653d3f54ba79",
+    "cmudict.dict": "81917843c7f44ce2b094ac63873c2c7a4cf802040792c455ba3ca406891c3d22"
+  }
+}

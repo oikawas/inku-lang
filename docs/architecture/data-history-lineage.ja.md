@@ -93,7 +93,7 @@ erDiagram
 
 ## 移植可能な永続化境界
 
-ServerはSQLAlchemy/SQLite、AndroidはRoom/SQLiteを物理ownerとして持ち、将来iOS adapterを作る場合も自身の物理schemaを持つ。共通意味とhost mappingの正本は[`persistence/README.md`](../../persistence/README.md)と[`persistence/contract.json`](../../persistence/contract.json)であり、同じDB file、table名、column配置を要求しない。Server専用の認証・管理tableと端末専用のprovider・model・cache tableはhost extensionであってparity gapではない。保存済みSVG、Score、hash、NULLの意味はこのmappingによって変えない。AndroidもRoom側に共有pipelineの状態（authority、action ACK、実行snapshot、履歴revisionの不変context）を持つ（`SharedPipelineEntities.kt`、`RoomSharedPipelineStore.kt`）。
+ServerはSQLAlchemy/SQLite、AndroidはRoom/SQLite、Swift初期基盤はGRDB/SQLiteを物理ownerとして持つ。共通意味とhost mappingの正本は[`persistence/README.ja.md`](../../persistence/README.ja.md)と[`persistence/contract.json`](../../persistence/contract.json)であり、同じDB file、table名、column配置を要求しない。Swiftは契約v2へ独立した物理schema v1をmappingし、iOSアプリの実装とは区別する。Server専用の認証・管理tableと端末専用のprovider・model・cache tableはhost extensionであってparity gapではない。保存済みSVG、Score、hash、NULLの意味はこのmappingによって変えない。AndroidはRoom、Swiftはexecution／ACK tableに共有pipelineの状態（authority、action ACK、opaque実行snapshot、履歴revisionの不変context）を持ち、保存とACKをatomicに確定する。
 
 ## Server SQLite lifecycle
 
@@ -122,7 +122,7 @@ flowchart LR
 
 起動時の経路は次のとおりである。fresh DBはschemaとregistry v4 `single_history_ddl`を1 transactionで作る。current DBは版・checksum、由来列と旧列の不存在、FTSを検査して通常起動し、全件照合を繰り返さない。旧二本文DBは手動移行必須として通常起動を拒否する。手動移行は既知のv3 fingerprintとregistryを確認し、検証済みsnapshotがwriter lock下の移行前像と一致した場合だけ一つのtransactionで本文を選択・旧列を削除する。全persistent tableの保護値、history rowid、主キー、本文byte、保存link digest、FTS、quick/foreign-key checkを照合し、registry v3の記録を保持してv4を加える。未知・部分状態・未来版・checksum不一致は拒否する。受入済みの古いbackupは原本を保持した新しいコピーで凍結v3 adapterを通してから統合する。詳しくは[共通保存契約](../../persistence/README.ja.md)を参照。
 
-Android Room v12は同じ論理契約を別の物理schemaで満たす。v10→v11で既存作品を保持したまま共有pipelineの状態を加え、v11→v12で履歴に要求時の`catalog_mode`を加えた。v1–9限定resetは旧DBと派生thumbnailを捨てるがmodel fileを残す。未来版や読めないDBは変更しない。このlifecycle差はportable contractのgapではなくhost adapterの明示的な所有範囲である。
+Android Room v14は同じ論理契約v2を別の物理schemaで満たす。v10→v11で共有pipelineの状態、v11→v12で要求時の`catalog_mode`を加え、v12→v13でDDLをNULL可にし、v13→v14でDDL本文を一本化した。保存Score／SVGと既存作品の保護値を保持する。v1–9限定resetは旧DBと派生thumbnailを捨てるがmodel fileを残す。未来版や読めないDBは変更しない。このlifecycle差はportable contractのgapではなくhost adapterの明示的な所有範囲である。
 
 ## 4種類のID
 

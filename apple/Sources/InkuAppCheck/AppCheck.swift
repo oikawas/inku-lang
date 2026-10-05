@@ -1,0 +1,302 @@
+import Foundation
+import InkuCore
+import InkuPersistence
+import InkuUI
+import InkuHost
+
+@main
+struct AppCheck {
+    @MainActor
+    static func main() async throws {
+        if CommandLine.arguments.contains("--palette-alias-parity-only") {
+            func path(_ argument: String) throws -> URL? {
+                guard let index = CommandLine.arguments.firstIndex(of: argument) else { return nil }
+                guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Missing palette fixture path") }
+                return URL(fileURLWithPath: CommandLine.arguments[index + 1])
+            }
+            guard let expected = try path("--expected-color-map") else { throw CheckFailure.message("Missing observed Server color map") }
+            try await runPaletteAliasParityChecks(expectedMap: Data(contentsOf: expected),
+                fixtureDirectory: path("--parity-native-fixture"), legacyDirectory: path("--previous-parity-native-fixture")); return
+        }
+        if CommandLine.arguments.contains("--resource-policy-parity-only") {
+            let folder: URL?
+            if let index = CommandLine.arguments.firstIndex(of: "--parity-native-fixture") {
+                guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Missing resource policy fixture path") }
+                folder = URL(fileURLWithPath: CommandLine.arguments[index + 1])
+            } else { folder = nil }
+            try await runResourcePolicyParityChecks(fixtureDirectory: folder); return
+        }
+        if CommandLine.arguments.contains("--app-parity-contract-only") {
+            let folder: URL?
+            if let index = CommandLine.arguments.firstIndex(of: "--parity-native-fixture"), CommandLine.arguments.indices.contains(index + 1) {
+                folder = URL(fileURLWithPath: CommandLine.arguments[index + 1])
+            } else { folder = nil }
+            try await runAppParityContractChecks(fixtureDirectory: folder); return
+        }
+        if CommandLine.arguments.contains("--drawing-failure-log-only") {
+            try await runDrawingFailureLogChecks(); return
+        }
+        if CommandLine.arguments.contains("--model-settings-ui-only") {
+            try await runModelSettingsUIChecks(); return
+        }
+        if CommandLine.arguments.contains("--provider-defaults-only") {
+            try await runProviderDefaultsChecks(); return
+        }
+        if CommandLine.arguments.contains("--batch-ui-only") {
+            try await runBatchUIPresentationChecks(); return
+        }
+        if CommandLine.arguments.contains("--library-browsing-only") {
+            try await runLibraryBrowsingChecks(); return
+        }
+        if CommandLine.arguments.contains("--lineage-presentation-only") {
+            try await runLineagePresentationChecks(); return
+        }
+        if CommandLine.arguments.contains("--ddl-editor-cancel-only") {
+            try await runDdlEditorCancelChecks(); return
+        }
+        if CommandLine.arguments.contains("--drawing-limits-editing-only") {
+            try await runDrawingLimitsEditingChecks(); return
+        }
+        if CommandLine.arguments.contains("--canvas-wheel-only") {
+            try runCanvasWheelChecks(); return
+        }
+        if let index = CommandLine.arguments.firstIndex(of: "--raster-only"), CommandLine.arguments.indices.contains(index + 1) {
+            try await runRasterChecks(fixtureURL: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
+            return
+        }
+        if CommandLine.arguments.contains("--authoring-only") {
+            try await runAuthoringChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--saved-output-availability-only") {
+            try await runSavedOutputAvailabilityChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--saved-annotation-selection-only") {
+            try await runSavedAnnotationSelectionChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--comparison-only") {
+            try await runComparisonChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--automation-only") {
+            try await runAutomationChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--model-selection-only") {
+            try await runModelSelectionChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--work-edit-only") {
+            let fixtureURL: URL?
+            if let index = CommandLine.arguments.firstIndex(of: "--work-edit-native-fixture") {
+                guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Missing work-edit fixture path") }
+                fixtureURL = URL(fileURLWithPath: CommandLine.arguments[index + 1])
+            } else { fixtureURL = nil }
+            try await runWorkEditChecks(nativeFixtureURL: fixtureURL)
+            return
+        }
+        if CommandLine.arguments.contains("--refinement-only") {
+            try await runRefinementChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--replay-comparison-only") {
+            try await runReplayComparisonChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--auxiliary-provenance-only") {
+            try await runAuxiliaryProvenanceChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--provider-progress-only") {
+            try await runProviderProgressChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--model-guidance-only") {
+            try await runModelGuidanceChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--composition-host-only") {
+            try await runCompositionHostChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--composition-personal-plan-gate-only") {
+            try await runCompositionPersonalPlanGateChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--composition-progress-only") {
+            try await runCompositionProgressChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--provider-observation-only") {
+            try await runProviderObservationChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--plugin-only") {
+            try await runPluginChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--cancel-only") {
+            try await checkControllerCancellation()
+            return
+        }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("inku-app-check-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let databaseURL = directory.appendingPathComponent("inku.sqlite")
+        let model = AppModel(databaseURL: databaseURL)
+        await model.initialize()
+        model.inputMode = "ddl"
+        model.ddlText = "place one green square at center."
+        model.seedText = "42"
+        guard model.canvases.count == 11, !model.catalogs.isEmpty, model.canGenerate else {
+            throw CheckFailure.message("Bundled Server defaults or Rust registry failed: \(model.errorText ?? model.status)")
+        }
+        await model.generate()
+        guard model.errorText == nil, model.works.count == 1, let work = model.selectedWork,
+              !work.svg.isEmpty, !work.score.isEmpty, work.renderSeed == "42" else {
+            throw CheckFailure.message("App DDL pipeline did not save: \(model.errorText ?? model.status)")
+        }
+        let frame = try await model.renderer.image(svg: work.svg, targetWidth: 128)
+        guard frame.width > 0, frame.height > 0 else { throw CheckFailure.message("Native frame missing") }
+        let recreated = AppModel(databaseURL: databaseURL)
+        await recreated.initialize()
+        guard recreated.works == model.works else { throw CheckFailure.message("Restart changed canonical saved values") }
+        let exportURL = directory.appendingPathComponent("work.svg")
+        await model.exportSVG(to: exportURL)
+        guard try String(contentsOf: exportURL, encoding: .utf8) == work.svg else {
+            throw CheckFailure.message("Export changed canonical SVG")
+        }
+        print("App pipeline passed: DDL → Score/SVG → SQLite → restart; native \(frame.width)×\(frame.height); canonical SVG export.")
+        print("Artifacts: \(directory.path)")
+    }
+
+    @MainActor
+    private static func checkControllerCancellation() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("inku-controller-cancel-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let databaseURL = directory.appendingPathComponent("inku.sqlite")
+        let provider = ProviderSettings(id: "local", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false)
+        let settings = HostSettings(providers: [provider], models: ModelSelection(stage1Model: "local:boundary-check", stage2Model: "local:boundary-check"))
+        try JSONEncoder().encode(settings).write(to: directory.appendingPathComponent("providers.json"), options: .atomic)
+
+        // A valid backup with a sentinel makes an accidental restore observable.
+        let restoreSource = try InkuDatabase(url: directory.appendingPathComponent("restore-source.sqlite"))
+        let sentinel = SavedWork(id: "restore-sentinel", at: 1, input: "sentinel", score: "{}", svg: "<svg/>", lineageNodeID: "restore-sentinel-node")
+        try await restoreSource.save(sentinel, node: LineageNode(id: "restore-sentinel-node", historyID: sentinel.id, at: 1))
+        let restoreURL = directory.appendingPathComponent("restore.sqlite")
+        try await restoreSource.backup(to: restoreURL)
+
+        let transport = DelayedControllerProvider()
+        let model = AppModel(databaseURL: databaseURL, transport: transport)
+        await model.initialize()
+        model.inputMode = "description"
+        model.descriptionText = "a red circle"
+        model.seedText = "42"
+        guard model.errorText == nil, model.canGenerate else {
+            throw CheckFailure.message("Cancellation fixture did not initialize: \(model.errorText ?? model.status)")
+        }
+        let generationFinished = BoundedSignal()
+        let generation = Task { @MainActor in
+            await model.generate()
+            await generationFinished.fire()
+        }
+        try await transport.started.wait()
+        let cancelFinished = BoundedSignal()
+        let cancellation = Task { @MainActor in
+            await model.cancel()
+            await cancelFinished.fire()
+        }
+        try await transport.cancelled.wait()
+        guard model.isBusy, !model.canGenerate, model.status == "停止中" else {
+            await transport.releaseLateAnswer()
+            throw CheckFailure.message("Stop released the controller before its provider task completed")
+        }
+        // Both entry points must stay closed while the cancelled task is still draining.
+        await model.generate()
+        await model.restore(from: restoreURL)
+        let callsWhileStopping = await transport.calls
+        let inspection = try InkuDatabase(url: databaseURL)
+        let rowsWhileStopping = try await inspection.list()
+        guard model.isBusy, !model.canGenerate, model.errorText == nil,
+              model.status == "停止中", callsWhileStopping == 1, rowsWhileStopping.isEmpty else {
+            await transport.releaseLateAnswer()
+            throw CheckFailure.message("A new generation or restore entered while the operation was stopping")
+        }
+        await transport.releaseLateAnswer()
+        try await generationFinished.wait()
+        try await cancelFinished.wait()
+        await generation.value
+        await cancellation.value
+        let finalRows = try await inspection.list()
+        guard !model.isBusy, model.canGenerate, model.errorText == nil,
+              model.status == "停止しました", model.works.isEmpty, finalRows.isEmpty,
+              await transport.calls == 1 else {
+            throw CheckFailure.message("Late provider completion changed the stopped controller or saved a work")
+        }
+        print("Controller cancellation passed: busy retained until completion; generation/restore denied; late response/progress rejected; no saved work.")
+    }
+}
+
+enum CheckFailure: Error {
+    case message(String)
+}
+
+/// The deadline releases the waiter rather than waiting for an uncooperative provider task.
+private actor BoundedSignal {
+    private var fired = false
+    private var waiter: CheckedContinuation<Void, Error>?
+    private var deadline: Task<Void, Never>?
+    func fire() {
+        fired = true
+        deadline?.cancel(); deadline = nil
+        waiter?.resume(); waiter = nil
+    }
+    func wait() async throws {
+        if fired { return }
+        try await withCheckedThrowingContinuation { continuation in
+            waiter = continuation
+            deadline = Task {
+                do { try await Task.sleep(for: .seconds(5)) }
+                catch { return }
+                self.timeout()
+            }
+        }
+    }
+    private func timeout() {
+        waiter?.resume(throwing: CheckFailure.message("Controller cancellation check timed out"))
+        waiter = nil; deadline = nil
+    }
+}
+
+/// Intentionally ignores task cancellation until the check releases its final answer.
+private actor DelayedControllerProvider: ProviderTransport {
+    nonisolated let started = BoundedSignal()
+    nonisolated let cancelled = BoundedSignal()
+    private(set) var calls = 0
+    private var action: Data?
+    private var continuation: CheckedContinuation<Data, Never>?
+    private var progress: (@Sendable (Int) -> Void)?
+    func perform(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
+                 onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
+        calls += 1; self.action = action; self.progress = onBytes
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                self.continuation = continuation
+                Task { await started.fire() }
+            }
+        } onCancel: {
+            Task { await self.cancelled.fire() }
+        }
+    }
+    func releaseLateAnswer() {
+        guard let continuation, let action,
+              let effect = try? ExactJSON(data: action) else { return }
+        self.continuation = nil
+        progress?(4096)
+        let result = ExactJSON.object(["tag": .string("normalized_ddl_generated"), "identity": effect["identity"],
+                                        "response": .string(#"{"normalized_ddl":"place one red circle at center."}"#), "elapsed_ms": .string("1")])
+        continuation.resume(returning: result.data)
+    }
+}

@@ -32,6 +32,7 @@ SWIFT_CHECKOUTS = (APPLE / "build/macOS/SourcePackages/checkouts", APPLE / ".bui
 LICENSE_NAME = re.compile(r"^(licen[cs]e|copying|notice|copyright)", re.IGNORECASE)
 # Crate archives without a license file, supplemented from the upstream repository's
 # own file at the same release (the published crates are unmodified).
+SUDACHIDICT_LEGAL = APPLE / "scripts/licenses/SudachiDict-v20260723-LEGAL"
 UPSTREAM_LICENSES = {("https://github.com/mozilla/uniffi-rs", "0.32.0"): APPLE / "scripts/licenses/uniffi-rs-v0.32.0-LICENSE"}
 # A new Swift package must be reviewed and named here before it can ship.
 SWIFT_LICENSES = {"grdb.swift": "MIT"}
@@ -239,8 +240,10 @@ def bundled_resources(notices: Notices) -> None:
                 [notices.text("LICENSE", read_text(METER_RESOURCES / "Sudachi-LICENSE.txt"))],
                 "sudachi.json, char.def, rewrite.def and unk.def, unmodified.")
     notices.add("resources", f"SudachiDict ({japanese['edition']})", japanese["version"], japanese["license"],
-                japanese["source"], [notices.text("LICENSE-2.0.txt", read_text(meter_license))],
-                "system.dic, unmodified, from the PyPI sudachidict-small package.")
+                japanese["source"], [notices.text("LICENSE-2.0.txt", read_text(meter_license)),
+                                     notices.text("LEGAL", read_text(SUDACHIDICT_LEGAL))],
+                "system.dic, unmodified, from the PyPI sudachidict-small package. The wheel omits the upstream LEGAL "
+                "notice for the UniDic data in the small lexicon, so it is reproduced from the v20260723 tag.")
     notices.add("resources", "The CMU Pronouncing Dictionary", english["revision"][:12], "BSD-2-Clause-style (CMU)",
                 f"{english['source']}/tree/{english['revision']}",
                 [notices.text("LICENSE", read_text(ROOT / "server/src/inku_server/cmudict/LICENSE"))],

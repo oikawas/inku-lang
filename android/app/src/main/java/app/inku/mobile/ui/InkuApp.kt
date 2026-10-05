@@ -796,6 +796,7 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
     )
     val table = LocalCompositionRangeTable.current
     val session = remember(table) { DdlRangeEditorSession(table) }
+    val synchronization = remember { DdlEditorSynchronization(state.ddl) }
     var focused by remember { mutableStateOf(false) }
     var rangeStatus by remember { mutableStateOf(DdlEditorRangeStatus()) }
     val editorValue = TextFieldValue(editorState.text.toString(), editorState.selection, editorState.composition)
@@ -832,12 +833,22 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
         if (update.names.isNotEmpty()) editorState.edit { update.applyTo(this) }
         rangeStatus = update.status
         val source = editorState.text.toString()
-        if (source != viewModel.state.value.ddl) viewModel.setDdl(source)
+        synchronization.publish(source, !viewModel.state.value.isDrawing)?.let(viewModel::setDdl)
     }
     LaunchedEffect(editorState, session, focused, state.isDrawing) {
         androidx.compose.runtime.snapshotFlow {
             DdlEditorSnapshot(editorState.text.toString(), editorState.selection, editorState.composition, focused, !state.isDrawing)
         }.collect { syncEditor() }
+    }
+    LaunchedEffect(state.ddl, editorState.composition) {
+        synchronization.external(viewModel.state.value.ddl, editorState.composition != null)?.let { source ->
+            session.reset()
+            editorState.edit {
+                val nextSelection = TextRange(selection.start.coerceAtMost(source.length), selection.end.coerceAtMost(source.length))
+                replace(0, length, source)
+                selection = nextSelection
+            }
+        }
     }
     fun closeEditor() {
         syncEditor(leaving = true)
@@ -856,6 +867,7 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
             viewModel.importDdlFile(text)
             val imported = viewModel.state.value.ddl
             session.reset()
+            synchronization.adopt(imported)
             editorState.edit {
                 replace(0, length, imported)
                 selection = TextRange(imported.length)

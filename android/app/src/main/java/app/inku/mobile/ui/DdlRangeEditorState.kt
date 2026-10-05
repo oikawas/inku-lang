@@ -3,6 +3,21 @@ package app.inku.mobile.ui
 import androidx.compose.foundation.text.input.TextFieldBuffer
 import androidx.compose.ui.text.TextRange
 
+/** Selection events never republish stale text over an externally updated draft. */
+internal class DdlEditorSynchronization(private var published: String) {
+    fun adopt(source: String) { published = source }
+    fun publish(source: String, editable: Boolean): String? {
+        if (!editable || source == published) return null
+        published = source
+        return source
+    }
+    fun external(source: String, composing: Boolean): String? {
+        if (composing || source == published) return null
+        published = source
+        return source
+    }
+}
+
 internal data class DdlEditorSnapshot(
     val source: String,
     val selection: TextRange,
@@ -136,7 +151,10 @@ internal class DdlRangeEditorSession(private val table: CompositionRangeTable) {
         if (snapshot.composition == null && snapshot.editable) {
             pendingNames.toList().forEach { start ->
                 val range = ranges.firstOrNull { it.start == start }
-                if (range != null && snapshot.focused && range.contains(snapshot.selection)) return@forEach
+                val editing = range?.contains(snapshot.selection) ?: oldActive?.takeIf { it.start == start }?.let {
+                    it.contains(snapshot.selection) || (snapshot.selection.collapsed && snapshot.selection.start == it.end)
+                } ?: false
+                if (snapshot.focused && editing) return@forEach
                 range?.bounds?.let(table::at)?.words(range.language)?.let { name ->
                     if (name != range.name) {
                         val from = range.nameStart(snapshot.source)
@@ -165,6 +183,7 @@ internal class DdlRangeEditorSession(private val table: CompositionRangeTable) {
             }?.copy(bounds = null, foldable = false)
         val bounds = active?.bounds ?: status.bounds.takeIf { active != null && active.start == fallback?.start }
         status = DdlEditorRangeStatus(active, bounds, finalRanges.any { it.bounds == null } || (active != null && active.bounds == null))
+        if (snapshot.editable && active?.bounds != null) pendingNames = pendingNames + active.start
         previous = updated
         return DdlEditorUpdate(updated, names, status)
     }

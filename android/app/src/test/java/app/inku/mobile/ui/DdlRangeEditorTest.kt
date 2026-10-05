@@ -16,6 +16,26 @@ class DdlRangeEditorTest {
     }
 
     @Test
+    fun externalDdlIsAdoptedWithoutSelectionRepublishingOrInterruptingComposition() {
+        val initial = "右下（横2/3〜1、縦2/3〜1）に、円。"
+        val state = TextFieldState(initial)
+        val synchronization = DdlEditorSynchronization(initial)
+        val external = "左上（横0〜1/3、縦0〜1/3）に、円。\r\n"
+        assertNull(synchronization.publish(initial, editable = true))
+        val replacement = synchronization.external(external, composing = false)!!
+        state.edit { replace(0, length, replacement); selection = TextRange(4) }
+        state.edit { selection = TextRange(6) }
+        assertEquals(external, state.text.toString())
+        assertNull(synchronization.publish(state.text.toString(), editable = true))
+        state.edit { replace(0, 2, "右下") }
+        assertNull(synchronization.publish(state.text.toString(), editable = false))
+        assertEquals("右下（横0〜1/3、縦0〜1/3）に、円。\r\n", synchronization.publish(state.text.toString(), editable = true))
+        assertNull(synchronization.external(external, composing = true))
+        assertEquals("右下（横0〜1/3、縦0〜1/3）に、円。\r\n", state.text.toString())
+        assertEquals(external, synchronization.external(external, composing = false))
+    }
+
+    @Test
     fun presentationDeletionsKeepRawTextAndSdkSelectionOffsets() {
         val raw = "🖼\n［構図］右下（横2/3〜1、縦2/3〜1）に、円。\r\n左上（横0〜1/3、縦0〜1/3）に、点。\n独自（横0.2〜0.5、縦0〜0.3）に、線。"
         val folded = "🖼\n右下に、円。\r\n左上に、点。\n独自（横0.2〜0.5、縦0〜0.3）に、線。"
@@ -66,6 +86,13 @@ class DdlRangeEditorTest {
         assertEquals(TextRange(expected.indexOf("Keep")), state.selection)
         assertEquals(state.selection, leaving.snapshot.selection)
         assertEquals("🖼 Place a circle at the bottom center.\r\nKeep this line.", displayDdlRanges(expected, table).text)
+
+        val unmodified = DdlRangeEditorSession(table)
+        val entering = unmodified.update(DdlEditorSnapshot(edited, TextRange(edited.indexOf("horizontal") + 12)))
+        assertTrue(entering.names.isEmpty())
+        val exiting = unmodified.update(DdlEditorSnapshot(edited, TextRange(edited.length)))
+        assertEquals(expected, exiting.snapshot.source)
+        assertEquals(1, exiting.names.size)
     }
 
     @Test

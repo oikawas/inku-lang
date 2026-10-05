@@ -19,7 +19,7 @@
 
 - Android仕様メモの「未実装」節は、外部provider executionを未実装とし、provider recordをcompatibility data structuresと記す。
 - 現行 `RoutingModelProvider` はenabled providerを解決し、`GeminiModelProvider`と`OpenAiCompatibleProvider`へ接続する。共有pipelineのprovider effectは`SingleAttemptModelEffectProvider`がこれらへ送る。同じ仕様メモの前半もGeminiとOpenAI互換への要求条件を記している。
-- Android担当が2026-09-25に「未実装」節から外部provider executionを削除した（`ddb1e19a`）。Anthropic固有protocolの実装は確認できず、全providerの同等性は主張しない。
+- Android担当が2026-09-25に「未実装」節から外部provider executionを削除した（`ddb1e19a`）。2026-09-26にMessages APIの`AnthropicModelProvider`（`045897fe`）が加わった。providerへの要求と失敗の分類は2026-10-06にServerへ揃えた（ANDROID_SPEC「2026-10-06 Server／Webとの差の解消」）。
 - 判定: **解消済み**。
 
 ### F-04 Stage 1.5の長い旧説明（解消）
@@ -44,7 +44,7 @@
 
 - cutoverで旧`description_labels.py`が削除され、行頭の連番と角括弧のコメントがStage 1・写生・色カタログ選択へそのまま届き、札だけの記述も400にならなかった（`SPEC.ja.md` §12.16と不一致）。
 - 2026-09-25に`description_labels.py`を戻し、`PipelineService.start`（記述起点の全経路）と記述からの再生成で、coreへ渡す記述だけから札を切るようにした。作品には書いたままの記述が残り、札だけの記述は400になる。
-- 判定: **解消済み**。Androidは切除を持ったことがなく、この門はServerの境界にある。
+- 判定: **解消済み**。Androidは2026-10-06から、同じ規則の共有coreの写し（`pipeline_description`、JNI）で切り、札だけの記述を断る。
 
 ### F-08 streamの進行event（解消）
 

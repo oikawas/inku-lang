@@ -3,7 +3,7 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-10-05。
+最終更新: 2026-10-06。
 
 **追随状況**: Android は `2.1.4-android.80` の世代にある。DDLの変換とScore → SVGの描画は、
 同じcommitの共有Rust core（`core/crates/`）を同梱してServerと同じ実装で行い、Android独自の版定数を持たない。
@@ -29,6 +29,41 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 - `ANDROID_SPEC.md` は英語版として、`ANDROID_SPEC.ja.md` の意図を保った翻訳・要約として更新する。
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
+
+## 2026-10-06 Server／Webとの差の解消
+
+Server／Webとの差の監査で見つけた差を、次の規則に揃えた。本節は以前の節の同じ項目より優先する。
+
+- **記述の札**: 行頭の連番と角括弧の注記は、共有coreの`pipeline_description`（JNI。Serverの`description_labels.py`と同じ規則で、行は`\n`だけで区切る）で切ってからcoreへ渡す。作品には書いたままの記述を残す。札だけの記述はWebと同じ文で断る。
+- **指示文の言語**: 記述から描くときは札を切った記述、DDLから描くときはDDL本文で判定する。指定が無ければ親の`instruction_lang_requested`を継ぎ、親も無ければ`auto`とする。UI言語も親から継ぐ。実行中のDDL編集で言語が変われば、新しいvariationへforkする。
+- **語の種**: render seedは共有coreの`render_seed_from_text`（JNI）で決め、正規化した語を記録する。要求に語が無ければ親の語を継ぎ、語は明示した`render_seed`より優先する（Serverと同じ）。再演も同じ規則で、Kotlinの写しは持たない。
+- **forkの色**: 保存作品や実行からforkするときは、今日のカタログ定義から全カタログの色を解く。保存作品の再演は従来どおり作品自身の色を使う。
+- **別の構図**: coreへ渡す作品の識別子は`sha256:`＋可視DDLのSHA-256、seedは`composition_seed`、無ければ`render_seed`とする（Serverの`/api/compose`と同じ）。
+- **入力の長さ**: 記述・DDL・写生文は100,000文字（code point）までとし、超えれば何も送らずに断る（Serverの互換APIと同じ上限）。
+- **補完前の安全な演奏**: known holeの補完を求める前に、成立したScoreを描いて保存する。補完の承認待ち・辞退・失敗のあいだも絵が残る。Scoreがあり未描画のまま止まった実行（`needs_user_edit`／`failed`）も描いて保存する。保存はrevisionごとに1作品で、承認後の完成は別の作品になる（系譜は兄弟。Serverと同じ）。推敲の候補は保存しない。
+- **補完の承認と辞退**: 画面に出ている変更案のrevisionとdigestを送り、変更案が変わっていればcoreが断る。承認待ちのあいだのDDL編集はhostで辞退を作らずcoreに任せ、断られたら「補完候補に答えてから、DDLを編集してください。」と出す（作者の決定、2026-10-06）。
+- **止まった理由**: `needs_user_edit`／`failed`の理由と、その段のmodelの失敗をWebと同じ文で出す（`attention.ts`）。APIキーが無いときは「モデルのAPIキーがありません」と出す。
+- **provider**:
+  - OpenAI互換では、構図の読み（`read_composition`）もStage 1と同じ温度0.3で送る。
+  - 応答の形が欠けたら`malformed_payload`とする。設定の誤り（鍵・Base URL・provider・httpのURL・未取得の端末モデル）は`provider_rejected`とし、coreに再試行させない。
+  - 鍵が要るproviderはServerの定義（openai・anthropic・gemini・nvidia・ollama-cloud）に従う。OpenAI互換は鍵が空なら`Bearer none`を送る。
+  - 成功の応答は1 MiB（bytes）まで読み、エラーの本文は先頭16 KiBで分類する。ChatGPTの引数の上限は1 MiBとし、失敗の分類とSSEの区切りはServerと同じにする。
+  - GeminiのモデルIDは、Pythonの`quote(model, safe="")`と同じに符号化する。
+  - 流量制御は、429の後に`Retry-After`／`RetryInfo`と62秒の長い方まで同じproviderへの要求を待たせることと、ollama-cloudの同時2本だけを持つ。rpm／tpm／rpdの予算と`countTokens`は持たない。Androidには上限を上げる手段が無く、既定の上限では大きなGeminiの要求が一度も送られなくなるためである（作者の決定、2026-10-06）。
+- **保存する記録**:
+  - 新作には`render_color_profile`、`compiler_outcome`、`render_limits`（4値）、`render_limits_source`（新作は`settings`、保存した設定から派生した作品は`work`）、`ui_lang`、`elapsed_stage1_ms`／`elapsed_stage2_ms`／`elapsed_total_ms`（modelの時間の段ごとの合計）を記録する。
+  - 再演には、カタログの名前とsub、`render_color_source`、`render_color_profile`、`seed_text`、`render_limits`／`render_limits_source`を記録する。
+  - `ddl_version`／`ddl_engine_version`はServerのPythonの定数、`render_build_number`はWebのBuild番号であり、Androidには対応する値が無いので記録しない。
+- **`rh3`**: hashする本文を、Pythonの`json.dumps(ensure_ascii=False, sort_keys=True, separators=(",", ":"))`と同じ書き方にした（`/`をescapeせず、小数はPythonの`repr`と同じ）。保存済みの行のhashは書き換えない。
+- **推敲**: 記述の無い作品でも、色カタログと配置の推敲はできる。色以外はDDLが要り、タッチ・読み取り・モデル比較は記述が要る（Webと同じ規則と文言）。色カタログの推敲は親以外の全カタログを一覧の順に1案ずつ描き、候補名はカタログ名とし、1案／4案の切替を出さない。進捗の枠は描く案の数だけ4つずつ並べる。
+- **記述の固定**: 保存作品はServerの`description_lock.py`の系譜の規則で、未保存の作品はauthorityで決める（Webと同じ）。
+- **書き出し**: PNGの高さは64〜2160pxとする（作者の決定、2026-10-06）。範囲の外は縮めずに断る。幅はキャンバスの比から描く前に求め、`inku-svg-raster`の上限（一辺8192px・16,777,216画素）を超えれば断る。既定のテンプレートは`PNG 1080px`・`PNG 2160px`とし、組み込みの`png-4320`は起動時に消す（作者が作ったテンプレートは残し、2160pxを超えるものは書き出し時に理由を示して断る）。PNGにはWebと同じく作品の作成日時を`eXIf`とtEXt `Creation Time`で入れる。表示用SVGの書き出しは、Webと同じく最初の`<svg>`の直後に記述を`<desc>`で入れる。
+- **変えずにAndroidの判断とした点**:
+  - 終わった実行の取消: 終端のphaseではcoreへcancelを送らない。Androidは描画の後で保存するので、Serverと同じく常に送ると、競合したときに未保存の完成が消える。
+  - fork contextの形: `inku.pipeline-history-fork-context.v2`の名前のまま、`authority`と`color_maps`を足した10鍵を端末内でだけ読む。hostをまたぐ経路は無く、名前を変えると全行の書き換えになる。
+  - MLXの接続: 端末のloopbackは端末自身で、LANのhttpは断るので、MacのMLXに届かない（ローカルOllamaと同じ理由）。
+  - 開発者向けのprovider入出力の記録と再試行の無効化: Androidには開発者モードが無い。
+  - 版0.1.0のScoreの再演: Serverは型検証とcoerceを通してから描き、Androidは共有coreの`render_saved`で描く。2026-10-06のバックアップにある28件をLinuxで比べ、27件はSVGが一致した。1件はServerの型検証が座標`1.0001`を`1.0`へ丸めるために違い、coerceの4段はどれも発火しなかった。
 
 ## 2026-10-05 数で書いた範囲の表示と編集
 
@@ -66,7 +101,7 @@ DDLの正本と記述からの新規作成を説明する画面文言は「作�
 
 Androidは端末で本人が使うsingle-user hostとして、Serverを介さずChatGPTプランへ直接接続する。設定の独立した「ChatGPTプラン」から「ChatGPTで続ける」を押し、端末のChromeで本人認証を行う。Macの移送アプリやAPIキーは使わない。接続が完了したらinkuへ戻り、初回の利用枠の案内を確認して「モデル設定を開く」へ進む。
 
-設定「モデル」のChatGPTプランで「モデル選択」から本人の一覧を取得し、使うモデルを選んで保存する。取得だけでは公開しない。公開済みかつ本人の一覧にあるモデルだけが描画候補に現れ、Stage 1/2に同じ`chatgpt:<slug>`を使う。提供終了の公開指定や保存済み作品のモデルIDは保持する。設定画面を開くだけではモデル一覧を取得しない。共有のAPIキー設定、bare名の所有、写真の観察、モデル検分、奥書、デモ指示文の生成にはこの接続を提供しない。
+設定「モデル」のChatGPTプランで「モデル選択」から本人の一覧を取得し、使うモデルを選んで保存する。取得だけでは公開しない。公開済みかつ本人の一覧にあるモデルだけが描画候補に現れ、Stage 1/2に同じ`chatgpt:<slug>`を使う。提供終了の公開指定や保存済み作品のモデルIDは保持する。設定画面を開くだけではモデル一覧を取得しない。共有のAPIキー設定、bare名の所有、写真の観察、モデル検分、デモ指示文の生成にはこの接続を提供しない（Androidは奥書を持たない）。
 
 登録を複数保持でき、本人確認済みのアカウントと発行client IDをラベルで見分けて選ぶ。再認証と明示した再同意、認証中止、切断、利用枠を管理するリンクを提供する。描画画面にも利用中のプランと登録を示す。本人確認だけではプラン利用を許可せず、`resource.invoke`と`chatgpt.tokens.use.direct`のscopeを確認する。上限に達した後は追加描画を止め、一覧の明示した再取得で利用可能性を確認できる。切断は端末のtokenを先に除去し、遠隔の失効が確認できない場合はその旨を示す。公開モデルと登録の識別情報は保持する。
 
@@ -88,7 +123,7 @@ LiteRT-LMは0.17.1を使う。端末providerは `ModelRequest.tool.parametersJso
 
 ## 2026-10-03 下絵の後の構図と読み
 
-共有SPEC §12.6.2の構図を新規設定へ取り込む。雲のモデルは `composition: {"read": true}` とし、下絵の後・可視DDLのcommit前に `read_composition` を同じStage 1モデル・最大token・温度0.0で送り、`composition_read` を返す。読みの再試行は共有coreが `composition_retry`、無ければ `catalog_retry` の予算で行う。端末のLiteRT Gemma 4 E2Bは作者の判断どおり `read: false` とし、読みの要求を送らず既定の読みで構図を入れる。
+共有SPEC §12.6.2の構図を新規設定へ取り込む。雲のモデルは `composition: {"read": true}` とし、下絵の後・可視DDLのcommit前に `read_composition` を同じStage 1モデル・最大token・sampling（OpenAI互換は温度0.3、2026-10-06に揃えた）で送り、`composition_read` を返す。読みの再試行は共有coreが `composition_retry`、無ければ `catalog_retry` の予算で行う。端末のLiteRT Gemma 4 E2Bは作者の判断どおり `read: false` とし、読みの要求を送らず既定の読みで構図を入れる。
 
 Geminiへ渡す応答の型は、各objectの `propertyOrdering` に沿って `properties` を書き、要旨 `thesis` を先頭にする。指名されない項目も残す。読みが使えない場合と構図を入れられない場合はcoreの既定の読み／下絵のままのcommitへ進み、Android hostは止めない。新しいsnapshot欄と出来事は共有coreの記録として保持し、読みの段を進み具合やプロンプトのタブへ加えない。
 
@@ -220,7 +255,7 @@ Androidの固定色カタログ13件はServerと同じID、色map、paletteを�
 
 Gemini provider の生成要求は Gemini API の `models/{model}:generateContent` に送る。API key は `x-goog-api-key` で渡し（モデル一覧の取得も同じヘッダーで渡し、最後のページまで読む）、共有pipelineの構造化応答は native function declaration と `functionCall.args` を使う。モデル一覧の取得だけが成功しても、生成要求の到達確認とは扱わない。
 
-共有pipelineのprovider要求はServerの`pipeline_provider.py`と同じ条件で送る。Geminiではtemperatureを送らず、`thinkingConfig.thinkingLevel`を`minimal`とし、`allowedFunctionNames`で応答関数を1つに固定し、core のresponse schemaをServerと同じGemini対応subsetへ変換する（`const`は1要素の`enum`へ、hole補完の`oneOf`は平坦化する。厳密な検証は共有Rustが行う）。OpenAI互換providerではStage 1（`generate_normalized_ddl`）だけtemperature 0.3、他の要求は0.0とする。Stage 1と写生・カタログ選択の出力上限は2048、hole補完は2048とする。
+共有pipelineのprovider要求はServerの`pipeline_provider.py`と同じ条件で送る。Geminiではtemperatureを送らず、`thinkingConfig.thinkingLevel`を`minimal`とし、`allowedFunctionNames`で応答関数を1つに固定し、core のresponse schemaをServerと同じGemini対応subsetへ変換する（`const`は1要素の`enum`へ、hole補完の`oneOf`は平坦化する。厳密な検証は共有Rustが行う）。OpenAI互換providerではStage 1（`generate_normalized_ddl`）と構図の読み（`read_composition`）をtemperature 0.3、他の要求を0.0とする。Stage 1と写生・カタログ選択の出力上限は2048、hole補完は2048とする。
 
 Room DBのcursor windowは40 MiBとする。SVGはServerと同じく12 MiBまで許され、実行状態はその描画結果を含むため、標準の約2 MBでは保存済みの行を読み戻せない。
 
@@ -347,8 +382,8 @@ Rust authoring pipelineとraster presentationを導入済みである。以下�
 - Stage 1の有限語彙と出典、catalog選択、visible normalized DDL schemaは共有Rustが構成する。
 - DDL parse、typed meaning／Stage 1.5、known-hole検出とpatch制約、Stage 2 Score compile、
   coerce／repair、診断と資源policyは共有Rustを正本とする。
-- 旧Kotlin Stage 1／1.5／2、Score coerce／repair、deterministic fallbackの実装は比較用に残るが、
-  通常の記述、直接DDL、batch／demo、推敲、カメラ経路からは到達しない。
+- 旧Kotlin Stage 1／1.5／2、Score coerce／repair、deterministic fallbackの実装は2026-09-14（`03bbd686`）に撤去し、
+  比較用にも残していない。
 - Kotlinはprovider／camera、Room／history、承認と表示のhost副作用を所有し、
   描画geometry／material／surface／stroke／SVG serializerは共有Rustだけが所有する。
 - Dark Compose UI は、Pixel 9 で記述から制作へ進み、保存作品を結果から見直せる構成とする:
@@ -482,85 +517,35 @@ Server-only web features は、clear local single-user equivalent がない限�
 ## Web/Server Master Policy
 
 Android 版のUI、host orchestration、保存の参照実装は `web/` と `server/` である。
-描画engineの正本は `core/crates/inku-render/` の共有Rust coreであり、serverもAndroidも同じcoreを使う。
-Android 側は独立した native application package として実装するが、DDL interpretation、
-Stage 1.5 expansion、Score coercion / repair、history persistenceのbehavioral source of truthは
-web/server側、SVGと演奏metadataのsource of truthはRust coreとする。
+pipelineの意味は共有Rust（`core/crates/inku-pipeline/`・`inku-ddl`・`inku-score`・`inku-render`）が正本で、
+Stage 1の語彙とprompt、Stage 1.5、known-holeの補完、Scoreのcompile、coerce／repair、診断と資源policy、
+SVGと演奏metadataをServerとAndroidが同じcoreから使う。Kotlinはhostの責務だけを持ち、coreの規則を写さない。
+coreにある規則（記述の札、語の種など）は、Kotlinに写さずJNIで呼ぶ。
 
 今後 web/server 側を更新するときは、Android 側の追従可否を同じ変更単位で確認する。
-Android 側の互換コードは server source の責務境界に対応するファイルへ分割し、
-差分確認と移植漏れ検出を容易にする。
+hostの責務の対応は次のとおり。
 
-描画engineのownershipと切替境界:
-
-| Canonical source / current bridge | Android側 | Responsibility |
+| 責務 | Server／Web | Android |
 | --- | --- | --- |
-| `core/crates/inku-render/` | `AndroidRenderHost` → `NativeRenderBridge` → `inku-render-android` | planning、geometry、mark、surface、layer、SVG emission、決定的seed、演奏metadata |
-| `server/src/inku_server/render_engines/default/adapter.py` | Android host adapter | canonical Scoreとrender optionを1 requestで渡し、SVGとmetadataを受け取る薄いhost境界 |
-| `core/crates/inku-svg-raster/` | `RustArtworkRasterizer` | canonical SVGをhost-neutral pixelへ変換するpresentation境界。Score、engine identity、`rh3`を所有しない |
+| 実行の駆動・effectの実行・snapshot保存 | `pipeline_api.py`／`pipeline_candidate.py`／`pipeline_product.py` | `SharedPipelineHost.kt`／`AndroidWorkPipeline.kt`／`RoomSharedPipelineStore.kt` |
+| coreへ渡す設定と入力 | `pipeline_product.py`（`prepare`）／`pipeline_settings.py`／`pipeline_defaults.py` | `AndroidWorkPipeline.kt`（`prepare`）／`SharedPipelineConfigBuilder.kt` |
+| provider transport | `pipeline_provider.py`／`openai_request.py`／`chatgpt_provider.py` | `RoutingModelProvider.kt`と各provider／`SingleAttemptModelEffectProvider.kt` |
+| 描画 | `render_engines/default/adapter.py` | `AndroidRenderHost` → `NativeRenderBridge`（旧9:5形式）、共有pipelineの`Render`と`renderSaved` |
+| 画像化 | `shared/src/inku_analysis/rasterizer.py` | `RustArtworkRasterizer`（`inku-svg-raster`） |
+| `rh3`／`dh1`／seed | `db.py::render_hash_for_item`／`identity.py::description_hash` | `AndroidWorkPipeline.kt`の`renderHash`／`descriptionHash`／`canonicalSeed`、`PythonJson.kt` |
+| 履歴保存 | `pipeline_product.py`（`save_result`）／`api_core/rendering.py` | `InkuRepository.kt::saveResult`／Room entities |
+| 記述の固定 | `persistence/description_lock.py` | `data/lineage/DescriptionLock.kt` |
+| headless | `inku-cli paint --save-history` | `HeadlessRenderActivity.kt` |
 
-切替受入では、単発描画、batch、demo、保存Scoreのreplay、headless、main preview、thumbnailの
-production描画がRust境界へ到達すること、engine id/versionがRust coreから来ること、同じrequestの
-SVGとengine metadataがserver hostと一致することを直接検査する。既存履歴の保存済みSVGは再生成しない。
-
-同じ方針を pipeline でも維持する。`server/src/inku_server/interpreter.py`、
-`ddl_expander.py`、`coerce.py`、`schema.py` の変更は、Android の
-`pipeline/` package と compatibility data model へ対応づけて確認する。
+Serverのpipeline・保存を変えるときは、対応する行を同じ変更単位で確かめる。
 Android 固有の UI / Room / LiteRT-LM / provider routing は native implementation としてよいが、
 生成される DDL、Score、SVG、render metadata、history persistence の user-visible behavior は
 web/server との parity を優先する。
-Rust描画切替はこのKotlin pipeline表を自動的にRustへ移す許可ではない。Stage 1 / 1.5 / 2やcoerceを
-共有coreへ広げる場合は、その境界と保存互換を別の契約で固定する。
-
-現在の pipeline compatibility layout:
-
-| server source | Android compatibility file | Responsibility |
-| --- | --- | --- |
-| `server/src/inku_server/interpreter.py` / Stage 1 model text cleanup and usable DDL guard | `android/app/src/main/java/app/inku/mobile/pipeline/ServerDdlText.kt` | model output cleanup、Stage 1 DDL normalization、number-noise repair、clause dedupe、drawable vocabulary guard |
-| `server/src/inku_server/ddl_expander.py` | `android/app/src/main/java/app/inku/mobile/pipeline/WebDdlExpander.kt` | Stage 1.5 DDL expansion and sensory / structural marker insertion |
-| `server/src/inku_server/coerce.py` / `PRIMITIVE_SPECS`、field coercion、post-coerce | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreCoercer.kt` | Stage 2 instruction の primitive field repair、fallback field selection、arc angle repair |
-| `server/src/inku_server/coerce.py` / semantic marker helpers、presence inference、color/layout/material/radius detection | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreSemantics.kt` | context marker detection、quiet-density / motion / colorful context 判定、presence inference、visible color/background、DDL hint helpers |
-| `server/src/inku_server/composer.py` and `coerce.py` / fallback score synthesis | `android/app/src/main/java/app/inku/mobile/pipeline/ServerFallbackComposer.kt` | provider failure / unusable Stage 2 output 時の fallback DDL、fallback instruction、arrangement synthesis |
-| `server/src/inku_server/coerce.py` / DDL coverage、shape/color/motif/composition repair factories | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreRepairFactory.kt` | drawable clause extraction、clause primitive/color mapping、coverage instruction、shape/motif repair instruction factories |
-| `server/src/inku_server/coerce.py` / semantic repair order and Android-local orchestration | `android/app/src/main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt` | Score coercion orchestration、dedupe、DDL coverage、color/shape/motif/composition/context/motion/presence/density repair order、fallback Score construction、Stage 1/2 provider fallback control |
-| `server/src/inku_server/schema.py` / Stage 2 tool contract and provider tool-call responses | `android/app/src/main/java/app/inku/mobile/pipeline/WebScoreTool.kt` | Stage 2 submit_score schema、Stage 2 JSON extraction、tool_calls / arguments unwrap、renderable instructions guard |
-| `server/src/inku_server/composer.py::_score_tool_schema()` の生成結果 | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreSchemaJson.kt` | Stage 2 tool schema の JSON 本体。primitive / weight / style の列挙、`additionalProperties: false`、arrangement・`at`・`relation`・`surface` の定義。**server schema の変更はまずここへ反映する** |
-| `server/src/inku_server/db.py::render_hash_for_item` / `identity.py::description_hash` | `android/app/src/main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt` の `renderHash` / `descriptionHash` / `canonicalSeed` | `rh3` payload、canonical JSON規則、`render_wild`の正規化、`dh1`の正規化規則、seedの整数化 |
-
-指示から描画までの function-level parity table:
-
-| Flow step | server master | Android port | Parity rule / current work item |
-| --- | --- | --- | --- |
-| UI prompt input | `web/src/lib/components/InputPanel.svelte` / `DdlEditor.svelte` | `ui/InkuApp.kt` / `ui/InkuViewModel.kt` | mobile-native UI でよいが、prompt、DDL、auto-repair、model/catalog/canvas state は同一 flow に保存する。 |
-| Paint API orchestration | `api.py::api_paint` | `data/InkuRepository.kt::paint` / `pipeline/LocalFallbackPipeline.kt::paint` | Stage 1、Stage 1.5、Stage 2、coerce、render、hash、history save の順序を一致させる。 |
-| Stage 1 model call | `interpreter.py::interpret_detail` / `_build_system_prompt` | `LocalFallbackPipeline.kt` + `WebDdlSpec.kt` | system prompt、example selection、model output cleanup、fallback control を server に合わせる。 |
-| Stage 1 text cleanup | `interpreter.py` cleanup / usable DDL checks | `ServerDdlText.kt` | DDL guard、number-noise repair、clause dedupe、drawable vocabulary guard を関数単位で比較する。 |
-| Stage 1.5 expansion | `ddl_expander.py::expand_intermediate_ddl` | `WebDdlExpander.kt` | sensory / structural markers、filter candidates、density and placement insertion を server 更新単位で追従する。 |
-| Stage 2 model call | `composer.py::compose` / `_compose_*` | `LocalFallbackPipeline.kt` / provider clients | prompt、tool schema、retry / fallback criteria、timeout policy を server と比較する。 |
-| Stage 2 tool schema | `schema.py::Score` / `Instruction` / `composer.py` tool schema | `WebScoreTool.kt` | JSON schema、tool_calls unwrap、arguments unwrap、renderable instruction guard を一致させる。 |
-| Score primitive field coerce | `coerce.py::PRIMITIVE_SPECS` / `POST_COERCE` | `ServerScoreCoercer.kt` | primitive required fields、fallback fields、default values、arc angle repair を一致させる。 |
-| Score semantic coerce | `coerce.py` marker helpers | `ServerScoreSemantics.kt` | material、color、variation、presence、density、motion marker を server の marker set と戻り値へ合わせる。 |
-| DDL coverage repair | `coerce.py::_ddl_clauses` / `_primitive_from_clause` / `_fallback_instruction_from_clause` | `ServerScoreRepairFactory.kt` | clause extraction、primitive selection、coverage instruction defaults を一致させる。`円` / `circle` は server と同じく coverage repair では `ellipse` へ寄せる。 |
-| Fallback Score synthesis | `api.py` fallback helpers / `coerce.py::_fallback_instruction_from_clause` | `ServerFallbackComposer.kt` | provider failure / unusable Stage 2 output 時の primitive、geometry、arrangement defaults を server に合わせる。 |
-| Repair order | `coerce.py::coerce_score` | `LocalFallbackPipeline.kt` | visible color、dedupe、coverage、shape/color/motif/composition/context/motion/presence/density の順序を比較し、Android 固有順序を残さない。 |
-| SVG render engine | `core/crates/inku-render/`（serverは`render_engines/default/adapter.py`経由） | `AndroidRenderHost` / `NativeRenderBridge` | productionは同じRust coreへ1 requestを渡し、engine identityとrenderer referenceも同じownerから読む。 |
-| SVG raster presentation | `core/crates/inku-svg-raster/` | `RustArtworkRasterizer` / Bitmap・Compose | 保存済み／現行SVGを変更せずpixel化する。AndroidSVGやKotlin描画fallbackは持たない。 |
-| Render hash / metadata | `api.py::_render_hash` / render metadata assembly | `LocalFallbackPipeline.kt::renderHash` / renderer metadata | hash input fields、build number handling、engine id/version、catalog/canvas metadata を一致させる。 |
-| History persistence | `api.py::_add_history_item` / `db.py::add_history_item` | `InkuRepository.kt::saveResult` / Room entities | saved input、DDL、Score、SVG、metadata、model IDs、catalog/canvas、hash、timestamps を同じ user-visible data として保持する。 |
-| Headless / CLI benchmark | `inku-cli paint --save-history` | `HeadlessRenderActivity.kt` / `android/scripts/headless_*` | server/android とも履歴保存可能にし、summary に history_id、DDL、hash、catalog を残す。 |
 
 Saijiki parity は生成で担保する。Android UI の word groups は手で写さず、
 `server/scripts/gen_saijiki_kt.py` が `saijiki.py` から焼く `SaijikiGenerated.kt`（日英各 10 分類 73 語）
-を画面が読む。鮮度は `server/tests/test_saijiki_kt_is_current.py` が見る。server Stage 1 は
-`interpreter.py` の saijiki list と allowed action verbs を参照する。Web UI が exposed していない
-`描く` は Android UI でも独立 word としては出さず、DDL / model output に現れた場合のみ pipeline で扱う。
-Score coercion / fallback / repair では、`katachi` を primitive、`tezawari` を weight、
-`tsuranari` を style、`iro` を visible color、`yuragi` を variation、`basho` を center / position、
-`ugoki` を arrangement、`katamuki` を rotation / line endpoints、`wariai` を size / arc angle /
-line span へ反映する。LLM output が欠落または揺れた場合も、Stage 1.5 後の DDL に含まれる
-Saijiki words を `ServerScoreCoercer.kt`、`ServerScoreSemantics.kt`、
-`ServerFallbackComposer.kt`、`ServerScoreRepairFactory.kt` で補完し、server `composer.py` /
-`coerce.py` の visible behavior へ寄せる。
+を画面が読む。鮮度は `server/tests/test_saijiki_kt_is_current.py` が見る。Stage 1の語彙とScoreのcoerce／repairは
+共有Rustが行い、Androidは歳時記の補完を独自に持たない。
 
 ## Web Component Porting Matrix
 
@@ -1957,7 +1942,7 @@ server 側の裁定「DB の列は残す・開発者モードで過去作にだ�
 - **server との違いを 1 つ持つ**: 一覧に無い id を渡されたとき、**server は 422 を返し、
   こちらは既定カタログへ落とす**。古いビルドが保存した設定で描けなくならないため。
   **これは Android 固有の事情なので、client 側の発明ではない**（保存済み設定の後方互換）。
-- **server の 3 モード（`fixed` / `auto` / `random`）はこの client に無い** — カタログは設定そのもので、
+- **この節の時点では server の 3 モード（`fixed` / `auto` / `random`）のうち `fixed` だけがあった**（`auto` は2026-08-25に加わり、2026-09-13から共有pipelineの`catalog_mode: "auto"`で選ぶ。推敲専用の`random`は持たない） — カタログは設定そのもので、
   デモ経路のランダム選択は [I-081] で撤去済み。**モードが来る日はこの関数の中に置く**旨を
   KDoc に書いた。
 

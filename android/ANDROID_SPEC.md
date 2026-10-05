@@ -4,7 +4,7 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-10-05.
+Last updated: 2026-10-06.
 
 **Catch-up status**: Android sits at generation `2.1.4-android.80`. DDL conversion and Score → SVG
 rendering run in the shared Rust core (`core/crates/`) of the same commit, packaged with the app, so
@@ -46,6 +46,41 @@ When updating Android specifications:
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
 
+## 2026-10-06 Closing the differences from Server and Web
+
+The differences found by the Server/Web parity audit now follow the rules below. This section takes precedence over the same items in earlier sections.
+
+- **Description labels**: leading numbers and bracketed notes are cut by the shared core's `pipeline_description` (JNI; the rule of Server's `description_labels.py`, with lines broken at `\n` only) before the description reaches the core. The work keeps the description as written. A description of labels alone is refused in the Web's words.
+- **Instruction language**: a run from a description reads the label-free description; a run from DDL reads the DDL itself. Without a request the parent's `instruction_lang_requested` is inherited, else `auto`. The interface language is inherited from the parent too. An edit to a running execution that changes the language forks a new variation.
+- **Word seeds**: the render seed comes from the shared core's `render_seed_from_text` (JNI), and the normalized words are recorded. A request without words inherits the parent's, and words take precedence over an explicit `render_seed`, as on Server. Replays follow the same rule; there is no Kotlin copy.
+- **Fork colors**: a fork from a saved work or a run resolves every catalog's colors from today's catalogs. A replay of a saved work still uses the work's own colors.
+- **Another composition**: the work identity passed to the core is `sha256:` plus the SHA-256 of the visible DDL, and the seed is `composition_seed`, else `render_seed`, as in Server's `/api/compose`.
+- **Input length**: a description, DDL or sketch text is limited to 100,000 characters (code points) and refused before anything is sent beyond it, the compatibility API's limit.
+- **Safe performance before completion**: before a known-hole completion is requested, the Score as it stands is drawn and saved, so the drawing stays while the proposal waits and after a decline or a failed completion. A run that stops (`needs_user_edit` / `failed`) with an undrawn Score is drawn and saved too. One work is saved per revision, and the approved completion is a separate work (siblings in the lineage, as on Server). Refinement candidates are not saved.
+- **Approving and declining a proposal**: the revision and digest of the proposal on screen are sent, and the core refuses a proposal that changed. A DDL edit while a proposal waits is left to the core rather than declined by the host; when refused, the screen says "Answer the completion proposal before editing the DDL." (author's decision, 2026-10-06).
+- **Why a run stopped**: the reason of `needs_user_edit` / `failed` and the model failure of that stage are shown in the Web's words (`attention.ts`), including "the model has no API key".
+- **Providers**:
+  - On OpenAI-compatible providers the composition reading (`read_composition`) is sent at temperature 0.3, as Stage 1 is.
+  - A response missing its expected shape is `malformed_payload`. A configuration error (key, base URL, provider, http URL, an undownloaded on-device model) is `provider_rejected`, so the core does not retry it.
+  - The providers that need a key follow Server's definitions (openai, anthropic, gemini, nvidia, ollama-cloud). OpenAI-compatible requests send `Bearer none` for an empty key.
+  - A success body is read up to 1 MiB (bytes) and an error body is classified from its first 16 KiB. The ChatGPT argument limit is 1 MiB, and its failure classes and SSE framing match Server.
+  - Gemini model IDs are encoded as Python's `quote(model, safe="")` encodes them.
+  - Rate control keeps only two parts: after a 429, requests to the same provider wait until the longer of `Retry-After` / `RetryInfo` and 62 seconds, and ollama-cloud runs at most two requests at once. The rpm/tpm/rpd budgets and `countTokens` are not kept: Android has no way to raise the limits, and the default limits would never send a large Gemini request (author's decision, 2026-10-06).
+- **Saved records**:
+  - A new work records `render_color_profile`, `compiler_outcome`, `render_limits` (four values), `render_limits_source` (`settings` for a new work, `work` for one drawn under its parent's saved configuration), `ui_lang`, and `elapsed_stage1_ms` / `elapsed_stage2_ms` / `elapsed_total_ms` (model time summed per stage).
+  - A replay records the catalog name and sub, `render_color_source`, `render_color_profile`, `seed_text`, and `render_limits` / `render_limits_source`.
+  - `ddl_version` / `ddl_engine_version` are Server's Python constants and `render_build_number` is the Web build number; Android has no counterpart and does not record them.
+- **`rh3`**: the hashed text is written as Python's `json.dumps(ensure_ascii=False, sort_keys=True, separators=(",", ":"))` writes it (no escaping of `/`, numbers as Python's `repr`). Saved rows keep the hash they were saved with.
+- **Refinement**: a work without a description can still take color and layout refinements. Every element but color needs the DDL, and touch, reading and model comparison need the description (the Web's rule and wording). The color refinement draws every catalog but the parent's in list order, one option each, named after the catalog, with no 1/4 option count. Progress lanes count the planned options, four per row.
+- **Description lock**: a saved work follows the lineage rule of Server's `description_lock.py`; an unsaved one follows its authority, as on the Web.
+- **Export**: PNG height is 64–2160px (author's decision, 2026-10-06). A height out of range is refused, not shrunk. The width is computed from the canvas ratio before drawing, and a size beyond `inku-svg-raster`'s limits (8192px per side, 16,777,216 pixels) is refused. The default templates are `PNG 1080px` and `PNG 2160px`; the built-in `png-4320` row is removed at start-up (templates the author made are kept, and one above 2160px is refused at export with the reason). Like the Web, a PNG carries the work's creation time as `eXIf` and a tEXt `Creation Time`, and the display SVG export inserts the description as `<desc>` right after the first `<svg>` tag.
+- **Kept as Android decisions**:
+  - Cancelling a finished run: no cancel is sent to the core in a terminal phase. Android saves after drawing, so always sending it, as Server does, would lose an unsaved completion in a race.
+  - The fork context shape: `inku.pipeline-history-fork-context.v2` keeps ten keys, adding `authority` and `color_maps`, and is read only on the device. No path carries it between hosts, and renaming it would rewrite every row.
+  - MLX connections: the device's loopback is the device itself and LAN http is refused, so a Mac's MLX is unreachable (the same reason as local Ollama).
+  - Developer provider I/O capture and retry disabling: Android has no developer mode.
+  - Replaying version 0.1.0 Scores: Server validates and coerces before drawing, while Android draws through the shared core's `render_saved`. The 28 such works in the 2026-10-06 backup were compared on Linux: 27 drew the same SVG, and one differs because Server's validation rounds a coordinate of `1.0001` to `1.0`; none of the four coerce stages fired.
+
 ## 2026-10-05 Displaying and editing numeric ranges
 
 New DDL omits `［構図］` / `[composition]` marks (shared SPEC §12.6.3 and §18). JNI `compositionRanges()` transports the shared core's `composition_ranges()` table, `inku.composition-ranges.v1`. Android keeps no copy of the names or coordinates. Older bindings without the function display the original text.
@@ -82,7 +117,7 @@ The DDL authority and description-based creation messages use “work”. Work-v
 
 Android is a local single-user host and connects directly to a personal ChatGPT plan. Settings has an independent ChatGPT plan pane. Continue with ChatGPT opens Chrome on the phone for authorization, without a Mac transfer helper or an API key. Return to inku, acknowledge the first-use plan notice, then open Model settings.
 
-In Settings → Models → ChatGPT plan, Model selection explicitly fetches the personal catalog; select models and save. Fetching alone publishes nothing. Only published models present in that catalog enter the drawing picker, with one `chatgpt:<slug>` for both stages. Retired publication references and saved work model IDs remain. Opening settings does not fetch models. This connection is excluded from API-key settings, bare-name ownership, photo observation, model inspection, colophons and demo instruction generation.
+In Settings → Models → ChatGPT plan, Model selection explicitly fetches the personal catalog; select models and save. Fetching alone publishes nothing. Only published models present in that catalog enter the drawing picker, with one `chatgpt:<slug>` for both stages. Retired publication references and saved work model IDs remain. Opening settings does not fetch models. This connection is excluded from API-key settings, bare-name ownership, photo observation, model inspection and demo instruction generation (Android has no colophon).
 
 Multiple registrations retain separate publication preferences and labels identifying the verified account and issued client ID. Users can select a registration, reauthorize, explicitly consent again, cancel authorization, disconnect and manage usage. The drawing screen also identifies the plan and registration in use. Identity alone does not authorize plan usage: both `resource.invoke` and `chatgpt.tokens.use.direct` scopes are required. Quota exhaustion stops more drawing calls; explicitly refreshing the catalog can check renewed availability. Disconnect removes local tokens first and reports unconfirmed remote revocation, retaining registration metadata and published models.
 
@@ -104,7 +139,7 @@ The author's decision on 2026-10-04 sets `ExperimentalFlags.enableSpeculativeDec
 
 ## 2026-10-03 Composition and reading after the underdrawing
 
-New configurations adopt the composition in shared SPEC §12.6.2. Cloud models set `composition: {"read": true}` and send `read_composition` after the underdrawing and before the visible DDL commit, using Stage 1's model, token limit and temperature 0.0, then return `composition_read`. The shared core retries under `composition_retry`, or `catalog_retry` when absent. On-device LiteRT Gemma 4 E2B sets `read: false`, following the author's decision: it sends no reading request and composes with the default reading.
+New configurations adopt the composition in shared SPEC §12.6.2. Cloud models set `composition: {"read": true}` and send `read_composition` after the underdrawing and before the visible DDL commit, using Stage 1's model, token limit and sampling (temperature 0.3 on OpenAI-compatible providers, aligned on 2026-10-06), then return `composition_read`. The shared core retries under `composition_retry`, or `catalog_retry` when absent. On-device LiteRT Gemma 4 E2B sets `read: false`, following the author's decision: it sends no reading request and composes with the default reading.
 
 Gemini response schemas write each object's `properties` in its `propertyOrdering`, with the thesis first, retaining any unnamed properties. When reading is unavailable or composition cannot be applied, the core uses the default reading or commits the printed underdrawing; the Android host continues. New snapshot fields and events remain shared-core records. The reading adds no progress display or prompt tab.
 
@@ -236,7 +271,7 @@ This sketch pipeline's rendered output is produced by the packaged `core/crates/
 
 Gemini provider generation requests use the Gemini API `models/{model}:generateContent` endpoint. The API key is sent as `x-goog-api-key` (the model-list fetch sends it the same way and reads every page), and structured responses for the shared pipeline use native function declarations and `functionCall.args`. A successful model-list fetch does not establish that generation requests work.
 
-Shared-pipeline provider requests use the same conditions as Server's `pipeline_provider.py`. For Gemini, no temperature is sent, `thinkingConfig.thinkingLevel` is `minimal`, `allowedFunctionNames` restricts the response to one function, and the core response schema is projected into the same Gemini-supported subset as on Server (`const` becomes a one-element `enum`; hole-completion `oneOf` variants are flattened; shared Rust performs the exact validation). OpenAI-compatible providers use temperature 0.3 for Stage 1 (`generate_normalized_ddl`) and 0.0 for other requests. The output limit is 2048 for Stage 1, sketch, and catalog selection, and 2048 for hole completion.
+Shared-pipeline provider requests use the same conditions as Server's `pipeline_provider.py`. For Gemini, no temperature is sent, `thinkingConfig.thinkingLevel` is `minimal`, `allowedFunctionNames` restricts the response to one function, and the core response schema is projected into the same Gemini-supported subset as on Server (`const` becomes a one-element `enum`; hole-completion `oneOf` variants are flattened; shared Rust performs the exact validation). OpenAI-compatible providers use temperature 0.3 for Stage 1 (`generate_normalized_ddl`) and the composition reading (`read_composition`), and 0.0 for other requests. The output limit is 2048 for Stage 1, sketch, and catalog selection, and 2048 for hole completion.
 
 The Room database cursor window is 40 MiB. SVGs may reach Server's 12 MiB limit, and the execution state embeds that render, so the default window of about 2 MB cannot read such saved rows back.
 
@@ -385,8 +420,7 @@ Implemented:
 - Shared Rust is authoritative for DDL parsing, typed meaning / Stage 1.5, known-hole detection
   and patch constraints, Stage 2 Score compilation, coercion and repair, diagnostics, and resource policy.
 - The former Kotlin Stage 1 / 1.5 / 2, Score coerce/repair, and deterministic fallback
-  implementations remain for comparison but are unreachable from normal description, direct-DDL,
-  batch, demo, refinement, and camera paths.
+  implementations were removed on 2026-09-14 (`03bbd686`) and are not kept for comparison.
 - Kotlin owns provider and camera operations, Room and history, approval, and presentation host
   side effects. Shared Rust alone owns drawing geometry, materials, surfaces, strokes, and SVG serialization.
 - Dark Compose UI is organized for writing and making on Pixel 9, then reviewing
@@ -557,92 +591,38 @@ clear local single-user equivalent.
 ## Web/Server Master Policy
 
 The Android UI, host orchestration, and persistence use `web/` and `server/` as their reference.
-The canonical drawing engine is the shared Rust core under `core/crates/inku-render/`, used by both
-server and Android. Android remains a standalone native package: web/server stay authoritative for
-DDL interpretation, Stage 1.5 expansion, Score coercion/repair, and history persistence, while the
-Rust core is authoritative for SVG output and performance metadata.
+The meaning of the pipeline lives in shared Rust (`core/crates/inku-pipeline/`, `inku-ddl`, `inku-score`,
+`inku-render`): the Stage 1 vocabulary and prompts, Stage 1.5, known-hole completion, the Score compile,
+coerce/repair, diagnostics and resource policy, and SVG output with its performance metadata come from the
+same core on Server and Android. Kotlin holds only the host's duties and does not copy the core's rules;
+a rule the core already has (description labels, word seeds) is called through JNI rather than copied.
 
 Whenever web/server changes, the corresponding Android parity surface must be
-checked in the same change unit. Android compatibility code is split along the
-same responsibility boundaries as the server source so that future diffs are
-easier to inspect and omissions are easier to catch.
+checked in the same change unit. The host duties correspond as follows.
 
-Drawing-engine ownership and cutover boundary:
-
-| Canonical source / current bridge | Android side | Responsibility |
+| Duty | Server / Web | Android |
 | --- | --- | --- |
-| `core/crates/inku-render/` | `AndroidRenderHost` → `NativeRenderBridge` → `inku-render-android` | Planning, geometry, marks, surfaces, layers, SVG emission, deterministic seeds, and performance metadata |
-| `server/src/inku_server/render_engines/default/adapter.py` | Android host adapter | Thin host boundary that sends canonical Score and render options in one request and receives SVG plus metadata |
-| `core/crates/inku-svg-raster/` | `RustArtworkRasterizer` | Presentation boundary from canonical SVG to host-neutral pixels; owns no Score, engine identity, or `rh3` semantics |
+| Driving a run, performing effects, saving snapshots | `pipeline_api.py` / `pipeline_candidate.py` / `pipeline_product.py` | `SharedPipelineHost.kt` / `AndroidWorkPipeline.kt` / `RoomSharedPipelineStore.kt` |
+| Configuration and input handed to the core | `pipeline_product.py` (`prepare`) / `pipeline_settings.py` / `pipeline_defaults.py` | `AndroidWorkPipeline.kt` (`prepare`) / `SharedPipelineConfigBuilder.kt` |
+| Provider transport | `pipeline_provider.py` / `openai_request.py` / `chatgpt_provider.py` | `RoutingModelProvider.kt` and the providers / `SingleAttemptModelEffectProvider.kt` |
+| Drawing | `render_engines/default/adapter.py` | `AndroidRenderHost` → `NativeRenderBridge` (legacy 9:5 paper), the shared pipeline's `Render` and `renderSaved` |
+| Rasterization | `shared/src/inku_analysis/rasterizer.py` | `RustArtworkRasterizer` (`inku-svg-raster`) |
+| `rh3` / `dh1` / seeds | `db.py::render_hash_for_item` / `identity.py::description_hash` | `renderHash` / `descriptionHash` / `canonicalSeed` in `AndroidWorkPipeline.kt`, `PythonJson.kt` |
+| History persistence | `pipeline_product.py` (`save_result`) / `api_core/rendering.py` | `InkuRepository.kt::saveResult` / Room entities |
+| Description lock | `persistence/description_lock.py` | `data/lineage/DescriptionLock.kt` |
+| Headless | `inku-cli paint --save-history` | `HeadlessRenderActivity.kt` |
 
-Cutover acceptance directly checks that single drawing, batch, demo, saved-Score replay, headless,
-main preview, and thumbnail production paths reach Rust; engine ID/version comes from the Rust core;
-and the same request yields matching SVG and engine metadata on the server host. Existing saved SVGs
-are not regenerated.
-
-The same policy applies to the pipeline. Changes in
-`server/src/inku_server/interpreter.py`, `ddl_expander.py`, `coerce.py`, and
-`schema.py` must be checked against the Android `pipeline/` package and
-compatibility data models. Android-specific UI, Room, LiteRT-LM, and provider
-routing can remain native, but user-visible DDL, Score, SVG, render metadata,
-and history persistence behavior prioritize web/server parity.
-The rendering cutover does not automatically move this Kotlin pipeline into Rust. Moving Stage 1,
-Stage 1.5, Stage 2, or coerce into the shared core requires a separate contract that fixes the
-boundary and persistence compatibility.
-
-Current pipeline compatibility layout:
-
-| server source | Android compatibility file | Responsibility |
-| --- | --- | --- |
-| `server/src/inku_server/interpreter.py` / Stage 1 model text cleanup and usable DDL guard | `android/app/src/main/java/app/inku/mobile/pipeline/ServerDdlText.kt` | Model output cleanup, Stage 1 DDL normalization, number-noise repair, clause dedupe, drawable vocabulary guard |
-| `server/src/inku_server/ddl_expander.py` | `android/app/src/main/java/app/inku/mobile/pipeline/WebDdlExpander.kt` | Stage 1.5 DDL expansion and sensory/structural marker insertion |
-| `server/src/inku_server/coerce.py` / `PRIMITIVE_SPECS`, field coercion, post-coerce | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreCoercer.kt` | Stage 2 instruction primitive field repair, fallback field selection, arc angle repair |
-| `server/src/inku_server/coerce.py` / semantic marker helpers, presence inference, color/layout/material/radius detection | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreSemantics.kt` | Context marker detection, quiet-density/motion/colorful context checks, presence inference, visible color/background, DDL hint helpers |
-| `server/src/inku_server/composer.py` and `coerce.py` / fallback score synthesis | `android/app/src/main/java/app/inku/mobile/pipeline/ServerFallbackComposer.kt` | Fallback DDL, fallback instruction, and arrangement synthesis after provider failure or unusable Stage 2 output |
-| `server/src/inku_server/coerce.py` / DDL coverage, shape/color/motif/composition repair factories | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreRepairFactory.kt` | Drawable clause extraction, clause primitive/color mapping, coverage instruction, shape/motif repair instruction factories |
-| `server/src/inku_server/coerce.py` / semantic repair order and Android-local orchestration | `android/app/src/main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt` | Score coercion orchestration, dedupe, DDL coverage, color/shape/motif/composition/context/motion/presence/density repair order, fallback Score construction, Stage 1/2 provider fallback control |
-| `server/src/inku_server/schema.py` / Stage 2 tool contract and provider tool-call responses | `android/app/src/main/java/app/inku/mobile/pipeline/WebScoreTool.kt` | Stage 2 `submit_score` schema, Stage 2 JSON extraction, tool_calls/arguments unwrap, renderable instructions guard |
-| Output of `server/src/inku_server/composer.py::_score_tool_schema()` | `android/app/src/main/java/app/inku/mobile/pipeline/ServerScoreSchemaJson.kt` | The Stage 2 tool schema JSON itself: primitive / weight / style enums, `additionalProperties: false`, and the arrangement, `at`, `relation`, and `surface` definitions. **Server schema changes land here first.** |
-| `server/src/inku_server/db.py::render_hash_for_item` / `identity.py::description_hash` | `renderHash` / `descriptionHash` / `canonicalSeed` in `android/app/src/main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt` | The `rh3` payload, canonical-JSON and `render_wild` normalization rules, `dh1` normalization, and integer coercion of seeds |
-
-Function-level parity table from prompt to rendering:
-
-| Flow step | server master | Android port | Parity rule / current work item |
-| --- | --- | --- | --- |
-| UI prompt input | `web/src/lib/components/InputPanel.svelte` / `DdlEditor.svelte` | `ui/InkuApp.kt` / `ui/InkuViewModel.kt` | Mobile-native UI is acceptable, but prompt, DDL, auto-repair, model/catalog/canvas state must stay in the same saved flow. |
-| Paint API orchestration | `api.py::api_paint` | `data/InkuRepository.kt::paint` / `pipeline/LocalFallbackPipeline.kt::paint` | Keep the order: Stage 1, Stage 1.5, Stage 2, coerce, render, hash, history save. |
-| Stage 1 model call | `interpreter.py::interpret_detail` / `_build_system_prompt` | `LocalFallbackPipeline.kt` + `WebDdlSpec.kt` | Match the system prompt, example selection, model output cleanup, and fallback control. |
-| Stage 1 text cleanup | `interpreter.py` cleanup / usable DDL checks | `ServerDdlText.kt` | Compare DDL guard, number-noise repair, clause dedupe, and drawable vocabulary guard function by function. |
-| Stage 1.5 expansion | `ddl_expander.py::expand_intermediate_ddl` | `WebDdlExpander.kt` | Track sensory/structural markers, filter candidates, density, and placement insertion with server updates. |
-| Stage 2 model call | `composer.py::compose` / `_compose_*` | `LocalFallbackPipeline.kt` / provider clients | Compare prompt, tool schema, retry/fallback criteria, and timeout policy. |
-| Stage 2 tool schema | `schema.py::Score` / `Instruction` / `composer.py` tool schema | `WebScoreTool.kt` | Match JSON schema, tool_calls unwrap, arguments unwrap, and renderable instruction guard. |
-| Score primitive field coerce | `coerce.py::PRIMITIVE_SPECS` / `POST_COERCE` | `ServerScoreCoercer.kt` | Match primitive required fields, fallback fields, default values, and arc angle repair. |
-| Score semantic coerce | `coerce.py` marker helpers | `ServerScoreSemantics.kt` | Align material, color, variation, presence, density, and motion marker sets and return values. |
-| DDL coverage repair | `coerce.py::_ddl_clauses` / `_primitive_from_clause` / `_fallback_instruction_from_clause` | `ServerScoreRepairFactory.kt` | Match clause extraction, primitive selection, and coverage instruction defaults. `円` / `circle` follows server behavior and becomes `ellipse` in coverage repair. |
-| Fallback Score synthesis | `api.py` fallback helpers / `coerce.py::_fallback_instruction_from_clause` | `ServerFallbackComposer.kt` | Match primitive, geometry, and arrangement defaults after provider failure or unusable Stage 2 output. |
-| Repair order | `coerce.py::coerce_score` | `LocalFallbackPipeline.kt` | Compare visible color, dedupe, coverage, shape/color/motif/composition/context/motion/presence/density order and remove Android-only ordering. |
-| SVG render engine | `core/crates/inku-render/` (the server calls it through `render_engines/default/adapter.py`) | `AndroidRenderHost` / `NativeRenderBridge` | Production sends one request to the same Rust core and reads engine identity and renderer reference from the same owner. |
-| SVG raster presentation | `core/crates/inku-svg-raster/` | `RustArtworkRasterizer` / Bitmap and Compose | Rasterizes saved/current SVG without changing it. There is no AndroidSVG or Kotlin drawing fallback. |
-| Render hash / metadata | `api.py::_render_hash` / render metadata assembly | `LocalFallbackPipeline.kt::renderHash` / renderer metadata | Match hash input fields, build number handling, engine id/version, catalog/canvas metadata. |
-| History persistence | `api.py::_add_history_item` / `db.py::add_history_item` | `InkuRepository.kt::saveResult` / Room entities | Store the same user-visible data: input, DDL, Score, SVG, metadata, model IDs, catalog/canvas, hash, and timestamps. |
-| Headless / CLI benchmark | `inku-cli paint --save-history` | `HeadlessRenderActivity.kt` / `android/scripts/headless_*` | Let both server and Android save history, and keep history_id, DDL, hash, and catalog in summaries. |
+When Server's pipeline or persistence changes, check the matching row in the same change unit.
+Android-specific UI, Room, LiteRT-LM, and provider routing may be native implementations, but the
+user-visible behavior of the generated DDL, Score, SVG, render metadata, and history persistence
+prefers parity with web/server.
 
 Saijiki parity is held by generation. The Android UI word groups are not copied
 by hand: `server/scripts/gen_saijiki_kt.py` bakes `SaijikiGenerated.kt` out of
 `saijiki.py` (10 categories and 73 words in each language) and the screen reads
-that. `server/tests/test_saijiki_kt_is_current.py` keeps it fresh. Server Stage 1 is
-checked against the saijiki list and allowed action verbs in `interpreter.py`.
-The verb `draw` / `描く`, which is not exposed by the web UI, is not exposed as
-an independent Android word either; it is handled only when it appears in DDL or
-model output. Score coercion, fallback, and repair map `katachi` to primitives,
-`tezawari` to weights, `tsuranari` to styles, `iro` to visible colors,
-`yuragi` to variation, `basho` to center/position, `ugoki` to arrangement,
-`katamuki` to rotation/line endpoints, and `wariai` to size, arc angle, and line
-span. Even when LLM output is incomplete or variable, saijiki words in the
-post-Stage-1.5 DDL are repaired through `ServerScoreCoercer.kt`,
-`ServerScoreSemantics.kt`, `ServerFallbackComposer.kt`, and
-`ServerScoreRepairFactory.kt` so Android behavior tracks server `composer.py`
-and `coerce.py`.
+that. `server/tests/test_saijiki_kt_is_current.py` keeps it fresh. The Stage 1
+vocabulary and Score coerce/repair run in shared Rust; Android keeps no saijiki
+repair of its own.
 
 ## Web Component Porting Matrix
 
@@ -2500,7 +2480,7 @@ same field, so **putting the random pick back into production code left all 118 
   answers 422 while this client falls back to the default catalogue**, so a setting saved by an
   older build cannot stop the app from drawing. **This is an Android-specific circumstance
   (backward compatibility of stored settings), not a client-side invention.**
-- **The server's three modes (`fixed`, `auto`, `random`) do not exist here** — the catalogue is
+- **At the time of this section only `fixed` of the server's three modes (`fixed`, `auto`, `random`) existed here** (`auto` arrived on 2026-08-25 and since 2026-09-13 is chosen inside the shared pipeline with `catalog_mode: "auto"`; the refinement-only `random` does not exist here) — the catalogue is
   the setting, and the demo path's random pick was removed in [I-081]. The KDoc records that
   **should a mode arrive, it belongs inside this function** rather than at a call site.
 

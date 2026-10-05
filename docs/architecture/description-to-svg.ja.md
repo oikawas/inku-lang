@@ -92,7 +92,7 @@ flowchart TD
 - **Macro catalog** — 新しい作品だけ、有効なplugin文書から新作用のMacro定義とlocalized summaryを`resolve_new_work_macro_catalog`が解決する。保存済みconfigからの派生はその定義をそのまま使う。
 - **資源上限** — manifestのhard policyとoperational budget（既存4上限 + 新6上限）に管理者の上限設定を重ね、保存済み作品からの派生はその作品のbudgetを保つ。
 - **色カタログ** — `fixed`は明示ID、`random`は現在以外から1つ、`auto`は色カタログ選択effectへ委ねる。全カタログの色をrender seedでpaletteへ解決しておき、選ばれたものだけを使う。
-- **seed** — `seed_text`（言葉でタッチを変える）があれば`render_seed`を決定的に導出する。無ければ明示の`render_seed`、それも無ければ63 bitの新しいseedを採り、必ず記録する。`composition_seed`は明示されたときだけ設定する。
+- **seed** — `seed_text`（言葉でタッチを変える）があれば`render_seed`を決定的に導出する。無ければ明示の`render_seed`、それも無ければ53 bit（JavaScriptの安全な整数）の新しいseedを採り、必ず記録する。`composition_seed`は明示されたときだけ設定する。
 - **変奏の廃止** — 新規要求は強度・seedを持たず、採番APIも無い。旧focus・強度・seedは履歴読取りだけに残し、新規保存へ書かない。保存済みの設定は保持し、次の実行用コピーからだけ`stage15_variation`を外す。
 - **再試行予算** — 色カタログ選択とhole補完は既定1回120秒・4回まで、Stage 1は1回300秒・合計540秒・4回まで（`INKU_LLM_*`で上書き）。写生は専用予算が無ければ色カタログ選択の予算を使う。developer modeでは`developer_disable_llm_retries`で全段を1回に限定できる。
 
@@ -152,7 +152,7 @@ coreは可視DDLとauthorityの次状態を1つのCAS保存effectとしてhost�
 
 ## known-hole補完（Stage 2）
 
-保存済みDDLのlockがknown holeを持つと、coreは別の作者操作を待たずにhole補完effectを要求する（prompt `inku.visible-ddl-hole-completion-prompt.v3`）。Serverはこの要求の前に、Scoreが成立していれば安全な演奏を保存する。
+保存済みDDLのlockがknown holeを持つと、coreは別の作者操作を待たずにhole補完effectを要求する（prompt `inku.visible-ddl-hole-completion-prompt.v3`）。hostはこの要求の前に、Scoreが成立していれば安全な演奏を保存する（ServerもAndroidも同じ）。
 
 - 要求は対象の原文、確定済みtyped fact、有限語彙と受理構文だけを持ち、description、無関係なclause、Score、renderer指示を持たない。
 - 応答は短い対象IDごとの修正候補か未解決理由で、coreがIDの一致・重複・欠落を検査し、保存済み要求とlockから実hole ID、許可span、digestを復元する。

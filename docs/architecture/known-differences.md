@@ -19,7 +19,7 @@
 
 - The "not implemented" section of the Android specification note lists external provider execution as not implemented and calls provider records compatibility data structures.
 - Current `RoutingModelProvider` resolves enabled providers and connects to `GeminiModelProvider` and `OpenAiCompatibleProvider`. `SingleAttemptModelEffectProvider` sends shared-pipeline provider effects to them. The first half of the same note also describes the request conditions for Gemini and OpenAI-compatible providers.
-- On 2026-09-25 the Android owner removed external provider execution from the "not implemented" section (`ddb1e19a`). An Anthropic-specific protocol implementation was not found, so parity across every provider is not claimed.
+- On 2026-09-25 the Android owner removed external provider execution from the "not implemented" section (`ddb1e19a`). On 2026-09-26 the Messages API `AnthropicModelProvider` (`045897fe`) was added. Provider requests and failure classes were aligned with Server on 2026-10-06 (ANDROID_SPEC "2026-10-06 Closing the differences from Server and Web").
 - Result: **resolved**.
 
 ### F-04 Long historical Stage 1.5 description (resolved)
@@ -44,7 +44,7 @@
 
 - The cutover deleted the old `description_labels.py`, so leading numbers and bracketed comments reached Stage 1, the sketch, and color catalog selection as written, and a label-only description was no longer refused with 400 (a mismatch with `SPEC.ja.md` §12.16).
 - On 2026-09-25 `description_labels.py` returned, and `PipelineService.start` (every description-origin path) and regeneration from a description cut labels only from the text handed to the core. The work keeps the description as written, and a label-only description is refused with 400.
-- Result: **resolved**. Android never had the cut; this gate sits at the Server boundary.
+- Result: **resolved**. Since 2026-10-06 Android cuts with the shared core's copy of the same rule (`pipeline_description`, through JNI) and refuses a description of labels alone.
 
 ### F-08 Stream progress events (resolved)
 

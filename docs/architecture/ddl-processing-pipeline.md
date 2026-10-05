@@ -66,7 +66,7 @@ flowchart TD
     HOLE -->|"no"| S15 --> LOWER --> SCORE --> RENDER --> SVG --> HISTORY
 ```
 
-A provider patch remains a candidate; a host never adopts it directly. The host attempts provider transport once for each effect and returns the failure to core. Core decides the next effect or a finite stop. A revision saved by residual adoption never starts known-hole completion; it carries `complete_with_omissions` and the original diagnostics through to the save. When there is a hole and a Score also exists, the Server saves the safe performance before requesting completion.
+A provider patch remains a candidate; a host never adopts it directly. The host attempts provider transport once for each effect and returns the failure to core. Core decides the next effect or a finite stop. A revision saved by residual adoption never starts known-hole completion; it carries `complete_with_omissions` and the original diagnostics through to the save. When there is a hole and a Score also exists, the host saves the safe performance before requesting completion (Server and Android alike).
 
 ## API and platform boundary
 

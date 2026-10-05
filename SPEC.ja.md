@@ -551,7 +551,7 @@ IntelliSenseは「書く前に候補を出す」ことで間違いを減らす�
 **角括弧で囲んだコメント**（`[疎  紀友則 / 古今和歌集（春下）]`。半角 `[]` と全角 `［］`）は、
 **作品には原文のまま保存し、描画のどの層にも渡さない**（**Stage 0.5 を含む**）。
 記述エリアとバッチの入力欄は、その範囲の**文字の背景を灰色**にして「これは描かれない」と示す。
-**切るのはサーバー側 1 か所**（`description_labels.py`）なので、web・CLI・Android のどの経路でも同じに効く。
+**規則は 1 つ**で、サーバーは `description_labels.py`、サーバーを介さない Android は同じ規則の共有 core の写し（`inku-pipeline-uniffi` の `pipeline_description`、JNI）で切るので、web・CLI・Android のどの経路でも同じに効く。両者は `server/tests/data/description-label-cases.json` の同じ例で照合する。行は `\n` だけで区切る（`\r`・U+2028 などは行の区切りではない。Web・Swift・共有 core と同じ）。
 数字が番号と見なされるのは**区切り記号か全角空白が続くときだけ**で、`2026年` や `3本の線` は記述として残る。
 **閉じていない `[` も記述**である（行末まで飲み込ませない）
 
@@ -633,7 +633,7 @@ Web アプリが現行の参照インターフェースである。v1.72 で推�
 
 描画 seed は JavaScript 安全な乱整数で、初回生成から候補・履歴・再演まで持ち回る。変奏 seed は 2026-10-04 に廃止し、保存済みの値は読むだけにした（§12.13）。タッチ候補は利用者が託した言葉から seed を決める。表示の描画は、正本の構図座標を変えずにタッチ seed の変化を見せる。
 
-色カタログの推敲は DDL・Score・キャンバス・配置 seed・描画 seed を固定したまま親と異なるカタログを当て、4 案は可能なかぎり異なるカタログを使う。色以外のすべての推敲は、次回描画の操作ではなく**表示中の親作品の実効カタログとキャンバスを継承する**。色の辺は `catalog_change` を使い、前後のカタログ ID を記録する。
+色カタログの推敲は DDL・Score・キャンバス・配置 seed・描画 seed を固定したまま親と異なるカタログを当て、対象作品の色カタログを除く全色カタログの候補をカタログ一覧の順に 1 案ずつ描く（案数の指定は使わず、LLM を呼ばない）。色以外のすべての推敲は、次回描画の操作ではなく**表示中の親作品の実効カタログとキャンバスを継承する**。色の辺は `catalog_change` を使い、前後のカタログ ID を記録する。
 
 キャプションの表示可否はユーザーごとに永続する。前後の移動は推敲の中で開いている 調整／モデル比較 のサブビューを保ったまま対象作品だけを変える。
 
@@ -693,7 +693,7 @@ Canvas パネルは鑑賞向けの操作も持つ。描画タブの全画面ア�
 
 履歴 DB は、Web UI・`inku-cli`・Android のヘッドレス CLI・その他の API クライアントが保存した描画の正本であり続ける。Web UI は、ログイン中の利用者が最新の非フィルタ履歴を見ているあいだ、最新の通常履歴ページを定期的に読み直す。ブラウザウィンドウが焦点を取り戻したときや、隠れていたタブが見えるようになったときにも読み直す。これにより CLI が保存した描画が手動の再読込なしに履歴ストリップへ現れ、現在選ばれている履歴項目はまだ在るかぎり保たれる。**スターのみの履歴・検索結果・古い履歴ページを見ているあいだ、また履歴要求が実行中のあいだは、UI が履歴を自動で置き換えることはない。**
 
-PNG 書き出しの選択肢は、設定モーダルのエクスポートタブでユーザーごとのテンプレートとして管理する。各テンプレートは名前・説明・y 軸の高さ（ピクセル）を持つ。既定のテンプレートは `PNG 1080px`・`PNG 2160px`・`PNG 4320px`（保存済みの旧既定 `1024px` / `2048px` は自動で置き換わり、利用者が手を入れたテンプレートは保たれる）。共通の「書き出す」メニュー内の PNG 選択肢はこれらのテンプレートから生成し、書き出しの幅は対象作品のキャンバス比から計算する。
+PNG 書き出しの選択肢は、設定モーダルのエクスポートタブでユーザーごとのテンプレートとして管理する。各テンプレートは名前・説明・y 軸の高さ（ピクセル）を持つ。既定のテンプレートは `PNG 1080px`・`PNG 2160px`・`PNG 4320px`（保存済みの旧既定 `1024px` / `2048px` は自動で置き換わり、利用者が手を入れたテンプレートは保たれる）。Android は高さを 2160px までとし、`PNG 4320px` を持たない（作者の決定、2026-10-06）。共通の「書き出す」メニュー内の PNG 選択肢はこれらのテンプレートから生成し、書き出しの幅は対象作品のキャンバス比から計算する。
 
 作品・ライブラリ・系譜の共通の「書き出す」メニューでは、対象が1作品なら「レイヤーアニメーション」、複数作品なら「作品をつなぐアニメーション」から同じ出力モーダルを開く。1作品だけなら、保存済みSVGの背景から描画順にレイヤーを増やし、完成品へ至る疑似制作過程を書き出す。背景と完成を含む分割枚数（2〜120枚、既定12枚）、アニメーション間隔（0.1〜30秒、既定0.3秒）、リプレイ設定を選べる。「最初に戻る」は繰り返し、「逆に再生する」は完成後に逆順で戻る往復再生、「最初だけ再生する」は一度再生して完成品で停止する。描画グループと重なり順、背景・クリップ・フィルターを保ち、完成フレームには元の保存SVGを使う。分割枚数よりレイヤーが少ない場合は同一状態の表示時間をまとめる。
 
@@ -749,7 +749,7 @@ PNG 書き出しの選択肢は、設定モーダルのエクスポートタブ�
 
 `render_seed` / `composition_seed` はJavaScript safe integer範囲の独立乱数とし、初回生成時から履歴・候補・再生へ引き継ぐ。タッチ候補は利用者が託す言葉から render seed を決め（64bit）、同じScoreの配置を維持しながら表示上の質感を変える。APIのJSONの応答は `render_seed` と `composition_seed` を10進の文字列で返し、2^53を超えるseedもJavaScriptの利用者へ正確に届ける。要求は数と10進の文字列のどちらも受ける。
 
-色カタログ変更は親作品のDDL・Score・キャンバス・配置seed・render seedを固定し、現在とは異なるcatalog IDだけを適用する。4案では可能な限り異なるカタログを使う。色以外の推敲は、次の描画設定ではなく親作品の実使用カタログとキャンバスを継承する。色変更は系譜の `catalog_change` として変更前後のcatalog IDを記録する。
+色カタログ変更は親作品のDDL・Score・キャンバス・配置seed・render seedを固定し、現在とは異なるcatalog IDだけを適用する。候補は親以外の全カタログを一覧の順に1案ずつ描く。色以外の推敲は、次の描画設定ではなく親作品の実使用カタログとキャンバスを継承する。色変更は系譜の `catalog_change` として変更前後のcatalog IDを記録する。
 
 詞書の表示状態、横書き／縦書き、左／右の選択はユーザー設定としてDBへ保存し、通常表示とプレゼンテーションモードで共有する。推敲タブ内の調整／モデル比較で前後の作品へ移動するときはサブタブ文脈を維持し、対象作品だけを切り替える。
 
@@ -1067,12 +1067,12 @@ Stage 1のfallback候補はStage 1の応答待ちにだけ属する。Stage 1が
 - 書き換え: 範囲の字句（日本語は範囲の言葉の頭から閉じ括弧まで、英語は前置詞の後から閉じ括弧まで）だけを、新しい範囲の名前と数で書き換える（`左上（横0〜1/3、縦0〜1/3）`、`the top left (horizontal 0 to 1/3, vertical 0 to 1/3)`）。言葉と数は一緒に書くので、書き換えた範囲は食い違わない。古い作品の印は字句に含まれ、動いた範囲では消え、動かない範囲では読まれない語として残る。ほかの字は変えない。書き換えた文書が診断なしで組めるときだけ使う。
 - 選び直せないとき: 動かす数の範囲が無い（構図より前の作品、端末のモデルの作品、場所を言葉だけで書いた指示書）、下絵が書かない文がある（Macroの語に範囲、まとまり、関係の句、色などの列）、原理に沿うで、指示書から読み戻した層の範囲の組み合わせが解きの上限（3,000,000、§12.6.2）を超える、組めないときは、指示書を変えずに今までどおり組み直し、構図が動かないことを理由とともに示す。
 - その後は今までどおり、選び直した（選び直せないときは保存した）DDLを、候補の`composition_seed`で組み直す。記述にかたむきがあるときの具体角度、`隅`の語の四候補、群の置き場所も選び直される。
-- 共有coreの関数は`recompose`（応答schema `inku.composition-recompose.v1`）。要求はpipelineの設定、原文、モード（`principled`・`chance`）、seed（10進の文字列）、作品の識別子である。答えは、選び直した原文と文ごとの動き（今の範囲と新しい範囲の書き方。今の範囲が28種のどれでもないときはその範囲の鍵を持たない）、または変えない理由（`nothing_to_move`・`not_canonical`・`unsupported_sentence`・`unplaced_sentence`・`no_other_answer`・`same_ranges`・`unsolved`・`not_canonical_after`）。`author_range`（印の無い数値の範囲）は2026-10-05から返さない（hostは互換のため文言を残してよい）。読めない要求は`invalid_request`を返す。LLMは呼ばない。
+- 共有coreの関数は`recompose`（応答schema `inku.composition-recompose.v1`）。要求はpipelineの設定、原文、モード（`principled`・`chance`）、seed（10進の文字列）、作品の識別子である。作品の識別子は`sha256:`に原文（可視DDL）のUTF-8のSHA-256の16進を続けた文字列とし、seedは`composition_seed`、無ければ`render_seed`とする（ServerもAndroidも同じ）。答えは、選び直した原文と文ごとの動き（今の範囲と新しい範囲の書き方。今の範囲が28種のどれでもないときはその範囲の鍵を持たない）、または変えない理由（`nothing_to_move`・`not_canonical`・`unsupported_sentence`・`unplaced_sentence`・`no_other_answer`・`same_ranges`・`unsolved`・`not_canonical_after`）。`author_range`（印の無い数値の範囲）は2026-10-05から返さない（hostは互換のため文言を残してよい）。読めない要求は`invalid_request`を返す。LLMは呼ばない。
 - 範囲の表: 共有coreの`composition_ranges`（schema `inku.composition-ranges.v1`、Pythonは`pipeline_composition_ranges`）は、28種と隅の4つの鍵・日英の名前・数（左・上・右・下の分数）・隅かどうかを返す。hostはこの表で、範囲が構図の書く形か（名前と数がそろっているか）を見分け、数に合う名前を引く。表を手で写さない。Serverの認証付き`GET /api/composition/ranges`が同じ表を返す。関数が無い旧wheelまたは読めない表では空表を返し、Webは数を畳まずに全文を表示する。
 - 指示書の表示（Web・Android、2026-10-05 作者の判断）: 構図の書く形の範囲は、括弧の中の数を畳み、範囲の名前に点線の下線を付けて見せる。重ねるか押すと絵の上に範囲の枠を出し、押すと数が開いて打ち直せる。打ち直すと枠が追従し、数が表の範囲と一致すれば名前もその名前に書き換え、一致しなければユーザーの範囲として畳まずに数を見せる。言葉と数が食い違う範囲とユーザーが書いた範囲は畳まない。絵の描き直しは「指示書から描画」で一度行う。保存するDDL、編集画面、コピーは数つきの原文のまま。古い作品の印は、表示では範囲の名前と一緒に畳む。
 - Webの「指示書を編集」（2026-10-05 作者の判断）: 編集欄をCodeMirror 6で作り直し、読む表示と同じ範囲の解析とcoreの表で、名前と数が一致する範囲の括弧と古い印を欄の中で畳む。名前を押すかカーソルが入るとふつうの文字として開き、数の打ち直しはダイアログ内の選択作品の小さな絵の枠へ追従する。成り立たない数は最後の有効な枠と書き方の案内を保持し、描画を止める。名前の追従は範囲から離れたときだけ行い、入力中・日本語変換中は字を変えたり畳み直したりしない。数が表に無い範囲は開いたまま。色付け・行番号・DDLの言語による歳時記の候補とMacro・語の挿入・未知Macroの案内・描画中の読み取り専用・外部valueの同期・スクロールを同じ編集欄で扱う。コピーと描画には数・印・改行を含む全文を渡し、移動や打ち直しだけで描き直さない。
-- Serverでは`/api/compose`の任意の`recompose_mode`で呼び、直接DDLの実行と同じprepared設定・contextを一度だけ作る。応答の`recomposition`はモード・動きまたは変えない理由を持つ。モード省略、関数の無い互換wheel、core error・不正な応答は原文の従来の組み直しへ進む。
-- Webの「配置を変える」の下に「原理に沿う／偶然に委ねる」（英語`By principle` / `By chance`）を置き、既定とAI／自律推敲の配置の世代は「原理に沿う」とする。候補は層番号を1から表示し、動きと変えない理由を示す。選んだ候補の`layout_change`辺に`composition_seed`と`recompose_mode`を残す。指示書があれば記述の無い作品も扱える。
+- Serverでは`/api/compose`の任意の`recompose_mode`で呼び、直接DDLの実行と同じprepared設定・contextを一度だけ作る。要求が保存済み作品の`work_id`（履歴ID）を持つときはその作品からforkする。共有pipelineで描いた作品はそのvariationを親とし、保存時のconfig・host options（`render_seed`・`composition_seed`・カタログ）・Macro catalog・資源上限を継ぐ。それより前の作品は履歴行を親とし、そのmetadataのseedと上限を継ぐ。要求が明示した値（新しい`composition_seed`など）はそれに優先する。`work_id`が無いとき（CLI、未保存の結果）は今日の設定で親の無い実行を始める。応答の`recomposition`はモード・動きまたは変えない理由を持つ。モード省略、関数の無い互換wheel、core error・不正な応答は原文の従来の組み直しへ進む。
+- Webの「配置を変える」の下に「原理に沿う／偶然に委ねる」（英語`By principle` / `By chance`）を置き、既定とAI／自律推敲の配置の世代は「原理に沿う」とする。候補は層番号を1から表示し、動きと変えない理由を示す。選んだ候補の`layout_change`辺に`composition_seed`と`recompose_mode`を残す。保存済みの作品の候補は`work_id`を送る。指示書があれば記述の無い作品も扱える。
 
 ### 12.7 第二段階（補完）と決定的な構造化
 
@@ -1092,7 +1092,7 @@ Serverは、Stage 1（作品計画）とhole completion（Stage 2）がprovider�
 
 実行中のviewは、modelの呼出し（写生、色カタログ選択、Stage 1、hole補完）を待つ間、`provider_attempt`を持つ。効果の種類（`action`）、1始まりの試行番号（`attempt`）、その段の再試行の方針の上限（`max_attempts`）、その試行の待ちと制限時間（`delay_ms`・`timeout_ms`、10進の文字列）は、共有coreが保存済みsnapshotから返す。hostは段と方針の対応を写さない。coreは時計を持たないので、Serverが自分で試行を始めたときだけ、始めた時刻に待ちと制限時間を足した締切`deadline_at`（epoch ms）を加える。再起動の前に始まった試行には付けない。Webの実行中の表示は、1回目を「応答待ち（1/4回目）」、2回目以降を「再試行中（2/4回目）」と示し、timeoutした1回目を遅い応答と見分けられるようにする。
 
-Androidはinku serverを介さず、Kotlin hostからproviderと共有Rust JNIへ接続する。通常の記述、直接DDL、batch／demo、推敲とカメラの送出は同じ共有pipelineを使用する。カメラ画像の前処理と端末内local LLMはhostに残し、得られた記述またはDDLを正規入口へ渡す。カメラの非画像provenanceは補完承認や再開をまたいで保持する。新規authoringでStage0.5を呼ばず、旧写生文を元記述の代わりに挿入しない。可視patchは通常描画画面に現在のDDLと変更案を示して承認を受ける。iOS接続は今回のAndroid接続に含めず、別途保留する。
+Androidはinku serverを介さず、Kotlin hostからproviderと共有Rust JNIへ接続する。通常の記述、直接DDL、batch／demo、推敲とカメラの送出は同じ共有pipelineを使用する。カメラ画像の前処理と端末内local LLMはhostに残し、得られた記述を正規入口へ渡す（記述生成モデルにDDLを書かせる「DDL直接」モードは2026-09-25に廃止した）。カメラの非画像provenanceは補完承認や再開をまたいで保持する。写生（Stage 0.5）は作者が選んだときだけ共有pipelineの`generate_sketch`で呼び、旧写生文を元記述の代わりに挿入しない。可視patchは通常描画画面に現在のDDLと変更案を示して承認を受ける。iOS接続は今回のAndroid接続に含めず、別途保留する。
 
 Room v10からv11へ既存作品を保持して移行し、origin／authority／sourceの原子保存、action ACK、opaque execution、履歴revisionの不変contextを追加する。同じexecutionの保存再開は同じ演奏の履歴を重複作成しない。保存済みScoreの再演奏も元の短いDDLと当該revisionのauthorityを保持し、独立して保存した資源予算で検証する。新作用紙のIDと整数比は共有Rustの11形式を正本とする。Android専用だった`pixel9_landscape_safe`は端末の表示余白へ移し、旧作品の9:5比率と保存画像は保持する。旧端末設定からの新作用紙選択は既定の`square`とし、9:5を16:9へ別名化しない。
 
@@ -1122,7 +1122,7 @@ Providerのpatchは候補にすぎない。共有compilerは再compile時に確�
 
 Transcript replayはcommandと最終effect resultの入力envelopeだけから同じsnapshotと出力を再構成し、出力専用の進行eventやhost effectを再入力しない。二つのowned byte bufferからなる入口は、空または直前snapshotのUTF-8 JSON bytesとinput envelope bytesを受け、outputまたはstable errorのJSON bytesを返す。共有bindingはこの`Vec<u8>, Vec<u8> -> Vec<u8>`、binding／protocol版、およびcanvas・palette・Macro catalog・Stage 1語彙projection・保存Score再演の共有入口を公開する。Python／JNI adapterに意味分岐を複製しない。Panicはplatform例外文ではなくstableな`internal_invariant` error envelopeへ閉じる。保存Score再演の入口は、描画を断るとき`{"error": code, "message": reason}`を返す。codeは`invalid_saved_performance`（読めない、または認可できない入力）、`resource_authority`、`performance_stopped`、`invalid_score`、`mark_too_large`、`output_too_large`、`non_finite_value`のいずれかで、panicは`internal_invariant`になる。messageはcoreの理由をログのために渡すもので、protocolではない。
 
-通常Webと`/api/interpret`、`/api/compose`、`/api/paint`、`/api/paint/stream`は同じ共有pipeline serviceを使い、11形式のcanvasは共有registryを正本とする。Androidの通常UIは`InkuRepository`、`AndroidWorkPipeline`、JNIを通って同じ共有Rustへ到達する。カメラDDL promptも共有Stage 1語彙projectionを使う。履歴に送信promptを保存していない場合は、旧promptを再構成して送信履歴と扱わない。
+通常Webと`/api/interpret`、`/api/compose`、`/api/paint`、`/api/paint/stream`は同じ共有pipeline serviceを使い、11形式のcanvasは共有registryを正本とする。Androidの通常UIは`InkuRepository`、`AndroidWorkPipeline`、JNIを通って同じ共有Rustへ到達する。カメラの写真は記述を経て通常のStage 1へ渡る。履歴に送信promptを保存していない場合は、旧promptを再構成して送信履歴と扱わない。
 
 通常履歴を選んだ後の記述生成・DDL描画は、同じhistoryの判別が完了してから対応するforkへ進む。判別中・失敗・選択の失効を新規作品と扱わず、元記述・保存時設定・親関係の継承を保つ。待機中に取り消した操作や別の作品へ切り替える前の操作を、後から開始しない。
 

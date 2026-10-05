@@ -66,7 +66,7 @@ flowchart TD
     HOLE -->|"no"| S15 --> LOWER --> SCORE --> RENDER --> SVG --> HISTORY
 ```
 
-Provider patchは候補にすぎず、hostが直接採用しない。Hostは一つのeffectにつきproviderを一度だけ呼び、失敗結果をcoreへ返す。次のeffectまたは有限な終了はcoreが決める。残部採用で保存したrevisionからはknown-hole補完を始めず、`complete_with_omissions`と元の診断を保存まで運ぶ。holeがあってScoreも成立する場合、Serverは補完の要求より先に安全な演奏を保存する。
+Provider patchは候補にすぎず、hostが直接採用しない。Hostは一つのeffectにつきproviderを一度だけ呼び、失敗結果をcoreへ返す。次のeffectまたは有限な終了はcoreが決める。残部採用で保存したrevisionからはknown-hole補完を始めず、`complete_with_omissions`と元の診断を保存まで運ぶ。holeがあってScoreも成立する場合、hostは補完の要求より先に安全な演奏を保存する（ServerもAndroidも同じ）。
 
 ## APIとplatform境界
 

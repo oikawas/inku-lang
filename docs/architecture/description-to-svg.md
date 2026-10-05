@@ -92,7 +92,7 @@ Before the first LLM call, the request and the host settle the following.
 - **Macro catalog** — for a new work only, `resolve_new_work_macro_catalog` resolves the Macro definitions and localized summaries from the enabled plugin documents. A derivation from a saved configuration uses that configuration's definitions unchanged.
 - **Resource limits** — the manifest's hard policy and operational budget (four existing limits plus six new ones) are combined with the administrator's limit settings; a derivation from a saved work keeps that work's budget.
 - **Color catalog** — `fixed` uses the explicit ID, `random` picks one other than the current one, and `auto` delegates to the color catalog selection effect. Every catalog's colors are resolved with the render seed in advance, and only the selected one is used.
-- **Seeds** — with `seed_text` (words that change the touch), `render_seed` is derived deterministically. Otherwise an explicit `render_seed` is used, or a new 63-bit seed is drawn; either way it is recorded. `composition_seed` is set only when given.
+- **Seeds** — with `seed_text` (words that change the touch), `render_seed` is derived deterministically. Otherwise an explicit `render_seed` is used, or a new 53-bit (JavaScript-safe) seed is drawn; either way it is recorded. `composition_seed` is set only when given.
 - **Retired variation** — new requests carry no amplitude or seed, and there is no seed allocation API. Old focus, amplitude and seed remain only in history reads and are never written by new saves. Saved configurations are preserved; only the copy for the next execution omits `stage15_variation`.
 - **Retry budgets** — color catalog selection and hole completion default to 120 seconds per attempt and up to 4 attempts; Stage 1 to 300 seconds per attempt, 540 seconds in total, and up to 4 attempts (overridable with `INKU_LLM_*`). The sketch uses the color catalog budget unless it has its own. In developer mode, `developer_disable_llm_retries` limits every stage to one attempt.
 
@@ -152,7 +152,7 @@ An ambiguous reference, a reference with no candidate, or several candidates are
 
 ## Known-hole completion (Stage 2)
 
-When the lock of the saved DDL carries known holes, core requests the hole completion effect without waiting for a separate author command (prompt `inku.visible-ddl-hole-completion-prompt.v3`). Before that request, the Server saves the safe performance if a Score exists.
+When the lock of the saved DDL carries known holes, core requests the hole completion effect without waiting for a separate author command (prompt `inku.visible-ddl-hole-completion-prompt.v3`). Before that request, the host saves the safe performance if a Score exists (Server and Android alike).
 
 - The request carries only the target source text, confirmed typed facts, the finite vocabulary, and the accepted syntax. It carries no description, unrelated clauses, Score, or renderer instructions.
 - The response is one correction or unresolved reason per short target ID. Core checks that the IDs match, with no duplicates or omissions, and restores the actual hole IDs, allowed spans, and digests from the saved request and the lock.

@@ -82,10 +82,10 @@ object InstructionLanguages {
      *
      * The server lets the UI language stand in as the fallback when it is one of
      * the supported ones, and uses `"ja"` when it is not -- an unknown `ui_lang`
-     * is not an error there. This client has no UI-language setting of its own,
-     * so every call arrives with `uiLang = null` today and takes the same else
-     * branch the server takes for `"fr"`; the parameter exists so that a client
-     * that grows one later wires it in rather than inventing a rule.
+     * is not an error there. This client passes its interface language
+     * (`UiLanguage.code`) from the describe, DDL, batch, demo and camera paths,
+     * and a run that names none inherits its parent's (`AndroidWorkPipeline`);
+     * with neither, it takes the same `"ja"` branch the server takes for `"fr"`.
      */
     fun resolveWithUiLang(text: String, requested: String?, uiLang: String? = null): String {
         val fallback = if (uiLang in SUPPORTED) uiLang!! else DEFAULT_LANG

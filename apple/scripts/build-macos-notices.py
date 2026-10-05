@@ -271,10 +271,30 @@ def build() -> dict:
             "components": notices.components, "texts": dict(sorted(notices.texts.items()))}
 
 
+def write_text(path: Path) -> int:
+    """Render the committed snapshot, exactly as the app shows it, as one plain-text Release attachment."""
+    notices = json.loads(OUTPUT.read_text(encoding="utf-8"))
+    lines = ["Third-party notices for the inku macOS application", ""]
+    for component in notices["components"]:
+        version = f" {component['version']}" if component["version"] else ""
+        lines += ["=" * 72, f"{component['name']}{version} ({component['license']})", component["source"]]
+        if component.get("note"):
+            lines.append(component["note"])
+        for text in component["texts"]:
+            lines += ["", f"--- {text['label']} ---", notices["texts"][text["text"]].rstrip("\n")]
+        lines.append("")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"Wrote {path} ({len(notices['components'])} components)")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--check", action="store_true", help="Fail when the committed snapshot differs")
+    parser.add_argument("--text", type=Path, help="Write the committed snapshot as plain text to this path")
     arguments = parser.parse_args()
+    if arguments.text:
+        return write_text(arguments.text)
     try:
         notices = build()
         rendered = json.dumps(notices, ensure_ascii=False, indent=1) + "\n"

@@ -154,7 +154,11 @@ fi
 
 SHA256="$(shasum -a 256 "$DMG" | cut -d' ' -f1)"
 printf '%s  %s\n' "$SHA256" "$(basename "$DMG")" > "$DMG.sha256"
-python3 - "$ROOT" "$OUT/release.json" "$DMG" "$SHA256" "$VERSION" "$BUILD_NUMBER" "$TEAM_ID" "$NOTARIZE" "$SUBMISSION_ID" "${DIRTY:+dirty}" <<'__INKU_RELEASE_RECORD__'
+# The Release attachment carries the same notices the app shows under About inku.
+NOTICES="$OUT/Inku-macOS-$VERSION-THIRD-PARTY-NOTICES.txt"
+python3 "$APPLE/scripts/build-macos-notices.py" --text "$NOTICES"
+python3 - "$ROOT" "$OUT/release.json" "$DMG" "$SHA256" "$VERSION" "$BUILD_NUMBER" "$TEAM_ID" "$NOTARIZE" "$SUBMISSION_ID" "${DIRTY:+dirty}" "$NOTICES" <<'__INKU_RELEASE_RECORD__'
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -162,6 +166,7 @@ import sys
 
 root, output, dmg = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
 sha256, version, build, team, notarized, submission, dirty = sys.argv[4:11]
+notices = Path(sys.argv[11])
 reference = json.loads((root / "apple/Sources/InkuUI/Resources/ui-reference.json").read_text())
 core = json.loads((root / "apple/Packages/InkuCore/Artifacts/build-manifest.json").read_text())
 record = {
@@ -173,6 +178,7 @@ record = {
     "rust_archives": core["archives"],
     "dmg": dmg.name, "bytes": dmg.stat().st_size, "sha256": sha256,
     "team_id": team, "notarized": notarized == "true", "notary_submission_id": submission or None,
+    "notices": notices.name, "notices_sha256": hashlib.sha256(notices.read_bytes()).hexdigest(),
 }
 output.write_text(json.dumps(record, indent=2) + "\n")
 __INKU_RELEASE_RECORD__

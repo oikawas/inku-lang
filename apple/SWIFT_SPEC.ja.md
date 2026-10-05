@@ -4,7 +4,7 @@
 
 最終更新: 2026-10-05。
 
-binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。Swiftアプリの製品版は正式な版管理に従い、この初期実装では新しい版を採番しない。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
+binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。macOSアプリの版は`apple/VERSION`と`apple/BUILD_NUMBER`を正本とする独自の版で、Server／Webの版とは別に採番する（初回は1.0.0／Build 1）。対応するServerの版はアプリの「inkuについて」と変更履歴に併記する。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
 
 ## 更新ルール
 
@@ -13,6 +13,53 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 確定した実装変更と残る範囲は本書の日付付き節へ記し、製品の変更履歴は共通の[CHANGELOG.ja.md](../CHANGELOG.ja.md)／[CHANGELOG.md](../CHANGELOG.md)へ同期して記す。Swift専用CHANGELOGを分けない。
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
+
+## 2026-10-05 初回配布に向けたWebとの整合とServer hostの照合
+
+macOS版を初めて配布するにあたり、画面・操作・保存した選択をWeb（Build 1162）へ揃え、共有Rust core以外のhost処理をServer（Build 1162）と照合した。Webより詳しく役に立つ要素（モデルの実測記録、段階別の時間とusage、描画ログ、推敲方針の文字数）は残す。
+
+### 画面の構成と密度
+
+- 左端は190ptの項目一覧をやめ、WebのAppRailと同じ44pt（展開164pt）のアイコン列にした。展開、ロゴ（「inkuについて」）、UIモード、ツールチップ、設定、テーマ、言語を置く。ライブラリは窓全体を覆う重ね表示、系譜は作品域の「作品／系譜」タブで開く。設定とデモはWebと同じ大きさの設定モーダルに入れる。メニューバーの移動（⌘1〜⌘4）と描画ログ（⇧⌘L）は残す。
+- 窓のツールバー、上部の記述／バッチ帯、下部の状態表示を撤去した。実行状況と状態文は左パネル内に置く。記述／バッチは入力パネル内の下線タブで、実行中は点と進捗を出す。入力パネルは幅440（窓幅1180以下ではmin(400, 42%)）で、開閉できる。
+- 作品まわりの操作（拡大縮小、キャプション・印・書き出し、前後移動）は作品の上に重ねる。作品域の外側余白と枠をなくし、Webと同じ式（基準400、倍率min((幅−120)/基準幅, (高さ−96)/基準高さ)、0.25〜10）で合わせる。
+- 文字はWebの`--ui-font-size-N`と同じ値に文字サイズ設定の倍率を掛ける。文字サイズ設定がすべての文字に効く。画面ごとの大見出しは置かない。
+- 履歴帯はサムネ82×58、件数floor((窓幅−40)/89)。ライブラリはminmax(142,1fr)の格子で、1ページの件数を実寸から計算してページ送りし、スクロールに頼らない。モデル名はWebの`shortModel`（カード）と`abbreviateStripModel`（履歴帯）と同じ規則で省略する。
+- ダイアログはWebと同じ大きさの式（例: DDL編集min(1360, 窓−40)×min(940, 窓高−40)）で開く。推敲は作品域の中、生成情報は作品上の引き出し、歳時記は右端の引き出しとして出す。
+
+### 選択の保存
+
+- 制作条件（色カタログとその自動選択、用紙、暴れる）、設定画面の最後のタブ、作品／系譜、記述／バッチ、ライブラリの表示方式と表示形式、推敲の種類、自律推敲の前回設定、モデル比較の選択を、表示設定（`interface.json`）へ保存する。保存した値がもう無いカタログ・用紙のときは既定に戻す。
+- 表示設定とデモ設定は項目ごとに読み、欠けた項目や型の合わない項目だけを既定に戻す。読めないファイルは上書きせず、日時付きの名前で残す。版を上げても他の選択は失われない。
+- デモで選んだモデルが一時的に使えないときは、表示だけをStage 1のモデルにし、保存した選択は書き換えない。
+- 新しく作る表示設定の既定は、Webと同じくテーマdark、写生欄を開く。既存の保存値は変えない。
+
+### 入力補助とツールチップ
+
+- 記述欄は番号・コメントの範囲をグレーで示し、コメント記法のヒントを出す。記述メーターは応答前と失敗時にWebと同じ推定を出し、4000字の上限をUTF-16で数える。番号・コメントを除いた本文が無い記述は生成できない。
+- DDL編集済みの作品では記述を固定し、「この記述から新しい作品を作る」で元作品の子として新しい作品を作る（Serverの`fork_linked_history`と同じ）。
+- 表示中作品の写生文をその場で直せる。直した文はそのまま解釈へ渡る。
+- DDL editorは行数・文字数、行番号、ハイライト、言語ラベル、未登録プラグイン名、簡易ガイドを出し、語をキャレット位置へ挿入する。
+- バッチは番号・コメントだけの行を送らず、件数もWebと同じく本文のある行だけを数える。行番号は保つ。
+- ツールチップはWebと同じく、hoverから0.12秒で出て、キーボードのフォーカスでも出る。押せない部品では理由を出す。Webの173箇所のうち、単一利用者のアプリに無い9箇所を除いて対応する。メニュー項目の中だけはmacOS標準のtool tipを使う。
+
+### Server hostとの照合
+
+- 非正方形の用紙は、Serverと同じく既定の高さ1000を保ち、幅を偶数丸めで出す（16:9は1778×1000）。新規の生成と再演奏の両方に適用する。
+- 指示書の言語はWebと同じく常に自動で、記述またはDDLの文字（日本語→英字→UI言語）で決める。言語の選択肢は置かない。
+- Personal ChatGPTの応答解析、HTTP sessionの寿命（要求ごと）、失敗の分類（応答過大、期限0）、rateの待ち方とGeminiのtoken計数の順序、Ollama Cloudの同時2本、model一覧の取得（ページ送り、新しいmodelは無効で登録、消えたmodelはEOLとして残す）、model参照の解決、Gemini schemaの`propertyOrdering`、自動配色の`catalog_mode`、デモの再試行と「暴れる」切、推敲助言と奥書の文脈JSON、失敗文言、PNGの撮影日時、DDL書出しの`exported_from`、描画警告の保存をServer／Webに合わせた。
+- Geminiのrate設定で欄が欠けた場合は、旧版が0（無制限）を欄の省略で保存していたため、無制限として読む扱いを残す。独自のproviderでkindがanthropic／geminiのものは、kindに合わせて送る。
+
+### 版・署名・配布
+
+- 版は`apple/VERSION`と`apple/BUILD_NUMBER`からbuild時にInfo.plistへ入れ、作品の来歴の`build`とDDL書出しの`build_number`にも使う。
+- 配布物は`apple/scripts/package-macos-release.sh`で作る。Universal Release build、第三者通知の照合、Developer ID署名（Hardened Runtime、timestamp、entitlementsは空）、`.dmg`の作成と署名、Appleの公証とstaple、Gatekeeperの確認、SHA-256の記録までを行う。署名identityと公証のprofileは引数か環境変数で渡し、sourceに書かない。
+- 配布アプリはbundle ID `app.inku.macos`と既定のデータ場所を使う。`--database`起動引数とbundleの`InkuDatabasePath`は開発用に残すが、配布物には`InkuDatabasePath`を入れない。
+- 第三者通知はRust crate（registry・git・path・vendored由来）、GRDB、辞書（SudachiDictのUniDic部分を含む）、フォントを網羅し、「inkuについて」の「ライセンス」から全文を読める。
+
+### 確認範囲
+
+画面の骨組み・ライブラリ・選択の保存・入力補助・ツールチップ・host照合は、それぞれ防ぐ失敗に対応した限定確認（ServerのPython・WebのTypeScriptを実際に動かした期待値との一致を含む）と型検査で確かめた。実providerへの送信、Intel／macOS14実機、iOSは今回の確認に含まない。hover・フォーカスでのツールチップの見え方は作者の画面確認に残す。
 
 ## 2026-10-05 「inkuについて」をmacOSアプリメニューへ移動
 

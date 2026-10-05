@@ -10,7 +10,7 @@ Following the M1 Swift/Rust and M2 standalone host/SQLite foundations, macOS now
 
 Bounded checks have established DDL → Score/SVG → SQLite save → reload after recreating the app model, native CGImage creation, and export of the saved canonical SVG. Boundary checks cover owned pixels, input errors, and preservation of UInt64 seeds. macOS arm64/x86_64 Rust slices, linking an x86_64 Swift executable, and generating iOS device/simulator Rust artifacts have also been checked. Intel hardware performance and startup, requests to real LLM providers, and author acceptance of ordinary screen interactions are separate checks.
 
-Isolated native checks of the updated Universal app confirmed DDL generation, an edited child, library comments/stars, Trash/restore, restart persistence, Japanese/English switching, lineage and PNG2160 saving of two selected works. Source integration, focused offline checks, native interaction and author acceptance are recorded separately. Old Server/Android physical DB import, real providers/OAuth, other native export recipes/performance, physical Intel/macOS14 and signing/distribution remain incomplete. The retired history.json migration array is not a current Web restoration format. iOS has shared packages and initial Rust artifacts; regeneration for the latest APIs, iPad/iPhone applications, camera, sharing and real-device acceptance remain incomplete.
+Isolated native checks of the updated Universal app confirmed DDL generation, an edited child, library comments/stars, Trash/restore, restart persistence, Japanese/English switching, lineage and PNG2160 saving of two selected works. Source integration, focused offline checks, native interaction and author acceptance are recorded separately. Old Server/Android physical DB import, real providers/OAuth, other native export recipes/performance, physical Intel/macOS14 remain incomplete. The retired history.json migration array is not a current Web restoration format. iOS has shared packages and initial Rust artifacts; regeneration for the latest APIs, iPad/iPhone applications, camera, sharing and real-device acceptance remain incomplete.
 
 Personal ChatGPT is explicitly enabled and connected in its dedicated settings page, where an offered drawing model is selected. It is separate from API key connections and disabled by default. An issued client ID and personal consent are required; actual sign-in, model discovery and inference remain unaccepted. Description, sketch, automatic color, composition reading and DDL hole filling are supported; unavailable uses such as Vision refinement and colophons are explained in the UI. See the [Swift specification](SWIFT_SPEC.md#personal-chatgpt).
 
@@ -18,9 +18,25 @@ This current-Server update follows Score 0.19/render engine 73, clears retained 
 
 On macOS, open the app menu → About inku to read version information, concept text, vocabulary, and creator information. It is no longer listed in Settings. Close the dedicated window and use the same menu to reopen it. On iOS, use About inku in Settings.
 
+## Installing the macOS app
+
+The distribution is `Inku-macOS-<version>.dmg` on [GitHub Releases](https://github.com/oikawas/inku-lang/releases). Compare it with the `.sha256` file published beside it before opening it.
+
+```sh
+shasum -a 256 Inku-macOS-1.0.0.dmg
+```
+
+Open the dmg and drag Inku to Applications. It is a Universal app for Apple silicon and Intel on macOS 14 or later, signed with Developer ID and notarized by Apple. It has not been run on Intel hardware or on macOS 14.
+
+First enter an API key for the provider of the drawing model. Without a key, a notice appears above the draw button with Open connection settings. Keys are stored in the login keychain (service `app.inku.provider-credentials`), never in files.
+
+Works and settings are stored in `~/Library/Application Support/app.inku.macos/`: the works database (`inku.sqlite`), connections (`providers.json`), display settings and remembered choices (`interface.json`), demo settings, batch records, and `drawing-logs/` when enabled. There are no automatic updates. To update, quit the app and replace it with Inku from the new dmg. Your data stays in place, and settings files are read field by field across versions. To remove inku, delete the app, the folder above, and the keychain items.
+
+About inku shows the app version beside the corresponding Server version. inku is licensed under MIT. Licenses for the bundled third-party software, dictionaries, and font are under License in About inku.
+
 ## When a drawing fails
 
-Open Drawing log in the toolbar and select the execution matching the failed description. It shows the time, pinned models, failed stage, retries and fallbacks. New ordinary API executions also retain OS connection error codes and HTTP refusal reasons. Details absent from older records are identified as unrecorded rather than invented. Opening logs does not perform or resend requests.
+Open Drawing log in the left rail (or ⇧⌘L from the menu) and select the execution matching the failed description. It shows the time, pinned models, failed stage, retries and fallbacks. New ordinary API executions also retain OS connection error codes and HTTP refusal reasons. Details absent from older records are identified as unrecorded rather than invented. Opening logs does not perform or resend requests.
 
 Enable result logging in Settings → Create to also save accumulated JSON through completion, failure or cancellation in `drawing-logs/` beside the DB. SQLite execution records remain readable in Drawing log when file logging is off. Ordinary logs exclude provider bodies, API keys, endpoint paths/queries and headers. Full body capture requires the separate explicit developer setting.
 
@@ -46,7 +62,7 @@ apple/scripts/build-macos.sh Release
 
 After checking prerequisites, `build-macos.sh` runs the [stop helper](scripts/stop-existing-macos.py) before changing resources, core artifacts, or the app. It validates known Inku bundle IDs and executables owned by the current user, rechecks PID identity, and stops them with SIGKILL. If shutdown cannot be confirmed within ten seconds, the build stops; the result is recorded in `apple/build/macOS/stop-existing.json`. An unknown Inku-like process causes a validation error without receiving a signal.
 
-Normal builds use committed, reviewed reference/default/catalog snapshots and prepare locked build dependencies with `uv sync --project server --frozen`. The [dictionary script](scripts/prepare-meter-resources.py) verifies hashes for Sudachi small (about 113 MiB), reading configuration, and CMUdict, then copies them with their licenses into InkuHost resources. It builds shared Rust/bindings/XCFramework, generates the Xcode project, and builds a generic Mac destination with `ARCHS=arm64 x86_64` and `ONLY_ACTIVE_ARCH=NO`, then verifies both slices. This is an unsigned local build without an Apple account, Team, or certificate. Signing, notarization, and distribution are outside this procedure.
+Normal builds use committed, reviewed reference/default/catalog snapshots and prepare locked build dependencies with `uv sync --project server --frozen`. The [dictionary script](scripts/prepare-meter-resources.py) verifies hashes for Sudachi small (about 113 MiB), reading configuration, and CMUdict, then copies them with their licenses into InkuHost resources. It builds shared Rust/bindings/XCFramework, generates the Xcode project, and builds a generic Mac destination with `ARCHS=arm64 x86_64` and `ONLY_ACTIVE_ARCH=NO`, then verifies both slices. This is an unsigned local build without an Apple account, Team, or certificate. The signed and notarized distribution is built as described in Building the distribution below.
 
 To avoid Rust 1.95's macOS host proc-macro [LINKEDIT alignment issue](https://github.com/rust-lang/rust/issues/157750), release builds disable stripping only for host build dependencies. Target Rust archive optimization and stripping remain enabled. No cache deletion or toolchain change is required.
 
@@ -67,6 +83,16 @@ INKU_APPLE_REFERENCE_ROOT=/absolute/path/to/server-checkout apple/scripts/build-
 ```sh
 open apple/build/macOS/DerivedData/Build/Products/Release/Inku.app
 ```
+
+### Building the distribution
+
+The following builds the distribution dmg: a Universal Release build, a check of the third-party notices, Developer ID signing with Hardened Runtime, creating and signing the dmg, notarization and stapling, a Gatekeeper check, the SHA-256, and a plain-text copy of the third-party notices for the Release. Output goes to `apple/build/release/Inku-<version>-<build>/`. The version comes from `apple/VERSION` and `apple/BUILD_NUMBER`. Pass the signing identity and the notary keychain profile as arguments or environment variables (`INKU_MACOS_SIGN_IDENTITY` / `INKU_MACOS_NOTARY_PROFILE`).
+
+```sh
+apple/scripts/package-macos-release.sh --identity "Developer ID Application: <name> (<team>)" --notary-profile <profile>
+```
+
+The third-party notices are a reviewed snapshot written by `apple/scripts/build-macos-notices.py`. Regenerate it when dependencies change; the release script stops a stale snapshot with `--check`.
 
 ### Keep one app in the Dock
 
@@ -93,7 +119,7 @@ The database is not copied or moved. Its path is retained in the `InkuDatabasePa
 
 Batch takes one description per work on each line. Full-width history, previous-run resume information, next conditions, and the new-batch action follow the editor. New batches offer no DDL input. The model row's Change button opens service-grouped cards for shared Stage 1/2 selection; choose a draft and Confirm to apply it. Cancel and close retain the original selection. An enabled registered LLM is required; an unknown default waits for selection. The color dialog offers an automatic-description card followed by catalogs with ten color samples. Confirm or close applies the draft; Cancel discards it. There is no random choice.
 
-Check sketch from life Off/On, Wild Off/On, and canvas, then choose Draw new batch. Batch sketch is independent of Paint and does not inherit a supplied sketch. Language and seed are under Details. The start action sits immediately after conditions; narrow layouts scroll through the work area as well. Blank lines retain original numbering, long lines scroll horizontally, and ruler numbers stay inside the editor.
+Check sketch from life Off/On, Wild Off/On, and canvas, then choose Draw new batch. Batch sketch is independent of Paint and does not inherit a supplied sketch. Seed is under Details; the instruction language follows the characters of the description. The start action sits immediately after conditions; narrow layouts scroll through the work area as well. Blank lines retain original numbering, long lines scroll horizontally, and ruler numbers stay inside the editor.
 
 Explicit history restoration replaces only editor text. Interrupted-run cards show remaining rows and frozen starting conditions; resuming preserves completed works. Distinguish the currently processed line from the displayed successful work, and inspect history before explicitly retrying or skipping ambiguous rows. When no batch work has been observed, the selected saved work remains on the right.
 
@@ -115,7 +141,7 @@ Generation information pins the saved work when opened and offers Details, Promp
 
 Presentation browses the captured saved work through independent history and preserves Creation input and selection when closed. Hash copy returns the complete digest without its leading domain prefix. A failed unread-word reload also keeps its earlier list and reason.
 
-Library preview preserves inputs in Paint. Open in Paint explicitly switches works, and closing preview returns to the full-width list. Lineage supports branch expansion and a map that restores the normal browsing position when closed. The canvas mouse wheel zooms, recentering at 100% or less. Choose the next canvas by shape and intent; ordinary Saijiki browsing is reference-only. Tooltips have a toolbar toggle. Edit drawing limits in Settings and choose Save changes to apply them to new works.
+Library preview preserves inputs in Paint. Open in Paint explicitly switches works, and closing preview returns to the full-width list. Lineage supports branch expansion and a map that restores the normal browsing position when closed. The canvas mouse wheel zooms, recentering at 100% or less. Choose the next canvas by shape and intent; ordinary Saijiki browsing is reference-only. Tooltips have a toggle in the left rail. Edit drawing limits in Settings and choose Save changes to apply them to new works.
 
 Open Model suitability and use in Creation or model settings to read Server evaluations/purposes/comments separately from service-discovered information. Unregistered services/models receive no guessed rating. During a call, stage, requested model, attempts, and elapsed time appear; unavailable usage is Not recorded. Stop freezes time, and New clears the previous card.
 

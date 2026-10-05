@@ -296,6 +296,7 @@ inku の描画エンジンには、**過去の版が存在しません**。（Gi
 - **Web版** — 稼働中（SvelteKit + Python FastAPI。描画の判断は Rust の共有コアが担う。ローカルまたはサーバーで動作）
 - **CLI** — `cli/` 以下に独立プロジェクトとして実装。API 経由でログイン、描画、バッチ生成、ベンチ評価を実行
 - **Android アプリ** — 稼働中（版は [`android/VERSION`](android/VERSION)）。サーバーを経由せず、端末内で同じ Rust の共有コアを呼んで描き、作品を端末に保存します。仕様は [android/ANDROID_SPEC.ja.md](android/ANDROID_SPEC.ja.md)
+- **macOS アプリ** — 版は [`apple/VERSION`](apple/VERSION)。サーバーを経由せず、Mac の中で同じ Rust の共有コアを呼んで描き、作品を Mac に保存します。Developer ID で署名・公証した `.dmg` を配布します。導入は [apple/README.ja.md](apple/README.ja.md)、仕様は [apple/SWIFT_SPEC.ja.md](apple/SWIFT_SPEC.ja.md)
 
 **日本語版**と**英語版**の inku は作者が維持します。他言語の実装は、OSS として各言語話者の貢献を歓迎します。DDLのエンジンは、言語特性による調整が重要だという事が分かってきました。なので、言語モジュールを入れ替えるだけで、日本語と英語以外の言語に、DDLをネイティブ対応させる、というのは手間が掛かるかもしれません。今のところ、追加の言語でDDLをサポートするフレームワークは未実装です。
 なお、内部の JSON Score 層は言語非依存（英語キーで統一）されています。UIについては、言語固有のデータは分離されており、比較的容易にローカライズが可能だと思います。

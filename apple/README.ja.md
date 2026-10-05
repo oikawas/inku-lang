@@ -10,7 +10,7 @@ M1のSwift／Rust基盤、M2のstandalone host／SQLite保存境界に続き、m
 
 限定した確認で、DDL→Score／SVG→SQLite保存→アプリモデルの再作成後の読出し、native CGImage生成、保存canonical SVGの書出しが成立しています。Swift／Rust境界ではowned pixel buffer、入力エラーとUInt64のseed保持を確認しています。macOSのarm64／x86_64 Rust sliceとx86_64 Swift executableのlink、iOS device／simulatorのRust artifact生成も確認しています。Intel実機での性能・起動、実providerへのLLM送信、作者による通常画面操作の受入は別の確認です。
 
-更新したUniversal appの隔離DBで、DDL生成→編集child→libraryのcomment／star→trash／復元→restart、日英切替と系譜表示、複数選択2作品のPNG2160保存を確認しています。機能のsource接続、限定したoffline確認、native操作、作者の通常利用の受入は別に記録します。旧Server／Android物理DBのimport、実provider／OAuth、他exportのnative・性能、Intel／macOS14実機、署名・配布は未完了です。廃止済みhistory.json移行utilityの配列は現行Webの復元形式ではありません。iOSは共通packageと初期Rust artifactまでで、最新APIのartifact再生成、iPad／iPhone app、camera、shareと実機受入は未完了です。
+更新したUniversal appの隔離DBで、DDL生成→編集child→libraryのcomment／star→trash／復元→restart、日英切替と系譜表示、複数選択2作品のPNG2160保存を確認しています。機能のsource接続、限定したoffline確認、native操作、作者の通常利用の受入は別に記録します。旧Server／Android物理DBのimport、実provider／OAuth、他exportのnative・性能、Intel／macOS14実機は未完了です。廃止済みhistory.json移行utilityの配列は現行Webの復元形式ではありません。iOSは共通packageと初期Rust artifactまでで、最新APIのartifact再生成、iPad／iPhone app、camera、shareと実機受入は未完了です。
 
 Personal ChatGPTは設定の専用画面で明示して有効化・接続し、提供されたmodelを描画用に選びます。通常のAPI key接続とは別で、初期状態は無効です。発行済みclient IDと本人の接続同意が必要で、実本人認証・model取得・推論は未受入です。記述、写生、自動配色、構図の読み、DDL補完に対応し、Vision推敲・奥書等の未対応用途は画面で説明します。詳細は[Swift仕様](SWIFT_SPEC.ja.md#personal-chatgpt)を参照してください。
 
@@ -18,9 +18,25 @@ Personal ChatGPTは設定の専用画面で明示して有効化・接続し、�
 
 macOSの版情報・概念説明・用語表・作者情報は、画面上部のアプリメニュー→「inkuについて」で開きます。設定一覧には表示しません。専用ウインドウを閉じても、同じメニューから再度開けます。iOSでは設定内の「inkuについて」を使います。
 
+## macOS版の導入
+
+配布版は[GitHub Releases](https://github.com/oikawas/inku-lang/releases)の`Inku-macOS-<版>.dmg`です。同じ場所の`.sha256`と照合してから開いてください。
+
+```sh
+shasum -a 256 Inku-macOS-1.0.0.dmg
+```
+
+dmgを開き、Inkuを「アプリケーション」へドラッグします。macOS 14以降のApple SiliconとIntelで動くUniversalアプリで、Developer IDで署名し、Appleの公証を受けています。Intel実機とmacOS 14実機での動作は未確認です。
+
+最初に、描画に使うモデルの接続先へAPIキーを入れてください。キーが無いと生成ボタンの上に案内が出て、「接続設定を開く」から設定できます。キーはログインキーチェーン（service `app.inku.provider-credentials`）に保存し、ファイルには書きません。
+
+作品と設定は`~/Library/Application Support/app.inku.macos/`に保存します。作品のSQLite（`inku.sqlite`）、接続設定（`providers.json`）、表示と選択の設定（`interface.json`）、デモ設定、バッチの記録、有効にした場合の`drawing-logs/`があります。自動更新はありません。新しい版はアプリを終了し、新しいdmgのInkuで置き換えてください。データはそのまま残り、設定ファイルは版を上げても項目ごとに読み込みます。削除する場合はアプリ、上のフォルダ、キーチェーンの項目を消します。
+
+アプリの版は「inkuについて」に、対応するServerの版と並べて表示します。inkuはMITライセンスです。同梱した第三者のソフトウェア・辞書・フォントのライセンスは「inkuについて」の「ライセンス」で読めます。
+
 ## 描画が失敗したとき
 
-toolbarの「描画ログ」を開き、失敗した記述の実行を選んでください。日時、使ったmodel、失敗した段階、再試行やfallbackの経過を確認できます。新しい通常APIの実行には通信のOS error codeやHTTP拒否理由も残ります。古い記録にない詳細は追加せず、未記録と表示します。ログを開いても生成・再送信は行いません。
+左の操作列の「描画ログ」（またはメニューの⇧⌘L）を開き、失敗した記述の実行を選んでください。日時、使ったmodel、失敗した段階、再試行やfallbackの経過を確認できます。新しい通常APIの実行には通信のOS error codeやHTTP拒否理由も残ります。古い記録にない詳細は追加せず、未記録と表示します。ログを開いても生成・再送信は行いません。
 
 設定→制作の「生成結果のログを保存」を有効にすると、成功・失敗・停止の累積JSONもDBと同じdirectoryの `drawing-logs/` に保存します。切ってもSQLiteの実行記録は「描画ログ」で読めます。通常logに通信本文、APIキー、接続先のpath／queryやheadersは含めません。詳しい本文保存は開発者用の明示設定に限ります。
 
@@ -46,7 +62,7 @@ apple/scripts/build-macos.sh Release
 
 `build-macos.sh`は必要toolの確認後、resource／core／appの変更前に[停止helper](scripts/stop-existing-macos.py)を実行します。現在のユーザーが所有する既知のInku bundle IDと実行fileを検証し、PIDのidentityを再確認してSIGKILLで停止します。最大10秒で停止を確認できなければbuildを中止し、結果は`apple/build/macOS/stop-existing.json`へ記録します。未知のInku類似processは検証errorとして扱い、signalを送信しません。
 
-通常のbuildはcommit済みのreview済みreference／default／catalog snapshotを使い、`uv sync --project server --frozen`で固定したbuild用依存を用意します。[辞書準備script](scripts/prepare-meter-resources.py)がSudachi small（約113MiB）、読み設定とCMUdictをhash検証し、licenseと共にInkuHost resourceへコピーします。共通RustとSwift binding／XCFrameworkを生成し、`project.yml`からXcode projectを作ってmacOS appをbuildします。generic Mac destination、`ARCHS=arm64 x86_64`、`ONLY_ACTIVE_ARCH=NO`を指定し、最後に両sliceの存在を検査します。Apple account、Team、証明書を使わないunsigned local buildです。署名、notarization、配布はこの手順に含みません。
+通常のbuildはcommit済みのreview済みreference／default／catalog snapshotを使い、`uv sync --project server --frozen`で固定したbuild用依存を用意します。[辞書準備script](scripts/prepare-meter-resources.py)がSudachi small（約113MiB）、読み設定とCMUdictをhash検証し、licenseと共にInkuHost resourceへコピーします。共通RustとSwift binding／XCFrameworkを生成し、`project.yml`からXcode projectを作ってmacOS appをbuildします。generic Mac destination、`ARCHS=arm64 x86_64`、`ONLY_ACTIVE_ARCH=NO`を指定し、最後に両sliceの存在を検査します。Apple account、Team、証明書を使わないunsigned local buildです。署名・公証した配布物は下の「配布物の作成」で作ります。
 
 Rust 1.95のmacOS host proc-macro stripによる[LINKEDIT alignment問題](https://github.com/rust-lang/rust/issues/157750)を避けるため、releaseのhost build dependencyだけstripを無効にします。target Rust archiveの最適化とstripは維持します。cache削除やtoolchain変更は不要です。
 
@@ -67,6 +83,16 @@ INKU_APPLE_REFERENCE_ROOT=/absolute/path/to/server-checkout apple/scripts/build-
 ```sh
 open apple/build/macOS/DerivedData/Build/Products/Release/Inku.app
 ```
+
+### 配布物の作成
+
+配布用のdmgは次で作ります。Universal Release build、第三者通知の照合、Developer ID署名（Hardened Runtime）、dmgの作成と署名、公証とstaple、Gatekeeperの確認、SHA-256とRelease添付用の第三者通知テキストの作成までを行い、`apple/build/release/Inku-<版>-<build>/`へ出力します。版は`apple/VERSION`と`apple/BUILD_NUMBER`です。署名identityと公証のkeychain profileは引数か環境変数（`INKU_MACOS_SIGN_IDENTITY`／`INKU_MACOS_NOTARY_PROFILE`）で渡します。
+
+```sh
+apple/scripts/package-macos-release.sh --identity "Developer ID Application: <name> (<team>)" --notary-profile <profile>
+```
+
+第三者通知は`apple/scripts/build-macos-notices.py`で作るreview済みsnapshotです。依存を変えたら再生成し、release scriptは古いsnapshotを`--check`で止めます。
 
 ### Dockから同じアプリを起動する
 
@@ -93,7 +119,7 @@ DBのcopyや移動は行いません。指定はbundleの`InkuDatabasePath`へ�
 
 バッチでは1行に1作品分の記述を入力し、幅いっぱいの履歴、前回の再開情報、次の描画条件、新しいバッチの操作の順に使います。新規バッチのDDL入力はありません。モデルの「変更」はStage 1/2共通のサービス別card dialogを開き、仮選択して「決定」で適用します。取消・×は元の選択を保ちます。登録済みで使用中のLLMモデルが必要で、登録外の既定値は選択待ちになります。色の「変更」は先頭の「記述から自動選択」かカタログの10色見本から選び、決定または×で適用、キャンセルで破棄します。ランダムの選択肢はありません。
 
-写生の「なし／あり」と暴れるの「切／入」、キャンバスを確認して「新しいバッチを描く」を押します。写生は制作とは独立し、指定写生は新バッチへ引き継ぎません。言語・seedは条件欄の「詳細」にあります。開始操作は条件直後に置き、狭い幅では作品領域まで縦へscrollできます。空行も元の行番号に含み、長い行は横へscrollできます。行番号は入力枠内だけに表示します。
+写生の「なし／あり」と暴れるの「切／入」、キャンバスを確認して「新しいバッチを描く」を押します。写生は制作とは独立し、指定写生は新バッチへ引き継ぎません。seedは条件欄の「詳細」にあります。指示書の言語は記述の文字から自動で決まります。開始操作は条件直後に置き、狭い幅では作品領域まで縦へscrollできます。空行も元の行番号に含み、長い行は横へscrollできます。行番号は入力枠内だけに表示します。
 
 履歴からの明示復元は入力欄だけを置き換えます。中断した記録は残件と開始時条件を確認して再開し、完成済み作品を描き直しません。処理中の行と表示中の成功作品の番号を区別し、結果不明の行は履歴を確認して再試行／省略を選んでください。バッチの観測作品がない場合は現在選択中の保存作品を右に残します。
 
@@ -115,7 +141,7 @@ DBのcopyや移動は行いません。指定はbundleの`InkuDatabasePath`へ�
 
 presentationは開いた保存作品を独立した履歴で閲覧し、戻った制作の入力と選択を保ちます。hashコピーは先頭のdomain prefixを外したdigest全体です。未読語台帳も再読込の失敗で以前の一覧を消さず、原因を残します。
 
-ライブラリは作品をpreviewしても制作中の入力を保持します。「制作で開く」で明示的に切り替え、previewは閉じて一覧へ戻れます。系譜は枝の開閉と全体図を使用でき、全体図を閉じると通常の閲覧位置へ戻ります。canvasのマウスホイールで拡縮し、100%以下で中央へ戻します。用紙は形と意図を見て次の条件へ選び、通常の歳時記は参照のみです。toolbarのTips切替と設定の描画制限値を使用できます。制限値は編集後に「変更を保存」を押すと新作品へ適用します。
+ライブラリは作品をpreviewしても制作中の入力を保持します。「制作で開く」で明示的に切り替え、previewは閉じて一覧へ戻れます。系譜は枝の開閉と全体図を使用でき、全体図を閉じると通常の閲覧位置へ戻ります。canvasのマウスホイールで拡縮し、100%以下で中央へ戻します。用紙は形と意図を見て次の条件へ選び、通常の歳時記は参照のみです。左の操作列のツールチップ切替と設定の描画制限値を使用できます。制限値は編集後に「変更を保存」を押すと新作品へ適用します。
 
 制作とモデル設定で「モデルの適性・用途」を開くと、Serverの登録評価・用途・commentと接続先から取得した情報を別々に読めます。未登録のservice／modelは推測で評価しません。処理中は段階・呼出しmodel・試行回数・経過時間を表示し、未取得token数は「記録なし」とします。停止で時間が確定し、新規制作で前の進行表示を消します。
 

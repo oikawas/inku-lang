@@ -114,11 +114,7 @@ class SingleAttemptModelEffectProvider(
         is InkuFailure -> "provider_rejected"
         is MalformedProviderResponseException -> "malformed_payload"
         is ProviderRateLimitWaitException -> "rate_limited"
-        is app.inku.mobile.llm.ChatGptException -> when (error.code) {
-            "chatgpt_transport_unavailable", "chatgpt_auth_unavailable", "chatgpt_response_incomplete",
-            "subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable", "chatgpt_refresh_not_ready" -> "transport_unavailable"
-            else -> "provider_rejected"
-        }
+        is app.inku.mobile.llm.ChatGptException -> error.failure
         is ModelProviderHttpException -> when {
             error.statusCode == 429 -> "rate_limited"
             error.statusCode >= 500 -> "transport_unavailable"

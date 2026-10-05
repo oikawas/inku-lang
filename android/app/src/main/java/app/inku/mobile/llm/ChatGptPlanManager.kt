@@ -3,6 +3,7 @@ package app.inku.mobile.llm
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.SocketTimeoutException
+import java.nio.charset.CharacterCodingException
 import java.time.Instant
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -17,6 +18,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 
 /** One locally hosted Android user. Profiles remain separate by verified sub and client ID. */
@@ -327,7 +329,8 @@ class ChatGptPlanManager internal constructor(
                 }
                 check()
                 val token = accessToken(ref)
-                val decoder = ChatGptSseDecoder()
+                // The server decodes with the pipeline's response bound as its argument limit.
+                val decoder = ChatGptSseDecoder(argumentLimit = MAX_PROVIDER_RESPONSE_BYTES)
                 val response = http.request("$CHATGPT_RESOURCE/responses", "POST", token, body.toString(), timeoutMs = request.timeoutMs ?: 60_000,
                     check = ::check, onChunk = decoder::feed)
                 if (response.status !in 200..299) throw chatGptResponseError(runCatching { JSONObject(response.body) }.getOrDefault(JSONObject()), response.status)
@@ -337,7 +340,16 @@ class ChatGptPlanManager internal constructor(
             } }
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (error: Exception) {
-            val safe = (error as? ChatGptException) ?: ChatGptException("chatgpt_transport_unavailable")
+            // Public codes only, but the class the server gives the cause:
+            // a read timeout, an answer that is not JSON, and bytes that are
+            // not UTF-8 are not the same failure as a dropped connection.
+            val safe = when (error) {
+                is ChatGptException -> error
+                is SocketTimeoutException -> ChatGptException("chatgpt_transport_unavailable", "transport_timeout")
+                is JSONException -> ChatGptException("chatgpt_response_invalid", "malformed_payload")
+                is CharacterCodingException -> ChatGptException("chatgpt_response_invalid", "provider_rejected")
+                else -> ChatGptException("chatgpt_transport_unavailable")
+            }
             invalidateForFailure(ref, safe.code)
             reportFailure(ref, safe.code)
             throw safe

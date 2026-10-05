@@ -43,6 +43,17 @@ pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_canvas
 
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_compositionRanges(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+) -> jstring {
+    jni_boundary(env, null_mut(), |env| {
+        new_java_string(env, &inku_pipeline_uniffi::composition_ranges())
+    })
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
 pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_step(
     env: JNIEnv<'_>,
     _receiver: JObject<'_>,

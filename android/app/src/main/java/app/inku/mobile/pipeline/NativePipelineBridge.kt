@@ -9,6 +9,7 @@ object NativePipelineBridge : SharedPipelineBinding {
     external override fun versionReport(): String
     external override fun step(snapshotBytes: ByteArray, inputEnvelopeBytes: ByteArray): ByteArray
     external override fun canvasRegistry(): String
+    external override fun compositionRanges(): String
     external override fun resolvePalette(inputBytes: ByteArray): ByteArray
     external override fun resolveMacroCatalog(inputBytes: ByteArray): ByteArray
     external override fun renderSaved(inputBytes: ByteArray): ByteArray

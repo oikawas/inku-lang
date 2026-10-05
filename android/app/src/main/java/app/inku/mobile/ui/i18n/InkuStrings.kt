@@ -381,6 +381,10 @@ interface InkuStrings {
      */
     val ddlLabelIn: (String) -> String
     val tooltipDdlLang: String
+    val rangeNumbers: String
+    val rangeEditNote: String
+    val rangeInvalid: String
+    val rangeClose: String
     val awaitingInterpretation: String
     val miscSubtitle: String
     val description: String

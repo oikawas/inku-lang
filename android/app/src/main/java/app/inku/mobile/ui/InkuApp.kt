@@ -307,7 +307,7 @@ private val DeviceRotation.clockwiseDegrees: Int
     }
 
 internal data class SaijikiGroup(val key: String, val label: String, val en: String, val words: List<String>)
-private data class DdlVocabularyToken(val word: String, val group: SaijikiGroup, val color: Color)
+internal data class DdlVocabularyToken(val word: String, val group: SaijikiGroup, val color: Color)
 private data class ModelChoice(val id: String, val label: String, val providerName: String)
 private data class ModelOptionChoice(val rawId: String, val qualifiedId: String, val label: String, val notes: String? = null)
 private data class ProviderModelCandidate(val id: String, val label: String, val notes: String? = null)
@@ -505,6 +505,9 @@ internal fun saijikiGroupColorAt(index: Int): Color = saijikiGroupColors[index %
 @Composable
 fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.viewModel()) {
     val state by viewModel.state.collectAsState()
+    val compositionRanges = remember {
+        CompositionRangeTable.load { app.inku.mobile.pipeline.NativePipelineBridge.compositionRanges() }
+    }
     val historyGridState = rememberLazyGridState()
     val cameraCaptureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         viewModel.onCameraCaptureResult(success)
@@ -588,6 +591,8 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
         LocalUiLanguage provides state.uiLanguage,
         LocalStrings provides stringsFor(state.uiLanguage),
         LocalUiTextScale provides state.uiTextScale,
+        LocalCompositionRangeTable provides compositionRanges,
+        LocalDdlRangePreview provides viewModel::previewDdlRange,
     ) {
     MaterialTheme(colorScheme = InkuColors, typography = inkuTypography(state.uiTextScale)) {
         if (state.chatGptPlan.showPlanNotice) {
@@ -913,7 +918,7 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
 }
 
 @Composable
-private fun rememberDdlVocabularyTokens(lang: UiLanguage): List<DdlVocabularyToken> {
+internal fun rememberDdlVocabularyTokens(lang: UiLanguage): List<DdlVocabularyToken> {
     return remember(lang) {
         val colorForKey = SaijikiGenerated.CATEGORIES.mapIndexed { index, category ->
             category.key to saijikiGroupColorAt(index)
@@ -1127,7 +1132,7 @@ private fun DdlVocabularyPill(token: DdlVocabularyToken, selected: Boolean = fal
     )
 }
 
-private fun isLightColor(color: Color): Boolean {
+internal fun isLightColor(color: Color): Boolean {
     val luminance = (0.2126f * color.red) + (0.7152f * color.green) + (0.0722f * color.blue)
     return luminance >= 0.58f
 }
@@ -1754,7 +1759,7 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
                                 uiLang = state.uiLanguage.code,
                             ),
                         )
-                        DdlPreviewBox(value = state.ddl, onClick = viewModel::openDdlEditor, modifier = Modifier.fillMaxWidth())
+                        DdlPreviewBox(state, viewModel, modifier = Modifier.fillMaxWidth())
                     }
                 }
             }
@@ -2628,6 +2633,7 @@ private fun CanvasHeroCard(
                         } else {
                             ArtworkPreview(
                                 item,
+                                rangeBounds = state.ddlRangePreview?.takeIf { it.source == state.ddl }?.bounds,
                                 presentationMode = presentation,
                                 presentationBackground = presentationBackground,
                                 rotationDegrees = presentationArtworkRotation,
@@ -2824,6 +2830,8 @@ private fun CanvasHeroCard(
             CopyableRenderTextView(
                 text,
                 Modifier.fillMaxWidth().height(Dimens.renderTextViewHeight),
+                ddl = it.normalizedDdl.takeIf { state.renderTab == RenderTab.Prompt },
+                rangePreview = { bounds -> RangeArtworkPreview(it, bounds) },
             )
         }
     }
@@ -3083,8 +3091,8 @@ private fun DrawPanel(
                         SaijikiPanel(viewModel)
                     }
                     DdlPreviewBox(
-                        value = state.ddl,
-                        onClick = viewModel::openDdlEditor,
+                        state = state,
+                        viewModel = viewModel,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     DrawingActionButton(
@@ -4017,6 +4025,7 @@ private fun RefinementCandidateCard(
     // the DDL opens on a long press instead (contract 段 3 leaves the gesture to
     // the port); everything else about the candidate is the same.
     var ddlOpen by remember(candidate.id) { mutableStateOf(false) }
+    var rangeBounds by remember(candidate.id) { mutableStateOf<DdlRangeBounds?>(null) }
     val readingCandidate = candidate.plan.element == RefinementElement.Reading
     Card(
         modifier = modifier
@@ -4029,6 +4038,7 @@ private fun RefinementCandidateCard(
             RefinementCandidateImage(
                 renderHash = candidate.renderHash,
                 svg = candidate.displaySvg,
+                rangeBounds = rangeBounds,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
@@ -4055,7 +4065,9 @@ private fun RefinementCandidateCard(
                             uiLang = LocalUiLanguage.current.code,
                         ),
                     )
-                    Text(candidate.normalizedDdl, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    CompositionLocalProvider(LocalDdlRangePreview provides { value -> rangeBounds = value?.bounds }) {
+                        RangeDdlText(candidate.normalizedDdl, style = MaterialTheme.typography.labelSmall)
+                    }
                 }
                 // The three states are three different labels, and only the
                 // first one is a button that does anything.
@@ -4077,14 +4089,18 @@ internal fun recompositionLines(info: RecompositionInfo?, strings: InkuStrings):
 }
 
 @Composable
-private fun RefinementCandidateImage(renderHash: String, svg: String, modifier: Modifier = Modifier) {
+private fun RefinementCandidateImage(renderHash: String, svg: String, modifier: Modifier = Modifier,
+    rangeBounds: DdlRangeBounds? = null) {
     val image by produceState<ImageBitmap?>(initialValue = null, renderHash, svg) {
         value = ArtworkBitmapCache.getCandidate(renderHash, svg)
     }
     Surface(color = Color.White, shape = RoundedCornerShape(0.dp), modifier = modifier) {
         val bitmap = image
         if (bitmap != null) {
-            Image(bitmap = bitmap, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+            Box(Modifier.fillMaxSize()) {
+                Image(bitmap = bitmap, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                RangeFrameOverlay(rangeBounds, bitmap)
+            }
         } else {
             Canvas(modifier = Modifier.fillMaxSize()) { drawRect(Color.White) }
         }
@@ -5931,14 +5947,17 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
                     Text("No render yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     if (state.renderTab == RenderTab.Artwork) {
-                        ArtworkPreview(item, modifier = Modifier.fillMaxSize())
+                        ArtworkPreview(item, modifier = Modifier.fillMaxSize(),
+                            rangeBounds = state.ddlRangePreview?.takeIf { it.source == state.ddl }?.bounds)
                     } else {
                         renderTabCopyText(
                             state.renderTab,
                             promptText = renderPromptText(item),
                             jsonText = renderJsonText(item),
                         )?.let { text ->
-                            CopyableRenderTextView(text, Modifier.fillMaxSize())
+                            CopyableRenderTextView(text, Modifier.fillMaxSize(),
+                                ddl = item.normalizedDdl.takeIf { state.renderTab == RenderTab.Prompt },
+                                rangePreview = { bounds -> RangeArtworkPreview(item, bounds) })
                         }
                     }
                 }
@@ -6301,7 +6320,8 @@ internal fun generationInfoDisplayValue(row: GenerationInfoRow, strings: InkuStr
 }
 
 @Composable
-private fun CopyableRenderTextView(text: String, modifier: Modifier = Modifier) {
+private fun CopyableRenderTextView(text: String, modifier: Modifier = Modifier, ddl: String? = null,
+    rangePreview: @Composable ((DdlRangeBounds?) -> Unit)? = null) {
     val clipboard = LocalClipboardManager.current
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -6310,7 +6330,7 @@ private fun CopyableRenderTextView(text: String, modifier: Modifier = Modifier) 
                 onClick = { clipboard.setText(AnnotatedString(text)) },
             )
         }
-        RenderTextView(text, Modifier.fillMaxWidth().weight(1f))
+        RenderTextView(text, Modifier.fillMaxWidth().weight(1f), ddl, rangePreview)
     }
 }
 
@@ -6323,14 +6343,25 @@ internal fun renderTabCopyText(renderTab: RenderTab, promptText: String, jsonTex
 }
 
 @Composable
-private fun RenderTextView(text: String, modifier: Modifier = Modifier) {
+private fun RenderTextView(text: String, modifier: Modifier = Modifier, ddl: String? = null,
+    rangePreview: @Composable ((DdlRangeBounds?) -> Unit)? = null) {
     Box(
         modifier = modifier
             .background(RenderTextPaper, RoundedCornerShape(Dimens.radiusCard))
             .padding(Dimens.spaceM)
             .verticalScroll(rememberScrollState()),
     ) {
-        Text(text, color = RenderTextInk, style = MaterialTheme.typography.bodySmall)
+        val savedDdl = ddl?.takeIf { it.isNotEmpty() }
+        val heading = "Saved normalized DDL:\n"
+        val start = savedDdl?.let { text.indexOf(heading + it) } ?: -1
+        if (start >= 0 && savedDdl != null) {
+            val ddlStart = start + heading.length
+            Column {
+                Text(text.substring(0, ddlStart), color = RenderTextInk, style = MaterialTheme.typography.bodySmall)
+                RangeDdlText(savedDdl, preview = rangePreview)
+                Text(text.substring(ddlStart + savedDdl.length), color = RenderTextInk, style = MaterialTheme.typography.bodySmall)
+            }
+        } else Text(text, color = RenderTextInk, style = MaterialTheme.typography.bodySmall)
     }
 }
 
@@ -6651,9 +6682,13 @@ private fun PipelineStatusPanel(state: InkuUiState, viewModel: InkuViewModel) {
             Column(Modifier.fillMaxWidth().padding(Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 Text(S.pipelineProposal, style = MaterialTheme.typography.titleSmall)
                 Text(S.pipelineOriginalDdl, style = MaterialTheme.typography.labelSmall)
-                Text(view.visibleDdl.orEmpty(), style = MaterialTheme.typography.bodySmall)
+                RangeDdlText(view.visibleDdl.orEmpty(), preview = { bounds ->
+                    state.selectedHistory?.let { RangeArtworkPreview(it, bounds) }
+                })
                 Text(S.pipelineProposedDdl, style = MaterialTheme.typography.labelSmall)
-                Text(proposal.candidateDdl, style = MaterialTheme.typography.bodySmall)
+                RangeDdlText(proposal.candidateDdl, preview = { bounds ->
+                    state.selectedHistory?.let { RangeArtworkPreview(it, bounds) }
+                })
                 WrapRow {
                     TextButton(onClick = viewModel::approvePipelinePatch, enabled = !state.isDrawing) { Text(S.pipelineApprove) }
                     TextButton(onClick = viewModel::declinePipelinePatch, enabled = !state.isDrawing) { Text(S.pipelineDecline) }
@@ -6738,57 +6773,34 @@ private fun PipelineStatusPanel(state: InkuUiState, viewModel: InkuViewModel) {
 }
 
 @Composable
-private fun DdlPreviewBox(value: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val vocabularyTokens = rememberDdlVocabularyTokens(LocalUiLanguage.current)
-    val visualTransformation = remember(vocabularyTokens) {
-        DdlKeywordHighlightTransformation(vocabularyTokens)
-    }
-    var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+private fun DdlPreviewBox(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .background(InputWellSurface, RoundedCornerShape(Dimens.radiusCard))
             .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusCard))
-            .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM)
-            .clickable(onClick = onClick),
+            .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM),
     ) {
-        BasicTextField(
-            value = value,
-            onValueChange = {},
-            readOnly = true,
-            // A read-only field still takes taps for focus and selection, so the
-            // box never saw them and the DDL editor could not be opened here.
-            enabled = false,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = Dimens.panelMinHeight)
-                .pointerInput(value) {
-                    detectTapGestures(onTap = { onClick() })
-                }
-                .drawBehind {
-                    val layout = textLayoutResult ?: return@drawBehind
-                    drawDdlKeywordHighlights(layout, value, vocabularyTokens)
+        if (state.ddl.isBlank()) {
+            Text(S.awaitingInterpretation, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.panelMinHeight).clickable(onClick = viewModel::openDdlEditor))
+        } else {
+            RangeDdlText(
+                source = state.ddl,
+                onEditSource = viewModel::setDdl,
+                onOpenEditor = viewModel::openDdlEditor,
+                enabled = !state.isRunning,
+                modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.panelMinHeight),
+                style = MaterialTheme.typography.bodySmall.copy(
+                    color = MaterialTheme.colorScheme.onSurface,
+                    lineHeight = TypeScale.denseLineHeight * LocalUiTextScale.current,
+                ),
+                preview = { bounds ->
+                    state.selectedHistory?.let { item ->
+                        RangeArtworkPreview(item, bounds)
+                    }
                 },
-            textStyle = MaterialTheme.typography.bodySmall.copy(
-                color = MaterialTheme.colorScheme.onSurface,
-                lineHeight = TypeScale.denseLineHeight * LocalUiTextScale.current,
-            ),
-            cursorBrush = SolidColor(Color.Transparent),
-            visualTransformation = visualTransformation,
-            onTextLayout = { textLayoutResult = it },
-            minLines = 6,
-            maxLines = 10,
-            decorationBox = { innerTextField ->
-                if (value.isBlank()) {
-                    Text(
-                        S.awaitingInterpretation,
-                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = TypeScale.denseLineHeight * LocalUiTextScale.current),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    innerTextField()
-                }
-            },
-        )
+            )
+        }
     }
 }
 
@@ -6898,7 +6910,7 @@ private fun DenseTextFieldValueInput(
     }
 }
 
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawDdlKeywordHighlights(
+internal fun androidx.compose.ui.graphics.drawscope.DrawScope.drawDdlKeywordHighlights(
     layout: TextLayoutResult,
     text: String,
     tokens: List<DdlVocabularyToken>,
@@ -6939,7 +6951,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawDdlKeywordHighl
     }
 }
 
-private class DdlKeywordHighlightTransformation(
+internal class DdlKeywordHighlightTransformation(
     private val tokens: List<DdlVocabularyToken>,
 ) : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
@@ -7697,6 +7709,8 @@ private fun ArtworkPreview(
     presentationMode: Boolean = false,
     presentationBackground: Color = Color.White,
     rotationDegrees: Int = 0,
+    rangeBounds: DdlRangeBounds? = null,
+    fitArtwork: Boolean = false,
 ) {
     var pixelSize by remember { mutableStateOf(IntSize.Zero) }
     val bitmap by produceState<ImageBitmap?>(initialValue = null, item.id, item.renderHash, pixelSize, rotationDegrees) {
@@ -7716,10 +7730,33 @@ private fun ArtworkPreview(
                     bitmap = image,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.FillBounds,
+                    contentScale = if (fitArtwork) ContentScale.Fit else ContentScale.FillBounds,
                 )
+                RangeFrameOverlay(rangeBounds, image, rotationDegrees, fitArtwork)
             }
         }
+    }
+}
+
+@Composable
+private fun RangeArtworkPreview(item: HistoryItemEntity, bounds: DdlRangeBounds?) {
+    ArtworkPreview(item, rangeBounds = bounds, fitArtwork = true,
+        modifier = Modifier.fillMaxWidth().height(Dimens.heroPreviewMaxHeight))
+}
+
+@Composable
+private fun RangeFrameOverlay(bounds: DdlRangeBounds?, image: ImageBitmap, rotationDegrees: Int = 0,
+    fitArtwork: Boolean = true) {
+    if (bounds == null) return
+    val color = MaterialTheme.colorScheme.primary
+    Canvas(Modifier.fillMaxSize()) {
+        val frame = rangeFrame(bounds, size.width, size.height,
+            if (fitArtwork) image.width.toFloat() else size.width,
+            if (fitArtwork) image.height.toFloat() else size.height, rotationDegrees)
+        val topLeft = Offset(frame.left, frame.top)
+        val extent = Size(frame.right - frame.left, frame.bottom - frame.top)
+        drawRect(Color.White, topLeft, extent, style = Stroke(width = 4.dp.toPx()))
+        drawRect(color, topLeft, extent, style = Stroke(width = 2.dp.toPx()))
     }
 }
 

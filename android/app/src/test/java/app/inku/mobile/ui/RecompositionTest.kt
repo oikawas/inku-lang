@@ -23,11 +23,11 @@ class RecompositionTest {
             recompositionLines(RecompositionInfo(moves = listOf(RecompositionMove(0, "bottom right", "top left"))), InkuStringsEn),
         )
         assertEquals(
-            listOf("この作品には構図の範囲が無い。", "構図の範囲を保って描き直しました。"),
+            listOf("この作品には数で書いた範囲が無い。", "数で書いた範囲を保って描き直しました。"),
             recompositionLines(RecompositionInfo(unchangedReason = "nothing_to_move"), InkuStringsJa),
         )
         assertEquals(
-            listOf("There are too many combinations to find another composition.", "Redrawn with the same composition ranges."),
+            listOf("There are too many combinations to find another composition.", "Redrawn with the same numeric ranges."),
             recompositionLines(RecompositionInfo(unchangedReason = "unsolved"), InkuStringsEn),
         )
     }

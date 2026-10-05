@@ -170,7 +170,7 @@ object InkuStringsJa : InkuStrings {
         }
     }
     override fun recomposeReason(reason: String): String = when (reason) {
-        "nothing_to_move" -> "この作品には構図の範囲が無い。"
+        "nothing_to_move" -> "この作品には数で書いた範囲が無い。"
         "not_canonical" -> "指示書に未確定の部分があるため、構図を動かせない。"
         "unsupported_sentence" -> "この指示書には構図の変更に対応していない文がある。"
         "unplaced_sentence" -> "配置を読み戻せない文があるため、構図を動かせない。"
@@ -181,7 +181,7 @@ object InkuStringsJa : InkuStrings {
         "not_canonical_after" -> "変更後の指示書を確かめられないため、構図を動かせない。"
         else -> "別の構図を使えないため、構図の範囲を保つ。"
     }
-    override val recomposeKeptRanges = "構図の範囲を保って描き直しました。"
+    override val recomposeKeptRanges = "数で書いた範囲を保って描き直しました。"
 
     override val variationAmplitudeLabel: (String) -> String = { id ->
         when (id) {
@@ -463,6 +463,10 @@ object InkuStringsJa : InkuStrings {
     override val autoRepair = "補正"
     override val ddlLabelIn: (String) -> String = { lang -> if (lang == "en") "指示書（英語DDL）" else "指示書（日本語DDL）" }
     override val tooltipDdlLang = "指示書はこの言語の文法で読みます。数値の範囲の書き方も日本語と英語で違います。平仮名・片仮名・漢字が1字でもあれば日本語DDLになるので、英語の指示書に日本語の名前が1つ入るだけで日本語として読みます。"
+    override val rangeNumbers = "範囲の数"
+    override val rangeEditNote = "枠で範囲を確認できます。絵は「DDLから描画」で描き直します。"
+    override val rangeInvalid = "0から1の数を、始まりが終わりより小さくなるように書いてください。枠は最後の有効な範囲を示しています。"
+    override val rangeClose = "範囲の編集を閉じる"
     override val awaitingInterpretation = "指示書を待機中…"
     override val miscSubtitle = "言語・文字の大きさ・表示"
     override val description = "記述"

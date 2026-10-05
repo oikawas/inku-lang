@@ -46,13 +46,23 @@ When updating Android specifications:
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
 
+## 2026-10-05 Displaying and editing numeric ranges
+
+New DDL omits `［構図］` / `[composition]` marks (shared SPEC §12.6.3 and §18). JNI `compositionRanges()` transports the shared core's `composition_ranges()` table, `inku.composition-ranges.v1`. Android keeps no copy of the names or coordinates. Older bindings without the function display the original text.
+
+Instruction views fold the parenthesized numbers only when both the name and exact rational bounds match the table. The entire name uses the place-word color with a dotted underline. The display reads Japanese and English names, reduced fractions, decimals, and Japanese full-width digits, decimal points, slashes, parentheses and the three tilde forms. Mismatched names and bounds, custom ranges and numbers-only ranges stay unfolded. An old mark is hidden together with a matching name's numbers. Refinement candidates, DDL proposals and saved-instruction views use the same display.
+
+Pressing a name expands muted numbers and frames the range on the actual drawing rectangle; mouse hover also shows the frame. In the current instructions an in-place number field edits the same DDL draft as Edit instructions. Matching another table entry updates the name; custom bounds keep the name and numbers visible. Out-of-canvas, reversed or unreadable input shows a localized explanation and keeps the last valid frame. Candidate and proposal views remain read-only.
+
+The frame follows the actual drawing rectangle and full-screen rotation. In-place previews and candidates fit the SVG's aspect ratio, excluding letterbox margins from the frame. The ordinary canvas keeps its previous display behavior. Typing invokes no DDL rendering or saving; Draw from instructions explicitly redraws the work. Saving, copying, exporting and the full-text editor continue to use the original numeric text. Displaying instructions never rewrites saved DDL, Scores or SVGs. Room, binding and Android versions and Build are unchanged. Pixel 9 E2B works without numeric ranges keep their previous display.
+
 ## 2026-10-05 Another composition: By principle / By chance
 
 Under the layout refinement, choose By principle or By chance. By principle is the default, and the choice remains in the current screen state. Each candidate receives a new composition seed. JNI `recompose` takes the same configuration used to compile the work, its saved instructions, the mode, that seed and a stable work identifier (shared SPEC §12.6.3). It calls no model and saves no composition reading.
 
-Selection precedes compilation for both a new direct-DDL execution and a fork of an existing execution. A `recomposed` response supplies the new instructions; `unchanged` keeps the original instructions. Both are compiled normally with the candidate seed. Invalid requests, core errors and older bindings that lack the operation also keep the original instructions. Android leaves all range and authored-position decisions to the shared core.
+Selection precedes compilation for both a new direct-DDL execution and a fork of an existing execution. A `recomposed` response supplies the new instructions; `unchanged` keeps the original instructions. Both are compiled normally with the candidate seed. Invalid requests, core errors and older bindings that lack the operation also keep the original instructions. The shared core chooses every numeric range again, whoever wrote it and with or without an old mark, preserving place words and corners. It no longer returns `author_range`; Android retains that old label only for older bindings and makes no range decisions itself.
 
-The candidate card names its mode and displays each moved range, with layer numbers starting at one, or the reason the composition stays. Reason and mode labels follow the UI language; moved-range text follows the instruction language. In particular, nothing_to_move says “This work has no composition ranges.” and unsolved says “There are too many combinations to find another composition.” An unchanged candidate also states that it was redrawn with the same composition ranges. The mode names are the author's By principle / By chance.
+The candidate card names its mode and displays each moved range, with layer numbers starting at one, or the reason the composition stays. Reason and mode labels follow the UI language; moved-range text follows the instruction language. In particular, nothing_to_move says “This work has no numeric ranges.” and unsolved says “There are too many combinations to find another composition.” An unchanged candidate also states that it was redrawn with the same numeric ranges. The mode names are the author's By principle / By chance.
 
 Only a chosen candidate is saved. Its layout_change edge records composition_seed and recompose_mode (principled / chance), fixed in the generation plan even if the screen choice changes later. Room columns, the schema and the binding version remain unchanged. Pixel 9 E2B works have no composition ranges under I-714 and report nothing_to_move. Angle, corner and group placement still use the composition seed as before.
 
@@ -94,7 +104,7 @@ New configurations adopt the composition in shared SPEC §12.6.2. Cloud models s
 
 Gemini response schemas write each object's `properties` in its `propertyOrdering`, with the thesis first, retaining any unnamed properties. When reading is unavailable or composition cannot be applied, the core uses the default reading or commits the printed underdrawing; the Android host continues. New snapshot fields and events remain shared-core records. The reading adds no progress display or prompt tab.
 
-Composed layers save their numeric ranges in visible DDL with `［構図］` (`[composition]` in English). Replay preserves existing saved configurations, DDL and Scores. Old configurations without composition remain absent; a new execution that changes the model from a work with composition adjusts its cloud/device read setting. DDL and rendering-core versions and the Room schema remain unchanged. Reading a specifically named corner is outside this change.
+Composed layers save their numeric ranges as names and numbers in visible DDL. From 2026-10-05 new output omits `［構図］` / `[composition]` marks and instruction views fold the numbers. Replay preserves existing saved configurations, DDL and Scores. Old configurations without composition remain absent; a new execution that changes the model from a work with composition adjusts its cloud/device read setting. DDL and rendering-core versions and the Room schema remain unchanged. Reading a specifically named corner was outside the 2026-10-03 adoption.
 
 ## 2026-10-02 Unify saved instructions into one DDL
 

@@ -270,6 +270,12 @@ data class InkuUiState(
     val refinementLayoutMode: RecomposeMode = RecomposeMode.Principled,
     val refinementTouchWords: String = "",
     val refinementCount: Int = 1,
+    /**
+     * How many candidates the running round draws. The colour change draws
+     * every other catalogue and a comparison every chosen model, so the
+     * progress lanes count this rather than [refinementCount].
+     */
+    val refinementPlannedCount: Int = 0,
     val refinementBusy: Boolean = false,
     // 「開始3秒後から共通デザインの停止ボタンでAPI要求を中断できる」.
     val refinementCanAbort: Boolean = false,
@@ -3061,15 +3067,19 @@ class InkuViewModel @JvmOverloads constructor(
         if (count > RefinementPlanner.maxCandidates(element)) {
             throw InkuFailure(RefinementPlanner.TOUCH_FANOUT_REFUSAL)
         }
+        // The colour change draws every other catalogue, one candidate each and
+        // named after it, whatever the count says (web's `planRefinementCandidates`).
         val catalogIds = if (element == RefinementElement.Color) {
-            RefinementPlanner.catalogCandidateIds(parent.catalogId, ColorCatalogs.all.map { it.id }, count)
+            RefinementPlanner.catalogCandidateIds(parent.catalogId, ColorCatalogs.all.map { it.id })
         } else {
             emptyList()
         }
-        return (0 until count).map { index ->
+        val planned = if (element == RefinementElement.Color) catalogIds.size else count
+        return (0 until planned).map { index ->
             CandidateJob(
                 id = "${element.id}-$index",
-                label = "${strings().refinementElementLabel(element.id)} ${index + 1}",
+                label = catalogIds.getOrNull(index)?.let { id -> ColorCatalogs.currentDisplayCatalog(id)?.name ?: id }
+                    ?: "${strings().refinementElementLabel(element.id)} ${index + 1}",
                 plan = RefinementPlanner.plan(
                     element = element,
                     parent = parent,
@@ -3136,6 +3146,7 @@ class InkuViewModel @JvmOverloads constructor(
             refinementStatus = null,
             refinementCandidates = emptyList(),
             refinementPreviewId = null,
+            refinementPlannedCount = jobs.size,
         )
         val run = viewModelScope.launch {
             // The stop appears three seconds in, not at once: a candidate that

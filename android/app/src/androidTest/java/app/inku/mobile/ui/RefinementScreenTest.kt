@@ -24,6 +24,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import app.inku.mobile.data.InkuRepository
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.InkuDatabase
+import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.refinement.PaintSeeds
 import app.inku.mobile.data.refinement.RefinementElement
 import app.inku.mobile.llm.ModelProvider
@@ -235,31 +236,36 @@ class RefinementScreenTest {
         }
     }
 
-    /** 「候補は2列（1案のみ全幅1列）で…表示する」and 「4案では可能な限り異なるカタログを使う」. */
+    /**
+     * 「候補は2列…で表示する」and SPEC.ja.md :644 -- the colour change draws the
+     * same Score in every catalogue but the parent's, in the catalogue list's
+     * order, each named after its catalogue, whatever count was chosen.
+     */
     @Test
-    fun t10_fourCandidatesAreDrawnAndEachUsesADifferentCatalogue() {
+    fun t10_theColourChangeDrawsEveryOtherCatalogueInListOrder() {
         openPanel()
+        val expected = ColorCatalogs.all.map { it.id }.filter { it != "ink_season" }
         composeTestRule.runOnIdle {
             vm().setRefinementElement(RefinementElement.Color)
-            vm().setRefinementCount(4)
+            // The count does not apply to the colour change.
+            vm().setRefinementCount(1)
             vm().generateRefinementCandidates()
         }
-        awaitState("four candidates") { it.refinementCandidates.size == 4 && !it.refinementBusy }
+        awaitState("every other catalogue") { it.refinementCandidates.size == expected.size && !it.refinementBusy }
         composeTestRule.waitForIdle()
 
-        // Two cards to a row, so the fourth is below the fold -- and a card
-        // clipped entirely out of the window is not in the semantics tree at
-        // all, which is why it is scrolled to rather than asserted from where
-        // the screen happens to be.
         // Two to a row, and the panel scrolls: a card clipped entirely out of
         // the window is not in the semantics tree, so what the screen can be
-        // asked is that the grid is really laid out in rows of two. That there
-        // are four of them is read off the state, which is where the count is.
+        // asked is that the grid is really laid out in rows of two. How many
+        // there are is read off the state, which is where the count is.
         assertTrue("the grid rows are on the screen", nodesWithTag(REFINE_CANDIDATE_TAG) >= 2)
-        assertEquals("four were drawn", 4, vm().state.value.refinementCandidates.size)
-        val catalogs = vm().state.value.refinementCandidates.map { it.plan.catalogId }
-        assertEquals("four different catalogues", 4, catalogs.toSet().size)
-        assertFalse("none of them is the parent's", catalogs.contains("ink_season"))
+        val candidates = vm().state.value.refinementCandidates
+        assertEquals("every other catalogue, in the list's order", expected, candidates.map { it.plan.catalogId })
+        assertEquals(
+            "each is named after its catalogue",
+            expected.map { ColorCatalogs.currentDisplayCatalog(it)?.name ?: it },
+            candidates.map { it.label },
+        )
     }
 
     /**
@@ -344,12 +350,17 @@ class RefinementScreenTest {
         assertNull("no drawing is left to restore", runBlocking { repository.restoreActivePipeline() })
     }
 
-    /** T-6 on the screen: unsaved → saved, and a second press writes no second row. */
+    /**
+     * T-6 on the screen: unsaved → saved, and a second press writes no second row.
+     * One touch is the fast single candidate: it replays the Score and asks no
+     * model, and the colour change now draws every other catalogue.
+     */
     @Test
     fun t6_theSaveGoesUnsavedThenSavedAndRefusesASecondPress() {
         openPanel()
         composeTestRule.runOnIdle {
-            vm().setRefinementElement(RefinementElement.Color)
+            vm().setRefinementElement(RefinementElement.Touch)
+            vm().setRefinementTouchWords("しずかに")
             vm().setRefinementCount(1)
             vm().generateRefinementCandidates()
         }

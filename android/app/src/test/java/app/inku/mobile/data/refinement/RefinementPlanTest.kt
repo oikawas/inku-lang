@@ -3,6 +3,7 @@ package app.inku.mobile.data.refinement
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.LineageNodeEntity
 import app.inku.mobile.data.lineage.LineageDeclaration
+import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.lineage.LineagePlanner
 import app.inku.mobile.pipeline.RecomposeMode
 import app.inku.mobile.ui.i18n.InkuFailure
@@ -148,15 +149,19 @@ class RefinementPlanTest {
         assertTrue(error.isFailure)
     }
 
-    /** 「4案では可能な限り異なるカタログを使う」. */
+    /**
+     * SPEC.ja.md :644 -- 「対象作品の色カタログを除く全色カタログで同じScoreを描いた
+     * 候補をカタログ一覧の順に並べる」, web's `otherCatalogIds`: every other
+     * catalogue, in the list's order, whatever count is chosen.
+     */
     @Test
-    fun t3_fourColourCandidatesUseFourDifferentCatalogues() {
-        val available = listOf("default", "ink_season", "vivid_material", "sea_stone", "moss_bark")
-        val ids = RefinementPlanner.catalogCandidateIds("ink_season", available, 4)
+    fun t3_theColourChangeOffersEveryOtherCatalogueInListOrder() {
+        val available = ColorCatalogs.all.map { it.id }
+        val ids = RefinementPlanner.catalogCandidateIds("ink_season", available)
 
-        assertEquals(4, ids.size)
-        assertEquals("all four differ", 4, ids.toSet().size)
+        assertEquals(available.filter { it != "ink_season" }, ids)
         assertFalse("the parent's own catalogue is not offered", ids.contains("ink_season"))
+        assertEquals("a second round is the same list", ids, RefinementPlanner.catalogCandidateIds("ink_season", available))
     }
 
     // ── T-5 ────────────────────────────────────────────────

@@ -260,14 +260,15 @@ object RefinementPlanner {
     }
 
     /**
-     * The catalogues four colour candidates use. 「4案では可能な限り異なるカタログ
-     * を使う」: the parent's own is excluded and the rest are shuffled, so a
-     * second round is not the same four.
+     * The catalogues the colour change draws: every one but the parent's, in
+     * the catalogue list's order (SPEC.ja.md :644, web's `otherCatalogIds`).
+     * The author compares them all side by side instead of a random few, so
+     * the 1 案 / 4 案 count does not apply and no model is asked.
      */
-    fun catalogCandidateIds(currentId: String, available: List<String>, count: Int): List<String> {
-        val others = available.filter { it.isNotBlank() && it != currentId }.shuffled()
+    fun catalogCandidateIds(currentId: String, available: List<String>): List<String> {
+        val others = available.filter { it.isNotBlank() && it != currentId }
         if (others.isEmpty()) inkuError { it.refinementNoOtherCatalog }
-        return List(count) { index -> others[index % others.size] }
+        return others
     }
 
     private fun unsigned(seed: Long): String = java.lang.Long.toUnsignedString(seed)

@@ -6,6 +6,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-05 — Align CI dictionary preparation and notice and dimension checks
+
+Prepare the pinned dictionaries and pass their explicit path to Rust's dictionary-counting test. Align the public API list with notice reads and composition ranges, retaining checks for documented path parameters. Name the Android range frame's 2dp width under the existing line-weight exceptions, which differ from distances. Product responses, drawing, and version numbers are unchanged.
+
+### 2026-10-05 — Use the shared button style for third-party notices
+
+Removed duplicate definitions from the license reader's close and retry buttons so they use the existing shared dimensions, colors, hover, and disabled styles. Notice loading, display, and actions are unchanged.
+
 ### 2026-10-05 — Align integrated CI checks and generated references with the current contract
 
 Updated checks for retired variation, the new editor, document pairs, and Docker build stages. Historical variation labels remain readable while the new-request type excludes variation. Android range-frame strokes use named dimensions with the same values; regenerated the design preview and CLI help. Formatted shared Rust with the pinned toolchain. Drawing and storage semantics and version numbers are unchanged.

@@ -194,7 +194,7 @@ In `inku-render`, `render.rs` is the only overall orchestrator. `render_with_res
 
 | Router | Endpoints | Main responsibility | Default guard |
 |---|---:|---|---|
-| `public` | 9 | Health, info, catalog, models, saijiki, plugin preview, reference, client config, demo | None; routes other than `/health` and `/api/info` have explicit guards |
+| `public` | 12 | Health, info, catalog, models, saijiki, plugin preview, reference, client config, demo, composition ranges, third-party notices | None; routes other than health, info, and third-party notices have explicit guards |
 | `auth` | 4 | Auth config and login/logout | None; routes other than login have explicit guards |
 | `me` | 13 | Profile, user settings, per-user storage | `_current_user` |
 | `plugins` | 5 | Plugin read/validation/CRUD/enable | `_current_user`; mutation requires admin |
@@ -208,9 +208,9 @@ In `inku-render`, `render.rs` is the only overall orchestrator. `render_with_res
 | `chatgpt` | 11 | Personal connection state, authorization, profiles, and model publication settings | `_current_user`; actions also check the owner |
 | `pipeline` | 13 | Canvas formats; start, read, and fork variations; the system prompts a variation sent; execution commands; author DDL; history links and forks; DDL export of a work (with the plugin definitions it names); reading and forking older works; provider observations | `_current_user` on each route; provider observations also require developer mode |
 
-Total: 118. Refinement variation seed allocation is retired. The public allowlist contains three paths: `/health`, `/api/info`, and `/api/auth/login` (`test_route_authorization.py`). The standard is to leave out anything login does not need.
+Total: 121. Refinement variation seed allocation is retired. The public allowlist contains five paths: `/health`, `/api/info`, `/api/auth/login`, `/api/notices`, and `/api/notices/{notice_id}` (`test_route_authorization.py`). The two notice routes only read fixed distribution licenses and return neither arbitrary files nor personal data. The other public routes are limited to those needed for login.
 
-The per-router counts match the current API baseline operations to their route declarations (2026-10-04). The total's source of truth is `EXPECTED_ROUTE_COUNT` (118) in `test_route_authorization.py`, and `tests/data/api-surface-baseline.json`, generated from the live app's OpenAPI, also records 118 operations.
+The per-router counts match the current API baseline operations to their route declarations (2026-10-05). The total's source of truth is `EXPECTED_ROUTE_COUNT` (121) in `test_route_authorization.py`, and `tests/data/api-surface-baseline.json`, generated from the live app's OpenAPI, also records 121 operations.
 
 ## Main flows
 

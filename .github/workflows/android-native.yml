@@ -61,6 +61,13 @@ jobs:
       - name: Rust format
         working-directory: core
         run: rustup run 1.95.0 cargo fmt --all -- --check
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.0.1
+      - name: Prepare pinned dictionary fixture
+        run: |
+          uv sync --frozen --project server
+          uv run --frozen --no-sync --project server python apple/scripts/prepare-meter-resources.py
+          echo "INKU_METER_TEST_RESOURCES=$GITHUB_WORKSPACE/apple/Packages/InkuHost/Sources/InkuHost/Resources/description-meter" >> "$GITHUB_ENV"
       - name: Rust tests
         working-directory: core
         run: rustup run 1.95.0 cargo test --locked --workspace

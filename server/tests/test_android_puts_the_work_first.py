@@ -210,7 +210,8 @@ SP_DECLARATION = re.compile(r"val\s+(\w+)\s*:\s*TextUnit\s*=\s*(\d+(?:\.\d+)?)\.
 
 # Allowed off the grid: line weights, which are lines, not distances. A 1dp
 # border, and strokes in navigation marks, lineage arrows and camera development
-# draw -- on the 4dp grid they would be two to four times as heavy.
+# draw, and instruction-range frames -- on the 4dp grid they would be two to
+# four times as heavy.
 OFF_GRID_EXEMPT = {
     "hairline",
     "navigationMarkStroke",
@@ -218,6 +219,7 @@ OFF_GRID_EXEMPT = {
     "cameraSavingOutlineWidth",
     "cameraSignalLine",
     "cameraPlotterStroke",
+    "rangeFrameStroke",
 }
 GRID_STEP = 4.0
 
@@ -267,7 +269,7 @@ def test_t6_no_type_size_is_below_twelve_sp() -> None:
 
 @android_only
 def test_t7_every_dimension_sits_on_the_four_dp_grid() -> None:
-    """`Dimens.kt` の `.dp` 直値が全部 4 の倍数であること (`hairline` の 1dp だけ例外)。
+    """`Dimens.kt` の距離を4dp格子へ揃え、名指した線幅だけを例外とする。
 
     段 A は 53 値のうち 22 値を格子の外に残した。**あれは意図して残した宿題で**、
     格子へ寄せると絵が動くから、画面を作り直す段まで待った。

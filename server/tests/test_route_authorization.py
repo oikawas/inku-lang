@@ -199,7 +199,7 @@ def _documented_public_paths(text: str) -> set[str]:
     sentence = next(
         line for line in text.splitlines() if "test_route_authorization.py" in line
     )
-    return set(re.findall(r"`(/[a-z0-9/_-]+)`", sentence))
+    return set(re.findall(r"`(/[a-z0-9/{}_\-]+)`", sentence))
 
 
 @pytest.mark.skipif(not _DOCS.is_dir(), reason="docs/ is absent from this checkout")

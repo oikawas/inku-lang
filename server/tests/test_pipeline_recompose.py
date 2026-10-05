@@ -6,6 +6,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 from pydantic import ValidationError
 
 from inku_server import pipeline_compat
@@ -157,3 +158,67 @@ def test_unchanged_errors_and_older_bindings_keep_the_saved_ddl(monkeypatch):
     legacy = pipeline_compat.compose("author", {"ddl": source})
     assert legacy["ddl"] == source and "recomposition" not in legacy
     assert len(service.preparations) == 1
+
+
+class SavedWorks:
+    """The two saved works a recomposition can name: one the shared pipeline
+    drew (its config and context kept with it), and one drawn before that."""
+
+    def __init__(self):
+        from inku_server.persistence.variation_authority import (
+            LegacyHistoryRecord, LinkedHistoryForkRecord,
+        )
+
+        def history(history_id, metadata):
+            return LegacyHistoryRecord(
+                history_id=history_id, description="saved prose", source=SOURCE, score_json="{}",
+                svg="<svg/>", authority="ddl_authoritative", metadata=metadata,
+            )
+
+        self.linked = LinkedHistoryForkRecord(
+            history=history("linked", {"lineage_node_id": "node-linked"}),
+            variation_id="parent-variation", revision="3", ddl_digest="digest",
+            saved_config={"language": "ja", "compiler": {"composition_seed": None}, "definitions": ["saved"]},
+            host_options={"render_seed": "23", "catalog_id": "saved-catalog"},
+            macro_catalog={"definition_locks": ["saved-lock"]}, pipeline_diagnostics=None,
+        )
+        self.legacy = history("legacy", {"lineage_node_id": "node-legacy", "render_seed": 29})
+
+    def read_linked_history(self, owner, history_id):
+        assert owner == "author"
+        return self.linked if history_id == "linked" else None
+
+    def read_legacy_history(self, owner, history_id):
+        assert owner == "author"
+        return {"linked": self.linked.history, "legacy": self.legacy}.get(history_id)
+
+
+def test_a_recomposition_of_a_saved_work_forks_from_it(monkeypatch):
+    """SPEC §12.7.1: the saved performance's config, seeds, catalog and limits
+    are authoritative, and the new direct-DDL variation keeps a parent."""
+    service = ComposeService(lambda _request: json.dumps({
+        "schema": "inku.composition-recompose.v1", "outcome": "unchanged", "reason": "nothing_to_move",
+    }).encode())
+    service.store = SavedWorks()
+    monkeypatch.setattr(pipeline_compat, "_service", lambda: service)
+    data = {"ddl": SOURCE, "description": "saved prose", "recompose_mode": "principled", "work_id": "linked"}
+    assert ComposeRequest.model_validate(data).model_dump(mode="json")["work_id"] == "linked"
+
+    pipeline_compat.compose("author", data)
+    source_work = service.preparations[0][4]
+    assert source_work["saved_config"] == service.store.linked.saved_config
+    assert source_work["host_options"] == {"render_seed": "23", "catalog_id": "saved-catalog"}
+    assert source_work["macro_catalog"] == {"definition_locks": ["saved-lock"]}
+    assert source_work["result"] == {"lineage_node_id": "node-linked"}
+    assert service.starts[0][3]["parent"] == {"kind": "variation", "id": "parent-variation"}
+    assert service.starts[0][3]["source_work"] is source_work
+
+    service.preparations.clear()
+    service.starts.clear()
+    pipeline_compat.compose("author", {**data, "work_id": "legacy"})
+    assert service.preparations[0][4]["metadata"]["render_seed"] == 29
+    assert service.starts[0][3]["parent"] == {"kind": "legacy_history", "id": "legacy"}
+
+    with pytest.raises(HTTPException) as missing:
+        pipeline_compat.compose("author", {**data, "work_id": "someone-else"})
+    assert missing.value.status_code == 404

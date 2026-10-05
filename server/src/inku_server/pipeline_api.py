@@ -496,17 +496,9 @@ class PipelineService:
             raise CandidateHostError("linked_history_context_unavailable") from error
         if linked is None:
             raise HTTPException(404, "pipeline_history_not_found")
-        history = asdict(linked.history)
-        if body.kind == "description" and _rewords(body.text, history["description"]):
+        source_work = linked_source_work(linked)
+        if body.kind == "description" and _rewords(body.text, source_work["description"]):
             _refuse_if_locked(history_id)
-        lineage_node_id = history["metadata"].get("lineage_node_id")
-        source_work = {
-            **history,
-            "saved_config": linked.saved_config,
-            "host_options": linked.host_options,
-            "macro_catalog": linked.macro_catalog,
-            "result": {"lineage_node_id": lineage_node_id},
-        }
         return self.start(
             owner,
             body.kind,
@@ -515,6 +507,38 @@ class PipelineService:
             source_work=source_work,
             options=body.options,
         )
+
+
+def linked_source_work(linked) -> dict:
+    """The saved work a fork of a managed history starts from: its exact
+    history, with the config and host context frozen when it was drawn."""
+    history = asdict(linked.history)
+    return {
+        **history,
+        "saved_config": linked.saved_config,
+        "host_options": linked.host_options,
+        "macro_catalog": linked.macro_catalog,
+        "result": {"lineage_node_id": history["metadata"].get("lineage_node_id")},
+    }
+
+
+def saved_work_parent(store, owner: str, history_id: str) -> tuple[dict, dict]:
+    """The parent relation and saved work a direct-DDL fork of one history takes.
+
+    A work the shared pipeline drew forks from its variation with the saved
+    config; an older work forks from its history row, whose metadata carries
+    its seeds and limits. Another owner's work reads as no work at all.
+    """
+    try:
+        linked = store.read_linked_history(owner, history_id)
+    except VariationAuthorityAdapterError as error:
+        raise CandidateHostError("linked_history_context_unavailable") from error
+    if linked is not None:
+        return {"kind": "variation", "id": linked.variation_id}, linked_source_work(linked)
+    work = store.read_legacy_history(owner, history_id)
+    if work is None:
+        raise HTTPException(404, "history_not_found")
+    return {"kind": "legacy_history", "id": history_id}, asdict(work)
 
 
 def pipeline_router(service: PipelineService | Callable[[], PipelineService], actor_dependency: Callable,

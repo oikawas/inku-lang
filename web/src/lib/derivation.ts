@@ -12,7 +12,6 @@ export type DerivationKind =
 	| 'description_edit'
 	| 'replay'
 	| 'canvas_aspect_change'
-	| 'variation'
 	// Sketch from life (Stage 0.5, v2.10): redrawn at a different grain.
 	| 'sketch_grain_change';
 

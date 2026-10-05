@@ -329,8 +329,7 @@ usage: inku-cli paint [-h] [--base-url BASE_URL]
                       [--composition-seed COMPOSITION_SEED]
                       [--seed-text SEED_TEXT] [--sketch]
                       [--sketch-grain {fine,coarse}]
-                      [--sketch-text SKETCH_TEXT]
-                      [--wild]
+                      [--sketch-text SKETCH_TEXT] [--wild]
                       [--limits KEY=VALUE [KEY=VALUE ...]]
                       [--catalog-mode {fixed,auto,random}]
                       [--interpretation-seed INTERPRETATION_SEED]
@@ -432,8 +431,7 @@ usage: inku-cli batch [-h] [--base-url BASE_URL]
                       [--composition-seed COMPOSITION_SEED]
                       [--seed-text SEED_TEXT] [--sketch]
                       [--sketch-grain {fine,coarse}]
-                      [--sketch-text SKETCH_TEXT]
-                      [--wild]
+                      [--sketch-text SKETCH_TEXT] [--wild]
                       [--limits KEY=VALUE [KEY=VALUE ...]]
                       [--catalog-mode {fixed,auto,random}]
                       [--interpretation-seed INTERPRETATION_SEED]
@@ -1182,10 +1180,9 @@ options:
   --kind {touch,layout,reading,color}
                         refinement element type
   --description DESCRIPTION
-                        override the description for layout/reading
-                        works; without it the parent's Sketch from life
-                        prose is carried over, and with it that prose is
-                        written again
+                        override the description for layout/reading works;
+                        without it the parent's Sketch from life prose is
+                        carried over, and with it that prose is written again
   --save-history        automatically save the result to history
   --no-save             do not save the result to history
   -o OUT_DIR, --out-dir OUT_DIR
@@ -1210,10 +1207,9 @@ options:
   --kind {touch,layout,reading,color}
                         refinement element type
   --description DESCRIPTION
-                        override the description for layout/reading
-                        works; without it the parent's Sketch from life
-                        prose is carried over, and with it that prose is
-                        written again
+                        override the description for layout/reading works;
+                        without it the parent's Sketch from life prose is
+                        carried over, and with it that prose is written again
   --save-history        automatically save the result to history
   --no-save             do not save the result to history
   -o OUT_DIR, --out-dir OUT_DIR

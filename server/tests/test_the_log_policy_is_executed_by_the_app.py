@@ -15,6 +15,7 @@ import gzip
 
 import logging
 import pathlib
+import re
 
 import pytest
 
@@ -215,8 +216,10 @@ def test_the_image_points_the_log_directory_at_the_data_volume():
     if not dockerfile.exists():
         pytest.skip("the image definition is not part of this checkout")
     text = dockerfile.read_text(encoding="utf-8")
-    assert "INKU_LOG_DIR=/data/logs" in text
-    assert "/data/logs" in text.split("mkdir -p", 1)[1].split("\n", 1)[0]
+    runtime = text.rsplit("FROM ", 1)[1].replace("\\\n", " ")
+    assert "INKU_LOG_DIR=/data/logs" in runtime
+    directories = re.findall(r"\bmkdir\s+-p\s+([^;&\n]+)", runtime)
+    assert any("/data/logs" in paths.split() for paths in directories)
 
 
 # T-11 -- what the daemon collects from stdout needs its own ceiling; the app's

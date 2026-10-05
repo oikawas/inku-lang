@@ -7746,8 +7746,8 @@ private fun RangeFrameOverlay(bounds: DdlRangeBounds?, image: ImageBitmap, rotat
             if (fitArtwork) image.height.toFloat() else size.height, rotationDegrees)
         val topLeft = Offset(frame.left, frame.top)
         val extent = Size(frame.right - frame.left, frame.bottom - frame.top)
-        drawRect(Color.White, topLeft, extent, style = Stroke(width = 4.dp.toPx()))
-        drawRect(color, topLeft, extent, style = Stroke(width = 2.dp.toPx()))
+        drawRect(Color.White, topLeft, extent, style = Stroke(width = Dimens.rangeFrameUnderlayStroke.toPx()))
+        drawRect(color, topLeft, extent, style = Stroke(width = Dimens.rangeFrameStroke.toPx()))
     }
 }
 

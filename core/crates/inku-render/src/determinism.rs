@@ -411,7 +411,10 @@ mod tests {
         assert_eq!(render_seed_from_text(padded), expected);
         assert_eq!(render_seed_from_text(words), expected);
         assert_eq!(render_seed_from_text(padded), render_seed_from_text(padded));
-        assert_eq!(render_seed_from_text("\u{001c}\u{3000}\u{00a0}\u{001f}"), None);
+        assert_eq!(
+            render_seed_from_text("\u{001c}\u{3000}\u{00a0}\u{001f}"),
+            None
+        );
     }
 
     #[test]

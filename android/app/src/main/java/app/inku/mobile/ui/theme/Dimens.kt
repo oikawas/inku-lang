@@ -74,6 +74,12 @@ object Dimens {
     /** 4dp. The ring drawn around a selected history tile. */
     val selectionRingWidth: Dp = 4.dp
 
+    /** 4dp. The contrasting underlay of the numeric-range frame. */
+    val rangeFrameUnderlayStroke: Dp = 4.dp
+
+    /** 2dp. The foreground stroke of the numeric-range frame. */
+    val rangeFrameStroke: Dp = 2.dp
+
     // --- Control sizes ------------------------------------------------------
 
     /** 24dp. A history badge. */

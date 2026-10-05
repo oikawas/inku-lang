@@ -233,7 +233,12 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
     # records"), and its response schema went with it. Named here so any other
     # frozen name leaving is still red.
     # Plugin document writes left with the editor that used them (I-703).
-    declared_retirements = {"PromptsResponse", "PluginCreateBody", "PluginUpdateBody"}
+    # Variation endpoints and their request/response schemas were retired
+    # together on 2026-10-04; stored historical works remain readable.
+    declared_retirements = {
+        "PromptsResponse", "PluginCreateBody", "PluginUpdateBody",
+        "VariationSeedsRequest", "VariationSeedsResponse",
+    }
     assert declared_retirements <= set(frozen_names)
     for name in declared_retirements:
         assert name not in after["schemas"], f"{name} was declared retired"

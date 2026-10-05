@@ -3,8 +3,8 @@ import type { PaintResult } from '../run/current-work.ts';
 import type { RecomposeMode } from './recomposition.ts';
 
 export type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
-/** Which dialog the refinement modal shows: drawing elements, models, or the color catalog change. */
-export type RefinementView = 'adjust' | 'compare' | 'color';
+/** Which dialog the refinement modal shows: parameters, models, color catalog, or layout. */
+export type RefinementView = 'adjust' | 'compare' | 'color' | 'layout';
 
 export type VariationCandidate = {
 	id: string;

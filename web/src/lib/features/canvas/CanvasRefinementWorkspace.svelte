@@ -83,9 +83,11 @@
 	const dialogTitle = $derived(
 		view === 'adjust'
 			? (isJapanese ? '描画要素を編集' : 'Edit drawing elements')
-			: view === 'color'
-				? t().canvasVaryColor
-				: t().workActionModels
+			: view === 'layout'
+				? t().canvasVaryComposition
+				: view === 'color'
+					? t().canvasVaryColor
+					: t().workActionModels
 	);
 </script>
 
@@ -99,8 +101,9 @@
 			<button type="button" aria-label={isJapanese ? '閉じる' : 'Close'} onclick={onClose}>×</button>
 		</div>
 	{/if}
-	{#if view === 'adjust'}
+	{#if view === 'adjust' || view === 'layout'}
 		<RefinementAdjustView
+			layoutOnly={view === 'layout'}
 			{isJapanese}
 			{resultAvailable}
 			{artworkUrl}

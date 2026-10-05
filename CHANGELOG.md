@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-05 — Move Another composition to the work-editing menu
+
+The work header and Lineage cards now open a dedicated composition dialog directly from their editing menu. Drawing parameters no longer offer the composition choice, and remembered parameter choices do not affect drawing composition options. By principle / By chance, one or four options, comparison, saving, and discarding share the existing flow.
+
 ### 2026-10-05 — Read third-party notices from Web information
 
 The information dialog now opens a third-party license reader from its License section. A grouped list and full-text pane follow the Swift layout, showing existing Web MIT notices and the Server's distribution, UniDic, CMU dictionary, and Noto font notices. SQLite, CPython, and Rust notices join the list when present in the container. Public read-only API routes serve fixed bundled notices only. Loading failures and retry, stale-response protection, keyboard operation, narrow layouts, and both languages are supported. Original notices, dependencies, drawing, storage, and authentication semantics are unchanged.

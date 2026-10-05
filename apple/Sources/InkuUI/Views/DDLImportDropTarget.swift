@@ -51,9 +51,9 @@ struct DDLImportDropTarget: ViewModifier {
                 }
             VStack(spacing: 12) {
                 Image(systemName: "doc.badge.arrow.up").font(.system(size: 36)).foregroundStyle(Color.accentColor)
-                Text(model.display.localized("DDLファイルをここにドロップ")).font(.title2.weight(.semibold))
+                Text(model.display.localized("DDLファイルをここにドロップ")).inkuFont(16, weight: .semibold)
                 Text(model.display.localized("1ファイル、4MiBまで。プラグイン定義は64件まで。"))
-                    .font(.callout).foregroundStyle(.secondary)
+                    .inkuFont(13).foregroundStyle(.secondary)
             }
             .padding(24).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
         }.padding(12)
@@ -63,7 +63,7 @@ struct DDLImportDropTarget: ViewModifier {
         HStack(spacing: 10) {
             ProgressView().controlSize(.small)
             Text(model.display.localized(importer.isCancelling ? "読み込みを中止しています…" : "DDLファイルを読み込み中"))
-                .font(.callout)
+                .inkuFont(13)
             Button(model.display.localized("中止")) { importer.cancel() }
                 .disabled(importer.isCancelling).keyboardShortcut(.escape, modifiers: [])
         }

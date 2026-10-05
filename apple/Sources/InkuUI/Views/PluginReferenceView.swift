@@ -13,20 +13,20 @@ public struct PluginReferenceView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if let error { Text(model.display.localized(error)).font(.caption).foregroundStyle(.orange) }
+            if let error { Text(model.display.localized(error)).inkuFont(12).foregroundStyle(.orange) }
             ForEach(references) { reference in
                 HStack(alignment: .top, spacing: 6) {
                     Image(systemName: reference.known ? "checkmark.circle" : "questionmark.circle")
                     VStack(alignment: .leading, spacing: 3) {
                         Text(reference.text + model.display.localized(reference.known ? " · 使用可能" : " · この設定では使えません"))
-                            .font(.caption.monospaced()).textSelection(.enabled)
+                            .inkuFont(12, design: .monospaced).textSelection(.enabled)
                         if !reference.known {
                             if let hint = reference.firesAs {
                                 Text(model.display.localizedFormat("名前空間を付けない表現では「%@」に対応します。指定名を確認してください。", hint))
-                                    .font(.caption2)
+                                    .inkuFont(11)
                             }
                             Text(model.display.localized("共通コアが保持しない指定名は、描画時に周囲の文とともに省略される場合があります。"))
-                                .font(.caption2)
+                                .inkuFont(11)
                         }
                     }
                 }.foregroundStyle(reference.known ? Color.secondary : Color.orange)

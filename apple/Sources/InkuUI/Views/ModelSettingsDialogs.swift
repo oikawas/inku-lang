@@ -65,7 +65,7 @@ struct ProviderServiceEditorSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(title).font(.title2.weight(.semibold))
+                Text(title).inkuFont(16, weight: .semibold)
                 Spacer()
                 Button { cancel() } label: { Image(systemName: "xmark") }
                     .buttonStyle(.plain)
@@ -86,7 +86,7 @@ struct ProviderServiceEditorSheet: View {
             Divider()
             HStack(spacing: 12) {
                 if let errorMessage {
-                    Text(model.display.localized(errorMessage)).font(.caption).foregroundStyle(.red).lineLimit(3)
+                    Text(model.display.localized(errorMessage)).inkuFont(12).foregroundStyle(.red).lineLimit(3)
                 }
                 Spacer()
                 if isSaving { ProgressView().controlSize(.small) }
@@ -120,7 +120,7 @@ struct ProviderServiceEditorSheet: View {
                 field("サービスID") {
                     TextField("my-openai", text: $serviceID).autocorrectionDisabled()
                     if !serviceID.isEmpty, let issue = serviceIDIssue {
-                        Text(model.display.localized(issue)).font(.caption).foregroundStyle(.red)
+                        Text(model.display.localized(issue)).inkuFont(12).foregroundStyle(.red)
                     }
                 }
                 field("サービス名") {
@@ -128,7 +128,7 @@ struct ProviderServiceEditorSheet: View {
                 }
             }
             Text(model.display.localized("サービスIDは変更できません。英数字・ハイフン・アンダースコアで短い名前を付けてください。"))
-                .font(.caption).foregroundStyle(.secondary)
+                .inkuFont(12).foregroundStyle(.secondary)
             field("接続形式") {
                 Picker(model.display.localized("接続形式"), selection: $connection) {
                     Text(model.display.localized("OpenAI互換")).tag(NewProviderConnection.openAICompatible)
@@ -141,14 +141,14 @@ struct ProviderServiceEditorSheet: View {
                 TextField("http://127.0.0.1:11434/v1", text: $baseURL).autocorrectionDisabled()
                 if !baseURL.isEmpty, !validURL {
                     Text(model.display.localized("接続先URLには http または https のURLを入力してください。"))
-                        .font(.caption).foregroundStyle(.red)
+                        .inkuFont(12).foregroundStyle(.red)
                 }
             }
             field("APIキー（任意）") {
                 SecureField(model.display.localized("新しいAPIキー"), text: $apiKey).autocorrectionDisabled()
                     .disabled(credentialsLocked)
                 Text(model.display.localized("ローカルLLMはAPIキー無しで利用できる場合があります。"))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .inkuFont(12).foregroundStyle(.secondary)
             }
         }
     }
@@ -156,7 +156,7 @@ struct ProviderServiceEditorSheet: View {
     private var renameFields: some View {
         VStack(alignment: .leading, spacing: 16) {
             field("サービスID") {
-                Text(serviceID).font(.system(.body, design: .monospaced)).textSelection(.enabled)
+                Text(serviceID).inkuFont(13, design: .monospaced).textSelection(.enabled)
             }
             field("サービス名") { TextField(model.display.localized("サービス名"), text: $serviceName) }
         }
@@ -170,13 +170,13 @@ struct ProviderServiceEditorSheet: View {
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.secondary.opacity(0.25)))
                 .accessibilityLabel(model.display.localized("メモ"))
             Text(model.display.localized("契約状況、支払い元、利用上限、連絡先、運用注意などを記録"))
-                .font(.caption).foregroundStyle(.secondary)
+                .inkuFont(12).foregroundStyle(.secondary)
         }
     }
 
     private func field<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(model.display.localized(label)).font(.caption.weight(.medium)).foregroundStyle(.secondary)
+            Text(model.display.localized(label)).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
             content()
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -305,8 +305,8 @@ struct ProviderModelsSheet: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(model.display.localizedFormat("%@ の使用モデル選択", provider?.displayName ?? providerID))
-                    .font(.title2.weight(.semibold))
-                Text(model.display.localizedFormat("サービスID: %@", providerID)).font(.caption).foregroundStyle(.secondary)
+                    .inkuFont(16, weight: .semibold)
+                Text(model.display.localizedFormat("サービスID: %@", providerID)).inkuFont(12).foregroundStyle(.secondary)
             }
             Spacer()
             Button { cancel() } label: { Image(systemName: "xmark") }
@@ -343,7 +343,7 @@ struct ProviderModelsSheet: View {
                     .disabled(isWorking || visibleModels.isEmpty)
                 Spacer()
                 Text(model.display.localizedFormat("%ld / %ld モデルを表示", visibleModels.count, draft.models.count))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .inkuFont(12).foregroundStyle(.secondary)
             }
         }.padding(16)
     }
@@ -353,10 +353,10 @@ struct ProviderModelsSheet: View {
             HStack(alignment: .top, spacing: 12) {
                 enabledToggle(item)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(item.label).font(.body.weight(.semibold))
-                    Text(item.id).font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary)
+                    Text(item.label).inkuFont(14, weight: .semibold)
+                    Text(item.id).inkuFont(12, design: .monospaced).foregroundStyle(.secondary)
                         .textSelection(.enabled)
-                    if let status = statusLabel(item) { Text(status).font(.caption).foregroundStyle(.orange) }
+                    if let status = statusLabel(item) { Text(status).inkuFont(12).foregroundStyle(.orange) }
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 6) {
                     purposeButton("LLM", purpose: "llm", item: item)
@@ -364,7 +364,7 @@ struct ProviderModelsSheet: View {
                 }
             }
             DisclosureGroup(model.display.localized("モデル詳細")) { metadataFields(item) }
-                .font(.callout)
+                .inkuFont(13)
         }.padding(14)
             .background(.background, in: RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(.secondary.opacity(0.18)))
@@ -387,7 +387,7 @@ struct ProviderModelsSheet: View {
         let selected = item.purposes.contains(purpose)
         return Button(label) { draft.togglePurpose(modelID: item.id, purpose: purpose) }
             .buttonStyle(.plain)
-            .font(.caption.weight(.medium))
+            .inkuFont(12, weight: .medium)
             .padding(.horizontal, 10).padding(.vertical, 5)
             .foregroundStyle(selected ? Color.accentColor : Color.secondary)
             .background(selected ? Color.accentColor.opacity(0.14) : Color.secondary.opacity(0.08), in: Capsule())
@@ -426,7 +426,7 @@ struct ProviderModelsSheet: View {
 
     private func metadataField<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(model.display.localized(label)).font(.caption).foregroundStyle(.secondary)
+            Text(model.display.localized(label)).inkuFont(12).foregroundStyle(.secondary)
             content()
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -465,14 +465,14 @@ struct ProviderModelsSheet: View {
     private var footer: some View {
         VStack(alignment: .leading, spacing: 10) {
             if let errorMessage {
-                Text(model.display.localized(errorMessage)).font(.caption).foregroundStyle(.red).lineLimit(3)
+                Text(model.display.localized(errorMessage)).inkuFont(12).foregroundStyle(.red).lineLimit(3)
             } else if let statusMessage {
-                Text(model.display.message(statusMessage)).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                Text(model.display.message(statusMessage)).inkuFont(12).foregroundStyle(.secondary).lineLimit(3)
             }
             HStack(spacing: 12) {
                 Text(model.display.localizedFormat("%ld モデルを使用中", draft.enabledCount))
-                    .font(.callout).foregroundStyle(.secondary)
-                if draft.isDirty { Text(model.display.localized("未保存の変更")).font(.caption.weight(.semibold)) }
+                    .inkuFont(13).foregroundStyle(.secondary)
+                if draft.isDirty { Text(model.display.localized("未保存の変更")).inkuFont(12, weight: .semibold) }
                 Spacer()
                 if isWorking { ProgressView().controlSize(.small) }
                 Button(model.display.localized("取消")) { cancel() }

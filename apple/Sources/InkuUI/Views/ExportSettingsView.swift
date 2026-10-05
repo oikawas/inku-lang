@@ -33,12 +33,10 @@ struct ExportSettingsView: View {
     var body: some View {
         Group {
             Section {
-                Picker(model.display.localized("エクスポート"), selection: $page) {
-                    Text(model.display.localized("保存先")).tag("destination")
-                    Text(model.display.localized("PNGテンプレート")).tag("png")
-                    Text(model.display.localized("アニメーション")).tag("animation")
-                    Text(model.display.localized("共有カード")).tag("card")
-                }.pickerStyle(.segmented)
+                InkuSegmentedButtons(options: [("destination", model.display.localized("保存先")), ("png", model.display.localized("PNGテンプレート")),
+                                               ("animation", model.display.localized("アニメーション")), ("card", model.display.localized("共有カード"))],
+                                     selection: $page)
+                    .accessibilityLabel(model.display.localized("エクスポート"))
             }
             if page == "destination" {
             #if os(macOS)
@@ -61,7 +59,7 @@ struct ExportSettingsView: View {
             if page == "png" {
             Section(model.display.localized("書き出しの初期設定")) {
                 Text(model.display.localized("この端末で使う書き出し条件です。作品の保存内容は変わりません。"))
-                    .font(.callout).foregroundStyle(.secondary)
+                    .inkuFont(13).foregroundStyle(.secondary)
                 Picker(model.display.localized("形式"), selection: $configuration.options.format) {
                     ForEach(SavedExportFormat.allCases, id: \.self) { Text(model.display.localized($0.title)).tag($0) }
                 }
@@ -92,7 +90,7 @@ struct ExportSettingsView: View {
                         }
                         if templateIsDirty(template) {
                             Text(model.display.localized(templateValidation(template) ?? "未保存"))
-                                .font(.caption).foregroundStyle(templateValidation(template) == nil ? Color.secondary : Color.red)
+                                .inkuFont(12).foregroundStyle(templateValidation(template) == nil ? Color.secondary : Color.red)
                         }
                     }
                 }

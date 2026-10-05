@@ -20,7 +20,7 @@ public struct AuxiliaryView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack {
-                    Text(model.display.localized(mode == .colophon ? "系譜の奥書" : "AI の助言・自律推敲")).font(.title2.weight(.semibold))
+                    Text(model.display.localized(mode == .colophon ? "系譜の奥書" : "AI の助言・自律推敲")).inkuFont(16, weight: .semibold)
                     Spacer()
                     Button(model.display.localized("閉じる")) {
                         Task {
@@ -35,7 +35,7 @@ public struct AuxiliaryView: View {
                         ArtworkThumbnail(work: work, renderer: model.renderer).frame(width: 110, height: 95)
                         VStack(alignment: .leading, spacing: 5) {
                             Text(work.effectiveSourceText).lineLimit(3)
-                            Text(model.display.localized("元の作品は保持し、新しい子を系譜に保存します。")).font(.caption).foregroundStyle(.secondary)
+                            Text(model.display.localized("元の作品は保持し、新しい子を系譜に保存します。")).inkuFont(12).foregroundStyle(.secondary)
                         }
                     }
                 } else {
@@ -45,8 +45,10 @@ public struct AuxiliaryView: View {
                     Button { showModels = true } label: {
                         Label(auxiliary.modelReference.isEmpty ? model.display.localized("Visionモデルを選択") : auxiliary.modelReference, systemImage: "eye")
                     }.help(model.display.tooltip("画像を扱える登録モデルから選択します。", serverKey: "modelSelectionVisionHint"))
-                    Picker(model.display.localized("応答の言語"), selection: $auxiliary.language) { Text(model.display.localized("日本語")).tag("ja"); Text("English").tag("en") }
-                        .pickerStyle(.segmented).frame(maxWidth: 220)
+                    HStack(spacing: 8) {
+                        Text(model.display.localized("応答の言語")).inkuFont(12).foregroundStyle(.secondary)
+                        InkuSegmentedButtons(options: [("ja", model.display.localized("日本語")), ("en", "English")], selection: $auxiliary.language)
+                    }.accessibilityElement(children: .contain).accessibilityLabel(model.display.localized("応答の言語"))
                 }.disabled(auxiliary.running || auxiliary.selectingSource || model.isBusy)
                 if mode == .colophon { colophonControls }
                 else { adviceControls; refinementControls }
@@ -58,7 +60,7 @@ public struct AuxiliaryView: View {
                         Button(model.display.localized(auxiliary.stopping ? "停止中" : "停止"), role: .destructive) { Task { await auxiliary.stop(app: model) } }
                             .disabled(auxiliary.stopping)
                     }
-                } else if !auxiliary.status.isEmpty { Text(model.display.message(auxiliary.status)).font(.callout).foregroundStyle(.secondary) }
+                } else if !auxiliary.status.isEmpty { Text(model.display.message(auxiliary.status)).inkuFont(13).foregroundStyle(.secondary) }
                 if let error = auxiliary.errorText { Text(model.display.message(error)).foregroundStyle(.red).textSelection(.enabled) }
                 if !auxiliary.draftText.isEmpty { draftEditor }
                 if !auxiliary.generatedWorks.isEmpty { generations }
@@ -84,23 +86,23 @@ public struct AuxiliaryView: View {
         @Bindable var auxiliary = auxiliary
         return GroupBox(model.display.localized("モデルから画像の助言を受ける")) {
             VStack(alignment: .leading, spacing: 10) {
-                Text(model.display.localized("画像に見える事実と次に試す方向を受け取ります。採点や順位付けは行いません。")).font(.caption).foregroundStyle(.secondary)
+                Text(model.display.localized("画像に見える事実と次に試す方向を受け取ります。採点や順位付けは行いません。")).inkuFont(12).foregroundStyle(.secondary)
                 TextField(model.display.localized("AI に伝える方向性"), text: $auxiliary.direction, axis: .vertical).lineLimit(2...4)
                     .disabled(auxiliary.sourceIsLocked || auxiliary.running || auxiliary.selectingSource || model.isBusy)
                     .help(model.display.tooltip("AIへ伝える方針は160文字までです。"))
                 Text("\(auxiliary.direction.utf16.count) / \(AuxiliaryModel.directionLimit)")
-                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    .inkuFont(12).monospacedDigit().foregroundStyle(.secondary)
                 Button(model.display.localized("画像から助言を読む"), systemImage: "eye") { Task { await auxiliary.requestAdvice(app: model) } }
                     .disabled(auxiliary.sourceIsLocked || auxiliary.sourceWork == nil || auxiliary.modelReference.isEmpty || auxiliary.running || model.isBusy)
                 if auxiliary.sourceIsLocked {
                     Text(model.display.localized("DDL を編集した作品は記述を読み直しません。色・配置・タッチを元の DDL から描けます。"))
-                        .font(.caption).foregroundStyle(.secondary)
+                        .inkuFont(12).foregroundStyle(.secondary)
                 }
                 if let advice = auxiliary.advice {
-                    Text(model.display.localized("観察")).font(.caption.weight(.semibold))
+                    Text(model.display.localized("観察")).inkuFont(12, weight: .semibold)
                     Text(advice.observation).textSelection(.enabled)
                     Text(model.display.localizedFormat("次の操作: %@ · 読み手: %@", model.display.localized(AuxiliaryModel.kindLabel(advice.suggestedKind)), advice.model))
-                        .font(.caption).foregroundStyle(.secondary)
+                        .inkuFont(12).foregroundStyle(.secondary)
                 }
             }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
         }
@@ -110,12 +112,12 @@ public struct AuxiliaryView: View {
         @Bindable var auxiliary = auxiliary
         return GroupBox(model.display.localized("世代を限定した自律推敲")) {
             VStack(alignment: .leading, spacing: 12) {
-                Picker(model.display.localized("方式"), selection: $auxiliary.visionMode) {
-                    Text(model.display.localized("ランダム")).tag(false)
-                    Text("AI Vision").tag(true)
-                }.pickerStyle(.segmented).frame(maxWidth: 300).disabled(auxiliary.sourceIsLocked)
+                HStack(spacing: 8) {
+                    Text(model.display.localized("方式")).inkuFont(12).foregroundStyle(.secondary)
+                    InkuSegmentedButtons(options: [(false, model.display.localized("ランダム")), (true, "AI Vision")], selection: $auxiliary.visionMode)
+                }.disabled(auxiliary.sourceIsLocked)
                 Text(model.display.localized(auxiliary.visionMode ? "上のモデルが観察し、同じモデルで各世代を描きます。" : "制作のモデルで描きます。方向性は読み取りを変える世代にだけ渡します。"))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .inkuFont(12).foregroundStyle(.secondary)
                 Stepper(model.display.localizedFormat("生成する世代数: %ld", auxiliary.generations), value: $auxiliary.generations, in: 1...10)
                 HStack {
                     ForEach(AuxiliaryProvider.allowedKinds, id: \.self) { kind in
@@ -139,14 +141,14 @@ public struct AuxiliaryView: View {
         GroupBox(model.display.localized("起点から現在の作品までを読む")) {
             VStack(alignment: .leading, spacing: 10) {
                 Text(model.display.localized("各世代の見える差を順に読み、機械抽出した不変量で結びます。詞書を物語化せず、評価や作者の意図は付けません。"))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .inkuFont(12).foregroundStyle(.secondary)
                 if auxiliary.loadingColophonPath {
                     ProgressView(model.display.localized("読み込み中"))
                 } else if let count = auxiliary.colophonPathCount {
                     let template = ServerTips.text("okugakiBranchConfirm", language: model.display.preferences.language)
                         ?? model.display.localized("起点から表示作品まで {count} 世代の枝を読みます。")
                     Text(template.replacingOccurrences(of: "{count}", with: count.formatted()))
-                        .font(.callout)
+                        .inkuFont(13)
                 } else {
                     Button(model.display.localized("再読込")) { Task { await auxiliary.refreshColophonPath() } }
                         .disabled(auxiliary.running || model.isBusy)
@@ -164,10 +166,10 @@ public struct AuxiliaryView: View {
                 if mode == .colophon {
                     Text(auxiliary.draftText).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    TextEditor(text: $auxiliary.draftText).font(.body).frame(minHeight: 100).disabled(auxiliary.running || auxiliary.selectingSource)
+                    TextEditor(text: $auxiliary.draftText).inkuFont(14).frame(minHeight: 100).disabled(auxiliary.running || auxiliary.selectingSource)
                 }
                 if let draft = auxiliary.colophonDraft, !draft.warnings.isEmpty {
-                    Text(model.display.localized("確認が必要な表現: ") + draft.warnings.joined(separator: model.display.preferences.language == "en" ? ", " : "、")).font(.caption).foregroundStyle(.orange)
+                    Text(model.display.localized("確認が必要な表現: ") + draft.warnings.joined(separator: model.display.preferences.language == "en" ? ", " : "、")).inkuFont(12).foregroundStyle(.orange)
                 }
                 HStack {
                     Button(model.display.localized("コピー"), systemImage: "doc.on.doc") { auxiliary.copyDraft() }
@@ -190,7 +192,7 @@ public struct AuxiliaryView: View {
                             Button { observedGeneration = work } label: {
                                 VStack {
                                     ArtworkThumbnail(work: work, renderer: model.renderer).frame(width: 130, height: 115)
-                                    Text(work.effectiveSourceText).font(.caption).lineLimit(2).frame(width: 130)
+                                    Text(work.effectiveSourceText).inkuFont(12).lineLimit(2).frame(width: 130)
                                 }.padding(6)
                                     .background(observedGeneration?.id == work.id ? Color.accentColor.opacity(0.12) : Color.clear,
                                                 in: RoundedRectangle(cornerRadius: 6))
@@ -199,7 +201,7 @@ public struct AuxiliaryView: View {
                     }
                 }
                 if let work = observedGeneration, auxiliary.generatedWorks.contains(where: { $0.id == work.id }) {
-                    Text(model.display.localized("観察する作品")).font(.caption.weight(.semibold))
+                    Text(model.display.localized("観察する作品")).inkuFont(12, weight: .semibold)
                     ArtworkCanvas(svg: work.svg, renderer: model.renderer, caption: work.effectiveSourceText)
                         .frame(height: 260)
                     HStack {
@@ -224,7 +226,7 @@ public struct AuxiliaryView: View {
                 ForEach(auxiliary.storedColophons) { record in
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text(record.signature).font(.caption).foregroundStyle(.secondary)
+                            Text(record.signature).inkuFont(12).foregroundStyle(.secondary)
                             Spacer()
                             Button(model.display.localized("コピー")) { auxiliary.draftText = record.adoptedBody ?? record.generatedBody; auxiliary.copyDraft() }
                             Button(model.display.localized("削除"), role: .destructive) { deleteRecordID = record.id }

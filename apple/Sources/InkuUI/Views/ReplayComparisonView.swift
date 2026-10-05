@@ -16,7 +16,7 @@ public struct ReplayComparisonView: View {
     public var body: some View {
         VStack(spacing: 0) {
             Text(model.display.localized("再現を比較"))
-                .font(.title2.weight(.semibold))
+                .inkuFont(16, weight: .semibold)
                 .frame(maxWidth: .infinity, alignment: .leading).padding(20)
             Divider()
             ScrollView {
@@ -30,7 +30,7 @@ public struct ReplayComparisonView: View {
                         Label {
                             Text(model.display.message(error)).textSelection(.enabled)
                         } icon: { Image(systemName: "exclamationmark.triangle") }
-                            .font(.callout).foregroundStyle(.red)
+                            .inkuFont(13).foregroundStyle(.red)
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -64,14 +64,14 @@ public struct ReplayComparisonView: View {
 
     private var sourceSummary: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(model.display.localized("記述")).font(.headline)
+            Text(model.display.localized("記述")).inkuFont(14, weight: .semibold)
             Text(comparison.work.effectiveSourceText.isEmpty
                 ? model.display.localized("この作品には記述が保存されていません。")
                 : comparison.work.effectiveSourceText)
-                .font(.callout).lineLimit(4).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+                .inkuFont(13).lineLimit(4).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
                 .help(model.display.preferences.showTooltips ? comparison.work.effectiveSourceText : "")
             Text(model.display.localized("保存時のSVGと、同じ保存条件を現行エンジンで描いた結果を比較します。作品・履歴・系譜は変わりません。"))
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                .inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }.replayComparisonPanel()
     }
 
@@ -92,17 +92,17 @@ public struct ReplayComparisonView: View {
 
     private func warning(_ message: String) -> some View {
         Label(message, systemImage: "exclamationmark.triangle")
-            .font(.callout).fixedSize(horizontal: false, vertical: true)
+            .inkuFont(13).fixedSize(horizontal: false, vertical: true)
             .replayComparisonPanel()
     }
 
     private func artworkCard(title: String, version: String?, svg: String?, replay: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(model.display.localized(title)).font(.headline)
+                Text(model.display.localized(title)).inkuFont(14, weight: .semibold)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(model.display.localizedFormat("描画エンジンの版: %@", version ?? model.display.localized(replay ? "未取得" : "記録なし")))
-                    .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                    .inkuFont(12).foregroundStyle(.secondary).textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }.frame(maxWidth: .infinity, minHeight: 64, alignment: .topLeading)
             Group {
@@ -121,7 +121,7 @@ public struct ReplayComparisonView: View {
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(model.display.message(comparison.status)).font(.callout).foregroundStyle(.secondary)
+            Text(model.display.message(comparison.status)).inkuFont(13).foregroundStyle(.secondary)
                 .lineLimit(2).fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 12) {
                 if comparison.running {

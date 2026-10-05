@@ -19,8 +19,9 @@ private enum DemoModelPicker: String, Identifiable {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if !demoOnly {
-              Picker(model.display.localized("自動制作"), selection: $tab) { Text(model.display.localized("バッチ")).tag("batch"); Text(model.display.localized("デモ")).tag("demo") }
-                .pickerStyle(.segmented).frame(width: 260).disabled(model.isBrowsingLocked)
+              InkuSegmentedButtons(options: [("batch", model.display.localized("バッチ")), ("demo", model.display.localized("デモ"))], selection: $tab)
+                .accessibilityLabel(model.display.localized("自動制作"))
+                .disabled(model.isBrowsingLocked)
             }
             if !demoOnly && tab == "batch" {
                 BatchPanelView(model: model, automation: automation)
@@ -36,7 +37,7 @@ private enum DemoModelPicker: String, Identifiable {
                                 .disabled(automation.stopping)
                         }
                     }
-                } else { Text(model.display.message(automation.status)).font(.callout).foregroundStyle(.secondary) }
+                } else { Text(model.display.message(automation.status)).inkuFont(13).foregroundStyle(.secondary) }
                 if let error = automation.errorText { Text(error).foregroundStyle(.red).textSelection(.enabled) }
             }
         }
@@ -74,10 +75,10 @@ private enum DemoModelPicker: String, Identifiable {
                                 Label(model.catalogMode == "auto" ? model.display.localized("記述から選択") : model.catalogs.first { $0.id == model.catalogID }?.name ?? model.catalogID, systemImage: "paintpalette")
                             }
                             HStack {
-                                Picker(model.display.localized("写生"), selection: $automation.demoSketchMode) {
-                                    Text(model.display.localized("なし")).tag("off")
-                                    Text(model.display.localized("あり")).tag("on")
-                                }.pickerStyle(.segmented).frame(maxWidth: 240)
+                                Text(model.display.localized("写生")).inkuFont(12).foregroundStyle(.secondary)
+                                InkuSegmentedButtons(options: [("off", model.display.localized("なし")), ("on", model.display.localized("あり"))],
+                                                     selection: $automation.demoSketchMode)
+                                    .accessibilityLabel(model.display.localized("写生"))
                                     .help(model.display.preferences.showTooltips ? model.display.localized(automation.demoSketchMode == "on"
                                         ? "記述の横に、場所の広がりや季節・時刻の光を補って描く" : "写生を通さず、記述だけで描く") : "")
                                 Button { showPaper = true } label: {
@@ -94,10 +95,10 @@ private enum DemoModelPicker: String, Identifiable {
                     Toggle(model.display.localized("生成作品をライブラリへ保存"), isOn: $automation.demoSaveWorks)
                     Toggle(model.display.localized("生成作品をファイルへ保存"), isOn: $automation.demoSaveFiles)
                     if let directory = model.localDataDirectory() {
-                        Text(directory.appendingPathComponent("demo-output").path).font(.caption).textSelection(.enabled)
+                        Text(directory.appendingPathComponent("demo-output").path).inkuFont(12).textSelection(.enabled)
                     }
                     Text(model.display.localized("保存をオフにした作品はデモ表示用です。生成条件はデモ開始時に固定します。"))
-                        .font(.caption).foregroundStyle(.secondary)
+                        .inkuFont(12).foregroundStyle(.secondary)
                 }
                 .padding(6)
             }.disabled(automation.isOccupied || model.isBusy)
@@ -106,25 +107,25 @@ private enum DemoModelPicker: String, Identifiable {
             if automation.demoModel.isEmpty || automation.demoStage1Model.isEmpty || automation.demoStage2Model.isEmpty {
                 Button(model.display.localized("使用中のLLMモデルを設定してください。"), systemImage: "gearshape") {
                     NotificationCenter.default.post(name: .inkuOpenSection, object: "settings", userInfo: ["settingsSection": "models"])
-                }.font(.caption).disabled(model.isBrowsingLocked)
+                }.inkuFont(12).disabled(model.isBrowsingLocked)
             }
             demoStatistics
             if let work = automation.demoWork {
                 ArtworkCanvas(svg: work.svg, renderer: model.renderer, caption: work.effectiveSourceText)
                     .frame(minHeight: 320)
                 HStack {
-                    Text(model.display.localized(automation.demoCurrentSaved ? "保存済み" : "未保存")).font(.caption).foregroundStyle(.secondary)
+                    Text(model.display.localized(automation.demoCurrentSaved ? "保存済み" : "未保存")).inkuFont(12).foregroundStyle(.secondary)
                     Spacer()
                     Button(model.display.localized(automation.savingDemo ? "保存中…" : "現在の作品を保存"), systemImage: "square.and.arrow.down") {
                         Task { await automation.saveDemoCurrent(app: model) }
                     }.disabled(!automation.canSaveDemoCurrent || model.isBusy || (automation.isOccupied && automation.mode == "batch"))
                 }
-                if !automation.demoSaveStatus.isEmpty { Text(model.display.message(automation.demoSaveStatus)).font(.caption) }
+                if !automation.demoSaveStatus.isEmpty { Text(model.display.message(automation.demoSaveStatus)).inkuFont(12) }
                 GroupBox(model.display.localized("生成した記述")) {
                     Text(automation.demoPrompt).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                 }
                 GroupBox(model.display.localized("生成した指示書")) {
-                    Text(work.ddl ?? model.display.localized("未記録")).font(.callout.monospaced()).textSelection(.enabled)
+                    Text(work.ddl ?? model.display.localized("未記録")).inkuFont(12.5, design: .monospaced).textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 ProviderObservationView(model: model, metrics: automation.demoCurrentMetrics,
@@ -151,9 +152,9 @@ private enum DemoModelPicker: String, Identifiable {
     private func modelButton(_ selection: DemoModelPicker) -> some View {
         Button { modelPicker = selection } label: {
             VStack(alignment: .leading, spacing: 3) {
-                Text(model.display.localized(selection.title)).font(.caption).foregroundStyle(.secondary)
+                Text(model.display.localized(selection.title)).inkuFont(12).foregroundStyle(.secondary)
                 Text(reference(selection).isEmpty ? model.display.localized("選択してください") : reference(selection))
-                    .font(.callout).lineLimit(2).truncationMode(.middle)
+                    .inkuFont(13).lineLimit(2).truncationMode(.middle)
             }.frame(maxWidth: .infinity, alignment: .leading)
         }.buttonStyle(.bordered)
     }
@@ -171,7 +172,7 @@ private enum DemoModelPicker: String, Identifiable {
                 Text(model.display.localized("描画トークン（記録分）") + ": " + tokens(automation.demoCurrentMetrics)
                     + " · " + model.display.localized("合計") + ": " + tokens(automation.demoTotalMetrics))
                 Text(model.display.localized("記述生成のトークン: 記録なし")).foregroundStyle(.secondary)
-            }.font(.caption).textSelection(.enabled)
+            }.inkuFont(12).textSelection(.enabled)
         }
     }
 

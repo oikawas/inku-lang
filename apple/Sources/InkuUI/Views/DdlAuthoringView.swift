@@ -12,7 +12,7 @@ struct DdlAuthoringView: View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text(model.display.localized("指示書")).font(.subheadline.weight(.semibold))
+                    Text(model.display.localized("指示書")).inkuFont(12, weight: .semibold)
                     Spacer()
                     Button(model.display.localized("DDLを編集")) { editingSession = DdlEditingSession(model: model) }
                         .disabled(!model.canEditCurrentDDL)
@@ -21,14 +21,14 @@ struct DdlAuthoringView: View {
                 if !model.authoringAuthority.isEmpty {
                     Label(model.display.localized(model.sourceLocked ? "DDL確定・記述ロック" : "記述から生成可能"),
                           systemImage: model.sourceLocked ? "lock.fill" : "pencil")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .inkuFont(12).foregroundStyle(.secondary)
                 }
             }
             if !model.authoringAuthority.isEmpty {
                 Text(model.display.localizedFormat("改訂 %@", model.authoringRevision))
-                    .font(.caption.monospaced()).textSelection(.enabled)
+                    .inkuFont(12, design: .monospaced).textSelection(.enabled)
             }
-            Text(model.visibleDDL).font(.system(.caption, design: .monospaced))
+            Text(model.visibleDDL).inkuFont(12, design: .monospaced)
                 .lineLimit(5).textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 10)
@@ -38,29 +38,29 @@ struct DdlAuthoringView: View {
                     HStack(spacing: 8) { checkButton; regenerateButton }.fixedSize(horizontal: true, vertical: false)
                     VStack(alignment: .leading, spacing: 8) { checkButton; regenerateButton }
                 }
-                .controlSize(.small)
+                .buttonStyle(InkuGhostButtonStyle())
             }
             if showsDiagnostics && model.sourceLocked {
                 Text(model.display.localized("確定したDDLの変更後は、この作品の記述を生成元へ戻せません。新規作品では別の記述を使えます。"))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .inkuFont(12).foregroundStyle(.secondary)
             }
             if !model.holeIDs.isEmpty {
-                Text(model.display.localized("補完対象")).font(.subheadline.weight(.semibold))
+                Text(model.display.localized("補完対象")).inkuFont(12, weight: .semibold)
                 ForEach(model.holeIDs, id: \.self) { id in
                     Toggle(id, isOn: Binding(
                         get: { model.selectedHoleIDs.contains(id) },
                         set: { if $0 { model.selectedHoleIDs.insert(id) } else { model.selectedHoleIDs.remove(id) } }
-                    )).font(.caption.monospaced()).disabled(model.isBusy)
+                    )).inkuFont(12, design: .monospaced).disabled(model.isBusy)
                 }
                 Button(model.display.localized(model.selectedHoleIDs.isEmpty ? "すべての未解決箇所を補完" : "選択した未解決箇所を補完")) {
                     Task { await model.completeHoles() }
                 }.disabled(!model.canCompleteHoles)
                 Text(model.display.localized("補完はモデルへ送信します。変更案は承認後に確定します。"))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .inkuFont(12).foregroundStyle(.secondary)
             }
             if !model.patchProposalJSON.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    Label(model.display.localized("補完案の承認待ち"), systemImage: "checkmark.bubble").font(.headline)
+                    Label(model.display.localized("補完案の承認待ち"), systemImage: "checkmark.bubble").inkuFont(14, weight: .semibold)
                     ViewThatFits(in: .horizontal) {
                         HStack(alignment: .top, spacing: 12) {
                             sourcePane("確定済み", model.visibleDDL).frame(width: 250)
@@ -76,7 +76,8 @@ struct DdlAuthoringView: View {
                             Text(model.display.localized("承認して確定・描画")).frame(maxWidth: .infinity)
                         }.buttonStyle(.borderedProminent)
                         Button(model.display.localized("却下")) { Task { await model.declinePatch() } }
-                    }.controlSize(.small).disabled(model.isBusy)
+                            .buttonStyle(InkuGhostButtonStyle())
+                    }.disabled(model.isBusy)
                     DisclosureGroup(model.display.localized("補完案の詳細")) { sourcePane("", model.patchProposalJSON) }
                 }
                 .padding(12).background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 8))
@@ -141,9 +142,9 @@ struct DdlAuthoringView: View {
     }
     private func sourcePane(_ title: String, _ source: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            if !title.isEmpty { Text(model.display.localized(title)).font(.caption.weight(.semibold)) }
+            if !title.isEmpty { Text(model.display.localized(title)).inkuFont(12, weight: .semibold) }
             ScrollView {
-                Text(source).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+                Text(source).inkuFont(12, design: .monospaced).textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading).padding(8)
             }
             .frame(minHeight: 120, maxHeight: 240)

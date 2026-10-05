@@ -18,7 +18,7 @@ public struct ComparisonView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack {
-                    Text(model.display.localized(comparison.kind == .catalog ? "色カタログを変える" : "モデルを変える")).font(.title2.weight(.semibold))
+                    Text(model.display.localized(comparison.kind == .catalog ? "色カタログを変える" : "モデルを変える")).inkuFont(16, weight: .semibold)
                     Spacer()
                     Button(model.display.localized(comparison.hasUnsaved ? "破棄して閉じる" : "閉じる")) {
                         Task { await comparison.stop(app: model); comparison.discardCandidates(); dismiss() }
@@ -29,12 +29,12 @@ public struct ComparisonView: View {
                     HStack(alignment: .top, spacing: 14) {
                         ArtworkThumbnail(work: work, renderer: model.renderer).frame(width: 150, height: 130)
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(model.display.localized("元の作品")).font(.headline)
+                            Text(model.display.localized("元の作品")).inkuFont(14, weight: .semibold)
                             Text(work.effectiveSourceText).textSelection(.enabled)
                             Text(model.display.localizedFormat("配色 %@ · シード %@", work.renderColorCatalogID ?? work.catalogID ?? model.display.localized("不明"), work.renderSeed ?? model.display.localized("不明")))
-                                .font(.caption).foregroundStyle(.secondary)
+                                .inkuFont(12).foregroundStyle(.secondary)
                             Text(model.display.localized("候補はまだ履歴に保存されていません。選択して保存した候補が履歴と系譜に追加されます。"))
-                                .font(.caption).foregroundStyle(.secondary)
+                                .inkuFont(12).foregroundStyle(.secondary)
                         }
                     }
                     if comparison.kind == .catalog { catalogChoices }
@@ -63,10 +63,10 @@ public struct ComparisonView: View {
                 } else {
                     ContentUnavailableView(model.display.localized("保存作品を選択"), systemImage: "photo", description: Text(model.display.localized("ライブラリか制作画面で元の作品を選択してください。")))
                 }
-                Text(model.display.message(comparison.status)).font(.callout).foregroundStyle(.secondary)
+                Text(model.display.message(comparison.status)).inkuFont(13).foregroundStyle(.secondary)
                 if let error = comparison.errorText { Text(error).foregroundStyle(.red).textSelection(.enabled) }
                 ForEach(Array(comparison.failures.enumerated()), id: \.offset) { _, failure in
-                    Text(failure).font(.callout).foregroundStyle(.red).textSelection(.enabled)
+                    Text(failure).inkuFont(13).foregroundStyle(.red).textSelection(.enabled)
                 }
             }.padding(20)
         }
@@ -85,7 +85,7 @@ public struct ComparisonView: View {
         GroupBox(model.display.localized("同じScoreを別の配色で描く")) {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 145))], alignment: .leading, spacing: 10) {
                 ForEach(model.catalogs.filter { $0.id != (comparison.original?.renderColorCatalogID ?? comparison.original?.catalogID) }, id: \.id) { catalog in
-                    Text(catalog.name).font(.callout)
+                    Text(catalog.name).inkuFont(13)
                 }
             }.padding(6)
         }
@@ -95,23 +95,23 @@ public struct ComparisonView: View {
         return GroupBox(model.display.localized("記述を各モデルで読み直す")) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(model.display.localized("使用中のLLMモデルを4件まで選択してください。"))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .inkuFont(12).foregroundStyle(.secondary)
                 ForEach(comparison.modelProviders) { provider in
-                    Text(provider.displayName).font(.caption.weight(.semibold))
+                    Text(provider.displayName).inkuFont(12, weight: .semibold)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 190))], alignment: .leading) {
                         ForEach(SettingsModel.batchModels(for: provider)) { entry in
                             comparisonModelCard(entry, provider: provider)
                         }
                     }
                 }
-                Text(model.display.localizedFormat("選択中: %ld / 4", comparison.modelReferences.count)).font(.caption).monospacedDigit()
+                Text(model.display.localizedFormat("選択中: %ld / 4", comparison.modelReferences.count)).inkuFont(12).monospacedDigit()
                 if comparison.modelProviders.isEmpty {
                     Text(model.display.localized("選べるモデルがありません。設定 → モデル設定 で使用するモデルを選択してください。"))
-                        .font(.caption).foregroundStyle(.secondary)
+                        .inkuFont(12).foregroundStyle(.secondary)
                 }
                 if comparison.sourceIsLocked {
                     Text(model.display.localized("DDLを編集した作品は記述を読み直せません。配色の比較を選択してください。"))
-                        .font(.callout).foregroundStyle(.secondary)
+                        .inkuFont(13).foregroundStyle(.secondary)
                 }
             }.padding(6)
         }
@@ -127,16 +127,16 @@ public struct ComparisonView: View {
                 get: { selected }, set: { comparison.selectModel(reference, selected: $0) }))
                 .disabled(comparison.running || model.isBusy || comparison.hasUnsaved || comparison.sourceIsLocked || target || full || !entry.isSelectable)
                 .strikethrough(entry.eol == true)
-            if target { Text(model.display.localized("元の作品のモデル")).font(.caption).foregroundStyle(.secondary) }
+            if target { Text(model.display.localized("元の作品のモデル")).inkuFont(12).foregroundStyle(.secondary) }
             if entry.eol == true {
-                Text(model.display.localized("提供終了") + (entry.eolDate.map { " (\($0))" } ?? "")).font(.caption).foregroundStyle(.secondary)
+                Text(model.display.localized("提供終了") + (entry.eolDate.map { " (\($0))" } ?? "")).inkuFont(12).foregroundStyle(.secondary)
             } else if entry.requiresSubscription == true {
-                Text(model.display.localized("有料プラン限定")).font(.caption).foregroundStyle(.secondary)
+                Text(model.display.localized("有料プラン限定")).inkuFont(12).foregroundStyle(.secondary)
             }
-            if comparison.failedModelReferences.contains(reference) { Text(model.display.localized("このモデルの候補を用意できませんでした。")).font(.caption).foregroundStyle(.red) }
+            if comparison.failedModelReferences.contains(reference) { Text(model.display.localized("このモデルの候補を用意できませんでした。")).inkuFont(12).foregroundStyle(.red) }
             DisclosureGroup(model.display.localized("モデルの適性・用途")) {
                 RegisteredModelMetadataView(entry: entry, provider: provider, display: model.display)
-            }.font(.caption)
+            }.inkuFont(12)
         }.padding(10).background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 8))
     }
 
@@ -145,7 +145,7 @@ public struct ComparisonView: View {
             ForEach(comparison.candidates) { candidate in
                 VStack(alignment: .leading, spacing: 10) {
                     ArtworkThumbnail(work: candidate.work, renderer: model.renderer).frame(height: 185)
-                    Text(candidate.label).font(.headline).textSelection(.enabled)
+                    Text(candidate.label).inkuFont(14, weight: .semibold).textSelection(.enabled)
                     ProviderObservationView(model: model, metrics: candidate.prepared.providerMetrics,
                         workID: candidate.savedWork?.id, executionID: candidate.prepared.executionID)
                     if let saved = candidate.savedWork {
@@ -154,12 +154,12 @@ public struct ComparisonView: View {
                             Spacer()
                             Button(model.display.localized("作品を開く")) { Task { await model.selectWork(saved) } }
                                 .disabled(comparison.running || model.isBusy)
-                        }.font(.caption)
+                        }.inkuFont(12)
                     } else {
                         Toggle(model.display.localized("この候補を保存"), isOn: Binding(get: { candidate.selected },
                             set: { comparison.selectCandidate(candidate.id, selected: $0) }))
                             .disabled(comparison.running || model.isBusy)
-                        Text(model.display.localized("未保存")).font(.caption).foregroundStyle(.secondary)
+                        Text(model.display.localized("未保存")).inkuFont(12).foregroundStyle(.secondary)
                     }
                 }.padding(12).background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
             }

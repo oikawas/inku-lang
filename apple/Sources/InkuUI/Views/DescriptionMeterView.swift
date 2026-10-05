@@ -14,8 +14,8 @@ public struct DescriptionMeterView: View {
         HStack {
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
-                Text(label).font(.caption).foregroundStyle(.secondary)
-                if let error { Text(model.display.localized(error)).font(.caption2).foregroundStyle(.orange) }
+                Text(label).inkuFont(12).foregroundStyle(.secondary)
+                if let error { Text(model.display.localized(error)).inkuFont(11).foregroundStyle(.orange) }
             }
         }
         .task(id: readingKey) { await loadReading() }
@@ -70,10 +70,10 @@ public struct DescriptionMeterSettingsView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Toggle(InkuLocalization.string("日本語の形式を判定する（読み辞書の音数）", locale: locale), isOn: $meter.japaneseEnabled)
-            Text(InkuLocalization.string("Sudachi small 辞書の読みで音数を数えます。切ると文字数だけを表示します。", locale: locale)).font(.caption).foregroundStyle(.secondary)
+            Text(InkuLocalization.string("Sudachi small 辞書の読みで音数を数えます。切ると文字数だけを表示します。", locale: locale)).inkuFont(12).foregroundStyle(.secondary)
             Toggle(InkuLocalization.string("英語の形式を判定する（行数・音節）", locale: locale), isOn: $meter.englishEnabled)
-            Text(InkuLocalization.string("CMUdict の発音と行数で近い形式に名前を付けます。切ると行数だけを表示します。", locale: locale)).font(.caption).foregroundStyle(.secondary)
-            if let error = meter.settingsError { Text(InkuLocalization.message(error, locale: locale)).font(.caption).foregroundStyle(.red) }
+            Text(InkuLocalization.string("CMUdict の発音と行数で近い形式に名前を付けます。切ると行数だけを表示します。", locale: locale)).inkuFont(12).foregroundStyle(.secondary)
+            if let error = meter.settingsError { Text(InkuLocalization.message(error, locale: locale)).inkuFont(12).foregroundStyle(.red) }
         }
     }
 }

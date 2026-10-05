@@ -20,9 +20,9 @@ public struct SaijikiView: View {
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(copy?.text("saijikiTitle") ?? model.display.localized("歳時記"))
-                        .font(.title2.weight(.semibold))
+                        .inkuFont(16, weight: .semibold)
                     if let copy {
-                        Text(copy.text("saijikiHint")).font(.caption).foregroundStyle(.secondary)
+                        Text(copy.text("saijikiHint")).inkuFont(12).foregroundStyle(.secondary)
                     }
                 }
                 TextField(model.display.localized("語を探す"), text: $search)
@@ -60,7 +60,7 @@ public struct SaijikiView: View {
                     if !words.isEmpty {
                         VStack(alignment: .leading, spacing: 7) {
                             Text(uiLanguage == "ja" ? category.name : category.englishName ?? category.name)
-                                .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                                .inkuFont(12, weight: .semibold).foregroundStyle(.secondary)
                             SaijikiFlowLayout {
                                 ForEach(words) { word in
                                     wordChip(name(word), selection: .builtin(word.id))
@@ -75,7 +75,7 @@ public struct SaijikiView: View {
                 if !plugins.isEmpty {
                     VStack(alignment: .leading, spacing: 7) {
                         Text(model.display.localized("プラグインの語"))
-                            .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                            .inkuFont(12, weight: .semibold).foregroundStyle(.secondary)
                         SaijikiFlowLayout {
                             ForEach(plugins) { word in
                                 wordChip(word.displayName(language: offeredLanguage), selection: .plugin(word.id))
@@ -92,7 +92,7 @@ public struct SaijikiView: View {
             selection = value
             if let onInsertWord, let preview = selectedPreview, preview.insertable, !model.isBusy { onInsertWord(preview.title) }
         } label: {
-            Text(title).font(.callout).multilineTextAlignment(.leading)
+            Text(title).inkuFont(13).multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 8).padding(.vertical, 5)
                 .background(.quaternary.opacity(selection == value ? 0.5 : 0.2), in: RoundedRectangle(cornerRadius: 5))
@@ -113,23 +113,23 @@ public struct SaijikiView: View {
                     if let preview = selectedPreview {
                         SaijikiPreviewView(svg: preview.svg, imageURL: preview.imageURL, renderer: model.renderer)
                             .frame(maxWidth: .infinity).frame(height: 92).id(preview.id)
-                        Text(preview.title).font(.headline)
+                        Text(preview.title).inkuFont(14, weight: .semibold)
                             .fixedSize(horizontal: false, vertical: true)
                         if !preview.effect.isEmpty {
-                            Text(preview.effect).font(.callout).foregroundStyle(.secondary)
+                            Text(preview.effect).inkuFont(13).foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         if !preview.example.isEmpty {
-                            Text(preview.example).font(.caption.monospaced()).foregroundStyle(.secondary)
+                            Text(preview.example).inkuFont(12, design: .monospaced).foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         if !preview.insertable {
                             Text(model.display.localized("この語は参照のみです。DDLに挿入する定義が同梱されていません。"))
-                                .font(.caption).foregroundStyle(.secondary)
+                                .inkuFont(12).foregroundStyle(.secondary)
                         }
                     } else if let copy {
                         Text(copy.text("saijikiPreviewPlaceholder"))
-                            .font(.callout).foregroundStyle(.secondary)
+                            .inkuFont(13).foregroundStyle(.secondary)
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
             }

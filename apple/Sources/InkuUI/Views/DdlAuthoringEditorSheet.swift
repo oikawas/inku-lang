@@ -17,9 +17,9 @@ struct DdlAuthoringEditorSheet: View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(model.display.localized("DDLを編集")).font(.title2)
+                    Text(model.display.localized("DDLを編集")).inkuFont(16, weight: .semibold)
                     Text(model.display.localized("取消すると、表示中の作品と指示書は変わりません。"))
-                        .font(.caption).foregroundStyle(.secondary)
+                        .inkuFont(12).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button { session.cancel(); dismiss() } label: { Image(systemName: "xmark") }
@@ -38,17 +38,17 @@ struct DdlAuthoringEditorSheet: View {
                 } label: {
                     Text(model.display.localized("暴れる") + " " + model.display.localized((wildOverride ?? inheritedWild) ? "入" : "切"))
                 }.buttonStyle(.bordered).tint((wildOverride ?? inheritedWild) ? .accentColor : .secondary)
-                if wildOverride == nil { Text(model.display.localized("元の作品から継承")).font(.caption).foregroundStyle(.secondary) }
+                if wildOverride == nil { Text(model.display.localized("元の作品から継承")).inkuFont(12).foregroundStyle(.secondary) }
             }.padding(.horizontal, 16).padding(.vertical, 10).disabled(model.isBusy)
             TextEditor(text: $session.draft)
-                .font(.system(.body, design: .monospaced))
+                .inkuFont(13, design: .monospaced)
                 .scrollContentBackground(.hidden).padding(12)
                 .disabled(model.isBusy)
                 .accessibilityLabel(model.display.localized("DDL編集"))
             Divider()
             HStack {
                 if let error = model.errorText {
-                    Text(model.display.message(error)).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+                    Text(model.display.message(error)).inkuFont(12).foregroundStyle(.red).textSelection(.enabled)
                 }
                 Spacer()
                 if model.isBusy {
@@ -119,7 +119,7 @@ struct NewDdlAuthoringSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(model.display.localized("指示書の新規作成")).font(.title2)
+                Text(model.display.localized("指示書の新規作成")).inkuFont(16, weight: .semibold)
                 Spacer()
                 Button { dismiss() } label: { Image(systemName: "xmark") }
                     .accessibilityLabel(model.display.localized("閉じる")).disabled(model.isBusy || importing)
@@ -132,12 +132,12 @@ struct NewDdlAuthoringSheet: View {
                 Spacer()
                 Button(model.display.localized("DDLファイルを読み込む…"), systemImage: "doc.badge.arrow.up") { showImport = true }
             }.padding(16).disabled(model.isBusy || importing)
-            TextEditor(text: $draft).font(.system(.body, design: .monospaced))
+            TextEditor(text: $draft).inkuFont(13, design: .monospaced)
                 .padding(12).disabled(model.isBusy || importing)
                 .accessibilityLabel(model.display.localized("指示書"))
             if let importedDocument, !importedDocument.names.isEmpty {
                 Text(model.display.localized("この新しい作品に定義を持ち込みます: ") + importedDocument.names.joined(separator: ", "))
-                    .font(.caption).textSelection(.enabled).padding(.horizontal, 16)
+                    .inkuFont(12).textSelection(.enabled).padding(.horizontal, 16)
             }
             if let error = importError ?? model.errorText {
                 Text(model.display.message(error)).foregroundStyle(.red).textSelection(.enabled).padding(.horizontal, 16)

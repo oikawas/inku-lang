@@ -15,7 +15,7 @@ struct BatchConditionsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(model.display.localized("次のバッチの描画条件"))
-                .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                .inkuFont(12, weight: .semibold).foregroundStyle(.secondary)
             conditionRow("モデル", value: modelSummary) { showModelPicker = true }
             .help(tip("次のバッチで使う描画モデルを選びます。"))
             Divider()
@@ -30,13 +30,13 @@ struct BatchConditionsView: View {
                     paperControl
                 }
             }
-            .controlSize(.small)
+            .buttonStyle(InkuGhostButtonStyle())
             HStack(alignment: .top, spacing: 8) {
                 Text(model.display.localized("描画条件はバッチ開始時に固定します。再開には前回の条件を使います。"))
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    .inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
                 Button(model.display.localized("詳細"), systemImage: "ellipsis") { showDetails = true }
-                    .controlSize(.small)
+                    .buttonStyle(InkuGhostButtonStyle())
                     .help(tip("言語とシードを確認して変更します。"))
                     .popover(isPresented: $showDetails) { details }
             }
@@ -74,14 +74,14 @@ struct BatchConditionsView: View {
     private func conditionRow(_ key: String, value: String, action: @escaping () -> Void) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .center, spacing: 12) {
-                Text(model.display.localized(key)).font(.caption).foregroundStyle(.secondary)
+                Text(model.display.localized(key)).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
                 Spacer(minLength: 0)
                 Button(model.display.localized("変更"), action: action)
-                    .controlSize(.small)
+                    .buttonStyle(InkuGhostButtonStyle())
                     .accessibilityLabel(model.display.localizedFormat("%@を変更", model.display.localized(key)))
                     .accessibilityValue(value)
             }
-            Text(value).font(.callout).lineLimit(2).truncationMode(.middle).textSelection(.enabled)
+            Text(value).inkuFont(14).lineLimit(2).truncationMode(.middle).textSelection(.enabled)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -104,7 +104,7 @@ struct BatchConditionsView: View {
 
     private var sketchPicker: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(model.display.localized("写生")).font(.caption).foregroundStyle(.secondary)
+            Text(model.display.localized("写生")).inkuFont(12).foregroundStyle(.secondary)
             ForEach(["off", "on"], id: \.self) { mode in
                 Button {
                     guard !disabled else { return }
@@ -113,11 +113,11 @@ struct BatchConditionsView: View {
                 } label: {
                     HStack(alignment: .top, spacing: 10) {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(model.display.localized(mode == "on" ? "あり" : "なし")).font(.callout.weight(.medium))
+                            Text(model.display.localized(mode == "on" ? "あり" : "なし")).inkuFont(13, weight: .medium)
                             Text(model.display.localized(mode == "on"
                                 ? "記述の横に、場所の広がりや季節・時刻の光を補って描く"
                                 : "写生を通さず、記述だけで描く"))
-                                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                                .inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer(minLength: 0)
                         if automation.batchSketchMode == mode {
@@ -141,11 +141,8 @@ struct BatchConditionsView: View {
             model.wild.toggle()
         } label: {
             Text(model.display.localized("暴れる") + " " + model.display.localized(model.wild ? "入" : "切"))
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(model.wild ? Color.accentColor.opacity(0.20) : Color.secondary.opacity(0.06),
-                            in: RoundedRectangle(cornerRadius: 4))
-                .overlay(RoundedRectangle(cornerRadius: 4).stroke(model.wild ? Color.accentColor : Color.secondary.opacity(0.25)))
         }
+        .buttonStyle(InkuGhostButtonStyle(active: model.wild))
         .buttonStyle(.plain)
         .help(tip("次の作品の筆致を規則から外します。"))
         .accessibilityLabel(model.display.localized("暴れる"))
@@ -174,7 +171,7 @@ struct BatchConditionsView: View {
 
     private var details: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(model.display.localized("生成条件の詳細")).font(.headline)
+            Text(model.display.localized("生成条件の詳細")).inkuFont(14, weight: .semibold)
             TextField(model.display.localized("シード（空欄で新規）"), text: $model.seedText).textFieldStyle(.roundedBorder)
                 .help(tip("空欄なら次の描画で新しいシードを使います。"))
         }

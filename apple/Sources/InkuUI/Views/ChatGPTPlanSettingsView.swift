@@ -16,7 +16,7 @@ public struct ChatGPTPlanSettingsView: View {
                     set: { value in Task { await controller.setEnabled(value, app: app) } }))
                     .disabled(controller.busy)
                 Text(app.display.localized("記述の解釈・写生・自動配色選択・指示書の補完で利用できます。Vision推敲、奥書、デモ記述生成、モデル調査には対応していません。"))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .inkuFont(12).foregroundStyle(.secondary)
                 if controller.state?.enabled == true {
                     Button(app.display.localized("新しい個人プロファイルを接続")) {
                         Task { await controller.authorize(app: app) { openURL($0) } }
@@ -31,10 +31,10 @@ public struct ChatGPTPlanSettingsView: View {
                     ForEach(state.profiles) { profile in
                         VStack(alignment: .leading, spacing: 5) {
                             HStack {
-                                Text(profile.label).font(.headline)
-                                if state.activeProfileID == profile.id { Text(app.display.localized("次の描画で使用")).font(.caption).foregroundStyle(.secondary) }
+                                Text(profile.label).inkuFont(14, weight: .semibold)
+                                if state.activeProfileID == profile.id { Text(app.display.localized("次の描画で使用")).inkuFont(12).foregroundStyle(.secondary) }
                             }
-                            Text(app.display.localizedFormat("%@ · 接続世代 %ld", profile.state, profile.generation)).font(.caption).textSelection(.enabled)
+                            Text(app.display.localizedFormat("%@ · 接続世代 %ld", profile.state, profile.generation)).inkuFont(12).textSelection(.enabled)
                             HStack {
                                 Button(app.display.localized("選択")) { Task { await controller.selectProfile(profile.id, app: app) } }
                                 Button(app.display.localized("再認証")) { Task { await controller.authorize(profileID: profile.id, app: app) { openURL($0) } } }
@@ -58,7 +58,7 @@ public struct ChatGPTPlanSettingsView: View {
                     Button(app.display.localized("モデル一覧を更新")) { Task { await controller.refreshModels(app: app) } }.disabled(controller.busy)
                     ForEach(controller.models) { model in
                         HStack {
-                            VStack(alignment: .leading) { Text(model.label); Text(model.id).font(.caption).foregroundStyle(.secondary) }
+                            VStack(alignment: .leading) { Text(model.label); Text(model.id).inkuFont(12).foregroundStyle(.secondary) }
                             Spacer()
                             Button(app.display.localized("描画に使用")) { Task { await controller.selectModel(model.id, app: app) } }
                         }.disabled(controller.busy)

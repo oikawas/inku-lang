@@ -39,6 +39,9 @@ struct AppCheck {
         if CommandLine.arguments.contains("--server-host-parity-only") {
             try await runServerHostParityChecks(); return
         }
+        if CommandLine.arguments.contains("--json-highlight-only") {
+            try runJSONHighlightChecks(); return
+        }
         if CommandLine.arguments.contains("--release-parity-only") {
             try await runReleaseParityChecks(); return
         }

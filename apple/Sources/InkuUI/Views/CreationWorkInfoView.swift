@@ -9,6 +9,7 @@ import AppKit
 struct CreationWorkInfoView: View {
     @Bindable var model: AppModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     private let work: SavedWork?
     @State private var information: SavedGenerationInformation?
     @State private var loading = true
@@ -167,18 +168,29 @@ struct CreationWorkInfoView: View {
         }
     }
 
+    /// OutputTabsContent.svelte `.score-*`: a toolbar on bg2, a line-number gutter on bg2, and Web JSON colors.
     private func score(_ work: SavedWork) -> some View {
-        VStack(spacing: 0) {
-            HStack { Spacer(); copyButton(prettyScore(work.score), id: "score") }.padding(8)
-            Divider()
+        let text = prettyScore(work.score)
+        let count = text.components(separatedBy: "\n").count
+        return VStack(spacing: 0) {
+            HStack { Spacer(); copyButton(text, id: "score") }.padding(.vertical, 6).padding(.horizontal, 8).background(InkuColor.bg2)
+            Rectangle().fill(InkuColor.border).frame(height: 1)
             ScrollView([.horizontal, .vertical]) {
-                let lines = prettyScore(work.score).components(separatedBy: "\n")
-                HStack(alignment: .top, spacing: 12) {
-                    Text((1...max(1, lines.count)).map(String.init).joined(separator: "\n")).foregroundStyle(.secondary)
-                    Text(lines.joined(separator: "\n")).textSelection(.enabled)
-                }.inkuFont(12, design: .monospaced).padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                HStack(alignment: .top, spacing: 0) {
+                    Text((1...max(1, count)).map(String.init).joined(separator: "\n"))
+                        .monospacedDigit().multilineTextAlignment(.trailing).foregroundStyle(.tertiary)
+                        .padding(.vertical, 12).padding(.horizontal, 8).frame(minWidth: 42, alignment: .trailing)
+                        .background(InkuColor.bg2)
+                        .overlay(alignment: .trailing) { Rectangle().fill(InkuColor.border).frame(width: 1) }
+                    Text(JSONHighlight.attributed(text, dark: colorScheme == .dark)).textSelection(.enabled)
+                        .fixedSize().padding(12)
+                }
+                .inkuFont(12, design: .monospaced).lineSpacing(4)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-        }.background(.background)
+        }
+        .background(InkuColor.panel)
+        .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border))
     }
 
     private func group<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {

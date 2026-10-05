@@ -14,13 +14,17 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-05 Route to About inku and JSON in generation information
+
+The macOS left rail no longer shows the inku logo; About inku opens only from the app menu in the menu bar. iOS keeps its Settings entry. The Score (JSON) tab of generation information colors keys, strings, numbers, booleans, and null with the same rule as the Web `highlightJsonLine`, using the Web colors for light and dark, bold and italic, and the line-number gutter and background. The tab still shows the saved Score; the run record that the Web shows with it is not included.
+
 ## 2026-10-05 Web alignment and Server host comparison for the first release
 
 For the first macOS distribution, screens, controls, and remembered choices follow the Web (Build 1162), and host processing outside the shared Rust core was compared with the Server (Build 1162). Elements that are more detailed than the Web and useful (measured model records, per-stage time and usage, the drawing log, and the character count of a refinement direction) remain.
 
 ### Layout and density
 
-- The 190 pt section list is replaced by an icon rail of 44 pt (164 pt expanded), as in the Web AppRail: expand, logo (About inku), UI mode, tooltips, settings, theme, and language. The library opens as an overlay over the whole window, and lineage is the Work / Lineage tab of the canvas area. Settings and the demo sit in a settings modal sized as on the Web. The menu bar navigation (⌘1–⌘4) and the drawing log (⇧⌘L) remain.
+- The 190 pt section list is replaced by an icon rail of 44 pt (164 pt expanded), as in the Web AppRail: expand, UI mode, tooltips, settings, theme, and language. The library opens as an overlay over the whole window, and lineage is the Work / Lineage tab of the canvas area. Settings and the demo sit in a settings modal sized as on the Web. The menu bar navigation (⌘1–⌘4) and the drawing log (⇧⌘L) remain.
 - The window toolbar, the top description/batch band, and the bottom status bar are removed. Run status and status text sit in the left panel. Description and batch are underlined tabs inside the input panel, with a dot and progress while running. The input panel is 440 wide (min(400, 42%) at window widths of 1180 or less) and can be collapsed.
 - Controls around the work (zoom, caption, marks, export, previous/next) float over the work. The canvas area has no outer padding or frame and fits with the Web formula (base 400, scale min((width − 120)/base width, (height − 96)/base height), 0.25–10).
 - Text uses the Web `--ui-font-size-N` values multiplied by the text-size setting, so the setting reaches every label. Screens have no large page headings.

@@ -852,12 +852,6 @@ class InkuRepository(
             ?: inkuError { it.demoPromptGenerationEmpty }
     }
 
-    suspend fun selectCatalogId(
-        selectedCatalogId: String,
-        sourceText: String,
-        stage1ModelId: String,
-    ): String = selectedCatalogId
-
     suspend fun renderFromScore(description: String, scoreJson: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), sourceText: String? = null, parentHistoryId: String? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val result = pipeline.renderFromScore(

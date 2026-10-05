@@ -2737,13 +2737,9 @@ class InkuViewModel @JvmOverloads constructor(
                     message = strings().batchRunning(index + 1, lines.size),
                 )
                 runCatching {
-                    val catalogId = withContext(Dispatchers.IO) {
-                        repository.selectCatalogId(
-                            current.selectedCatalogId,
-                            prompt,
-                            current.selectedModelId,
-                        )
-                    }
+                    // The setting as it is: `auto` goes to the shared pipeline,
+                    // which chooses the catalogue there.
+                    val catalogId = current.selectedCatalogId
                     withContext(Dispatchers.IO) {
                         repository.paint(
                             description = prompt,
@@ -2863,13 +2859,7 @@ class InkuViewModel @JvmOverloads constructor(
                         repository.generateDemoPrompt(cycle.demoSeed, cycle.selectedModelId)
                     }
                     if (!isCurrentDrawingRun(runId)) return@launch
-                    val catalogId = withContext(Dispatchers.IO) {
-                        repository.selectCatalogId(
-                            cycle.selectedCatalogId,
-                            prompt,
-                            cycle.selectedModelId,
-                        )
-                    }
+                    val catalogId = cycle.selectedCatalogId
                     localState.value = localState.value.copy(
                         demoGeneratedPrompt = prompt,
                         demoGeneratedDdl = null,

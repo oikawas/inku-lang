@@ -28,7 +28,6 @@ private class CapturingRasterBridge : RenderBridge {
     override fun rasterApiVersion(): String = EXPECTED_RASTER_API_VERSION
     override fun renderEngineId(): String = "default"
     override fun renderEngineVersion(): String = "41"
-    override fun defaultColorMapJson(): String = "{}"
     override fun rendererReferenceJson(): String = "{}"
     override fun render(requestJson: String): NativeRenderOutput = error("not used")
 

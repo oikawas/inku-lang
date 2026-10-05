@@ -216,6 +216,8 @@ interface InkuStrings {
     val mascotIncu: String
     val localModelNote: String
     val exportPngTooLarge: String
+    /** A PNG height outside the range the export draws, with the range. */
+    val exportPngHeightOutOfRange: (Int, Int) -> String
     val pngAlphaWhite: String
     val stagesShared: String
     val uiModeSubtitle: String

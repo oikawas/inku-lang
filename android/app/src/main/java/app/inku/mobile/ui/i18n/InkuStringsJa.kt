@@ -302,6 +302,7 @@ object InkuStringsJa : InkuStrings {
     override val mascotIncu = "Incu (立方体)"
     override val localModelNote = "LiteRT-LM でローカル実行する Gemma モデルです。"
     override val exportPngTooLarge = "PNG出力サイズが大きすぎます。キャンバス比率または出力サイズを下げてください。"
+    override val exportPngHeightOutOfRange: (Int, Int) -> String = { min, max -> "PNGの高さは${min}〜${max}pxにしてください。テンプレートの高さを直してください。" }
     // Web's wording (`settingsPngAlpha`); the earlier label read the opposite way.
     override val pngAlphaWhite = "白背景時アルファチャンネルを有効にする"
     override val stagesShared = "Stage 1 / Stage 2 共通"

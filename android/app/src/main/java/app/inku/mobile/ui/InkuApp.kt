@@ -230,9 +230,10 @@ import app.inku.mobile.pipeline.SaijikiGenerated
 import app.inku.mobile.pipeline.Sketches
 import app.inku.mobile.pipeline.SketchMode
 import app.inku.mobile.pipeline.ProviderAttempt
+import app.inku.mobile.ui.export.PngCaptureDate
+import app.inku.mobile.ui.export.PngExportSize
 import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.i18n.LocalStrings
-import app.inku.mobile.ui.i18n.inkuError
 import app.inku.mobile.ui.i18n.messageFor
 import app.inku.mobile.ui.i18n.LocalUiLanguage
 import app.inku.mobile.ui.i18n.stringsFor
@@ -247,9 +248,10 @@ import app.inku.mobile.ui.camera.cameraDevelopmentPresentation
 import app.inku.mobile.ui.camera.locksCameraInteraction
 import app.inku.mobile.render.NativeRenderBridge
 import app.inku.mobile.render.RustArtworkRasterizer
+import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.FileOutputStream
 import java.security.MessageDigest
+import java.time.ZoneId
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
@@ -4439,7 +4441,7 @@ private fun SettingsHomePanel(state: InkuUiState, viewModel: InkuViewModel, modi
         SettingsListItem(mark = "◇", title = S.modelSettings, sub = "OpenAI / Claude / Gemini / NVIDIA", onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
         SettingsListItem(mark = "◎", title = S.chatGptPlan, sub = S.chatGptConnectionSubtitle, onClick = { viewModel.setSettingsPane(SettingsPane.ChatGpt) })
         SettingsListItem(mark = "◉", title = S.demo, sub = S.demoRunAndSeed, onClick = { viewModel.setSettingsPane(SettingsPane.Demo) })
-        SettingsListItem(mark = "⬚", title = S.export, sub = "PNG 1080 / 2160 / 4320", onClick = { viewModel.setSettingsPane(SettingsPane.Export) })
+        SettingsListItem(mark = "⬚", title = S.export, sub = "PNG 1080 / 2160", onClick = { viewModel.setSettingsPane(SettingsPane.Export) })
         SettingsListItem(mark = "◐", title = S.settingsMisc, sub = S.miscSubtitle, onClick = { viewModel.setSettingsPane(SettingsPane.Misc) })
         SettingsListItem(
             mark = "#",
@@ -6560,40 +6562,40 @@ private fun buildHistorySvgPayload(context: Context, item: HistoryItemEntity, pr
 }
 
 private fun buildHistoryPngPayload(context: Context, item: HistoryItemEntity, targetHeight: Int): SharePayload {
-    val height = targetHeight.coerceIn(64, MaxPngExportHeightPx)
-    val bitmap = RustArtworkRasterizer().rasterize(item.displaySvg, targetHeight = height)
-    try {
-        val estimatedBytes = bitmap.width.toLong() * bitmap.height.toLong() * 4L
-        // Not `require`: this sentence reaches the reader, so the language is
-        // chosen where it is shown rather than here (see InkuFailure).
-        if (estimatedBytes > MaxPngExportBitmapBytes) inkuError { it.exportPngTooLarge }
-        val exportDir = exportCacheDir(context)
-        val file = File(exportDir, "inku-${item.renderHashShort}-${height}.png")
-        try {
-            FileOutputStream(file).use { out ->
-                if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) {
-                    throw IllegalStateException()
-                }
+    // Refused before drawing: a height out of range, or a paper too wide for
+    // the raster crate, says so instead of coming out at another size.
+    val size = PngExportSize.of(targetHeight, CanvasAspects.ratioFor(item.canvasAspect))
+    val bitmap = RustArtworkRasterizer().rasterize(item.displaySvg, targetHeight = size.height)
+    val png = try {
+        ByteArrayOutputStream().use { out ->
+            if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) {
+                throw IllegalStateException()
             }
-            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-            return SharePayload(uri, "image/png", "inku ${item.renderHashShort}", file.name, "Export inku PNG")
-        } catch (error: Throwable) {
-            file.delete()
-            throw error
+            out.toByteArray()
         }
     } finally {
         bitmap.recycle()
     }
+    // The work's own creation time in the device's zone, as web stamps its
+    // generation time (`download.ts`), not the time it was shared.
+    val stamped = PngCaptureDate.stamp(png, item.createdAt, ZoneId.systemDefault())
+    val exportDir = exportCacheDir(context)
+    val file = File(exportDir, "inku-${item.renderHashShort}-${size.height}.png")
+    try {
+        file.writeBytes(stamped)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        return SharePayload(uri, "image/png", "inku ${item.renderHashShort}", file.name, "Export inku PNG")
+    } catch (error: Throwable) {
+        file.delete()
+        throw error
+    }
 }
-
-private const val MaxPngExportHeightPx = 4320
-private const val MaxPngExportBitmapBytes = 128L * 1024L * 1024L
 
 /**
  * The shared export folder, with yesterday's files cleared out.
  *
- * Every export lands here for the share sheet and nothing removed it: a 4320px
- * PNG is tens of megabytes, and each work and height kept its own file. A
+ * Every export lands here for the share sheet and nothing removed it: a 2160px
+ * PNG can be megabytes, and each work and height kept its own file. A
  * file older than a day has long been read by whatever it was shared to.
  */
 private fun exportCacheDir(context: Context): File {

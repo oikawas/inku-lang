@@ -328,6 +328,7 @@ object InkuStringsEn : InkuStrings {
     override val mascotIncu = "Incu (cube)"
     override val localModelNote = "Gemma models that run on the device through LiteRT-LM."
     override val exportPngTooLarge = "The PNG is too large to write. Lower the canvas ratio or the output size."
+    override val exportPngHeightOutOfRange: (Int, Int) -> String = { min, max -> "A PNG height must be ${min} to ${max}px. Change the template's height." }
     // Web's wording (`settingsPngAlpha`); the earlier label read the opposite way.
     override val pngAlphaWhite = "Enable alpha channel on white background"
     override val stagesShared = "Stage 1 / Stage 2 shared"

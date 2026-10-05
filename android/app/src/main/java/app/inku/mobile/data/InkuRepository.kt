@@ -1,5 +1,6 @@
 package app.inku.mobile.data
 
+import app.inku.mobile.ui.export.PngExportSize
 import app.inku.mobile.ui.i18n.inkuError
 import android.content.Context
 import android.graphics.Bitmap
@@ -498,6 +499,10 @@ class InkuRepository(
     }
 
     suspend fun ensureDefaultExportTemplates() {
+        // The built-in 4320px row is retired with the 2160px ceiling (the
+        // author, 2026-10-06). Only the built-in row goes: a template the
+        // author made has its own id and is left as it is.
+        database.exportTemplateDao().deleteBuiltin("png-4320")
         defaultExportTemplates().forEach { template ->
             database.exportTemplateDao().upsert(template)
         }
@@ -538,7 +543,7 @@ class InkuRepository(
                 id = id.take(80),
                 name = name.trim().ifBlank { "PNG" }.take(80),
                 description = description.trim().take(240),
-                heightPx = heightPx.coerceIn(64, 12000),
+                heightPx = heightPx.coerceIn(PngExportSize.MIN_HEIGHT_PX, PngExportSize.MAX_HEIGHT_PX),
                 sortOrder = sortOrder,
                 isBuiltin = isBuiltin,
                 updatedAt = System.currentTimeMillis(),
@@ -1357,7 +1362,6 @@ class InkuRepository(
             // first launch would keep that language for good.
             ExportTemplateEntity("png-1080", "PNG 1080px", "", 1080, 0, true, now),
             ExportTemplateEntity("png-2160", "PNG 2160px", "", 2160, 1, true, now),
-            ExportTemplateEntity("png-4320", "PNG 4320px", "", 4320, 2, true, now),
         )
     }
 }

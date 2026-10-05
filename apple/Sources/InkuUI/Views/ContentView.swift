@@ -227,18 +227,10 @@ public struct ContentView: View {
     private var libraryOverlay: some View {
         LibraryView(model: model, preview: libraryPreview, onEditWork: openWorkEdit, onAdjustWork: openRefinement,
                     onReplayWork: openReplay, onWorkAction: openWorkAction,
-                    writingLocked: model.isBusy || automation.isOccupied)
+                    writingLocked: model.isBusy || automation.isOccupied, onClose: closeLibrary)
             .disabled(importing)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(InkuColor.bg)
-            // Placeholder close until LibraryView takes its own close action.
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button(model.display.localized("閉じる"), systemImage: "xmark") { closeLibrary() }
-                        .keyboardShortcut(.cancelAction)
-                        .help(model.display.tooltip("閉じる"))
-                }
-            }
             .transition(.opacity)
     }
 

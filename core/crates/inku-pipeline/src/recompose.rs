@@ -154,7 +154,6 @@ fn shown(text: &str, language: ResolvedInstructionLanguage) -> String {
 /// Read every sentence back as a layer, or say why the work cannot be recomposed.
 fn read_layers(
     source: &str,
-    language: ResolvedInstructionLanguage,
     ast: &inku_ddl::SemanticDocumentAst,
 ) -> Result<Vec<ReadLayer>, &'static str> {
     if !ast.coordinated_head_groups.is_empty()
@@ -229,7 +228,7 @@ pub fn composition_layers(
         .semantic_document
         .as_ref()
         .ok_or("not_canonical")?;
-    let read = read_layers(source, language, &semantic.ast)?;
+    let read = read_layers(source, &semantic.ast)?;
     let background = semantic
         .ast
         .background
@@ -260,7 +259,7 @@ pub fn recompose(
     let Some(semantic) = compilation.semantic_document.as_ref() else {
         return unchanged("not_canonical");
     };
-    let read = match read_layers(source, language, &semantic.ast) {
+    let read = match read_layers(source, &semantic.ast) {
         Ok(read) => read,
         Err(reason) => return unchanged(reason),
     };

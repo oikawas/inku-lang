@@ -103,7 +103,9 @@ printf 'Signed %d nested code item(s) and the application.\n' "${#NESTED[@]}"
 
 codesign --verify --deep --strict --verbose=2 "$APP"
 DETAILS="$(codesign -d --verbose=4 "$APP" 2>&1)"
-for expected in "Identifier=$BUNDLE_ID" 'flags=0x10000(runtime)' 'Authority=Developer ID Application: ' 'Timestamp='; do
+printf '%s\n' "$DETAILS" | /usr/bin/grep -qE '^CodeDirectory .* flags=0x[0-9a-f]+\(([a-z-]+,)*runtime[,)]' \
+    || fail 'Signed app lacks the Hardened Runtime flag.'
+for expected in "Identifier=$BUNDLE_ID" 'Authority=Developer ID Application: ' 'Timestamp='; do
     printf '%s\n' "$DETAILS" | /usr/bin/grep -qF "$expected" || fail "Signed app lacks $expected"
 done
 TEAM_ID="$(printf '%s\n' "$DETAILS" | sed -n 's/^TeamIdentifier=//p')"

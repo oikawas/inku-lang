@@ -40,6 +40,10 @@ class ModelProviderHttpException(
     message: String,
     /** What the provider said, from [providerRefusal]; empty when it said nothing readable. */
     val refusal: JSONObject = JSONObject(),
+    /** The answer's `Retry-After` header, as sent: seconds or an HTTP date. */
+    val retryAfter: String? = null,
+    /** Gemini's `google.rpc.RetryInfo.retryDelay` in the refusal body, in seconds. */
+    val retryDelaySeconds: Double? = null,
 ) : IllegalStateException(message)
 
 /**
@@ -91,6 +95,8 @@ internal fun readProviderBody(connection: HttpURLConnection): String {
             status,
             "HTTP $status from ${connection.url.host.orEmpty()}: ${DisplaySanitizer.redact(body).take(180)}$suffix",
             providerRefusal(body),
+            retryAfter = connection.getHeaderField("Retry-After"),
+            retryDelaySeconds = retryInfoDelaySeconds(body),
         )
     }
     require(!over) { "Remote response was too large." }

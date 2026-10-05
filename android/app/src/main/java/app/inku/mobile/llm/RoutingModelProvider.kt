@@ -11,6 +11,7 @@ class RoutingModelProvider(
     private val database: InkuDatabase,
     private val localProvider: LocalLiteRtLmProvider,
     private val chatGptPlan: (() -> ChatGptPlanManager)? = null,
+    private val admission: ProviderAdmission = ProviderAdmission.shared,
 ) : ModelProvider {
     override val providerId: String = "routing"
 
@@ -26,7 +27,10 @@ class RoutingModelProvider(
             return localProvider.generate(request)
         }
         val remote = remoteProvider(provider)
-        return remote.generate(request)
+        if (request.pipelineAction == null) return remote.generate(request)
+        // Only shared-pipeline requests are paced, as only they pass the
+        // server's provider slot and rate budget.
+        return admission.admit(provider.providerId, request.timeoutMs) { remote.generate(request) }
     }
 
     suspend fun fetchModels(providerId: String): List<String> {

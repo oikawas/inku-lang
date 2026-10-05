@@ -106,6 +106,31 @@ object InkuStringsEn : InkuStrings {
     override val pipelineNewDescription = "Create a new work from the description"
     override val pipelineNewDescriptionNotice = "The next drawing will be saved as a new work."
     override val pipelineCheckDdl = "Check the DDL and drawing diagnostics."
+    override val pipelineNeedsAttention = "Review the result of this operation."
+    override fun pipelineAttentionReason(reason: String) = "Reason: " + when (reason) {
+        "stage1_failed" -> "the description could not be interpreted"
+        "hole_completion_failed" -> "a DDL completion proposal could not be prepared"
+        "patch_declined" -> "the completion proposal was declined"
+        "hole_request_unavailable" -> "the parts requiring completion could not be prepared"
+        "compiler_diagnostics" -> "some parts need review or editing"
+        "host_commit_failed" -> "the work could not be saved"
+        "compiler_boundary_failed" -> "the DDL could not be converted into a score"
+        else -> reason
+    }
+    override fun pipelineFailureCause(failure: String, attempts: Int, detail: String?): String {
+        val cause = when (failure) {
+            "transport_timeout" -> "the model did not answer within the time limit"
+            "transport_unavailable" -> "the model could not be reached"
+            "rate_limited" -> "the model provider rate-limited the request"
+            "provider_rejected" -> if (detail == "credentials_unavailable") "the model has no API key" else "the model provider refused the request"
+            "malformed_payload" -> "the model's answer could not be read"
+            "schema_violation" -> "the model's answer was not in the expected form"
+            "semantic_violation" -> "the model's answer could not be used for the drawing"
+            else -> return ""
+        }
+        return " ($cause${if (attempts > 1) "; tried $attempts times" else ""})"
+    }
+    override val pipelineAnswerProposalFirst = "Answer the completion proposal before editing the DDL."
     override val pipelineDiagnostics = "Drawing diagnostics"
     override fun pipelinePluginDiagnostic(reason: String, name: String, suggestion: String?) = when (reason) {
         "plugin_disabled" -> "The plugin $name is disabled, so this sentence was not drawn. Enable it to draw it."

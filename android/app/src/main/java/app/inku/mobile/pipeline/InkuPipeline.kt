@@ -77,6 +77,8 @@ data class PaintRequest(
     val inputProvenance: app.inku.mobile.data.model.CameraInputProvenance? = null,
     /** Definitions read from an `inku.ddl-export.v1` file; used by a new work only. */
     val importedPlugins: List<ImportedPluginDefinition> = emptyList(),
+    /** False for a refinement candidate: no drawing of the run is saved until the author keeps it. */
+    val saveHistory: Boolean = true,
 ) {
     /**
      * The one model that draws both stages (2026-09-30, the author): the Stage 1

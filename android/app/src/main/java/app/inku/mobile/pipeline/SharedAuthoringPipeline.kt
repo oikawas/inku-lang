@@ -17,6 +17,8 @@ data class SharedPipelineRunRequest(
     val uiLang: String? = null,
     /** `settings` for a new work, `work` for one drawn under its parent's saved configuration. */
     val renderLimitsSource: String = "settings",
+    /** The server's `save_history`: false keeps a candidate's drawings out of the gallery. */
+    val saveHistory: Boolean = true,
     val sketch: PipelineSketchRequest = PipelineSketchRequest.Off,
     val parentHistoryId: String? = null,
     val inputProvenanceJson: String? = null,
@@ -194,6 +196,7 @@ class SharedAuthoringPipeline(
                     .put("instruction_lang_resolved", request.instructionLangResolved)
                     .put("ui_lang", request.uiLang)
                     .put("render_limits_source", request.renderLimitsSource)
+                    .put("save_history", request.saveHistory)
                     .put("parent_history_id", request.parentHistoryId)
                     .put("input_provenance", request.inputProvenanceJson?.let { org.json.JSONObject(it) }),
             )

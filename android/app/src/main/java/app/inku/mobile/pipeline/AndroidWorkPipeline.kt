@@ -38,6 +38,12 @@ class AndroidWorkPipeline(
     /** Told which model call a run waits on (see [SharedPipelineHost]). */
     onProviderAttempt: (executionId: String, attempt: ProviderAttempt?) -> Unit = { _, _ -> },
     private val pinModelSession: (PipelineModelSelection) -> PipelineModelSelection = { it },
+    /**
+     * Saves a drawing made before a run's holes are completed, or one a run
+     * stopped with (the server's safe performance). The work it saves is the
+     * one [PaintResult.pipelineView] names; saving it again finds that work.
+     */
+    private val saveSafePerformance: suspend (PaintResult) -> Unit = {},
 ) {
     private val configBuilder = SharedPipelineConfigBuilder(binding)
     private val host = SharedPipelineHost(
@@ -47,6 +53,26 @@ class AndroidWorkPipeline(
         executionStore = executionStore,
         maxEffectSteps = configBuilder.policy.maximumEffectSteps,
         onProviderAttempt = onProviderAttempt,
+        safePerformance = object : SafePerformancePort {
+            override fun renderCommand(view: PipelineView): PipelineCommand.Render? {
+                val context = JSONObject(view.hostContextJson)
+                val hostOptions = context.optJSONObject("host_options") ?: return null
+                val colors = context.optJSONObject("color_maps")?.stringMaps() ?: return null
+                return configBuilder.renderCommand(
+                    colors,
+                    view,
+                    hostOptions.optionalUnsignedLong("render_seed"),
+                    hostOptions.optBoolean("wild", false),
+                )
+            }
+
+            override suspend fun save(view: PipelineView) {
+                val resultOptions = JSONObject(view.hostContextJson).optJSONObject("result_options")
+                // A refinement candidate is not a work until the author keeps it.
+                if (resultOptions?.optBoolean("save_history", true) == false) return
+                saveSafePerformance(project(view, safePerformance = true))
+            }
+        },
     )
     private val authoring = SharedAuthoringPipeline(host, configBuilder)
 
@@ -93,9 +119,9 @@ class AndroidWorkPipeline(
      * Draws edited DDL. Without an execution it starts a direct-DDL run. With
      * one, changed run options (models, colors, canvas, seeds, Wild,
      * language) fork a new variation from the saved policy. Otherwise the edit
-     * is committed to the same execution, declining a pending patch proposal
-     * first. Unchanged DDL is drawn without a commit, unless a patch proposal
-     * still waits for an answer.
+     * is committed to the same execution; while a patch proposal waits the
+     * core refuses it. Unchanged DDL is drawn without a commit, unless a patch
+     * proposal still waits for an answer.
      */
     suspend fun composeFromDdl(
         ddl: String,
@@ -129,26 +155,25 @@ class AndroidWorkPipeline(
             )
             return composePrepared(ddl, fork, request.recomposeMode)
         }
-        val editable = if (current.phaseTag == "awaiting_patch_approval") {
-            if (current.visibleDdl == ddl) throw PipelineInteractionRequired(current)
-            val proposal = current.patchProposal ?: throw PipelineHostException("patch_proposal_required")
-            host.command(
-                OWNER_ID,
-                existingId,
-                PipelineCommand.DeclinePatch(proposal.proposalDigest),
-            )
-        } else {
+        val awaitingApproval = current.phaseTag == "awaiting_patch_approval"
+        if (awaitingApproval && current.visibleDdl == ddl) throw PipelineInteractionRequired(current)
+        val next = if (current.visibleDdl == ddl) {
             current
-        }
-        val next = if (editable.visibleDdl == ddl) {
-            editable
         } else {
-            host.command(
-                OWNER_ID,
-                existingId,
-                PipelineCommand.CommitUserDdl(editable.revision, ddl),
-                hostContextJson = activeEditorHostContext(stored, request),
-            )
+            // The edit goes to the core as it is. While a proposal waits the
+            // core refuses it, as it refuses the server's `author_ddl`: the
+            // author answers the proposal, the host does not decline it for them.
+            try {
+                host.command(
+                    OWNER_ID,
+                    existingId,
+                    PipelineCommand.CommitUserDdl(current.revision, ddl),
+                    hostContextJson = activeEditorHostContext(stored, request),
+                )
+            } catch (error: PipelineHostException) {
+                if (awaitingApproval) throw InkuFailure { it.pipelineAnswerProposalFirst }
+                throw error
+            }
         }
         if (next.phaseTag != "score_ready" && next.phaseTag != "completed") {
             throw PipelineInteractionRequired(next)
@@ -188,13 +213,16 @@ class AndroidWorkPipeline(
         return readyResult(authoring.startDirectDdl(request)).copy(recomposition = selected?.info)
     }
 
-    suspend fun approvePatch(executionId: String): PaintResult {
-        val current = host.view(OWNER_ID, executionId)
-        val proposal = current.patchProposal ?: throw PipelineHostException("patch_proposal_required")
+    /**
+     * Approves the proposal the author saw: its revision and digest go to the
+     * core as shown, so a proposal that changed since is refused rather than
+     * approved in its place (web `controller.ts`).
+     */
+    suspend fun approvePatch(executionId: String, expectedRevision: String, proposalDigest: String): PaintResult {
         val next = host.command(
             OWNER_ID,
             executionId,
-            PipelineCommand.ApprovePatch(current.revision, proposal.proposalDigest),
+            PipelineCommand.ApprovePatch(expectedRevision, proposalDigest),
         )
         if (next.phaseTag != "score_ready" && next.phaseTag != "completed") {
             throw PipelineInteractionRequired(next)
@@ -203,15 +231,8 @@ class AndroidWorkPipeline(
         return project(authoring.renderReady(OWNER_ID, next, stored.config, stored.renderSeed, stored.wild))
     }
 
-    suspend fun declinePatch(executionId: String): PipelineView {
-        val current = host.view(OWNER_ID, executionId)
-        val proposal = current.patchProposal ?: throw PipelineHostException("patch_proposal_required")
-        return host.command(
-            OWNER_ID,
-            executionId,
-            PipelineCommand.DeclinePatch(proposal.proposalDigest),
-        )
-    }
+    suspend fun declinePatch(executionId: String, proposalDigest: String): PipelineView =
+        host.command(OWNER_ID, executionId, PipelineCommand.DeclinePatch(proposalDigest))
 
     suspend fun view(executionId: String): PipelineView = host.view(OWNER_ID, executionId)
 
@@ -416,8 +437,8 @@ class AndroidWorkPipeline(
         is PipelineRunOutcome.InteractionRequired -> throw PipelineInteractionRequired(outcome.view)
     }
 
-    private suspend fun project(view: PipelineView): PaintResult {
-        if (view.phaseTag != "completed" || view.renderedJson == null) {
+    private suspend fun project(view: PipelineView, safePerformance: Boolean = false): PaintResult {
+        if (view.renderedJson == null || (view.phaseTag != "completed" && !safePerformance)) {
             throw PipelineInteractionRequired(view)
         }
         val execution = host.executionContext(OWNER_ID, view.executionId)
@@ -467,6 +488,9 @@ class AndroidWorkPipeline(
             .put("render_limits", renderLimits(compiler.requiredObject("operational_resource_budget")))
             .put("render_limits_source", resultOptions.optionalString("render_limits_source") ?: JSONObject.NULL)
             .put("ui_lang", resultOptions.optionalString("ui_lang") ?: JSONObject.NULL)
+            .put("elapsed_stage1_ms", execution.metrics["stage1"] ?: 0L)
+            .put("elapsed_stage2_ms", execution.metrics["stage2"] ?: 0L)
+            .put("elapsed_total_ms", execution.metrics.values.sum())
         val ddl = document.requiredString("source")
         val diagnostics = pipelineDiagnostics(delivery, metadata)
             .put(
@@ -711,6 +735,7 @@ class AndroidWorkPipeline(
                 instructionLangResolved = resolvedLang,
                 uiLang = uiLang,
                 renderLimitsSource = if (inherited != null || saved != null) "work" else "settings",
+                saveHistory = request.saveHistory,
                 sketch = PipelineSketchRequest.from(request.sketch),
                 parentHistoryId = request.parentHistoryId,
                 inputProvenanceJson = request.inputProvenance?.toJson()?.toString(),

@@ -66,7 +66,35 @@ data class PipelineExecutionContext(
     val authoringContext: AuthoringContext,
     val hostContextJson: String,
     val renderedJson: String?,
+    /** Model time per stage in ms, as the server's `metrics` (`sketch`, `catalog`, `stage1`, `composition`, `stage2`). */
+    val metrics: Map<String, Long> = emptyMap(),
 )
+
+/**
+ * The last failed model attempt of a run, as the server's view keeps
+ * `provider_failure`; a later success clears it. [detail] is
+ * `credentials_unavailable` when the model has no API key.
+ */
+data class PipelineProviderFailure(
+    val failure: String,
+    val stage: String,
+    val attempt: Int,
+    val elapsedMs: Long,
+    val detail: String? = null,
+)
+
+/**
+ * The drawing the server saves before a known-hole completion is asked for
+ * (`pipeline_api.py` `_drain`), and again when a run stops with a Score it
+ * never drew: the host draws the Score as it stands and saves that work.
+ */
+interface SafePerformancePort {
+    /** The render command for [view]'s delivered Score; null when it cannot be drawn. */
+    fun renderCommand(view: PipelineView): PipelineCommand.Render?
+
+    /** Saves the drawn [view]; saving the same drawing again finds the work saved first. */
+    suspend fun save(view: PipelineView)
+}
 
 sealed interface PipelineCommand {
     data class CommitUserDdl(val expectedRevision: String, val source: String) : PipelineCommand
@@ -110,6 +138,9 @@ data class PipelineView(
     val hostContextJson: String = "{}",
     val models: PipelineModelSelection? = null,
     val sketch: PipelineSketchResult = PipelineSketchResult(),
+    /** Why a stopped run stopped (`needs_user_edit` / `failed` only), as web's `pipelineAttentionReason`. */
+    val phaseReason: String? = null,
+    val providerFailure: PipelineProviderFailure? = null,
 )
 
 class PipelineHostException(

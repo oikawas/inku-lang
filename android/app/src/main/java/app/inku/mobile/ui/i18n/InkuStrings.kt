@@ -107,6 +107,12 @@ interface InkuStrings {
     val pipelineNewDescription: String
     val pipelineNewDescriptionNotice: String
     val pipelineCheckDdl: String
+    /** Web's `pipelineNeedsAttention`, `pipelineAttentionReason` and `pipelineFailureCause` (`attention.ts`). */
+    val pipelineNeedsAttention: String
+    fun pipelineAttentionReason(reason: String): String
+    fun pipelineFailureCause(failure: String, attempts: Int, detail: String?): String
+    /** An edit sent while a completion proposal still waits; the core refuses it. */
+    val pipelineAnswerProposalFirst: String
     val pipelineDiagnostics: String
     /** Same wording as the web's `pipelinePluginDiagnostic`. */
     fun pipelinePluginDiagnostic(reason: String, name: String, suggestion: String?): String

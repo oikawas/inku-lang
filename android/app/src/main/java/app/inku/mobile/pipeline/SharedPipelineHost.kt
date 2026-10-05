@@ -26,6 +26,10 @@ class SharedPipelineHost(
      * same execution finds the call taken and must not blank it.
      */
     private val onProviderAttempt: (executionId: String, attempt: ProviderAttempt?) -> Unit = { _, _ -> },
+    /** Draws and saves a Score before its holes are completed, as the server does; null draws nothing early. */
+    private val safePerformance: SafePerformancePort? = null,
+    /** Why a model attempt failed beyond its class (`credentials_unavailable`), by action id. */
+    private val failureDetail: (actionId: String) -> String? = { null },
 ) {
     private val sessions = mutableMapOf<String, Session>()
     private val sessionsMutex = Mutex()
@@ -197,6 +201,18 @@ class SharedPipelineHost(
             fresh = state.getBoolean("fresh"),
             renderedJson = state.optionalString("rendered_json"),
             eventsJson = state.optString("events_json", "[]"),
+            metrics = state.optJSONObject("metrics")?.let { metrics ->
+                metrics.keys().asSequence().associateWith { metrics.getLong(it) }
+            } ?: emptyMap(),
+            providerFailure = state.optJSONObject("provider_failure")?.let { failure ->
+                PipelineProviderFailure(
+                    failure = failure.requiredString("failure"),
+                    stage = failure.requiredString("stage"),
+                    attempt = failure.getInt("attempt"),
+                    elapsedMs = failure.getLong("elapsed_ms"),
+                    detail = failure.optionalString("detail"),
+                )
+            },
         )
         val snapshot = session.snapshot()
         if (snapshot.requiredString("execution_id") != executionId) {
@@ -221,6 +237,7 @@ class SharedPipelineHost(
                 authoringContext = session.context,
                 hostContextJson = session.hostContextJson,
                 renderedJson = session.renderedJson,
+                metrics = session.metrics,
             )
         }
     }
@@ -229,7 +246,7 @@ class SharedPipelineHost(
     private suspend fun driveWithCancellation(session: Session): PipelineView {
         session.mutex.withLock { session.drivers += 1 }
         return try {
-            drive(session)
+            drive(session).let { view -> if (view.phaseTag in STOPPED_PHASES) performSafely(session) ?: view else view }
         } catch (cancelled: CancellationException) {
             withContext(NonCancellable) {
                 runCatching { cancel(session.ownerId, session.snapshot().requiredString("execution_id")) }
@@ -252,11 +269,14 @@ class SharedPipelineHost(
             } ?: return view(session)
             when (action.requiredString("tag")) {
                 "commit_visible_normalized_ddl" -> runCommitEffect(session, action)
+                "complete_visible_ddl_holes" -> {
+                    performSafely(session, action)
+                    if (!runProviderEffect(session, action)) return view(session)
+                }
                 "select_description_catalog",
                 "generate_sketch",
                 "generate_normalized_ddl",
                 "read_composition",
-                "complete_visible_ddl_holes"
                 -> if (!runProviderEffect(session, action)) return view(session)
                 else -> throw PipelineHostException("unsupported_pipeline_effect")
             }
@@ -310,6 +330,7 @@ class SharedPipelineHost(
                 if (!sameAction(session.snapshot().optJSONObject("action"), action)) {
                     return@withLock false
                 }
+                recordProviderResult(session, action, JSONObject(resultJson))
                 advanceLocked(
                     session,
                     JSONObject().put("tag", "effect_result").put("result", JSONObject(resultJson)),
@@ -324,6 +345,61 @@ class SharedPipelineHost(
             // as web shows no attempt while no model call is pending.
             attempt?.let { onProviderAttempt(it.executionId, null) }
         }
+    }
+
+    /**
+     * The server's per-stage model time and last failed attempt
+     * (`pipeline_product.py` `perform`): a success clears the failure.
+     */
+    private fun recordProviderResult(session: Session, action: JSONObject, result: JSONObject) {
+        val stage = ACTION_STAGES[action.requiredString("tag")] ?: return
+        val elapsed = result.optString("elapsed_ms").toLongOrNull() ?: 0L
+        session.metrics = session.metrics + (stage to (session.metrics[stage] ?: 0L) + elapsed)
+        session.providerFailure = if (result.optString("tag") == "provider_failed") {
+            val identity = action.requiredObject("identity")
+            val failure = result.requiredString("failure")
+            PipelineProviderFailure(
+                failure = failure,
+                stage = stage,
+                attempt = identity.optInt("attempt", 1),
+                elapsedMs = elapsed,
+                detail = failureDetail(identity.requiredString("action_id"))
+                    ?.takeIf { failure == "provider_rejected" && it == "credentials_unavailable" },
+            )
+        } else {
+            null
+        }
+    }
+
+    /**
+     * Draws the delivered Score while [action] still waits (the hole effect),
+     * or while the run has stopped without a drawing, and saves it. Returns
+     * the view after drawing, or null when nothing was drawn.
+     */
+    private suspend fun performSafely(session: Session, action: JSONObject? = null): PipelineView? {
+        val port = safePerformance ?: return null
+        val pending = view(session)
+        if (pending.scoreJson == null) return null
+        if (pending.renderedJson == null) {
+            val render = port.renderCommand(pending) ?: return null
+            val drawn = session.mutex.withLock {
+                val current = session.snapshot()
+                val stillWaiting = if (action == null) {
+                    current.optJSONObject("action") == null &&
+                        current.requiredObject("phase").requiredString("tag") in STOPPED_PHASES
+                } else {
+                    sameAction(current.optJSONObject("action"), action)
+                }
+                if (!stillWaiting || session.renderedJson != null) return@withLock false
+                advanceLocked(session, commandPayload(render))
+                true
+            }
+            if (!drawn) return null
+        }
+        val rendered = view(session)
+        if (rendered.renderedJson == null) return null
+        port.save(rendered)
+        return rendered
     }
 
     /**
@@ -450,6 +526,8 @@ class SharedPipelineHost(
             hostContextJson = session.hostContextJson,
             models = session.models,
             sketch = PipelineSketchResult.from(snapshot.optJSONObject("sketch")),
+            phaseReason = phase.optionalString("reason")?.takeIf { phaseTag in STOPPED_PHASES },
+            providerFailure = session.providerFailure,
         )
     }
 
@@ -480,6 +558,18 @@ class SharedPipelineHost(
         .put("fresh", session.fresh)
         .put("rendered_json", session.renderedJson)
         .put("events_json", session.eventsJson)
+        .put("metrics", JSONObject(session.metrics))
+        .put(
+            "provider_failure",
+            session.providerFailure?.let { failure ->
+                JSONObject()
+                    .put("failure", failure.failure)
+                    .put("stage", failure.stage)
+                    .put("attempt", failure.attempt)
+                    .put("elapsed_ms", failure.elapsedMs)
+                    .put("detail", failure.detail)
+            },
+        )
         .toString()
         .encodeToByteArray()
 
@@ -598,6 +688,9 @@ class SharedPipelineHost(
         var users: Int = 0,
         var eventsJson: String,
         var providerActionInFlight: String? = null,
+        /** Model time per stage, as the server's `metrics`. */
+        var metrics: Map<String, Long> = emptyMap(),
+        var providerFailure: PipelineProviderFailure? = null,
         /** Drives running on this session; guarded by [mutex]. */
         var drivers: Int = 0,
         val mutex: Mutex = Mutex(),
@@ -626,5 +719,15 @@ class SharedPipelineHost(
         const val VERSION = "1.0.0"
         const val STORED_STATE_SCHEMA = "inku.android-pipeline-execution.v1"
         val TERMINAL_PHASES = setOf("completed", "needs_user_edit", "failed", "cancelled")
+        /** The phases web reads as a stop with a reason (`attention.ts`). */
+        val STOPPED_PHASES = setOf("needs_user_edit", "failed")
+        /** The server's `_ACTION_STAGES` (`pipeline_candidate.py`). */
+        val ACTION_STAGES = mapOf(
+            "generate_sketch" to "sketch",
+            "select_description_catalog" to "catalog",
+            "generate_normalized_ddl" to "stage1",
+            "read_composition" to "composition",
+            "complete_visible_ddl_holes" to "stage2",
+        )
     }
 }

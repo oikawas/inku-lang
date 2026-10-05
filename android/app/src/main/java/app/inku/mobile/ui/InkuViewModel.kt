@@ -601,11 +601,14 @@ class InkuViewModel @JvmOverloads constructor(
         val context = JSONObject(view.hostContextJson)
         val options = context.optJSONObject("host_options")
         val parentId = context.optJSONObject("result_options")?.optString("parent_history_id")
-        val selected = localState.value.selectedHistory?.takeIf { item ->
-            item.id == parentId || runCatching {
-                JSONObject(item.renderMetadataJson).optString("pipeline_execution_id") == view.executionId
-            }.getOrDefault(false)
-        }
+        // A drawing the run saved before it stopped for the author is the work
+        // on screen while the proposal or the stop is answered, as on web.
+        val selected = repository.safePerformance(view.executionId)
+            ?: localState.value.selectedHistory?.takeIf { item ->
+                item.id == parentId || runCatching {
+                    JSONObject(item.renderMetadataJson).optString("pipeline_execution_id") == view.executionId
+                }.getOrDefault(false)
+            }
         localState.value = localState.value.copy(
             tab = AppTab.Compose,
             composeMode = ComposeMode.Write,
@@ -629,10 +632,10 @@ class InkuViewModel @JvmOverloads constructor(
             ddlEditedAfterGeneration = false,
             isDrawing = false,
             cameraCaptureState = CameraCaptureState.Idle,
-            message = if (view.patchProposal != null) {
-                strings().pipelineProposal
-            } else {
-                strings().pipelineCheckDdl
+            message = when {
+                view.patchProposal != null -> strings().pipelineProposal
+                view.phaseReason != null -> pipelineAttentionText(view.phaseReason, view.providerFailure, strings())
+                else -> strings().pipelineCheckDdl
             },
         )
     }
@@ -655,7 +658,14 @@ class InkuViewModel @JvmOverloads constructor(
         drawingJob = viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    if (approve) repository.approvePipelinePatch(view.executionId, originalPhoto) else repository.resumePipeline(view.executionId, originalPhoto)
+                    if (approve) {
+                        // The proposal on screen is the one approved; one that
+                        // changed since is refused by the core, as on web.
+                        val proposal = view.patchProposal ?: throw app.inku.mobile.pipeline.PipelineHostException("patch_proposal_required")
+                        repository.approvePipelinePatch(view.executionId, view.revision, proposal.proposalDigest, originalPhoto)
+                    } else {
+                        repository.resumePipeline(view.executionId, originalPhoto)
+                    }
                 }
             }.onSuccess { item ->
                 if (!isCurrentDrawingRun(runId)) return@onSuccess
@@ -684,7 +694,8 @@ class InkuViewModel @JvmOverloads constructor(
         val view = localState.value.pipelineView ?: return
         if (localState.value.isDrawing) return
         viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { repository.declinePipelinePatch(view.executionId) } }
+            val proposal = view.patchProposal ?: return@launch
+            runCatching { withContext(Dispatchers.IO) { repository.declinePipelinePatch(view.executionId, proposal.proposalDigest) } }
                 .onSuccess { if (localState.value.pipelineView?.executionId == view.executionId) presentPipelineView(it) }
                 .onFailure { localState.value = localState.value.copy(message = messageFor(it, strings(), strings().pipelineDeclineFailed)) }
         }

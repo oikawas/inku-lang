@@ -230,6 +230,14 @@ class SharedPipelineConfigBuilder(
         view: PipelineView,
         renderSeed: Long?,
         wild: Boolean,
+    ): PipelineCommand.Render = renderCommand(config.renderColorMaps, view, renderSeed, wild)
+
+    /** The same command from an execution's saved colors, for a drawing made mid-run. */
+    fun renderCommand(
+        renderColorMaps: Map<String, Map<String, String>>,
+        view: PipelineView,
+        renderSeed: Long?,
+        wild: Boolean,
     ): PipelineCommand.Render {
         val delivery = view.deliveryJson?.let(::JSONObject)
             ?: throw PipelineHostException("score_not_ready")
@@ -237,7 +245,7 @@ class SharedPipelineConfigBuilder(
         val host = compiler.requiredObject("host")
         val canvasFormatId = host.requiredString("canvas_format_id")
         val catalogId = host.requiredString("resolved_catalog_id")
-        val renderColorMap = config.renderColorMaps[catalogId]
+        val renderColorMap = renderColorMaps[catalogId]
             ?: throw PipelineHostException("saved_color_catalog_unavailable")
         val registry = JSONObject(binding.canvasRegistry()).requiredObject("registry")
         val format = registry.requiredArray("formats").objects()

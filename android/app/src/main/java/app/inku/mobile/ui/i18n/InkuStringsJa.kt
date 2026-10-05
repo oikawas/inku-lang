@@ -100,6 +100,31 @@ object InkuStringsJa : InkuStrings {
     override val pipelineNewDescription = "記述から新しい作品を作る"
     override val pipelineNewDescriptionNotice = "次の描画は、新しい作品として保存します。"
     override val pipelineCheckDdl = "DDLと描画の診断を確認してください。"
+    override val pipelineNeedsAttention = "処理の結果を確認してください。"
+    override fun pipelineAttentionReason(reason: String) = "理由: " + when (reason) {
+        "stage1_failed" -> "記述の解釈を完了できませんでした"
+        "hole_completion_failed" -> "DDLの補完候補を作れませんでした"
+        "patch_declined" -> "補完候補を採用しませんでした"
+        "hole_request_unavailable" -> "補完が必要な箇所を準備できませんでした"
+        "compiler_diagnostics" -> "確認または修正が必要な箇所があります"
+        "host_commit_failed" -> "作品の保存を完了できませんでした"
+        "compiler_boundary_failed" -> "DDLを楽譜へ変換できませんでした"
+        else -> reason
+    }
+    override fun pipelineFailureCause(failure: String, attempts: Int, detail: String?): String {
+        val cause = when (failure) {
+            "transport_timeout" -> "モデルの応答が制限時間内に返りませんでした"
+            "transport_unavailable" -> "モデルに接続できませんでした"
+            "rate_limited" -> "モデルの提供元が要求を制限しました"
+            "provider_rejected" -> if (detail == "credentials_unavailable") "モデルのAPIキーがありません" else "モデルの提供元が要求を断りました"
+            "malformed_payload" -> "モデルの応答を読めませんでした"
+            "schema_violation" -> "モデルの応答が決まった形になっていませんでした"
+            "semantic_violation" -> "モデルの応答を描画に使えませんでした"
+            else -> return ""
+        }
+        return "（$cause${if (attempts > 1) "。${attempts}回試しました" else ""}）"
+    }
+    override val pipelineAnswerProposalFirst = "補完候補に答えてから、DDLを編集してください。"
     override val pipelineDiagnostics = "描画の診断"
     override fun pipelinePluginDiagnostic(reason: String, name: String, suggestion: String?) = when (reason) {
         "plugin_disabled" -> "プラグイン $name は無効になっているため、この文は描かれていません。有効にすると描けます。"

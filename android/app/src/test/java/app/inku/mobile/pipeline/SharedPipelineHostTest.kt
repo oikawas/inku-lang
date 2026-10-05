@@ -231,6 +231,87 @@ class SharedPipelineHostTest {
         assertEquals("en", metadata.getString("ui_lang"))
     }
 
+    @Test
+    fun aScoreIsDrawnAndSavedBeforeItsHolesAreCompleted() = runBlocking {
+        val binding = ScriptedBinding()
+        binding.holeDelivers = true
+        val saved = mutableListOf<PaintResult>()
+        val pipeline = answeringPipeline(binding) { saved += it }
+        val waiting = try {
+            pipeline.paint(describe("a circle"))
+            fail("the proposal waits for the author")
+            error("unreachable")
+        } catch (interaction: PipelineInteractionRequired) {
+            interaction.view
+        }
+
+        val render = binding.inputs.indexOfFirst { it.optString("tag") == "render" }
+        val hole = binding.inputs.indexOfFirst {
+            it.optJSONObject("result")?.optJSONObject("identity")?.optString("action_id") == "provider-2"
+        }
+        assertTrue("drawn before the hole call returned", render in 0 until hole)
+        assertEquals("awaiting_llm", saved.single().pipelineView!!.phaseTag)
+        assertTrue(JSONObject(saved.single().renderMetadataJson).has("elapsed_stage1_ms"))
+        assertEquals("awaiting_patch_approval", waiting.phaseTag)
+        assertNotNull("the drawing stays while the proposal waits", waiting.renderedJson)
+    }
+
+    @Test
+    fun theProposalOnScreenIsTheOneApproved() = runBlocking {
+        val binding = ScriptedBinding()
+        val pipeline = answeringPipeline(binding)
+        val waiting = runCatching { pipeline.paint(describe("a circle")) }.exceptionOrNull() as PipelineInteractionRequired
+        pipeline.approvePatch(waiting.view.executionId, "0", "stale")
+
+        val approve = binding.inputs.single { it.optString("tag") == "approve_patch" }
+        assertEquals("0", approve.getString("expected_revision"))
+        assertEquals("stale", approve.getString("proposal_digest"))
+    }
+
+    @Test
+    fun anEditWhileAProposalWaitsIsLeftToTheCore() = runBlocking {
+        val binding = ScriptedBinding()
+        val pipeline = answeringPipeline(binding)
+        val waiting = runCatching { pipeline.paint(describe("a circle")) }.exceptionOrNull() as PipelineInteractionRequired
+        try {
+            pipeline.composeFromDdl("an edited DDL.", describe("a circle").copy(executionId = waiting.view.executionId))
+            fail("the core refuses an edit while a proposal waits")
+        } catch (error: app.inku.mobile.ui.i18n.InkuFailure) {
+            assertEquals(
+                app.inku.mobile.ui.i18n.InkuStringsEn.pipelineAnswerProposalFirst,
+                error.text(app.inku.mobile.ui.i18n.InkuStringsEn),
+            )
+        }
+        assertTrue("the host declined nothing", binding.inputs.none { it.optString("tag") == "decline_patch" })
+    }
+
+    @Test
+    fun aStoppedRunSaysWhyAsWebDoes() {
+        val text = app.inku.mobile.ui.pipelineAttentionText(
+            "stage1_failed",
+            PipelineProviderFailure("transport_timeout", "stage1", 3, 1000),
+            app.inku.mobile.ui.i18n.InkuStringsJa,
+        )
+        assertEquals(
+            "処理の結果を確認してください。 理由: 記述の解釈を完了できませんでした（モデルの応答が制限時間内に返りませんでした。3回試しました）",
+            text,
+        )
+    }
+
+    private fun answeringPipeline(binding: SharedPipelineBinding, saveSafe: suspend (PaintResult) -> Unit = {}) = AndroidWorkPipeline(
+        binding = binding,
+        modelProvider = object : ModelProvider {
+            override val providerId = "test"
+            override suspend fun generate(request: ModelRequest): ModelResponse = ModelResponse("{}", "test")
+        },
+        commitStore = RecordingCommitStore(), executionStore = MemoryExecutionStore(), readHistory = { null },
+        legacyRenderer = object : SvgRenderer {
+            override fun render(request: RenderRequest): RenderResult = error("the shared pipeline renders this run")
+        },
+        bundledPluginsEnabled = { false },
+        saveSafePerformance = saveSafe,
+    )
+
     private fun describe(text: String) = PaintRequest(
         description = text, stage1Model = "local-litert-lm:gemma-4-e2b", stage2Model = "local-litert-lm:gemma-4-e2b",
         colorCatalogId = "default", canvasAspect = "square", autoRepair = false,
@@ -691,6 +772,8 @@ class SharedPipelineHostTest {
                 JSONObject().put("render_seed", "123").put("seed_text", it).toString()
             }
         }
+        /** A known-hole run whose Score is delivered while it waits, as the core delivers one. */
+        var holeDelivers = false
         override fun pipelineDescription(text: String) = labelCut(text)
         override fun renderSeedFromText(seedText: String) = wordSeed(seedText)
         val recompositionRequests = mutableListOf<JSONObject>()
@@ -715,7 +798,20 @@ class SharedPipelineHostTest {
                 payload.optJSONObject("sketch")
             } else null
             val config = if (previous == null) payload.getJSONObject("config") else previous.getJSONObject("config")
+            val previousPhase = previous?.optJSONObject("phase")?.optString("tag")
+            if (payload.optString("tag") == "commit_user_ddl" && previousPhase == "awaiting_patch_approval") {
+                return JSONObject()
+                    .put("protocol", "inku.pipeline").put("version", "1.0.0").put("kind", "error")
+                    .put("payload", JSONObject().put("code", "invalid_state"))
+                    .toString().encodeToByteArray()
+            }
+            val previousState = when {
+                previousPhase == "awaiting_patch_approval" -> State.AwaitingPatch
+                previousActionId == "provider-2" -> State.Hole
+                else -> null
+            }
             val state = when {
+                payload.optString("tag") == "render" && holeDelivers && previousState != null -> previousState
                 payload.optString("tag") == "cancel" -> State.Cancelled
                 payload.optString("tag") == "approve_patch" -> State.SecondCommit
                 direct -> State.FirstCommit
@@ -739,7 +835,7 @@ class SharedPipelineHostTest {
             val origin = if (direct || previous?.optString("origin_fixture") == "direct") "direct" else "description"
             val directSource = if (direct) payload.getJSONObject("authoring").getString("source") else
                 previous?.optJSONObject("document")?.optString("source") ?: "place one circle."
-            val snapshot = snapshot(state, input.getString("sequence"), variationId, executionId, config, origin, directSource)
+            val snapshot = snapshot(state, input.getString("sequence"), variationId, executionId, config, origin, directSource, holeDelivers)
             val sketch = when {
                 sketchRequest?.optString("mode") == "supplied" -> JSONObject()
                     .put("state", "supplied").put("text", sketchRequest.getString("text"))
@@ -749,7 +845,7 @@ class SharedPipelineHostTest {
                 else -> previous?.optJSONObject("sketch")
             }
             snapshot.put("sketch", sketch ?: JSONObject.NULL)
-            val rendered = if (state == State.Completed) {
+            val rendered = if (state == State.Completed || payload.optString("tag") == "render") {
                 JSONObject().put("svg", "<svg/>").put("metadata", JSONObject())
             } else {
                 JSONObject.NULL
@@ -786,6 +882,7 @@ class SharedPipelineHostTest {
             config: JSONObject,
             originFixture: String,
             directSource: String,
+            holeDelivers: Boolean = false,
         ): JSONObject {
             val direct = originFixture == "direct"
             val revision = when (state) {
@@ -821,7 +918,9 @@ class SharedPipelineHostTest {
                 State.Completed -> JSONObject().put("tag", "completed")
                 State.Cancelled -> JSONObject().put("tag", "cancelled")
             }
-            val delivery = if (state in setOf(State.Ready, State.Completed)) {
+            val delivered = setOf(State.Ready, State.Completed) +
+                if (holeDelivers) setOf(State.Hole, State.AwaitingPatch) else emptySet()
+            val delivery = if (state in delivered) {
                 JSONObject()
                     .put("score", JSONObject().put("schema", "inku.score.v1").put("instructions", JSONArray()))
                     .put(

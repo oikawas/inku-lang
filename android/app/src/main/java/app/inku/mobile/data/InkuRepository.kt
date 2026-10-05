@@ -144,6 +144,9 @@ class InkuRepository(
                     attempt ?: current.takeIf { it?.executionId != executionId }
                 }
             },
+            saveSafePerformance = { result ->
+                result.pipelineView?.let { view -> safePerformances[view.executionId] = saveResumedPerformance(result) }
+            },
         )
     }
     private val modelDownloader = LocalModelDownloader(context.applicationContext, database.modelAssetDao())
@@ -239,14 +242,32 @@ class InkuRepository(
     // Named after the execution's step, so saving the same completed run again
     // (a restore after the process ended) finds the row saved first.
     private fun pipelineHistoryId(view: PipelineView): String =
-        java.util.UUID.nameUUIDFromBytes("pipeline:${view.executionId}:${view.sequence}".encodeToByteArray()).toString()
+        if (view.phaseTag == "completed") {
+            java.util.UUID.nameUUIDFromBytes("pipeline:${view.executionId}:${view.sequence}".encodeToByteArray()).toString()
+        } else {
+            // A drawing saved before its holes were completed, or when its run
+            // stopped: one work per revision, as the server keys it, so the
+            // same drawing saved again (a failure after it, a restore) is found.
+            java.util.UUID.nameUUIDFromBytes("pipeline-safe:${view.executionId}:${view.revision}".encodeToByteArray()).toString()
+        }
 
-    suspend fun declinePipelinePatch(executionId: String): PipelineView = pipeline.declinePatch(executionId)
+    private val safePerformances = java.util.concurrent.ConcurrentHashMap<String, HistoryItemEntity>()
+
+    /** The work saved from [executionId] before it stopped for the author, if any. */
+    fun safePerformance(executionId: String): HistoryItemEntity? = safePerformances[executionId]
+
+    suspend fun declinePipelinePatch(executionId: String, proposalDigest: String): PipelineView =
+        pipeline.declinePatch(executionId, proposalDigest)
 
     suspend fun cancelPipeline(executionId: String): PipelineView = pipeline.cancel(executionId)
 
-    suspend fun approvePipelinePatch(executionId: String, originalPhoto: File? = null): HistoryItemEntity =
-        saveResumedPerformance(pipeline.approvePatch(executionId), originalPhoto)
+    suspend fun approvePipelinePatch(
+        executionId: String,
+        expectedRevision: String,
+        proposalDigest: String,
+        originalPhoto: File? = null,
+    ): HistoryItemEntity =
+        saveResumedPerformance(pipeline.approvePatch(executionId, expectedRevision, proposalDigest), originalPhoto)
 
     suspend fun resumePipeline(executionId: String, originalPhoto: File? = null): HistoryItemEntity =
         saveResumedPerformance(pipeline.resume(executionId), originalPhoto)
@@ -888,6 +909,7 @@ class InkuRepository(
             workColorSnapshot = refinementColorSnapshot(parent, plan),
             renderWild = parent.renderWild,
             parentHistoryId = parent.historyId,
+            saveHistory = false,
         )
         return when (plan.route) {
             RefinementRoute.RenderFromScore -> pipeline.renderFromScore(parent.scoreJson, request)

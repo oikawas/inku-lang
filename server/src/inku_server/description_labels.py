@@ -44,13 +44,15 @@ def excluded_spans(text: str) -> list[Span]:
         return []
     spans: list[Span] = []
     offset = 0
-    for line in text.splitlines(keepends=True):
+    # Only "\n" starts a line, as in the web editor, Swift and the shared core;
+    # splitlines() would also break at "\r", U+2028 and the other separators.
+    for line in text.split("\n"):
         number = _LEADING_NUMBER.match(line)
         if number:
             spans.append(Span(offset + number.start(), offset + number.end(), "number"))
         for comment in _COMMENT.finditer(line):
             spans.append(Span(offset + comment.start(), offset + comment.end(), "comment"))
-        offset += len(line)
+        offset += len(line) + 1  # + the "\n" that split() removed
     spans.sort()
     return spans
 

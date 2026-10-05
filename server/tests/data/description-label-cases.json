@@ -120,6 +120,18 @@
       "text": "1.\n春の雪",
       "pipeline": "\n春の雪",
       "spans": [[0, 2, "number"]]
+    },
+    {
+      "why": "only a newline starts a line: a number after U+2028 is description",
+      "text": "花\u20281. 月",
+      "pipeline": "花\u20281. 月",
+      "spans": []
+    },
+    {
+      "why": "a lone carriage return does not close a comment's line",
+      "text": "[a\rb]",
+      "pipeline": "",
+      "spans": [[0, 5, "comment"]]
     }
   ]
 }

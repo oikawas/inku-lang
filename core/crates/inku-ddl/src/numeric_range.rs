@@ -16,8 +16,8 @@
 //! Japanese accepts the wave dash, the full-width tilde, the ASCII tilde, and the
 //! ASCII and full-width hyphens (the author's decision of 2026-10-05) as the range
 //! mark, full-width digits, periods, and slashes, and full-width or
-//! ASCII parentheses. English accepts only `to`, ASCII digits, and ASCII
-//! parentheses. A value is a decimal or a fraction. Whether a range lies on the
+//! ASCII parentheses. English accepts `to`, and the ASCII hyphen and the en dash
+//! (the author's decision of 2026-10-05), ASCII digits, and ASCII parentheses. A value is a decimal or a fraction. Whether a range lies on the
 //! canvas and has a width is checked by the geometry analysis, not here.
 
 use crate::{ResolvedInstructionLanguage, SourceSpan};
@@ -360,22 +360,38 @@ fn english_with_words(source: &str, start: usize) -> Option<NumericRangeLexeme> 
     })
 }
 
-// `horizontal A to B, vertical C to D`.
+// Between two English bounds: `to` between spaces, or a hyphen U+002D or an en
+// dash U+2013 with optional spaces (2026-10-05). A bound is never negative, so a
+// dash between two numbers can only join them. Returns where the second starts.
+fn english_range_join(source: &str, after_number: usize) -> Option<usize> {
+    let cursor = skip_english_space(source, after_number);
+    if let Some(dash) = source[cursor..]
+        .chars()
+        .next()
+        .filter(|character| matches!(character, '-' | '–'))
+    {
+        return Some(skip_english_space(source, cursor + dash.len_utf8()));
+    }
+    let after_to = english_word(
+        source,
+        skip_english_space_required(source, after_number)?,
+        "to",
+    )?;
+    skip_english_space_required(source, after_to)
+}
+
+// `horizontal A to B, vertical C to D` (or `A-B`, `A–B`).
 fn english_body(source: &str, start: usize) -> Option<Body> {
     let cursor = english_word(source, skip_english_space(source, start), "horizontal")?;
     let (cursor, x0, x0_span) =
         english_number(source, skip_english_space_required(source, cursor)?)?;
-    let cursor = english_word(source, skip_english_space_required(source, cursor)?, "to")?;
-    let (cursor, x1, x1_span) =
-        english_number(source, skip_english_space_required(source, cursor)?)?;
+    let (cursor, x1, x1_span) = english_number(source, english_range_join(source, cursor)?)?;
     let cursor = skip_english_space(source, cursor);
     let cursor = source[cursor..].starts_with(',').then_some(cursor + 1)?;
     let cursor = english_word(source, skip_english_space(source, cursor), "vertical")?;
     let (cursor, y0, y0_span) =
         english_number(source, skip_english_space_required(source, cursor)?)?;
-    let cursor = english_word(source, skip_english_space_required(source, cursor)?, "to")?;
-    let (cursor, y1, y1_span) =
-        english_number(source, skip_english_space_required(source, cursor)?)?;
+    let (cursor, y1, y1_span) = english_number(source, english_range_join(source, cursor)?)?;
     Some(Body {
         end: cursor,
         bounds: [x0, y0, x1, y1],
@@ -639,10 +655,11 @@ mod tests {
         );
     }
 
-    /// An author joins a range with a hyphen as often as with a wave dash
-    /// (2026-10-05): `横1/3-2/3` reads as `横1/3〜2/3`, in either width.
+    /// An author joins a range with a hyphen as often as with a wave dash or `to`
+    /// (2026-10-05): `横1/3-2/3` reads as `横1/3〜2/3` in either width, and
+    /// `horizontal 1/3-2/3` as `horizontal 1/3 to 2/3`, with an en dash too.
     #[test]
-    fn a_hyphen_joins_a_japanese_range() {
+    fn a_hyphen_joins_a_range() {
         let source = "下中央（横1/3-2/3、縦2/3－1）に、橙色の小さな円を十個散らす。";
         let lexeme = read(source, "下中央", ResolvedInstructionLanguage::Ja).unwrap();
         assert_eq!(
@@ -655,10 +672,12 @@ mod tests {
             ]
         );
         let english =
-            "Scatter circles at the bottom center (horizontal 1/3-2/3, vertical 2/3 to 1).";
+            "Scatter circles at the bottom center (horizontal 1/3-2/3, vertical 2/3 – 1).";
         assert_eq!(
-            read(english, "the bottom", ResolvedInstructionLanguage::En),
-            None
+            read(english, "the bottom", ResolvedInstructionLanguage::En)
+                .unwrap()
+                .bounds,
+            lexeme.bounds
         );
     }
 

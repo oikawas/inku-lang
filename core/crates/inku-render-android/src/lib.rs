@@ -131,22 +131,6 @@ pub extern "system" fn Java_app_inku_mobile_render_NativeRenderBridge_renderEngi
     })
 }
 
-/// Serialize the core-owned default color map for host freshness checks.
-#[unsafe(no_mangle)]
-#[allow(non_snake_case)]
-pub extern "system" fn Java_app_inku_mobile_render_NativeRenderBridge_defaultColorMapJson(
-    env: JNIEnv<'_>,
-    _receiver: JObject<'_>,
-) -> jstring {
-    jni_boundary(env, null_mut(), |env| {
-        let json =
-            serde_json::to_string(&inku_render::palette::default_color_map()).map_err(|error| {
-                BindingError::state(format!("default color map serialization failed: {error}"))
-            })?;
-        new_java_string(env, &json)
-    })
-}
-
 /// Serialize renderer-owned reference data from the canonical Rust owner.
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]

@@ -13,9 +13,9 @@ mod raster;
 mod saijiki_migration;
 mod standalone;
 
+pub use description_labels::pipeline_description;
 #[cfg(not(target_os = "android"))]
 pub use description_meter::count_description_meter;
-pub use description_labels::pipeline_description;
 pub use macro_catalog::resolve_macro_catalog;
 pub use plugin_diagnostics::explain_plugin_diagnostics;
 pub use raster::{

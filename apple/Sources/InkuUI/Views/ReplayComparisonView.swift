@@ -69,7 +69,7 @@ public struct ReplayComparisonView: View {
                 ? model.display.localized("この作品には記述が保存されていません。")
                 : comparison.work.effectiveSourceText)
                 .inkuFont(13).lineLimit(4).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
-                .help(model.display.preferences.showTooltips ? comparison.work.effectiveSourceText : "")
+                .inkuTooltip(model.display.preferences.showTooltips ? comparison.work.effectiveSourceText : "")
             Text(model.display.localized("保存時のSVGと、同じ保存条件を現行エンジンで描いた結果を比較します。作品・履歴・系譜は変わりません。"))
                 .inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }.replayComparisonPanel()

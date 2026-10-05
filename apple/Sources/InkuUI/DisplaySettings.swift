@@ -52,6 +52,8 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
     public var refineKind: String?
     public var comparisonModels: [String]?
     public var aiRefine: AIRefineChoices?
+    /// Web `inku-result-log-open`: the result log under the input starts closed.
+    public var resultLogOpen: Bool?
     public init() {}
 
     /// Web `normalizeHistoryStripFields`: the declared order, whichever order the boxes were ticked, at most three.

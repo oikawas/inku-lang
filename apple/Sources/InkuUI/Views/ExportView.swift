@@ -62,9 +62,14 @@ struct ExportView: View {
                         Toggle(isOn: Binding(get: { selectedIDs.contains(work.id) }, set: { included in
                             if included { selectedIDs.insert(work.id) } else { selectedIDs.remove(work.id) }
                         })) {
+                            // SavedWorkExportMenu.svelte:189-190: the id prefix and the text, each whole on hover.
                             VStack(alignment: .leading, spacing: 3) {
                                 LibraryWorkTitle(work: work, untitled: model.display.localized("無題"))
-                                Text(Date(timeIntervalSince1970: Double(work.at) / 1000), format: .dateTime).inkuFont(12).foregroundStyle(.secondary)
+                                    .inkuTooltip(model.display.tooltipValue(work.effectiveSourceText))
+                                HStack(spacing: 6) {
+                                    Text(Date(timeIntervalSince1970: Double(work.at) / 1000), format: .dateTime)
+                                    Text(String(work.id.prefix(8))).monospaced().inkuTooltip(model.display.tooltipValue(work.id))
+                                }.inkuFont(12).foregroundStyle(.secondary)
                             }
                         }.disabled(isBusy || work.trashed)
                     }.frame(minWidth: 240, maxWidth: 310, minHeight: 260)
@@ -85,7 +90,7 @@ struct ExportView: View {
                             }
                             Button { svgHelpOpen.toggle() } label: { Image(systemName: "questionmark.circle") }
                                 .buttonStyle(.borderless).accessibilityLabel(copy("svgExportHelpAria", "SVGの用途と特徴"))
-                                .help(model.display.tooltip("SVGの用途と特徴", serverKey: "svgExportHelpAria"))
+                                .inkuTooltip(model.display.tooltip("SVGの用途と特徴", serverKey: "svgExportHelpAria"))
                                 .popover(isPresented: $svgHelpOpen) { svgHelp }
                         }
                         Text(model.display.localized("表示用は保存時の記述をSVGへ添えます。ほかのプロファイルは作品の保存条件で描画します。"))

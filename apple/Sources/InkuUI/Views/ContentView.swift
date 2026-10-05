@@ -99,6 +99,7 @@ public struct ContentView: View {
                 .opacity(presentation ? 0 : 1)
                 .accessibilityHidden(presentation)
                 .allowsHitTesting(!presentation)
+                .environment(\.inkuTooltipsCovered, presentation || ui.libraryOpen || ui.settingsOpen)
             if ui.libraryOpen && !presentation { libraryOverlay }
             if ui.settingsOpen && !presentation { settingsOverlay }
             if presentation { presentationView }
@@ -580,18 +581,35 @@ public struct ContentView: View {
         VStack(spacing: 8) {
             ArtworkCanvas(svg: presentationWork?.svg ?? "", renderer: model.renderer, caption: presentationWork?.effectiveSourceText ?? "",
                           style: .workspace, aspectRatio: presentationWork?.renderCanvasAspectRatio)
+            // CanvasPresentationOverlay.svelte:76-133: navigation, the star and the caption switch, each with its bubble.
             HStack {
-                Button(model.display.localized("最新")) { navigatePresentation(boundary: "latest") }
+                let display = model.display
+                Button(display.localized("最新")) { navigatePresentation(boundary: "latest") }
                     .disabled(!presentationHistory.canMoveNewer || model.isBrowsingLocked)
-                Button(model.display.localized("新しい作品"), systemImage: "chevron.left") { navigatePresentation(delta: -1) }
+                    .inkuTooltip(display.tooltip("最新の履歴", serverKey: "tooltipCanvasNavLatest"))
+                Button(display.localized("新しい作品"), systemImage: "chevron.left") { navigatePresentation(delta: -1) }
                     .disabled(!presentationHistory.canMoveNewer || model.isBrowsingLocked)
-                Button(model.display.localized("古い作品"), systemImage: "chevron.right") { navigatePresentation(delta: 1) }
+                    .inkuTooltip(display.tooltip("新しい作品", serverKey: "tooltipCanvasNavNewer"))
+                Button(display.localized("古い作品"), systemImage: "chevron.right") { navigatePresentation(delta: 1) }
                     .disabled(!presentationHistory.canMoveOlder || model.isBrowsingLocked)
-                Button(model.display.localized("最古")) { navigatePresentation(boundary: "oldest") }
+                    .inkuTooltip(display.tooltip("古い作品", serverKey: "tooltipCanvasNavOlder"))
+                Button(display.localized("最古")) { navigatePresentation(boundary: "oldest") }
                     .disabled(!presentationHistory.canMoveOlder || model.isBrowsingLocked)
+                    .inkuTooltip(display.tooltip("最古の履歴", serverKey: "tooltipCanvasNavOldest"))
                 if let work = presentationWork { Text(work.renderHash.map { String($0.suffix(4)) } ?? "").inkuFont(12, design: .monospaced) }
                 Spacer()
-                Button(model.display.localized("表示を終了")) { exitPresentation() }.keyboardShortcut(.escape, modifiers: [])
+                let starred = presentationWork.map { work in model.library.works.first { $0.id == work.id }?.starred ?? work.starred } ?? false
+                Button { presentationToggleStar() } label: { Text("★").foregroundStyle(starred ? Color(red: 0.84, green: 0.61, blue: 0.13) : .secondary) }
+                    .disabled(presentationWork == nil || model.library.mutating || !canUseWork)
+                    .accessibilityLabel(display.webCopy(starred ? "starOn" : "starOff", starred ? "スターを外す" : "スターを付ける"))
+                    .inkuTooltip(display.tooltip(starred ? "スターを外す" : "スターを付ける", serverKey: starred ? "starOn" : "starOff"))
+                Button { display.preferences.captionVisible.toggle() } label: { Image(systemName: "text.bubble") }
+                    .buttonStyle(InkuGhostButtonStyle(active: display.preferences.captionVisible))
+                    .disabled(presentationWork?.effectiveSourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false)
+                    .accessibilityLabel(display.webCopy("canvasCaptionToggle", "詞書の表示"))
+                    .inkuTooltip(display.tooltip("詞書の表示", serverKey: "canvasCaptionToggle"))
+                Button(display.localized("表示を終了")) { exitPresentation() }.keyboardShortcut(.escape, modifiers: [])
+                    .inkuTooltip(display.tooltip("プレゼンテーションモードを閉じる", serverKey: "canvasPresentationClose"))
             }
             .buttonStyle(InkuGhostButtonStyle())
             .padding(.horizontal, 16).padding(.bottom, 10)
@@ -607,6 +625,17 @@ public struct ContentView: View {
         guard canReadWork, ui.libraryOpen == fromLibrary, presentationLoadID == token else { return }
         presentationWork = work; presentationHistory = viewer
         enterPresentation()
+    }
+    private func presentationToggleStar() {
+        guard var work = presentationWork, !model.library.mutating else { return }
+        work.starred = model.library.works.first { $0.id == work.id }?.starred ?? work.starred
+        let target = work
+        Task {
+            await model.library.toggleStar(target)
+            if let saved = try? await model.auxiliaryDatabase().work(id: target.id), presentationWork?.id == target.id {
+                presentationWork?.starred = saved.starred
+            }
+        }
     }
     private func navigatePresentation(delta: Int = 0, boundary: String? = nil) {
         let workID = presentationWork?.id

@@ -16,7 +16,7 @@ struct DdlAuthoringView: View {
                     Spacer()
                     Button(model.display.localized("DDLを編集")) { editingSession = DdlEditingSession(model: model) }
                         .disabled(!model.canEditCurrentDDL)
-                        .help(tip("独立した編集画面でDDLを変更します。"))
+                        .inkuTooltip(tip("独立した編集画面でDDLを変更します。"))
                 }
                 if !model.authoringAuthority.isEmpty {
                     Label(model.display.localized(model.sourceLocked ? "DDL確定・記述ロック" : "記述から生成可能"),
@@ -108,7 +108,7 @@ struct DdlAuthoringView: View {
     private var checkButton: some View {
         Button(model.display.localized("検査")) { Task { await model.checkDDL() } }
             .disabled(model.isBusy || model.ddlText.isEmpty)
-            .help(tip("保存せずに、現在の指示書を検査します。"))
+            .inkuTooltip(tip("保存せずに、現在の指示書を検査します。"))
     }
 
     private func tip(_ key: String) -> String {

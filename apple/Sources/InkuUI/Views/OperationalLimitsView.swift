@@ -32,7 +32,7 @@ import SwiftUI
                                 Button { helpGroup = group.id } label: { Image(systemName: "info.circle") }
                                     .buttonStyle(.plain)
                                     .accessibilityLabel(model.display.localizedFormat("%@の説明", copy.limitGroups[group.id] ?? group.id))
-                                    .help(model.display.preferences.showTooltips ? tip : "")
+                                    .inkuTooltip(model.display.preferences.showTooltips ? tip : "")
                                     .popover(isPresented: Binding(get: { helpGroup == group.id }, set: { if !$0 { helpGroup = nil } })) {
                                         Text(tip).inkuFont(13).textSelection(.enabled).padding(16).frame(width: 380)
                                     }
@@ -45,7 +45,7 @@ import SwiftUI
                     HStack {
                         Button(model.display.localized("再読込")) { load() }.disabled(changed)
                         Button(copy.text("settingsRenderLimitsReset")) { draft = definition.defaults.mapValues(String.init); message = "" }
-                            .help(model.display.preferences.showTooltips ? model.display.localized("既定値を入力欄に戻します。変更を保存するまで適用しません。") : "")
+                            .inkuTooltip(model.display.preferences.showTooltips ? model.display.localized("既定値を入力欄に戻します。変更を保存するまで適用しません。") : "")
                         Spacer()
                         if changed {
                             Button(model.display.localized("取消")) { draft = saved.mapValues(String.init); message = "" }
@@ -86,7 +86,7 @@ import SwiftUI
                     TextField(copy.limitLabels[key] ?? key, text: Binding(get: { draft[key] ?? "" }, set: { draft[key] = $0; message = "" }))
                         .textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing).frame(width: 100)
                         .accessibilityLabel(copy.limitLabels[key] ?? key)
-                        .help(model.display.preferences.showTooltips ? copy.limitHints[key] ?? "" : "")
+                        .inkuTooltip(model.display.preferences.showTooltips ? copy.limitHints[key] ?? "" : "")
                     Button { step(key, by: 1, definition: definition) } label: { Image(systemName: "plus") }
                 }.buttonStyle(.borderless).disabled(saving || model.isBrowsingLocked)
             }

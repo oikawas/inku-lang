@@ -39,8 +39,8 @@ public struct RefinementView: View {
                 Button { Task { await close() } } label: { Image(systemName: "xmark") }
                     .buttonStyle(.plain)
                     .accessibilityLabel(model.display.localized(refinement.hasUnsaved ? "破棄して閉じる" : "閉じる"))
-                    .help(model.display.preferences.showTooltips ? model.display.localized(refinement.hasUnsaved ? "破棄して閉じる" : "閉じる") : "")
                     .disabled(closeDisabled)
+                    .inkuTooltip(model.display.preferences.showTooltips ? model.display.localized(refinement.hasUnsaved ? "破棄して閉じる" : "閉じる") : "")
             }.padding(.horizontal, 16).padding(.vertical, 12)
             Divider()
             ScrollViewReader { proxy in
@@ -93,7 +93,7 @@ public struct RefinementView: View {
                     .accessibilityLabel(model.display.localized("元の作品"))
                 Text(refinement.work.effectiveSourceText).inkuFont(13).lineLimit(4)
                     .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
-                    .help(model.display.preferences.showTooltips ? refinement.work.effectiveSourceText : "")
+                    .inkuTooltip(model.display.preferences.showTooltips ? refinement.work.effectiveSourceText : "")
                     .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
             }.frame(minHeight: 120, alignment: .top)
             workFacts(refinement.work)
@@ -175,9 +175,23 @@ public struct RefinementView: View {
                 .background(selected ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(selected ? Color.accentColor : Color.secondary.opacity(0.2)))
         }.buttonStyle(.plain).disabled(controlsDisabled || !refinement.initialized || locked)
+            .inkuTooltip(kindTooltip(kind, locked: locked), placement: locked ? .right : .bottom)
             .accessibilityLabel(model.display.localized(kind.titleKey))
             .accessibilityValue(model.display.localized(selected ? "選択済み" : "未選択"))
             .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    /// RefinementAdjustView.svelte:96-117: what each element does; a held work names why reading is off.
+    private func kindTooltip(_ kind: RefinementKind, locked: Bool) -> String {
+        if locked {
+            return model.display.tooltip("編集した指示書で確定した作品です。記述を読み直す操作は使えません。", serverKey: "descriptionLockedReason")
+        }
+        switch kind {
+        case .layout: return model.display.tooltip("指示書で明示したかたむきの角度と「隅」の位置を選び直します。「中心」だけの作品では、どの候補も同じ絵になります", serverKey: "tooltipCanvasVaryComposition")
+        case .reading: return model.display.tooltip("AIによる言葉の読み取りからやり直し、新しい正規化DDLを生成します。配置とタッチは下流工程として再生成されます", serverKey: "tooltipCanvasVaryInterpretation")
+        case .touch: return model.display.tooltip("入力した言葉から、線の質感、太さの揺らぎ、インクの滲みなどのタッチだけを決めます。同じ言葉は同じタッチになり、読み取りとJSON Scoreは保たれ、LLMを呼びません", serverKey: "tooltipCanvasVaryPerformance")
+        case .variation: return ""
+        }
     }
 
     private var generationControls: some View {
@@ -206,8 +220,9 @@ public struct RefinementView: View {
         }.buttonStyle(.bordered)
             .disabled(!refinement.canGenerate(count: count) || controlsDisabled || model.isPreview
                 || refinement.kind == .reading && !model.hasNextDrawingModel)
-            .help(model.display.preferences.showTooltips && count == 4 && refinement.kind == .touch
-                ? model.display.localized("タッチの候補は1案だけ用意できます。") : "")
+            // RefinementAdjustView.svelte:134,144.
+            .inkuTooltip(count == 1 ? model.display.tooltip("選択した1種類の要素だけを変更した1案を作ります。選んだ候補は履歴に保存できます", serverKey: "tooltipRefineSingle")
+                         : model.display.tooltip("選択した1種類の要素だけを変えて4案を作ります。", serverKey: "tooltipVariationGridDefault"))
     }
 
     private var progressCard: some View {
@@ -225,8 +240,11 @@ public struct RefinementView: View {
                     .accessibilityLabel(model.display.localized("候補の進捗"))
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 140))], alignment: .leading, spacing: 8) {
                     ForEach(refinement.slots) { slot in
+                        // VariationLanes.svelte:85: each lane names its task on hover.
                         Label(model.display.localizedFormat("候補 %ld: %@", slot.id, model.display.localized(slotLabel(slot))), systemImage: slotSymbol(slot))
                             .inkuFont(12).foregroundStyle(slot.state == .failed ? Color.red : Color.secondary)
+                            .inkuTooltip(model.display.tooltipValue(model.display.localizedFormat("候補 %ld", slot.id) + " · "
+                                                                    + model.display.localized(refinement.kind.titleKey)))
                     }
                 }
             }
@@ -279,7 +297,9 @@ public struct RefinementView: View {
                 Text(model.display.localized("動いたもの: なし")).inkuFont(12, weight: .semibold)
             }
             if candidate.savedWork != nil {
+                // RefinementCandidateGrid.svelte:63: the saved mark says so.
                 Label(model.display.localized("保存済み"), systemImage: "checkmark.circle.fill").inkuFont(13).foregroundStyle(.secondary)
+                    .inkuTooltip(model.display.tooltip("保存済み"))
             } else {
                 Toggle(model.display.localized("この候補を採用"), isOn: Binding(
                     get: { candidate.selected }, set: { refinement.selectCandidate(candidate.id, selected: $0) }))
@@ -326,6 +346,10 @@ public struct RefinementView: View {
         Button(model.display.localized(refinement.hasUnsaved ? "破棄して閉じる" : "閉じる"), role: refinement.hasUnsaved ? .destructive : nil) {
             Task { await close() }
         }.disabled(closeDisabled).keyboardShortcut(.cancelAction)
+            // RefinementCandidateGrid.svelte:34.
+            .inkuTooltip(refinement.hasUnsaved
+                         ? model.display.tooltip("未保存の候補をすべて捨てて閉じます。保存済みの候補は履歴に残ります。", serverKey: "tooltipRefineDiscardAndClose")
+                         : model.display.tooltip("閉じる"))
     }
 
     private var saveButton: some View {
@@ -338,6 +362,8 @@ public struct RefinementView: View {
             }
         }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
             .disabled(!refinement.canSave || model.isBusy || model.isPreview || closing)
+            // RefinementCandidateGrid.svelte:39.
+            .inkuTooltip(model.display.tooltip("チェックした候補を履歴に保存して閉じます。選ばなかった候補は破棄します。保存した候補には、スターと選んだ理由を残せます。", serverKey: "tooltipVariationGridSaveSelected"))
     }
 
     private var settingsButton: some View {

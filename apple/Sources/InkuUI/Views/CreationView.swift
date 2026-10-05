@@ -132,12 +132,15 @@ struct CreationView: View {
                         Button(display.webCopy("ddlNewButton", "指示書の新規作成")) { showNewDDL = true }
                             .buttonStyle(InkuGhostButtonStyle())
                             .disabled(controlsDisabled)
-                            .help(display.tooltip("記述を介さず、指示書を直接書いて独立した作品として描画します", serverKey: "tooltipDdlNew"))
+                            .inkuTooltip(display.tooltip("記述を介さず、指示書を直接書いて独立した作品として描画します", serverKey: "tooltipDdlNew"))
                     }.padding(.top, -6)
                 }
                 if !isBatch, let work = workspaceWork {
                     CreationDisplayedProcess(model: model, work: work, saved: hasSavedWorkspaceWork,
                                              disabled: controlsDisabled, onWorkAction: onWorkAction)
+                }
+                if !isBatch, display.visible("detail_status"), let work = workspaceWork {
+                    CreationResultLog(model: model, work: work)
                 }
                 statusFooter
             }
@@ -154,12 +157,12 @@ struct CreationView: View {
                          running: model.isBusy && !automation.isOccupied) {
                 automation.workspaceInputMode = "description"
             }
-            .help(display.tooltip("自由な自然言語で記述を入力して1枚ずつ描画します", serverKey: "tooltipInputTabSingle"))
+            .inkuTooltip(display.tooltip("自由な自然言語で記述を入力して1枚ずつ描画します", serverKey: "tooltipInputTabSingle"))
             InkuPanelTab(title: display.webCopy("modeBatch", "バッチ"), selected: isBatch,
                          running: automation.running && automation.mode == "batch", progress: batchProgress) {
                 automation.workspaceInputMode = "batch"
             }
-            .help(display.tooltip("改行区切りで複数の記述を入力し、順次連続して描画します", serverKey: "tooltipInputTabBatch"))
+            .inkuTooltip(display.tooltip("改行区切りで複数の記述を入力し、順次連続して描画します", serverKey: "tooltipInputTabBatch"))
         }
         .overlay(alignment: .bottom) { Rectangle().fill(InkuColor.border).frame(height: 1).allowsHitTesting(false) }
         .disabled(browsingDisabled)
@@ -226,7 +229,7 @@ struct CreationView: View {
                 }
                 .buttonStyle(InkuGhostButtonStyle())
                 .disabled(controlsDisabled)
-                .help(display.tooltip("入力をクリアする", serverKey: "tooltipInputClear"))
+                .inkuTooltip(display.tooltip("入力をクリアする", serverKey: "tooltipInputClear"))
             }
             editor(text: $model.descriptionText, readOnly: descriptionLocked)
             if descriptionLocked {
@@ -278,11 +281,11 @@ struct CreationView: View {
                 Spacer(minLength: 0)
                 Button(display.webCopy("editButton", "変更"), action: action)
                     .buttonStyle(InkuGhostButtonStyle())
-                    .help(help)
+                    .inkuTooltip(help)
             }
             Text(value).inkuFont(14).lineLimit(2).truncationMode(.middle)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .help(display.tooltipValue(value))
+                .inkuTooltip(display.tooltipValue(value))
         }
         .padding(.vertical, 7)
     }
@@ -290,20 +293,20 @@ struct CreationView: View {
     @ViewBuilder private var compactConditionControls: some View {
         Button(display.localized("写生") + ": " + display.localized(model.sketchMode == "on" ? "あり" : "なし")) { showSketchMenu.toggle() }
             .buttonStyle(InkuGhostButtonStyle())
-            .help(tip(model.sketchMode == "on" ? "記述の横に、場所の広がりや季節・時刻の光を補って描く" : "写生を通さず、記述だけで描く"))
+            .inkuTooltip(display.tooltip("次の作品で写生を使うかを選びます。", serverKey: "tooltipInputSketch"))
             .popover(isPresented: $showSketchMenu, arrowEdge: .bottom) { sketchMenu }
         Button(display.webCopy("wildButton", "暴れる") + " " + display.webCopy(model.wild ? "wildEnabled" : "wildDisabled", model.wild ? "入" : "切")) {
             model.wild.toggle()
         }
         .buttonStyle(InkuGhostButtonStyle(active: model.wild))
         .accessibilityValue(display.localized(model.wild ? "オン" : "オフ"))
-        .help(tip("次の作品の筆致を規則から外します。"))
+        .inkuTooltip(tip("次の作品の筆致を規則から外します。"))
         Button { showPaperPicker = true } label: {
             Label(display.localized("用紙") + ": " + (model.canvases.first { $0.id == model.canvasID }?.label ?? model.canvasID),
                   systemImage: "rectangle.portrait")
         }
         .buttonStyle(InkuGhostButtonStyle())
-        .help(tip("用紙の形と意図を見て、次の作品の用紙を選びます。"))
+        .inkuTooltip(tip("用紙の形と意図を見て、次の作品の用紙を選びます。"))
         .popover(isPresented: $showPaperPicker) {
             CreationPaperPicker(model: model) { showPaperPicker = false }.environment(display)
         }
@@ -311,7 +314,7 @@ struct CreationView: View {
         // Native: language, seed and catalog choice, which the Web keeps in other places.
         Button(display.localized("生成条件の詳細")) { showConditionDetails = true }
             .buttonStyle(InkuGhostButtonStyle())
-            .help(tip("言語・シード・配色の選び方を確認して変更します。"))
+            .inkuTooltip(tip("言語・シード・配色の選び方を確認して変更します。"))
             .popover(isPresented: $showConditionDetails) { conditionDetails }
     }
 
@@ -344,9 +347,9 @@ struct CreationView: View {
             Picker(display.localized("配色の選び方"), selection: $model.catalogMode) {
                 Text(display.localized("指定")).tag("fixed")
                 Text(display.localized("記述から選択")).tag("auto")
-            }.help(tip("次の作品の配色を選びます。"))
+            }.inkuTooltip(tip("次の作品の配色を選びます。"))
             TextField(display.localized("シード（空欄で新規）"), text: $model.seedText).textFieldStyle(.roundedBorder)
-                .help(tip("空欄なら次の描画で新しいシードを使います。"))
+                .inkuTooltip(tip("空欄なら次の描画で新しいシードを使います。"))
         }.padding(16).frame(width: 360).disabled(controlsDisabled)
     }
 
@@ -395,7 +398,7 @@ struct CreationView: View {
                 .buttonStyle(InkuPaintButtonStyle())
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!model.canForkDescription || automation.isOccupied)
-                .help(display.tooltip("この記述をそのまま使って、新しい作品として描き直します。", serverKey: "tooltipForkDescription"))
+                .inkuTooltip(display.tooltip("この記述をそのまま使って、新しい作品として描き直します。", serverKey: "tooltipForkDescription"))
             } else {
                 Button { batchWorkspace.showHistory(); Task { await model.generateDescription() } } label: {
                     Text(display.webCopy("submitBtn", "生成"))
@@ -403,7 +406,7 @@ struct CreationView: View {
                 .buttonStyle(InkuPaintButtonStyle())
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!model.canGenerateDescription || automation.isOccupied)
-                .help(tip("入力と次の生成条件から作品を描きます。"))
+                .inkuTooltip(tip("入力と次の生成条件から作品を描きます。"))
             }
         }
     }
@@ -421,7 +424,7 @@ struct CreationView: View {
                 .buttonStyle(InkuGhostButtonStyle())
                 .keyboardShortcut(.escape, modifiers: [])
                 .disabled(stopping)
-                .help(tip("実行中の描画を停止します。"))
+                .inkuTooltip(tip("実行中の描画を停止します。"))
         }
         .padding(.vertical, 6).padding(.horizontal, 8)
         .frame(minHeight: 46)
@@ -472,7 +475,7 @@ struct CreationView: View {
         .buttonStyle(.plain)
         .overlay(alignment: .trailing) { Rectangle().fill(InkuColor.border).frame(width: 1) }
         .accessibilityLabel(title)
-        .help(display.preferences.showTooltips ? title : "")
+        .inkuTooltip(display.preferences.showTooltips ? title : "")
     }
 
     // MARK: - Canvas panel
@@ -502,12 +505,12 @@ struct CreationView: View {
                 InkuTextTab(title: display.webCopy("tabCanvas", "作品"), selected: ui.workspaceTab != "lineage", compact: !wide) {
                     ui.workspaceTab = "artwork"
                 }
-                .help(display.tooltip("描画された作品のキャンバスを表示します", serverKey: "tooltipCanvasTabCanvas"))
+                .inkuTooltip(display.tooltip("描画された作品のキャンバスを表示します", serverKey: "tooltipCanvasTabCanvas"), placement: .bottom)
                 InkuTextTab(title: display.localized("系譜"), selected: ui.workspaceTab == "lineage", compact: !wide) {
                     ui.workspaceTab = "lineage"
                 }
                 .disabled(workspaceWork == nil || browsingDisabled)
-                .help(display.tooltip("作品の派生関係を表示"))
+                .inkuTooltip(display.tooltip("作品の派生関係を表示"), placement: .bottom)
                 if wide && showsMeta, let work = workspaceWork {
                     Spacer(minLength: 12)
                     metaStrip(work)
@@ -537,7 +540,8 @@ struct CreationView: View {
             Text(display.webCopy("displayedWorkConditions", "表示中作品の描画条件")).inkuFont(12, weight: .medium)
                 .foregroundStyle(.secondary).lineLimit(1).fixedSize()
                 .padding(.trailing, 12)
-            metaItem(display.localized("モデル"), maxWidth: 280) {
+            // CanvasPanel.svelte:707,726,730: each value carries its own title, the models as "解釈 / 描画".
+            metaItem(display.localized("モデル"), maxWidth: 280, title: stage1 + " / " + stage2) {
                 if stage1 == stage2 {
                     Text(stage1)
                 } else {
@@ -547,22 +551,23 @@ struct CreationView: View {
                     }
                 }
             }
-            metaItem(display.localized("色カタログ"), maxWidth: 130) { Text(catalog) }
-            metaItem(display.localized("キャンバス"), maxWidth: 100) { Text(canvas) }
+            metaItem(display.localized("色カタログ"), maxWidth: 130, title: catalog) { Text(catalog) }
+            metaItem(display.localized("キャンバス"), maxWidth: 100, title: canvas) { Text(canvas) }
             metaItem(display.localized("サイズ"), maxWidth: nil) { Text(size).monospacedDigit() }
             metaItem(display.localized("作成"), maxWidth: nil) { Text(created).monospacedDigit() }
         }
         .padding(.vertical, 7)
-        .help(display.tooltipValue([stage1 == stage2 ? stage1 : stage1 + " / " + stage2, catalog, canvas, size, created].joined(separator: " · ")))
         .accessibilityElement(children: .combine)
     }
 
-    private func metaItem<Value: View>(_ label: String, maxWidth: CGFloat?, @ViewBuilder value: () -> Value) -> some View {
+    private func metaItem<Value: View>(_ label: String, maxWidth: CGFloat?, title: String = "",
+                                       @ViewBuilder value: () -> Value) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label).inkuFont(12).foregroundStyle(.tertiary).lineLimit(1)
             value().inkuFont(13).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
                 .frame(maxWidth: maxWidth, alignment: .leading)
                 .fixedSize(horizontal: maxWidth == nil, vertical: false)
+                .inkuTooltip(display.tooltipValue(title))
         }
         .padding(.horizontal, 12)
         .overlay(alignment: .leading) { Rectangle().fill(InkuColor.border).frame(width: 1).padding(.vertical, 2) }
@@ -588,7 +593,9 @@ struct CreationView: View {
             .menuStyle(.borderlessButton)
             .fixedSize()
             .disabled(browsingDisabled)
-            .help(display.tooltip("作品の操作"))
+            // WorkActionMenu.svelte:107: a locked trigger says why (CanvasPanel passes `workActionGenerationLocked`).
+            .inkuTooltip(browsingDisabled ? display.tooltip("生成中は推敲を開始できません。", serverKey: "workActionGenerationLocked")
+                         : display.tooltip("作品の操作"))
         } else if workspaceWork != nil, !model.isBusy {
             Text(display.webCopy("workActionSaveFirst", "推敲するには、先に作品を保存してください。"))
                 .inkuFont(11).foregroundStyle(.tertiary).lineLimit(1)
@@ -649,6 +656,9 @@ struct CreationView: View {
                 .padding(.trailing, 18).padding(.bottom, 14)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             if workspaceIsPreview { previewBadge.frame(maxHeight: .infinity, alignment: .top).padding(.top, 12) }
+            CanvasFallbackBadges(display: display, work: workspaceWork)
+                .padding([.top, .trailing], 12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         }
     }
 
@@ -674,12 +684,12 @@ struct CreationView: View {
             Button(display.webCopy("historyLatest", "最新")) { navigateHistory(boundary: "latest") }
                 .buttonStyle(InkuFloatingPillButtonStyle())
                 .disabled(!history.canMoveNewer)
-                .help(display.tooltip("最新の履歴", serverKey: "tooltipCanvasNavLatest"))
+                .inkuTooltip(display.tooltip("最新の履歴", serverKey: "tooltipCanvasNavLatest"), placement: .right)
             Button { navigateHistory(delta: -1) } label: { Text("‹") }
                 .buttonStyle(InkuFloatingCircleButtonStyle(diameter: 38))
                 .disabled(!history.canMoveNewer)
                 .accessibilityLabel(display.localized("新しい作品"))
-                .help(display.tooltip("新しい作品", serverKey: "tooltipCanvasNavNewer"))
+                .inkuTooltip(display.tooltip("新しい作品", serverKey: "tooltipCanvasNavNewer"), placement: .right)
         }
         .disabled(browsingDisabled)
     }
@@ -690,12 +700,12 @@ struct CreationView: View {
             Button(display.webCopy("historyOldest", "最古")) { navigateHistory(boundary: "oldest") }
                 .buttonStyle(InkuFloatingPillButtonStyle())
                 .disabled(!history.canMoveOlder)
-                .help(display.tooltip("最古の履歴", serverKey: "tooltipCanvasNavOldest"))
+                .inkuTooltip(display.tooltip("最古の履歴", serverKey: "tooltipCanvasNavOldest"), placement: .left)
             Button { navigateHistory(delta: 1) } label: { Text("›") }
                 .buttonStyle(InkuFloatingCircleButtonStyle(diameter: 38))
                 .disabled(!history.canMoveOlder)
                 .accessibilityLabel(display.localized("古い作品"))
-                .help(display.tooltip("古い作品", serverKey: "tooltipCanvasNavOlder"))
+                .inkuTooltip(display.tooltip("古い作品", serverKey: "tooltipCanvasNavOlder"), placement: .left)
             if history.library.total > 0 {
                 Text("\((history.selectedIndex ?? 0) + 1) / \(history.library.total)")
                     .inkuFont(11).monospacedDigit().foregroundStyle(.secondary).fixedSize()
@@ -726,7 +736,7 @@ struct CreationView: View {
                 Button { ui.saijikiOpen = false } label: { Image(systemName: "xmark").inkuFont(15).frame(width: 30, height: 30).contentShape(Rectangle()) }
                     .buttonStyle(.plain).foregroundStyle(.secondary)
                     .accessibilityLabel(display.localized("閉じる"))
-                    .help(display.tooltip("閉じる"))
+                    .inkuTooltip(display.tooltip("閉じる"))
             }.padding(.horizontal, 8).padding(.top, 6)
             SaijikiView(model: model)
         }

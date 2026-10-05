@@ -1336,7 +1336,7 @@
 "full hash をコピー" = "Copy full hash";
 "クリックでfull hashをコピーします" = "Click to copy the full hash";
 "保存済みScoreとseedで再レンダリング" = "perform again from the saved Score and seed";
-"選択中作品の生成情報を表示" = "Show generation information for the selected work";
+"選択中作品の生成情報を表示" = "Show the provenance, prompts, and JSON of the chosen work";
 "表示中の作品を共有カードとして書き出します。版面と刻印は設定に従います。" = "Exports the work on the canvas as a share card. The page shape and seal follow the settings.";
 "書き出すには、先に作品を保存してください。" = "Save the work first to export it.";
 "クリップボードにコピー" = "Copy to clipboard";
@@ -1441,3 +1441,5 @@
 "Swiftパッケージ" = "Swift packages";
 "Rustクレート" = "Rust crates";
 "同梱の辞書とフォント" = "Bundled dictionaries and font";
+"作品の派生関係を表示" = "Show how this work was derived";
+"チェックした作品をゴミ箱へ移動" = "Move checked works to trash";

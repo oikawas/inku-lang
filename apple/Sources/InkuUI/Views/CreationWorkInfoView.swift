@@ -45,7 +45,7 @@ struct CreationWorkInfoView: View {
                 if loading { ProgressView().controlSize(.small) }
                 Button(model.display.localized("閉じる")) { close() }.keyboardShortcut(.cancelAction)
                     .buttonStyle(InkuGhostButtonStyle())
-                    .help(model.display.tooltip("閉じる"))
+                    .inkuTooltip(model.display.tooltip("閉じる"))
             }
             if let work {
                 Text(LibraryWorkPresentation.title(work, untitled: model.display.localized("無題")))
@@ -77,7 +77,7 @@ struct CreationWorkInfoView: View {
                     Text(loadError).foregroundStyle(.red).textSelection(.enabled)
                     Spacer()
                     Button(model.display.localized("再読込")) { Task { await load() } }.disabled(loading)
-                        .help(model.display.tooltip("作品の保存記録を再読み込みします。"))
+                        .inkuTooltip(model.display.tooltip("作品の保存記録を再読み込みします。"))
                 }.inkuFont(13)
             }
         }
@@ -190,7 +190,7 @@ struct CreationWorkInfoView: View {
     private func row(_ label: String, _ value: String?, hint: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 16) {
             Text(label).foregroundStyle(.secondary).frame(width: 190, alignment: .leading)
-                .help(model.display.tooltip(label, serverKey: hint))
+                .inkuTooltip(model.display.tooltip(label, serverKey: hint))
             Text(value.flatMap { $0.isEmpty ? nil : $0 } ?? absent).frame(maxWidth: .infinity, alignment: .leading)
         }.inkuFont(13)
     }
@@ -206,14 +206,14 @@ struct CreationWorkInfoView: View {
         if let raw = work.renderColorMap, let fields = try? ExactJSON(data: Data(raw.utf8)).object, !fields.isEmpty {
             HStack(alignment: .top, spacing: 16) {
                 Text(copy("provenanceLabelColorMap", "色の対応")).foregroundStyle(.secondary).frame(width: 190, alignment: .leading)
-                    .help(model.display.tooltip("色の対応", serverKey: "provenanceHintColorMap"))
+                    .inkuTooltip(model.display.tooltip("色の対応", serverKey: "provenanceHintColorMap"))
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), alignment: .leading)], alignment: .leading, spacing: 6) {
                     ForEach(fields.keys.sorted(), id: \.self) { key in
                         let code = fields[key]?.string ?? ""
                         HStack(spacing: 5) {
                             RoundedRectangle(cornerRadius: 2).fill(swatch(code)).frame(width: 12, height: 12)
                             Text(key).inkuFont(12)
-                        }.help(model.display.tooltipValue(code))
+                        }.inkuTooltip(model.display.tooltipValue(code))
                     }
                 }
             }
@@ -228,7 +228,7 @@ struct CreationWorkInfoView: View {
                 if collapsible {
                     Button(copy(expandedPrompts.contains(id) ? "promptCollapse" : "promptExpand", expandedPrompts.contains(id) ? "折りたたむ" : "展開")) {
                         if !expandedPrompts.insert(id).inserted { expandedPrompts.remove(id) }
-                    }.buttonStyle(.borderless).help(model.display.tooltip("プロンプトの表示を切り替えます。"))
+                    }.buttonStyle(.borderless).inkuTooltip(model.display.tooltip("プロンプトの表示を切り替えます。"))
                 }
                 copyButton(text, id: id)
             }
@@ -260,9 +260,15 @@ struct CreationWorkInfoView: View {
             NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string)
             #endif
             copied = id
+            // OutputTabsContent.svelte:62,94,130 with `+page.svelte` copyPrompt: "copied" for 1.2 s.
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(1200))
+                if copied == id { copied = nil }
+            }
         } label: { Label(copy(copied == id ? "promptCopied" : "promptCopy", copied == id ? "コピーしました" : "コピー"), systemImage: "doc.on.doc") }
             .buttonStyle(.borderless).inkuFont(12)
-            .help(model.display.tooltip("内容をコピーします。", serverKey: "promptCopy"))
+            .inkuTooltip(copied == id ? model.display.tooltip("コピーしました", serverKey: "promptCopied")
+                         : model.display.tooltip("内容をコピーします。", serverKey: "promptCopy"))
     }
 
     private func copy(_ key: String, _ fallback: String) -> String {

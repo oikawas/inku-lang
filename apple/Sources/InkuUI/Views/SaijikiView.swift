@@ -27,7 +27,7 @@ public struct SaijikiView: View {
                 }
                 TextField(model.display.localized("語を探す"), text: $search)
                     .textFieldStyle(.roundedBorder)
-                    .help(tip("語を探す"))
+                    .inkuTooltip(tip("語を探す"))
                 if geometry.size.width >= 660 {
                     HStack(alignment: .top, spacing: 12) {
                         wordList.frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -102,7 +102,7 @@ public struct SaijikiView: View {
         .buttonStyle(.plain)
         .focused($focusedSelection, equals: value)
         .onHover { hovering in if hovering { selection = value } }
-        .help(model.display.tooltip("語彙を選ぶと、描画への効き方と作例を表示します。", serverKey: "saijikiHint"))
+        .inkuTooltip(model.display.tooltip("語彙を選ぶと、描画への効き方と作例を表示します。", serverKey: "saijikiHint"))
         .accessibilityAddTraits(selection == value ? .isSelected : [])
     }
 
@@ -140,7 +140,7 @@ public struct SaijikiView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(model.isBusy || !preview.insertable)
-                .help(tip("選んだ語を編集中DDLの末尾に挿入します。"))
+                .inkuTooltip(tip("選んだ語を編集中DDLの末尾に挿入します。"))
             }
         }
         .padding(12).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

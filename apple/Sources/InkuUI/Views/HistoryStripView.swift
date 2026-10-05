@@ -83,7 +83,7 @@ import SwiftUI
             }
             .buttonStyle(HistoryTitleButtonStyle())
             .disabled(locked)
-            .help(tip("ライブラリを開き、検索や複数選択を使えます。"))
+            .inkuTooltip(tip("ライブラリを開き、検索や複数選択を使えます。"))
             if !collapsed { filters.padding(.leading, 12) }
             if locked {
                 HStack(spacing: 6) {
@@ -105,7 +105,7 @@ import SwiftUI
             Button(collapsed ? "⌄" : "⌃") { collapsed.toggle() }
                 .buttonStyle(LibraryGhostButtonStyle(minWidth: 28))
                 .accessibilityLabel(display.webCopy(collapsed ? "historyExpand" : "historyCollapse", fallback: collapsed ? "履歴エリアを表示" : "履歴エリアを仕舞う"))
-                .help(display.tooltipValue(display.webCopy(collapsed ? "historyExpand" : "historyCollapse", fallback: collapsed ? "履歴エリアを表示" : "履歴エリアを仕舞う")))
+                .inkuTooltip(display.tooltipValue(display.webCopy(collapsed ? "historyExpand" : "historyCollapse", fallback: collapsed ? "履歴エリアを表示" : "履歴エリアを仕舞う")))
         }
     }
 
@@ -134,7 +134,7 @@ import SwiftUI
         }
         .buttonStyle(LibraryGhostButtonStyle(active: isOn.wrappedValue, minWidth: 76, minHeight: 28))
         .accessibilityAddTraits(isOn.wrappedValue ? .isSelected : [])
-        .help(tooltip)
+        .inkuTooltip(tooltip)
     }
 
     private var pageNavigation: some View {
@@ -143,22 +143,22 @@ import SwiftUI
                 .buttonStyle(LibraryGhostButtonStyle(minWidth: 54))
                 .disabled(locked || library.page == 0)
                 .accessibilityLabel(display.localized("最新の履歴"))
-                .help(display.tooltip("先頭ページ", serverKey: "tooltipHistoryLatestPage"))
+                .inkuTooltip(display.tooltip("先頭ページ", serverKey: "tooltipHistoryLatestPage"))
             Button(display.label("← 新しい\(library.pageSize)件", "← newer \(library.pageSize)")) { Task { await library.setPage(library.page - 1) } }
                 .buttonStyle(LibraryGhostButtonStyle(minWidth: 92))
                 .disabled(locked || library.page == 0)
-                .help(display.tooltip("前のページ", serverKey: "tooltipHistoryNewerPage"))
+                .inkuTooltip(display.tooltip("前のページ", serverKey: "tooltipHistoryNewerPage"))
             Text("\(library.page + 1) / \(library.pageCount)")
                 .inkuFont(11).monospacedDigit().foregroundStyle(.tertiary).frame(minWidth: 30)
             Button(display.label("古い\(library.pageSize)件 →", "older \(library.pageSize) →")) { Task { await library.setPage(library.page + 1) } }
                 .buttonStyle(LibraryGhostButtonStyle(minWidth: 92))
                 .disabled(locked || library.page + 1 >= library.pageCount)
-                .help(display.tooltip("次のページ", serverKey: "tooltipHistoryOlderPage"))
+                .inkuTooltip(display.tooltip("次のページ", serverKey: "tooltipHistoryOlderPage"))
             Button(display.webCopy("historyOldest", fallback: "最古")) { Task { await library.setPage(library.pageCount - 1) } }
                 .buttonStyle(LibraryGhostButtonStyle(minWidth: 54))
                 .disabled(locked || library.page + 1 >= library.pageCount)
                 .accessibilityLabel(display.localized("最古の履歴"))
-                .help(display.tooltip("最終ページ", serverKey: "tooltipHistoryOldestPage"))
+                .inkuTooltip(display.tooltip("最終ページ", serverKey: "tooltipHistoryOldestPage"))
         }
     }
 
@@ -184,6 +184,19 @@ import SwiftUI
             VStack(alignment: .leading, spacing: 0) {
                 ArtworkThumbnail(work: work, renderer: model.renderer)
                     .frame(width: 82, height: 58)
+                    .overlay(alignment: .topLeading) {
+                        // HistoryStrip.svelte:264-266: a work held by its edited DDL carries a lock, a mark rather than a control.
+                        if model.workActionState(for: work) == .lockedDescription {
+                            let mark = display.webCopy("descriptionLockedMark", fallback: "ロック")
+                            Image(systemName: "lock.fill").font(.system(size: 8 * display.preferences.textScale))
+                                .foregroundStyle(.secondary)
+                                .padding(2)
+                                .background(.background.opacity(0.85), in: RoundedRectangle(cornerRadius: 3))
+                                .padding(3)
+                                .accessibilityLabel(mark)
+                                .inkuTooltip(display.tooltipValue(mark))
+                        }
+                    }
                     .overlay(alignment: .bottomTrailing) {
                         if current {
                             Text(display.webCopy("historyCurrentBadge", fallback: "表示中"))
@@ -203,6 +216,8 @@ import SwiftUI
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1).truncationMode(.tail)
                                 .frame(height: 13 * display.preferences.textScale, alignment: .leading)
+                                // HistoryStrip.svelte:282: each field names itself in full.
+                                .inkuTooltip(display.tooltipValue(line.full))
                         }
                     }
                     .padding(.vertical, 3).padding(.horizontal, 5)
@@ -217,7 +232,8 @@ import SwiftUI
         }
         .buttonStyle(.plain)
         .overlay(alignment: .topTrailing) { starButton(work).padding(3) }
-        .help(display.tooltipValue(detailsTip(work)))
+        .task(id: work.id) { await model.loadWorkActionState(work) }
+        .inkuTooltip(display.tooltipValue(detailsTip(work)))
         .accessibilityLabel(display.localizedFormat("作品を開く: %@", title(work)))
     }
 
@@ -235,7 +251,7 @@ import SwiftUI
         .buttonStyle(.plain)
         .disabled(locked || model.isBusy || model.library.mutating)
         .accessibilityLabel(display.webCopy(work.starred ? "starOn" : "starOff", fallback: work.starred ? "スターを外す" : "スターを付ける"))
-        .help(display.tooltip(work.starred ? "スターを外す" : "スターを付ける", serverKey: work.starred ? "starOn" : "starOff"))
+        .inkuTooltip(display.tooltip(work.starred ? "スターを外す" : "スターを付ける", serverKey: work.starred ? "starOn" : "starOff"))
     }
 
     private func metadata(_ work: SavedWork) -> [(short: String, full: String)] {

@@ -341,6 +341,13 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 Text(model.display.localized("最新の成功") + ": " + (maintenance.backupLastSuccess?.formatted(date: .numeric, time: .shortened) ?? model.display.localized("未実行")))
                 Text(model.display.localized("次回予定") + ": " + (maintenance.nextBackupDate(preferences: model.display.preferences)?.formatted(date: .numeric, time: .shortened)
                     ?? model.display.localized(model.display.preferences.automaticBackup ? "状態の読込待ち" : "無効")))
+                if let bytes = maintenance.databaseBytes {
+                    // DatabaseAdministrationSettings.svelte:146: the estimate names what it counts on hover.
+                    Text(model.display.webCopy("settingsDbBackupEstimatedDisk", "必要な空き容量（概算）") + ": "
+                         + ByteCountFormatter.string(fromByteCount: bytes * Int64(max(1, model.display.preferences.backupGenerations)), countStyle: .file))
+                        .inkuTooltip(model.display.tooltip("いまの DB ファイルの大きさ × 最大保存世代数。手動バックアップは間引かれないので、この見積もりには入りません。",
+                                                           serverKey: "settingsDbBackupEstimatedDiskHint"))
+                }
                 Text(model.display.localizedFormat("保持済み: %ld世代", maintenance.backupGenerations.count)
                      + " · " + ByteCountFormatter.string(fromByteCount: maintenance.backupTotalBytes, countStyle: .file))
                 if !maintenance.backupGenerations.isEmpty {
@@ -360,7 +367,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             if let error = maintenance.backupInfoError { Text(model.display.message(error)).foregroundStyle(.red).textSelection(.enabled) }
             if let error = maintenance.backupError { Text(model.display.message(error)).foregroundStyle(.red).textSelection(.enabled) }
             Button(model.display.localized("状態を再読込")) { Task { await maintenance.refreshBackupInfo(app: model) } }
-                .help(model.display.tooltip("自動バックアップの状態と保存済みファイルの情報を読み直します。バックアップは作成しません。"))
+                .inkuTooltip(model.display.tooltip("自動バックアップの状態と保存済みファイルの情報を読み直します。バックアップは作成しません。"))
         }.inkuFont(13).task { await maintenance.refreshBackupInfo(app: model) }
     }
     private var clipboard: some View {

@@ -81,6 +81,8 @@ public final class AppModel {
     /// Browsing may continue during an explicitly backgrounded batch row; writers still use isBusy.
     public var isBrowsingLocked: Bool { isBusy && !backgroundDrawing }
     public var errorText: String?
+    /// Web CanvasPanel `clipboardMessage`: the copy button names the result, 2.5 s after success and 8 s after a failure.
+    public private(set) var clipboardMessageKey: String?
     public var providerURL = "http://localhost:8080/v1"
     public var providerModel = ""
     public var providerKind = "openai_compatible"
@@ -477,6 +479,8 @@ public final class AppModel {
     }
 
     public func localDataDirectory() -> URL? { database?.url.deletingLastPathComponent() }
+    /// The database file in use, once opened.
+    public var databaseFileURL: URL? { database?.url }
 
     public func hostSettings() async -> HostSettings { settings }
 
@@ -1645,7 +1649,8 @@ public final class AppModel {
         guard !isBusy, let work = target ?? displayedWork, !work.svg.isEmpty else { return }
         let executionID = currentExecutionID
         let height = min(4096, max(256, display.preferences.clipboardHeight))
-        _ = await performSerialized(status: "コピー画像を準備中") { [weak self] _ in
+        clipboardMessageKey = nil
+        let copied = await performSerialized(status: "コピー画像を準備中") { [weak self] _ in
             guard let self else { return }
             defer { self.currentExecutionID = executionID }
             var options = self.display.preferences.exportDefaults.options
@@ -1659,6 +1664,12 @@ public final class AppModel {
             NSPasteboard.general.clearContents()
             guard NSPasteboard.general.writeObjects([nativeImage]) else { throw HostError("clipboard_write_failed") }
             self.status = "画像をコピーしました（Y軸 \(height)px）"
+        }
+        let key = copied ? "canvasCopiedToClipboard" : "clipboardCopyFailed"
+        clipboardMessageKey = key
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(copied ? 2500 : 8000))
+            if self?.clipboardMessageKey == key { self?.clipboardMessageKey = nil }
         }
         #endif
     }

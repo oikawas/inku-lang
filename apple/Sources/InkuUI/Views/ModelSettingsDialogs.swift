@@ -336,7 +336,7 @@ struct ProviderModelsSheet: View {
             HStack(spacing: 10) {
                 Button(model.display.localized(isFetching ? "取得中…" : "モデルリスト取得")) { Task { await fetch() } }
                     .disabled(isWorking || model.isBrowsingLocked || settings.isLoadingModels || draft.isDirty || provider == nil)
-                    .help(draft.isDirty ? model.display.tooltip("未保存の変更を保存または取り消してからモデルリストを取得してください。", serverKey: "settingsModelFetchDisabledWhileDirty") : "")
+                    .inkuTooltip(draft.isDirty ? model.display.tooltip("未保存の変更を保存または取り消してからモデルリストを取得してください。", serverKey: "settingsModelFetchDisabledWhileDirty") : "")
                 Button(model.display.localized("表示中を全て使用")) { draft.setVisible(models: visibleModels, enabled: true) }
                     .disabled(isWorking || visibleModels.isEmpty)
                 Button(model.display.localized("表示中を全て解除")) { draft.setVisible(models: visibleModels, enabled: false) }

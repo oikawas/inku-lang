@@ -14,7 +14,10 @@ public struct UnreadWordsView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(model.display.localized("未読語台帳")).inkuFont(14, weight: .semibold)
-                Image(systemName: "questionmark.circle").help(model.display.tooltip("固有名詞・専門語・造語など、記述からDDLへの直接の対応を確認できなかった語を集めます。頻度と文脈を人間が確認し、語彙追加を判断します。辞書への自動追加は行いません。"))
+                Image(systemName: "questionmark.circle")
+                    // UnreadWordsPanel.svelte:48: the purpose, in the Web's paragraphs.
+                    .inkuTooltip(model.display.tooltip("固有名詞・専門語・造語など、記述からDDLへの直接の対応を確認できなかった語を集めます。頻度と文脈を人間が確認し、語彙追加を判断します。辞書への自動追加は行いません。",
+                                                       serverKey: "settingsUnreadWordsPurposeTooltip"), wide: true)
                 Spacer()
                 Button(model.display.localized("再読込")) { Task { await reload() } }.disabled(loading)
             }
@@ -35,8 +38,11 @@ public struct UnreadWordsView: View {
                                     Spacer()
                                     Text(date(item.lastAt), style: .date).inkuFont(12)
                                     Text(date(item.lastAt), style: .time).inkuFont(12)
-                                }.help(model.display.tooltipValue(model.display.localized("初回記録: ") + date(item.firstAt).formatted(date: .abbreviated, time: .standard)))
-                                ForEach(item.contexts, id: \.self) { context in Text(context).inkuFont(12).foregroundStyle(.secondary).textSelection(.enabled) }
+                                }.inkuTooltip(model.display.tooltipValue(model.display.webCopy("settingsUnreadWordsFirstSeen", "初回記録") + ": " + date(item.firstAt).formatted(date: .abbreviated, time: .standard)))
+                                ForEach(item.contexts, id: \.self) { context in
+                                    Text(context).inkuFont(12).foregroundStyle(.secondary).textSelection(.enabled)
+                                        .inkuTooltip(model.display.tooltipValue(context))
+                                }
                             }
                             Divider()
                         }

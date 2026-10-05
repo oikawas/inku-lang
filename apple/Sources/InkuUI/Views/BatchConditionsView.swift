@@ -17,11 +17,11 @@ struct BatchConditionsView: View {
             Text(model.display.localized("次のバッチの描画条件"))
                 .inkuFont(12, weight: .semibold).foregroundStyle(.secondary)
             conditionRow("モデル", value: modelSummary) { showModelPicker = true }
-            .help(tip("次のバッチで使う描画モデルを選びます。"))
+            .inkuTooltip(tip("次のバッチで使う描画モデルを選びます。"))
             Divider()
             conditionRow("色カタログ", value: catalogSummary) { showColorCatalogs = true }
             .disabled(model.catalogs.isEmpty)
-            .help(tip("次のバッチで使う配色を選びます。"))
+            .inkuTooltip(tip("次のバッチで使う配色を選びます。"))
             Divider()
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 6) { compactControls }.fixedSize(horizontal: true, vertical: false)
@@ -37,7 +37,7 @@ struct BatchConditionsView: View {
                 Spacer(minLength: 0)
                 Button(model.display.localized("詳細"), systemImage: "ellipsis") { showDetails = true }
                     .buttonStyle(InkuGhostButtonStyle())
-                    .help(tip("言語とシードを確認して変更します。"))
+                    .inkuTooltip(tip("言語とシードを確認して変更します。"))
                     .popover(isPresented: $showDetails) { details }
             }
         }
@@ -96,7 +96,7 @@ struct BatchConditionsView: View {
         Button { showSketchPicker = true } label: {
             Text(model.display.localized("写生") + ": " + model.display.localized(automation.batchSketchMode == "on" ? "あり" : "なし"))
         }
-        .help(tip("次の作品で写生を使うかを選びます。"))
+        .inkuTooltip(tip("次の作品で写生を使うかを選びます。"))
         .accessibilityLabel(model.display.localized("写生"))
         .accessibilityValue(model.display.localized(automation.batchSketchMode == "on" ? "あり" : "なし"))
         .popover(isPresented: $showSketchPicker) { sketchPicker }
@@ -144,7 +144,7 @@ struct BatchConditionsView: View {
         }
         .buttonStyle(InkuGhostButtonStyle(active: model.wild))
         .buttonStyle(.plain)
-        .help(tip("次の作品の筆致を規則から外します。"))
+        .inkuTooltip(tip("次の作品の筆致を規則から外します。"))
         .accessibilityLabel(model.display.localized("暴れる"))
         .accessibilityValue(model.display.localized(model.wild ? "入" : "切"))
     }
@@ -154,7 +154,7 @@ struct BatchConditionsView: View {
             Text(model.display.localized("キャンバス") + ": " + (model.canvases.first { $0.id == model.canvasID }?.label ?? model.canvasID))
                 .lineLimit(1)
         }
-        .help(tip("用紙の形と意図を見て、次の作品の用紙を選びます。"))
+        .inkuTooltip(tip("用紙の形と意図を見て、次の作品の用紙を選びます。"))
         .popover(isPresented: $showPaperPicker) {
             CreationPaperPicker(model: model) { showPaperPicker = false }.environment(model.display).disabled(disabled)
         }
@@ -166,14 +166,14 @@ struct BatchConditionsView: View {
             guard !disabled else { return }
             automation.restoreBatchInput("")
         }
-        .help(tip("バッチの入力欄を空にします。前回の実行記録と保存作品は残ります。"))
+        .inkuTooltip(tip("バッチの入力欄を空にします。前回の実行記録と保存作品は残ります。"))
     }
 
     private var details: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(model.display.localized("生成条件の詳細")).inkuFont(14, weight: .semibold)
             TextField(model.display.localized("シード（空欄で新規）"), text: $model.seedText).textFieldStyle(.roundedBorder)
-                .help(tip("空欄なら次の描画で新しいシードを使います。"))
+                .inkuTooltip(tip("空欄なら次の描画で新しいシードを使います。"))
         }
         .padding(16).frame(width: 340).disabled(disabled)
     }

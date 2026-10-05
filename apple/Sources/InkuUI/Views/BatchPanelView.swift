@@ -175,6 +175,7 @@ struct BatchPanelView: View {
             .inkuFont(12).foregroundStyle(.secondary)
         Button(model.display.localized("新規作成")) { automation.restoreBatchInput("") }
             .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
+            .inkuTooltip(model.display.tooltip("入力をクリアする", serverKey: "tooltipInputClear"))
     }
 
     private var inputHistory: some View {
@@ -211,7 +212,7 @@ struct BatchPanelView: View {
         .disabled(controlsDisabled || automation.batchPromptHistory.isEmpty)
         .accessibilityLabel(model.display.localized("入力履歴"))
         .accessibilityValue(selectedHistoryPrompt.isEmpty ? model.display.localized("履歴から選択") : historyLabel(selectedHistoryPrompt))
-        .help(tip("選んだ履歴をバッチ入力欄へ復元します。実行記録と保存作品は変わりません。"))
+        .inkuTooltip(tip("選んだ履歴をバッチ入力欄へ復元します。実行記録と保存作品は変わりません。"))
     }
 
     private func historyLabel(_ text: String) -> String {
@@ -238,7 +239,7 @@ struct BatchPanelView: View {
             Button(model.display.localized("前回のバッチを再開")) { Task { await automation.resumeBatch(app: model) } }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .disabled(controlsDisabled || automation.uncertainCount > 0)
-                .help(tip("前回の開始時の条件で、未処理の行と失敗した行を再開します。"))
+                .inkuTooltip(tip("前回の開始時の条件で、未処理の行と失敗した行を再開します。"))
         }
         .padding(12).frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
@@ -257,7 +258,7 @@ struct BatchPanelView: View {
                     Task { await automation.stop(app: model) }
                 }
                 .buttonStyle(.bordered).disabled(automation.stopping)
-                .help(tip("実行中のバッチを停止します。未処理の行は後で再開できます。"))
+                .inkuTooltip(tip("実行中のバッチを停止します。未処理の行は後で再開できます。"))
             } else {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 8) { newBatchLabel; newBatchButton }
@@ -296,7 +297,7 @@ struct BatchPanelView: View {
         }
         .buttonStyle(.borderedProminent)
         .disabled(!canStartNewBatch)
-        .help(tip("入力欄と次のバッチの描画条件で、各行を独立した作品として描きます。"))
+        .inkuTooltip(tip("入力欄と次のバッチの描画条件で、各行を独立した作品として描きます。"))
     }
 
     private func startNewBatch() {
@@ -423,7 +424,7 @@ struct BatchPanelView: View {
                 TimelineView(.periodic(from: startedAt, by: 0.5)) { context in
                     Text(model.display.localizedFormat("この行の経過 %.1f秒", max(0, context.date.timeIntervalSince(startedAt))))
                         .inkuFont(12).foregroundStyle(.secondary).monospacedDigit()
-                        .help(tip("この行を描き始めてからの時間です。写生・色カタログ・指示書生成と各応答待ちを含みます。"))
+                        .inkuTooltip(tip("この行を描き始めてからの時間です。写生・色カタログ・指示書生成と各応答待ちを含みます。"))
                 }
             }
             ProviderProgressView(model: model)

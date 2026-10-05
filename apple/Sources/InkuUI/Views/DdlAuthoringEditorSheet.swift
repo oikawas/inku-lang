@@ -53,14 +53,14 @@ struct DdlAuthoringEditorSheet: View {
                 } else {
                     Button(model.display.localized("取消")) { session.cancel(); dismiss() }
                         .keyboardShortcut(.cancelAction)
-                        .help(tip("編集中の変更を破棄して閉じます。"))
+                        .inkuTooltip(tip("編集中の変更を破棄して閉じます。"))
                     Button(model.display.localized("変更を確定・描画")) {
                         Task { if await session.commit(to: model, wildOverride: wildOverride) { dismiss() } }
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(!session.canSubmit(to: model))
                     .keyboardShortcut(.defaultAction)
-                    .help(tip("このDDLを確定して、新しい作品として描画します。"))
+                    .inkuTooltip(tip("このDDLを確定して、新しい作品として描画します。"))
                 }
             }.padding(16)
         }

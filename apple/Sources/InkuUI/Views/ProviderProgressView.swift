@@ -54,7 +54,7 @@ public struct ProviderProgressView: View {
         if let reference = snapshot.modelReference {
             Text(model.display.localizedFormat("呼出しモデル: %@", reference))
                 .inkuFont(12).foregroundStyle(.secondary).lineLimit(1)
-                .help(model.display.preferences.showTooltips ? reference : "")
+                .inkuTooltip(model.display.preferences.showTooltips ? reference : "")
         }
     }
 

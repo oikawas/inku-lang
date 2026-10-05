@@ -236,6 +236,8 @@ struct InkuTextTab: View {
 struct InkuSegmentedButtons<Value: Hashable>: View {
     let options: [(Value, String)]
     @Binding var selection: Value
+    /// One bubble per choice, as Web SketchSelect's `title` on each segment.
+    var tooltips: [String] = []
 
     var body: some View {
         HStack(spacing: 0) {
@@ -251,6 +253,7 @@ struct InkuSegmentedButtons<Value: Hashable>: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(selection == option.0 ? .isSelected : [])
+                .inkuTooltip(tooltips.indices.contains(index) ? tooltips[index] : "")
                 if index < options.count - 1 { Rectangle().fill(InkuColor.border2).frame(width: 1) }
             }
         }

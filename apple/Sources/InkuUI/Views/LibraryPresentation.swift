@@ -34,6 +34,48 @@ struct LibraryWorkTitle: View {
     }
 }
 
+/// Web HistoryDescription.svelte: three lines, then a 全文 / 折りたたむ button when the text is cut, whose title says
+/// which way it goes.
+@MainActor
+struct LibraryExpandableTitle: View {
+    let work: SavedWork
+    let display: DisplaySettings
+    var size: Double = 13
+    @State private var expanded = false
+    @State private var shownHeight: CGFloat = 0
+    @State private var fullHeight: CGFloat = 0
+
+    private var title: String { LibraryWorkPresentation.title(work, untitled: display.localized("無題")) }
+    private var ddl: Bool { LibraryWorkPresentation.usesDDLTitle(work) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            text.lineLimit(expanded ? nil : 3)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { shownHeight = $0 }
+                .background(alignment: .topLeading) {
+                    text.fixedSize(horizontal: false, vertical: true).hidden()
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { fullHeight = $0 }
+                }
+            if expanded || fullHeight > shownHeight + 1 {
+                Button(display.webCopy(expanded ? "historyDescriptionCollapse" : "historyDescriptionExpand",
+                                       fallback: expanded ? "折りたたむ" : "全文")) { expanded.toggle() }
+                    .buttonStyle(.borderless).inkuFont(11).foregroundStyle(Color.accentColor)
+                    .accessibilityValue(display.localized(expanded ? "展開中" : "折りたたみ中"))
+                    .inkuTooltip(display.tooltip(expanded ? "記述を折りたたむ" : "記述の全文を表示",
+                                                 serverKey: expanded ? "historyDescriptionCollapseTitle" : "historyDescriptionExpandTitle"))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onChange(of: work.id) { expanded = false }
+    }
+
+    private var text: some View {
+        Text(title)
+            .inkuFont(ddl ? size - 1 : size, design: ddl ? .monospaced : .default)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 @MainActor
 struct LibraryModelFactsView: View {
     let work: SavedWork
@@ -50,7 +92,7 @@ struct LibraryModelFactsView: View {
                         .lineLimit(compact ? 1 : nil)
                         .textSelection(.enabled)
                 }
-                .help(display.tooltipValue(display.localized(fact.label) + ": " + (fact.reference ?? display.localized("未記録"))))
+                .inkuTooltip(display.tooltipValue(display.localized(fact.label) + ": " + (fact.reference ?? display.localized("未記録"))))
             }
         }.inkuFont(compact ? 10 : 12)
     }
@@ -71,7 +113,7 @@ struct LibraryModelLinesView: View {
                 let unrecorded = display.webCopy("historyModelUnrecorded", fallback: "未記録")
                 (Text(role.map { $0 + ":" } ?? "").foregroundStyle(.secondary) + Text(line.compact ?? unrecorded))
                     .lineLimit(1).truncationMode(.tail)
-                    .help(display.tooltipValue((role.map { $0 + ": " } ?? "") + (line.full ?? unrecorded)))
+                    .inkuTooltip(display.tooltipValue((role.map { $0 + ": " } ?? "") + (line.full ?? unrecorded)))
             }
         }
         .inkuFont(12).lineSpacing(3)
@@ -93,7 +135,7 @@ struct LibraryWorkMarks: View {
                     .foregroundStyle(work.starred ? Color.accentColor : Color.secondary)
             }
             .accessibilityLabel(model.display.localized(work.starred ? "お気に入りを解除" : "お気に入り"))
-            .help(model.display.tooltip(work.starred ? "スターを外す" : "スターを付ける",
+            .inkuTooltip(model.display.tooltip(work.starred ? "スターを外す" : "スターを付ける",
                                         serverKey: work.starred ? "starOn" : "starOff"))
             LibraryAnnotationMarkButton(model: model, work: work, mark: .revision)
             LibraryAnnotationMarkButton(model: model, work: work, mark: .share)
@@ -166,8 +208,8 @@ struct LibraryAnnotationMarkButton: View {
         }
         .accessibilityLabel(model.display.localized(title))
         .accessibilityValue(model.display.localized(accessibilityState))
-        .help(markTooltip)
         .disabled(loading || marked == nil || library.mutating || model.isBusy)
+        .inkuTooltip(markTooltip)
     }
 }
 
@@ -264,7 +306,7 @@ struct LibrarySegmentTabs<Value: Hashable>: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help(option.tooltip)
+                .inkuTooltip(option.tooltip, placement: .bottom)
                 .accessibilityAddTraits(selection == option.value ? .isSelected : [])
             }
         }

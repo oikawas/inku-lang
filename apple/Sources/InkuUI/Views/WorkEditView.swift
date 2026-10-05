@@ -57,7 +57,7 @@ public struct WorkEditView: View {
                     .accessibilityLabel(model.display.localized("元の作品"))
                 Text(editor.work.effectiveSourceText).inkuFont(13).lineLimit(4)
                     .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
-                    .help(model.display.preferences.showTooltips ? editor.work.effectiveSourceText : "")
+                    .inkuTooltip(model.display.preferences.showTooltips ? editor.work.effectiveSourceText : "")
                     .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
             }.frame(minHeight: 120, alignment: .top)
         }.workEditPanel()
@@ -82,11 +82,12 @@ public struct WorkEditView: View {
             } else {
                 HStack(spacing: 8) {
                     Text(model.display.localized("写生")).inkuFont(12).foregroundStyle(.secondary)
+                    // SketchSelect.svelte:47: each choice names what it does (`sketchModeHint`).
                     InkuSegmentedButtons(options: [("off", model.display.localized("なし")), ("on", model.display.localized("あり"))],
-                                         selection: $editor.sketchMode)
+                                         selection: $editor.sketchMode,
+                                         tooltips: [model.display.tooltip("写生を通さず、記述だけで描く"),
+                                                    model.display.tooltip("記述の横に、場所の広がりや季節・時刻の光を補って描く")])
                 }.disabled(editor.running)
-                    .help(model.display.tooltip(editor.sketchMode == "on"
-                        ? "記述の横に、場所の広がりや季節・時刻の光を補って描く" : "写生を通さず、記述だけで描く"))
                 Text(model.display.localized("親の写生")).inkuFont(14, weight: .semibold)
                 if let prose = editor.work.sketchText, !prose.isEmpty {
                     Text(prose).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)

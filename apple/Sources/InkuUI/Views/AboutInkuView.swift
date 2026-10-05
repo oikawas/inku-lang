@@ -103,7 +103,7 @@ struct AboutInkuView: View {
             Text(value.flatMap { $0.isEmpty ? nil : $0 } ?? model.display.localized("未記録"))
                 .monospacedDigit()
         } label: {
-            Text(title).help(model.display.preferences.showTooltips ? hint : "")
+            Text(title).inkuTooltip(model.display.preferences.showTooltips ? hint : "")
         }
     }
 

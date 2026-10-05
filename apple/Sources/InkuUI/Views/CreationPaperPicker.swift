@@ -11,7 +11,7 @@ struct CreationPaperPicker: View {
                 Text(model.display.localized("用紙を選ぶ")).inkuFont(14, weight: .semibold)
                 Spacer()
                 Button(model.display.localized("閉じる")) { onClose() }
-                    .help(tip("用紙を変更せずに閉じます。"))
+                    .inkuTooltip(tip("用紙を変更せずに閉じます。"))
             }.padding(14)
             Divider()
             ScrollView {
@@ -45,7 +45,7 @@ struct CreationPaperPicker: View {
                         .buttonStyle(.plain).disabled(model.isBusy)
                         .accessibilityElement(children: .combine)
                         .accessibilityValue(option.id == model.canvasID ? model.display.localized("選択中") : "")
-                        .help(tip("この用紙を次の作品に使います。保存作品の用紙は変わりません。"))
+                        .inkuTooltip(tip("この用紙を次の作品に使います。保存作品の用紙は変わりません。"))
                     }
                 }.padding(6)
             }.frame(maxHeight: 520)

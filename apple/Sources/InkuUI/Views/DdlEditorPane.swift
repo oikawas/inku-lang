@@ -45,11 +45,11 @@ struct DdlEditorPane: View {
         return HStack(spacing: 8) {
             Text(display.localized(model.instructionLanguage(for: text) == "ja" ? "指示書（日本語DDL）" : "指示書（英語DDL）"))
                 .inkuFont(12, weight: .medium).foregroundStyle(.secondary).lineLimit(1)
-                .help(display.tooltip("指示書はこの言語の文法で読みます。", serverKey: "tooltipDdlLang"))
+                .inkuTooltip(display.tooltip("指示書はこの言語の文法で読みます。", serverKey: "tooltipDdlLang"))
             if let onShowSaijiki {
                 Button(display.webCopy("ddlEditorVocabulary", "歳時記の語彙"), action: onShowSaijiki)
                     .buttonStyle(InkuGhostButtonStyle()).disabled(disabled)
-                    .help(display.tooltip("選んだ語を編集中DDLのカーソル位置に挿入します。"))
+                    .inkuTooltip(display.tooltip("選んだ語を編集中DDLのカーソル位置に挿入します。"))
             }
             Button(display.webCopy("ddlEditorSyntaxGuideToggle", "簡易ガイド")) { showGuide.toggle() }
                 .buttonStyle(InkuGhostButtonStyle(active: showGuide))

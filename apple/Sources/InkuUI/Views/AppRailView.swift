@@ -24,7 +24,10 @@ struct AppRailView: View {
                 uiModeMenu
                 railButton(display.webCopy(display.preferences.showTooltips ? "tooltipsHide" : "tooltipsShow",
                                            display.preferences.showTooltips ? "ツールチップを非表示" : "ツールチップを表示"),
-                           help: display.tooltip("ツールチップを非表示", serverKey: "tooltipsHide"),
+                           // AppRail.svelte:156: the bubble names what a click does. While tooltips are off it is
+                           // hidden with every other bubble (`.tooltips-disabled .tooltip-bubble`), and the label says it.
+                           help: display.tooltip(display.preferences.showTooltips ? "ツールチップを非表示" : "ツールチップを表示",
+                                                 serverKey: display.preferences.showTooltips ? "tooltipsHide" : "tooltipsShow"),
                            active: false) {
                     display.preferences.showTooltips.toggle()
                 } icon: {
@@ -73,7 +76,7 @@ struct AppRailView: View {
             .buttonStyle(.plain)
             .accessibilityLabel(display.webCopy(expanded ? "railCollapseLabel" : "railExpandLabel",
                                                 expanded ? "サイドバーを格納する" : "サイドバーを伸ばす"))
-            .help(display.tooltip("サイドバーを展開 / 折りたたむ", serverKey: "tooltipAppRailToggle"))
+            .inkuTooltip(display.tooltip("サイドバーを展開 / 折りたたむ", serverKey: "tooltipAppRailToggle"), placement: .right)
             if showAuxiliary {
                 Button(action: onOpenAbout) {
                     HStack(spacing: 0) {
@@ -90,7 +93,7 @@ struct AppRailView: View {
                 .buttonStyle(.plain)
                 .padding(.top, 6)
                 .accessibilityLabel(display.localized("inkuについて"))
-                .help(display.tooltip("inku-lang について", serverKey: "tooltipAppRailLogo"))
+                .inkuTooltip(display.tooltip("inku-lang について", serverKey: "tooltipAppRailLogo"), placement: .right)
                 if expanded {
                     Text(display.webCopy("subtitle", "視覚的な短歌を書く")).inkuFont(10).foregroundStyle(.secondary)
                         .lineLimit(1).padding(.top, 4)
@@ -116,7 +119,7 @@ struct AppRailView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(display.webCopy("uiModeLabel", "UIモード"))
         .accessibilityValue(uiModeLabel)
-        .help(uiModeOpen ? "" : display.tooltip("UIモード", serverKey: "uiModeLabel"))
+        .inkuTooltip(uiModeOpen ? "" : display.tooltip("UIモード", serverKey: "uiModeLabel"), placement: .right)
         .popover(isPresented: $uiModeOpen, arrowEdge: .trailing) {
             VStack(alignment: .leading, spacing: 0) {
                 // In the order the icon draws them: one bar, two, three.
@@ -148,14 +151,15 @@ struct AppRailView: View {
         let languages = [("ja", "日本語"), ("en", "English")]
         return Group {
             if expanded {
-                HStack(spacing: 4) { ForEach(languages, id: \.0) { languageButton($0.0, label: $0.1) } }
+                HStack(spacing: 4) { ForEach(languages, id: \.0) { languageButton($0.0, label: $0.1, name: $0.1) } }
             } else {
-                VStack(spacing: 4) { ForEach(languages, id: \.0) { languageButton($0.0, label: $0.0.uppercased()) } }
+                VStack(spacing: 4) { ForEach(languages, id: \.0) { languageButton($0.0, label: $0.0.uppercased(), name: $0.1) } }
             }
         }
     }
 
-    private func languageButton(_ code: String, label: String) -> some View {
+    /// AppRail.svelte:187: the bubble names the pack (`pack.label`), also when the button shows its code.
+    private func languageButton(_ code: String, label: String, name: String) -> some View {
         let active = display.preferences.language == code
         return Button { display.preferences.language = code } label: {
             Text(label).inkuFont(10).lineLimit(1)
@@ -167,7 +171,8 @@ struct AppRailView: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(active ? .isSelected : [])
-        .help(display.preferences.showTooltips ? display.tooltip("表示言語の切り替え", serverKey: "tooltipAppRailLang") + ": " + label : "")
+        .inkuTooltip(display.preferences.showTooltips ? display.tooltip("表示言語の切り替え", serverKey: "tooltipAppRailLang") + ": " + name : "",
+                     placement: .right)
     }
 
     private func railButton<Icon: View>(_ title: String, help: String, active: Bool, action: @escaping () -> Void,
@@ -175,7 +180,7 @@ struct AppRailView: View {
         Button(action: action) { railLabel(title, active: active, icon: icon) }
             .buttonStyle(.plain)
             .accessibilityLabel(title)
-            .help(help)
+            .inkuTooltip(help, placement: .right)
     }
 
     private func railLabel<Icon: View>(_ title: String, active: Bool, @ViewBuilder icon: () -> Icon) -> some View {

@@ -19,7 +19,7 @@ struct DrawingLogView: View {
                 Text(model.display.localized("描画ログ")).inkuFont(16, weight: .semibold)
                 Spacer()
                 Button(model.display.localized("記録を更新")) { Task { await load() } }.disabled(loading)
-                    .help(model.display.tooltip("描画ログを読み直します。生成や再送信は行いません。"))
+                    .inkuTooltip(model.display.tooltip("描画ログを読み直します。生成や再送信は行いません。"))
                 Button(model.display.localized("閉じる")) { dismiss() }.keyboardShortcut(.cancelAction)
             }.padding()
             Divider()

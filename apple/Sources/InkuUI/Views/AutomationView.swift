@@ -79,7 +79,7 @@ private enum DemoModelPicker: String, Identifiable {
                                 InkuSegmentedButtons(options: [("off", model.display.localized("なし")), ("on", model.display.localized("あり"))],
                                                      selection: $automation.demoSketchMode)
                                     .accessibilityLabel(model.display.localized("写生"))
-                                    .help(model.display.preferences.showTooltips ? model.display.localized(automation.demoSketchMode == "on"
+                                    .inkuTooltip(model.display.preferences.showTooltips ? model.display.localized(automation.demoSketchMode == "on"
                                         ? "記述の横に、場所の広がりや季節・時刻の光を補って描く" : "写生を通さず、記述だけで描く") : "")
                                 Button { showPaper = true } label: {
                                     Label(model.canvases.first { $0.id == model.canvasID }?.label ?? model.canvasID, systemImage: "rectangle.portrait")

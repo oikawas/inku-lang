@@ -45,7 +45,7 @@ public struct AuxiliaryView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Button { showModels = true } label: {
                         Label(auxiliary.modelReference.isEmpty ? model.display.localized("Visionモデルを選択") : auxiliary.modelReference, systemImage: "eye")
-                    }.help(model.display.tooltip("画像を扱える登録モデルから選択します。", serverKey: "modelSelectionVisionHint"))
+                    }.inkuTooltip(model.display.tooltip("画像を扱える登録モデルから選択します。", serverKey: "modelSelectionVisionHint"))
                     HStack(spacing: 8) {
                         Text(model.display.localized("応答の言語")).inkuFont(12).foregroundStyle(.secondary)
                         InkuSegmentedButtons(options: [("ja", model.display.localized("日本語")), ("en", "English")], selection: $auxiliary.language)
@@ -97,7 +97,7 @@ public struct AuxiliaryView: View {
                 Text(model.display.localized("画像に見える事実と次に試す方向を受け取ります。採点や順位付けは行いません。")).inkuFont(12).foregroundStyle(.secondary)
                 TextField(model.display.localized("AI に伝える方向性"), text: $auxiliary.direction, axis: .vertical).lineLimit(2...4)
                     .disabled(auxiliary.sourceIsLocked || auxiliary.running || auxiliary.selectingSource || model.isBusy)
-                    .help(model.display.tooltip("AIへ伝える方針は160文字までです。"))
+                    .inkuTooltip(model.display.tooltip("AIへ伝える方針は160文字までです。"))
                 Text("\(auxiliary.direction.utf16.count) / \(AuxiliaryModel.directionLimit)")
                     .inkuFont(12).monospacedDigit().foregroundStyle(.secondary)
                 Button(model.display.localized("画像から助言を読む"), systemImage: "eye") { Task { await auxiliary.requestAdvice(app: model) } }
@@ -138,6 +138,8 @@ public struct AuxiliaryView: View {
                     Text(model.display.localized("方式")).inkuFont(12).foregroundStyle(.secondary)
                     InkuSegmentedButtons(options: [(false, model.display.localized("ランダム")), (true, "AI Vision")], selection: $auxiliary.visionMode)
                 }.disabled(auxiliary.sourceIsLocked)
+                    // AIRefineModal.svelte:251: a held work names why Vision is off.
+                    .inkuTooltip(auxiliary.sourceIsLocked ? lockedReason : "")
                 Text(model.display.localized(auxiliary.visionMode ? "上のモデルが観察し、同じモデルで各世代を描きます。" : "制作のモデルで描きます。方向性は読み取りを変える世代にだけ渡します。"))
                     .inkuFont(12).foregroundStyle(.secondary)
                 Stepper(model.display.localizedFormat("生成する世代数: %ld", auxiliary.generations), value: $auxiliary.generations, in: 1...10)
@@ -147,6 +149,7 @@ public struct AuxiliaryView: View {
                             get: { auxiliary.enabledKinds.contains(kind) },
                             set: { if $0 { auxiliary.enabledKinds.insert(kind) } else { auxiliary.enabledKinds.remove(kind) } }))
                             .toggleStyle(.button).disabled(kind == "reinterpretation" && auxiliary.sourceIsLocked)
+                            .inkuTooltip(kindTooltip(kind), placement: .bottom)
                     }
                 }
                 HStack {
@@ -157,6 +160,21 @@ public struct AuxiliaryView: View {
                     .disabled(auxiliary.sourceWork == nil || auxiliary.enabledKinds.isEmpty || (auxiliary.visionMode && auxiliary.modelReference.isEmpty))
             }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
         }.disabled(auxiliary.running || auxiliary.selectingSource || model.isBusy)
+    }
+
+    private var lockedReason: String {
+        model.display.tooltip("編集した指示書で確定した作品です。記述を読み直す操作は使えません。", serverKey: "descriptionLockedReason")
+    }
+
+    /// AIRefineModal.svelte:255: what each element costs; reading names the lock on a held work.
+    private func kindTooltip(_ kind: String) -> String {
+        switch kind {
+        case "reinterpretation":
+            return auxiliary.sourceIsLocked ? lockedReason : model.display.tooltip("低速（LLM・API使用）", serverKey: "refineCostReading")
+        case "catalog_change": return model.display.tooltip("超高速（LLM不要）", serverKey: "refineCostColor")
+        case "layout_change": return model.display.tooltip("高速（補完の穴があるときだけLLM）", serverKey: "refineCostLayout")
+        default: return model.display.tooltip("超高速（LLM不要）", serverKey: "refineCostTouch")
+        }
     }
 
     private var colophonControls: some View {
@@ -252,6 +270,7 @@ public struct AuxiliaryView: View {
                             Spacer()
                             Button(model.display.localized("コピー")) { auxiliary.draftText = record.adoptedBody ?? record.generatedBody; auxiliary.copyDraft() }
                             Button(model.display.localized("削除"), role: .destructive) { deleteRecordID = record.id }
+                                .inkuTooltip(model.display.tooltip("この奥書を削除", serverKey: "okugakiDelete"))
                         }
                         Text(record.adoptedBody ?? record.generatedBody).textSelection(.enabled)
                     }

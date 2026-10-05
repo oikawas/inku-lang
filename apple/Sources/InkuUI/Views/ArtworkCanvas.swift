@@ -65,7 +65,7 @@ struct ArtworkCanvas: View {
             let fit = webFit(in: geometry.size)
             interactiveCanvas(size: geometry.size, box: fit.box)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .help(display.tooltip("マウスホイールで拡大・縮小、ドラッグで移動します。"))
+                .inkuTooltip(display.tooltip("マウスホイールで拡大・縮小、ドラッグで移動します。"))
                 .task(id: requestKey(box: fit.box)) { await render(box: fit.box) }
                 .onChange(of: fit.zoom, initial: true) { _, zoom in fitZoom = zoom }
         }
@@ -87,18 +87,18 @@ struct ArtworkCanvas: View {
         HStack(spacing: 0) {
             Button { setScale(scale / 1.25) } label: { Text("−").inkuFont(16).frame(width: 32, height: 28).contentShape(Rectangle()) }
                 .accessibilityLabel(display.localized("縮小"))
-                .help(display.tooltip("縮小", serverKey: "tooltipCanvasZoomOut"))
                 .disabled(scale <= CanvasInteraction.minimumScale)
+                .inkuTooltip(display.tooltip("縮小", serverKey: "tooltipCanvasZoomOut"))
             Text("\(Int((fitZoom * scale * 100).rounded()))%").inkuFont(11, weight: .medium).monospacedDigit()
                 .frame(minWidth: 38)
             Button { setScale(scale * 1.25) } label: { Text("＋").inkuFont(16).frame(width: 32, height: 28).contentShape(Rectangle()) }
                 .accessibilityLabel(display.localized("拡大"))
-                .help(display.tooltip("拡大", serverKey: "tooltipCanvasZoomIn"))
                 .disabled(scale >= CanvasInteraction.maximumScale)
+                .inkuTooltip(display.tooltip("拡大", serverKey: "tooltipCanvasZoomIn"))
             Rectangle().fill(InkuColor.border).frame(width: 1, height: 28)
             Button { reset() } label: { Text("⊙").inkuFont(11).foregroundStyle(.secondary).frame(width: 32, height: 28).contentShape(Rectangle()) }
                 .accessibilityLabel(display.localized("用紙に合わせる"))
-                .help(display.tooltip("拡大率と位置をリセット", serverKey: "tooltipCanvasZoomReset"))
+                .inkuTooltip(display.tooltip("拡大率と位置をリセット", serverKey: "tooltipCanvasZoomReset"))
         }
         .buttonStyle(.plain)
         .background(Capsule().fill(InkuColor.floating))
@@ -115,7 +115,7 @@ struct ArtworkCanvas: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(.quaternary))
-                    .help(display.tooltip("マウスホイールで拡大・縮小、ドラッグで移動します。"))
+                    .inkuTooltip(display.tooltip("マウスホイールで拡大・縮小、ドラッグで移動します。"))
                     .task(id: requestKey(box: CGSize(width: geometry.size.width - 36, height: geometry.size.height - 36))) {
                         await render(box: CGSize(width: geometry.size.width - 36, height: geometry.size.height - 36))
                     }
@@ -126,15 +126,15 @@ struct ArtworkCanvas: View {
                 Spacer(minLength: 12)
                 Button { setScale(scale / 1.25) } label: { Image(systemName: "minus.magnifyingglass") }
                     .accessibilityLabel(display.localized("縮小"))
-                    .help(display.tooltip("縮小", serverKey: "tooltipCanvasZoomOut"))
                     .disabled(scale <= CanvasInteraction.minimumScale)
+                    .inkuTooltip(display.tooltip("縮小", serverKey: "tooltipCanvasZoomOut"))
                 Text(Double(scale).formatted(.percent.precision(.fractionLength(0)))).inkuFont(12).monospacedDigit()
                 Button { setScale(scale * 1.25) } label: { Image(systemName: "plus.magnifyingglass") }
                     .accessibilityLabel(display.localized("拡大"))
-                    .help(display.tooltip("拡大", serverKey: "tooltipCanvasZoomIn"))
                     .disabled(scale >= CanvasInteraction.maximumScale)
+                    .inkuTooltip(display.tooltip("拡大", serverKey: "tooltipCanvasZoomIn"))
                 Button(display.localized("用紙に合わせる")) { reset() }
-                    .help(display.tooltip("拡大率と位置をリセット", serverKey: "tooltipCanvasZoomReset"))
+                    .inkuTooltip(display.tooltip("拡大率と位置をリセット", serverKey: "tooltipCanvasZoomReset"))
             }
             .buttonStyle(.borderless)
             .inkuFont(12)
@@ -352,8 +352,18 @@ private struct VerticalCaption: View {
 struct ArtworkThumbnail: View {
     let work: SavedWork
     let renderer: ArtworkRenderer
+    @Environment(DisplaySettings.self) private var display: DisplaySettings?
     @State private var image: CGImage?
     @State private var failed = false
+
+    /// HistoryThumbnail.svelte:51-62: one dot for both layers, its title naming the layer that fell.
+    private var fallbackMarkLabel: String? {
+        guard let display else { return nil }
+        let labels = [work.interpretFallback.flatMap { $0.isEmpty ? nil : display.webCopy("interpretFallbackBadge", "解釈フォールバック") },
+                      FallbackCopy.composeReason(work.composeFallback).map { _ in display.webCopy("composeFallbackBadge", "作曲フォールバック") }]
+            .compactMap { $0 }
+        return labels.isEmpty ? nil : labels.joined(separator: " / ")
+    }
 
     var body: some View {
         ZStack {
@@ -364,6 +374,16 @@ struct ArtworkThumbnail: View {
                 Image(systemName: "exclamationmark.triangle").foregroundStyle(.secondary)
             } else {
                 ProgressView().controlSize(.small)
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if let label = fallbackMarkLabel, let display {
+                Circle().fill(Color(red: 0.878, green: 0.659, blue: 0.314))
+                    .overlay(Circle().stroke(Color(red: 0.42, green: 0.267, blue: 0.063)))
+                    .frame(width: 7, height: 7)
+                    .padding(3)
+                    .accessibilityLabel(label)
+                    .inkuTooltip(display.tooltipValue(label))
             }
         }
         .task(id: work.svg) {

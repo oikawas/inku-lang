@@ -105,6 +105,8 @@ public final class LocalMaintenance {
     public private(set) var backupLastSuccess: Date?
     public private(set) var backupGenerations: [LocalBackupGeneration] = []
     public private(set) var backupTotalBytes: Int64 = 0
+    /// The database file's size now, for Web `dbBackupEstimatedBytes` (size × generations kept).
+    public private(set) var databaseBytes: Int64?
     public private(set) var backupInfoLoaded = false
     public private(set) var backupInfoError: String?
     public private(set) var backupError: String?
@@ -129,6 +131,9 @@ public final class LocalMaintenance {
             backupLastSuccess = snapshot.lastSuccess
             backupGenerations = snapshot.generations
             backupTotalBytes = snapshot.totalBytes
+            databaseBytes = app.databaseFileURL.flatMap {
+                (try? FileManager.default.attributesOfItem(atPath: $0.path)[.size] as? NSNumber)?.int64Value
+            }
             backupInfoLoaded = true
             backupInfoError = nil
         } catch is CancellationError { }

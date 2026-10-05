@@ -22,6 +22,8 @@ import logging
 import multiprocessing
 import time
 from concurrent.futures import Future, ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
+from contextlib import ExitStack
 from threading import Lock
 
 from .. import db as _db
@@ -97,6 +99,9 @@ def build_one(history_id: str, svg: str, render_hash: str | None, scale: int) ->
 def _offer(pool: ProcessPoolExecutor, svg: str, scale: int) -> "Future[bytes] | None":
     """Hand one bake to the pool. Never raises; None means it was not accepted.
 
+    A broken pool is returned as a failed future, so rejection at submit and a
+    child dying after submit share the same one-retry budget at the consumer.
+
     Handing work over can fail as readily as doing it: once a child has been
     killed -- the first thing that happens when a container's memory is capped
     -- the pool is broken and every later submit raises. Outside this guard that
@@ -109,13 +114,17 @@ def _offer(pool: ProcessPoolExecutor, svg: str, scale: int) -> "Future[bytes] | 
         return None
     try:
         return pool.submit(svg_to_png, svg, width=_thumbs.width_for_scale(scale))
+    except BrokenProcessPool as error:
+        future: Future[bytes] = Future()
+        future.set_exception(error)
+        return future
     except Exception:
         _logger.exception("could not hand a thumbnail to the pool: scale=%s", scale)
         return None
 
 
 def _store_result(history_id: str, render_hash: str | None, scale: int, future: "Future[bytes]") -> bool:
-    """Take one bake back from a child and write it here. Never raises.
+    """Take one bake back and write it here; let a broken pool reach its owner.
 
     A work that cannot be baked is one work: the rebuild has 2,917 of them and
     the run has to survive the bad one. Before this guard existed, a single
@@ -127,6 +136,9 @@ def _store_result(history_id: str, render_hash: str | None, scale: int, future: 
 
     try:
         png = future.result()
+    except BrokenProcessPool:
+        # Both callers replace the broken pool and retry this SVG once.
+        raise
     except RasterizerUnavailable:
         # Not an error: a thumbnail is an optimization, and the listing falls
         # back to the SVG it already has when one is missing.
@@ -201,37 +213,40 @@ def shutdown_bake_pool() -> None:
         pool.shutdown(wait=False)
 
 
-def _offer_a_saved_work(svg: str, scale: int) -> "Future[bytes] | None":
-    """Hand one save's bake over, rebuilding the pool once if it is broken.
-
-    The rebuild makes and drops its pool inside a single run, so a killed child
-    costs that run and no more. A resident pool has no such end: without this,
-    the first killed child would leave every later save without a thumbnail for
-    the life of the process.
-    """
-    pool = _bake_pool_now()
-    if pool is None:
-        return None
-    future = _offer(pool, svg, scale)
-    if future is not None:
-        return future
-    _discard_bake_pool(pool)
-    fresh = _bake_pool_now()
-    return _offer(fresh, svg, scale) if fresh is not None else None
-
-
 def _bake_in_a_child(history_id: str, svg: str, render_hash: str | None, scale: int) -> bool | None:
-    """Bake one scale in a child and write the result here.
+    """Bake one scale, replacing a broken pool and retrying this SVG once.
 
     True when a thumbnail was written, False when there was none to write, and
-    None when the pool could not take the work even after being rebuilt.
+    None when the pool failed even after being rebuilt. Submit and result
+    failures consume the same budget; an ordinary rasterizer error does not
+    trigger a retry.
     """
     if not svg:
         return False
-    future = _offer_a_saved_work(svg, scale)
-    if future is None:
-        return None
-    return _store_result(history_id, render_hash, scale, future)
+    for attempt in range(2):
+        pool = _bake_pool_now()
+        if pool is None:
+            return None
+        future = _offer(pool, svg, scale)
+        try:
+            if future is not None:
+                return _store_result(history_id, render_hash, scale, future)
+        except BrokenProcessPool:
+            _discard_bake_pool(pool)
+            if attempt == 1:
+                _logger.exception(
+                    "failed to bake thumbnail after pool retry: history_id=%s scale=%s",
+                    history_id, scale,
+                )
+                return None
+            _logger.warning(
+                "retrying thumbnail after a broken pool: history_id=%s scale=%s",
+                history_id, scale,
+            )
+            continue
+        # Preserve recovery when a closed pool refuses submit with RuntimeError.
+        _discard_bake_pool(pool)
+    return None
 
 
 def _run_thumbnail_build(item: dict) -> None:
@@ -421,23 +436,56 @@ def _rebuild_worker(targets: list[tuple[str, str | None, int]], workers: int) ->
         # nothing of the server -- which is why svg_to_png is what crosses, with
         # the scale already resolved to a width on this side.
         context = multiprocessing.get_context("spawn")
-        with ProcessPoolExecutor(max_workers=max(1, workers), mp_context=context) as pool:
+        with ExitStack() as pools:
+            pool: ProcessPoolExecutor | None = None
+
+            def pool_now() -> ProcessPoolExecutor:
+                nonlocal pool
+                if pool is None:
+                    pool = pools.enter_context(
+                        ProcessPoolExecutor(max_workers=max(1, workers), mp_context=context)
+                    )
+                return pool
+
+            def discard_pool(broken: ProcessPoolExecutor) -> None:
+                nonlocal pool
+                if pool is broken:
+                    pool = None
+                    broken.shutdown(wait=False)
+
             for start in range(0, len(ids), _REBUILD_BATCH):
                 batch = ids[start:start + _REBUILD_BATCH]
                 svgs = _db.history_svgs(batch)
-                pending: list[tuple[str, str | None, int, "Future[bytes] | None"]] = []
+                pending: list[tuple[str, str | None, int, ProcessPoolExecutor, Future[bytes] | None]] = []
                 for history_id in batch:
                     svg = svgs.get(history_id, "")
                     for render_hash, scale in by_id[history_id]:
+                        offered_pool = pool_now()
                         pending.append(
-                            (history_id, render_hash, scale, _offer(pool, svg, scale))
+                            (history_id, render_hash, scale, offered_pool, _offer(offered_pool, svg, scale))
                         )
-                for history_id, render_hash, scale, future in pending:
-                    built = (
-                        _store_result(history_id, render_hash, scale, future)
-                        if future is not None
-                        else False
-                    )
+                for history_id, render_hash, scale, offered_pool, future in pending:
+                    try:
+                        built = _store_result(history_id, render_hash, scale, future) if future is not None else False
+                    except BrokenProcessPool:
+                        # Other pending futures still name their old pool. Do
+                        # not discard a healthy replacement for their failure.
+                        discard_pool(offered_pool)
+                        _logger.warning(
+                            "retrying thumbnail after a broken pool: history_id=%s scale=%s",
+                            history_id, scale,
+                        )
+                        retry_pool = pool_now()
+                        retry = _offer(retry_pool, svgs.get(history_id, ""), scale)
+                        try:
+                            built = _store_result(history_id, render_hash, scale, retry) if retry is not None else False
+                        except BrokenProcessPool:
+                            discard_pool(retry_pool)
+                            _logger.exception(
+                                "failed to bake thumbnail after pool retry: history_id=%s scale=%s",
+                                history_id, scale,
+                            )
+                            built = False
                     _rebuild.record(built)
     except Exception:
         _logger.exception("thumbnail rebuild failed")

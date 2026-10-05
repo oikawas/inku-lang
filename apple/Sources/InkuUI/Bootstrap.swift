@@ -201,7 +201,7 @@ struct Bootstrap {
               let render = manifest["render"] as? [String: Any],
               let defaults = render["options"] as? [String: Any],
               let base = defaults["canvas"] as? [String: Any],
-              let baseWidth = base["width"] as? Double,
+              let baseHeight = base["height"] as? Double,
               let clip = render["clip"] as? [String: Any],
               let registryBody = registry["registry"] as? [String: Any] else {
             throw HostError("installation_defaults_invalid")
@@ -266,7 +266,8 @@ struct Bootstrap {
                 let map = try Self.renderColorMap(for: record)
                 var resolved = host
                 resolved["resolved_catalog_id"] = id
-                resolved["catalog_mode"] = id == "default" ? "default" : "explicit"
+                // Server marks the default candidate "default" only through the host it shares when default is chosen.
+                resolved["catalog_mode"] = id == "default" && selectedID == "default" ? "default" : "explicit"
                 resolved["palette"] = try Self.object(InkuCore.resolvePalette(Self.bytes([
                     "color_map": map, "catalog_id": id, "render_seed": actualSeed, "background": host["background"] ?? "white",
                 ])))
@@ -274,10 +275,10 @@ struct Bootstrap {
                                     "description": record[language == "ja" ? "sub_ja" : "sub"] ?? ""], "resolved": resolved]
             }
         }
-        let height = baseWidth * Double(canvas.heightRatio) / Double(canvas.widthRatio)
+        let width = Self.canvasWidth(height: baseHeight, canvas: canvas)
         let options: [String: Any] = [
             "resolved_color_map": colorMap, "catalog_id": selectedID,
-            "canvas": ["width": baseWidth, "height": height],
+            "canvas": ["width": width, "height": baseHeight],
             "canvas_aspect_id": canvasID, "svg_profile": "display",
             "render_seed": actualSeed, "composition_seed": compositionSeed.map { $0 as Any } ?? NSNull(),
             "wild": wild, "error_policy": compiler["error_policy"] ?? "omit_and_continue",
@@ -346,9 +347,19 @@ struct Bootstrap {
               let canvas = canvases.first(where: { $0.id == canvasID }) else {
             throw HostError("replay_options_invalid")
         }
+        guard let render = manifest["render"] as? [String: Any], let defaults = render["options"] as? [String: Any],
+              let base = defaults["canvas"] as? [String: Any], let baseHeight = base["height"] as? Double else {
+            throw HostError("installation_defaults_invalid")
+        }
         let map = try Self.renderColorMap(for: record)
         return ReplayOptions(catalogID: catalogID, colorMap: try Self.bytes(map), canvasID: canvasID,
-            widthRatio: canvas.widthRatio, heightRatio: canvas.heightRatio)
+            widthRatio: canvas.widthRatio, heightRatio: canvas.heightRatio,
+            canvasWidth: Self.canvasWidth(height: baseHeight, canvas: canvas), canvasHeight: baseHeight)
+    }
+
+    /// Server keeps the manifest height and derives the width with Python's half-to-even round.
+    static func canvasWidth(height: Double, canvas: CanvasOption) -> Double {
+        (height * Double(canvas.widthRatio) / Double(canvas.heightRatio)).rounded(.toNearestOrEven)
     }
 
     static func object(_ data: Data) throws -> [String: Any] {

@@ -37,7 +37,8 @@ public final class LibraryModel {
         didSet { if layout != oldValue { changedPresentation(resetPage: isGrouped || oldValue == .lineage) } }
     }
     public var grouped = false { didSet { if grouped != oldValue { changedPresentation(resetPage: true) } } }
-    public var pageSize = 30 {
+    /// The library measures its own grid and sets this (Web `HistoryManagerState.pageSize`, initially 24).
+    public var pageSize = 24 {
         didSet {
             let bounded = min(1000, max(1, pageSize))
             if pageSize != bounded { pageSize = bounded; return }
@@ -64,6 +65,10 @@ public final class LibraryModel {
     public private(set) var mutating = false
     public private(set) var errorText: String?
     public private(set) var status = ""
+    /// Web `lineage_generation` of listed works, by lineage node.
+    public private(set) var generations: [String: Int] = [:]
+    /// Web `copiedHistoryHash` / `statusHashCopied`: the copied hash says so for 1.2 s.
+    public private(set) var copiedHash: String?
     public private(set) var graph: LineageGraph?
     public private(set) var lineageLoading = false
     public private(set) var lineageError: String?
@@ -187,9 +192,12 @@ public final class LibraryModel {
                 let result = try await database.libraryPage(query: requestedFilter, limit: requestedSize,
                                                              offset: requestedPage * requestedSize)
                 guard refreshToken == token, !Task.isCancelled else { return }
+                let listed = try await database.lineageGenerations(nodeIDs: result.items.compactMap { $0.work.lineageNodeID })
+                guard refreshToken == token, !Task.isCancelled else { return }
                 groups = []; total = result.total
                 works = result.items.map(\.work)
                 annotations = Dictionary(uniqueKeysWithValues: result.items.map { ($0.id, $0.annotation) })
+                generations.merge(listed) { $1 }
             }
             trashTotal = count
             loading = false
@@ -371,6 +379,7 @@ public final class LibraryModel {
                 return (lhs, $0.work.at, $0.id) < (rhs, $1.work.at, $1.id)
             }
             groupMemberTotals[root] = result.total
+            self.generations.merge(generations) { $1 }
             for item in result.items { annotations[item.id] = item.annotation }
         } catch { if token == refreshToken, !Task.isCancelled { errorText = error.localizedDescription } }
     }
@@ -552,5 +561,10 @@ public final class LibraryModel {
         UIPasteboard.general.string = SavedWorkFacts.hashDigest(hash)
         #endif
         status = "ハッシュをコピーしました"
+        copiedHash = hash
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(1200))
+            if self?.copiedHash == hash { self?.copiedHash = nil }
+        }
     }
 }

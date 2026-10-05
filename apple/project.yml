@@ -26,6 +26,21 @@ targets:
     dependencies:
       - package: InkuApple
         product: InkuUI
+    preBuildScripts:
+      # apple/VERSION and apple/BUILD_NUMBER are the only bundle version source.
+      # The build scripts pass them as settings; a build without them stops here.
+      - name: Check bundle version
+        basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(SRCROOT)/VERSION
+          - $(SRCROOT)/BUILD_NUMBER
+        script: |
+          version="$(tr -d '[:space:]' < "$SRCROOT/VERSION")"
+          build="$(tr -d '[:space:]' < "$SRCROOT/BUILD_NUMBER")"
+          if [ "$MARKETING_VERSION" != "$version" ] || [ "$CURRENT_PROJECT_VERSION" != "$build" ]; then
+              echo "error: pass MARKETING_VERSION=$version CURRENT_PROJECT_VERSION=$build (apple/scripts/build-macos.sh does)"
+              exit 1
+          fi
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.inku.macos

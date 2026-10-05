@@ -12,24 +12,37 @@ struct BatchPanelView: View {
     var observationRevision: Binding<UUID>? = nil
     @State private var rowObservationID = UUID()
     @State private var replaceBatch = false
-    @State private var resultsExpanded = false
-    @State private var issuesExpanded = false
-    @State private var conditionsExpanded = false
-    @State private var workspaceTab = "work"
+    /// The creation panel keeps these on WorkspaceUIState, so switching 記述／バッチ does not reset them.
+    var ui: WorkspaceUIState? = nil
+    @State private var localResultsExpanded = false
+    @State private var localIssuesExpanded = false
+    @State private var localConditionsExpanded = false
+    @State private var localWorkspaceTab = "work"
     @State private var selectedHistoryPrompt = ""
+
+    private var resultsExpanded: Binding<Bool> { kept(\.batchResultsExpanded, $localResultsExpanded) }
+    private var issuesExpanded: Binding<Bool> { kept(\.batchIssuesExpanded, $localIssuesExpanded) }
+    private var conditionsExpanded: Binding<Bool> { kept(\.batchConditionsExpanded, $localConditionsExpanded) }
+    private var workspaceTab: Binding<String> { kept(\.batchWorkspaceTab, $localWorkspaceTab) }
+    private func kept<Value>(_ path: ReferenceWritableKeyPath<WorkspaceUIState, Value>, _ local: Binding<Value>) -> Binding<Value> {
+        guard let ui else { return local }
+        return Binding(get: { ui[keyPath: path] }, set: { ui[keyPath: path] = $0 })
+    }
 
     private var controlsDisabled: Bool { automation.isOccupied || model.isBusy }
     private var displayedRowID: String? { followsLatestWork ? automation.observedRow?.id : selectedRowID }
     private var canStartNewBatch: Bool {
-        !controlsDisabled && automation.nonEmptyBatchCount > 0
+        !controlsDisabled && automation.nonEmptyBatchCount > 0 && paintableCount > 0
             && model.hasAvailableBatchDrawingModel
     }
+    /// Web `batchNonEmpty`: lines with something to draw besides numbers and comments.
+    private var paintableCount: Int { BatchInputLines.paintableCount(in: automation.batchText) }
     private var issueRows: [BatchRow] { automation.rows.filter { $0.state == .failed || $0.state == .uncertain } }
     private var displayedWork: SavedWork? {
         automation.observedWork ?? model.selectedWork
     }
     private var workspaceMinimumHeight: CGFloat {
-        automation.running && conditionsExpanded ? 620 : 500
+        automation.running && conditionsExpanded.wrappedValue ? 620 : 500
     }
 
     var body: some View {
@@ -69,12 +82,12 @@ struct BatchPanelView: View {
         } message: {
             Text(model.display.localized("保存済み作品は残ります。未処理の行を再開する場合は「前回のバッチを再開」を選んでください。"))
         }
-        .onAppear { if automation.uncertainCount > 0 { issuesExpanded = true } }
+        .onAppear { if automation.uncertainCount > 0 { issuesExpanded.wrappedValue = true } }
         .onChange(of: automation.running) { _, running in if running { rowObservationID = UUID() } }
         .onChange(of: automation.preparing) { _, preparing in if preparing { rowObservationID = UUID() } }
         .onDisappear { rowObservationID = UUID() }
         .onChange(of: automation.uncertainCount) { _, count in
-            if count > 0 { issuesExpanded = true }
+            if count > 0 { issuesExpanded.wrappedValue = true }
         }
         .onChange(of: automation.isOccupied) { _, occupied in
             if occupied { replaceBatch = false }
@@ -96,9 +109,9 @@ struct BatchPanelView: View {
             Divider()
             if inputOnly && automation.running {
                 runProgress
-                DisclosureGroup(model.display.localized("開始時の描画条件"), isExpanded: $conditionsExpanded) {
+                DisclosureGroup(model.display.localized("開始時の描画条件"), isExpanded: conditionsExpanded) {
                     frozenConditions.padding(.top, 4)
-                }.font(.caption)
+                }.inkuFont(12)
             } else if model.display.visible("drawing_settings") {
                 BatchConditionsView(model: model, automation: automation)
             }
@@ -122,37 +135,47 @@ struct BatchPanelView: View {
             if automation.running, let row = automation.activeRow {
                 VStack(alignment: .leading, spacing: 6) {
                     Label(model.display.localizedFormat("処理中: %ld行", row.line), systemImage: "play.fill")
-                        .font(.caption.weight(.semibold)).monospacedDigit()
-                    Text(row.input).font(.callout).lineLimit(4).textSelection(.enabled)
+                        .inkuFont(12, weight: .semibold).monospacedDigit()
+                    Text(row.input).inkuFont(13).lineLimit(4).textSelection(.enabled)
                 }
                 .padding(10).frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
             } else {
                 BatchInputEditor(text: $automation.batchText, isEditable: !controlsDisabled,
                                  accessibilityLabel: model.display.localized("バッチ入力"))
+                    .overlay(alignment: .topLeading) {
+                        // BatchPanel.svelte:191 `batchPlaceholder`: three example lines beside the gutter.
+                        if automation.batchText.isEmpty {
+                            Text(model.display.webCopy("batchPlaceholder", "山の向こうに月が昇る\n夜の霧が広がる\n青いクレヨンの線がゆっくり波打つ"))
+                                .inkuFont(13, design: .monospaced).foregroundStyle(.tertiary)
+                                .padding(.leading, 44).padding(.top, 8).allowsHitTesting(false)
+                        }
+                    }
                     .frame(height: 220)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(.quaternary))
-                if automation.nonEmptyBatchCount > 0 {
-                    Text(model.display.localizedFormat("空行を除く入力: %ld件", automation.nonEmptyBatchCount))
-                        .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                // BatchPanel.svelte:200: 「N 件」 while there is something to draw and no run.
+                if paintableCount > 0 && !automation.running {
+                    Text(model.display.preferences.language == "en" ? "\(paintableCount) items" : "\(paintableCount) 件")
+                        .inkuFont(12).foregroundStyle(.secondary).monospacedDigit()
                 }
                 inputHistory
             }
             Text(model.display.localized("空行を除き、元の行番号を保持して順に描きます。"))
-                .font(.caption).foregroundStyle(.secondary)
+                .inkuFont(12).foregroundStyle(.secondary)
             if let error = automation.historyErrorText {
-                Text(model.display.message(error)).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+                Text(model.display.message(error)).inkuFont(12).foregroundStyle(.red).textSelection(.enabled)
             }
         }
     }
 
     @ViewBuilder private var inputHeading: some View {
-        Text(model.display.localized("バッチ")).font(.callout.weight(.semibold))
+        Text(model.display.localized("バッチ")).inkuFont(14, weight: .semibold)
         Text(model.display.localized("1行に1つの記述を入力"))
-            .font(.caption).foregroundStyle(.secondary)
+            .inkuFont(12).foregroundStyle(.secondary)
         Button(model.display.localized("新規作成")) { automation.restoreBatchInput("") }
-            .controlSize(.small).disabled(controlsDisabled)
+            .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
+            .inkuTooltip(model.display.tooltip("入力をクリアする", serverKey: "tooltipInputClear"))
     }
 
     private var inputHistory: some View {
@@ -174,7 +197,7 @@ struct BatchPanelView: View {
                 Text(selectedHistoryPrompt.isEmpty ? model.display.localized("履歴から選択") : historyLabel(selectedHistoryPrompt))
                     .lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.down").font(.caption2)
+                Image(systemName: "chevron.down").inkuFont(11)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 8).padding(.vertical, 6)
@@ -185,11 +208,11 @@ struct BatchPanelView: View {
         .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
         .background(Color.secondary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
-        .controlSize(.small)
+        .inkuFont(12)
         .disabled(controlsDisabled || automation.batchPromptHistory.isEmpty)
         .accessibilityLabel(model.display.localized("入力履歴"))
         .accessibilityValue(selectedHistoryPrompt.isEmpty ? model.display.localized("履歴から選択") : historyLabel(selectedHistoryPrompt))
-        .help(tip("選んだ履歴をバッチ入力欄へ復元します。実行記録と保存作品は変わりません。"))
+        .inkuTooltip(tip("選んだ履歴をバッチ入力欄へ復元します。実行記録と保存作品は変わりません。"))
     }
 
     private func historyLabel(_ text: String) -> String {
@@ -200,23 +223,23 @@ struct BatchPanelView: View {
     private var resumeCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label(model.display.localized("前回のバッチを再開"), systemImage: "arrow.clockwise")
-                .font(.subheadline.weight(.semibold))
+                .inkuFont(12, weight: .semibold)
             if let line = automation.nextPendingLine {
                 Text(model.display.localizedFormat("次は%ld行・残り%ld件（全%ld件）", line, automation.pendingCount, automation.rows.count))
-                    .font(.caption).monospacedDigit()
+                    .inkuFont(12).monospacedDigit()
             } else {
                 Text(model.display.localizedFormat("残り%ld件（全%ld件）", automation.pendingCount, automation.rows.count))
-                    .font(.caption).monospacedDigit()
+                    .inkuFont(12).monospacedDigit()
             }
             frozenConditions
             if automation.uncertainCount > 0 {
                 Text(model.display.localized("要確認の行を確認してから再開してください。"))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .inkuFont(12).foregroundStyle(.secondary)
             }
             Button(model.display.localized("前回のバッチを再開")) { Task { await automation.resumeBatch(app: model) } }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .disabled(controlsDisabled || automation.uncertainCount > 0)
-                .help(tip("前回の開始時の条件で、未処理の行と失敗した行を再開します。"))
+                .inkuTooltip(tip("前回の開始時の条件で、未処理の行と失敗した行を再開します。"))
         }
         .padding(12).frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
@@ -228,14 +251,14 @@ struct BatchPanelView: View {
             if automation.preparing {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
-                    Text(model.display.localized("バッチを準備中…")).font(.callout)
+                    Text(model.display.localized("バッチを準備中…")).inkuFont(13)
                 }
             } else if automation.running {
                 Button(model.display.localized(automation.stopping ? "停止中" : "停止"), systemImage: "stop.fill") {
                     Task { await automation.stop(app: model) }
                 }
                 .buttonStyle(.bordered).disabled(automation.stopping)
-                .help(tip("実行中のバッチを停止します。未処理の行は後で再開できます。"))
+                .inkuTooltip(tip("実行中のバッチを停止します。未処理の行は後で再開できます。"))
             } else {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 8) { newBatchLabel; newBatchButton }
@@ -243,15 +266,15 @@ struct BatchPanelView: View {
                 }
                 if !model.hasAvailableBatchDrawingModel {
                     Text(model.display.localized("使用中のLLMモデルを選択してから描いてください。"))
-                        .font(.caption).foregroundStyle(.secondary)
+                        .inkuFont(12).foregroundStyle(.secondary)
                 }
             }
             if !automation.status.isEmpty && !automation.preparing {
-                Text(model.display.message(automation.status)).font(.caption).foregroundStyle(.secondary)
+                Text(model.display.message(automation.status)).inkuFont(12).foregroundStyle(.secondary)
                     .lineLimit(3).textSelection(.enabled)
             }
             if let error = automation.errorText {
-                Text(model.display.message(error)).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+                Text(model.display.message(error)).inkuFont(12).foregroundStyle(.red).textSelection(.enabled)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -259,7 +282,7 @@ struct BatchPanelView: View {
     }
 
     private var newBatchLabel: some View {
-        Text(model.display.localized("新しいバッチ")).font(.caption).foregroundStyle(.secondary)
+        Text(model.display.localized("新しいバッチ")).inkuFont(12).foregroundStyle(.secondary)
             .fixedSize(horizontal: true, vertical: false)
     }
 
@@ -274,7 +297,7 @@ struct BatchPanelView: View {
         }
         .buttonStyle(.borderedProminent)
         .disabled(!canStartNewBatch)
-        .help(tip("入力欄と次のバッチの描画条件で、各行を独立した作品として描きます。"))
+        .inkuTooltip(tip("入力欄と次のバッチの描画条件で、各行を独立した作品として描きます。"))
     }
 
     private func startNewBatch() {
@@ -285,23 +308,23 @@ struct BatchPanelView: View {
     private var resultSummary: some View {
         Text(model.display.localizedFormat("成功 %ld・失敗 %ld・全 %ld件",
             automation.successfulCount, automation.failedCount, automation.rows.count))
-            .font(.callout).monospacedDigit()
+            .inkuFont(13).monospacedDigit()
     }
 
     private var issueResults: some View {
-        DisclosureGroup(isExpanded: $issuesExpanded) {
+        DisclosureGroup(isExpanded: issuesExpanded) {
             rowList(issueRows, maxHeight: 220)
         } label: {
             Label(model.display.localizedFormat("失敗・要確認の行 (%ld)", issueRows.count), systemImage: "exclamationmark.circle")
-                .font(.subheadline)
+                .inkuFont(12)
         }
     }
 
     private var allResults: some View {
-        DisclosureGroup(isExpanded: $resultsExpanded) {
+        DisclosureGroup(isExpanded: resultsExpanded) {
             rowList(automation.rows, maxHeight: 260)
         } label: {
-            Text(model.display.localizedFormat("全行の結果 (%ld)", automation.rows.count)).font(.subheadline)
+            Text(model.display.localizedFormat("全行の結果 (%ld)", automation.rows.count)).inkuFont(12)
         }
     }
 
@@ -320,13 +343,13 @@ struct BatchPanelView: View {
     private func resultRow(_ row: BatchRow) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
-                Text(model.display.localizedFormat("%ld行", row.line)).font(.caption.weight(.semibold)).monospacedDigit()
+                Text(model.display.localizedFormat("%ld行", row.line)).inkuFont(12, weight: .semibold).monospacedDigit()
                 Spacer(minLength: 0)
-                Text(model.display.localized(stateLabel(row.state))).font(.caption)
+                Text(model.display.localized(stateLabel(row.state))).inkuFont(12)
                     .foregroundStyle(row.state == .failed ? Color.red : Color.secondary)
-                Text(model.display.localizedFormat("%ld回", row.attempts)).font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                Text(model.display.localizedFormat("%ld回", row.attempts)).inkuFont(12).monospacedDigit().foregroundStyle(.secondary)
             }
-            Text(row.input).font(.callout).textSelection(.enabled)
+            Text(row.input).inkuFont(13).textSelection(.enabled)
             if row.state == .succeeded, row.workID != nil {
                 Button(model.display.localized(displayedRowID == row.id ? "表示中の作品" : "作品を表示"), systemImage: "paintpalette") {
                     let token = UUID(); rowObservationID = token
@@ -340,10 +363,10 @@ struct BatchPanelView: View {
                               work.id == row.workID, !Task.isCancelled else { return }
                         onObserveWork?(work, row.id)
                     }
-                }.font(.caption).disabled(model.isBrowsingLocked)
+                }.inkuFont(12).disabled(model.isBrowsingLocked)
             }
             if let error = row.error {
-                Text(model.display.message(error)).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                Text(model.display.message(error)).inkuFont(12).foregroundStyle(.secondary).textSelection(.enabled)
             }
             if row.state == .uncertain {
                 VStack(alignment: .leading, spacing: 6) {
@@ -353,7 +376,7 @@ struct BatchPanelView: View {
                         Button(model.display.localized("この行を省略")) { Task { await automation.resolveUncertain(id: row.id, retry: false) } }
                     }.disabled(controlsDisabled)
                 }
-                .controlSize(.small)
+                .buttonStyle(InkuGhostButtonStyle())
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -363,10 +386,10 @@ struct BatchPanelView: View {
         VStack(alignment: .leading, spacing: 12) {
             if automation.running {
                 runProgress
-                DisclosureGroup(model.display.localized("開始時の描画条件"), isExpanded: $conditionsExpanded) {
+                DisclosureGroup(model.display.localized("開始時の描画条件"), isExpanded: conditionsExpanded) {
                     frozenConditions.padding(.top, 4)
                 }
-                .font(.caption)
+                .inkuFont(12)
             }
             observation
         }
@@ -389,19 +412,19 @@ struct BatchPanelView: View {
             HStack {
                 if let row = automation.activeRow {
                     Text(model.display.localizedFormat("処理中: %ld行", row.line))
-                        .font(.subheadline.weight(.semibold)).monospacedDigit()
+                        .inkuFont(12, weight: .semibold).monospacedDigit()
                 }
                 Spacer(minLength: 0)
                 if automation.currentRetryRound > 0 {
                     Text(model.display.localizedFormat("再試行 %ld巡目", automation.currentRetryRound))
-                        .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                        .inkuFont(12).foregroundStyle(.secondary).monospacedDigit()
                 }
             }
             if let startedAt = automation.batchRowStartedAt {
                 TimelineView(.periodic(from: startedAt, by: 0.5)) { context in
                     Text(model.display.localizedFormat("この行の経過 %.1f秒", max(0, context.date.timeIntervalSince(startedAt))))
-                        .font(.caption).foregroundStyle(.secondary).monospacedDigit()
-                        .help(tip("この行を描き始めてからの時間です。写生・色カタログ・指示書生成と各応答待ちを含みます。"))
+                        .inkuFont(12).foregroundStyle(.secondary).monospacedDigit()
+                        .inkuTooltip(tip("この行を描き始めてからの時間です。写生・色カタログ・指示書生成と各応答待ちを含みます。"))
                 }
             }
             ProviderProgressView(model: model)
@@ -410,11 +433,11 @@ struct BatchPanelView: View {
 
     private var frozenConditions: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(model.display.localized("開始時の描画条件")).font(.caption.weight(.semibold))
+            Text(model.display.localized("開始時の描画条件")).inkuFont(12, weight: .semibold)
             if let conditions = automation.batchConditions {
-                Text(conditionsSummary(conditions)).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                Text(conditionsSummary(conditions)).inkuFont(12).foregroundStyle(.secondary).textSelection(.enabled)
             } else {
-                Text(model.display.localized("未記録")).font(.caption).foregroundStyle(.secondary)
+                Text(model.display.localized("未記録")).inkuFont(12).foregroundStyle(.secondary)
             }
         }
     }
@@ -444,33 +467,29 @@ struct BatchPanelView: View {
     private var observation: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                Text(model.display.localized(observationTitle)).font(.subheadline.weight(.semibold))
+                Text(model.display.localized(observationTitle)).inkuFont(12, weight: .semibold)
                 if automation.observedWork != nil, let row = automation.observedRow {
-                    Text(model.display.localizedFormat("%ld行", row.line)).font(.caption).monospacedDigit()
+                    Text(model.display.localizedFormat("%ld行", row.line)).inkuFont(12).monospacedDigit()
                 }
                 Spacer(minLength: 0)
                 if displayedWork != nil {
-                    Label(model.display.localized("保存済み"), systemImage: "checkmark.circle").font(.caption).foregroundStyle(.secondary)
+                    Label(model.display.localized("保存済み"), systemImage: "checkmark.circle").inkuFont(12).foregroundStyle(.secondary)
                 }
             }
-            Picker(model.display.localized("表示"), selection: $workspaceTab) {
-                Text(model.display.localized("作品")).tag("work")
-                Text("DDL").tag("ddl")
-                Text(model.display.localized("写生")).tag("sketch")
-            }
-            .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 300)
+            InkuSegmentedButtons(options: [("work", model.display.localized("作品")), ("ddl", "DDL"), ("sketch", model.display.localized("写生"))],
+                                 selection: workspaceTab)
             .accessibilityLabel(model.display.localized("表示する内容"))
             if let work = displayedWork {
                 if automation.observedWork == nil {
                     Text(model.display.localized("このバッチの成功作品はまだありません。前に表示した保存作品を表示しています。"))
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        .inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
-                Text(savedSummary(work)).font(.caption).foregroundStyle(.secondary)
+                Text(savedSummary(work)).inkuFont(12).foregroundStyle(.secondary)
                     .lineLimit(2).textSelection(.enabled)
-                if workspaceTab == "work" {
+                if workspaceTab.wrappedValue == "work" {
                     ArtworkCanvas(svg: work.svg, renderer: model.renderer, caption: work.effectiveSourceText)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if workspaceTab == "ddl" {
+                } else if workspaceTab.wrappedValue == "ddl" {
                     observedText(work.ddl, empty: "この作品には保存されたDDLがありません。", monospaced: true)
                 } else {
                     observedText(work.sketchText, empty: "この作品には保存された写生がありません。", monospaced: false)
@@ -485,7 +504,7 @@ struct BatchPanelView: View {
     }
 
     private var observationTitle: String {
-        workspaceTab == "ddl" ? "表示中のDDL" : workspaceTab == "sketch" ? "表示中の写生" : "表示中の作品"
+        workspaceTab.wrappedValue == "ddl" ? "表示中のDDL" : workspaceTab.wrappedValue == "sketch" ? "表示中の写生" : "表示中の作品"
     }
 
     private func observedText(_ text: String?, empty: String, monospaced: Bool) -> some View {

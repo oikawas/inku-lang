@@ -47,7 +47,7 @@ struct ExportView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text(model.display.localized(directCard ? "共有カードを書き出す" : "保存作品を書き出す")).font(.title2.bold())
+                Text(model.display.localized(directCard ? "共有カードを書き出す" : "保存作品を書き出す")).inkuFont(16, weight: .semibold)
                 Spacer()
                 Text(model.display.localizedFormat("%ld作品", selectedIDs.count)).foregroundStyle(.secondary)
             }
@@ -62,14 +62,19 @@ struct ExportView: View {
                         Toggle(isOn: Binding(get: { selectedIDs.contains(work.id) }, set: { included in
                             if included { selectedIDs.insert(work.id) } else { selectedIDs.remove(work.id) }
                         })) {
+                            // SavedWorkExportMenu.svelte:189-190: the id prefix and the text, each whole on hover.
                             VStack(alignment: .leading, spacing: 3) {
                                 LibraryWorkTitle(work: work, untitled: model.display.localized("無題"))
-                                Text(Date(timeIntervalSince1970: Double(work.at) / 1000), format: .dateTime).font(.caption).foregroundStyle(.secondary)
+                                    .inkuTooltip(model.display.tooltipValue(work.effectiveSourceText))
+                                HStack(spacing: 6) {
+                                    Text(Date(timeIntervalSince1970: Double(work.at) / 1000), format: .dateTime)
+                                    Text(String(work.id.prefix(8))).monospaced().inkuTooltip(model.display.tooltipValue(work.id))
+                                }.inkuFont(12).foregroundStyle(.secondary)
                             }
                         }.disabled(isBusy || work.trashed)
                     }.frame(minWidth: 240, maxWidth: 310, minHeight: 260)
                     Text(model.display.localized(preserveOrder ? "系譜の順序で書き出します。" : "選択作品を作成日時の順で書き出します。"))
-                        .font(.caption).foregroundStyle(.secondary)
+                        .inkuFont(12).foregroundStyle(.secondary)
                 }
                 Form {
                     Picker(model.display.localized("形式"), selection: $options.format) {
@@ -85,11 +90,11 @@ struct ExportView: View {
                             }
                             Button { svgHelpOpen.toggle() } label: { Image(systemName: "questionmark.circle") }
                                 .buttonStyle(.borderless).accessibilityLabel(copy("svgExportHelpAria", "SVGの用途と特徴"))
-                                .help(model.display.tooltip("SVGの用途と特徴", serverKey: "svgExportHelpAria"))
+                                .inkuTooltip(model.display.tooltip("SVGの用途と特徴", serverKey: "svgExportHelpAria"))
                                 .popover(isPresented: $svgHelpOpen) { svgHelp }
                         }
                         Text(model.display.localized("表示用は保存時の記述をSVGへ添えます。ほかのプロファイルは作品の保存条件で描画します。"))
-                            .font(.caption).foregroundStyle(.secondary)
+                            .inkuFont(12).foregroundStyle(.secondary)
                     }
                     if options.format == .png || options.format == .shareCard || animation {
                         Picker(model.display.localized("Y軸"), selection: $resolution) {
@@ -104,7 +109,7 @@ struct ExportView: View {
                         }
                         if resolution == 0 { TextField("64〜12000px", value: $customHeight, format: .number) }
                         Text(model.display.localized("用紙比率を保ちます。1画像は1億4400万画素まで。"))
-                            .font(.caption).foregroundStyle(.secondary)
+                            .inkuFont(12).foregroundStyle(.secondary)
                     }
                     if options.format == .png {
                         Menu(model.display.localized("PNGテンプレート")) {
@@ -125,7 +130,7 @@ struct ExportView: View {
                         TextField(model.display.localized("タイトル"), text: $options.title)
                         TextField(model.display.localized("サブタイトル"), text: $options.subtitle)
                         Text(model.display.localized(options.format == .aiSheet ? "12作品ずつ番号付き画像と全文の説明ファイルを書き出します。" : "28作品ずつ説明付きの閲覧用シートを書き出します。"))
-                            .font(.caption).foregroundStyle(.secondary)
+                            .inkuFont(12).foregroundStyle(.secondary)
                     }
                     if animation {
                         if selection.count == 1 {
@@ -142,13 +147,13 @@ struct ExportView: View {
                             TextField(model.display.localized("作品の表示時間（0.1〜30秒）"), value: $options.holdSeconds, format: .number)
                         }
                         Text(model.display.localized("1作品では描画要素を順に表示します。合計6億画素を超える設定は書き出す前に確認します。"))
-                            .font(.caption).foregroundStyle(.secondary)
+                            .inkuFont(12).foregroundStyle(.secondary)
                     }
                 }.formStyle(.grouped).frame(minWidth: 370).disabled(isBusy)
               }
             }
             if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
-            if !status.isEmpty { Text(model.display.message(status)).font(.callout).foregroundStyle(.secondary) }
+            if !status.isEmpty { Text(model.display.message(status)).inkuFont(13).foregroundStyle(.secondary) }
             HStack {
                 if isBusy { ProgressView().controlSize(.small); Button(model.display.localized("中止")) { operation?.cancel(); status = "中止しています…" } }
                 if !exportedURLs.isEmpty {
@@ -175,7 +180,7 @@ struct ExportView: View {
 
     private var svgHelp: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(copy("svgExportHelpTitle", "SVGの用途と特徴")).font(.headline)
+            Text(copy("svgExportHelpTitle", "SVGの用途と特徴")).inkuFont(14, weight: .semibold)
             Grid(alignment: .topLeading, horizontalSpacing: 14, verticalSpacing: 12) {
                 GridRow {
                     Text(copy("svgExportTableFormat", "形式")).bold()
@@ -189,7 +194,7 @@ struct ExportView: View {
                         Text(copy("svgExport" + profile + "Feature", "")).frame(width: 220, alignment: .leading)
                     }
                 }
-            }.font(.callout).fixedSize(horizontal: false, vertical: true)
+            }.inkuFont(13).fixedSize(horizontal: false, vertical: true)
         }.padding(20).frame(width: 530)
     }
 

@@ -15,12 +15,12 @@ import SwiftUI
             if let definition = model.drawingLimitDefinition,
                let copy = model.productReference?.localized(language: model.display.preferences.language) {
                 Section(copy.text("settingsRenderLimitsTitle")) {
-                    Text(copy.text("settingsRenderLimitsIntro")).font(.callout).foregroundStyle(.secondary)
+                    Text(copy.text("settingsRenderLimitsIntro")).inkuFont(13).foregroundStyle(.secondary)
                 }
                 ForEach(definition.groups, id: \.id) { group in
                     Section {
                         if let summary = copy.limitGroupSummaries[group.id], !summary.isEmpty {
-                            Text(summary).font(.callout).foregroundStyle(.secondary)
+                            Text(summary).inkuFont(13).foregroundStyle(.secondary)
                         }
                         ForEach(group.fields, id: \.self) { key in
                             limitRow(key, definition: definition, copy: copy)
@@ -32,20 +32,20 @@ import SwiftUI
                                 Button { helpGroup = group.id } label: { Image(systemName: "info.circle") }
                                     .buttonStyle(.plain)
                                     .accessibilityLabel(model.display.localizedFormat("%@の説明", copy.limitGroups[group.id] ?? group.id))
-                                    .help(model.display.preferences.showTooltips ? tip : "")
+                                    .inkuTooltip(model.display.preferences.showTooltips ? tip : "")
                                     .popover(isPresented: Binding(get: { helpGroup == group.id }, set: { if !$0 { helpGroup = nil } })) {
-                                        Text(tip).font(.callout).textSelection(.enabled).padding(16).frame(width: 380)
+                                        Text(tip).inkuFont(13).textSelection(.enabled).padding(16).frame(width: 380)
                                     }
                             }
                         }
                     }
                 }
                 Section {
-                    Text(copy.text("settingsRenderLimitsRounding")).font(.callout).foregroundStyle(.secondary)
+                    Text(copy.text("settingsRenderLimitsRounding")).inkuFont(13).foregroundStyle(.secondary)
                     HStack {
                         Button(model.display.localized("再読込")) { load() }.disabled(changed)
                         Button(copy.text("settingsRenderLimitsReset")) { draft = definition.defaults.mapValues(String.init); message = "" }
-                            .help(model.display.preferences.showTooltips ? model.display.localized("既定値を入力欄に戻します。変更を保存するまで適用しません。") : "")
+                            .inkuTooltip(model.display.preferences.showTooltips ? model.display.localized("既定値を入力欄に戻します。変更を保存するまで適用しません。") : "")
                         Spacer()
                         if changed {
                             Button(model.display.localized("取消")) { draft = saved.mapValues(String.init); message = "" }
@@ -56,9 +56,9 @@ import SwiftUI
                     }.disabled(saving || model.isBrowsingLocked)
                     if changed, (try? definition.parsedDraft(draft)) == nil {
                         Text(model.display.localized("制限値には整数を入力してください。"))
-                            .font(.caption).foregroundStyle(.red)
+                            .inkuFont(12).foregroundStyle(.red)
                     }
-                    if !message.isEmpty { Text(model.display.message(message)).font(.caption).textSelection(.enabled) }
+                    if !message.isEmpty { Text(model.display.message(message)).inkuFont(12).textSelection(.enabled) }
                 }
             } else {
                 Section { ProgressView(model.display.localized("準備中")) }
@@ -71,14 +71,14 @@ import SwiftUI
             HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(copy.limitLabels[key] ?? key)
-                    Text(copy.limitHints[key] ?? "").font(.caption).foregroundStyle(.secondary)
+                    Text(copy.limitHints[key] ?? "").inkuFont(12).foregroundStyle(.secondary)
                     if ["max_expanded_primitives", "max_expanded_per_instruction"].contains(key),
                        let value = Int(draft[key] ?? ""), let low = definition.bytesPerMark["pen"],
                        let high = definition.bytesPerMark["brush_thick"] {
                         Text(String(format: copy.text("limitWeightFormat"),
                                     String(format: "%.1f", Double(max(1, value)) * Double(low) / 1_000_000),
                                     String(format: "%.1f", Double(max(1, value)) * Double(high) / 1_000_000)))
-                            .font(.caption).foregroundStyle(.secondary)
+                            .inkuFont(12).foregroundStyle(.secondary)
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 5) {
@@ -86,7 +86,7 @@ import SwiftUI
                     TextField(copy.limitLabels[key] ?? key, text: Binding(get: { draft[key] ?? "" }, set: { draft[key] = $0; message = "" }))
                         .textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing).frame(width: 100)
                         .accessibilityLabel(copy.limitLabels[key] ?? key)
-                        .help(model.display.preferences.showTooltips ? copy.limitHints[key] ?? "" : "")
+                        .inkuTooltip(model.display.preferences.showTooltips ? copy.limitHints[key] ?? "" : "")
                     Button { step(key, by: 1, definition: definition) } label: { Image(systemName: "plus") }
                 }.buttonStyle(.borderless).disabled(saving || model.isBrowsingLocked)
             }
@@ -94,7 +94,7 @@ import SwiftUI
                 Text(model.display.localizedFormat("現在: %ld", Int(saved[key] ?? 0)))
                 Text(model.display.localizedFormat("既定: %ld", Int(definition.defaults[key] ?? 0)))
                 if let unit = copy.limitUnits[key] { Text(unit) }
-            }.font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            }.inkuFont(12).monospacedDigit().foregroundStyle(.secondary)
         }.padding(.vertical, 4)
     }
 

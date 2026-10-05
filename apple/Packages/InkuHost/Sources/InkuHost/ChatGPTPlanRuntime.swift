@@ -246,8 +246,10 @@ public actor ChatGPTPlanRuntime {
         guard ["generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition", "complete_visible_ddl_holes"].contains(tag) else {
             throw HostError("chatgpt_operation_not_supported")
         }
-        guard let timeout = Double(try effect.requiredString("timeout_ms")), timeout.isFinite, timeout > 0,
+        guard let timeout = Double(try effect.requiredString("timeout_ms")), timeout.isFinite,
               argumentLimit > 0, argumentLimit <= (Int.max - 524_288) / 6 else { throw HostError("pipeline_schema_violation") }
+        // Server raises TimeoutError for a non-positive attempt timeout before the ChatGPT request.
+        guard timeout > 0 else { throw HostError("chatgpt_transport_timeout") }
         let deadline = Date().addingTimeInterval(timeout / 1000)
         let operationEpoch = epoch
         try validate(session)
@@ -332,10 +334,13 @@ public actor ChatGPTPlanRuntime {
         }
         let value = try ExactJSON(data: result.data)
         guard let rows = value["models"].array else { throw HostError("chatgpt_response_invalid") }
-        let models = try rows.filter { $0["visibility"].string == "list" }.map {
-            ChatGPTPlanModel(id: try $0.requiredString("slug"), label: try $0.requiredString("display_name"))
+        // Server skips a listed row without a string slug and display name instead of refusing the catalog.
+        var seen = Set<String>()
+        let models = rows.filter { $0["visibility"].string == "list" }.compactMap { row -> ChatGPTPlanModel? in
+            guard let id = row["slug"].string, let label = row["display_name"].string, !id.isEmpty, !label.isEmpty,
+                  seen.insert(id).inserted else { return nil }
+            return ChatGPTPlanModel(id: id, label: label)
         }
-        guard models.allSatisfy({ !$0.id.isEmpty && !$0.label.isEmpty }), Set(models.map(\.id)).count == models.count else { throw HostError("chatgpt_response_invalid") }
         try await mutate { value in
             try self.validate(session, operationEpoch: operationEpoch)
             _ = try self.checkedProfile(session, value: value)

@@ -31,7 +31,7 @@ public struct ProviderObservationView: View {
                     let attempts = metrics.filter { $0.stage == stage }
                     if !attempts.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(model.display.localized(title(stage))).font(.caption.weight(.semibold))
+                            Text(model.display.localized(title(stage))).inkuFont(12, weight: .semibold)
                             ForEach(Array(attempts.enumerated()), id: \.offset) { _, metric in
                                 metricRow(metric)
                             }
@@ -47,7 +47,7 @@ public struct ProviderObservationView: View {
                         else { records = []; loadFailed = false; rawLoadID = nil; loading = false }
                     }
                 }
-            }.padding(.top, 6).font(.caption)
+            }.padding(.top, 6).inkuFont(12)
         }
         .onChange(of: sourceID) { _, _ in
             expanded = false; rawExpanded = false; records = []; loadFailed = false; rawLoadID = nil; loading = false
@@ -75,15 +75,15 @@ public struct ProviderObservationView: View {
                 Text(model.display.localizedFormat("診断の操作: %@", model.display.localized(diagnosticOperation(metric.diagnostic?.operation))))
                     .foregroundStyle(.secondary)
             }
-            if let status = metric.httpStatus ?? metric.diagnostic?.httpStatus { Text("HTTP \(status)").font(.caption.monospaced()) }
-            if let failure = metric.failure { Text(failure).font(.caption.monospaced()).foregroundStyle(.secondary) }
+            if let status = metric.httpStatus ?? metric.diagnostic?.httpStatus { Text("HTTP \(status)").inkuFont(12, design: .monospaced) }
+            if let failure = metric.failure { Text(failure).inkuFont(12, design: .monospaced).foregroundStyle(.secondary) }
             if let diagnostic = metric.diagnostic {
-                if let endpoint = diagnostic.endpoint { Text(endpoint).font(.caption.monospaced()) }
+                if let endpoint = diagnostic.endpoint { Text(endpoint).inkuFont(12, design: .monospaced) }
                 if let domain = diagnostic.errorDomain, let code = diagnostic.errorCode {
-                    Text("\(domain) \(code)").font(.caption.monospaced()).foregroundStyle(.secondary)
+                    Text("\(domain) \(code)").inkuFont(12, design: .monospaced).foregroundStyle(.secondary)
                 }
-                if let code = diagnostic.hostCode { Text(code).font(.caption.monospaced()).foregroundStyle(.secondary) }
-                if let message = diagnostic.providerMessage { Text(message).font(.caption) }
+                if let code = diagnostic.hostCode { Text(code).inkuFont(12, design: .monospaced).foregroundStyle(.secondary) }
+                if let message = diagnostic.providerMessage { Text(message).inkuFont(12) }
             }
             Text(model.display.localizedFormat("トークン 入力 %@・出力 %@",
                 metric.usage?.inputTokens.map(String.init) ?? absent,
@@ -122,7 +122,7 @@ public struct ProviderObservationView: View {
         DisclosureGroup(model.display.localized(title)) {
             VStack(alignment: .leading, spacing: 6) {
                 ScrollView {
-                    Text(String(decoding: body.utf8.prefix(previewLimit), as: UTF8.self)).font(.system(.caption2, design: .monospaced))
+                    Text(String(decoding: body.utf8.prefix(previewLimit), as: UTF8.self)).inkuFont(11, design: .monospaced)
                         .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                 }.frame(maxHeight: 180)
                 if body.utf8.count > previewLimit {

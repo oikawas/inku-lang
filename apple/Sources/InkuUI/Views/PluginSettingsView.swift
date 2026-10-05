@@ -14,13 +14,13 @@ struct PluginSettingsView: View {
         Group {
             Section(model.display.localized("語彙プラグイン")) {
                 Text(model.display.localized("有効なプラグインを次に作る作品で使います。保存作品は保存時の定義と版を使います。"))
-                    .font(.callout).foregroundStyle(.secondary)
+                    .inkuFont(13).foregroundStyle(.secondary)
                 ForEach(settings.packages) { package in
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
-                            Text(package.id).font(.headline)
+                            Text(package.id).inkuFont(14, weight: .semibold)
                             Text(package.versions.isEmpty ? model.display.localized("描画定義なし") : package.versions.map { "v" + $0 }.joined(separator: ", "))
-                                .font(.caption).foregroundStyle(.secondary)
+                                .inkuFont(12).foregroundStyle(.secondary)
                             Spacer()
                             Toggle(model.display.localized("有効"), isOn: Binding(get: { settings.preferences.isEnabled(package.id) }, set: { value in
                                 Task { await settings.setEnabled(value, packageID: package.id, model: model) }
@@ -31,10 +31,10 @@ struct PluginSettingsView: View {
                                 HStack(alignment: .top, spacing: 12) {
                                     if let url = word.previewURL { preview(url).frame(width: 64, height: 64) }
                                     VStack(alignment: .leading, spacing: 4) {
-                                        HStack { Text(word.id).font(.callout.bold()); Text(model.display.localized(package.drawnNames.contains(word.id) ? "描画に使用" : "描画定義なし")).font(.caption).foregroundStyle(.secondary) }
-                                        if !word.aliases.isEmpty { Text(word.aliases.joined(separator: ", ")).font(.caption) }
-                                        Text((model.display.preferences.language == "en" ? word.english : word.japanese).joined(separator: " | ")).font(.callout)
-                                        Text(word.note).font(.caption).foregroundStyle(.secondary)
+                                        HStack { Text(word.id).inkuFont(13, weight: .semibold); Text(model.display.localized(package.drawnNames.contains(word.id) ? "描画に使用" : "描画定義なし")).inkuFont(12).foregroundStyle(.secondary) }
+                                        if !word.aliases.isEmpty { Text(word.aliases.joined(separator: ", ")).inkuFont(12) }
+                                        Text((model.display.preferences.language == "en" ? word.english : word.japanese).joined(separator: " | ")).inkuFont(13)
+                                        Text(word.note).inkuFont(12).foregroundStyle(.secondary)
                                     }
                                 }.padding(.vertical, 4)
                             }

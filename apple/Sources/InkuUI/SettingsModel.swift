@@ -39,7 +39,7 @@ public final class SettingsModel {
     private var discoveredModelCatalog: [ProviderModelInfo] = []
     private var modelCatalogProvider: ProviderSettings?
     @ObservationIgnored private let credentials: any ProviderCredentialStore
-    @ObservationIgnored private var discovery: Task<[ProviderModelInfo], Error>?
+    @ObservationIgnored private var discovery: Task<[FetchedProviderModel], Error>?
     @ObservationIgnored private var discoveryID: UUID?
     @ObservationIgnored private var isSaving = false
     public init(credentials: any ProviderCredentialStore = KeychainCredentialStore()) { self.credentials = credentials }
@@ -72,9 +72,7 @@ public final class SettingsModel {
     }
 
     public nonisolated static func isModelAvailable(_ reference: String, settings: HostSettings) -> Bool {
-        guard let separator = reference.firstIndex(of: ":") else { return false }
-        let providerID = String(reference[..<separator])
-        let modelID = String(reference[reference.index(after: separator)...])
+        let (providerID, modelID) = ProviderModelReference.resolve(reference, providers: settings.providers)
         guard !modelID.isEmpty, let provider = settings.providers.first(where: { $0.id == providerID }) else { return false }
         guard provider.enabledModels?[modelID] != false else { return false }
         let models = provider.models ?? ModelGuidanceCatalog.bundled?.registeredModelSettings(for: provider) ?? []
@@ -93,17 +91,13 @@ public final class SettingsModel {
     }
 
     public nonisolated static func isRegisteredModelAvailable(_ reference: String, purpose: String, settings: HostSettings) -> Bool {
-        guard let separator = reference.firstIndex(of: ":") else { return false }
-        let providerID = String(reference[..<separator])
-        let modelID = String(reference[reference.index(after: separator)...])
+        let (providerID, modelID) = ProviderModelReference.resolve(reference, providers: settings.providers)
         guard let provider = settings.providers.first(where: { $0.id == providerID }) else { return false }
         return registeredModels(for: provider, purpose: purpose).contains { $0.id == modelID && $0.isSelectable }
     }
 
     public nonisolated static func isBatchModelAvailable(_ reference: String, settings: HostSettings) -> Bool {
-        guard let separator = reference.firstIndex(of: ":") else { return false }
-        let providerID = String(reference[..<separator])
-        let modelID = String(reference[reference.index(after: separator)...])
+        let (providerID, modelID) = ProviderModelReference.resolve(reference, providers: settings.providers)
         guard !modelID.isEmpty, let provider = settings.providers.first(where: { $0.id == providerID }) else { return false }
         return batchModels(for: provider).contains { $0.id == modelID && $0.isSelectable }
     }
@@ -320,24 +314,25 @@ public final class SettingsModel {
         let provider = latest.providers[try Self.editableProviderIndex(providerID, in: latest)]
         let fetched = try await fetchModelCatalog(for: provider)
         try Task.checkCancellation()
+        // Server probes Ollama Cloud models once per fetch for retirement and plan access.
+        let today = ProviderModelCatalog.utcDay()
+        let key = try await credentials.key(for: provider.credentialID)
+        let access = await ProviderModelCatalog.probeAccess(provider: provider, key: key, modelIDs: fetched.map(\.id),
+                                                            today: today, send: Self.probeStatus)
+        try Task.checkCancellation()
         try await saveProvider(providerID: providerID, model: model) { current in
             guard current.baseURL == provider.baseURL, current.kind == provider.kind,
                   current.apiProfile == provider.apiProfile, current.credentialID == provider.credentialID
             else { throw HostError("provider_configuration_changed") }
-            var merged = catalogModels(for: current)
-            var known = Set(merged.map(\.id))
-            let prefix = providerID + ":"
-            for model in fetched where model.id.hasPrefix(prefix) {
-                let id = String(model.id.dropFirst(prefix.count))
-                guard !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, known.insert(id).inserted else { continue }
-                merged.append(.init(id: id, label: model.name))
-            }
-            current.models = merged
+            let merged = ProviderModelCatalog.merge(fetched: fetched, previous: catalogModels(for: current),
+                previousEnabled: current.enabledModels, access: access, today: today)
+            current.models = merged.models
+            current.enabledModels = merged.enabled
         }
         guard let current = host.providers.first(where: { $0.id == providerID }) else { throw HostError("provider_missing") }
         if selectedProviderID == providerID {
             modelCatalogProvider = current
-            discoveredModelCatalog = fetched
+            discoveredModelCatalog = Self.modelInfo(fetched, provider: provider)
         }
         status = "\(fetched.count)個のモデルを取得しました。"
         return catalogModels(for: current)
@@ -420,7 +415,7 @@ public final class SettingsModel {
     public func discoverModels() async {
         guard let provider = selectedProvider else { return }
         do {
-            let models = try await fetchModelCatalog(for: provider)
+            let models = Self.modelInfo(try await fetchModelCatalog(for: provider), provider: provider)
             guard selectedProvider == provider else { return }
             modelCatalogProvider = provider
             discoveredModelCatalog = models
@@ -430,7 +425,7 @@ public final class SettingsModel {
     }
     public func cancelDiscovery() { discovery?.cancel() }
 
-    private func fetchModelCatalog(for provider: ProviderSettings) async throws -> [ProviderModelInfo] {
+    private func fetchModelCatalog(for provider: ProviderSettings) async throws -> [FetchedProviderModel] {
         guard !isLoadingModels else { throw HostError("model_catalog_busy") }
         guard provider.kind != .chatGPTPlan else { throw HostError("personal_plan_model_catalog_requires_runtime") }
         let token = UUID()
@@ -452,49 +447,48 @@ public final class SettingsModel {
         }
     }
 
-    private func requestModels(for provider: ProviderSettings) async throws -> [ProviderModelInfo] {
+    private func requestModels(for provider: ProviderSettings) async throws -> [FetchedProviderModel] {
         try Task.checkCancellation()
         let url = try Self.modelCatalogURL(for: provider)
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 30
-        let key = provider.requiresAPIKey ? try await credentials.key(for: provider.credentialID) : nil
+        // Server sends the key only when one is saved; a list some services give anyone is still read.
+        let key = try await credentials.key(for: provider.credentialID)
         try Task.checkCancellation()
-        if provider.requiresAPIKey && (key == nil || key?.isEmpty == true) { throw HostError("provider_credentials_missing") }
-        if let key, !key.isEmpty {
-            switch provider.kind {
-            case .gemini: request.setValue(key, forHTTPHeaderField: "x-goog-api-key")
-            case .anthropic:
-                request.setValue(key, forHTTPHeaderField: "x-api-key")
-                request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-            case .openAICompatible: request.setValue("Bearer " + key, forHTTPHeaderField: "Authorization")
-            case .chatGPTPlan: throw HostError("personal_plan_model_catalog_requires_runtime")
+        return try await ProviderModelCatalog.fetch(provider: provider, firstURL: url, key: key) { request in
+            // One HTTP client per page, 20 seconds each, as Server's urlopen.
+            let config = URLSessionConfiguration.ephemeral
+            config.timeoutIntervalForResource = ProviderModelCatalog.timeout
+            let session = URLSession(configuration: config, delegate: ModelCatalogRedirectPolicy(), delegateQueue: nil)
+            defer { session.invalidateAndCancel() }
+            let (bytes, response) = try await session.bytes(for: request)
+            guard let http = response as? HTTPURLResponse else { throw HostError("model_catalog_http_failure") }
+            guard (200...299).contains(http.statusCode) else { return (http.statusCode, Data()) }
+            var data = Data()
+            for try await byte in bytes {
+                try Task.checkCancellation()
+                guard data.count < 4 * 1024 * 1024 else { throw HostError("model_catalog_too_large") }
+                data.append(byte)
             }
+            return (http.statusCode, data)
         }
+    }
+
+    private nonisolated static func modelInfo(_ rows: [FetchedProviderModel], provider: ProviderSettings) -> [ProviderModelInfo] {
+        var seen: Set<String> = []
+        return rows.filter { seen.insert($0.id).inserted }.map {
+            ProviderModelInfo(id: provider.id + ":" + $0.id, name: $0.label, contextLimit: $0.contextLimit, capabilities: $0.capabilities)
+        }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    /// Status and the first 2 KiB of the body; a network failure settles nothing.
+    private nonisolated static func probeStatus(_ request: URLRequest) async -> (status: Int?, text: String) {
         let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForResource = 30
+        config.timeoutIntervalForResource = ProviderModelCatalog.timeout
         let session = URLSession(configuration: config, delegate: ModelCatalogRedirectPolicy(), delegateQueue: nil)
         defer { session.invalidateAndCancel() }
-        let (bytes, response) = try await session.bytes(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { throw HostError("model_catalog_http_failure") }
+        guard let (bytes, response) = try? await session.bytes(for: request), let http = response as? HTTPURLResponse else { return (nil, "") }
         var data = Data()
-        for try await byte in bytes {
-            try Task.checkCancellation()
-            guard data.count < 4 * 1024 * 1024 else { throw HostError("model_catalog_too_large") }
-            data.append(byte)
-        }
-        try Task.checkCancellation()
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
-        let rows = (json["data"] ?? json["models"]) as? [[String: Any]] ?? []
-        var seen: Set<String> = []
-        return rows.compactMap { row -> ProviderModelInfo? in
-            guard let raw = (row["id"] ?? row["name"]) as? String else { return nil }
-            let slug = raw.hasPrefix("models/") ? String(raw.dropFirst(7)) : raw
-            guard !slug.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, seen.insert(slug).inserted else { return nil }
-            return ProviderModelInfo(id: provider.id + ":" + slug,
-                                     name: (row["displayName"] ?? row["display_name"]) as? String ?? slug,
-                                     contextLimit: row["inputTokenLimit"] as? Int,
-                                     capabilities: row["supportedGenerationMethods"] as? [String] ?? [])
-        }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        do { for try await byte in bytes { data.append(byte); if data.count >= 2048 { break } } } catch {}
+        return (http.statusCode, String(decoding: data, as: UTF8.self))
     }
 }
 

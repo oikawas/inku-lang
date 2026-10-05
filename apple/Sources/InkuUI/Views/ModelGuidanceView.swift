@@ -14,9 +14,9 @@ struct ModelGuidanceView: View {
     var body: some View {
         DisclosureGroup {
             VStack(alignment: .leading, spacing: 8) {
-                Text(display.localized("登録資料の評価")).font(.caption.weight(.semibold))
+                Text(display.localized("登録資料の評価")).inkuFont(12, weight: .semibold)
                 if let guidance {
-                    Text(guidance.label).font(.callout).textSelection(.enabled)
+                    Text(guidance.label).inkuFont(13).textSelection(.enabled)
                     row("用途", guidance.purposes.map { $0 == "vision" ? "Vision" : $0 == "llm" ? "LLM" : $0 }.joined(separator: " / "))
                     if guidance.hasStageRecommendations {
                         row("解釈の適性（Stage 1）", ModelGuidance.recommendation(guidance.stage1Level))
@@ -53,7 +53,7 @@ struct ModelGuidanceView: View {
                 Text(display.localized("登録資料の評価は、現在の接続先の性能を保証するものではありません。"))
                     .foregroundStyle(.secondary)
                 Divider()
-                Text(display.localized("接続先から取得した情報")).font(.caption.weight(.semibold))
+                Text(display.localized("接続先から取得した情報")).inkuFont(12, weight: .semibold)
                 if let discovered, discovered.id == reference,
                    discovered.contextLimit != nil || !discovered.capabilities.isEmpty {
                     if let limit = discovered.contextLimit {
@@ -66,7 +66,7 @@ struct ModelGuidanceView: View {
                     Text(display.localized("入力上限・対応機能は接続先から未取得です。")).foregroundStyle(.secondary)
                 }
             }
-            .font(.caption)
+            .inkuFont(12)
             .padding(.top, 6)
         } label: {
             HStack {

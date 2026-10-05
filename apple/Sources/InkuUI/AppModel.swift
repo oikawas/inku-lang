@@ -11,6 +11,18 @@ import UniformTypeIdentifiers
 import AppKit
 #endif
 
+/// The sketch prose of one saved work as the author is editing it, and the description it was written for.
+public struct SketchDraft: Sendable, Equatable {
+    public let workID: String
+    public let source: String
+    public let original: String
+    public var text: String
+    public var editing = true
+    public init(workID: String, source: String, original: String) {
+        self.workID = workID; self.source = source; self.original = original; text = original
+    }
+}
+
 /// Availability of the author-facing prompt journal, independent of whether a provider was called.
 public enum PromptAvailability: Sendable, Equatable {
     case loading, recorded, notRecorded, unavailable
@@ -34,14 +46,18 @@ public final class AppModel {
     public var inputMode = "description"
     public var descriptionText = ""
     public var ddlText = ""
-    public var language = "en"
-    public var catalogID = "default"
-    public var canvasID = "square"
+    /// The Web always requests `auto`; an explicit language remains possible for restored inputs.
+    public var language = "auto"
+    public var catalogID = "default" { didSet { rememberNextConditions() } }
+    public var canvasID = "square" { didSet { rememberNextConditions() } }
     public var seedText = ""
-    public var wild = false
-    public var catalogMode = "fixed"
+    public var wild = false { didSet { rememberNextConditions() } }
+    public var catalogMode = "fixed" { didSet { rememberNextConditions() } }
     public var sketchMode = "off"
     public var sketchText = ""
+    /// Web `sketchDraft`/`sketchEditing`: the author's edit of the displayed work's sketch prose. Drawing that work's
+    /// description again with the sketch on sends the edited prose instead of calling the layer (I8).
+    public var sketchDraft: SketchDraft?
     public var variationAmplitude = "small"
     public var variationSeedText = ""
     public var selectedHoleIDs: Set<String> = []
@@ -65,6 +81,10 @@ public final class AppModel {
     /// Browsing may continue during an explicitly backgrounded batch row; writers still use isBusy.
     public var isBrowsingLocked: Bool { isBusy && !backgroundDrawing }
     public var errorText: String?
+    /// The ChatGPT plan diagnostic each execution reported last, for its failure text.
+    @ObservationIgnored private var chatGPTFailureCodes: [String: String] = [:]
+    /// Web CanvasPanel `clipboardMessage`: the copy button names the result, 2.5 s after success and 8 s after a failure.
+    public private(set) var clipboardMessageKey: String?
     public var providerURL = "http://localhost:8080/v1"
     public var providerModel = ""
     public var providerKind = "openai_compatible"
@@ -125,6 +145,8 @@ public final class AppModel {
     @ObservationIgnored private var currentView: PipelineView?
     @ObservationIgnored private var importedDDL: DDLPackageImport?
     @ObservationIgnored private var providerModelsByExecution: [String: ModelSelection] = [:]
+    /// Set once the saved next-work conditions have been read, so the defaults never overwrite them.
+    @ObservationIgnored private var nextConditionsRestored = false
 
     public init(databaseURL: URL? = nil, transport: (any ProviderTransport)? = nil) {
         self.databaseURL = databaseURL
@@ -162,15 +184,42 @@ public final class AppModel {
     public var nextBatchDrawingModelReference: String {
         hasAvailableBatchDrawingModel ? nextDrawingModelReference : ""
     }
+    /// A description is drawable only when something is left once the author's numbers and comments are cut
+    /// (Web `canSubmit`, state.svelte.ts:363-364).
     public var canGenerate: Bool {
-        database != nil && !isBusy && !isPreview && !(inputMode == "ddl" ? ddlText : descriptionText).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        database != nil && !isBusy && !isPreview
+            && (inputMode == "ddl" ? !ddlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                   : DescriptionLabels.hasDrawableText(descriptionText))
             && (inputMode == "ddl" || (hasAvailableNextDrawingModel
                 && !(selectedWorkID != nil && sourceLocked)))
     }
     public var canGenerateDescription: Bool {
         database != nil && !isBusy && !isPreview && hasAvailableNextDrawingModel
-            && !descriptionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && DescriptionLabels.hasDrawableText(descriptionText)
             && !(selectedWorkID != nil && sourceLocked)
+    }
+    /// Web `forkPipelineDescription`: a work its edited DDL holds is drawn from its description only as a new work.
+    public var canForkDescription: Bool {
+        database != nil && !isBusy && !isPreview && hasAvailableNextDrawingModel
+            && DescriptionLabels.hasDrawableText(descriptionText) && selectedWorkID != nil && sourceLocked
+    }
+
+    /// Web `forkPipelineDescription` → Server `fork_linked_history`: the held work's own description, unchanged, starts
+    /// a child of it (`description_fork`, edge `description_edit`) from its saved configuration and the next conditions.
+    /// The edited DDL is not carried over, and the held work itself is untouched.
+    public func forkDescription() async {
+        guard canForkDescription, let parent = selectedWorkID else { return }
+        inputMode = "description"
+        await generate(parentWorkID: parent, fork: true)
+    }
+
+    /// R6: the next drawing model's service needs an API key and none is stored. Read only when a screen asks,
+    /// so checks that build an AppModel never query the Keychain.
+    public func drawingModelKeyMissing() async -> Bool {
+        guard initialized, hasNextDrawingModel,
+              let provider = settings.providers.first(where: { nextDrawingModelReference.hasPrefix($0.id + ":") }),
+              provider.requiresAPIKey else { return false }
+        return (try? await credentials.isConfigured(for: provider.credentialID)) == false
     }
 
     public func generateDescription() async {
@@ -200,6 +249,7 @@ public final class AppModel {
             self.settingsStore = store
             self.settings = settings
             synchronizeNextDrawingModel(previousSettings: nil)
+            pruneComparisonModels()
             self.bootstrap = bootstrap
             self.productReference = bootstrap.productReference
             self.drawingLimitDefinition = bootstrap.drawingLimitDefinition
@@ -207,11 +257,17 @@ public final class AppModel {
             descriptionMeter.connect(directory: url.deletingLastPathComponent())
             self.catalogs = bootstrap.catalogs
             self.canvases = bootstrap.canvases
+            restoreNextConditions()
             self.saijiki = bootstrap.saijiki
             self.pluginWords = bootstrap.pluginWords.filter { settings.plugins?.isEnabled($0.packageID ?? "") ?? true }
-            let macro = try bootstrap.macroCatalog(language: language, settings: settings)
+            let macro = try bootstrap.macroCatalog(language: instructionLanguage(for: currentInputText), settings: settings)
             self.macroDiagnostics = try Self.pretty(try Bootstrap.bytes(macro))
             library.onMutation = { [weak self] in await self?.refreshWorks() }
+            // Web `inku-history-display-mode` and the thumbnail/list tab come back with the library.
+            if let layout = display.preferences.libraryLayout.flatMap(LibraryLayout.init(rawValue:)), layout != .lineage {
+                library.layout = layout
+            }
+            if let grouped = display.preferences.libraryGrouped { library.grouped = grouped }
             await library.connect(database: database)
             if let provider = settings.providers.first {
                 providerURL = provider.baseURL.absoluteString
@@ -227,8 +283,10 @@ public final class AppModel {
         }
     }
 
-    public func generate() async {
-        guard canGenerate, let host, let bootstrap else { return }
+    public func generate() async { await generate(parentWorkID: selectedWorkID) }
+
+    private func generate(parentWorkID: String?, fork: Bool = false) async {
+        guard fork ? canForkDescription : canGenerate, let host, let bootstrap else { return }
         let token = UUID()
         generationToken = token
         providerProgress = nil
@@ -241,17 +299,17 @@ public final class AppModel {
         status = "生成中"
         let operation = Task { @MainActor [weak self] in
             guard let self else { return }
-            await self.runGeneration(host: host, bootstrap: bootstrap, token: token)
+            await self.runGeneration(host: host, bootstrap: bootstrap, token: token, parentWorkID: parentWorkID)
         }
         activeOperation = operation
         await operation.value
         finishOperation(token: token)
     }
 
-    private func runGeneration(host: PipelineHost, bootstrap: Bootstrap, token: UUID) async {
+    private func runGeneration(host: PipelineHost, bootstrap: Bootstrap, token: UUID, parentWorkID: String?) async {
         do {
-            let freshRequest = try requestForCurrentInput(parentWorkID: selectedWorkID,
-                derivationKind: selectedWorkID == nil ? "new" : inputMode == "ddl" ? "ddl_edit" : "description_edit")
+            let freshRequest = try requestForCurrentInput(parentWorkID: parentWorkID,
+                derivationKind: parentWorkID == nil ? "new" : inputMode == "ddl" ? "ddl_edit" : "description_edit")
             let request = try await pinPersonalPlanRequests([freshRequest])[0]
             let view = try await host.generate(request) { [weak self] progress in
                 Task { @MainActor in self?.receive(progress, token: token, models: request.models) }
@@ -344,6 +402,8 @@ public final class AppModel {
         previewWork = nil
         selectedWorkID = work.id
         selectedWork = work
+        // Web `adoptSketch`: another work on screen brings its own prose; an edit belongs to the work it was made on.
+        if sketchDraft?.workID != work.id { sketchDraft = nil }
         if loadSelectedAnnotation {
             Task { @MainActor [weak self] in
                 guard let self, self.displayToken == selectionToken,
@@ -423,6 +483,8 @@ public final class AppModel {
     }
 
     public func localDataDirectory() -> URL? { database?.url.deletingLastPathComponent() }
+    /// The database file in use, once opened.
+    public var databaseFileURL: URL? { database?.url }
 
     public func hostSettings() async -> HostSettings { settings }
 
@@ -471,6 +533,14 @@ public final class AppModel {
         return next
     }
 
+    /// Web model-inspection `$effect`: a saved comparison model that is no longer offered leaves the saved choice at once,
+    /// not at the next tick of a checkbox.
+    func pruneComparisonModels() {
+        guard let saved = display.preferences.comparisonModels else { return }
+        let kept = Array(saved.filter { SettingsModel.isBatchModelAvailable($0, settings: settings) }.prefix(4))
+        if kept != saved { display.preferences.comparisonModels = kept }
+    }
+
     private func synchronizeNextDrawingModel(previousSettings: HostSettings?) {
         if previousSettings == nil || previousSettings?.models != settings.models || !hasNextDrawingModel {
             nextDrawingModelReference = settings.models.stage1Model
@@ -494,11 +564,12 @@ public final class AppModel {
                 throw HostError("invalid_operational_limits")
             }
         }
-        let diagnostics = try bootstrap.map { try Self.pretty($0.macroCatalogValue(language: language, settings: settings, importedPlugins: importedDDL?.plugins ?? []).data) }
+        let diagnostics = try bootstrap.map { try Self.pretty($0.macroCatalogValue(language: instructionLanguage(for: currentInputText), settings: settings, importedPlugins: importedDDL?.plugins ?? []).data) }
         try await settingsStore.save(settings)
         let previousSettings = self.settings
         self.settings = settings
         synchronizeNextDrawingModel(previousSettings: previousSettings)
+        pruneComparisonModels()
         if let bootstrap {
             pluginWords = bootstrap.pluginWords.filter { settings.plugins?.isEnabled($0.packageID ?? "") ?? true }
             macroDiagnostics = diagnostics ?? ""
@@ -664,7 +735,7 @@ public final class AppModel {
 
     public func applyDDLImport(_ value: DDLPackageImport) throws {
         guard !isBusy, let bootstrap else { throw HostError("ddl_import_busy_or_unavailable") }
-        let language = value.language ?? self.language
+        let language = value.language ?? instructionLanguage(for: value.source)
         let catalog = try bootstrap.macroCatalogValue(language: language, settings: settings, importedPlugins: value.plugins)
         newWork()
         importedDDL = value; importedMacroNames = value.names
@@ -672,7 +743,7 @@ public final class AppModel {
             guard let namespace = plugin.definition["namespace"].string else { return [String]() }
             return (plugin.definition["aliases"].array ?? []).compactMap(\.string).map { namespace + "." + $0 }
         }
-        inputMode = "ddl"; ddlText = value.source; self.language = language
+        inputMode = "ddl"; ddlText = value.source
         macroDiagnostics = try Self.pretty(catalog.data)
         status = "DDLを読み込みました。生成して保存できます。"
     }
@@ -686,17 +757,35 @@ public final class AppModel {
         if mode == "description", !SettingsModel.isModelAvailable(nextDrawingModelReference, settings: settings) {
             throw HostError("drawing_model_not_available")
         }
-        if parentWorkID != nil && mode == "description" && (selectedContext?.authority == "ddl_authoritative" || sourceLocked) { throw HostError("description_source_locked") }
-        let sketch: SketchRequest = sketchOverride ?? (sketchMode == "on" ? .on : sketchMode == "supplied" ? .supplied(sketchText) : .off)
+        // Server `_refuse_if_locked` after `_rewords`: a held parent takes only its own description back (the fork).
+        if parentWorkID != nil && mode == "description" && (selectedContext?.authority == "ddl_authoritative" || sourceLocked),
+           parentWorkID != selectedWorkID
+            || DescriptionLabels.rewords(description ?? descriptionText, selectedWork?.effectiveSourceText ?? "") {
+            throw HostError("description_source_locked")
+        }
+        let sketch: SketchRequest = sketchOverride
+            ?? editedSketch(parentWorkID: parentWorkID, mode: mode, description: description ?? descriptionText)
+            ?? (sketchMode == "on" ? .on : sketchMode == "supplied" ? .supplied(sketchText) : .off)
         let savedConfig = parentWorkID == selectedWorkID && parentWorkID != nil ? selectedContext?.configuration : nil
         var request = try bootstrap.request(inputMode: mode, source: source ?? ddlText,
-            description: description ?? descriptionText, language: language, catalogID: catalogID,
+            description: description ?? descriptionText,
+            language: instructionLanguage(for: mode == "ddl" ? source ?? ddlText : description ?? descriptionText), catalogID: catalogID,
             canvasID: canvasID, seed: seedText, wild: wildOverride ?? wild, settings: mode == "ddl" ? settings : nextGenerationHostSettings,
             parentWorkID: parentWorkID, derivationKind: derivationKind, catalogMode: catalogModeOverride ?? catalogMode,
             sketch: sketch, savedConfiguration: savedConfig,
             importedPlugins: mode == "ddl" && parentWorkID == nil ? importedDDL?.plugins ?? [] : [])
         request.captureProviderIO = developerModeEnabled && display.preferences.captureProviderIO == true
         return request
+    }
+
+    /// Web `sketchTextFor`: prose written for this very description, as the author left it. Unedited prose is not
+    /// sent, so an ordinary redraw still asks the layer as before.
+    private func editedSketch(parentWorkID: String?, mode: String, description: String) -> SketchRequest? {
+        guard mode == "description", sketchMode == "on", let draft = sketchDraft, draft.workID == parentWorkID,
+              draft.text != draft.original, !draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              draft.source.trimmingCharacters(in: .whitespacesAndNewlines) == description.trimmingCharacters(in: .whitespacesAndNewlines)
+        else { return nil }
+        return .supplied(draft.text)
     }
 
     public func requestForBatchDescription(_ description: String, sketchMode: String) throws -> GenerationRequest {
@@ -712,8 +801,9 @@ public final class AppModel {
               SettingsModel.isBatchModelAvailable(settings.models.stage1Model, settings: settings) else {
             throw HostError("drawing_model_not_available")
         }
+        // Web work/state.svelte.ts:636-641: the demo follows the catalog choice but has no wild setting (`wildOverride(false)`).
         return try bootstrap.request(inputMode: "description", source: "", description: description,
-            language: language, catalogID: catalogID, canvasID: canvasID, seed: seedText, wild: wild,
+            language: instructionLanguage(for: description), catalogID: catalogID, canvasID: canvasID, seed: seedText, wild: false,
             settings: settings, parentWorkID: nil, derivationKind: "new",
             catalogMode: catalogMode == "auto" ? "auto" : "fixed", sketch: sketchMode == "on" ? .on : .off)
     }
@@ -722,7 +812,7 @@ public final class AppModel {
         guard !isBusy, let bootstrap, !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         do {
             var request = try bootstrap.request(inputMode: "ddl", source: source, description: "",
-                language: imported?.language ?? language, catalogID: catalogID, canvasID: canvasID,
+                language: imported?.language ?? instructionLanguage(for: source), catalogID: catalogID, canvasID: canvasID,
                 seed: seedText, wild: wild, settings: settings, parentWorkID: nil, derivationKind: "new",
                 importedPlugins: imported?.plugins ?? [])
             request = try await pinPersonalPlanRequests([request])[0]
@@ -962,7 +1052,7 @@ public final class AppModel {
         let held = saved.authority == "ddl_authoritative"
         let reading = readDescription ?? (kind == "reinterpretation" || kind == "model_comparison" || !direction.isEmpty && kind != "catalog_change")
         if held && (reading || kind == "model_comparison" || kind == "reinterpretation") { throw HostError("description_source_locked") }
-        let language = work.instructionLangResolved ?? config["language"].string ?? self.language
+        let language = work.instructionLangResolved ?? config["language"].string ?? instructionLanguage(for: work.effectiveSourceText)
         guard let renderSeed = work.renderSeed ?? options["render_seed"].string ?? options["render_seed"].number,
               let canvasID = work.renderCanvasAspectID ?? options["canvas_aspect_id"].string,
               let catalogID = work.renderColorCatalogID ?? work.catalogID ?? options["catalog_id"].string else {
@@ -1002,11 +1092,11 @@ public final class AppModel {
                                         sketchMode: String = "off", wildOverride: Bool? = nil) async throws -> GenerationRequest {
         guard !isBusy, !isPreview, database != nil else { throw HostError("authoring_busy_or_unavailable") }
         let drawing = nextGenerationHostSettings
-        let selectedLanguage = language
         guard hasNextDrawingModel else { throw HostError("model_reference_missing") }
-        guard ["ja", "en"].contains(selectedLanguage) else { throw HostError("invalid_instruction_language") }
         let saved = try await savedWorkEditContext(work)
         let text = (mode == .description ? description : work.effectiveSourceText).trimmingCharacters(in: .whitespacesAndNewlines)
+        let selectedLanguage = instructionLanguage(for: text)
+        guard ["ja", "en"].contains(selectedLanguage) else { throw HostError("invalid_instruction_language") }
         guard !text.isEmpty else { throw HostError("description_required") }
         var configuration = try ExactJSON(data: saved.configuration)
         var options = try ExactJSON(data: saved.renderOptions)
@@ -1242,13 +1332,13 @@ public final class AppModel {
             }
             if self.generationToken == token, !self.stopping {
                 self.activeExecutionID = view.executionID
-                if let message = DrawingFailureMessage.text(for: view, language: self.display.preferences.language) {
+                if let message = self.drawingFailureText(view) {
                     self.automationFailureMessage = message
                     if self.errorText == nil { self.errorText = message }
                 }
                 if allowsBrowsing {
                     self.finishProviderStage(view)
-                    self.status = Self.phaseStatus(view.phase)
+                    self.status = self.statusText(for: view)
                 }
             }
             await self.recordDescriptionFeedback(request: request, view: view)
@@ -1314,6 +1404,7 @@ public final class AppModel {
         inputMode = "description"
         descriptionText = ""
         ddlText = ""
+        sketchDraft = nil
     }
 
     public func commitDDL(wildOverride: Bool? = nil) async {
@@ -1436,7 +1527,7 @@ public final class AppModel {
         do {
             let request = try requestForCurrentInput(inputMode: "ddl", parentWorkID: selectedWorkID, derivationKind: "ddl_edit")
             let config = try ExactJSON(data: request.configuration)
-            let catalog = try bootstrap.macroCatalog(language: language, settings: settings, importedPlugins: importedDDL?.plugins ?? [])
+            let catalog = try bootstrap.macroCatalog(language: instructionLanguage(for: ddlText), settings: settings, importedPlugins: importedDDL?.plugins ?? [])
             let entries = catalog["entries"] as? [[String: Any]] ?? []
             let locks = try Bootstrap.bytes(entries.map { item in
                 ["qualified_name": item["qualified_name"]!, "version": item["version"]!, "digest": item["digest"]!, "aliases": item["aliases"] ?? []]
@@ -1577,7 +1668,8 @@ public final class AppModel {
         guard !isBusy, let work = target ?? displayedWork, !work.svg.isEmpty else { return }
         let executionID = currentExecutionID
         let height = min(4096, max(256, display.preferences.clipboardHeight))
-        _ = await performSerialized(status: "コピー画像を準備中") { [weak self] _ in
+        clipboardMessageKey = nil
+        let copied = await performSerialized(status: "コピー画像を準備中") { [weak self] _ in
             guard let self else { return }
             defer { self.currentExecutionID = executionID }
             var options = self.display.preferences.exportDefaults.options
@@ -1591,6 +1683,12 @@ public final class AppModel {
             NSPasteboard.general.clearContents()
             guard NSPasteboard.general.writeObjects([nativeImage]) else { throw HostError("clipboard_write_failed") }
             self.status = "画像をコピーしました（Y軸 \(height)px）"
+        }
+        let key = copied ? "canvasCopiedToClipboard" : "clipboardCopyFailed"
+        clipboardMessageKey = key
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(copied ? 2500 : 8000))
+            if self?.clipboardMessageKey == key { self?.clipboardMessageKey = nil }
         }
         #endif
     }
@@ -1647,13 +1745,13 @@ public final class AppModel {
         receiveProviderProgress(progress, models: models, comparison: false)
         switch progress {
         case .changed(let view):
-            if backgroundDrawing { status = Self.phaseStatus(view.phase) }
+            if backgroundDrawing { status = statusText(for: view) }
             else { apply(view) }
         case .providerAttempt(_, _, _, let deadline):
             status = providerProgress?.stage == .composition ? "構図を読んでいます" : "モデルの応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）"
         case .transportBytes(_, let count):
             status = providerProgress?.stage == .composition ? "構図の応答を受信中" : "応答を受信中（\(count) bytes）"
-        case .providerDiagnostic(_, let diagnostic): errorText = "ChatGPTプラン: \(diagnostic.code)（\(diagnostic.action)）"
+        case .providerDiagnostic(let id, let diagnostic): receive(diagnostic, executionID: id)
         case .providerMetric: break
         case .saved(_, _): status = "作品を保存しました"
         }
@@ -1670,10 +1768,15 @@ public final class AppModel {
         case .transportBytes(_, let count):
             if providerProgress?.stage == .composition { status = comparison ? "比較候補の構図の応答を受信中" : "構図の応答を受信中" }
             else { status = comparison ? "比較候補を受信中（\(count) bytes）" : "応答を受信中（\(count) bytes）" }
-        case .providerDiagnostic(_, let diagnostic): errorText = "ChatGPTプラン: \(diagnostic.code)（\(diagnostic.action)）"
+        case .providerDiagnostic(let id, let diagnostic): receive(diagnostic, executionID: id)
         case .providerMetric: break
         case .saved: break
         }
+    }
+    /// Web words a ChatGPT plan failure with `chatgptStatus(code)`.
+    private func receive(_ diagnostic: ChatGPTPlanDiagnostic, executionID: String) {
+        chatGPTFailureCodes[executionID] = diagnostic.code
+        errorText = ChatGPTStatusCopy.text(diagnostic.code, language: display.preferences.language)
     }
     private func receiveProviderProgress(_ progress: PipelineProgress, models: ModelSelection?, comparison: Bool) {
         switch progress {
@@ -1777,7 +1880,15 @@ public final class AppModel {
             unreadOutputs.remove("prompt")
         }
         eventsJSON = (try? Self.pretty(view.eventsJSON)) ?? String(decoding: view.eventsJSON, as: UTF8.self)
-        status = Self.phaseStatus(view.phase)
+        status = statusText(for: view)
+    }
+    /// Web PipelineStatus prints `pipelineAttentionText` for a failed run, not a bare "failed".
+    private func statusText(for view: PipelineView) -> String {
+        drawingFailureText(view) ?? Self.phaseStatus(view.phase)
+    }
+    func drawingFailureText(_ view: PipelineView) -> String? {
+        DrawingFailureMessage.text(for: view, language: display.preferences.language,
+                                   chatGPTCode: chatGPTFailureCodes[view.executionID])
     }
     private static func phaseStatus(_ phase: String) -> String {
         [
@@ -1788,6 +1899,27 @@ public final class AppModel {
             "cancelled": "停止しました",
         ][phase] ?? "処理中"
     }
+    /// Web restores the catalog, paper and wild choice at start-up; a saved catalog or paper that is gone is the default.
+    private func restoreNextConditions() {
+        let saved = display.preferences
+        if let id = saved.nextCatalogID, catalogs.contains(where: { $0.id == id }) { catalogID = id }
+        if let mode = saved.nextCatalogMode, ["fixed", "auto"].contains(mode) { catalogMode = mode }
+        if let id = saved.nextCanvasID, canvases.contains(where: { $0.id == id }) { canvasID = id }
+        if let saved = saved.nextWild { wild = saved }
+        nextConditionsRestored = true
+    }
+
+    private func rememberNextConditions() {
+        guard nextConditionsRestored else { return }
+        var next = display.preferences
+        next.nextCatalogID = catalogID
+        // Batch-only modes are not a next-work choice of the creation screen.
+        if ["fixed", "auto"].contains(catalogMode) { next.nextCatalogMode = catalogMode }
+        next.nextCanvasID = canvasID
+        next.nextWild = wild
+        if next != display.preferences { display.preferences = next }
+    }
+
     private func report(_ error: Error) {
         if generationToken != nil, !stopping { providerProgress?.finish(.failed, at: Date()) }
         errorText = error.localizedDescription
@@ -1798,4 +1930,18 @@ public final class AppModel {
         // Pretty formatting may round JSON numbers; retain exact wire lexemes in the displayed output.
         return value.text
     }
+}
+
+extension AppModel {
+    /// Server `_resolve_instruction_lang`: an explicit language wins; `auto` reads Japanese, then Latin
+    /// letters, and otherwise falls back to the UI language.
+    public func instructionLanguage(for text: String) -> String {
+        if ["ja", "en"].contains(language) { return language }
+        let scalars = text.unicodeScalars
+        if scalars.contains(where: { (0x3040...0x30ff).contains($0.value) || (0x3400...0x9fff).contains($0.value) }) { return "ja" }
+        if scalars.contains(where: { (0x41...0x5a).contains($0.value) || (0x61...0x7a).contains($0.value) }) { return "en" }
+        return display.preferences.language == "en" ? "en" : "ja"
+    }
+
+    var currentInputText: String { inputMode == "ddl" ? ddlText : descriptionText }
 }

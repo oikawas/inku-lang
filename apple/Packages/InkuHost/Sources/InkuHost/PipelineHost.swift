@@ -23,8 +23,15 @@ public actor PipelineHost {
             throw HostError("developer_provider_observations_not_available")
         }
         guard ["normal", "lineage_only"].contains(request.historyVisibility) else { throw HostError("invalid_history_visibility") }
+        // Server `fork_linked_history`/`fork_description`: a work its edited DDL holds refuses a description that
+        // rewords it (`_refuse_if_locked`), while its own description starts a new child (the description fork).
         if !request.authoring.isDirect, let parentID = request.parentWorkID,
-           try await savedAuthoringContext(workID: parentID).authority == "ddl_authoritative" { throw HostError("description_source_locked") }
+           try await savedAuthoringContext(workID: parentID).authority == "ddl_authoritative" {
+            guard let parent = try await database.work(id: parentID),
+                  !DescriptionLabels.rewords(request.description, parent.effectiveSourceText) else {
+                throw HostError("description_source_locked")
+            }
+        }
         if request.retainedDocument != nil || request.retainedAuthority != nil {
             return try await generateRetained(request, progress: progress)
         }

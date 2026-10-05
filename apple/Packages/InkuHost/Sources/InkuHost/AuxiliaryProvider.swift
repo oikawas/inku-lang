@@ -78,7 +78,7 @@ public actor AuxiliaryProvider {
             "constraints": .object(["no_score": .bool(true), "no_ranking": .bool(true),
                                     "no_accept_reject": .bool(true), "human_makes_final_choice": .bool(true)])])
         let message = (language == "en" ? "Observe this generation and return bounded refinement advice. Context:\n"
-                       : "この世代を観察し、限定された推敲助言を返してください。文脈:\n") + payload.text
+                       : "この世代を観察し、限定された推敲助言を返してください。文脈:\n") + payload.pythonText
         let prompt = AuxiliaryPrompt(system: Self.adviceSystem(language), message: message,
                                      images: [Self.imageURL(png)], temperature: 0.35, maximumTokens: 320)
         let raw = try await transport.performAuxiliary(prompt: prompt, modelReference: model,
@@ -196,16 +196,16 @@ public actor AuxiliaryProvider {
         if language == "en" {
             return (paired ? "The image places the previous generation on the left and the current generation on the right. Describe their visible difference."
                     : "The image is the current generation. Describe only its visible physical features.")
-                + "\nFacts available up to this generation:\n" + request.text
+                + "\nFacts available up to this generation:\n" + request.pythonText
         }
         return (paired ? "画像は左が前世代、右が現世代です。両者の見える差を読んでください。"
-                : "画像は現世代です。見える物理だけを読んでください。") + "\n現在までに知り得る事実:\n" + request.text
+                : "画像は現世代です。見える物理だけを読んでください。") + "\n現在までに知り得る事実:\n" + request.pythonText
     }
 
     private static func invariantMessage(_ invariants: ExactJSON, language: String) -> String {
         (language == "en"
          ? "In one first-person paragraph, verbalize only the following mechanically computed invariants. Do not add causality, intent, evaluation, scores, or a story of progress. Facts:\n"
-         : "次の機械抽出された不変量だけを、一人称の短い結びとして言語化してください。因果、意図、評価、点数、進歩の物語を加えないでください。\n") + invariants.text
+         : "次の機械抽出された不変量だけを、一人称の短い結びとして言語化してください。因果、意図、評価、点数、進歩の物語を加えないでください。\n") + invariants.pythonText
     }
 
     private static func firstPerson(_ text: String, language: String) -> String {
@@ -451,20 +451,26 @@ public enum AuxiliaryWire {
         return (String(header.dropFirst(5).dropLast(7)), data)
     }
 
-    public static func responseText(_ data: Data, kind: ProviderKind) throws -> String {
+    /// Server reads a missing answer as empty text (vision_client._answer, public.py), so an empty
+    /// reply reaches the caller's own empty handling instead of failing as a malformed payload.
+    public static func responseText(_ data: Data, kind: ProviderKind, purpose: AuxiliaryPrompt.Purpose = .vision) throws -> String {
         let value = try ExactJSON(data: data)
         let text: String
         switch kind {
         case .chatGPTPlan: throw HostError("chatgpt_operation_not_supported")
         case .openAICompatible:
-            guard let content = value["choices"].array?.first?["message"]["content"].string else { throw HostError("malformed_payload") }
-            text = content
+            guard let message = value["choices"].array?.first?["message"], message.object != nil else { throw HostError("malformed_payload") }
+            text = message["content"].string ?? ""
         case .anthropic:
-            guard let blocks = value["content"].array else { throw HostError("malformed_payload") }
-            text = blocks.filter { $0["type"].string == "text" }.compactMap { $0["text"].string }.joined(separator: "\n")
+            guard let blocks = value["content"] == .null ? [] : value["content"].array else { throw HostError("malformed_payload") }
+            text = blocks.filter { $0["type"].string == "text" }.map { $0["text"].string ?? "" }.joined(separator: "\n")
         case .gemini:
-            guard let parts = value["candidates"].array?.first?["content"]["parts"].array else { throw HostError("malformed_payload") }
-            text = parts.filter { $0["thought"].bool != true }.compactMap { $0["text"].string }.joined(separator: "\n")
+            let candidates = value["candidates"] == .null ? [.object([:])] : value["candidates"].array
+            guard let candidate = candidates?.first else { throw HostError("malformed_payload") }
+            guard let parts = candidate["content"]["parts"] == .null ? [] : candidate["content"]["parts"].array else { throw HostError("malformed_payload") }
+            // The demo joins every part as Server's demo does; Vision drops thought parts as vision_client does.
+            text = purpose == .demo ? parts.map { $0["text"].string ?? "" }.joined(separator: "\n")
+                : parts.filter { $0["thought"].bool != true }.compactMap { $0["text"].string }.joined(separator: "\n")
         }
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }

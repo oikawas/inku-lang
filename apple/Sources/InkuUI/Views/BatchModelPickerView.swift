@@ -55,10 +55,10 @@ struct BatchModelPickerView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(model.display.localized(title)).font(.headline)
+                Text(model.display.localized(title)).inkuFont(14, weight: .semibold)
                 Spacer()
                 Button { dismiss() } label: {
-                    Image(systemName: "xmark").font(.title3)
+                    Image(systemName: "xmark").inkuFont(16)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(model.display.localized("閉じる"))
@@ -73,7 +73,7 @@ struct BatchModelPickerView: View {
             Divider()
             if let selectionError {
                 Text(model.display.localized("モデルの変更に失敗しました。もう一度選択してください。") + "\n" + model.display.message(selectionError))
-                    .font(.callout).foregroundStyle(.red)
+                    .inkuFont(13).foregroundStyle(.red)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading).padding([.horizontal, .top], 16)
             }
@@ -84,7 +84,7 @@ struct BatchModelPickerView: View {
                     selectionSummary
                     sharedModelHint
                     Text(model.display.localized("選べるモデルがありません。設定 → モデル設定 で使用するモデルを選択してください。"))
-                        .font(.callout).foregroundStyle(.secondary)
+                        .inkuFont(13).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(16)
             } else {
@@ -94,7 +94,7 @@ struct BatchModelPickerView: View {
                         sharedModelHint
                         ForEach(groups) { provider in
                             VStack(alignment: .leading, spacing: 7) {
-                                Text(provider.displayName).font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                                Text(provider.displayName).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
                                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 7)], spacing: 7) {
                                     ForEach(sortedModels(for: provider)) { entry in
                                         modelCard(entry, provider: provider)
@@ -175,7 +175,7 @@ struct BatchModelPickerView: View {
             hoveredReference = nil
             focusedReference = nil
         } label: {
-            Text(title).font(.callout.weight(.semibold)).frame(maxWidth: .infinity).padding(10)
+            Text(title).inkuFont(13, weight: .semibold).frame(maxWidth: .infinity).padding(10)
                 .background(selected ? Color.accentColor.opacity(0.12) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
                 .overlay(alignment: .bottom) { Rectangle().fill(selected ? Color.accentColor : Color.clear).frame(height: 2) }
         }.buttonStyle(.plain).disabled(cannotSelect).accessibilityAddTraits(selected ? .isSelected : [])
@@ -183,14 +183,14 @@ struct BatchModelPickerView: View {
 
     private var selectionSummary: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(immediateSelection ? model.display.localized(title) : "Stage 1/2").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+            Text(immediateSelection ? model.display.localized(title) : "Stage 1/2").inkuFont(11, weight: .semibold).foregroundStyle(.secondary)
             Text(entry(for: draftReference, purpose: purpose).map { $0.model.label.isEmpty ? $0.model.id : $0.model.label }
                  ?? model.display.localized("未設定"))
-                .font(.callout).fixedSize(horizontal: false, vertical: true)
+                .inkuFont(13).fixedSize(horizontal: false, vertical: true)
             if hasVisionTab {
-                Text("Vision").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                Text("Vision").inkuFont(11, weight: .semibold).foregroundStyle(.secondary)
                 Text(entry(for: draftVisionReference, purpose: "vision").map { $0.model.label.isEmpty ? $0.model.id : $0.model.label }
-                     ?? model.display.localized("未設定")).font(.callout)
+                     ?? model.display.localized("未設定")).inkuFont(13)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading).padding(10)
@@ -202,7 +202,7 @@ struct BatchModelPickerView: View {
         Text(model.display.localized(immediateSelection ? "モデルを選ぶと変更を適用して閉じます。" : selectedPurpose == "vision"
             ? "画像を読むVision処理に使うモデルを選択します。"
             : "選んだモデルを Stage 1 と Stage 2 の両方に使います（段ごとに別のモデルは選べません）。段ごとに測ってあるモデルは、低いほうの段の順に並べます。"))
-            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            .inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
     }
 
     private func confirmSelection() async {
@@ -236,13 +236,13 @@ struct BatchModelPickerView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .top, spacing: 8) {
                     Text(entry.label.isEmpty ? entry.id : entry.label)
-                        .font(.callout.weight(.medium)).strikethrough(entry.eol == true)
+                        .inkuFont(13, weight: .medium).strikethrough(entry.eol == true)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
                     if selected { Image(systemName: "checkmark").foregroundStyle(Color.accentColor) }
                 }
                 if let status = statusLabel(entry) {
-                    Text(status).font(.caption).foregroundStyle(.red)
+                    Text(status).inkuFont(12).foregroundStyle(.red)
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 20, alignment: .topLeading)
@@ -308,8 +308,8 @@ struct BatchModelPickerView: View {
 
     private func metadataRow(_ key: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(model.display.localized(key)).font(.caption2).foregroundStyle(.secondary)
-            Text(value).font(.caption).fixedSize(horizontal: false, vertical: true)
+            Text(model.display.localized(key)).inkuFont(11).foregroundStyle(.secondary)
+            Text(value).inkuFont(12).fixedSize(horizontal: false, vertical: true)
         }
     }
 

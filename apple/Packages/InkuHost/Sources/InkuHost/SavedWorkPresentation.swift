@@ -47,8 +47,17 @@ enum SavedPresentation {
         record["rendered"] = .object(["metadata": metadata])
         record["diagnostics"]["render_diagnostics"] = metadata["execution"]
         record["diagnostics"]["resource_execution"] = metadata["resource_execution"]
+        record["diagnostics"] = withRenderWarnings(record["diagnostics"], metadata)
         record["events"] = .array([])
         return record
+    }
+
+    /// Server keeps the core's render warnings with the work only when this render raised any.
+    static func withRenderWarnings(_ diagnostics: ExactJSON, _ metadata: ExactJSON) -> ExactJSON {
+        guard var fields = diagnostics.object else { return diagnostics }
+        if (metadata["render_warnings"].array ?? []).isEmpty { fields.removeValue(forKey: "render_warnings") }
+        else { fields["render_warnings"] = metadata["render_warnings"] }
+        return .object(fields)
     }
 
     static func capture(delivery: ExactJSON, rendered: ExactJSON, prompts: Data?, events: Data,
@@ -68,6 +77,7 @@ enum SavedPresentation {
             "render_diagnostics": metadata["execution"],
             "resource_execution": metadata["resource_execution"],
         ])
+        diagnostics = withRenderWarnings(diagnostics, metadata)
         let names = (configuration["definitions"].array ?? []).flatMap { definition -> [ExactJSON] in
             guard let namespace = definition["namespace"].string, let heading = definition["heading"].string else { return [] }
             return ([heading] + (definition["aliases"].array?.compactMap(\.string) ?? []))

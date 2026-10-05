@@ -12,21 +12,19 @@ struct DdlAuthoringEditorSheet: View {
     @State private var drawingModel = ""
     @State private var inheritedWild = false
     @State private var wildOverride: Bool?
+    @State private var insertion: InkuEditorInsertion?
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(model.display.localized("DDLを編集")).font(.title2)
+                    Text(model.display.localized("DDLを編集")).inkuFont(16, weight: .semibold)
                     Text(model.display.localized("取消すると、表示中の作品と指示書は変わりません。"))
-                        .font(.caption).foregroundStyle(.secondary)
+                        .inkuFont(12).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button { session.cancel(); dismiss() } label: { Image(systemName: "xmark") }
                     .accessibilityLabel(model.display.localized("閉じる")).disabled(model.isBusy)
-                Button(model.display.localized("歳時記を開く"), systemImage: "book") { showSaijiki = true }
-                    .disabled(model.isBusy)
-                    .help(tip("選んだ語を編集中DDLの末尾に挿入します。"))
             }.padding(16)
             Divider()
             HStack(spacing: 16) {
@@ -38,17 +36,15 @@ struct DdlAuthoringEditorSheet: View {
                 } label: {
                     Text(model.display.localized("暴れる") + " " + model.display.localized((wildOverride ?? inheritedWild) ? "入" : "切"))
                 }.buttonStyle(.bordered).tint((wildOverride ?? inheritedWild) ? .accentColor : .secondary)
-                if wildOverride == nil { Text(model.display.localized("元の作品から継承")).font(.caption).foregroundStyle(.secondary) }
+                if wildOverride == nil { Text(model.display.localized("元の作品から継承")).inkuFont(12).foregroundStyle(.secondary) }
             }.padding(.horizontal, 16).padding(.vertical, 10).disabled(model.isBusy)
-            TextEditor(text: $session.draft)
-                .font(.system(.body, design: .monospaced))
-                .scrollContentBackground(.hidden).padding(12)
-                .disabled(model.isBusy)
-                .accessibilityLabel(model.display.localized("DDL編集"))
+            DdlEditorPane(model: model, text: $session.draft, disabled: model.isBusy, insertion: $insertion,
+                          onShowSaijiki: { showSaijiki = true })
+                .padding(.horizontal, 18).padding(.vertical, 14)
             Divider()
             HStack {
                 if let error = model.errorText {
-                    Text(model.display.message(error)).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+                    Text(model.display.message(error)).inkuFont(12).foregroundStyle(.red).textSelection(.enabled)
                 }
                 Spacer()
                 if model.isBusy {
@@ -57,14 +53,14 @@ struct DdlAuthoringEditorSheet: View {
                 } else {
                     Button(model.display.localized("取消")) { session.cancel(); dismiss() }
                         .keyboardShortcut(.cancelAction)
-                        .help(tip("編集中の変更を破棄して閉じます。"))
+                        .inkuTooltip(tip("編集中の変更を破棄して閉じます。"))
                     Button(model.display.localized("変更を確定・描画")) {
                         Task { if await session.commit(to: model, wildOverride: wildOverride) { dismiss() } }
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(!session.canSubmit(to: model))
                     .keyboardShortcut(.defaultAction)
-                    .help(tip("このDDLを確定して、新しい作品として描画します。"))
+                    .inkuTooltip(tip("このDDLを確定して、新しい作品として描画します。"))
                 }
             }.padding(16)
         }
@@ -86,7 +82,8 @@ struct DdlAuthoringEditorSheet: View {
         .sheet(isPresented: $showSaijiki) {
             VStack(spacing: 0) {
                 HStack { Spacer(); Button(model.display.localized("閉じる")) { showSaijiki = false } }.padding(12)
-                SaijikiView(model: model, onInsertWord: { session.insert($0) }, wordLanguage: model.language)
+                SaijikiView(model: model, onInsertWord: { insertion = InkuEditorInsertion(text: $0) },
+                            wordLanguage: model.instructionLanguage(for: session.draft))
             }.frame(minWidth: 560, minHeight: 620)
         }
     }
@@ -109,6 +106,8 @@ struct NewDdlAuthoringSheet: View {
     @State private var importTask: Task<Void, Never>?
     @State private var importing = false
     @State private var importError: String?
+    @State private var insertion: InkuEditorInsertion?
+    @State private var showSaijiki = false
 
     init(model: AppModel, initialImport: DDLPackageImport? = nil) {
         self.model = model
@@ -119,7 +118,7 @@ struct NewDdlAuthoringSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(model.display.localized("指示書の新規作成")).font(.title2)
+                Text(model.display.localized("指示書の新規作成")).inkuFont(16, weight: .semibold)
                 Spacer()
                 Button { dismiss() } label: { Image(systemName: "xmark") }
                     .accessibilityLabel(model.display.localized("閉じる")).disabled(model.isBusy || importing)
@@ -132,12 +131,12 @@ struct NewDdlAuthoringSheet: View {
                 Spacer()
                 Button(model.display.localized("DDLファイルを読み込む…"), systemImage: "doc.badge.arrow.up") { showImport = true }
             }.padding(16).disabled(model.isBusy || importing)
-            TextEditor(text: $draft).font(.system(.body, design: .monospaced))
-                .padding(12).disabled(model.isBusy || importing)
-                .accessibilityLabel(model.display.localized("指示書"))
+            DdlEditorPane(model: model, text: $draft, disabled: model.isBusy || importing, insertion: $insertion,
+                          onShowSaijiki: { showSaijiki = true })
+                .padding(.horizontal, 18).padding(.vertical, 14)
             if let importedDocument, !importedDocument.names.isEmpty {
                 Text(model.display.localized("この新しい作品に定義を持ち込みます: ") + importedDocument.names.joined(separator: ", "))
-                    .font(.caption).textSelection(.enabled).padding(.horizontal, 16)
+                    .inkuFont(12).textSelection(.enabled).padding(.horizontal, 16)
             }
             if let error = importError ?? model.errorText {
                 Text(model.display.message(error)).foregroundStyle(.red).textSelection(.enabled).padding(.horizontal, 16)
@@ -173,6 +172,13 @@ struct NewDdlAuthoringSheet: View {
                 try await model.selectDdlDrawingModel(reference)
                 drawingModel = reference
             }
+        }
+        .sheet(isPresented: $showSaijiki) {
+            VStack(spacing: 0) {
+                HStack { Spacer(); Button(model.display.localized("閉じる")) { showSaijiki = false } }.padding(12)
+                SaijikiView(model: model, onInsertWord: { insertion = InkuEditorInsertion(text: $0) },
+                            wordLanguage: model.instructionLanguage(for: draft))
+            }.frame(minWidth: 560, minHeight: 620)
         }
         .fileImporter(isPresented: $showImport,
             allowedContentTypes: [.json, .plainText, UTType(filenameExtension: "ddl") ?? .text], allowsMultipleSelection: false) { result in

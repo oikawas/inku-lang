@@ -16,10 +16,10 @@ struct DrawingLogView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(model.display.localized("描画ログ")).font(.title2.weight(.semibold))
+                Text(model.display.localized("描画ログ")).inkuFont(16, weight: .semibold)
                 Spacer()
                 Button(model.display.localized("記録を更新")) { Task { await load() } }.disabled(loading)
-                    .help(model.display.tooltip("描画ログを読み直します。生成や再送信は行いません。"))
+                    .inkuTooltip(model.display.tooltip("描画ログを読み直します。生成や再送信は行いません。"))
                 Button(model.display.localized("閉じる")) { dismiss() }.keyboardShortcut(.cancelAction)
             }.padding()
             Divider()
@@ -31,7 +31,7 @@ struct DrawingLogView: View {
                         Button(model.display.localized("もう一度読み込む")) { Task { await load() } }.disabled(loading)
                         Button(model.display.localized("エラーを閉じる")) { self.loadError = nil }
                     }
-                    if hasLoaded { Text(model.display.localized("前回読み込めた記録を表示しています。")).font(.caption).foregroundStyle(.secondary) }
+                    if hasLoaded { Text(model.display.localized("前回読み込めた記録を表示しています。")).inkuFont(12).foregroundStyle(.secondary) }
                 }.padding().frame(maxWidth: .infinity, alignment: .leading)
                 Divider()
             }
@@ -49,11 +49,11 @@ struct DrawingLogView: View {
                                         HStack {
                                             Text(model.display.localized(phase(record.phase))).fontWeight(.semibold)
                                             Spacer()
-                                            Text(record.startedAt.formatted(date: .numeric, time: .shortened)).font(.caption)
+                                            Text(record.startedAt.formatted(date: .numeric, time: .shortened)).inkuFont(12)
                                         }
                                         Text(record.description.isEmpty ? model.display.localized("DDLからの描画") : record.description)
-                                            .lineLimit(3).font(.caption)
-                                        Text(record.stage1Model).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                                            .lineLimit(3).inkuFont(12)
+                                        Text(record.stage1Model).inkuFont(11).foregroundStyle(.secondary).lineLimit(1)
                                     }.frame(maxWidth: .infinity, alignment: .leading).padding(10)
                                         .background(selectedID == record.id ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.04),
                                                     in: RoundedRectangle(cornerRadius: 8))
@@ -69,7 +69,7 @@ struct DrawingLogView: View {
             }
             Divider()
             Text(model.display.localized("直近100件の実行記録です。開いても描画や再送信は行いません。"))
-                .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                .inkuFont(12).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(12)
         }
         #if os(macOS)
         .frame(minWidth: 760, idealWidth: 1040, minHeight: 480, idealHeight: 700)
@@ -79,7 +79,7 @@ struct DrawingLogView: View {
 
     private func details(_ record: DrawingLogRecord) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(model.display.localized(phase(record.phase))).font(.title3.weight(.semibold))
+            Text(model.display.localized(phase(record.phase))).inkuFont(16, weight: .semibold)
             Text(record.startedAt.formatted(date: .complete, time: .standard)).foregroundStyle(.secondary)
             if !record.description.isEmpty { Text(record.description).textSelection(.enabled) }
             Text(model.display.localizedFormat("解釈モデル: %@", record.stage1Model))
@@ -87,16 +87,16 @@ struct DrawingLogView: View {
             if let reason = record.failureReason {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(model.display.localized(failure(reason))).fontWeight(.semibold)
-                    Text(reason).font(.caption.monospaced()).foregroundStyle(.secondary)
+                    Text(reason).inkuFont(12, design: .monospaced).foregroundStyle(.secondary)
                     if let stage = record.failureStage { Text(model.display.localized(action(stage))) }
                     if record.providerMetrics.contains(where: { $0.failure != nil && $0.diagnostic == nil }) {
                         Text(model.display.localized("この実行は詳細な通信理由を保存する前の記録です。"))
-                            .font(.caption).foregroundStyle(.secondary)
+                            .inkuFont(12).foregroundStyle(.secondary)
                     }
                 }
             }
             Divider()
-            Text(model.display.localized("モデルの実測記録")).font(.headline)
+            Text(model.display.localized("モデルの実測記録")).inkuFont(14, weight: .semibold)
             ForEach(Array(record.providerMetrics.enumerated()), id: \.offset) { _, metric in
                 VStack(alignment: .leading, spacing: 5) {
                     Text(model.display.localized(action(metric.action))).fontWeight(.semibold)
@@ -106,28 +106,28 @@ struct DrawingLogView: View {
                         Text(model.display.localized(outcome(metric.outcome)))
                         if let elapsed = metric.elapsedMS { Text(model.display.localizedFormat("呼出し %.1f秒", Double(elapsed) / 1_000)) }
                         if let status = metric.httpStatus ?? metric.diagnostic?.httpStatus { Text("HTTP \(status)") }
-                    }.font(.caption).monospacedDigit()
+                    }.inkuFont(12).monospacedDigit()
                     if !metric.sent {
-                        Text(model.display.localized("送信状態不明／応答未確認")).font(.caption).foregroundStyle(.secondary)
+                        Text(model.display.localized("送信状態不明／応答未確認")).inkuFont(12).foregroundStyle(.secondary)
                     }
                     if metric.failure != nil || metric.diagnostic != nil || metric.outcome == .failed || metric.outcome == .cancelled {
                         Text(model.display.localizedFormat("診断の操作: %@", model.display.localized(diagnosticOperation(metric.diagnostic?.operation))))
-                            .font(.caption).foregroundStyle(.secondary)
+                            .inkuFont(12).foregroundStyle(.secondary)
                     }
                     if let failureCode = metric.failure {
                         Text(model.display.localized(failure(failureCode)))
-                        Text(failureCode).font(.caption.monospaced()).foregroundStyle(.secondary)
+                        Text(failureCode).inkuFont(12, design: .monospaced).foregroundStyle(.secondary)
                     }
                     if let diagnostic = metric.diagnostic {
                         Text(model.display.localized(diagnosticReason(diagnostic.reason)))
-                        if let endpoint = diagnostic.endpoint { Text(endpoint).font(.caption.monospaced()) }
+                        if let endpoint = diagnostic.endpoint { Text(endpoint).inkuFont(12, design: .monospaced) }
                         if let domain = diagnostic.errorDomain, let code = diagnostic.errorCode {
-                            Text("\(domain) \(code)").font(.caption.monospaced()).foregroundStyle(.secondary)
+                            Text("\(domain) \(code)").inkuFont(12, design: .monospaced).foregroundStyle(.secondary)
                         }
-                        if let code = diagnostic.hostCode { Text(code).font(.caption.monospaced()).foregroundStyle(.secondary) }
-                        if let message = diagnostic.providerMessage { Text(message).font(.caption) }
+                        if let code = diagnostic.hostCode { Text(code).inkuFont(12, design: .monospaced).foregroundStyle(.secondary) }
+                        if let message = diagnostic.providerMessage { Text(message).inkuFont(12) }
                         let codes = [diagnostic.providerCode, diagnostic.providerType, diagnostic.providerParameter, diagnostic.providerStatus].compactMap { $0 }
-                        if !codes.isEmpty { Text(codes.joined(separator: " · ")).font(.caption.monospaced()).foregroundStyle(.secondary) }
+                        if !codes.isEmpty { Text(codes.joined(separator: " · ")).inkuFont(12, design: .monospaced).foregroundStyle(.secondary) }
                     }
                 }.padding(10).frame(maxWidth: .infinity, alignment: .leading)
                     .background(.quaternary, in: RoundedRectangle(cornerRadius: 8)).textSelection(.enabled)
@@ -139,12 +139,12 @@ struct DrawingLogView: View {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(model.display.localized(eventTitle(event)))
                             if let actionName = event.action ?? event.stage { Text(model.display.localized(action(actionName))) }
-                            if let reason = event.reason { Text(reason).font(.caption.monospaced()).foregroundStyle(.secondary) }
+                            if let reason = event.reason { Text(reason).inkuFont(12, design: .monospaced).foregroundStyle(.secondary) }
                         }
                     }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 3)
                 }
             }
-            DisclosureGroup(model.display.localized("実行ID")) { Text(record.id).font(.caption.monospaced()).textSelection(.enabled) }
+            DisclosureGroup(model.display.localized("実行ID")) { Text(record.id).inkuFont(12, design: .monospaced).textSelection(.enabled) }
         }
     }
 

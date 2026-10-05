@@ -17,6 +17,7 @@ public struct AboutInkuScreen: View {
         .environment(model.display)
         .environment(\.locale, Locale(identifier: model.display.preferences.language))
         .preferredColorScheme(model.display.colorScheme)
+        .environment(\.inkuTextScale, model.display.preferences.textScale)
         .font(.system(size: 13 * model.display.preferences.textScale))
     }
 }
@@ -25,6 +26,7 @@ public struct AboutInkuScreen: View {
 @MainActor
 struct AboutInkuView: View {
     @Bindable var model: AppModel
+    @State private var showsLicenses = false
 
     private static let bindingReport: [String: String] = {
         (try? JSONSerialization.jsonObject(with: Data(InkuCore.versionReport.utf8)) as? [String: String]) ?? [:]
@@ -35,9 +37,13 @@ struct AboutInkuView: View {
             if let reference = model.productReference,
                let copy = reference.localized(language: model.display.preferences.language) {
                 Section("inku") {
-                    LabeledContent(copy.text("appInfoVersionLabel"), value: reference.version)
-                    LabeledContent(copy.text("appInfoBuildLabel"), value: reference.build)
-                    LabeledContent(copy.text("appInfoBuildDateLabel"), value: buildDate(reference.buildDate))
+                    // The macOS application has its own version (apple/VERSION, apple/BUILD_NUMBER);
+                    // the Server release it follows is shown beside it.
+                    LabeledContent(copy.text("appInfoVersionLabel"), value: bundleValue("CFBundleShortVersionString"))
+                    LabeledContent(copy.text("appInfoBuildLabel"), value: bundleValue("CFBundleVersion"))
+                    LabeledContent(model.display.localized("対応するServerの版"),
+                                   value: "\(reference.version) (\(copy.text("appInfoBuildLabel")) \(reference.build))")
+                    LabeledContent(model.display.localized("対応するServerのビルド日時"), value: buildDate(reference.buildDate))
                     versionRow("DDL Spec. ver.", value: reference.versions["ddlSpec"],
                                hint: copy.text("appInfoHintDdlSpec"))
                     versionRow("DDL engine ver.", value: reference.versions["ddlEngine"],
@@ -49,6 +55,10 @@ struct AboutInkuView: View {
                     LabeledContent(copy.text("appInfoRepositoryLabel")) {
                         Link("https://github.com/oikawas/inku-lang", destination: URL(string: "https://github.com/oikawas/inku-lang")!)
                     }
+                }
+                Section(model.display.localized("ライセンス")) {
+                    LabeledContent("inku", value: "MIT License")
+                    Button(model.display.localized("第三者ライセンスを表示")) { showsLicenses = true }
                 }
                 Section(copy.text("appInfoConceptTitle")) {
                     Text(copy.text("appInfoConceptBody")).fixedSize(horizontal: false, vertical: true)
@@ -78,7 +88,14 @@ struct AboutInkuView: View {
             } else {
                 Section("inku") { Text(model.display.localized("未記録")).foregroundStyle(.secondary) }
             }
-        }.textSelection(.enabled)
+        }
+        .textSelection(.enabled)
+        .sheet(isPresented: $showsLicenses) { ThirdPartyNoticesView(display: model.display) }
+    }
+
+    private func bundleValue(_ key: String) -> String {
+        (Bundle.main.object(forInfoDictionaryKey: key) as? String).flatMap { $0.isEmpty ? nil : $0 }
+            ?? model.display.localized("未記録")
     }
 
     private func versionRow(_ title: String, value: String?, hint: String) -> some View {
@@ -86,7 +103,7 @@ struct AboutInkuView: View {
             Text(value.flatMap { $0.isEmpty ? nil : $0 } ?? model.display.localized("未記録"))
                 .monospacedDigit()
         } label: {
-            Text(title).help(model.display.preferences.showTooltips ? hint : "")
+            Text(title).inkuTooltip(model.display.preferences.showTooltips ? hint : "")
         }
     }
 

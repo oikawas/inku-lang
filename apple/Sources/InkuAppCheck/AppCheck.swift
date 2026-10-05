@@ -33,6 +33,15 @@ struct AppCheck {
             } else { folder = nil }
             try await runAppParityContractChecks(fixtureDirectory: folder); return
         }
+        if CommandLine.arguments.contains("--canvas-fit-only") {
+            try runCanvasFitChecks(); return
+        }
+        if CommandLine.arguments.contains("--server-host-parity-only") {
+            try await runServerHostParityChecks(); return
+        }
+        if CommandLine.arguments.contains("--release-parity-only") {
+            try await runReleaseParityChecks(); return
+        }
         if CommandLine.arguments.contains("--drawing-failure-log-only") {
             try await runDrawingFailureLogChecks(); return
         }
@@ -45,6 +54,9 @@ struct AppCheck {
         if CommandLine.arguments.contains("--batch-ui-only") {
             try await runBatchUIPresentationChecks(); return
         }
+        if CommandLine.arguments.contains("--library-release-only") { try await runLibraryReleaseChecks(); return }
+        if CommandLine.arguments.contains("--input-aids-only") { try await runInputAidChecks(); return }
+        if CommandLine.arguments.contains("--tooltips-leftovers-only") { try await runTooltipAndLeftoverChecks(); return }
         if CommandLine.arguments.contains("--library-browsing-only") {
             try await runLibraryBrowsingChecks(); return
         }

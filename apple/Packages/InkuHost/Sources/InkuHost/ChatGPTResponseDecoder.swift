@@ -10,6 +10,7 @@ public struct ChatGPTResponseDecoder: Sendable {
     private var buffer: [UInt8] = []
     private var scan = 0
     private var function: ExactJSON?
+    private var finalized: ExactJSON?
     private var arguments: Data?
     private var completed: String?
     private var responseID: String?
@@ -53,7 +54,7 @@ public struct ChatGPTResponseDecoder: Sendable {
             guard buffer.count <= eventLimit else { throw HostError("chatgpt_response_too_large") }
         } catch {
             let reason = error as? HostError ?? HostError(error is CancellationError ? "chatgpt_cancelled" : "chatgpt_response_invalid")
-            failure = reason; completed = nil; arguments = nil; function = nil; buffer.removeAll(); scan = 0
+            failure = reason; completed = nil; arguments = nil; function = nil; finalized = nil; buffer.removeAll(); scan = 0
             throw reason
         }
     }
@@ -91,11 +92,14 @@ public struct ChatGPTResponseDecoder: Sendable {
             try matchResponse(event["response"])
         case "response.output_item.added", "response.output_item.done":
             let item = event["item"]
-            if item["type"].string == "reasoning" { return }
+            guard item["type"].string == "function_call" else { try Self.auxiliary(item); return }
             try checkFunction(item)
             if let existing = function { try matchFunction(existing, item) }
-            if tag == "response.output_item.done", let text = item["arguments"].string {
+            if tag == "response.output_item.done" {
+                guard item["status"] == .null || item["status"].string == "completed" else { throw HostError("chatgpt_response_incomplete") }
+                guard let text = item["arguments"].string else { throw HostError("chatgpt_response_invalid") }
                 try setArguments(text, requireMatch: true)
+                finalized = item
             }
             function = item
         case "response.function_call_arguments.delta":
@@ -113,9 +117,18 @@ public struct ChatGPTResponseDecoder: Sendable {
             let response = event["response"]
             try matchResponse(response)
             guard response["status"].string == "completed" else { throw HostError("chatgpt_response_incomplete") }
-            guard response["error"] == .null, response["incomplete_details"] == .null,
-                  let output = response["output"].array else { throw HostError("chatgpt_response_invalid") }
-            let calls = output.filter { $0["type"].string != "reasoning" }
+            // Some streams finish with an empty summary; the finalized item event then carries the result.
+            var output: [ExactJSON]
+            switch response["output"] {
+            case .null: output = []
+            case .array(let items): output = items
+            default: throw HostError("chatgpt_response_invalid")
+            }
+            if output.isEmpty, let finalized { output = [finalized] }
+            var calls: [ExactJSON] = []
+            for item in output {
+                if item["type"].string == "function_call" { calls.append(item) } else { try Self.auxiliary(item) }
+            }
             guard calls.count == 1 else { throw HostError("chatgpt_unexpected_tool") }
             let item = calls[0]
             try checkFunction(item)
@@ -136,7 +149,16 @@ public struct ChatGPTResponseDecoder: Sendable {
         if let id = response["id"].string {
             guard !id.isEmpty, id.utf8.count <= 160, responseID == nil || responseID == id else { throw HostError("chatgpt_response_invalid") }
             responseID = id
-        } else if responseID != nil { throw HostError("chatgpt_response_invalid") }
+        }
+    }
+    /// Reasoning and assistant text may accompany the required call but never become the result.
+    private static func auxiliary(_ item: ExactJSON) throws {
+        if item["type"].string == "reasoning" { return }
+        guard item["type"].string == "message", item["role"].string == "assistant" else { throw HostError("chatgpt_unexpected_tool") }
+        for part in item["content"].array ?? [] {
+            if part["type"].string == "refusal" { throw HostError("chatgpt_refused") }
+            guard part["type"].string == "output_text" else { throw HostError("chatgpt_unexpected_tool") }
+        }
     }
     private func checkFunction(_ item: ExactJSON) throws {
         guard item["type"].string == "function_call", item["namespace"].string == "inku",

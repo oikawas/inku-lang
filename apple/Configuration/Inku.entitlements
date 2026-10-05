@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Developer ID release of the macOS application: Hardened Runtime, no App Sandbox.
+  No exception is needed. Outside the sandbox, provider requests, the 127.0.0.1
+  ChatGPT callback listener, the login Keychain items and files the user picks
+  in open and save panels need no entitlement. The app has no JIT, loads no
+  unsigned or other-team code, and reads no DYLD environment variables.
+-->
+<plist version="1.0">
+<dict/>
+</plist>

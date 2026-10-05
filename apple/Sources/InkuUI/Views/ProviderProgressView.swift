@@ -27,7 +27,7 @@ public struct ProviderProgressView: View {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 10) { timing(snapshot, at: date); tokens(snapshot) }
                 VStack(alignment: .leading, spacing: 2) { timing(snapshot, at: date); tokens(snapshot) }
-            }.font(.caption).foregroundStyle(.secondary).monospacedDigit()
+            }.inkuFont(12).foregroundStyle(.secondary).monospacedDigit()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 10).padding(.vertical, 6)
@@ -42,10 +42,10 @@ public struct ProviderProgressView: View {
             } else {
                 Image(systemName: symbol(snapshot.outcome)).foregroundStyle(snapshot.outcome == .failed ? Color.red : Color.secondary)
             }
-            Text(model.display.localized(snapshot.stageTitleKey)).font(.caption.weight(.semibold))
-            if snapshot.comparison { Text(model.display.localized("比較候補")).font(.caption).foregroundStyle(.secondary) }
+            Text(model.display.localized(snapshot.stageTitleKey)).inkuFont(12, weight: .semibold)
+            if snapshot.comparison { Text(model.display.localized("比較候補")).inkuFont(12).foregroundStyle(.secondary) }
             if snapshot.outcome != .running {
-                Text(model.display.localized(outcomeKey(snapshot.outcome))).font(.caption).foregroundStyle(.secondary)
+                Text(model.display.localized(outcomeKey(snapshot.outcome))).inkuFont(12).foregroundStyle(.secondary)
             }
         }.fixedSize(horizontal: true, vertical: false)
     }
@@ -53,8 +53,8 @@ public struct ProviderProgressView: View {
     @ViewBuilder private func requestedModel(_ snapshot: ProviderProgressSnapshot) -> some View {
         if let reference = snapshot.modelReference {
             Text(model.display.localizedFormat("呼出しモデル: %@", reference))
-                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                .help(model.display.preferences.showTooltips ? reference : "")
+                .inkuFont(12).foregroundStyle(.secondary).lineLimit(1)
+                .inkuTooltip(model.display.preferences.showTooltips ? reference : "")
         }
     }
 

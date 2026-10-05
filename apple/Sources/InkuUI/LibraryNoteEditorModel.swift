@@ -14,8 +14,25 @@ public final class LibraryNoteEditorModel {
 
     public init() {}
 
+    /// Web `maxlength="240"` (HistoryManager.svelte:991) counts UTF-16 code units.
+    public static let limit = 240
+
     public var dirty: Bool { text != savedText }
-    public var canSave: Bool { state.annotation != nil && dirty && !saving && text.unicodeScalars.count <= 240 }
+    public var canSave: Bool { state.annotation != nil && dirty && !saving && text.utf16.count <= Self.limit }
+
+    /// What `maxlength` lets through: whole characters while they fit in 240 UTF-16 units.
+    public static func limited(_ value: String) -> String {
+        guard value.utf16.count > limit else { return value }
+        var used = 0
+        var kept = ""
+        for character in value {
+            let size = String(character).utf16.count
+            guard used + size <= limit else { break }
+            used += size
+            kept.append(character)
+        }
+        return kept
+    }
 
     public func receive(workID: String, state: LibraryAnnotationState) {
         if self.workID != workID {

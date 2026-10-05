@@ -71,4 +71,31 @@ final class ChatGPTDecoderChecks: XCTestCase, @unchecked Sendable {
         assertCode("subscription_sharing_usage_limit_exceeded") { try completedThenQuota.feed(event("error", ["code": .string("subscription_sharing_usage_limit_exceeded")])) }
         assertCode("subscription_sharing_usage_limit_exceeded") { _ = try completedThenQuota.finish() }
     }
+    // Failure: a completed event with an empty summary, or assistant text beside the call, fails although Server delivers the finalized call.
+    func testEmptySummaryAndAssistantTextFollowServer() throws {
+        let finalized = started + event("response.output_item.done", ["item": item(arguments)])
+        let message = ExactJSON.object(["type": .string("message"), "role": .string("assistant"),
+            "content": .array([.object(["type": .string("output_text"), "text": .string("note")])])])
+        for output: ExactJSON? in [nil, .null, .array([])] {
+            var decoder = ChatGPTResponseDecoder(argumentLimit: 512)
+            var response: [String: ExactJSON] = ["id": .string("resp_fixture"), "status": .string("completed")]
+            if let output { response["output"] = output }
+            try decoder.feed(finalized + event("response.completed", ["response": .object(response)]))
+            XCTAssertEqual(try decoder.finish(), arguments)
+        }
+        var withText = ChatGPTResponseDecoder(argumentLimit: 512)
+        try withText.feed(started + event("response.output_item.done", ["item": message]) + event("response.output_item.done", ["item": item(arguments)]) +
+            event("response.completed", ["response": .object(["id": .string("resp_fixture"), "status": .string("completed"),
+                "output": .array([message, item(arguments)])])]))
+        XCTAssertEqual(try withText.finish(), arguments)
+        var deltasOnly = ChatGPTResponseDecoder(argumentLimit: 512)
+        try deltasOnly.feed(started + event("response.function_call_arguments.done", ["item_id": .string("fc_fixture"), "arguments": .string(arguments)]))
+        assertCode("chatgpt_unexpected_tool") { try deltasOnly.feed(event("response.completed", ["response": .object(["status": .string("completed"), "output": .array([])])])) }
+        var refusedPart = ChatGPTResponseDecoder(argumentLimit: 512)
+        try refusedPart.feed(started)
+        assertCode("chatgpt_refused") { try refusedPart.feed(event("response.output_item.done", ["item": .object(["type": .string("message"), "role": .string("assistant"),
+            "content": .array([.object(["type": .string("refusal"), "refusal": .string("no")])])])])) }
+        var otherItem = ChatGPTResponseDecoder(argumentLimit: 512)
+        assertCode("chatgpt_unexpected_tool") { try otherItem.feed(event("response.output_item.added", ["item": .object(["type": .string("web_search_call"), "id": .string("ws")])])) }
+    }
 }

@@ -144,7 +144,7 @@ struct DDLImportButton: View {
             Button(model.display.localized(importer.isReading ? "読み込んでいます…" : "DDLファイルを読み込む…"), systemImage: "doc.badge.arrow.up") { importer.read(app: model) }
                 .disabled(importer.isReading || model.isBusy)
             if !importer.visibleMessage(app: model).isEmpty {
-                Text(model.display.message(importer.visibleMessage(app: model))).font(.caption).foregroundStyle(.secondary)
+                Text(model.display.message(importer.visibleMessage(app: model))).inkuFont(12).foregroundStyle(.secondary)
             }
         }
     }

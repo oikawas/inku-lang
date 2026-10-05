@@ -10,10 +10,10 @@ public struct DescriptionFeedbackView: View {
     public var body: some View {
         if !parts.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
-                Text(InkuLocalization.string("解釈フィードバック", locale: locale)).font(.caption.weight(.semibold))
-                feedbackText.font(.callout).textSelection(.enabled)
+                Text(InkuLocalization.string("解釈フィードバック", locale: locale)).inkuFont(12, weight: .semibold)
+                feedbackText.inkuFont(13).textSelection(.enabled)
                 Text(InkuLocalization.string("濃い表示: 語やカテゴリが対応・中間: 歳時記の語や言い換え・薄い表示: 直接の対応が未確認", locale: locale))
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .inkuFont(11).foregroundStyle(.secondary)
             }
         }
     }

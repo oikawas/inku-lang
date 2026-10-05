@@ -4,7 +4,7 @@ This directory contains the native SwiftUI client, developed for macOS first, an
 
 Last updated: 2026-10-05.
 
-Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The Swift app's product version follows formal version management; this initial implementation does not allocate a new version. Matching shared layer versions does not establish that host features and the native UI port are complete.
+Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The macOS app has its own version, defined by `apple/VERSION` and `apple/BUILD_NUMBER` and allocated separately from the Server and Web versions (the first release is 1.0.0, Build 1). The corresponding Server version is shown in the app's About inku window and in the changelog. Matching shared layer versions does not establish that host features and the native UI port are complete.
 
 ## Specification Update Workflow
 
@@ -13,6 +13,53 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Record confirmed implementation changes and remaining scope in dated sections of this specification. Maintain product history in the shared [CHANGELOG.ja.md](../CHANGELOG.ja.md) and [CHANGELOG.md](../CHANGELOG.md). Do not create a separate Swift changelog.
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
+
+## 2026-10-05 Web alignment and Server host comparison for the first release
+
+For the first macOS distribution, screens, controls, and remembered choices follow the Web (Build 1162), and host processing outside the shared Rust core was compared with the Server (Build 1162). Elements that are more detailed than the Web and useful (measured model records, per-stage time and usage, the drawing log, and the character count of a refinement direction) remain.
+
+### Layout and density
+
+- The 190 pt section list is replaced by an icon rail of 44 pt (164 pt expanded), as in the Web AppRail: expand, logo (About inku), UI mode, tooltips, settings, theme, and language. The library opens as an overlay over the whole window, and lineage is the Work / Lineage tab of the canvas area. Settings and the demo sit in a settings modal sized as on the Web. The menu bar navigation (⌘1–⌘4) and the drawing log (⇧⌘L) remain.
+- The window toolbar, the top description/batch band, and the bottom status bar are removed. Run status and status text sit in the left panel. Description and batch are underlined tabs inside the input panel, with a dot and progress while running. The input panel is 440 wide (min(400, 42%) at window widths of 1180 or less) and can be collapsed.
+- Controls around the work (zoom, caption, marks, export, previous/next) float over the work. The canvas area has no outer padding or frame and fits with the Web formula (base 400, scale min((width − 120)/base width, (height − 96)/base height), 0.25–10).
+- Text uses the Web `--ui-font-size-N` values multiplied by the text-size setting, so the setting reaches every label. Screens have no large page headings.
+- The history strip uses 82×58 thumbnails and floor((window width − 40)/89) items. The library uses a minmax(142, 1fr) grid, computes the page size from the measured space, and pages instead of scrolling. Model names are shortened with the Web rules (`shortModel` on cards and `abbreviateStripModel` on the strip).
+- Dialogs open with the Web size formulas (for example, the DDL editor at min(1360, window − 40) × min(940, window height − 40)). Refinement appears inside the canvas area, generation information as a drawer over the work, and the saijiki as a drawer on the right.
+
+### Remembered choices
+
+- The display settings (`interface.json`) store the drawing conditions (color catalog and its automatic selection, paper, and wild), the last settings page, Work / Lineage, description / batch, the library display mode and layout, the refinement kind, the previous autonomous-refinement settings, and the model-comparison selection. A saved catalog or paper that no longer exists falls back to the default.
+- Display and demo settings are read field by field: a missing or mistyped field alone falls back to its default. An unreadable file is kept under a dated name instead of being overwritten. Upgrading the app keeps the other choices.
+- When the demo model is temporarily unavailable, only the shown value falls back to the Stage 1 model; the saved choice is not rewritten.
+- New display settings default to the dark theme and an open sketch section, as on the Web. Existing saved values are unchanged.
+
+### Input aids and tooltips
+
+- The description field greys out numbering and comment ranges and shows the comment-syntax hint. The description meter shows the same estimate as the Web before an answer arrives and after a failure, and counts the 4000-character limit in UTF-16. A description with no text left after removing numbering and comments cannot be drawn.
+- A work whose DDL was edited keeps its description locked; "Create a new work from this description" makes a child of the original, as the Server's `fork_linked_history` does.
+- The sketch of the shown work can be edited in place, and the edited text is passed to interpretation as is.
+- The DDL editor shows line and character counts, line numbers, highlighting, the language label, unregistered plugin names, and a short guide, and inserts words at the caret.
+- Batch runs skip lines that contain only numbering or comments, and the count also includes only lines with text, as on the Web. Line numbers are preserved.
+- Tooltips appear 0.12 s after hover and on keyboard focus, as on the Web, and disabled controls show the reason. All 173 Web tooltip places are covered except 9 that have no counterpart in a single-user app. Menu items keep the standard macOS tool tip.
+
+### Server host comparison
+
+- Non-square paper keeps the default height of 1000 and rounds the width half to even, as on the Server (16:9 is 1778×1000), for new works and replays.
+- The instruction language is always automatic, as on the Web, and follows the characters of the description or DDL (Japanese, then Latin letters, then the UI language). There is no language picker.
+- Personal ChatGPT response parsing, HTTP session lifetime (one per request), failure classes (oversized answers, a zero timeout), rate waiting and the order of Gemini token counting, two simultaneous Ollama Cloud requests, model list fetching (paging, new models registered disabled, vanished models kept as end-of-life), model reference resolution, Gemini schema `propertyOrdering`, the automatic color catalog `catalog_mode`, demo retries and wild off, the context JSON of refinement advice and colophons, failure wording, PNG capture time, DDL export `exported_from`, and saved render warnings now follow the Server or the Web.
+- A missing field in Gemini rate settings is still read as unlimited, because earlier versions saved a zero (unlimited) by omitting the field. Custom providers whose kind is anthropic or gemini are sent according to their kind.
+
+### Version, signing, and distribution
+
+- The build writes `apple/VERSION` and `apple/BUILD_NUMBER` into Info.plist; they also become the `build` of a work's provenance and the `build_number` of a DDL export.
+- `apple/scripts/package-macos-release.sh` produces the distribution: a Universal Release build, a check of the third-party notices, Developer ID signing (Hardened Runtime, timestamp, empty entitlements), creating and signing the `.dmg`, Apple notarization and stapling, a Gatekeeper check, and the SHA-256. The signing identity and notary profile are passed as arguments or environment variables and are not written in the source.
+- The distributed app uses bundle ID `app.inku.macos` and the default data location. The `--database` launch argument and the bundle's `InkuDatabasePath` remain for development; the distribution never contains `InkuDatabasePath`.
+- The third-party notices cover Rust crates (registry, git, path, and vendored), GRDB, the dictionaries (including the UniDic part of SudachiDict), and the font. The full texts are under License in About inku.
+
+### Verification scope
+
+The layout, library, remembered choices, input aids, tooltips, and host comparison were each checked with a bounded check for the failure it prevents (including agreement with expectations produced by running the Server Python and the Web TypeScript) and with type checks. Real provider requests, Intel and macOS 14 hardware, and iOS are outside this check. How tooltips look on hover and focus remains for the author's screen review.
 
 ## 2026-10-05 Move About inku to the macOS app menu
 

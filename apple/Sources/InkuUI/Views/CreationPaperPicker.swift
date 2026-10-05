@@ -8,10 +8,10 @@ struct CreationPaperPicker: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(model.display.localized("用紙を選ぶ")).font(.headline)
+                Text(model.display.localized("用紙を選ぶ")).inkuFont(14, weight: .semibold)
                 Spacer()
                 Button(model.display.localized("閉じる")) { onClose() }
-                    .help(tip("用紙を変更せずに閉じます。"))
+                    .inkuTooltip(tip("用紙を変更せずに閉じます。"))
             }.padding(14)
             Divider()
             ScrollView {
@@ -26,14 +26,14 @@ struct CreationPaperPicker: View {
                                 CanvasPaperShape(option: option).frame(width: 44, height: 48).accessibilityHidden(true)
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack(alignment: .firstTextBaseline) {
-                                        Text(option.label).font(.callout.weight(.medium))
-                                        Text("\(option.widthRatio):\(option.heightRatio)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                                        Text(option.label).inkuFont(13, weight: .medium)
+                                        Text("\(option.widthRatio):\(option.heightRatio)").inkuFont(12).monospacedDigit().foregroundStyle(.secondary)
                                         Spacer(minLength: 0)
                                         if option.id == model.canvasID { Image(systemName: "checkmark").foregroundStyle(Color.accentColor) }
                                     }
-                                    Text(option.category).font(.caption).foregroundStyle(.secondary)
+                                    Text(option.category).inkuFont(12).foregroundStyle(.secondary)
                                     Text(model.display.preferences.language == "en" ? option.intentEn : option.intentJa)
-                                        .font(.caption).foregroundStyle(.secondary)
+                                        .inkuFont(12).foregroundStyle(.secondary)
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
                             }
@@ -45,7 +45,7 @@ struct CreationPaperPicker: View {
                         .buttonStyle(.plain).disabled(model.isBusy)
                         .accessibilityElement(children: .combine)
                         .accessibilityValue(option.id == model.canvasID ? model.display.localized("選択中") : "")
-                        .help(tip("この用紙を次の作品に使います。保存作品の用紙は変わりません。"))
+                        .inkuTooltip(tip("この用紙を次の作品に使います。保存作品の用紙は変わりません。"))
                     }
                 }.padding(6)
             }.frame(maxHeight: 520)

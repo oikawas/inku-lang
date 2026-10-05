@@ -19,12 +19,13 @@ protocol ObservedChatGPTHTTPClient: ChatGPTHTTPClient {
 }
 
 public final class ChatGPTURLSessionClient: ObservedChatGPTHTTPClient, Sendable {
-    private let session: URLSession
-    public init() {
+    public init() {}
+    /// Server opens one HTTP client for each token, catalog and response call; no connection outlives its request.
+    private static func makeSession() -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpCookieStorage = nil; configuration.httpShouldSetCookies = false
         configuration.urlCache = nil; configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        session = URLSession(configuration: configuration, delegate: ChatGPTRedirectPolicy(), delegateQueue: nil)
+        return URLSession(configuration: configuration, delegate: ChatGPTRedirectPolicy(), delegateQueue: nil)
     }
     public func send(_ request: URLRequest, maximumBytes: Int,
                      onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
@@ -40,6 +41,8 @@ public final class ChatGPTURLSessionClient: ObservedChatGPTHTTPClient, Sendable 
         try ChatGPTEndpoints.validate(url)
         var data = Data(), status: Int?, complete = false, truncated = false
         defer { onResponse(ProviderHTTPRead(status: status, data: data, sent: true, complete: complete, truncated: truncated)) }
+        let session = Self.makeSession()
+        defer { session.invalidateAndCancel() }
         let (bytes, response) = try await session.bytes(for: request)
         defer { bytes.task.cancel() }
         guard let response = response as? HTTPURLResponse else { throw HostError("chatgpt_transport_unavailable") }

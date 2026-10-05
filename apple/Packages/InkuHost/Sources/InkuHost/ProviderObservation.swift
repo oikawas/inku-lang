@@ -172,7 +172,7 @@ final class ProviderAttemptRecorder: @unchecked Sendable {
     init(action: Data, reference: String, options: ProviderObservationOptions) throws {
         let effect = try ExactJSON(data: action), tag = try effect.requiredString("tag")
         guard let stage = ProviderObservationStage(action: tag),
-              let timeout = UInt64(try effect.requiredString("timeout_ms")), timeout > 0 else {
+              let timeout = UInt64(try effect.requiredString("timeout_ms")) else {
             throw HostError("pipeline_schema_violation")
         }
         self.options = options

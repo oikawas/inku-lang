@@ -40,7 +40,7 @@ enum ProviderDiagnosticSanitizer {
     private static let maximumErrorBytes = 65_536
     private static let knownHostCodes: Set<String> = ["provider_selection_required", "credentials_unavailable",
         "provider_base_url_invalid", "invalid_provider_rate_limits", "duplicate_provider_model", "provider_model_settings_invalid",
-        "pipeline_schema_violation", "malformed_payload", "invalid_json", "duplicate_json_key",
+        "pipeline_schema_violation", "malformed_payload", "provider_response_too_large", "invalid_json", "duplicate_json_key",
         "transport_timeout", "rate_limited", "transport_unavailable", "chatgpt_session_pin_required", "chatgpt_operation_not_supported"]
 
     static func diagnostic(error: any Error, endpoint: URL?, secrets: [String],
@@ -117,6 +117,7 @@ enum ProviderDiagnosticSanitizer {
         case "rate_limited": "The provider request budget is exhausted."
         case "transport_unavailable": "The provider transport is unavailable."
         case "malformed_payload", "invalid_json", "duplicate_json_key": "The provider response could not be read."
+        case "provider_response_too_large": "The provider response exceeded the size limit."
         default: "The provider request could not be prepared or completed."
         }
     }

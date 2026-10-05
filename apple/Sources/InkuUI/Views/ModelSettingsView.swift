@@ -30,7 +30,7 @@ struct ModelSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text(model.display.localized("AIサービス接続")).font(.title3.weight(.semibold))
+                Text(model.display.localized("AIサービス接続")).inkuFont(16, weight: .semibold)
                 serviceCards
                 if let provider = settings.selectedProvider {
                     serviceEditor(provider)
@@ -39,7 +39,7 @@ struct ModelSettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 if !settings.status.isEmpty {
-                    Text(model.display.message(settings.status)).font(.callout).foregroundStyle(.secondary)
+                    Text(model.display.message(settings.status)).inkuFont(13).foregroundStyle(.secondary)
                 }
                 HStack {
                     Spacer()
@@ -102,12 +102,12 @@ struct ModelSettingsView: View {
                     settings.selectedProviderID = provider.id
                 } label: {
                     VStack(alignment: .leading, spacing: 5) {
-                        Text(provider.displayName).font(.callout.weight(.semibold)).lineLimit(2)
-                        Text(provider.id).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        Text(provider.displayName).inkuFont(13, weight: .semibold).lineLimit(2)
+                        Text(provider.id).inkuFont(12).foregroundStyle(.secondary).lineLimit(1)
                         Text(model.display.localized(credentialStatus(provider.id)))
-                            .font(.caption).foregroundStyle(.secondary)
+                            .inkuFont(12).foregroundStyle(.secondary)
                         Text(model.display.localizedFormat("使用モデル: %ld個", settings.publishedModels(for: provider).count))
-                            .font(.caption).foregroundStyle(.secondary)
+                            .inkuFont(12).foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, minHeight: 90, alignment: .topLeading)
                     .padding(12)
@@ -129,9 +129,9 @@ struct ModelSettingsView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(provider.displayName).font(.headline)
+                    Text(provider.displayName).inkuFont(14, weight: .semibold)
                     Text(model.display.localizedFormat("サービスID: %@", provider.id))
-                        .font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+                        .inkuFont(12, design: .monospaced).foregroundStyle(.secondary).textSelection(.enabled)
                 }
                 Spacer(minLength: 8)
                 Button(model.display.localized("名前変更")) { sheetRoute = .service(.rename(provider.id)) }
@@ -158,16 +158,16 @@ struct ModelSettingsView: View {
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(model.display.localized("使用するモデル")).font(.callout).foregroundStyle(.secondary)
+                    Text(model.display.localized("使用するモデル")).inkuFont(13).foregroundStyle(.secondary)
                     Text(model.display.localizedFormat("使用モデル: %ld個", selectedModels.count))
-                        .font(.callout.weight(.semibold))
+                        .inkuFont(13, weight: .semibold)
                 }
                 Spacer(minLength: 8)
                 Button(model.display.localized("モデル選択")) { sheetRoute = .models(provider.id) }
             }
             if selectedModels.isEmpty {
                 Text(model.display.localized("使用するモデルはありません。"))
-                    .font(.callout).foregroundStyle(.secondary)
+                    .inkuFont(13).foregroundStyle(.secondary)
             } else {
                 ViewThatFits(in: .vertical) {
                     modelGroups(provider)
@@ -190,10 +190,10 @@ struct ModelSettingsView: View {
                             Text(purpose == "llm" ? "LLM" : "Vision").fontWeight(.semibold)
                             Text("\(models.count)").foregroundStyle(.secondary)
                         }
-                        .font(.caption).frame(width: 68, alignment: .leading).padding(.top, 5)
+                        .inkuFont(12).frame(width: 68, alignment: .leading).padding(.top, 5)
                         ModelSettingsChipLayout(spacing: 6) {
                             ForEach(models) { item in
-                                Text(item.label).font(.caption)
+                                Text(item.label).inkuFont(12)
                                     .padding(.horizontal, 9).padding(.vertical, 5)
                                     .background(Color.primary.opacity(0.04), in: Capsule())
                                     .overlay { Capsule().stroke(Color.primary.opacity(0.15)) }
@@ -215,12 +215,12 @@ struct ModelSettingsView: View {
             rateField("日次の要求数（RPD）", help: "再試行を含む1日当たりの要求数です。Geminiは太平洋時間、ほかの接続先はUTCの0時にリセットします。0は上限なしです。",
                       provider: provider, key: \.rpd)
             Text(model.display.localized("0は上限なし。毎分の枠を待ち、日次上限では生成を開始しません。"))
-                .font(.caption).foregroundStyle(.secondary)
+                .inkuFont(12).foregroundStyle(.secondary)
             Text(model.display.localized("未設定の標準Gemini接続は30／16,000／14,400、ほかの接続先は0が初期値です。契約の利用枠に合わせて設定してください。"))
-                .font(.caption).foregroundStyle(.secondary)
+                .inkuFont(12).foregroundStyle(.secondary)
             if draft.limits == nil {
                 Text(model.display.localized("レート制限には0から1,000,000,000までの整数を設定してください。"))
-                    .font(.caption).foregroundStyle(.red)
+                    .inkuFont(12).foregroundStyle(.red)
             }
             HStack {
                 Spacer()
@@ -234,13 +234,13 @@ struct ModelSettingsView: View {
                            key: WritableKeyPath<ServiceDraft, String>) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 6) {
-                Text(model.display.localized(title)).font(.callout)
+                Text(model.display.localized(title)).inkuFont(13)
                 Button { rateHelp = title } label: { Image(systemName: "info.circle") }
                     .buttonStyle(.plain).foregroundStyle(.secondary)
                     .accessibilityLabel(model.display.localizedFormat("%@の説明", model.display.localized(title)))
-                    .help(model.display.preferences.showTooltips ? model.display.localized(help) : "")
+                    .inkuTooltip(model.display.preferences.showTooltips ? model.display.localized(help) : "")
                     .popover(isPresented: Binding(get: { rateHelp == title }, set: { if !$0 { rateHelp = nil } })) {
-                        Text(model.display.localized(help)).font(.callout).padding()
+                        Text(model.display.localized(help)).inkuFont(13).padding()
                             .frame(maxWidth: 320).fixedSize(horizontal: false, vertical: true)
                     }
             }
@@ -255,7 +255,7 @@ struct ModelSettingsView: View {
         let configured = settings.credentialStates[provider.id]
         return VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 5) {
-                Text(model.display.localized("接続先URL")).font(.callout)
+                Text(model.display.localized("接続先URL")).inkuFont(13)
                 HStack(spacing: 8) {
                     TextField(model.display.localized("接続先URL"), text: draftBinding(provider, \.url))
                         .textFieldStyle(.roundedBorder).autocorrectionDisabled()
@@ -264,7 +264,7 @@ struct ModelSettingsView: View {
                 }
             }
             VStack(alignment: .leading, spacing: 5) {
-                Text(model.display.localized("APIキー")).font(.callout)
+                Text(model.display.localized("APIキー")).inkuFont(13)
                 HStack(spacing: 8) {
                     SecureField(model.display.localized(configured == true ? "設定済みのAPIキーを保持" : "APIキー"),
                                 text: configured == true ? .constant("") : draftBinding(provider, \.credential))
@@ -284,7 +284,7 @@ struct ModelSettingsView: View {
                     }
                 }
                 Text(model.display.localized("APIキーはKeychainに保存します。設定済みのキーは表示しません。変更するには先に削除してください。"))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .inkuFont(12).foregroundStyle(.secondary)
             }
             HStack(spacing: 10) {
                 Spacer()
@@ -310,7 +310,7 @@ struct ModelSettingsView: View {
                         }
                     }
                 } else {
-                    Text(model.display.localized("使用中のLLMモデルを設定してください。")).font(.caption).foregroundStyle(.secondary)
+                    Text(model.display.localized("使用中のLLMモデルを設定してください。")).inkuFont(12).foregroundStyle(.secondary)
                 }
                 if !drawingModels.stage1Model.isEmpty {
                     ModelGuidanceView(reference: drawingModels.stage1Model, providers: settings.host.providers,
@@ -322,7 +322,7 @@ struct ModelSettingsView: View {
                 Stepper(model.display.localizedFormat("補完の出力上限: %ld", drawingModels.holeMaxTokens),
                         value: drawingBinding(\.holeMaxTokens), in: 256...65536, step: 256)
                 Text(model.display.localized("解釈と構造化に同じモデルを使います。接続設定の保存では生成を開始しません。"))
-                    .font(.callout).foregroundStyle(.secondary)
+                    .inkuFont(13).foregroundStyle(.secondary)
                 HStack {
                     Spacer()
                     Button(model.display.localized("取消")) { drawingDraft = settings.host.models }.disabled(!drawingChanged)

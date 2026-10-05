@@ -35,13 +35,13 @@ struct ColorCatalogView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(model.display.localized("色カタログ")).font(.headline)
+                Text(model.display.localized("色カタログ")).inkuFont(14, weight: .semibold)
                 Spacer()
                 Button { confirm() } label: { Image(systemName: "xmark") }
                     .buttonStyle(.plain)
                     .disabled(!canConfirm)
                     .accessibilityLabel(model.display.localized("閉じる"))
-                    .help(model.display.tooltip("閉じる"))
+                    .inkuTooltip(model.display.tooltip("閉じる"))
             }
             .padding(.horizontal, 18).padding(.vertical, 14).background(.bar)
             Divider()
@@ -90,10 +90,10 @@ struct ColorCatalogView: View {
         Button { draftMode = "auto" } label: {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 5) {
-                    Text(model.display.localized("記述から自動選択")).font(.system(size: 12, weight: .semibold))
+                    Text(model.display.localized("記述から自動選択")).inkuFont(12, weight: .semibold)
                     if draftMode == "auto" { Image(systemName: "checkmark").foregroundStyle(.tint) }
                 }
-                Text(model.display.localized("描くたびに記述を読んで選ぶ")).font(.system(size: 10)).foregroundStyle(.secondary)
+                Text(model.display.localized("描くたびに記述を読んで選ぶ")).inkuFont(10).foregroundStyle(.secondary)
             }
             .padding(10).frame(maxWidth: .infinity, alignment: .leading)
             .background(draftMode == "auto" ? Color.accentColor.opacity(0.10) : Color.secondary.opacity(0.03),
@@ -155,12 +155,12 @@ struct ColorCatalogView: View {
     private func catalogHeading(_ catalog: ColorCatalogOption, selected: Bool) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .firstTextBaseline, spacing: 5) {
-                Text(catalog.name).font(.system(size: 12, weight: .semibold))
+                Text(catalog.name).inkuFont(12, weight: .semibold)
                 if selected { Image(systemName: "checkmark").foregroundStyle(.tint).accessibilityHidden(true) }
             }
-            Text(catalog.id).font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+            Text(catalog.id).inkuFont(9, design: .monospaced).foregroundStyle(.secondary)
             Text(catalog.localizedDetail(language: model.display.preferences.language))
-                .font(.system(size: 10)).foregroundStyle(.secondary)
+                .inkuFont(10).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -171,10 +171,10 @@ struct ColorCatalogView: View {
             ForEach(Array(catalog.palette.enumerated()), id: \.offset) { _, swatch in
                 VStack(spacing: 2) {
                     CatalogSwatchShape(swatch: swatch).frame(height: 38)
-                    Text(swatch.code).font(.system(size: 8, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1)
-                    Text(swatch.name).font(.system(size: 9)).lineLimit(1)
+                    Text(swatch.code).inkuFont(8, design: .monospaced).foregroundStyle(.secondary).lineLimit(1)
+                    Text(swatch.name).inkuFont(9).lineLimit(1)
                     if model.display.preferences.language == "ja", let japaneseName = swatch.japaneseName, !japaneseName.isEmpty {
-                        Text(japaneseName).font(.system(size: 8)).foregroundStyle(.secondary).lineLimit(1)
+                        Text(japaneseName).inkuFont(8).foregroundStyle(.secondary).lineLimit(1)
                     }
                 }
                 .accessibilityElement(children: .combine)
@@ -193,26 +193,26 @@ struct ColorCatalogPreview: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Label(display.localized("色カタログ"), systemImage: "paintpalette").font(.subheadline.weight(.semibold))
+                Label(display.localized("色カタログ"), systemImage: "paintpalette").inkuFont(12, weight: .semibold)
                 Spacer()
-                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Image(systemName: "chevron.right").inkuFont(12, weight: .semibold).foregroundStyle(.secondary)
             }
             if mode == "fixed" {
                 if let catalog {
-                    Text(catalog.name).font(.callout.weight(.medium))
+                    Text(catalog.name).inkuFont(13, weight: .medium)
                     HStack(spacing: 3) {
                         ForEach(Array(catalog.palette.enumerated()), id: \.offset) { _, swatch in
                             CatalogSwatchShape(swatch: swatch)
                         }
                     }
                     .frame(height: 18).accessibilityHidden(true)
-                    Text(catalog.localizedDetail(language: display.preferences.language)).font(.caption).foregroundStyle(.secondary)
+                    Text(catalog.localizedDetail(language: display.preferences.language)).inkuFont(12).foregroundStyle(.secondary)
                 } else {
-                    Text(display.localized("選択してください")).font(.caption).foregroundStyle(.secondary)
+                    Text(display.localized("選択してください")).inkuFont(12).foregroundStyle(.secondary)
                 }
             } else {
                 Text(display.localized(mode == "random" ? "生成ごとに配色をランダムに選びます。" : "次の生成で、記述から配色を選びます。"))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .inkuFont(12).foregroundStyle(.secondary)
             }
         }
         .padding(12)

@@ -48,47 +48,20 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         SettingsSection.allCases.filter { detailed || ![.plugins, .unread, .limits].contains($0) }
     }
 
+    var onClose: () -> Void = {}
+
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
-            VStack(spacing: 0) {
-                Toggle(model.display.localized(detailed ? "詳細" : "標準"), isOn: Binding(get: { detailed }, set: { enabled in
-                    model.display.preferences.settingsDetail = enabled ? "detailed" : "standard"
-                    if !enabled && [.plugins, .unread, .limits].contains(section) { section = .display }
-                })).padding(12)
-                List(sections, selection: $section) { item in
-                    Label(model.display.localized(item.title), systemImage: item.symbol).tag(item)
-                }.listStyle(.sidebar)
-            }.frame(width: 190)
-            Divider()
-            Group {
-                if section == .models {
-                    ModelSettingsView(model: model, settings: settings, automation: automation)
-                } else if section == .demo {
-                    AutomationView(model: model, automation: automation, demoOnly: true)
-                } else {
-                    Form {
-                        switch section {
-                        case .display: appearance
-                        case .making: making
-                        case .demo: EmptyView()
-                        case .models: EmptyView()
-                        case .personalPlan:
-                            ChatGPTPlanSettingsView(model: model).disabled(model.isBusy || automation.isOccupied)
-                        case .database: database
-                        case .export: ExportSettingsView(model: model)
-                        case .clipboard: clipboard
-                        case .plugins:
-                            PluginSettingsView(model: model).disabled(model.isBusy || automation.isOccupied)
-                            Section(model.display.localized("歳時記")) { SaijikiView(model: model).frame(minHeight: 480) }
-                        case .unread: Section { UnreadWordsView(model: model) }
-                        case .limits: OperationalLimitsView(model: model)
-                        #if !os(macOS)
-                        case .about: AboutInkuView(model: model)
-                        #endif
-                        }
-                    }.formStyle(.grouped)
+        VStack(spacing: 0) {
+            header
+            HStack(spacing: 0) {
+                navigation
+                Rectangle().fill(InkuColor.border).frame(width: 1)
+                VStack(spacing: 0) {
+                    pageHeading
+                    pageBody.frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-            }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                .inkuFont(14)
+            }
         }
         .task(id: section) { await settings.load(model: model) }
         .onAppear {
@@ -112,6 +85,149 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             #endif
             Button(model.display.localized("キャンセル"), role: .cancel) {}
         } message: { Text(model.display.localized("現在のデータを残す場合は、先にバックアップを保存してください。")) }
+    }
+
+    /// settings-modal.css `.modal-head`: 16px title, the detail switch and the close button, padding 14×22.
+    private var header: some View {
+        HStack(spacing: 12) {
+            Text(model.display.webCopy("settingsTitle", "設定")).inkuFont(16, weight: .semibold)
+            Spacer()
+            Toggle(isOn: Binding(get: { detailed }, set: { enabled in
+                model.display.preferences.settingsDetail = enabled ? "detailed" : "standard"
+                if !enabled && [.plugins, .unread, .limits].contains(section) { section = .display }
+            })) {
+                Text(model.display.webCopy(detailed ? "settingsDetailDetailed" : "settingsDetailStandard", detailed ? "詳細" : "標準"))
+                    .inkuFont(12).foregroundStyle(detailed ? Color.accentColor : Color.secondary)
+            }
+            .toggleStyle(.switch).controlSize(.mini)
+            .accessibilityLabel(model.display.webCopy("settingsDetailLabel", "表示モード"))
+            Button(action: onClose) { Image(systemName: "xmark").inkuFont(15).frame(width: 32, height: 32).contentShape(Rectangle()) }
+                .buttonStyle(.plain).foregroundStyle(.secondary)
+                .keyboardShortcut(.cancelAction)
+                .accessibilityLabel(model.display.localized("閉じる"))
+        }
+        .padding(.horizontal, 22).padding(.vertical, 10)
+        .overlay(alignment: .bottom) { Rectangle().fill(InkuColor.border).frame(height: 1) }
+    }
+
+    /// SettingsModal.svelte:270-318: categories with a 12px label and 14px items, 208pt wide.
+    private var groups: [(label: String, items: [SettingsSection])] {
+        var result: [(label: String, items: [SettingsSection])] = [
+            (model.display.webCopy("settingsCategoryDisplayOperation", "表示と操作"), [.display]),
+            (model.display.webCopy("settingsCategoryMaking", "制作"), [.making, .demo]),
+            (model.display.localized(SettingsSection.personalPlan.title), [.personalPlan]),
+            (model.display.webCopy("settingsTabExport", "エクスポート"), [.export, .clipboard]),
+            (model.display.webCopy("settingsCategoryAdministration", "接続と管理"), [.models, .database] + (detailed ? [.limits] : [])),
+        ]
+        if detailed { result.append((model.display.webCopy("settingsCategoryExtensions", "拡張と詳細"), [.plugins, .unread])) }
+        #if !os(macOS)
+        result.append((model.display.localized("inkuについて"), [.about]))
+        #endif
+        return result
+    }
+
+    private var navigation: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                ForEach(groups, id: \.label) { group in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(group.label).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
+                            .padding(.horizontal, 10).padding(.bottom, 3)
+                        ForEach(group.items) { item in navigationItem(item) }
+                    }
+                }
+            }
+            .padding(.vertical, 18).padding(.horizontal, 12)
+        }
+        .frame(width: 208)
+        .background(InkuColor.bg)
+    }
+
+    private func navigationItem(_ item: SettingsSection) -> some View {
+        let active = section == item
+        return Button {
+            section = item
+            // Web `selectTab` saves the author's choice (`settings_tab`); opening at a named page does not.
+            model.display.preferences.settingsTab = item.rawValue
+        } label: {
+            Text(model.display.localized(item.title))
+                .inkuFont(14, weight: active ? .semibold : .regular)
+                .foregroundStyle(active ? Color.primary : Color.secondary)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
+                .padding(.horizontal, 10)
+                .background(RoundedRectangle(cornerRadius: 4).fill(active ? InkuColor.panel : Color.clear))
+                .overlay(RoundedRectangle(cornerRadius: 4).stroke(active ? InkuColor.border2 : Color.clear))
+                .overlay(alignment: .leading) {
+                    if active { Rectangle().fill(Color.accentColor).frame(width: 3).padding(.vertical, 1) }
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(active ? .isSelected : [])
+    }
+
+    private var pageHint: String {
+        switch section {
+        case .display: model.display.webCopy("settingsDisplayHint", "")
+        case .making: model.display.webCopy("settingsMakingHint", "")
+        case .demo: model.display.webCopy("tooltipInputTabDemo", "")
+        case .models: model.display.webCopy("settingsModelsHint", "")
+        case .personalPlan: model.display.webCopy("chatgptPlanNotice", "")
+        case .database: model.display.webCopy("settingsDatabaseHint", "")
+        case .export: model.display.webCopy("settingsExportHint", "")
+        case .clipboard: model.display.webCopy("settingsClipboardHint", "")
+        case .plugins: model.display.webCopy("settingsPluginsHint", "")
+        case .unread: model.display.webCopy("settingsUnreadHint", "")
+        case .limits: model.display.webCopy("settingsLimitsHint", "")
+        #if !os(macOS)
+        case .about: ""
+        #endif
+        }
+    }
+
+    /// settings-modal.css `.settings-page-heading`: 20px title over a 13px hint, padding 22/24/18.
+    private var pageHeading: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(model.display.localized(section.title)).inkuFont(20, weight: .semibold)
+            if !pageHint.isEmpty {
+                Text(pageHint).inkuFont(13).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 620, alignment: .leading)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 22).padding(.horizontal, 24).padding(.bottom, 18)
+        .overlay(alignment: .bottom) { Rectangle().fill(InkuColor.border).frame(height: 1) }
+    }
+
+    @ViewBuilder private var pageBody: some View {
+        if section == .models {
+            ModelSettingsView(model: model, settings: settings, automation: automation)
+        } else if section == .demo {
+            AutomationView(model: model, automation: automation, demoOnly: true)
+        } else {
+            Form {
+                switch section {
+                case .display: appearance
+                case .making: making
+                case .demo: EmptyView()
+                case .models: EmptyView()
+                case .personalPlan:
+                    ChatGPTPlanSettingsView(model: model).disabled(model.isBusy || automation.isOccupied)
+                case .database: database
+                case .export: ExportSettingsView(model: model)
+                case .clipboard: clipboard
+                case .plugins:
+                    PluginSettingsView(model: model).disabled(model.isBusy || automation.isOccupied)
+                    Section(model.display.localized("歳時記")) { SaijikiView(model: model).frame(minHeight: 480) }
+                case .unread: Section { UnreadWordsView(model: model) }
+                case .limits: OperationalLimitsView(model: model)
+                #if !os(macOS)
+                case .about: AboutInkuView(model: model)
+                #endif
+                }
+            }.formStyle(.grouped)
+        }
     }
 
     private var appearance: some View {
@@ -172,15 +288,15 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             Section(model.display.localized("バッチの再試行")) {
                 Stepper(display.localizedFormat("失敗行の再試行: %ld回", display.preferences.batchRetries), value: $display.preferences.batchRetries, in: 0...5)
                 Text(model.display.localized("一巡したあと失敗した行だけを再試行します。0なら再試行せず、中断したときも再試行しません。"))
-                    .font(.callout).foregroundStyle(.secondary)
+                    .inkuFont(13).foregroundStyle(.secondary)
             }
             Section(model.display.localized("結果ログ")) {
                 Toggle(model.display.localized("生成結果のログを保存"), isOn: $display.preferences.saveResultLog)
                     .disabled(model.isBusy || automation.isOccupied)
                 Text(model.display.localized("成功・失敗・停止の経過を描画ログへ保存します。ファイル保存を切っても端末の実行記録は確認できます。"))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .inkuFont(12).foregroundStyle(.secondary)
                 Text(model.display.localized("指示書・Score・生成情報を端末内へ記録します。APIキーは記録しません。"))
-                    .font(.callout).foregroundStyle(.secondary)
+                    .inkuFont(13).foregroundStyle(.secondary)
             }
             if model.developerModeEnabled {
                 Section(model.display.localized("開発用の応答記録")) {
@@ -189,7 +305,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                         set: { display.preferences.captureProviderIO = $0 }))
                         .disabled(model.isBrowsingLocked)
                     Text(model.display.localized("モデルへ送った本文と受け取った応答を端末内に保存します。接続先・ヘッダー・認証情報は記録しません。"))
-                        .font(.callout).foregroundStyle(.secondary)
+                        .inkuFont(13).foregroundStyle(.secondary)
                 }
             }
         }
@@ -199,18 +315,18 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         return Group {
             #if os(macOS)
             Section(model.display.localized("保存データ")) {
-                if let directory = model.localDataDirectory() { Text(directory.path).font(.caption).textSelection(.enabled) }
+                if let directory = model.localDataDirectory() { Text(directory.path).inkuFont(12).textSelection(.enabled) }
                 Button(model.display.localized("バックアップを保存…")) { if let url = NativeFilePanels.backup(language: model.display.preferences.language) { Task { await model.backup(to: url) } } }
                 Button(model.display.localized("バックアップから復元…")) { confirmRestore = true }
                 Text(model.display.localized("作品・系譜・作業状態をSQLiteへ保存します。接続設定とKeychainのAPIキーは別です。"))
-                    .font(.callout).foregroundStyle(.secondary)
+                    .inkuFont(13).foregroundStyle(.secondary)
             }.disabled(model.isBusy || automation.isOccupied)
             Section(model.display.localized("自動バックアップ")) {
                 Toggle(model.display.localized("自動バックアップ"), isOn: $display.preferences.automaticBackup)
                 Stepper(display.localizedFormat("間隔: %ld時間", display.preferences.backupIntervalHours), value: $display.preferences.backupIntervalHours, in: 1...168)
                 Stepper(display.localizedFormat("保持: %ld世代", display.preferences.backupGenerations), value: $display.preferences.backupGenerations, in: 1...30)
                 Text(model.display.localized("アプリの起動中に実行し、生成中・復元中は待ちます。"))
-                    .font(.callout).foregroundStyle(.secondary)
+                    .inkuFont(13).foregroundStyle(.secondary)
                 backupInformation
             }
             #endif
@@ -219,33 +335,40 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     private var backupInformation: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let directory = maintenance.backupDirectory {
-                Text(model.display.localized("保存先") + ": " + directory.path).font(.caption).textSelection(.enabled)
+                Text(model.display.localized("保存先") + ": " + directory.path).inkuFont(12).textSelection(.enabled)
             }
             if maintenance.backupInfoLoaded {
                 Text(model.display.localized("最新の成功") + ": " + (maintenance.backupLastSuccess?.formatted(date: .numeric, time: .shortened) ?? model.display.localized("未実行")))
                 Text(model.display.localized("次回予定") + ": " + (maintenance.nextBackupDate(preferences: model.display.preferences)?.formatted(date: .numeric, time: .shortened)
                     ?? model.display.localized(model.display.preferences.automaticBackup ? "状態の読込待ち" : "無効")))
+                if let bytes = maintenance.databaseBytes {
+                    // DatabaseAdministrationSettings.svelte:146: the estimate names what it counts on hover.
+                    Text(model.display.webCopy("settingsDbBackupEstimatedDisk", "必要な空き容量（概算）") + ": "
+                         + ByteCountFormatter.string(fromByteCount: bytes * Int64(max(1, model.display.preferences.backupGenerations)), countStyle: .file))
+                        .inkuTooltip(model.display.tooltip("いまの DB ファイルの大きさ × 最大保存世代数。手動バックアップは間引かれないので、この見積もりには入りません。",
+                                                           serverKey: "settingsDbBackupEstimatedDiskHint"))
+                }
                 Text(model.display.localizedFormat("保持済み: %ld世代", maintenance.backupGenerations.count)
                      + " · " + ByteCountFormatter.string(fromByteCount: maintenance.backupTotalBytes, countStyle: .file))
                 if !maintenance.backupGenerations.isEmpty {
                     DisclosureGroup(model.display.localized("保持中の世代")) {
                         ForEach(maintenance.backupGenerations) { generation in
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(generation.name).font(.caption.monospaced()).textSelection(.enabled)
+                                Text(generation.name).inkuFont(12, design: .monospaced).textSelection(.enabled)
                                 Text(ByteCountFormatter.string(fromByteCount: generation.byteCount, countStyle: .file)
                                      + (generation.modifiedAt.map { " · " + $0.formatted(date: .numeric, time: .shortened) } ?? ""))
-                                    .font(.caption).foregroundStyle(.secondary)
+                                    .inkuFont(12).foregroundStyle(.secondary)
                             }.padding(.vertical, 3)
                         }
                     }
                 }
-            } else { Text(model.display.localized("状態の読込待ち")).font(.caption).foregroundStyle(.secondary) }
-            if !maintenance.backupStatus.isEmpty { Text(model.display.message(maintenance.backupStatus)).font(.caption).textSelection(.enabled) }
+            } else { Text(model.display.localized("状態の読込待ち")).inkuFont(12).foregroundStyle(.secondary) }
+            if !maintenance.backupStatus.isEmpty { Text(model.display.message(maintenance.backupStatus)).inkuFont(12).textSelection(.enabled) }
             if let error = maintenance.backupInfoError { Text(model.display.message(error)).foregroundStyle(.red).textSelection(.enabled) }
             if let error = maintenance.backupError { Text(model.display.message(error)).foregroundStyle(.red).textSelection(.enabled) }
             Button(model.display.localized("状態を再読込")) { Task { await maintenance.refreshBackupInfo(app: model) } }
-                .help(model.display.tooltip("自動バックアップの状態と保存済みファイルの情報を読み直します。バックアップは作成しません。"))
-        }.font(.callout).task { await maintenance.refreshBackupInfo(app: model) }
+                .inkuTooltip(model.display.tooltip("自動バックアップの状態と保存済みファイルの情報を読み直します。バックアップは作成しません。"))
+        }.inkuFont(13).task { await maintenance.refreshBackupInfo(app: model) }
     }
     private var clipboard: some View {
         @Bindable var display = model.display
@@ -258,9 +381,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             Stepper(display.localizedFormat("Y軸の高さ: %ld px", display.preferences.clipboardHeight),
                     value: $display.preferences.clipboardHeight, in: 256...4096, step: 64)
             Text(model.display.localized("表示中作品の保存SVGから画像を作り、OSのクリップボードへコピーします。"))
-                .font(.callout).foregroundStyle(.secondary)
+                .inkuFont(13).foregroundStyle(.secondary)
             Text(model.display.localized("カードは保存済みの作品に使えます。カードのレイアウトと印はエクスポート設定に従います。"))
-                .font(.caption).foregroundStyle(.secondary)
+                .inkuFont(12).foregroundStyle(.secondary)
             if let error = display.saveError {
                 Text(display.message(error)).foregroundStyle(.red).textSelection(.enabled)
                 Button(model.display.localized("もう一度保存")) { display.retrySave() }

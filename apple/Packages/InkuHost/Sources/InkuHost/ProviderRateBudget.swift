@@ -21,13 +21,10 @@ actor ProviderRateBudget {
 
     /// CountTokens is not a generation reservation. Still verify durable accounting
     /// before its HTTP call, so a broken ledger cannot cause any provider send.
+    /// The daily limit is judged at reservation, after the count, as Server does.
     func prepare(provider: ProviderSettings) async throws {
         let database = try accountingDatabase()
         try await importLegacy(provider: provider, database: database)
-        let day = Self.day(now(), kind: provider.kind), limits = provider.effectiveRateLimits
-        try await database.changeProviderRateState(providerID: provider.id) { state in
-            if state.day == day && limits.requestsPerDay > 0 && state.daily >= limits.requestsPerDay { throw HostError("rate_limited") }
-        }
     }
 
     func reserve(provider: ProviderSettings, inputTokens: Int, deadline: Date) async throws -> String {
@@ -68,8 +65,7 @@ actor ProviderRateBudget {
                 return 0.0
             }
             if delay <= 0 { return token }
-            // No request can be admitted during this attempt if the wait consumes its deadline.
-            guard delay < deadline.timeIntervalSince(now) else { throw HostError("rate_limited") }
+            // Server waits without its own deadline; the attempt deadline ends the wait as rate_limited.
             try await environment.sleep(delay)
         }
     }

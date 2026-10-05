@@ -16,7 +16,7 @@ public final class ChatGPTPlanSettingsModel {
 
     public func load(app: AppModel) async {
         do { state = try await app.personalPlanRuntime().state() }
-        catch { report(error) }
+        catch { report(error, language: app.display.preferences.language) }
     }
     public func setEnabled(_ enabled: Bool, app: AppModel) async {
         await perform(app: app) {
@@ -48,7 +48,7 @@ public final class ChatGPTPlanSettingsModel {
                 try Task.checkCancellation()
                 self.models = []
                 self.status = "本人確認済みのChatGPTプランを接続しました。提供モデルを取得して描画モデルを選択してください。"
-            } catch { if !Task.isCancelled { self.report(error) } }
+            } catch { if !Task.isCancelled { self.report(error, language: app.display.preferences.language) } }
             if let id = self.attemptID { try? await app.personalPlanRuntime().cancelAuthorization(id) }
             self.attemptID = nil
             await self.load(app: app)
@@ -99,11 +99,11 @@ public final class ChatGPTPlanSettingsModel {
     }
     private func perform(app: AppModel, operation: @escaping @MainActor () async throws -> Void) async {
         guard !busy else { return }; busy = true; errorText = nil
-        do { try await operation() } catch { report(error) }
+        do { try await operation() } catch { report(error, language: app.display.preferences.language) }
         await load(app: app); busy = false
     }
-    private func report(_ error: Error) {
-        let diagnostic = ChatGPTPlanRuntime.diagnostic(error)
-        errorText = "ChatGPTプラン: \(diagnostic.code)（\(diagnostic.action)）"
+    /// Web ChatGPTSettings / model-administration word a failure with `chatgptStatus(code)`.
+    private func report(_ error: Error, language: String) {
+        errorText = ChatGPTStatusCopy.text(ChatGPTPlanRuntime.diagnostic(error).code, language: language)
     }
 }

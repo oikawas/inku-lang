@@ -868,7 +868,15 @@ export function createWorkState(deps: WorkStateDeps) {
 	}
 
 	// ── Replay (Stage 2 only) ───────────────────────────────
+	let replayStarting = false;
 	async function replay() {
+		// Reserve the action before the parent/fallback awaits can yield.
+		if (replayStarting) return;
+		replayStarting = true;
+		try { await replayOnce(); }
+		finally { replayStarting = false; }
+	}
+	async function replayOnce() {
 		if (!ddl || !hasDdlBody(ddl) || reloading) return;
 		if (submitWouldRefine() && !(await confirmFallbackRefine(currentRefineParent()))) return;
 		resetTargetScopedState();

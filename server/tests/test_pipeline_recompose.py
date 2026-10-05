@@ -1,4 +1,4 @@
-"""The compose host chooses marked ranges before its existing direct-DDL run."""
+"""The compose host chooses numeric ranges before its existing direct-DDL run."""
 
 from copy import deepcopy
 import hashlib
@@ -12,8 +12,8 @@ from inku_server import pipeline_compat
 from inku_server.api_core.routers.render import ComposeRequest, ComposeResponse
 
 
-SOURCE = "白い地に［構図］右下（横2/3〜1、縦2/3〜1）の赤い円を置く。\n作者の追記。"
-RECOMPOSED = "白い地に［構図］左上（横0〜1/3、縦0〜1/3）の赤い円を置く。\n作者の追記。"
+SOURCE = "白い地に右下（横2/3〜1、縦2/3〜1）の赤い円を置く。\n作者の追記。"
+RECOMPOSED = "白い地に左上（横0〜1/3、縦0〜1/3）の赤い円を置く。\n作者の追記。"
 MOVE = {
     "layer": 0, "from_key": "cell-22", "from": "右下（横2/3〜1、縦2/3〜1）",
     "to_key": "cell-00", "to": "左上（横0〜1/3、縦0〜1/3）",
@@ -146,6 +146,7 @@ def test_unchanged_errors_and_older_bindings_keep_the_saved_ddl(monkeypatch):
     service = ComposeService(None)
     service.binding = pipeline_candidate.PipelineBinding()
     assert service.binding.recompose is None
+    assert service.binding.composition_ranges is None
     monkeypatch.setattr(pipeline_compat, "_service", lambda: service)
     old = pipeline_compat.compose("author", {"ddl": source, "recompose_mode": "principled"})
     assert old["ddl"] == source and old["recomposition"]["reason"] == "binding_unavailable"

@@ -2,7 +2,7 @@
 
 Stage 1 places a layer only where the description states its place. The shared
 pipeline then asks for a reading of the description and places the other layers
-on ranges of the thirds grid, marked as the composition's. The reading is sent
+on numeric ranges of the thirds grid. The reading is sent
 with Stage 1's model and timed apart from it.
 """
 
@@ -90,6 +90,10 @@ def sent(monkeypatch):
 
 
 def test_a_description_is_composed_from_its_reading(author, sent):
+    table = client.get("/api/composition/ranges", headers=author)
+    assert table.status_code == 200, table.text
+    assert table.json()["schema"] == "inku.composition-ranges.v1"
+    assert len(table.json()["ranges"]) == 32
     painted = client.post("/api/paint", json={"description": DESCRIPTION}, headers=author)
     assert painted.status_code == 200, painted.text
     assert [action["tag"] for action in sent] == ["generate_normalized_ddl", "read_composition"]
@@ -101,8 +105,8 @@ def test_a_description_is_composed_from_its_reading(author, sent):
     layers = body["ddl"].splitlines()[-3:]
     # The field and the circle are placed by the composition; the dots keep the
     # place the description states.
-    assert layers[0].startswith("［構図］"), body["ddl"]
-    assert layers[1].startswith("［構図］"), body["ddl"]
+    assert "（横" in layers[0], body["ddl"]
+    assert "（横" in layers[1], body["ddl"]
     assert layers[2].startswith("下に、"), body["ddl"]
     assert body["elapsed_stage1_ms"] == 3
     assert body["elapsed_total_ms"] == 8

@@ -31,6 +31,7 @@
 	import { needsFallbackRefineConfirm, rememberFallbackRefineConfirm, type FallbackRefineParent } from '$lib/fallbackRefineGate';
 	import { submitDerivationKind as submitDerivationKindOf, type DerivationKind } from '$lib/derivation';
 	import DdlViewer from '$lib/components/DdlViewer.svelte';
+	import { readCompositionRanges, type CompositionRange, type RangePreview } from '$lib/composition-ranges';
 	import HistoryStrip from '$lib/components/HistoryStrip.svelte';
 	import InputPanel from '$lib/components/InputPanel.svelte';
 	import DemoPanel from '$lib/components/DemoPanel.svelte';
@@ -1120,6 +1121,18 @@
 		}
 	}
 
+	let compositionRanges = $state<CompositionRange[]>([]);
+	let ddlRangePreview = $state<RangePreview | null>(null);
+	async function loadCompositionRanges(): Promise<void> {
+		compositionRanges = [];
+		try {
+			const response = await apiFetch('/api/composition/ranges', { cache: 'no-store' });
+			if (response.ok) compositionRanges = readCompositionRanges(await response.json());
+		} catch {
+			// Older servers retain the ordinary, complete DDL display.
+		}
+	}
+
 	async function loadPluginVocabulary() {
 		type SaijikiPayload = {
 			categories: { key: string; name_ja: string; name_en: string; words: string[] }[];
@@ -1206,6 +1219,7 @@
 			demo.loadSettings(),
 			loadPluginStorage(),
 			loadPluginVocabulary(),
+			loadCompositionRanges(),
 			loadExportTemplates(),
 			loadClientConfig(),
 			...(source === 'login' ? [loadColorCatalogs()] : [])
@@ -1216,6 +1230,8 @@
 	}
 
 	function resetAfterSignedOut(): void {
+		compositionRanges = [];
+		ddlRangePreview = null;
 		userMenuOpen = false;
 		batch.clearPromptHistory();
 		demo.resetForSignedOut();
@@ -1701,6 +1717,7 @@ async function openCurrentDdlEditor(): Promise<void> {
 	const node = lineageState.graph?.nodes.find((entry) => entry.id === nodeId) ?? null;
 	if (!node) return;
 	openLineageDdlEditor(node.history ? node : { ...node, history: item }, opener);
+	ddlDialogInitial = work.ddl ?? ddlDialogInitial;
 }
 
 function openLineageDdlEditor(node: LineageNode, opener = document.activeElement instanceof HTMLElement ? document.activeElement : null): void {
@@ -1837,6 +1854,13 @@ const currentLineageNodeId = $derived(work.displayedHistoryItem?.lineage_node_id
 		return resolveInstructionLang(work.ddl, instructionLangOf(getLang()));
 	});
 const canEditCurrentDdl = $derived(!!currentLineageNodeId && !!(work.displayedHistoryItem?.ddl ?? work.ddl));
+	const rangeEditingLocked = $derived(demoRunning || work.loading || work.reloading || refinementSession.gridBusy);
+	$effect(() => {
+		work.result;
+		work.displayedHistoryItem;
+		outputTab;
+		ddlRangePreview = null;
+	});
 
 $effect(() => {
 	if (outputTab === 'lineage' && currentLineageNodeId) void lineageState.load(currentLineageNodeId);
@@ -2822,10 +2846,14 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 								ddl={work.ddl}
 								label={t().ddlLabel}
 								lang={shownDdlLang}
+								ranges={compositionRanges}
+								workKey={work.result}
+								onDdlChange={(ddl) => { if (!rangeEditingLocked) work.ddl = ddl; }}
+								onRangePreview={(preview) => { ddlRangePreview = preview; }}
 								onEdit={openCurrentDdlEditor}
-								editDisabled={!canEditCurrentDdl}
+								editDisabled={!canEditCurrentDdl || rangeEditingLocked}
 								onPaint={() => { void work.replay(); }}
-								paintDisabled={work.loading || work.reloading || refinementSession.gridBusy}
+								paintDisabled={rangeEditingLocked}
 								runStatus={work.reloading ? ddlRunStatus : null}
 							/>
 						</section>
@@ -2926,6 +2954,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				bind:outputTab
 				exportCardOnly={!session.uiVisibility.work_tools}
 				result={work.result}
+				rangePreview={ddlRangePreview}
 				{unsavedRefinementPreview}
 				{lineageIntermediateNotice}
 				allowEmptyOutputTabs={work.showingDemo}

@@ -1,5 +1,6 @@
 import { SAIJIKI, SAIJIKI_EN, type SaijikiCategory } from './saijiki';
 import { scanPluginReferences, type PluginNameIndex } from './plugin-names';
+import { scanNumericRanges } from './composition-ranges';
 
 export type Part = {
 	text: string;
@@ -103,6 +104,10 @@ export function annotate(text: string, pluginNames: PluginNameIndex | null = nul
 	const parts: Part[] = [];
 	const references = pluginNames ? scanPluginReferences(text, pluginNames) : [];
 	const referenceAt = new Map(references.map((reference) => [reference.start, reference]));
+	const placeAt = new Map(scanNumericRanges(text).map((range) => [
+		range.nameStart + text.slice(range.nameStart, range.nameEnd).lastIndexOf(range.name),
+		range.name
+	]));
 	let i = 0;
 
 	const pushPlain = (ch: string) => {
@@ -121,6 +126,12 @@ export function annotate(text: string, pluginNames: PluginNameIndex | null = nul
 		if (reference) {
 			parts.push({ text: reference.text, kind: 'plugin-name', known: reference.known });
 			i = reference.end;
+			continue;
+		}
+		const place = placeAt.get(i);
+		if (place) {
+			parts.push({ text: place, kind: 'saijiki', categoryKey: 'basho' });
+			i += place.length;
 			continue;
 		}
 

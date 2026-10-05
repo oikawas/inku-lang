@@ -77,7 +77,9 @@ flowchart TD
 
 描画の入口は4つある。`/api/paint`（1応答）、`/api/paint/stream`（同じ生成を、層が落ち着くたびのNDJSON eventつきで返す）、`/api/interpret`（保存済みDDLまで）、`/api/compose`（受け取ったDDLから始め、作品数を数えない）。4つとも`pipeline_compat.py`が要求を共有pipelineのoptionへ写し、`PipelineService.start`を呼び、executionが落ち着くまで保存済み状態を読み直してから`view["result"]`を投影する。応答にはpipelineのvariation ID、execution ID、revisionが加わる。
 
-`/api/compose`の任意の`recompose_mode`（`principled`・`chance`）は、保存DDLの［構図］の範囲を組み直しの前に選び直す。`prepare_for`が一度作った設定とcontextを、純粋な`pipeline_recompose`と次のdirect DDL runで共有する。応答の`recomposition`にモード・動きまたは変えない理由を載せ、DDLは実際に描いた全文を返す。関数の無い互換wheel、coreのエラー・不正な応答では原文で従来どおり描く。モード省略は旧呼出しを保つ。選択したWeb候補の`layout_change`辺には`composition_seed`と`recompose_mode`を保存する。元作品のDBと構図の読みの保存は変更しない。
+`/api/compose`の任意の`recompose_mode`（`principled`・`chance`）は、保存DDLの数で書いた範囲を組み直しの前に選び直す。書いた人に関係なく数の範囲を動かし、隅と位置の語を保つ。`prepare_for`が一度作った設定とcontextを、純粋な`pipeline_recompose`と次のdirect DDL runで共有する。応答の`recomposition`にモード・動きまたは変えない理由を載せ、DDLは実際に描いた全文を返す。関数の無い互換wheel、coreのエラー・不正な応答では原文で従来どおり描く。モード省略は旧呼出しを保つ。選択したWeb候補の`layout_change`辺には`composition_seed`と`recompose_mode`を保存する。元作品のDBと構図の読みの保存は変更しない。
+
+認証付き`GET /api/composition/ranges`は、coreの`pipeline_composition_ranges()`の表（schema `inku.composition-ranges.v1`）を、日英の名前・有理数の境界・隅の印を保って返す。runと描画は作らない。関数の無い互換wheelまたは読めない表では空表を返す。Webは名前と数が同じ表の範囲に一致するときだけ表示を畳み、絵の表示矩形に枠を重ねる。数の編集は既存のDDL編集状態へ接続し、無効な数では枠を保ち、表に一致する数には名前を追従させる。保存・コピー・テキスト編集には全文を使い、明示した再描画まで生成しない。
 
 最初のLLM呼び出しの前に、requestとhostから次が確定する。
 

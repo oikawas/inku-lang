@@ -21,7 +21,7 @@ from ...saved_score_compat import coerce_saved_score
 from ...schema import Score
 from ..common import DESCRIPTION_LOCKED_DETAIL, MODEL_NOT_OFFERED_DETAIL, _model_offered_to, _resolve_instruction_lang, _resolved_vision_model, _unexpected_http_error
 from ..deps import _current_user
-from ..models import JsonSeed, RecompositionResult
+from ..models import CompositionRanges, JsonSeed, RecompositionResult
 from ..rendering import (
     COLOR_CATALOG_ID_HEADER,
     COLOR_SOURCE_HEADER,
@@ -43,6 +43,12 @@ from ..rendering import (
 _logger = logging.getLogger(__name__)
 
 router = APIRouter(dependencies=[Depends(_current_user)])
+
+
+@router.get("/api/composition/ranges", response_model=CompositionRanges)
+def composition_ranges() -> CompositionRanges:
+    return _pipeline_compat.composition_ranges()
+
 
 _LIMITS_FIELD_DESCRIPTION = (
     "Draw under these limits instead of the installation's settings. Missing keys "
@@ -68,7 +74,7 @@ class ComposeRequest(BaseModel):
     composition_seed: int | None = Field(default=None, description="Composition seed for shared-pipeline layout; omitted means the placement follows the performance seed")
     recompose_mode: Literal["principled", "chance"] | None = Field(
         default=None,
-        description="Choose the saved DDL's marked composition ranges again; omission keeps the existing rebuild",
+        description="Choose the saved DDL's numeric ranges again; omission keeps the existing rebuild",
     )
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
     seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")

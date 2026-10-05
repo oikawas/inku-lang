@@ -4,6 +4,7 @@
 	import { shareTargetOf } from '$lib/shareTarget';
 	import type { CanvasViewport } from '$lib/features/canvas/viewport-state.svelte';
 	import type { PaintResult } from '$lib/features/run/current-work';
+	import type { RangePreview } from '$lib/composition-ranges';
 	import type { CanvasStatusHistoryItem } from './view-types';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import CaptionText from '$lib/components/CaptionText.svelte';
@@ -12,6 +13,7 @@
 
 	type Props = {
 		result: PaintResult | null;
+		rangePreview?: RangePreview | null;
 		artworkUrl: string | null;
 		canvasContentEl: HTMLDivElement | null;
 		canvasAspectWidth: number;
@@ -61,6 +63,7 @@
 
 	let {
 		result,
+		rangePreview = null,
 		artworkUrl,
 		canvasContentEl = $bindable(null),
 		canvasAspectWidth,
@@ -141,6 +144,10 @@
 						{#if result}
 							{#if artworkUrl}
 								<img class="canvas-art" src={artworkUrl} alt="" />
+								{#if rangePreview}
+									<div class="ddl-range-frame" class:invalid={rangePreview.invalid} aria-hidden="true"
+										style="left: {rangePreview.bounds[0] * 100}%; top: {rangePreview.bounds[1] * 100}%; width: {(rangePreview.bounds[2] - rangePreview.bounds[0]) * 100}%; height: {(rangePreview.bounds[3] - rangePreview.bounds[1]) * 100}%;"></div>
+								{/if}
 							{/if}
 						{:else}
 							<div class="canvas-placeholder-art" aria-label={t().canvasPlaceholder}>
@@ -415,6 +422,8 @@
 			</div>
 
 <style>
+	.ddl-range-frame { position: absolute; box-sizing: border-box; border: 2px dashed var(--accent); pointer-events: none; z-index: 1; }
+	.ddl-range-frame.invalid { border-style: dotted; }
 	.unsaved-refinement-badge { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5; padding: 5px 9px; border: 1px solid var(--border2); border-radius: 999px; background: color-mix(in srgb, var(--panel) 94%, transparent); color: var(--fg2); box-shadow: 0 2px 10px #0002; font-size: var(--ui-font-size-11); white-space: nowrap; }
 	/* The stack owns the corner; each badge only paints itself, so a second one
 	   sits under the first instead of on top of it. */
@@ -440,6 +449,7 @@
 		will-change: transform;
 	}
 	.canvas-box {
+		position: relative;
 		width: 400px;
 		height: 400px;
 		background: var(--panel);

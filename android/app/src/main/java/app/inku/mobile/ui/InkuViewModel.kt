@@ -142,9 +142,17 @@ const val CANVAS_FIT_ZOOM = 1.0f
 /** Float slack for "is it back at fit", which a pinch never lands on exactly. */
 const val CANVAS_ZOOM_EPSILON = 0.01f
 
+/**
+ * The description field is held by the DDL. web's rule
+ * (`features/work/state.svelte.ts`): a saved work answers with its lock mark
+ * ([InkuUiState.historyDescriptionLocked]), which also holds a work derived from
+ * an edited DDL without reading the description again; before a work is
+ * saved, its authoring variation's authority decides.
+ */
 val InkuUiState.descriptionLocked: Boolean
     get() = historyAuthorityLoading || (!descriptionForkRequested &&
-        (pipelineView?.authority == "ddl_authoritative" || historyAuthority == "ddl_authoritative"))
+        (historyDescriptionLocked
+            ?: (pipelineView?.authority == "ddl_authoritative" || historyAuthority == "ddl_authoritative")))
 
 data class ProviderModelFetchState(
     val message: String,
@@ -160,6 +168,11 @@ data class InkuUiState(
     val confirmDdlOverwrite: Boolean = false,
     val pipelineView: PipelineView? = null,
     val historyAuthority: String? = null,
+    /**
+     * The selected saved work's description lock (`DescriptionLock`), or `null`
+     * while there is no saved work to answer for or its mark could not be read.
+     */
+    val historyDescriptionLocked: Boolean? = null,
     val historyAuthorityLoading: Boolean = false,
     val descriptionForkRequested: Boolean = false,
     val batchText: String = "赤い円を5個、横に並べる\n黒い太筆の線を3本、斜めに置く\n緑の四角を12個、散らす",
@@ -630,6 +643,7 @@ class InkuViewModel @JvmOverloads constructor(
             ddl = view.visibleDdl ?: localState.value.ddl,
             pipelineView = view,
             historyAuthority = view.authority,
+            historyDescriptionLocked = null,
             historyAuthorityLoading = false,
             descriptionForkRequested = false,
             ddlEditedAfterGeneration = false,
@@ -784,6 +798,7 @@ class InkuViewModel @JvmOverloads constructor(
             pipelineView = null,
             cameraSourcePhotoPath = null,
             historyAuthority = null,
+            historyDescriptionLocked = null,
             historyAuthorityLoading = false,
         )
         cameraJob = viewModelScope.launch {
@@ -1188,6 +1203,7 @@ class InkuViewModel @JvmOverloads constructor(
             selectedHistory = if (phase >= CameraInstantPrintPhase.InterpretingStage1) null else current.selectedHistory,
             pipelineView = if (phase >= CameraInstantPrintPhase.InterpretingStage1) null else current.pipelineView,
             historyAuthority = if (phase >= CameraInstantPrintPhase.InterpretingStage1) null else current.historyAuthority,
+            historyDescriptionLocked = if (phase >= CameraInstantPrintPhase.InterpretingStage1) null else current.historyDescriptionLocked,
             historyAuthorityLoading = if (phase >= CameraInstantPrintPhase.InterpretingStage1) false else current.historyAuthorityLoading,
             message = presentation?.message,
         )
@@ -1390,6 +1406,7 @@ class InkuViewModel @JvmOverloads constructor(
             ddl = "",
             pipelineView = null,
             historyAuthority = null,
+            historyDescriptionLocked = null,
             historyAuthorityLoading = false,
             descriptionForkRequested = false,
             selectedHistory = null,
@@ -1433,6 +1450,7 @@ class InkuViewModel @JvmOverloads constructor(
             lineageDetached = true,
             pipelineView = null,
             historyAuthority = null,
+            historyDescriptionLocked = null,
             importedPlugins = parsed.plugins,
             importedPluginNames = parsed.names,
             message = if (parsed.names.isEmpty()) null else strings().ddlImportedPlugins(parsed.names.joinToString(", ")),
@@ -1541,7 +1559,7 @@ class InkuViewModel @JvmOverloads constructor(
         if (current.selectedHistory != null) {
             current = current.copy(
                 prompt = "", ddl = "", ddlEditedAfterGeneration = false,
-                selectedHistory = null, pipelineView = null, historyAuthority = null,
+                selectedHistory = null, pipelineView = null, historyAuthority = null, historyDescriptionLocked = null,
                 historyAuthorityLoading = false, descriptionForkRequested = false,
                 cameraSourcePhotoPath = null, cameraCaptureState = CameraCaptureState.Idle,
             )
@@ -1673,6 +1691,7 @@ class InkuViewModel @JvmOverloads constructor(
     private fun InkuUiState.restoreAuthoring(source: InkuUiState): InkuUiState = copy(
         prompt = source.prompt, ddl = source.ddl, ddlEditedAfterGeneration = source.ddlEditedAfterGeneration,
         pipelineView = source.pipelineView, historyAuthority = source.historyAuthority,
+        historyDescriptionLocked = source.historyDescriptionLocked,
         historyAuthorityLoading = source.historyAuthorityLoading, descriptionForkRequested = source.descriptionForkRequested,
         selectedHistory = source.selectedHistory, selectedCatalogId = source.selectedCatalogId,
         selectedCanvasAspect = source.selectedCanvasAspect, sketchMode = source.sketchMode,
@@ -2152,11 +2171,15 @@ class InkuViewModel @JvmOverloads constructor(
             cameraSourcePhotoPath = originalPhotos.savedPhoto(item.id)?.absolutePath,
             pipelineView = null,
             historyAuthority = null,
+            historyDescriptionLocked = null,
             historyAuthorityLoading = true,
         )
         viewModelScope.launch {
             val managed = runCatching {
                 withContext(Dispatchers.IO) { repository.readManagedHistory(AndroidWorkPipeline.OWNER_ID, item.id) }
+            }
+            val lock = runCatching {
+                withContext(Dispatchers.IO) { repository.isDescriptionLocked(item) }
             }
             val pipelineView = if (activeExecution) {
                 runCatching {
@@ -2176,6 +2199,7 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = current.copy(
                 pipelineView = view,
                 historyAuthority = history?.authority ?: view?.authority,
+                historyDescriptionLocked = lock.getOrNull(),
                 historyAuthorityLoading = false,
                 message = history?.warning
                     ?: pipelineView.exceptionOrNull()?.let { messageFor(it, strings(), strings().drawingContextUnreadable) }
@@ -2225,6 +2249,7 @@ class InkuViewModel @JvmOverloads constructor(
             sketchMode = Sketches.DEFAULT_MODE,
             pipelineView = null,
             historyAuthority = null,
+            historyDescriptionLocked = null,
             historyAuthorityLoading = false,
             descriptionForkRequested = false,
             lineageDetached = true,
@@ -2525,6 +2550,9 @@ class InkuViewModel @JvmOverloads constructor(
                         repository.readManagedHistory(AndroidWorkPipeline.OWNER_ID, current.selectedHistory.id)
                     }
                 }
+                val lock = runCatching {
+                    withContext(Dispatchers.IO) { repository.isDescriptionLocked(current.selectedHistory) }
+                }.getOrNull()
                 if (!isCurrentDrawingRun(runId)) return@launch
                 val managed = read.getOrNull()
                 if (read.isFailure || managed == null || managed.warning != null) {
@@ -2535,11 +2563,13 @@ class InkuViewModel @JvmOverloads constructor(
                     )
                     return@launch
                 }
-                if (managed.authority == "ddl_authoritative" && !current.descriptionForkRequested) {
+                // A saved work answers with its lock mark, as the field does.
+                if ((lock ?: (managed.authority == "ddl_authoritative")) && !current.descriptionForkRequested) {
                     localState.value = localState.value.copy(
                         isDrawing = false,
                         historyAuthorityLoading = false,
                         historyAuthority = managed.authority,
+                        historyDescriptionLocked = lock,
                         message = strings().pipelineDdlAuthority,
                     )
                     return@launch
@@ -2554,6 +2584,7 @@ class InkuViewModel @JvmOverloads constructor(
                 confirmDdlOverwrite = false,
                 pipelineView = null,
                 historyAuthority = null,
+                historyDescriptionLocked = null,
                 message = strings().statusStage1,
             )
             runCatching {
@@ -3582,6 +3613,7 @@ class InkuViewModel @JvmOverloads constructor(
                     lineageGraph = null,
                     pipelineView = null,
                     historyAuthority = null,
+                    historyDescriptionLocked = null,
                     workNotice = strings().workDeleted,
                 )
             } else {

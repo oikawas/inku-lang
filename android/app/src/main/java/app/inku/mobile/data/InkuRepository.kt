@@ -19,6 +19,7 @@ import app.inku.mobile.data.db.ModelAssetEntity
 import app.inku.mobile.data.db.PluginSettingEntity
 import app.inku.mobile.data.db.ProviderSettingEntity
 import app.inku.mobile.data.db.RoomSharedPipelineStore
+import app.inku.mobile.data.lineage.DescriptionLock
 import app.inku.mobile.data.lineage.LineageDeclaration
 import app.inku.mobile.data.lineage.LineageGraph
 import app.inku.mobile.data.lineage.LineageGraphResult
@@ -276,6 +277,29 @@ class InkuRepository(
 
     suspend fun readManagedHistory(ownerId: String, historyId: String): ManagedHistoryRead? =
         sharedPipelineStore.readHistory(ownerId, historyId)
+
+    /**
+     * Whether [item] is held by its DDL rather than by its description: the
+     * server's `description_locked` mark, from the same lineage, DDL and
+     * variation authority rows (`DescriptionLock`).
+     */
+    suspend fun isDescriptionLocked(item: HistoryItemEntity): Boolean =
+        item.id in DescriptionLock.lockedHistoryIds(descriptionLockStore, listOf(item.id))
+
+    private val descriptionLockStore = object : DescriptionLock.Store {
+        override suspend fun nodesOfHistories(historyIds: Collection<String>) =
+            database.lineageDao().lockNodesOfHistories(historyIds)
+        override suspend fun nodesByIds(nodeIds: Collection<String>) =
+            database.lineageDao().lockNodesByIds(nodeIds)
+        override suspend fun edgesOfChildren(childNodeIds: Collection<String>) =
+            database.lineageDao().lockEdgesOfChildren(childNodeIds)
+        override suspend fun ddlOfHistories(historyIds: Collection<String>) =
+            database.historyDao().lockDdlOfHistories(historyIds)
+        override suspend fun historyLinks(historyIds: Collection<String>) =
+            database.sharedPipelineDao().lockHistoryLinks(historyIds)
+        override suspend fun authorities(variationIds: Collection<String>) =
+            database.sharedPipelineDao().lockAuthorities(variationIds)
+    }
 
     /**
      * The saved work as `inku.ddl-export.v1`: its visible DDL and the plugin

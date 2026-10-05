@@ -22,10 +22,12 @@ struct LibraryWorkTitle: View {
     let work: SavedWork
     let untitled: String
     var lineLimit = 2
+    /// The Web px size of a description; a DDL line is set one step smaller in monospace.
+    var size: Double = 13
 
     var body: some View {
         Text(LibraryWorkPresentation.title(work, untitled: untitled))
-            .font(LibraryWorkPresentation.usesDDLTitle(work) ? .system(.callout, design: .monospaced) : .body)
+            .inkuFont(LibraryWorkPresentation.usesDDLTitle(work) ? size - 1 : size, design: LibraryWorkPresentation.usesDDLTitle(work) ? .monospaced : .default)
             .foregroundStyle(.primary)
             .lineLimit(lineLimit)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -50,7 +52,30 @@ struct LibraryModelFactsView: View {
                 }
                 .help(display.tooltipValue(display.localized(fact.label) + ": " + (fact.reference ?? display.localized("未記録"))))
             }
-        }.font(compact ? .caption2 : .caption)
+        }.inkuFont(compact ? 10 : 12)
+    }
+}
+
+/// Web `modelLines` on a library card: "解釈:" / "描画:" only when the two stages differ (HistoryManager.svelte:364-374).
+@MainActor
+struct LibraryModelLinesView: View {
+    let work: SavedWork
+    let display: DisplaySettings
+    let naming: ModelNaming
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(naming.cardLines(stage1: work.stage1Model, stage2: work.stage2Model).enumerated()), id: \.offset) { _, line in
+                let role = line.role.map { display.webCopy($0 == .interpretation ? "historyModelInterpretation" : "historyModelDrawing",
+                                                            fallback: $0 == .interpretation ? "解釈" : "描画") }
+                let unrecorded = display.webCopy("historyModelUnrecorded", fallback: "未記録")
+                (Text(role.map { $0 + ":" } ?? "").foregroundStyle(.secondary) + Text(line.compact ?? unrecorded))
+                    .lineLimit(1).truncationMode(.tail)
+                    .help(display.tooltipValue((role.map { $0 + ": " } ?? "") + (line.full ?? unrecorded)))
+            }
+        }
+        .inkuFont(12).lineSpacing(3)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -58,10 +83,11 @@ struct LibraryModelFactsView: View {
 struct LibraryWorkMarks: View {
     @Bindable var model: AppModel
     let work: SavedWork
+    var spacing: CGFloat = 12
     private var library: LibraryModel { model.library }
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: spacing) {
             Button { Task { await library.toggleStar(work) } } label: {
                 Image(systemName: work.starred ? "star.fill" : "star")
                     .foregroundStyle(work.starred ? Color.accentColor : Color.secondary)
@@ -149,14 +175,124 @@ struct LibraryCardSurface: ViewModifier {
     var current = false
     var focused = false
     var tombstone = false
+    var cornerRadius: CGFloat = 12
 
     func body(content: Content) -> some View {
         content
-            .background(.background, in: RoundedRectangle(cornerRadius: 12))
+            .background(.background, in: RoundedRectangle(cornerRadius: cornerRadius))
             .overlay {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: cornerRadius)
                     .stroke(current || focused ? Color.accentColor : Color.secondary.opacity(0.18),
                             style: StrokeStyle(lineWidth: focused ? 2 : 1, dash: tombstone ? [5, 4] : []))
             }
+    }
+}
+
+/// Web `historyGridPageSize` (lib/historyManagerSizing.ts): the complete rows that fit, times the columns.
+public enum LibraryGridPaging {
+    public static let minCardWidth: Double = 142
+    public static let gap: Double = 8
+    /// Web `HISTORY_MANAGER_DEFAULT_PAGE_SIZE` and the ceiling of `setPageSize`.
+    public static let initialPageSize = 24
+    public static let maximumPageSize = 100
+
+    public static func pageSize(width: Double, height: Double, gap: Double = gap, minCardWidth: Double = minCardWidth,
+                                cardHeights: [Double]) -> Int {
+        guard width > 0, height > 0 else { return 1 }
+        let columns = max(1, Int(((width + gap) / (minCardWidth + gap)).rounded(.down)))
+        let measured = cardHeights.reduce(0) { $1.isFinite && $1 > 0 ? max($0, $1) : $0 }
+        let cardWidth = max(minCardWidth, (width - gap * Double(columns - 1)) / Double(columns))
+        let cardHeight = measured > 0 ? measured : max(1, cardWidth - 12) * 58 / 82 + 75
+        let rows = max(1, Int(((height + gap) / (cardHeight + gap)).rounded(.down)))
+        return columns * rows
+    }
+}
+
+/// Web palette roles used by the library overlay and the history strip.
+enum LibraryChrome {
+    static let border = Color.secondary.opacity(0.28)
+    static var panel2: Color {
+        #if os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #else
+        Color(uiColor: .secondarySystemBackground)
+        #endif
+    }
+}
+
+/// Web `.ghost-btn` at `--btn-sm-*`: 12px, padding 4×10, radius 4, 1px border; `active` is `.ghost-active`.
+struct LibraryGhostButtonStyle: ButtonStyle {
+    var active = false
+    var minWidth: CGFloat? = nil
+    var minHeight: CGFloat? = nil
+    /// Web `.danger-btn`.
+    var danger = false
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .inkuFont(12)
+            .lineLimit(1).fixedSize()
+            .padding(.vertical, 4).padding(.horizontal, 10)
+            .frame(minWidth: minWidth, minHeight: minHeight)
+            .foregroundStyle(active || danger ? Color.white : Color.primary)
+            .background(danger ? Color.red : active ? Color.accentColor : Color.primary.opacity(configuration.isPressed ? 0.12 : 0.04),
+                        in: RoundedRectangle(cornerRadius: 4))
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(danger ? Color.red : active ? Color.accentColor : LibraryChrome.border))
+            .opacity(isEnabled ? 1 : 0.45)
+            .contentShape(RoundedRectangle(cornerRadius: 4))
+    }
+}
+
+/// Web `.settings-tabs`: connected small buttons, 12px, padding 4×10, one frame; the chosen one takes the
+/// panel background and weight 500. No icons.
+struct LibrarySegmentTabs<Value: Hashable>: View {
+    let options: [(value: Value, title: String, tooltip: String)]
+    @Binding var selection: Value
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(options.enumerated()), id: \.offset) { index, option in
+                if index > 0 { Rectangle().fill(LibraryChrome.border).frame(width: 1) }
+                Button { selection = option.value } label: {
+                    Text(option.title)
+                        .inkuFont(12, weight: selection == option.value ? .medium : .regular)
+                        .foregroundStyle(selection == option.value ? Color.primary : Color.secondary)
+                        .lineLimit(1)
+                        .padding(.vertical, 4).padding(.horizontal, 10)
+                        .background(selection == option.value ? AnyShapeStyle(.background) : AnyShapeStyle(Color.clear))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(option.tooltip)
+                .accessibilityAddTraits(selection == option.value ? .isSelected : [])
+            }
+        }
+        .fixedSize()
+        .background(LibraryChrome.panel2)
+        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .overlay(RoundedRectangle(cornerRadius: 4).stroke(LibraryChrome.border))
+    }
+}
+
+/// A selection box drawn like Web `.selection-checkbox` (20×20, radius 3, ✓ in the accent).
+struct LibrarySelectionBox: View {
+    let selected: Bool
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 3).fill(.background.opacity(0.92))
+            RoundedRectangle(cornerRadius: 3).stroke(selected ? Color.accentColor : Color.primary.opacity(0.32))
+            if selected { Text("✓").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.accentColor) }
+        }
+        .frame(width: 20, height: 20)
+        .shadow(color: .black.opacity(0.16), radius: 1.5, y: 1)
+    }
+}
+
+extension DisplaySettings {
+    /// Web copy by its i18n key, from the bundled Server reference; the native string when the key is absent.
+    func webCopy(_ key: String, fallback: String) -> String {
+        ServerTips.text(key, language: preferences.language) ?? localized(fallback)
     }
 }

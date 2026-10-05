@@ -37,7 +37,8 @@ public final class LibraryModel {
         didSet { if layout != oldValue { changedPresentation(resetPage: isGrouped || oldValue == .lineage) } }
     }
     public var grouped = false { didSet { if grouped != oldValue { changedPresentation(resetPage: true) } } }
-    public var pageSize = 30 {
+    /// The library measures its own grid and sets this (Web `HistoryManagerState.pageSize`, initially 24).
+    public var pageSize = 24 {
         didSet {
             let bounded = min(1000, max(1, pageSize))
             if pageSize != bounded { pageSize = bounded; return }

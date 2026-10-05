@@ -206,8 +206,10 @@ final class InkuTooltipPresenter {
     }
 
     private func present() {
+        // Only the key window shows bubbles, as with native tool tips: ordering the child bubble front would
+        // also bring an inactive parent window in front of the window the author is using.
         guard let token = engaged.last(where: { !$0.text.isEmpty && $0.view?.window != nil }),
-              let view = token.view, let window = view.window, window.isVisible,
+              let view = token.view, let window = view.window, window.isVisible, window.isKeyWindow,
               window.attachedSheet == nil else { hide(); return }
         let anchor = window.convertToScreen(view.convert(view.bounds, to: nil))
         var bounds = window.frame.insetBy(dx: 8, dy: 8)

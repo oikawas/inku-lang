@@ -45,7 +45,7 @@ For the first macOS distribution, screens, controls, and remembered choices foll
 - The sketch of the shown work can be edited in place, and the edited text is passed to interpretation as is.
 - The DDL editor shows line and character counts, line numbers, highlighting, the language label, unregistered plugin names, and a short guide, and inserts words at the caret.
 - Batch runs skip lines that contain only numbering or comments, and the count also includes only lines with text, as on the Web. Line numbers are preserved.
-- Tooltips appear 0.12 s after hover and on keyboard focus, as on the Web, and disabled controls show the reason. All 173 Web tooltip places are covered except 9 that have no counterpart in a single-user app. Menu items keep the standard macOS tool tip.
+- Tooltips appear 0.12 s after hover and on keyboard focus, as on the Web, and disabled controls show the reason. As with native tool tips, they appear only over the key window, never over a window behind it. All 173 Web tooltip places are covered except 9 that have no counterpart in a single-user app. Menu items keep the standard macOS tool tip.
 
 ### Server host comparison
 

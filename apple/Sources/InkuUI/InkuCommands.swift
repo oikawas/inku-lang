@@ -3,7 +3,7 @@ import SwiftUI
 /// Scene-owned actions keep menus aligned with the active work and selection.
 public enum InkuCommandAction: Hashable, Sendable {
     case newWork, openDDL, settings
-    case creation, library, lineage, automation
+    case creation, library, lineage, automation, drawingLogs
     case export, copyImage, presentation
 }
 
@@ -76,6 +76,7 @@ public struct InkuCommands: Commands {
                 .keyboardShortcut("c", modifiers: [.command, .shift])
             actionButton("全画面で表示", action: .presentation)
         }
+        // Library opens over the window, lineage is the workspace tab, demo is a settings page (Web AppRail).
         CommandMenu(Text(display.localized("移動"))) {
             actionButton("制作", action: .creation)
                 .keyboardShortcut("1", modifiers: .command)
@@ -83,8 +84,11 @@ public struct InkuCommands: Commands {
                 .keyboardShortcut("2", modifiers: .command)
             actionButton("系譜", action: .lineage)
                 .keyboardShortcut("3", modifiers: .command)
-            actionButton("バッチ・デモ", action: .automation)
+            actionButton("デモ", action: .automation)
                 .keyboardShortcut("4", modifiers: .command)
+            Divider()
+            actionButton("描画ログ", action: .drawingLogs)
+                .keyboardShortcut("l", modifiers: [.command, .shift])
         }
     }
 

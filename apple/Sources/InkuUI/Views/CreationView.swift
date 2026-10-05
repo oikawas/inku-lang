@@ -17,102 +17,86 @@ struct BatchWorkspaceSelection {
     mutating func invalidateReads() { revision = UUID() }
 }
 
+/// Web `.main-shell`: the input panel, its 18pt toggle, the canvas panel, and the history strip under both.
 @MainActor
 struct CreationView: View {
     @Bindable var model: AppModel
     @Bindable var history: HistoryModel
     @Bindable var automation: AutomationModel
+    @Bindable var maintenance: LocalMaintenance
+    @Bindable var ui: WorkspaceUIState
     @Binding var batchWorkspace: BatchWorkspaceSelection
+    /// The refine workspace, shown in place of the canvas while it is open.
+    var inlinePanel: AnyView? = nil
     let onEditWork: (SavedWork, WorkEditMode) -> Void
     let onAdjustWork: (SavedWork) -> Void
     let onReplayWork: (SavedWork) -> Void
     let onWorkAction: (SavedWork, String) -> Void
     let onLineageExport: (String) -> Void
+    var onPresentWork: () -> Void = {}
     var onWorkspaceWorkChange: (SavedWork?) -> Void = { _ in }
     private var controlsDisabled: Bool { model.isBusy || automation.isOccupied }
     private var browsingDisabled: Bool { model.isBrowsingLocked }
-    @State private var showSaijiki = false
-    @State private var workspaceTab = "artwork"
     @State private var showColorCatalogs = false
     @State private var showModelPicker = false
     @State private var showConditionDetails = false
     @State private var showPaperPicker = false
+    @State private var showSketchMenu = false
     @State private var showNewDDL = false
+    @State private var rightPanelWidth: CGFloat = 0
+    @Environment(\.inkuWindowSize) private var windowSize
     private var isBatch: Bool { automation.workspaceInputMode == "batch" }
     private var batchWork: SavedWork? { batchWorkspace.pinnedWork ?? (batchWorkspace.followsLatest ? automation.observedWork : nil) }
     private var usesBatchWork: Bool { isBatch && batchWork != nil }
     private var workspaceWork: SavedWork? { usesBatchWork ? batchWork : model.displayedWork }
     private var workspaceIsPreview: Bool { !usesBatchWork && model.isPreview }
     private var hasSavedWorkspaceWork: Bool { workspaceWork?.trashed == false && !workspaceIsPreview }
+    private var display: DisplaySettings { model.display }
     #if os(macOS)
     @Environment(DDLImportController.self) private var importer
     #endif
 
+    /// `+page.svelte:3738-3779`: 440pt, and `min(400px, 42vw)` at 1180 or narrower.
+    private var compactWindow: Bool { (windowSize?.width ?? 1320) <= 1180 }
+    private var leftPanelWidth: CGFloat {
+        let width = windowSize?.width ?? 1320
+        return compactWindow ? min(400, width * 0.42) : 440
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-          if model.display.visible("input_modes") || model.display.visible("ddl_tools") {
-          HStack(spacing: 16) {
-            if model.display.visible("input_modes") {
-                Picker(model.display.localized("入力"), selection: $automation.workspaceInputMode) {
-                    Text(model.display.localized("記述")).tag("description")
-                    Text(model.display.localized("バッチ")).tag("batch")
-                }.pickerStyle(.segmented).frame(width: 260)
-                    .disabled(browsingDisabled)
-            }
-            Spacer()
-            if model.display.visible("ddl_tools") {
-                Button(model.display.localized("指示書の新規作成"), systemImage: "doc.badge.plus") { showNewDDL = true }
-                    .disabled(model.isBusy || automation.isOccupied)
-            }
-          }.padding(.horizontal, 16).padding(.vertical, 10).background(.bar)
-          Divider()
-          }
-          GeometryReader { geometry in
-            if geometry.size.width >= 800 {
-                HStack(alignment: .top, spacing: 0) {
-                    VStack(spacing: 0) {
-                        ScrollView {
-                            inputContents.padding(12)
-                        }
-                        if !isBatch {
-                            Divider()
-                            generationAction.padding(12).background(.bar)
-                        }
-                    }
-                    .frame(width: 360)
-                    .background(.quaternary.opacity(0.16))
-                    Divider()
-                    workspace.padding(16)
+            HStack(spacing: 0) {
+                if !ui.leftPanelCollapsed {
+                    leftPanel.frame(width: leftPanelWidth).disabled(inlinePanel != nil)
                 }
-            } else {
-                VStack(spacing: 0) {
-                    ScrollView {
-                        VStack(spacing: 16) {
-                            inputContents
-                            workspace.frame(height: max(480, geometry.size.height * 0.85))
-                        }
-                        .padding(16)
-                    }
-                    if !isBatch {
-                        Divider()
-                        generationAction.padding(16).background(.bar)
-                    }
-                }
+                leftPanelToggle
+                rightPanel
             }
-          }
-          if model.display.visible("history") { Divider(); HistoryStripView(model: model, history: history, displayedWorkID: workspaceWork?.id, onSelectWork: { _ in batchWorkspace.showHistory() }) }
+            if display.visible("history") {
+                Rectangle().fill(InkuColor.border).frame(height: 1)
+                HistoryStripView(model: model, history: history, displayedWorkID: workspaceWork?.id,
+                                 onSelectWork: { _ in batchWorkspace.showHistory() })
+                    .disabled(inlinePanel != nil)
+            }
         }
-        .sheet(isPresented: $showSaijiki) {
-            VStack(spacing: 0) {
-                HStack { Spacer(); Button(model.display.localized("閉じる")) { showSaijiki = false } }.padding(12)
-                SaijikiView(model: model)
-            }.frame(minWidth: 560, minHeight: 620)
+        .overlay(alignment: .trailing) {
+            if ui.saijikiOpen { saijikiDrawer.transition(.move(edge: .trailing)) }
         }
-        .sheet(isPresented: $showColorCatalogs) { ColorCatalogView(model: model, descriptionOnly: true) }
-        .sheet(isPresented: $showModelPicker) { BatchModelPickerView(model: model) }
-        .sheet(isPresented: $showNewDDL) { NewDdlAuthoringSheet(model: model) }
+        .animation(.easeOut(duration: 0.2), value: ui.saijikiOpen)
+        .sheet(isPresented: $showColorCatalogs) {
+            ColorCatalogView(model: model, descriptionOnly: true)
+                .environment(\.inkuWindowSize, windowSize).inkuDialogFrame(.colorCatalog)
+        }
+        .sheet(isPresented: $showModelPicker) {
+            BatchModelPickerView(model: model)
+                .environment(\.inkuWindowSize, windowSize).inkuDialogFrame(.modelSelection)
+        }
+        .sheet(isPresented: $showNewDDL) {
+            NewDdlAuthoringSheet(model: model)
+                .environment(\.inkuWindowSize, windowSize).inkuDialogFrame(.ddlEditor)
+        }
         .onChange(of: automation.workspaceInputMode) { _, _ in batchWorkspace.invalidateReads() }
-        .onChange(of: workspaceTab) { _, tab in
+        .onChange(of: ui.workspaceTab) { _, tab in
             batchWorkspace.invalidateReads()
             if tab == "lineage", isBatch, batchWorkspace.followsLatest,
                let work = batchWork, let rowID = automation.observedRow?.id {
@@ -122,6 +106,8 @@ struct CreationView: View {
         .onDisappear { batchWorkspace.invalidateReads() }
         .onChange(of: workspaceWork?.id) { _, _ in
             onWorkspaceWorkChange(workspaceWork)
+            // CanvasGenerationInfo follows the chosen work only when the setting says so.
+            if !display.preferences.keepGenerationInfo { ui.generationInfoOpen = false }
         }
         .onAppear {
             model.inputMode = "description"
@@ -131,8 +117,77 @@ struct CreationView: View {
         }
     }
 
+    // MARK: - Left panel
+
+    /// Web `.left-panel` / `.panel-scroll`: padding 14×16 (12 at 1180 or narrower), 14 between sections.
+    private var leftPanel: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                if automation.running && automation.mode == "demo" { demoBanner }
+                if display.visible("input_modes") { inputTabs }
+                inputContents
+                if !isBatch && display.visible("ddl_tools") {
+                    HStack {
+                        Spacer(minLength: 0)
+                        Button(display.webCopy("ddlNewButton", "指示書の新規作成")) { showNewDDL = true }
+                            .buttonStyle(InkuGhostButtonStyle())
+                            .disabled(controlsDisabled)
+                            .help(display.tooltip("記述を介さず、指示書を直接書いて独立した作品として描画します", serverKey: "tooltipDdlNew"))
+                    }.padding(.top, -6)
+                }
+                if !isBatch, let work = workspaceWork {
+                    CreationDisplayedProcess(model: model, work: work, saved: hasSavedWorkspaceWork,
+                                             disabled: controlsDisabled, onWorkAction: onWorkAction)
+                }
+                statusFooter
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 14).padding(.horizontal, compactWindow ? 12 : 16)
+        }
+        .background(InkuColor.bg)
+    }
+
+    /// InputPanel.svelte:180-198: two equal underline tabs; a running tab carries a dot and `(n/N ↻r)`.
+    private var inputTabs: some View {
+        HStack(spacing: 0) {
+            InkuPanelTab(title: display.webCopy("modeSingle", "記述"), selected: !isBatch,
+                         running: model.isBusy && !automation.isOccupied) {
+                automation.workspaceInputMode = "description"
+            }
+            .help(display.tooltip("自由な自然言語で記述を入力して1枚ずつ描画します", serverKey: "tooltipInputTabSingle"))
+            InkuPanelTab(title: display.webCopy("modeBatch", "バッチ"), selected: isBatch,
+                         running: automation.running && automation.mode == "batch", progress: batchProgress) {
+                automation.workspaceInputMode = "batch"
+            }
+            .help(display.tooltip("改行区切りで複数の記述を入力し、順次連続して描画します", serverKey: "tooltipInputTabBatch"))
+        }
+        .overlay(alignment: .bottom) { Rectangle().fill(InkuColor.border).frame(height: 1).allowsHitTesting(false) }
+        .disabled(browsingDisabled)
+    }
+
+    private var batchProgress: String {
+        guard automation.running, automation.mode == "batch", !automation.rows.isEmpty else { return "" }
+        let current = automation.completedCount + (automation.activeRow == nil ? 0 : 1)
+        guard current > 0 else { return "" }
+        let retry = automation.currentRetryRound > 0 ? " ↻\(automation.currentRetryRound)" : ""
+        return "(\(current)/\(automation.rows.count)\(retry))"
+    }
+
+    /// `+page.svelte` `.demo-running-banner`: a way back to the demo settings and the run status.
+    private var demoBanner: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button(display.webCopy("demoOpenSettings", "デモの設定・進行状況")) {
+                ui.settingsSection = .demo; ui.settingsOpen = true
+            }.buttonStyle(InkuGhostButtonStyle())
+            runStatus(label: automation.status, onStop: { Task { await automation.stop(app: model) } },
+                      stopping: automation.stopping)
+        }
+        .padding(.vertical, 10)
+        .overlay(alignment: .bottom) { Rectangle().fill(InkuColor.border).frame(height: 1) }
+    }
+
     private var inputContents: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 6) {
             if isBatch {
                 BatchPanelView(model: model, automation: automation, inputOnly: true,
                                onObserveWork: { work, rowID in batchWorkspace.pin(work, rowID: rowID) },
@@ -140,135 +195,166 @@ struct CreationView: View {
                                selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision)
             } else {
                 input
-                if model.display.visible("drawing_settings") { nextConditions }
-                if let work = workspaceWork {
-                    CreationDisplayedProcess(model: model, work: work, saved: hasSavedWorkspaceWork,
-                                             disabled: controlsDisabled, onWorkAction: onWorkAction)
-                }
+                if display.visible("drawing_settings") { nextConditions }
+                generationAction.padding(.top, 8)
             }
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var descriptionLocked: Bool { model.sourceLocked && model.selectedWork != nil }
+
+    /// InputPanel.svelte:271-305: a 14px heading with a 12px hint, the box (14px, line 1.65), then the meter row.
     private var input: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(model.display.localized("作品を作る")).font(.title2.weight(.semibold))
-                Spacer()
-                Button(model.display.localized("新規")) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 8) {
+                        Text(display.webCopy("inputSectionLabel", "記述")).inkuFont(14, weight: .semibold)
+                        if descriptionLocked {
+                            Label(display.webCopy("descriptionLockedMark", "ロック"), systemImage: "lock").inkuFont(11, weight: .medium).foregroundStyle(.secondary)
+                        }
+                    }
+                    Text(display.webCopy("inputSectionHint", "短い文章で、表現したいものを入力。")).inkuFont(12).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                Button(display.webCopy("clearInputBtn", "新規")) {
                     batchWorkspace.showHistory()
                     #if os(macOS)
                     importer.clearMessage()
                     #endif
                     model.newWork()
-                }.disabled(controlsDisabled)
-                    .help(tip("入力をクリアして、新しい作品を始めます。"))
-            }
-                editor(text: $model.descriptionText, placeholder: "描きたいものや情景を記述", height: 120,
-                       readOnly: model.sourceLocked && model.selectedWork != nil)
-                DescriptionMeterView(model: model, text: model.descriptionText)
-                if model.sourceLocked && model.selectedWork != nil {
-                    Text(model.display.localized("この作品の記述はロックされています。別の記述で生成するには「新規」を選んでください。"))
-                        .font(.caption).foregroundStyle(.secondary)
                 }
+                .buttonStyle(InkuGhostButtonStyle())
+                .disabled(controlsDisabled)
+                .help(tip("入力をクリアして、新しい作品を始めます。"))
+            }
+            editor(text: $model.descriptionText, placeholder: "描きたいものや情景を記述", readOnly: descriptionLocked)
+            if descriptionLocked {
+                Text(display.localized("この作品の記述はロックされています。別の記述で生成するには「新規」を選んでください。"))
+                    .inkuFont(12).foregroundStyle(.secondary)
+            }
+            Text(display.webCopy("inputCommentHint", "[括弧内文字列はコメント扱い]")).inkuFont(12).foregroundStyle(.tertiary)
+            DescriptionMeterView(model: model, text: model.descriptionText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// InputPanel.svelte:201-262,445-503: "次に描く条件", two rows with a 変更 button, then the compact row.
     private var nextConditions: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(model.display.localized("次の生成条件"), systemImage: "slider.horizontal.3")
-                .font(.subheadline.weight(.semibold))
-            Button { showModelPicker = true } label: {
-                conditionRow("モデル", value: model.nextBatchDrawingModelReference.isEmpty ? model.display.localized("選択してください") : model.nextBatchDrawingModelReference)
-            }
-            .buttonStyle(.plain).disabled(controlsDisabled)
-            .help(tip("次の作品の描画モデルを選びます。"))
-            Button { showColorCatalogs = true } label: {
-                conditionRow("色カタログ", value: catalogSummary)
-            }
-            .buttonStyle(.plain).disabled(controlsDisabled || model.catalogs.isEmpty)
-            .accessibilityLabel(model.display.localized("色カタログを開く"))
-            .accessibilityValue(catalogSummary)
-            .help(tip("次の作品の配色を選びます。"))
-            Divider()
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 10) { compactConditionControls }
-                VStack(alignment: .leading, spacing: 8) { compactConditionControls }
-            }
-            .controlSize(.small).disabled(controlsDisabled)
-            HStack {
-                Button(model.display.localized("生成条件の詳細"), systemImage: "ellipsis.circle") { showConditionDetails = true }
-                    .help(tip("言語・シード・配色の選び方を確認して変更します。"))
-                    .popover(isPresented: $showConditionDetails) { conditionDetails }
-                Spacer(minLength: 0)
-                if model.display.visible("saijiki") {
-                    Button { showSaijiki = true } label: { Image(systemName: "book") }
-                        .accessibilityLabel(model.display.localized("歳時記を開く"))
-                        .help(tip("歳時記の語と説明を参照します。"))
-                }
-            }
-            .controlSize(.small).disabled(controlsDisabled)
+        VStack(alignment: .leading, spacing: 6) {
+            Text(display.webCopy("nextWorkConditions", "次の生成条件")).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
+                .padding(.top, 8).padding(.bottom, 2)
+            conditionRow(display.webCopy("modelButton", "モデル"),
+                         value: model.nextBatchDrawingModelReference.isEmpty ? display.localized("選択してください") : model.nextBatchDrawingModelReference,
+                         help: tip("次の作品の描画モデルを選びます。")) { showModelPicker = true }
+                .disabled(controlsDisabled)
+            Rectangle().fill(InkuColor.border).frame(height: 1)
+            conditionRow(display.webCopy("colorCatalogButton", "色カタログ"), value: catalogSummary,
+                         help: tip("次の作品の配色を選びます。")) { showColorCatalogs = true }
+                .disabled(controlsDisabled || model.catalogs.isEmpty)
+                .accessibilityLabel(display.localized("色カタログを開く"))
+                .accessibilityValue(catalogSummary)
+            Rectangle().fill(InkuColor.border).frame(height: 1)
+            WrappingHStack(spacing: 6) { compactConditionControls }
+                .padding(.top, 2)
+                .disabled(controlsDisabled)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var catalogSummary: String {
-        model.catalogMode == "auto" ? model.display.localized("記述から選択")
+        model.catalogMode == "auto" ? display.localized("記述から選択")
             : model.catalogs.first { $0.id == model.catalogID }?.name ?? model.catalogID
     }
 
-    private func conditionRow(_ key: String, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(model.display.localized(key)).font(.caption).foregroundStyle(.secondary)
-                Text(value).font(.callout).lineLimit(1).truncationMode(.middle)
+    private func conditionRow(_ label: String, value: String, help: String, action: @escaping () -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 8) {
+                Text(label).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                Button(display.webCopy("editButton", "変更"), action: action)
+                    .buttonStyle(InkuGhostButtonStyle())
+                    .help(help)
             }
-            Spacer(minLength: 0)
-            Text(model.display.localized("変更")).font(.caption).foregroundStyle(.secondary)
-        }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+            Text(value).inkuFont(14).lineLimit(2).truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .help(display.tooltipValue(value))
+        }
+        .padding(.vertical, 7)
     }
 
     @ViewBuilder private var compactConditionControls: some View {
-            Menu {
-                Button(model.display.localized("なし")) { model.sketchMode = "off" }
-                Button(model.display.localized("あり")) { model.sketchMode = "on" }
-            } label: {
-                Text(model.display.localized("写生") + ": " + model.display.localized(model.sketchMode == "on" ? "あり" : "なし"))
-            }.help(tip(model.sketchMode == "on" ? "記述の横に、場所の広がりや季節・時刻の光を補って描く" : "写生を通さず、記述だけで描く"))
-        Button(model.display.localized("暴れる") + " " + model.display.localized(model.wild ? "入" : "切")) { model.wild.toggle() }
-            .buttonStyle(.bordered).tint(model.wild ? .accentColor : .secondary)
-            .help(tip("次の作品の筆致を規則から外します。"))
+        Button(display.localized("写生") + ": " + display.localized(model.sketchMode == "on" ? "あり" : "なし")) { showSketchMenu.toggle() }
+            .buttonStyle(InkuGhostButtonStyle())
+            .help(tip(model.sketchMode == "on" ? "記述の横に、場所の広がりや季節・時刻の光を補って描く" : "写生を通さず、記述だけで描く"))
+            .popover(isPresented: $showSketchMenu, arrowEdge: .bottom) { sketchMenu }
+        Button(display.webCopy("wildButton", "暴れる") + " " + display.webCopy(model.wild ? "wildEnabled" : "wildDisabled", model.wild ? "入" : "切")) {
+            model.wild.toggle()
+        }
+        .buttonStyle(InkuGhostButtonStyle(active: model.wild))
+        .accessibilityValue(display.localized(model.wild ? "オン" : "オフ"))
+        .help(tip("次の作品の筆致を規則から外します。"))
         Button { showPaperPicker = true } label: {
-            Label(model.display.localized("用紙") + ": " + (model.canvases.first { $0.id == model.canvasID }?.label ?? model.canvasID),
+            Label(display.localized("用紙") + ": " + (model.canvases.first { $0.id == model.canvasID }?.label ?? model.canvasID),
                   systemImage: "rectangle.portrait")
         }
+        .buttonStyle(InkuGhostButtonStyle())
         .help(tip("用紙の形と意図を見て、次の作品の用紙を選びます。"))
         .popover(isPresented: $showPaperPicker) {
-            CreationPaperPicker(model: model) { showPaperPicker = false }.environment(model.display)
+            CreationPaperPicker(model: model) { showPaperPicker = false }.environment(display)
         }
         .accessibilityValue(model.canvases.first { $0.id == model.canvasID }?.name ?? model.canvasID)
+        // Native: language, seed and catalog choice, which the Web keeps in other places.
+        Button(display.localized("生成条件の詳細")) { showConditionDetails = true }
+            .buttonStyle(InkuGhostButtonStyle())
+            .help(tip("言語・シード・配色の選び方を確認して変更します。"))
+            .popover(isPresented: $showConditionDetails) { conditionDetails }
+    }
+
+    /// Web SketchSelect: the two choices with what each does.
+    private var sketchMenu: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach([("off", "なし", "写生を通さず、記述だけで描く"), ("on", "あり", "記述の横に、場所の広がりや季節・時刻の光を補って描く")], id: \.0) { option in
+                Button {
+                    model.sketchMode = option.0; showSketchMenu = false
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark").opacity(model.sketchMode == option.0 ? 1 : 0)
+                            Text(display.localized(option.1)).inkuFont(13, weight: .medium)
+                        }
+                        Text(display.localized(option.2)).inkuFont(12).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true).padding(.leading, 20)
+                    }
+                    .padding(.vertical, 6).padding(.horizontal, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }.buttonStyle(.plain)
+            }
+        }.padding(6).frame(width: 310)
     }
 
     private var conditionDetails: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(model.display.localized("生成条件の詳細")).font(.headline)
-            Picker(model.display.localized("配色の選び方"), selection: $model.catalogMode) {
-                Text(model.display.localized("指定")).tag("fixed")
-                Text(model.display.localized("記述から選択")).tag("auto")
+            Text(display.localized("生成条件の詳細")).inkuFont(14, weight: .semibold)
+            Picker(display.localized("配色の選び方"), selection: $model.catalogMode) {
+                Text(display.localized("指定")).tag("fixed")
+                Text(display.localized("記述から選択")).tag("auto")
             }.help(tip("次の作品の配色を選びます。"))
-            TextField(model.display.localized("シード（空欄で新規）"), text: $model.seedText).textFieldStyle(.roundedBorder)
+            TextField(display.localized("シード（空欄で新規）"), text: $model.seedText).textFieldStyle(.roundedBorder)
                 .help(tip("空欄なら次の描画で新しいシードを使います。"))
         }.padding(16).frame(width: 360).disabled(controlsDisabled)
     }
 
+    /// InputPanel.svelte:308-337: the paint button, or the run status while drawing.
     private var generationAction: some View {
         VStack(alignment: .leading, spacing: 10) {
             if model.inputMode == "description" && !model.hasNextDrawingModel {
                 Button {
-                    NotificationCenter.default.post(name: .inkuOpenSection, object: "settings", userInfo: ["settingsSection": "models"])
+                    ui.settingsSection = .models; ui.settingsOpen = true
                 } label: {
-                    Label(model.display.localized("記述から生成するには、設定で接続先とモデルを指定してください。"), systemImage: "gearshape")
-                        .font(.callout).multilineTextAlignment(.leading)
+                    Label(display.localized("記述から生成するには、設定で接続先とモデルを指定してください。"), systemImage: "gearshape")
+                        .inkuFont(13).multilineTextAlignment(.leading)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
@@ -276,103 +362,104 @@ struct CreationView: View {
             }
             if automation.isOccupied {
                 Button { Task { await automation.stop(app: model) } } label: {
-                    Label(model.display.localized(automation.stopping ? "停止中" : "停止"), systemImage: "stop.fill").frame(maxWidth: .infinity)
-                }.buttonStyle(.bordered).disabled(!automation.running || automation.stopping)
-            } else if model.isBusy {
-                Button { Task { await model.cancel() } } label: {
-                    Label(model.display.localized("停止"), systemImage: "stop.fill").frame(maxWidth: .infinity)
+                    Label(display.localized(automation.stopping ? "停止中" : "停止"), systemImage: "stop.fill")
                 }
-                    .buttonStyle(.bordered)
-                    .frame(maxWidth: .infinity)
-                    .help(tip("実行中の描画を停止します。"))
+                .buttonStyle(InkuPaintButtonStyle())
+                .disabled(!automation.running || automation.stopping)
+            } else if model.isBusy {
+                runStatus(label: model.status, onStop: { Task { await model.cancel() } }, stopping: false)
             } else {
                 Button { batchWorkspace.showHistory(); Task { await model.generateDescription() } } label: {
-                    Label(model.display.localized("生成"), systemImage: "play.fill").frame(maxWidth: .infinity)
+                    Text(display.webCopy("submitBtn", "生成"))
                 }
-                    .buttonStyle(.borderedProminent)
-                    .frame(maxWidth: .infinity)
-                    .disabled(!model.canGenerateDescription || automation.isOccupied)
-                    .help(tip("入力と次の生成条件から作品を描きます。"))
+                .buttonStyle(InkuPaintButtonStyle())
+                .keyboardShortcut(.return, modifiers: .command)
+                .disabled(!model.canGenerateDescription || automation.isOccupied)
+                .help(tip("入力と次の生成条件から作品を描きます。"))
             }
-            if model.isBusy && !automation.isOccupied { ProviderProgressView(model: model) }
         }
-        .controlSize(.large)
     }
 
-    private func editor(text: Binding<String>, placeholder: String, monospaced: Bool = false, height: CGFloat, readOnly: Bool = false) -> some View {
-        ZStack(alignment: .topLeading) {
+    /// Web RunStatus.svelte: mascot, the stage and its provider facts, and the stop button, in one bordered box.
+    private func runStatus(label: String, onStop: @escaping () -> Void, stopping: Bool) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            NativeMascot(kind: display.preferences.mascot).frame(width: 28, height: 28)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(display.message(label)).inkuFont(12, weight: .medium).lineLimit(2)
+                ProviderProgressView(model: model)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button(display.localized(stopping ? "停止中" : "停止"), action: onStop)
+                .buttonStyle(InkuGhostButtonStyle())
+                .keyboardShortcut(.escape, modifiers: [])
+                .disabled(stopping)
+                .help(tip("実行中の描画を停止します。"))
+        }
+        .padding(.vertical, 6).padding(.horizontal, 8)
+        .frame(minHeight: 46)
+        .background(RoundedRectangle(cornerRadius: 4).fill(InkuColor.panel))
+        .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
+    }
+
+    /// The native status line and the backup and result-log reports, which the Web has no place for.
+    @ViewBuilder private var statusFooter: some View {
+        let status = automation.running ? automation.status : model.status
+        if !status.isEmpty || !maintenance.backupStatus.isEmpty || !maintenance.logStatus.isEmpty {
+            VStack(alignment: .leading, spacing: 2) {
+                if !status.isEmpty && !model.isBusy { Text(display.message(status)).inkuFont(12).lineLimit(2) }
+                if !maintenance.backupStatus.isEmpty { Text(display.message(maintenance.backupStatus)).inkuFont(11) }
+                if !maintenance.logStatus.isEmpty { Text(display.message(maintenance.logStatus)).inkuFont(11) }
+            }
+            .foregroundStyle(.secondary)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func editor(text: Binding<String>, placeholder: String, readOnly: Bool = false) -> some View {
+        let scale = display.preferences.textScale
+        return ZStack(alignment: .topLeading) {
             TextEditor(text: text)
-                .font(monospaced ? .system(.body, design: .monospaced) : .body)
+                .font(.system(size: 14 * scale))
+                .lineSpacing(14 * 0.65 * scale)
                 .scrollContentBackground(.hidden)
-                .padding(6)
+                .padding(.vertical, 9).padding(.horizontal, 5)
                 .disabled(controlsDisabled || readOnly)
             if text.wrappedValue.isEmpty {
-                Text(model.display.localized(placeholder)).foregroundStyle(.tertiary).padding(12).allowsHitTesting(false)
+                Text(display.localized(placeholder)).inkuFont(14).foregroundStyle(.tertiary)
+                    .padding(.vertical, 9).padding(.horizontal, 10).allowsHitTesting(false)
             }
         }
-        .frame(height: height)
-        .background(.background, in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(.quaternary))
-        .accessibilityLabel(model.display.localized(monospaced ? "DDL" : "記述"))
+        // Five rows at 14px with line height 1.65, as `rows="5"`.
+        .frame(height: (5 * 14 * 1.65 + 18) * scale)
+        .background(readOnly ? InkuColor.bg2 : InkuColor.panel, in: RoundedRectangle(cornerRadius: 4))
+        .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2, style: StrokeStyle(lineWidth: 1, dash: readOnly ? [4, 3] : [])))
+        .accessibilityLabel(display.localized("記述"))
     }
 
-    private var workspace: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-              if model.display.visible("work_tools") {
-              HStack(spacing: 12) {
-                Picker(model.display.localized("表示"), selection: $workspaceTab) { Text(model.display.localized("作品")).tag("artwork"); Text(model.display.localized("系譜")).tag("lineage") }
-                    .pickerStyle(.segmented).labelsHidden().frame(width: 150)
-                    .accessibilityLabel(model.display.localized("表示"))
-                    .disabled(workspaceWork == nil || browsingDisabled)
-                Spacer()
-                if let work = workspaceWork, hasSavedWorkspaceWork {
-                    Menu(model.display.localized("推敲する")) {
-                        SavedWorkRefinementActions(model: model, work: work, onAction: onWorkAction)
-                    }.disabled(controlsDisabled)
-                }
-              }
-              }
-              if let work = workspaceWork, model.display.visible("detail_status") {
-                  Text(model.display.localized("表示中作品の描画条件"))
-                      .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-                  Text(savedSummary(work))
-                      .font(.caption).foregroundStyle(.secondary)
-                      .lineLimit(1).truncationMode(.middle)
-                      .frame(maxWidth: .infinity, alignment: .leading)
-                      .help(model.display.tooltipValue(savedSummary(work)))
-                      .accessibilityLabel(savedSummary(work))
-              }
-            }
-            if workspaceTab == "lineage" && model.display.visible("work_tools") {
-                LineageView(model: model, onEditWork: onEditWork, onAdjustWork: onAdjustWork, onReplayWork: onReplayWork,
-                            onWorkAction: onWorkAction, onExport: onLineageExport, initialWork: workspaceWork,
-                            writingLocked: controlsDisabled, onBrowseWork: { _ in batchWorkspace.showHistory() })
-            }
-            else {
-                ArtworkCanvas(svg: workspaceWork?.svg ?? model.currentSVG, renderer: model.renderer,
-                              caption: workspaceWork?.effectiveSourceText ?? "")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            if workspaceTab == "artwork" || !model.display.visible("work_tools") {
-                CreationCanvasControls(model: model, work: workspaceWork, saved: hasSavedWorkspaceWork,
-                                       disabled: controlsDisabled, browsingDisabled: browsingDisabled, onReplayWork: onReplayWork,
-                                       onWorkAction: onWorkAction, onShowSaijiki: { showSaijiki = true })
-            }
-            if workspaceIsPreview {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label(model.display.localized("未保存の候補"), systemImage: "eye")
-                    HStack {
-                        Button(model.display.localized("この候補を保存")) { Task { await model.savePreview() } }.buttonStyle(.borderedProminent)
-                        Button(model.display.localized("候補を閉じる")) { Task { await model.clearPreview() } }
-                    }
-                }.disabled(controlsDisabled)
-            }
-            if model.display.visible("history") {
-                navigationActions.controlSize(.small).disabled(browsingDisabled)
-            }
+    private var leftPanelToggle: some View {
+        let title = display.localized(ui.leftPanelCollapsed ? "記述エリアを開く" : "記述エリアを畳む")
+        return Button { ui.leftPanelCollapsed.toggle() } label: {
+            Text(ui.leftPanelCollapsed ? "›" : "‹").inkuFont(13).foregroundStyle(.secondary)
+                .frame(width: 18).frame(maxHeight: .infinity)
+                .background(InkuColor.bg2)
+                .contentShape(Rectangle())
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .buttonStyle(.plain)
+        .overlay(alignment: .trailing) { Rectangle().fill(InkuColor.border).frame(width: 1) }
+        .accessibilityLabel(title)
+        .help(display.preferences.showTooltips ? title : "")
+    }
+
+    // MARK: - Canvas panel
+
+    private var rightPanel: some View {
+        VStack(spacing: 0) {
+            if display.visible("work_tools") && inlinePanel == nil { tabsRow }
+            canvasArea
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { rightPanelWidth = $0 }
         .task(id: workspaceWork?.id) {
             guard let work = workspaceWork, hasSavedWorkspaceWork, !Task.isCancelled else { return }
             await history.locate(app: model, workID: work.id)
@@ -381,28 +468,249 @@ struct CreationView: View {
         }
     }
 
-    private func savedSummary(_ work: SavedWork) -> String {
-        [work.stage1Model ?? "DDL", work.renderColorCatalogName ?? work.renderColorCatalogID ?? work.catalogID ?? "—",
-         work.renderCanvasAspectID ?? "—", ByteCountFormatter.string(fromByteCount: Int64(work.svg.utf8.count), countStyle: .file)].joined(separator: " · ")
+    /// CanvasPanel.svelte:687-756,1025-1053: 作品／系譜 text tabs and the displayed work's conditions.
+    /// Below 880pt (67.69em at 13px) the conditions take a second row, as the Web's container query does.
+    private var tabsRow: some View {
+        let wide = rightPanelWidth >= 880 * display.preferences.textScale
+        let showsMeta = workspaceWork != nil && display.visible("detail_status")
+        return VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                InkuTextTab(title: display.webCopy("tabCanvas", "作品"), selected: ui.workspaceTab != "lineage", compact: !wide) {
+                    ui.workspaceTab = "artwork"
+                }
+                .help(display.tooltip("描画された作品のキャンバスを表示します", serverKey: "tooltipCanvasTabCanvas"))
+                InkuTextTab(title: display.localized("系譜"), selected: ui.workspaceTab == "lineage", compact: !wide) {
+                    ui.workspaceTab = "lineage"
+                }
+                .disabled(workspaceWork == nil || browsingDisabled)
+                .help(display.tooltip("作品の派生関係を表示"))
+                if wide && showsMeta, let work = workspaceWork {
+                    Spacer(minLength: 12)
+                    metaStrip(work)
+                } else {
+                    Spacer(minLength: 8)
+                }
+                workActionMenu.padding(.leading, 8)
+            }
+            if !wide && showsMeta, let work = workspaceWork {
+                metaStrip(work).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            }
+        }
+        .padding(.horizontal, wide ? 16 : 10)
+        .background(InkuColor.bg)
+        .overlay(alignment: .bottom) { Rectangle().fill(InkuColor.border).frame(height: 1) }
     }
 
-    private var navigationActions: some View {
-        HStack(spacing: 8) {
-            Button(model.display.localized("最新")) { navigateHistory(boundary: "latest") }
-                .disabled(!history.canMoveNewer)
-                .help(model.display.tooltip("最新の履歴", serverKey: "tooltipCanvasNavLatest"))
-            Button { navigateHistory(delta: -1) } label: { Image(systemName: "chevron.left") }
-                .disabled(!history.canMoveNewer)
-                .accessibilityLabel(model.display.localized("新しい作品"))
-                .help(model.display.tooltip("新しい作品", serverKey: "tooltipCanvasNavNewer"))
-            Button { navigateHistory(delta: 1) } label: { Image(systemName: "chevron.right") }
-                .disabled(!history.canMoveOlder)
-                .accessibilityLabel(model.display.localized("古い作品"))
-                .help(model.display.tooltip("古い作品", serverKey: "tooltipCanvasNavOlder"))
-            Button(model.display.localized("最古")) { navigateHistory(boundary: "oldest") }
-                .disabled(!history.canMoveOlder)
-                .help(model.display.tooltip("最古の履歴", serverKey: "tooltipCanvasNavOldest"))
+    private func metaStrip(_ work: SavedWork) -> some View {
+        let stage1 = work.stage1Model ?? "DDL"
+        let stage2 = work.stage2Model ?? stage1
+        let catalog = work.renderColorCatalogName ?? work.renderColorCatalogID ?? work.catalogID ?? "—"
+        let canvasID = work.renderCanvasAspectID ?? ""
+        let canvas = model.canvases.first { $0.id == canvasID }?.label ?? work.renderCanvasAspect ?? (canvasID.isEmpty ? "—" : canvasID)
+        let size = ByteCountFormatter.string(fromByteCount: Int64(work.svg.utf8.count), countStyle: .file)
+        let created = Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(.dateTime.year().month(.twoDigits).day(.twoDigits).hour().minute())
+        return HStack(spacing: 0) {
+            Text(display.webCopy("displayedWorkConditions", "表示中作品の描画条件")).inkuFont(12, weight: .medium)
+                .foregroundStyle(.secondary).lineLimit(1).fixedSize()
+                .padding(.trailing, 12)
+            metaItem(display.localized("モデル"), maxWidth: 280) {
+                if stage1 == stage2 {
+                    Text(stage1)
+                } else {
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: 4) { Text(display.localized("解釈")).foregroundStyle(.tertiary); Text(stage1) }
+                        HStack(spacing: 4) { Text(display.localized("描画")).foregroundStyle(.tertiary); Text(stage2) }
+                    }
+                }
+            }
+            metaItem(display.localized("色カタログ"), maxWidth: 130) { Text(catalog) }
+            metaItem(display.localized("キャンバス"), maxWidth: 100) { Text(canvas) }
+            metaItem(display.localized("サイズ"), maxWidth: nil) { Text(size).monospacedDigit() }
+            metaItem(display.localized("作成"), maxWidth: nil) { Text(created).monospacedDigit() }
         }
+        .padding(.vertical, 7)
+        .help(display.tooltipValue([stage1 == stage2 ? stage1 : stage1 + " / " + stage2, catalog, canvas, size, created].joined(separator: " · ")))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func metaItem<Value: View>(_ label: String, maxWidth: CGFloat?, @ViewBuilder value: () -> Value) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).inkuFont(12).foregroundStyle(.tertiary).lineLimit(1)
+            value().inkuFont(13).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+                .frame(maxWidth: maxWidth, alignment: .leading)
+                .fixedSize(horizontal: maxWidth == nil, vertical: false)
+        }
+        .padding(.horizontal, 12)
+        .overlay(alignment: .leading) { Rectangle().fill(InkuColor.border).frame(width: 1).padding(.vertical, 2) }
+    }
+
+    /// Web WorkActionMenu (header variant): every action on the displayed work in one menu.
+    @ViewBuilder private var workActionMenu: some View {
+        if let work = workspaceWork, hasSavedWorkspaceWork {
+            Menu {
+                SavedWorkRefinementActions(model: model, work: work, onAction: onWorkAction, writingLocked: automation.isOccupied)
+                Divider()
+                Button(display.localized("再演奏"), systemImage: "arrow.clockwise") { onReplayWork(work) }
+                    .disabled(controlsDisabled)
+                Button(display.localized("生成情報"), systemImage: "info.circle") { onWorkAction(work, "info") }
+                Button(display.localized("系譜の奥書")) { onWorkAction(work, "colophon") }.disabled(controlsDisabled)
+                Button(display.localized("系譜を開く")) { ui.workspaceTab = "lineage" }
+                Divider()
+                Button(display.localized("全画面で表示")) { onPresentWork() }
+                    .keyboardShortcut("f", modifiers: [.command, .shift])
+            } label: {
+                Label(display.localized("作品の操作"), systemImage: "ellipsis.circle").inkuFont(12)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .disabled(browsingDisabled)
+            .help(display.tooltip("作品の操作"))
+        } else if workspaceWork != nil, !model.isBusy {
+            Text(display.webCopy("workActionSaveFirst", "推敲するには、先に作品を保存してください。"))
+                .inkuFont(11).foregroundStyle(.tertiary).lineLimit(1)
+        }
+    }
+
+    /// CanvasPanel `.canvas-area`: no outer margin; navigation sits on the sides, the corner controls on the work.
+    private var canvasArea: some View {
+        ZStack {
+            InkuColor.bg2
+            if let inlinePanel {
+                // refinement-workspace.css:6: `min(1120px, 100% − 136px)` wide and 28pt short of the area.
+                inlinePanel
+                    .frame(maxWidth: min(1120, max(320, rightPanelWidth - 136)))
+                    .background(InkuColor.bg, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(InkuColor.border2))
+                    .padding(.vertical, 14)
+            } else if ui.workspaceTab == "lineage" && display.visible("work_tools") {
+                LineageView(model: model, onEditWork: onEditWork, onAdjustWork: onAdjustWork, onReplayWork: onReplayWork,
+                            onWorkAction: onWorkAction, onExport: onLineageExport, initialWork: workspaceWork,
+                            writingLocked: controlsDisabled, onBrowseWork: { _ in batchWorkspace.showHistory() })
+                    .background(InkuColor.bg)
+                    .padding(.horizontal, display.visible("history") ? 68 : 0)
+            } else {
+                artwork
+            }
+        }
+        .overlay(alignment: .leading) {
+            if display.visible("history") && inlinePanel == nil { navigationLeft.padding(.leading, 14) }
+        }
+        .overlay(alignment: .trailing) {
+            if display.visible("history") && inlinePanel == nil { navigationRight.padding(.trailing, 14) }
+        }
+        .overlay(alignment: .topTrailing) {
+            if ui.generationInfoOpen, inlinePanel == nil, let work = workspaceWork { generationInfoDrawer(work) }
+        }
+        .clipped()
+    }
+
+    private var artwork: some View {
+        ZStack {
+            ArtworkCanvas(svg: workspaceWork?.svg ?? model.currentSVG, renderer: model.renderer,
+                          caption: workspaceWork?.effectiveSourceText ?? "", style: .workspace,
+                          showsZoomControls: display.visible("work_tools"),
+                          // Below about 740pt the capsule would sit on the right corner row (seven 34pt buttons).
+                          zoomControlsAtTop: rightPanelWidth < 740 * display.preferences.textScale,
+                          aspectRatio: workspaceWork?.renderCanvasAspectRatio)
+            CreationCanvasControls(model: model, corner: .left, work: workspaceWork, saved: hasSavedWorkspaceWork,
+                                   disabled: controlsDisabled, browsingDisabled: browsingDisabled,
+                                   generationInfoOpen: ui.generationInfoOpen,
+                                   onReplayWork: onReplayWork, onWorkAction: onWorkAction, onShowSaijiki: { ui.saijikiOpen.toggle() })
+                .padding(.leading, 18).padding(.bottom, 14)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            CreationCanvasControls(model: model, corner: .right, work: workspaceWork, saved: hasSavedWorkspaceWork,
+                                   disabled: controlsDisabled, browsingDisabled: browsingDisabled,
+                                   generationInfoOpen: ui.generationInfoOpen,
+                                   onReplayWork: onReplayWork, onWorkAction: onWorkAction, onShowSaijiki: { ui.saijikiOpen.toggle() })
+                .padding(.trailing, 18).padding(.bottom, 14)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            if workspaceIsPreview { previewBadge.frame(maxHeight: .infinity, alignment: .top).padding(.top, 12) }
+        }
+    }
+
+    /// Web `.unsaved-refinement-badge` at the top centre, with the native save and close actions.
+    private var previewBadge: some View {
+        HStack(spacing: 8) {
+            Label(display.localized("未保存の候補"), systemImage: "eye").inkuFont(11)
+            Button(display.localized("この候補を保存")) { Task { await model.savePreview() } }
+                .buttonStyle(InkuGhostButtonStyle(prominent: true))
+            Button(display.localized("候補を閉じる")) { Task { await model.clearPreview() } }
+                .buttonStyle(InkuGhostButtonStyle())
+        }
+        .padding(.vertical, 5).padding(.horizontal, 9)
+        .background(Capsule().fill(InkuColor.floating))
+        .overlay(Capsule().stroke(InkuColor.border2))
+        .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
+        .disabled(controlsDisabled)
+    }
+
+    /// Web `.nav-left`: 最新 above the 38pt ‹ circle, 14pt from the edge.
+    private var navigationLeft: some View {
+        VStack(spacing: 6) {
+            Button(display.webCopy("historyLatest", "最新")) { navigateHistory(boundary: "latest") }
+                .buttonStyle(InkuFloatingPillButtonStyle())
+                .disabled(!history.canMoveNewer)
+                .help(display.tooltip("最新の履歴", serverKey: "tooltipCanvasNavLatest"))
+            Button { navigateHistory(delta: -1) } label: { Text("‹") }
+                .buttonStyle(InkuFloatingCircleButtonStyle(diameter: 38))
+                .disabled(!history.canMoveNewer)
+                .accessibilityLabel(display.localized("新しい作品"))
+                .help(display.tooltip("新しい作品", serverKey: "tooltipCanvasNavNewer"))
+        }
+        .disabled(browsingDisabled)
+    }
+
+    /// Web `.nav-right`: 最古, the › circle and the `n / N` counter.
+    private var navigationRight: some View {
+        VStack(spacing: 6) {
+            Button(display.webCopy("historyOldest", "最古")) { navigateHistory(boundary: "oldest") }
+                .buttonStyle(InkuFloatingPillButtonStyle())
+                .disabled(!history.canMoveOlder)
+                .help(display.tooltip("最古の履歴", serverKey: "tooltipCanvasNavOldest"))
+            Button { navigateHistory(delta: 1) } label: { Text("›") }
+                .buttonStyle(InkuFloatingCircleButtonStyle(diameter: 38))
+                .disabled(!history.canMoveOlder)
+                .accessibilityLabel(display.localized("古い作品"))
+                .help(display.tooltip("古い作品", serverKey: "tooltipCanvasNavOlder"))
+            if history.library.total > 0 {
+                Text("\((history.selectedIndex ?? 0) + 1) / \(history.library.total)")
+                    .inkuFont(11).monospacedDigit().foregroundStyle(.secondary).fixedSize()
+            }
+        }
+        .disabled(browsingDisabled)
+    }
+
+    /// CanvasGenerationInfo.svelte:378-398: `min(760px, 100% − 72px)` wide from the right edge,
+    /// above the corner controls (49pt from the bottom).
+    private func generationInfoDrawer(_ work: SavedWork) -> some View {
+        CreationWorkInfoView(model: model, work: work, onClose: { ui.generationInfoOpen = false })
+            .id(work.id)
+            .frame(width: min(760, max(320, rightPanelWidth - 72)))
+            .frame(maxHeight: .infinity)
+            .background(InkuColor.bg)
+            .overlay(alignment: .leading) { Rectangle().fill(InkuColor.border2).frame(width: 1) }
+            .shadow(color: .black.opacity(0.18), radius: 17, x: -14)
+            .padding(.bottom, 49)
+            .transition(.move(edge: .trailing))
+    }
+
+    /// SaijikiDrawer.svelte:163-170: a 460pt drawer on the right edge.
+    private var saijikiDrawer: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Button { ui.saijikiOpen = false } label: { Image(systemName: "xmark").inkuFont(15).frame(width: 30, height: 30).contentShape(Rectangle()) }
+                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                    .accessibilityLabel(display.localized("閉じる"))
+                    .help(display.tooltip("閉じる"))
+            }.padding(.horizontal, 8).padding(.top, 6)
+            SaijikiView(model: model)
+        }
+        .frame(width: 460)
+        .frame(maxHeight: .infinity)
+        .background(InkuColor.bg)
+        .overlay(alignment: .leading) { Rectangle().fill(InkuColor.border2).frame(width: 1) }
+        .shadow(color: .black.opacity(0.18), radius: 17, x: -10)
     }
 
     private func navigateHistory(delta: Int = 0, boundary: String? = nil) {
@@ -427,7 +735,50 @@ struct CreationView: View {
                           "次の作品の指示書に使う言語を選びます。": "tooltipInputLang", "次の作品の筆致を規則から外します。": "tooltipInputWild",
                           "用紙の形と意図を見て、次の作品の用紙を選びます。": "tooltipInputCanvas", "入力と次の生成条件から作品を描きます。": "tooltipSubmit",
                           "歳時記の語と説明を参照します。": "tooltipSaijikiToggle"]
-        return model.display.tooltip(key, serverKey: serverKeys[key])
+        return display.tooltip(key, serverKey: serverKeys[key])
+    }
+}
+
+/// Web `flex-wrap: wrap` for a row of small buttons.
+struct WrappingHStack: Layout {
+    var spacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = arrange(width: proposal.width ?? .infinity, subviews: subviews)
+        let height = rows.reduce(0) { $0 + $1.height } + spacing * CGFloat(max(0, rows.count - 1))
+        let width = rows.map(\.width).max() ?? 0
+        return CGSize(width: proposal.width ?? width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in arrange(width: bounds.width, subviews: subviews) {
+            var x = bounds.minX
+            for index in row.indices {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(at: CGPoint(x: x, y: y + (row.height - size.height) / 2), proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+            y += row.height + spacing
+        }
+    }
+
+    private struct Row { var indices: [Int] = []; var width: CGFloat = 0; var height: CGFloat = 0 }
+    private func arrange(width: CGFloat, subviews: Subviews) -> [Row] {
+        var rows: [Row] = []
+        var current = Row()
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            let needed = current.indices.isEmpty ? size.width : current.width + spacing + size.width
+            if needed > width, !current.indices.isEmpty {
+                rows.append(current); current = Row()
+            }
+            current.width = current.indices.isEmpty ? size.width : current.width + spacing + size.width
+            current.height = max(current.height, size.height)
+            current.indices.append(index)
+        }
+        if !current.indices.isEmpty { rows.append(current) }
+        return rows
     }
 }
 
@@ -439,14 +790,11 @@ struct OutputView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Picker(InkuLocalization.string("出力", locale: locale), selection: $tab) {
-                Text("DDL").tag("ddl")
-                Text("Score").tag("score")
-            }
-            .pickerStyle(.segmented)
+            InkuSegmentedButtons(options: [("ddl", "DDL"), ("score", "Score")], selection: $tab)
+                .accessibilityLabel(InkuLocalization.string("出力", locale: locale))
             ScrollView {
                 Text(tab == "ddl" ? ddl : score)
-                    .font(.system(.caption, design: .monospaced))
+                    .inkuFont(12, design: .monospaced)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(10)

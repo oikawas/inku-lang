@@ -1427,3 +1427,5 @@
 "古い →" = "older →";
 "← 新しい" = "← newer";
 "SVGサイズ" = "SVG size";
+"描画モデル（%@）の接続先にAPIキーがありません。設定の「モデル設定」でAPIキーを入力すると描けます。" = "The service for the drawing model (%@) has no API key. Enter one in Settings → Models to draw.";
+"接続設定を開く" = "Open connection settings";

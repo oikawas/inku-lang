@@ -210,7 +210,7 @@ struct CreationDisplayedProcess: View {
                 .overlay(alignment: .top) { Rectangle().fill(InkuColor.border).frame(height: 1) }
             HStack {
                 DisclosureGroup(isExpanded: Binding(
-                    get: { model.display.preferences.sketchExpanded ?? false },
+                    get: { model.display.preferences.sketchExpanded ?? true },
                     set: { model.display.preferences.sketchExpanded = $0 })) {
                     VStack(alignment: .leading, spacing: 8) {
                         if !sketchNote.isEmpty {

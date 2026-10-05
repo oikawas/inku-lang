@@ -145,7 +145,11 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     private func navigationItem(_ item: SettingsSection) -> some View {
         let active = section == item
-        return Button { section = item } label: {
+        return Button {
+            section = item
+            // Web `selectTab` saves the author's choice (`settings_tab`); opening at a named page does not.
+            model.display.preferences.settingsTab = item.rawValue
+        } label: {
             Text(model.display.localized(item.title))
                 .inkuFont(14, weight: active ? .semibold : .regular)
                 .foregroundStyle(active ? Color.primary : Color.secondary)

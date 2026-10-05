@@ -192,7 +192,7 @@ struct CreationView: View {
                 BatchPanelView(model: model, automation: automation, inputOnly: true,
                                onObserveWork: { work, rowID in batchWorkspace.pin(work, rowID: rowID) },
                                followsLatestWork: batchWorkspace.followsLatest,
-                               selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision)
+                               selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision, ui: ui)
             } else {
                 input
                 if display.visible("drawing_settings") { nextConditions }
@@ -359,6 +359,21 @@ struct CreationView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 .disabled(browsingDisabled)
+            }
+            if model.inputMode == "description" && model.hasNextDrawingModel && ui.drawingKeyMissing {
+                // R6: the Web has no first-run guide (its keys live on the Server); this points to the connection page.
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(display.localizedFormat("描画モデル（%@）の接続先にAPIキーがありません。設定の「モデル設定」でAPIキーを入力すると描けます。",
+                                                 model.nextDrawingModelReference))
+                        .inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Button(display.localized("接続設定を開く")) { ui.settingsSection = .models; ui.settingsOpen = true }
+                        .buttonStyle(InkuGhostButtonStyle(prominent: true))
+                        .disabled(browsingDisabled)
+                }
+                .padding(.vertical, 8).padding(.horizontal, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 4).fill(InkuColor.panel))
+                .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
             }
             if automation.isOccupied {
                 Button { Task { await automation.stop(app: model) } } label: {
@@ -582,7 +597,7 @@ struct CreationView: View {
                     .background(InkuColor.bg, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(InkuColor.border2))
                     .padding(.vertical, 14)
-            } else if ui.workspaceTab == "lineage" && display.visible("work_tools") {
+            } else if ui.workspaceTab == "lineage" && display.visible("work_tools") && workspaceWork != nil {
                 LineageView(model: model, onEditWork: onEditWork, onAdjustWork: onAdjustWork, onReplayWork: onReplayWork,
                             onWorkAction: onWorkAction, onExport: onLineageExport, initialWork: workspaceWork,
                             writingLocked: controlsDisabled, onBrowseWork: { _ in batchWorkspace.showHistory() })
@@ -611,7 +626,7 @@ struct CreationView: View {
                           showsZoomControls: display.visible("work_tools"),
                           // Below about 740pt the capsule would sit on the right corner row (seven 34pt buttons).
                           zoomControlsAtTop: rightPanelWidth < 740 * display.preferences.textScale,
-                          aspectRatio: workspaceWork?.renderCanvasAspectRatio)
+                          aspectRatio: workspaceWork?.renderCanvasAspectRatio, viewport: $ui.canvasViewport)
             CreationCanvasControls(model: model, corner: .left, work: workspaceWork, saved: hasSavedWorkspaceWork,
                                    disabled: controlsDisabled, browsingDisabled: browsingDisabled,
                                    generationInfoOpen: ui.generationInfoOpen,
@@ -683,7 +698,7 @@ struct CreationView: View {
     /// CanvasGenerationInfo.svelte:378-398: `min(760px, 100% − 72px)` wide from the right edge,
     /// above the corner controls (49pt from the bottom).
     private func generationInfoDrawer(_ work: SavedWork) -> some View {
-        CreationWorkInfoView(model: model, work: work, onClose: { ui.generationInfoOpen = false })
+        CreationWorkInfoView(model: model, work: work, tab: $ui.generationInfoTab, onClose: { ui.generationInfoOpen = false })
             .id(work.id)
             .frame(width: min(760, max(320, rightPanelWidth - 72)))
             .frame(maxHeight: .infinity)

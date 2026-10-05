@@ -12,11 +12,22 @@ struct BatchPanelView: View {
     var observationRevision: Binding<UUID>? = nil
     @State private var rowObservationID = UUID()
     @State private var replaceBatch = false
-    @State private var resultsExpanded = false
-    @State private var issuesExpanded = false
-    @State private var conditionsExpanded = false
-    @State private var workspaceTab = "work"
+    /// The creation panel keeps these on WorkspaceUIState, so switching 記述／バッチ does not reset them.
+    var ui: WorkspaceUIState? = nil
+    @State private var localResultsExpanded = false
+    @State private var localIssuesExpanded = false
+    @State private var localConditionsExpanded = false
+    @State private var localWorkspaceTab = "work"
     @State private var selectedHistoryPrompt = ""
+
+    private var resultsExpanded: Binding<Bool> { kept(\.batchResultsExpanded, $localResultsExpanded) }
+    private var issuesExpanded: Binding<Bool> { kept(\.batchIssuesExpanded, $localIssuesExpanded) }
+    private var conditionsExpanded: Binding<Bool> { kept(\.batchConditionsExpanded, $localConditionsExpanded) }
+    private var workspaceTab: Binding<String> { kept(\.batchWorkspaceTab, $localWorkspaceTab) }
+    private func kept<Value>(_ path: ReferenceWritableKeyPath<WorkspaceUIState, Value>, _ local: Binding<Value>) -> Binding<Value> {
+        guard let ui else { return local }
+        return Binding(get: { ui[keyPath: path] }, set: { ui[keyPath: path] = $0 })
+    }
 
     private var controlsDisabled: Bool { automation.isOccupied || model.isBusy }
     private var displayedRowID: String? { followsLatestWork ? automation.observedRow?.id : selectedRowID }
@@ -29,7 +40,7 @@ struct BatchPanelView: View {
         automation.observedWork ?? model.selectedWork
     }
     private var workspaceMinimumHeight: CGFloat {
-        automation.running && conditionsExpanded ? 620 : 500
+        automation.running && conditionsExpanded.wrappedValue ? 620 : 500
     }
 
     var body: some View {
@@ -69,12 +80,12 @@ struct BatchPanelView: View {
         } message: {
             Text(model.display.localized("保存済み作品は残ります。未処理の行を再開する場合は「前回のバッチを再開」を選んでください。"))
         }
-        .onAppear { if automation.uncertainCount > 0 { issuesExpanded = true } }
+        .onAppear { if automation.uncertainCount > 0 { issuesExpanded.wrappedValue = true } }
         .onChange(of: automation.running) { _, running in if running { rowObservationID = UUID() } }
         .onChange(of: automation.preparing) { _, preparing in if preparing { rowObservationID = UUID() } }
         .onDisappear { rowObservationID = UUID() }
         .onChange(of: automation.uncertainCount) { _, count in
-            if count > 0 { issuesExpanded = true }
+            if count > 0 { issuesExpanded.wrappedValue = true }
         }
         .onChange(of: automation.isOccupied) { _, occupied in
             if occupied { replaceBatch = false }
@@ -96,7 +107,7 @@ struct BatchPanelView: View {
             Divider()
             if inputOnly && automation.running {
                 runProgress
-                DisclosureGroup(model.display.localized("開始時の描画条件"), isExpanded: $conditionsExpanded) {
+                DisclosureGroup(model.display.localized("開始時の描画条件"), isExpanded: conditionsExpanded) {
                     frozenConditions.padding(.top, 4)
                 }.inkuFont(12)
             } else if model.display.visible("drawing_settings") {
@@ -289,7 +300,7 @@ struct BatchPanelView: View {
     }
 
     private var issueResults: some View {
-        DisclosureGroup(isExpanded: $issuesExpanded) {
+        DisclosureGroup(isExpanded: issuesExpanded) {
             rowList(issueRows, maxHeight: 220)
         } label: {
             Label(model.display.localizedFormat("失敗・要確認の行 (%ld)", issueRows.count), systemImage: "exclamationmark.circle")
@@ -298,7 +309,7 @@ struct BatchPanelView: View {
     }
 
     private var allResults: some View {
-        DisclosureGroup(isExpanded: $resultsExpanded) {
+        DisclosureGroup(isExpanded: resultsExpanded) {
             rowList(automation.rows, maxHeight: 260)
         } label: {
             Text(model.display.localizedFormat("全行の結果 (%ld)", automation.rows.count)).inkuFont(12)
@@ -363,7 +374,7 @@ struct BatchPanelView: View {
         VStack(alignment: .leading, spacing: 12) {
             if automation.running {
                 runProgress
-                DisclosureGroup(model.display.localized("開始時の描画条件"), isExpanded: $conditionsExpanded) {
+                DisclosureGroup(model.display.localized("開始時の描画条件"), isExpanded: conditionsExpanded) {
                     frozenConditions.padding(.top, 4)
                 }
                 .inkuFont(12)
@@ -454,7 +465,7 @@ struct BatchPanelView: View {
                 }
             }
             InkuSegmentedButtons(options: [("work", model.display.localized("作品")), ("ddl", "DDL"), ("sketch", model.display.localized("写生"))],
-                                 selection: $workspaceTab)
+                                 selection: workspaceTab)
             .accessibilityLabel(model.display.localized("表示する内容"))
             if let work = displayedWork {
                 if automation.observedWork == nil {
@@ -463,10 +474,10 @@ struct BatchPanelView: View {
                 }
                 Text(savedSummary(work)).inkuFont(12).foregroundStyle(.secondary)
                     .lineLimit(2).textSelection(.enabled)
-                if workspaceTab == "work" {
+                if workspaceTab.wrappedValue == "work" {
                     ArtworkCanvas(svg: work.svg, renderer: model.renderer, caption: work.effectiveSourceText)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if workspaceTab == "ddl" {
+                } else if workspaceTab.wrappedValue == "ddl" {
                     observedText(work.ddl, empty: "この作品には保存されたDDLがありません。", monospaced: true)
                 } else {
                     observedText(work.sketchText, empty: "この作品には保存された写生がありません。", monospaced: false)
@@ -481,7 +492,7 @@ struct BatchPanelView: View {
     }
 
     private var observationTitle: String {
-        workspaceTab == "ddl" ? "表示中のDDL" : workspaceTab == "sketch" ? "表示中の写生" : "表示中の作品"
+        workspaceTab.wrappedValue == "ddl" ? "表示中のDDL" : workspaceTab.wrappedValue == "sketch" ? "表示中の写生" : "表示中の作品"
     }
 
     private func observedText(_ text: String?, empty: String, monospaced: Bool) -> some View {

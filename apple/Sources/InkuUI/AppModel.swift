@@ -36,11 +36,11 @@ public final class AppModel {
     public var ddlText = ""
     /// The Web always requests `auto`; an explicit language remains possible for restored inputs.
     public var language = "auto"
-    public var catalogID = "default"
-    public var canvasID = "square"
+    public var catalogID = "default" { didSet { rememberNextConditions() } }
+    public var canvasID = "square" { didSet { rememberNextConditions() } }
     public var seedText = ""
-    public var wild = false
-    public var catalogMode = "fixed"
+    public var wild = false { didSet { rememberNextConditions() } }
+    public var catalogMode = "fixed" { didSet { rememberNextConditions() } }
     public var sketchMode = "off"
     public var sketchText = ""
     public var variationAmplitude = "small"
@@ -126,6 +126,8 @@ public final class AppModel {
     @ObservationIgnored private var currentView: PipelineView?
     @ObservationIgnored private var importedDDL: DDLPackageImport?
     @ObservationIgnored private var providerModelsByExecution: [String: ModelSelection] = [:]
+    /// Set once the saved next-work conditions have been read, so the defaults never overwrite them.
+    @ObservationIgnored private var nextConditionsRestored = false
 
     public init(databaseURL: URL? = nil, transport: (any ProviderTransport)? = nil) {
         self.databaseURL = databaseURL
@@ -174,6 +176,15 @@ public final class AppModel {
             && !(selectedWorkID != nil && sourceLocked)
     }
 
+    /// R6: the next drawing model's service needs an API key and none is stored. Read only when a screen asks,
+    /// so checks that build an AppModel never query the Keychain.
+    public func drawingModelKeyMissing() async -> Bool {
+        guard initialized, hasNextDrawingModel,
+              let provider = settings.providers.first(where: { nextDrawingModelReference.hasPrefix($0.id + ":") }),
+              provider.requiresAPIKey else { return false }
+        return (try? await credentials.isConfigured(for: provider.credentialID)) == false
+    }
+
     public func generateDescription() async {
         guard canGenerateDescription else { return }
         inputMode = "description"
@@ -208,11 +219,17 @@ public final class AppModel {
             descriptionMeter.connect(directory: url.deletingLastPathComponent())
             self.catalogs = bootstrap.catalogs
             self.canvases = bootstrap.canvases
+            restoreNextConditions()
             self.saijiki = bootstrap.saijiki
             self.pluginWords = bootstrap.pluginWords.filter { settings.plugins?.isEnabled($0.packageID ?? "") ?? true }
             let macro = try bootstrap.macroCatalog(language: instructionLanguage(for: currentInputText), settings: settings)
             self.macroDiagnostics = try Self.pretty(try Bootstrap.bytes(macro))
             library.onMutation = { [weak self] in await self?.refreshWorks() }
+            // Web `inku-history-display-mode` and the thumbnail/list tab come back with the library.
+            if let layout = display.preferences.libraryLayout.flatMap(LibraryLayout.init(rawValue:)), layout != .lineage {
+                library.layout = layout
+            }
+            if let grouped = display.preferences.libraryGrouped { library.grouped = grouped }
             await library.connect(database: database)
             if let provider = settings.providers.first {
                 providerURL = provider.baseURL.absoluteString
@@ -1790,6 +1807,27 @@ public final class AppModel {
             "cancelled": "停止しました",
         ][phase] ?? "処理中"
     }
+    /// Web restores the catalog, paper and wild choice at start-up; a saved catalog or paper that is gone is the default.
+    private func restoreNextConditions() {
+        let saved = display.preferences
+        if let id = saved.nextCatalogID, catalogs.contains(where: { $0.id == id }) { catalogID = id }
+        if let mode = saved.nextCatalogMode, ["fixed", "auto"].contains(mode) { catalogMode = mode }
+        if let id = saved.nextCanvasID, canvases.contains(where: { $0.id == id }) { canvasID = id }
+        if let saved = saved.nextWild { wild = saved }
+        nextConditionsRestored = true
+    }
+
+    private func rememberNextConditions() {
+        guard nextConditionsRestored else { return }
+        var next = display.preferences
+        next.nextCatalogID = catalogID
+        // Batch-only modes are not a next-work choice of the creation screen.
+        if ["fixed", "auto"].contains(catalogMode) { next.nextCatalogMode = catalogMode }
+        next.nextCanvasID = canvasID
+        next.nextWild = wild
+        if next != display.preferences { display.preferences = next }
+    }
+
     private func report(_ error: Error) {
         if generationToken != nil, !stopping { providerProgress?.finish(.failed, at: Date()) }
         errorText = error.localizedDescription

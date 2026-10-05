@@ -11,6 +11,7 @@ public struct AuxiliaryView: View {
     @State private var deleteRecordID: String?
     @State private var showModels = false
     @State private var observedGeneration: SavedWork?
+    @State private var refineChoicesRestored = false
     @Environment(\.dismiss) private var dismiss
 
     public init(model: AppModel, mode: AuxiliaryMode = .advice, work: SavedWork? = nil) { self.model = model; self.mode = mode; self.work = work }
@@ -68,7 +69,14 @@ public struct AuxiliaryView: View {
             }.padding(20)
         }
         .frame(minWidth: 460, idealWidth: 700, minHeight: 520)
-        .task(id: work?.id ?? model.selectedWorkID) { await auxiliary.initialize(app: model, work: work, mode: mode) }
+        .task(id: work?.id ?? model.selectedWorkID) {
+            if mode == .advice && !refineChoicesRestored { restoreRefineChoices() }
+            await auxiliary.initialize(app: model, work: work, mode: mode)
+        }
+        // A held work turns Vision and reading off for itself; that is not the author's choice, so it is not kept.
+        .onChange(of: refineChoices) { _, choices in
+            if mode == .advice, refineChoicesRestored, !auxiliary.sourceIsLocked { model.display.preferences.aiRefine = choices }
+        }
         .sheet(isPresented: $showModels) {
             BatchModelPickerView(model: model, initialReference: auxiliary.modelReference, immediateSelection: true,
                                  title: model.display.localized("Visionモデルを選択"), purpose: "vision",
@@ -106,6 +114,20 @@ public struct AuxiliaryView: View {
                 }
             }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
         }
+    }
+
+    /// Web `inku-ai-refine-settings`: mode, generations, the four dimensions and the direction, not the wild switch.
+    private var refineChoices: AIRefineChoices {
+        AIRefineChoices(visionMode: auxiliary.visionMode, generations: auxiliary.generations,
+                        kinds: AuxiliaryProvider.allowedKinds.filter(auxiliary.enabledKinds.contains), direction: auxiliary.direction)
+    }
+    private func restoreRefineChoices() {
+        refineChoicesRestored = true
+        guard let saved = model.display.preferences.aiRefine else { return }
+        auxiliary.visionMode = saved.visionMode
+        if (1...10).contains(saved.generations) { auxiliary.generations = saved.generations }
+        auxiliary.enabledKinds = Set(saved.kinds.filter(AuxiliaryProvider.allowedKinds.contains))
+        auxiliary.direction = saved.direction
     }
 
     private var refinementControls: some View {

@@ -239,7 +239,7 @@ import SwiftUI
     }
 
     private func metadata(_ work: SavedWork) -> [(short: String, full: String)] {
-        let fields = display.preferences.historyFields
+        let fields = display.preferences.historyStripFields
         let naming = ModelNaming(providers: providers)
         var output: [(short: String, full: String)] = []
         if fields.contains("generation") { let label = generationLabel(work); output.append((label, label)) }

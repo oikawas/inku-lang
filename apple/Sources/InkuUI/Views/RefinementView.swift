@@ -20,7 +20,11 @@ public struct RefinementView: View {
         self.onCommitted = onCommitted
         self.onConfigureModels = onConfigureModels
         self.onClose = onClose
-        _refinement = State(initialValue: RefinementModel(work: work))
+        // Web `inku-refine-kind`: the last dimension chosen comes back (initialize drops a locked reading).
+        let refinement = RefinementModel(work: work)
+        if let saved = model.display.preferences.refineKind.flatMap(RefinementKind.init(rawValue:)),
+           RefinementKind.availableKinds.contains(saved) { refinement.kind = saved }
+        _refinement = State(initialValue: refinement)
     }
 
     private func finish() {
@@ -157,7 +161,10 @@ public struct RefinementView: View {
     private func kindButton(_ kind: RefinementKind) -> some View {
         let selected = refinement.kind == kind
         let locked = kind == .reading && refinement.sourceIsLocked
-        return Button { refinement.kind = kind } label: {
+        return Button {
+            refinement.kind = kind
+            model.display.preferences.refineKind = kind.rawValue
+        } label: {
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: kind.symbol).frame(width: 18)
                 Text(model.display.localized(kind.titleKey)).inkuFont(13, weight: .semibold)

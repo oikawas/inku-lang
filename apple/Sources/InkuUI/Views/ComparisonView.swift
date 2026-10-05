@@ -75,6 +75,12 @@ public struct ComparisonView: View {
         #endif
         .task {
             await comparison.initialize(app: model)
+            // Web `model_inspection_selected_models`: the last choice, less models no longer offered (at most 4).
+            if comparison.kind == .model {
+                for reference in model.display.preferences.comparisonModels ?? [] {
+                    comparison.selectModel(reference, selected: true)
+                }
+            }
             if comparison.kind == .catalog, comparison.canGenerate { await comparison.generate(app: model) }
         }
         .interactiveDismissDisabled(comparison.running || comparison.hasUnsaved || model.isBusy)
@@ -124,7 +130,10 @@ public struct ComparisonView: View {
         let full = !selected && comparison.modelReferences.count >= 4
         return VStack(alignment: .leading, spacing: 6) {
             Toggle(entry.label.isEmpty ? entry.id : entry.label, isOn: Binding(
-                get: { selected }, set: { comparison.selectModel(reference, selected: $0) }))
+                get: { selected }, set: {
+                    comparison.selectModel(reference, selected: $0)
+                    model.display.preferences.comparisonModels = Array(comparison.modelReferences.prefix(4))
+                }))
                 .disabled(comparison.running || model.isBusy || comparison.hasUnsaved || comparison.sourceIsLocked || target || full || !entry.isSelectable)
                 .strikethrough(entry.eol == true)
             if target { Text(model.display.localized("元の作品のモデル")).inkuFont(12).foregroundStyle(.secondary) }

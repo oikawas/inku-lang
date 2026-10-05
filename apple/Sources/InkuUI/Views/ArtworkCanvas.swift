@@ -23,23 +23,41 @@ struct ArtworkCanvas: View {
     var zoomControlsAtTop = false
     /// The saved canvas proportion (width / height). The Web sizes the base box from it, not from the picture.
     var aspectRatio: Double? = nil
+    /// The workspace keeps its zoom and pan here while the canvas view is rebuilt (tab switch, refine panel).
+    var viewport: Binding<CanvasViewport>? = nil
     @Environment(DisplaySettings.self) private var display
     @Environment(\.displayScale) private var displayScale
     @State private var image: CGImage?
     @State private var error: String?
     @State private var loading = false
-    @State private var scale: CGFloat = 1
+    @State private var localViewport = CanvasViewport()
     @State private var gestureScale: CGFloat = 1
-    @State private var offset = CGSize.zero
     @State private var dragOrigin = CGSize.zero
     @State private var imageAspect: CGFloat = 1
     @State private var fitZoom: CGFloat = 1
+
+    private var scale: CGFloat {
+        get { viewport?.wrappedValue.scale ?? localViewport.scale }
+        nonmutating set { if let viewport { viewport.wrappedValue.scale = newValue } else { localViewport.scale = newValue } }
+    }
+    private var offset: CGSize {
+        get { viewport?.wrappedValue.offset ?? localViewport.offset }
+        nonmutating set { if let viewport { viewport.wrappedValue.offset = newValue } else { localViewport.offset = newValue } }
+    }
 
     var body: some View {
         switch style {
         case .embedded: embeddedBody
         case .workspace: workspaceBody
         }
+    }
+
+    /// A kept viewport belongs to one picture; the gesture origins resume from it.
+    private func adoptViewport() {
+        guard let viewport else { return }
+        let key = svg.hashValue
+        if viewport.wrappedValue.svgKey != key { viewport.wrappedValue = CanvasViewport(svgKey: key) }
+        gestureScale = scale; dragOrigin = offset
     }
 
     private var workspaceBody: some View {
@@ -54,6 +72,7 @@ struct ArtworkCanvas: View {
         .overlay(alignment: zoomControlsAtTop ? .top : .bottom) {
             if showsZoomControls { zoomCapsule.padding(zoomControlsAtTop ? .top : .bottom, 14) }
         }
+        .onAppear { adoptViewport() }
         .onChange(of: svg) { _, _ in image = nil; error = nil; reset() }
     }
 
@@ -265,7 +284,10 @@ struct ArtworkCanvas: View {
         if scale <= 1 { dragOrigin = .zero }
     }
     private func setScale(_ value: CGFloat) { scale = bounded(value); gestureScale = scale; clearPanWhenFitted() }
-    private func reset() { scale = 1; gestureScale = 1; offset = .zero; dragOrigin = .zero }
+    private func reset() {
+        scale = 1; gestureScale = 1; offset = .zero; dragOrigin = .zero
+        viewport?.wrappedValue.svgKey = svg.hashValue
+    }
 }
 
 #if os(macOS)

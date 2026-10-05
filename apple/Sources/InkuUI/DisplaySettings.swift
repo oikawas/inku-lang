@@ -5,7 +5,8 @@ import SwiftUI
 
 public struct DisplayPreferences: Codable, Sendable, Equatable {
     public var language = "ja"
-    public var theme = "system"
+    /// Web `theme` starts dark; a saved choice is kept.
+    public var theme = "dark"
     public var textSizeStep = 1
     public var uiMode = "simple"
     public var settingsDetail: String?
@@ -35,9 +36,41 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
     /// Older preference files omit this field. Capture always starts disabled.
     public var captureProviderIO: Bool?
     public var includeThinking: Bool?
+    /// Next-work conditions (Web `color_catalog_id` with its `auto` sentinel, `plugin_storage[canvas-aspect].selected`,
+    /// `inku-wild`). A catalog or paper that no longer exists falls back to the default when read.
+    public var nextCatalogID: String?
+    public var nextCatalogMode: String?
+    public var nextCanvasID: String?
+    public var nextWild: Bool?
+    /// Screen choices (Web `settings_tab`, `inku-history-display-mode`), restored on the next launch.
+    public var settingsTab: String?
+    public var workspaceTab: String?
+    public var inputTab: String?
+    public var libraryLayout: String?
+    public var libraryGrouped: Bool?
+    /// Dialog choices (Web `inku-refine-kind`, `model_inspection_selected_models`, `inku-ai-refine-settings`).
+    public var refineKind: String?
+    public var comparisonModels: [String]?
+    public var aiRefine: AIRefineChoices?
     public init() {}
 
+    /// Web `normalizeHistoryStripFields`: the declared order, whichever order the boxes were ticked, at most three.
+    public var historyStripFields: [String] {
+        Array(["generation", "model", "engine", "size"].filter { historyFields.contains($0) }.prefix(3))
+    }
+
     public var textScale: Double { [0.9, 1, 1.1, 1.2, 1.3][min(4, max(0, textSizeStep))] }
+}
+
+/// Web `ai-refine-settings.ts`: the autonomous refinement dialog opens with the last choices. Wild is not kept.
+public struct AIRefineChoices: Codable, Sendable, Equatable {
+    public var visionMode: Bool
+    public var generations: Int
+    public var kinds: [String]
+    public var direction: String
+    public init(visionMode: Bool, generations: Int, kinds: [String], direction: String) {
+        self.visionMode = visionMode; self.generations = generations; self.kinds = kinds; self.direction = direction
+    }
 }
 
 /// Local interface preferences are independent of the immutable work records.

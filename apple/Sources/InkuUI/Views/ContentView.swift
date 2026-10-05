@@ -122,6 +122,8 @@ public struct ContentView: View {
             await automation.connect(app: model)
             await history.connect(app: model)
             maintenance.connect(app: model)
+            restoreScreenChoices()
+            await refreshDrawingKeyState()
             model.onSavedWork = { [weak model = model, weak maintenance = maintenance] work in
                 guard let model, let maintenance else { return }
                 await maintenance.log(work: work, enabled: model.display.preferences.saveResultLog)
@@ -162,6 +164,15 @@ public struct ContentView: View {
                 await history.locate(app: model)
             }
         }
+        .onChange(of: ui.workspaceTab) { _, tab in remember { $0.workspaceTab = tab } }
+        .onChange(of: automation.workspaceInputMode) { _, mode in remember { $0.inputTab = mode } }
+        .onChange(of: model.library.layout) { _, layout in
+            if layout != .lineage { remember { $0.libraryLayout = layout.rawValue } }
+        }
+        .onChange(of: model.library.grouped) { _, grouped in remember { $0.libraryGrouped = grouped } }
+        .onChange(of: ui.settingsOpen) { _, open in if !open { Task { await refreshDrawingKeyState() } } }
+        .onChange(of: model.providerSettingsRevision) { _, _ in Task { await refreshDrawingKeyState() } }
+        .onChange(of: model.errorText) { _, error in if error != nil { Task { await refreshDrawingKeyState() } } }
         .onReceive(NotificationCenter.default.publisher(for: .inkuOpenSection)) { message in
             guard let raw = message.object as? String, let target = AppSection(rawValue: raw), canNavigateSections else { return }
             let opensWork = message.userInfo?["workID"] is String
@@ -381,9 +392,39 @@ public struct ContentView: View {
         ui.libraryOpen = true
     }
     private func closeLibrary() { ui.libraryOpen = false }
+    /// Web `openSettings()`: with no destination, the tab the author last chose (`settings_tab`), else the first.
     private func openSettings(_ destination: SettingsSection?) {
-        if let destination { ui.settingsSection = destination }
+        ui.settingsSection = destination ?? savedSettingsSection ?? .display
         ui.settingsOpen = true
+    }
+    private var savedSettingsSection: SettingsSection? {
+        guard let section = model.display.preferences.settingsTab.flatMap(SettingsSection.init(rawValue:)) else { return nil }
+        let detailedOnly: [SettingsSection] = [.plugins, .unread, .limits]
+        return detailedOnly.contains(section) && model.display.preferences.settingsDetail != "detailed" ? nil : section
+    }
+
+    /// Screen choices saved in `interface.json` come back on launch; a choice the screen cannot show is skipped.
+    private func restoreScreenChoices() {
+        let saved = model.display.preferences
+        if let tab = saved.workspaceTab, ["artwork", "lineage"].contains(tab) { ui.workspaceTab = tab }
+        // Web returns to the description tab when the input switch is hidden.
+        if saved.inputTab == "batch", model.display.visible("input_modes"), !automation.isOccupied {
+            automation.workspaceInputMode = "batch"
+        }
+        if model.descriptionText.isEmpty, model.selectedWork == nil {
+            // Web `DEFAULT_INPUT` (state.svelte.ts:72): the box starts with an example description.
+            model.descriptionText = "山の向こうに月が昇る"
+        }
+    }
+    private func remember(_ change: (inout DisplayPreferences) -> Void) {
+        var next = model.display.preferences
+        change(&next)
+        if next != model.display.preferences { model.display.preferences = next }
+    }
+
+    /// R6: guidance to the connection settings while the drawing model's service has no stored API key.
+    private func refreshDrawingKeyState() async {
+        ui.drawingKeyMissing = await model.drawingModelKeyMissing()
     }
     private func closeSettings() { ui.settingsOpen = false }
     private func openAbout() {

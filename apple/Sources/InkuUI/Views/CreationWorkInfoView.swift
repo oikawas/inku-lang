@@ -13,16 +13,23 @@ struct CreationWorkInfoView: View {
     @State private var information: SavedGenerationInformation?
     @State private var loading = true
     @State private var loadError: String?
-    @State private var tab = "details"
+    @State private var localTab = "details"
+    /// The drawer over the canvas keeps its tab when the work changes (Web CanvasGenerationInfo lives in CanvasPanel).
+    private let keptTab: Binding<String>?
+    private var tab: String {
+        get { keptTab?.wrappedValue ?? localTab }
+        nonmutating set { if let keptTab { keptTab.wrappedValue = newValue } else { localTab = newValue } }
+    }
     @State private var expandedPrompts: Set<String> = []
     @State private var copied: String?
 
     /// Set when the view is the drawer over the canvas rather than a sheet.
     private let onClose: (() -> Void)?
 
-    init(model: AppModel, work: SavedWork? = nil, onClose: (() -> Void)? = nil) {
+    init(model: AppModel, work: SavedWork? = nil, tab: Binding<String>? = nil, onClose: (() -> Void)? = nil) {
         self.model = model
         self.work = work ?? model.displayedWork
+        self.keptTab = tab
         self.onClose = onClose
     }
 

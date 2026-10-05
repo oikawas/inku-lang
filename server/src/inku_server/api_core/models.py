@@ -25,6 +25,36 @@ def json_seeds(item: dict | None) -> dict | None:
                        if item.get(key) is not None}}
 
 
+class CompositionMove(BaseModel):
+    layer: int = Field(ge=0, strict=True)
+    from_key: str | None = None
+    from_: str = Field(alias="from", min_length=1)
+    to_key: str = Field(min_length=1)
+    to: str = Field(min_length=1)
+
+
+class RecompositionResult(BaseModel):
+    mode: Literal["principled", "chance"]
+    outcome: Literal["recomposed", "unchanged"]
+    moves: list[CompositionMove] = Field(default_factory=list)
+    reason: Literal[
+        "nothing_to_move", "not_canonical", "unsupported_sentence", "unplaced_sentence",
+        "author_range", "no_other_answer", "same_ranges", "unsolved", "not_canonical_after",
+        "binding_unavailable", "invalid_request", "internal_invariant", "internal",
+        "invalid_response", "recompose_failed",
+    ] | None = None
+    answer: Literal["near", "next", "chance"] | None = None
+
+    @model_validator(mode="after")
+    def consistent_outcome(self):
+        if self.outcome == "recomposed":
+            if not self.moves or self.answer is None or self.reason is not None:
+                raise ValueError("a recomposed answer must name its moves and choice")
+        elif self.reason is None or self.moves or self.answer is not None:
+            raise ValueError("an unchanged answer must give only its reason")
+        return self
+
+
 class HistoryPostBody(BaseModel):
     input: str
     ddl: str | None = None

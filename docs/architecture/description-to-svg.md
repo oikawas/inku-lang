@@ -77,6 +77,8 @@ flowchart TD
 
 There are four drawing entry points: `/api/paint` (one response), `/api/paint/stream` (the same generation with an NDJSON event as each layer settles), `/api/interpret` (up to the saved DDL), and `/api/compose` (starts from the DDL it receives and does not count a work). All four let `pipeline_compat.py` map the request to shared-pipeline options, call `PipelineService.start`, re-read the saved state until the execution settles, and project `view["result"]`. The response also carries the pipeline's variation ID, execution ID, and revision.
 
+The optional `recompose_mode` (`principled` or `chance`) on `/api/compose` chooses the saved DDL's marked composition ranges before rebuilding. The pure `pipeline_recompose` call and the following direct-DDL run share the configuration and context that `prepare_for` prepared once. The response carries the mode and moves or unchanged reason in `recomposition`, and returns the full DDL actually drawn. A compatible wheel without the function, a core error or an invalid reply rebuilds the original source as before; omitting the mode keeps the old call. Saving a chosen Web option records `composition_seed` and `recompose_mode` on its `layout_change` edge. The original work's database values and the storage of composition readings do not change.
+
 Before the first LLM call, the request and the host settle the following.
 
 - **Whitespace-only description** — the `PaintRequest` validator rejects it with 422.

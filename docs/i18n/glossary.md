@@ -67,6 +67,8 @@
 | 推敲 | **refinement** / **refine** | 名詞／動詞 | ~~revision~~（事務的）、~~iteration~~（工学的） |
 | 言葉でタッチを変える | **Another performance** | **lint 固定**。四操作は Another + 名詞で統一 | — |
 | 配置を変える | **Another composition** | **lint 固定** | — |
+| 原理に沿う | **By principle** | 配置を変えるときの選び。作者裁定（2026-10-05）、**lint 固定** | 指示書から分かることだけで解き直す |
+| 偶然に委ねる | **By chance** | 配置を変えるときの選び。作者裁定（2026-10-05）、**lint 固定** | 層の種類が許す範囲からseedで選ぶ |
 | 読み取りを変える | **Another reading** | **lint 固定** | — |
 | 色カタログを変える | **Another catalog** | **lint 固定** | — |
 | 変奏（旧） | **Variation (retired)** | 2026-10-04 に廃止した（作者裁定）。古い系譜の辺の札と、古い作品の生成情報の行にだけ使う。強度の Subtle／Moderate／Sweeping も廃止した | — |

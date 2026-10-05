@@ -159,6 +159,8 @@ class PipelineBinding:
             self.explain_plugin_diagnostics = getattr(module, "pipeline_explain_plugin_diagnostics", None)
             # Optional for the same reason; views then carry no attempt.
             self.provider_attempt = getattr(module, "pipeline_provider_attempt", None)
+            # Older compatible wheels rebuild the saved DDL without choosing its ranges again.
+            self.recompose = getattr(module, "pipeline_recompose", None)
         except (AttributeError, ImportError) as error:
             raise CandidateHostError("binding_unavailable") from error
         self.versions = json.loads(version_report())

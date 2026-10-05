@@ -337,6 +337,10 @@ export interface LangPack {
 	settingsTextSizeRetry: string;
 	canvasVaryPerformance: string;
 	canvasVaryComposition: string;
+	recomposeByPrinciple: string;
+	recomposeByChance: string;
+	recomposeReason: (reason?: string | null) => string;
+	recomposeKeptRanges: string;
 	canvasVaryInterpretation: string;
 	canvasVaryColor: string;
 	retiredVariationSmall: string;

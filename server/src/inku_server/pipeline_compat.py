@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import time
 from collections.abc import Callable, Iterator
@@ -11,6 +13,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .api_core.models import RecompositionResult
 from .persistence.schema import HistoryRow
 
 
@@ -215,6 +218,56 @@ def interpret(owner: str, data: dict[str, Any], reader_left: Callable[[], bool] 
     }
 
 
+def _recompose(
+    service, owner: str, data: dict[str, Any], options: dict, source_work: dict,
+) -> tuple[str, dict, tuple[dict, dict] | None]:
+    """Choose ranges before the existing direct-DDL run, with its exact settings."""
+    source, mode = data["ddl"], data["recompose_mode"]
+
+    def unchanged(reason: str) -> dict:
+        return {"mode": mode, "outcome": "unchanged", "reason": reason, "moves": []}
+
+    native = getattr(service.binding, "recompose", None)
+    if not callable(native):
+        return source, unchanged("binding_unavailable"), None
+    prepared = service.prepare_for(owner, "direct_ddl", source, options, source_work)
+    config, context = prepared
+    seed = config["compiler"].get("composition_seed")
+    if seed is None:
+        seed = context["host_options"]["render_seed"]
+    request = {
+        "config": config, "source": source, "mode": mode, "seed": str(seed),
+        "work_id": "sha256:" + hashlib.sha256(source.encode("utf-8")).hexdigest(),
+    }
+    try:
+        output = native(json.dumps(request, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    except Exception:
+        _logger.warning("Composition recompose fell back: recompose_failed")
+        return source, unchanged("recompose_failed"), prepared
+    try:
+        value = json.loads(output)
+        if not isinstance(value, dict):
+            raise ValueError("invalid recompose response")
+        if "error" in value:
+            reason = value["error"]
+            if reason not in {"invalid_request", "internal_invariant", "internal"}:
+                raise ValueError("unknown recompose error")
+            return source, unchanged(reason), prepared
+        if value.get("schema") != "inku.composition-recompose.v1":
+            raise ValueError("invalid recompose schema")
+        result = RecompositionResult.model_validate({**value, "mode": mode})
+        if result.outcome == "recomposed":
+            chosen = value.get("source")
+            if not isinstance(chosen, str) or not chosen.strip():
+                raise ValueError("missing recomposed source")
+        else:
+            chosen = source
+        return chosen, result.model_dump(mode="json", by_alias=True, exclude_none=True), prepared
+    except (TypeError, ValueError):
+        _logger.warning("Composition recompose fell back: invalid_response")
+        return source, unchanged("invalid_response"), prepared
+
+
 def compose(owner: str, data: dict[str, Any], reader_left: Callable[[], bool] | None = None) -> dict:
     options = _options(data, save_history=False)
     # The old compose endpoint produced a candidate and never counted it as a
@@ -223,20 +276,26 @@ def compose(owner: str, data: dict[str, Any], reader_left: Callable[[], bool] | 
     options["count_generation"] = False
     if data.get("imported_plugins"):
         options["imported_plugins"] = data["imported_plugins"]
+    service = _service()
+    source_work = {"description": data.get("description") or ""}
+    source, recomposition, prepared = data["ddl"], None, None
+    if data.get("recompose_mode") is not None:
+        source, recomposition, prepared = _recompose(service, owner, data, options, source_work)
     view = _settled(
         owner,
-        _service().start(
+        service.start(
             owner,
             "direct_ddl",
-            data["ddl"],
-            source_work={"description": data.get("description") or ""},
+            source,
+            source_work=source_work,
             canvas_aspect=data.get("canvas_aspect"),
             options=options,
+            prepared=prepared,
         ),
         perform=True,
         reader_left=reader_left,
     )
-    return {**view["result"], **_identity(view)}
+    return {**view["result"], **_identity(view), **({"recomposition": recomposition} if recomposition is not None else {})}
 
 
 def _start_paint(owner: str, data: dict[str, Any], idempotency_key: str | None) -> dict:

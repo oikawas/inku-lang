@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { ComposeLayoutGeneration } from '$lib/features/canvas/recomposition';
 	import { onMount, tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
@@ -182,6 +183,7 @@
 		onLoadLineageBranch: (nodeId: string) => void | Promise<void>;
 		onPaintOne: (text: string, options: any) => Promise<any>;
 		onPaintDdl: (parent: { id: string; pipeline_variation_id?: string | null }, ddl: string, options: any) => Promise<any>;
+		onComposeLayout: ComposeLayoutGeneration;
 		onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<any>;
 	};
 
@@ -300,6 +302,7 @@
 		onLoadLineageBranch,
 		onPaintOne,
 		onPaintDdl,
+		onComposeLayout,
 		onVisionAdvice
 	}: Props = $props();
 
@@ -882,7 +885,7 @@
 						stage2ModelLabel={runStage2ModelLabel} {runTokensIn} {runTokensOut} {runAttempt} onSaveOkugakiModel={onSaveOkugakiModel}
 						{onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote}
 						onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview}
-						onLoadBranch={onLoadLineageBranch} {onPaintOne} {onPaintDdl} {onVisionAdvice} {visionModel} {okugakiModel}
+						onLoadBranch={onLoadLineageBranch} {onPaintOne} {onPaintDdl} {onComposeLayout} {onVisionAdvice} {visionModel} {okugakiModel}
 						{visionProviderGroups} {animationExportSettings} {pngTemplates}
 						onDownloadSavedWorkSVG={savedWorkExportActions.onDownloadSVG}
 						onDownloadSavedWorkPNG={savedWorkExportActions.onDownloadPNG}
@@ -974,6 +977,7 @@
 			onClose={() => { directAIRefineNode = null; if (directAIRefineSaved) outputTab = 'lineage'; }}
 			{onPaintOne}
 			{onPaintDdl}
+			{onComposeLayout}
 			{onVisionAdvice}
 			{onSaveVisionModel}
 			{visionModel}

@@ -1062,6 +1062,8 @@ Stage 1 は自由記述を、書き手が観察・編集できる正規化 DDL �
 - 選び直せないとき: ［構図］の印が無い（作者が書いた指示書、構図より前の作品、端末のモデルの作品）、下絵が書かない文がある（Macroの語に範囲、まとまり、関係の句、色などの列）、印の無い数値の範囲（作者の範囲）がある、原理に沿うで、指示書から読み戻した層の範囲の組み合わせが解きの上限（3,000,000、§12.6.2）を超える、組めないときは、指示書を変えずに今までどおり組み直し、構図が動かないことを理由とともに示す。
 - その後は今までどおり、選び直した（選び直せないときは保存した）DDLを、候補の`composition_seed`で組み直す。記述にかたむきがあるときの具体角度、`隅`の語の四候補、群の置き場所も選び直される。
 - 共有coreの関数は`recompose`（応答schema `inku.composition-recompose.v1`）。要求はpipelineの設定、原文、モード（`principled`・`chance`）、seed（10進の文字列）、作品の識別子である。答えは、選び直した原文と文ごとの動き（今の範囲と新しい範囲の書き方。今の範囲が28種のどれでもないときはその範囲の鍵を持たない）、または変えない理由（`nothing_to_move`・`not_canonical`・`unsupported_sentence`・`unplaced_sentence`・`author_range`・`no_other_answer`・`same_ranges`・`unsolved`・`not_canonical_after`）。読めない要求は`invalid_request`を返す。LLMは呼ばない。
+- Serverでは`/api/compose`の任意の`recompose_mode`で呼び、直接DDLの実行と同じprepared設定・contextを一度だけ作る。応答の`recomposition`はモード・動きまたは変えない理由を持つ。モード省略、関数の無い互換wheel、core error・不正な応答は原文の従来の組み直しへ進む。
+- Webの「配置を変える」の下に「原理に沿う／偶然に委ねる」（英語`By principle` / `By chance`）を置き、既定とAI／自律推敲の配置の世代は「原理に沿う」とする。候補は層番号を1から表示し、動きと変えない理由を示す。選んだ候補の`layout_change`辺に`composition_seed`と`recompose_mode`を残す。指示書があれば記述の無い作品も扱える。
 
 ### 12.7 第二段階（補完）と決定的な構造化
 

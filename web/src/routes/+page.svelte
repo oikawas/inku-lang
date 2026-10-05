@@ -3032,6 +3032,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onLoadLineageBranch={lineageState.loadBranch}
 				onPaintOne={work.paintOne}
 				onPaintDdl={paintFromParentDdl}
+				onComposeLayout={refinement.composeLayoutGeneration}
 				onVisionAdvice={work.requestVisionRefineAdvice}
 				pngTemplates={exportTemplates}
 				animationExportSettings={exportSettings.animation}

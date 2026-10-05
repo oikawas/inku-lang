@@ -13,6 +13,7 @@
   import { loadAiRefineSettings, saveAiRefineSettings } from '$lib/features/canvas/ai-refine-settings';
   import { colorCatalogOverride } from '$lib/features/color-catalog/render';
   import { ddlGenerationSeeds } from '$lib/features/canvas/ai-refine-generation';
+  import type { ComposeLayoutGeneration } from '$lib/features/canvas/recomposition';
   import { wildOverride as wildRenderOverride } from '$lib/features/wild/render';
 
   type RefineMode = 'random' | 'vision';
@@ -29,12 +30,13 @@
     onPaintOne: (text: string, options: any) => Promise<any>;
     /** Draw from a parent's DDL as its child (a work its edited DDL holds). */
     onPaintDdl: (parent: { id: string; pipeline_variation_id?: string | null }, ddl: string, options: any) => Promise<any>;
+    onComposeLayout: ComposeLayoutGeneration;
     onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<VisionAdvice>;
     onLoadBranch: (nodeId: string) => void | Promise<void>;
     onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
   };
 
-  let { node, visionModel, visionProviderGroups, stage1ModelLabel, stage2ModelLabel, onClose, onPaintOne, onPaintDdl, onVisionAdvice, onLoadBranch, onSaveVisionModel }: Props = $props();
+  let { node, visionModel, visionProviderGroups, stage1ModelLabel, stage2ModelLabel, onClose, onPaintOne, onPaintDdl, onComposeLayout, onVisionAdvice, onLoadBranch, onSaveVisionModel }: Props = $props();
 
   function addTokens(total: number | null, delta: number): number | null {
     return (total ?? 0) + delta;
@@ -150,6 +152,10 @@
       catalogId: node.history?.render_color_catalog_id ?? node.history?.catalog_id ?? null,
       renderSeed: node.history?.render_seed ?? null,
       compositionSeed: node.history?.composition_seed ?? null,
+      canvasAspectId: node.history?.render_canvas_aspect_id ?? node.history?.render_canvas_aspect ?? null,
+      stage1Model: node.history?.stage1_model ?? null,
+      instructionLang: node.history?.instruction_lang_resolved ?? node.history?.instruction_lang_requested ?? null,
+      ddlSourceOrigin: node.history?.ddl_source_origin ?? null,
       wild: node.history?.render_wild === true
     };
     let advice: VisionAdvice | null = null;
@@ -187,7 +193,11 @@
           signal: abortController.signal
         };
         let result: any;
-        if (held) {
+        if (kind === 'layout_change') {
+          // Layout follows the saved instructions, with the principle mode
+          // fixed independently of the manual dialog's choice.
+          result = await onComposeLayout(parent, currentText, options);
+        } else if (held) {
           Object.assign(options, ddlGenerationSeeds(kind, parent, () => Math.floor(Math.random() * 2 ** 31)));
           result = await onPaintDdl({ id: parent.id, pipeline_variation_id: parent.variationId }, parent.ddl, options);
         } else {
@@ -206,6 +216,10 @@
           catalogId: result.render_color_catalog_id ?? parent.catalogId,
           renderSeed: result.render_seed ?? parent.renderSeed,
           compositionSeed: result.composition_seed ?? parent.compositionSeed,
+          canvasAspectId: result.render_canvas_aspect_id ?? result.render_canvas_aspect ?? parent.canvasAspectId,
+          stage1Model: result.stage1_model ?? parent.stage1Model,
+          instructionLang: result.instruction_lang_resolved ?? parent.instructionLang,
+          ddlSourceOrigin: result.ddl_source_origin ?? parent.ddlSourceOrigin,
           wild: result.render_wild ?? parent.wild
         };
         if (mode === 'vision' && result.history_id) advice = await readVisionAdvice(result.history_id, currentText);

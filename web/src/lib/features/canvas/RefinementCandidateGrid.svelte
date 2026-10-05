@@ -3,6 +3,7 @@
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { svgImage } from '$lib/svgImage';
 	import type { RefinementSession } from '$lib/features/canvas/refinement-session.svelte';
+	import { recompositionLines } from './recomposition';
 
 	type Props = {
 		isJapanese: boolean;
@@ -51,6 +52,9 @@
 								<span class="variation-card-art"><img use:svgImage={candidate.result.svg} alt="" /></span>
 								<span class="variation-card-meta">
 									<span>{candidate.label}</span>
+									{#each recompositionLines(candidate.result.recomposition, t()) as line}
+										<span class="recomposition-detail">{line}</span>
+									{/each}
 									<span>r {candidate.result.render_seed ?? "-"} / v {candidate.result.composition_seed ?? t().seedBaseLabel}{candidate.result.interpretation_seed ? ` / i ${candidate.result.interpretation_seed.slice(0, 8)}` : ""}</span>
 								</span>
 							</button>

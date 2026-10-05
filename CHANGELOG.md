@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-05 — Join a Japanese numeric range with a hyphen too (core)
+
+When the author edited a range's numbers, `横1/3-2/3、縦2/3〜1` was an error: a Japanese range was joined only by `〜`, `～` or `~`, not by a hyphen. By the author's decision (2026-10-05) the ASCII `-` and the full-width `－` join a Japanese range too. Bounds lie from 0 to 1 and are never negative, so a hyphen between two numbers can only join them. An English range still uses `to` only. Writing that did not compile now compiles; saved works do not change. The Web and Android editors accept the same marks and show an example of the form in their error text (each host's part).
+
 ### v2.15.88 — Rechoose numeric ranges and fold their display (Build 1164, 2026-10-05)
 
 This version aligns the core's unmarked numeric-range recomposition with range display on Server, Web and Android. Ranges with matching names and numbers fold for display, with frames for inspection and numeric editing. Drawing remains explicit; saving and copying keep the full text and numbers. DDL engine 57, render engine 73, Score 0.19.0 and the Android version and Build are retained.

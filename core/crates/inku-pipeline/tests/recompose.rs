@@ -341,3 +341,18 @@ fn an_old_mark_goes_with_its_range() {
     assert!(!after.contains("［構図］"), "{after}");
     assert_eq!(after, format!("{}に、{CIRCLE}", moves[0].to));
 }
+
+/// The range the author typed with a hyphen (`横1/3-2/3`, 2026-10-05) compiles
+/// and is the bottom center the composition writes; another composition moves it.
+#[test]
+fn a_range_joined_with_a_hyphen_moves() {
+    let source = format!("下中央（横1/3-2/3、縦2/3〜1）に、{CIRCLE}");
+    let moves = (1..=8)
+        .find_map(|seed| match by_chance(&source, seed) {
+            Recomposition::Recomposed { moves, .. } => Some(moves),
+            Recomposition::Unchanged { .. } => None,
+        })
+        .expect("the hyphenated range compiles and moves for some seed");
+    assert_eq!(moves[0].from, "下中央（横1/3-2/3、縦2/3〜1）");
+    assert_eq!(moves[0].from_key.as_deref(), Some("cell-12"));
+}

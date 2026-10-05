@@ -230,9 +230,10 @@ import app.inku.mobile.pipeline.SaijikiGenerated
 import app.inku.mobile.pipeline.Sketches
 import app.inku.mobile.pipeline.SketchMode
 import app.inku.mobile.pipeline.ProviderAttempt
+import app.inku.mobile.ui.export.PngCaptureDate
+import app.inku.mobile.ui.export.PngExportSize
 import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.i18n.LocalStrings
-import app.inku.mobile.ui.i18n.inkuError
 import app.inku.mobile.ui.i18n.messageFor
 import app.inku.mobile.ui.i18n.LocalUiLanguage
 import app.inku.mobile.ui.i18n.stringsFor
@@ -247,9 +248,10 @@ import app.inku.mobile.ui.camera.cameraDevelopmentPresentation
 import app.inku.mobile.ui.camera.locksCameraInteraction
 import app.inku.mobile.render.NativeRenderBridge
 import app.inku.mobile.render.RustArtworkRasterizer
+import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.FileOutputStream
 import java.security.MessageDigest
+import java.time.ZoneId
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
@@ -3856,10 +3858,11 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
             horizontal = Dimens.spaceM,
             vertical = Dimens.spaceM,
         ) {
-            // Both counts stay pressable whichever element is chosen, the way
+            // Both counts stay pressable for touch, layout and reading, the way
             // web leaves its own pair alone: the refusal for four touches is
-            // stated when the button is pressed, not by hiding the choice.
-            if (state.refinementSubview == RefinementSubview.Adjust) {
+            // stated when the button is pressed, not by hiding the choice. The
+            // colour change draws every other catalogue, so it has no count.
+            if (state.refinementSubview == RefinementSubview.Adjust && state.refinementElement != RefinementElement.Color) {
                 listOf(1, 4).forEach { count ->
                     ChipButton(
                         text = S.optionCount(count),
@@ -3877,7 +3880,7 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
 
         RefinementProgressLanes(
             lanes = refinementProgressLanes(
-                candidateCount = state.refinementCount,
+                candidateCount = state.refinementPlannedCount,
                 completedCount = state.refinementCandidates.size,
                 busy = state.refinementBusy,
             ),
@@ -3949,53 +3952,83 @@ private fun RefinementProgressLanes(
 ) {
     if (lanes.isEmpty()) return
     val runningMascotKind = if (selectedMascotKind == "incu") "yuragi" else "incu"
-    Row(
+    // Four to a row: the colour change draws every other catalogue, and a
+    // dozen lanes side by side would leave each too narrow to read.
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
-        lanes.forEachIndexed { index, lane ->
-            Surface(
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("refinement_progress_lane_${index + 1}_${lane.name.lowercase()}"),
-                shape = RoundedCornerShape(Dimens.radiusCard),
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(Dimens.hairline, MaterialTheme.colorScheme.outline),
+        lanes.withIndex().chunked(REFINEMENT_LANES_PER_ROW).forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
             ) {
-                Column(
-                    modifier = Modifier.padding(Dimens.spaceXs),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
+                row.forEach { (index, lane) ->
+                    RefinementProgressLane(
+                        index = index,
+                        lane = lane,
+                        runningMascotKind = runningMascotKind,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                // A short last row keeps the width of the rows above it.
+                if (lanes.size > REFINEMENT_LANES_PER_ROW) {
+                    repeat(REFINEMENT_LANES_PER_ROW - row.size) { Spacer(modifier = Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
+
+/** Lanes per row of [RefinementProgressLanes]. */
+private const val REFINEMENT_LANES_PER_ROW = 4
+
+@Composable
+private fun RefinementProgressLane(
+    index: Int,
+    lane: RefinementProgressLaneState,
+    runningMascotKind: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .testTag("refinement_progress_lane_${index + 1}_${lane.name.lowercase()}"),
+        shape = RoundedCornerShape(Dimens.radiusCard),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(Dimens.hairline, MaterialTheme.colorScheme.outline),
+    ) {
+        Column(
+            modifier = Modifier.padding(Dimens.spaceXs),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
+        ) {
+            Text(
+                text = "${index + 1}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            when (lane) {
+                RefinementProgressLaneState.Done -> Box(
+                    modifier = Modifier.size(Dimens.buttonHeightSmall),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "${index + 1}",
-                        style = MaterialTheme.typography.labelSmall,
+                        text = "✓",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+                RefinementProgressLaneState.Running ->
+                    MascotWidget(mascotKind = runningMascotKind)
+                RefinementProgressLaneState.Waiting -> Box(
+                    modifier = Modifier.size(Dimens.buttonHeightSmall),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "·",
+                        style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    when (lane) {
-                        RefinementProgressLaneState.Done -> Box(
-                            modifier = Modifier.size(Dimens.buttonHeightSmall),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = "✓",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.secondary,
-                            )
-                        }
-                        RefinementProgressLaneState.Running ->
-                            MascotWidget(mascotKind = runningMascotKind)
-                        RefinementProgressLaneState.Waiting -> Box(
-                            modifier = Modifier.size(Dimens.buttonHeightSmall),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = "·",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
                 }
             }
         }
@@ -4408,7 +4441,7 @@ private fun SettingsHomePanel(state: InkuUiState, viewModel: InkuViewModel, modi
         SettingsListItem(mark = "◇", title = S.modelSettings, sub = "OpenAI / Claude / Gemini / NVIDIA", onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
         SettingsListItem(mark = "◎", title = S.chatGptPlan, sub = S.chatGptConnectionSubtitle, onClick = { viewModel.setSettingsPane(SettingsPane.ChatGpt) })
         SettingsListItem(mark = "◉", title = S.demo, sub = S.demoRunAndSeed, onClick = { viewModel.setSettingsPane(SettingsPane.Demo) })
-        SettingsListItem(mark = "⬚", title = S.export, sub = "PNG 1080 / 2160 / 4320", onClick = { viewModel.setSettingsPane(SettingsPane.Export) })
+        SettingsListItem(mark = "⬚", title = S.export, sub = "PNG 1080 / 2160", onClick = { viewModel.setSettingsPane(SettingsPane.Export) })
         SettingsListItem(mark = "◐", title = S.settingsMisc, sub = S.miscSubtitle, onClick = { viewModel.setSettingsPane(SettingsPane.Misc) })
         SettingsListItem(
             mark = "#",
@@ -6529,40 +6562,40 @@ private fun buildHistorySvgPayload(context: Context, item: HistoryItemEntity, pr
 }
 
 private fun buildHistoryPngPayload(context: Context, item: HistoryItemEntity, targetHeight: Int): SharePayload {
-    val height = targetHeight.coerceIn(64, MaxPngExportHeightPx)
-    val bitmap = RustArtworkRasterizer().rasterize(item.displaySvg, targetHeight = height)
-    try {
-        val estimatedBytes = bitmap.width.toLong() * bitmap.height.toLong() * 4L
-        // Not `require`: this sentence reaches the reader, so the language is
-        // chosen where it is shown rather than here (see InkuFailure).
-        if (estimatedBytes > MaxPngExportBitmapBytes) inkuError { it.exportPngTooLarge }
-        val exportDir = exportCacheDir(context)
-        val file = File(exportDir, "inku-${item.renderHashShort}-${height}.png")
-        try {
-            FileOutputStream(file).use { out ->
-                if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) {
-                    throw IllegalStateException()
-                }
+    // Refused before drawing: a height out of range, or a paper too wide for
+    // the raster crate, says so instead of coming out at another size.
+    val size = PngExportSize.of(targetHeight, CanvasAspects.ratioFor(item.canvasAspect))
+    val bitmap = RustArtworkRasterizer().rasterize(item.displaySvg, targetHeight = size.height)
+    val png = try {
+        ByteArrayOutputStream().use { out ->
+            if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) {
+                throw IllegalStateException()
             }
-            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-            return SharePayload(uri, "image/png", "inku ${item.renderHashShort}", file.name, "Export inku PNG")
-        } catch (error: Throwable) {
-            file.delete()
-            throw error
+            out.toByteArray()
         }
     } finally {
         bitmap.recycle()
     }
+    // The work's own creation time in the device's zone, as web stamps its
+    // generation time (`download.ts`), not the time it was shared.
+    val stamped = PngCaptureDate.stamp(png, item.createdAt, ZoneId.systemDefault())
+    val exportDir = exportCacheDir(context)
+    val file = File(exportDir, "inku-${item.renderHashShort}-${size.height}.png")
+    try {
+        file.writeBytes(stamped)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        return SharePayload(uri, "image/png", "inku ${item.renderHashShort}", file.name, "Export inku PNG")
+    } catch (error: Throwable) {
+        file.delete()
+        throw error
+    }
 }
-
-private const val MaxPngExportHeightPx = 4320
-private const val MaxPngExportBitmapBytes = 128L * 1024L * 1024L
 
 /**
  * The shared export folder, with yesterday's files cleared out.
  *
- * Every export lands here for the share sheet and nothing removed it: a 4320px
- * PNG is tens of megabytes, and each work and height kept its own file. A
+ * Every export lands here for the share sheet and nothing removed it: a 2160px
+ * PNG can be megabytes, and each work and height kept its own file. A
  * file older than a day has long been read by whatever it was shared to.
  */
 private fun exportCacheDir(context: Context): File {

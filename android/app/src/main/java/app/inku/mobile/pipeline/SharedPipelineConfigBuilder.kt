@@ -11,17 +11,6 @@ import org.json.JSONObject
 internal fun compositionForModel(modelId: String): JSONObject =
     JSONObject().put("read", !isLocalVisionModel(modelId))
 
-data class PipelineCanonicalMacro(
-    val sourceId: String,
-    val definitionJson: String,
-    val summary: String,
-)
-
-data class PipelineLegacyMacro(
-    val sourceId: String,
-    val qualifiedName: String,
-)
-
 /** One definition carried by an `inku.ddl-export.v1` file, offered to a new work only. */
 data class ImportedPluginDefinition(
     val definitionJson: String,
@@ -35,21 +24,11 @@ data class SharedPipelineConfigRequest(
     val renderSeed: Long? = null,
     val compositionSeed: Long? = null,
     val errorPolicy: String = "omit_and_continue",
-    val resourceLimits: PipelineResourceLimits = PipelineResourceLimits(),
-    val canonicalMacros: List<PipelineCanonicalMacro> = emptyList(),
-    val legacyMacros: List<PipelineLegacyMacro> = emptyList(),
     /** False when the author disabled the bundled `Nature.leaves` package. */
     val bundledPluginsEnabled: Boolean = true,
     /** Definitions from an imported DDL export; they win their names for this work. */
     val importedPlugins: List<ImportedPluginDefinition> = emptyList(),
     val drawingModelId: String = "",
-)
-
-data class PipelineResourceLimits(
-    val primitiveMarks: Int = 400,
-    val maximumPerTemplatePrimitiveMarks: Int = 240,
-    val maximumResolvedCount: Int = 2_000,
-    val objectTemplates: Int = 64,
 )
 
 data class PreparedPipelineConfig(
@@ -129,8 +108,7 @@ class SharedPipelineConfigBuilder(
         val macroCatalog = resolveMacros(request)
         val entries = macroCatalog.requiredArray("entries")
         val retry = retryPolicy()
-        val maximum = resourceMaximum(request.resourceLimits)
-        val budgetJson = canonicalBudgetJson(maximum)
+        val budgetJson = canonicalBudgetJson(RESOURCE_MAXIMUM)
         val policyIdentity = "host-settings:" + sha256(budgetJson.encodeToByteArray())
         val compiler = JSONObject()
             .put("host", selectedHost)
@@ -404,28 +382,10 @@ class SharedPipelineConfigBuilder(
                                 .put("summary", candidate.summary),
                         )
                     }
-                    request.canonicalMacros.forEach { candidate ->
-                        output.put(
-                            JSONObject()
-                                .put("source_id", candidate.sourceId)
-                                .put("definition_json", candidate.definitionJson)
-                                .put("summary", candidate.summary),
-                        )
-                    }
                 },
             )
-            .put(
-                "legacy",
-                JSONArray().also { output ->
-                    request.legacyMacros.forEach { candidate ->
-                        output.put(
-                            JSONObject()
-                                .put("source_id", candidate.sourceId)
-                                .put("qualified_name", candidate.qualifiedName),
-                        )
-                    }
-                },
-            )
+            // No installed legacy macro is offered.
+            .put("legacy", JSONArray())
         val output = JSONObject(
             binding.resolveMacroCatalog(input.toString().encodeToByteArray()).toString(Charsets.UTF_8),
         )
@@ -471,21 +431,6 @@ class SharedPipelineConfigBuilder(
         .put("total_timeout_ms", totalTimeoutMs.toString())
         .put("retry_delay_ms", policy.providerRetryDelayMs.toString())
 
-    private fun resourceMaximum(limits: PipelineResourceLimits): Map<String, Int> = linkedMapOf(
-        "logical_objects" to 4_096,
-        "template_nodes" to 128,
-        "anchor_instances" to 4_096,
-        "transform_instances" to 4_096,
-        "placement_instances" to 64,
-        "fill_instances" to 64,
-        "primitive_marks" to limits.primitiveMarks,
-        "maximum_per_template_primitive_marks" to limits.maximumPerTemplatePrimitiveMarks,
-        "maximum_resolved_count" to limits.maximumResolvedCount,
-        "object_templates" to limits.objectTemplates,
-    ).also { maximum ->
-        if (maximum.values.any { it <= 0 }) throw PipelineHostException("invalid_resource_budget")
-    }
-
     private fun canonicalBudgetJson(maximum: Map<String, Int>): String =
         maximum.toSortedMap().entries.joinToString(
             prefix = "{\"maximum\":{",
@@ -523,5 +468,22 @@ class SharedPipelineConfigBuilder(
         const val IMPORTED_SOURCE = "imported:"
         const val PIXEL9_HOST_ONLY_FORMAT = "pixel9_landscape_safe"
         const val CANVAS_BASE_PX = 1000.0
+
+        /**
+         * The server's resource budget (`pipeline_defaults.py`). Fixed: no
+         * caller ever asked for another, so it is no longer a request field.
+         */
+        val RESOURCE_MAXIMUM: Map<String, Int> = linkedMapOf(
+            "logical_objects" to 4_096,
+            "template_nodes" to 128,
+            "anchor_instances" to 4_096,
+            "transform_instances" to 4_096,
+            "placement_instances" to 64,
+            "fill_instances" to 64,
+            "primitive_marks" to 400,
+            "maximum_per_template_primitive_marks" to 240,
+            "maximum_resolved_count" to 2_000,
+            "object_templates" to 64,
+        )
     }
 }

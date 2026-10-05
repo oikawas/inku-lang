@@ -21,7 +21,6 @@ interface RenderBridge {
     fun rasterApiVersion(): String
     fun renderEngineId(): String
     fun renderEngineVersion(): String
-    fun defaultColorMapJson(): String
     fun rendererReferenceJson(): String
     fun render(requestJson: String): NativeRenderOutput
     fun rasterize(svg: String, rasterOptionsJson: String): NativeRasterOutput
@@ -42,7 +41,6 @@ object NativeRenderBridge : RenderBridge {
     external override fun rasterApiVersion(): String
     external override fun renderEngineId(): String
     external override fun renderEngineVersion(): String
-    external override fun defaultColorMapJson(): String
     external override fun rendererReferenceJson(): String
     external override fun render(requestJson: String): NativeRenderOutput
     external override fun rasterize(svg: String, rasterOptionsJson: String): NativeRasterOutput

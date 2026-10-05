@@ -123,7 +123,7 @@ const val SETTING_KEY_DISPLAY_SAFE_MARGINS = "display_safe_margins"
 const val SETTING_KEY_RENDER_WILD = "render_wild"
 /** Said by every generating entry point that refuses while candidates are drawn. */
 val REFINEMENT_IN_PROGRESS: (InkuStrings) -> String = { it.refinementInProgress }
-/** 「固定モードでは固定側を1モデル、比較側を最大4モデル選ぶ」(SPEC `:616`). */
+/** Up to four explicitly chosen models, each used for both stages (SPEC §7.8). */
 const val MAX_COMPARE_SELECTION = 4
 val MODEL_SELECT_PROMPT: (InkuStrings) -> String = { it.comparisonModelSelectPrompt }
 val MODEL_CHOICE_BLOCKED: (InkuStrings) -> String = { it.comparisonModelChoiceBlocked }
@@ -142,9 +142,17 @@ const val CANVAS_FIT_ZOOM = 1.0f
 /** Float slack for "is it back at fit", which a pinch never lands on exactly. */
 const val CANVAS_ZOOM_EPSILON = 0.01f
 
+/**
+ * The description field is held by the DDL. web's rule
+ * (`features/work/state.svelte.ts`): a saved work answers with its lock mark
+ * ([InkuUiState.historyDescriptionLocked]), which also holds a work derived from
+ * an edited DDL without reading the description again; before a work is
+ * saved, its authoring variation's authority decides.
+ */
 val InkuUiState.descriptionLocked: Boolean
     get() = historyAuthorityLoading || (!descriptionForkRequested &&
-        (pipelineView?.authority == "ddl_authoritative" || historyAuthority == "ddl_authoritative"))
+        (historyDescriptionLocked
+            ?: (pipelineView?.authority == "ddl_authoritative" || historyAuthority == "ddl_authoritative")))
 
 data class ProviderModelFetchState(
     val message: String,
@@ -160,6 +168,11 @@ data class InkuUiState(
     val confirmDdlOverwrite: Boolean = false,
     val pipelineView: PipelineView? = null,
     val historyAuthority: String? = null,
+    /**
+     * The selected saved work's description lock (`DescriptionLock`), or `null`
+     * while there is no saved work to answer for or its mark could not be read.
+     */
+    val historyDescriptionLocked: Boolean? = null,
     val historyAuthorityLoading: Boolean = false,
     val descriptionForkRequested: Boolean = false,
     val batchText: String = "赤い円を5個、横に並べる\n黒い太筆の線を3本、斜めに置く\n緑の四角を12個、散らす",
@@ -270,6 +283,12 @@ data class InkuUiState(
     val refinementLayoutMode: RecomposeMode = RecomposeMode.Principled,
     val refinementTouchWords: String = "",
     val refinementCount: Int = 1,
+    /**
+     * How many candidates the running round draws. The colour change draws
+     * every other catalogue and a comparison every chosen model, so the
+     * progress lanes count this rather than [refinementCount].
+     */
+    val refinementPlannedCount: Int = 0,
     val refinementBusy: Boolean = false,
     // 「開始3秒後から共通デザインの停止ボタンでAPI要求を中断できる」.
     val refinementCanAbort: Boolean = false,
@@ -627,6 +646,7 @@ class InkuViewModel @JvmOverloads constructor(
             ddl = view.visibleDdl ?: localState.value.ddl,
             pipelineView = view,
             historyAuthority = view.authority,
+            historyDescriptionLocked = null,
             historyAuthorityLoading = false,
             descriptionForkRequested = false,
             ddlEditedAfterGeneration = false,
@@ -789,6 +809,7 @@ class InkuViewModel @JvmOverloads constructor(
             pipelineView = null,
             cameraSourcePhotoPath = null,
             historyAuthority = null,
+            historyDescriptionLocked = null,
             historyAuthorityLoading = false,
         )
         cameraJob = viewModelScope.launch {
@@ -1193,6 +1214,7 @@ class InkuViewModel @JvmOverloads constructor(
             selectedHistory = if (phase >= CameraInstantPrintPhase.InterpretingStage1) null else current.selectedHistory,
             pipelineView = if (phase >= CameraInstantPrintPhase.InterpretingStage1) null else current.pipelineView,
             historyAuthority = if (phase >= CameraInstantPrintPhase.InterpretingStage1) null else current.historyAuthority,
+            historyDescriptionLocked = if (phase >= CameraInstantPrintPhase.InterpretingStage1) null else current.historyDescriptionLocked,
             historyAuthorityLoading = if (phase >= CameraInstantPrintPhase.InterpretingStage1) false else current.historyAuthorityLoading,
             message = presentation?.message,
         )
@@ -1395,6 +1417,7 @@ class InkuViewModel @JvmOverloads constructor(
             ddl = "",
             pipelineView = null,
             historyAuthority = null,
+            historyDescriptionLocked = null,
             historyAuthorityLoading = false,
             descriptionForkRequested = false,
             selectedHistory = null,
@@ -1438,6 +1461,7 @@ class InkuViewModel @JvmOverloads constructor(
             lineageDetached = true,
             pipelineView = null,
             historyAuthority = null,
+            historyDescriptionLocked = null,
             importedPlugins = parsed.plugins,
             importedPluginNames = parsed.names,
             message = if (parsed.names.isEmpty()) null else strings().ddlImportedPlugins(parsed.names.joinToString(", ")),
@@ -1546,7 +1570,7 @@ class InkuViewModel @JvmOverloads constructor(
         if (current.selectedHistory != null) {
             current = current.copy(
                 prompt = "", ddl = "", ddlEditedAfterGeneration = false,
-                selectedHistory = null, pipelineView = null, historyAuthority = null,
+                selectedHistory = null, pipelineView = null, historyAuthority = null, historyDescriptionLocked = null,
                 historyAuthorityLoading = false, descriptionForkRequested = false,
                 cameraSourcePhotoPath = null, cameraCaptureState = CameraCaptureState.Idle,
             )
@@ -1678,6 +1702,7 @@ class InkuViewModel @JvmOverloads constructor(
     private fun InkuUiState.restoreAuthoring(source: InkuUiState): InkuUiState = copy(
         prompt = source.prompt, ddl = source.ddl, ddlEditedAfterGeneration = source.ddlEditedAfterGeneration,
         pipelineView = source.pipelineView, historyAuthority = source.historyAuthority,
+        historyDescriptionLocked = source.historyDescriptionLocked,
         historyAuthorityLoading = source.historyAuthorityLoading, descriptionForkRequested = source.descriptionForkRequested,
         selectedHistory = source.selectedHistory, selectedCatalogId = source.selectedCatalogId,
         selectedCanvasAspect = source.selectedCanvasAspect, sketchMode = source.sketchMode,
@@ -2157,11 +2182,15 @@ class InkuViewModel @JvmOverloads constructor(
             cameraSourcePhotoPath = originalPhotos.savedPhoto(item.id)?.absolutePath,
             pipelineView = null,
             historyAuthority = null,
+            historyDescriptionLocked = null,
             historyAuthorityLoading = true,
         )
         viewModelScope.launch {
             val managed = runCatching {
                 withContext(Dispatchers.IO) { repository.readManagedHistory(AndroidWorkPipeline.OWNER_ID, item.id) }
+            }
+            val lock = runCatching {
+                withContext(Dispatchers.IO) { repository.isDescriptionLocked(item) }
             }
             val pipelineView = if (activeExecution) {
                 runCatching {
@@ -2181,6 +2210,7 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = current.copy(
                 pipelineView = view,
                 historyAuthority = history?.authority ?: view?.authority,
+                historyDescriptionLocked = lock.getOrNull(),
                 historyAuthorityLoading = false,
                 message = history?.warning
                     ?: pipelineView.exceptionOrNull()?.let { messageFor(it, strings(), strings().drawingContextUnreadable) }
@@ -2230,6 +2260,7 @@ class InkuViewModel @JvmOverloads constructor(
             sketchMode = Sketches.DEFAULT_MODE,
             pipelineView = null,
             historyAuthority = null,
+            historyDescriptionLocked = null,
             historyAuthorityLoading = false,
             descriptionForkRequested = false,
             lineageDetached = true,
@@ -2530,6 +2561,9 @@ class InkuViewModel @JvmOverloads constructor(
                         repository.readManagedHistory(AndroidWorkPipeline.OWNER_ID, current.selectedHistory.id)
                     }
                 }
+                val lock = runCatching {
+                    withContext(Dispatchers.IO) { repository.isDescriptionLocked(current.selectedHistory) }
+                }.getOrNull()
                 if (!isCurrentDrawingRun(runId)) return@launch
                 val managed = read.getOrNull()
                 if (read.isFailure || managed == null || managed.warning != null) {
@@ -2540,11 +2574,13 @@ class InkuViewModel @JvmOverloads constructor(
                     )
                     return@launch
                 }
-                if (managed.authority == "ddl_authoritative" && !current.descriptionForkRequested) {
+                // A saved work answers with its lock mark, as the field does.
+                if ((lock ?: (managed.authority == "ddl_authoritative")) && !current.descriptionForkRequested) {
                     localState.value = localState.value.copy(
                         isDrawing = false,
                         historyAuthorityLoading = false,
                         historyAuthority = managed.authority,
+                        historyDescriptionLocked = lock,
                         message = strings().pipelineDdlAuthority,
                     )
                     return@launch
@@ -2559,6 +2595,7 @@ class InkuViewModel @JvmOverloads constructor(
                 confirmDdlOverwrite = false,
                 pipelineView = null,
                 historyAuthority = null,
+                historyDescriptionLocked = null,
                 message = strings().statusStage1,
             )
             runCatching {
@@ -2711,13 +2748,9 @@ class InkuViewModel @JvmOverloads constructor(
                     message = strings().batchRunning(index + 1, lines.size),
                 )
                 runCatching {
-                    val catalogId = withContext(Dispatchers.IO) {
-                        repository.selectCatalogId(
-                            current.selectedCatalogId,
-                            prompt,
-                            current.selectedModelId,
-                        )
-                    }
+                    // The setting as it is: `auto` goes to the shared pipeline,
+                    // which chooses the catalogue there.
+                    val catalogId = current.selectedCatalogId
                     withContext(Dispatchers.IO) {
                         repository.paint(
                             description = prompt,
@@ -2837,13 +2870,7 @@ class InkuViewModel @JvmOverloads constructor(
                         repository.generateDemoPrompt(cycle.demoSeed, cycle.selectedModelId)
                     }
                     if (!isCurrentDrawingRun(runId)) return@launch
-                    val catalogId = withContext(Dispatchers.IO) {
-                        repository.selectCatalogId(
-                            cycle.selectedCatalogId,
-                            prompt,
-                            cycle.selectedModelId,
-                        )
-                    }
+                    val catalogId = cycle.selectedCatalogId
                     localState.value = localState.value.copy(
                         demoGeneratedPrompt = prompt,
                         demoGeneratedDdl = null,
@@ -3054,11 +3081,6 @@ class InkuViewModel @JvmOverloads constructor(
      * comparison from growing a second copy of it (SPEC `:688`).
      */
     private fun candidateJobs(current: InkuUiState, parent: RefinementParent): List<CandidateJob> {
-        // A work drawn from hand-written DDL has no description to refine
-        // from. Every element is refused, as web refuses them; before this a
-        // route through Stage 1 sent the core an empty description and the
-        // panel showed its bare `schema_violation`.
-        if (parent.description.isBlank()) inkuError { it.refinementNeedsDescription }
         return when (current.refinementSubview) {
             RefinementSubview.Adjust -> adjustJobs(current, parent)
             RefinementSubview.Model -> modelJobs(current, parent)
@@ -3067,6 +3089,7 @@ class InkuViewModel @JvmOverloads constructor(
 
     private fun adjustJobs(current: InkuUiState, parent: RefinementParent): List<CandidateJob> {
         val element = current.refinementElement
+        RefinementPlanner.requireSource(element, parent)
         val count = current.refinementCount
         if (element == RefinementElement.Touch && current.refinementTouchWords.isBlank()) {
             inkuError { it.refinementTouchWordsRequired }
@@ -3076,15 +3099,19 @@ class InkuViewModel @JvmOverloads constructor(
         if (count > RefinementPlanner.maxCandidates(element)) {
             throw InkuFailure(RefinementPlanner.TOUCH_FANOUT_REFUSAL)
         }
+        // The colour change draws every other catalogue, one candidate each and
+        // named after it, whatever the count says (web's `planRefinementCandidates`).
         val catalogIds = if (element == RefinementElement.Color) {
-            RefinementPlanner.catalogCandidateIds(parent.catalogId, ColorCatalogs.all.map { it.id }, count)
+            RefinementPlanner.catalogCandidateIds(parent.catalogId, ColorCatalogs.all.map { it.id })
         } else {
             emptyList()
         }
-        return (0 until count).map { index ->
+        val planned = if (element == RefinementElement.Color) catalogIds.size else count
+        return (0 until planned).map { index ->
             CandidateJob(
                 id = "${element.id}-$index",
-                label = "${strings().refinementElementLabel(element.id)} ${index + 1}",
+                label = catalogIds.getOrNull(index)?.let { id -> ColorCatalogs.currentDisplayCatalog(id)?.name ?: id }
+                    ?: "${strings().refinementElementLabel(element.id)} ${index + 1}",
                 plan = RefinementPlanner.plan(
                     element = element,
                     parent = parent,
@@ -3101,6 +3128,7 @@ class InkuViewModel @JvmOverloads constructor(
      * an empty selection draws nothing and says so.
      */
     private fun modelJobs(current: InkuUiState, parent: RefinementParent): List<CandidateJob> {
+        RefinementPlanner.requireSource(null, parent)
         val chosen = current.modelCompareSelectedModels
             .take(MAX_COMPARE_SELECTION)
             .filterNot {
@@ -3150,6 +3178,7 @@ class InkuViewModel @JvmOverloads constructor(
             refinementStatus = null,
             refinementCandidates = emptyList(),
             refinementPreviewId = null,
+            refinementPlannedCount = jobs.size,
         )
         val run = viewModelScope.launch {
             // The stop appears three seconds in, not at once: a candidate that
@@ -3585,6 +3614,7 @@ class InkuViewModel @JvmOverloads constructor(
                     lineageGraph = null,
                     pipelineView = null,
                     historyAuthority = null,
+                    historyDescriptionLocked = null,
                     workNotice = strings().workDeleted,
                 )
             } else {

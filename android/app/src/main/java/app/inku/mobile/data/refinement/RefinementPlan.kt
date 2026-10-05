@@ -1,5 +1,6 @@
 package app.inku.mobile.data.refinement
 
+import app.inku.mobile.data.DdlSource
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.drawnWild
 import app.inku.mobile.data.model.WorkColorSnapshot
@@ -242,14 +243,35 @@ object RefinementPlanner {
     val TOUCH_FANOUT_REFUSAL: (InkuStrings) -> String = { it.refinementTouchFanoutRefusal }
 
     /**
-     * The catalogues four colour candidates use. 「4案では可能な限り異なるカタログ
-     * を使う」: the parent's own is excluded and the rest are shuffled, so a
-     * second round is not the same four.
+     * Refuses a round the parent cannot feed, in web's order
+     * (`generateVariationCandidates`, `generateModelCandidates`). [element] is
+     * `null` for the model comparison.
+     *
+     * A colour change replays the saved Score and a layout draws the saved DDL,
+     * so neither needs a description: a work drawn from hand-written DDL can
+     * still take them. Touch, reading and the model comparison keep the
+     * description guard -- before it, a route through Stage 1 sent the core an
+     * empty description and the panel showed its bare `schema_violation`.
+     * Every element but colour then needs the DDL, as web asks for it.
      */
-    fun catalogCandidateIds(currentId: String, available: List<String>, count: Int): List<String> {
-        val others = available.filter { it.isNotBlank() && it != currentId }.shuffled()
+    fun requireSource(element: RefinementElement?, parent: RefinementParent) {
+        val needsDescription = element != RefinementElement.Color && element != RefinementElement.Layout
+        if (needsDescription && parent.description.isBlank()) inkuError { it.refinementNeedsDescription }
+        if (element != null && element != RefinementElement.Color && !DdlSource.hasBody(parent.ddl)) {
+            inkuError { it.refinementNeedsDdl }
+        }
+    }
+
+    /**
+     * The catalogues the colour change draws: every one but the parent's, in
+     * the catalogue list's order (SPEC.ja.md :644, web's `otherCatalogIds`).
+     * The author compares them all side by side instead of a random few, so
+     * the 1 案 / 4 案 count does not apply and no model is asked.
+     */
+    fun catalogCandidateIds(currentId: String, available: List<String>): List<String> {
+        val others = available.filter { it.isNotBlank() && it != currentId }
         if (others.isEmpty()) inkuError { it.refinementNoOtherCatalog }
-        return List(count) { index -> others[index % others.size] }
+        return others
     }
 
     private fun unsigned(seed: Long): String = java.lang.Long.toUnsignedString(seed)

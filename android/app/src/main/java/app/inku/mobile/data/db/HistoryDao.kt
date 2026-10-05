@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import app.inku.mobile.data.lineage.DescriptionLock
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -78,4 +79,8 @@ interface HistoryDao {
 
     @Query("DELETE FROM history_items WHERE id = :id")
     suspend fun deletePermanently(id: String)
+
+    /** Each work's DDL and its origin, for the description lock's replay test. */
+    @Query("SELECT id AS historyId, normalized_ddl AS ddl, ddl_source_origin AS ddlSourceOrigin FROM history_items WHERE id IN (:ids)")
+    suspend fun lockDdlOfHistories(ids: Collection<String>): List<DescriptionLock.HistoryDdl>
 }

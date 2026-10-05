@@ -16,4 +16,8 @@ interface ExportTemplateDao {
 
     @Query("DELETE FROM export_templates WHERE id = :id")
     suspend fun delete(id: String)
+
+    /** Removes a built-in row only; a template the author made is never matched. */
+    @Query("DELETE FROM export_templates WHERE id = :id AND is_builtin = 1")
+    suspend fun deleteBuiltin(id: String)
 }

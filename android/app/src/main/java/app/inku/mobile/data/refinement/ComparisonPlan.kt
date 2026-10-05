@@ -37,10 +37,13 @@ object ComparisonPlanner {
     ): Boolean = model == targetStage1Model || model == targetStage2Model
 
     /**
-     * A comparison redraws the description from the top, so it carries none of
-     * the parent's seeds: a held render seed would hand every model the same
-     * performance and hide the difference the comparison exists to show. web
-     * sends none either -- `interpretOne` / `composeOne` with no seed fields.
+     * A comparison redraws the description from the top with another model,
+     * and the plan sets no seed of its own. It is not seedless: the candidate is
+     * drawn with the parent as `parentHistoryId`, and `prepare`
+     * (AndroidWorkPipeline) then takes the parent's saved `render_seed`, and
+     * its saved composition seed with the configuration, so the models are
+     * compared under the parent's performance. A parent with no saved context
+     * gets a new render seed.
      */
     fun modelPlan(
         model: String,

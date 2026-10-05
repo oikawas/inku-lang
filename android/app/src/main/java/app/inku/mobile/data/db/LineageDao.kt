@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import app.inku.mobile.data.lineage.DescriptionLock
 
 @Dao
 interface LineageDao {
@@ -50,4 +51,17 @@ interface LineageDao {
 
     @Query("SELECT * FROM lineage_edges WHERE parent_node_id IN (:parentIds)")
     suspend fun getEdgesByParentIds(parentIds: Collection<String>): List<LineageEdgeEntity>
+
+    // What the description lock walks (`DescriptionLock`), without the rows' other columns.
+    @Query("SELECT id, history_id AS historyId FROM lineage_nodes WHERE history_id IN (:historyIds)")
+    suspend fun lockNodesOfHistories(historyIds: Collection<String>): List<DescriptionLock.Node>
+
+    @Query("SELECT id, history_id AS historyId FROM lineage_nodes WHERE id IN (:nodeIds)")
+    suspend fun lockNodesByIds(nodeIds: Collection<String>): List<DescriptionLock.Node>
+
+    @Query(
+        "SELECT parent_node_id AS parentNodeId, child_node_id AS childNodeId, derivation_kind AS derivationKind " +
+            "FROM lineage_edges WHERE child_node_id IN (:childNodeIds)",
+    )
+    suspend fun lockEdgesOfChildren(childNodeIds: Collection<String>): List<DescriptionLock.Edge>
 }

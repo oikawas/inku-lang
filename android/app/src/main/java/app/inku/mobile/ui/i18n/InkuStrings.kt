@@ -150,6 +150,8 @@ interface InkuStrings {
     val refinementTouchWordsRequired: String
     /** The web's `refineNeedsDescription`, pointing at a work: Android refines a saved work's description. */
     val refinementNeedsDescription: String
+    /** The web's `refineNeedsDdl`: a layout, touch or reading needs the work's DDL. */
+    val refinementNeedsDdl: String
     val refinementNoOtherCatalog: String
     val refinementTouchFanoutRefusal: String
     val refinementElementLabel: (String) -> String
@@ -224,6 +226,8 @@ interface InkuStrings {
     val mascotIncu: String
     val localModelNote: String
     val exportPngTooLarge: String
+    /** A PNG height outside the range the export draws, with the range. */
+    val exportPngHeightOutOfRange: (Int, Int) -> String
     val pngAlphaWhite: String
     val stagesShared: String
     val uiModeSubtitle: String

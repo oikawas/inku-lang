@@ -3,8 +3,11 @@ package app.inku.mobile.data.refinement
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.LineageNodeEntity
 import app.inku.mobile.data.lineage.LineageDeclaration
+import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.lineage.LineagePlanner
 import app.inku.mobile.pipeline.RecomposeMode
+import app.inku.mobile.ui.i18n.InkuFailure
+import app.inku.mobile.ui.i18n.InkuStringsJa
 import kotlin.reflect.full.memberProperties
 import kotlin.reflect.full.valueParameters
 import org.junit.Assert.assertEquals
@@ -146,15 +149,19 @@ class RefinementPlanTest {
         assertTrue(error.isFailure)
     }
 
-    /** 「4案では可能な限り異なるカタログを使う」. */
+    /**
+     * SPEC.ja.md :644 -- 「対象作品の色カタログを除く全色カタログで同じScoreを描いた
+     * 候補をカタログ一覧の順に並べる」, web's `otherCatalogIds`: every other
+     * catalogue, in the list's order, whatever count is chosen.
+     */
     @Test
-    fun t3_fourColourCandidatesUseFourDifferentCatalogues() {
-        val available = listOf("default", "ink_season", "vivid_material", "sea_stone", "moss_bark")
-        val ids = RefinementPlanner.catalogCandidateIds("ink_season", available, 4)
+    fun t3_theColourChangeOffersEveryOtherCatalogueInListOrder() {
+        val available = ColorCatalogs.all.map { it.id }
+        val ids = RefinementPlanner.catalogCandidateIds("ink_season", available)
 
-        assertEquals(4, ids.size)
-        assertEquals("all four differ", 4, ids.toSet().size)
+        assertEquals(available.filter { it != "ink_season" }, ids)
         assertFalse("the parent's own catalogue is not offered", ids.contains("ink_season"))
+        assertEquals("a second round is the same list", ids, RefinementPlanner.catalogCandidateIds("ink_season", available))
     }
 
     // ── T-5 ────────────────────────────────────────────────
@@ -301,5 +308,46 @@ class RefinementPlanTest {
                 TextSeed(java.lang.Long.parseUnsignedLong("14859340650796947346"), it)
             }
         }
+    }
+
+    // ── what the parent must have ─────────────────────────
+
+    /**
+     * web's order (`generateVariationCandidates`, `generateModelCandidates`):
+     * a colour and a layout need no description; touch, reading and the model
+     * comparison do; everything but colour needs the DDL. The refusal is read
+     * as the sentence it carries, so a refusal for the wrong reason fails too.
+     */
+    private fun refusal(element: RefinementElement?, parent: RefinementParent): String? = try {
+        RefinementPlanner.requireSource(element, parent)
+        null
+    } catch (failure: InkuFailure) {
+        failure.text(InkuStringsJa)
+    }
+
+    @Test
+    fun aWorkWithoutADescriptionCanStillChangeItsColourAndLayout() {
+        val parent = RefinementParent.of(parentItem(), description = "")
+
+        assertNull(refusal(RefinementElement.Color, parent))
+        assertNull(refusal(RefinementElement.Layout, parent))
+        assertEquals(InkuStringsJa.refinementNeedsDescription, refusal(RefinementElement.Touch, parent))
+        assertEquals(InkuStringsJa.refinementNeedsDescription, refusal(RefinementElement.Reading, parent))
+        assertEquals("the model comparison reads the description", InkuStringsJa.refinementNeedsDescription, refusal(null, parent))
+    }
+
+    @Test
+    fun everythingButColourNeedsTheDdlAndTheDescriptionIsAskedFirst() {
+        val noDdl = parentItem().copy(normalizedDdl = " \n")
+        val described = RefinementParent.of(noDdl, noDdl.originalInput)
+        val bare = RefinementParent.of(noDdl, description = "")
+
+        assertNull(refusal(RefinementElement.Color, bare))
+        assertEquals(InkuStringsJa.refinementNeedsDdl, refusal(RefinementElement.Layout, bare))
+        assertEquals("the description is asked first", InkuStringsJa.refinementNeedsDescription, refusal(RefinementElement.Touch, bare))
+        assertEquals(InkuStringsJa.refinementNeedsDdl, refusal(RefinementElement.Touch, described))
+        assertEquals(InkuStringsJa.refinementNeedsDdl, refusal(RefinementElement.Reading, described))
+        assertEquals(InkuStringsJa.refinementNeedsDdl, refusal(RefinementElement.Layout, described))
+        assertNull("the model comparison draws from the description alone", refusal(null, described))
     }
 }

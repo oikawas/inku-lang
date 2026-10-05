@@ -6,38 +6,41 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * JVM-only guard for the call-site ownership of I-382's auto selector.
+ * JVM-only guard for where the colour catalogue of a run is chosen (I-382).
  *
- * The focused selector test exercises the real resolver against a recording
- * provider. These source assertions keep the UI routes from accidentally
- * moving that call to a DDL, replay, or refinement path without requiring an
- * emulator or Room fixture.
+ * `auto` is resolved inside the shared pipeline (`catalog_mode` "auto"), so
+ * every drawing route hands the setting over as it is. These source
+ * assertions keep a route from growing its own selector again -- the batch and
+ * demo used to call a repository selector that by then only returned its
+ * argument -- without requiring an emulator or Room fixture.
  */
 class ColorCatalogAutoWiringTest {
 
     @Test
-    fun batchSelectsOnceForEachNonBlankLine() {
+    fun batchHandsEachLineTheSettingAsItIs() {
         val batch = viewModelSection("fun runBatch()", "private fun rememberBatchPrompt")
 
-        assertTrue("selection must stay inside the per-line loop", batch.contains("lines.forEachIndexed"))
-        assertEquals("a batch line must select exactly once", 1, selectorCalls(batch))
+        assertTrue("the catalogue is read inside the per-line loop", batch.contains("lines.forEachIndexed"))
+        assertTrue("a batch line draws in the setting", batch.contains("val catalogId = current.selectedCatalogId"))
+        assertEquals("no batch line chooses a catalogue of its own", 0, selectorCalls(batch))
     }
 
     @Test
-    fun demoSelectsOnceForEachCycle() {
+    fun demoHandsEachCycleTheSettingAsItIs() {
         val demo = viewModelSection("fun startDemo()", "fun stopDrawing()")
 
-        assertTrue("selection must stay inside the demo cycle", demo.contains("while (isActive"))
-        assertEquals("a demo cycle must select exactly once", 1, selectorCalls(demo))
+        assertTrue("the catalogue is read inside the demo cycle", demo.contains("while (isActive"))
+        assertTrue("a demo cycle draws in the setting", demo.contains("val catalogId = cycle.selectedCatalogId"))
+        assertEquals("no demo cycle chooses a catalogue of its own", 0, selectorCalls(demo))
     }
 
     @Test
-    fun ddlReplayAndRefinementNeverInvokeTheSelector() {
-        assertEquals(0, selectorCalls(viewModelSection("fun drawFromDdl()", "fun runBatch()")))
-        assertEquals(0, selectorCalls(viewModelSectionToEnd("fun openRefinement")))
-        // A normal draw no longer calls it: its auto catalog is chosen inside
-        // the shared pipeline (catalog_mode "auto").
-        assertEquals("only batch and demo own selector calls", 2, selectorCalls(source("app/src/main/java/app/inku/mobile/ui/InkuViewModel.kt")))
+    fun noRouteChoosesACatalogueBeforeThePipeline() {
+        // A normal draw, DDL, replay and refinement never did; the batch and
+        // the demo no longer do. The auto catalogue is chosen inside the
+        // shared pipeline.
+        assertEquals(0, selectorCalls(source("app/src/main/java/app/inku/mobile/ui/InkuViewModel.kt")))
+        assertEquals(0, selectorCalls(source("app/src/main/java/app/inku/mobile/data/InkuRepository.kt")))
     }
 
     @Test
@@ -55,17 +58,10 @@ class ColorCatalogAutoWiringTest {
     }
 
     private fun selectorCalls(source: String): Int =
-        Regex("repository\\.selectCatalogId\\(").findAll(source).count()
+        Regex("selectCatalogId\\(|resolveCatalogIdForRun\\(").findAll(source).count()
 
     private fun viewModelSection(start: String, end: String): String {
         return sourceSection(source("app/src/main/java/app/inku/mobile/ui/InkuViewModel.kt"), start, end)
-    }
-
-    private fun viewModelSectionToEnd(start: String): String {
-        val content = source("app/src/main/java/app/inku/mobile/ui/InkuViewModel.kt")
-        val from = content.indexOf(start)
-        assertTrue("missing source section beginning $start", from >= 0)
-        return content.substring(from)
     }
 
     private fun sourceSection(content: String, start: String, end: String): String {

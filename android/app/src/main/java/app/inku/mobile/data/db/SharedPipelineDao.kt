@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import app.inku.mobile.data.lineage.DescriptionLock
 
 @Dao
 interface SharedPipelineDao {
@@ -124,4 +125,17 @@ interface SharedPipelineDao {
 
     @Query("SELECT * FROM pipeline_history_links WHERE history_id = :historyId LIMIT 1")
     suspend fun getAnyHistoryLink(historyId: String): PipelineHistoryLinkEntity?
+
+    // The authority each saved work's variation holds now, for the description lock.
+    @Query(
+        "SELECT owner_id AS ownerId, history_id AS historyId, variation_id AS variationId " +
+            "FROM pipeline_history_links WHERE history_id IN (:historyIds)",
+    )
+    suspend fun lockHistoryLinks(historyIds: Collection<String>): List<DescriptionLock.HistoryLink>
+
+    @Query(
+        "SELECT owner_id AS ownerId, variation_id AS variationId, authority " +
+            "FROM variation_authority WHERE variation_id IN (:variationIds)",
+    )
+    suspend fun lockAuthorities(variationIds: Collection<String>): List<DescriptionLock.Authority>
 }

@@ -1,5 +1,6 @@
 package app.inku.mobile.data
 
+import app.inku.mobile.ui.export.PngExportSize
 import app.inku.mobile.ui.i18n.inkuError
 import android.content.Context
 import android.graphics.Bitmap
@@ -19,6 +20,7 @@ import app.inku.mobile.data.db.ModelAssetEntity
 import app.inku.mobile.data.db.PluginSettingEntity
 import app.inku.mobile.data.db.ProviderSettingEntity
 import app.inku.mobile.data.db.RoomSharedPipelineStore
+import app.inku.mobile.data.lineage.DescriptionLock
 import app.inku.mobile.data.lineage.LineageDeclaration
 import app.inku.mobile.data.lineage.LineageGraph
 import app.inku.mobile.data.lineage.LineageGraphResult
@@ -299,6 +301,29 @@ class InkuRepository(
         sharedPipelineStore.readHistory(ownerId, historyId)
 
     /**
+     * Whether [item] is held by its DDL rather than by its description: the
+     * server's `description_locked` mark, from the same lineage, DDL and
+     * variation authority rows (`DescriptionLock`).
+     */
+    suspend fun isDescriptionLocked(item: HistoryItemEntity): Boolean =
+        item.id in DescriptionLock.lockedHistoryIds(descriptionLockStore, listOf(item.id))
+
+    private val descriptionLockStore = object : DescriptionLock.Store {
+        override suspend fun nodesOfHistories(historyIds: Collection<String>) =
+            database.lineageDao().lockNodesOfHistories(historyIds)
+        override suspend fun nodesByIds(nodeIds: Collection<String>) =
+            database.lineageDao().lockNodesByIds(nodeIds)
+        override suspend fun edgesOfChildren(childNodeIds: Collection<String>) =
+            database.lineageDao().lockEdgesOfChildren(childNodeIds)
+        override suspend fun ddlOfHistories(historyIds: Collection<String>) =
+            database.historyDao().lockDdlOfHistories(historyIds)
+        override suspend fun historyLinks(historyIds: Collection<String>) =
+            database.sharedPipelineDao().lockHistoryLinks(historyIds)
+        override suspend fun authorities(variationIds: Collection<String>) =
+            database.sharedPipelineDao().lockAuthorities(variationIds)
+    }
+
+    /**
      * The saved work as `inku.ddl-export.v1`: its visible DDL and the plugin
      * definitions that DDL names, from the work's own saved configuration.
      */
@@ -495,6 +520,10 @@ class InkuRepository(
     }
 
     suspend fun ensureDefaultExportTemplates() {
+        // The built-in 4320px row is retired with the 2160px ceiling (the
+        // author, 2026-10-06). Only the built-in row goes: a template the
+        // author made has its own id and is left as it is.
+        database.exportTemplateDao().deleteBuiltin("png-4320")
         defaultExportTemplates().forEach { template ->
             database.exportTemplateDao().upsert(template)
         }
@@ -535,7 +564,7 @@ class InkuRepository(
                 id = id.take(80),
                 name = name.trim().ifBlank { "PNG" }.take(80),
                 description = description.trim().take(240),
-                heightPx = heightPx.coerceIn(64, 12000),
+                heightPx = heightPx.coerceIn(PngExportSize.MIN_HEIGHT_PX, PngExportSize.MAX_HEIGHT_PX),
                 sortOrder = sortOrder,
                 isBuiltin = isBuiltin,
                 updatedAt = System.currentTimeMillis(),
@@ -793,14 +822,15 @@ class InkuRepository(
     /**
      * The work as an SVG file in one of the three profiles the server offers.
      *
-     * Display is the saved SVG itself. Editable and compat are drawn again from
+     * Display is the saved SVG with the description it was drawn from in a
+     * `<desc>`, as web's download writes it. Editable and compat are drawn again from
      * the saved Score with the work's own colors, seeds and Wild, as the
      * server's `GET /api/history/{id}/svg?profile=` does; they used to be the
      * display SVG with a new title, so neither carried the groups and ids the
      * editable file promises nor the compat file's simplified effects.
      */
     suspend fun exportSvg(item: HistoryItemEntity, profile: String): String {
-        if (profile == "display") return item.displaySvg
+        if (profile == "display") return withDescription(item.displaySvg, item.sourceText ?: item.originalInput)
         val seeds = PaintSeeds.of(item)
         val description = item.sourceText ?: item.originalInput
         return pipeline.renderExportSvg(
@@ -842,12 +872,6 @@ class InkuRepository(
             .firstOrNull { it.isNotBlank() }
             ?: inkuError { it.demoPromptGenerationEmpty }
     }
-
-    suspend fun selectCatalogId(
-        selectedCatalogId: String,
-        sourceText: String,
-        stage1ModelId: String,
-    ): String = selectedCatalogId
 
     suspend fun renderFromScore(description: String, scoreJson: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), sourceText: String? = null, parentHistoryId: String? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
@@ -1355,7 +1379,6 @@ class InkuRepository(
             // first launch would keep that language for good.
             ExportTemplateEntity("png-1080", "PNG 1080px", "", 1080, 0, true, now),
             ExportTemplateEntity("png-2160", "PNG 2160px", "", 2160, 1, true, now),
-            ExportTemplateEntity("png-4320", "PNG 4320px", "", 4320, 2, true, now),
         )
     }
 }

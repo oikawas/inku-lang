@@ -93,6 +93,10 @@ class ComposeRequest(BaseModel):
     # here and it stands in for the description everywhere the description went.
     sketch_text: str | None = Field(default=None, max_length=100_000, description="写生層 (Stage 0.5) の出力。与えられたら記述の代わりに後段へ渡る")
     sketch_grain: str | None = Field(default=None, pattern="^(fine|coarse)$", description="写生の区切り fine / coarse (記録・再現用。この経路では 0.5 を呼ばない)")
+    work_id: str | None = Field(
+        default=None,
+        description="Id of the saved work being drawn again; the run forks from it with its saved settings and seeds",
+    )
     lineage_parent_node_id: str | None = None
     derivation_kind: str | None = None
     derivation_metadata: dict[str, object] = Field(default_factory=dict)

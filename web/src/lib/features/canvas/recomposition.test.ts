@@ -159,7 +159,7 @@ test('manual layout draws a saved DDL without a description and saves its chosen
 			session,
 			work: {
 				input: '', ddl: 'saved parent instructions', loading: false, thinking: null,
-				result: { svg: '<svg/>', score: { instructions: [] }, composition_seed: 7 },
+				result: { svg: '<svg/>', score: { instructions: [] }, composition_seed: 7, history_id: 'parent-work' },
 				instructionLang: 'auto', sketchPayloadFor: () => ({}),
 				confirmFallbackRefine: async () => true, currentRefineParent: () => null,
 				paintTokensIn: () => null, paintTokensOut: () => null,
@@ -178,6 +178,9 @@ test('manual layout draws a saved DDL without a description and saves its chosen
 				assert.equal(payload.ddl, 'saved parent instructions');
 				assert.equal(payload.recompose_mode, 'chance');
 				assert.equal(payload.composition_seed, 42);
+				// The server forks the candidate from this saved work, with its
+				// saved settings and seeds (SPEC §12.7.1).
+				assert.equal(payload.work_id, 'parent-work');
 				return new Response(JSON.stringify({ ddl: 'recomposed instructions', svg: '<svg/>', score: { instructions: [] } }));
 			},
 			pushHistory: async (item: HistoryItem, options?: SaveHistoryOptions) => {

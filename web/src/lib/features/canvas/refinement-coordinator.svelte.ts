@@ -176,6 +176,9 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				ui_lang: getLang(),
 				canvas_aspect: refinementCanvasAspectId(),
 				composition_seed: compositionSeed,
+				// The server forks the candidate from this saved work, with its
+				// saved settings and seeds; an unsaved result starts afresh.
+				...workReferencePayload(refinementWorkId()),
 				...renderSettingsPayload('compose', refinementRenderOverrides()),
 				...(deps.lineageParentId() ? { lineage_parent_node_id: deps.lineageParentId() } : {}),
 		}, mode, signal, apiFetch, work.pipelineCompatibilityError);

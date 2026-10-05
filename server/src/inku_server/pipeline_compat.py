@@ -295,7 +295,17 @@ def compose(owner: str, data: dict[str, Any], reader_left: Callable[[], bool] | 
     if data.get("imported_plugins"):
         options["imported_plugins"] = data["imported_plugins"]
     service = _service()
-    source_work = {"description": data.get("description") or ""}
+    source_work, parent = {"description": data.get("description") or ""}, None
+    if data.get("work_id"):
+        # A drawing of a saved work forks from it (SPEC §12.7.1): its saved
+        # config, seeds, catalog and limits decide this run, and the new
+        # direct-DDL variation keeps the saved one as its parent. Without one
+        # (a CLI, an unsaved result) the run starts from today's settings.
+        from .pipeline_api import saved_work_parent
+
+        parent, source_work = saved_work_parent(service.store, owner, data["work_id"])
+        if data.get("description"):
+            source_work["description"] = data["description"]
     source, recomposition, prepared = data["ddl"], None, None
     if data.get("recompose_mode") is not None:
         source, recomposition, prepared = _recompose(service, owner, data, options, source_work)
@@ -305,6 +315,7 @@ def compose(owner: str, data: dict[str, Any], reader_left: Callable[[], bool] | 
             owner,
             "direct_ddl",
             source,
+            parent=parent,
             source_work=source_work,
             canvas_aspect=data.get("canvas_aspect"),
             options=options,

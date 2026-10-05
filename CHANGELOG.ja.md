@@ -6,6 +6,10 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### v2.15.87 — 別の構図を原理または偶然で選び直す（Build 1163、2026-10-05）
+
+［構図］の範囲を選び直す共有coreと、Server・Web・Androidの配置の選択を揃えた版。保存した指示書から「原理に沿う／偶然に委ねる」で新しい候補を作り、動きまたは変わらない理由を表示する。DDL engine 57、render engine 73、Score 0.19.0、Androidの版・Buildと保存済み作品は維持する。
+
 ### Android 2.1.4-android.88 — GitHubで署名付きAPKを配布する（Build 148372、2026-10-04）
 
 ChatGPTプラン・共有構図・個数の区画配置と変奏廃止を含む現行Androidを、Android 15以降・arm64向けの公開APKとして配布する。専用の公開署名を使い、debug版からの直接更新はできない。確定したBuildでreleaseを再現する指定を追加し、通常の自動採番を保持した。実際のruntime依存のLICENSE・NOTICE、LiteRT-LM JNIの上流全文、共有Rustのライセンス集をAPKへ同梱し、導入・更新と既存作品の保全条件を日英で案内する。Android以外の版・配備は変更しない。

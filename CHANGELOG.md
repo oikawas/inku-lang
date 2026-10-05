@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### v2.15.87 — Choose another composition by principle or chance (Build 1163, 2026-10-05)
+
+This version aligns the shared core's choice of marked composition ranges with the Server, Web and Android layout controls. Saved instructions produce a new candidate by principle or by chance, showing moves or the reason the ranges stay. DDL engine 57, render engine 73, Score 0.19.0, the Android version and Build, and saved works are retained.
+
 ### Android 2.1.4-android.88 — Publish a signed APK on GitHub (Build 148372, 2026-10-04)
 
 Distribute the current Android app, including the ChatGPT plan, shared composition, cell placement for counts and variation retirement, as a public APK for Android 15 or newer on arm64. A dedicated distribution signature means debug installations cannot update directly. A reproducible-release option uses the finalized Build while retaining ordinary automatic increments. Bundle the resolved runtime LICENSE and NOTICE files, LiteRT-LM's complete upstream JNI notices and the shared Rust license inventory. Japanese and English guides cover installation, updates and preservation of existing works. Other application versions and deployments are unchanged.

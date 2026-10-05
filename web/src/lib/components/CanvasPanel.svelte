@@ -429,8 +429,8 @@
 	let directAIRefineSaved = $state(false);
 	// Refinement dimensions retain the previous selection.
 	const REFINE_KIND_KEY = 'inku-refine-kind';
-	// The color change has a dialog of its own, so it is not a remembered choice here.
-	const REFINE_KINDS: RefineKind[] = ['touch', 'layout', 'reading'];
+	// Layout and color changes have their own dialogs, apart from remembered parameters.
+	const REFINE_KINDS: RefineKind[] = ['touch', 'reading'];
 	let refineKind = $state<RefineKind>('touch');
 	onMount(() => {
 		try {
@@ -504,6 +504,7 @@
 			case 'adjust':
 				startDirectRefinement(node, 'adjust');
 				break;
+			case 'layout': startDirectRefinement(node, 'layout'); break;
 			case 'color-catalog': startDirectRefinement(node, 'color'); break;
 			case 'description': openDirectEdit(node, 'description'); break;
 			case 'instructions': onOpenLineageDdlEditor(node); break;

@@ -1,5 +1,5 @@
 <script module lang="ts">
-	export type WorkAction = 'adjust' | 'color-catalog' | 'description' | 'instructions' | 'sketch-grain' | 'models' | 'autonomous';
+	export type WorkAction = 'adjust' | 'layout' | 'color-catalog' | 'description' | 'instructions' | 'sketch-grain' | 'models' | 'autonomous';
 
 	let lastWorkActionTrigger: HTMLButtonElement | null = null;
 
@@ -121,6 +121,7 @@
 				{#if descriptionLocked}<span class="work-action-origin">{t().descriptionLockedMark}</span>{/if}
 			</div>
 			<button type="button" role="menuitem" onclick={(event) => select('adjust', event)}>{t().workActionAdjust}</button>
+			<button type="button" role="menuitem" onclick={(event) => select('layout', event)}>{t().canvasVaryComposition}</button>
 			<button type="button" role="menuitem" onclick={(event) => select('color-catalog', event)}>{t().canvasVaryColor}</button>
 			{#if !ddlOrigin}
 				<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('description', event)}>{t().workActionDescription}</button>

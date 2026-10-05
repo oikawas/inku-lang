@@ -423,6 +423,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 	async function runWorkAction(action: WorkAction, node: LineageNode): Promise<void> {
 		switch (action) {
 			case 'adjust': await onOpenRefinement(node, 'adjust'); break;
+			case 'layout': await onOpenRefinement(node, 'layout'); break;
 			case 'color-catalog': await onOpenRefinement(node, 'color'); break;
 			case 'description': openEditDialog(node); break;
 			case 'instructions': onOpenDdlEditor(node); break;

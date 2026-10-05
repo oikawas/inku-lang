@@ -4,6 +4,18 @@ The inku application code is licensed under the [repository MIT license](../LICE
 The container also carries independently licensed Python packages, native Rust
 code, and Noto Serif JP. This document does not relicense those components.
 
+The API image also preserves Ubuntu's SQLite `3.37.2-2ubuntu0.8` binary under
+`/opt/inku-sqlite/lib/`, independently of the base distribution's SQLite.
+Its complete packaged copyright notice is
+`/opt/inku-sqlite/licenses/Ubuntu-libsqlite3-copyright.txt`.
+The unchanged SQLite extension sources from
+[CPython 3.12.15](https://www.python.org/downloads/release/python-31215/)
+are rebuilt against that library. The source archive's complete `LICENSE` is
+retained at `/opt/inku-sqlite/licenses/CPython-LICENSE.txt`.
+`/opt/inku-sqlite/contract.json` and `metadata.json` record the exact source,
+package revision and built library/module checksums. Existing base-image and
+Python-package notices remain in place.
+
 Where an installed Python distribution supplies license files, they are
 preserved alongside that package under
 `/app/server/.venv/lib/python3.12/site-packages/*-dist-info/`.

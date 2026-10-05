@@ -6,6 +6,10 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-05 — リリースAPIのSQLiteを確認済みソース配備と揃える
+
+今後のAPIイメージをSQLite3.37.2・Ubuntu修正版3.37.2-2ubuntu0.8に固定する。Debian系Pythonの土台は維持し、独立libraryと同じ未変更のCPython SQLite moduleを組み込む。両architectureのbuildとAPI venvで版・artifact checksumの不一致を拒否し、exact配布noticeを保持する。DB schema・保存済み作品・Web・native codeを変更しない。
+
 ### v2.15.88 — 数で書いた範囲を選び直し、表示で畳む（Build 1164、2026-10-05）
 
 ［構図］の印を付けず、数で書いた範囲を「配置を変える」で選び直すcoreと、Server・Web・Androidの範囲表示を揃えた版。名前と数が一致する範囲を畳み、枠で確認・数を編集できる。描画は明示操作で行い、保存・コピーは数を含む全文を保持する。DDL engine 57、render engine 73、Score 0.19.0、Androidの版・Buildは維持する。

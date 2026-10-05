@@ -3975,6 +3975,20 @@ authentication and administration tables and device-only provider, model, and
 cache tables are host extensions, not parity gaps. The mapping does not change
 the meaning of stored SVG, Score, hashes, or NULL values.
 
+Release API images pin SQLite to engine 3.37.2 and Ubuntu
+security revision `3.37.2-2ubuntu0.8`, specified in
+[`server/runtime/sqlite.json`](server/runtime/sqlite.json). The Debian-based
+Python platform remains; the Ubuntu library lives separately under
+`/opt/inku-sqlite`. Only the unchanged `_sqlite3` module from checksum-verified
+CPython 3.12.15 source is rebuilt against those headers, avoiding a library
+replacement underneath a stock module compiled for newer SQLite symbols.
+Both amd64 and arm64 builds verify the versions, checksums and distribution
+notices of the library and module actually loaded by Python, then verify again
+with the API virtualenv. An unavailable pinned package or identity mismatch
+stops the build instead of falling back to another revision or Debian's
+library. Compilers do not ship. This pin changes no database schema, saved work,
+host SQLite or Android SQLite.
+
 A versioned migration registry owns the Server schema lifecycle. A fresh
 database creates its schema and registry in one single-writer transaction. A
 registered database verifies its version and checksum and then starts without

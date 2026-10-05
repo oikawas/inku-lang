@@ -1735,8 +1735,8 @@ fn a_composing_run_reads_the_settled_plan_and_commits_marked_ranges() {
     let lines: Vec<&str> = source.lines().collect();
     // The field and the circle are placed by the composition; the dots keep the
     // place the description states.
-    assert!(lines[2].contains(" at the [composition] "), "{source}");
-    assert!(lines[3].contains(" at the [composition] "), "{source}");
+    assert!(lines[2].contains(" (horizontal "), "{source}");
+    assert!(lines[3].contains(" (horizontal "), "{source}");
     assert!(lines[4].ends_with(" at the bottom."), "{source}");
     assert!(read.snapshot.composition.is_none());
     let committed = run(
@@ -1757,7 +1757,7 @@ fn a_run_that_does_not_read_composes_from_the_default_reading() {
     let output = plan_answer(&pending);
     let source = committed_source(&output.snapshot);
     let lines: Vec<&str> = source.lines().collect();
-    assert!(lines[2].contains(" at the [composition] "), "{source}");
+    assert!(lines[2].contains(" (horizontal "), "{source}");
     // Without a reading every place the plan set is kept.
     assert!(lines[3].ends_with(" at the center."), "{source}");
     assert!(lines[4].ends_with(" at the bottom."), "{source}");
@@ -1788,7 +1788,7 @@ fn a_failed_reading_composes_from_the_default_reading() {
         "{:?}",
         tags(&last)
     );
-    assert!(committed_source(&state).contains(" at the [composition] "));
+    assert!(committed_source(&state).contains(" (horizontal "));
 }
 
 /// A white circle on the white ground sends the plan back to Stage 1 once,
@@ -1847,7 +1847,7 @@ fn a_returned_stage1_settles_into_the_composition_reading() {
         "{:?}",
         tags(&read)
     );
-    assert!(committed_source(&read.snapshot).contains(" at the [composition] "));
+    assert!(committed_source(&read.snapshot).contains(" (horizontal "));
     let committed = run(
         Some(&read.snapshot),
         &envelope(Some(&read.snapshot), ack(&read.snapshot)),
@@ -1869,7 +1869,7 @@ fn a_run_without_composition_commits_the_plan_as_printed() {
     assert!(!system.contains("8. Choose a place only"));
     let output = plan_answer(&pending);
     let source = committed_source(&output.snapshot);
-    assert!(!source.contains("[composition]"), "{source}");
+    assert!(!source.contains(" (horizontal "), "{source}");
     assert!(
         !tags(&output)
             .iter()

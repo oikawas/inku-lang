@@ -710,9 +710,10 @@ fn ja_modifier(surface: &str) -> String {
     }
 }
 
-/// The mark that says the composition step chose a range, before the words that
-/// name it. The compiler keeps these words unread, so removing the mark makes the
-/// range the author's own.
+/// The mark works printed from Build 1155 to Build 1163 carry before a range the
+/// composition step chose. The compiler keeps it unread with the words after it;
+/// ranges are no longer printed with it (the author's decision of 2026-10-05), and
+/// another composition moves every numeric range whether it carries the mark or not.
 pub const COMPOSITION_MARK_JA: &str = "［構図］";
 pub const COMPOSITION_MARK_EN: &str = "[composition]";
 
@@ -727,13 +728,13 @@ pub struct ComposedRange {
 }
 
 impl ComposedRange {
-    /// The range as the visible DDL writes it, from the composition mark to the
-    /// closing parenthesis (the printer writes the same text).
+    /// The range as the visible DDL writes it, from its words to the closing
+    /// parenthesis (the printer writes the same text; in English after `at the`).
     #[must_use]
     pub fn written(&self, language: ResolvedInstructionLanguage) -> String {
         match language {
             ResolvedInstructionLanguage::Ja => format!(
-                "{COMPOSITION_MARK_JA}{}（横{}〜{}、縦{}〜{}）",
+                "{}（横{}〜{}、縦{}〜{}）",
                 self.words_ja,
                 self.bound(0),
                 self.bound(2),
@@ -741,7 +742,7 @@ impl ComposedRange {
                 self.bound(3)
             ),
             ResolvedInstructionLanguage::En => format!(
-                "{COMPOSITION_MARK_EN} {} (horizontal {} to {}, vertical {} to {})",
+                "{} (horizontal {} to {}, vertical {} to {})",
                 self.words_en,
                 self.bound(0),
                 self.bound(2),
@@ -767,7 +768,7 @@ fn print_layer_ja(layer: &WorkPlanLayer, range: Option<&ComposedRange>) -> Strin
     let mut out = String::new();
     if let Some(range) = range {
         out.push_str(&format!(
-            "{COMPOSITION_MARK_JA}{}（横{}〜{}、縦{}〜{}）",
+            "{}（横{}〜{}、縦{}〜{}）",
             range.words_ja,
             range.bound(0),
             range.bound(2),
@@ -885,7 +886,7 @@ fn print_layer_en(layer: &WorkPlanLayer, range: Option<&ComposedRange>) -> Strin
     }
     if let Some(range) = range {
         out.push_str(&format!(
-            " at the {COMPOSITION_MARK_EN} {} (horizontal {} to {}, vertical {} to {})",
+            " at the {} (horizontal {} to {}, vertical {} to {})",
             range.words_en,
             range.bound(0),
             range.bound(2),
@@ -1046,7 +1047,7 @@ pub fn print_work_plan_with_plugins(
 }
 
 /// Print a plan whose layers the composition step placed: a layer with a range is
-/// written with the composition mark and the range instead of a place word. Layers
+/// written with its range (words and numbers) instead of a place word. Layers
 /// past the end of `ranges`, or with `None`, keep their own place.
 #[must_use]
 pub fn print_work_plan_composed(

@@ -1410,7 +1410,7 @@ fn region_words(key: &str) -> Option<(&'static str, &'static str)> {
 
 /// The plan and the ranges to print for a solved placement. A layer placed on a
 /// stated place keeps (or takes) that place word; every other layer is written with
-/// the composition mark and its range, and loses any place the plan guessed.
+/// its range (words and numbers), and loses any place the plan guessed.
 #[must_use]
 pub fn composed_plan(plan: &WorkPlan, chosen: &[usize]) -> (WorkPlan, Vec<Option<ComposedRange>>) {
     let table = regions();
@@ -1508,6 +1508,40 @@ pub fn written_range(index: usize) -> Option<ComposedRange> {
             bound(region.rect[3])?,
         ],
     })
+}
+
+/// One range a host shows by its name: one of the 28 composition ranges, or a
+/// corner (which another composition keeps). Bounds are left, top, right, bottom,
+/// each an exact fraction `(numerator, denominator)`, as `written_range` writes them.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct NamedRange {
+    pub key: &'static str,
+    pub words_ja: String,
+    pub words_en: String,
+    pub bounds: [(u32, u32); 4],
+    pub corner: bool,
+}
+
+/// The ranges the composition writes by name, in the order of `placement_keys`:
+/// the 28 composition ranges, then the four corners. A host folds a written range
+/// whose words and numbers are one of these, and names numbers by them.
+#[must_use]
+pub fn named_ranges() -> Vec<NamedRange> {
+    let all = &regions().all;
+    (0..all.len())
+        .filter(|index| !all[*index].key.starts_with("named-"))
+        .filter_map(|index| {
+            let range = written_range(index)?;
+            let key = all[index].key.as_str();
+            Some(NamedRange {
+                key,
+                words_ja: range.words_ja,
+                words_en: range.words_en,
+                bounds: range.bounds,
+                corner: key.starts_with("corner-"),
+            })
+        })
+        .collect()
 }
 
 /// How an answer other than the current one was found.

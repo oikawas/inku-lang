@@ -3,8 +3,9 @@
 //!
 //! On the composition acceptance works the instructions give back the layers the
 //! composition reads, and both modes give the prototype's answers
-//! (`tools/recompose_fixture.py`, seed 1, the case as the work). Only the marked
-//! ranges change, and a work the instructions cannot recompose stays as it is.
+//! (`tools/recompose_fixture.py`, seed 1, the case as the work). Only the numeric
+//! ranges change, whoever wrote them; a stated place and a corner stay, and a work
+//! the instructions cannot recompose stays as it is.
 
 mod common;
 
@@ -21,7 +22,6 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_nodes_per_invocation: 128,
     max_total_nodes: 128,
 };
-const MARKS: [&str; 2] = ["［構図］", "[composition]"];
 
 /// The bundled Nature words: three works draw a plugin word beside their layers,
 /// and a host recomposes with the definitions it draws with.
@@ -164,17 +164,37 @@ fn a_chance_recomposition_gives_the_prototypes_chance_ranges() {
     });
 }
 
+/// A line without its range: a Japanese range opens the line and ends at its
+/// closing parenthesis; an English range follows ` at ` and ends the sentence.
+fn without_range(line: &str, language: ResolvedInstructionLanguage) -> String {
+    match language {
+        ResolvedInstructionLanguage::Ja => line.find('）').map_or(line.to_owned(), |at| {
+            line[at + '）'.len_utf8()..].to_owned()
+        }),
+        ResolvedInstructionLanguage::En => match (line.rfind(" at the "), line.rfind(')')) {
+            (Some(start), Some(end)) if start < end => {
+                format!("{}{}", &line[..start], &line[end + 1..])
+            }
+            _ => line.to_owned(),
+        },
+    }
+}
+
 #[test]
-fn only_the_marked_ranges_change() {
+fn only_the_ranges_change() {
     let definitions = definitions();
     let recomposed: usize =
         common::par_map(fixture()["cases"].as_array().expect("cases"), |case| {
             let id = text(case, "id");
             let source = text(case, "source");
+            let language = language(case);
             let mut recomposed = 0;
             for mode in [RecomposeMode::Principled, RecomposeMode::Chance] {
-                let Recomposition::Recomposed { source: after, .. } =
-                    recompose(source, language(case), &definitions, LIMITS, mode, 1, id)
+                let Recomposition::Recomposed {
+                    source: after,
+                    moves,
+                    ..
+                } = recompose(source, language, &definitions, LIMITS, mode, 1, id)
                 else {
                     continue;
                 };
@@ -183,21 +203,20 @@ fn only_the_marked_ranges_change() {
                     (source.lines().collect(), after.lines().collect());
                 assert_eq!(before.len(), after.len(), "{id}");
                 for (old, new) in before.iter().zip(&after) {
-                    let cut = |line: &str| {
-                        MARKS
-                            .iter()
-                            .find_map(|mark| line.find(mark))
-                            .map_or(line.len(), |at| at)
-                    };
-                    // Before the mark nothing changes; after it, only the range.
-                    assert_eq!(&old[..cut(old)], &new[..cut(new)], "{id}");
-                    let tail = |line: &str| {
-                        let after_range = line.rfind(['）', ')']).map_or(line.len(), |at| at);
-                        line[after_range..]
-                            .trim_start_matches(['）', ')'])
-                            .to_owned()
-                    };
-                    assert_eq!(tail(old), tail(new), "{id}");
+                    // Outside the range nothing changes.
+                    assert_eq!(
+                        without_range(old, language),
+                        without_range(new, language),
+                        "{id}"
+                    );
+                }
+                for step in &moves {
+                    assert!(source.contains(&step.from), "{id}: {}", step.from);
+                    assert!(
+                        after.iter().any(|line| line.contains(&step.to)),
+                        "{id}: {}",
+                        step.to
+                    );
                 }
             }
             recomposed
@@ -220,23 +239,15 @@ fn a_work_the_instructions_cannot_recompose_stays_as_it_is() {
             "w",
         )
     };
-    // The author's own instructions: no range carries the composition mark.
+    // A place written as a word is a place the description states: nothing moves.
     assert_eq!(
         unchanged("上に、細かくゆるやかに波打つ赤い鉛筆の刷きの薄い円を1個置く。"),
         Recomposition::Unchanged {
             reason: "nothing_to_move"
         }
     );
-    let composed = "［構図］左上（横0〜1/3、縦0〜1/3）に、細かくゆるやかに波打つ赤い鉛筆の刷きの薄い円を1個置く。";
-    // A range the author wrote: the mark is gone, so the range is the author's own.
-    assert_eq!(
-        unchanged(&format!(
-            "{composed}\n右下（横2/3〜1、縦2/3〜1）に、細かくゆるやかに波打つ赤い鉛筆の刷きの薄い円を1個置く。"
-        )),
-        Recomposition::Unchanged {
-            reason: "author_range"
-        }
-    );
+    let composed =
+        "左上（横0〜1/3、縦0〜1/3）に、細かくゆるやかに波打つ赤い鉛筆の刷きの薄い円を1個置く。";
     // A sentence a plan does not write: a relation to the previous shape.
     assert_eq!(
         unchanged(&format!(
@@ -246,4 +257,87 @@ fn a_work_the_instructions_cannot_recompose_stays_as_it_is() {
             reason: "unsupported_sentence"
         }
     );
+}
+
+const CIRCLE: &str = "細かくゆるやかに波打つ赤い鉛筆の刷きの薄い円を1個置く。";
+
+fn by_chance(source: &str, seed: u64) -> Recomposition {
+    recompose(
+        source,
+        ResolvedInstructionLanguage::Ja,
+        &[],
+        LIMITS,
+        RecomposeMode::Chance,
+        seed,
+        "w",
+    )
+}
+
+/// "Change the layout" asks for the places to change: a range the author wrote
+/// moves too, even when its words say another place than its numbers (the
+/// author's decision of 2026-10-05). The new range writes its words and numbers
+/// together.
+#[test]
+fn every_numeric_range_moves_whoever_wrote_it() {
+    let source = format!("右下（横0.9〜1、縦0.1〜0.2）に、{CIRCLE}");
+    let Recomposition::Recomposed {
+        source: after,
+        moves,
+        ..
+    } = by_chance(&source, 1)
+    else {
+        panic!("the author's range moves");
+    };
+    assert_eq!(moves.len(), 1, "{moves:?}");
+    assert_eq!(moves[0].from, "右下（横0.9〜1、縦0.1〜0.2）");
+    assert_eq!(moves[0].from_key, None);
+    assert_eq!(after, format!("{}に、{CIRCLE}", moves[0].to));
+}
+
+/// A corner keeps its corner and a stated place keeps its place; the range
+/// beside them moves.
+#[test]
+fn a_corner_and_a_stated_place_stay() {
+    let source = format!(
+        "右上の隅（横4/5〜1、縦0〜1/5）に、{CIRCLE}\n下に、{CIRCLE}\n左上（横0〜1/3、縦0〜1/3）に、{CIRCLE}"
+    );
+    let moved = (1..=8)
+        .find_map(|seed| match by_chance(&source, seed) {
+            Recomposition::Recomposed {
+                source: after,
+                moves,
+                ..
+            } => Some((after, moves)),
+            Recomposition::Unchanged { .. } => None,
+        })
+        .expect("the third range moves for some seed");
+    let (after, moves) = moved;
+    assert!(moves.iter().all(|step| step.layer == 2), "{moves:?}");
+    let lines: Vec<&str> = after.lines().collect();
+    assert_eq!(
+        lines[0],
+        format!("右上の隅（横4/5〜1、縦0〜1/5）に、{CIRCLE}")
+    );
+    assert_eq!(lines[1], format!("下に、{CIRCLE}"));
+}
+
+/// A work printed with the mark (Build 1155 to 1163) still moves; the mark goes
+/// with the range it stood before.
+#[test]
+fn an_old_mark_goes_with_its_range() {
+    let source = format!("［構図］左上（横0〜1/3、縦0〜1/3）に、{CIRCLE}");
+    let (after, moves) = (1..=8)
+        .find_map(|seed| match by_chance(&source, seed) {
+            Recomposition::Recomposed {
+                source: after,
+                moves,
+                ..
+            } => Some((after, moves)),
+            Recomposition::Unchanged { .. } => None,
+        })
+        .expect("the range moves for some seed");
+    assert_eq!(moves[0].from, "左上（横0〜1/3、縦0〜1/3）");
+    assert_eq!(moves[0].from_key.as_deref(), Some("cell-00"));
+    assert!(!after.contains("［構図］"), "{after}");
+    assert_eq!(after, format!("{}に、{CIRCLE}", moves[0].to));
 }

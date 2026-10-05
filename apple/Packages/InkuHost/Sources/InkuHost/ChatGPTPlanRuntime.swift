@@ -246,8 +246,10 @@ public actor ChatGPTPlanRuntime {
         guard ["generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition", "complete_visible_ddl_holes"].contains(tag) else {
             throw HostError("chatgpt_operation_not_supported")
         }
-        guard let timeout = Double(try effect.requiredString("timeout_ms")), timeout.isFinite, timeout > 0,
+        guard let timeout = Double(try effect.requiredString("timeout_ms")), timeout.isFinite,
               argumentLimit > 0, argumentLimit <= (Int.max - 524_288) / 6 else { throw HostError("pipeline_schema_violation") }
+        // Server raises TimeoutError for a non-positive attempt timeout before the ChatGPT request.
+        guard timeout > 0 else { throw HostError("chatgpt_transport_timeout") }
         let deadline = Date().addingTimeInterval(timeout / 1000)
         let operationEpoch = epoch
         try validate(session)

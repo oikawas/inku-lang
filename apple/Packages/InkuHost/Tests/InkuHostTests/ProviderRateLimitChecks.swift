@@ -56,7 +56,9 @@ final class ProviderRateLimitChecks: XCTestCase, @unchecked Sendable {
         for _ in 0..<9 { _ = try await limiter.reserve(provider: window, inputTokens: 10, deadline: clock.now.addingTimeInterval(1_000)) }
         await expectLimited { _ = try await limiter.reserve(provider: window, inputTokens: 10, deadline: clock.now.addingTimeInterval(1)) }
         _ = try await limiter.reserve(provider: window, inputTokens: 10, deadline: clock.now.addingTimeInterval(1_000))
-        XCTAssertEqual(clock.sleeps, [62]) // Fixed sleep advances the clock; no real wait.
+        // Fixed sleep advances the clock; no real wait. The refused reservation waits as Server does and
+        // is refused at its deadline, then the next one waits out the window.
+        XCTAssertEqual(clock.sleeps, [62, 62])
         let settled = try await limiter.reserve(provider: Self.provider("usage", limits: .init(tokensPerMinute: 1_000)), inputTokens: 100, deadline: clock.now.addingTimeInterval(2))
         try await limiter.settle(providerID: "usage", reservation: settled, used: nil)
         let unknown = try await state(firstDB, "usage")

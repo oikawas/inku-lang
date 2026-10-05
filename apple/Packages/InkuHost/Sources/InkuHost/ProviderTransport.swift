@@ -64,7 +64,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                        "generate_normalized_ddl": "normalized_ddl_generated", "read_composition": "composition_read",
                        "complete_visible_ddl_holes": "visible_ddl_hole_patch_generated"]
         guard let resultTag = results[tag],
-              let timeoutMS = UInt64(try effect.requiredString("timeout_ms")), timeoutMS > 0,
+              let timeoutMS = UInt64(try effect.requiredString("timeout_ms")),
               timeoutMS <= UInt64.max / 1_000_000 else { throw HostError("pipeline_schema_violation") }
         let began = ContinuousClock.now
         let deadline = budget.now().addingTimeInterval(Double(timeoutMS) / 1000)
@@ -72,8 +72,11 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         let maxTokens = tag == "complete_visible_ddl_holes" ? models.holeMaxTokens : models.stage1MaxTokens
         var failure: String?
         var response: String?
+        let rateWait = ProviderRateWait()
         recorder?.setOperation(.preparation)
         do {
+            // Server raises TimeoutError for a non-positive attempt timeout.
+            guard timeoutMS > 0 else { throw HostError("transport_timeout") }
             let (provider, model) = try resolve(modelReference, providers: providers)
             recorder?.setEndpoint(provider.baseURL)
             let key = try await credentials.key(for: provider.credentialID)
@@ -112,7 +115,9 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                         }
                     }
                     recorder?.setOperation(.admission)
+                    rateWait.set(true)
                     let reservation = try await self.budget.reserve(provider: provider, inputTokens: inputTokens, deadline: deadline)
+                    rateWait.set(false)
                     var bytes: Data?, used: Int?, attemptError: (any Error)?
                     recorder?.setOperation(.generation)
                     do {
@@ -155,9 +160,11 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         catch is ProviderAttemptDeadline {
             // The whole-attempt deadline can expire while a child is draining.
             // Do not attribute it to whichever HTTP operation finished cancellation last.
-            recorder?.setOperation(nil)
-            recorder?.recordFailure(HostError("transport_timeout"))
-            failure = "transport_timeout"
+            // A deadline reached while waiting for admission is Server's rate_limit_wait.
+            let waiting = rateWait.value
+            recorder?.setOperation(waiting ? .admission : nil)
+            failure = waiting ? "rate_limited" : "transport_timeout"
+            recorder?.recordFailure(HostError(failure!))
         }
         catch let error as HTTPFailure {
             recorder?.recordFailure(error, httpStatus: error.status, httpBody: error.body)
@@ -177,6 +184,8 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
             default: failure = "provider_rejected"
             }
         } catch {
+            // What remains are rate-ledger failures (database, legacy import), which Server reports as
+            // RateAccountingUnavailable -> transport_unavailable.
             recorder?.recordFailure(error)
             failure = "transport_unavailable"
         }
@@ -234,7 +243,8 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
             throw HTTPFailure(status: response.statusCode,
                 retryAfter: ProviderRateBudget.retryAfter(response.value(forHTTPHeaderField: "Retry-After"), raw: data, now: budget.now()), body: data)
         }
-        guard !truncated else { throw HostError("malformed_payload") }
+        // Server raises ValueError for an oversized answer: provider_rejected, which the core does not retry.
+        guard !truncated else { throw HostError("provider_response_too_large") }
         return data
     }
 
@@ -290,6 +300,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         request.httpBody = ExactJSON.object(["generateContentRequest": inner]).data
         let value = try ExactJSON(data: await readObserved(request, session: session, maximum: min(16384, maximumResponseBytes),
             onBytes: { _ in }, onResponse: { _ in }))
+        guard value.object != nil else { throw HostError("malformed_payload") }
         guard let count = value["totalTokens"].number.flatMap(Int.init), count >= 0, count <= (Int.max - 9) / 11 else { throw HostError("rate_limited") }
         return (count * 11 + 9) / 10
     }
@@ -362,6 +373,13 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
 }
 
 private struct ProviderAttemptDeadline: Error {}
+/// Set while an attempt waits for rate admission, read after its task group has drained.
+private final class ProviderRateWait: @unchecked Sendable {
+    private let lock = NSLock()
+    private var waiting = false
+    var value: Bool { lock.withLock { waiting } }
+    func set(_ value: Bool) { lock.withLock { waiting = value } }
+}
 struct HTTPFailure: Error {
     let status: Int; let retryAfter: Double; var body: Data? = nil
     var shouldRetry: Bool? = nil; var serverDelay: Double? = nil

@@ -155,7 +155,8 @@ internal class DdlRangeEditorSession(private val table: CompositionRangeTable) {
                     it.contains(snapshot.selection) || (snapshot.selection.collapsed && snapshot.selection.start == it.end)
                 } ?: false
                 if (snapshot.focused && editing) return@forEach
-                range?.bounds?.let(table::at)?.words(range.language)?.let { name ->
+                if (range != null) {
+                    val name = followedRangeName(range.bounds, range.name, range.name, range.language, table)
                     if (name != range.name) {
                         val from = range.nameStart(snapshot.source)
                         names += DdlSourceChange(from, from + range.name.length, name)
@@ -183,7 +184,6 @@ internal class DdlRangeEditorSession(private val table: CompositionRangeTable) {
             }?.copy(bounds = null, foldable = false)
         val bounds = active?.bounds ?: status.bounds.takeIf { active != null && active.start == fallback?.start }
         status = DdlEditorRangeStatus(active, bounds, finalRanges.any { it.bounds == null } || (active != null && active.bounds == null))
-        if (snapshot.editable && active?.bounds != null) pendingNames = pendingNames + active.start
         previous = updated
         return DdlEditorUpdate(updated, names, status)
     }

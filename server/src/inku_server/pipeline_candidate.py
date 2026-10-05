@@ -161,6 +161,8 @@ class PipelineBinding:
             self.provider_attempt = getattr(module, "pipeline_provider_attempt", None)
             # Older compatible wheels rebuild the saved DDL without choosing its ranges again.
             self.recompose = getattr(module, "pipeline_recompose", None)
+            # The display keeps the complete DDL when this table is unavailable.
+            self.composition_ranges = getattr(module, "pipeline_composition_ranges", None)
         except (AttributeError, ImportError) as error:
             raise CandidateHostError("binding_unavailable") from error
         self.versions = json.loads(version_report())

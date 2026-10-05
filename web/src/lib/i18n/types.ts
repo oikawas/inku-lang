@@ -405,6 +405,8 @@ export interface LangPack {
 	tooltipCanvasZoomReset: string;
 	tooltipCanvasVaryPerformance: string;
 	tooltipCanvasVaryComposition: string;
+	ddlRangeNumbers: string;
+	ddlRangeInvalid: string;
 	tooltipCanvasVaryInterpretation: string;
 	tooltipCanvasVaryColor: string;
 	tooltipCanvasNavNewer: string;

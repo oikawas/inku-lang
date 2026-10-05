@@ -13,7 +13,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .api_core.models import RecompositionResult
+from .api_core.models import CompositionRanges, RecompositionResult
 from .persistence.schema import HistoryRow
 
 
@@ -34,6 +34,24 @@ def _service():
     from .pipeline_runtime import get_service
 
     return get_service()
+
+
+def composition_ranges() -> CompositionRanges:
+    """Read the core's display table without creating a run or drawing."""
+    from .pipeline_runtime import get_binding
+
+    empty = CompositionRanges.model_validate({
+        "schema": "inku.composition-ranges.v1", "ranges": [],
+    })
+    native = getattr(get_binding(), "composition_ranges", None)
+    if not callable(native):
+        return empty
+    try:
+        return CompositionRanges.model_validate_json(native())
+    except Exception:
+        # The display is optional; no native exception text belongs in its API.
+        _logger.warning("composition range table unavailable")
+        return empty
 
 
 def _wait(owner: str, view: dict, reader_left: Callable[[], bool] | None = None) -> dict:

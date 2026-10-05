@@ -177,6 +177,14 @@ There are two entrances to the instructions. Both use the same dialog and editor
 
 `Draw from instructions` sends the displayed instructions to Stage 2 unchanged. Stage 1 does not run, so the interpretation does not change.
 
+### See and edit a place's range
+
+When a range's name and numbers match the range table, for example `at the bottom right (horizontal 2/3 to 1, vertical 2/3 to 1)`, the display folds the numbers and gives `bottom right` a dotted underline. Hover over or press the name to show its rectangle on the work. Press it to open the muted numbers for editing. The rectangle follows valid numbers, and a match to another table entry changes the name too. Setting both axes to `0 to 1/3`, for example, changes the name to `top left`.
+
+Numbers outside the table or a name that disagrees with its numbers stay unfolded. Editing to a custom range keeps the name and shows the numbers. Numbers outside 0–1, an end that is not greater than its start, or unreadable numbers show an invalid state; the rectangle stays at its last valid place.
+
+Changing the numbers edits the instructions. Typing does not draw; press `Draw from instructions` to redraw once. Saving, copying, and the text editor use the complete source with its numbers. Only the display folds them. An older drawing engine without a range table keeps the complete display.
+
 ### A plugin name that does not exist shows up while you type
 
 A `namespace.word` such as `Nature.青葉` is marked in the plugin color only when that qualified name is registered on this server. **A name that is not registered takes a different color, and the reason is listed under the editor.**
@@ -243,7 +251,7 @@ In the refinement area of the work tab, choose exactly one element to change at 
 
 | Element | What changes | Cost |
 |---|---|---|
-| Another composition | Chooses the marked composition ranges again. The option's seed also reselects explicit tilt angles and corners | Fast (choosing ranges calls no LLM; existing completion only runs when the instructions still have gaps) |
+| Another composition | Chooses numeric ranges again, except corners. The option's seed also reselects explicit tilt angles and corners | Fast (choosing ranges calls no LLM; existing completion only runs when the instructions still have gaps) |
 | Another reading | Reads again from Stage 1 and regenerates the instructions, composition, and performance | Slow (LLM and API) |
 | Another performance | Derives only the renderer's performance seed from your words, changing line quality, weight sway, and bleed | Very fast (no LLM) |
 
@@ -251,9 +259,9 @@ You may choose `Make one option` or `Make four options`. `Another performance` i
 
 The color catalog is changed from the work-editing menu instead (8.3).
 
-Under `Another composition`, choose `By principle` or `By chance`. The default, `By principle`, solves another composition from what the instructions alone tell; `By chance` chooses among the ranges each layer's kind permits. Options use the saved instructions, so a work without a description can make them too. Characters outside the marked composition ranges and the original work stay as they are.
+Under `Another composition`, choose `By principle` or `By chance`. The default, `By principle`, solves another composition from what the instructions alone tell; `By chance` chooses among the ranges each layer's kind permits. Options use the saved instructions, so a work without a description can make them too. Numeric ranges are chosen again whoever wrote them. Corners, place words, characters outside the moving ranges, and the original work stay as they are.
 
-Each option shows its layer number and move, such as `1: lower right → upper left`. When the ranges cannot be chosen again, it gives a reason, such as no composition ranges in this work or too many combinations to find another composition, and rebuilds the saved instructions as they are. A work without marked ranges, explicit tilts or corners may give the same picture. Saving an option records the composition seed and chosen mode on its Layout lineage edge.
+Each option shows its layer number and move, such as `1: bottom right → top left`. When the ranges cannot be chosen again, it gives a reason, such as no composition ranges in this work or too many combinations to find another composition, and rebuilds the saved instructions as they are. A work without numeric ranges, explicit tilts or corners may give the same picture. Saving an option records the composition seed and chosen mode on its Layout lineage edge.
 
 ### 8.1 Variation (retired)
 

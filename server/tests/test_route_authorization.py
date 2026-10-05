@@ -73,7 +73,8 @@ PUBLIC = {  # every entry needs a reason
 #   and the personal catalog (2026-10-02).
 #   +2 for GET/PUT /api/me/chatgpt/models/settings (2026-10-04).
 #   -1 for retiring POST /api/variation/seeds (2026-10-04).
-EXPECTED_ROUTE_COUNT = 118
+#   +1 for GET /api/composition/ranges, the core's display table (2026-10-05).
+EXPECTED_ROUTE_COUNT = 119
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

@@ -25,6 +25,29 @@ def json_seeds(item: dict | None) -> dict | None:
                        if item.get(key) is not None}}
 
 
+RangeNumerator = Annotated[int, Field(ge=0, strict=True)]
+RangeDenominator = Annotated[int, Field(gt=0, strict=True)]
+RangeFraction = tuple[RangeNumerator, RangeDenominator]
+
+
+class CompositionRangeWords(BaseModel):
+    ja: str = Field(min_length=1, strict=True)
+    en: str = Field(min_length=1, strict=True)
+
+
+class CompositionRange(BaseModel):
+    key: str = Field(min_length=1, strict=True)
+    words: CompositionRangeWords
+    # Keep the core's exact rational numbers, rather than rounding to floats.
+    bounds: tuple[RangeFraction, RangeFraction, RangeFraction, RangeFraction]
+    corner: bool = Field(strict=True)
+
+
+class CompositionRanges(BaseModel):
+    schema_id: Literal["inku.composition-ranges.v1"] = Field(alias="schema")
+    ranges: list[CompositionRange]
+
+
 class CompositionMove(BaseModel):
     layer: int = Field(ge=0, strict=True)
     from_key: str | None = None

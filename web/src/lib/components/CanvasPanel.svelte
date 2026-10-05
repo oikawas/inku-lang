@@ -28,6 +28,7 @@
 	import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
 	import type { CanvasViewport } from '$lib/features/canvas/viewport-state.svelte';
 	import type { PaintResult } from '$lib/features/run/current-work';
+	import type { RangePreview } from '$lib/composition-ranges';
 	import type { makeSavedWorkExportActions } from '$lib/features/export/saved-work-actions';
 	import type { CanvasStatusHistoryItem as HistoryItem } from '$lib/features/canvas/view-types';
 	import type { ProviderAttemptCount } from '$lib/paintStream';
@@ -42,6 +43,7 @@
 	type Props = {
 		outputTab: OutputTab;
 		result: PaintResult | null;
+		rangePreview?: RangePreview | null;
 		unsavedRefinementPreview: boolean;
 		lineageIntermediateNotice: string | null;
 		allowEmptyOutputTabs: boolean;
@@ -190,6 +192,7 @@
 	let {
 		outputTab = $bindable('canvas'),
 		result,
+		rangePreview = null,
 		unsavedRefinementPreview = false,
 		lineageIntermediateNotice = null,
 		allowEmptyOutputTabs,
@@ -786,6 +789,7 @@
 					...savedWorkExportActions
 				} : null}
 				{result}
+				{rangePreview}
 				{artworkUrl}
 				bind:canvasContentEl
 				{canvasAspectWidth}

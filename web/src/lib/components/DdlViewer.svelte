@@ -4,6 +4,8 @@
 	import type { ResolvedInstructionLang } from '$lib/instructionLang';
 	import { t } from '$lib/i18n/index.svelte';
 	import { hasDdlBody } from '$lib/ddl-source';
+	import RangeDdlBody from './RangeDdlBody.svelte';
+	import { scanNumericRanges, type CompositionRange, type RangePreview } from '$lib/composition-ranges';
 
 	type Props = {
 		/** The single source used for display, editing, and replay. */
@@ -19,13 +21,19 @@
 		runStatus?: import('svelte').Snippet | null;
 		/** The language the DDL is read in; it names the heading. Omitted = `label`. */
 		lang?: ResolvedInstructionLang | null;
+		ranges?: CompositionRange[];
+		workKey?: unknown;
+		onDdlChange?: ((ddl: string) => void) | null;
+		onRangePreview?: ((preview: RangePreview | null) => void) | null;
 	};
 
-	let { ddl, label, onEdit = null, editDisabled = false, onPaint = null, paintDisabled = false, runStatus = null, lang = null }: Props = $props();
+	let { ddl, label, onEdit = null, editDisabled = false, onPaint = null, paintDisabled = false, runStatus = null, lang = null, ranges = [], workKey = null, onDdlChange = null, onRangePreview = null }: Props = $props();
+	let invalidRange = $state(false);
 
 	const primaryLabel = $derived(lang ? t().ddlLabelIn(lang) : label);
 	const highlighted = $derived(highlightDDL(ddl));
-	const paintBlocked = $derived(paintDisabled || !hasDdlBody(ddl));
+	const invalidSource = $derived(invalidRange || (ranges.length > 0 && scanNumericRanges(ddl).some((range) => (!lang || range.lang === lang) && !range.bounds)));
+	const paintBlocked = $derived(paintDisabled || !hasDdlBody(ddl) || invalidSource);
 </script>
 
 <div class="ddl-viewer">
@@ -48,7 +56,11 @@
 			</Tooltip>
 		{/if}
 	</div>
-	<div class="ddl-viewer-body ddl-highlight">{@html highlighted}</div>
+	<div class="ddl-viewer-body ddl-highlight">
+		{#if ranges.length}
+			<RangeDdlBody {ddl} {ranges} {workKey} {lang} disabled={editDisabled} onChange={onDdlChange} onPreview={onRangePreview} onInvalid={(invalid) => invalidRange = invalid} />
+		{:else}{@html highlighted}{/if}
+	</div>
 	{#if onPaint}
 		<div class="ddl-viewer-actions">
 			<Tooltip placement="left" text={t().tooltipDdlPaint}>

@@ -1,11 +1,14 @@
 //! Another composition read from the visible instructions alone (draw-system05,
 //! the author's decisions of 2026-10-04).
 //!
-//! A work's composition is written into its instructions as ranges behind the
-//! composition mark (`［構図］右下（横2/3〜1、縦2/3〜1）に`). Another composition
-//! moves only those ranges: a place the description states is written without the
-//! mark and stays, and a corner keeps its corner, since the instructions cannot
-//! tell a corner the description names from one the composition chose.
+//! A work's composition is written into its instructions as numeric ranges
+//! (`右下（横2/3〜1、縦2/3〜1）に`). Another composition moves every numeric range,
+//! whoever wrote it, as "change the layout" asks for the places to change (the
+//! author's decision of 2026-10-05): a place the description states is written as a
+//! place word and stays, and a corner keeps its corner, since the instructions
+//! cannot tell a corner the description names from one the composition chose.
+//! Works printed from Build 1155 to Build 1163 carry the mark `［構図］` before a
+//! range; it is read as part of the range's words and goes when the range moves.
 //!
 //! Each sentence is read back as the work-plan layer it was printed from, and the
 //! layers are solved with what the instructions alone tell (roles from how each
@@ -18,8 +21,8 @@
 //!   allows, by a hash of the seed, the work and the layer.
 //!
 //! Only the text of the moving ranges changes; every other byte stays. A work the
-//! instructions cannot recompose (no mark, a sentence a plan does not write, a
-//! range the author wrote) is left as it is, with the reason.
+//! instructions cannot recompose (no range to move, a sentence a plan does not
+//! write) is left as it is, with the reason.
 
 use inku_ddl::work_plan::{
     COMPOSITION_MARK_EN, COMPOSITION_MARK_JA, WorkPlanLayer, WorkPlanSlot, composition_background,
@@ -56,10 +59,10 @@ pub struct RangeMove {
     /// The range the sentence had: its key when it is one of the composition's
     /// ranges, else `None`.
     pub from_key: Option<String>,
-    /// The words the sentence had after the mark, as written.
+    /// The range the sentence had, as written (without an old mark).
     pub from: String,
     pub to_key: String,
-    /// The words the sentence has after the mark, as written.
+    /// The range the sentence has now, as written.
     pub to: String,
 }
 
@@ -81,7 +84,7 @@ pub enum Recomposition {
 /// A sentence read back as a layer, with what its range allows.
 struct ReadLayer {
     layer: WorkPlanLayer,
-    /// The source bytes of the range from the mark to its end, when it moves.
+    /// The source bytes of the range, from its words to its end, when it moves.
     moving: Option<std::ops::Range<usize>>,
     /// The range it has now, when the instructions name one of the solver's.
     current: Option<usize>,
@@ -134,10 +137,23 @@ const fn mark(language: ResolvedInstructionLanguage) -> &'static str {
     }
 }
 
+/// A range as the moves show it: its text without the English article or an old
+/// mark (`右下（横2/3〜1、縦2/3〜1）`, `bottom right (horizontal 2/3 to 1, ...)`).
+fn shown(text: &str, language: ResolvedInstructionLanguage) -> String {
+    let text = text.trim();
+    let text = match language {
+        ResolvedInstructionLanguage::Ja => text,
+        ResolvedInstructionLanguage::En => text.strip_prefix("the ").unwrap_or(text),
+    };
+    text.strip_prefix(mark(language))
+        .unwrap_or(text)
+        .trim_start()
+        .to_owned()
+}
+
 /// Read every sentence back as a layer, or say why the work cannot be recomposed.
 fn read_layers(
     source: &str,
-    language: ResolvedInstructionLanguage,
     ast: &inku_ddl::SemanticDocumentAst,
 ) -> Result<Vec<ReadLayer>, &'static str> {
     if !ast.coordinated_head_groups.is_empty()
@@ -169,12 +185,9 @@ fn read_layers(
             return Err("unplaced_sentence");
         };
         let span = range.source().span;
-        let text = source
+        source
             .get(span.start_byte..span.end_byte)
             .ok_or("unsupported_sentence")?;
-        let Some(offset) = text.find(mark(language)) else {
-            return Err("author_range");
-        };
         let bounds = range
             .bounds
             .map(|value| (value.numerator(), value.denominator()));
@@ -193,7 +206,7 @@ fn read_layers(
         }
         read.push(ReadLayer {
             layer,
-            moving: Some(span.start_byte + offset..span.end_byte),
+            moving: Some(span.start_byte..span.end_byte),
             current: region.filter(|index| is_composition_range(*index)),
         });
     }
@@ -215,7 +228,7 @@ pub fn composition_layers(
         .semantic_document
         .as_ref()
         .ok_or("not_canonical")?;
-    let read = read_layers(source, language, &semantic.ast)?;
+    let read = read_layers(source, &semantic.ast)?;
     let background = semantic
         .ast
         .background
@@ -246,7 +259,7 @@ pub fn recompose(
     let Some(semantic) = compilation.semantic_document.as_ref() else {
         return unchanged("not_canonical");
     };
-    let read = match read_layers(source, language, &semantic.ast) {
+    let read = match read_layers(source, &semantic.ast) {
         Ok(read) => read,
         Err(reason) => return unchanged(reason),
     };
@@ -314,14 +327,19 @@ pub fn recompose(
             return unchanged("unsolved");
         };
         let to = range.written(language);
-        let from = source[span.clone()].to_owned();
-        rewritten.replace_range(span.clone(), &to);
+        let replacement = match language {
+            ResolvedInstructionLanguage::Ja => to.clone(),
+            // The range's words follow the place preposition: `at the top left (...)`.
+            ResolvedInstructionLanguage::En => format!("the {to}"),
+        };
+        let from = shown(&source[span.clone()], language);
+        rewritten.replace_range(span.clone(), &replacement);
         moves.push(RangeMove {
             layer: index,
             from_key: layer.current.map(|current| region_key(current).to_owned()),
-            from: from[mark(language).len()..].trim_start().to_owned(),
+            from,
             to_key: region_key(answer[index]).to_owned(),
-            to: to[mark(language).len()..].trim_start().to_owned(),
+            to,
         });
     }
     if moves.is_empty() {
@@ -383,11 +401,61 @@ pub fn recompose_json(input: &[u8]) -> Vec<u8> {
     .unwrap_or_else(|_| br#"{"error":"internal"}"#.to_vec())
 }
 
+pub const COMPOSITION_RANGES_SCHEMA_ID: &str = "inku.composition-ranges.v1";
+
+#[derive(Serialize)]
+struct RangeWords<'a> {
+    ja: &'a str,
+    en: &'a str,
+}
+
+#[derive(Serialize)]
+struct RangeEntry<'a> {
+    key: &'a str,
+    words: RangeWords<'a>,
+    bounds: [(u32, u32); 4],
+    corner: bool,
+}
+
+#[derive(Serialize)]
+struct RangesResponse<'a> {
+    schema: &'static str,
+    ranges: Vec<RangeEntry<'a>>,
+}
+
+/// The named ranges as JSON, for the hosts' display of the instructions: the 28
+/// composition ranges and the four corners, each with its key, its words in both
+/// languages, its bounds (left, top, right, bottom as `[numerator, denominator]`)
+/// and whether it is a corner another composition keeps.
+#[must_use]
+pub fn composition_ranges_json() -> String {
+    let ranges = composition::named_ranges();
+    serde_json::to_string(&RangesResponse {
+        schema: COMPOSITION_RANGES_SCHEMA_ID,
+        ranges: ranges
+            .iter()
+            .map(|range| RangeEntry {
+                key: range.key,
+                words: RangeWords {
+                    ja: &range.words_ja,
+                    en: &range.words_en,
+                },
+                bounds: range.bounds,
+                corner: range.corner,
+            })
+            .collect(),
+    })
+    .expect("the named ranges serialize")
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::{Value, json};
 
-    use super::{RECOMPOSITION_SCHEMA_ID, recompose_json};
+    use super::{
+        COMPOSITION_RANGES_SCHEMA_ID, RECOMPOSITION_SCHEMA_ID, composition_ranges_json,
+        recompose_json,
+    };
 
     /// The hosts call the JSON entry with the configuration they run the work
     /// with, the saved source, the mode, the candidate's seed as a decimal and
@@ -424,5 +492,59 @@ mod tests {
             recompose_json(&request(Value::Null)),
             br#"{"error":"invalid_request"}"#
         );
+    }
+
+    /// The hosts read the named ranges as JSON (Server and Android display): the
+    /// 28 composition ranges and the four corners, each written as the printer
+    /// writes it, so a printed range is found in the table by its words and numbers.
+    #[test]
+    fn the_named_ranges_are_the_ones_the_printer_writes() {
+        let table: Value = serde_json::from_str(&composition_ranges_json()).expect("JSON");
+        assert_eq!(table["schema"], COMPOSITION_RANGES_SCHEMA_ID);
+        let ranges = table["ranges"].as_array().expect("ranges");
+        assert_eq!(ranges.len(), 32);
+        assert_eq!(
+            ranges
+                .iter()
+                .filter(|range| range["corner"] == true)
+                .count(),
+            4
+        );
+        let bottom_right = ranges
+            .iter()
+            .find(|range| range["key"] == "cell-22")
+            .expect("cell-22");
+        assert_eq!(
+            bottom_right["words"],
+            json!({"ja": "右下", "en": "bottom right"})
+        );
+        assert_eq!(
+            bottom_right["bounds"],
+            json!([[2, 3], [2, 3], [1, 1], [1, 1]])
+        );
+        let corner = ranges
+            .iter()
+            .find(|range| range["key"] == "corner-tr")
+            .expect("corner-tr");
+        assert_eq!(corner["words"]["ja"], "右上の隅");
+        assert_eq!(corner["bounds"], json!([[4, 5], [0, 1], [1, 1], [1, 5]]));
+        for (index, range) in ranges.iter().enumerate() {
+            let written = crate::composition::written_range(
+                crate::composition::region_of_bounds(
+                    range["bounds"]
+                        .as_array()
+                        .expect("bounds")
+                        .iter()
+                        .map(|bound| (bound[0].as_u64().expect("n"), bound[1].as_u64().expect("d")))
+                        .collect::<Vec<_>>()
+                        .try_into()
+                        .expect("four bounds"),
+                )
+                .expect("a named range is found by its bounds"),
+            )
+            .expect("written");
+            assert_eq!(range["words"]["ja"], written.words_ja.as_str(), "{index}");
+            assert_eq!(range["words"]["en"], written.words_en.as_str(), "{index}");
+        }
     }
 }

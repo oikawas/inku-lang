@@ -225,6 +225,12 @@ fn pipeline_recompose<'py>(
     PyBytes::new(py, &output)
 }
 
+/// The ranges the composition writes by name, for the host's display (draw-system05).
+#[pyfunction]
+fn pipeline_composition_ranges() -> String {
+    inku_pipeline_uniffi::composition_ranges()
+}
+
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(core_api_version, module)?)?;
@@ -248,5 +254,6 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pipeline_render_saved, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_migrate_saijiki_v1, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_recompose, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_composition_ranges, module)?)?;
     Ok(())
 }

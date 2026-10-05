@@ -51,6 +51,15 @@ pub fn recompose(input_bytes: Vec<u8>) -> Vec<u8> {
     .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
 }
 
+/// The ranges the composition writes by name (schema `inku.composition-ranges.v1`):
+/// the hosts fold a written range whose words and numbers are one of them, and
+/// rename numbers the author edits. The binding version is unchanged: this only
+/// adds a call.
+#[uniffi::export]
+pub fn composition_ranges() -> String {
+    inku_pipeline::recompose::composition_ranges_json()
+}
+
 /// Report the fixed binding and byte-protocol versions as stable JSON.
 #[uniffi::export]
 pub fn version_report() -> String {

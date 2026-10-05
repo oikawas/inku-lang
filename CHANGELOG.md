@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+## v2.15.91 (2026-10-05 / Build 1167)
+
+Thumbnail saving and rebuilding recover once from a broken child process pool. Stored SVG and Score and all engine versions remain unchanged.
+
 ### 2026-10-05 — Retry thumbnail baking once after a broken child pool
 
 When a saved thumbnail or a rebuild receives `BrokenProcessPool` at submit or while taking its result, replace the pool and retry the same SVG once. Count and log a final failure once. Outstanding jobs retain their original pool identity so their failure does not discard a healthy replacement. Ordinary rasterizer failures, the saved work's SVG, and existing PNG handling retain their previous behavior.

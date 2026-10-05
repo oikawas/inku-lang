@@ -22,7 +22,8 @@ use crate::protocol::{
     RetryPolicy,
 };
 
-fn config() -> PipelineConfig {
+/// A host's run configuration, also what a host sends with a recomposition.
+pub(crate) fn config() -> PipelineConfig {
     let white = ResolvedPaletteColorDto {
         abstract_color: Color::White,
         concrete_rgb: [255; 3],

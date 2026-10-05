@@ -382,3 +382,47 @@ pub fn recompose_json(input: &[u8]) -> Vec<u8> {
     })
     .unwrap_or_else(|_| br#"{"error":"internal"}"#.to_vec())
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::{Value, json};
+
+    use super::{RECOMPOSITION_SCHEMA_ID, recompose_json};
+
+    /// The hosts call the JSON entry with the configuration they run the work
+    /// with, the saved source, the mode, the candidate's seed as a decimal and
+    /// the work's identity (Server and Android, 2026-10-05); their own tests
+    /// answer for the core. en-01 by principle gives the fixture's answer.
+    #[test]
+    fn the_json_entry_reads_the_request_a_host_sends() {
+        let fixture: Value = serde_json::from_str(include_str!("../tests/data/recompose-v1.json"))
+            .expect("the fixture is JSON");
+        let case = fixture["cases"]
+            .as_array()
+            .expect("cases")
+            .iter()
+            .find(|case| case["id"] == "en-01")
+            .expect("en-01");
+        let request = |seed: Value| {
+            serde_json::to_vec(&json!({
+                "config": crate::focused_flow::config(),
+                "source": case["source"],
+                "mode": "principled",
+                "seed": seed,
+                "work_id": "en-01",
+            }))
+            .expect("a request")
+        };
+        let answer: Value =
+            serde_json::from_slice(&recompose_json(&request(json!("1")))).expect("JSON");
+        assert_eq!(answer["schema"], RECOMPOSITION_SCHEMA_ID);
+        assert_eq!(answer["outcome"], "recomposed");
+        assert_eq!(answer["source"], case["principled"]["source"]);
+        assert_eq!(answer["answer"], "near");
+        // The seed is the candidate's, as a decimal: a request without one is not read.
+        assert_eq!(
+            recompose_json(&request(Value::Null)),
+            br#"{"error":"invalid_request"}"#
+        );
+    }
+}

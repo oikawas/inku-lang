@@ -29,6 +29,38 @@ public indirect enum ExactJSON: Sendable, Equatable {
         }
     }
 
+    /// Python `json.dumps(value, ensure_ascii=False, sort_keys=True)`: ", " and ": " separators, keys in
+    /// code point order, and only quotes, backslashes and control characters escaped. Server writes the
+    /// auxiliary prompts' context in this form.
+    public var pythonText: String {
+        switch self {
+        case .object(let fields):
+            let keys = fields.keys.sorted { $0.unicodeScalars.map(\.value).lexicographicallyPrecedes($1.unicodeScalars.map(\.value)) }
+            return "{" + keys.map { Self.pythonQuote($0) + ": " + fields[$0]!.pythonText }.joined(separator: ", ") + "}"
+        case .array(let values): return "[" + values.map(\.pythonText).joined(separator: ", ") + "]"
+        case .string(let value): return Self.pythonQuote(value)
+        default: return text
+        }
+    }
+    private static func pythonQuote(_ value: String) -> String {
+        var result = "\""
+        for scalar in value.unicodeScalars {
+            switch scalar {
+            case "\"": result += "\\\""
+            case "\\": result += "\\\\"
+            case "\n": result += "\\n"
+            case "\r": result += "\\r"
+            case "\t": result += "\\t"
+            case "\u{08}": result += "\\b"
+            case "\u{0C}": result += "\\f"
+            default:
+                if scalar.value < 0x20 { result += String(format: "\\u%04x", scalar.value) }
+                else { result.unicodeScalars.append(scalar) }
+            }
+        }
+        return result + "\""
+    }
+
     public subscript(_ key: String) -> ExactJSON {
         get { if case .object(let fields) = self { fields[key] ?? .null } else { .null } }
         set { if case .object(var fields) = self { fields[key] = newValue; self = .object(fields) } }

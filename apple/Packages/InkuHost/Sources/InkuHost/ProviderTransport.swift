@@ -8,7 +8,6 @@ public protocol ProviderTransport: Sendable {
 }
 
 public final class URLSessionProviderTransport: ObservedProviderTransport, Sendable {
-    private let auxiliarySession: URLSession
     private let budget: ProviderRateBudget
     private let http: (any ProviderHTTPClient)?
     private let legacyUsageURL: URL
@@ -25,7 +24,6 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         self.legacyUsageURL = usageURL ?? Self.defaultUsageURL
         self.budget = ProviderRateBudget(database: database, legacyURL: legacyUsageURL, environment: environment)
         self.http = http
-        self.auxiliarySession = Self.makeSession()
     }
     private static func makeSession() -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
@@ -255,21 +253,22 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         let (provider, model) = try resolve(modelReference, providers: settings.providers)
         let key = try await credentials.key(for: provider.credentialID)
         let request = try AuxiliaryWire.request(prompt: prompt, provider: provider, model: model, key: key)
+        // Server's demo calls the Anthropic and OpenAI SDKs (two retries by default) and Gemini through urllib
+        // (none); Vision uses one httpx request.
+        let retries = prompt.purpose == .demo && provider.kind != .gemini ? 2 : 0
         do {
-            let raw = try await withThrowingTaskGroup(of: Data.self) { group in
-                group.addTask { [self] in
-                    try await self.read(request, maximum: self.maximumResponseBytes, onBytes: onBytes)
+            var attempt = 0
+            while true {
+                do {
+                    let raw = try await auxiliaryAttempt(request, timeout: prompt.timeoutSeconds, onBytes: onBytes)
+                    try Task.checkCancellation()
+                    return try AuxiliaryWire.responseText(raw, kind: provider.kind, purpose: prompt.purpose)
+                } catch {
+                    guard attempt < retries, let delay = Self.sdkRetryDelay(error, retry: attempt, kind: provider.kind) else { throw error }
+                    attempt += 1
+                    try await Task.sleep(for: .seconds(delay))
                 }
-                group.addTask {
-                    try await Task.sleep(for: .seconds(prompt.timeoutSeconds))
-                    throw HostError("transport_timeout")
-                }
-                defer { group.cancelAll() }
-                guard let bytes = try await group.next() else { throw HostError("transport_unavailable") }
-                return bytes
             }
-            try Task.checkCancellation()
-            return try AuxiliaryWire.responseText(raw, kind: provider.kind)
         } catch is CancellationError { throw CancellationError() }
         catch let error as HTTPFailure {
             throw HostError(error.status == 429 ? "rate_limited" : error.status >= 500 ? "transport_unavailable" : "provider_rejected")
@@ -295,13 +294,59 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         return (count * 11 + 9) / 10
     }
 
+    private func auxiliaryAttempt(_ request: URLRequest, timeout: Double, onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
+        try await withThrowingTaskGroup(of: Data.self) { group in
+            group.addTask { [self] in
+                try await self.read(request, maximum: self.maximumResponseBytes, onBytes: onBytes)
+            }
+            group.addTask {
+                try await Task.sleep(for: .seconds(timeout))
+                throw HostError("transport_timeout")
+            }
+            defer { group.cancelAll() }
+            guard let bytes = try await group.next() else { throw HostError("transport_unavailable") }
+            return bytes
+        }
+    }
+
+    /// The Anthropic (0.120) and OpenAI (2.52) Python SDK policy: 408, 409, 429, 5xx and connection or timeout
+    /// failures, `x-should-retry` first, a short server-directed delay, else 0.5 s doubling to 8 s with jitter.
+    static func sdkRetryDelay(_ error: any Error, retry: Int, kind: ProviderKind, random: Double = .random(in: 0..<1)) -> Double? {
+        if let failure = error as? HTTPFailure {
+            // OpenAI gives up on a Retry-After beyond two minutes; Anthropic falls back to its own backoff.
+            let ceiling: Double = kind == .anthropic ? 60 : 120
+            if kind != .anthropic, let after = failure.serverDelay, after.isFinite, after > ceiling { return nil }
+            if let header = failure.shouldRetry { guard header else { return nil } }
+            else { guard [408, 409, 429].contains(failure.status) || failure.status >= 500 else { return nil } }
+            if let after = failure.serverDelay, after.isFinite, after > 0, after <= ceiling { return after }
+        } else if let error = error as? URLError {
+            guard error.code != .cancelled else { return nil }
+        } else if (error as? HostError)?.code != "transport_timeout" { return nil }
+        return min(0.5 * pow(2, Double(retry)), 8) * (1 - 0.25 * random)
+    }
+
+    /// `retry-after-ms`, then `retry-after` as seconds or an HTTP date, as both SDKs read them.
+    static func sdkRetryAfter(_ response: HTTPURLResponse, now: Date = Date()) -> Double? {
+        if let value = response.value(forHTTPHeaderField: "retry-after-ms").flatMap(Double.init) { return value / 1000 }
+        guard let header = response.value(forHTTPHeaderField: "retry-after") else { return nil }
+        if let seconds = Double(header) { return seconds }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        return formatter.date(from: header).map { $0.timeIntervalSince(now) }
+    }
+
     private func read(_ request: URLRequest, maximum: Int, onBytes: @Sendable (Int) -> Void) async throws -> Data {
-        let (bytes, response) = try await auxiliarySession.bytes(for: request)
+        // One HTTP client per request, as Server opens one for each auxiliary call.
+        let session = Self.makeSession()
+        defer { session.invalidateAndCancel() }
+        let (bytes, response) = try await session.bytes(for: request)
         defer { bytes.task.cancel() }
         guard let response = response as? HTTPURLResponse else { throw HostError("transport_unavailable") }
         guard (200...299).contains(response.statusCode) else {
             let retry = response.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init) ?? 60
-            throw HTTPFailure(status: response.statusCode, retryAfter: max(0, retry))
+            throw HTTPFailure(status: response.statusCode, retryAfter: max(0, retry),
+                              shouldRetry: response.value(forHTTPHeaderField: "x-should-retry").flatMap { ["true": true, "false": false][$0] },
+                              serverDelay: Self.sdkRetryAfter(response))
         }
         if response.expectedContentLength > Int64(maximum) { throw HostError("malformed_payload") }
         var raw = Data(); raw.reserveCapacity(min(maximum, 65536))
@@ -317,7 +362,10 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
 }
 
 private struct ProviderAttemptDeadline: Error {}
-private struct HTTPFailure: Error { let status: Int; let retryAfter: Double; var body: Data? = nil }
+struct HTTPFailure: Error {
+    let status: Int; let retryAfter: Double; var body: Data? = nil
+    var shouldRetry: Bool? = nil; var serverDelay: Double? = nil
+}
 private final class RejectRedirects: NSObject, URLSessionTaskDelegate, Sendable {
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void) { completionHandler(nil) }

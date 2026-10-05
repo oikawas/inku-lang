@@ -875,6 +875,7 @@ class InkuRepository(
             autoRepair = plan.route != RefinementRoute.RenderFromScore,
             renderSeed = plan.seeds.renderSeed,
             compositionSeed = plan.seeds.compositionSeed,
+            recomposeMode = plan.recomposeMode,
             interpretationSeed = plan.seeds.interpretationSeed,
             seedText = plan.seeds.seedText,
             // 写生 (Stage 0.5) is not re-run for a candidate: a refinement varies

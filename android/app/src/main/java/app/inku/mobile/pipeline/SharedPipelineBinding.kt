@@ -9,6 +9,10 @@ interface SharedPipelineBinding {
     fun resolveMacroCatalog(inputBytes: ByteArray): ByteArray
     fun renderSaved(inputBytes: ByteArray): ByteArray
 
+    /** Selects other composition ranges without a model; an older binding leaves them alone. */
+    fun recompose(inputBytes: ByteArray): ByteArray =
+        """{"error":"unavailable"}""".encodeToByteArray()
+
     /** Author-facing reasons for withheld plugin sentences; a host without it has none. */
     fun explainPluginDiagnostics(inputBytes: ByteArray): ByteArray =
         """{"schema":"inku.plugin-diagnostics.v1","plugins":[]}""".encodeToByteArray()

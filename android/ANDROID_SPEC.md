@@ -4,7 +4,7 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-10-04.
+Last updated: 2026-10-05.
 
 **Catch-up status**: Android sits at generation `2.1.4-android.80`. DDL conversion and Score → SVG
 rendering run in the shared Rust core (`core/crates/`) of the same commit, packaged with the app, so
@@ -45,6 +45,16 @@ When updating Android specifications:
    adaptation of the Japanese source.
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
+
+## 2026-10-05 Another composition: By principle / By chance
+
+Under the layout refinement, choose By principle or By chance. By principle is the default, and the choice remains in the current screen state. Each candidate receives a new composition seed. JNI `recompose` takes the same configuration used to compile the work, its saved instructions, the mode, that seed and a stable work identifier (shared SPEC §12.6.3). It calls no model and saves no composition reading.
+
+Selection precedes compilation for both a new direct-DDL execution and a fork of an existing execution. A `recomposed` response supplies the new instructions; `unchanged` keeps the original instructions. Both are compiled normally with the candidate seed. Invalid requests, core errors and older bindings that lack the operation also keep the original instructions. Android leaves all range and authored-position decisions to the shared core.
+
+The candidate card names its mode and displays each moved range, with layer numbers starting at one, or the reason the composition stays. Reason and mode labels follow the UI language; moved-range text follows the instruction language. In particular, nothing_to_move says “This work has no composition ranges.” and unsolved says “There are too many combinations to find another composition.” An unchanged candidate also states that it was redrawn with the same composition ranges. The mode names are the author's By principle / By chance.
+
+Only a chosen candidate is saved. Its layout_change edge records composition_seed and recompose_mode (principled / chance), fixed in the generation plan even if the screen choice changes later. Room columns, the schema and the binding version remain unchanged. Pixel 9 E2B works have no composition ranges under I-714 and report nothing_to_move. Angle, corner and group placement still use the composition seed as before.
 
 ## 2026-10-04 Retiring variation refinement
 

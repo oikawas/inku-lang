@@ -50,6 +50,7 @@ import app.inku.mobile.pipeline.InstructionLanguages
 import app.inku.mobile.pipeline.ComposeFromDdlProgress
 import app.inku.mobile.pipeline.InterpretResult
 import app.inku.mobile.pipeline.PaintResult
+import app.inku.mobile.pipeline.RecomposeMode
 import app.inku.mobile.pipeline.AndroidWorkPipeline
 import app.inku.mobile.pipeline.PipelineInteractionRequired
 import app.inku.mobile.pipeline.PipelineView
@@ -265,6 +266,7 @@ data class InkuUiState(
     val refinementOpen: Boolean = false,
     val refinementParent: HistoryItemEntity? = null,
     val refinementElement: RefinementElement = RefinementElement.Touch,
+    val refinementLayoutMode: RecomposeMode = RecomposeMode.Principled,
     val refinementTouchWords: String = "",
     val refinementCount: Int = 1,
     val refinementBusy: Boolean = false,
@@ -3005,6 +3007,11 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = localState.value.copy(refinementTouchWords = value, refinementStatus = null)
     }
 
+    fun setRefinementLayoutMode(mode: RecomposeMode) {
+        if (localState.value.refinementBusy) return
+        localState.value = localState.value.copy(refinementLayoutMode = mode, refinementStatus = null)
+    }
+
     /**
      * 1 案 or 4 案. The count is kept independent of the element, as web keeps
      * its own pair: four touches is refused when the button is pressed, and a
@@ -3067,6 +3074,7 @@ class InkuViewModel @JvmOverloads constructor(
                     parent = parent,
                     newCatalogId = catalogIds.getOrNull(index),
                     seedText = current.refinementTouchWords.takeIf { element == RefinementElement.Touch },
+                    recomposeMode = current.refinementLayoutMode,
                 ),
             )
         }

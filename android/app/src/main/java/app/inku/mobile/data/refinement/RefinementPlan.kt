@@ -4,6 +4,7 @@ import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.drawnWild
 import app.inku.mobile.data.model.WorkColorSnapshot
 import app.inku.mobile.data.model.workColorSnapshot
+import app.inku.mobile.pipeline.RecomposeMode
 import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.i18n.inkuError
 
@@ -122,6 +123,7 @@ data class RefinementPlan(
      */
     val stage1Model: String? = null,
     val stage2Model: String? = null,
+    val recomposeMode: RecomposeMode? = null,
 )
 
 /**
@@ -144,6 +146,7 @@ object RefinementPlanner {
         parent: RefinementParent,
         newCatalogId: String? = null,
         seedText: String? = null,
+        recomposeMode: RecomposeMode = RecomposeMode.Principled,
     ): RefinementPlan = when (element) {
         // The Score, the DDL, the canvas and the catalogue all stay; only the
         // performance is played again. web derives the seed from the words the
@@ -179,7 +182,8 @@ object RefinementPlanner {
                 canvasAspect = parent.canvasAspect,
                 seeds = PaintSeeds(compositionSeed = seed, interpretationSeed = parent.seeds.interpretationSeed),
                 derivationKind = element.derivationKind,
-                derivationMetadata = mapOf("composition_seed" to seed),
+                derivationMetadata = mapOf("composition_seed" to seed, "recompose_mode" to recomposeMode.id),
+                recomposeMode = recomposeMode,
             )
         }
 

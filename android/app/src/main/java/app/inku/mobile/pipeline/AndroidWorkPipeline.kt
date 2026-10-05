@@ -106,12 +106,13 @@ class AndroidWorkPipeline(
         onProgress(ComposeFromDdlProgress.Rendering)
         val existingId = request.executionId
         if (existingId == null) {
-            return readyResult(authoring.startDirectDdl(prepare(request, descriptionFlow = false, text = ddl).request))
+            val run = prepare(request, descriptionFlow = false, text = ddl)
+            return composePrepared(ddl, run, request.recomposeMode, request.parentHistoryId ?: sha256(ddl))
         }
 
         val current = host.view(OWNER_ID, existingId)
         val stored = restoredRun(existingId)
-        if (runtimeOptionsChanged(request, stored)) {
+        if (request.recomposeMode != null || runtimeOptionsChanged(request, stored)) {
             val renderSeed = request.renderSeed ?: stored.renderSeed ?: newRenderSeed()
             val derivedConfig = deriveSavedConfig(stored.config, request, renderSeed)
             val fork = prepare(
@@ -122,7 +123,7 @@ class AndroidWorkPipeline(
                 configOverride = derivedConfig,
                 renderSeedOverride = renderSeed,
             )
-            return readyResult(authoring.startDirectDdl(fork.request))
+            return composePrepared(ddl, fork, request.recomposeMode, request.parentHistoryId ?: current.variationId)
         }
         val editable = if (current.phaseTag == "awaiting_patch_approval") {
             if (current.visibleDdl == ddl) throw PipelineInteractionRequired(current)
@@ -156,6 +157,18 @@ class AndroidWorkPipeline(
             stored.wild,
         )
         return project(rendered)
+    }
+
+    /** Selection and compilation share one prepared configuration and composition seed. */
+    private suspend fun composePrepared(
+        ddl: String,
+        run: PreparedRun,
+        mode: RecomposeMode?,
+        workId: String,
+    ): PaintResult {
+        val selected = mode?.let { recomposeDdl(binding, ddl, run.request.config, it, workId) }
+        val request = run.request.copy(text = selected?.source ?: ddl)
+        return readyResult(authoring.startDirectDdl(request)).copy(recomposition = selected?.info)
     }
 
     suspend fun approvePatch(executionId: String): PaintResult {

@@ -50,7 +50,7 @@ class DdlRangesTest {
     }
 
     @Test
-    fun japaneseHyphensWorkInTheRangeEditorWhileEnglishKeepsTo() {
+    fun japaneseHyphensWorkInTheRangeEditor() {
         val source = "右下（横2/3〜1、縦2/3〜1）に、赤い円を置く。"
         val editor = DdlRangeEdit.open(source, ddlNamedRanges(source, table).single())
         val expected = table.ranges.single { it.key == "cell-12" }.bounds
@@ -63,8 +63,31 @@ class DdlRangesTest {
         assertTrue(fullWidth.valid)
         assertEquals(expected, fullWidth.lastValidBounds)
         assertEquals("下中央に、赤い円を置く。", displayDdlRanges(fullWidth.source, table).text)
-        assertEquals(expected, rangeNumbersBounds("(horizontal 1/3 to 2/3, vertical 2/3 to 1)", "en"))
-        assertNull(rangeNumbersBounds("(horizontal 1/3-2/3, vertical 2/3 to 1)", "en"))
+    }
+
+    @Test
+    fun englishHyphensWorkInTheRangeEditorAndTildeStaysInvalid() {
+        val source = "Place a red circle at the bottom right (horizontal 2/3 to 1, vertical 2/3 to 1)."
+        val editor = DdlRangeEdit.open(source, ddlNamedRanges(source, table).single())
+        val expected = table.ranges.single { it.key == "cell-12" }.bounds
+        val compact = editor.update("(horizontal 1/3-2/3, vertical 2/3–1)", table)
+        assertTrue(compact.valid)
+        assertEquals(expected, compact.lastValidBounds)
+        assertEquals("Place a red circle at the bottom center (horizontal 1/3-2/3, vertical 2/3–1).", compact.source)
+        assertEquals("Place a red circle at the bottom center.", displayDdlRanges(compact.source, table).text)
+
+        val spaced = editor.update("(horizontal 1/3 - 2/3, vertical 2/3 – 1)", table)
+        assertTrue(spaced.valid)
+        assertEquals(expected, spaced.lastValidBounds)
+        assertEquals("Place a red circle at the bottom center.", displayDdlRanges(spaced.source, table).text)
+        val to = editor.update("(horizontal 1/3 to 2/3, vertical 2/3 to 1)", table)
+        assertTrue(to.valid)
+        assertEquals(expected, to.lastValidBounds)
+
+        val tilde = compact.update("(horizontal 1/3~2/3, vertical 2/3~1)", table)
+        assertFalse(tilde.valid)
+        assertEquals(expected, tilde.lastValidBounds)
+        assertNull(rangeNumbersBounds(tilde.numbers, "en"))
     }
 
     @Test

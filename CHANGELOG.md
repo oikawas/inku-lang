@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-05 — Join English numeric ranges with dashes on Android
+
+English numeric ranges now accept ASCII `-` and en dash `–` as well as the existing `to`. `(horizontal 1/3-2/3, vertical 2/3–1)` works with or without spaces around the dashes; matching bounds update the place name and fold for display. `~` is not a range in English. Both localized input errors and the Android specifications now describe these joining marks and show the English form.
+
 ### 2026-10-05 — Accept hyphens when editing Android range numbers
 
 Japanese numeric ranges now accept ASCII `-` and full-width `－`, including `（横1/3-2/3、縦2/3〜1）`, in the editor and display. English still uses `to`. Localized input errors give examples and joining marks, following the shared core and SPEC. Numeric meaning, saved source, drawing entrances, Room, versions and Build remain unchanged.

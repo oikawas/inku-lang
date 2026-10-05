@@ -266,7 +266,8 @@ struct Bootstrap {
                 let map = try Self.renderColorMap(for: record)
                 var resolved = host
                 resolved["resolved_catalog_id"] = id
-                resolved["catalog_mode"] = id == "default" ? "default" : "explicit"
+                // Server marks the default candidate "default" only through the host it shares when default is chosen.
+                resolved["catalog_mode"] = id == "default" && selectedID == "default" ? "default" : "explicit"
                 resolved["palette"] = try Self.object(InkuCore.resolvePalette(Self.bytes([
                     "color_map": map, "catalog_id": id, "render_seed": actualSeed, "background": host["background"] ?? "white",
                 ])))

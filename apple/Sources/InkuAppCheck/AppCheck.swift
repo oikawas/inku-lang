@@ -36,6 +36,9 @@ struct AppCheck {
         if CommandLine.arguments.contains("--canvas-fit-only") {
             try runCanvasFitChecks(); return
         }
+        if CommandLine.arguments.contains("--server-host-parity-only") {
+            try await runServerHostParityChecks(); return
+        }
         if CommandLine.arguments.contains("--release-parity-only") {
             try await runReleaseParityChecks(); return
         }

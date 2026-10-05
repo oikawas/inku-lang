@@ -3,6 +3,8 @@ import InkuHost
 
 /// Projects only closed failure facts from one execution's terminal view, without reading logs or raw IO.
 enum DrawingFailureMessage {
+    /// Web's pipelineAttentionText first ("Review the result… Reason: … (cause; tried N times)"), then the
+    /// native diagnosis (stage, network/host reason, operation, HTTP status, URL error code) as details.
     static func text(for view: PipelineView, language: String) -> String? {
         guard view.phase == "failed" else { return nil }
         let english = language == "en"
@@ -18,10 +20,18 @@ enum DrawingFailureMessage {
         }
         let stage = action.flatMap { stages[$0] }.map { english ? $0.1 : $0.0 }
             ?? (english ? "Drawing processing" : "描画処理")
-        let coreReason = reason.flatMap { failures[$0] }.map { english ? $0.1 : $0.0 }
-            ?? (english ? "The failure reason was not recorded" : "失敗理由の詳細が記録されていません")
         let diagnostic = metric?.diagnostic
-        let cause = diagnostic.flatMap { diagnosticReason($0, english: english) } ?? coreReason
+
+        let phaseReason = action.flatMap { phaseReasons[$0] }.map { english ? $0.1 : $0.0 } ?? stage
+        var web = (english ? "Review the result of this operation. Reason: " : "処理の結果を確認してください。 理由: ") + phaseReason
+        let credentials = reason == "provider_rejected" && diagnostic?.hostCode == "credentials_unavailable"
+        if let reason, let text = credentials ? (english ? "the model has no API key" : "モデルのAPIキーがありません")
+            : causes[reason].map({ english ? $0.1 : $0.0 }) {
+            let attempts = finalMetric.map { Int($0.identity.attempt) } ?? 1
+            web += english ? " (" + text + (attempts > 1 ? "; tried \(attempts) times" : "") + ")"
+                : "（" + text + (attempts > 1 ? "。\(attempts)回試しました" : "") + "）"
+        }
+
         var details: [String] = []
         if let operation = diagnostic?.operation {
             let label: (String, String)
@@ -33,9 +43,6 @@ enum DrawingFailureMessage {
             }
             details.append(english ? label.1 : label.0)
         }
-        if let attempt = metric?.identity.attempt {
-            details.append(english ? "attempt \(attempt)" : "試行\(attempt)")
-        }
         if let status = metric?.httpStatus ?? diagnostic?.httpStatus, (100...599).contains(status) {
             details.append("HTTP \(status)")
         }
@@ -44,11 +51,13 @@ enum DrawingFailureMessage {
             details.append("NSURLErrorDomain \(code)")
         }
         if let code = diagnostic?.hostCode, hostReasons[code] != nil { details.append(code) }
-        if let reason, failures[reason] != nil, !details.contains(reason) { details.append(reason) }
+        if let reason, causes[reason] != nil, !details.contains(reason) { details.append(reason) }
+        let nativeCause = diagnostic.flatMap { diagnosticReason($0, english: english) }
         let suffix = details.isEmpty ? "" : (english
             ? " (" + details.joined(separator: "; ") + ")"
             : "（" + details.joined(separator: "、") + "）")
-        return stage + ": " + cause + suffix + (english ? "." : "。")
+        let supplement = stage + (nativeCause.map { (english ? ": " : "・") + $0 } ?? "") + suffix
+        return web + (english ? " Details: " + supplement + "." : " 詳細: " + supplement + "。")
     }
 
     private static func diagnosticReason(_ diagnostic: ProviderAttemptDiagnostic, english: Bool) -> String? {
@@ -79,14 +88,22 @@ enum DrawingFailureMessage {
         "read_composition": ("構図読み取り処理", "Composition reading processing"),
         "complete_visible_ddl_holes": ("指示書補完処理", "DDL hole-completion processing"),
     ]
-    private static let failures: [String: (String, String)] = [
-        "transport_unavailable": ("通信を完了できませんでした", "The provider connection could not be completed"),
-        "transport_timeout": ("応答が期限を超えました", "The provider request timed out"),
-        "rate_limited": ("レート制限により処理できませんでした", "A request rate limit prevented completion"),
-        "provider_rejected": ("サービスが要求を拒否しました", "The provider rejected the request"),
-        "malformed_payload": ("応答を読み取れませんでした", "The provider response could not be read"),
-        "schema_violation": ("応答が必要な形式に合いませんでした", "The response did not match the required format"),
-        "semantic_violation": ("応答が必要な条件を満たしませんでした", "The response did not meet the required constraints"),
+    /// Web ja.ts/en.ts pipelineAttentionReason for the phase a failed action stops.
+    private static let phaseReasons: [String: (String, String)] = [
+        "generate_sketch": ("記述の解釈を完了できませんでした", "the description could not be interpreted"),
+        "select_description_catalog": ("記述の解釈を完了できませんでした", "the description could not be interpreted"),
+        "generate_normalized_ddl": ("記述の解釈を完了できませんでした", "the description could not be interpreted"),
+        "complete_visible_ddl_holes": ("DDLの補完候補を作れませんでした", "a DDL completion proposal could not be prepared"),
+    ]
+    /// Web ja.ts/en.ts pipelineFailureCause.
+    private static let causes: [String: (String, String)] = [
+        "transport_timeout": ("モデルの応答が制限時間内に返りませんでした", "the model did not answer within the time limit"),
+        "transport_unavailable": ("モデルに接続できませんでした", "the model could not be reached"),
+        "rate_limited": ("モデルの提供元が要求を制限しました", "the model provider rate-limited the request"),
+        "provider_rejected": ("モデルの提供元が要求を断りました", "the model provider refused the request"),
+        "malformed_payload": ("モデルの応答を読めませんでした", "the model's answer could not be read"),
+        "schema_violation": ("モデルの応答が決まった形になっていませんでした", "the model's answer was not in the expected form"),
+        "semantic_violation": ("モデルの応答を描画に使えませんでした", "the model's answer could not be used for the drawing"),
     ]
     private static let hostReasons: [String: (String, String)] = [
         "credentials_unavailable": ("認証情報を利用できませんでした", "The provider credential was unavailable"),
@@ -99,5 +116,6 @@ enum DrawingFailureMessage {
         "malformed_payload": ("応答を読み取れませんでした", "The provider response could not be read"),
         "invalid_json": ("応答を読み取れませんでした", "The provider response could not be read"),
         "duplicate_json_key": ("応答を読み取れませんでした", "The provider response could not be read"),
+        "provider_response_too_large": ("応答が上限の大きさを超えました", "The provider response exceeded the size limit"),
     ]
 }

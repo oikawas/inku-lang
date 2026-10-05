@@ -9,7 +9,8 @@ class DdlRangesTest {
     private val table = CompositionRangeTable.load {
         """{"schema":"inku.composition-ranges.v1","ranges":[
           {"key":"cell-22","words":{"ja":"右下","en":"bottom right"},"bounds":[[2,3],[2,3],[1,1],[1,1]],"corner":false},
-          {"key":"cell-00","words":{"ja":"左上","en":"top left"},"bounds":[[0,1],[0,1],[1,3],[1,3]],"corner":false}
+          {"key":"cell-00","words":{"ja":"左上","en":"top left"},"bounds":[[0,1],[0,1],[1,3],[1,3]],"corner":false},
+          {"key":"cell-12","words":{"ja":"下中央","en":"bottom center"},"bounds":[[1,3],[2,3],[2,3],[1,1]],"corner":false}
         ]}"""
     }
 
@@ -46,6 +47,24 @@ class DdlRangesTest {
         assertFalse(invalid.valid)
         assertEquals(custom.lastValidBounds, invalid.lastValidBounds)
         assertTrue(invalid.source.endsWith("に置く。\r\n青い円を置く。"))
+    }
+
+    @Test
+    fun japaneseHyphensWorkInTheRangeEditorWhileEnglishKeepsTo() {
+        val source = "右下（横2/3〜1、縦2/3〜1）に、赤い円を置く。"
+        val editor = DdlRangeEdit.open(source, ddlNamedRanges(source, table).single())
+        val expected = table.ranges.single { it.key == "cell-12" }.bounds
+        val halfWidth = editor.update("（横1/3-2/3、縦2/3〜1）", table)
+        assertTrue(halfWidth.valid)
+        assertEquals(expected, halfWidth.lastValidBounds)
+        assertEquals("下中央（横1/3-2/3、縦2/3〜1）に、赤い円を置く。", halfWidth.source)
+        assertEquals("下中央に、赤い円を置く。", displayDdlRanges(halfWidth.source, table).text)
+        val fullWidth = editor.update("（横1/3－2/3、縦2/3－1）", table)
+        assertTrue(fullWidth.valid)
+        assertEquals(expected, fullWidth.lastValidBounds)
+        assertEquals("下中央に、赤い円を置く。", displayDdlRanges(fullWidth.source, table).text)
+        assertEquals(expected, rangeNumbersBounds("(horizontal 1/3 to 2/3, vertical 2/3 to 1)", "en"))
+        assertNull(rangeNumbersBounds("(horizontal 1/3-2/3, vertical 2/3 to 1)", "en"))
     }
 
     @Test

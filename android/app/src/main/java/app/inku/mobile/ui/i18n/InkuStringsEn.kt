@@ -492,7 +492,7 @@ object InkuStringsEn : InkuStrings {
     override val tooltipDdlLang = "The instructions are read with this language's grammar, and numeric ranges are written differently in Japanese and English. A single hiragana, katakana, or kanji character makes it Japanese DDL, so one Japanese name in English instructions has them read as Japanese."
     override val rangeNumbers = "Range numbers"
     override val rangeEditNote = "The frame previews the range. Use Draw from instructions to redraw the work."
-    override val rangeInvalid = "Use numbers from 0 to 1, with each start below its end. The frame shows the last valid range."
+    override val rangeInvalid = "Examples: Japanese （横1/3-2/3、縦2/3〜1）; English (horizontal 1/3 to 2/3, vertical 2/3 to 1). Japanese joins numbers with 〜, ～, ~, - or －; English uses to. Use numbers from 0 to 1, with each start below its end. The frame shows the last valid range."
     override val rangeClose = "Close range editing"
     override val awaitingInterpretation = "Waiting for instructions…"
     override val miscSubtitle = "Language, text size and display"

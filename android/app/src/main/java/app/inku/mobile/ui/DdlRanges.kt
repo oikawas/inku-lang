@@ -91,7 +91,7 @@ internal data class DdlNamedRange(
 
 private const val JapaneseSpace = "[ \\t\\u3000]*"
 private const val EnglishSpace = "[ \\t]*"
-private val JapaneseNumbers = Regex("[（(]${JapaneseSpace}横${JapaneseSpace}([^〜～~、，,（）()]+)[〜～~]([^、，,（）()]+)[、，,]${JapaneseSpace}縦${JapaneseSpace}([^〜～~（）()]+)[〜～~]([^（）()]+)[）)]")
+private val JapaneseNumbers = Regex("[（(]${JapaneseSpace}横${JapaneseSpace}([^-〜～~－、，,（）()]+)[-〜～~－]([^、，,（）()]+)[、，,]${JapaneseSpace}縦${JapaneseSpace}([^-〜～~－（）()]+)[-〜～~－]([^（）()]+)[）)]")
 private val EnglishNumbers = Regex("\\(${EnglishSpace}horizontal[ \\t]+(.+?)[ \\t]+to[ \\t]+(.+?),[ \\t]*vertical[ \\t]+(.+?)[ \\t]+to[ \\t]+(.+?)${EnglishSpace}\\)", RegexOption.IGNORE_CASE)
 private val EnglishNamed = Regex("\\b(?:at|in|on)[ \\t]+([^,;.!?\\n\\r()（）]+?)[ \\t]*(\\(horizontal[^()\\n\\r]*\\))", RegexOption.IGNORE_CASE)
 private val OldMark = Regex("^(?:［構図］|\\[composition\\])[ \\t\\u3000]*", RegexOption.IGNORE_CASE)

@@ -214,6 +214,17 @@ fn pipeline_migrate_saijiki_v1<'py>(
     PyBytes::new(py, &output)
 }
 
+/// Another composition read from a work's visible instructions (draw-system05).
+#[pyfunction]
+fn pipeline_recompose<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::recompose(input));
+    PyBytes::new(py, &output)
+}
+
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(core_api_version, module)?)?;
@@ -236,5 +247,6 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     module.add_function(wrap_pyfunction!(pipeline_render_saved, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_migrate_saijiki_v1, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_recompose, module)?)?;
     Ok(())
 }

@@ -1449,6 +1449,177 @@ pub fn region_key(index: usize) -> &'static str {
     &regions().all[index].key
 }
 
+/// The range a written range is, by its exact bounds (left, top, right, bottom):
+/// one of the 28 composition ranges, a named place or a corner.
+#[must_use]
+pub fn region_of_bounds(bounds: [(u64, u64); 4]) -> Option<usize> {
+    let mut rect = [Frac::ZERO; 4];
+    for (slot, (numerator, denominator)) in rect.iter_mut().zip(bounds) {
+        let (numerator, denominator) = (
+            i64::try_from(numerator).ok()?,
+            i64::try_from(denominator).ok()?,
+        );
+        if denominator == 0 {
+            return None;
+        }
+        *slot = Frac::new(numerator, denominator);
+    }
+    regions().all.iter().position(|region| region.rect == rect)
+}
+
+/// Whether a range is one of the 28 a composition chooses from.
+#[must_use]
+pub fn is_composition_range(index: usize) -> bool {
+    regions().composed.contains(&index)
+}
+
+/// The corner a range is, as the place a reading names it with.
+#[must_use]
+pub fn corner_place(index: usize) -> Option<&'static str> {
+    let key = regions().all.get(index)?.key.as_str();
+    NAMED_CORNERS
+        .iter()
+        .find(|(_, corner)| *corner == key)
+        .map(|(place, _)| *place)
+}
+
+/// The one range a fixed place keeps, when it keeps exactly one.
+#[must_use]
+pub fn fixed_region(place: &str) -> Option<usize> {
+    match stated_regions(place)?.as_slice() {
+        [index] => Some(*index),
+        _ => None,
+    }
+}
+
+/// The words and bounds a composition range or a corner is written with.
+#[must_use]
+pub fn written_range(index: usize) -> Option<ComposedRange> {
+    let region = regions().all.get(index)?;
+    let (words_ja, words_en) = region_words(&region.key)?;
+    let bound = |value: Frac| Some((u32::try_from(value.n).ok()?, u32::try_from(value.d).ok()?));
+    Some(ComposedRange {
+        words_ja: words_ja.to_owned(),
+        words_en: words_en.to_owned(),
+        bounds: [
+            bound(region.rect[0])?,
+            bound(region.rect[1])?,
+            bound(region.rect[2])?,
+            bound(region.rect[3])?,
+        ],
+    })
+}
+
+/// How an answer other than the current one was found.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OtherAnswer {
+    /// Another near-best answer, chosen as `solve` chooses.
+    Near,
+    /// The near-best held only the current answer: the best other one by score.
+    Next,
+    /// No other answer exists (every layer keeps its only range).
+    None,
+}
+
+/// An answer other than `current` (the author's decision Q5, 2026-10-04): among the
+/// near-best answers, chosen by the seed and the work as `solve` chooses; when the
+/// near-best holds only the current answer, the best other combination by score,
+/// then by range keys.
+pub fn other_answer(
+    layers: &[WorkPlanLayer],
+    reading: &CheckedReading,
+    background: &str,
+    searched: &Searched,
+    current: Option<&[usize]>,
+    seed: u64,
+    work_id: &str,
+) -> Result<(Vec<usize>, OtherAnswer), Unsolved> {
+    let near: Vec<&Vec<usize>> = searched
+        .near
+        .iter()
+        .filter(|answer| Some(answer.as_slice()) != current)
+        .collect();
+    if !near.is_empty() {
+        return Ok((
+            near[pick_index(seed, work_id, near.len())].clone(),
+            OtherAnswer::Near,
+        ));
+    }
+    let Some(current) = current else {
+        return Err(Unsolved::NoRanges);
+    };
+    let work = Work::new(layers, reading, background)?;
+    let sizes: Vec<usize> = work.options.iter().map(Vec::len).collect();
+    let table = regions();
+    let keys = |choice: &[usize]| -> Vec<&str> {
+        choice.iter().map(|i| table.all[*i].key.as_str()).collect()
+    };
+    let mut best: Option<(f64, Vec<usize>)> = None;
+    let mut terms = Terms::default();
+    let mut digits = vec![0_usize; sizes.len()];
+    loop {
+        let choice: Vec<usize> = digits
+            .iter()
+            .enumerate()
+            .map(|(layer, digit)| work.options[layer][*digit])
+            .collect();
+        if choice != current {
+            let total = work.score(&choice, &mut terms).total;
+            let better = match &best {
+                None => true,
+                Some((best_total, best_choice)) => {
+                    total < *best_total
+                        || (total == *best_total && keys(&choice) < keys(best_choice))
+                }
+            };
+            if better {
+                best = Some((total, choice));
+            }
+        }
+        if !advance(&mut digits, &sizes) {
+            break;
+        }
+    }
+    Ok(match best {
+        Some((_, choice)) => (choice, OtherAnswer::Next),
+        None => (current.to_vec(), OtherAnswer::None),
+    })
+}
+
+/// Ranges chosen by chance (automatism, the author's decision 2026-10-04): each
+/// layer without a fixed place takes one of the ranges its kind allows (the
+/// solver's own constraints, without a role's), by a hash of the seed, the work
+/// and the layer. A fixed layer keeps its range.
+pub fn chance_answer(
+    layers: &[WorkPlanLayer],
+    fixed: &BTreeMap<usize, String>,
+    seed: u64,
+    work_id: &str,
+) -> Result<Vec<usize>, Unsolved> {
+    layers
+        .iter()
+        .enumerate()
+        .map(|(index, layer)| {
+            let options = candidates(
+                layer,
+                Role::Secondary,
+                fixed.get(&index).map(String::as_str),
+            )
+            .filter(|options| !options.is_empty())
+            .ok_or(Unsolved::NoRanges)?;
+            let digest = Sha256::digest(format!("{seed}:{work_id}:{index}").as_bytes());
+            let value = u64::from_be_bytes(
+                digest[..8]
+                    .try_into()
+                    .expect("a SHA-256 digest has eight bytes"),
+            );
+            let count = u64::try_from(options.len()).expect("a range count fits u64");
+            Ok(options[usize::try_from(value % count).expect("an index below the count")])
+        })
+        .collect()
+}
+
 fn candidates(layer: &WorkPlanLayer, role: Role, fixed: Option<&str>) -> Option<Vec<usize>> {
     let table = regions();
     if let Some(place) = fixed {
@@ -2386,6 +2557,20 @@ pub fn search(
     })
 }
 
+/// The answer a seed picks among `count`: the work's digest says where to start,
+/// and consecutive seeds walk through the answers, so they differ when they can.
+fn pick_index(seed: u64, work_id: &str, count: usize) -> usize {
+    let digest = Sha256::digest(work_id.as_bytes());
+    let start = u128::from(u64::from_be_bytes(
+        digest[..8]
+            .try_into()
+            .expect("a SHA-256 digest has eight bytes"),
+    ));
+    let count = count as u128;
+    let index = (start % count + u128::from(seed) % count + count - 1) % count;
+    usize::try_from(index).expect("an index below the number of answers")
+}
+
 /// Choose one of the near-best placements: consecutive seeds walk through them.
 pub fn solve(
     layers: &[WorkPlanLayer],
@@ -2396,17 +2581,7 @@ pub fn solve(
     work_id: &str,
 ) -> Result<Solution, Unsolved> {
     let work = Work::new(layers, reading, background)?;
-    let digest = Sha256::digest(work_id.as_bytes());
-    let start = u128::from(u64::from_be_bytes(
-        digest[..8]
-            .try_into()
-            .expect("a SHA-256 digest has eight bytes"),
-    ));
-    let count = searched.near.len() as u128;
-    let index = (start % count + u128::from(seed) % count + count - 1) % count;
-    let regions = searched.near
-        [usize::try_from(index).expect("an index below the number of answers")]
-    .clone();
+    let regions = searched.near[pick_index(seed, work_id, searched.near.len())].clone();
     let mut terms = Terms::default();
     let score = work.score(&regions, &mut terms);
     let terms = terms

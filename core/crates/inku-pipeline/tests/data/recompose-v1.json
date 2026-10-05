@@ -1,0 +1,4256 @@
+{
+ "schema": "inku.recompose-port-fixture.v1",
+ "note": "Alternate composition read from the visible DDL (draw-system05, 2026-10-04): the layers the DDL gives back and the answers the prototype gives, seed 1, the case id as the work id. Written by tools/recompose_fixture.py from the composition acceptance works.",
+ "seed": 1,
+ "cases": [
+  {
+   "id": "ja-01",
+   "lang": "ja",
+   "source": "紙。\n背景を白で埋める。\n［構図］左上の四半分（横0〜1/2、縦0〜1/2）に、灰の鉛筆の薄い空の横長の大きな四角を1個置く。\n［構図］右中央（横2/3〜1、縦1/3〜2/3）に、細かく小刻みに揺れる黒の細い細筆の実線の濃い粒の垂直の普通の大きさの線を1個引く。\n［構図］右上（横2/3〜1、縦0〜1/3）に、緑のペンの程よいとても小さな点を5個散らす。",
+   "current": [
+    "quarter-tl",
+    "cell-21",
+    "cell-20"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "square",
+     "proportion": "wide",
+     "action": "place",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "large",
+      "surface": "empty"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "black",
+      "size": "normal_sized",
+      "surface": "grain"
+     }
+    },
+    {
+     "shape": "point",
+     "proportion": null,
+     "action": "scatter",
+     "count": 5,
+     "attributes": {
+      "color": "green",
+      "size": "very_small"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "quarter-bl",
+     "cell-10",
+     "twothirds-top"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "quarter-tl",
+      "to_key": "quarter-bl"
+     },
+     {
+      "layer": 1,
+      "from_key": "cell-21",
+      "to_key": "cell-10"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-20",
+      "to_key": "twothirds-top"
+     }
+    ],
+    "source": "紙。\n背景を白で埋める。\n［構図］左下の四半分（横0〜1/2、縦1/2〜1）に、灰の鉛筆の薄い空の横長の大きな四角を1個置く。\n［構図］上中央（横1/3〜2/3、縦0〜1/3）に、細かく小刻みに揺れる黒の細い細筆の実線の濃い粒の垂直の普通の大きさの線を1個引く。\n［構図］上の3分の2（横0〜1、縦0〜2/3）に、緑のペンの程よいとても小さな点を5個散らす。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "cell-12",
+     "cell-02",
+     "whole"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "quarter-tl",
+      "to_key": "cell-12"
+     },
+     {
+      "layer": 1,
+      "from_key": "cell-21",
+      "to_key": "cell-02"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-20",
+      "to_key": "whole"
+     }
+    ],
+    "source": "紙。\n背景を白で埋める。\n［構図］下中央（横1/3〜2/3、縦2/3〜1）に、灰の鉛筆の薄い空の横長の大きな四角を1個置く。\n［構図］左下（横0〜1/3、縦2/3〜1）に、細かく小刻みに揺れる黒の細い細筆の実線の濃い粒の垂直の普通の大きさの線を1個引く。\n［構図］画面全体（横0〜1、縦0〜1）に、緑のペンの程よいとても小さな点を5個散らす。"
+   }
+  },
+  {
+   "id": "ja-02",
+   "lang": "ja",
+   "source": "メゾチント。\n背景を黒で埋める。\n［構図］左下の四半分（横0〜1/2、縦1/2〜1）に、細かく小刻みに揺れる灰の細い銀筆の実線の程よい粒の垂直の大きな線を1個引く。\n［構図］左下の四半分（横0〜1/2、縦1/2〜1）に、大きくゆるやかに波打つ灰のごく細い鉛筆の実線の薄い刷きの小さな弧を20個引く。",
+   "current": [
+    "quarter-bl",
+    "quarter-bl"
+   ],
+   "background": "black",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "large",
+      "surface": "grain"
+     }
+    },
+    {
+     "shape": "arc",
+     "proportion": null,
+     "action": "draw",
+     "count": 20,
+     "attributes": {
+      "color": "gray",
+      "size": "small",
+      "surface": "sweep"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "cell-01",
+     "quarter-br"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "quarter-bl",
+      "to_key": "cell-01"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-bl",
+      "to_key": "quarter-br"
+     }
+    ],
+    "source": "メゾチント。\n背景を黒で埋める。\n［構図］左中央（横0〜1/3、縦1/3〜2/3）に、細かく小刻みに揺れる灰の細い銀筆の実線の程よい粒の垂直の大きな線を1個引く。\n［構図］右下の四半分（横1/2〜1、縦1/2〜1）に、大きくゆるやかに波打つ灰のごく細い鉛筆の実線の薄い刷きの小さな弧を20個引く。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "quarter-tl",
+     "cell-02"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "quarter-bl",
+      "to_key": "quarter-tl"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-bl",
+      "to_key": "cell-02"
+     }
+    ],
+    "source": "メゾチント。\n背景を黒で埋める。\n［構図］左上の四半分（横0〜1/2、縦0〜1/2）に、細かく小刻みに揺れる灰の細い銀筆の実線の程よい粒の垂直の大きな線を1個引く。\n［構図］左下（横0〜1/3、縦2/3〜1）に、大きくゆるやかに波打つ灰のごく細い鉛筆の実線の薄い刷きの小さな弧を20個引く。"
+   }
+  },
+  {
+   "id": "ja-03",
+   "lang": "ja",
+   "source": "和紙。\n背景を黒で埋める。\n［構図］右中央（横2/3〜1、縦1/3〜2/3）に、大きくゆるやかに波打つ灰の太い太筆の薄い刷きの垂直の巨大な線を1個引く。\n［構図］上中央（横1/3〜2/3、縦0〜1/3）に、細かく小刻みに揺れる黒の太い太筆の濃い粒の垂直の大きな線を3個引く。\n［構図］左上（横0〜1/3、縦0〜1/3）に、白の油彩の程よい塗りの大きな円を1個置く。\n［構図］左上の四半分（横0〜1/2、縦0〜1/2）に、白のペンの濃いとても小さな点を30個散らす。",
+   "current": [
+    "cell-21",
+    "cell-10",
+    "cell-00",
+    "quarter-tl"
+   ],
+   "background": "black",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "huge",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 3,
+     "attributes": {
+      "color": "black",
+      "size": "large",
+      "surface": "grain"
+     }
+    },
+    {
+     "shape": "circle",
+     "proportion": null,
+     "action": "place",
+     "count": 1,
+     "attributes": {
+      "color": "white",
+      "size": "large",
+      "surface": "flat"
+     }
+    },
+    {
+     "shape": "point",
+     "proportion": null,
+     "action": "scatter",
+     "count": 30,
+     "attributes": {
+      "color": "white",
+      "size": "very_small"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "cell-20",
+     "quarter-tl",
+     "cell-02",
+     "twothirds-top"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "cell-21",
+      "to_key": "cell-20"
+     },
+     {
+      "layer": 1,
+      "from_key": "cell-10",
+      "to_key": "quarter-tl"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-00",
+      "to_key": "cell-02"
+     },
+     {
+      "layer": 3,
+      "from_key": "quarter-tl",
+      "to_key": "twothirds-top"
+     }
+    ],
+    "source": "和紙。\n背景を黒で埋める。\n［構図］右上（横2/3〜1、縦0〜1/3）に、大きくゆるやかに波打つ灰の太い太筆の薄い刷きの垂直の巨大な線を1個引く。\n［構図］左上の四半分（横0〜1/2、縦0〜1/2）に、細かく小刻みに揺れる黒の太い太筆の濃い粒の垂直の大きな線を3個引く。\n［構図］左下（横0〜1/3、縦2/3〜1）に、白の油彩の程よい塗りの大きな円を1個置く。\n［構図］上の3分の2（横0〜1、縦0〜2/3）に、白のペンの濃いとても小さな点を30個散らす。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "cell-00",
+     "cell-12",
+     "cell-01",
+     "cell-22"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "cell-21",
+      "to_key": "cell-00"
+     },
+     {
+      "layer": 1,
+      "from_key": "cell-10",
+      "to_key": "cell-12"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-00",
+      "to_key": "cell-01"
+     },
+     {
+      "layer": 3,
+      "from_key": "quarter-tl",
+      "to_key": "cell-22"
+     }
+    ],
+    "source": "和紙。\n背景を黒で埋める。\n［構図］左上（横0〜1/3、縦0〜1/3）に、大きくゆるやかに波打つ灰の太い太筆の薄い刷きの垂直の巨大な線を1個引く。\n［構図］下中央（横1/3〜2/3、縦2/3〜1）に、細かく小刻みに揺れる黒の太い太筆の濃い粒の垂直の大きな線を3個引く。\n［構図］左中央（横0〜1/3、縦1/3〜2/3）に、白の油彩の程よい塗りの大きな円を1個置く。\n［構図］右下（横2/3〜1、縦2/3〜1）に、白のペンの濃いとても小さな点を30個散らす。"
+   }
+  },
+  {
+   "id": "ja-04",
+   "lang": "ja",
+   "source": "紙。\n背景を白で埋める。\n［構図］上（横0〜1、縦0〜1/3）に、細かく小刻みに波打つ灰の太い太筆の実線の濃い粒の右上がりの全幅の線を1個引く。\n［構図］右中央（横2/3〜1、縦1/3〜2/3）に、黒のペンの程よい塗りの縦長の小さな楕円を3個置く。\n上端に、大きくゆるやかに揺れる黒の細い鉛筆の薄い空の垂直の普通の大きさの線を5個引く。",
+   "current": [
+    "hband-0",
+    "cell-21",
+    "named-top_edge"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": "full_width",
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "surface": "grain"
+     }
+    },
+    {
+     "shape": "ellipse",
+     "proportion": "tall",
+     "action": "place",
+     "count": 3,
+     "attributes": {
+      "color": "black",
+      "size": "small",
+      "surface": "flat"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 5,
+     "attributes": {
+      "color": "black",
+      "size": "normal_sized",
+      "surface": "empty",
+      "position": "top_edge"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "whole",
+     "cell-22",
+     "named-top_edge"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-0",
+      "to_key": "whole"
+     },
+     {
+      "layer": 1,
+      "from_key": "cell-21",
+      "to_key": "cell-22"
+     }
+    ],
+    "source": "紙。\n背景を白で埋める。\n［構図］画面全体（横0〜1、縦0〜1）に、細かく小刻みに波打つ灰の太い太筆の実線の濃い粒の右上がりの全幅の線を1個引く。\n［構図］右下（横2/3〜1、縦2/3〜1）に、黒のペンの程よい塗りの縦長の小さな楕円を3個置く。\n上端に、大きくゆるやかに揺れる黒の細い鉛筆の薄い空の垂直の普通の大きさの線を5個引く。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "twothirds-top",
+     "cell-11",
+     "named-top_edge"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-0",
+      "to_key": "twothirds-top"
+     },
+     {
+      "layer": 1,
+      "from_key": "cell-21",
+      "to_key": "cell-11"
+     }
+    ],
+    "source": "紙。\n背景を白で埋める。\n［構図］上の3分の2（横0〜1、縦0〜2/3）に、細かく小刻みに波打つ灰の太い太筆の実線の濃い粒の右上がりの全幅の線を1個引く。\n［構図］中心（横1/3〜2/3、縦1/3〜2/3）に、黒のペンの程よい塗りの縦長の小さな楕円を3個置く。\n上端に、大きくゆるやかに揺れる黒の細い鉛筆の薄い空の垂直の普通の大きさの線を5個引く。"
+   }
+  },
+  {
+   "id": "ja-05",
+   "lang": "ja",
+   "source": "和紙。\n背景を白で埋める。\n［構図］下半分（横0〜1、縦1/2〜1）に、細かくゆるやかに波打つ灰の細い細筆の薄い刷きの水平の全幅の線を1個引く。\n［構図］左下の四半分（横0〜1/2、縦1/2〜1）に、灰の太筆の程よい塗りの横長の特大のの雲形を1個置く。\n［構図］中心（横1/3〜2/3、縦1/3〜2/3）に、細かく小刻みに揺れる白の油彩の濃い塗りの垂直の縦長の普通の大きさの四角を7個散らす。",
+   "current": [
+    "half-bottom",
+    "quarter-bl",
+    "cell-11"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": "full_width",
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "cloudform",
+     "proportion": "wide",
+     "action": "place",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "extra_large",
+      "surface": "flat"
+     }
+    },
+    {
+     "shape": "square",
+     "proportion": "tall",
+     "action": "scatter",
+     "count": 7,
+     "attributes": {
+      "color": "white",
+      "size": "normal_sized",
+      "surface": "flat"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "hband-1",
+     "quarter-bl",
+     "cell-21"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "half-bottom",
+      "to_key": "hband-1"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-11",
+      "to_key": "cell-21"
+     }
+    ],
+    "source": "和紙。\n背景を白で埋める。\n［構図］中ほど（横0〜1、縦1/3〜2/3）に、細かくゆるやかに波打つ灰の細い細筆の薄い刷きの水平の全幅の線を1個引く。\n［構図］左下の四半分（横0〜1/2、縦1/2〜1）に、灰の太筆の程よい塗りの横長の特大のの雲形を1個置く。\n［構図］右中央（横2/3〜1、縦1/3〜2/3）に、細かく小刻みに揺れる白の油彩の濃い塗りの垂直の縦長の普通の大きさの四角を7個散らす。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "twothirds-top",
+     "quarter-tr",
+     "twothirds-left"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "half-bottom",
+      "to_key": "twothirds-top"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-bl",
+      "to_key": "quarter-tr"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-11",
+      "to_key": "twothirds-left"
+     }
+    ],
+    "source": "和紙。\n背景を白で埋める。\n［構図］上の3分の2（横0〜1、縦0〜2/3）に、細かくゆるやかに波打つ灰の細い細筆の薄い刷きの水平の全幅の線を1個引く。\n［構図］右上の四半分（横1/2〜1、縦0〜1/2）に、灰の太筆の程よい塗りの横長の特大のの雲形を1個置く。\n［構図］左の3分の2（横0〜2/3、縦0〜1）に、細かく小刻みに揺れる白の油彩の濃い塗りの垂直の縦長の普通の大きさの四角を7個散らす。"
+   }
+  },
+  {
+   "id": "ja-06",
+   "lang": "ja",
+   "source": "画用紙。\n背景を白で埋める。\n下に、灰の太筆の薄い塗りの垂直の横長の特大のの四角を1個埋める。\n［構図］右上（横2/3〜1、縦0〜1/3）に、細かく小刻みに波打つ黒の細いペンの実線の濃い粒の小さな線を12個引く。\n［構図］右上（横2/3〜1、縦0〜1/3）に、大きくゆるやかに揺れる黄のごく細い銀筆の実線の程よい空の回転のとても小さな弧を40個引く。\n［構図］右上（横2/3〜1、縦0〜1/3）に、黄のクレヨンの実線の濃い普通の大きさの点を6個置く。",
+   "current": [
+    "named-bottom",
+    "cell-20",
+    "cell-20",
+    "cell-20"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "square",
+     "proportion": "wide",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "extra_large",
+      "surface": "flat",
+      "position": "bottom"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 12,
+     "attributes": {
+      "color": "black",
+      "size": "small",
+      "surface": "grain"
+     }
+    },
+    {
+     "shape": "arc",
+     "proportion": null,
+     "action": "draw",
+     "count": 40,
+     "attributes": {
+      "color": "yellow",
+      "size": "very_small",
+      "surface": "empty"
+     }
+    },
+    {
+     "shape": "point",
+     "proportion": null,
+     "action": "place",
+     "count": 6,
+     "attributes": {
+      "color": "yellow",
+      "size": "normal_sized"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "named-bottom",
+     "quarter-br",
+     "cell-10",
+     "cell-21"
+    ],
+    "moves": [
+     {
+      "layer": 1,
+      "from_key": "cell-20",
+      "to_key": "quarter-br"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-20",
+      "to_key": "cell-10"
+     },
+     {
+      "layer": 3,
+      "from_key": "cell-20",
+      "to_key": "cell-21"
+     }
+    ],
+    "source": "画用紙。\n背景を白で埋める。\n下に、灰の太筆の薄い塗りの垂直の横長の特大のの四角を1個埋める。\n［構図］右下の四半分（横1/2〜1、縦1/2〜1）に、細かく小刻みに波打つ黒の細いペンの実線の濃い粒の小さな線を12個引く。\n［構図］上中央（横1/3〜2/3、縦0〜1/3）に、大きくゆるやかに揺れる黄のごく細い銀筆の実線の程よい空の回転のとても小さな弧を40個引く。\n［構図］右中央（横2/3〜1、縦1/3〜2/3）に、黄のクレヨンの実線の濃い普通の大きさの点を6個置く。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "named-bottom",
+     "quarter-bl",
+     "cell-01",
+     "cell-22"
+    ],
+    "moves": [
+     {
+      "layer": 1,
+      "from_key": "cell-20",
+      "to_key": "quarter-bl"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-20",
+      "to_key": "cell-01"
+     },
+     {
+      "layer": 3,
+      "from_key": "cell-20",
+      "to_key": "cell-22"
+     }
+    ],
+    "source": "画用紙。\n背景を白で埋める。\n下に、灰の太筆の薄い塗りの垂直の横長の特大のの四角を1個埋める。\n［構図］左下の四半分（横0〜1/2、縦1/2〜1）に、細かく小刻みに波打つ黒の細いペンの実線の濃い粒の小さな線を12個引く。\n［構図］左中央（横0〜1/3、縦1/3〜2/3）に、大きくゆるやかに揺れる黄のごく細い銀筆の実線の程よい空の回転のとても小さな弧を40個引く。\n［構図］右下（横2/3〜1、縦2/3〜1）に、黄のクレヨンの実線の濃い普通の大きさの点を6個置く。"
+   }
+  },
+  {
+   "id": "ja-07",
+   "lang": "ja",
+   "source": "紙。\n背景を黒で埋める。\n［構図］下（横0〜1、縦2/3〜1）に、細かく小刻みに波打つ灰の太筆の薄い刷きの水平の横長の大きな楕円を1個埋める。\n［構図］左下（横0〜1/3、縦2/3〜1）に、大きくゆるやかに揺れる赤の細い鉛筆の実線の濃い粒の水平の小さな線を1個引く。\n［構図］左下（横0〜1/3、縦2/3〜1）に、赤の油彩の濃い塗りのとても小さな円を1個置く。",
+   "current": [
+    "hband-2",
+    "cell-02",
+    "cell-02"
+   ],
+   "background": "black",
+   "layers": [
+    {
+     "shape": "ellipse",
+     "proportion": "wide",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "large",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "red",
+      "size": "small",
+      "surface": "grain"
+     }
+    },
+    {
+     "shape": "circle",
+     "proportion": null,
+     "action": "place",
+     "count": 1,
+     "attributes": {
+      "color": "red",
+      "size": "very_small",
+      "surface": "flat"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "hband-1",
+     "quarter-bl",
+     "cell-21"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-2",
+      "to_key": "hband-1"
+     },
+     {
+      "layer": 1,
+      "from_key": "cell-02",
+      "to_key": "quarter-bl"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-02",
+      "to_key": "cell-21"
+     }
+    ],
+    "source": "紙。\n背景を黒で埋める。\n［構図］中ほど（横0〜1、縦1/3〜2/3）に、細かく小刻みに波打つ灰の太筆の薄い刷きの水平の横長の大きな楕円を1個埋める。\n［構図］左下の四半分（横0〜1/2、縦1/2〜1）に、大きくゆるやかに揺れる赤の細い鉛筆の実線の濃い粒の水平の小さな線を1個引く。\n［構図］右中央（横2/3〜1、縦1/3〜2/3）に、赤の油彩の濃い塗りのとても小さな円を1個置く。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "hband-2",
+     "cell-10",
+     "cell-22"
+    ],
+    "moves": [
+     {
+      "layer": 1,
+      "from_key": "cell-02",
+      "to_key": "cell-10"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-02",
+      "to_key": "cell-22"
+     }
+    ],
+    "source": "紙。\n背景を黒で埋める。\n［構図］下（横0〜1、縦2/3〜1）に、細かく小刻みに波打つ灰の太筆の薄い刷きの水平の横長の大きな楕円を1個埋める。\n［構図］上中央（横1/3〜2/3、縦0〜1/3）に、大きくゆるやかに揺れる赤の細い鉛筆の実線の濃い粒の水平の小さな線を1個引く。\n［構図］右下（横2/3〜1、縦2/3〜1）に、赤の油彩の濃い塗りのとても小さな円を1個置く。"
+   }
+  },
+  {
+   "id": "ja-08",
+   "lang": "ja",
+   "source": "和紙。\n背景を黒で埋める。\n下に、細かく小刻みに揺れる灰のチョークの濃い粒の横長の大きな雲形を1個埋める。\n［構図］右下（横2/3〜1、縦2/3〜1）に、橙の細筆の程よいとても小さな点を10個散らす。",
+   "current": [
+    "named-bottom",
+    "cell-22"
+   ],
+   "background": "black",
+   "layers": [
+    {
+     "shape": "cloudform",
+     "proportion": "wide",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "large",
+      "surface": "grain",
+      "position": "bottom"
+     }
+    },
+    {
+     "shape": "point",
+     "proportion": null,
+     "action": "scatter",
+     "count": 10,
+     "attributes": {
+      "color": "orange",
+      "size": "very_small"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "named-bottom",
+     "hband-0"
+    ],
+    "moves": [
+     {
+      "layer": 1,
+      "from_key": "cell-22",
+      "to_key": "hband-0"
+     }
+    ],
+    "source": "和紙。\n背景を黒で埋める。\n下に、細かく小刻みに揺れる灰のチョークの濃い粒の横長の大きな雲形を1個埋める。\n［構図］上（横0〜1、縦0〜1/3）に、橙の細筆の程よいとても小さな点を10個散らす。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "named-bottom",
+     "vband-0"
+    ],
+    "moves": [
+     {
+      "layer": 1,
+      "from_key": "cell-22",
+      "to_key": "vband-0"
+     }
+    ],
+    "source": "和紙。\n背景を黒で埋める。\n下に、細かく小刻みに揺れる灰のチョークの濃い粒の横長の大きな雲形を1個埋める。\n［構図］左（横0〜1/3、縦0〜1）に、橙の細筆の程よいとても小さな点を10個散らす。"
+   }
+  },
+  {
+   "id": "ja-09",
+   "lang": "ja",
+   "source": "背景を黒で埋める。\n［構図］右半分（横1/2〜1、縦0〜1）に、細かくゆるやかに波打つ黄の太筆の薄い刷きの垂直の縦長の特大のの四角を1個埋める。\n［構図］右上の四半分（横1/2〜1、縦0〜1/2）に、白の鉛筆の濃いとても小さな点を40個散らす。",
+   "current": [
+    "half-right",
+    "quarter-tr"
+   ],
+   "background": "black",
+   "layers": [
+    {
+     "shape": "square",
+     "proportion": "tall",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "color": "yellow",
+      "size": "extra_large",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "point",
+     "proportion": null,
+     "action": "scatter",
+     "count": 40,
+     "attributes": {
+      "color": "white",
+      "size": "very_small"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "vband-0",
+     "hband-0"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "half-right",
+      "to_key": "vband-0"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-tr",
+      "to_key": "hband-0"
+     }
+    ],
+    "source": "背景を黒で埋める。\n［構図］左（横0〜1/3、縦0〜1）に、細かくゆるやかに波打つ黄の太筆の薄い刷きの垂直の縦長の特大のの四角を1個埋める。\n［構図］上（横0〜1、縦0〜1/3）に、白の鉛筆の濃いとても小さな点を40個散らす。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "vband-2",
+     "half-right"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "half-right",
+      "to_key": "vband-2"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-tr",
+      "to_key": "half-right"
+     }
+    ],
+    "source": "背景を黒で埋める。\n［構図］右（横2/3〜1、縦0〜1）に、細かくゆるやかに波打つ黄の太筆の薄い刷きの垂直の縦長の特大のの四角を1個埋める。\n［構図］右半分（横1/2〜1、縦0〜1）に、白の鉛筆の濃いとても小さな点を40個散らす。"
+   }
+  },
+  {
+   "id": "ja-10",
+   "lang": "ja",
+   "source": "和紙。\n背景を白で埋める。\nNature.落葉。\n［構図］下の3分の2（横0〜1、縦1/3〜1）に、灰の太筆の薄い刷きの全幅の雲形を1個埋める。\n［構図］左下（横0〜1/3、縦2/3〜1）に、細かく小刻みに揺れる橙の太い太筆の実線の濃い粒の斜めの大きな線を2個引く。\n［構図］左中央（横0〜1/3、縦1/3〜2/3）に、黒のペンの実線の濃い塗りの回転の横長の小さな楕円を1個置く。\n［構図］左下の四半分（横0〜1/2、縦1/2〜1）に、灰の鉛筆の程よいとても小さな点を15個散らす。",
+   "current": [
+    "twothirds-bottom",
+    "cell-02",
+    "cell-01",
+    "quarter-bl"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "cloudform",
+     "proportion": "full_width",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 2,
+     "attributes": {
+      "color": "orange",
+      "size": "large",
+      "surface": "grain"
+     }
+    },
+    {
+     "shape": "ellipse",
+     "proportion": "wide",
+     "action": "place",
+     "count": 1,
+     "attributes": {
+      "color": "black",
+      "size": "small",
+      "surface": "flat"
+     }
+    },
+    {
+     "shape": "point",
+     "proportion": null,
+     "action": "scatter",
+     "count": 15,
+     "attributes": {
+      "color": "gray",
+      "size": "very_small"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "half-bottom",
+     "quarter-bl",
+     "cell-22",
+     "twothirds-bottom"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "twothirds-bottom",
+      "to_key": "half-bottom"
+     },
+     {
+      "layer": 1,
+      "from_key": "cell-02",
+      "to_key": "quarter-bl"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-01",
+      "to_key": "cell-22"
+     },
+     {
+      "layer": 3,
+      "from_key": "quarter-bl",
+      "to_key": "twothirds-bottom"
+     }
+    ],
+    "source": "和紙。\n背景を白で埋める。\nNature.落葉。\n［構図］下半分（横0〜1、縦1/2〜1）に、灰の太筆の薄い刷きの全幅の雲形を1個埋める。\n［構図］左下の四半分（横0〜1/2、縦1/2〜1）に、細かく小刻みに揺れる橙の太い太筆の実線の濃い粒の斜めの大きな線を2個引く。\n［構図］右下（横2/3〜1、縦2/3〜1）に、黒のペンの実線の濃い塗りの回転の横長の小さな楕円を1個置く。\n［構図］下の3分の2（横0〜1、縦1/3〜1）に、灰の鉛筆の程よいとても小さな点を15個散らす。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "hband-0",
+     "cell-21",
+     "quarter-br",
+     "twothirds-bottom"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "twothirds-bottom",
+      "to_key": "hband-0"
+     },
+     {
+      "layer": 1,
+      "from_key": "cell-02",
+      "to_key": "cell-21"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-01",
+      "to_key": "quarter-br"
+     },
+     {
+      "layer": 3,
+      "from_key": "quarter-bl",
+      "to_key": "twothirds-bottom"
+     }
+    ],
+    "source": "和紙。\n背景を白で埋める。\nNature.落葉。\n［構図］上（横0〜1、縦0〜1/3）に、灰の太筆の薄い刷きの全幅の雲形を1個埋める。\n［構図］右中央（横2/3〜1、縦1/3〜2/3）に、細かく小刻みに揺れる橙の太い太筆の実線の濃い粒の斜めの大きな線を2個引く。\n［構図］右下の四半分（横1/2〜1、縦1/2〜1）に、黒のペンの実線の濃い塗りの回転の横長の小さな楕円を1個置く。\n［構図］下の3分の2（横0〜1、縦1/3〜1）に、灰の鉛筆の程よいとても小さな点を15個散らす。"
+   }
+  },
+  {
+   "id": "ja-11",
+   "lang": "ja",
+   "source": "和紙。\n背景を黒で埋める。\n［構図］中ほど（横0〜1、縦1/3〜2/3）に、灰の太筆の薄い刷きの横長の特大のの雲形を1個埋める。\n［構図］右上の四半分（横1/2〜1、縦0〜1/2）に、細かく小刻みに揺れる白の太いロットリングの実線の濃い粒の垂直の大きな線を2個引く。\n［構図］画面全体（横0〜1、縦0〜1）に、青の鉛筆の薄いとても小さな点を12個散らす。\n［構図］下中央（横1/3〜2/3、縦2/3〜1）に、細かく小刻みに揺れる白の細い細筆の程よい粒の回転の小さな弧を8個引く。",
+   "current": [
+    "hband-1",
+    "quarter-tr",
+    "whole",
+    "cell-12"
+   ],
+   "background": "black",
+   "layers": [
+    {
+     "shape": "cloudform",
+     "proportion": "wide",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "extra_large",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 2,
+     "attributes": {
+      "color": "white",
+      "size": "large",
+      "surface": "grain"
+     }
+    },
+    {
+     "shape": "point",
+     "proportion": null,
+     "action": "scatter",
+     "count": 12,
+     "attributes": {
+      "color": "blue",
+      "size": "very_small"
+     }
+    },
+    {
+     "shape": "arc",
+     "proportion": null,
+     "action": "draw",
+     "count": 8,
+     "attributes": {
+      "color": "white",
+      "size": "small",
+      "surface": "grain"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "half-top",
+     "quarter-tr",
+     "twothirds-bottom",
+     "quarter-tl"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-1",
+      "to_key": "half-top"
+     },
+     {
+      "layer": 2,
+      "from_key": "whole",
+      "to_key": "twothirds-bottom"
+     },
+     {
+      "layer": 3,
+      "from_key": "cell-12",
+      "to_key": "quarter-tl"
+     }
+    ],
+    "source": "和紙。\n背景を黒で埋める。\n［構図］上半分（横0〜1、縦0〜1/2）に、灰の太筆の薄い刷きの横長の特大のの雲形を1個埋める。\n［構図］右上の四半分（横1/2〜1、縦0〜1/2）に、細かく小刻みに揺れる白の太いロットリングの実線の濃い粒の垂直の大きな線を2個引く。\n［構図］下の3分の2（横0〜1、縦1/3〜1）に、青の鉛筆の薄いとても小さな点を12個散らす。\n［構図］左上の四半分（横0〜1/2、縦0〜1/2）に、細かく小刻みに揺れる白の細い細筆の程よい粒の回転の小さな弧を8個引く。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "hband-0",
+     "quarter-br",
+     "cell-02",
+     "cell-01"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-1",
+      "to_key": "hband-0"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-tr",
+      "to_key": "quarter-br"
+     },
+     {
+      "layer": 2,
+      "from_key": "whole",
+      "to_key": "cell-02"
+     },
+     {
+      "layer": 3,
+      "from_key": "cell-12",
+      "to_key": "cell-01"
+     }
+    ],
+    "source": "和紙。\n背景を黒で埋める。\n［構図］上（横0〜1、縦0〜1/3）に、灰の太筆の薄い刷きの横長の特大のの雲形を1個埋める。\n［構図］右下の四半分（横1/2〜1、縦1/2〜1）に、細かく小刻みに揺れる白の太いロットリングの実線の濃い粒の垂直の大きな線を2個引く。\n［構図］左下（横0〜1/3、縦2/3〜1）に、青の鉛筆の薄いとても小さな点を12個散らす。\n［構図］左中央（横0〜1/3、縦1/3〜2/3）に、細かく小刻みに揺れる白の細い細筆の程よい粒の回転の小さな弧を8個引く。"
+   }
+  },
+  {
+   "id": "ja-12",
+   "lang": "ja",
+   "source": "和紙。\n背景を白で埋める。\n［構図］上半分（横0〜1、縦0〜1/2）に、大きくゆるやかに波打つ灰の太筆の薄いアクアチントの全幅の雲形を1個埋める。\n［構図］左上の四半分（横0〜1/2、縦0〜1/2）に、細かく小刻みに揺れる青の太い鉛筆の実線の程よい粒の右上がりの縦長の大きな三角を3個置く。\n［構図］左中央（横0〜1/3、縦1/3〜2/3）に、黒のごく細い銀筆の薄いとても小さな点を12個散らす。",
+   "current": [
+    "half-top",
+    "quarter-tl",
+    "cell-01"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "cloudform",
+     "proportion": "full_width",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "surface": "aquatint"
+     }
+    },
+    {
+     "shape": "triangle",
+     "proportion": "tall",
+     "action": "place",
+     "count": 3,
+     "attributes": {
+      "color": "blue",
+      "size": "large",
+      "surface": "grain"
+     }
+    },
+    {
+     "shape": "point",
+     "proportion": null,
+     "action": "scatter",
+     "count": 12,
+     "attributes": {
+      "color": "black",
+      "size": "very_small"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "hband-1",
+     "quarter-tl",
+     "half-bottom"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "half-top",
+      "to_key": "hband-1"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-01",
+      "to_key": "half-bottom"
+     }
+    ],
+    "source": "和紙。\n背景を白で埋める。\n［構図］中ほど（横0〜1、縦1/3〜2/3）に、大きくゆるやかに波打つ灰の太筆の薄いアクアチントの全幅の雲形を1個埋める。\n［構図］左上の四半分（横0〜1/2、縦0〜1/2）に、細かく小刻みに揺れる青の太い鉛筆の実線の程よい粒の右上がりの縦長の大きな三角を3個置く。\n［構図］下半分（横0〜1、縦1/2〜1）に、黒のごく細い銀筆の薄いとても小さな点を12個散らす。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "twothirds-bottom",
+     "cell-02",
+     "cell-20"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "half-top",
+      "to_key": "twothirds-bottom"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-tl",
+      "to_key": "cell-02"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-01",
+      "to_key": "cell-20"
+     }
+    ],
+    "source": "和紙。\n背景を白で埋める。\n［構図］下の3分の2（横0〜1、縦1/3〜1）に、大きくゆるやかに波打つ灰の太筆の薄いアクアチントの全幅の雲形を1個埋める。\n［構図］左下（横0〜1/3、縦2/3〜1）に、細かく小刻みに揺れる青の太い鉛筆の実線の程よい粒の右上がりの縦長の大きな三角を3個置く。\n［構図］右上（横2/3〜1、縦0〜1/3）に、黒のごく細い銀筆の薄いとても小さな点を12個散らす。"
+   }
+  },
+  {
+   "id": "ja-13",
+   "lang": "ja",
+   "source": "カンバス。\n背景を黒で埋める。\n下に、細かくゆるやかに波打つ青の太筆の薄い塗りの水平の横長の大きな四角を1個埋める。\n［構図］左下の四半分（横0〜1/2、縦1/2〜1）に、白の太筆の濃い塗りの大きな円を1個置く。\n［構図］下中央（横1/3〜2/3、縦2/3〜1）に、大きくゆるやかに揺れる白の細い鉛筆の程よい刷きの斜めの小さな線を12個引く。\n［構図］中心（横1/3〜2/3、縦1/3〜2/3）に、細かく小刻みに波打つ白のごく太いクレヨンの濃い粒の斜めの普通の大きさの線を8個引く。",
+   "current": [
+    "named-bottom",
+    "quarter-bl",
+    "cell-12",
+    "cell-11"
+   ],
+   "background": "black",
+   "layers": [
+    {
+     "shape": "square",
+     "proportion": "wide",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "color": "blue",
+      "size": "large",
+      "surface": "flat",
+      "position": "bottom"
+     }
+    },
+    {
+     "shape": "circle",
+     "proportion": null,
+     "action": "place",
+     "count": 1,
+     "attributes": {
+      "color": "white",
+      "size": "large",
+      "surface": "flat"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 12,
+     "attributes": {
+      "color": "white",
+      "size": "small",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 8,
+     "attributes": {
+      "color": "white",
+      "size": "normal_sized",
+      "surface": "grain"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "named-bottom",
+     "cell-01",
+     "cell-22",
+     "cell-02"
+    ],
+    "moves": [
+     {
+      "layer": 1,
+      "from_key": "quarter-bl",
+      "to_key": "cell-01"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-12",
+      "to_key": "cell-22"
+     },
+     {
+      "layer": 3,
+      "from_key": "cell-11",
+      "to_key": "cell-02"
+     }
+    ],
+    "source": "カンバス。\n背景を黒で埋める。\n下に、細かくゆるやかに波打つ青の太筆の薄い塗りの水平の横長の大きな四角を1個埋める。\n［構図］左中央（横0〜1/3、縦1/3〜2/3）に、白の太筆の濃い塗りの大きな円を1個置く。\n［構図］右下（横2/3〜1、縦2/3〜1）に、大きくゆるやかに揺れる白の細い鉛筆の程よい刷きの斜めの小さな線を12個引く。\n［構図］左下（横0〜1/3、縦2/3〜1）に、細かく小刻みに波打つ白のごく太いクレヨンの濃い粒の斜めの普通の大きさの線を8個引く。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "named-bottom",
+     "cell-21",
+     "quarter-tl",
+     "cell-22"
+    ],
+    "moves": [
+     {
+      "layer": 1,
+      "from_key": "quarter-bl",
+      "to_key": "cell-21"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-12",
+      "to_key": "quarter-tl"
+     },
+     {
+      "layer": 3,
+      "from_key": "cell-11",
+      "to_key": "cell-22"
+     }
+    ],
+    "source": "カンバス。\n背景を黒で埋める。\n下に、細かくゆるやかに波打つ青の太筆の薄い塗りの水平の横長の大きな四角を1個埋める。\n［構図］右中央（横2/3〜1、縦1/3〜2/3）に、白の太筆の濃い塗りの大きな円を1個置く。\n［構図］左上の四半分（横0〜1/2、縦0〜1/2）に、大きくゆるやかに揺れる白の細い鉛筆の程よい刷きの斜めの小さな線を12個引く。\n［構図］右下（横2/3〜1、縦2/3〜1）に、細かく小刻みに波打つ白のごく太いクレヨンの濃い粒の斜めの普通の大きさの線を8個引く。"
+   }
+  },
+  {
+   "id": "ja-14",
+   "lang": "ja",
+   "source": "紙。\n背景を黒で埋める。\n［構図］下の3分の2（横0〜1、縦1/3〜1）に、白のチョークの濃いとても小さな点を40個散らす。\n［構図］右下の四半分（横1/2〜1、縦1/2〜1）に、細かく揺れる灰の細い鉛筆の実線の程よい粒の垂直の普通の大きさの線を3個引く。\n［構図］右中央（横2/3〜1、縦1/3〜2/3）に、白の細筆の薄い空のとても小さな円を1個置く。",
+   "current": [
+    "twothirds-bottom",
+    "quarter-br",
+    "cell-21"
+   ],
+   "background": "black",
+   "layers": [
+    {
+     "shape": "point",
+     "proportion": null,
+     "action": "scatter",
+     "count": 40,
+     "attributes": {
+      "color": "white",
+      "size": "very_small"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 3,
+     "attributes": {
+      "color": "gray",
+      "size": "normal_sized",
+      "surface": "grain"
+     }
+    },
+    {
+     "shape": "circle",
+     "proportion": null,
+     "action": "place",
+     "count": 1,
+     "attributes": {
+      "color": "white",
+      "size": "very_small",
+      "surface": "empty"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "quarter-br",
+     "quarter-tl",
+     "cell-02"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "twothirds-bottom",
+      "to_key": "quarter-br"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-br",
+      "to_key": "quarter-tl"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-21",
+      "to_key": "cell-02"
+     }
+    ],
+    "source": "紙。\n背景を黒で埋める。\n［構図］右下の四半分（横1/2〜1、縦1/2〜1）に、白のチョークの濃いとても小さな点を40個散らす。\n［構図］左上の四半分（横0〜1/2、縦0〜1/2）に、細かく揺れる灰の細い鉛筆の実線の程よい粒の垂直の普通の大きさの線を3個引く。\n［構図］左下（横0〜1/3、縦2/3〜1）に、白の細筆の薄い空のとても小さな円を1個置く。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "twothirds-right",
+     "quarter-tr",
+     "cell-11"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "twothirds-bottom",
+      "to_key": "twothirds-right"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-br",
+      "to_key": "quarter-tr"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-21",
+      "to_key": "cell-11"
+     }
+    ],
+    "source": "紙。\n背景を黒で埋める。\n［構図］右の3分の2（横1/3〜1、縦0〜1）に、白のチョークの濃いとても小さな点を40個散らす。\n［構図］右上の四半分（横1/2〜1、縦0〜1/2）に、細かく揺れる灰の細い鉛筆の実線の程よい粒の垂直の普通の大きさの線を3個引く。\n［構図］中心（横1/3〜2/3、縦1/3〜2/3）に、白の細筆の薄い空のとても小さな円を1個置く。"
+   }
+  },
+  {
+   "id": "ja-15",
+   "lang": "ja",
+   "source": "画用紙。\n背景を白で埋める。\n下に、灰の太筆の薄い塗りの横長の特大のの四角を1個埋める。\n［構図］右中央（横2/3〜1、縦1/3〜2/3）に、細かく小刻みに揺れる黒の太いロットリングの実線の濃い粒の垂直の大きな線を6個引く。\n中心に、細かく小刻みに波打つ黄のクレヨンの濃い塗りの小さな円を24個散らす。\n［構図］中心（横1/3〜2/3、縦1/3〜2/3）に、細かくゆるやかに揺れる黄の細い細筆の実線の程よい粒の回転の小さめの弧を40個引く。",
+   "current": [
+    "named-bottom",
+    "cell-21",
+    "named-center",
+    "cell-11"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "square",
+     "proportion": "wide",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "extra_large",
+      "surface": "flat",
+      "position": "bottom"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 6,
+     "attributes": {
+      "color": "black",
+      "size": "large",
+      "surface": "grain"
+     }
+    },
+    {
+     "shape": "circle",
+     "proportion": null,
+     "action": "scatter",
+     "count": 24,
+     "attributes": {
+      "color": "yellow",
+      "size": "small",
+      "surface": "flat",
+      "position": "center"
+     }
+    },
+    {
+     "shape": "arc",
+     "proportion": null,
+     "action": "draw",
+     "count": 40,
+     "attributes": {
+      "color": "yellow",
+      "size": "slightly_small",
+      "surface": "grain"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "named-bottom",
+     "cell-22",
+     "named-center",
+     "cell-02"
+    ],
+    "moves": [
+     {
+      "layer": 1,
+      "from_key": "cell-21",
+      "to_key": "cell-22"
+     },
+     {
+      "layer": 3,
+      "from_key": "cell-11",
+      "to_key": "cell-02"
+     }
+    ],
+    "source": "画用紙。\n背景を白で埋める。\n下に、灰の太筆の薄い塗りの横長の特大のの四角を1個埋める。\n［構図］右下（横2/3〜1、縦2/3〜1）に、細かく小刻みに揺れる黒の太いロットリングの実線の濃い粒の垂直の大きな線を6個引く。\n中心に、細かく小刻みに波打つ黄のクレヨンの濃い塗りの小さな円を24個散らす。\n［構図］左下（横0〜1/3、縦2/3〜1）に、細かくゆるやかに揺れる黄の細い細筆の実線の程よい粒の回転の小さめの弧を40個引く。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "named-bottom",
+     "cell-00",
+     "named-center",
+     "cell-20"
+    ],
+    "moves": [
+     {
+      "layer": 1,
+      "from_key": "cell-21",
+      "to_key": "cell-00"
+     },
+     {
+      "layer": 3,
+      "from_key": "cell-11",
+      "to_key": "cell-20"
+     }
+    ],
+    "source": "画用紙。\n背景を白で埋める。\n下に、灰の太筆の薄い塗りの横長の特大のの四角を1個埋める。\n［構図］左上（横0〜1/3、縦0〜1/3）に、細かく小刻みに揺れる黒の太いロットリングの実線の濃い粒の垂直の大きな線を6個引く。\n中心に、細かく小刻みに波打つ黄のクレヨンの濃い塗りの小さな円を24個散らす。\n［構図］右上（横2/3〜1、縦0〜1/3）に、細かくゆるやかに揺れる黄の細い細筆の実線の程よい粒の回転の小さめの弧を40個引く。"
+   }
+  },
+  {
+   "id": "ja-16",
+   "lang": "ja",
+   "source": "紙。\n背景を白で埋める。\n中心に、細かく揺れる灰の細い鉛筆の実線の薄い粒の水平の半幅の線を1個引く。\n上端に、白のチョークの程よい塗りの大きな円を1個置く。",
+   "current": [
+    "named-center",
+    "named-top_edge"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": "half_width",
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "surface": "grain",
+      "position": "center"
+     }
+    },
+    {
+     "shape": "circle",
+     "proportion": null,
+     "action": "place",
+     "count": 1,
+     "attributes": {
+      "color": "white",
+      "size": "large",
+      "surface": "flat",
+      "position": "top_edge"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "unchanged",
+    "reason": "nothing_to_move"
+   },
+   "chance": {
+    "outcome": "unchanged",
+    "reason": "nothing_to_move"
+   }
+  },
+  {
+   "id": "ja-17",
+   "lang": "ja",
+   "source": "紙。\n背景を白で埋める。\n中心に、細かく小刻みに波打つ黒の太いロットリングの濃い塗りの水平の全幅の線を1個引く。\n［構図］左下の隅（横0〜1/5、縦4/5〜1）に、赤のクレヨンの濃い塗りの小さな楕円を1個置く。\n［構図］左中央（横0〜1/3、縦1/3〜2/3）に、灰の鉛筆の薄いとても小さな点を30個散らす。",
+   "current": [
+    "named-center",
+    "corner-bl",
+    "cell-01"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": "full_width",
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "black",
+      "surface": "flat",
+      "position": "center"
+     }
+    },
+    {
+     "shape": "ellipse",
+     "proportion": null,
+     "action": "place",
+     "count": 1,
+     "attributes": {
+      "color": "red",
+      "size": "small",
+      "surface": "flat",
+      "position": "bottom_left_corner"
+     }
+    },
+    {
+     "shape": "point",
+     "proportion": null,
+     "action": "scatter",
+     "count": 30,
+     "attributes": {
+      "color": "gray",
+      "size": "very_small"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "named-center",
+     "corner-bl",
+     "half-right"
+    ],
+    "moves": [
+     {
+      "layer": 2,
+      "from_key": "cell-01",
+      "to_key": "half-right"
+     }
+    ],
+    "source": "紙。\n背景を白で埋める。\n中心に、細かく小刻みに波打つ黒の太いロットリングの濃い塗りの水平の全幅の線を1個引く。\n［構図］左下の隅（横0〜1/5、縦4/5〜1）に、赤のクレヨンの濃い塗りの小さな楕円を1個置く。\n［構図］右半分（横1/2〜1、縦0〜1）に、灰の鉛筆の薄いとても小さな点を30個散らす。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "named-center",
+     "corner-bl",
+     "hband-0"
+    ],
+    "moves": [
+     {
+      "layer": 2,
+      "from_key": "cell-01",
+      "to_key": "hband-0"
+     }
+    ],
+    "source": "紙。\n背景を白で埋める。\n中心に、細かく小刻みに波打つ黒の太いロットリングの濃い塗りの水平の全幅の線を1個引く。\n［構図］左下の隅（横0〜1/5、縦4/5〜1）に、赤のクレヨンの濃い塗りの小さな楕円を1個置く。\n［構図］上（横0〜1、縦0〜1/3）に、灰の鉛筆の薄いとても小さな点を30個散らす。"
+   }
+  },
+  {
+   "id": "ja-18",
+   "lang": "ja",
+   "source": "和紙。\n背景を白で埋める。\n［構図］上（横0〜1、縦0〜1/3）に、灰の鉛筆の薄いとても小さな点を40個散らす。\n［構図］上半分（横0〜1、縦0〜1/2）に、大きくゆるやかに波打つ黒の細い細筆の実線の程よい刷きの水平の全幅の線を3個引く。\n［構図］右中央（横2/3〜1、縦1/3〜2/3）に、黒の太筆の濃い塗りの横長の大きな雲形を1個置く。\n［構図］中心（横1/3〜2/3、縦1/3〜2/3）に、細かく小刻みに揺れる黒の細筆の程よい塗りの右上がりの小さな楕円を15個散らす。",
+   "current": [
+    "hband-0",
+    "half-top",
+    "cell-21",
+    "cell-11"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "point",
+     "proportion": null,
+     "action": "scatter",
+     "count": 40,
+     "attributes": {
+      "color": "gray",
+      "size": "very_small"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": "full_width",
+     "action": "draw",
+     "count": 3,
+     "attributes": {
+      "color": "black",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "cloudform",
+     "proportion": "wide",
+     "action": "place",
+     "count": 1,
+     "attributes": {
+      "color": "black",
+      "size": "large",
+      "surface": "flat"
+     }
+    },
+    {
+     "shape": "ellipse",
+     "proportion": null,
+     "action": "scatter",
+     "count": 15,
+     "attributes": {
+      "color": "black",
+      "size": "small",
+      "surface": "flat"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "quarter-bl",
+     "hband-0",
+     "quarter-tl",
+     "cell-21"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-0",
+      "to_key": "quarter-bl"
+     },
+     {
+      "layer": 1,
+      "from_key": "half-top",
+      "to_key": "hband-0"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-21",
+      "to_key": "quarter-tl"
+     },
+     {
+      "layer": 3,
+      "from_key": "cell-11",
+      "to_key": "cell-21"
+     }
+    ],
+    "source": "和紙。\n背景を白で埋める。\n［構図］左下の四半分（横0〜1/2、縦1/2〜1）に、灰の鉛筆の薄いとても小さな点を40個散らす。\n［構図］上（横0〜1、縦0〜1/3）に、大きくゆるやかに波打つ黒の細い細筆の実線の程よい刷きの水平の全幅の線を3個引く。\n［構図］左上の四半分（横0〜1/2、縦0〜1/2）に、黒の太筆の濃い塗りの横長の大きな雲形を1個置く。\n［構図］右中央（横2/3〜1、縦1/3〜2/3）に、細かく小刻みに揺れる黒の細筆の程よい塗りの右上がりの小さな楕円を15個散らす。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "half-right",
+     "whole",
+     "cell-21",
+     "vband-0"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-0",
+      "to_key": "half-right"
+     },
+     {
+      "layer": 1,
+      "from_key": "half-top",
+      "to_key": "whole"
+     },
+     {
+      "layer": 3,
+      "from_key": "cell-11",
+      "to_key": "vband-0"
+     }
+    ],
+    "source": "和紙。\n背景を白で埋める。\n［構図］右半分（横1/2〜1、縦0〜1）に、灰の鉛筆の薄いとても小さな点を40個散らす。\n［構図］画面全体（横0〜1、縦0〜1）に、大きくゆるやかに波打つ黒の細い細筆の実線の程よい刷きの水平の全幅の線を3個引く。\n［構図］右中央（横2/3〜1、縦1/3〜2/3）に、黒の太筆の濃い塗りの横長の大きな雲形を1個置く。\n［構図］左（横0〜1/3、縦0〜1）に、細かく小刻みに揺れる黒の細筆の程よい塗りの右上がりの小さな楕円を15個散らす。"
+   }
+  },
+  {
+   "id": "ja-19",
+   "lang": "ja",
+   "source": "紙。\n背景を白で埋める。\n下に、細かくゆるやかに波打つ灰の太筆の薄い刷きの横長の特大のの雲形を1個埋める。\n中心に、細かく小刻みに揺れる黒の細い鉛筆の実線の濃い粒の垂直の小さな線を2個引く。\n［構図］中心（横1/3〜2/3、縦1/3〜2/3）に、黒のペンの実線の程よい塗りのとても小さな円を2個置く。\n［構図］中心（横1/3〜2/3、縦1/3〜2/3）に、細かく揺れる黒のごく細い銀筆の実線の薄い刷きの水平の半幅の弧を1個引く。",
+   "current": [
+    "named-bottom",
+    "named-center",
+    "cell-11",
+    "cell-11"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "cloudform",
+     "proportion": "wide",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "extra_large",
+      "surface": "sweep",
+      "position": "bottom"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 2,
+     "attributes": {
+      "color": "black",
+      "size": "small",
+      "surface": "grain",
+      "position": "center"
+     }
+    },
+    {
+     "shape": "circle",
+     "proportion": null,
+     "action": "place",
+     "count": 2,
+     "attributes": {
+      "color": "black",
+      "size": "very_small",
+      "surface": "flat"
+     }
+    },
+    {
+     "shape": "arc",
+     "proportion": "half_width",
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "black",
+      "surface": "sweep"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "named-bottom",
+     "named-center",
+     "cell-22",
+     "cell-02"
+    ],
+    "moves": [
+     {
+      "layer": 2,
+      "from_key": "cell-11",
+      "to_key": "cell-22"
+     },
+     {
+      "layer": 3,
+      "from_key": "cell-11",
+      "to_key": "cell-02"
+     }
+    ],
+    "source": "紙。\n背景を白で埋める。\n下に、細かくゆるやかに波打つ灰の太筆の薄い刷きの横長の特大のの雲形を1個埋める。\n中心に、細かく小刻みに揺れる黒の細い鉛筆の実線の濃い粒の垂直の小さな線を2個引く。\n［構図］右下（横2/3〜1、縦2/3〜1）に、黒のペンの実線の程よい塗りのとても小さな円を2個置く。\n［構図］左下（横0〜1/3、縦2/3〜1）に、細かく揺れる黒のごく細い銀筆の実線の薄い刷きの水平の半幅の弧を1個引く。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "named-bottom",
+     "named-center",
+     "cell-12",
+     "quarter-tl"
+    ],
+    "moves": [
+     {
+      "layer": 2,
+      "from_key": "cell-11",
+      "to_key": "cell-12"
+     },
+     {
+      "layer": 3,
+      "from_key": "cell-11",
+      "to_key": "quarter-tl"
+     }
+    ],
+    "source": "紙。\n背景を白で埋める。\n下に、細かくゆるやかに波打つ灰の太筆の薄い刷きの横長の特大のの雲形を1個埋める。\n中心に、細かく小刻みに揺れる黒の細い鉛筆の実線の濃い粒の垂直の小さな線を2個引く。\n［構図］下中央（横1/3〜2/3、縦2/3〜1）に、黒のペンの実線の程よい塗りのとても小さな円を2個置く。\n［構図］左上の四半分（横0〜1/2、縦0〜1/2）に、細かく揺れる黒のごく細い銀筆の実線の薄い刷きの水平の半幅の弧を1個引く。"
+   }
+  },
+  {
+   "id": "ja-20",
+   "lang": "ja",
+   "source": "紙。\n背景を白で埋める。\n中心に、黒のごく太いロットリングの濃い塗りの水平の全幅の線を1個引く。",
+   "current": [
+    "named-center"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": "full_width",
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "black",
+      "surface": "flat",
+      "position": "center"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "unchanged",
+    "reason": "nothing_to_move"
+   },
+   "chance": {
+    "outcome": "unchanged",
+    "reason": "nothing_to_move"
+   }
+  },
+  {
+   "id": "ja-21",
+   "lang": "ja",
+   "source": "和紙。\n背景を白で埋める。\n［構図］下半分（横0〜1、縦1/2〜1）に、細かくゆるやかに波打つ灰の太筆の薄い刷きの横長の大きな雲形を1個埋める。\n［構図］右下の四半分（横1/2〜1、縦1/2〜1）に、白の鉛筆の濃いとても小さな点を40個散らす。\n［構図］下半分（横0〜1、縦1/2〜1）に、黒のペンの程よい小さな点を15個散らす。",
+   "current": [
+    "half-bottom",
+    "quarter-br",
+    "half-bottom"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "cloudform",
+     "proportion": "wide",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "large",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "point",
+     "proportion": null,
+     "action": "scatter",
+     "count": 40,
+     "attributes": {
+      "color": "white",
+      "size": "very_small"
+     }
+    },
+    {
+     "shape": "point",
+     "proportion": null,
+     "action": "scatter",
+     "count": 15,
+     "attributes": {
+      "color": "black",
+      "size": "small"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "hband-2",
+     "twothirds-left",
+     "quarter-tl"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "half-bottom",
+      "to_key": "hband-2"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-br",
+      "to_key": "twothirds-left"
+     },
+     {
+      "layer": 2,
+      "from_key": "half-bottom",
+      "to_key": "quarter-tl"
+     }
+    ],
+    "source": "和紙。\n背景を白で埋める。\n［構図］下（横0〜1、縦2/3〜1）に、細かくゆるやかに波打つ灰の太筆の薄い刷きの横長の大きな雲形を1個埋める。\n［構図］左の3分の2（横0〜2/3、縦0〜1）に、白の鉛筆の濃いとても小さな点を40個散らす。\n［構図］左上の四半分（横0〜1/2、縦0〜1/2）に、黒のペンの程よい小さな点を15個散らす。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "half-top",
+     "cell-02",
+     "half-top"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "half-bottom",
+      "to_key": "half-top"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-br",
+      "to_key": "cell-02"
+     },
+     {
+      "layer": 2,
+      "from_key": "half-bottom",
+      "to_key": "half-top"
+     }
+    ],
+    "source": "和紙。\n背景を白で埋める。\n［構図］上半分（横0〜1、縦0〜1/2）に、細かくゆるやかに波打つ灰の太筆の薄い刷きの横長の大きな雲形を1個埋める。\n［構図］左下（横0〜1/3、縦2/3〜1）に、白の鉛筆の濃いとても小さな点を40個散らす。\n［構図］上半分（横0〜1、縦0〜1/2）に、黒のペンの程よい小さな点を15個散らす。"
+   }
+  },
+  {
+   "id": "ja-22",
+   "lang": "ja",
+   "source": "紙。\n背景を白で埋める。\n中心に、細かくゆるやかに揺れる灰の細い鉛筆の薄い粒の水平の大きな線を1個引く。\n上端に、白のチョークの程よい塗りの普通の大きさの円を1個置く。",
+   "current": [
+    "named-center",
+    "named-top_edge"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "large",
+      "surface": "grain",
+      "position": "center"
+     }
+    },
+    {
+     "shape": "circle",
+     "proportion": null,
+     "action": "place",
+     "count": 1,
+     "attributes": {
+      "color": "white",
+      "size": "normal_sized",
+      "surface": "flat",
+      "position": "top_edge"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "unchanged",
+    "reason": "nothing_to_move"
+   },
+   "chance": {
+    "outcome": "unchanged",
+    "reason": "nothing_to_move"
+   }
+  },
+  {
+   "id": "ja-23",
+   "lang": "ja",
+   "source": "紙。\n背景を黄で埋める。\n［構図］下（横0〜1、縦2/3〜1）に、橙の太筆の薄いアクアチントの全幅の雲形を1個埋める。\n［構図］右上の四半分（横1/2〜1、縦0〜1/2）に、大きくゆるやかに揺れる赤の油彩の濃い塗りの縦長の普通の大きさの楕円を12個散らす。\n［構図］右下の四半分（横1/2〜1、縦1/2〜1）に、黒の太い太筆の実線の程よい刷きの水平の大きな線を1個引く。\n下に、細かく小刻みに波打つ灰の細い鉛筆の薄い粒の斜めの小さな線を4個引く。",
+   "current": [
+    "hband-2",
+    "quarter-tr",
+    "quarter-br",
+    "named-bottom"
+   ],
+   "background": "yellow",
+   "layers": [
+    {
+     "shape": "cloudform",
+     "proportion": "full_width",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "color": "orange",
+      "surface": "aquatint"
+     }
+    },
+    {
+     "shape": "ellipse",
+     "proportion": "tall",
+     "action": "scatter",
+     "count": 12,
+     "attributes": {
+      "color": "red",
+      "size": "normal_sized",
+      "surface": "flat"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "black",
+      "size": "large",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 4,
+     "attributes": {
+      "color": "gray",
+      "size": "small",
+      "surface": "grain",
+      "position": "bottom"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "hband-2",
+     "hband-2",
+     "cell-01",
+     "named-bottom"
+    ],
+    "moves": [
+     {
+      "layer": 1,
+      "from_key": "quarter-tr",
+      "to_key": "hband-2"
+     },
+     {
+      "layer": 2,
+      "from_key": "quarter-br",
+      "to_key": "cell-01"
+     }
+    ],
+    "source": "紙。\n背景を黄で埋める。\n［構図］下（横0〜1、縦2/3〜1）に、橙の太筆の薄いアクアチントの全幅の雲形を1個埋める。\n［構図］下（横0〜1、縦2/3〜1）に、大きくゆるやかに揺れる赤の油彩の濃い塗りの縦長の普通の大きさの楕円を12個散らす。\n［構図］左中央（横0〜1/3、縦1/3〜2/3）に、黒の太い太筆の実線の程よい刷きの水平の大きな線を1個引く。\n下に、細かく小刻みに波打つ灰の細い鉛筆の薄い粒の斜めの小さな線を4個引く。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "hband-0",
+     "cell-01",
+     "cell-20",
+     "named-bottom"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-2",
+      "to_key": "hband-0"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-tr",
+      "to_key": "cell-01"
+     },
+     {
+      "layer": 2,
+      "from_key": "quarter-br",
+      "to_key": "cell-20"
+     }
+    ],
+    "source": "紙。\n背景を黄で埋める。\n［構図］上（横0〜1、縦0〜1/3）に、橙の太筆の薄いアクアチントの全幅の雲形を1個埋める。\n［構図］左中央（横0〜1/3、縦1/3〜2/3）に、大きくゆるやかに揺れる赤の油彩の濃い塗りの縦長の普通の大きさの楕円を12個散らす。\n［構図］右上（横2/3〜1、縦0〜1/3）に、黒の太い太筆の実線の程よい刷きの水平の大きな線を1個引く。\n下に、細かく小刻みに波打つ灰の細い鉛筆の薄い粒の斜めの小さな線を4個引く。"
+   }
+  },
+  {
+   "id": "ja-24",
+   "lang": "ja",
+   "source": "和紙。\n背景を白で埋める。\n［構図］中ほど（横0〜1、縦1/3〜2/3）に、灰の太筆の薄いアクアチントの横長の巨大な雲形を1個埋める。\n［構図］右下の四半分（横1/2〜1、縦1/2〜1）に、細かくゆるやかに揺れる黒の細い鉛筆の実線の程よい粒の右下がりの大きな線を15個引く。\n［構図］左中央（横0〜1/3、縦1/3〜2/3）に、黒のペンの濃いとても小さな点を3個置く。\n［構図］左中央（横0〜1/3、縦1/3〜2/3）に、大きく小刻みに波打つ灰のごく細い銀筆の破線の薄い刷きの小さな弧を20個引く。",
+   "current": [
+    "hband-1",
+    "quarter-br",
+    "cell-01",
+    "cell-01"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "cloudform",
+     "proportion": "wide",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "huge",
+      "surface": "aquatint"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 15,
+     "attributes": {
+      "color": "black",
+      "size": "large",
+      "surface": "grain"
+     }
+    },
+    {
+     "shape": "point",
+     "proportion": null,
+     "action": "place",
+     "count": 3,
+     "attributes": {
+      "color": "black",
+      "size": "very_small"
+     }
+    },
+    {
+     "shape": "arc",
+     "proportion": null,
+     "action": "draw",
+     "count": 20,
+     "attributes": {
+      "color": "gray",
+      "size": "small",
+      "surface": "sweep"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "hband-1",
+     "quarter-tl",
+     "quarter-tl",
+     "cell-21"
+    ],
+    "moves": [
+     {
+      "layer": 1,
+      "from_key": "quarter-br",
+      "to_key": "quarter-tl"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-01",
+      "to_key": "quarter-tl"
+     },
+     {
+      "layer": 3,
+      "from_key": "cell-01",
+      "to_key": "cell-21"
+     }
+    ],
+    "source": "和紙。\n背景を白で埋める。\n［構図］中ほど（横0〜1、縦1/3〜2/3）に、灰の太筆の薄いアクアチントの横長の巨大な雲形を1個埋める。\n［構図］左上の四半分（横0〜1/2、縦0〜1/2）に、細かくゆるやかに揺れる黒の細い鉛筆の実線の程よい粒の右下がりの大きな線を15個引く。\n［構図］左上の四半分（横0〜1/2、縦0〜1/2）に、黒のペンの濃いとても小さな点を3個置く。\n［構図］右中央（横2/3〜1、縦1/3〜2/3）に、大きく小刻みに波打つ灰のごく細い銀筆の破線の薄い刷きの小さな弧を20個引く。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "hband-1",
+     "cell-01",
+     "cell-21",
+     "cell-22"
+    ],
+    "moves": [
+     {
+      "layer": 1,
+      "from_key": "quarter-br",
+      "to_key": "cell-01"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-01",
+      "to_key": "cell-21"
+     },
+     {
+      "layer": 3,
+      "from_key": "cell-01",
+      "to_key": "cell-22"
+     }
+    ],
+    "source": "和紙。\n背景を白で埋める。\n［構図］中ほど（横0〜1、縦1/3〜2/3）に、灰の太筆の薄いアクアチントの横長の巨大な雲形を1個埋める。\n［構図］左中央（横0〜1/3、縦1/3〜2/3）に、細かくゆるやかに揺れる黒の細い鉛筆の実線の程よい粒の右下がりの大きな線を15個引く。\n［構図］右中央（横2/3〜1、縦1/3〜2/3）に、黒のペンの濃いとても小さな点を3個置く。\n［構図］右下（横2/3〜1、縦2/3〜1）に、大きく小刻みに波打つ灰のごく細い銀筆の破線の薄い刷きの小さな弧を20個引く。"
+   }
+  },
+  {
+   "id": "ja-25",
+   "lang": "ja",
+   "source": "紙。\n背景を白で埋める。\n中心に、灰の細い鉛筆の薄い粒の水平の普通の大きさの線を1個引く。\n上端に、白のチョークの程よい塗りの普通の大きさの円を1個置く。\n右端に、細かく揺れる細い細筆の薄い刷きの小さな弧を1個引く。\n下に、緑の太筆の濃い塗りの横長の大きな楕円を1個置く。\n下端に、クレヨンの程よい粒の回転の小さな四角を1個置く。\n［構図］右下（横2/3〜1、縦2/3〜1）に、黒のビュランの濃いとても小さな点を1個置く。\n上端に、黄のごく太い太筆の濃い刷きの垂直の大きな線を1個引く。\n下に、細かく小刻みに波打つ細いドライポイントの程よい粒の水平の普通の大きさの線を1個引く。",
+   "current": [
+    "named-center",
+    "named-top_edge",
+    "named-right_edge",
+    "named-bottom",
+    "named-bottom_edge",
+    "cell-22",
+    "named-top_edge",
+    "named-bottom"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "normal_sized",
+      "surface": "grain",
+      "position": "center"
+     }
+    },
+    {
+     "shape": "circle",
+     "proportion": null,
+     "action": "place",
+     "count": 1,
+     "attributes": {
+      "color": "white",
+      "size": "normal_sized",
+      "surface": "flat",
+      "position": "top_edge"
+     }
+    },
+    {
+     "shape": "arc",
+     "proportion": null,
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "size": "small",
+      "surface": "sweep",
+      "position": "right_edge"
+     }
+    },
+    {
+     "shape": "ellipse",
+     "proportion": "wide",
+     "action": "place",
+     "count": 1,
+     "attributes": {
+      "color": "green",
+      "size": "large",
+      "surface": "flat",
+      "position": "bottom"
+     }
+    },
+    {
+     "shape": "square",
+     "proportion": null,
+     "action": "place",
+     "count": 1,
+     "attributes": {
+      "size": "small",
+      "surface": "grain",
+      "position": "bottom_edge"
+     }
+    },
+    {
+     "shape": "point",
+     "proportion": null,
+     "action": "place",
+     "count": 1,
+     "attributes": {
+      "color": "black",
+      "size": "very_small"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "yellow",
+      "size": "large",
+      "surface": "sweep",
+      "position": "top_edge"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "size": "normal_sized",
+      "surface": "grain",
+      "position": "bottom"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "named-center",
+     "named-top_edge",
+     "named-right_edge",
+     "named-bottom",
+     "named-bottom_edge",
+     "cell-20",
+     "named-top_edge",
+     "named-bottom"
+    ],
+    "moves": [
+     {
+      "layer": 5,
+      "from_key": "cell-22",
+      "to_key": "cell-20"
+     }
+    ],
+    "source": "紙。\n背景を白で埋める。\n中心に、灰の細い鉛筆の薄い粒の水平の普通の大きさの線を1個引く。\n上端に、白のチョークの程よい塗りの普通の大きさの円を1個置く。\n右端に、細かく揺れる細い細筆の薄い刷きの小さな弧を1個引く。\n下に、緑の太筆の濃い塗りの横長の大きな楕円を1個置く。\n下端に、クレヨンの程よい粒の回転の小さな四角を1個置く。\n［構図］右上（横2/3〜1、縦0〜1/3）に、黒のビュランの濃いとても小さな点を1個置く。\n上端に、黄のごく太い太筆の濃い刷きの垂直の大きな線を1個引く。\n下に、細かく小刻みに波打つ細いドライポイントの程よい粒の水平の普通の大きさの線を1個引く。"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "named-center",
+     "named-top_edge",
+     "named-right_edge",
+     "named-bottom",
+     "named-bottom_edge",
+     "quarter-tl",
+     "named-top_edge",
+     "named-bottom"
+    ],
+    "moves": [
+     {
+      "layer": 5,
+      "from_key": "cell-22",
+      "to_key": "quarter-tl"
+     }
+    ],
+    "source": "紙。\n背景を白で埋める。\n中心に、灰の細い鉛筆の薄い粒の水平の普通の大きさの線を1個引く。\n上端に、白のチョークの程よい塗りの普通の大きさの円を1個置く。\n右端に、細かく揺れる細い細筆の薄い刷きの小さな弧を1個引く。\n下に、緑の太筆の濃い塗りの横長の大きな楕円を1個置く。\n下端に、クレヨンの程よい粒の回転の小さな四角を1個置く。\n［構図］左上の四半分（横0〜1/2、縦0〜1/2）に、黒のビュランの濃いとても小さな点を1個置く。\n上端に、黄のごく太い太筆の濃い刷きの垂直の大きな線を1個引く。\n下に、細かく小刻みに波打つ細いドライポイントの程よい粒の水平の普通の大きさの線を1個引く。"
+   }
+  },
+  {
+   "id": "en-01",
+   "lang": "en",
+   "source": "Paper.\nFill the background with white.\nScatter 7 broadly loosely swaying black thin pen solid dense sweep small lines at the [composition] upper left quarter (horizontal 0 to 1/2, vertical 0 to 1/2).",
+   "current": [
+    "quarter-tl"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "scatter",
+     "count": 7,
+     "attributes": {
+      "color": "black",
+      "size": "small",
+      "surface": "sweep"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "half-right"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "quarter-tl",
+      "to_key": "half-right"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nScatter 7 broadly loosely swaying black thin pen solid dense sweep small lines at the [composition] right half (horizontal 1/2 to 1, vertical 0 to 1)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "half-bottom"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "quarter-tl",
+      "to_key": "half-bottom"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nScatter 7 broadly loosely swaying black thin pen solid dense sweep small lines at the [composition] lower half (horizontal 0 to 1, vertical 1/2 to 1)."
+   }
+  },
+  {
+   "id": "en-02",
+   "lang": "en",
+   "source": "Paper.\nFill the background with white.\nScatter 20 broadly loosely swaying orange thin fine-brush temperate sweep small arcs at the [composition] lower half (horizontal 0 to 1, vertical 1/2 to 1).\nScatter 15 narrowly tightly swaying blue extra-fine pencil faint grain small lines at the [composition] lower half (horizontal 0 to 1, vertical 1/2 to 1).\nDraw one black thick thick-brush dense flat large line at the [composition] lower right quarter (horizontal 1/2 to 1, vertical 1/2 to 1).\nLine up 2 narrowly tightly swaying gray thin crayon faint grain slightly small ellipses at the [composition] center right (horizontal 2/3 to 1, vertical 1/3 to 2/3).",
+   "current": [
+    "half-bottom",
+    "half-bottom",
+    "quarter-br",
+    "cell-21"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "arc",
+     "proportion": null,
+     "action": "scatter",
+     "count": 20,
+     "attributes": {
+      "color": "orange",
+      "size": "small",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "scatter",
+     "count": 15,
+     "attributes": {
+      "color": "blue",
+      "size": "small",
+      "surface": "grain"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "black",
+      "size": "large",
+      "surface": "flat"
+     }
+    },
+    {
+     "shape": "ellipse",
+     "proportion": null,
+     "action": "line_up",
+     "count": 2,
+     "attributes": {
+      "color": "gray",
+      "size": "slightly_small",
+      "surface": "grain"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "cell-20",
+     "cell-22",
+     "cell-01",
+     "quarter-tr"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "half-bottom",
+      "to_key": "cell-20"
+     },
+     {
+      "layer": 1,
+      "from_key": "half-bottom",
+      "to_key": "cell-22"
+     },
+     {
+      "layer": 2,
+      "from_key": "quarter-br",
+      "to_key": "cell-01"
+     },
+     {
+      "layer": 3,
+      "from_key": "cell-21",
+      "to_key": "quarter-tr"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nScatter 20 broadly loosely swaying orange thin fine-brush temperate sweep small arcs at the [composition] top right (horizontal 2/3 to 1, vertical 0 to 1/3).\nScatter 15 narrowly tightly swaying blue extra-fine pencil faint grain small lines at the [composition] bottom right (horizontal 2/3 to 1, vertical 2/3 to 1).\nDraw one black thick thick-brush dense flat large line at the [composition] center left (horizontal 0 to 1/3, vertical 1/3 to 2/3).\nLine up 2 narrowly tightly swaying gray thin crayon faint grain slightly small ellipses at the [composition] upper right quarter (horizontal 1/2 to 1, vertical 0 to 1/2)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "quarter-bl",
+     "half-right",
+     "cell-00",
+     "twothirds-bottom"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "half-bottom",
+      "to_key": "quarter-bl"
+     },
+     {
+      "layer": 1,
+      "from_key": "half-bottom",
+      "to_key": "half-right"
+     },
+     {
+      "layer": 2,
+      "from_key": "quarter-br",
+      "to_key": "cell-00"
+     },
+     {
+      "layer": 3,
+      "from_key": "cell-21",
+      "to_key": "twothirds-bottom"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nScatter 20 broadly loosely swaying orange thin fine-brush temperate sweep small arcs at the [composition] lower left quarter (horizontal 0 to 1/2, vertical 1/2 to 1).\nScatter 15 narrowly tightly swaying blue extra-fine pencil faint grain small lines at the [composition] right half (horizontal 1/2 to 1, vertical 0 to 1).\nDraw one black thick thick-brush dense flat large line at the [composition] top left (horizontal 0 to 1/3, vertical 0 to 1/3).\nLine up 2 narrowly tightly swaying gray thin crayon faint grain slightly small ellipses at the [composition] lower two thirds (horizontal 0 to 1, vertical 1/3 to 1)."
+   }
+  },
+  {
+   "id": "en-03",
+   "lang": "en",
+   "source": "Paper.\nFill the background with white.\nLine up 15 narrowly loosely swaying gray thin pencil faint sweep horizontal full-width lines horizontally at the [composition] bottom (horizontal 0 to 1, vertical 2/3 to 1).\nPlace one red pen dense flat very small circle at the [composition] center left (horizontal 0 to 1/3, vertical 1/3 to 2/3).",
+   "current": [
+    "hband-2",
+    "cell-01"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": "full_width",
+     "action": "line_up",
+     "count": 15,
+     "attributes": {
+      "color": "gray",
+      "line_up_direction": "horizontal",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "circle",
+     "proportion": null,
+     "action": "place",
+     "count": 1,
+     "attributes": {
+      "color": "red",
+      "size": "very_small",
+      "surface": "flat"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "twothirds-bottom",
+     "quarter-tl"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-2",
+      "to_key": "twothirds-bottom"
+     },
+     {
+      "layer": 1,
+      "from_key": "cell-01",
+      "to_key": "quarter-tl"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nLine up 15 narrowly loosely swaying gray thin pencil faint sweep horizontal full-width lines horizontally at the [composition] lower two thirds (horizontal 0 to 1, vertical 1/3 to 1).\nPlace one red pen dense flat very small circle at the [composition] upper left quarter (horizontal 0 to 1/2, vertical 0 to 1/2)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "half-bottom",
+     "quarter-bl"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-2",
+      "to_key": "half-bottom"
+     },
+     {
+      "layer": 1,
+      "from_key": "cell-01",
+      "to_key": "quarter-bl"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nLine up 15 narrowly loosely swaying gray thin pencil faint sweep horizontal full-width lines horizontally at the [composition] lower half (horizontal 0 to 1, vertical 1/2 to 1).\nPlace one red pen dense flat very small circle at the [composition] lower left quarter (horizontal 0 to 1/2, vertical 1/2 to 1)."
+   }
+  },
+  {
+   "id": "en-04",
+   "lang": "en",
+   "source": "Paper.\nFill the background with white.\nDraw one narrowly swaying gray thin fine-brush dense sweep small line at the [composition] top center (horizontal 1/3 to 2/3, vertical 0 to 1/3).\nDraw one broadly undulating gray thin fine-brush faint sweep large arc at the [composition] center right (horizontal 2/3 to 1, vertical 1/3 to 2/3).",
+   "current": [
+    "cell-10",
+    "cell-21"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "small",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "arc",
+     "proportion": null,
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "large",
+      "surface": "sweep"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "cell-11",
+     "quarter-br"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "cell-10",
+      "to_key": "cell-11"
+     },
+     {
+      "layer": 1,
+      "from_key": "cell-21",
+      "to_key": "quarter-br"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nDraw one narrowly swaying gray thin fine-brush dense sweep small line at the [composition] center (horizontal 1/3 to 2/3, vertical 1/3 to 2/3).\nDraw one broadly undulating gray thin fine-brush faint sweep large arc at the [composition] lower right quarter (horizontal 1/2 to 1, vertical 1/2 to 1)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "cell-10",
+     "quarter-br"
+    ],
+    "moves": [
+     {
+      "layer": 1,
+      "from_key": "cell-21",
+      "to_key": "quarter-br"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nDraw one narrowly swaying gray thin fine-brush dense sweep small line at the [composition] top center (horizontal 1/3 to 2/3, vertical 0 to 1/3).\nDraw one broadly undulating gray thin fine-brush faint sweep large arc at the [composition] lower right quarter (horizontal 1/2 to 1, vertical 1/2 to 1)."
+   }
+  },
+  {
+   "id": "en-05",
+   "lang": "en",
+   "source": "Paper.\nFill the background with white.\nScatter 40 broadly loosely swaying yellow fine-brush temperate flat tall normal-sized ellipses at the top.\nScatter 30 narrowly tightly undulating yellow thick-brush dense sweep wide slightly small ellipses at the [composition] center right (horizontal 2/3 to 1, vertical 1/3 to 2/3).\nScatter 20 gray pencil faint very small points at the [composition] center left (horizontal 0 to 1/3, vertical 1/3 to 2/3).",
+   "current": [
+    "named-top",
+    "cell-21",
+    "cell-01"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "ellipse",
+     "proportion": "tall",
+     "action": "scatter",
+     "count": 40,
+     "attributes": {
+      "color": "yellow",
+      "size": "normal_sized",
+      "surface": "flat",
+      "position": "top"
+     }
+    },
+    {
+     "shape": "ellipse",
+     "proportion": "wide",
+     "action": "scatter",
+     "count": 30,
+     "attributes": {
+      "color": "yellow",
+      "size": "slightly_small",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "point",
+     "proportion": null,
+     "action": "scatter",
+     "count": 20,
+     "attributes": {
+      "color": "gray",
+      "size": "very_small"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "named-top",
+     "cell-01",
+     "vband-0"
+    ],
+    "moves": [
+     {
+      "layer": 1,
+      "from_key": "cell-21",
+      "to_key": "cell-01"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-01",
+      "to_key": "vband-0"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nScatter 40 broadly loosely swaying yellow fine-brush temperate flat tall normal-sized ellipses at the top.\nScatter 30 narrowly tightly undulating yellow thick-brush dense sweep wide slightly small ellipses at the [composition] center left (horizontal 0 to 1/3, vertical 1/3 to 2/3).\nScatter 20 gray pencil faint very small points at the [composition] left (horizontal 0 to 1/3, vertical 0 to 1)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "named-top",
+     "vband-0",
+     "cell-02"
+    ],
+    "moves": [
+     {
+      "layer": 1,
+      "from_key": "cell-21",
+      "to_key": "vband-0"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-01",
+      "to_key": "cell-02"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nScatter 40 broadly loosely swaying yellow fine-brush temperate flat tall normal-sized ellipses at the top.\nScatter 30 narrowly tightly undulating yellow thick-brush dense sweep wide slightly small ellipses at the [composition] left (horizontal 0 to 1/3, vertical 0 to 1).\nScatter 20 gray pencil faint very small points at the [composition] bottom left (horizontal 0 to 1/3, vertical 2/3 to 1)."
+   }
+  },
+  {
+   "id": "en-07",
+   "lang": "en",
+   "source": "Paper.\nFill the background with white.\nFill one undulating gray chalk faint grain full-width ellipse at the [composition] middle (horizontal 0 to 1, vertical 1/3 to 2/3).\nDraw 3 narrowly tightly swaying white thick thick-brush solid dense sweep vertical large lines at the [composition] top center (horizontal 1/3 to 2/3, vertical 0 to 1/3).",
+   "current": [
+    "hband-1",
+    "cell-10"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "ellipse",
+     "proportion": "full_width",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "surface": "grain"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 3,
+     "attributes": {
+      "color": "white",
+      "size": "large",
+      "surface": "sweep"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "half-bottom",
+     "quarter-bl"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-1",
+      "to_key": "half-bottom"
+     },
+     {
+      "layer": 1,
+      "from_key": "cell-10",
+      "to_key": "quarter-bl"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nFill one undulating gray chalk faint grain full-width ellipse at the [composition] lower half (horizontal 0 to 1, vertical 1/2 to 1).\nDraw 3 narrowly tightly swaying white thick thick-brush solid dense sweep vertical large lines at the [composition] lower left quarter (horizontal 0 to 1/2, vertical 1/2 to 1)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "half-bottom",
+     "cell-11"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-1",
+      "to_key": "half-bottom"
+     },
+     {
+      "layer": 1,
+      "from_key": "cell-10",
+      "to_key": "cell-11"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nFill one undulating gray chalk faint grain full-width ellipse at the [composition] lower half (horizontal 0 to 1, vertical 1/2 to 1).\nDraw 3 narrowly tightly swaying white thick thick-brush solid dense sweep vertical large lines at the [composition] center (horizontal 1/3 to 2/3, vertical 1/3 to 2/3)."
+   }
+  },
+  {
+   "id": "en-08",
+   "lang": "en",
+   "source": "Paper.\nFill the background with white.\nScatter 12 broadly loosely undulating gray thin fine-brush solid temperate sweep large arcs at the [composition] lower half (horizontal 0 to 1, vertical 1/2 to 1).\nScatter 8 narrowly tightly swaying black thick-brush solid dense flat normal-sized ellipses at the [composition] lower left quarter (horizontal 0 to 1/2, vertical 1/2 to 1).\nScatter 15 narrowly loosely swaying gray crayon solid faint grain small circles at the [composition] middle (horizontal 0 to 1, vertical 1/3 to 2/3).",
+   "current": [
+    "half-bottom",
+    "quarter-bl",
+    "hband-1"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "arc",
+     "proportion": null,
+     "action": "scatter",
+     "count": 12,
+     "attributes": {
+      "color": "gray",
+      "size": "large",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "ellipse",
+     "proportion": null,
+     "action": "scatter",
+     "count": 8,
+     "attributes": {
+      "color": "black",
+      "size": "normal_sized",
+      "surface": "flat"
+     }
+    },
+    {
+     "shape": "circle",
+     "proportion": null,
+     "action": "scatter",
+     "count": 15,
+     "attributes": {
+      "color": "gray",
+      "size": "small",
+      "surface": "grain"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "quarter-br",
+     "cell-11",
+     "cell-20"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "half-bottom",
+      "to_key": "quarter-br"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-bl",
+      "to_key": "cell-11"
+     },
+     {
+      "layer": 2,
+      "from_key": "hband-1",
+      "to_key": "cell-20"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nScatter 12 broadly loosely undulating gray thin fine-brush solid temperate sweep large arcs at the [composition] lower right quarter (horizontal 1/2 to 1, vertical 1/2 to 1).\nScatter 8 narrowly tightly swaying black thick-brush solid dense flat normal-sized ellipses at the [composition] center (horizontal 1/3 to 2/3, vertical 1/3 to 2/3).\nScatter 15 narrowly loosely swaying gray crayon solid faint grain small circles at the [composition] top right (horizontal 2/3 to 1, vertical 0 to 1/3)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "cell-01",
+     "cell-12",
+     "hband-1"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "half-bottom",
+      "to_key": "cell-01"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-bl",
+      "to_key": "cell-12"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nScatter 12 broadly loosely undulating gray thin fine-brush solid temperate sweep large arcs at the [composition] center left (horizontal 0 to 1/3, vertical 1/3 to 2/3).\nScatter 8 narrowly tightly swaying black thick-brush solid dense flat normal-sized ellipses at the [composition] bottom center (horizontal 1/3 to 2/3, vertical 2/3 to 1).\nScatter 15 narrowly loosely swaying gray crayon solid faint grain small circles at the [composition] middle (horizontal 0 to 1, vertical 1/3 to 2/3)."
+   }
+  },
+  {
+   "id": "en-09",
+   "lang": "en",
+   "source": "Paper.\nFill the background with white.\nDraw one black thick thick-brush dense sweep large line at the [composition] lower right quarter (horizontal 1/2 to 1, vertical 1/2 to 1).\nScatter 30 gray pen temperate very small points at the [composition] center (horizontal 1/3 to 2/3, vertical 1/3 to 2/3).\nDraw 3 broadly tightly swaying gray thin fine-brush faint sweep semicircle extra-large arcs at the [composition] center (horizontal 1/3 to 2/3, vertical 1/3 to 2/3).",
+   "current": [
+    "quarter-br",
+    "cell-11",
+    "cell-11"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "black",
+      "size": "large",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "point",
+     "proportion": null,
+     "action": "scatter",
+     "count": 30,
+     "attributes": {
+      "color": "gray",
+      "size": "very_small"
+     }
+    },
+    {
+     "shape": "arc",
+     "proportion": "semicircle",
+     "action": "draw",
+     "count": 3,
+     "attributes": {
+      "color": "gray",
+      "size": "extra_large",
+      "surface": "sweep"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "cell-21",
+     "vband-2",
+     "quarter-tl"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "quarter-br",
+      "to_key": "cell-21"
+     },
+     {
+      "layer": 1,
+      "from_key": "cell-11",
+      "to_key": "vband-2"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-11",
+      "to_key": "quarter-tl"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nDraw one black thick thick-brush dense sweep large line at the [composition] center right (horizontal 2/3 to 1, vertical 1/3 to 2/3).\nScatter 30 gray pen temperate very small points at the [composition] right (horizontal 2/3 to 1, vertical 0 to 1).\nDraw 3 broadly tightly swaying gray thin fine-brush faint sweep semicircle extra-large arcs at the [composition] upper left quarter (horizontal 0 to 1/2, vertical 0 to 1/2)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "quarter-br",
+     "cell-01",
+     "cell-01"
+    ],
+    "moves": [
+     {
+      "layer": 1,
+      "from_key": "cell-11",
+      "to_key": "cell-01"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-11",
+      "to_key": "cell-01"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nDraw one black thick thick-brush dense sweep large line at the [composition] lower right quarter (horizontal 1/2 to 1, vertical 1/2 to 1).\nScatter 30 gray pen temperate very small points at the [composition] center left (horizontal 0 to 1/3, vertical 1/3 to 2/3).\nDraw 3 broadly tightly swaying gray thin fine-brush faint sweep semicircle extra-large arcs at the [composition] center left (horizontal 0 to 1/3, vertical 1/3 to 2/3)."
+   }
+  },
+  {
+   "id": "en-10",
+   "lang": "en",
+   "source": "Paper.\nFill the background with black.\nDraw one narrowly tightly swaying white thin fine-brush dense flat rotated crescent normal-sized arc at the center.",
+   "current": [
+    "named-center"
+   ],
+   "background": "black",
+   "layers": [
+    {
+     "shape": "arc",
+     "proportion": "crescent",
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "white",
+      "size": "normal_sized",
+      "surface": "flat",
+      "position": "center"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "unchanged",
+    "reason": "nothing_to_move"
+   },
+   "chance": {
+    "outcome": "unchanged",
+    "reason": "nothing_to_move"
+   }
+  },
+  {
+   "id": "en-11",
+   "lang": "en",
+   "source": "Paper.\nFill the background with white.\nFill 40 broadly loosely undulating green thick-brush faint sweep wide large cloudforms at the [composition] middle (horizontal 0 to 1, vertical 1/3 to 2/3).\nScatter 15 narrowly tightly swaying black thin pen temperate grain small lines at the [composition] lower two thirds (horizontal 0 to 1, vertical 1/3 to 1).\nDraw one black thick thick-brush solid dense sweep vertical very large line at the [composition] center (horizontal 1/3 to 2/3, vertical 1/3 to 2/3).",
+   "current": [
+    "hband-1",
+    "twothirds-bottom",
+    "cell-11"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "cloudform",
+     "proportion": "wide",
+     "action": "fill",
+     "count": 40,
+     "attributes": {
+      "color": "green",
+      "size": "large",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "scatter",
+     "count": 15,
+     "attributes": {
+      "color": "black",
+      "size": "small",
+      "surface": "grain"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "black",
+      "size": "very_large",
+      "surface": "sweep"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "half-top",
+     "quarter-tr",
+     "quarter-tl"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-1",
+      "to_key": "half-top"
+     },
+     {
+      "layer": 1,
+      "from_key": "twothirds-bottom",
+      "to_key": "quarter-tr"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-11",
+      "to_key": "quarter-tl"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nFill 40 broadly loosely undulating green thick-brush faint sweep wide large cloudforms at the [composition] upper half (horizontal 0 to 1, vertical 0 to 1/2).\nScatter 15 narrowly tightly swaying black thin pen temperate grain small lines at the [composition] upper right quarter (horizontal 1/2 to 1, vertical 0 to 1/2).\nDraw one black thick thick-brush solid dense sweep vertical very large line at the [composition] upper left quarter (horizontal 0 to 1/2, vertical 0 to 1/2)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "half-bottom",
+     "quarter-tl",
+     "cell-02"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-1",
+      "to_key": "half-bottom"
+     },
+     {
+      "layer": 1,
+      "from_key": "twothirds-bottom",
+      "to_key": "quarter-tl"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-11",
+      "to_key": "cell-02"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nFill 40 broadly loosely undulating green thick-brush faint sweep wide large cloudforms at the [composition] lower half (horizontal 0 to 1, vertical 1/2 to 1).\nScatter 15 narrowly tightly swaying black thin pen temperate grain small lines at the [composition] upper left quarter (horizontal 0 to 1/2, vertical 0 to 1/2).\nDraw one black thick thick-brush solid dense sweep vertical very large line at the [composition] bottom left (horizontal 0 to 1/3, vertical 2/3 to 1)."
+   }
+  },
+  {
+   "id": "en-12",
+   "lang": "en",
+   "source": "Paper.\nFill the background with yellow.\nFill one broadly loosely undulating yellow crayon faint grain horizontal full-width cloudform at the [composition] bottom (horizontal 0 to 1, vertical 2/3 to 1).\nLine up 8 narrowly tightly swaying black thin pen solid dense sweep vertical normal-sized lines horizontally at the [composition] middle (horizontal 0 to 1, vertical 1/3 to 2/3).",
+   "current": [
+    "hband-2",
+    "hband-1"
+   ],
+   "background": "yellow",
+   "layers": [
+    {
+     "shape": "cloudform",
+     "proportion": "full_width",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "color": "yellow",
+      "surface": "grain"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "line_up",
+     "count": 8,
+     "attributes": {
+      "color": "black",
+      "line_up_direction": "horizontal",
+      "size": "normal_sized",
+      "surface": "sweep"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "hband-0",
+     "half-top"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-2",
+      "to_key": "hband-0"
+     },
+     {
+      "layer": 1,
+      "from_key": "hband-1",
+      "to_key": "half-top"
+     }
+    ],
+    "source": "Paper.\nFill the background with yellow.\nFill one broadly loosely undulating yellow crayon faint grain horizontal full-width cloudform at the [composition] top (horizontal 0 to 1, vertical 0 to 1/3).\nLine up 8 narrowly tightly swaying black thin pen solid dense sweep vertical normal-sized lines horizontally at the [composition] upper half (horizontal 0 to 1, vertical 0 to 1/2)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "twothirds-top",
+     "whole"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-2",
+      "to_key": "twothirds-top"
+     },
+     {
+      "layer": 1,
+      "from_key": "hband-1",
+      "to_key": "whole"
+     }
+    ],
+    "source": "Paper.\nFill the background with yellow.\nFill one broadly loosely undulating yellow crayon faint grain horizontal full-width cloudform at the [composition] upper two thirds (horizontal 0 to 1, vertical 0 to 2/3).\nLine up 8 narrowly tightly swaying black thin pen solid dense sweep vertical normal-sized lines horizontally at the [composition] whole canvas (horizontal 0 to 1, vertical 0 to 1)."
+   }
+  },
+  {
+   "id": "en-13",
+   "lang": "en",
+   "source": "Paper.\nFill the background with white.\nNature.FallenLeaves.\nScatter 40 broadly loosely swaying black extra-fine pen faint grain falling small lines at the [composition] lower left quarter (horizontal 0 to 1/2, vertical 1/2 to 1).",
+   "current": [
+    "quarter-bl"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "scatter",
+     "count": 40,
+     "attributes": {
+      "color": "black",
+      "size": "small",
+      "surface": "grain"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "half-bottom"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "quarter-bl",
+      "to_key": "half-bottom"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nNature.FallenLeaves.\nScatter 40 broadly loosely swaying black extra-fine pen faint grain falling small lines at the [composition] lower half (horizontal 0 to 1, vertical 1/2 to 1)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "twothirds-bottom"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "quarter-bl",
+      "to_key": "twothirds-bottom"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nNature.FallenLeaves.\nScatter 40 broadly loosely swaying black extra-fine pen faint grain falling small lines at the [composition] lower two thirds (horizontal 0 to 1, vertical 1/3 to 1)."
+   }
+  },
+  {
+   "id": "en-14",
+   "lang": "en",
+   "source": "Paper.\nFill the background with white.\nFill 4 narrowly loosely swaying orange thin fine-brush faint sweep diagonal large lines at the [composition] lower left quarter (horizontal 0 to 1/2, vertical 1/2 to 1).",
+   "current": [
+    "quarter-bl"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "fill",
+     "count": 4,
+     "attributes": {
+      "color": "orange",
+      "size": "large",
+      "surface": "sweep"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "vband-0"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "quarter-bl",
+      "to_key": "vband-0"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nFill 4 narrowly loosely swaying orange thin fine-brush faint sweep diagonal large lines at the [composition] left (horizontal 0 to 1/3, vertical 0 to 1)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "vband-0"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "quarter-bl",
+      "to_key": "vband-0"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nFill 4 narrowly loosely swaying orange thin fine-brush faint sweep diagonal large lines at the [composition] left (horizontal 0 to 1/3, vertical 0 to 1)."
+   }
+  },
+  {
+   "id": "en-15",
+   "lang": "en",
+   "source": "Paper.\nFill the background with gray.\nNature.Undergrowth.\nFill one crayon faint grain full-width square at the [composition] whole canvas (horizontal 0 to 1, vertical 0 to 1).",
+   "current": [
+    "whole"
+   ],
+   "background": "gray",
+   "layers": [
+    {
+     "shape": "square",
+     "proportion": "full_width",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "surface": "grain"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "half-top"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "whole",
+      "to_key": "half-top"
+     }
+    ],
+    "source": "Paper.\nFill the background with gray.\nNature.Undergrowth.\nFill one crayon faint grain full-width square at the [composition] upper half (horizontal 0 to 1, vertical 0 to 1/2)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "half-top"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "whole",
+      "to_key": "half-top"
+     }
+    ],
+    "source": "Paper.\nFill the background with gray.\nNature.Undergrowth.\nFill one crayon faint grain full-width square at the [composition] upper half (horizontal 0 to 1, vertical 0 to 1/2)."
+   }
+  },
+  {
+   "id": "en-16",
+   "lang": "en",
+   "source": "Paper.\nFill the background with gray.\nScatter 12 broadly loosely undulating white thin fine-brush faint sweep horizontal full-width lines at the [composition] upper half (horizontal 0 to 1, vertical 0 to 1/2).\nPlace one narrowly swaying red thick thick-brush dense flat normal-sized circle at the [composition] upper right quarter (horizontal 1/2 to 1, vertical 0 to 1/2).",
+   "current": [
+    "half-top",
+    "quarter-tr"
+   ],
+   "background": "gray",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": "full_width",
+     "action": "scatter",
+     "count": 12,
+     "attributes": {
+      "color": "white",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "circle",
+     "proportion": null,
+     "action": "place",
+     "count": 1,
+     "attributes": {
+      "color": "red",
+      "size": "normal_sized",
+      "surface": "flat"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "hband-0",
+     "cell-22"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "half-top",
+      "to_key": "hband-0"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-tr",
+      "to_key": "cell-22"
+     }
+    ],
+    "source": "Paper.\nFill the background with gray.\nScatter 12 broadly loosely undulating white thin fine-brush faint sweep horizontal full-width lines at the [composition] top (horizontal 0 to 1, vertical 0 to 1/3).\nPlace one narrowly swaying red thick thick-brush dense flat normal-sized circle at the [composition] bottom right (horizontal 2/3 to 1, vertical 2/3 to 1)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "hband-1",
+     "cell-21"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "half-top",
+      "to_key": "hband-1"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-tr",
+      "to_key": "cell-21"
+     }
+    ],
+    "source": "Paper.\nFill the background with gray.\nScatter 12 broadly loosely undulating white thin fine-brush faint sweep horizontal full-width lines at the [composition] middle (horizontal 0 to 1, vertical 1/3 to 2/3).\nPlace one narrowly swaying red thick thick-brush dense flat normal-sized circle at the [composition] center right (horizontal 2/3 to 1, vertical 1/3 to 2/3)."
+   }
+  },
+  {
+   "id": "en-17",
+   "lang": "en",
+   "source": "Paper.\nFill the background with white.\nDraw one narrowly swaying gray thin fine-brush dense sweep small line at the [composition] top center (horizontal 1/3 to 2/3, vertical 0 to 1/3).\nDraw one broadly undulating gray thick thick-brush temperate sweep large arc at the [composition] upper left quarter (horizontal 0 to 1/2, vertical 0 to 1/2).",
+   "current": [
+    "cell-10",
+    "quarter-tl"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "small",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "arc",
+     "proportion": null,
+     "action": "draw",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "large",
+      "surface": "sweep"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "cell-11",
+     "quarter-tr"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "cell-10",
+      "to_key": "cell-11"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-tl",
+      "to_key": "quarter-tr"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nDraw one narrowly swaying gray thin fine-brush dense sweep small line at the [composition] center (horizontal 1/3 to 2/3, vertical 1/3 to 2/3).\nDraw one broadly undulating gray thick thick-brush temperate sweep large arc at the [composition] upper right quarter (horizontal 1/2 to 1, vertical 0 to 1/2)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "cell-00",
+     "quarter-br"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "cell-10",
+      "to_key": "cell-00"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-tl",
+      "to_key": "quarter-br"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nDraw one narrowly swaying gray thin fine-brush dense sweep small line at the [composition] top left (horizontal 0 to 1/3, vertical 0 to 1/3).\nDraw one broadly undulating gray thick thick-brush temperate sweep large arc at the [composition] lower right quarter (horizontal 1/2 to 1, vertical 1/2 to 1)."
+   }
+  },
+  {
+   "id": "en-18",
+   "lang": "en",
+   "source": "Paper.\nFill the background with white.\nFill one undulating white chalk faint flat full-width cloudform at the [composition] middle (horizontal 0 to 1, vertical 1/3 to 2/3).\nScatter 20 loosely swaying gray thin pencil temperate stipple small ellipses at the [composition] middle (horizontal 0 to 1, vertical 1/3 to 2/3).\nPlace one black extra-thick thick-brush dense normal-sized point at the [composition] center (horizontal 1/3 to 2/3, vertical 1/3 to 2/3).",
+   "current": [
+    "hband-1",
+    "hband-1",
+    "cell-11"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "cloudform",
+     "proportion": "full_width",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "color": "white",
+      "surface": "flat"
+     }
+    },
+    {
+     "shape": "ellipse",
+     "proportion": null,
+     "action": "scatter",
+     "count": 20,
+     "attributes": {
+      "color": "gray",
+      "size": "small",
+      "surface": "stipple"
+     }
+    },
+    {
+     "shape": "point",
+     "proportion": null,
+     "action": "place",
+     "count": 1,
+     "attributes": {
+      "color": "black",
+      "size": "normal_sized"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "hband-2",
+     "quarter-bl",
+     "quarter-tr"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-1",
+      "to_key": "hband-2"
+     },
+     {
+      "layer": 1,
+      "from_key": "hband-1",
+      "to_key": "quarter-bl"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-11",
+      "to_key": "quarter-tr"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nFill one undulating white chalk faint flat full-width cloudform at the [composition] bottom (horizontal 0 to 1, vertical 2/3 to 1).\nScatter 20 loosely swaying gray thin pencil temperate stipple small ellipses at the [composition] lower left quarter (horizontal 0 to 1/2, vertical 1/2 to 1).\nPlace one black extra-thick thick-brush dense normal-sized point at the [composition] upper right quarter (horizontal 1/2 to 1, vertical 0 to 1/2)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "hband-1",
+     "cell-21",
+     "quarter-bl"
+    ],
+    "moves": [
+     {
+      "layer": 1,
+      "from_key": "hband-1",
+      "to_key": "cell-21"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-11",
+      "to_key": "quarter-bl"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nFill one undulating white chalk faint flat full-width cloudform at the [composition] middle (horizontal 0 to 1, vertical 1/3 to 2/3).\nScatter 20 loosely swaying gray thin pencil temperate stipple small ellipses at the [composition] center right (horizontal 2/3 to 1, vertical 1/3 to 2/3).\nPlace one black extra-thick thick-brush dense normal-sized point at the [composition] lower left quarter (horizontal 0 to 1/2, vertical 1/2 to 1)."
+   }
+  },
+  {
+   "id": "en-19",
+   "lang": "en",
+   "source": "Paper.\nFill the background with white.\nFill 3 narrowly loosely swaying gray thin pencil faint sweep horizontal large lines at the [composition] middle (horizontal 0 to 1, vertical 1/3 to 2/3).\nScatter one broadly tightly undulating black thick-brush temperate flat small cloudform at the [composition] lower left quarter (horizontal 0 to 1/2, vertical 1/2 to 1).\nScatter one broadly tightly undulating gray crayon faint flat small cloudform at the [composition] center left (horizontal 0 to 1/3, vertical 1/3 to 2/3).",
+   "current": [
+    "hband-1",
+    "quarter-bl",
+    "cell-01"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "fill",
+     "count": 3,
+     "attributes": {
+      "color": "gray",
+      "size": "large",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "cloudform",
+     "proportion": null,
+     "action": "scatter",
+     "count": 1,
+     "attributes": {
+      "color": "black",
+      "size": "small",
+      "surface": "flat"
+     }
+    },
+    {
+     "shape": "cloudform",
+     "proportion": null,
+     "action": "scatter",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "small",
+      "surface": "flat"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "hband-1",
+     "quarter-tl",
+     "cell-21"
+    ],
+    "moves": [
+     {
+      "layer": 1,
+      "from_key": "quarter-bl",
+      "to_key": "quarter-tl"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-01",
+      "to_key": "cell-21"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nFill 3 narrowly loosely swaying gray thin pencil faint sweep horizontal large lines at the [composition] middle (horizontal 0 to 1, vertical 1/3 to 2/3).\nScatter one broadly tightly undulating black thick-brush temperate flat small cloudform at the [composition] upper left quarter (horizontal 0 to 1/2, vertical 0 to 1/2).\nScatter one broadly tightly undulating gray crayon faint flat small cloudform at the [composition] center right (horizontal 2/3 to 1, vertical 1/3 to 2/3)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "half-top",
+     "cell-12",
+     "cell-10"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-1",
+      "to_key": "half-top"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-bl",
+      "to_key": "cell-12"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-01",
+      "to_key": "cell-10"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nFill 3 narrowly loosely swaying gray thin pencil faint sweep horizontal large lines at the [composition] upper half (horizontal 0 to 1, vertical 0 to 1/2).\nScatter one broadly tightly undulating black thick-brush temperate flat small cloudform at the [composition] bottom center (horizontal 1/3 to 2/3, vertical 2/3 to 1).\nScatter one broadly tightly undulating gray crayon faint flat small cloudform at the [composition] top center (horizontal 1/3 to 2/3, vertical 0 to 1/3)."
+   }
+  },
+  {
+   "id": "en-20",
+   "lang": "en",
+   "source": "Paper.\nFill the background with black.\nScatter 40 gray extra-fine pencil faint very small points at the [composition] upper half (horizontal 0 to 1, vertical 0 to 1/2).\nPlace one broadly undulating white fine-brush dense stipple normal-sized circle at the [composition] upper left quarter (horizontal 0 to 1/2, vertical 0 to 1/2).\nDraw 3 gray thick thick-brush dense sweep large lines at the [composition] center left (horizontal 0 to 1/3, vertical 1/3 to 2/3).",
+   "current": [
+    "half-top",
+    "quarter-tl",
+    "cell-01"
+   ],
+   "background": "black",
+   "layers": [
+    {
+     "shape": "point",
+     "proportion": null,
+     "action": "scatter",
+     "count": 40,
+     "attributes": {
+      "color": "gray",
+      "size": "very_small"
+     }
+    },
+    {
+     "shape": "circle",
+     "proportion": null,
+     "action": "place",
+     "count": 1,
+     "attributes": {
+      "color": "white",
+      "size": "normal_sized",
+      "surface": "stipple"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "draw",
+     "count": 3,
+     "attributes": {
+      "color": "gray",
+      "size": "large",
+      "surface": "sweep"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "twothirds-top",
+     "cell-20",
+     "quarter-tl"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "half-top",
+      "to_key": "twothirds-top"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-tl",
+      "to_key": "cell-20"
+     },
+     {
+      "layer": 2,
+      "from_key": "cell-01",
+      "to_key": "quarter-tl"
+     }
+    ],
+    "source": "Paper.\nFill the background with black.\nScatter 40 gray extra-fine pencil faint very small points at the [composition] upper two thirds (horizontal 0 to 1, vertical 0 to 2/3).\nPlace one broadly undulating white fine-brush dense stipple normal-sized circle at the [composition] top right (horizontal 2/3 to 1, vertical 0 to 1/3).\nDraw 3 gray thick thick-brush dense sweep large lines at the [composition] upper left quarter (horizontal 0 to 1/2, vertical 0 to 1/2)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "whole",
+     "cell-12",
+     "cell-01"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "half-top",
+      "to_key": "whole"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-tl",
+      "to_key": "cell-12"
+     }
+    ],
+    "source": "Paper.\nFill the background with black.\nScatter 40 gray extra-fine pencil faint very small points at the [composition] whole canvas (horizontal 0 to 1, vertical 0 to 1).\nPlace one broadly undulating white fine-brush dense stipple normal-sized circle at the [composition] bottom center (horizontal 1/3 to 2/3, vertical 2/3 to 1).\nDraw 3 gray thick thick-brush dense sweep large lines at the [composition] center left (horizontal 0 to 1/3, vertical 1/3 to 2/3)."
+   }
+  },
+  {
+   "id": "en-21",
+   "lang": "en",
+   "source": "Paper.\nFill the background with white.\nLine up 4 narrowly tightly undulating gray thin fine-brush faint sweep horizontal full-width lines horizontally at the [composition] whole canvas (horizontal 0 to 1, vertical 0 to 1).\nScatter 15 broadly loosely swaying black crayon temperate stipple small ellipses at the [composition] upper left quarter (horizontal 0 to 1/2, vertical 0 to 1/2).",
+   "current": [
+    "whole",
+    "quarter-tl"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": "full_width",
+     "action": "line_up",
+     "count": 4,
+     "attributes": {
+      "color": "gray",
+      "line_up_direction": "horizontal",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "ellipse",
+     "proportion": null,
+     "action": "scatter",
+     "count": 15,
+     "attributes": {
+      "color": "black",
+      "size": "small",
+      "surface": "stipple"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "hband-2",
+     "quarter-tl"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "whole",
+      "to_key": "hband-2"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nLine up 4 narrowly tightly undulating gray thin fine-brush faint sweep horizontal full-width lines horizontally at the [composition] bottom (horizontal 0 to 1, vertical 2/3 to 1).\nScatter 15 broadly loosely swaying black crayon temperate stipple small ellipses at the [composition] upper left quarter (horizontal 0 to 1/2, vertical 0 to 1/2)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "hband-1",
+     "cell-01"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "whole",
+      "to_key": "hband-1"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-tl",
+      "to_key": "cell-01"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nLine up 4 narrowly tightly undulating gray thin fine-brush faint sweep horizontal full-width lines horizontally at the [composition] middle (horizontal 0 to 1, vertical 1/3 to 2/3).\nScatter 15 broadly loosely swaying black crayon temperate stipple small ellipses at the [composition] center left (horizontal 0 to 1/3, vertical 1/3 to 2/3)."
+   }
+  },
+  {
+   "id": "en-22",
+   "lang": "en",
+   "source": "Paper.\nFill the background with white.\nScatter 12 broadly loosely swaying blue thin fine-brush temperate sweep large lines at the [composition] middle (horizontal 0 to 1, vertical 1/3 to 2/3).\nScatter 15 narrowly tightly undulating gray extra-fine pencil dense grain small lines at the [composition] lower left quarter (horizontal 0 to 1/2, vertical 1/2 to 1).",
+   "current": [
+    "hband-1",
+    "quarter-bl"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "scatter",
+     "count": 12,
+     "attributes": {
+      "color": "blue",
+      "size": "large",
+      "surface": "sweep"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "scatter",
+     "count": 15,
+     "attributes": {
+      "color": "gray",
+      "size": "small",
+      "surface": "grain"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "vband-0",
+     "cell-12"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-1",
+      "to_key": "vband-0"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-bl",
+      "to_key": "cell-12"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nScatter 12 broadly loosely swaying blue thin fine-brush temperate sweep large lines at the [composition] left (horizontal 0 to 1/3, vertical 0 to 1).\nScatter 15 narrowly tightly undulating gray extra-fine pencil dense grain small lines at the [composition] bottom center (horizontal 1/3 to 2/3, vertical 2/3 to 1)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "twothirds-right",
+     "vband-0"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-1",
+      "to_key": "twothirds-right"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-bl",
+      "to_key": "vband-0"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nScatter 12 broadly loosely swaying blue thin fine-brush temperate sweep large lines at the [composition] right two thirds (horizontal 1/3 to 1, vertical 0 to 1).\nScatter 15 narrowly tightly undulating gray extra-fine pencil dense grain small lines at the [composition] left (horizontal 0 to 1/3, vertical 0 to 1)."
+   }
+  },
+  {
+   "id": "en-23",
+   "lang": "en",
+   "source": "Paper.\nFill the background with white.\nFill one gray thick-brush dense flat wide extra-large square at the [composition] top (horizontal 0 to 1, vertical 0 to 1/3).\nTile 12 narrowly tightly swaying red crayon temperate flat small squares at the [composition] bottom right (horizontal 2/3 to 1, vertical 2/3 to 1).\nTile 12 narrowly tightly swaying blue crayon temperate flat small squares at the [composition] lower right quarter (horizontal 1/2 to 1, vertical 1/2 to 1).\nTile 12 narrowly tightly swaying green crayon temperate flat small squares at the [composition] center (horizontal 1/3 to 2/3, vertical 1/3 to 2/3).\nTile 12 narrowly tightly swaying gray crayon temperate flat small squares at the [composition] center right (horizontal 2/3 to 1, vertical 1/3 to 2/3).",
+   "current": [
+    "hband-0",
+    "cell-22",
+    "quarter-br",
+    "cell-11",
+    "cell-21"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "square",
+     "proportion": "wide",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "size": "extra_large",
+      "surface": "flat"
+     }
+    },
+    {
+     "shape": "square",
+     "proportion": null,
+     "action": "tile",
+     "count": 12,
+     "attributes": {
+      "color": "red",
+      "size": "small",
+      "surface": "flat"
+     }
+    },
+    {
+     "shape": "square",
+     "proportion": null,
+     "action": "tile",
+     "count": 12,
+     "attributes": {
+      "color": "blue",
+      "size": "small",
+      "surface": "flat"
+     }
+    },
+    {
+     "shape": "square",
+     "proportion": null,
+     "action": "tile",
+     "count": 12,
+     "attributes": {
+      "color": "green",
+      "size": "small",
+      "surface": "flat"
+     }
+    },
+    {
+     "shape": "square",
+     "proportion": null,
+     "action": "tile",
+     "count": 12,
+     "attributes": {
+      "color": "gray",
+      "size": "small",
+      "surface": "flat"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "unchanged",
+    "reason": "unsolved"
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "half-top",
+     "vband-1",
+     "twothirds-right",
+     "cell-21",
+     "quarter-tl"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-0",
+      "to_key": "half-top"
+     },
+     {
+      "layer": 1,
+      "from_key": "cell-22",
+      "to_key": "vband-1"
+     },
+     {
+      "layer": 2,
+      "from_key": "quarter-br",
+      "to_key": "twothirds-right"
+     },
+     {
+      "layer": 3,
+      "from_key": "cell-11",
+      "to_key": "cell-21"
+     },
+     {
+      "layer": 4,
+      "from_key": "cell-21",
+      "to_key": "quarter-tl"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nFill one gray thick-brush dense flat wide extra-large square at the [composition] upper half (horizontal 0 to 1, vertical 0 to 1/2).\nTile 12 narrowly tightly swaying red crayon temperate flat small squares at the [composition] center column (horizontal 1/3 to 2/3, vertical 0 to 1).\nTile 12 narrowly tightly swaying blue crayon temperate flat small squares at the [composition] right two thirds (horizontal 1/3 to 1, vertical 0 to 1).\nTile 12 narrowly tightly swaying green crayon temperate flat small squares at the [composition] center right (horizontal 2/3 to 1, vertical 1/3 to 2/3).\nTile 12 narrowly tightly swaying gray crayon temperate flat small squares at the [composition] upper left quarter (horizontal 0 to 1/2, vertical 0 to 1/2)."
+   }
+  },
+  {
+   "id": "en-24",
+   "lang": "en",
+   "source": "Paper.\nFill the background with white.\nFill one broadly loosely undulating gray thin pencil faint grain horizontal full-width cloudform at the [composition] top (horizontal 0 to 1, vertical 0 to 1/3).\nScatter 40 broadly tightly swaying gray thin fine-brush dense flat small ellipses at the top.",
+   "current": [
+    "hband-0",
+    "named-top"
+   ],
+   "background": "white",
+   "layers": [
+    {
+     "shape": "cloudform",
+     "proportion": "full_width",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "surface": "grain"
+     }
+    },
+    {
+     "shape": "ellipse",
+     "proportion": null,
+     "action": "scatter",
+     "count": 40,
+     "attributes": {
+      "color": "gray",
+      "size": "small",
+      "surface": "flat",
+      "position": "top"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "next",
+    "keys": [
+     "half-top",
+     "named-top"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-0",
+      "to_key": "half-top"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nFill one broadly loosely undulating gray thin pencil faint grain horizontal full-width cloudform at the [composition] upper half (horizontal 0 to 1, vertical 0 to 1/2).\nScatter 40 broadly tightly swaying gray thin fine-brush dense flat small ellipses at the top."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "hband-1",
+     "named-top"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-0",
+      "to_key": "hband-1"
+     }
+    ],
+    "source": "Paper.\nFill the background with white.\nFill one broadly loosely undulating gray thin pencil faint grain horizontal full-width cloudform at the [composition] middle (horizontal 0 to 1, vertical 1/3 to 2/3).\nScatter 40 broadly tightly swaying gray thin fine-brush dense flat small ellipses at the top."
+   }
+  },
+  {
+   "id": "en-25",
+   "lang": "en",
+   "source": "Canvas.\nFill the background with gray.\nFill one gray chalk faint stipple full-width square at the [composition] middle (horizontal 0 to 1, vertical 1/3 to 2/3).\nScatter 12 swaying white thin chalk temperate grain small lines at the [composition] upper right quarter (horizontal 1/2 to 1, vertical 0 to 1/2).",
+   "current": [
+    "hband-1",
+    "quarter-tr"
+   ],
+   "background": "gray",
+   "layers": [
+    {
+     "shape": "square",
+     "proportion": "full_width",
+     "action": "fill",
+     "count": 1,
+     "attributes": {
+      "color": "gray",
+      "surface": "stipple"
+     }
+    },
+    {
+     "shape": "line",
+     "proportion": null,
+     "action": "scatter",
+     "count": 12,
+     "attributes": {
+      "color": "white",
+      "size": "small",
+      "surface": "grain"
+     }
+    }
+   ],
+   "principled": {
+    "outcome": "recomposed",
+    "answer": "near",
+    "keys": [
+     "half-bottom",
+     "half-bottom"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-1",
+      "to_key": "half-bottom"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-tr",
+      "to_key": "half-bottom"
+     }
+    ],
+    "source": "Canvas.\nFill the background with gray.\nFill one gray chalk faint stipple full-width square at the [composition] lower half (horizontal 0 to 1, vertical 1/2 to 1).\nScatter 12 swaying white thin chalk temperate grain small lines at the [composition] lower half (horizontal 0 to 1, vertical 1/2 to 1)."
+   },
+   "chance": {
+    "outcome": "recomposed",
+    "answer": "chance",
+    "keys": [
+     "hband-0",
+     "cell-22"
+    ],
+    "moves": [
+     {
+      "layer": 0,
+      "from_key": "hband-1",
+      "to_key": "hband-0"
+     },
+     {
+      "layer": 1,
+      "from_key": "quarter-tr",
+      "to_key": "cell-22"
+     }
+    ],
+    "source": "Canvas.\nFill the background with gray.\nFill one gray chalk faint stipple full-width square at the [composition] top (horizontal 0 to 1, vertical 0 to 1/3).\nScatter 12 swaying white thin chalk temperate grain small lines at the [composition] bottom right (horizontal 2/3 to 1, vertical 2/3 to 1)."
+   }
+  }
+ ]
+}

@@ -1294,12 +1294,13 @@ and both change only on an explicit action.
 | Stage | Name | What changes | Cost |
 |---|---|---|---|
 | Performance | Another performance | region, relation, and placement phase as resolved by the performance seed (§13.8 / §14.4) | no LLM call (re-render only) |
-| Composition | Another composition | The concrete angle and corner for explicitly authored angle and corner meaning, from the composition seed (§12.11 / §18) | no LLM call (rebuilt from the saved normalized DDL) |
+| Composition | Another composition | The ranges behind the composition mark, by principle or by chance (§12.6.3), and the concrete angle and corner for explicitly authored angle and corner meaning, from the composition seed (§12.11 / §18) | no LLM call (rebuilt from the saved normalized DDL with its marked ranges chosen again) |
 
-Another composition reselects the concrete angle when the description has an
-angle, and the corner among its four candidates. `center` is the canvas-center
-region and is not reselected, so a work with neither an angle nor a corner
-redraws the same. The shared lowerer resolves the angle from `composition_seed`.
+Another composition chooses again the ranges behind the composition mark, by
+principle or by chance as the author picks (§12.6.3), and reselects the concrete
+angle when the description has an angle, and the corner among its four
+candidates. `center` is the canvas-center region and is not reselected, so a work
+with no marked range, no angle, and no corner redraws the same. The shared lowerer resolves the angle from `composition_seed`.
 It must not invent or reselect a composition family, technique, color, touch,
 relation, or element count. Another performance preserves the resolved angle.
 Stage 1.5 used to reinterpret `center` as one of six focus candidates and let
@@ -1773,7 +1774,19 @@ In a run that composes, a **composition** step runs once after the underdrawing 
 - When the reading is unavailable: when the reading request uses up its budget, when unreadable replies exhaust the retries, or when the request cannot be built, the default reading (no relations, the author's defaults, every underdrawing place kept) is used (event `composition_fallback`). When the combinations exceed the limit, no range fits, or the composed document does not compile, Stage 1's printed document is committed without composition (event `composition_skipped`). The residual path (`stage1_residual_execution`) and the replay of a saved response that carries `normalized_ddl` are not composed.
 - Setting: `PipelineConfig.composition` (`{read}`). Without it there is no composition. `read: false` sends no reading and uses the default reading. The Server's default manifest sets `{read: true}`; a work redrawn under its saved settings keeps them. New Android configurations set `read: true` for cloud models and `read: false` for on-device LiteRT Gemma 4 E2B.
 - The Server times the reading apart from Stage 1 in `metrics.composition` (no new history column; it enters only the total) and records the reading's failures under the stage `composition`. The prompt tab does not show the reading's system prompt.
-- Composition leaves saved works unchanged. A work saves the composed visible DDL and its Score; redrawing and "another composition" read the saved DDL (the ranges written in it do not move).
+- Composition leaves saved works unchanged. A work saves the composed visible DDL and its Score, not the composition reading. Redrawing reads the saved DDL, and "another composition" chooses again only the ranges behind the composition mark in it (§12.6.3).
+
+### 12.6.3 Another Composition (Choosing the Marked Ranges Again, draw-system05)
+
+"Another composition" (the refinement "Another composition") chooses again only the ranges behind the composition mark in the saved visible DDL (the author's decision, 2026-10-04). For each option the author chooses one of two ways:
+
+- By principle: solve from what the instructions alone tell. Each sentence is read back as the work-plan layer it was printed from (shape, proportion, action, count, place, size, color, surface, and line-up direction); roles follow the default reading's rules from how each layer is drawn, there are no relations, and the tension is the author's defaults. The composition reading is not used. Among the solver's near-best answers, one other than the current ranges is chosen by the option's `composition_seed` and the work's identity (the same choice as the solver of §12.6.2). When the near-best holds no other answer, the next answer by score is used.
+- By chance (automatism): each moving sentence takes one of the ranges its layer's kind allows, by a hash of the seed, the work's identity, and the sentence's order. The ranges allowed are the solver's own constraints (a small range for a bundle, a full-width range for a horizontal row or a full-width line, a full-height range for a vertical row, any of the 28 otherwise), and the principles' score is not used.
+- What stays: a place kept from the description's words (a place word without the mark) and a corner range. The instructions alone cannot tell a corner the description names from one the composition chose, so corners do not move.
+- Rewriting: only the text from the mark to the closing parenthesis is rewritten with the new range's name and numbers (`［構図］左上（横0〜1/3、縦0〜1/3）`, `[composition] top left (horizontal 0 to 1/3, vertical 0 to 1/3)`); every other character stays. The rewritten document is used only when it compiles without diagnostics.
+- When the ranges cannot be chosen again: with no composition mark (the author's own instructions, works from before composition, works from the on-device model), with a sentence a plan does not write (a range on a Macro word, a group, a relation, a color or other sequence), with an unmarked numeric range (the author's own), by principle when the layers read back from the instructions have more combinations of ranges than the solving limit (3,000,000, §12.6.2), or when the result does not compile, the instructions stay as they are and are recomposed as before, and the option says that the composition does not move, with the reason.
+- After that, as before, the rechosen DDL (or the saved one) is recomposed with the option's `composition_seed`, which also rechooses the concrete angle of an explicit slant, the four candidates of `corner`, and the placement of groups.
+- The shared core function is `recompose` (response schema `inku.composition-recompose.v1`). The request carries the pipeline configuration, the source, the mode (`principled` or `chance`), the seed (a decimal string), and the work's identity. The answer is the rechosen source with each sentence's move (how the current and the new range are written; the current range has no key when it is none of the 28), or the reason the instructions stay (`nothing_to_move`, `not_canonical`, `unsupported_sentence`, `unplaced_sentence`, `author_range`, `no_other_answer`, `same_ranges`, `unsolved`, `not_canonical_after`). An unreadable request answers `invalid_request`. No LLM is called.
 
 ### 12.7 Stage 2 Completion and Deterministic Structuring
 

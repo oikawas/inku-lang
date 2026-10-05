@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### v2.15.88 — Rechoose numeric ranges and fold their display (Build 1164, 2026-10-05)
+
+This version aligns the core's unmarked numeric-range recomposition with range display on Server, Web and Android. Ranges with matching names and numbers fold for display, with frames for inspection and numeric editing. Drawing remains explicit; saving and copying keep the full text and numbers. DDL engine 57, render engine 73, Score 0.19.0 and the Android version and Build are retained.
+
 ### 2026-10-05 — Fold numeric ranges in the instructions and see them on the work
 
 An authenticated Server API returns the core's range table. Web folds only ranges whose name and numbers match, with a dotted underline under the name. Hovering or pressing shows a rectangle on the work; pressing opens the numbers for editing. Valid numbers update the rectangle and a matching name, custom ranges stay unfolded, and invalid numbers keep the last valid rectangle. Edits enter the existing DDL editing state and draw once through `Draw from instructions`. Saving, copying and the text editor keep the full source with its numbers. Older wheels retain the complete display. Guides now describe numeric ranges; legacy reason labels, saved works and versions are retained.

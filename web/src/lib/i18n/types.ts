@@ -267,6 +267,9 @@ export interface LangPack {
 	ddlEditDialogSubtitle: string;
 	ddlSyntaxGuide: string;
 	ddlEditorInstructions: string;
+	ddlEditorArtwork: string;
+	ddlEditorNoArtwork: string;
+	ddlEditorRangeHint: string;
 	ddlEditorVocabulary: string;
 	ddlEditorSyntaxGuideToggle: string;
 	ddlEditorStatus: (lines: number, chars: number) => string;

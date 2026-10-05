@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## v2.15.89 — 2026-10-05
 
+### 2026-10-05 — Rebuild the instruction editor with CodeMirror 6
+
+The overlaid textarea and measured line copies are replaced with one editable CodeMirror document. It retains the existing token colors, line numbers, Saijiki and Macro completions, word insertion and unknown Macro guidance. The reading view's parser and the core's table fold range numbers and old marks inside the editor. Clicking a name or entering it with the caret opens the text; names follow only on leaving, with renaming and refolding deferred during IME composition. A small image of the selected work shows the frame, retaining its last valid bounds for invalid input. Complete-source copying, drawing, external synchronization and read-only operation are preserved. Dependencies are pinned and the complete MIT notices for 12 new packages accompany the distribution.
+
 ### 2026-10-05 — Accept hyphens in Web numeric range edits
 
 Numeric edits in the instructions accept `-` and `－` in Japanese, and `-` and `–` besides `to` in English. Detection, frames and matching names use the same parser. Invalid-range guidance gives an example in each language. English `~`, numeric limits, rejection of reversed or zero-width ranges, explicit drawing and full-source preservation remain unchanged.

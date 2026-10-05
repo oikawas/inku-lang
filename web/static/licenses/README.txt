@@ -15,6 +15,16 @@ SvelteKit/adapter-node output built with the versions in manifest.json:
   sirv and @polka/url: lukeed-MIT.txt
   mrmime: mrmime-MIT.txt
   totalist: totalist-MIT.txt
+  CodeMirror autocomplete, commands, language, state, view: codemirror-*-MIT.txt
+  Lezer common, highlight, lr: lezer-*-MIT.txt
+  @marijn/find-cluster-break: marijn-find-cluster-break-MIT.txt
+  crelt: crelt-MIT.txt
+  style-mod: style-mod-MIT.txt
+  w3c-keyname: w3c-keyname-MIT.txt
+
+The CodeMirror editor and its dependencies above carry the full LICENSE from
+each exact installed npm package. Versions are fixed by package-lock.json and
+recorded in manifest.json. These files accompany both browser and server output.
 
 The sirv and @polka/url npm packages do not include license files; their
 upstream projects identify MIT copyright Luke Edwards. The bundled copy

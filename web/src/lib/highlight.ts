@@ -213,26 +213,21 @@ function ddlCaretMarkup(): string {
 	return '<span class="ddl-custom-caret"></span>';
 }
 
+/** The reading view and the CodeMirror editor share exactly the same palette. */
+export function ddlPartClass(part: Part): string | null {
+	if (part.kind === 'plugin-name') return `ddl-token ddl-token-${part.known ? 'plugin' : 'unknown'}`;
+	if (part.kind === 'saijiki') return `ddl-token ddl-token-${part.categoryKey ? saijikiCategoryClassByKey(part.categoryKey) : saijikiCategoryClass(part.category)}`;
+	if (part.kind === 'emotion') return 'ddl-token-emotion';
+	return null;
+}
+
 function renderDDLPart(part: Part, caretOffset: number | null): string {
-	const { text, kind, category, categoryKey } = part;
+	const { text } = part;
 	const before = caretOffset === null ? text : text.slice(0, caretOffset);
 	const after = caretOffset === null ? '' : text.slice(caretOffset);
 	const content = caretOffset === null ? escapeHtml(text) : `${escapeHtml(before)}${ddlCaretMarkup()}${escapeHtml(after)}`;
-	if (kind === 'plugin-name') {
-		// A name the server does not hold is not an error -- plugins can be
-		// installed later, and today's unknown name is tomorrow's word. The
-		// class says "not on this server", and the palette says it in amber.
-		const cls = part.known ? 'plugin' : 'unknown';
-		return `<span class="ddl-token ddl-token-${cls}">${content}</span>`;
-	}
-	if (kind === 'saijiki') {
-		const cls = categoryKey ? saijikiCategoryClassByKey(categoryKey) : saijikiCategoryClass(category);
-		return `<span class="ddl-token ddl-token-${cls}">${content}</span>`;
-	}
-	if (kind === 'emotion') {
-		return `<span class="ddl-token-emotion">${content}</span>`;
-	}
-	return content;
+	const cls = ddlPartClass(part);
+	return cls ? `<span class="${cls}">${content}</span>` : content;
 }
 
 /**

@@ -1429,3 +1429,4 @@
 "SVGサイズ" = "SVG size";
 "描画モデル（%@）の接続先にAPIキーがありません。設定の「モデル設定」でAPIキーを入力すると描けます。" = "The service for the drawing model (%@) has no API key. Enter one in Settings → Models to draw.";
 "接続設定を開く" = "Open connection settings";
+"選んだ語を編集中DDLのカーソル位置に挿入します。" = "Insert the chosen word at the caret in this editor's DDL draft.";

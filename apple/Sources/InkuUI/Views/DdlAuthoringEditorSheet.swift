@@ -12,6 +12,7 @@ struct DdlAuthoringEditorSheet: View {
     @State private var drawingModel = ""
     @State private var inheritedWild = false
     @State private var wildOverride: Bool?
+    @State private var insertion: InkuEditorInsertion?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,9 +25,6 @@ struct DdlAuthoringEditorSheet: View {
                 Spacer()
                 Button { session.cancel(); dismiss() } label: { Image(systemName: "xmark") }
                     .accessibilityLabel(model.display.localized("閉じる")).disabled(model.isBusy)
-                Button(model.display.localized("歳時記を開く"), systemImage: "book") { showSaijiki = true }
-                    .disabled(model.isBusy)
-                    .help(tip("選んだ語を編集中DDLの末尾に挿入します。"))
             }.padding(16)
             Divider()
             HStack(spacing: 16) {
@@ -40,11 +38,9 @@ struct DdlAuthoringEditorSheet: View {
                 }.buttonStyle(.bordered).tint((wildOverride ?? inheritedWild) ? .accentColor : .secondary)
                 if wildOverride == nil { Text(model.display.localized("元の作品から継承")).inkuFont(12).foregroundStyle(.secondary) }
             }.padding(.horizontal, 16).padding(.vertical, 10).disabled(model.isBusy)
-            TextEditor(text: $session.draft)
-                .inkuFont(13, design: .monospaced)
-                .scrollContentBackground(.hidden).padding(12)
-                .disabled(model.isBusy)
-                .accessibilityLabel(model.display.localized("DDL編集"))
+            DdlEditorPane(model: model, text: $session.draft, disabled: model.isBusy, insertion: $insertion,
+                          onShowSaijiki: { showSaijiki = true })
+                .padding(.horizontal, 18).padding(.vertical, 14)
             Divider()
             HStack {
                 if let error = model.errorText {
@@ -86,7 +82,8 @@ struct DdlAuthoringEditorSheet: View {
         .sheet(isPresented: $showSaijiki) {
             VStack(spacing: 0) {
                 HStack { Spacer(); Button(model.display.localized("閉じる")) { showSaijiki = false } }.padding(12)
-                SaijikiView(model: model, onInsertWord: { session.insert($0) }, wordLanguage: model.instructionLanguage(for: model.ddlText))
+                SaijikiView(model: model, onInsertWord: { insertion = InkuEditorInsertion(text: $0) },
+                            wordLanguage: model.instructionLanguage(for: session.draft))
             }.frame(minWidth: 560, minHeight: 620)
         }
     }
@@ -109,6 +106,8 @@ struct NewDdlAuthoringSheet: View {
     @State private var importTask: Task<Void, Never>?
     @State private var importing = false
     @State private var importError: String?
+    @State private var insertion: InkuEditorInsertion?
+    @State private var showSaijiki = false
 
     init(model: AppModel, initialImport: DDLPackageImport? = nil) {
         self.model = model
@@ -132,9 +131,9 @@ struct NewDdlAuthoringSheet: View {
                 Spacer()
                 Button(model.display.localized("DDLファイルを読み込む…"), systemImage: "doc.badge.arrow.up") { showImport = true }
             }.padding(16).disabled(model.isBusy || importing)
-            TextEditor(text: $draft).inkuFont(13, design: .monospaced)
-                .padding(12).disabled(model.isBusy || importing)
-                .accessibilityLabel(model.display.localized("指示書"))
+            DdlEditorPane(model: model, text: $draft, disabled: model.isBusy || importing, insertion: $insertion,
+                          onShowSaijiki: { showSaijiki = true })
+                .padding(.horizontal, 18).padding(.vertical, 14)
             if let importedDocument, !importedDocument.names.isEmpty {
                 Text(model.display.localized("この新しい作品に定義を持ち込みます: ") + importedDocument.names.joined(separator: ", "))
                     .inkuFont(12).textSelection(.enabled).padding(.horizontal, 16)
@@ -173,6 +172,13 @@ struct NewDdlAuthoringSheet: View {
                 try await model.selectDdlDrawingModel(reference)
                 drawingModel = reference
             }
+        }
+        .sheet(isPresented: $showSaijiki) {
+            VStack(spacing: 0) {
+                HStack { Spacer(); Button(model.display.localized("閉じる")) { showSaijiki = false } }.padding(12)
+                SaijikiView(model: model, onInsertWord: { insertion = InkuEditorInsertion(text: $0) },
+                            wordLanguage: model.instructionLanguage(for: draft))
+            }.frame(minWidth: 560, minHeight: 620)
         }
         .fileImporter(isPresented: $showImport,
             allowedContentTypes: [.json, .plainText, UTType(filenameExtension: "ddl") ?? .text], allowsMultipleSelection: false) { result in

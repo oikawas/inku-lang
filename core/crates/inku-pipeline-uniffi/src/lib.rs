@@ -5,6 +5,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use inku_pipeline::protocol::{ProtocolError, error_bytes};
 
 mod macro_catalog;
+#[cfg(not(target_os = "android"))]
 mod description_meter;
 mod plugin_diagnostics;
 mod raster;
@@ -12,6 +13,7 @@ mod saijiki_migration;
 mod standalone;
 
 pub use macro_catalog::resolve_macro_catalog;
+#[cfg(not(target_os = "android"))]
 pub use description_meter::count_description_meter;
 pub use plugin_diagnostics::explain_plugin_diagnostics;
 pub use raster::{RasterFailure, RasterFrame, RasterScene, prepare_raster_scene, raster_api_version, rasterize_svg, rasterize_svg_region};

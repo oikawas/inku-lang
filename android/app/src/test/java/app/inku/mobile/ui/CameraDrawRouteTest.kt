@@ -54,6 +54,19 @@ class CameraDrawRouteTest {
         assertNull(modelReadinessIssue(gemini, listOf(provider()), emptyList()))
     }
 
+    /** Server builtins `requires_api_key`: Ollama Cloud needs a key, local Ollama does not. */
+    @Test
+    fun ollamaCloudWithoutAKeyIsNotReadyButLocalOllamaIs() {
+        fun ollama(id: String) = provider(apiKey = null).copy(
+            providerId = id, kind = "openai-compatible", baseUrl = "https://ollama.com/v1", publishedModelsJson = "[]",
+        )
+        assertEquals(
+            ModelReadinessIssue.ApiKeyMissing,
+            modelReadinessIssue("ollama-cloud:gemma4:31b", listOf(ollama("ollama-cloud")), emptyList()),
+        )
+        assertNull(modelReadinessIssue("ollama:gemma4:31b", listOf(ollama("ollama")), emptyList()))
+    }
+
     @Test
     fun explicitBoundaryActionsClearTerminalCameraOrigin() {
         assertSame(CameraCaptureState.Idle, CameraCaptureState.ReadyToEdit(provenance()).clearCameraOrigin())

@@ -30,7 +30,23 @@ data class ChatGptPlanView(
 }
 
 /** Messages contain public codes only, never a response body or credential. */
-class ChatGptException(val code: String) : IllegalArgumentException(code)
+class ChatGptException(
+    val code: String,
+    /**
+     * The failure class the shared core receives, as the server's
+     * `ChatGPTError.failure`: by default the one the server gives [code], set
+     * where the same code is a refusal in one place and temporary in another.
+     */
+    val failure: String = chatGptFailureFor(code),
+) : IllegalArgumentException(code)
+
+/** The server's temporary ChatGPT failures; every other code is `provider_rejected`. */
+internal fun chatGptFailureFor(code: String): String = when (code) {
+    "chatgpt_transport_unavailable", "chatgpt_auth_unavailable", "chatgpt_response_incomplete",
+    "subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable", "chatgpt_refresh_not_ready",
+    -> "transport_unavailable"
+    else -> "provider_rejected"
+}
 
 internal const val CHATGPT_PROVIDER = "chatgpt"
 internal const val CHATGPT_ISSUER = "https://auth.openai.com"

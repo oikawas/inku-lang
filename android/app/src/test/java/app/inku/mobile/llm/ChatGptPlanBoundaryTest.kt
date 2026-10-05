@@ -27,6 +27,9 @@ class ChatGptPlanBoundaryTest {
 
     private class Http : ChatGptHttp {
         val calls = mutableListOf<String>()
+        var chunkSize = 7
+        /** Streamed instead of a 200 body's UTF-8, for bytes no String holds. */
+        var streamBytes: ByteArray? = null
         var handler: (String, String?, String?) -> ChatGptHttpResponse = { _, _, _ -> error("Unexpected request") }
         override suspend fun request(url: String, method: String, token: String?, body: String?, formBody: Boolean,
                                      timeoutMs: Long, check: () -> Unit, onChunk: ((ByteArray) -> Unit)?): ChatGptHttpResponse {
@@ -34,7 +37,7 @@ class ChatGptPlanBoundaryTest {
             val result = handler(url, token, body)
             check()
             if (onChunk != null && result.status == 200) {
-                result.body.toByteArray().asList().chunked(7).forEach { check(); onChunk(it.toByteArray()) }
+                (streamBytes ?: result.body.toByteArray()).asList().chunked(chunkSize).forEach { check(); onChunk(it.toByteArray()) }
                 return result.copy(body = "")
             }
             return result
@@ -73,10 +76,10 @@ class ChatGptPlanBoundaryTest {
         systemInstruction = "Pipeline instruction", tool = ModelTool("core-name", "core-description", "{\"type\":\"object\"}"),
         pipelineAction = "generate_normalized_ddl", chatGptSession = ref)
     private fun event(type: String, key: String, value: JSONObject) = JSONObject().put("type", type).put(key, value).let { "data: $it\r\n\r\n" }
-    private fun function() = JSONObject().put("type", "function_call").put("namespace", "inku").put("name", "submit_pipeline_response")
-        .put("id", "call-item").put("status", "completed").put("arguments", "{\"ddl\":\"赤い円。\"}")
-    private fun completedStream(): String = event("response.output_item.added", "item", function().put("arguments", "")) +
-        event("response.output_item.done", "item", function()) + event("response.completed", "response",
+    private fun function(arguments: String = "{\"ddl\":\"赤い円。\"}") = JSONObject().put("type", "function_call").put("namespace", "inku").put("name", "submit_pipeline_response")
+        .put("id", "call-item").put("status", "completed").put("arguments", arguments)
+    private fun completedStream(arguments: String = "{\"ddl\":\"赤い円。\"}"): String = event("response.output_item.added", "item", function().put("arguments", "")) +
+        event("response.output_item.done", "item", function(arguments)) + event("response.completed", "response",
             JSONObject().put("status", "completed").put("output", JSONObject.NULL).put("usage", JSONObject().put("input_tokens", 10).put("output_tokens", 12)))
 
     private fun rejected(code: String, block: () -> Unit) {
@@ -236,6 +239,96 @@ class ChatGptPlanBoundaryTest {
             assertEquals(listOf(CHATGPT_TOKEN), http.calls)
             assertFalse(manager.state.value.canUsePlan)
             assertEquals("rotated-refresh", store.read().getJSONObject("profiles").getJSONObject("a").getString("refresh_token"))
+        } finally { manager.cancelAuthorization(); scope.cancel() }
+    }
+
+    /** Server `SSEDecoder`: `\r?\n\r?\n` ends an event, so LF followed by CRLF does too. */
+    @Test
+    fun aLineFeedThenCrlfBlankLineEndsAnEvent() {
+        val decoder = ChatGptSseDecoder()
+        decoder.feed(completedStream().replace("\r\n\r\n", "\n\r\n").toByteArray())
+        assertEquals("赤い円。", JSONObject(decoder.finish()).getString("ddl"))
+    }
+
+    /** Server pipeline: `SSEDecoder(max_response_bytes)`, the shared 1 MiB response bound. */
+    @Test
+    fun aSixHundredKibArgumentIsAcceptedAsTheServerAcceptsIt() = runBlocking {
+        val ddl = "a".repeat(600 * 1024)
+        val arguments = JSONObject().put("ddl", ddl).toString()
+        withPlan({ completedStream(arguments) }) { manager, ref, http ->
+            http.chunkSize = 64 * 1024
+            assertEquals(ddl, JSONObject(manager.generate(request(ref)).text).getString("ddl"))
+        }
+    }
+
+    /** Server `chatgpt_provider.py` / `chatgpt_store.py` failure classes, as the core receives them. */
+    @Test
+    fun streamFailuresAreClassedAsTheServerClassesThem() {
+        fun decoded(vararg events: String) = runCatching {
+            ChatGptSseDecoder().apply { events.forEach { feed(it.toByteArray()) } }.finish()
+        }.exceptionOrNull()!!
+        val added = event("response.output_item.added", "item", function().put("arguments", ""))
+        // An unfinished item or response is a refusal; a stream that stops is temporary.
+        assertEquals("provider_rejected", failureOf(decoded(added, event("response.output_item.done", "item", function().put("status", "incomplete")))))
+        assertEquals("provider_rejected", failureOf(decoded(added, event("response.output_item.done", "item", function()),
+            event("response.completed", "response", JSONObject().put("status", "failed")))))
+        assertEquals("transport_unavailable", failureOf(decoded(added, event("response.incomplete", "response", JSONObject()))))
+        assertEquals("transport_unavailable", failureOf(decoded(added)))
+        // A public code that arrives with a 5xx is temporary.
+        val ineligible = JSONObject().put("error", JSONObject().put("code", "subscription_sharing_user_not_eligible"))
+        assertEquals("transport_unavailable", failureOf(chatGptResponseError(ineligible, 503)))
+        assertEquals("provider_rejected", failureOf(chatGptResponseError(ineligible, 403)))
+    }
+
+    @Test
+    fun generationFailuresKeepTheirClassThroughThePlanManager() = runBlocking {
+        suspend fun generated(stream: () -> String, bytes: ByteArray? = null): Throwable {
+            var thrown: Throwable? = null
+            withPlan(stream) { manager, ref, http ->
+                http.streamBytes = bytes
+                thrown = runCatching { manager.generate(request(ref)) }.exceptionOrNull()
+            }
+            return thrown!!
+        }
+        // Arguments that are not JSON are malformed; JSON that is not an object is refused.
+        assertEquals("malformed_payload", failureOf(generated({ completedStream("{") })))
+        assertEquals("provider_rejected", failureOf(generated({ completedStream("[1]") })))
+        assertEquals("transport_timeout", failureOf(generated({ throw java.net.SocketTimeoutException("read timed out") })))
+        val badUtf8 = completedStream().toByteArray().let { it.copyOf(40) + byteArrayOf(0xC3.toByte(), 0x28) + it.copyOfRange(40, it.size) }
+        assertEquals("provider_rejected", failureOf(generated({ completedStream() }, badUtf8)))
+    }
+
+    private fun failureOf(error: Throwable): String = runBlocking {
+        val provider = object : ModelProvider {
+            override val providerId = "chatgpt"
+            override suspend fun generate(request: ModelRequest): ModelResponse = throw error
+        }
+        val action = JSONObject().put("tag", "generate_normalized_ddl")
+            .put("identity", JSONObject().put("action_id", "a").put("attempt", 1).put("request_digest", "b"))
+            .put("timeout_ms", "5000")
+            .put("payload", JSONObject().put("prompt", JSONObject().put("action_name", "generate_normalized_ddl")
+                .put("system", "system").put("message", "message").put("response_schema", JSONObject().put("type", "object"))))
+        JSONObject(app.inku.mobile.pipeline.SingleAttemptModelEffectProvider(provider)
+            .perform(action.toString(), app.inku.mobile.pipeline.PipelineModelSelection("chatgpt:m", "chatgpt:m"))).getString("failure")
+    }
+
+    /** A published personal model on profile "a", answering /responses with [stream]. */
+    private suspend fun withPlan(stream: () -> String, block: suspend (ChatGptPlanManager, ChatGptSessionRef, Http) -> Unit) {
+        val store = Store().apply { value.getJSONObject("profiles").put("a", profile("a")); value.put("active", "a") }
+        val http = Http(); val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val manager = ChatGptPlanManager(store, scope, http) { now }
+        try {
+            http.handler = { url, _, _ ->
+                when {
+                    url.endsWith("/models") -> ChatGptHttpResponse(200, "{\"models\":[{\"slug\":\"personal-model\",\"display_name\":\"Personal model\",\"visibility\":\"list\"}]}")
+                    url.endsWith("/responses") -> ChatGptHttpResponse(200, stream())
+                    else -> error("Unexpected provider endpoint")
+                }
+            }
+            val ref = manager.pinSession()
+            manager.refreshModels()
+            manager.publishModels(ref, listOf("personal-model"))
+            block(manager, ref, http)
         } finally { manager.cancelAuthorization(); scope.cancel() }
     }
 }

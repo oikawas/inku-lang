@@ -4766,7 +4766,7 @@ private fun ProviderConnectionCard(
     statusMessage: String?,
     fetchState: ProviderModelFetchState?,
 ) {
-    val requiresKey = provider.providerId in setOf("openai", "nvidia", "anthropic", "gemini", "ollama-cloud")
+    val requiresKey = app.inku.mobile.llm.requiresApiKey(provider.providerId)
     val keySet = !provider.encryptedApiKey.isNullOrBlank()
     var displayName by remember(provider.providerId, provider.displayName) { mutableStateOf(provider.displayName) }
     val kind = provider.kind

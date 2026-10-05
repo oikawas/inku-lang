@@ -4,6 +4,7 @@ import app.inku.mobile.data.db.ModelAssetEntity
 import app.inku.mobile.data.db.ProviderSettingEntity
 import app.inku.mobile.data.model.CameraInputProvenance
 import app.inku.mobile.llm.RoutingModelProvider
+import app.inku.mobile.llm.requiresApiKey
 import app.inku.mobile.pipeline.SketchInput
 
 /**
@@ -65,14 +66,11 @@ internal fun modelReadinessIssue(
         ?.takeIf { it.isEnabled && !it.isDefaultLocal }
         ?: return ModelReadinessIssue.ProviderMissingOrDisabled
     if (provider.baseUrl.isNullOrBlank()) return ModelReadinessIssue.BaseUrlMissing
-    if (provider.requiresApiKey() && provider.encryptedApiKey.isNullOrBlank()) {
+    if (requiresApiKey(provider.providerId) && provider.encryptedApiKey.isNullOrBlank()) {
         return ModelReadinessIssue.ApiKeyMissing
     }
     return null
 }
-
-private fun ProviderSettingEntity.requiresApiKey(): Boolean =
-    kind == "gemini" || kind == "anthropic" || providerId in setOf("openai", "nvidia")
 
 /** Clear only a camera description that is still eligible for the camera draw route. */
 internal fun CameraCaptureState.clearCameraOrigin(): CameraCaptureState =

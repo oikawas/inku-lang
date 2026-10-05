@@ -87,6 +87,35 @@ class GeminiModelProviderTest {
             GeminiModelProvider.responseText(parts, "submit_pipeline_response")
         }
     }
+
+    /** Server `quote(model, safe="")`: only A-Z a-z 0-9 _ . - ~ stay as they are. */
+    @Test
+    fun aModelIdIsPercentEncodedAsThePythonServerQuotesIt() = runBlocking {
+        val urls = mutableListOf<String>()
+        val provider = GeminiModelProvider("gemini", "https://generativelanguage.googleapis.com", "test-key") { url ->
+            urls += url.toString()
+            GeminiConnection(url)
+        }
+        for (model in listOf("gemini:models/gemma~4/it", "gemini:a b+c:d")) {
+            provider.generate(
+                ModelRequest(
+                    modelId = model,
+                    prompt = "Draw a circle",
+                    temperature = 0.0,
+                    maxTokens = 1024,
+                    tool = ModelTool("submit_pipeline_response", "Submit", """{"type":"object"}"""),
+                    pipelineAction = "generate_normalized_ddl",
+                ),
+            )
+        }
+        assertEquals(
+            listOf(
+                "https://generativelanguage.googleapis.com/v1beta/models/gemma~4%2Fit:generateContent",
+                "https://generativelanguage.googleapis.com/v1beta/models/a%20b%2Bc%3Ad:generateContent",
+            ),
+            urls,
+        )
+    }
 }
 
 class GeminiVisionRequestTest {

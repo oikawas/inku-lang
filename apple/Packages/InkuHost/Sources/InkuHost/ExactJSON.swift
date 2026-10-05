@@ -29,6 +29,26 @@ public indirect enum ExactJSON: Sendable, Equatable {
         }
     }
 
+    /// `text`, except that a schema object naming `propertyOrdering` writes its `properties` in that order
+    /// (the rest sorted after them), as Server's Gemini projection does. Gemini generates in this order.
+    public var orderedText: String {
+        switch self {
+        case .object(let fields):
+            return "{" + fields.keys.sorted().map { key in
+                let value = fields[key]!
+                if key == "properties", let names = fields["propertyOrdering"]?.array?.compactMap(\.string),
+                   case .object(let properties) = value {
+                    let named = names.reduce(into: [String]()) { if properties[$1] != nil && !$0.contains($1) { $0.append($1) } }
+                    let order = named + properties.keys.sorted().filter { !named.contains($0) }
+                    return Self.quote(key) + ":{" + order.map { Self.quote($0) + ":" + properties[$0]!.orderedText }.joined(separator: ",") + "}"
+                }
+                return Self.quote(key) + ":" + value.orderedText
+            }.joined(separator: ",") + "}"
+        case .array(let values): return "[" + values.map(\.orderedText).joined(separator: ",") + "]"
+        default: return text
+        }
+    }
+
     /// Python `json.dumps(value, ensure_ascii=False, sort_keys=True)`: ", " and ": " separators, keys in
     /// code point order, and only quotes, backslashes and control characters escaped. Server writes the
     /// auxiliary prompts' context in this form.

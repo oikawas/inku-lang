@@ -296,7 +296,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         let modelPath = originalURL.path.components(separatedBy: "/models/").last?.replacingOccurrences(of: ":generateContent", with: "") ?? ""
         inner["model"] = .string("models/" + modelPath)
         var request = original; request.url = url
-        request.httpBody = ExactJSON.object(["generateContentRequest": inner]).data
+        request.httpBody = Data(ExactJSON.object(["generateContentRequest": inner]).orderedText.utf8)
         let value = try ExactJSON(data: await readObserved(request, session: session, maximum: min(16384, maximumResponseBytes),
             onBytes: { _ in }, onResponse: { _ in }))
         guard value.object != nil else { throw HostError("malformed_payload") }

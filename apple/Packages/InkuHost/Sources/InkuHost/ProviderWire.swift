@@ -68,7 +68,8 @@ public enum ProviderWire {
         }
         guard let url = URL(string: endpoint) else { throw HostError("provider_base_url_invalid") }
         var request = URLRequest(url: url)
-        request.httpMethod = "POST"; request.httpBody = body.data
+        // Gemini reads property order from the wire; the other dialects receive the core's sorted schema as Server sends it.
+        request.httpMethod = "POST"; request.httpBody = provider.kind == .gemini ? Data(body.orderedText.utf8) : body.data
         request.allHTTPHeaderFields = headers
         return request
     }

@@ -194,7 +194,7 @@ flowchart LR
 
 | Router | endpoint数 | 主責任 | default guard |
 |---|---:|---|---|
-| `public` | 9 | health、info、catalog、models、saijiki、plugin preview、reference、client config、demo | なし。`/health`と`/api/info`以外は個別guard |
+| `public` | 12 | health、info、catalog、models、saijiki、plugin preview、reference、client config、demo、構図の範囲、第三者通知 | なし。health・info・第三者通知以外は個別guard |
 | `auth` | 4 | auth config、login/logout | なし。login以外は個別guard |
 | `me` | 13 | profile、user settings、各user storage | `_current_user` |
 | `plugins` | 5 | plugin閲覧・検証・CRUD・enable | `_current_user`、変更はadmin |
@@ -208,9 +208,9 @@ flowchart LR
 | `chatgpt` | 11 | 本人の接続状態・認可・profile・モデル公開設定 | `_current_user`、操作は本人owner判定 |
 | `pipeline` | 13 | canvas形式、variationの開始・取得・fork、variationが送ったsystem prompt、execution command、author DDL、history link・fork、作品のDDL書き出し（名指すplugin定義つき）、旧作品の読取・fork、provider観測 | 各routeで`_current_user`。provider観測はさらにdeveloper modeだけ |
 
-合計118。推敲の変奏seed採番は廃止した。公開allowlistは `/health`、`/api/info`、`/api/auth/login` の3 pathである（`test_route_authorization.py`）。ログインに要らないものは残さない、が基準である。
+合計121。推敲の変奏seed採番は廃止した。公開allowlistは `/health`、`/api/info`、`/api/auth/login`、`/api/notices`、`/api/notices/{notice_id}` の5 pathである（`test_route_authorization.py`）。通知の2つは固定した配布ライセンスの読取りだけを提供し、任意ファイルや本人情報を返さない。それ以外はログインに必要な入口だけを公開する。
 
-router別の件数は現行API基準表の操作とrouteの宣言を照合したもの（2026-10-04）。合計の正本は`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`（118）で、live appのOpenAPIから作った`tests/data/api-surface-baseline.json`も118 operationを記録する。
+router別の件数は現行API基準表の操作とrouteの宣言を照合したもの（2026-10-05）。合計の正本は`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`（121）で、live appのOpenAPIから作った`tests/data/api-surface-baseline.json`も121 operationを記録する。
 
 ## 主要flow
 

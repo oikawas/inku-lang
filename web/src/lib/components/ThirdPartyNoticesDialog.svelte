@@ -103,8 +103,6 @@
 		border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: 0 18px 56px rgba(0, 0, 0, 0.24); }
 	header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
 	h2 { margin: 0; font-size: var(--ui-font-size-14); font-weight: 500; }
-	.ghost-btn { font-family: inherit; font-size: var(--btn-sm-font-size); padding: var(--btn-sm-padding); border-radius: var(--btn-sm-radius);
-		border: 1px solid var(--border); background: transparent; color: var(--fg); cursor: pointer; }
 	button:disabled { opacity: 0.5; cursor: default; }
 	button:focus-visible, a:focus-visible, .notice-text:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 	.catalog-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px;

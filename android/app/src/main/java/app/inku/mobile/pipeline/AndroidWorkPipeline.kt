@@ -46,9 +46,14 @@ class AndroidWorkPipeline(
     private val saveSafePerformance: suspend (PaintResult) -> Unit = {},
 ) {
     private val configBuilder = SharedPipelineConfigBuilder(binding)
+    /** Why the last attempt of each action failed, until the host records it. */
+    private val failureDetails = java.util.concurrent.ConcurrentHashMap<String, String>()
     private val host = SharedPipelineHost(
         binding = binding,
-        providerEffect = SingleAttemptModelEffectProvider(modelProvider),
+        providerEffect = SingleAttemptModelEffectProvider(modelProvider) { actionId, _, detail, _ ->
+            if (detail != null) failureDetails[actionId] = detail else failureDetails.remove(actionId)
+        },
+        failureDetail = { actionId -> failureDetails.remove(actionId) },
         commitStore = commitStore,
         executionStore = executionStore,
         maxEffectSteps = configBuilder.policy.maximumEffectSteps,

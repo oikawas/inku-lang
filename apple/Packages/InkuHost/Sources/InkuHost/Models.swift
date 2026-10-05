@@ -238,9 +238,13 @@ public struct ReplayOptions: Sendable {
     public let canvasID: String
     public let widthRatio: UInt32
     public let heightRatio: UInt32
-    public init(catalogID: String, colorMap: Data, canvasID: String, widthRatio: UInt32, heightRatio: UInt32) {
+    public let canvasWidth: Double
+    public let canvasHeight: Double
+    public init(catalogID: String, colorMap: Data, canvasID: String, widthRatio: UInt32, heightRatio: UInt32,
+                canvasWidth: Double, canvasHeight: Double) {
         self.catalogID = catalogID; self.colorMap = colorMap; self.canvasID = canvasID
         self.widthRatio = widthRatio; self.heightRatio = heightRatio
+        self.canvasWidth = canvasWidth; self.canvasHeight = canvasHeight
     }
 }
 

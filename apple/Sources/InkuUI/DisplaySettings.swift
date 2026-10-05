@@ -54,11 +54,15 @@ public final class DisplaySettings {
         let url = directory.appendingPathComponent("interface.json")
         do {
             if FileManager.default.fileExists(atPath: url.path) {
-                preferences = try JSONDecoder().decode(DisplayPreferences.self, from: Data(contentsOf: url))
+                preferences = try TolerantPreferences.decode(DisplayPreferences.self, from: Data(contentsOf: url),
+                                                             defaults: DisplayPreferences())
             }
-            fileURL = url
             saveError = nil
-        } catch { saveError = "表示設定を読み込めませんでした: \(error.localizedDescription)" }
+        } catch {
+            TolerantPreferences.setAside(url)
+            saveError = "表示設定を読み込めませんでした: \(error.localizedDescription)"
+        }
+        fileURL = url
     }
 
     public var colorScheme: ColorScheme? {

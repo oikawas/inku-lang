@@ -86,7 +86,7 @@ struct DdlAuthoringEditorSheet: View {
         .sheet(isPresented: $showSaijiki) {
             VStack(spacing: 0) {
                 HStack { Spacer(); Button(model.display.localized("閉じる")) { showSaijiki = false } }.padding(12)
-                SaijikiView(model: model, onInsertWord: { session.insert($0) }, wordLanguage: model.language)
+                SaijikiView(model: model, onInsertWord: { session.insert($0) }, wordLanguage: model.instructionLanguage(for: model.ddlText))
             }.frame(minWidth: 560, minHeight: 620)
         }
     }

@@ -72,15 +72,15 @@ enum SavedPerformance {
             guard let format = registry["registry"]["formats"].array?.first(where: { $0["id"].string == replayOptions.canvasID }),
                   format["width_units"].number.flatMap(UInt32.init) == replayOptions.widthRatio,
                   format["height_units"].number.flatMap(UInt32.init) == replayOptions.heightRatio,
-                  let width = options["canvas"]["width"].number.flatMap(Double.init), width > 0,
+                  replayOptions.canvasWidth > 0, replayOptions.canvasHeight > 0,
                   !replayOptions.catalogID.isEmpty else { throw HostError("replay_options_invalid") }
             let colorMap = try ExactJSON(data: replayOptions.colorMap)
             guard colorMap.object != nil else { throw HostError("replay_options_invalid") }
             options["resolved_color_map"] = colorMap
             options["catalog_id"] = .string(replayOptions.catalogID)
             options["canvas_aspect_id"] = .string(replayOptions.canvasID)
-            options["canvas"] = .object(["width": .number(String(width)),
-                "height": .number(String(width * Double(replayOptions.heightRatio) / Double(replayOptions.widthRatio)))])
+            options["canvas"] = .object(["width": .number(String(Int(replayOptions.canvasWidth))),
+                                         "height": .number(String(Int(replayOptions.canvasHeight)))])
         }
         for key in ["render_seed", "composition_seed"] {
             if let text = options[key].string {

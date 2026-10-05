@@ -175,11 +175,6 @@ struct BatchConditionsView: View {
     private var details: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(model.display.localized("生成条件の詳細")).font(.headline)
-            Picker(model.display.localized("言語"), selection: $model.language) {
-                Text(model.display.localized("日本語")).tag("ja")
-                Text("English").tag("en")
-            }
-            .help(tip("次の作品の指示書に使う言語を選びます。"))
             TextField(model.display.localized("シード（空欄で新規）"), text: $model.seedText).textFieldStyle(.roundedBorder)
                 .help(tip("空欄なら次の描画で新しいシードを使います。"))
         }

@@ -89,12 +89,12 @@ private enum BatchPromptHistory {
 }
 
 private struct DemoPreferences: Codable {
-    var seedPhrase: String
-    var model: String
-    var interval: Int
-    var duration: Int
-    var saveWorks: Bool
-    var saveFiles: Bool
+    var seedPhrase = "日本の四季を感じさせる文章を40語以内で生成"
+    var model = ""
+    var interval = 30
+    var duration = 3600
+    var saveWorks = false
+    var saveFiles = false
 }
 
 /// Requests are pinned before the first row. A restart never resends an ambiguous row.
@@ -104,7 +104,13 @@ public final class AutomationModel {
     public var batchText = ""
     public var batchSketchMode = "off"
     public var demoSeedPhrase = "日本の四季を感じさせる文章を40語以内で生成" { didSet { persistDemoPreferences() } }
-    public var demoModel = "" { didSet { persistDemoPreferences() } }
+    /// The saved choice survives while its provider is temporarily unusable; only the shown value falls back.
+    public var demoModel: String {
+        get { demoSavedModelAvailable ? demoSavedModel : demoStage1Model }
+        set { demoSavedModel = newValue; demoSavedModelAvailable = true }
+    }
+    private var demoSavedModel = "" { didSet { persistDemoPreferences() } }
+    private var demoSavedModelAvailable = true
     public var demoInterval = 30 { didSet { persistDemoPreferences() } }
     public var demoDuration = 3600 { didSet { persistDemoPreferences() } }
     public var demoSaveWorks = false { didSet { persistDemoPreferences() } }
@@ -169,7 +175,7 @@ public final class AutomationModel {
         let settings = await app.hostSettings()
         demoStage1Model = SettingsModel.isBatchModelAvailable(settings.models.stage1Model, settings: settings) ? settings.models.stage1Model : ""
         demoStage2Model = SettingsModel.isBatchModelAvailable(settings.models.stage2Model, settings: settings) ? settings.models.stage2Model : ""
-        if !SettingsModel.isBatchModelAvailable(demoModel, settings: settings) { demoModel = demoStage1Model }
+        demoSavedModelAvailable = SettingsModel.isBatchModelAvailable(demoSavedModel, settings: settings)
     }
 
     public func connect(app: AppModel) async {
@@ -177,13 +183,17 @@ public final class AutomationModel {
         let preferencesURL = directory.appendingPathComponent("demo-settings.json")
         do {
             if FileManager.default.fileExists(atPath: preferencesURL.path) {
-                let saved = try JSONDecoder().decode(DemoPreferences.self, from: Data(contentsOf: preferencesURL))
-                demoSeedPhrase = saved.seedPhrase; demoModel = saved.model
+                let saved = try TolerantPreferences.decode(DemoPreferences.self, from: Data(contentsOf: preferencesURL),
+                                                           defaults: DemoPreferences())
+                demoSeedPhrase = saved.seedPhrase; demoSavedModel = saved.model
                 demoInterval = min(999, max(1, saved.interval)); demoDuration = min(86400, max(60, saved.duration))
                 demoSaveWorks = saved.saveWorks; demoSaveFiles = saved.saveFiles
             }
-            demoPreferencesURL = preferencesURL
-        } catch { errorText = "デモの設定を読み込めませんでした。" }
+        } catch {
+            TolerantPreferences.setAside(preferencesURL)
+            errorText = "デモの設定を読み込めませんでした。"
+        }
+        demoPreferencesURL = preferencesURL
         await refreshDemoModels(app: app)
         let store = BatchJournalStore(url: directory.appendingPathComponent("batch-journal.json"))
         self.store = store
@@ -389,7 +399,7 @@ public final class AutomationModel {
             let provider = try app.auxiliaryProvider()
             let seedPhrase = demoSeedPhrase
             let reference = demoModel
-            let language = app.language
+            let language = app.instructionLanguage(for: seedPhrase)
             let interval = min(999, max(1, demoInterval))
             let duration = min(86400, max(60, demoDuration))
             let saveWorks = demoSaveWorks
@@ -488,7 +498,7 @@ public final class AutomationModel {
     private func persistDemoPreferences() {
         guard let demoPreferencesURL else { return }
         do {
-            let saved = DemoPreferences(seedPhrase: demoSeedPhrase, model: demoModel, interval: demoInterval,
+            let saved = DemoPreferences(seedPhrase: demoSeedPhrase, model: demoSavedModel, interval: demoInterval,
                 duration: demoDuration, saveWorks: demoSaveWorks, saveFiles: demoSaveFiles)
             try JSONEncoder().encode(saved).write(to: demoPreferencesURL, options: .atomic)
         } catch { errorText = "デモの設定を保存できませんでした。" }

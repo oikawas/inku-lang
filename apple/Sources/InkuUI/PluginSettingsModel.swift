@@ -25,7 +25,7 @@ final class PluginSettingsModel {
             let host = await model.hostSettings()
             preferences = host.plugins ?? .init()
             let bootstrap = try Bootstrap()
-            let catalog = try bootstrap.macroCatalog(language: model.language)
+            let catalog = try bootstrap.macroCatalog(language: model.instructionLanguage(for: ""))
             let entries = catalog["entries"] as? [[String: Any]] ?? []
             let grouped = Dictionary(grouping: bootstrap.pluginWords, by: { $0.packageID ?? "" })
             packages = grouped.keys.filter { !$0.isEmpty }.sorted().map { packageID in

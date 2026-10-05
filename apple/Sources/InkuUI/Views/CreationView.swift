@@ -252,9 +252,6 @@ struct CreationView: View {
     private var conditionDetails: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(model.display.localized("生成条件の詳細")).font(.headline)
-            Picker(model.display.localized("言語"), selection: $model.language) {
-                Text(model.display.localized("日本語")).tag("ja"); Text("English").tag("en")
-            }.help(tip("次の作品の指示書に使う言語を選びます。"))
             Picker(model.display.localized("配色の選び方"), selection: $model.catalogMode) {
                 Text(model.display.localized("指定")).tag("fixed")
                 Text(model.display.localized("記述から選択")).tag("auto")

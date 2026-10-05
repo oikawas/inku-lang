@@ -33,6 +33,9 @@ struct AppCheck {
             } else { folder = nil }
             try await runAppParityContractChecks(fixtureDirectory: folder); return
         }
+        if CommandLine.arguments.contains("--release-parity-only") {
+            try await runReleaseParityChecks(); return
+        }
         if CommandLine.arguments.contains("--drawing-failure-log-only") {
             try await runDrawingFailureLogChecks(); return
         }

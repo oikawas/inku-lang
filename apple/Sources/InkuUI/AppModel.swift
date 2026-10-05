@@ -34,7 +34,8 @@ public final class AppModel {
     public var inputMode = "description"
     public var descriptionText = ""
     public var ddlText = ""
-    public var language = "en"
+    /// The Web always requests `auto`; an explicit language remains possible for restored inputs.
+    public var language = "auto"
     public var catalogID = "default"
     public var canvasID = "square"
     public var seedText = ""
@@ -209,7 +210,7 @@ public final class AppModel {
             self.canvases = bootstrap.canvases
             self.saijiki = bootstrap.saijiki
             self.pluginWords = bootstrap.pluginWords.filter { settings.plugins?.isEnabled($0.packageID ?? "") ?? true }
-            let macro = try bootstrap.macroCatalog(language: language, settings: settings)
+            let macro = try bootstrap.macroCatalog(language: instructionLanguage(for: currentInputText), settings: settings)
             self.macroDiagnostics = try Self.pretty(try Bootstrap.bytes(macro))
             library.onMutation = { [weak self] in await self?.refreshWorks() }
             await library.connect(database: database)
@@ -494,7 +495,7 @@ public final class AppModel {
                 throw HostError("invalid_operational_limits")
             }
         }
-        let diagnostics = try bootstrap.map { try Self.pretty($0.macroCatalogValue(language: language, settings: settings, importedPlugins: importedDDL?.plugins ?? []).data) }
+        let diagnostics = try bootstrap.map { try Self.pretty($0.macroCatalogValue(language: instructionLanguage(for: currentInputText), settings: settings, importedPlugins: importedDDL?.plugins ?? []).data) }
         try await settingsStore.save(settings)
         let previousSettings = self.settings
         self.settings = settings
@@ -664,7 +665,7 @@ public final class AppModel {
 
     public func applyDDLImport(_ value: DDLPackageImport) throws {
         guard !isBusy, let bootstrap else { throw HostError("ddl_import_busy_or_unavailable") }
-        let language = value.language ?? self.language
+        let language = value.language ?? instructionLanguage(for: value.source)
         let catalog = try bootstrap.macroCatalogValue(language: language, settings: settings, importedPlugins: value.plugins)
         newWork()
         importedDDL = value; importedMacroNames = value.names
@@ -672,7 +673,7 @@ public final class AppModel {
             guard let namespace = plugin.definition["namespace"].string else { return [String]() }
             return (plugin.definition["aliases"].array ?? []).compactMap(\.string).map { namespace + "." + $0 }
         }
-        inputMode = "ddl"; ddlText = value.source; self.language = language
+        inputMode = "ddl"; ddlText = value.source
         macroDiagnostics = try Self.pretty(catalog.data)
         status = "DDLを読み込みました。生成して保存できます。"
     }
@@ -690,7 +691,8 @@ public final class AppModel {
         let sketch: SketchRequest = sketchOverride ?? (sketchMode == "on" ? .on : sketchMode == "supplied" ? .supplied(sketchText) : .off)
         let savedConfig = parentWorkID == selectedWorkID && parentWorkID != nil ? selectedContext?.configuration : nil
         var request = try bootstrap.request(inputMode: mode, source: source ?? ddlText,
-            description: description ?? descriptionText, language: language, catalogID: catalogID,
+            description: description ?? descriptionText,
+            language: instructionLanguage(for: mode == "ddl" ? source ?? ddlText : description ?? descriptionText), catalogID: catalogID,
             canvasID: canvasID, seed: seedText, wild: wildOverride ?? wild, settings: mode == "ddl" ? settings : nextGenerationHostSettings,
             parentWorkID: parentWorkID, derivationKind: derivationKind, catalogMode: catalogModeOverride ?? catalogMode,
             sketch: sketch, savedConfiguration: savedConfig,
@@ -713,7 +715,7 @@ public final class AppModel {
             throw HostError("drawing_model_not_available")
         }
         return try bootstrap.request(inputMode: "description", source: "", description: description,
-            language: language, catalogID: catalogID, canvasID: canvasID, seed: seedText, wild: wild,
+            language: instructionLanguage(for: description), catalogID: catalogID, canvasID: canvasID, seed: seedText, wild: wild,
             settings: settings, parentWorkID: nil, derivationKind: "new",
             catalogMode: catalogMode == "auto" ? "auto" : "fixed", sketch: sketchMode == "on" ? .on : .off)
     }
@@ -722,7 +724,7 @@ public final class AppModel {
         guard !isBusy, let bootstrap, !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         do {
             var request = try bootstrap.request(inputMode: "ddl", source: source, description: "",
-                language: imported?.language ?? language, catalogID: catalogID, canvasID: canvasID,
+                language: imported?.language ?? instructionLanguage(for: source), catalogID: catalogID, canvasID: canvasID,
                 seed: seedText, wild: wild, settings: settings, parentWorkID: nil, derivationKind: "new",
                 importedPlugins: imported?.plugins ?? [])
             request = try await pinPersonalPlanRequests([request])[0]
@@ -962,7 +964,7 @@ public final class AppModel {
         let held = saved.authority == "ddl_authoritative"
         let reading = readDescription ?? (kind == "reinterpretation" || kind == "model_comparison" || !direction.isEmpty && kind != "catalog_change")
         if held && (reading || kind == "model_comparison" || kind == "reinterpretation") { throw HostError("description_source_locked") }
-        let language = work.instructionLangResolved ?? config["language"].string ?? self.language
+        let language = work.instructionLangResolved ?? config["language"].string ?? instructionLanguage(for: work.effectiveSourceText)
         guard let renderSeed = work.renderSeed ?? options["render_seed"].string ?? options["render_seed"].number,
               let canvasID = work.renderCanvasAspectID ?? options["canvas_aspect_id"].string,
               let catalogID = work.renderColorCatalogID ?? work.catalogID ?? options["catalog_id"].string else {
@@ -1002,11 +1004,11 @@ public final class AppModel {
                                         sketchMode: String = "off", wildOverride: Bool? = nil) async throws -> GenerationRequest {
         guard !isBusy, !isPreview, database != nil else { throw HostError("authoring_busy_or_unavailable") }
         let drawing = nextGenerationHostSettings
-        let selectedLanguage = language
         guard hasNextDrawingModel else { throw HostError("model_reference_missing") }
-        guard ["ja", "en"].contains(selectedLanguage) else { throw HostError("invalid_instruction_language") }
         let saved = try await savedWorkEditContext(work)
         let text = (mode == .description ? description : work.effectiveSourceText).trimmingCharacters(in: .whitespacesAndNewlines)
+        let selectedLanguage = instructionLanguage(for: text)
+        guard ["ja", "en"].contains(selectedLanguage) else { throw HostError("invalid_instruction_language") }
         guard !text.isEmpty else { throw HostError("description_required") }
         var configuration = try ExactJSON(data: saved.configuration)
         var options = try ExactJSON(data: saved.renderOptions)
@@ -1436,7 +1438,7 @@ public final class AppModel {
         do {
             let request = try requestForCurrentInput(inputMode: "ddl", parentWorkID: selectedWorkID, derivationKind: "ddl_edit")
             let config = try ExactJSON(data: request.configuration)
-            let catalog = try bootstrap.macroCatalog(language: language, settings: settings, importedPlugins: importedDDL?.plugins ?? [])
+            let catalog = try bootstrap.macroCatalog(language: instructionLanguage(for: ddlText), settings: settings, importedPlugins: importedDDL?.plugins ?? [])
             let entries = catalog["entries"] as? [[String: Any]] ?? []
             let locks = try Bootstrap.bytes(entries.map { item in
                 ["qualified_name": item["qualified_name"]!, "version": item["version"]!, "digest": item["digest"]!, "aliases": item["aliases"] ?? []]
@@ -1798,4 +1800,18 @@ public final class AppModel {
         // Pretty formatting may round JSON numbers; retain exact wire lexemes in the displayed output.
         return value.text
     }
+}
+
+extension AppModel {
+    /// Server `_resolve_instruction_lang`: an explicit language wins; `auto` reads Japanese, then Latin
+    /// letters, and otherwise falls back to the UI language.
+    public func instructionLanguage(for text: String) -> String {
+        if ["ja", "en"].contains(language) { return language }
+        let scalars = text.unicodeScalars
+        if scalars.contains(where: { (0x3040...0x30ff).contains($0.value) || (0x3400...0x9fff).contains($0.value) }) { return "ja" }
+        if scalars.contains(where: { (0x41...0x5a).contains($0.value) || (0x61...0x7a).contains($0.value) }) { return "en" }
+        return display.preferences.language == "en" ? "en" : "ja"
+    }
+
+    var currentInputText: String { inputMode == "ddl" ? ddlText : descriptionText }
 }

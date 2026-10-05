@@ -5,6 +5,9 @@ interface SharedPipelineBinding {
     fun versionReport(): String
     fun step(snapshotBytes: ByteArray, inputEnvelopeBytes: ByteArray): ByteArray
     fun canvasRegistry(): String
+    /** Range names and exact bounds; an older binding leaves the DDL display unfolded. */
+    fun compositionRanges(): String =
+        """{"schema":"inku.composition-ranges.v1","ranges":[]}"""
     fun resolvePalette(inputBytes: ByteArray): ByteArray
     fun resolveMacroCatalog(inputBytes: ByteArray): ByteArray
     fun renderSaved(inputBytes: ByteArray): ByteArray

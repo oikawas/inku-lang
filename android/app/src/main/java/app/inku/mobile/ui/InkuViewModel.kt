@@ -155,6 +155,7 @@ data class ProviderModelFetchState(
 data class InkuUiState(
     val prompt: String = "",
     val ddl: String = "",
+    val ddlRangePreview: DdlRangePreview? = null,
     val ddlEditedAfterGeneration: Boolean = false,
     val confirmDdlOverwrite: Boolean = false,
     val pipelineView: PipelineView? = null,
@@ -1404,6 +1405,10 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun setDdl(value: String) {
         localState.value = localState.value.copy(ddl = value, ddlEditedAfterGeneration = true, message = null)
+    }
+
+    internal fun previewDdlRange(preview: DdlRangePreview?) {
+        localState.value = localState.value.copy(ddlRangePreview = preview)
     }
 
     /**

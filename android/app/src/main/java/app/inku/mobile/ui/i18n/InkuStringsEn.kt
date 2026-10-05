@@ -177,7 +177,7 @@ object InkuStringsEn : InkuStrings {
         }
     }
     override fun recomposeReason(reason: String): String = when (reason) {
-        "nothing_to_move" -> "This work has no composition ranges."
+        "nothing_to_move" -> "This work has no numeric ranges."
         "not_canonical" -> "The instructions have unresolved parts, so the composition cannot move."
         "unsupported_sentence" -> "These instructions include a sentence that cannot change composition."
         "unplaced_sentence" -> "A sentence has no recoverable placement, so the composition cannot move."
@@ -188,7 +188,7 @@ object InkuStringsEn : InkuStrings {
         "not_canonical_after" -> "The changed instructions could not be checked, so the composition cannot move."
         else -> "Another composition is unavailable, so the composition ranges are kept."
     }
-    override val recomposeKeptRanges = "Redrawn with the same composition ranges."
+    override val recomposeKeptRanges = "Redrawn with the same numeric ranges."
 
     override val variationAmplitudeLabel: (String) -> String = { id ->
         // Keep the recorded legacy amplitudes readable; these are not controls.
@@ -490,6 +490,10 @@ object InkuStringsEn : InkuStrings {
     override val autoRepair = "Auto-repair"
     override val ddlLabelIn: (String) -> String = { lang -> if (lang == "en") "Instructions (English DDL)" else "Instructions (Japanese DDL)" }
     override val tooltipDdlLang = "The instructions are read with this language's grammar, and numeric ranges are written differently in Japanese and English. A single hiragana, katakana, or kanji character makes it Japanese DDL, so one Japanese name in English instructions has them read as Japanese."
+    override val rangeNumbers = "Range numbers"
+    override val rangeEditNote = "The frame previews the range. Use Draw from instructions to redraw the work."
+    override val rangeInvalid = "Use numbers from 0 to 1, with each start below its end. The frame shows the last valid range."
+    override val rangeClose = "Close range editing"
     override val awaitingInterpretation = "Waiting for instructions…"
     override val miscSubtitle = "Language, text size and display"
     override val description = "Description"

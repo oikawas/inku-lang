@@ -28,8 +28,8 @@ class SharedPipelineHostTest {
     @Test
     fun recompositionRewritesANewRunWithTheSamePreparedSeedWithoutAModelCall() = runBlocking {
         val binding = ScriptedBinding(uniqueExecutions = true)
-        val original = "[composition] bottom right (horizontal 2/3 to 1, vertical 2/3 to 1): one red circle."
-        val selected = "[composition] top left (horizontal 0 to 1/3, vertical 0 to 1/3): one red circle."
+        val original = "Place one red circle at the bottom right (horizontal 2/3 to 1, vertical 2/3 to 1)."
+        val selected = "Place one red circle at the top left (horizontal 0 to 1/3, vertical 0 to 1/3)."
         binding.recompositionResponse = JSONObject()
             .put("schema", "inku.composition-recompose.v1").put("outcome", "recomposed")
             .put("source", selected).put("answer", "chance")

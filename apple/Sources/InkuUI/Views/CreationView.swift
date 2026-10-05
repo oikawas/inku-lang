@@ -226,15 +226,19 @@ struct CreationView: View {
                 }
                 .buttonStyle(InkuGhostButtonStyle())
                 .disabled(controlsDisabled)
-                .help(tip("入力をクリアして、新しい作品を始めます。"))
+                .help(display.tooltip("入力をクリアする", serverKey: "tooltipInputClear"))
             }
-            editor(text: $model.descriptionText, placeholder: "描きたいものや情景を記述", readOnly: descriptionLocked)
+            editor(text: $model.descriptionText, readOnly: descriptionLocked)
             if descriptionLocked {
-                Text(display.localized("この作品の記述はロックされています。別の記述で生成するには「新規」を選んでください。"))
-                    .inkuFont(12).foregroundStyle(.secondary)
+                Text(display.webCopy("pipelineDescriptionLocked", "この作品はDDLを編集しているため、記述は固定しています。"))
+                    .inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
-            Text(display.webCopy("inputCommentHint", "[括弧内文字列はコメント扱い]")).inkuFont(12).foregroundStyle(.tertiary)
-            DescriptionMeterView(model: model, text: model.descriptionText)
+            // InputPanel.svelte:308-311 `.input-meta-row`: the comment hint at the left, the meter at the right.
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(display.webCopy("inputCommentHint", "[括弧内文字列はコメント扱い]")).inkuFont(12).foregroundStyle(.tertiary)
+                Spacer(minLength: 0)
+                DescriptionMeterView(model: model, text: model.descriptionText)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -383,6 +387,15 @@ struct CreationView: View {
                 .disabled(!automation.running || automation.stopping)
             } else if model.isBusy {
                 runStatus(label: model.status, onStop: { Task { await model.cancel() } }, stopping: false)
+            } else if descriptionLocked {
+                // InputPanel.svelte:326-334: a held work is drawn from its description only as a new work, named as such.
+                Button { batchWorkspace.showHistory(); Task { await model.forkDescription() } } label: {
+                    Text(display.webCopy("pipelineForkDescription", "この記述から新しい作品を作る"))
+                }
+                .buttonStyle(InkuPaintButtonStyle())
+                .keyboardShortcut(.return, modifiers: .command)
+                .disabled(!model.canForkDescription || automation.isOccupied)
+                .help(display.tooltip("この記述をそのまま使って、新しい作品として描き直します。", serverKey: "tooltipForkDescription"))
             } else {
                 Button { batchWorkspace.showHistory(); Task { await model.generateDescription() } } label: {
                     Text(display.webCopy("submitBtn", "生成"))
@@ -431,17 +444,14 @@ struct CreationView: View {
         }
     }
 
-    private func editor(text: Binding<String>, placeholder: String, readOnly: Bool = false) -> some View {
+    /// InputPanel.svelte:292-304: the textarea over LabelHighlight, which paints the numbers and comments grey.
+    private func editor(text: Binding<String>, readOnly: Bool = false) -> some View {
         let scale = display.preferences.textScale
         return ZStack(alignment: .topLeading) {
-            TextEditor(text: text)
-                .font(.system(size: 14 * scale))
-                .lineSpacing(14 * 0.65 * scale)
-                .scrollContentBackground(.hidden)
-                .padding(.vertical, 9).padding(.horizontal, 5)
-                .disabled(controlsDisabled || readOnly)
+            InkuTextEditor(text: text, isEditable: !readOnly, accessibilityLabel: display.localized("記述"), style: .description)
+                .disabled(controlsDisabled)
             if text.wrappedValue.isEmpty {
-                Text(display.localized(placeholder)).inkuFont(14).foregroundStyle(.tertiary)
+                Text(display.webCopy("inputPlaceholder", "山の向こうに月が昇る")).inkuFont(14).foregroundStyle(.tertiary)
                     .padding(.vertical, 9).padding(.horizontal, 10).allowsHitTesting(false)
             }
         }
@@ -449,7 +459,6 @@ struct CreationView: View {
         .frame(height: (5 * 14 * 1.65 + 18) * scale)
         .background(readOnly ? InkuColor.bg2 : InkuColor.panel, in: RoundedRectangle(cornerRadius: 4))
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2, style: StrokeStyle(lineWidth: 1, dash: readOnly ? [4, 3] : [])))
-        .accessibilityLabel(display.localized("記述"))
     }
 
     private var leftPanelToggle: some View {

@@ -32,9 +32,11 @@ struct BatchPanelView: View {
     private var controlsDisabled: Bool { automation.isOccupied || model.isBusy }
     private var displayedRowID: String? { followsLatestWork ? automation.observedRow?.id : selectedRowID }
     private var canStartNewBatch: Bool {
-        !controlsDisabled && automation.nonEmptyBatchCount > 0
+        !controlsDisabled && automation.nonEmptyBatchCount > 0 && paintableCount > 0
             && model.hasAvailableBatchDrawingModel
     }
+    /// Web `batchNonEmpty`: lines with something to draw besides numbers and comments.
+    private var paintableCount: Int { BatchInputLines.paintableCount(in: automation.batchText) }
     private var issueRows: [BatchRow] { automation.rows.filter { $0.state == .failed || $0.state == .uncertain } }
     private var displayedWork: SavedWork? {
         automation.observedWork ?? model.selectedWork
@@ -141,11 +143,20 @@ struct BatchPanelView: View {
             } else {
                 BatchInputEditor(text: $automation.batchText, isEditable: !controlsDisabled,
                                  accessibilityLabel: model.display.localized("バッチ入力"))
+                    .overlay(alignment: .topLeading) {
+                        // BatchPanel.svelte:191 `batchPlaceholder`: three example lines beside the gutter.
+                        if automation.batchText.isEmpty {
+                            Text(model.display.webCopy("batchPlaceholder", "山の向こうに月が昇る\n夜の霧が広がる\n青いクレヨンの線がゆっくり波打つ"))
+                                .inkuFont(13, design: .monospaced).foregroundStyle(.tertiary)
+                                .padding(.leading, 44).padding(.top, 8).allowsHitTesting(false)
+                        }
+                    }
                     .frame(height: 220)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(.quaternary))
-                if automation.nonEmptyBatchCount > 0 {
-                    Text(model.display.localizedFormat("空行を除く入力: %ld件", automation.nonEmptyBatchCount))
+                // BatchPanel.svelte:200: 「N 件」 while there is something to draw and no run.
+                if paintableCount > 0 && !automation.running {
+                    Text(model.display.preferences.language == "en" ? "\(paintableCount) items" : "\(paintableCount) 件")
                         .inkuFont(12).foregroundStyle(.secondary).monospacedDigit()
                 }
                 inputHistory

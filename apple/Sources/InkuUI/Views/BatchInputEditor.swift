@@ -6,11 +6,62 @@ import AppKit
 import UIKit
 #endif
 
+/// How a native editor lays out its text. The batch box is 13pt monospaced without wrapping and numbers its lines;
+/// the description box is the Web `.input-ta` (14px, line height 1.65, padding 9×10, wrapping) over the panel colour;
+/// the DDL editor is `.ddl-edit-ta` (14px, line height 1.7, padding 10×11, wrapping) with a line-number gutter.
+struct InkuEditorStyle: Equatable {
+    var fontSize: CGFloat = 13
+    var monospaced = true
+    var lineHeightMultiple: CGFloat?
+    var wraps = false
+    var lineNumbers = true
+    var inset = CGSize(width: 10, height: 8)
+    var drawsBackground = true
+
+    static let batch = InkuEditorStyle()
+    static let description = InkuEditorStyle(fontSize: 14, monospaced: false, lineHeightMultiple: 1.65, wraps: true,
+                                             lineNumbers: false, inset: CGSize(width: 10, height: 9), drawsBackground: false)
+    static let ddl = InkuEditorStyle(fontSize: 14, monospaced: false, lineHeightMultiple: 1.7, wraps: true,
+                                     lineNumbers: true, inset: CGSize(width: 11, height: 10), drawsBackground: false)
+}
+
+/// A range an editor paints without changing its text: the grey band of a number or comment (Web LabelHighlight),
+/// or a DDL token colour (Web `highlight.ts`). Painted as layout-manager temporary attributes, never while the IME composes.
+struct InkuEditorMark: Equatable {
+    enum Style: Equatable { case muted, token(DdlTokenClass), unknownName }
+    let range: NSRange
+    let style: Style
+
+    static func descriptionLabels(_ text: String) -> [InkuEditorMark] {
+        DescriptionLabels.excludedSpans(text).map { InkuEditorMark(range: $0.range, style: .muted) }
+    }
+}
+
+/// A word to put at the caret (Web DdlEditor `insertWord`), replacing the selection.
+struct InkuEditorInsertion: Equatable {
+    let id = UUID()
+    let text: String
+}
+
 @MainActor
 struct BatchInputEditor: View {
     @Binding var text: String
     var isEditable = true
     var accessibilityLabel: String
+
+    var body: some View {
+        InkuTextEditor(text: $text, isEditable: isEditable, accessibilityLabel: accessibilityLabel, style: .batch)
+    }
+}
+
+@MainActor
+struct InkuTextEditor: View {
+    @Binding var text: String
+    var isEditable = true
+    var accessibilityLabel: String
+    var style = InkuEditorStyle.batch
+    var marks: (String) -> [InkuEditorMark] = InkuEditorMark.descriptionLabels
+    var insertion: Binding<InkuEditorInsertion?>? = nil
     @Environment(DisplaySettings.self) private var display
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.colorScheme) private var colorScheme
@@ -18,7 +69,8 @@ struct BatchInputEditor: View {
     var body: some View {
         BatchNativeInputEditor(text: $text, isEditable: isEditable && isEnabled,
                                accessibilityLabel: accessibilityLabel,
-                               textScale: display.preferences.textScale, colorScheme: colorScheme)
+                               textScale: display.preferences.textScale, colorScheme: colorScheme,
+                               style: style, marks: marks, insertion: insertion)
             .clipped()
     }
 }
@@ -86,6 +138,9 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
     let accessibilityLabel: String
     let textScale: Double
     let colorScheme: ColorScheme
+    let style: InkuEditorStyle
+    let marks: (String) -> [InkuEditorMark]
+    let insertion: Binding<InkuEditorInsertion?>?
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
 
@@ -96,7 +151,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         layout.usesFontLeading = false
         let container = NSTextContainer(containerSize: NSSize(width: CGFloat.greatestFiniteMagnitude,
                                                               height: CGFloat.greatestFiniteMagnitude))
-        container.widthTracksTextView = false
+        container.widthTracksTextView = style.wraps
         container.heightTracksTextView = false
         container.lineFragmentPadding = 0
         storage.addLayoutManager(layout)
@@ -105,10 +160,10 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         editor.isRichText = false
         editor.importsGraphics = false
         editor.allowsUndo = true
-        editor.isHorizontallyResizable = true
+        editor.isHorizontallyResizable = !style.wraps
         editor.isVerticallyResizable = true
         editor.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        editor.textContainerInset = NSSize(width: 10, height: 8)
+        editor.textContainerInset = NSSize(width: style.inset.width, height: style.inset.height)
         editor.isContinuousSpellCheckingEnabled = false
         editor.isGrammarCheckingEnabled = false
         editor.isAutomaticSpellingCorrectionEnabled = false
@@ -120,25 +175,32 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         editor.textColor = .labelColor
         editor.insertionPointColor = .labelColor
         editor.backgroundColor = .textBackgroundColor
+        editor.drawsBackground = style.drawsBackground
         scroll.borderType = .noBorder
         scroll.backgroundColor = .textBackgroundColor
+        scroll.drawsBackground = style.drawsBackground
+        scroll.wraps = style.wraps
         scroll.hasVerticalScroller = true
-        scroll.hasHorizontalScroller = true
+        scroll.hasHorizontalScroller = !style.wraps
         scroll.autohidesScrollers = true
         // AppKit no longer clips ordinary views to their bounds by default.
         scroll.clipsToBounds = true
         scroll.contentView.clipsToBounds = true
         scroll.documentView = editor
-        let ruler = BatchEditorRuler(scrollView: scroll, orientation: .verticalRuler)
-        ruler.clipsToBounds = true
-        ruler.clientView = editor
-        ruler.reservedThicknessForMarkers = 0
-        ruler.reservedThicknessForAccessoryView = 0
-        ruler.setAccessibilityElement(false)
-        scroll.verticalRulerView = ruler
-        scroll.hasVerticalRuler = true
-        scroll.hasHorizontalRuler = false
-        scroll.rulersVisible = true
+        var ruler: BatchEditorRuler?
+        if style.lineNumbers {
+            let gutter = BatchEditorRuler(scrollView: scroll, orientation: .verticalRuler)
+            gutter.clipsToBounds = true
+            gutter.clientView = editor
+            gutter.reservedThicknessForMarkers = 0
+            gutter.reservedThicknessForAccessoryView = 0
+            gutter.setAccessibilityElement(false)
+            scroll.verticalRulerView = gutter
+            scroll.hasVerticalRuler = true
+            scroll.hasHorizontalRuler = false
+            scroll.rulersVisible = true
+            ruler = gutter
+        }
         context.coordinator.attach(scroll: scroll, editor: editor, ruler: ruler)
         context.coordinator.update(from: self)
         return scroll
@@ -163,10 +225,11 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         private var fontSize: CGFloat?
         private var pendingExternalText: String?
         private var replacingText = false
+        private var lastInsertionID: UUID?
 
         init(text: Binding<String>) { self.text = text }
 
-        func attach(scroll: BatchEditorScrollView, editor: BatchEditorTextView, ruler: BatchEditorRuler) {
+        func attach(scroll: BatchEditorScrollView, editor: BatchEditorTextView, ruler: BatchEditorRuler?) {
             self.scroll = scroll
             self.editor = editor
             self.ruler = ruler
@@ -206,6 +269,44 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             pendingExternalText = nil
             if editor.string != source { replaceText(with: source) }
             applySettings()
+            applyMarks()
+            if let request = settings.insertion?.wrappedValue, request.id != lastInsertionID {
+                lastInsertionID = request.id
+                let binding = settings.insertion
+                // Editing the text changes SwiftUI state, so it waits until this update has finished.
+                DispatchQueue.main.async { [weak self] in
+                    self?.insert(request.text)
+                    if binding?.wrappedValue?.id == request.id { binding?.wrappedValue = nil }
+                }
+            }
+        }
+
+        /// Web DdlEditor `insertWord`: the word replaces the selection, which the editor keeps while another control
+        /// has focus, and the caret follows it.
+        private func insert(_ word: String) {
+            guard let editor, editor.isEditable, !editor.hasMarkedText(), !word.isEmpty else { return }
+            let length = (editor.string as NSString).length
+            let selected = editor.selectedRange()
+            let range = NSRange(location: min(selected.location, length), length: min(selected.length, max(0, length - selected.location)))
+            guard editor.shouldChangeText(in: range, replacementString: word) else { return }
+            editor.textStorage?.replaceCharacters(in: range, with: NSAttributedString(string: word, attributes: editor.typingAttributes))
+            editor.didChangeText()
+            let caret = NSRange(location: range.location + (word as NSString).length, length: 0)
+            editor.setSelectedRange(caret)
+            editor.scrollRangeToVisible(caret)
+            editor.window?.makeFirstResponder(editor)
+        }
+
+        /// Temporary attributes paint without touching the text, its undo or the IME's marked range.
+        private func applyMarks() {
+            guard let editor, let settings, let layout = editor.layoutManager, !editor.hasMarkedText() else { return }
+            let full = NSRange(location: 0, length: (editor.string as NSString).length)
+            for key in [NSAttributedString.Key.backgroundColor, .foregroundColor, .underlineStyle, .underlineColor] {
+                layout.removeTemporaryAttribute(key, forCharacterRange: full)
+            }
+            for mark in settings.marks(editor.string) where mark.range.location >= 0 && NSMaxRange(mark.range) <= full.length {
+                layout.addTemporaryAttributes(mark.style.attributes, forCharacterRange: mark.range)
+            }
         }
 
         func textDidChange(_ notification: Notification) {
@@ -226,24 +327,29 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
                 replaceText(with: text.wrappedValue)
             }
             applySettings()
+            applyMarks()
         }
 
         private func applySettings() {
             guard let editor, let scroll, let settings else { return }
             if editor.isEditable != settings.isEditable { editor.isEditable = settings.isEditable }
             if !editor.isSelectable { editor.isSelectable = true }
-            let size = CGFloat(13 * settings.textScale)
+            let size = settings.style.fontSize * CGFloat(settings.textScale)
             guard fontSize != size else { return }
             let origin = scroll.contentView.bounds.origin
             fontSize = size
-            let font = NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+            let font = settings.style.monospaced ? NSFont.monospacedSystemFont(ofSize: size, weight: .regular) : NSFont.systemFont(ofSize: size)
+            let natural = ceil(font.ascender - font.descender + font.leading)
+            let lineHeight = settings.style.lineHeightMultiple.map { ceil(size * $0) } ?? natural
             let paragraph = NSMutableParagraphStyle()
-            paragraph.minimumLineHeight = ceil(font.ascender - font.descender + font.leading)
-            paragraph.maximumLineHeight = paragraph.minimumLineHeight
-            paragraph.lineBreakMode = .byClipping
+            paragraph.minimumLineHeight = lineHeight
+            paragraph.maximumLineHeight = lineHeight
+            paragraph.lineBreakMode = settings.style.wraps ? .byWordWrapping : .byClipping
             editor.font = font
             editor.defaultParagraphStyle = paragraph
-            editor.typingAttributes = [.font: font, .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph]
+            editor.typingAttributes = [.font: font, .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph,
+                                       // CSS centres the glyphs in a tall line; TextKit puts the extra space above them.
+                                       .baselineOffset: max(0, (lineHeight - natural) / 2)]
             editor.textStorage?.addAttributes(editor.typingAttributes, range: NSRange(location: 0, length: editor.string.utf16.count))
             ruler?.numberFont = CTFontCreateWithName(font.fontName as CFString, size, nil)
             refreshLayout()
@@ -291,6 +397,8 @@ private final class BatchEditorTextView: NSTextView {
 @MainActor
 private final class BatchEditorScrollView: NSScrollView {
     private var resizingDocument = false
+    /// A wrapping editor is exactly as wide as its viewport; the text grows downwards only.
+    var wraps = false
 
     override func tile() {
         super.tile()
@@ -307,7 +415,7 @@ private final class BatchEditorScrollView: NSScrollView {
         let extra = layout.extraLineFragmentTextContainer === container ? layout.extraLineFragmentRect : .zero
         let inset = editor.textContainerInset
         let viewport = contentView.bounds.size
-        let size = NSSize(width: max(viewport.width, ceil(used.maxX + 2 * inset.width)),
+        let size = NSSize(width: wraps ? viewport.width : max(viewport.width, ceil(used.maxX + 2 * inset.width)),
                           height: max(viewport.height, ceil(max(used.maxY, extra.maxY) + 2 * inset.height)))
         editor.minSize = viewport
         if editor.frame.size != size { editor.setFrameSize(size) }
@@ -403,6 +511,10 @@ private struct BatchNativeInputEditor: UIViewRepresentable {
     let accessibilityLabel: String
     let textScale: Double
     let colorScheme: ColorScheme
+    // iOS keeps the plain editor: no marks, and words are appended by the caller's binding.
+    let style: InkuEditorStyle
+    let marks: (String) -> [InkuEditorMark]
+    let insertion: Binding<InkuEditorInsertion?>?
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
     func makeUIView(context: Context) -> BatchIOSTextView {

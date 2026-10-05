@@ -914,12 +914,14 @@ struct LibraryWorkDetails: View {
                 HStack {
                     Label(model.display.localized("コメント"), systemImage: "text.bubble").inkuFont(12, weight: .medium)
                     Spacer()
-                    Text("\(comment.text.unicodeScalars.count) / 240").inkuFont(12).monospacedDigit().foregroundStyle(comment.text.unicodeScalars.count > 240 ? Color.red : Color.secondary)
+                    Text("\(comment.text.utf16.count) / \(LibraryNoteEditorModel.limit)").inkuFont(12).monospacedDigit().foregroundStyle(.secondary)
                     Button(model.display.localized("保存")) { saveNote() }
                         .disabled(writingDisabled || library.mutating || !comment.canSave)
                         .help(model.display.tooltip("この作品のコメントを保存します。"))
                 }
-                TextField(model.display.localized("コメント（240文字まで）"), text: $comment.text, axis: .vertical)
+                // Typing stops at the limit, as the Web textarea's maxlength does.
+                TextField(model.display.localized("コメント（240文字まで）"), text: Binding(
+                    get: { comment.text }, set: { comment.text = LibraryNoteEditorModel.limited($0) }), axis: .vertical)
                     .lineLimit(2...4).textFieldStyle(.roundedBorder)
                     .disabled(writingDisabled || annotationState.annotation == nil || comment.saving)
                 if annotationState == .loading {

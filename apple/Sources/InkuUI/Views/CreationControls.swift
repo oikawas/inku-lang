@@ -186,6 +186,7 @@ struct CreationDisplayedProcess: View {
     let onWorkAction: (SavedWork, String) -> Void
 
     private var sketch: String? { work.sketchText.flatMap { $0.isEmpty ? nil : $0 } }
+    private var draft: SketchDraft? { model.sketchDraft?.workID == work.id ? model.sketchDraft : nil }
     private var ddl: String { work.ddl ?? "" }
     private var hasDDL: Bool { !ddl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     private var canEditSketch: Bool { saved && model.workActionState(for: work)?.canReadDescription == true }
@@ -216,18 +217,42 @@ struct CreationDisplayedProcess: View {
                         if !sketchNote.isEmpty {
                             Text(model.display.localized(sketchNote)).inkuFont(12).foregroundStyle(.secondary)
                         }
-                        if let sketch { Text(sketch).inkuFont(13).lineSpacing(13 * 0.5).textSelection(.enabled) }
+                        if let draft, draft.editing {
+                            // `+page.svelte:2808-2810`: the prose in a 7-row box, and what editing it does.
+                            TextEditor(text: Binding(get: { model.sketchDraft?.text ?? draft.text },
+                                                     set: { if model.sketchDraft?.workID == work.id { model.sketchDraft?.text = $0 } }))
+                                .inkuFont(13).scrollContentBackground(.hidden)
+                                .padding(.vertical, 6).padding(.horizontal, 5)
+                                .frame(height: 7 * 13 * 1.5 * model.display.preferences.textScale + 12)
+                                .background(InkuColor.panel, in: RoundedRectangle(cornerRadius: 4))
+                                .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
+                                .disabled(disabled)
+                                .accessibilityLabel(model.display.webCopy("sketchLabel", "写生（Stage 0.5）"))
+                            Text(model.display.webCopy("sketchEditHint", "直した写生文がそのまま解釈へ渡ります")).inkuFont(12).foregroundStyle(.secondary)
+                        } else if let shown = draft?.text ?? sketch {
+                            Text(shown).inkuFont(13).lineSpacing(13 * 0.5).textSelection(.enabled)
+                        }
                         if let grain = work.sketchGrain {
                             Text(model.display.localizedFormat("旧写生の区切り: %@（保存記録）", grain))
                                 .inkuFont(12).foregroundStyle(.secondary)
                         }
                     }.padding(.top, 6)
-                } label: { Text(model.display.localized("写生 (Stage 0.5)")).inkuFont(12, weight: .semibold) }
+                } label: { Text(model.display.webCopy("sketchLabel", "写生（Stage 0.5）")).inkuFont(12, weight: .semibold) }
                 .help(model.display.tooltip("写生層が書いた文章を表示します。", serverKey: "tooltipSketchToggle"))
-                if sketch != nil {
-                    Button(model.display.localized("編集")) {
-                        model.display.preferences.sketchExpanded = true
-                        onWorkAction(work, "sketch")
+                if let sketch {
+                    // `+page.svelte:2794`: editing needs the prose on screen, so the button unfolds the section.
+                    Button(model.display.webCopy(draft?.editing == true ? "ddlDoneBtn" : "ddlEditBtn", draft?.editing == true ? "完了" : "編集")) {
+                        if draft?.editing == true {
+                            model.sketchDraft?.editing = false
+                        } else {
+                            if model.sketchDraft?.workID != work.id {
+                                model.sketchDraft = SketchDraft(workID: work.id, source: work.effectiveSourceText, original: sketch)
+                            }
+                            model.sketchDraft?.editing = true
+                            // The edited prose is read only by a run that keeps the sketch on.
+                            model.sketchMode = "on"
+                            model.display.preferences.sketchExpanded = true
+                        }
                     }.buttonStyle(InkuGhostButtonStyle()).disabled(!canEditSketch || disabled)
                         .help(model.display.tooltip("表示中作品の写生を編集します。"))
                 }

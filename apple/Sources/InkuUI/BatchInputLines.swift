@@ -20,4 +20,12 @@ public enum BatchInputLines {
             return value.isEmpty ? nil : (offset + 1, value)
         }
     }
+
+    /// Web `batch.nonEmpty` (`numberedBatchLines` with `paintable`): the lines left with something to draw once the
+    /// author's numbers and comments are cut. The count shown under the box; the run itself keeps `entries`.
+    public static func paintableCount(in text: String) -> Int {
+        text.components(separatedBy: "\n").filter {
+            DescriptionLabels.hasDrawableText($0.trimmingCharacters(in: .whitespacesAndNewlines))
+        }.count
+    }
 }

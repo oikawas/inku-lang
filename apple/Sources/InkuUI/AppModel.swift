@@ -11,6 +11,18 @@ import UniformTypeIdentifiers
 import AppKit
 #endif
 
+/// The sketch prose of one saved work as the author is editing it, and the description it was written for.
+public struct SketchDraft: Sendable, Equatable {
+    public let workID: String
+    public let source: String
+    public let original: String
+    public var text: String
+    public var editing = true
+    public init(workID: String, source: String, original: String) {
+        self.workID = workID; self.source = source; self.original = original; text = original
+    }
+}
+
 /// Availability of the author-facing prompt journal, independent of whether a provider was called.
 public enum PromptAvailability: Sendable, Equatable {
     case loading, recorded, notRecorded, unavailable
@@ -43,6 +55,9 @@ public final class AppModel {
     public var catalogMode = "fixed" { didSet { rememberNextConditions() } }
     public var sketchMode = "off"
     public var sketchText = ""
+    /// Web `sketchDraft`/`sketchEditing`: the author's edit of the displayed work's sketch prose. Drawing that work's
+    /// description again with the sketch on sends the edited prose instead of calling the layer (I8).
+    public var sketchDraft: SketchDraft?
     public var variationAmplitude = "small"
     public var variationSeedText = ""
     public var selectedHoleIDs: Set<String> = []
@@ -165,15 +180,32 @@ public final class AppModel {
     public var nextBatchDrawingModelReference: String {
         hasAvailableBatchDrawingModel ? nextDrawingModelReference : ""
     }
+    /// A description is drawable only when something is left once the author's numbers and comments are cut
+    /// (Web `canSubmit`, state.svelte.ts:363-364).
     public var canGenerate: Bool {
-        database != nil && !isBusy && !isPreview && !(inputMode == "ddl" ? ddlText : descriptionText).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        database != nil && !isBusy && !isPreview
+            && (inputMode == "ddl" ? !ddlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                   : DescriptionLabels.hasDrawableText(descriptionText))
             && (inputMode == "ddl" || (hasAvailableNextDrawingModel
                 && !(selectedWorkID != nil && sourceLocked)))
     }
     public var canGenerateDescription: Bool {
         database != nil && !isBusy && !isPreview && hasAvailableNextDrawingModel
-            && !descriptionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && DescriptionLabels.hasDrawableText(descriptionText)
             && !(selectedWorkID != nil && sourceLocked)
+    }
+    /// Web `forkPipelineDescription`: a work its edited DDL holds is drawn from its description only as a new work.
+    public var canForkDescription: Bool {
+        database != nil && !isBusy && !isPreview && hasAvailableNextDrawingModel
+            && DescriptionLabels.hasDrawableText(descriptionText) && selectedWorkID != nil && sourceLocked
+    }
+
+    /// The Server forks the held variation (`fork-description`) as a `description_fork` child; this host refuses a
+    /// description request under a held parent, so the description starts an independent new work instead.
+    public func forkDescription() async {
+        guard canForkDescription else { return }
+        inputMode = "description"
+        await generate(parentWorkID: nil)
     }
 
     /// R6: the next drawing model's service needs an API key and none is stored. Read only when a screen asks,
@@ -245,8 +277,10 @@ public final class AppModel {
         }
     }
 
-    public func generate() async {
-        guard canGenerate, let host, let bootstrap else { return }
+    public func generate() async { await generate(parentWorkID: selectedWorkID) }
+
+    private func generate(parentWorkID: String?) async {
+        guard canGenerate || (parentWorkID == nil && canForkDescription), let host, let bootstrap else { return }
         let token = UUID()
         generationToken = token
         providerProgress = nil
@@ -259,17 +293,17 @@ public final class AppModel {
         status = "生成中"
         let operation = Task { @MainActor [weak self] in
             guard let self else { return }
-            await self.runGeneration(host: host, bootstrap: bootstrap, token: token)
+            await self.runGeneration(host: host, bootstrap: bootstrap, token: token, parentWorkID: parentWorkID)
         }
         activeOperation = operation
         await operation.value
         finishOperation(token: token)
     }
 
-    private func runGeneration(host: PipelineHost, bootstrap: Bootstrap, token: UUID) async {
+    private func runGeneration(host: PipelineHost, bootstrap: Bootstrap, token: UUID, parentWorkID: String?) async {
         do {
-            let freshRequest = try requestForCurrentInput(parentWorkID: selectedWorkID,
-                derivationKind: selectedWorkID == nil ? "new" : inputMode == "ddl" ? "ddl_edit" : "description_edit")
+            let freshRequest = try requestForCurrentInput(parentWorkID: parentWorkID,
+                derivationKind: parentWorkID == nil ? "new" : inputMode == "ddl" ? "ddl_edit" : "description_edit")
             let request = try await pinPersonalPlanRequests([freshRequest])[0]
             let view = try await host.generate(request) { [weak self] progress in
                 Task { @MainActor in self?.receive(progress, token: token, models: request.models) }
@@ -362,6 +396,8 @@ public final class AppModel {
         previewWork = nil
         selectedWorkID = work.id
         selectedWork = work
+        // Web `adoptSketch`: another work on screen brings its own prose; an edit belongs to the work it was made on.
+        if sketchDraft?.workID != work.id { sketchDraft = nil }
         if loadSelectedAnnotation {
             Task { @MainActor [weak self] in
                 guard let self, self.displayToken == selectionToken,
@@ -705,7 +741,9 @@ public final class AppModel {
             throw HostError("drawing_model_not_available")
         }
         if parentWorkID != nil && mode == "description" && (selectedContext?.authority == "ddl_authoritative" || sourceLocked) { throw HostError("description_source_locked") }
-        let sketch: SketchRequest = sketchOverride ?? (sketchMode == "on" ? .on : sketchMode == "supplied" ? .supplied(sketchText) : .off)
+        let sketch: SketchRequest = sketchOverride
+            ?? editedSketch(parentWorkID: parentWorkID, mode: mode, description: description ?? descriptionText)
+            ?? (sketchMode == "on" ? .on : sketchMode == "supplied" ? .supplied(sketchText) : .off)
         let savedConfig = parentWorkID == selectedWorkID && parentWorkID != nil ? selectedContext?.configuration : nil
         var request = try bootstrap.request(inputMode: mode, source: source ?? ddlText,
             description: description ?? descriptionText,
@@ -716,6 +754,16 @@ public final class AppModel {
             importedPlugins: mode == "ddl" && parentWorkID == nil ? importedDDL?.plugins ?? [] : [])
         request.captureProviderIO = developerModeEnabled && display.preferences.captureProviderIO == true
         return request
+    }
+
+    /// Web `sketchTextFor`: prose written for this very description, as the author left it. Unedited prose is not
+    /// sent, so an ordinary redraw still asks the layer as before.
+    private func editedSketch(parentWorkID: String?, mode: String, description: String) -> SketchRequest? {
+        guard mode == "description", sketchMode == "on", let draft = sketchDraft, draft.workID == parentWorkID,
+              draft.text != draft.original, !draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              draft.source.trimmingCharacters(in: .whitespacesAndNewlines) == description.trimmingCharacters(in: .whitespacesAndNewlines)
+        else { return nil }
+        return .supplied(draft.text)
     }
 
     public func requestForBatchDescription(_ description: String, sketchMode: String) throws -> GenerationRequest {
@@ -1333,6 +1381,7 @@ public final class AppModel {
         inputMode = "description"
         descriptionText = ""
         ddlText = ""
+        sketchDraft = nil
     }
 
     public func commitDDL(wildOverride: Bool? = nil) async {

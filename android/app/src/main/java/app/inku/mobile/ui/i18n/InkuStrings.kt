@@ -143,6 +143,9 @@ interface InkuStrings {
     val refinementNoOtherCatalog: String
     val refinementTouchFanoutRefusal: String
     val refinementElementLabel: (String) -> String
+    val recomposeModeLabel: (String) -> String
+    fun recomposeReason(reason: String): String
+    val recomposeKeptRanges: String
     /** Formats only the amplitude recorded on a legacy history row. */
     val variationAmplitudeLabel: (String) -> String
 

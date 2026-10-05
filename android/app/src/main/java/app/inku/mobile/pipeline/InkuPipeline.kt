@@ -32,6 +32,8 @@ data class PaintRequest(
     val litertStage1PromptOptimization: Boolean = false,
     val renderSeed: Long? = null,
     val compositionSeed: Long? = null,
+    /** Present only when selecting another composition for a layout candidate. */
+    val recomposeMode: RecomposeMode? = null,
     val interpretationSeed: String? = null,
     val seedText: String? = null,
     /**
@@ -104,6 +106,7 @@ data class PaintResult(
     val renderHashShort: String,
     val renderSeed: Long? = null,
     val compositionSeed: Long? = null,
+    val recomposition: RecompositionInfo? = null,
     val interpretationSeed: String? = null,
     val seedText: String? = null,
     /**

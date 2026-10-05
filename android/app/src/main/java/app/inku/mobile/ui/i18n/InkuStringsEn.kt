@@ -169,6 +169,27 @@ object InkuStringsEn : InkuStrings {
             else -> id
         }
     }
+    override val recomposeModeLabel: (String) -> String = { id ->
+        when (id) {
+            "principled" -> "By principle"
+            "chance" -> "By chance"
+            else -> id
+        }
+    }
+    override fun recomposeReason(reason: String): String = when (reason) {
+        "nothing_to_move" -> "This work has no composition ranges."
+        "not_canonical" -> "The instructions have unresolved parts, so the composition cannot move."
+        "unsupported_sentence" -> "These instructions include a sentence that cannot change composition."
+        "unplaced_sentence" -> "A sentence has no recoverable placement, so the composition cannot move."
+        "author_range" -> "The ranges the author specified keep the composition in place."
+        "no_other_answer" -> "No other composition was found."
+        "same_ranges" -> "Chance chose the same composition ranges."
+        "unsolved" -> "There are too many combinations to find another composition."
+        "not_canonical_after" -> "The changed instructions could not be checked, so the composition cannot move."
+        else -> "Another composition is unavailable, so the composition ranges are kept."
+    }
+    override val recomposeKeptRanges = "Redrawn with the same composition ranges."
+
     override val variationAmplitudeLabel: (String) -> String = { id ->
         // Keep the recorded legacy amplitudes readable; these are not controls.
         when (id) {

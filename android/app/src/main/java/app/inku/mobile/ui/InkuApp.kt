@@ -224,6 +224,8 @@ import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.pipeline.InstructionLanguages
 import app.inku.mobile.pipeline.PluginDiagnostic
 import app.inku.mobile.pipeline.RenderWarning
+import app.inku.mobile.pipeline.RecomposeMode
+import app.inku.mobile.pipeline.RecompositionInfo
 import app.inku.mobile.pipeline.SaijikiGenerated
 import app.inku.mobile.pipeline.Sketches
 import app.inku.mobile.pipeline.SketchMode
@@ -3962,6 +3964,17 @@ private fun RefinementAdjustControls(
             modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) onTouchWordsFocused() },
         )
     }
+    if (state.refinementElement == RefinementElement.Layout) {
+        WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
+            RecomposeMode.entries.forEach { mode ->
+                ChipButton(
+                    text = S.recomposeModeLabel(mode.id),
+                    selected = state.refinementLayoutMode == mode,
+                    onClick = { viewModel.setRefinementLayoutMode(mode) },
+                )
+            }
+        }
+    }
 }
 
 /**
@@ -4026,6 +4039,12 @@ private fun RefinementCandidateCard(
             )
             Column(modifier = Modifier.padding(horizontal = Dimens.spaceM).padding(bottom = Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                 Text(candidate.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                candidate.plan.recomposeMode?.let { mode ->
+                    Text(S.recomposeModeLabel(mode.id), style = MaterialTheme.typography.labelSmall)
+                }
+                recompositionLines(candidate.pipelineResult?.recomposition, S).forEach { line ->
+                    Text(line, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 Text(candidate.renderHashShort, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (readingCandidate && ddlOpen) {
                     DdlHeading(
@@ -4049,6 +4068,12 @@ private fun RefinementCandidateCard(
             }
         }
     }
+}
+
+internal fun recompositionLines(info: RecompositionInfo?, strings: InkuStrings): List<String> = when {
+    info == null -> emptyList()
+    info.unchangedReason != null -> listOf(strings.recomposeReason(info.unchangedReason), strings.recomposeKeptRanges)
+    else -> info.moves.map { move -> "${move.layer + 1}: ${move.from} → ${move.to}" }
 }
 
 @Composable

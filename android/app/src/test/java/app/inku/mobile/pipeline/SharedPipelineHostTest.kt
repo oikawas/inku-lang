@@ -26,6 +26,93 @@ import org.junit.Test
 
 class SharedPipelineHostTest {
     @Test
+    fun recompositionRewritesANewRunWithTheSamePreparedSeedWithoutAModelCall() = runBlocking {
+        val binding = ScriptedBinding(uniqueExecutions = true)
+        val original = "[composition] bottom right (horizontal 2/3 to 1, vertical 2/3 to 1): one red circle."
+        val selected = "[composition] top left (horizontal 0 to 1/3, vertical 0 to 1/3): one red circle."
+        binding.recompositionResponse = JSONObject()
+            .put("schema", "inku.composition-recompose.v1").put("outcome", "recomposed")
+            .put("source", selected).put("answer", "chance")
+            .put("moves", JSONArray().put(JSONObject().put("layer", 0).put("from", "bottom right").put("to", "top left")))
+        val result = androidPipeline(binding).composeFromDdl(original, layoutRequest(RecomposeMode.Chance, 42L))
+
+        val input = binding.recompositionRequests.single()
+        assertEquals(original, input.getString("source"))
+        assertEquals("chance", input.getString("mode"))
+        assertEquals("42", input.getString("seed"))
+        assertEquals("42", input.getJSONObject("config").getJSONObject("compiler").getString("composition_seed"))
+        assertTrue(input.getString("work_id").isNotBlank())
+        val start = binding.inputs.first()
+        assertEquals(selected, start.getJSONObject("authoring").getString("source"))
+        assertEquals(input.getJSONObject("config").toString(), start.getJSONObject("config").toString())
+        assertEquals(selected, result.normalizedDdl)
+        assertEquals(42L, result.compositionSeed)
+        assertEquals(listOf(RecompositionMove(0, "bottom right", "top left")), result.recomposition!!.moves)
+        assertNull(result.recomposition!!.unchangedReason)
+    }
+
+    @Test
+    fun recompositionOfAnExecutionForkKeepsUnmarkedInstructionsAndTheParent() = runBlocking {
+        val binding = ScriptedBinding(uniqueExecutions = true)
+        val pipeline = androidPipeline(binding)
+        val original = "place one red circle."
+        val request = layoutRequest(RecomposeMode.Principled, 42L)
+        val parent = pipeline.composeFromDdl(original, request.copy(recomposeMode = null))
+        binding.recompositionResponse = JSONObject()
+            .put("schema", "inku.composition-recompose.v1").put("outcome", "unchanged").put("reason", "nothing_to_move")
+        val result = pipeline.composeFromDdl(
+            original,
+            request.copy(executionId = parent.pipelineView!!.executionId, compositionSeed = 43L),
+        )
+
+        val input = binding.recompositionRequests.single()
+        assertEquals("principled", input.getString("mode"))
+        assertEquals("43", input.getString("seed"))
+        assertEquals(parent.pipelineView!!.variationId, input.getString("work_id"))
+        val starts = binding.inputs.filter { it.optString("tag") == "start" }
+        assertEquals(2, starts.size)
+        assertEquals("42", starts.first().getJSONObject("config").getJSONObject("compiler").getString("composition_seed"))
+        assertEquals("43", starts.last().getJSONObject("config").getJSONObject("compiler").getString("composition_seed"))
+        assertEquals(original, starts.last().getJSONObject("authoring").getString("source"))
+        assertEquals(original, result.normalizedDdl)
+        assertEquals(43L, result.compositionSeed)
+        assertEquals("nothing_to_move", result.recomposition!!.unchangedReason)
+        assertTrue(parent.pipelineView!!.variationId != result.pipelineView!!.variationId)
+    }
+
+    @Test
+    fun recompositionErrorsKeepTheNormalComposePath() = runBlocking {
+        val binding = ScriptedBinding(uniqueExecutions = true)
+        binding.recompositionResponse = JSONObject().put("error", "invalid_request")
+        val original = "place one red circle."
+        val result = androidPipeline(binding).composeFromDdl(original, layoutRequest(RecomposeMode.Principled, 44L))
+
+        assertEquals(original, result.normalizedDdl)
+        assertEquals(44L, result.compositionSeed)
+        assertEquals("unavailable", result.recomposition!!.unchangedReason)
+        assertEquals("completed", result.pipelineView!!.phaseTag)
+    }
+
+    private fun layoutRequest(mode: RecomposeMode, seed: Long) = PaintRequest(
+        description = "a red circle", stage1Model = "local-litert-lm:gemma-4-e2b", stage2Model = "local-litert-lm:gemma-4-e2b",
+        colorCatalogId = "default", canvasAspect = "square", autoRepair = false,
+        compositionSeed = seed, recomposeMode = mode, instructionLang = "en",
+    )
+
+    private fun androidPipeline(binding: SharedPipelineBinding) = AndroidWorkPipeline(
+        binding = binding,
+        modelProvider = object : ModelProvider {
+            override val providerId = "test"
+            override suspend fun generate(request: ModelRequest): ModelResponse = error("recomposition must not call a model")
+        },
+        commitStore = RecordingCommitStore(), executionStore = MemoryExecutionStore(), readHistory = { null },
+        legacyRenderer = object : SvgRenderer {
+            override fun render(request: RenderRequest): RenderResult = error("the shared pipeline renders this run")
+        },
+        bundledPluginsEnabled = { false },
+    )
+
+    @Test
     fun newRunOmitsRetiredVariationSettingsAndStoredConfigRemainsReadable() = runBlocking {
         val binding = object : SharedPipelineBinding by ScriptedBinding() {
             override fun canvasRegistry() = """{"digest":"registry-digest","registry":{"schema":"inku.canvas-format-registry.v1","formats":[{"id":"square","width_units":1,"height_units":1}]}}"""
@@ -451,8 +538,10 @@ class SharedPipelineHostTest {
             states["$ownerId:$executionId"]?.second?.copyOf()
     }
 
-    private class ScriptedBinding : SharedPipelineBinding {
+    private class ScriptedBinding(private val uniqueExecutions: Boolean = false) : SharedPipelineBinding {
         val inputs = mutableListOf<JSONObject>()
+        val recompositionRequests = mutableListOf<JSONObject>()
+        var recompositionResponse: JSONObject? = null
         override fun versionReport() = """{"binding_version":"1.1.0","protocol_version":"1.0.0"}"""
 
         override fun step(snapshotBytes: ByteArray, inputEnvelopeBytes: ByteArray): ByteArray {
@@ -492,8 +581,12 @@ class SharedPipelineHostTest {
                 else -> error("unexpected transition: $payload")
             }
             val variationId = previous?.getString("variation_id") ?: payload.getString("variation_id")
+            val executionId = previous?.getString("execution_id")
+                ?: if (uniqueExecutions) "execution-$variationId" else EXECUTION_ID
             val origin = if (direct || previous?.optString("origin_fixture") == "direct") "direct" else "description"
-            val snapshot = snapshot(state, input.getString("sequence"), variationId, config, origin)
+            val directSource = if (direct) payload.getJSONObject("authoring").getString("source") else
+                previous?.optJSONObject("document")?.optString("source") ?: "place one circle."
+            val snapshot = snapshot(state, input.getString("sequence"), variationId, executionId, config, origin, directSource)
             val sketch = when {
                 sketchRequest?.optString("mode") == "supplied" -> JSONObject()
                     .put("state", "supplied").put("text", sketchRequest.getString("text"))
@@ -512,7 +605,7 @@ class SharedPipelineHostTest {
                 .put("protocol", "inku.pipeline")
                 .put("version", "1.0.0")
                 .put("kind", "output")
-                .put("execution_id", EXECUTION_ID)
+                .put("execution_id", executionId)
                 .put("message_id", input.getString("message_id"))
                 .put("sequence", input.getString("sequence"))
                 .put(
@@ -536,8 +629,10 @@ class SharedPipelineHostTest {
             state: State,
             sequence: String,
             variationId: String,
+            executionId: String,
             config: JSONObject,
             originFixture: String,
+            directSource: String,
         ): JSONObject {
             val direct = originFixture == "direct"
             val revision = when (state) {
@@ -548,8 +643,8 @@ class SharedPipelineHostTest {
             }
             val document = when (state) {
                 State.Sketch, State.Stage1, State.Composition, State.Cancelled -> null
-                State.FirstCommit, State.Hole, State.AwaitingPatch -> if (direct) "place one circle." else "DDL with hole"
-                State.SecondCommit, State.Ready, State.Completed -> if (direct) "place one circle." else "patched DDL"
+                State.FirstCommit, State.Hole, State.AwaitingPatch -> if (direct) directSource else "DDL with hole"
+                State.SecondCommit, State.Ready, State.Completed -> if (direct) directSource else "patched DDL"
             }
             val action = when (state) {
                 State.Sketch -> providerAction("generate_sketch", "provider-sketch")
@@ -578,18 +673,21 @@ class SharedPipelineHostTest {
                     .put("score", JSONObject().put("schema", "inku.score.v1").put("instructions", JSONArray()))
                     .put(
                         "compiler_options",
-                        JSONObject()
+                        config.optJSONObject("compiler") ?: JSONObject()
                             .put("host", JSONObject().put("canvas_format_id", "square").put("resolved_catalog_id", "default"))
                             .put("composition_seed", JSONObject.NULL)
                             .put("error_policy", "omit_and_continue"),
                     )
+                    .put("source_digest", "ddl-fixture")
+                    .put("upstream_diagnostics", JSONArray()).put("downstream_diagnostics", JSONArray())
+                    .put("resource_omissions", JSONArray()).put("relation_omissions", JSONArray())
             } else {
                 null
             }
             return JSONObject()
                 .put("protocol", "inku.pipeline")
                 .put("version", "1.0.0")
-                .put("execution_id", EXECUTION_ID)
+                .put("execution_id", executionId)
                 .put("variation_id", variationId)
                 .put("sequence", sequence)
                 .put("event_sequence", sequence)
@@ -613,9 +711,14 @@ class SharedPipelineHostTest {
                 .put("origin_fixture", originFixture)
         }
 
-        override fun canvasRegistry() = error("not used")
-        override fun resolvePalette(inputBytes: ByteArray) = error("not used")
-        override fun resolveMacroCatalog(inputBytes: ByteArray) = error("not used")
+        override fun canvasRegistry() = """{"digest":"registry-digest","registry":{"schema":"inku.canvas-format-registry.v1","formats":[{"id":"square","width_units":1,"height_units":1}]}}"""
+        override fun resolvePalette(inputBytes: ByteArray) = "{}".encodeToByteArray()
+        override fun resolveMacroCatalog(inputBytes: ByteArray) =
+            """{"schema":"inku.macro-catalog-resolution.v1","entries":[],"locks":[],"diagnostics":[]}""".encodeToByteArray()
+        override fun recompose(inputBytes: ByteArray): ByteArray {
+            recompositionRequests += JSONObject(inputBytes.toString(Charsets.UTF_8))
+            return recompositionResponse?.toString()?.encodeToByteArray() ?: super.recompose(inputBytes)
+        }
         override fun renderSaved(inputBytes: ByteArray) = error("not used")
 
         private enum class State { Sketch, Stage1, Composition, FirstCommit, Hole, AwaitingPatch, SecondCommit, Ready, Completed, Cancelled }

@@ -1,6 +1,10 @@
 package app.inku.mobile.data.refinement
 
 import app.inku.mobile.data.db.HistoryItemEntity
+import app.inku.mobile.data.db.LineageNodeEntity
+import app.inku.mobile.data.lineage.LineageDeclaration
+import app.inku.mobile.data.lineage.LineagePlanner
+import app.inku.mobile.pipeline.RecomposeMode
 import kotlin.reflect.full.memberProperties
 import kotlin.reflect.full.valueParameters
 import org.junit.Assert.assertEquals
@@ -9,6 +13,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.json.JSONObject
 
 /**
  * T-1, T-3 and T-5: what one round of refinement decides, before anything is
@@ -175,7 +180,7 @@ class RefinementPlanTest {
 
         val layout = RefinementPlanner.plan(RefinementElement.Layout, parent)
         assertEquals("layout_change", layout.derivationKind)
-        assertEquals(setOf("composition_seed"), layout.derivationMetadata.keys)
+        assertEquals(setOf("composition_seed", "recompose_mode"), layout.derivationMetadata.keys)
         assertEquals(layout.seeds.compositionSeed, layout.derivationMetadata["composition_seed"])
 
         val reading = RefinementPlanner.plan(RefinementElement.Reading, parent)
@@ -198,7 +203,30 @@ class RefinementPlanTest {
         assertEquals("7", oldItem.variationSeed)
     }
 
-    /** Every kind named above is one the server registers. */
+    /** A selected candidate declares the same mode and seed when its edge is written. */
+    @Test
+    fun aLayoutCandidateKeepsItsSelectedModeAndSeedOnTheSavedEdge() {
+        val parent = parent()
+        val defaultPlan = RefinementPlanner.plan(RefinementElement.Layout, parent)
+        assertEquals(RecomposeMode.Principled, defaultPlan.recomposeMode)
+        assertEquals("principled", defaultPlan.derivationMetadata["recompose_mode"])
+
+        val chosen = RefinementPlanner.plan(RefinementElement.Layout, parent, recomposeMode = RecomposeMode.Chance)
+        assertEquals(RecomposeMode.Chance, chosen.recomposeMode)
+        val write = LineagePlanner.plan(
+            nodeId = "chosen", edgeId = "chosen-edge", historyId = "chosen-work", at = 1L,
+            descriptionHash = "description", renderHash = "render", historyVisibility = null,
+            declaration = LineageDeclaration("parent-node", chosen.derivationKind, chosen.derivationMetadata),
+            parentNode = LineageNodeEntity(id = "parent-node", rootNodeId = "root-node"),
+        )
+        val metadata = JSONObject(write.edge!!.metadataJson)
+        assertEquals("layout_change", write.edge!!.derivationKind)
+        assertEquals("chance", metadata.getString("recompose_mode"))
+        assertEquals(chosen.seeds.compositionSeed, metadata.getLong("composition_seed"))
+        assertNotEquals(parent.seeds.compositionSeed, chosen.seeds.compositionSeed)
+    }
+
+    /** Every active kind is one the server registers. */
     @Test
     fun t5_theFourKindsAreTheServersOwn() {
         val registered = app.inku.mobile.data.model.DerivationKindRegistry.KINDS

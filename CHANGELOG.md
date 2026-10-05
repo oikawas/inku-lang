@@ -10,6 +10,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 Prepare the pinned dictionaries and pass their explicit path to Rust's dictionary-counting test. Align the public API list with notice reads and composition ranges, retaining checks for documented path parameters. Name the Android range frame's 2dp width under the existing line-weight exceptions, which differ from distances. Product responses, drawing, and version numbers are unchanged.
 
+Combine the existing dictionary-counting conditions to follow the pinned Rust version's clippy rules. Cache and dictionary reading behavior are unchanged.
+
 ### 2026-10-05 — Use the shared button style for third-party notices
 
 Removed duplicate definitions from the license reader's close and retry buttons so they use the existing shared dimensions, colors, hover, and disabled styles. Notice loading, display, and actions are unchanged.

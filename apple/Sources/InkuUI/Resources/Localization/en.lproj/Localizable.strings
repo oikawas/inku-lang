@@ -1430,3 +1430,14 @@
 "描画モデル（%@）の接続先にAPIキーがありません。設定の「モデル設定」でAPIキーを入力すると描けます。" = "The service for the drawing model (%@) has no API key. Enter one in Settings → Models to draw.";
 "接続設定を開く" = "Open connection settings";
 "選んだ語を編集中DDLのカーソル位置に挿入します。" = "Insert the chosen word at the caret in this editor's DDL draft.";
+"対応するServerの版" = "Server version followed";
+"対応するServerのビルド日時" = "Server build date";
+"ライセンス" = "License";
+"第三者ライセンスを表示" = "Show third-party licenses";
+"第三者ライセンス" = "Third-party licenses";
+"入手先" = "Source";
+"項目を選ぶと全文を表示します。" = "Select an item to show its full text.";
+"ライセンス一覧を読み込めません。" = "Could not load the license list.";
+"Swiftパッケージ" = "Swift packages";
+"Rustクレート" = "Rust crates";
+"同梱の辞書とフォント" = "Bundled dictionaries and font";

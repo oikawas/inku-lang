@@ -53,7 +53,7 @@ import SwiftUI
                                 .buttonStyle(.borderedProminent)
                                 .disabled((try? definition.parsedDraft(draft)) == nil)
                         }
-                    }.disabled(saving || model.isBusy)
+                    }.disabled(saving || model.isBrowsingLocked)
                     if changed, (try? definition.parsedDraft(draft)) == nil {
                         Text(model.display.localized("制限値には整数を入力してください。"))
                             .font(.caption).foregroundStyle(.red)
@@ -88,7 +88,7 @@ import SwiftUI
                         .accessibilityLabel(copy.limitLabels[key] ?? key)
                         .help(model.display.preferences.showTooltips ? copy.limitHints[key] ?? "" : "")
                     Button { step(key, by: 1, definition: definition) } label: { Image(systemName: "plus") }
-                }.buttonStyle(.borderless).disabled(saving || model.isBusy)
+                }.buttonStyle(.borderless).disabled(saving || model.isBrowsingLocked)
             }
             HStack(spacing: 16) {
                 Text(model.display.localizedFormat("現在: %ld", Int(saved[key] ?? 0)))

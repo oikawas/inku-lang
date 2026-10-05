@@ -18,11 +18,11 @@ public final class HistoryModel {
     public var canMoveNewer: Bool { (selectedIndex ?? 0) > 0 }
     public var canMoveOlder: Bool { library.total > 0 && (selectedIndex ?? 0) < library.total - 1 }
 
-    public func updateCapacity(_ value: Int, app: AppModel) async {
+    public func updateCapacity(_ value: Int, app: AppModel, workID: String? = nil) async {
         let capacity = max(1, value)
         guard library.pageSize != capacity else { return }
         library.pageSize = capacity
-        await locate(app: app)
+        await locate(app: app, workID: workID)
         await library.setPage(library.page)
     }
     public func connect(app: AppModel) async {
@@ -72,7 +72,7 @@ public final class HistoryModel {
     @discardableResult
     public func navigate(app: AppModel, fromWorkID: String? = nil, delta: Int = 0, boundary: String? = nil,
                          selectWork: Bool = true) async -> SavedWork? {
-        guard let database, !app.isBusy, library.total > 0 else { return nil }
+        guard let database, !app.isBrowsingLocked, library.total > 0 else { return nil }
         let token = UUID(); navigationToken = token
         let initialSelection = app.selectedWorkID
         let query = library.filter
@@ -80,16 +80,22 @@ public final class HistoryModel {
             let current: Int?
             if let id = fromWorkID ?? app.selectedWorkID { current = try await database.libraryIndex(id: id, query: library.filter) }
             else { current = nil }
-            guard navigationToken == token, app.selectedWorkID == initialSelection, library.filter == query else { return nil }
+            guard navigationToken == token, !app.isBrowsingLocked,
+                  app.selectedWorkID == initialSelection, library.filter == query else { return nil }
             let index: Int
             if boundary == "latest" { index = 0 }
             else if boundary == "oldest" { index = library.total - 1 }
             else { index = min(library.total - 1, max(0, (current ?? 0) + delta)) }
             await library.setPage(index / library.pageSize)
-            guard navigationToken == token, app.selectedWorkID == initialSelection, library.filter == query else { return nil }
+            guard navigationToken == token, !app.isBrowsingLocked,
+                  app.selectedWorkID == initialSelection, library.filter == query else { return nil }
             guard library.works.indices.contains(index % library.pageSize) else { return nil }
             let work = library.works[index % library.pageSize]
-            if selectWork { await app.selectWork(work) }
+            if selectWork {
+                await app.selectWork(work)
+                guard navigationToken == token, !app.isBrowsingLocked,
+                      app.selectedWorkID == work.id, library.filter == query else { return nil }
+            }
             selectedIndex = index
             return work
         } catch { if navigationToken == token { app.errorText = error.localizedDescription }; return nil }

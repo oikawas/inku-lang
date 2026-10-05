@@ -5,6 +5,7 @@ import SwiftUI
 struct ModelSettingsView: View {
     @Bindable var model: AppModel
     @Bindable var settings: SettingsModel
+    @Bindable var automation: AutomationModel
 
     @State private var serviceDrafts: [String: ServiceDraft] = [:]
     @State private var drawingDraft: ModelSelection?
@@ -13,7 +14,9 @@ struct ModelSettingsView: View {
     @State private var saving = false
     @State private var rateHelp: String?
 
-    private var actionsDisabled: Bool { model.isBusy || saving }
+    private var actionsDisabled: Bool { model.isBrowsingLocked || saving }
+    private var credentialsLocked: Bool { model.isBusy || automation.isOccupied }
+    private var credentialActionsDisabled: Bool { actionsDisabled || credentialsLocked }
     private var drawingModels: ModelSelection { drawingDraft ?? settings.host.models }
     private var drawingChoices: [DrawingChoice] {
         settings.orderedProviders.flatMap { provider in
@@ -51,7 +54,8 @@ struct ModelSettingsView: View {
         .sheet(item: $sheetRoute) { route in
             switch route {
             case .service(let mode):
-                ProviderServiceEditorSheet(mode: mode, model: model, settings: settings)
+                ProviderServiceEditorSheet(mode: mode, model: model, settings: settings,
+                                           automation: automation)
             case .models(let providerID):
                 ProviderModelsSheet(providerID: providerID, model: model, settings: settings)
             }
@@ -64,7 +68,7 @@ struct ModelSettingsView: View {
                         confirmation = nil
                         confirm(action)
                     }
-                    .disabled(actionsDisabled)
+                    .disabled(confirmationDisabled(action))
                 }
                 Button(model.display.localized("キャンセル"), role: .cancel) { confirmation = nil }
             } message: {
@@ -265,14 +269,14 @@ struct ModelSettingsView: View {
                     SecureField(model.display.localized(configured == true ? "設定済みのAPIキーを保持" : "APIキー"),
                                 text: configured == true ? .constant("") : draftBinding(provider, \.credential))
                         .textFieldStyle(.roundedBorder).autocorrectionDisabled()
-                        .disabled(configured != false)
+                        .disabled(configured != false || credentialActionsDisabled)
                     if configured == true {
                         Button(model.display.localized("削除…"), role: .destructive) {
                             confirmation = .clearCredential(provider.id)
-                        }
+                        }.disabled(credentialActionsDisabled)
                     } else if configured == false {
                         Button(model.display.localized("保存")) { saveCredential(provider) }
-                            .disabled(draft.credential.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .disabled(credentialActionsDisabled || draft.credential.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     } else {
                         Button(model.display.localized("状態を確認")) {
                             Task { await settings.inspectAllCredentials() }
@@ -400,9 +404,10 @@ struct ModelSettingsView: View {
     }
 
     private func saveCredential(_ provider: ProviderSettings) {
-        guard settings.credentialStates[provider.id] == false else { return }
+        guard !credentialActionsDisabled, settings.credentialStates[provider.id] == false else { return }
         let key = draft(for: provider).credential
         perform {
+            guard !credentialsLocked else { throw HostError("settings_busy_or_unavailable") }
             try await settings.saveProviderCredential(providerID: provider.id, key: key, model: model)
             if var next = serviceDrafts[provider.id] {
                 next.credential = ""
@@ -422,9 +427,11 @@ struct ModelSettingsView: View {
     }
 
     private func confirm(_ action: Confirmation) {
+        guard !confirmationDisabled(action) else { return }
         perform {
             switch action {
             case .clearCredential(let providerID):
+                guard !credentialsLocked else { throw HostError("settings_busy_or_unavailable") }
                 try await settings.clearProviderCredential(providerID: providerID, model: model)
                 if var next = serviceDrafts[providerID] {
                     next.credential = ""
@@ -439,6 +446,13 @@ struct ModelSettingsView: View {
                     drawingDraft = next
                 }
             }
+        }
+    }
+
+    private func confirmationDisabled(_ action: Confirmation) -> Bool {
+        switch action {
+        case .clearCredential: credentialActionsDisabled
+        case .deleteService: actionsDisabled
         }
     }
 

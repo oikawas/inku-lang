@@ -58,6 +58,10 @@ public final class AppModel {
     /// Metrics of the displayed saved work, frozen to that work's save identity.
     public private(set) var providerMetrics: [ProviderAttemptMetric] = []
     public private(set) var isBusy = false
+    /// Retained between batch rows so browsing does not clear the last row's progress or failure.
+    private var backgroundDrawing = false
+    /// Browsing may continue during an explicitly backgrounded batch row; writers still use isBusy.
+    public var isBrowsingLocked: Bool { isBusy && !backgroundDrawing }
     public var errorText: String?
     public var providerURL = "http://localhost:8080/v1"
     public var providerModel = ""
@@ -107,7 +111,10 @@ public final class AppModel {
     @ObservationIgnored private var settingsStore: ProviderSettingsStore?
     @ObservationIgnored private var settings = HostSettings()
     @ObservationIgnored private var bootstrap: Bootstrap?
+    /// Cancellation targets the active task, independently of the saved work being viewed.
+    @ObservationIgnored private var activeExecutionID: String?
     @ObservationIgnored private var currentExecutionID: String?
+    @ObservationIgnored private var displayToken = UUID()
     @ObservationIgnored private var generationToken: UUID?
     @ObservationIgnored private var activeOperation: Task<Void, Never>?
     @ObservationIgnored private var stopping = false
@@ -223,7 +230,9 @@ public final class AppModel {
         let token = UUID()
         generationToken = token
         providerProgress = nil
+        activeExecutionID = nil
         currentExecutionID = nil
+        backgroundDrawing = false
         stopping = false
         isBusy = true
         errorText = nil
@@ -265,20 +274,24 @@ public final class AppModel {
         stopping = true
         providerProgress?.finish(.cancelled, at: Date())
         status = "停止中"
+        let executionID = activeExecutionID
         operation.cancel()
-        if let id = currentExecutionID, let host {
+        if let id = executionID, let host {
             do { _ = try await host.cancel(executionID: id) }
             catch { report(error) }
         }
         await operation.value
-        if let id = currentExecutionID { recordDrawingLog(executionID: id) }
+        if let id = executionID { recordDrawingLog(executionID: id) }
     }
 
     public func selectWork(_ work: SavedWork) async {
-        guard !isBusy else { return }
-        providerProgress = nil
-        errorText = nil
+        guard !isBrowsingLocked else { return }
+        if !backgroundDrawing {
+            providerProgress = nil
+            errorText = nil
+        }
         displayWork(work, loadSelectedAnnotation: false)
+        let selectionToken = displayToken
         currentExecutionID = nil
         currentView = nil
         selectedContext = nil
@@ -292,27 +305,27 @@ public final class AppModel {
         unreadOutputs.remove("prompt")
         eventsJSON = ""
         await library.loadSelectedAnnotation(workID: work.id)
-        guard selectedWorkID == work.id, !isBusy else { return }
+        guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
         guard let host else { promptAvailability = .unavailable; return }
         let recordedMetrics = (try? await host.savedProviderMetrics(workID: work.id)) ?? []
-        guard selectedWorkID == work.id, !isBusy else { return }
+        guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
         providerMetrics = recordedMetrics
         do {
             let context = try await host.savedAuthoringContext(workID: work.id)
-            guard selectedWorkID == work.id, !isBusy else { return }
+            guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
             selectedContext = context
             authoringAuthority = context.authority
             authoringOrigin = context.origin
             authoringRevision = context.revision
             authoringPhase = "completed"
             let presentation = try await host.savedWorkPresentation(workID: work.id)
-            guard selectedWorkID == work.id, !isBusy else { return }
+            guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
             promptJSON = try presentation.promptJSON.map(Self.pretty) ?? ""
             promptAvailability = presentation.promptJSON == nil ? .notRecorded : .recorded
             diagnosticsJSON = try presentation.diagnosticsJSON.map(Self.pretty) ?? ""
             eventsJSON = try presentation.eventsJSON.map(Self.pretty) ?? ""
         } catch {
-            guard selectedWorkID == work.id, !isBusy else { return }
+            guard displayToken == selectionToken, selectedWorkID == work.id, !isBrowsingLocked else { return }
             promptAvailability = .unavailable
             authoringAuthority = "legacy_unknown"
             authoringOrigin = work.ddlSourceOrigin ?? "legacy_unknown"
@@ -323,13 +336,16 @@ public final class AppModel {
     }
 
     private func displayWork(_ work: SavedWork, loadSelectedAnnotation: Bool = true) {
+        displayToken = UUID()
+        let selectionToken = displayToken
         importedDDL = nil; importedMacroNames = []
         previewWork = nil
         selectedWorkID = work.id
         selectedWork = work
         if loadSelectedAnnotation {
             Task { @MainActor [weak self] in
-                guard let self, self.selectedWorkID == work.id, self.previewWork == nil else { return }
+                guard let self, self.displayToken == selectionToken,
+                      self.selectedWorkID == work.id, self.previewWork == nil else { return }
                 await self.library.loadSelectedAnnotation(workID: work.id)
             }
         }
@@ -339,12 +355,11 @@ public final class AppModel {
             unreadOutputs.remove("prompt")
         }
         providerMetrics = currentView?.savedWorkID == work.id ? currentView?.providerMetrics ?? [] : []
-        let displayedGenerationToken = generationToken
         if currentView?.savedWorkID != work.id, let host {
             Task { @MainActor [weak self] in
                 let metrics = (try? await host.savedProviderMetrics(workID: work.id)) ?? []
-                guard let self, self.selectedWorkID == work.id, self.previewWork == nil,
-                      !self.isBusy || self.generationToken == displayedGenerationToken else { return }
+                guard let self, self.displayToken == selectionToken, self.selectedWorkID == work.id,
+                      self.previewWork == nil, !self.isBrowsingLocked else { return }
                 self.providerMetrics = metrics
             }
         }
@@ -360,7 +375,9 @@ public final class AppModel {
         let token = UUID()
         generationToken = token
         providerProgress = nil
+        activeExecutionID = nil
         currentExecutionID = nil
+        backgroundDrawing = false
         stopping = false
         isBusy = true
         errorText = nil
@@ -397,6 +414,7 @@ public final class AppModel {
         else if providerProgress?.outcome == .running { providerProgress?.finish(.succeeded, at: Date()) }
         if stopping { status = "停止しました" }
         activeOperation = nil
+        activeExecutionID = nil
         generationToken = nil
         stopping = false
         isBusy = false
@@ -414,7 +432,7 @@ public final class AppModel {
     }
 
     public func selectSharedDrawingModel(_ reference: String) async throws {
-        guard SettingsModel.isModelAvailable(reference, settings: settings) else { throw HostError("drawing_model_not_available") }
+        guard !isBusy, SettingsModel.isModelAvailable(reference, settings: settings) else { throw HostError("drawing_model_not_available") }
         var changed = settings
         changed.models.stage1Model = reference
         changed.models.stage2Model = reference
@@ -424,7 +442,7 @@ public final class AppModel {
 
     /// The DDL and adjustment pickers save Stage 2 immediately; the shared next-work picker is a draft.
     public func selectDdlDrawingModel(_ reference: String) async throws {
-        guard SettingsModel.isModelAvailable(reference, settings: settings) else { throw HostError("drawing_model_not_available") }
+        guard !isBusy, SettingsModel.isModelAvailable(reference, settings: settings) else { throw HostError("drawing_model_not_available") }
         let next = nextDrawingModelReference
         var changed = settings
         changed.models.stage2Model = reference
@@ -433,7 +451,7 @@ public final class AppModel {
     }
 
     public func selectDemoDrawingModel(stage: Int, reference: String) async throws {
-        guard [1, 2].contains(stage), SettingsModel.isBatchModelAvailable(reference, settings: settings) else {
+        guard !isBusy, [1, 2].contains(stage), SettingsModel.isBatchModelAvailable(reference, settings: settings) else {
             throw HostError("drawing_model_not_available")
         }
         let next = nextDrawingModelReference
@@ -460,7 +478,8 @@ public final class AppModel {
     }
 
     public func updateHostSettings(_ settings: HostSettings) async throws {
-        guard !isBusy, let settingsStore else { throw HostError("settings_busy_or_unavailable") }
+        guard !isBrowsingLocked, let settingsStore,
+              !isBusy || settings.plugins == self.settings.plugins else { throw HostError("settings_busy_or_unavailable") }
         var settings = settings
         if self.settings.providerDefaultsInstalled == true { settings.providerDefaultsInstalled = true }
         if let limits = settings.drawingLimits {
@@ -511,6 +530,7 @@ public final class AppModel {
     }
 
     public func setCredential(_ key: String?, credentialID: String) async throws {
+        guard !isBusy else { throw HostError("settings_busy_or_unavailable") }
         try await credentials.setKey(key, for: credentialID)
     }
 
@@ -1179,12 +1199,15 @@ public final class AppModel {
 
     /// The busy flag remains held until cancellation has drained the active task.
     @discardableResult
-    public func performSerialized(status: String, operation: @escaping @MainActor (UUID) async throws -> Void) async -> Bool {
+    public func performSerialized(status: String, allowsBrowsing: Bool = false,
+                                  operation: @escaping @MainActor (UUID) async throws -> Void) async -> Bool {
         guard !isBusy, activeOperation == nil, database != nil else { return false }
         let token = UUID()
         generationToken = token
         providerProgress = nil
-        currentExecutionID = nil
+        activeExecutionID = nil
+        if !allowsBrowsing { currentExecutionID = nil }
+        backgroundDrawing = allowsBrowsing
         stopping = false
         isBusy = true
         errorText = nil
@@ -1205,33 +1228,44 @@ public final class AppModel {
         return succeeded
     }
 
-    public func runAutomation(request: GenerationRequest) async -> SavedWork? {
+    public func runAutomation(request: GenerationRequest, allowsBrowsing: Bool = false) async -> SavedWork? {
         guard let host else { return nil }
         var result: SavedWork?
-        _ = await performSerialized(status: "生成中") { [weak self] token in
+        _ = await performSerialized(status: "生成中", allowsBrowsing: allowsBrowsing) { [weak self] token in
             guard let self else { return }
             try await self.validatePinnedRequest(request)
             let view = try await host.generate(request) { [weak self] progress in
                 Task { @MainActor in self?.receive(progress, token: token, models: request.models) }
             }
+            if self.generationToken == token, !self.stopping {
+                self.activeExecutionID = view.executionID
+                if allowsBrowsing {
+                    self.finishProviderStage(view)
+                    self.status = Self.phaseStatus(view.phase)
+                }
+            }
             await self.recordDescriptionFeedback(request: request, view: view)
             await self.notifyCommittedWork(view)
             try Task.checkCancellation()
-            self.apply(view)
+            if !allowsBrowsing { self.apply(view) }
             try await self.reloadWorks()
             if let id = view.savedWorkID, let work = try await self.database?.work(id: id) {
-                self.displayWork(work)
-                self.selectedContext = try await host.savedAuthoringContext(workID: id)
-                if request.retainedDocument != nil {
-                    // Retained compilation stores a completed candidate, not an editable core execution.
-                    self.currentExecutionID = nil
-                    self.currentView = nil
+                if !allowsBrowsing {
+                    self.displayWork(work)
+                    self.selectedContext = try await host.savedAuthoringContext(workID: id)
+                    if request.retainedDocument != nil {
+                        // Retained compilation stores a completed candidate, not an editable core execution.
+                        self.currentExecutionID = nil
+                        self.currentView = nil
+                    }
                 }
                 result = work
             } else if !request.saveHistory, let work = view.candidateWork {
-                self.previewWork = work
-                self.providerMetrics = view.providerMetrics
-                self.status = "未保存の候補を表示しています"
+                if !allowsBrowsing {
+                    self.previewWork = work
+                    self.providerMetrics = view.providerMetrics
+                    self.status = "未保存の候補を表示しています"
+                }
                 result = work
             }
         }
@@ -1240,6 +1274,8 @@ public final class AppModel {
 
     public func newWork() {
         guard !isBusy else { return }
+        backgroundDrawing = false
+        displayToken = UUID()
         library.clearSelectedAnnotation()
         providerProgress = nil
         providerMetrics = []
@@ -1319,6 +1355,7 @@ public final class AppModel {
         let parentID = selectedWorkID
         _ = await performSerialized(status: "DDLを処理中") { [weak self] token in
             guard let self else { return }
+            self.activeExecutionID = executionID
             self.currentExecutionID = executionID
             let stage2: Bool?
             switch command {
@@ -1473,6 +1510,7 @@ public final class AppModel {
 
     public func restore(from url: URL) async {
         guard !isBusy, activeOperation == nil, let database, let host else { return }
+        backgroundDrawing = false
         isBusy = true
         defer { isBusy = false }
         let scoped = url.startAccessingSecurityScopedResource()
@@ -1480,6 +1518,8 @@ public final class AppModel {
         do {
             try await host.cancelAll()
             try await database.restore(from: url)
+            displayToken = UUID()
+            activeExecutionID = nil
             currentExecutionID = nil
             generationToken = nil
             currentSVG = ""
@@ -1552,16 +1592,21 @@ public final class AppModel {
         guard let database else { return }
         works = try await database.list(limit: 100)
         if let id = selectedWorkID {
-            if let saved = try await database.work(id: id) { selectedWork = saved }
-            else {
-                selectedWork = nil
-                selectedWorkID = nil
-                selectedContext = nil
-                currentView = nil
-                currentExecutionID = nil
-                currentSVG = ""
-                visibleDDL = ""
-                scoreJSON = ""
+            let selectionToken = displayToken
+            let saved = try await database.work(id: id)
+            if displayToken == selectionToken, selectedWorkID == id {
+                if let saved { selectedWork = saved }
+                else {
+                    displayToken = UUID()
+                    selectedWork = nil
+                    selectedWorkID = nil
+                    selectedContext = nil
+                    currentView = nil
+                    currentExecutionID = nil
+                    currentSVG = ""
+                    visibleDDL = ""
+                    scoreJSON = ""
+                }
             }
         }
         await library.refresh()
@@ -1594,7 +1639,9 @@ public final class AppModel {
         guard generationToken == token, !stopping else { return }
         receiveProviderProgress(progress, models: models, comparison: false)
         switch progress {
-        case .changed(let view): apply(view)
+        case .changed(let view):
+            if backgroundDrawing { status = Self.phaseStatus(view.phase) }
+            else { apply(view) }
         case .providerAttempt(_, _, _, let deadline):
             status = providerProgress?.stage == .composition ? "構図を読んでいます" : "モデルの応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）"
         case .transportBytes(_, let count):
@@ -1624,12 +1671,14 @@ public final class AppModel {
     private func receiveProviderProgress(_ progress: PipelineProgress, models: ModelSelection?, comparison: Bool) {
         switch progress {
         case .providerAttempt(let id, let report, let beganAt, let deadline):
+            activeExecutionID = id
             if let models { providerModelsByExecution[id] = models }
             if let next = ProviderProgressSnapshot.start(executionID: id, report: report, beganAt: beganAt,
                 deadline: deadline, models: models ?? providerModelsByExecution[id], comparison: comparison, previous: providerProgress) {
                 providerProgress = next
             }
         case .changed(let view):
+            activeExecutionID = view.executionID
             if let models { providerModelsByExecution[view.executionID] = models }
             finishProviderStage(view)
         case .transportBytes(let id, let bytes):
@@ -1721,13 +1770,16 @@ public final class AppModel {
             unreadOutputs.remove("prompt")
         }
         eventsJSON = (try? Self.pretty(view.eventsJSON)) ?? String(decoding: view.eventsJSON, as: UTF8.self)
-        status = [
+        status = Self.phaseStatus(view.phase)
+    }
+    private static func phaseStatus(_ phase: String) -> String {
+        [
             "authoring_started": "生成を開始しました", "awaiting_llm": "モデルの応答待ち",
             "awaiting_visible_ddl_commit": "DDLを確認しています", "awaiting_patch_approval": "補完案の承認待ち",
             "score_ready": "描画中", "completed": "生成を完了しました",
             "needs_user_edit": "DDLを編集してください", "failed": "生成できませんでした",
             "cancelled": "停止しました",
-        ][view.phase] ?? "処理中"
+        ][phase] ?? "処理中"
     }
     private func report(_ error: Error) {
         if generationToken != nil, !stopping { providerProgress?.finish(.failed, at: Date()) }

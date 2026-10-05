@@ -72,13 +72,13 @@ public final class LibraryPreviewModel {
 
     @discardableResult
     public func openInCreate(app: AppModel) async throws -> Bool {
-        guard !app.isBusy, let id = work?.id else { return false }
+        guard !app.isBrowsingLocked, let id = work?.id else { return false }
         let selection = selectionToken
         let database = try app.auxiliaryDatabase()
         guard let saved = try await database.work(id: id), !saved.trashed else { return false }
-        guard selectionToken == selection, work?.id == id, !app.isBusy, !Task.isCancelled else { return false }
+        guard selectionToken == selection, work?.id == id, !app.isBrowsingLocked, !Task.isCancelled else { return false }
         await app.selectWork(saved)
-        return selectionToken == selection && work?.id == id && app.selectedWorkID == id && !app.isBusy && !Task.isCancelled
+        return selectionToken == selection && work?.id == id && app.selectedWorkID == id && !app.isBrowsingLocked && !Task.isCancelled
     }
 
     public func exportWorks(app: AppModel) async throws -> [SavedWork] {

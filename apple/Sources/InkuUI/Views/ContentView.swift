@@ -89,6 +89,7 @@ public struct ContentView: View {
     @State private var history = HistoryModel()
     @State private var libraryPreview = LibraryPreviewModel()
     @State private var workspaceWork: SavedWork?
+    @State private var batchWorkspace = BatchWorkspaceSelection()
     @State private var maintenance = LocalMaintenance()
     @State private var dialog: WorkDialog?
     @State private var presentation = false
@@ -156,11 +157,23 @@ public struct ContentView: View {
                 do { try await Task.sleep(for: .seconds(60)) } catch { return }
             }
         }
-        .onChange(of: model.selectedWorkID) { _, _ in Task { await history.locate(app: model) } }
-        .onChange(of: model.works) { _, _ in Task { await history.library.refresh() } }
+        .onChange(of: model.selectedWorkID) { _, _ in
+            batchWorkspace.showHistory()
+            Task { await history.locate(app: model) }
+        }
+        .onChange(of: automation.running) { _, running in
+            if running && automation.mode == "batch" { batchWorkspace.followLatest() }
+        }
+        .onChange(of: presentation) { _, _ in batchWorkspace.invalidateReads() }
+        .onChange(of: dialog?.id) { _, _ in batchWorkspace.invalidateReads() }
+        .onChange(of: model.works) { _, _ in Task {
+            await history.library.refresh()
+            await history.locate(app: model, workID: section == .create ? workspaceWork?.id : model.selectedWorkID)
+        } }
         .onChange(of: model.restorationRevision) { _, revision in
             libraryPreview.close()
             automation.invalidateWorkObservationsAfterRestore()
+            batchWorkspace.showHistory()
             workspaceWork = nil
             presentationLoadID = UUID()
             presentationWork = nil
@@ -175,6 +188,7 @@ public struct ContentView: View {
             if let raw = message.object as? String, let target = AppSection(rawValue: raw), canNavigateSections {
                 if target == .settings, let raw = message.userInfo?["settingsSection"] as? String,
                    let destination = SettingsSection(rawValue: raw) { settingsSection = destination }
+                if (target == .create || target == .lineage), message.userInfo?["workID"] is String { batchWorkspace.showHistory() }
                 section = target
             }
         }
@@ -226,9 +240,12 @@ public struct ContentView: View {
 
     @ViewBuilder private var detail: some View {
         switch section ?? .create {
-        case .create: CreationView(model: model, history: history, automation: automation, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay, onWorkAction: openWorkAction, onLineageExport: openLineageExport, onWorkspaceWorkChange: { workspaceWork = $0 }).disabled(importing)
-        case .library: LibraryView(model: model, preview: libraryPreview, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay, onWorkAction: openWorkAction).disabled(automation.isOccupied || importing)
-        case .lineage: LineageView(model: model, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay, onWorkAction: openWorkAction, onExport: openLineageExport).disabled(automation.isOccupied || importing)
+        case .create: CreationView(model: model, history: history, automation: automation, batchWorkspace: $batchWorkspace, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay, onWorkAction: openWorkAction, onLineageExport: openLineageExport, onWorkspaceWorkChange: { work in
+            workspaceWork = work
+            Task { await history.locate(app: model, workID: work?.id) }
+        }).disabled(importing)
+        case .library: LibraryView(model: model, preview: libraryPreview, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay, onWorkAction: openWorkAction, writingLocked: model.isBusy || automation.isOccupied).disabled(importing)
+        case .lineage: LineageView(model: model, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay, onWorkAction: openWorkAction, onExport: openLineageExport, writingLocked: model.isBusy || automation.isOccupied, onBrowseWork: { _ in batchWorkspace.showHistory() }).disabled(importing)
         case .automation: AutomationView(model: model, automation: automation, demoOnly: true).disabled(importing)
         case .settings: SettingsView(model: model, automation: automation, maintenance: maintenance, section: $settingsSection).disabled(importing)
         }
@@ -241,7 +258,8 @@ public struct ContentView: View {
         false
         #endif
     }
-    private var canNavigateSections: Bool { !automation.isOccupied && !importing && dialog == nil && !presentation }
+    private var canNavigateSections: Bool { !importing && dialog == nil && !presentation }
+    private var canReadWork: Bool { !model.isBrowsingLocked && !importing && dialog == nil && !presentation }
     private var canUseWork: Bool { !model.isBusy && !automation.isOccupied && !importing && dialog == nil && !presentation }
     private var workTarget: SavedWork? {
         switch section ?? .create {
@@ -253,6 +271,7 @@ public struct ContentView: View {
     }
     private var hasSavedWork: Bool { (section != .create || workTarget?.id != model.previewWork?.id) && workTarget?.trashed == false }
     private var canCopyImage: Bool { canUseWork && workTarget?.svg.isEmpty == false }
+    private var canPresentWork: Bool { canReadWork && workTarget?.svg.isEmpty == false }
     private var canExport: Bool {
         guard canUseWork else { return false }
         switch section ?? .create {
@@ -275,13 +294,15 @@ public struct ContentView: View {
             #endif
         }
         if canExport { enabled.insert(.export) }
-        if canCopyImage { enabled.formUnion([.copyImage, .presentation]) }
+        if canCopyImage { enabled.insert(.copyImage) }
+        if canPresentWork { enabled.insert(.presentation) }
         return InkuCommandContext(enabledActions: enabled, perform: performCommand)
     }
     private func performCommand(_ action: InkuCommandAction) {
         guard commandContext.isEnabled(action) else { return }
         switch action {
         case .newWork:
+            batchWorkspace.showHistory()
             #if os(macOS)
             importer.clearMessage()
             #endif
@@ -350,14 +371,15 @@ public struct ContentView: View {
                 Menu(model.display.localized("作品の操作"), systemImage: "ellipsis.circle") {
                     Button(model.display.localized("再演奏"), systemImage: "arrow.clockwise") {
                         if let work = workTarget { openReplay(work) }
-                    }.disabled(!hasSavedWork)
-                    if let work = workTarget { SavedWorkRefinementActions(model: model, work: work, onAction: openWorkAction) }
-                    Button(model.display.localized("系譜の奥書")) { if let work = workTarget { openWorkAction(work, "colophon") } }.disabled(!hasSavedWork)
+                    }.disabled(!canUseWork || !hasSavedWork)
+                    if let work = workTarget { SavedWorkRefinementActions(model: model, work: work, onAction: openWorkAction, writingLocked: automation.isOccupied) }
+                    Button(model.display.localized("生成情報"), systemImage: "info.circle") { if let work = workTarget { openWorkAction(work, "info") } }.disabled(!hasSavedWork)
+                    Button(model.display.localized("系譜の奥書")) { if let work = workTarget { openWorkAction(work, "colophon") } }.disabled(!canUseWork || !hasSavedWork)
                     Button(model.display.localized("系譜を開く")) { if let work = workTarget { openWorkAction(work, "lineage") } }.disabled(!hasSavedWork)
                     Divider()
                     Button(model.display.localized("全画面で表示")) { Task { await preparePresentation() } }
-                        .disabled(!canCopyImage).keyboardShortcut("f", modifiers: [.command, .shift])
-                }.disabled(!canUseWork || !hasSavedWork)
+                        .disabled(!canPresentWork).keyboardShortcut("f", modifiers: [.command, .shift])
+                }.disabled(!canReadWork || !hasSavedWork)
                     .help(model.display.tooltip("作品の操作"))
             }
         }
@@ -429,7 +451,8 @@ public struct ContentView: View {
     }
 
     private func openWorkAction(_ work: SavedWork, _ action: String) {
-        guard canUseWork, !work.trashed else { return }
+        guard !work.trashed,
+              canUseWork || (canReadWork && SavedWorkActionState.isBrowsingAction(action)) else { return }
         switch action {
         case "info": dialog = .information(RefinementSession(work: work))
         case "presentation": Task { await preparePresentation(work: work) }
@@ -447,7 +470,9 @@ public struct ContentView: View {
         case "parameters": openRefinement(work)
         case "description": openWorkEdit(work, .description)
         case "sketch": openWorkEdit(work, .sketch)
-        case "create": Task { await model.selectWork(work); section = .create }
+        case "create":
+            batchWorkspace.showHistory()
+            Task { await model.selectWork(work); section = .create }
         case "lineage": Task { await model.library.loadLineage(work: work); section = .lineage }
         default: break
         }
@@ -493,13 +518,13 @@ public struct ContentView: View {
             ArtworkCanvas(svg: presentationWork?.svg ?? "", renderer: model.renderer, caption: presentationWork?.effectiveSourceText ?? "")
             HStack {
                 Button(model.display.localized("最新")) { navigatePresentation(boundary: "latest") }
-                    .disabled(!presentationHistory.canMoveNewer || model.isBusy)
+                    .disabled(!presentationHistory.canMoveNewer || model.isBrowsingLocked)
                 Button(model.display.localized("新しい作品"), systemImage: "chevron.left") { navigatePresentation(delta: -1) }
-                    .disabled(!presentationHistory.canMoveNewer || model.isBusy)
+                    .disabled(!presentationHistory.canMoveNewer || model.isBrowsingLocked)
                 Button(model.display.localized("古い作品"), systemImage: "chevron.right") { navigatePresentation(delta: 1) }
-                    .disabled(!presentationHistory.canMoveOlder || model.isBusy)
+                    .disabled(!presentationHistory.canMoveOlder || model.isBrowsingLocked)
                 Button(model.display.localized("最古")) { navigatePresentation(boundary: "oldest") }
-                    .disabled(!presentationHistory.canMoveOlder || model.isBusy)
+                    .disabled(!presentationHistory.canMoveOlder || model.isBrowsingLocked)
                 if let work = presentationWork { Text(work.renderHash.map { String($0.suffix(4)) } ?? "").font(.caption.monospaced()) }
                 Spacer()
                 Button(model.display.localized("表示を終了")) { exitPresentation() }.keyboardShortcut(.escape, modifiers: [])
@@ -507,13 +532,13 @@ public struct ContentView: View {
         }.padding(16).frame(maxWidth: .infinity, maxHeight: .infinity).background(.background)
     }
     private func preparePresentation(work target: SavedWork? = nil) async {
-        guard canUseWork, let work = target ?? workTarget, !work.svg.isEmpty else { return }
+        guard canReadWork, let work = target ?? workTarget, !work.svg.isEmpty else { return }
         let token = UUID(); presentationLoadID = token
         let sourceSection = section
         let viewer = HistoryModel()
         await viewer.connect(app: model)
         await viewer.locate(app: model, workID: work.id)
-        guard canUseWork, section == sourceSection, presentationLoadID == token else { return }
+        guard canReadWork, section == sourceSection, presentationLoadID == token else { return }
         presentationWork = work; presentationHistory = viewer
         enterPresentation()
     }

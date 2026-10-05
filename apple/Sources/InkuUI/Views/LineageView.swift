@@ -10,6 +10,8 @@ struct LineageView: View {
     let onWorkAction: (SavedWork, String) -> Void
     let onExport: (String) -> Void
     var initialWork: SavedWork? = nil
+    var writingLocked = false
+    var onBrowseWork: (SavedWork) -> Void = { _ in }
     @State private var details: LineageItem?
     @State private var replayAfterDetails: SavedWork?
     @State private var actionAfterDetails: (work: SavedWork, action: String)?
@@ -17,6 +19,7 @@ struct LineageView: View {
     @State private var scrollToFocus = 0
     @FocusState private var focusedNodeID: String?
     private var library: LibraryModel { model.library }
+    private var writingDisabled: Bool { model.isBusy || writingLocked }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -49,7 +52,7 @@ struct LineageView: View {
                     Label(model.display.localized("系譜を読み込めません"), systemImage: "exclamationmark.triangle")
                 } description: { Text(error).textSelection(.enabled) } actions: {
                     Button(model.display.localized("再試行")) { Task { await library.retryLineage() } }
-                        .disabled(library.lineageLoading || model.isBusy)
+                        .disabled(library.lineageLoading || model.isBrowsingLocked)
                 }
             } else {
                 ContentUnavailableView(model.display.localized("系譜を選択"), systemImage: "point.3.connected.trianglepath.dotted",
@@ -83,7 +86,7 @@ struct LineageView: View {
         .alert(item: $trashConfirmation) { request in
             Alert(title: Text(model.display.localizedFormat("%ld件をごみ箱に移動しますか？", request.ids.count)),
                   primaryButton: .default(Text(model.display.localized("実行"))) {
-                      guard !library.mutating, !model.isBusy else { return }
+                      guard !library.mutating, !writingDisabled else { return }
                       Task { await library.trash(ids: request.ids) }
                   }, secondaryButton: .cancel(Text(model.display.localized("キャンセル"))))
         }
@@ -108,7 +111,7 @@ struct LineageView: View {
                     Button(model.display.localized("起点からの道筋")) { onExport("path") }.disabled(library.graph == nil)
                     Button(model.display.localizedFormat("チェックした作品: %ld 件", library.selectedIDs.count)) { onExport("checked") }
                         .disabled(library.selectedIDs.isEmpty)
-                }.disabled(model.isBusy || library.lineageLoading)
+                }.disabled(writingDisabled || library.lineageLoading)
             }
             navigation
             ViewThatFits(in: .horizontal) {
@@ -124,7 +127,7 @@ struct LineageView: View {
                             if library.lineageError != nil { await library.retryLineage() }
                             else { await library.refresh() }
                         }
-                    }.disabled(library.lineageLoading || library.loading || model.isBusy)
+                    }.disabled(library.lineageLoading || library.loading || model.isBrowsingLocked)
                 }.font(.caption)
             } else if library.mutating {
                 HStack(spacing: 8) { ProgressView().controlSize(.small); Text(model.display.localized("変更を保存中")) }.font(.caption)
@@ -177,7 +180,7 @@ struct LineageView: View {
                 .help(tip("今見えている作品を複数選択に追加します。"))
             Button(model.display.localized("解除")) { library.selectedIDs.removeAll() }.disabled(library.selectedIDs.isEmpty)
                 .help(tip("作品の複数選択を解除します。"))
-        }.controlSize(.small).disabled(library.mutating || model.isBusy || library.lineageLoading)
+        }.controlSize(.small).disabled(library.mutating || model.isBrowsingLocked || library.lineageLoading)
     }
 
     private var selectionLegend: some View {
@@ -290,7 +293,7 @@ struct LineageView: View {
                     }.buttonStyle(.plain).foregroundStyle(library.selectedIDs.contains(work.id) ? Color.accentColor : Color.secondary)
                         .accessibilityLabel(model.display.localized("複数選択のチェック"))
                         .accessibilityValue(model.display.localized(library.selectedIDs.contains(work.id) ? "選択済み" : "未選択"))
-                        .disabled(library.mutating || model.isBusy)
+                        .disabled(library.mutating || model.isBrowsingLocked)
                 }
                 Text(operation(graph.edges.first { $0.childNodeID == item.id }?.derivationKind)).font(.caption.weight(.semibold)).lineLimit(1)
                 Spacer(minLength: 0)
@@ -308,14 +311,14 @@ struct LineageView: View {
                         ArtworkThumbnail(work: work, renderer: model.renderer).frame(height: 148)
                         LibraryWorkTitle(work: work, untitled: model.display.localized("無題"), lineLimit: 3)
                     }
-                }.buttonStyle(.plain).disabled(model.isBusy)
+                }.buttonStyle(.plain).disabled(model.isBrowsingLocked)
                 HStack(spacing: 8) {
                     if model.selectedWorkID == work.id { Label(model.display.localized("表示中"), systemImage: "eye").foregroundStyle(Color.accentColor) }
                     if LibraryWorkPresentation.usesDDLTitle(work) { Text("DDL").monospaced() }
                     if work.trashed { Label(model.display.localized("ごみ箱の作品"), systemImage: "trash") }
                 }.font(.caption2).foregroundStyle(.secondary)
                 HStack {
-                    LibraryWorkMarks(model: model, work: work)
+                    LibraryWorkMarks(model: model, work: work).disabled(writingDisabled)
                     Spacer(minLength: 6)
                     if let hash = work.renderHash {
                         Button("…\(hash.suffix(4))") { library.copyHash(hash) }.font(.caption.monospaced())
@@ -327,7 +330,7 @@ struct LineageView: View {
                 }
                 if item.node.state == "lineage_only" {
                     Button(model.display.localized("ライブラリへ追加"), systemImage: "plus") { Task { await library.promote(item.id) } }
-                        .controlSize(.small).disabled(library.mutating || model.isBusy)
+                        .controlSize(.small).disabled(library.mutating || writingDisabled)
                 }
             } else {
                 VStack(spacing: 8) {
@@ -359,12 +362,12 @@ struct LineageView: View {
         .task(id: item.work?.id) { if let work = item.work { await model.loadWorkActionState(work) } }
         .focusable().focused($focusedNodeID, equals: item.id)
         .onKeyPress(.return) {
-            guard focusedNodeID == item.id, !model.isBusy, !library.lineageLoading else { return .ignored }
+            guard focusedNodeID == item.id, !model.isBrowsingLocked, !library.lineageLoading else { return .ignored }
             if item.work != nil { openWork(item) } else { focusNode(item.id) }
             return .handled
         }
         .onKeyPress(.space) {
-            guard focusedNodeID == item.id, let work = item.work, !library.mutating, !model.isBusy else { return .ignored }
+            guard focusedNodeID == item.id, let work = item.work, !library.mutating, !model.isBrowsingLocked else { return .ignored }
             library.toggleSelection(work.id); return .handled
         }
         .anchorPreference(key: LineageCardBounds.self, value: .bounds) { [item.id: $0] }
@@ -396,7 +399,8 @@ struct LineageView: View {
     }
 
     private func openWork(_ item: LineageItem) {
-        guard let work = item.work else { return }
+        guard let work = item.work, !model.isBrowsingLocked else { return }
+        onBrowseWork(work)
         Task { await model.selectWork(work) }
     }
 
@@ -423,31 +427,32 @@ struct LineageView: View {
             .help(tip("作品の保存情報とコメントを開きます。"))
         if let work = item.work {
             Divider()
-            Button(model.display.localized("作品を開く"), systemImage: "eye") { openWork(item) }.disabled(model.isBusy)
+            Button(model.display.localized("作品を開く"), systemImage: "eye") { openWork(item) }.disabled(model.isBrowsingLocked)
+            Button(model.display.localized("生成情報"), systemImage: "info.circle") { onWorkAction(work, "info") }.disabled(model.isBrowsingLocked || work.trashed)
             Button(model.display.localized("制作で編集"), systemImage: "pencil") {
-                Task { await model.selectWork(work); NotificationCenter.default.post(name: .inkuOpenSection, object: "create") }
-            }.disabled(model.isBusy || work.trashed)
-            SavedWorkRefinementActions(model: model, work: work, onAction: onWorkAction)
-            Button(model.display.localized("書き出す")) { onWorkAction(work, "export") }.disabled(model.isBusy || work.trashed)
+                Task { await model.selectWork(work); NotificationCenter.default.post(name: .inkuOpenSection, object: "create", userInfo: ["workID": work.id]) }
+            }.disabled(model.isBrowsingLocked || work.trashed)
+            SavedWorkRefinementActions(model: model, work: work, onAction: onWorkAction, writingLocked: writingDisabled)
+            Button(model.display.localized("書き出す")) { onWorkAction(work, "export") }.disabled(writingDisabled || work.trashed)
             Button(model.display.localized(library.selectedIDs.contains(work.id) ? "チェックを外す" : "複数選択に追加"), systemImage: "checkmark.square") { library.toggleSelection(work.id) }
-                .disabled(library.mutating || model.isBusy)
+                .disabled(library.mutating || model.isBrowsingLocked)
             Button(model.display.localized(work.starred ? "お気に入りを解除" : "お気に入り"), systemImage: "star") { Task { await library.toggleStar(work) } }
-                .disabled(library.mutating || model.isBusy)
+                .disabled(library.mutating || writingDisabled)
             Button(model.display.localized("推敲の印"), systemImage: library.annotation(for: work.id).forRevision ? "pencil.circle.fill" : "pencil.circle") { Task { await library.toggleRevision(work) } }
-                .disabled(library.mutating || model.isBusy)
+                .disabled(library.mutating || writingDisabled)
             Button(model.display.localized("書き出し用の印"), systemImage: library.annotation(for: work.id).forShare ? "square.and.arrow.up.fill" : "square.and.arrow.up") { Task { await library.toggleShare(work) } }
-                .disabled(library.mutating || model.isBusy)
+                .disabled(library.mutating || writingDisabled)
             if let hash = work.renderHash { Button(model.display.localized("描画ハッシュ全体をコピー"), systemImage: "doc.on.doc") { library.copyHash(hash) } }
             if item.node.state == "lineage_only" {
-                Button(model.display.localized("ライブラリへ追加"), systemImage: "plus") { Task { await library.promote(item.id) } }.disabled(library.mutating || model.isBusy)
+                Button(model.display.localized("ライブラリへ追加"), systemImage: "plus") { Task { await library.promote(item.id) } }.disabled(library.mutating || writingDisabled)
             }
             Divider()
             if work.trashed {
-                Button(model.display.localized("戻す"), systemImage: "arrow.uturn.backward") { Task { await library.restore(ids: [work.id]) } }.disabled(library.mutating || model.isBusy)
+                Button(model.display.localized("戻す"), systemImage: "arrow.uturn.backward") { Task { await library.restore(ids: [work.id]) } }.disabled(library.mutating || writingDisabled)
             } else {
                 Button(model.display.localized("ごみ箱へ"), systemImage: "trash") {
                     trashConfirmation = LineageTrashConfirmation(ids: [work.id])
-                }.disabled(library.mutating || model.isBusy)
+                }.disabled(library.mutating || writingDisabled)
             }
         }
     }
@@ -471,7 +476,8 @@ struct LineageView: View {
                 }, onOpenInCreate: { parent in queueDetailsAction(parent, "create") },
                    onAdjustWork: { parent in queueDetailsAction(parent, "parameters") },
                    onWorkAction: queueDetailsAction,
-                   onOpenLineage: { parent in queueDetailsAction(parent, "lineage") }).id(work.id)
+                   onOpenLineage: { parent in queueDetailsAction(parent, "lineage") },
+                   writingLocked: writingDisabled).id(work.id)
             }
             else { Text(model.display.localized("元の節点と接続を保持しています。作品本文は削除されています。")).foregroundStyle(.secondary) }
         }.padding(24).frame(minWidth: 340, idealWidth: 700, minHeight: item.work == nil ? 240 : 660)

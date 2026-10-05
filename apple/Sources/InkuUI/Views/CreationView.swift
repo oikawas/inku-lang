@@ -1,11 +1,28 @@
 import InkuPersistence
 import SwiftUI
 
+struct BatchWorkspaceSelection {
+    private enum Display { case history, latest, row(SavedWork, String) }
+    private var display = Display.history
+    var revision = UUID()
+    init() {}
+
+    var followsLatest: Bool { if case .latest = display { true } else { false } }
+    var pinnedWork: SavedWork? { if case .row(let work, _) = display { work } else { nil } }
+    var rowID: String? { if case .row(_, let id) = display { id } else { nil } }
+
+    mutating func showHistory() { display = .history; revision = UUID() }
+    mutating func followLatest() { display = .latest; revision = UUID() }
+    mutating func pin(_ work: SavedWork, rowID: String) { display = .row(work, rowID); revision = UUID() }
+    mutating func invalidateReads() { revision = UUID() }
+}
+
 @MainActor
 struct CreationView: View {
     @Bindable var model: AppModel
     @Bindable var history: HistoryModel
     @Bindable var automation: AutomationModel
+    @Binding var batchWorkspace: BatchWorkspaceSelection
     let onEditWork: (SavedWork, WorkEditMode) -> Void
     let onAdjustWork: (SavedWork) -> Void
     let onReplayWork: (SavedWork) -> Void
@@ -13,17 +30,18 @@ struct CreationView: View {
     let onLineageExport: (String) -> Void
     var onWorkspaceWorkChange: (SavedWork?) -> Void = { _ in }
     private var controlsDisabled: Bool { model.isBusy || automation.isOccupied }
+    private var browsingDisabled: Bool { model.isBrowsingLocked }
     @State private var showSaijiki = false
     @State private var workspaceTab = "artwork"
-    @State private var batchFollowsLatest = false
     @State private var showColorCatalogs = false
     @State private var showModelPicker = false
     @State private var showConditionDetails = false
     @State private var showPaperPicker = false
     @State private var showNewDDL = false
     private var isBatch: Bool { automation.workspaceInputMode == "batch" }
-    private var usesBatchWork: Bool { batchFollowsLatest && automation.observedWork != nil }
-    private var workspaceWork: SavedWork? { usesBatchWork ? automation.observedWork : model.displayedWork }
+    private var batchWork: SavedWork? { batchWorkspace.pinnedWork ?? (batchWorkspace.followsLatest ? automation.observedWork : nil) }
+    private var usesBatchWork: Bool { isBatch && batchWork != nil }
+    private var workspaceWork: SavedWork? { usesBatchWork ? batchWork : model.displayedWork }
     private var workspaceIsPreview: Bool { !usesBatchWork && model.isPreview }
     private var hasSavedWorkspaceWork: Bool { workspaceWork?.trashed == false && !workspaceIsPreview }
     #if os(macOS)
@@ -39,7 +57,7 @@ struct CreationView: View {
                     Text(model.display.localized("記述")).tag("description")
                     Text(model.display.localized("バッチ")).tag("batch")
                 }.pickerStyle(.segmented).frame(width: 260)
-                    .disabled(model.isBusy || automation.isOccupied)
+                    .disabled(browsingDisabled)
             }
             Spacer()
             if model.display.visible("ddl_tools") {
@@ -82,7 +100,7 @@ struct CreationView: View {
                 }
             }
           }
-          if model.display.visible("history") { Divider(); HistoryStripView(model: model, history: history) }
+          if model.display.visible("history") { Divider(); HistoryStripView(model: model, history: history, displayedWorkID: workspaceWork?.id, onSelectWork: { _ in batchWorkspace.showHistory() }) }
         }
         .sheet(isPresented: $showSaijiki) {
             VStack(spacing: 0) {
@@ -93,15 +111,15 @@ struct CreationView: View {
         .sheet(isPresented: $showColorCatalogs) { ColorCatalogView(model: model, descriptionOnly: true) }
         .sheet(isPresented: $showModelPicker) { BatchModelPickerView(model: model) }
         .sheet(isPresented: $showNewDDL) { NewDdlAuthoringSheet(model: model) }
-        .onChange(of: automation.observedWork?.id) { _, id in
-            if id != nil && (isBatch || (automation.running && automation.mode == "batch")) { batchFollowsLatest = true }
+        .onChange(of: automation.workspaceInputMode) { _, _ in batchWorkspace.invalidateReads() }
+        .onChange(of: workspaceTab) { _, tab in
+            batchWorkspace.invalidateReads()
+            if tab == "lineage", isBatch, batchWorkspace.followsLatest,
+               let work = batchWork, let rowID = automation.observedRow?.id {
+                batchWorkspace.pin(work, rowID: rowID)
+            }
         }
-        .onChange(of: automation.running) { _, running in
-            if running && automation.mode == "batch" { batchFollowsLatest = true }
-        }
-        .onChange(of: model.selectedWorkID) { _, _ in
-            if !automation.isOccupied { batchFollowsLatest = false }
-        }
+        .onDisappear { batchWorkspace.invalidateReads() }
         .onChange(of: workspaceWork?.id) { _, _ in
             onWorkspaceWorkChange(workspaceWork)
         }
@@ -117,7 +135,9 @@ struct CreationView: View {
         VStack(alignment: .leading, spacing: 14) {
             if isBatch {
                 BatchPanelView(model: model, automation: automation, inputOnly: true,
-                               onObserveWork: { batchFollowsLatest = true })
+                               onObserveWork: { work, rowID in batchWorkspace.pin(work, rowID: rowID) },
+                               followsLatestWork: batchWorkspace.followsLatest,
+                               selectedRowID: batchWorkspace.rowID, observationRevision: $batchWorkspace.revision)
             } else {
                 input
                 if model.display.visible("drawing_settings") { nextConditions }
@@ -135,7 +155,7 @@ struct CreationView: View {
                 Text(model.display.localized("作品を作る")).font(.title2.weight(.semibold))
                 Spacer()
                 Button(model.display.localized("新規")) {
-                    batchFollowsLatest = false
+                    batchWorkspace.showHistory()
                     #if os(macOS)
                     importer.clearMessage()
                     #endif
@@ -255,7 +275,7 @@ struct CreationView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .disabled(model.isBusy)
+                .disabled(browsingDisabled)
             }
             if automation.isOccupied {
                 Button { Task { await automation.stop(app: model) } } label: {
@@ -269,7 +289,7 @@ struct CreationView: View {
                     .frame(maxWidth: .infinity)
                     .help(tip("実行中の描画を停止します。"))
             } else {
-                Button { batchFollowsLatest = false; Task { await model.generateDescription() } } label: {
+                Button { batchWorkspace.showHistory(); Task { await model.generateDescription() } } label: {
                     Label(model.display.localized("生成"), systemImage: "play.fill").frame(maxWidth: .infinity)
                 }
                     .buttonStyle(.borderedProminent)
@@ -307,7 +327,7 @@ struct CreationView: View {
                 Picker(model.display.localized("表示"), selection: $workspaceTab) { Text(model.display.localized("作品")).tag("artwork"); Text(model.display.localized("系譜")).tag("lineage") }
                     .pickerStyle(.segmented).labelsHidden().frame(width: 150)
                     .accessibilityLabel(model.display.localized("表示"))
-                    .disabled(workspaceWork == nil || controlsDisabled)
+                    .disabled(workspaceWork == nil || browsingDisabled)
                 Spacer()
                 if let work = workspaceWork, hasSavedWorkspaceWork {
                     Menu(model.display.localized("推敲する")) {
@@ -329,7 +349,8 @@ struct CreationView: View {
             }
             if workspaceTab == "lineage" && model.display.visible("work_tools") {
                 LineageView(model: model, onEditWork: onEditWork, onAdjustWork: onAdjustWork, onReplayWork: onReplayWork,
-                            onWorkAction: onWorkAction, onExport: onLineageExport, initialWork: workspaceWork)
+                            onWorkAction: onWorkAction, onExport: onLineageExport, initialWork: workspaceWork,
+                            writingLocked: controlsDisabled, onBrowseWork: { _ in batchWorkspace.showHistory() })
             }
             else {
                 ArtworkCanvas(svg: workspaceWork?.svg ?? model.currentSVG, renderer: model.renderer,
@@ -338,7 +359,7 @@ struct CreationView: View {
             }
             if workspaceTab == "artwork" || !model.display.visible("work_tools") {
                 CreationCanvasControls(model: model, work: workspaceWork, saved: hasSavedWorkspaceWork,
-                                       disabled: controlsDisabled, onReplayWork: onReplayWork,
+                                       disabled: controlsDisabled, browsingDisabled: browsingDisabled, onReplayWork: onReplayWork,
                                        onWorkAction: onWorkAction, onShowSaijiki: { showSaijiki = true })
             }
             if workspaceIsPreview {
@@ -348,10 +369,10 @@ struct CreationView: View {
                         Button(model.display.localized("この候補を保存")) { Task { await model.savePreview() } }.buttonStyle(.borderedProminent)
                         Button(model.display.localized("候補を閉じる")) { Task { await model.clearPreview() } }
                     }
-                }.disabled(model.isBusy)
+                }.disabled(controlsDisabled)
             }
             if model.display.visible("history") {
-                navigationActions.controlSize(.small).disabled(controlsDisabled)
+                navigationActions.controlSize(.small).disabled(browsingDisabled)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -388,10 +409,20 @@ struct CreationView: View {
     }
 
     private func navigateHistory(delta: Int = 0, boundary: String? = nil) {
-        guard !controlsDisabled else { return }
+        guard !browsingDisabled else { return }
         let workID = workspaceWork?.id
-        batchFollowsLatest = false
-        Task { await history.navigate(app: model, fromWorkID: workID, delta: delta, boundary: boundary) }
+        batchWorkspace.invalidateReads()
+        let revision = batchWorkspace.revision
+        Task {
+            guard let work = await history.navigate(app: model, fromWorkID: workID, delta: delta,
+                                                   boundary: boundary, selectWork: false) else { return }
+            guard batchWorkspace.revision == revision, !browsingDisabled else {
+                await history.locate(app: model, workID: workspaceWork?.id)
+                return
+            }
+            batchWorkspace.showHistory()
+            await model.selectWork(work)
+        }
     }
 
     private func tip(_ key: String) -> String {

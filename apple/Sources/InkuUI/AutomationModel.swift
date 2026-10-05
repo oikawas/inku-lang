@@ -225,26 +225,36 @@ public final class AutomationModel {
         demoSaveStatus = ""
     }
 
-    public func observeBatchRow(id: String, app: AppModel) async {
-        guard !isOccupied, !app.isBusy, let row = rows.first(where: { $0.id == id && $0.state == .succeeded }),
-              let workID = row.workID else { return }
+    @discardableResult
+    public func observeBatchRow(id: String, app: AppModel) async -> SavedWork? {
+        guard !app.isBrowsingLocked, let row = rows.first(where: { $0.id == id && $0.state == .succeeded }),
+              let workID = row.workID else { return nil }
         let observationToken = UUID()
         batchObservationToken = observationToken
         let selectedWorkID = app.selectedWorkID
         do {
             guard let work = try await app.auxiliaryDatabase().work(id: workID) else { throw HostError("saved_work_missing") }
             guard batchObservationToken == observationToken, app.selectedWorkID == selectedWorkID,
-                  !Task.isCancelled, !isOccupied, !app.isBusy,
-                  rows.contains(where: { $0.id == id && $0.workID == workID && $0.state == .succeeded }) else { return }
-            observedRowID = id
-            observedWork = work
-            journal?.observedRowID = id
-            await persist()
+                  !Task.isCancelled, !app.isBrowsingLocked,
+                  rows.contains(where: { $0.id == id && $0.workID == workID && $0.state == .succeeded }) else { return nil }
+            // Browsing during a run pins a view snapshot without changing the live
+            // latest-result observation or the authoritative batch journal.
+            if !isOccupied {
+                observedRowID = id
+                observedWork = work
+                journal?.observedRowID = id
+                await persist()
+            }
+            guard batchObservationToken == observationToken, app.selectedWorkID == selectedWorkID,
+                  !Task.isCancelled, !app.isBrowsingLocked,
+                  rows.contains(where: { $0.id == id && $0.workID == workID && $0.state == .succeeded }) else { return nil }
+            return work
         } catch {
             guard batchObservationToken == observationToken, app.selectedWorkID == selectedWorkID,
-                  !Task.isCancelled, !isOccupied, !app.isBusy,
-                  rows.contains(where: { $0.id == id && $0.workID == workID && $0.state == .succeeded }) else { return }
+                  !Task.isCancelled, !app.isBrowsingLocked,
+                  rows.contains(where: { $0.id == id && $0.workID == workID && $0.state == .succeeded }) else { return nil }
             errorText = error.localizedDescription
+            return nil
         }
     }
 
@@ -258,6 +268,7 @@ public final class AutomationModel {
     public func startBatch(app: AppModel) async {
         guard !running, !preparing, !app.isBusy else { return }
         preparing = true
+        batchObservationToken = UUID()
         defer { preparing = false }
         do {
             let originalText = batchText
@@ -298,6 +309,7 @@ public final class AutomationModel {
     public func resumeBatch(app: AppModel) async {
         guard !running, !preparing, !app.isBusy, canResume, uncertainCount == 0 else { return }
         preparing = true
+        batchObservationToken = UUID()
         defer { preparing = false }
         if let originalText = journal?.originalText {
             batchText = BatchInputLines.normalizedText(originalText)
@@ -332,7 +344,7 @@ public final class AutomationModel {
                         self.status = "\(index + 1) / \(self.rows.count)（元の\(self.rows[index].line)行目）\(round > 0 ? "・再試行\(round)" : "")"
                         try await self.saveJournal()
                         self.batchRowStartedAt = Date()
-                        let result = await app.runAutomation(request: self.rows[index].request)
+                        let result = await app.runAutomation(request: self.rows[index].request, allowsBrowsing: true)
                         self.batchRowStartedAt = nil
                         if let result {
                             self.rows[index].state = .succeeded; self.rows[index].workID = result.id

@@ -14,6 +14,16 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-05 Browsing and next-run settings during a batch
+
+While a batch row is drawing, users can switch the description/batch and work/lineage tabs, navigate screens, select and page through history, move to its ends, inspect saved-work details/prompts/Score JSON, and use Settings tabs. Active executions have separate identities from the displayed work. Batch progress and completion do not replace the browsed image, DDL, prompts, or saved measurements; completed works still enter history. Explicitly starting or resuming a batch follows its latest result. Selecting history or a previous successful work pins that display, and neither another completed row nor returning to the screen restarts following.
+
+The saved work displayed on the canvas can be starred or unstarred during a batch. Saving pins the work ID and star state at the click, so another completed row cannot move the save target. Duplicate actions are disabled while saving, and the resulting display update applies only while that same work is shown. Stars update saved-work attributes without changing active drawing conditions.
+
+New drawing, redrawing, edit commits, imports, work mutations other than the canvas star action, and batch input/conditions/resume decisions retain the whole-batch execution lock, including gaps between rows. Display settings and ordinary provider/model/URL/rate/drawing-limit saves apply to future runs without changing pinned models, connections, budgets, or retry conditions. API-key writes/deletions, personal ChatGPT connection changes, plugin changes, database restore/backup, and result-file logging switches remain restricted during execution. Sheets opened beforehand recheck current execution state when beginning a key change.
+
+This update changes source and documentation and stops immediately before building. Compilation, test execution, and native interaction remain unverified. Ordinary foreground drawing and demos retain their execution boundaries; only batch rows opt into background processing that permits browsing.
+
 ## 2026-10-05 Following shared Rust parallelism and test-profile optimizations
 
 Ported Server's additional changes to derive the drawing capability matrix concurrently by shape. Predicate and term enumeration, result ordering, and asset identities remain intact. The bundled matrix used by normal rendering, shared protocols, and drawing semantics are unchanged.

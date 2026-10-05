@@ -4,7 +4,10 @@ import SwiftUI
 @MainActor struct HistoryStripView: View {
     @Bindable var model: AppModel
     @Bindable var history: HistoryModel
+    var displayedWorkID: String? = nil
+    var onSelectWork: (SavedWork) -> Void = { _ in }
     private var library: LibraryModel { history.library }
+    private var selectionID: String? { displayedWorkID ?? model.selectedWorkID }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -40,27 +43,31 @@ import SwiftUI
                 let capacity = max(1, Int((geometry.size.width + 10) / 110))
                 HStack(spacing: 10) {
                     ForEach(library.works, id: \.id) { work in
-                        Button { Task { await model.selectWork(work) } } label: {
+                        Button {
+                            guard !model.isBrowsingLocked else { return }
+                            onSelectWork(work)
+                            Task { await model.selectWork(work) }
+                        } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 ArtworkThumbnail(work: work, renderer: model.renderer).frame(width: 90, height: 70)
                                     .overlay(alignment: .topTrailing) { if work.starred { Image(systemName: "star.fill").foregroundStyle(.yellow).padding(3) } }
                                 ForEach(metadata(work), id: \.self) { Text($0).lineLimit(1) }
                             }.font(.caption2).frame(width: 90, alignment: .leading).padding(5)
-                                .background(model.selectedWorkID == work.id ? Color.accentColor.opacity(0.15) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
-                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(model.selectedWorkID == work.id ? Color.accentColor : .clear))
+                                .background(selectionID == work.id ? Color.accentColor.opacity(0.15) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(selectionID == work.id ? Color.accentColor : .clear))
                         }.buttonStyle(.plain).help(model.display.tooltipValue(detailsTip(work))).accessibilityLabel(model.display.localizedFormat("作品を開く: %@", title(work)))
                     }
                     Spacer(minLength: 0)
                 }
-                .task(id: capacity) { await history.updateCapacity(capacity, app: model) }
+                .task(id: capacity) { await history.updateCapacity(capacity, app: model, workID: selectionID) }
             }
             .frame(height: CGFloat(84 + min(3, model.display.preferences.historyFields.count) * 13))
-        }.disabled(model.isBusy || library.loading).padding(.horizontal, 16).padding(.vertical, 10)
+        }.disabled(model.isBrowsingLocked || library.loading).padding(.horizontal, 16).padding(.vertical, 10)
             .task(id: GenerationRequest(nodeIDs: library.works.compactMap(\.lineageNodeID), loading: library.loading)) {
                 guard !library.loading else { return }
                 await history.refreshGenerations()
             }
-            .task(id: model.selectedWorkID) { await history.locate(app: model) }
+            .task(id: selectionID) { await history.locate(app: model, workID: selectionID) }
     }
     private var newerLabel: String { model.display.label("新しい\(library.pageSize)件", "\(library.pageSize) newer works") }
     private var olderLabel: String { model.display.label("古い\(library.pageSize)件", "\(library.pageSize) older works") }

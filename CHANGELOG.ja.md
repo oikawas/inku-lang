@@ -6,6 +6,10 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-05 — Swiftのバッチ中に画面移動・履歴・詳細・設定を許可
+
+バッチ実行lockから閲覧操作を分け、制作tab、画面移動、履歴帯、保存作品の生成情報と設定panelを使えるようにした。背景描画の実行IDを表示作品から分離し、履歴や過去の成功作品を見ている途中に次の行の完了が表示・prompt・詳細を上書きしない。表示中の保存作品へのスター付与・解除も、押した時の対象を固定して許可する。新規描画とバッチ入力・スター以外の作品変更のlock、開始済み条件の固定を維持する。次回用の通常設定保存を許可し、キー変更・plugin・DB復元など実行へ影響する操作は制限する。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[利用手順](apple/README.ja.md)の日英を同期。sourceと文書の更新後、build直前で停止し、compile・試験実行・native操作は未実施。
+
 ### 2026-10-05 — Swiftへ共通Rustの並列処理と試験用最適化を反映
 
 Serverの追加変更から、shape単位のcapability matrix再導出と既存corpus／raster比較の並列実行を取り込んだ。入力・結果の順序とSwiftの限定fixture／case指定を保持し、試験ケースを追加しない。描画依存4packageの `opt-level = 3` はtest profileだけへ適用し、release profile・共有protocol・通常描画の意味は変更しない。[Swift仕様](apple/SWIFT_SPEC.ja.md)の日英を同期した。sourceと文書の更新後、build直前で停止し、compile・試験実行・速度測定・新binaryの確認は未実施。

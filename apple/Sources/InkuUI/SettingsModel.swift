@@ -236,14 +236,17 @@ public final class SettingsModel {
                                         requiresAPIKey: !key.isEmpty, label: label.isEmpty ? id : label,
                                         models: [], enabledModels: [:])
         try provider.validate()
-        try beginSaving(model: model)
+        try beginSaving(model: model, credentialMutation: !key.isEmpty)
         defer { isSaving = false }
         var latest = await model.hostSettings()
         guard !latest.providers.contains(where: { $0.id == id }) else { throw HostError("duplicate_provider") }
         latest.providers.append(provider)
         try latest.providers.forEach { try $0.validate() }
         // Validate the settings change before writing its optional secret.
-        if !key.isEmpty { try await credentials.setKey(key, for: provider.credentialID) }
+        if !key.isEmpty {
+            guard !model.isBusy else { throw HostError("settings_busy_or_unavailable") }
+            try await credentials.setKey(key, for: provider.credentialID)
+        }
         try await model.updateHostSettings(latest)
         host = await model.hostSettings()
         selectedProviderID = id
@@ -273,12 +276,13 @@ public final class SettingsModel {
     public func saveProviderCredential(providerID: String, key: String, model: AppModel) async throws {
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty else { throw HostError("provider_credentials_missing") }
-        try beginSaving(model: model)
+        try beginSaving(model: model, credentialMutation: true)
         defer { isSaving = false; credentialDraft = "" }
         var latest = await model.hostSettings()
         let index = try Self.editableProviderIndex(providerID, in: latest)
         latest.providers[index].requiresAPIKey = true
         try latest.providers.forEach { try $0.validate() }
+        guard !model.isBusy else { throw HostError("settings_busy_or_unavailable") }
         try await credentials.setKey(key, for: latest.providers[index].credentialID)
         try await model.updateHostSettings(latest)
         host = await model.hostSettings()
@@ -288,10 +292,11 @@ public final class SettingsModel {
     }
 
     public func clearProviderCredential(providerID: String, model: AppModel) async throws {
-        try beginSaving(model: model)
+        try beginSaving(model: model, credentialMutation: true)
         defer { isSaving = false; credentialDraft = "" }
         let latest = await model.hostSettings()
         let index = try Self.editableProviderIndex(providerID, in: latest)
+        guard !model.isBusy else { throw HostError("settings_busy_or_unavailable") }
         try await credentials.setKey(nil, for: latest.providers[index].credentialID)
         host = latest
         credentialStates[providerID] = false
@@ -310,7 +315,7 @@ public final class SettingsModel {
 
     @discardableResult
     public func fetchProviderModels(providerID: String, model: AppModel) async throws -> [ProviderModelSettings] {
-        guard !model.isBusy else { throw HostError("settings_busy_or_unavailable") }
+        guard !model.isBrowsingLocked else { throw HostError("settings_busy_or_unavailable") }
         let latest = await model.hostSettings()
         let provider = latest.providers[try Self.editableProviderIndex(providerID, in: latest)]
         let fetched = try await fetchModelCatalog(for: provider)
@@ -338,8 +343,10 @@ public final class SettingsModel {
         return catalogModels(for: current)
     }
 
-    private func beginSaving(model: AppModel) throws {
-        guard !isSaving, !model.isBusy else { throw HostError("settings_busy_or_unavailable") }
+    private func beginSaving(model: AppModel, credentialMutation: Bool = false) throws {
+        guard !isSaving, !(credentialMutation ? model.isBusy : model.isBrowsingLocked) else {
+            throw HostError("settings_busy_or_unavailable")
+        }
         isSaving = true
     }
 

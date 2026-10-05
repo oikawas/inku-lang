@@ -24,6 +24,7 @@ struct CreationCanvasControls: View {
     let work: SavedWork?
     let saved: Bool
     let disabled: Bool
+    var browsingDisabled = false
     let onReplayWork: (SavedWork) -> Void
     let onWorkAction: (SavedWork, String) -> Void
     let onShowSaijiki: () -> Void
@@ -69,7 +70,7 @@ struct CreationCanvasControls: View {
             .accessibilityLabel(model.display.localized("詞書の表示"))
             .accessibilityValue(model.display.localized(model.display.preferences.captionVisible ? "オン" : "オフ"))
             .help(model.display.tooltip("詞書（入力テキスト）の表示/非表示", serverKey: "tooltipCanvasCaption"))
-            .disabled(caption.isEmpty)
+            .disabled(browsingDisabled || caption.isEmpty)
             if verticalCaptionAvailable {
                 Picker(model.display.localized("詞書きの書字方向"), selection: Binding(
                     get: { model.display.preferences.captionVertical },
@@ -79,7 +80,7 @@ struct CreationCanvasControls: View {
                 }.pickerStyle(.menu).labelsHidden().fixedSize()
                     .accessibilityLabel(model.display.localized("詞書きの書字方向"))
                     .help(model.display.tooltip("詞書きの書字方向"))
-                    .disabled(!model.display.preferences.captionVisible || caption.isEmpty)
+                    .disabled(browsingDisabled || !model.display.preferences.captionVisible || caption.isEmpty)
             }
             Button { toggleStar() } label: {
                 Image(systemName: starred ? "star.fill" : "star")
@@ -88,7 +89,7 @@ struct CreationCanvasControls: View {
             .accessibilityLabel(model.display.localized(starred ? "スターを外す" : "スターを付ける"))
             .accessibilityValue(model.display.localized(starred ? "オン" : "オフ"))
             .help(model.display.tooltip(starred ? "スターを外す" : "スターを付ける", serverKey: starred ? "starOn" : "starOff"))
-            .disabled(!saved || disabled)
+            .disabled(!saved || browsingDisabled || model.library.mutating)
             if let work, saved {
                 LibraryAnnotationMarkButton(model: model, work: work, mark: .revision).disabled(disabled)
                 LibraryAnnotationMarkButton(model: model, work: work, mark: .share).disabled(disabled)
@@ -107,7 +108,7 @@ struct CreationCanvasControls: View {
                 Button { perform("copy-hash") } label: { Text("#").font(.caption.monospaced().weight(.semibold)) }
                     .accessibilityLabel(model.display.localized("full hash をコピー"))
                     .help(model.display.tooltip("クリックでfull hashをコピーします"))
-                    .disabled(disabled)
+                    .disabled(browsingDisabled)
             }
             if model.display.visible("work_tools") {
                 Button { if let work { onReplayWork(work) } } label: { Image(systemName: "arrow.clockwise") }
@@ -119,10 +120,11 @@ struct CreationCanvasControls: View {
                 Button { perform("info") } label: { Image(systemName: "info.circle") }
                     .accessibilityLabel(model.display.localized("生成情報"))
                     .help(model.display.tooltip("選択中作品の生成情報を表示"))
-                    .disabled(work == nil || disabled)
+                    .disabled(work == nil || browsingDisabled)
             }
             if model.display.visible("work_tools") {
                 Button(action: onShowSaijiki) { Image(systemName: "book") }
+                    .disabled(browsingDisabled)
                     .accessibilityLabel(model.display.localized("歳時記を開く"))
                     .help(model.display.tooltip("歳時記の語と説明を参照します。", serverKey: "tooltipSaijikiToggle"))
             }
@@ -144,18 +146,20 @@ struct CreationCanvasControls: View {
                 Button { perform("presentation") } label: { Image(systemName: "arrow.up.left.and.arrow.down.right") }
                     .accessibilityLabel(model.display.localized("プレゼンテーションモードを開く"))
                     .help(model.display.tooltip("プレゼンテーションモード (全画面表示)", serverKey: "tooltipCanvasPresentation"))
-                    .disabled(work?.svg.isEmpty != false || disabled)
+                    .disabled(work?.svg.isEmpty != false || browsingDisabled)
             }
         }.fixedSize(horizontal: true, vertical: false)
     }
 
     private func perform(_ action: String) {
-        guard let work, !disabled else { return }
+        guard let work else { return }
+        let allowed = SavedWorkActionState.isBrowsingAction(action) ? !browsingDisabled : !disabled
+        guard allowed else { return }
         onWorkAction(work, action)
     }
 
     private func toggleStar() {
-        guard var target = work, saved, !disabled else { return }
+        guard var target = work, saved, !browsingDisabled, !model.library.mutating else { return }
         target.starred = starred
         let pinnedTarget = target
         Task {

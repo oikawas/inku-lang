@@ -6,7 +6,11 @@ struct BatchPanelView: View {
     @Bindable var model: AppModel
     @Bindable var automation: AutomationModel
     var inputOnly = false
-    var onObserveWork: (() -> Void)? = nil
+    var onObserveWork: ((SavedWork, String) -> Void)? = nil
+    var followsLatestWork = true
+    var selectedRowID: String? = nil
+    var observationRevision: Binding<UUID>? = nil
+    @State private var rowObservationID = UUID()
     @State private var replaceBatch = false
     @State private var resultsExpanded = false
     @State private var issuesExpanded = false
@@ -15,6 +19,7 @@ struct BatchPanelView: View {
     @State private var selectedHistoryPrompt = ""
 
     private var controlsDisabled: Bool { automation.isOccupied || model.isBusy }
+    private var displayedRowID: String? { followsLatestWork ? automation.observedRow?.id : selectedRowID }
     private var canStartNewBatch: Bool {
         !controlsDisabled && automation.nonEmptyBatchCount > 0
             && model.hasAvailableBatchDrawingModel
@@ -65,6 +70,9 @@ struct BatchPanelView: View {
             Text(model.display.localized("保存済み作品は残ります。未処理の行を再開する場合は「前回のバッチを再開」を選んでください。"))
         }
         .onAppear { if automation.uncertainCount > 0 { issuesExpanded = true } }
+        .onChange(of: automation.running) { _, running in if running { rowObservationID = UUID() } }
+        .onChange(of: automation.preparing) { _, preparing in if preparing { rowObservationID = UUID() } }
+        .onDisappear { rowObservationID = UUID() }
         .onChange(of: automation.uncertainCount) { _, count in
             if count > 0 { issuesExpanded = true }
         }
@@ -320,15 +328,19 @@ struct BatchPanelView: View {
             }
             Text(row.input).font(.callout).textSelection(.enabled)
             if row.state == .succeeded, row.workID != nil {
-                Button(model.display.localized(automation.observedRow?.id == row.id ? "表示中の作品" : "作品を表示"), systemImage: "paintpalette") {
+                Button(model.display.localized(displayedRowID == row.id ? "表示中の作品" : "作品を表示"), systemImage: "paintpalette") {
+                    let token = UUID(); rowObservationID = token
+                    let revision = observationRevision?.wrappedValue
+                    let selectedWorkID = model.selectedWorkID
                     Task {
-                        let selectedWorkID = model.selectedWorkID
-                        await automation.observeBatchRow(id: row.id, app: model)
-                        guard !controlsDisabled, model.selectedWorkID == selectedWorkID,
-                              automation.observedRow?.id == row.id, automation.observedWork?.id == row.workID else { return }
-                        onObserveWork?()
+                        guard let work = await automation.observeBatchRow(id: row.id, app: model),
+                              rowObservationID == token, !model.isBrowsingLocked,
+                              observationRevision?.wrappedValue == revision,
+                              model.selectedWorkID == selectedWorkID,
+                              work.id == row.workID, !Task.isCancelled else { return }
+                        onObserveWork?(work, row.id)
                     }
-                }.font(.caption).disabled(controlsDisabled)
+                }.font(.caption).disabled(model.isBrowsingLocked)
             }
             if let error = row.error {
                 Text(model.display.message(error)).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
@@ -339,9 +351,9 @@ struct BatchPanelView: View {
                     HStack(spacing: 8) {
                         Button(model.display.localized("この行を再試行")) { Task { await automation.resolveUncertain(id: row.id, retry: true) } }
                         Button(model.display.localized("この行を省略")) { Task { await automation.resolveUncertain(id: row.id, retry: false) } }
-                    }
+                    }.disabled(controlsDisabled)
                 }
-                .controlSize(.small).disabled(controlsDisabled)
+                .controlSize(.small)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

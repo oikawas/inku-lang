@@ -50,11 +50,11 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 List(sections, selection: $section) { item in
                     Label(model.display.localized(item.title), systemImage: item.symbol).tag(item)
                 }.listStyle(.sidebar)
-            }.frame(width: 190).disabled(automation.isOccupied)
+            }.frame(width: 190)
             Divider()
             Group {
                 if section == .models {
-                    ModelSettingsView(model: model, settings: settings).disabled(automation.isOccupied)
+                    ModelSettingsView(model: model, settings: settings, automation: automation)
                 } else if section == .demo {
                     AutomationView(model: model, automation: automation, demoOnly: true)
                 } else {
@@ -64,18 +64,19 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                         case .making: making
                         case .demo: EmptyView()
                         case .models: EmptyView()
-                        case .personalPlan: ChatGPTPlanSettingsView(model: model)
+                        case .personalPlan:
+                            ChatGPTPlanSettingsView(model: model).disabled(model.isBusy || automation.isOccupied)
                         case .database: database
                         case .export: ExportSettingsView(model: model)
                         case .clipboard: clipboard
                         case .plugins:
-                            PluginSettingsView(model: model)
+                            PluginSettingsView(model: model).disabled(model.isBusy || automation.isOccupied)
                             Section(model.display.localized("歳時記")) { SaijikiView(model: model).frame(minHeight: 480) }
                         case .unread: Section { UnreadWordsView(model: model) }
                         case .limits: OperationalLimitsView(model: model)
                         case .about: about
                         }
-                    }.formStyle(.grouped).disabled(automation.isOccupied)
+                    }.formStyle(.grouped)
                 }
             }.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -95,8 +96,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         .confirmationDialog(model.display.localized("現在の保存データを置き換えます"), isPresented: $confirmRestore, titleVisibility: .visible) {
             #if os(macOS)
             Button(model.display.localized("復元するバックアップを選択…"), role: .destructive) {
+                guard !model.isBusy, !automation.isOccupied else { return }
                 if let url = NativeFilePanels.restore(language: model.display.preferences.language) { Task { await model.restore(from: url) } }
-            }
+            }.disabled(model.isBusy || automation.isOccupied)
             #endif
             Button(model.display.localized("キャンセル"), role: .cancel) {}
         } message: { Text(model.display.localized("現在のデータを残す場合は、先にバックアップを保存してください。")) }
@@ -164,6 +166,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             }
             Section(model.display.localized("結果ログ")) {
                 Toggle(model.display.localized("生成結果のログを保存"), isOn: $display.preferences.saveResultLog)
+                    .disabled(model.isBusy || automation.isOccupied)
                 Text(model.display.localized("成功・失敗・停止の経過を描画ログへ保存します。ファイル保存を切っても端末の実行記録は確認できます。"))
                     .font(.caption).foregroundStyle(.secondary)
                 Text(model.display.localized("指示書・Score・生成情報を端末内へ記録します。APIキーは記録しません。"))
@@ -174,7 +177,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                     Toggle(model.display.localized("生成時の送受信を記録"), isOn: Binding(
                         get: { display.preferences.captureProviderIO == true },
                         set: { display.preferences.captureProviderIO = $0 }))
-                        .disabled(model.isBusy)
+                        .disabled(model.isBrowsingLocked)
                     Text(model.display.localized("モデルへ送った本文と受け取った応答を端末内に保存します。接続先・ヘッダー・認証情報は記録しません。"))
                         .font(.callout).foregroundStyle(.secondary)
                 }
@@ -191,7 +194,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 Button(model.display.localized("バックアップから復元…")) { confirmRestore = true }
                 Text(model.display.localized("作品・系譜・作業状態をSQLiteへ保存します。接続設定とKeychainのAPIキーは別です。"))
                     .font(.callout).foregroundStyle(.secondary)
-            }.disabled(model.isBusy)
+            }.disabled(model.isBusy || automation.isOccupied)
             Section(model.display.localized("自動バックアップ")) {
                 Toggle(model.display.localized("自動バックアップ"), isOn: $display.preferences.automaticBackup)
                 Stepper(display.localizedFormat("間隔: %ld時間", display.preferences.backupIntervalHours), value: $display.preferences.backupIntervalHours, in: 1...168)

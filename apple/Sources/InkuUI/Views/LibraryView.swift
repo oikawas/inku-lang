@@ -9,10 +9,12 @@ struct LibraryView: View {
     let onAdjustWork: (SavedWork) -> Void
     let onReplayWork: (SavedWork) -> Void
     let onWorkAction: (SavedWork, String) -> Void
+    var writingLocked = false
     @State private var deletion: LibraryDeletion?
     @State private var loadingGroups: Set<String> = []
     @FocusState private var focusedWorkID: String?
     private var library: LibraryModel { model.library }
+    private var writingDisabled: Bool { model.isBusy || writingLocked }
     private var hasFilters: Bool {
         !library.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || library.starredOnly || library.revisionOnly || library.shareOnly
@@ -50,13 +52,14 @@ struct LibraryView: View {
           if request.movesToTrash {
             return Alert(title: Text(model.display.localizedFormat("%ld件をごみ箱に移動しますか？", request.ids.count)),
                   primaryButton: .default(Text(model.display.localized("実行"))) {
-                      guard !library.mutating, !model.isBusy else { return }
+                      guard !library.mutating, !writingDisabled else { return }
                       Task { await library.trash(ids: request.ids) }
                   }, secondaryButton: .cancel(Text(model.display.localized("キャンセル"))))
           } else {
             return Alert(title: Text(model.display.localized(request.empty ? "ごみ箱を空にしますか？" : "選択した作品を完全に削除しますか？")),
                   message: Text(model.display.localized("作品を復元することはできません。系譜には削除済みの節点が残ります。")),
                   primaryButton: .destructive(Text(model.display.localized("完全に削除"))) {
+                      guard !library.mutating, !writingDisabled else { return }
                       Task { if request.empty { await library.emptyTrash() } else { await library.permanentlyDelete(ids: request.ids) } }
                   }, secondaryButton: .cancel(Text(model.display.localized("キャンセル"))))
           }
@@ -93,7 +96,7 @@ struct LibraryView: View {
                 Text(model.display.message(library.status)).font(.caption).foregroundStyle(.secondary)
             }
         }
-        .disabled(library.mutating || model.isBusy)
+        .disabled(library.mutating || model.isBrowsingLocked)
     }
 
     private var displayControls: some View {
@@ -150,7 +153,7 @@ struct LibraryView: View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 14) { selectionSummary; Spacer(minLength: 8); selectionActions }
             VStack(alignment: .leading, spacing: 10) { selectionSummary; selectionActions }
-        }.controlSize(.small).disabled(library.mutating || model.isBusy)
+        }.controlSize(.small).disabled(library.mutating || model.isBrowsingLocked)
     }
 
     private var selectionSummary: some View {
@@ -180,7 +183,7 @@ struct LibraryView: View {
                     deletion = LibraryDeletion(ids: library.selectedIDs.sorted(), movesToTrash: true)
                 }.disabled(library.selectedIDs.isEmpty)
             }
-        }.fixedSize()
+        }.fixedSize().disabled(writingDisabled || library.mutating)
     }
 
     @ViewBuilder
@@ -253,7 +256,7 @@ struct LibraryView: View {
                 Text(ByteCountFormatter.string(fromByteCount: SavedWorkFacts.svgBytes(row.work), countStyle: .file))
                     .font(.caption.monospacedDigit())
             }.width(80)
-            TableColumn(model.display.localized("印")) { row in LibraryWorkMarks(model: model, work: row.work) }.width(85)
+            TableColumn(model.display.localized("印")) { row in LibraryWorkMarks(model: model, work: row.work).disabled(writingDisabled) }.width(85)
             TableColumn(model.display.localized("操作")) { row in
                 Menu { workMenu(row.work) } label: { Image(systemName: "ellipsis") }
                     .menuStyle(.borderlessButton).menuIndicator(.hidden)
@@ -321,14 +324,14 @@ struct LibraryView: View {
                         Spacer(minLength: 0)
                     }
                 }
-            }.buttonStyle(.plain).disabled(model.isBusy)
+            }.buttonStyle(.plain).disabled(model.isBrowsingLocked)
                 .accessibilityLabel(model.display.localizedFormat("%@ を開く", LibraryWorkPresentation.title(work, untitled: model.display.localized("無題"))))
                 .help(tip("作品をプレビューします。制作中の内容は変わりません。"))
             if let note = library.annotation(for: work.id).note {
                 Label { Text(note).lineLimit(2) } icon: { Image(systemName: "text.bubble") }.font(.caption).foregroundStyle(.secondary)
             }
             HStack {
-                LibraryWorkMarks(model: model, work: work)
+                LibraryWorkMarks(model: model, work: work).disabled(writingDisabled)
                 Spacer(minLength: 6)
                 if let hash = work.renderHash {
                     Button("…\(hash.suffix(4))") { library.copyHash(hash) }.font(.caption.monospaced())
@@ -336,7 +339,7 @@ struct LibraryView: View {
                 }
                 if work.lineageNodeID != nil {
                     Button { openLineage(work) } label: { Image(systemName: "point.3.connected.trianglepath.dotted") }
-                        .accessibilityLabel(model.display.localized("系譜")).disabled(model.isBusy)
+                        .accessibilityLabel(model.display.localized("系譜")).disabled(model.isBrowsingLocked)
                         .help(model.display.tooltip("この作品の系譜を開きます。"))
                 }
             }.font(.caption).buttonStyle(.borderless)
@@ -347,11 +350,11 @@ struct LibraryView: View {
         .task(id: work.id) { await model.loadWorkActionState(work) }
         .focusable().focused($focusedWorkID, equals: work.id)
         .onKeyPress(.return) {
-            guard focusedWorkID == work.id, !model.isBusy else { return .ignored }
+            guard focusedWorkID == work.id, !model.isBrowsingLocked else { return .ignored }
             openWork(work); return .handled
         }
         .onKeyPress(.space) {
-            guard focusedWorkID == work.id, !library.mutating, !model.isBusy else { return .ignored }
+            guard focusedWorkID == work.id, !library.mutating, !model.isBrowsingLocked else { return .ignored }
             library.toggleSelection(work.id); return .handled
         }
     }
@@ -363,7 +366,7 @@ struct LibraryView: View {
             .accessibilityLabel(model.display.localizedFormat("%@ を選択", LibraryWorkPresentation.title(work, untitled: model.display.localized("無題"))))
             .accessibilityValue(model.display.localized(library.selectedIDs.contains(work.id) ? "選択済み" : "未選択"))
             .help(model.display.tooltip(library.selectedIDs.contains(work.id) ? "作品の選択を解除" : "作品を選択"))
-            .disabled(library.mutating || model.isBusy)
+            .disabled(library.mutating || model.isBrowsingLocked)
     }
 
     private func summary(_ work: SavedWork) -> some View {
@@ -381,53 +384,58 @@ struct LibraryView: View {
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func openWork(_ work: SavedWork) { preview.show(work) }
+    private func openWork(_ work: SavedWork) {
+        guard !model.isBrowsingLocked else { return }
+        preview.show(work)
+    }
 
     private func openInCreate(_ work: SavedWork) {
-        guard preview.work?.id == work.id, !model.isBusy else { return }
+        guard preview.work?.id == work.id, !model.isBrowsingLocked else { return }
         Task {
             do {
                 if try await preview.openInCreate(app: model) {
-                    NotificationCenter.default.post(name: .inkuOpenSection, object: "create")
+                    NotificationCenter.default.post(name: .inkuOpenSection, object: "create", userInfo: ["workID": work.id])
                 }
             } catch { model.errorText = error.localizedDescription }
         }
     }
 
     private func openLineage(_ work: SavedWork) {
+        guard !model.isBrowsingLocked else { return }
         Task {
             await model.selectWork(work); await library.loadLineage(work: work)
-            NotificationCenter.default.post(name: .inkuOpenSection, object: "lineage")
+            NotificationCenter.default.post(name: .inkuOpenSection, object: "lineage", userInfo: ["workID": work.id])
         }
     }
 
     @ViewBuilder
     private func workMenu(_ work: SavedWork) -> some View {
-        Button(model.display.localized("作品プレビュー"), systemImage: "eye") { openWork(work) }.disabled(model.isBusy)
+        Button(model.display.localized("作品プレビュー"), systemImage: "eye") { openWork(work) }.disabled(model.isBrowsingLocked)
+        Button(model.display.localized("生成情報"), systemImage: "info.circle") { onWorkAction(work, "info") }.disabled(model.isBrowsingLocked || work.trashed)
         Button(model.display.localized("制作で開く"), systemImage: "pencil") {
             openWork(work); openInCreate(work)
-        }.disabled(model.isBusy || work.trashed)
-        SavedWorkRefinementActions(model: model, work: work, onAction: onWorkAction)
-        Button(model.display.localized("書き出す"), systemImage: "square.and.arrow.up") { onWorkAction(work, "export") }.disabled(model.isBusy || work.trashed)
-        if work.lineageNodeID != nil { Button(model.display.localized("系譜"), systemImage: "point.3.connected.trianglepath.dotted") { openLineage(work) }.disabled(model.isBusy) }
+        }.disabled(model.isBrowsingLocked || work.trashed)
+        SavedWorkRefinementActions(model: model, work: work, onAction: onWorkAction, writingLocked: writingDisabled)
+        Button(model.display.localized("書き出す"), systemImage: "square.and.arrow.up") { onWorkAction(work, "export") }.disabled(writingDisabled || work.trashed)
+        if work.lineageNodeID != nil { Button(model.display.localized("系譜"), systemImage: "point.3.connected.trianglepath.dotted") { openLineage(work) }.disabled(model.isBrowsingLocked) }
         Divider()
         Button(model.display.localized(library.selectedIDs.contains(work.id) ? "チェックを外す" : "複数選択に追加"), systemImage: "checkmark.square") { library.toggleSelection(work.id) }
-            .disabled(library.mutating || model.isBusy)
+            .disabled(library.mutating || model.isBrowsingLocked)
         Button(model.display.localized(work.starred ? "お気に入りを解除" : "お気に入り"), systemImage: "star") { Task { await library.toggleStar(work) } }
-            .disabled(library.mutating || model.isBusy)
+            .disabled(library.mutating || writingDisabled)
         Button(model.display.localized("推敲の印"), systemImage: library.annotation(for: work.id).forRevision ? "pencil.circle.fill" : "pencil.circle") { Task { await library.toggleRevision(work) } }
-            .disabled(library.mutating || model.isBusy)
+            .disabled(library.mutating || writingDisabled)
         Button(model.display.localized("書き出し用の印"), systemImage: library.annotation(for: work.id).forShare ? "square.and.arrow.up.fill" : "square.and.arrow.up") { Task { await library.toggleShare(work) } }
-            .disabled(library.mutating || model.isBusy)
+            .disabled(library.mutating || writingDisabled)
         if let hash = work.renderHash { Button(model.display.localized("描画ハッシュ全体をコピー"), systemImage: "doc.on.doc") { library.copyHash(hash) } }
         Divider()
         if work.trashed {
-            Button(model.display.localized("戻す"), systemImage: "arrow.uturn.backward") { Task { await library.restore(ids: [work.id]) } }.disabled(library.mutating || model.isBusy)
-            Button(model.display.localized("完全に削除"), role: .destructive) { deletion = LibraryDeletion(ids: [work.id]) }.disabled(library.mutating || model.isBusy)
+            Button(model.display.localized("戻す"), systemImage: "arrow.uturn.backward") { Task { await library.restore(ids: [work.id]) } }.disabled(library.mutating || writingDisabled)
+            Button(model.display.localized("完全に削除"), role: .destructive) { deletion = LibraryDeletion(ids: [work.id]) }.disabled(library.mutating || writingDisabled)
         } else {
             Button(model.display.localized("ごみ箱へ"), systemImage: "trash") {
                 deletion = LibraryDeletion(ids: [work.id], movesToTrash: true)
-            }.disabled(library.mutating || model.isBusy)
+            }.disabled(library.mutating || writingDisabled)
         }
     }
 
@@ -451,10 +459,10 @@ struct LibraryView: View {
             HStack(spacing: 12) {
                 Button(model.display.localized("この系譜を選択"), systemImage: "checkmark.square") {
                     Task { await library.selectGroup(group.id) }
-                }.disabled(library.mutating || model.isBusy || library.loading)
+                }.disabled(library.mutating || model.isBrowsingLocked || library.loading)
                 Spacer(minLength: 0)
                 Button(model.display.localized("系譜"), systemImage: "point.3.connected.trianglepath.dotted") { openLineage(group.representative.work) }
-                    .disabled(model.isBusy || group.representative.work.lineageNodeID == nil)
+                    .disabled(model.isBrowsingLocked || group.representative.work.lineageNodeID == nil)
             }.buttonStyle(.borderless).font(.caption)
                 .help(model.display.tooltip("この系譜の検索条件に合う作品を、ページをまたいですべてチェックします。"))
             if library.layout == .grid || library.expandedGroups.contains(group.id) {
@@ -467,9 +475,9 @@ struct LibraryView: View {
         }.padding(12).background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
             .contextMenu {
                 Button(model.display.localized("この系譜を選択"), systemImage: "checkmark.square") { Task { await library.selectGroup(group.id) } }
-                    .disabled(library.mutating || model.isBusy)
+                    .disabled(library.mutating || model.isBrowsingLocked)
                 Button(model.display.localized("系譜"), systemImage: "point.3.connected.trianglepath.dotted") { openLineage(group.representative.work) }
-                    .disabled(model.isBusy || group.representative.work.lineageNodeID == nil)
+                    .disabled(model.isBrowsingLocked || group.representative.work.lineageNodeID == nil)
             }
     }
 
@@ -522,7 +530,7 @@ struct LibraryView: View {
                                        onAnnotationSaved: { id, value in preview.adoptAnnotation(value, workID: id) },
                                        onOpenInCreate: openInCreate,
                                        onAdjustWork: onAdjustWork, onWorkAction: onWorkAction,
-                                       onOpenLineage: openLineage)
+                                       onOpenLineage: openLineage, writingLocked: writingDisabled)
                         .id(work.id)
                     if let error = preview.errorText {
                         Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
@@ -602,8 +610,10 @@ struct LibraryWorkDetails: View {
     var onAdjustWork: ((SavedWork) -> Void)? = nil
     var onWorkAction: ((SavedWork, String) -> Void)? = nil
     var onOpenLineage: ((SavedWork) -> Void)? = nil
+    var writingLocked = false
     @State private var comment = LibraryNoteEditorModel()
     private var library: LibraryModel { model.library }
+    private var writingDisabled: Bool { model.isBusy || writingLocked }
     private var annotationState: LibraryAnnotationState {
         if let annotationSource { return annotationSource }
         if library.isAnnotationLoading(for: work.id) { return .loading }
@@ -624,7 +634,7 @@ struct LibraryWorkDetails: View {
                 ViewThatFits(in: .horizontal) {
                     HStack { previewActions(onWorkAction) }
                     VStack(alignment: .leading, spacing: 8) { previewActions(onWorkAction) }
-                }.controlSize(.small).disabled(model.isBusy || work.trashed)
+                }.controlSize(.small).disabled(model.isBrowsingLocked || work.trashed)
             }
             LabeledContent(model.display.localized("SVG容量"), value: ByteCountFormatter.string(fromByteCount: SavedWorkFacts.svgBytes(work), countStyle: .file))
                 .font(.caption).foregroundStyle(.secondary)
@@ -634,12 +644,12 @@ struct LibraryWorkDetails: View {
                     Spacer()
                     Text("\(comment.text.unicodeScalars.count) / 240").font(.caption.monospacedDigit()).foregroundStyle(comment.text.unicodeScalars.count > 240 ? Color.red : Color.secondary)
                     Button(model.display.localized("保存")) { saveNote() }
-                        .disabled(library.mutating || !comment.canSave)
+                        .disabled(writingDisabled || library.mutating || !comment.canSave)
                         .help(model.display.tooltip("この作品のコメントを保存します。"))
                 }
                 TextField(model.display.localized("コメント（240文字まで）"), text: $comment.text, axis: .vertical)
                     .lineLimit(2...4).textFieldStyle(.roundedBorder)
-                    .disabled(annotationState.annotation == nil || comment.saving)
+                    .disabled(writingDisabled || annotationState.annotation == nil || comment.saving)
                 if annotationState == .loading {
                     HStack(spacing: 6) { ProgressView().controlSize(.small); Text(model.display.localized("コメントを読み込み中")) }
                         .font(.caption).foregroundStyle(.secondary)
@@ -685,32 +695,35 @@ struct LibraryWorkDetails: View {
     }
 
     @ViewBuilder private func previewActions(_ action: @escaping (SavedWork, String) -> Void) -> some View {
+        Button(model.display.localized("生成情報"), systemImage: "info.circle") { action(work, "info") }
         if let onOpenLineage {
             Button(model.display.localized("系譜"), systemImage: "point.3.connected.trianglepath.dotted") { onOpenLineage(work) }
                 .disabled(work.lineageNodeID == nil)
         }
         if let onAdjustWork {
             Button(model.display.localized("推敲する"), systemImage: "slider.horizontal.3") { onAdjustWork(work) }
+                .disabled(writingDisabled)
         }
         Menu(model.display.localized("作品の操作"), systemImage: "ellipsis.circle") {
-            SavedWorkRefinementActions(model: model, work: work, onAction: action)
-        }
-        Button(model.display.localized("書き出す"), systemImage: "square.and.arrow.up") { action(work, "export") }
+            SavedWorkRefinementActions(model: model, work: work, onAction: action, writingLocked: writingDisabled)
+        }.disabled(writingDisabled)
+        Button(model.display.localized("書き出す"), systemImage: "square.and.arrow.up") { action(work, "export") }.disabled(writingDisabled)
     }
 
     private var workActions: some View {
         HStack(spacing: 10) {
             Button(model.display.localized(onOpenInCreate == nil ? "制作で編集" : "制作で開く"), systemImage: "pencil") {
                 if let onOpenInCreate { onOpenInCreate(work) }
-                else { Task { await model.selectWork(work); NotificationCenter.default.post(name: .inkuOpenSection, object: "create") } }
-            }.disabled(model.isBusy || work.trashed)
+                else { Task { await model.selectWork(work); NotificationCenter.default.post(name: .inkuOpenSection, object: "create", userInfo: ["workID": work.id]) } }
+            }.disabled(model.isBrowsingLocked || work.trashed)
                 .help(model.display.tooltip("保存作品を制作に開きます。制作中の内容が置き換わります。"))
-            Button(model.display.localized("再演奏"), systemImage: "arrow.clockwise") { onReplayWork(work) }.disabled(model.isBusy || work.trashed)
+            Button(model.display.localized("再演奏"), systemImage: "arrow.clockwise") { onReplayWork(work) }.disabled(writingDisabled || work.trashed)
                 .help(model.display.tooltip("保存時と現行の描画を比較します。"))
         }.controlSize(.small).fixedSize()
     }
 
     private func saveNote() {
+        guard !writingDisabled, !library.mutating else { return }
         Task {
             let id = work.id
             let value = await comment.save { id, submitted in

@@ -14,6 +14,10 @@ public enum SavedWorkActionState: Sendable, Equatable {
 
     var showsDescriptionActions: Bool { self != .userDDL }
     var canReadDescription: Bool { self == .description }
+
+    static func isBrowsingAction(_ action: String) -> Bool {
+        ["info", "presentation", "copy-hash", "create", "lineage"].contains(action)
+    }
 }
 
 /// All entrances act on the saved work, without selecting it as the next input.
@@ -22,6 +26,7 @@ struct SavedWorkRefinementActions: View {
     @Bindable var model: AppModel
     let work: SavedWork
     let onAction: (SavedWork, String) -> Void
+    var writingLocked = false
     private var state: SavedWorkActionState? { model.workActionState(for: work) }
     private var reason: String {
         if state == .lockedDescription {
@@ -48,6 +53,6 @@ struct SavedWorkRefinementActions: View {
                 if state?.canReadDescription != true { Text(reason) }
             }
             Button(model.display.localized("AIプロセス"), systemImage: "wand.and.stars") { onAction(work, "ai") }
-        }.disabled(model.isBusy || work.trashed)
+        }.disabled(model.isBusy || writingLocked || work.trashed)
     }
 }

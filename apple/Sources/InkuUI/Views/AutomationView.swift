@@ -20,7 +20,7 @@ private enum DemoModelPicker: String, Identifiable {
         VStack(alignment: .leading, spacing: 12) {
             if !demoOnly {
               Picker(model.display.localized("自動制作"), selection: $tab) { Text(model.display.localized("バッチ")).tag("batch"); Text(model.display.localized("デモ")).tag("demo") }
-                .pickerStyle(.segmented).frame(width: 260).disabled(automation.isOccupied || model.isBusy)
+                .pickerStyle(.segmented).frame(width: 260).disabled(model.isBrowsingLocked)
             }
             if !demoOnly && tab == "batch" {
                 BatchPanelView(model: model, automation: automation)
@@ -106,7 +106,7 @@ private enum DemoModelPicker: String, Identifiable {
             if automation.demoModel.isEmpty || automation.demoStage1Model.isEmpty || automation.demoStage2Model.isEmpty {
                 Button(model.display.localized("使用中のLLMモデルを設定してください。"), systemImage: "gearshape") {
                     NotificationCenter.default.post(name: .inkuOpenSection, object: "settings", userInfo: ["settingsSection": "models"])
-                }.font(.caption).disabled(automation.isOccupied || model.isBusy)
+                }.font(.caption).disabled(model.isBrowsingLocked)
             }
             demoStatistics
             if let work = automation.demoWork {
@@ -117,7 +117,7 @@ private enum DemoModelPicker: String, Identifiable {
                     Spacer()
                     Button(model.display.localized(automation.savingDemo ? "保存中…" : "現在の作品を保存"), systemImage: "square.and.arrow.down") {
                         Task { await automation.saveDemoCurrent(app: model) }
-                    }.disabled(!automation.canSaveDemoCurrent || model.isBusy)
+                    }.disabled(!automation.canSaveDemoCurrent || model.isBusy || (automation.isOccupied && automation.mode == "batch"))
                 }
                 if !automation.demoSaveStatus.isEmpty { Text(model.display.message(automation.demoSaveStatus)).font(.caption) }
                 GroupBox(model.display.localized("生成した記述")) {

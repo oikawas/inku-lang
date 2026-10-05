@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+## v2.15.90 — 2026-10-05
+
+### 2026-10-05 — Rebuild the instruction editor with CodeMirror 6
+
+The overlaid textarea and measured line copies are replaced with one editable CodeMirror document. It retains the existing token colors, line numbers, Saijiki and Macro completions, word insertion and unknown Macro guidance. The reading view's parser and the core's table fold range numbers and old marks inside the editor. Clicking a name or entering it with the caret opens the text; names follow only on leaving, with renaming and refolding deferred during IME composition. A small image of the selected work shows the frame, retaining its last valid bounds for invalid input. Complete-source copying, drawing, external synchronization and read-only operation are preserved. Dependencies are pinned and the complete MIT notices for 12 new packages accompany the distribution.
+
 ### 2026-10-05 — Move macOS About inku to the app menu
 
 Moved About inku from Settings to the app menu, displaying existing version information, concept text, vocabulary, and creator information in a dedicated window. Repeated selection uses the same window, sharing the app's language, theme, and text scale. The iOS Settings entry remains available. Synchronized both languages of the [Swift specification](apple/SWIFT_SPEC.md) and [usage guide](apple/README.md).
@@ -124,10 +130,6 @@ Generated Server defaults now connect the shared Rust `read_composition`/`compos
 
 Focused real-Rust/mock/temporary-DB checks confirmed composition saves, finite fallback, retained legacy settings/saved-Score replay, progress, and unconnected Personal ChatGPT refusal. A separate isolated window of the updated Release Universal app also confirmed loopback-mock composition/DDL/work saves while retaining existing DB rows. Actual provider/OAuth acceptance and Server-style per-stage usage/raw SSE observations remain incomplete. The [Swift specification](apple/SWIFT_SPEC.md) records behavior and verification scope.
 ## v2.15.89 — 2026-10-05
-
-### 2026-10-05 — Rebuild the instruction editor with CodeMirror 6
-
-The overlaid textarea and measured line copies are replaced with one editable CodeMirror document. It retains the existing token colors, line numbers, Saijiki and Macro completions, word insertion and unknown Macro guidance. The reading view's parser and the core's table fold range numbers and old marks inside the editor. Clicking a name or entering it with the caret opens the text; names follow only on leaving, with renaming and refolding deferred during IME composition. A small image of the selected work shows the frame, retaining its last valid bounds for invalid input. Complete-source copying, drawing, external synchronization and read-only operation are preserved. Dependencies are pinned and the complete MIT notices for 12 new packages accompany the distribution.
 
 ### 2026-10-05 — Accept hyphens in Web numeric range edits
 

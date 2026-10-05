@@ -33,6 +33,9 @@ struct AppCheck {
             } else { folder = nil }
             try await runAppParityContractChecks(fixtureDirectory: folder); return
         }
+        if CommandLine.arguments.contains("--canvas-detail-only") {
+            try await runCanvasDetailChecks(); return
+        }
         if CommandLine.arguments.contains("--canvas-fit-only") {
             try runCanvasFitChecks(); return
         }

@@ -35,6 +35,8 @@ struct ArtworkCanvas: View {
     @State private var dragOrigin = CGSize.zero
     @State private var imageAspect: CGFloat = 1
     @State private var fitZoom: CGFloat = 1
+    /// The visible window redrawn from the SVG at the screen's density while zoomed in.
+    @State private var detail: CanvasDetail?
 
     private var scale: CGFloat {
         get { viewport?.wrappedValue.scale ?? localViewport.scale }
@@ -73,7 +75,7 @@ struct ArtworkCanvas: View {
             if showsZoomControls { zoomCapsule.padding(zoomControlsAtTop ? .top : .bottom, 14) }
         }
         .onAppear { adoptViewport() }
-        .onChange(of: svg) { _, _ in image = nil; error = nil; reset() }
+        .onChange(of: svg) { _, _ in image = nil; detail = nil; error = nil; reset() }
     }
 
     /// The Web fit for this canvas: the saved proportion, or the picture's own until a saved one is known.
@@ -140,7 +142,7 @@ struct ArtworkCanvas: View {
             .inkuFont(12)
             .disabled(image == nil)
         }
-        .onChange(of: svg) { _, _ in image = nil; error = nil; reset() }
+        .onChange(of: svg) { _, _ in image = nil; detail = nil; error = nil; reset() }
     }
 
     @ViewBuilder private func interactiveCanvas(size: CGSize, box: CGSize?) -> some View {
@@ -167,7 +169,10 @@ struct ArtworkCanvas: View {
     }
 
     private func canvasContent(size: CGSize, box: CGSize?) -> some View {
-              ZStack {
+              let plan = picture(in: size, box: box).flatMap {
+                  CanvasInteraction.detailPlan(picture: $0, area: size, scale: scale, offset: offset, pixelScale: displayScale)
+              }
+              return ZStack {
                 if box == nil { RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.quaternary.opacity(0.3)) }
                 if let image {
                     fitted(image, box: box)
@@ -186,6 +191,7 @@ struct ArtworkCanvas: View {
                             }
                             .onEnded { _ in dragOrigin = offset })
                         .accessibilityLabel(display.localized("作品"))
+                    detailLayer(size: size, box: box)
                 } else if loading {
                     ProgressView(display.localized("作品を表示中"))
                 } else if let error {
@@ -198,6 +204,45 @@ struct ArtworkCanvas: View {
                 }
                 if loading && image != nil { ProgressView().controlSize(.small).padding(12).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing) }
               }
+              .frame(width: size.width, height: size.height)
+              .task(id: DetailRequest(svg: svg, plan: plan)) { await renderDetail(plan) }
+    }
+
+    /// The fitted picture at 100% in the canvas area: centered in the Web box, or inside the embedded frame's margin.
+    private func picture(in size: CGSize, box: CGSize?) -> CGRect? {
+        guard let image, image.width > 0, image.height > 0 else { return nil }
+        let container = box.map { CGRect(x: (size.width - $0.width) / 2, y: (size.height - $0.height) / 2, width: $0.width, height: $0.height) }
+            ?? CGRect(origin: .zero, size: size).insetBy(dx: 18, dy: 18)
+        return CanvasInteraction.fittedPicture(aspect: CGFloat(image.width) / CGFloat(image.height), in: container)
+    }
+
+    /// A finished window keeps its place under later zoom and pan until its replacement is drawn.
+    @ViewBuilder private func detailLayer(size: CGSize, box: CGSize?) -> some View {
+        if let detail, scale > 1.001, let picture = picture(in: size, box: box) {
+            let zoomed = CanvasInteraction.zoomedPicture(picture, area: size, scale: scale, offset: offset)
+            Image(decorative: detail.image, scale: 1)
+                .resizable().interpolation(.high)
+                .frame(width: detail.unit.width * zoomed.width, height: detail.unit.height * zoomed.height)
+                .offset(x: zoomed.minX + detail.unit.minX * zoomed.width, y: zoomed.minY + detail.unit.minY * zoomed.height)
+                .frame(width: size.width, height: size.height, alignment: .topLeading)
+                .clipped()
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private struct CanvasDetail { let image: CGImage; let unit: CGRect }
+    private struct DetailRequest: Equatable { let svg: String; let plan: CanvasDetailPlan? }
+    private func renderDetail(_ plan: CanvasDetailPlan?) async {
+        guard let plan, !svg.isEmpty else { detail = nil; return }
+        // Coalesce wheel and drag events; the enlarged frame (and the previous window) stay until this one is ready.
+        do {
+            try await Task.sleep(for: .milliseconds(120))
+            let frame = try await renderer.region(svg: svg, fullWidth: plan.fullWidth, fullHeight: plan.fullHeight,
+                                                  x: plan.x, y: plan.y, width: plan.width, height: plan.height)
+            try Task.checkCancellation()
+            detail = CanvasDetail(image: frame, unit: plan.unit)
+        } catch {}
     }
 
     private func applyWheel(_ deltaY: CGFloat) -> Bool {
@@ -208,9 +253,9 @@ struct ArtworkCanvas: View {
 
     private struct RequestKey: Hashable { let svg: String; let width: UInt32; let height: UInt32 }
     private func requestKey(box: CGSize) -> RequestKey {
-        let magnification = min(3, max(1, scale))
-        var width = max(128, min(4096, ceil(max(1, box.width) * displayScale * magnification / 128) * 128))
-        var height = max(128, min(4096, ceil(max(1, box.height) * displayScale * magnification / 128) * 128))
+        // The fitted frame is drawn for 100%; a zoomed canvas adds the visible window on top (detailLayer).
+        var width = max(128, min(4096, ceil(max(1, box.width) * displayScale / 128) * 128))
+        var height = max(128, min(4096, ceil(max(1, box.height) * displayScale / 128) * 128))
         let factor = min(1, sqrt(8_000_000 / (width * height)))
         width *= factor; height *= factor
         return RequestKey(svg: svg, width: UInt32(width), height: UInt32(height))

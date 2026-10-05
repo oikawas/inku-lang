@@ -139,6 +139,7 @@ public struct ContentView: View {
         .environment(\.locale, Locale(identifier: model.display.preferences.language))
         .preferredColorScheme(model.display.colorScheme)
         .font(.system(size: 13 * model.display.preferences.textScale))
+        .environment(\.inkuTextScale, model.display.preferences.textScale)
         .task {
             await model.initialize()
             await automation.connect(app: model)

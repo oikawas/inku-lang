@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### Android 2.1.4-android.89 — APK for on-device instruction editor checks (Build 148374, 2026-10-05)
+
+Stamp the Android version containing instruction editing with inline folded numeric ranges. Build an APK for device checks with the existing debug signing identity, retaining automatic build numbering. Web v2.15.90 / Build1166, Room14 and shared layer versions are unchanged. Real-device input, composition and frame acceptance are checked separately from APK creation.
+
+Exclude the dictionary-counting UniFFI function and Sudachi dependency, unused by Android's JNI, from Android builds to prevent compilation failure in unsupported dynamic plugins. Swift and the other existing targets retain the same counting implementation and pinned dependency. Existing Android JNI functions and drawing semantics are unchanged.
+
 ### 2026-10-05 — Fold numeric ranges inside Android instruction editing
 
 The editor is rebuilt with Compose's standard state and output transformation, sharing the reading view's range rules. Numbers and old marks fold behind dotted names. Pressing a name or moving the caret into a range opens ordinary numeric editing; names follow matching bounds on leaving. A small view of the work inside the dialog shows the frame, keeping the last valid bounds for incomplete numbers. Japanese composition defers automatic edits, and selected ranges stay open so copy and cut retain raw numbers. Vocabulary, file import and explicit drawing keep their existing flow.

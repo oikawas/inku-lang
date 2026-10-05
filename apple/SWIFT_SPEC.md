@@ -2,7 +2,7 @@
 
 This directory contains the native SwiftUI client, developed for macOS first, and the shared Apple packages. [SWIFT_SPEC.ja.md](SWIFT_SPEC.ja.md) is the canonical specification for Swift host behavior; this document is its maintained English version. The [product specification](../SPEC.md) defines shared DDL, Score, prompts, authoring authority, pipeline transitions, seeds, and rendering semantics. Server remains the primary development host, and Swift follows the same Rust core without duplicating semantic processing.
 
-Last updated: 2026-10-04.
+Last updated: 2026-10-05.
 
 Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The Swift app's product version follows formal version management; this initial implementation does not allocate a new version. Matching shared layer versions does not establish that host features and the native UI port are complete.
 
@@ -13,6 +13,14 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Record confirmed implementation changes and remaining scope in dated sections of this specification. Maintain product history in the shared [CHANGELOG.ja.md](../CHANGELOG.ja.md) and [CHANGELOG.md](../CHANGELOG.md). Do not create a separate Swift changelog.
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
+
+## 2026-10-05 Following shared Rust parallelism and test-profile optimizations
+
+Ported Server's additional changes to derive the drawing capability matrix concurrently by shape. Predicate and term enumeration, result ordering, and asset identities remain intact. The bundled matrix used by normal rendering, shared protocols, and drawing semantics are unchanged.
+
+Existing DDL/pipeline corpus and raster-comparison test sources now collect parallel results in input order. Swift's bounded fixtures and raster-case selector are retained without adding cases, inputs, or expected results. The Cargo test profile sets `opt-level = 3` only for `resvg`, `usvg`, `tiny-skia`, and `tiny-skia-path`; release profiles and dependencies are unchanged.
+
+This follow-up updates sources and documentation, then stops immediately before building. Compilation, test execution, performance measurement, and validation of a new binary have not been performed. Earlier verification of the installed app remains separate evidence.
 
 ## 2026-10-04 Following current Server core, saved works, and app operations
 

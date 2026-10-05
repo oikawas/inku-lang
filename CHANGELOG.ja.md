@@ -6,6 +6,10 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-05 — Swiftへ共通Rustの並列処理と試験用最適化を反映
+
+Serverの追加変更から、shape単位のcapability matrix再導出と既存corpus／raster比較の並列実行を取り込んだ。入力・結果の順序とSwiftの限定fixture／case指定を保持し、試験ケースを追加しない。描画依存4packageの `opt-level = 3` はtest profileだけへ適用し、release profile・共有protocol・通常描画の意味は変更しない。[Swift仕様](apple/SWIFT_SPEC.ja.md)の日英を同期した。sourceと文書の更新後、build直前で停止し、compile・試験実行・速度測定・新binaryの確認は未実施。
+
 ### 2026-10-05 — Swift新規requestの描画policyと配色mapを整合
 
 描画制限の設定が未記録の場合も9項目を既定値へ正規化し、現行Serverと同じく実効hard budgetから `host-settings:SHA256` のidentityを常に作る。未記録と明示した既定値で同じ制限なのにauthority／Score／描画hashが異なる分岐を修正した。custom制限は新規requestへ適用し、旧保存作品の凍結policy／再演条件は変更しない。限定checkで未記録／明示保存の一致と保存条件の保持を確認した。[Swift仕様](apple/SWIFT_SPEC.ja.md)の日英へ反映した。

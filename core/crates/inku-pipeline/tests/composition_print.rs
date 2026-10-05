@@ -2,6 +2,8 @@
 //! compiles with no diagnostic: a range replaces a guessed place, a stated place
 //! keeps its word, and every composition range and corner reads in both languages.
 
+mod common;
+
 use inku_ddl::ResolvedInstructionLanguage;
 use inku_ddl::work_plan::{
     WorkPlan, WorkPlanLayer, print_work_plan_composed, work_plan_source_compiles_cleanly,
@@ -65,9 +67,9 @@ fn composed_source(
 #[test]
 fn composed_placements_print_as_the_prototype_and_compile_cleanly() {
     let fixture: Fixture = serde_json::from_str(FIXTURE).expect("the fixture is JSON");
-    let (mut printed, mut failures) = (0, Vec::new());
-    for case in &fixture.cases {
+    let checked = common::par_map(&fixture.cases, |case| {
         let language = language(&case.lang);
+        let (mut printed, mut failures) = (0, Vec::new());
         for (seed, solved) in [("s1", &case.solve.s1), ("s2", &case.solve.s2)] {
             let Some(solved) = solved else { continue };
             let source = composed_source(&case.layers, &solved.regions, language);
@@ -87,7 +89,13 @@ fn composed_placements_print_as_the_prototype_and_compile_cleanly() {
             }
             printed += 1;
         }
-    }
+        (printed, failures)
+    });
+    let printed: usize = checked.iter().map(|(printed, _)| printed).sum();
+    let failures: Vec<String> = checked
+        .into_iter()
+        .flat_map(|(_, failures)| failures)
+        .collect();
     println!("{printed} composed placements printed");
     assert!(
         failures.is_empty(),
@@ -122,25 +130,31 @@ fn every_range_and_corner_compiles_cleanly_for_each_action() {
         .map(str::to_owned)
         .collect();
     assert_eq!(keys.len(), 32, "{keys:?}");
-    let (mut compiled, mut failures) = (0, Vec::new());
-    for layer in &examples {
-        for key in &keys {
-            for language in [
-                ResolvedInstructionLanguage::Ja,
-                ResolvedInstructionLanguage::En,
-            ] {
-                let source = composed_source(
-                    std::slice::from_ref(layer),
-                    std::slice::from_ref(key),
-                    language,
-                );
-                if !work_plan_source_compiles_cleanly(&source, language) {
-                    failures.push(source);
-                }
-                compiled += 1;
+    let placements: Vec<(&WorkPlanLayer, &String)> = examples
+        .iter()
+        .flat_map(|layer| keys.iter().map(move |key| (layer, key)))
+        .collect();
+    let failures: Vec<String> = common::par_map(&placements, |&(layer, key)| {
+        let mut failures = Vec::new();
+        for language in [
+            ResolvedInstructionLanguage::Ja,
+            ResolvedInstructionLanguage::En,
+        ] {
+            let source = composed_source(
+                std::slice::from_ref(layer),
+                std::slice::from_ref(key),
+                language,
+            );
+            if !work_plan_source_compiles_cleanly(&source, language) {
+                failures.push(source);
             }
         }
-    }
+        failures
+    })
+    .into_iter()
+    .flatten()
+    .collect();
+    let compiled = 2 * placements.len();
     println!("{compiled} sentences compiled");
     assert!(
         failures.is_empty(),

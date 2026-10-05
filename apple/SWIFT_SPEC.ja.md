@@ -2,7 +2,7 @@
 
 このディレクトリは、macOS先行のnative SwiftUIクライアントとApple向け共通packageのworkspaceである。本書をSwift host固有の仕様正本とし、[SWIFT_SPEC.md](SWIFT_SPEC.md)を対応英語版とする。共有DDL、Score、prompt、authoring authority、pipeline状態遷移、seed、描画の意味は[製品仕様](../SPEC.ja.md)を正本とし、Serverを開発上のprimaryとして同じRust coreへ追随する。Swift側に意味処理を複製しない。
 
-最終更新: 2026-10-04。
+最終更新: 2026-10-05。
 
 binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。Swiftアプリの製品版は正式な版管理に従い、この初期実装では新しい版を採番しない。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
 
@@ -13,6 +13,14 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 確定した実装変更と残る範囲は本書の日付付き節へ記し、製品の変更履歴は共通の[CHANGELOG.ja.md](../CHANGELOG.ja.md)／[CHANGELOG.md](../CHANGELOG.md)へ同期して記す。Swift専用CHANGELOGを分けない。
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
+
+## 2026-10-05 共通Rustの並列処理と試験用最適化への追随
+
+Serverの追加変更に合わせ、描画capability matrixの再導出をshape単位の並列処理へ移植した。predicate・termの列挙順と結果の順序、asset identityを保持する。通常の描画が参照する同梱matrix、共有protocolと描画の意味は変更しない。
+
+既存のDDL・pipeline corpusとraster比較の試験sourceへ、入力順で結果を回収する並列実行を取り込んだ。Swift側の限定fixtureとraster case指定を保持し、試験ケース・入力・期待値を増やさない。Cargoのtest profileでは `resvg`、`usvg`、`tiny-skia`、`tiny-skia-path` のみ `opt-level = 3` とする。release profileと依存関係は変更しない。
+
+この追随はsourceと文書の更新までとし、buildの直前で停止した。compile・試験実行・実行速度・新binaryの動作確認は未実施であり、既にインストールしたアプリの確認結果とは分けて扱う。
 
 ## 2026-10-04 現行Serverの共通core・保存作品・全体操作への追随
 

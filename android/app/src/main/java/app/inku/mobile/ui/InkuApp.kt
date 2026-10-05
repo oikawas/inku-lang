@@ -3964,12 +3964,50 @@ private fun RefinementProgressLanes(
                 horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
             ) {
                 row.forEach { (index, lane) ->
-                    RefinementProgressLane(
-                        index = index,
-                        lane = lane,
-                        runningMascotKind = runningMascotKind,
-                        modifier = Modifier.weight(1f),
-                    )
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("refinement_progress_lane_${index + 1}_${lane.name.lowercase()}"),
+                        shape = RoundedCornerShape(Dimens.radiusCard),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(Dimens.hairline, MaterialTheme.colorScheme.outline),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(Dimens.spaceXs),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
+                        ) {
+                            Text(
+                                text = "${index + 1}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            when (lane) {
+                                RefinementProgressLaneState.Done -> Box(
+                                    modifier = Modifier.size(Dimens.buttonHeightSmall),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = "✓",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.secondary,
+                                    )
+                                }
+                                RefinementProgressLaneState.Running ->
+                                    MascotWidget(mascotKind = runningMascotKind)
+                                RefinementProgressLaneState.Waiting -> Box(
+                                    modifier = Modifier.size(Dimens.buttonHeightSmall),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = "·",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
                 // A short last row keeps the width of the rows above it.
                 if (lanes.size > REFINEMENT_LANES_PER_ROW) {
@@ -3982,58 +4020,6 @@ private fun RefinementProgressLanes(
 
 /** Lanes per row of [RefinementProgressLanes]. */
 private const val REFINEMENT_LANES_PER_ROW = 4
-
-@Composable
-private fun RefinementProgressLane(
-    index: Int,
-    lane: RefinementProgressLaneState,
-    runningMascotKind: String,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier
-            .testTag("refinement_progress_lane_${index + 1}_${lane.name.lowercase()}"),
-        shape = RoundedCornerShape(Dimens.radiusCard),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(Dimens.hairline, MaterialTheme.colorScheme.outline),
-    ) {
-        Column(
-            modifier = Modifier.padding(Dimens.spaceXs),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
-        ) {
-            Text(
-                text = "${index + 1}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            when (lane) {
-                RefinementProgressLaneState.Done -> Box(
-                    modifier = Modifier.size(Dimens.buttonHeightSmall),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "✓",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.secondary,
-                    )
-                }
-                RefinementProgressLaneState.Running ->
-                    MascotWidget(mascotKind = runningMascotKind)
-                RefinementProgressLaneState.Waiting -> Box(
-                    modifier = Modifier.size(Dimens.buttonHeightSmall),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "·",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-    }
-}
 
 /** 調整: the four elements and the touch words. */
 @Composable

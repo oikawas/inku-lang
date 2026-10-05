@@ -354,7 +354,8 @@ public final class AutomationModel {
                             self.rows[index].state = .uncertain
                             self.rows[index].error = "停止した処理の保存結果を履歴で確認してください。"
                         } else {
-                            self.rows[index].state = .failed; self.rows[index].error = app.errorText ?? "生成できませんでした。"
+                            self.rows[index].state = .failed
+                            self.rows[index].error = app.automationFailureMessage ?? app.errorText ?? "生成できませんでした。"
                         }
                         try await self.saveJournal()
                         try Task.checkCancellation()

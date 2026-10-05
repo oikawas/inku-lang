@@ -3,6 +3,12 @@
 "ライブラリ" = "Library";
 "バッチ・デモ" = "Batch & Demo";
 "設定" = "Settings";
+"送信状態不明／応答未確認" = "Send status unknown / response unconfirmed";
+"診断の操作: %@" = "Diagnostic operation: %@";
+"準備" = "Preparation";
+"受付待ち" = "Admission";
+"トークン計数" = "Token count";
+"生成要求" = "Generation request";
 "0は上限なし。毎分の枠を待ち、日次上限では生成を開始しません。" = "0 means unlimited. Drawing waits for the per-minute budget and stops at the daily limit.";
 "1作品では描画要素を順に表示します。合計6億画素を超える設定は書き出す前に確認します。" = "For one work, drawing elements appear in sequence. Settings exceeding 600 million total pixels are checked before export.";
 "1作品の再生" = "Single-work playback";

@@ -167,6 +167,7 @@ final class ProviderAttemptRecorder: @unchecked Sendable {
     private var secrets: [String] = []
     private var received: ProviderHTTPRead?
     private var endpoint: URL?
+    private var operation: ProviderAttemptDiagnosticOperation?
 
     init(action: Data, reference: String, options: ProviderObservationOptions) throws {
         let effect = try ExactJSON(data: action), tag = try effect.requiredString("tag")
@@ -192,10 +193,11 @@ final class ProviderAttemptRecorder: @unchecked Sendable {
     }
     func addSecrets(_ secrets: [String]) { lock.withLock { self.secrets += secrets.filter { !$0.isEmpty } } }
     func setEndpoint(_ endpoint: URL) { lock.withLock { self.endpoint = endpoint } }
+    func setOperation(_ operation: ProviderAttemptDiagnosticOperation?) { lock.withLock { self.operation = operation } }
     func recordFailure(_ error: any Error, httpStatus: Int? = nil, httpBody: Data? = nil) {
         lock.withLock {
             value.metric.diagnostic = ProviderDiagnosticSanitizer.diagnostic(error: error, endpoint: endpoint,
-                secrets: secrets, httpStatus: httpStatus, httpBody: httpBody)
+                secrets: secrets, httpStatus: httpStatus, httpBody: httpBody, operation: operation)
         }
     }
     func receive(_ response: ProviderHTTPRead) {

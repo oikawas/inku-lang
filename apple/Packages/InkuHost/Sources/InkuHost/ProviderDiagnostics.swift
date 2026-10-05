@@ -1,6 +1,10 @@
 import Foundation
 
 public enum ProviderAttemptDiagnosticKind: String, Codable, Sendable, Equatable { case network, http, host, unknown }
+public enum ProviderAttemptDiagnosticOperation: String, Codable, Sendable, Equatable {
+    case preparation, admission, generation
+    case tokenCount = "token_count"
+}
 
 /// Safe ordinary failure facts. This value never contains a request URL, headers or response body.
 public struct ProviderAttemptDiagnostic: Codable, Sendable, Equatable {
@@ -16,15 +20,18 @@ public struct ProviderAttemptDiagnostic: Codable, Sendable, Equatable {
     public let providerParameter: String?
     public let providerStatus: String?
     public let providerMessage: String?
+    public let operation: ProviderAttemptDiagnosticOperation?
 
     public init(kind: ProviderAttemptDiagnosticKind, reason: String, endpoint: String? = nil,
                 errorDomain: String? = nil, errorCode: Int? = nil, hostCode: String? = nil,
                 httpStatus: Int? = nil, providerCode: String? = nil, providerType: String? = nil,
-                providerParameter: String? = nil, providerStatus: String? = nil, providerMessage: String? = nil) {
+                providerParameter: String? = nil, providerStatus: String? = nil, providerMessage: String? = nil,
+                operation: ProviderAttemptDiagnosticOperation? = nil) {
         self.kind = kind; self.reason = reason; self.endpoint = endpoint
         self.errorDomain = errorDomain; self.errorCode = errorCode; self.hostCode = hostCode
         self.httpStatus = httpStatus; self.providerCode = providerCode; self.providerType = providerType
         self.providerParameter = providerParameter; self.providerStatus = providerStatus; self.providerMessage = providerMessage
+        self.operation = operation
     }
 }
 
@@ -37,7 +44,8 @@ enum ProviderDiagnosticSanitizer {
         "transport_timeout", "rate_limited", "transport_unavailable", "chatgpt_session_pin_required", "chatgpt_operation_not_supported"]
 
     static func diagnostic(error: any Error, endpoint: URL?, secrets: [String],
-                           httpStatus: Int?, httpBody: Data?) -> ProviderAttemptDiagnostic {
+                           httpStatus: Int?, httpBody: Data?,
+                           operation: ProviderAttemptDiagnosticOperation? = nil) -> ProviderAttemptDiagnostic {
         let origin = endpoint.flatMap { Self.origin($0, secrets: secrets) }
         if let httpStatus {
             let refusal: ExactJSON?
@@ -52,19 +60,20 @@ enum ProviderDiagnosticSanitizer {
             return ProviderAttemptDiagnostic(kind: .http, reason: "The provider returned an HTTP error.", endpoint: origin,
                 httpStatus: httpStatus, providerCode: field("code"), providerType: field("type"),
                 providerParameter: field("param"), providerStatus: field("status"),
-                providerMessage: refusal?["message"].string.flatMap { bounded($0, secrets: secrets) })
+                providerMessage: refusal?["message"].string.flatMap { bounded($0, secrets: secrets) }, operation: operation)
         }
         if let error = error as? URLError {
             return ProviderAttemptDiagnostic(kind: .network, reason: networkReason(error.code), endpoint: origin,
-                errorDomain: NSURLErrorDomain, errorCode: error.errorCode)
+                errorDomain: NSURLErrorDomain, errorCode: error.errorCode, operation: operation)
         }
         if let error = error as? HostError {
             return ProviderAttemptDiagnostic(kind: .host, reason: hostReason(error.code), endpoint: origin,
-                errorDomain: "InkuHost", hostCode: knownHostCodes.contains(error.code) ? bounded(error.code, secrets: secrets) : nil)
+                errorDomain: "InkuHost", hostCode: knownHostCodes.contains(error.code) ? bounded(error.code, secrets: secrets) : nil,
+                operation: operation)
         }
         let system = error as NSError
         return ProviderAttemptDiagnostic(kind: .unknown, reason: "The provider request could not be completed.", endpoint: origin,
-            errorDomain: bounded(system.domain, secrets: secrets), errorCode: system.code)
+            errorDomain: bounded(system.domain, secrets: secrets), errorCode: system.code, operation: operation)
     }
 
     private static func origin(_ url: URL, secrets: [String]) -> String? {

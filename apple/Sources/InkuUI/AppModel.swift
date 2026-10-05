@@ -58,6 +58,8 @@ public final class AppModel {
     /// Metrics of the displayed saved work, frozen to that work's save identity.
     public private(set) var providerMetrics: [ProviderAttemptMetric] = []
     public private(set) var isBusy = false
+    /// Failure of this automation request, independent of errors from concurrent browsing.
+    public private(set) var automationFailureMessage: String?
     /// Retained between batch rows so browsing does not clear the last row's progress or failure.
     private var backgroundDrawing = false
     /// Browsing may continue during an explicitly backgrounded batch row; writers still use isBusy.
@@ -1233,12 +1235,17 @@ public final class AppModel {
         var result: SavedWork?
         _ = await performSerialized(status: "生成中", allowsBrowsing: allowsBrowsing) { [weak self] token in
             guard let self else { return }
+            self.automationFailureMessage = nil
             try await self.validatePinnedRequest(request)
             let view = try await host.generate(request) { [weak self] progress in
                 Task { @MainActor in self?.receive(progress, token: token, models: request.models) }
             }
             if self.generationToken == token, !self.stopping {
                 self.activeExecutionID = view.executionID
+                if let message = DrawingFailureMessage.text(for: view, language: self.display.preferences.language) {
+                    self.automationFailureMessage = message
+                    if self.errorText == nil { self.errorText = message }
+                }
                 if allowsBrowsing {
                     self.finishProviderStage(view)
                     self.status = Self.phaseStatus(view.phase)

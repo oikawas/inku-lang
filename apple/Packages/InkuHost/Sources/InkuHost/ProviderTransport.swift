@@ -8,7 +8,7 @@ public protocol ProviderTransport: Sendable {
 }
 
 public final class URLSessionProviderTransport: ObservedProviderTransport, Sendable {
-    private let session: URLSession
+    private let auxiliarySession: URLSession
     private let budget: ProviderRateBudget
     private let http: (any ProviderHTTPClient)?
     private let legacyUsageURL: URL
@@ -25,10 +25,13 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         self.legacyUsageURL = usageURL ?? Self.defaultUsageURL
         self.budget = ProviderRateBudget(database: database, legacyURL: legacyUsageURL, environment: environment)
         self.http = http
+        self.auxiliarySession = Self.makeSession()
+    }
+    private static func makeSession() -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.urlCache = nil; configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.httpCookieStorage = nil; configuration.httpShouldSetCookies = false
-        self.session = URLSession(configuration: configuration, delegate: RejectRedirects(), delegateQueue: nil)
+        return URLSession(configuration: configuration, delegate: RejectRedirects(), delegateQueue: nil)
     }
     public func withRateDatabase(_ database: InkuDatabase) -> URLSessionProviderTransport {
         URLSessionProviderTransport(maximumResponseBytes: maximumResponseBytes, usageURL: legacyUsageURL,
@@ -71,6 +74,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         let maxTokens = tag == "complete_visible_ddl_holes" ? models.holeMaxTokens : models.stage1MaxTokens
         var failure: String?
         var response: String?
+        recorder?.setOperation(.preparation)
         do {
             let (provider, model) = try resolve(modelReference, providers: providers)
             recorder?.setEndpoint(provider.baseURL)
@@ -86,27 +90,38 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
             }
             let remaining = deadline.timeIntervalSince(budget.now())
             guard remaining > 0 else { throw HostError("transport_timeout") }
+            // One HTTP client per core-owned attempt, shared only by token count and generation.
+            // Structured concurrency drains the cancelled task group before this session closes.
+            let attemptSession = http == nil ? Self.makeSession() : nil
+            defer { attemptSession?.invalidateAndCancel() }
             let raw = try await withThrowingTaskGroup(of: Data.self) { group in
                 group.addTask { [self] in
                     let limits = provider.effectiveRateLimits
                     var inputTokens = limits.tokensPerMinute > 0 ? (boundedRequest.httpBody?.count ?? 0) + 128 : 0
                     // Gemini token accounting asks the provider for the same exact request.
                     if provider.kind == .gemini, limits.tokensPerMinute > 0 {
+                        recorder?.setOperation(.admission)
                         try await self.budget.prepare(provider: provider)
-                        do { inputTokens = try await self.countGeminiTokens(boundedRequest) }
+                        recorder?.setOperation(.tokenCount)
+                        do { inputTokens = try await self.countGeminiTokens(boundedRequest, session: attemptSession) }
                         catch {
                             if let status = error as? HTTPFailure, status.status == 429 {
+                                recorder?.setOperation(.admission)
                                 try await self.budget.coolDown(providerID: provider.id, seconds: status.retryAfter)
+                                recorder?.setOperation(.tokenCount)
                             }
                             throw error
                         }
                     }
+                    recorder?.setOperation(.admission)
                     let reservation = try await self.budget.reserve(provider: provider, inputTokens: inputTokens, deadline: deadline)
                     var bytes: Data?, used: Int?, attemptError: (any Error)?
+                    recorder?.setOperation(.generation)
                     do {
                         try Task.checkCancellation()
                         guard self.budget.now() < deadline else { throw HostError("rate_limited") }
-                        bytes = try await self.readObserved(boundedRequest, maximum: self.maximumResponseBytes, onBytes: onBytes,
+                        bytes = try await self.readObserved(boundedRequest, session: attemptSession,
+                            maximum: self.maximumResponseBytes, onBytes: onBytes,
                             onResponse: { recorder?.receive($0) })
                         let value = try ExactJSON(data: bytes!)
                         recorder?.report(value)
@@ -114,18 +129,20 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                         let tokenKey = provider.kind == .gemini ? "promptTokenCount" : (provider.kind == .anthropic ? "input_tokens" : "prompt_tokens")
                         used = usage[tokenKey].number.flatMap(Int.init).flatMap { $0 >= 0 ? $0 : nil }
                     } catch { attemptError = error }
+                    recorder?.setOperation(.admission)
                     if let status = attemptError as? HTTPFailure, status.status == 429 {
                         try await self.budget.coolDown(providerID: provider.id, seconds: status.retryAfter)
                     }
                     // Unknown TPM retains its reservation and closes admission for 62 seconds.
                     try await self.budget.settle(providerID: provider.id, reservation: reservation,
                                                 used: used ?? (limits.tokensPerMinute == 0 ? 0 : nil))
+                    recorder?.setOperation(.generation)
                     if let attemptError { throw attemptError }
                     return bytes!
                 }
                 group.addTask {
                     try await Task.sleep(for: .seconds(remaining))
-                    throw HostError("transport_timeout")
+                    throw ProviderAttemptDeadline()
                 }
                 defer { group.cancelAll() }
                 guard let result = try await group.next() else { throw HostError("transport_unavailable") }
@@ -136,6 +153,13 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         catch is CancellationError {
             try await recorder?.finish(failure: nil, cancelled: true, callback: didFinish)
             throw CancellationError()
+        }
+        catch is ProviderAttemptDeadline {
+            // The whole-attempt deadline can expire while a child is draining.
+            // Do not attribute it to whichever HTTP operation finished cancellation last.
+            recorder?.setOperation(nil)
+            recorder?.recordFailure(HostError("transport_timeout"))
+            failure = "transport_timeout"
         }
         catch let error as HTTPFailure {
             recorder?.recordFailure(error, httpStatus: error.status, httpBody: error.body)
@@ -169,7 +193,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         return result.data
     }
 
-    private func readObserved(_ request: URLRequest, maximum: Int, onBytes: @escaping @Sendable (Int) -> Void,
+    private func readObserved(_ request: URLRequest, session: URLSession?, maximum: Int, onBytes: @escaping @Sendable (Int) -> Void,
                               onResponse: @escaping ProviderHTTPReadHandler) async throws -> Data {
         if let http {
             // Calling a client does not prove it connected or sent a request.
@@ -181,6 +205,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
             }
             return response.data
         }
+        guard let session else { throw HostError("transport_unavailable") }
         var data = Data(), status: Int?, complete = false, truncated = false
         // An HTTP response proves a send; a connection error before response headers does not.
         defer { onResponse(ProviderHTTPRead(status: status, data: data, sent: status != nil, complete: complete, truncated: truncated)) }
@@ -254,7 +279,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         }
     }
 
-    private func countGeminiTokens(_ original: URLRequest) async throws -> Int {
+    private func countGeminiTokens(_ original: URLRequest, session: URLSession?) async throws -> Int {
         guard let originalURL = original.url,
               let originalBody = original.httpBody,
               let url = URL(string: originalURL.absoluteString.replacingOccurrences(of: ":generateContent", with: ":countTokens")) else { throw HostError("rate_limited") }
@@ -264,14 +289,14 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         inner["model"] = .string("models/" + modelPath)
         var request = original; request.url = url
         request.httpBody = ExactJSON.object(["generateContentRequest": inner]).data
-        let value = try ExactJSON(data: await readObserved(request, maximum: min(16384, maximumResponseBytes),
+        let value = try ExactJSON(data: await readObserved(request, session: session, maximum: min(16384, maximumResponseBytes),
             onBytes: { _ in }, onResponse: { _ in }))
         guard let count = value["totalTokens"].number.flatMap(Int.init), count >= 0, count <= (Int.max - 9) / 11 else { throw HostError("rate_limited") }
         return (count * 11 + 9) / 10
     }
 
     private func read(_ request: URLRequest, maximum: Int, onBytes: @Sendable (Int) -> Void) async throws -> Data {
-        let (bytes, response) = try await session.bytes(for: request)
+        let (bytes, response) = try await auxiliarySession.bytes(for: request)
         defer { bytes.task.cancel() }
         guard let response = response as? HTTPURLResponse else { throw HostError("transport_unavailable") }
         guard (200...299).contains(response.statusCode) else {
@@ -291,6 +316,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
     }
 }
 
+private struct ProviderAttemptDeadline: Error {}
 private struct HTTPFailure: Error { let status: Int; let retryAfter: Double; var body: Data? = nil }
 private final class RejectRedirects: NSObject, URLSessionTaskDelegate, Sendable {
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,

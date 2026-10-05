@@ -107,6 +107,13 @@ struct DrawingLogView: View {
                         if let elapsed = metric.elapsedMS { Text(model.display.localizedFormat("呼出し %.1f秒", Double(elapsed) / 1_000)) }
                         if let status = metric.httpStatus ?? metric.diagnostic?.httpStatus { Text("HTTP \(status)") }
                     }.font(.caption).monospacedDigit()
+                    if !metric.sent {
+                        Text(model.display.localized("送信状態不明／応答未確認")).font(.caption).foregroundStyle(.secondary)
+                    }
+                    if metric.failure != nil || metric.diagnostic != nil || metric.outcome == .failed || metric.outcome == .cancelled {
+                        Text(model.display.localizedFormat("診断の操作: %@", model.display.localized(diagnosticOperation(metric.diagnostic?.operation))))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     if let failureCode = metric.failure {
                         Text(model.display.localized(failure(failureCode)))
                         Text(failureCode).font(.caption.monospaced()).foregroundStyle(.secondary)
@@ -163,6 +170,15 @@ struct DrawingLogView: View {
     }
     private func outcome(_ value: ProviderAttemptOutcome) -> String {
         switch value { case .failed: "失敗"; case .completed: "完了"; case .cancelled: "停止済み"; case .requestSaved: "応答未確定" }
+    }
+    private func diagnosticOperation(_ value: ProviderAttemptDiagnosticOperation?) -> String {
+        switch value {
+        case .some(.preparation): "準備"
+        case .some(.admission): "受付待ち"
+        case .some(.tokenCount): "トークン計数"
+        case .some(.generation): "生成要求"
+        case .none: "不明"
+        }
     }
     private func failure(_ value: String) -> String {
         switch value {

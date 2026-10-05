@@ -68,6 +68,13 @@ public struct ProviderObservationView: View {
                 } else { Text(model.display.localized("時間: 記録なし")) }
                 Text(model.display.localized(outcome(metric.outcome)))
             }.foregroundStyle(.secondary).monospacedDigit()
+            if !metric.sent {
+                Text(model.display.localized("送信状態不明／応答未確認")).foregroundStyle(.secondary)
+            }
+            if metric.failure != nil || metric.diagnostic != nil || metric.outcome == .failed || metric.outcome == .cancelled {
+                Text(model.display.localizedFormat("診断の操作: %@", model.display.localized(diagnosticOperation(metric.diagnostic?.operation))))
+                    .foregroundStyle(.secondary)
+            }
             if let status = metric.httpStatus ?? metric.diagnostic?.httpStatus { Text("HTTP \(status)").font(.caption.monospaced()) }
             if let failure = metric.failure { Text(failure).font(.caption.monospaced()).foregroundStyle(.secondary) }
             if let diagnostic = metric.diagnostic {
@@ -151,5 +158,14 @@ public struct ProviderObservationView: View {
     }
     private func outcome(_ outcome: ProviderAttemptOutcome) -> String {
         switch outcome { case .requestSaved: "応答未確定"; case .completed: "完了"; case .failed: "失敗"; case .cancelled: "停止済み" }
+    }
+    private func diagnosticOperation(_ value: ProviderAttemptDiagnosticOperation?) -> String {
+        switch value {
+        case .some(.preparation): "準備"
+        case .some(.admission): "受付待ち"
+        case .some(.tokenCount): "トークン計数"
+        case .some(.generation): "生成要求"
+        case .none: "不明"
+        }
     }
 }

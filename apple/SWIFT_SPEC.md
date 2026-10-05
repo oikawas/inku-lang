@@ -14,6 +14,16 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-05 Batch connection-loss handling and failure diagnostics
+
+The drawing pipeline creates an HTTP client for each core-owned attempt, matching Server. Gemini token counting and generation share that attempt's ephemeral session, which is discarded after tasks have completed or drained on failure or cancellation. Sessions are not shared across rows or retries. Request formats, models, token limits, deadlines, durable rate budgets, and core retry limits are retained without adding transport-owned resends.
+
+Terminal failures use the same execution's failed event and the corresponding action's final metric to save the processing stage, safe cause, attempt number, and diagnostic code in the row error. This remains independent of browsing errors, and background drawing does not replace the displayed work, prompts, or saved metrics. If the final metric succeeded but core validation failed, an earlier retry's connection loss is not reused as the cause.
+
+New transport diagnostics optionally record preparation, admission, token counting, or generation. Older records retain an unknown operation; pipeline stages do not imply which HTTP operation failed. Whole-attempt deadline failures are not attributed to the last HTTP operation. `sent=false` without an observed HTTP response is not proof that a request was never sent; drawing logs and generation information show an unknown send state and unconfirmed response. No request URLs, headers, provider bodies, or API keys are added to diagnostics.
+
+Connection-loss records alone cannot establish the disconnection source or whether session reuse caused it. This source update addresses the client-lifetime difference and missing diagnostics and stops immediately before building. Compilation, test execution, resolution with a real provider, and updates to the running app remain unverified or unperformed.
+
 ## 2026-10-05 Browsing and next-run settings during a batch
 
 While a batch row is drawing, users can switch the description/batch and work/lineage tabs, navigate screens, select and page through history, move to its ends, inspect saved-work details/prompts/Score JSON, and use Settings tabs. Active executions have separate identities from the displayed work. Batch progress and completion do not replace the browsed image, DDL, prompts, or saved measurements; completed works still enter history. Explicitly starting or resuming a batch follows its latest result. Selecting history or a previous successful work pins that display, and neither another completed row nor returning to the screen restarts following.

@@ -5,11 +5,20 @@ import XCTest
 final class ChatGPTPlanRuntimeChecks: XCTestCase {
     // Failure: a one-provider bare model skipped pinning, or a reserved personal reference fell into an API-key route.
     func testPersonalSelectionUsesOrdinaryResolutionRulesAndRefusesMissingReservedProvider() throws {
-        XCTAssertEqual(try PersonalPlanRoutingTransport.personalModel("offered", providers: [.personalPlan]), "offered")
+        // Server's resolver never gives a bare reference to the plan: it falls to the stage default provider.
+        XCTAssertNil(try PersonalPlanRoutingTransport.personalModel("offered", providers: [.personalPlan]))
         XCTAssertEqual(try PersonalPlanRoutingTransport.personalModel("chatgpt:offered", providers: [.personalPlan]), "offered")
         XCTAssertThrowsError(try PersonalPlanRoutingTransport.personalModel("chatgpt:offered", providers: [])) {
             XCTAssertEqual(($0 as? HostError)?.code, "chatgpt_provider_selection_required")
         }
+    }
+    // Failure (D9): one listed row without a display name refuses the whole catalog; Server skips that row.
+    func testCatalogSkipsRowsWithoutStringNames() async throws {
+        let fixture = try RuntimeFixture(expired: false)
+        defer { fixture.remove() }
+        let runtime = ChatGPTPlanRuntime(store: fixture.store, http: RuntimeHTTP(blockRefresh: false))
+        let models = try await runtime.models(force: true)
+        XCTAssertEqual(models.map(\.id), ["offered"])
     }
     // Failure: a refresh completed after local sign-out and resurrected tokens or sent the queued request.
     func testBlockedRefreshCannotResurrectSignedOutSession() async throws {
@@ -121,7 +130,7 @@ private actor RuntimeHTTP: ChatGPTHTTPClient {
             if blockRefresh { try await Task.sleep(for: .seconds(5)) }
             return .init(status: 200, data: Data(#"{"token_type":"Bearer","access_token":"rotated-access","refresh_token":"rotated-refresh","expires_in":3600}"#.utf8))
         case "/.well-known/openid-configuration": return .init(status: 200, data: Data(#"{"issuer":"https://auth.openai.com"}"#.utf8))
-        case "/v1/models": return .init(status: 200, data: Data(#"{"models":[{"visibility":"list","slug":"offered","display_name":"Offered"},{"visibility":"hidden","slug":"hidden","display_name":"Hidden"}]}"#.utf8))
+        case "/v1/models": return .init(status: 200, data: Data(#"{"models":[{"visibility":"list","slug":"offered","display_name":"Offered"},{"visibility":"hidden","slug":"hidden","display_name":"Hidden"},{"visibility":"list","slug":"unnamed"},{"visibility":"list","slug":"numbered","display_name":5}]}"#.utf8))
         case "/v1/responses":
             responses += 1; responseRequest = request
             let arguments = #"{"normalized_ddl":"赤い円"}"#

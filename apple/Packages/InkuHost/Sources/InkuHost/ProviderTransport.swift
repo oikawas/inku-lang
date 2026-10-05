@@ -250,11 +250,9 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
     }
 
     private func resolve(_ reference: String, providers: [ProviderSettings]) throws -> (ProviderSettings, String) {
-        if let colon = reference.firstIndex(of: ":") {
-            let providerID = String(reference[..<colon]); let model = String(reference[reference.index(after: colon)...])
-            if let provider = providers.first(where: { $0.id == providerID }), !model.isEmpty { return (provider, model) }
-        } else if providers.count == 1, !reference.isEmpty { return (providers[0], reference) }
-        throw HostError("provider_selection_required")
+        let (providerID, model) = ProviderModelReference.resolve(reference, providers: providers)
+        guard !model.isEmpty, let provider = providers.first(where: { $0.id == providerID }) else { throw HostError("provider_selection_required") }
+        return (provider, model)
     }
 
     /// Vision and other auxiliary routes share HTTP policy, not pipeline accounting.

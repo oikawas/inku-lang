@@ -72,9 +72,7 @@ public final class SettingsModel {
     }
 
     public nonisolated static func isModelAvailable(_ reference: String, settings: HostSettings) -> Bool {
-        guard let separator = reference.firstIndex(of: ":") else { return false }
-        let providerID = String(reference[..<separator])
-        let modelID = String(reference[reference.index(after: separator)...])
+        let (providerID, modelID) = ProviderModelReference.resolve(reference, providers: settings.providers)
         guard !modelID.isEmpty, let provider = settings.providers.first(where: { $0.id == providerID }) else { return false }
         guard provider.enabledModels?[modelID] != false else { return false }
         let models = provider.models ?? ModelGuidanceCatalog.bundled?.registeredModelSettings(for: provider) ?? []
@@ -93,17 +91,13 @@ public final class SettingsModel {
     }
 
     public nonisolated static func isRegisteredModelAvailable(_ reference: String, purpose: String, settings: HostSettings) -> Bool {
-        guard let separator = reference.firstIndex(of: ":") else { return false }
-        let providerID = String(reference[..<separator])
-        let modelID = String(reference[reference.index(after: separator)...])
+        let (providerID, modelID) = ProviderModelReference.resolve(reference, providers: settings.providers)
         guard let provider = settings.providers.first(where: { $0.id == providerID }) else { return false }
         return registeredModels(for: provider, purpose: purpose).contains { $0.id == modelID && $0.isSelectable }
     }
 
     public nonisolated static func isBatchModelAvailable(_ reference: String, settings: HostSettings) -> Bool {
-        guard let separator = reference.firstIndex(of: ":") else { return false }
-        let providerID = String(reference[..<separator])
-        let modelID = String(reference[reference.index(after: separator)...])
+        let (providerID, modelID) = ProviderModelReference.resolve(reference, providers: settings.providers)
         guard !modelID.isEmpty, let provider = settings.providers.first(where: { $0.id == providerID }) else { return false }
         return batchModels(for: provider).contains { $0.id == modelID && $0.isSelectable }
     }

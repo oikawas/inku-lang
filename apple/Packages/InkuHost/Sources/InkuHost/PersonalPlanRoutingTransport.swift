@@ -17,19 +17,13 @@ public final class PersonalPlanRoutingTransport: ObservedProviderTransport, Obse
         if reference == "chatgpt" || reference.hasPrefix("chatgpt:") { return true }
         return (try? personalModel(reference, providers: providers)) != nil
     }
-    /// Matches the ordinary resolver's explicit service ID and one-provider bare-model rules.
+    /// Uses the ordinary resolver (Server provider_for_model): only a `chatgpt:` reference reaches the plan.
     public static func personalModel(_ reference: String, providers: [ProviderSettings]) throws -> String? {
-        if let colon = reference.firstIndex(of: ":") {
-            let id = String(reference[..<colon]), model = String(reference[reference.index(after: colon)...])
-            guard id == "chatgpt" || providers.contains(where: { $0.id == id && $0.kind == .chatGPTPlan }) else { return nil }
-            guard let provider = providers.first(where: { $0.id == id && $0.kind == .chatGPTPlan }), !model.isEmpty else { throw HostError("chatgpt_provider_selection_required") }
-            try provider.validate(); return model
-        }
         if reference == "chatgpt" { throw HostError("chatgpt_provider_selection_required") }
-        if providers.count == 1, providers[0].kind == .chatGPTPlan, !reference.isEmpty {
-            try providers[0].validate(); return reference
-        }
-        return nil
+        let (id, model) = ProviderModelReference.resolve(reference, providers: providers)
+        guard id == "chatgpt" || providers.contains(where: { $0.id == id && $0.kind == .chatGPTPlan }) else { return nil }
+        guard let provider = providers.first(where: { $0.id == id && $0.kind == .chatGPTPlan }), !model.isEmpty else { throw HostError("chatgpt_provider_selection_required") }
+        try provider.validate(); return model
     }
     public func perform(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
                         onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
@@ -98,7 +92,7 @@ public final class PersonalPlanRoutingTransport: ObservedProviderTransport, Obse
         do {
             let answer: String
             if let recorder {
-                let providerID = reference.firstIndex(of: ":").map { String(reference[..<$0]) } ?? providers[0].id
+                let providerID = ProviderModelReference.resolve(reference, providers: providers).providerID
                 answer = try await runtime.performObserved(action: action, session: session, model: model, providerID: providerID,
                     argumentLimit: argumentLimit, recorder: recorder, willSend: willSend, onBytes: onBytes)
             } else { answer = try await runtime.perform(action: action, session: session, model: model, argumentLimit: argumentLimit, onBytes: onBytes) }

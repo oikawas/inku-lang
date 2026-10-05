@@ -13,6 +13,7 @@ import type { CanvasAspectId } from '../../plugins/system/canvas-aspect/index.ts
 import { type SketchMode } from '../../sketch.ts';
 import type { ApiFetch } from '../../transport/api-fetch.ts';
 import type { RenderOverrides } from '../render-payload.ts';
+import type { Recomposition } from '../canvas/recomposition.ts';
 import { pipelineViewFromErrorDetail, type PipelineView } from '../pipeline/api.ts';
 
 export type InstructionLang = 'auto' | 'ja' | 'en';
@@ -52,6 +53,7 @@ export type PaintResult = {
 	render_seed?: Seed | null;
 	render_wild?: boolean | null;
 	composition_seed?: Seed | null;
+	recomposition?: Recomposition | null;
 	interpretation_seed?: string | null;
 	seed_text?: string | null;
 	sketch_text?: string | null;

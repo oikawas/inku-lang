@@ -122,6 +122,12 @@
 							</Tooltip>
 						</label>
 					</div>
+					{#if refineKind === 'layout'}
+						<div class="recompose-mode-options" role="radiogroup" aria-label={t().canvasVaryComposition}>
+							<label><input type="radio" name="recompose-mode" value="principled" checked={refinementSession.recomposeMode === 'principled'} onchange={() => refinementSession.setRecomposeMode('principled')} disabled={refinementSession.busy || refinementSession.gridBusy} />{t().recomposeByPrinciple}</label>
+							<label><input type="radio" name="recompose-mode" value="chance" checked={refinementSession.recomposeMode === 'chance'} onchange={() => refinementSession.setRecomposeMode('chance')} disabled={refinementSession.busy || refinementSession.gridBusy} />{t().recomposeByChance}</label>
+						</div>
+					{/if}
 					{#if refineKind === 'touch'}
 						<label class="touch-seed-field">
 							<input bind:value={touchSeedText} aria-label={t().canvasVaryPerformance} placeholder={isJapanese ? 'タッチへ託す言葉' : 'Words for the touch'} disabled={refinementSession.busy || refinementSession.gridBusy} />

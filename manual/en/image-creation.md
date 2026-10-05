@@ -243,13 +243,17 @@ In the refinement area of the work tab, choose exactly one element to change at 
 
 | Element | What changes | Cost |
 |---|---|---|
-| Another composition | Picks again the tilt angles and corners the instructions name. A work placed only at the center gives the same picture for every option | Fast (the Stage 2 LLM only when the instructions still have gaps to fill) |
+| Another composition | Chooses the marked composition ranges again. The option's seed also reselects explicit tilt angles and corners | Fast (choosing ranges calls no LLM; existing completion only runs when the instructions still have gaps) |
 | Another reading | Reads again from Stage 1 and regenerates the instructions, composition, and performance | Slow (LLM and API) |
 | Another performance | Derives only the renderer's performance seed from your words, changing line quality, weight sway, and bleed | Very fast (no LLM) |
 
 You may choose `Make one option` or `Make four options`. `Another performance` is deterministic, the same words giving the same touch seed, so it makes one option only. The words do not act on the work's meaning, reading, DDL, JSON Score, or composition.
 
 The color catalog is changed from the work-editing menu instead (8.3).
+
+Under `Another composition`, choose `By principle` or `By chance`. The default, `By principle`, solves another composition from what the instructions alone tell; `By chance` chooses among the ranges each layer's kind permits. Options use the saved instructions, so a work without a description can make them too. Characters outside the marked composition ranges and the original work stay as they are.
+
+Each option shows its layer number and move, such as `1: lower right → upper left`. When the ranges cannot be chosen again, it gives a reason, such as no composition ranges in this work or too many combinations to find another composition, and rebuilds the saved instructions as they are. A work without marked ranges, explicit tilts or corners may give the same picture. Saving an option records the composition seed and chosen mode on its Layout lineage edge.
 
 ### 8.1 Variation (retired)
 
@@ -277,6 +281,8 @@ From the lineage tab the application can build generations on its own.
 | Autonomous refinement with Vision | Observes the picture and passes a direction to try to each generation |
 
 You choose the number of generations and which refinement elements to use. A direction you write reaches every generation under Vision; under random autonomous refinement it applies only to `Another reading` generations, and not at all if `Another reading` is removed.
+
+In either form of autonomous refinement, a composition generation rebuilds its parent's saved instructions `By principle`. A manual choice of `By chance` does not change this default. Choosing the composition ranges calls no LLM.
 
 **The model chosen for autonomous refinement with Vision is used to draw each generation, not only to observe it** (the running display names the model it is drawing with). Random autonomous refinement chooses no model, so it draws with the model selected on the page.
 

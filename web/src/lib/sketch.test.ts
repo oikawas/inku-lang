@@ -104,25 +104,12 @@ test('T-10: the edge is named for the sketch, not the retired grain', () => {
 	assert.match(derivation, /sketch_grain_change: '写生の有無'/);
 	assert.match(derivation, /sketch_grain_change: 'Sketch from life'/);
 });
-// ------------------------------------------- every sender, not just the first
+// ------------------------------------------- the paint layer's run boundary
 
-test('T-2/T-9: every request body that starts at Stage 2 carries the prose', () => {
-	// Renaming or adding an API key means counting the senders: a receiver drops
-	// what it does not know, so a missed sender stays a silent 200. Inside the
-	// the route and Work owner there are several places that post to /api/compose
-	// directly rather than through composeOne, and each one is a place the four consumers below
-	// Stage 1 could quietly go back to reading the raw description.
-	const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
-	const work = read('./features/work/state.svelte.ts');
-	const refinement = read('./features/canvas/refinement-coordinator.svelte.ts');
-	const bodies = [page, work, refinement].flatMap((source) => source.split(/apiFetch\(\s*['"]\/api\/compose['"]/).slice(1));
-	assert.ok(bodies.length >= 3, `expected the known /api/compose senders, found ${bodies.length}`);
-	for (const [i, body] of bodies.entries()) {
-		const head = body.slice(0, 900);
-		assert.match(head, /sketchPayloadFor\(/, `/api/compose sender ${i + 1} does not carry the prose`);
-	}
-
-	// And the paint path says whether the layer runs at all.
+test('T-2/T-9: the paint request says whether the sketch layer runs', () => {
+	// Compose prose is checked on the actual coordinator payload in
+	// features/canvas/recomposition.test.ts, independently of helper placement.
+	// The paint boundary still says whether the layer is called at all.
 	const currentWork = read('./features/run/current-work.ts');
 	const paint = currentWork.slice(currentWork.indexOf("capabilities.apiFetch('/api/paint/stream'"));
 	assert.match(paint.slice(0, 900), /sketch: sketchOn/);

@@ -71,6 +71,10 @@ no-git-sync/fable5/claude_code/tasks/en-terminology.md（2026-07-25 の作者裁
 変奏の推敲操作は廃止した。古い系譜の辺と生成情報は「変奏（旧）」／`Variation (retired)` と表示し、強度は値を持つ古い作品にだけ表示する。作品の版を意味する画面の語は「作品」／`work` とする。
 lint が一字一句を強制する事実と、次の 2 つの規則は本書が持つ。
 
+「配置を変える」の中で選ぶ「原理に沿う」／`By principle`、
+「偶然に委ねる」／`By chance` も作者が2026-10-05に確定した固定値として lint が強制する。
+既定は「原理に沿う」。推敲の要素は4つのままとし、独立した操作を増やさない。
+
 > **`Moderate` は古い作品の変奏の強度の表示に予約されている。** 速度の表示に使わない（コストは
 > `Very fast (no LLM)` / `Medium (Stage 2 LLM and API)` / `Slow (LLM and API)`）。
 
@@ -195,7 +199,7 @@ DB 列 `history.tenkei`、`tenkei_for_node()` 等の内部識別子、web の `t
 `web/scripts/i18n-lint.mjs`（error は 1 件でも exit 1）:
 
 1. `en.ts` と `ja.ts` の**鍵集合が完全一致**すること
-2. §3 の固定ラベル（四操作・古い作品の強度・`Paint`・`Wild`）が**一字一句その語**であること
+2. §3 の固定ラベル（四操作・配置の選び `By principle` / `By chance`・古い作品の強度・`Paint`・`Wild`）が**一字一句その語**であること
 3. §5-1 の禁止語が**どこにも無い**こと
 4. §5-2 の制限語が**許容キー以外に無い**こと
 5. `...`（三点）と感嘆符が無いこと

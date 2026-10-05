@@ -1,5 +1,6 @@
 import { createElapsed, type Elapsed } from '../../elapsed.svelte.ts';
 import type { PaintResult } from '../run/current-work.ts';
+import type { RecomposeMode } from './recomposition.ts';
 
 export type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
 /** Which dialog the refinement modal shows: drawing elements, models, or the color catalog change. */
@@ -19,6 +20,8 @@ export type VariationCandidate = {
 export type VariationSlotState = 'waiting' | 'running' | 'done';
 
 export type RefinementSession = {
+	readonly recomposeMode: RecomposeMode;
+	setRecomposeMode(mode: RecomposeMode): void;
 	readonly busy: boolean;
 	readonly candidates: readonly VariationCandidate[];
 	readonly gridBusy: boolean;
@@ -61,6 +64,12 @@ const addTokenCount = (total: number | null, delta: number | null | undefined): 
 
 /** Route-instance owner for refinement progress, cancellation, and selection. */
 export class RefinementSessionState implements RefinementSession {
+	recomposeMode = $state<RecomposeMode>('principled');
+
+	setRecomposeMode(mode: RecomposeMode): void {
+		this.recomposeMode = mode;
+	}
+
 	busy = $state(false);
 	candidates = $state<VariationCandidate[]>([]);
 	gridBusy = $state(false);

@@ -30,6 +30,8 @@ const listMode = process.argv.includes('--list');
 const FIXED = {
 	canvasVaryPerformance: 'Another performance',
 	canvasVaryComposition: 'Another composition',
+	recomposeByPrinciple: 'By principle',
+	recomposeByChance: 'By chance',
 	canvasVaryInterpretation: 'Another reading',
 	canvasVaryColor: 'Another catalog',
 	retiredVariationSmall: 'Subtle',

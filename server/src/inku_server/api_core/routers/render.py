@@ -21,7 +21,7 @@ from ...saved_score_compat import coerce_saved_score
 from ...schema import Score
 from ..common import DESCRIPTION_LOCKED_DETAIL, MODEL_NOT_OFFERED_DETAIL, _model_offered_to, _resolve_instruction_lang, _resolved_vision_model, _unexpected_http_error
 from ..deps import _current_user
-from ..models import JsonSeed
+from ..models import JsonSeed, RecompositionResult
 from ..rendering import (
     COLOR_CATALOG_ID_HEADER,
     COLOR_SOURCE_HEADER,
@@ -66,6 +66,10 @@ class ComposeRequest(BaseModel):
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     wild: bool = Field(default=False, description="Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed")
     composition_seed: int | None = Field(default=None, description="Composition seed for shared-pipeline layout; omitted means the placement follows the performance seed")
+    recompose_mode: Literal["principled", "chance"] | None = Field(
+        default=None,
+        description="Choose the saved DDL's marked composition ranges again; omission keeps the existing rebuild",
+    )
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
     seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
     fires_on: str | None = Field(
@@ -90,6 +94,7 @@ class ComposeRequest(BaseModel):
 
 class ComposeResponse(BaseModel):
     ddl: str
+    recomposition: RecompositionResult | None = None
     # The committed pipeline document, also used when this work is saved.
     plugin_provenance: list[dict[str, str]] = Field(default_factory=list)
     plugin_warnings: list[str] = Field(default_factory=list)

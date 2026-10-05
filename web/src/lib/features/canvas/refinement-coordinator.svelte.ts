@@ -5,11 +5,12 @@ import { wildOverride } from '$lib/features/wild/render';
 import { normalizeCanvasAspectId, type CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
 import type { HistoryItem } from '$lib/historyManagerState.svelte';
 import type { SaveHistoryOptions } from '$lib/features/history/save';
-import type { PaintResult } from '$lib/features/run/current-work';
+import type { PaintResult, PaintOptions } from '$lib/features/run/current-work';
 import type { WorkState } from '$lib/features/work/state.svelte';
 import { RefinementSessionState, type RefineKind, type VariationCandidate } from '$lib/features/canvas/refinement-session.svelte';
 import { saveRefinementCandidates } from '$lib/features/canvas/refinement-actions';
 import { otherCatalogIds, planRefinementCandidates, runRefinementFanout } from '$lib/features/canvas/refinement-fanout';
+import { layoutCandidateResult, requestLayoutComposition, type ComposeLayoutGeneration, type RecomposeMode, type LayoutComposeResponse } from './recomposition.ts';
 
 type Iteration = HistoryItem;
 type RefinementWork = Pick<WorkState,
@@ -64,7 +65,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		refinementSession.reset({ preserveCandidates: options.preserveVariationCandidates });
 	}
 
-	function composeCandidateResult(source: string, baseDdl: string, data: PaintResult & { ddl: string; thinking?: string | null; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null; }): PaintResult & { ddl: string; thinking: string | null; } {
+	function composeCandidateResult(source: string, baseDdl: string, data: LayoutComposeResponse & { ddl: string; thinking?: string | null; }): PaintResult & { ddl: string; thinking: string | null; } {
 		return {
 			...data,
 			ddl: data.ddl,
@@ -149,6 +150,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				focus: undefined,
 				variation_amplitude: undefined,
 				variation_seed: undefined,
+				recomposition: undefined,
 				...data,
 				ddl: work.ddl ?? '',
 				thinking: work.thinking,
@@ -162,14 +164,10 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		};
 	}
 
-	async function composeVariationCandidate(compositionSeed: number, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
+	async function composeVariationCandidate(compositionSeed: number, label: string, signal: AbortSignal, mode: RecomposeMode): Promise<VariationCandidate> {
 		const source = work.input.trim();
 		const baseDdl = work.ddl ?? "";
-		const r = await apiFetch("/api/compose", {
-			method: "POST",
-			signal,
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
+		const data = await requestLayoutComposition({
 				ddl: baseDdl,
 				description: source,
 				...work.sketchPayloadFor(source),
@@ -180,12 +178,54 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				composition_seed: compositionSeed,
 				...renderSettingsPayload('compose', refinementRenderOverrides()),
 				...(deps.lineageParentId() ? { lineage_parent_node_id: deps.lineageParentId() } : {}),
-			})
-		});
-		if (!r.ok) throw await work.pipelineCompatibilityError(r);
-		const data = await r.json();
-		return { id: `comp-${compositionSeed}`, label, selected: false, result: { ...composeCandidateResult(source, baseDdl, data), lineage_parent_node_id: deps.lineageParentId(), derivation_kind: deps.lineageParentId() ? 'layout_change' : null, derivation_metadata: { composition_seed: compositionSeed } } };
+		}, mode, signal, apiFetch, work.pipelineCompatibilityError);
+		const layout = layoutCandidateResult(data, baseDdl, compositionSeed, mode);
+		return { id: `comp-${compositionSeed}`, kind: 'layout', label, selected: false, result: { ...composeCandidateResult(source, baseDdl, layout), lineage_parent_node_id: deps.lineageParentId(), derivation_kind: deps.lineageParentId() ? 'layout_change' : null, derivation_metadata: layout.derivation_metadata } };
 	}
+
+	const composeLayoutGeneration: ComposeLayoutGeneration = async (parent, source, options: PaintOptions) => {
+		const seed = deps.seeds.composition(new Set([Number(parent.compositionSeed ?? parent.renderSeed)]));
+		const data = await requestLayoutComposition({
+			ddl: parent.ddl,
+			description: source,
+			...(options.sketchText ? { sketch_text: options.sketchText } : {}),
+			model: options.stage2Model ?? deps.models.stage2(),
+			instruction_lang: parent.instructionLang ?? work.instructionLang,
+			ui_lang: getLang(),
+			canvas_aspect: normalizeCanvasAspectId(parent.canvasAspectId ?? deps.render.canvasAspectId()),
+			render_seed: parent.renderSeed,
+			composition_seed: seed,
+			...workReferencePayload(parent.id),
+			...renderSettingsPayload('compose', options.renderOverrides),
+			...(options.lineageParentNodeId ? { lineage_parent_node_id: options.lineageParentNodeId } : {}),
+		}, 'principled', options.signal, apiFetch, work.pipelineCompatibilityError);
+		const layout = layoutCandidateResult(data, parent.ddl, seed, 'principled');
+		const result = {
+			...composeCandidateResult(source, parent.ddl, layout),
+			stage1_model: parent.stage1Model,
+			lineage_parent_node_id: options.lineageParentNodeId ?? null,
+			derivation_kind: 'layout_change' as const,
+			derivation_metadata: { ...options.derivationMetadata, ...layout.derivation_metadata },
+			source_text: source
+		};
+		const saved = await deps.pushHistory({
+			...result, input: source, at: Date.now(),
+			ddl_source_origin: parent.ddlSourceOrigin,
+			elapsed_ms: result.elapsed_total_ms,
+			tokens_in: result.tokens_in_stage2,
+			tokens_out: result.tokens_out_stage2,
+			catalog_id: result.render_color_catalog_id ?? parent.catalogId ?? deps.catalog.defaultId()
+		}, {
+			countGeneration: options.countGeneration,
+			sourceText: source,
+			historyVisibility: options.historyVisibility,
+			lineageParentNodeId: result.lineage_parent_node_id,
+			derivationKind: 'layout_change',
+			derivationMetadata: result.derivation_metadata
+		});
+		if (!saved?.id) throw new Error(t().pipelineAttentionReason('host_commit_failed'));
+		return { ...result, history_id: saved.id, history_at: saved.at, lineage_node_id: saved.lineage_node_id };
+	};
 
 	async function interpretationVariationCandidate(label: string, signal?: AbortSignal): Promise<VariationCandidate> {
 		const source = work.input.trim();
@@ -236,6 +276,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				focus: undefined,
 				variation_amplitude: undefined,
 				variation_seed: undefined,
+				recomposition: undefined,
 				...data,
 				ddl: work.ddl ?? "",
 				thinking: work.thinking,
@@ -297,11 +338,12 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 
 	async function generateVariationCandidates(kind: RefineKind, count: number, touchWords?: string) {
 		if (!work.result || refinementSession.gridBusy || work.loading) return;
+		// Every option in this round uses the choice made before any await.
+		const recomposeMode = refinementSession.recomposeMode;
 		const source = work.input.trim();
-		// Say why nothing is made instead of returning in silence: a work drawn
-		// from hand-written DDL has no description to refine from. A catalog
-		// change redraws the saved Score alone, so it needs neither.
-		if (!source && kind !== 'color') {
+		// A layout draws the saved DDL, and a catalog change draws the saved
+		// Score. Neither needs a description; the other kinds keep their guard.
+		if (!source && kind !== 'color' && kind !== 'layout') {
 			refinementSession.setStatus(t().refineNeedsDescription);
 			return;
 		}
@@ -358,7 +400,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				createCompositionSeed: deps.seeds.composition,
 				catalogName: deps.catalog.name,
 				renderTouch: renderWordTouchCandidate,
-				renderLayout: composeVariationCandidate,
+				renderLayout: (seed, label, signal) => composeVariationCandidate(seed, label, signal, recomposeMode),
 				renderReading: interpretationVariationCandidate,
 				renderColor: renderColorCatalogCandidate
 			});
@@ -490,6 +532,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		refinementCatalogId,
 		refinementCanvasAspectId,
 		generateVariationCandidates,
+		composeLayoutGeneration,
 		generateColorCatalogCandidates,
 		generateModelCandidates,
 		saveSelectedVariationCandidates,

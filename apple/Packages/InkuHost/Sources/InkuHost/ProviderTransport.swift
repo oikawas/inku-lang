@@ -96,7 +96,8 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
             let attemptSession = http == nil ? Self.makeSession() : nil
             defer { attemptSession?.invalidateAndCancel() }
             let raw = try await withThrowingTaskGroup(of: Data.self) { group in
-                group.addTask { [self] in
+                // The provider slot is held for the whole attempt, inside its deadline (provider_limits.py).
+                group.addTask { [self] in try await ProviderConcurrencySlots.shared.holding(provider.id) {
                     let limits = provider.effectiveRateLimits
                     var inputTokens = limits.tokensPerMinute > 0 ? (boundedRequest.httpBody?.count ?? 0) + 128 : 0
                     // Gemini token accounting asks the provider for the same exact request.
@@ -142,7 +143,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                     recorder?.setOperation(.generation)
                     if let attemptError { throw attemptError }
                     return bytes!
-                }
+                } }
                 group.addTask {
                     try await Task.sleep(for: .seconds(remaining))
                     throw ProviderAttemptDeadline()
@@ -373,6 +374,49 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
 }
 
 private struct ProviderAttemptDeadline: Error {}
+
+/// Server provider_limits.py: Ollama Cloud refuses above two simultaneous requests, so its pipeline
+/// requests wait for one of two slots. The limit belongs to the builtin provider ID, not to a setting.
+actor ProviderConcurrencySlots {
+    static let shared = ProviderConcurrencySlots()
+    static func limit(providerID: String) -> Int { providerID == "ollama-cloud" ? 2 : 0 }
+    private var active: [String: Int] = [:]
+    private var waiters: [String: [(id: UUID, continuation: CheckedContinuation<Void, any Error>)]] = [:]
+
+    nonisolated func holding<T: Sendable>(_ providerID: String, _ operation: @Sendable () async throws -> T) async throws -> T {
+        let limit = Self.limit(providerID: providerID)
+        guard limit > 0 else { return try await operation() }
+        try await acquire(providerID, limit: limit)
+        do {
+            let value = try await operation()
+            await release(providerID)
+            return value
+        } catch {
+            await release(providerID)
+            throw error
+        }
+    }
+    private func acquire(_ providerID: String, limit: Int) async throws {
+        try Task.checkCancellation()
+        if active[providerID, default: 0] < limit { active[providerID, default: 0] += 1; return }
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                waiters[providerID, default: []].append((id, continuation))
+            }
+        } onCancel: { Task { await self.abandon(providerID, id) } }
+    }
+    private func abandon(_ providerID: String, _ id: UUID) {
+        guard let index = waiters[providerID]?.firstIndex(where: { $0.id == id }) else { return }
+        waiters[providerID]!.remove(at: index).continuation.resume(throwing: CancellationError())
+    }
+    private func release(_ providerID: String) {
+        // A waiting request takes the released slot directly.
+        if let next = waiters[providerID]?.first {
+            waiters[providerID]!.removeFirst(); next.continuation.resume()
+        } else { active[providerID, default: 1] -= 1 }
+    }
+}
 /// Set while an attempt waits for rate admission, read after its task group has drained.
 private final class ProviderRateWait: @unchecked Sendable {
     private let lock = NSLock()

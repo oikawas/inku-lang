@@ -28,6 +28,20 @@ private actor CountingHTTP: ProviderHTTPClient {
     }
 }
 
+private actor InFlightHTTP: ProviderHTTPClient {
+    private(set) var current = 0
+    private(set) var peak = 0
+    func send(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void,
+              onResponse: @escaping ProviderHTTPReadHandler) async throws -> ProviderHTTPResponse {
+        current += 1; peak = max(peak, current)
+        try await Task.sleep(for: .milliseconds(150))
+        current -= 1
+        let value: ExactJSON = .object(["choices": .array([.object(["message": .object(["content": .string("{\"composition\":\"fixture\"}")])])])])
+        onResponse(.init(status: 200, data: value.data, sent: true, complete: true, truncated: false))
+        return .init(status: 200, data: value.data)
+    }
+}
+
 final class ProviderFailureParityChecks: XCTestCase, @unchecked Sendable {
     private var folder: URL!
     override func setUpWithError() throws {
@@ -87,5 +101,23 @@ final class ProviderFailureParityChecks: XCTestCase, @unchecked Sendable {
         let counts = await http.counts, sent = await http.generations
         XCTAssertEqual(counts, 2)
         XCTAssertEqual(sent, 2)
+    }
+
+    // Failure (D7): three simultaneous Ollama Cloud requests are sent at once, where Server holds the third
+    // until one of two slots is free; other providers are not slowed.
+    func testOllamaCloudTakesTwoRequestsAtOnce() async throws {
+        for (id, expected) in [("ollama-cloud", 2), ("ollama", 3)] {
+            let http = InFlightHTTP()
+            let transport = URLSessionProviderTransport(usageURL: folder.appendingPathComponent(id + ".json"), http: http,
+                database: try InkuDatabase(url: folder.appendingPathComponent(id + ".sqlite")))
+            let provider = ProviderSettings(id: id, baseURL: URL(string: "https://fixture.invalid/v1")!, requiresAPIKey: false)
+            async let a = perform(transport, provider, id: id + "-a")
+            async let b = perform(transport, provider, id: id + "-b")
+            async let c = perform(transport, provider, id: id + "-c")
+            let tags = try await [a, b, c].map { $0["tag"].string }
+            XCTAssertEqual(tags, Array(repeating: "composition_read", count: 3))
+            let peak = await http.peak
+            XCTAssertEqual(peak, expected, id)
+        }
     }
 }

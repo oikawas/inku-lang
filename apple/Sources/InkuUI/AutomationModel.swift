@@ -186,7 +186,7 @@ public final class AutomationModel {
                 let saved = try TolerantPreferences.decode(DemoPreferences.self, from: Data(contentsOf: preferencesURL),
                                                            defaults: DemoPreferences())
                 demoSeedPhrase = saved.seedPhrase; demoSavedModel = saved.model
-                demoInterval = min(999, max(1, saved.interval)); demoDuration = min(86400, max(60, saved.duration))
+                demoInterval = min(3600, max(1, saved.interval)); demoDuration = min(86400, max(60, saved.duration))
                 demoSaveWorks = saved.saveWorks; demoSaveFiles = saved.saveFiles
             }
         } catch {
@@ -400,7 +400,8 @@ public final class AutomationModel {
             let seedPhrase = demoSeedPhrase
             let reference = demoModel
             let language = app.instructionLanguage(for: seedPhrase)
-            let interval = min(999, max(1, demoInterval))
+            // Web demo state.svelte.ts normalizeSettings: 1...3600 seconds.
+            let interval = min(3600, max(1, demoInterval))
             let duration = min(86400, max(60, demoDuration))
             let saveWorks = demoSaveWorks
             let saveFiles = demoSaveFiles
@@ -447,7 +448,9 @@ public final class AutomationModel {
                         self.demoCurrentMetrics = app.providerMetrics
                         self.demoTotalMetrics += self.demoCurrentMetrics
                         self.demoSaveStatus = ""
-                        if saveFiles, !(await app.saveDemoFiles(work)) { throw HostError(app.errorText ?? "demo_file_save_failed") }
+                        // Web leaves artifact files to the drawing it already counted; a failed file save is
+                        // reported without shortening the interval to the one-second failure retry.
+                        if saveFiles, !(await app.saveDemoFiles(work)) { self.errorText = app.errorText ?? "demo_file_save_failed" }
                         let now = Date()
                         let intervalRemaining = Double(interval) - now.timeIntervalSince(iterationStartedAt)
                         let timeoutRemaining = timeoutAt.timeIntervalSince(now)

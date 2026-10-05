@@ -55,7 +55,18 @@ func runServerHostParityChecks() async throws {
     guard network == expectedNetwork, keyless.automationFailureMessage == expectedKeyless else {
         throw CheckFailure.message("Failure wording differs from Web: \(network ?? "nil") / \(keyless.automationFailureMessage ?? "nil")")
     }
-    print("Server host parity passed: auto catalog_mode default only when chosen (2 selections); failed-run wording follows Web with native details (network, 4 attempts; missing key, 1 attempt). Temporary DB only, no provider sends.")
+    // Failure (H13 demo): a saved interval above 999 seconds is cut to 999; Web's demo allows up to 3600.
+    let demoFolder = folder.appendingPathComponent("demo", isDirectory: true)
+    try FileManager.default.createDirectory(at: demoFolder, withIntermediateDirectories: true)
+    try Data(#"{"interval":2000,"duration":7200}"#.utf8).write(to: demoFolder.appendingPathComponent("demo-settings.json"))
+    let demoApp = AppModel(databaseURL: demoFolder.appendingPathComponent("demo.sqlite"), transport: ParityFailingProvider(mode: .network))
+    await demoApp.initialize()
+    let automation = AutomationModel()
+    await automation.connect(app: demoApp)
+    guard automation.demoInterval == 2000, automation.demoDuration == 7200 else {
+        throw CheckFailure.message("Demo interval is not bounded as Web's 1...3600: \(automation.demoInterval)")
+    }
+    print("Server host parity passed: auto catalog_mode default only when chosen (2 selections); failed-run wording follows Web with native details (network, 4 attempts; missing key, 1 attempt); demo interval 2000 s kept. Temporary DB only, no provider sends.")
 }
 
 private actor ParityFailingProvider: ObservedProviderTransport {

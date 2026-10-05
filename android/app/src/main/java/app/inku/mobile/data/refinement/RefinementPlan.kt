@@ -4,7 +4,10 @@ import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.drawnWild
 import app.inku.mobile.data.model.WorkColorSnapshot
 import app.inku.mobile.data.model.workColorSnapshot
+import app.inku.mobile.pipeline.NativePipelineBridge
 import app.inku.mobile.pipeline.RecomposeMode
+import app.inku.mobile.pipeline.SharedPipelineBinding
+import org.json.JSONObject
 import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.i18n.inkuError
 
@@ -147,25 +150,25 @@ object RefinementPlanner {
         newCatalogId: String? = null,
         seedText: String? = null,
         recomposeMode: RecomposeMode = RecomposeMode.Principled,
+        textSeed: (String) -> TextSeed? = TextSeeds::derive,
     ): RefinementPlan = when (element) {
         // The Score, the DDL, the canvas and the catalogue all stay; only the
         // performance is played again. web derives the seed from the words the
         // author typed (`renderWordTouchCandidate`), so the same words always
         // give the same touch.
         RefinementElement.Touch -> {
-            val to = seedText?.let { SeedFactory.renderSeedFromText(it) }
-                ?: inkuError { it.refinementTouchWordsRequired }
+            val touch = seedText?.let(textSeed) ?: inkuError { it.refinementTouchWordsRequired }
             RefinementPlan(
                 element = element,
                 route = RefinementRoute.RenderFromScore,
                 catalogId = parent.catalogId,
                 canvasAspect = parent.canvasAspect,
-                seeds = parent.seeds.copy(renderSeed = to, seedText = seedText.trim()),
+                seeds = parent.seeds.copy(renderSeed = touch.renderSeed, seedText = touch.seedText),
                 derivationKind = element.derivationKind,
                 derivationMetadata = mapOf(
                     "render_seed_from" to parent.seeds.renderSeed?.let { unsigned(it) },
-                    "render_seed_to" to unsigned(to),
-                    "seed_text" to seedText.trim(),
+                    "render_seed_to" to unsigned(touch.renderSeed),
+                    "seed_text" to touch.seedText,
                 ),
             )
         }
@@ -250,4 +253,23 @@ object RefinementPlanner {
     }
 
     private fun unsigned(seed: Long): String = java.lang.Long.toUnsignedString(seed)
+}
+
+/** A word-touch seed and the words as the work records them. */
+data class TextSeed(val renderSeed: Long, val seedText: String)
+
+/**
+ * The server's `_render_seed_from_text`, from the shared core rather than a
+ * Kotlin copy: the same words give the same touch on every host.
+ */
+object TextSeeds {
+    fun derive(seedText: String): TextSeed? = derive(seedText, NativePipelineBridge)
+
+    fun derive(seedText: String, binding: SharedPipelineBinding): TextSeed? =
+        binding.renderSeedFromText(seedText)?.let(::JSONObject)?.let { seed ->
+            TextSeed(
+                renderSeed = java.lang.Long.parseUnsignedLong(seed.getString("render_seed")),
+                seedText = seed.getString("seed_text"),
+            )
+        }
 }

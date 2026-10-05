@@ -42,7 +42,7 @@ class RefinementColorContractTest {
     @Test
     fun scoreOnlyRefinementKeepsTheParentSnapshot() {
         val parent = parent()
-        val plan = RefinementPlanner.plan(RefinementElement.Touch, parent, seedText = "quiet")
+        val plan = RefinementPlanner.plan(RefinementElement.Touch, parent, seedText = "quiet", textSeed = { TextSeed(7L, it) })
 
         assertEquals(snapshot, refinementColorSnapshot(parent, plan))
     }
@@ -50,7 +50,7 @@ class RefinementColorContractTest {
     @Test
     fun missingParentSnapshotStaysMissing() {
         val parent = parent(null)
-        val plan = RefinementPlanner.plan(RefinementElement.Touch, parent, seedText = "quiet")
+        val plan = RefinementPlanner.plan(RefinementElement.Touch, parent, seedText = "quiet", textSeed = { TextSeed(7L, it) })
 
         assertNull(refinementColorSnapshot(parent, plan))
     }

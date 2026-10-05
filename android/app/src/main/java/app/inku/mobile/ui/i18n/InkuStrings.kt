@@ -116,6 +116,10 @@ interface InkuStrings {
      * A saved work the render core would not draw again, by the core's refusal
      * code: the web's `errorScoreNotRenderable` with its `renderRefusalReason`.
      */
+    /** The web's `errorDescriptionOnlyLabels`: nothing but numbering and bracketed notes. */
+    val descriptionOnlyLabels: String
+    /** An input past the server's 100,000-character request limit; [kind] is `description`, `ddl` or `sketch`. */
+    fun inputTooLong(kind: String, length: Int, limit: Int): String
     fun savedRenderRefused(code: String): String
     val pipelineOmissions: (Int) -> String
     val pipelinePartialExecution: (Int, Int) -> String

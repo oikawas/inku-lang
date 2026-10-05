@@ -41,7 +41,7 @@ class SharedPipelineHostTest {
         assertEquals("chance", input.getString("mode"))
         assertEquals("42", input.getString("seed"))
         assertEquals("42", input.getJSONObject("config").getJSONObject("compiler").getString("composition_seed"))
-        assertTrue(input.getString("work_id").isNotBlank())
+        assertEquals("sha256:" + sha256(original), input.getString("work_id"))
         val start = binding.inputs.first()
         assertEquals(selected, start.getJSONObject("authoring").getString("source"))
         assertEquals(input.getJSONObject("config").toString(), start.getJSONObject("config").toString())
@@ -68,7 +68,7 @@ class SharedPipelineHostTest {
         val input = binding.recompositionRequests.single()
         assertEquals("principled", input.getString("mode"))
         assertEquals("43", input.getString("seed"))
-        assertEquals(parent.pipelineView!!.variationId, input.getString("work_id"))
+        assertEquals("sha256:" + sha256(original), input.getString("work_id"))
         val starts = binding.inputs.filter { it.optString("tag") == "start" }
         assertEquals(2, starts.size)
         assertEquals("42", starts.first().getJSONObject("config").getJSONObject("compiler").getString("composition_seed"))
@@ -92,6 +92,149 @@ class SharedPipelineHostTest {
         assertEquals("unavailable", result.recomposition!!.unchangedReason)
         assertEquals("completed", result.pipelineView!!.phaseTag)
     }
+
+    @Test
+    fun recompositionWithoutACompositionSeedUsesTheRenderSeed() = runBlocking {
+        val binding = ScriptedBinding(uniqueExecutions = true)
+        binding.recompositionResponse = JSONObject()
+            .put("schema", "inku.composition-recompose.v1").put("outcome", "unchanged").put("reason", "nothing_to_move")
+        androidPipeline(binding).composeFromDdl(
+            "place one red circle.",
+            layoutRequest(RecomposeMode.Chance, 42L).copy(compositionSeed = null, renderSeed = 7L),
+        )
+
+        assertEquals("7", binding.recompositionRequests.single().getString("seed"))
+    }
+
+    @Test
+    fun theDescriptionReachesTheCoreWithoutItsLabelsAndTheWorkKeepsThemAsWritten() = runBlocking {
+        val binding = ScriptedBinding()
+        binding.labelCut = { if (it == "1. 春の雪 [出典]") "春の雪" else it }
+        runCatching { androidPipeline(binding).interpret(describe("1. 春の雪 [出典]")) }
+
+        val start = binding.inputs.first()
+        assertEquals("春の雪", start.getJSONObject("authoring").getString("description"))
+    }
+
+    @Test
+    fun aDescriptionThatIsOnlyLabelsIsRefusedBeforeTheCore() = runBlocking {
+        val binding = ScriptedBinding()
+        binding.labelCut = { "" }
+        try {
+            androidPipeline(binding).interpret(describe("1. [出典]"))
+            fail("a description of labels alone must not start a drawing")
+        } catch (error: app.inku.mobile.ui.i18n.InkuFailure) {
+            assertEquals(app.inku.mobile.ui.i18n.InkuStringsEn.descriptionOnlyLabels, error.text(app.inku.mobile.ui.i18n.InkuStringsEn))
+        }
+        assertTrue(binding.inputs.isEmpty())
+    }
+
+    @Test
+    fun handWrittenDdlIsReadInItsOwnLanguageNotTheDescriptions() = runBlocking {
+        val binding = ScriptedBinding()
+        val result = androidPipeline(binding).composeFromDdl(
+            "Place one red circle.",
+            describe("雨の日").copy(instructionLang = "auto"),
+        )
+
+        assertEquals("en", binding.inputs.first().getJSONObject("config").getString("language"))
+        assertEquals("en", result.instructionLangResolved)
+    }
+
+    @Test
+    fun anUnstatedLanguageIsAutoAsTheServerReadsIt() = runBlocking {
+        val binding = ScriptedBinding()
+        val result = androidPipeline(binding).composeFromDdl("Place one red circle.", describe("").copy(instructionLang = null))
+
+        assertEquals("auto", result.instructionLangRequested)
+        assertEquals("en", result.instructionLangResolved)
+    }
+
+    @Test
+    fun wordsDecideTheRenderSeedThroughTheSharedRule() = runBlocking {
+        val binding = ScriptedBinding()
+        val result = androidPipeline(binding).composeFromDdl(
+            "place one red circle.",
+            describe("").copy(seedText = "しずかに\u0085", renderSeed = 9L),
+        )
+
+        assertEquals(123L, result.renderSeed)
+        assertEquals("しずかに", result.seedText)
+    }
+
+    @Test
+    fun anInputPastTheRequestLimitIsRefusedBeforeTheCore() = runBlocking {
+        val binding = ScriptedBinding()
+        try {
+            androidPipeline(binding).composeFromDdl("円".repeat(100_001), describe(""))
+            fail("an over-long DDL must be refused")
+        } catch (error: app.inku.mobile.ui.i18n.InkuFailure) {
+            assertTrue(error.text(app.inku.mobile.ui.i18n.InkuStringsEn).contains("100001"))
+        }
+        assertTrue(binding.inputs.isEmpty())
+    }
+
+    @Test
+    fun aForkFromASavedWorkDrawsInTodaysCatalogsEvenOnesItsParentNeverSaved() = runBlocking {
+        val binding = ScriptedBinding()
+        val builder = SharedPipelineConfigBuilder(binding)
+        val parentConfig = builder.build(
+            SharedPipelineConfigRequest("en", "square", "default", bundledPluginsEnabled = false),
+        )
+        val forkContext = JSONObject()
+            .put("config", JSONObject(parentConfig.configJson))
+            .put("color_maps", JSONObject().put("default", JSONObject(parentConfig.renderColorMaps.getValue("default"))))
+            .put("macro_catalog", JSONObject().put("definition_locks", JSONArray()).put("diagnostics", JSONArray()))
+            .put("host_options", JSONObject().put("render_seed", "7"))
+        val parent = HistoryItemEntity(
+            id = "parent", createdAt = 1, updatedAt = 2, originalInput = "",
+            normalizedDdl = "place one red circle.", ddlSourceOrigin = null,
+            scoreJson = "{}", displaySvg = "<svg/>", stage1Model = null, stage2Model = null,
+            renderMetadataJson = "{}", renderHash = "hash", renderHashShort = "0000",
+            colorCatalogId = "default", canvasAspect = "square",
+            starred = false, trashed = false, elapsedMs = null, tokenMetadataJson = null,
+        )
+        val pipeline = AndroidWorkPipeline(
+            binding = binding,
+            modelProvider = object : ModelProvider {
+                override val providerId = "test"
+                override suspend fun generate(request: ModelRequest): ModelResponse = error("no model call expected")
+            },
+            commitStore = RecordingCommitStore(), executionStore = MemoryExecutionStore(),
+            readHistory = {
+                ManagedHistoryRead(parent, "ddl_authoritative", variationId = "parent-variation", forkContextJson = forkContext.toString())
+            },
+            legacyRenderer = object : SvgRenderer {
+                override fun render(request: RenderRequest): RenderResult = error("the shared pipeline renders this run")
+            },
+            bundledPluginsEnabled = { false },
+        )
+        val result = pipeline.composeFromDdl(
+            "place one red circle.",
+            describe("").copy(colorCatalogId = "moss_bark", parentHistoryId = "parent"),
+        )
+
+        val moss = app.inku.mobile.data.model.ColorCatalogs.find("moss_bark")!!.renderMap
+        assertEquals(JSONObject(moss).toString(), JSONObject(result.renderMetadataJson).getJSONObject("render_color_map").toString())
+        assertEquals("work", JSONObject(result.renderMetadataJson).getString("render_limits_source"))
+    }
+
+    @Test
+    fun aSavedWorkRecordsTheServersProfileLimitsAndOutcome() = runBlocking {
+        val result = androidPipeline(ScriptedBinding()).composeFromDdl("place one red circle.", describe("").copy(uiLang = "en"))
+
+        val metadata = JSONObject(result.renderMetadataJson)
+        assertEquals("srgb", metadata.getJSONObject("render_color_profile").getString("id"))
+        assertEquals(64, metadata.getJSONObject("render_limits").getInt("max_instructions"))
+        assertEquals("settings", metadata.getString("render_limits_source"))
+        assertEquals("complete", metadata.getString("compiler_outcome"))
+        assertEquals("en", metadata.getString("ui_lang"))
+    }
+
+    private fun describe(text: String) = PaintRequest(
+        description = text, stage1Model = "local-litert-lm:gemma-4-e2b", stage2Model = "local-litert-lm:gemma-4-e2b",
+        colorCatalogId = "default", canvasAspect = "square", autoRepair = false,
+    )
 
     private fun layoutRequest(mode: RecomposeMode, seed: Long) = PaintRequest(
         description = "a red circle", stage1Model = "local-litert-lm:gemma-4-e2b", stage2Model = "local-litert-lm:gemma-4-e2b",
@@ -540,6 +683,16 @@ class SharedPipelineHostTest {
 
     private class ScriptedBinding(private val uniqueExecutions: Boolean = false) : SharedPipelineBinding {
         val inputs = mutableListOf<JSONObject>()
+        /** The shared label cut, scripted; the rule itself is tested in Rust. */
+        var labelCut: (String) -> String = { it }
+        /** The shared word seed, scripted: words become seed 123 and their text stripped as Python strips it. */
+        var wordSeed: (String) -> String? = { words ->
+            words.trim { it.isWhitespace() || it == '\u0085' }.takeIf(String::isNotEmpty)?.let {
+                JSONObject().put("render_seed", "123").put("seed_text", it).toString()
+            }
+        }
+        override fun pipelineDescription(text: String) = labelCut(text)
+        override fun renderSeedFromText(seedText: String) = wordSeed(seedText)
         val recompositionRequests = mutableListOf<JSONObject>()
         var recompositionResponse: JSONObject? = null
         override fun versionReport() = """{"binding_version":"1.1.0","protocol_version":"1.0.0"}"""
@@ -679,6 +832,7 @@ class SharedPipelineHostTest {
                             .put("error_policy", "omit_and_continue"),
                     )
                     .put("source_digest", "ddl-fixture")
+                    .put("outcome", "complete")
                     .put("upstream_diagnostics", JSONArray()).put("downstream_diagnostics", JSONArray())
                     .put("resource_omissions", JSONArray()).put("relation_omissions", JSONArray())
             } else {
@@ -785,6 +939,10 @@ class SharedPipelineHostTest {
                             ),
                     ),
             )
+
+        fun sha256(value: String): String = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(value.encodeToByteArray())
+            .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
 
         fun visibleDocument(source: String) = JSONObject()
             .put("source", source)

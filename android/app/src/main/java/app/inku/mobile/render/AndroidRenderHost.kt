@@ -81,13 +81,7 @@ class AndroidRenderHost(
             .put("render_color_catalog_id", resolvedCatalogId)
             .put("render_color_catalog_name", catalogName)
             .put("render_color_catalog_sub", catalogSub)
-            .put(
-                "render_color_profile",
-                JSONObject()
-                    .put("id", "srgb")
-                    .put("name", "sRGB IEC61966-2.1")
-                    .put("standard", "IEC 61966-2-1:1999"),
-            )
+            .put("render_color_profile", srgbColorProfile())
             .put("render_color_map", JSONObject(resolvedColorMap))
             .put("render_wild", wild)
 
@@ -138,3 +132,9 @@ class AndroidRenderHost(
         .digest(value.toByteArray(Charsets.UTF_8))
         .joinToString("") { byte -> "%02x".format(byte) }
 }
+
+/** The color profile every saved work names, as the server's `_SRGB_COLOR_PROFILE`. */
+internal fun srgbColorProfile(): JSONObject = JSONObject()
+    .put("id", "srgb")
+    .put("name", "sRGB IEC61966-2.1")
+    .put("standard", "IEC 61966-2-1:1999")

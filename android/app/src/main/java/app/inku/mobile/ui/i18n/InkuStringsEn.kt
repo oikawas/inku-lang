@@ -120,6 +120,10 @@ object InkuStringsEn : InkuStrings {
     } else {
         "The performance raised a warning ($kind) and went on drawing."
     }
+    override val descriptionOnlyLabels = "The description is only its numbering and bracketed notes, so nothing is left to draw. Write what you want drawn."
+    override fun inputTooLong(kind: String, length: Int, limit: Int) =
+        "The " + when (kind) { "ddl" -> "instructions are"; "sketch" -> "sketch text is"; else -> "description is" } +
+            " too long ($length characters; the limit is $limit)."
     override fun savedRenderRefused(code: String) = "This Score cannot be drawn: " + when (code) {
         "resource_authority" -> "the work's resource policy could not be confirmed"
         "performance_stopped" -> "drawing stopped at a limit"

@@ -13,6 +13,7 @@ import app.inku.mobile.data.refinement.SeedFactory
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.render.AndroidRenderHost
 import app.inku.mobile.render.SvgRenderer
+import app.inku.mobile.render.srgbColorProfile
 import app.inku.mobile.ui.i18n.InkuFailure
 import java.math.BigInteger
 import java.security.MessageDigest
@@ -107,23 +108,26 @@ class AndroidWorkPipeline(
         val existingId = request.executionId
         if (existingId == null) {
             val run = prepare(request, descriptionFlow = false, text = ddl)
-            return composePrepared(ddl, run, request.recomposeMode, request.parentHistoryId ?: sha256(ddl))
+            return composePrepared(ddl, run, request.recomposeMode)
         }
 
         val current = host.view(OWNER_ID, existingId)
         val stored = restoredRun(existingId)
-        if (request.recomposeMode != null || runtimeOptionsChanged(request, stored)) {
-            val renderSeed = request.renderSeed ?: stored.renderSeed ?: newRenderSeed()
-            val derivedConfig = deriveSavedConfig(stored.config, request, renderSeed)
+        if (request.recomposeMode != null || runtimeOptionsChanged(request, stored, ddl)) {
             val fork = prepare(
                 request.copy(executionId = null),
                 descriptionFlow = false,
                 text = ddl,
                 parentVariationId = current.variationId,
-                configOverride = derivedConfig,
-                renderSeedOverride = renderSeed,
+                inherited = InheritedRun(
+                    config = stored.config,
+                    renderSeed = stored.renderSeed,
+                    seedText = stored.resultOptions.optionalString("seed_text"),
+                    instructionLang = stored.resultOptions.optionalString("instruction_lang_requested"),
+                    uiLang = stored.resultOptions.optionalString("ui_lang"),
+                ),
             )
-            return composePrepared(ddl, fork, request.recomposeMode, request.parentHistoryId ?: current.variationId)
+            return composePrepared(ddl, fork, request.recomposeMode)
         }
         val editable = if (current.phaseTag == "awaiting_patch_approval") {
             if (current.visibleDdl == ddl) throw PipelineInteractionRequired(current)
@@ -159,14 +163,27 @@ class AndroidWorkPipeline(
         return project(rendered)
     }
 
-    /** Selection and compilation share one prepared configuration and composition seed. */
+    /**
+     * Selection and compilation share one prepared configuration and composition
+     * seed. The work identity and seed are the server's (`pipeline_compat.py`):
+     * the source's digest, and the composition seed or else the render seed.
+     */
     private suspend fun composePrepared(
         ddl: String,
         run: PreparedRun,
         mode: RecomposeMode?,
-        workId: String,
     ): PaintResult {
-        val selected = mode?.let { recomposeDdl(binding, ddl, run.request.config, it, workId) }
+        val selected = mode?.let {
+            recomposeDdl(
+                binding,
+                ddl,
+                run.request.config,
+                it,
+                workId = "sha256:" + sha256(ddl),
+                seed = run.request.config.compositionSeed ?: run.request.renderSeed
+                    ?: throw PipelineHostException("render_seed_required"),
+            )
+        }
         val request = run.request.copy(text = selected?.source ?: ddl)
         return readyResult(authoring.startDirectDdl(request)).copy(recomposition = selected?.info)
     }
@@ -239,6 +256,11 @@ class AndroidWorkPipeline(
         val canvas = saved.canvas
         val renderSeed = saved.renderSeed
         val output = saved.output
+        // The fields the server's saved replay records (`pipeline_product.py`
+        // `replay_saved`), so a redrawn work reads the same on both.
+        val catalog = ColorCatalogs.find(catalogId)
+        val parentMetadata = replaySource?.history?.renderMetadataJson
+            ?.let { runCatching { JSONObject(it) }.getOrNull() }
         val metadata = output.requiredObject("metadata")
             .put("catalog_id", catalogId)
             .put("canvas_aspect_id", request.canvasAspect)
@@ -246,10 +268,30 @@ class AndroidWorkPipeline(
             .put("render_canvas_aspect_id", request.canvasAspect)
             .put("render_canvas_aspect_ratio", canvas.ratio)
             .put("render_color_catalog_id", catalogId)
+            .put(
+                "render_color_catalog_name",
+                parentMetadata?.optionalString("render_color_catalog_name") ?: catalog?.name ?: catalogId,
+            )
+            .put(
+                "render_color_catalog_sub",
+                parentMetadata?.optionalString("render_color_catalog_sub") ?: catalog?.sub ?: "",
+            )
             .put("render_color_map", JSONObject(colors))
+            .put("render_color_source", saved.colorSource)
+            .put("render_color_profile", srgbColorProfile())
             .put("render_seed", java.lang.Long.toUnsignedString(renderSeed))
             .put("render_wild", request.renderWild == true)
-        val replayRequest = request.copy(renderSeed = renderSeed)
+            .put("seed_text", saved.seedText ?: JSONObject.NULL)
+            .put("render_limits", saved.limits)
+            .put(
+                "render_limits_source",
+                when {
+                    replaySource == null -> "settings"
+                    parentMetadata?.optJSONObject("render_limits") != null -> "work"
+                    else -> "work_unrecorded"
+                },
+            )
+        val replayRequest = request.copy(renderSeed = renderSeed, seedText = saved.seedText)
         return replayResult(
             scoreJson,
             replayRequest,
@@ -291,6 +333,9 @@ class AndroidWorkPipeline(
         val colors: Map<String, String>,
         val canvas: CanvasInfo,
         val renderSeed: Long,
+        val seedText: String?,
+        val colorSource: String,
+        val limits: JSONObject,
     )
 
     /** A saved Score through `renderSaved`, with the policy the work was compiled under. */
@@ -316,7 +361,8 @@ class AndroidWorkPipeline(
         val colors = request.workColorSnapshot?.colorMap ?: run.request.config.renderColorMaps[catalogId]
             ?: throw PipelineHostException("saved_color_catalog_unavailable")
         val canvas = canvas(request.canvasAspect)
-        val renderSeed = request.renderSeed ?: newRenderSeed()
+        val (textSeed, seedText) = textSeed(request.seedText, request.renderSeed)
+        val renderSeed = textSeed ?: newRenderSeed()
         val options = JSONObject()
             .put("resolved_color_map", JSONObject(colors))
             .put("catalog_id", catalogId)
@@ -342,7 +388,16 @@ class AndroidWorkPipeline(
             throw InkuFailure { it.savedRenderRefused(code) }
         }
         loggedRenderWarnings(output.requiredObject("metadata"), "saved replay ($svgProfile)")
-        return SavedRender(output, catalogId, colors, canvas, renderSeed)
+        return SavedRender(
+            output,
+            catalogId,
+            colors,
+            canvas,
+            renderSeed,
+            seedText,
+            colorSource = if (request.workColorSnapshot != null) "snapshot" else "catalog",
+            limits = renderLimits(operationalBudget),
+        )
     }
 
     /** The server's `description_hash` (`identity.py`): an identity, not a secret. */
@@ -404,6 +459,14 @@ class AndroidWorkPipeline(
             .put("parent_history_id", resultOptions.optionalString("parent_history_id"))
             .put("pipeline_derivation_kind", resultOptions.optionalString("derivation_kind")
                 ?: execution.authoringContext.derivationKind)
+            // The server's saved fields (`pipeline_product.py` `save_result`).
+            // The DDL and engine version constants and the web build number are
+            // the server's own and have no Android counterpart (ANDROID_SPEC).
+            .put("render_color_profile", srgbColorProfile())
+            .put("compiler_outcome", delivery.requiredString("outcome"))
+            .put("render_limits", renderLimits(compiler.requiredObject("operational_resource_budget")))
+            .put("render_limits_source", resultOptions.optionalString("render_limits_source") ?: JSONObject.NULL)
+            .put("ui_lang", resultOptions.optionalString("ui_lang") ?: JSONObject.NULL)
         val ddl = document.requiredString("source")
         val diagnostics = pipelineDiagnostics(delivery, metadata)
             .put(
@@ -547,12 +610,18 @@ class AndroidWorkPipeline(
         descriptionFlow: Boolean,
         text: String = rawRequest.description,
         parentVariationId: String? = null,
-        configOverride: PreparedPipelineConfig? = null,
-        renderSeedOverride: Long? = null,
+        inherited: InheritedRun? = null,
     ): PreparedRun {
         // Legacy paper remains valid for display/replay; new works use the
         // canonical default even when started from a legacy history selection.
         val request = authoringRequest(rawRequest)
+        checkInputLength(request, text, descriptionFlow)
+        // Every layer reads the description without the author's labels; the
+        // work keeps it as written (server `pipeline_api.py` `_drawn_description`).
+        val drawn = if (descriptionFlow) binding.pipelineDescription(text) else text
+        if (descriptionFlow && text.isNotBlank() && drawn.isBlank()) {
+            throw InkuFailure { it.descriptionOnlyLabels }
+        }
         val history = request.parentHistoryId?.let { historyId ->
             readHistory(historyId) ?: throw PipelineHostException("parent_history_not_found")
         }
@@ -562,16 +631,31 @@ class AndroidWorkPipeline(
             throw PipelineHostException("saved_history_context_corrupt")
         }
         val saved = history?.forkContextJson?.let(::JSONObject)
-        val renderSeed = renderSeedOverride ?: request.renderSeed ?: saved?.requiredObject("host_options")
-            ?.optionalUnsignedLong("render_seed") ?: newRenderSeed()
-        val config = configOverride ?: if (saved == null) {
-            configBuilder.build(
+        // The server merges the parent's options under the request's
+        // (`pipeline_product.py` `prepare`): words, seeds and languages a request
+        // leaves out are the parent's. A legacy parent passes on its languages
+        // but not its words.
+        val parentMetadata = history?.history?.renderMetadataJson
+            ?.let { runCatching { JSONObject(it) }.getOrNull() }
+        val inheritedSeedText = inherited?.seedText ?: history?.takeIf { saved != null }?.history?.seedText
+        val inheritedRenderSeed = inherited?.renderSeed
+            ?: saved?.requiredObject("host_options")?.optionalUnsignedLong("render_seed")
+        val (textSeed, seedText) = textSeed(request.seedText ?: inheritedSeedText, request.renderSeed ?: inheritedRenderSeed)
+        val renderSeed = textSeed ?: newRenderSeed()
+        val requestedLang = InstructionLanguages.normalize(
+            request.instructionLang
+                ?: inherited?.instructionLang
+                ?: history?.history?.instructionLangRequested
+                ?: InstructionLanguages.AUTO,
+        )
+        val uiLang = request.uiLang ?: inherited?.uiLang ?: parentMetadata?.optionalString("ui_lang")
+        // The labels are gone before the language is read, and DDL is read as DDL.
+        val language = InstructionLanguages.resolveWithUiLang(drawn, requestedLang, uiLang)
+        val config = when {
+            inherited != null -> deriveSavedConfig(inherited.config, request, renderSeed, language)
+            saved == null -> configBuilder.build(
                 SharedPipelineConfigRequest(
-                    resolvedLanguage = InstructionLanguages.resolveWithUiLang(
-                        request.description.ifBlank { text },
-                        InstructionLanguages.normalize(request.instructionLang),
-                        request.uiLang,
-                    ),
+                    resolvedLanguage = language,
                     canvasFormatId = request.canvasAspect,
                     catalogSelectionId = request.colorCatalogId,
                     renderSeed = renderSeed,
@@ -581,17 +665,17 @@ class AndroidWorkPipeline(
                     drawingModelId = request.drawingModel,
                 ),
             )
-        } else {
-            val macroCatalog = saved.requiredObject("macro_catalog")
-            val inherited = configBuilder.fromSavedConfig(
-                configJson = saved.requiredObject("config").toString(),
-                renderColorMaps = saved.requiredObject("color_maps").stringMaps(),
-                macroLocksJson = macroCatalog.requiredArray("definition_locks").toString(),
-                macroDiagnosticsJson = macroCatalog.requiredArray("diagnostics").toString(),
-            )
-            deriveSavedConfig(inherited, request, renderSeed)
+            else -> {
+                val macroCatalog = saved.requiredObject("macro_catalog")
+                val parentConfig = configBuilder.fromSavedConfig(
+                    configJson = saved.requiredObject("config").toString(),
+                    renderColorMaps = saved.requiredObject("color_maps").stringMaps(),
+                    macroLocksJson = macroCatalog.requiredArray("definition_locks").toString(),
+                    macroDiagnosticsJson = macroCatalog.requiredArray("diagnostics").toString(),
+                )
+                deriveSavedConfig(parentConfig, request, renderSeed, language)
+            }
         }
-        val requestedLang = InstructionLanguages.normalize(request.instructionLang)
         val resolvedLang = JSONObject(config.configJson).requiredString("language")
         val context = when {
             parentVariationId != null -> AuthoringContext(
@@ -614,7 +698,7 @@ class AndroidWorkPipeline(
         return PreparedRun(
             request = SharedPipelineRunRequest(
                 ownerId = OWNER_ID,
-                text = text,
+                text = drawn,
                 originalInput = request.originalText,
                 config = config,
                 models = pinModelSession(PipelineModelSelection(request.drawingModel, request.drawingModel)),
@@ -622,9 +706,11 @@ class AndroidWorkPipeline(
                 renderSeed = renderSeed,
                 wild = request.renderWild == true,
                 interpretationSeed = request.interpretationSeed,
-                seedText = request.seedText,
+                seedText = seedText,
                 instructionLangRequested = requestedLang,
                 instructionLangResolved = resolvedLang,
+                uiLang = uiLang,
+                renderLimitsSource = if (inherited != null || saved != null) "work" else "settings",
                 sketch = PipelineSketchRequest.from(request.sketch),
                 parentHistoryId = request.parentHistoryId,
                 inputProvenanceJson = request.inputProvenance?.toJson()?.toString(),
@@ -634,11 +720,45 @@ class AndroidWorkPipeline(
         )
     }
 
+    /**
+     * The server's `_render_seed_from_text` (`api_core/rendering.py`): words,
+     * when there are any, decide the render seed through the shared rule, and
+     * the normalized words are what the work records.
+     */
+    private fun textSeed(seedText: String?, renderSeed: Long?): Pair<Long?, String?> {
+        if (seedText.isNullOrEmpty()) return renderSeed to null
+        val derived = binding.renderSeedFromText(seedText)?.let(::JSONObject) ?: return renderSeed to null
+        return java.lang.Long.parseUnsignedLong(derived.requiredString("render_seed")) to
+            derived.requiredString("seed_text")
+    }
+
+    /**
+     * The compatibility API's request limit (`api_core/routers/render.py`):
+     * a description, DDL or sketch text past 100,000 characters is refused
+     * before anything runs. Characters are code points, as Python counts them.
+     */
+    private fun checkInputLength(request: PaintRequest, text: String, descriptionFlow: Boolean) {
+        fun check(kind: String, value: String?) {
+            val length = value?.let { it.codePointCount(0, it.length) } ?: return
+            if (length > MAX_INPUT_CHARACTERS) throw InkuFailure { it.inputTooLong(kind, length, MAX_INPUT_CHARACTERS) }
+        }
+        check(if (descriptionFlow) "description" else "ddl", text)
+        check("sketch", request.sketch.text)
+    }
+
+    /**
+     * A fork's configuration from its parent's: the parent's compiler policy and
+     * plugins with this request's canvas, catalog, seeds and language. Colors
+     * come from today's catalogs, as the server resolves them for every fork
+     * (`pipeline_product.py`); only a replay keeps the work's own colors.
+     */
     private fun deriveSavedConfig(
         saved: PreparedPipelineConfig,
         request: PaintRequest,
         renderSeed: Long,
+        language: String,
     ): PreparedPipelineConfig {
+        val colorMaps = ColorCatalogs.all.associate { it.id to it.renderMap }
         val config = JSONObject(saved.configJson)
         val compiler = config.requiredObject("compiler")
         // A new fork must not inherit a retired request from its saved parent.
@@ -651,12 +771,12 @@ class AndroidWorkPipeline(
         }
         val auto = request.colorCatalogId == "auto"
         val selectedCatalogId = if (auto) "default" else request.colorCatalogId
-        if (!saved.renderColorMaps.containsKey(selectedCatalogId)) {
-            throw PipelineHostException("saved_color_catalog_unavailable")
+        if (!colorMaps.containsKey(selectedCatalogId)) {
+            throw PipelineHostException("unknown_color_catalog")
         }
         fun resolvedHost(catalogId: String): JSONObject {
-            val colors = saved.renderColorMaps[catalogId]
-                ?: throw PipelineHostException("saved_color_catalog_unavailable")
+            val colors = colorMaps[catalogId]
+                ?: throw PipelineHostException("unknown_color_catalog")
             val paletteInput = JSONObject()
                 .put("color_map", JSONObject(colors))
                 .put("catalog_id", catalogId)
@@ -688,16 +808,7 @@ class AndroidWorkPipeline(
                     ?: compiler.opt("composition_seed")
                     ?: JSONObject.NULL,
             )
-        if (request.instructionLang != null) {
-            config.put(
-                "language",
-                InstructionLanguages.resolveWithUiLang(
-                    request.description,
-                    InstructionLanguages.normalize(request.instructionLang),
-                    request.uiLang,
-                ),
-            )
-        }
+        config.put("language", language)
         config.put(
             "catalogs",
             if (!auto) {
@@ -705,22 +816,17 @@ class AndroidWorkPipeline(
             } else {
                 JSONArray().also { candidates ->
                     ColorCatalogs.all.forEach { catalog ->
-                        if (saved.renderColorMaps.containsKey(catalog.id)) {
-                            candidates.put(
-                                JSONObject()
-                                    .put(
-                                        "prompt",
-                                        JSONObject()
-                                            .put("catalog_id", catalog.id)
-                                            .put("label", catalog.name)
-                                            .put(
-                                                "description",
-                                                if (config.requiredString("language") == "ja") catalog.subJa else catalog.sub,
-                                            ),
-                                    )
-                                    .put("resolved", resolvedHost(catalog.id).put("catalog_mode", "explicit")),
-                            )
-                        }
+                        candidates.put(
+                            JSONObject()
+                                .put(
+                                    "prompt",
+                                    JSONObject()
+                                        .put("catalog_id", catalog.id)
+                                        .put("label", catalog.name)
+                                        .put("description", if (language == "ja") catalog.subJa else catalog.sub),
+                                )
+                                .put("resolved", resolvedHost(catalog.id).put("catalog_mode", "explicit")),
+                        )
                     }
                 }
             },
@@ -730,7 +836,7 @@ class AndroidWorkPipeline(
             autoCatalog = auto,
             canvasFormatId = request.canvasAspect,
             catalogId = selectedCatalogId,
-            renderColorMaps = saved.renderColorMaps,
+            renderColorMaps = colorMaps,
             compositionSeed = compiler.optionalUnsignedLong("composition_seed"),
             errorPolicy = compiler.requiredString("error_policy"),
             macroLocksJson = saved.macroLocksJson,
@@ -770,9 +876,24 @@ class AndroidWorkPipeline(
         return context.toString()
     }
 
-    private fun runtimeOptionsChanged(request: PaintRequest, stored: RestoredRun): Boolean {
+    /**
+     * Whether an edit draws under other settings and so forks, as the server's
+     * `author_ddl` compares a re-prepared configuration. The language is read
+     * from the edited DDL, so an edit that changes it forks too.
+     */
+    private fun runtimeOptionsChanged(request: PaintRequest, stored: RestoredRun, ddl: String): Boolean {
         val options = stored.hostOptions
-        return request.drawingModel != stored.models.stage1ModelId ||
+        val language = InstructionLanguages.resolveWithUiLang(
+            ddl,
+            InstructionLanguages.normalize(
+                request.instructionLang
+                    ?: stored.resultOptions.optionalString("instruction_lang_requested")
+                    ?: InstructionLanguages.AUTO,
+            ),
+            request.uiLang ?: stored.resultOptions.optionalString("ui_lang"),
+        )
+        return language != JSONObject(stored.config.configJson).requiredString("language") ||
+            request.drawingModel != stored.models.stage1ModelId ||
             request.drawingModel != stored.models.stage2ModelId ||
             (request.colorCatalogId == "auto") != (options.requiredString("catalog_mode") == "auto") ||
             (request.colorCatalogId != "auto" && request.colorCatalogId != options.requiredString("catalog_id")) ||
@@ -826,6 +947,19 @@ class AndroidWorkPipeline(
             ?: throw PipelineHostException("unknown_canvas_format")
         val ratio = format.getDouble("width_units") / format.getDouble("height_units")
         return CanvasInfo(Math.rint(CANVAS_BASE_PX * ratio), CANVAS_BASE_PX, ratio)
+    }
+
+    /**
+     * The four limits a work records, in the server's names (`limits.py`),
+     * read from the compiler budget the work was drawn under.
+     */
+    private fun renderLimits(operationalBudget: JSONObject): JSONObject {
+        val maximum = operationalBudget.requiredObject("maximum")
+        return JSONObject()
+            .put("max_expanded_primitives", maximum.get("primitive_marks"))
+            .put("max_expanded_per_instruction", maximum.get("maximum_per_template_primitive_marks"))
+            .put("schema_count_max", maximum.get("maximum_resolved_count"))
+            .put("max_instructions", maximum.get("object_templates"))
     }
 
     /** The server's render clip limits (`pipeline_defaults.py`). */
@@ -918,6 +1052,15 @@ class AndroidWorkPipeline(
         val instructionLangResolved: String,
     )
 
+    /** A running execution's settings, inherited by a fork made from it. */
+    private data class InheritedRun(
+        val config: PreparedPipelineConfig,
+        val renderSeed: Long?,
+        val seedText: String?,
+        val instructionLang: String?,
+        val uiLang: String?,
+    )
+
     private data class RestoredRun(
         val config: PreparedPipelineConfig,
         val models: PipelineModelSelection,
@@ -947,5 +1090,6 @@ class AndroidWorkPipeline(
         // renderer; a new work started from one uses the default canvas.
         private const val PIXEL9_HOST_ONLY_FORMAT = "pixel9_landscape_safe"
         private const val CANVAS_BASE_PX = 1000.0
+        private const val MAX_INPUT_CHARACTERS = 100_000
     }
 }

@@ -26,6 +26,7 @@ internal fun recomposeDdl(
     config: PreparedPipelineConfig,
     mode: RecomposeMode,
     workId: String,
+    seed: Long,
 ): RecomposedDdl {
     fun unchanged(reason: String) = RecomposedDdl(source, RecompositionInfo(unchangedReason = reason))
     try {
@@ -33,7 +34,7 @@ internal fun recomposeDdl(
             .put("config", JSONObject(config.configJson))
             .put("source", source)
             .put("mode", mode.id)
-            .put("seed", config.compositionSeed?.let(java.lang.Long::toUnsignedString) ?: JSONObject.NULL)
+            .put("seed", java.lang.Long.toUnsignedString(seed))
             .put("work_id", workId)
         val output = JSONObject(binding.recompose(input.toString().encodeToByteArray()).toString(Charsets.UTF_8))
         if (output.has("error") || output.optString("schema") != "inku.composition-recompose.v1") {

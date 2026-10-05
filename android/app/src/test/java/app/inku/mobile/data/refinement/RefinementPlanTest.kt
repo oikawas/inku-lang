@@ -115,7 +115,7 @@ class RefinementPlanTest {
             RefinementElement.Layout to null,
             RefinementElement.Reading to null,
         ).forEach { (element, words) ->
-            val plan = RefinementPlanner.plan(element, parent, seedText = words)
+            val plan = RefinementPlanner.plan(element, parent, seedText = words, textSeed = WORD_SEED)
             assertEquals("$element keeps the parent's catalogue", parent.catalogId, plan.catalogId)
             assertEquals("$element keeps the parent's canvas", parent.canvasAspect, plan.canvasAspect)
             assertNotEquals("$element did not read the next-draw catalogue", nextDrawCatalog, plan.catalogId)
@@ -172,7 +172,7 @@ class RefinementPlanTest {
         assertEquals(listOf("touch", "layout", "reading", "color"), RefinementElement.entries.map { it.id })
         assertNull(RefinementElement.byId("variation"))
 
-        val touch = RefinementPlanner.plan(RefinementElement.Touch, parent, seedText = "しずかに")
+        val touch = RefinementPlanner.plan(RefinementElement.Touch, parent, seedText = "しずかに", textSeed = WORD_SEED)
         assertEquals("touch_change", touch.derivationKind)
         assertEquals(setOf("render_seed_from", "render_seed_to", "seed_text"), touch.derivationMetadata.keys)
         assertEquals("4242", touch.derivationMetadata["render_seed_from"])
@@ -278,7 +278,7 @@ class RefinementPlanTest {
      */
     @Test
     fun aTouchSeedAboveTheSignedRangeSurvivesTheRoundTrip() {
-        val seed = SeedFactory.renderSeedFromText("しずかに")!!
+        val seed = WORD_SEED("しずかに")!!.renderSeed
         val stored = java.lang.Long.toUnsignedString(seed)
         val readBack = PaintSeeds.of(parentItem(renderSeed = stored)).renderSeed
 
@@ -286,11 +286,20 @@ class RefinementPlanTest {
         assertEquals(stored, java.lang.Long.toUnsignedString(readBack!!))
     }
 
-    /** The same words are the same touch -- which is why four of them is refused. */
+    /** The touch takes the words and the seed the shared rule gives them. */
     @Test
-    fun theSameWordsGiveTheSameTouchSeed() {
-        assertEquals(SeedFactory.renderSeedFromText("しずかに"), SeedFactory.renderSeedFromText(" しずかに "))
-        assertNotEquals(SeedFactory.renderSeedFromText("しずかに"), SeedFactory.renderSeedFromText("はげしく"))
-        assertNull("no words, no seed", SeedFactory.renderSeedFromText("   "))
+    fun theTouchUsesTheSharedRulesSeedAndWords() {
+        val touch = RefinementPlanner.plan(RefinementElement.Touch, parent(), seedText = " しずかに ", textSeed = WORD_SEED)
+        assertEquals(WORD_SEED("しずかに")!!.renderSeed, touch.seeds.renderSeed)
+        assertEquals("しずかに", touch.seeds.seedText)
+    }
+
+    private companion object {
+        /** The shared rule is tested in Rust; here it is scripted, with a seed past Long.MAX_VALUE. */
+        val WORD_SEED: (String) -> TextSeed? = { words ->
+            words.trim().takeIf(String::isNotEmpty)?.let {
+                TextSeed(java.lang.Long.parseUnsignedLong("14859340650796947346"), it)
+            }
+        }
     }
 }

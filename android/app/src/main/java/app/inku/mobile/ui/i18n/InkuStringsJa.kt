@@ -114,6 +114,10 @@ object InkuStringsJa : InkuStrings {
     } else {
         "描画の警告があります（$kind）。描画は続けました。"
     }
+    override val descriptionOnlyLabels = "記述が通し番号と［　］の注記だけで、描くところが残っていません。描きたいことを書いてください。"
+    override fun inputTooLong(kind: String, length: Int, limit: Int) =
+        when (kind) { "ddl" -> "指示書"; "sketch" -> "写生文"; else -> "記述" } +
+            "が長すぎます（${length}字。上限は${limit}字です）。"
     override fun savedRenderRefused(code: String) = "このScoreは描けません: " + when (code) {
         "resource_authority" -> "作品の資源の方針を確かめられませんでした"
         "performance_stopped" -> "描画が上限に達して止まりました"

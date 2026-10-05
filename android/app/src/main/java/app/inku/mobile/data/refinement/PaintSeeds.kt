@@ -1,7 +1,6 @@
 package app.inku.mobile.data.refinement
 
 import app.inku.mobile.data.db.HistoryItemEntity
-import java.security.MessageDigest
 import java.security.SecureRandom
 
 /**
@@ -74,20 +73,4 @@ object SeedFactory {
 
     /** `createInterpretationSeed` -- an opaque uuid4, never read as a number. */
     fun newInterpretationSeed(): String = java.util.UUID.randomUUID().toString()
-
-    /**
-     * `_render_seed_from_text` (`rendering.py:324`): the first eight bytes of the
-     * digest, big-endian, unsigned. The same words always give the same touch,
-     * which is why the touch refinement can only offer one candidate.
-     */
-    fun renderSeedFromText(seedText: String): Long? {
-        val normalized = seedText.trim()
-        if (normalized.isEmpty()) return null
-        val digest = MessageDigest.getInstance("SHA-256").digest(normalized.toByteArray(Charsets.UTF_8))
-        var seed = 0L
-        for (index in 0 until 8) {
-            seed = (seed shl 8) or (digest[index].toLong() and 0xffL)
-        }
-        return seed
-    }
 }

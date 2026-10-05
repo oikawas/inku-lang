@@ -791,9 +791,14 @@ private fun WorkSketchDialog(item: HistoryItemEntity, viewModel: InkuViewModel) 
 
 @Composable
 private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
-    var editorValue by remember {
-        mutableStateOf(TextFieldValue(state.ddl, selection = TextRange(state.ddl.length)))
-    }
+    val editorState = androidx.compose.foundation.text.input.rememberTextFieldState(
+        state.ddl, initialSelection = TextRange(state.ddl.length),
+    )
+    val table = LocalCompositionRangeTable.current
+    val session = remember(table) { DdlRangeEditorSession(table) }
+    var focused by remember { mutableStateOf(false) }
+    var rangeStatus by remember { mutableStateOf(DdlEditorRangeStatus()) }
+    val editorValue = TextFieldValue(editorState.text.toString(), editorState.selection, editorState.composition)
     var vocabularyOpen by remember { mutableStateOf(false) }
     var vocabularyQuery by remember { mutableStateOf("") }
     val lang = LocalUiLanguage.current
@@ -821,9 +826,22 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
             }
         }
     }
-    fun updateEditor(value: TextFieldValue) {
-        editorValue = value
-        viewModel.setDdl(value.text)
+    fun syncEditor(leaving: Boolean = false) {
+        val update = session.update(DdlEditorSnapshot(editorState.text.toString(), editorState.selection,
+            editorState.composition, focused && !leaving, !viewModel.state.value.isDrawing))
+        if (update.names.isNotEmpty()) editorState.edit { update.applyTo(this) }
+        rangeStatus = update.status
+        val source = editorState.text.toString()
+        if (source != viewModel.state.value.ddl) viewModel.setDdl(source)
+    }
+    LaunchedEffect(editorState, session, focused, state.isDrawing) {
+        androidx.compose.runtime.snapshotFlow {
+            DdlEditorSnapshot(editorState.text.toString(), editorState.selection, editorState.composition, focused, !state.isDrawing)
+        }.collect { syncEditor() }
+    }
+    fun closeEditor() {
+        syncEditor(leaving = true)
+        viewModel.closeDdlEditor()
     }
     val context = LocalContext.current
     val importScope = rememberCoroutineScope()
@@ -837,17 +855,30 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
             }
             viewModel.importDdlFile(text)
             val imported = viewModel.state.value.ddl
-            editorValue = TextFieldValue(imported, selection = TextRange(imported.length))
+            session.reset()
+            editorState.edit {
+                replace(0, length, imported)
+                selection = TextRange(imported.length)
+            }
         }
     }
     fun insertVocabulary(word: String) {
-        updateEditor(insertWordAtSelection(editorValue, word))
+        if (viewModel.state.value.isDrawing) return
+        val current = TextFieldValue(editorState.text.toString(), editorState.selection)
+        val inserted = insertWordAtSelection(current, word)
+        val change = DdlSourceChange.between(current.text, inserted.text)
+        editorState.edit {
+            if (change != null) replace(change.start, change.end, change.replacement)
+            selection = inserted.selection
+        }
     }
     fun selectVocabulary(word: String) {
-        updateEditor(selectNextWordOccurrence(editorValue, word))
+        val current = TextFieldValue(editorState.text.toString(), editorState.selection)
+        val selected = selectNextWordOccurrence(current, word)
+        editorState.edit { selection = selected.selection }
     }
     Dialog(
-        onDismissRequest = viewModel::closeDdlEditor,
+        onDismissRequest = ::closeEditor,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(
@@ -876,12 +907,12 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
                     ) {
                         Text(S.ddlImportFile)
                     }
-                    TextButton(onClick = viewModel::closeDdlEditor) {
+                    TextButton(onClick = ::closeEditor) {
                         Text(S.close)
                     }
                     TextButton(
                         onClick = {
-                            viewModel.closeDdlEditor()
+                            closeEditor()
                             viewModel.drawFromDdl()
                         },
                         enabled = !state.isDrawing && DdlSource.hasBody(state.ddl),
@@ -890,15 +921,29 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
                     }
                 }
                 DdlSelectedVocabularyHeader(selectedWord)
-                DenseTextFieldValueInput(
-                    value = editorValue,
-                    onValueChange = ::updateEditor,
+                if (rangeStatus.active != null || rangeStatus.invalid) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                        state.selectedHistory?.let { item ->
+                            ArtworkPreview(item, rangeBounds = rangeStatus.bounds, fitArtwork = true,
+                                modifier = Modifier.size(Dimens.ddlEditorPreviewSize))
+                        }
+                        Text(if (rangeStatus.invalid) S.rangeInvalid else S.rangeEditNote,
+                            modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall,
+                            color = if (rangeStatus.invalid) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                DdlRangeEditor(
+                    state = editorState,
+                    focused = focused,
+                    onFocusChanged = { focused = it },
                     modifier = Modifier.fillMaxWidth().weight(1f),
-                    minLines = 20,
-                    maxLines = 80,
-                    enabled = !state.isDrawing,
-                    highlightTokens = vocabularyTokens,
-                    selectWords = allVocabularyWords,
+                    readOnly = state.isDrawing,
+                    tokens = vocabularyTokens,
+                    onWordTap = {
+                        val current = TextFieldValue(editorState.text.toString(), editorState.selection)
+                        val selected = selectVocabularyAtOffset(current, current.selection.start, allVocabularyWords)
+                        if (current.selection != selected.selection) editorState.edit { selection = selected.selection }
+                    },
                 )
                 DdlVocabularyBar(
                     open = vocabularyOpen,
@@ -6650,7 +6695,7 @@ private fun CompactLabel(text: String) {
 }
 
 @OptIn(ExperimentalFoundationApi::class)
-private fun kotlinx.coroutines.CoroutineScope.launchImeBringIntoViewGuard(requester: BringIntoViewRequester) {
+internal fun kotlinx.coroutines.CoroutineScope.launchImeBringIntoViewGuard(requester: BringIntoViewRequester) {
     launch {
         listOf(80L, 220L, 420L, 700L, 1000L).forEach { waitMs ->
             delay(waitMs)
@@ -6842,72 +6887,6 @@ private fun DenseMultilineInput(
         minLines = minLines,
         maxLines = maxLines,
     )
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun DenseTextFieldValueInput(
-    value: TextFieldValue,
-    onValueChange: (TextFieldValue) -> Unit,
-    modifier: Modifier = Modifier,
-    minLines: Int,
-    maxLines: Int,
-    enabled: Boolean = true,
-    highlightTokens: List<DdlVocabularyToken> = emptyList(),
-    selectWords: List<String> = emptyList(),
-) {
-    val bringIntoViewRequester = remember { BringIntoViewRequester() }
-    val scope = rememberCoroutineScope()
-    var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
-    val visualTransformation = remember(highlightTokens) {
-        DdlKeywordHighlightTransformation(highlightTokens)
-    }
-    val normalizedOnValueChange: (TextFieldValue) -> Unit = { nextValue ->
-        val shouldSelectVocabulary =
-            nextValue.text == value.text &&
-                nextValue.selection.collapsed &&
-                selectWords.isNotEmpty()
-        if (shouldSelectVocabulary) {
-            val selected = selectVocabularyAtOffset(nextValue, nextValue.selection.start, selectWords)
-            onValueChange(selected)
-        } else {
-            onValueChange(nextValue)
-        }
-    }
-    Box(
-        modifier = modifier
-            .bringIntoViewRequester(bringIntoViewRequester)
-            .background(InputWellSurface, RoundedCornerShape(Dimens.radiusCard))
-            .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusCard))
-            .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceXs),
-    ) {
-        BasicTextField(
-            value = value,
-            onValueChange = normalizedOnValueChange,
-            enabled = enabled,
-            modifier = Modifier
-                .fillMaxSize()
-                .onFocusChanged { focusState ->
-                    if (focusState.isFocused) {
-                        scope.launchImeBringIntoViewGuard(bringIntoViewRequester)
-                    }
-                }
-                .drawBehind {
-                    val layout = textLayoutResult ?: return@drawBehind
-                    drawDdlKeywordHighlights(layout, value.text, highlightTokens)
-                },
-            textStyle = MaterialTheme.typography.bodySmall.copy(
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = TypeScale.editorBody * LocalUiTextScale.current,
-                lineHeight = TypeScale.editorLineHeight * LocalUiTextScale.current,
-            ),
-            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            visualTransformation = visualTransformation,
-            onTextLayout = { textLayoutResult = it },
-            minLines = minLines,
-            maxLines = maxLines,
-        )
-    }
 }
 
 internal fun androidx.compose.ui.graphics.drawscope.DrawScope.drawDdlKeywordHighlights(

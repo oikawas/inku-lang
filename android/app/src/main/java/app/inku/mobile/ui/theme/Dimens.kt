@@ -167,6 +167,9 @@ object Dimens {
 
     // --- Dialogs ------------------------------------------------------------
 
+    /** 112dp. The current work beside the range status in the instructions editor. */
+    val ddlEditorPreviewSize: Dp = 112.dp
+
     /** 420dp. The add-provider card. */
     val addProviderCardHeight: Dp = 420.dp
 

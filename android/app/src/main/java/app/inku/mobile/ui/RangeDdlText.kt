@@ -55,9 +55,11 @@ internal fun RangeDdlText(
     val placeInk = if (isLightColor(placeColor)) PillInkOnLight else PillInkOnDark
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     var edit by remember { mutableStateOf<DdlRangeEdit?>(null) }
+    var hoveredBounds by remember { mutableStateOf<DdlRangeBounds?>(null) }
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     LaunchedEffect(source) {
         if (edit?.source != source) edit = null
+        hoveredBounds = null
     }
     val display = remember(source, table, edit?.range?.start) { displayDdlRanges(source, table, edit?.range?.start) }
     val text = remember(display, tokens, placeInk, muted) {
@@ -98,9 +100,14 @@ internal fun RangeDdlText(
                         while (true) {
                             val event = awaitPointerEvent()
                             when (event.type) {
-                                PointerEventType.Enter, PointerEventType.Move ->
-                                    show(event.changes.firstOrNull()?.position?.let { at(it)?.range?.bounds } ?: edit?.lastValidBounds)
-                                PointerEventType.Exit -> show(edit?.lastValidBounds)
+                                PointerEventType.Enter, PointerEventType.Move -> {
+                                    hoveredBounds = event.changes.firstOrNull()?.position?.let { at(it)?.range?.bounds }
+                                    show(hoveredBounds ?: edit?.lastValidBounds)
+                                }
+                                PointerEventType.Exit -> {
+                                    hoveredBounds = null
+                                    show(edit?.lastValidBounds)
+                                }
                             }
                         }
                     }
@@ -128,8 +135,8 @@ internal fun RangeDdlText(
                 },
             onTextLayout = { layout = it },
         )
+        if (edit != null || hoveredBounds != null) preview?.invoke(hoveredBounds ?: edit?.lastValidBounds)
         edit?.let { current ->
-            preview?.invoke(current.lastValidBounds)
             if (onEditSource != null) {
                 OutlinedTextField(
                     value = current.numbers,

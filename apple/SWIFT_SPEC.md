@@ -14,6 +14,12 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-05 macOS Universal build and fixed application update
+
+The author's build instruction produced a Release app containing connection-loss diagnostics, browsing/settings/displayed-work stars during background batches, and the preceding shared Rust changes. The bundled Server reference snapshot was retained without incorporating newer main changes. Rust archives and Swift bindings were regenerated, and the unsigned Universal app was verified for arm64/x86_64 with minimum macOS 14 on both architectures. Updating the fixed app retained its existing bundle ID, database path, outer directory, incu icon, and Dock registration. One normal app instance and the same database connection were confirmed.
+
+Verification covered compilation, artifacts, installation, and normal launch. No new drawing, batch resend, or real-provider communication was started. Connection-loss resolution, concurrent batch operations, and screen acceptance require separate verification; earlier unaccepted items and remaining iOS work are retained.
+
 ## 2026-10-05 Batch connection-loss handling and failure diagnostics
 
 The drawing pipeline creates an HTTP client for each core-owned attempt, matching Server. Gemini token counting and generation share that attempt's ephemeral session, which is discarded after tasks have completed or drained on failure or cancellation. Sessions are not shared across rows or retries. Request formats, models, token limits, deadlines, durable rate budgets, and core retry limits are retained without adding transport-owned resends.
@@ -22,7 +28,7 @@ Terminal failures use the same execution's failed event and the corresponding ac
 
 New transport diagnostics optionally record preparation, admission, token counting, or generation. Older records retain an unknown operation; pipeline stages do not imply which HTTP operation failed. Whole-attempt deadline failures are not attributed to the last HTTP operation. `sent=false` without an observed HTTP response is not proof that a request was never sent; drawing logs and generation information show an unknown send state and unconfirmed response. No request URLs, headers, provider bodies, or API keys are added to diagnostics.
 
-Connection-loss records alone cannot establish the disconnection source or whether session reuse caused it. This source update addresses the client-lifetime difference and missing diagnostics and stops immediately before building. Compilation, test execution, resolution with a real provider, and updates to the running app remain unverified or unperformed.
+Connection-loss records alone cannot establish the disconnection source or whether session reuse caused it. This change addresses the client-lifetime difference and missing diagnostics. The initial source save stopped before building; the author's later instruction completed the Universal build, fixed-app update, and normal launch described above. Test execution and resolution with a real provider remain unperformed.
 
 ## 2026-10-05 Browsing and next-run settings during a batch
 
@@ -32,7 +38,7 @@ The saved work displayed on the canvas can be starred or unstarred during a batc
 
 New drawing, redrawing, edit commits, imports, work mutations other than the canvas star action, and batch input/conditions/resume decisions retain the whole-batch execution lock, including gaps between rows. Display settings and ordinary provider/model/URL/rate/drawing-limit saves apply to future runs without changing pinned models, connections, budgets, or retry conditions. API-key writes/deletions, personal ChatGPT connection changes, plugin changes, database restore/backup, and result-file logging switches remain restricted during execution. Sheets opened beforehand recheck current execution state when beginning a key change.
 
-This update changes source and documentation and stops immediately before building. Compilation, test execution, and native interaction remain unverified. Ordinary foreground drawing and demos retain their execution boundaries; only batch rows opt into background processing that permits browsing.
+The initial source/documentation save stopped before building; the author's later instruction completed the Universal build, fixed-app update, and normal launch described above. Test execution and concurrent native-operation acceptance remain unverified. Ordinary foreground drawing and demos retain their execution boundaries; only batch rows opt into background processing that permits browsing.
 
 ## 2026-10-05 Following shared Rust parallelism and test-profile optimizations
 
@@ -40,7 +46,7 @@ Ported Server's additional changes to derive the drawing capability matrix concu
 
 Existing DDL/pipeline corpus and raster-comparison test sources now collect parallel results in input order. Swift's bounded fixtures and raster-case selector are retained without adding cases, inputs, or expected results. The Cargo test profile sets `opt-level = 3` only for `resvg`, `usvg`, `tiny-skia`, and `tiny-skia-path`; release profiles and dependencies are unchanged.
 
-This follow-up updates sources and documentation, then stops immediately before building. Compilation, test execution, performance measurement, and validation of a new binary have not been performed. Earlier verification of the installed app remains separate evidence.
+The initial source/documentation follow-up stopped before building; the author's later instruction completed Rust artifact regeneration, the Universal build, the fixed-app update, and normal launch described above. Test execution, performance measurements, and drawing results from the new binary remain unverified. Earlier app verification remains separate evidence.
 
 ## 2026-10-04 Following current Server core, saved works, and app operations
 

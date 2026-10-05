@@ -99,7 +99,7 @@ DBのcopyや移動は行いません。指定はbundleの`InkuDatabasePath`へ�
 
 バッチの失敗行には、記録された処理段階・原因・試行番号・診断codeを残します。「描画ログ」や生成情報で、今後の記録はtoken計数と生成要求など失敗した操作を区別できます。旧記録の操作は不明とし、応答を確認できなかった通信を未送信と断定しません。試行ごとに通信sessionを作り直しますが、接続断の根本原因や解消は実行確認が必要です。
 
-バッチ中の操作開放と接続断対策はsourceと文書の更新段階で、build直前で停止しています。compile・試験実行・native画面の確認・起動中appの更新は未実施です。詳細は[Swift SPEC](SWIFT_SPEC.ja.md)の2026-10-05の接続断診断・バッチ中閲覧節を参照してください。
+バッチ中の操作開放と接続断対策を含むRelease Universal版は、両CPU／最低macOS14のbuildと固定アプリ更新、通常起動まで確認しました。同じDB指定・incuアイコン・Dock登録を保持しています。試験実行、native画面の操作受入、実providerでの接続断解消は未確認です。詳細は[Swift SPEC](SWIFT_SPEC.ja.md)の2026-10-05のUniversal build・接続断診断・バッチ中閲覧節を参照してください。
 
 初期入力は英語の直接DDLです。モデル接続なしで生成を試せます。OpenAI API Platform、Claude API、Gemini API、NVIDIA NIM、Ollama、Ollama Cloudを標準接続として用意し、旧設定にも不足分を一度だけ追加します。既存のURL・モデル選択を保持し、削除した標準接続を再起動で復活させません。
 

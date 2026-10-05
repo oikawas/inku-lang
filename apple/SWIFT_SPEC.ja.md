@@ -14,6 +14,12 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-05 macOS Universalビルドと固定アプリ更新
+
+作者のbuild指示により、接続断診断・背景バッチ中の閲覧／設定／表示作品のスターと、先行の共通Rust改修を含むReleaseアプリを生成した。同梱Server参照snapshotを保持し、追加のmain変更を取り込んでいない。Rust archiveとSwift bindingを再生成し、署名なしUniversalのarm64／x86_64、両CPUの最低macOS14を確認した。固定アプリの更新では既存bundle ID、DB指定、外側directory、incuアイコンとDock登録を保持し、通常起動1件と同じDB接続を確認した。
+
+今回の確認はcompile・artifact・導入・通常起動まで。新しい描画やバッチ再送、実provider通信は開始していない。接続断の解消、バッチ中の同時操作と画面の受入は別に確認が必要で、先行の未受入項目とiOSの残件を保持する。
+
 ## 2026-10-05 バッチの接続断対策と失敗診断
 
 描画pipelineのHTTP clientはServerと同じくcoreの試行ごとに作成する。Geminiのtoken計数と生成要求はその試行内の同じephemeral sessionを使い、成功・失敗・取消しによるtaskの終了を待って破棄する。別の行や再試行へsessionを共有しない。要求の形式・model・token数・期限・保存したレート予算とcoreの再試行上限は保持し、transportで独自に再送しない。
@@ -22,7 +28,7 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 
 新しい通信診断には、準備・受付待ち・token計数・生成要求の操作をoptionalで記録する。古い記録は操作不明として読み、pipeline段階から失敗HTTP操作を補完しない。全試行の期限切れも最後のHTTP操作へ誤帰属しない。HTTP応答を観測していない `sent=false` は未送信の証明とせず、描画ログと生成情報へ「送信状態不明／応答未確認」を表示する。診断に要求URL・header・provider本文・APIキーを追加しない。
 
-接続断の記録だけでは切断元やsession再利用が根本原因かを確定できない。本変更はclient寿命の実装差と診断不足へ対処したsource更新であり、build直前で停止した。compile・試験実行・実providerでの解消確認・起動中appの更新は未実施。
+接続断の記録だけでは切断元やsession再利用が根本原因かを確定できない。本変更はclient寿命の実装差と診断不足へ対処した。初回source保存ではbuild直前で停止し、その後の作者指示で上記Universal build・固定アプリ更新・通常起動まで完了した。試験実行と実providerでの解消確認は未実施。
 
 ## 2026-10-05 バッチ中の閲覧と次回設定を許可
 
@@ -32,7 +38,7 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 
 新規描画、再描画、編集の確定、取込、スター以外の作品の変更、バッチの入力・条件・再開判定は、行の間もバッチ全体の実行lockを維持する。設定の表示・通常のprovider／model／URL／rate／描画制限の保存は次回用として許可し、開始済みrequestのmodel、接続、budgetと再試行条件を変更しない。APIキーの保存・削除、個人ChatGPT接続、plugin変更、DB復元・backup、結果file logの切替は実行中に制限する。開始前から開いていたsheetでも、キー変更の開始時に現在の実行状態を再確認する。
 
-この更新はsourceと文書までとし、build直前で停止した。compile・試験実行・native操作は未確認。通常のforeground描画とdemoは従来の実行境界を保持し、batch行だけを閲覧可能な背景処理として扱う。
+初回保存はsourceと文書まででbuild直前に停止し、その後の作者指示で上記Universal build・固定アプリ更新・通常起動まで完了した。試験実行とnativeでの同時操作受入は未確認。通常のforeground描画とdemoは従来の実行境界を保持し、batch行だけを閲覧可能な背景処理として扱う。
 
 ## 2026-10-05 共通Rustの並列処理と試験用最適化への追随
 
@@ -40,7 +46,7 @@ Serverの追加変更に合わせ、描画capability matrixの再導出をshape�
 
 既存のDDL・pipeline corpusとraster比較の試験sourceへ、入力順で結果を回収する並列実行を取り込んだ。Swift側の限定fixtureとraster case指定を保持し、試験ケース・入力・期待値を増やさない。Cargoのtest profileでは `resvg`、`usvg`、`tiny-skia`、`tiny-skia-path` のみ `opt-level = 3` とする。release profileと依存関係は変更しない。
 
-この追随はsourceと文書の更新までとし、buildの直前で停止した。compile・試験実行・実行速度・新binaryの動作確認は未実施であり、既にインストールしたアプリの確認結果とは分けて扱う。
+初回追随はsourceと文書の更新まででbuild直前に停止し、その後の作者指示で上記Rust artifact再生成・Universal build・固定アプリ更新・通常起動まで完了した。試験実行・実行速度・新binaryの描画結果は未確認であり、先行アプリの確認結果とは分けて扱う。
 
 ## 2026-10-04 現行Serverの共通core・保存作品・全体操作への追随
 

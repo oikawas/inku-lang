@@ -6,6 +6,10 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-05 — Swift追加改修のUniversalビルド・固定アプリ更新
+
+接続断診断、背景バッチ中の閲覧・設定・表示作品のスターと、先行共通Rust改修を含むRelease版を生成し、arm64／x86_64・両最低macOS14を確認した。Server参照snapshotを固定したままRust artifactとbindingを再生成し、同じ固定アプリへ更新。起動前の保存データと既存bundle ID・DB指定・外側directory・incuアイコン・Dock登録を保持し、通常起動1件と同じDB接続を確認した。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[利用手順](apple/README.ja.md)の日英を同期。新規描画・バッチ再送・実provider通信と試験実行は行わず、接続断解消・同時操作と画面の受入は未確認。
+
 ### 2026-10-05 — Swiftバッチの接続断対策と行エラーの詳細化
 
 Serverに合わせpipeline試行ごとにephemeral HTTP sessionを作成し、token計数と生成で共有して終了後に破棄する。レート予算・期限・coreの再試行を保持し、独自再送を追加しない。終端失敗の段階・安全な原因・試行番号・codeを行エラーへ渡し、閲覧エラーと分けた。新しい診断へ失敗操作をoptionalで記録し、旧記録は不明、HTTP応答未観測は送信状態不明と表示する。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[利用手順](apple/README.ja.md)の日英を同期。接続断の根本原因と解消は未確定で、build直前で停止。compile・試験実行・実API・app更新は未実施。

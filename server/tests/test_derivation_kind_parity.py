@@ -48,7 +48,6 @@ EXPECTED_KINDS = {
     "replay",
     "sketch_grain_change",
     "touch_change",
-    "variation",
 }
 
 # Kinds the server names but no web screen sends. Four are reserved for
@@ -79,7 +78,7 @@ def _web_client_kinds() -> set[str]:
     return kinds
 
 
-def test_the_server_accepts_exactly_the_seventeen_named_kinds():
+def test_the_server_accepts_exactly_the_sixteen_named_kinds():
     assert db.LINEAGE_DERIVATION_KINDS == EXPECTED_KINDS
 
 

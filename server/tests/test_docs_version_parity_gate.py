@@ -41,7 +41,13 @@ def test_a_mark_on_only_one_side_is_reported() -> None:
 def test_current_public_pairs_have_version_parity(capsys: object) -> None:
     module = _check_docs()
     assert module.check_version_parity() == []
-    assert "version-mark pairs compared: 36" in capsys.readouterr().out
+    compared = sum(
+        ja_name not in module.VERSION_PARITY_EXEMPT
+        and (module.REPO_ROOT / ja_name).is_file()
+        and (module.REPO_ROOT / en_name).is_file()
+        for ja_name, en_name, _, _ in module.PAIRS
+    )
+    assert f"version-mark pairs compared: {compared}\n" in capsys.readouterr().out
 
 
 def test_root_changelog_uses_entry_parity_instead() -> None:

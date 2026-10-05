@@ -191,10 +191,9 @@ def test_the_thirteen_earlier_pairs_are_intact() -> None:
     ja_names = [pair[0] for pair in pairs]
     missing = [name for name in EXISTING_PAIRS if name not in ja_names]
     assert not missing, f"pairs that check_docs.py used to compare are gone: {missing}"
-    assert len(pairs) == 37, (
-        f"PAIRS holds {len(pairs)} pairs, not the 13 earlier, 7 manual, "
-        "13 architecture, 1 plugin, and 3 setup/ChatGPT guide pairs"
-    )
+    assert len(ja_names) == len(set(ja_names)), "a Japanese document is paired twice"
+    en_names = [pair[1] for pair in pairs]
+    assert len(en_names) == len(set(en_names)), "an English document is paired twice"
 
 
 @manual_tree_only

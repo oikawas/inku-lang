@@ -39,16 +39,23 @@ fn optimized_turbulence_preserves_upstream_images() {
         ),
     ];
 
-    let selected = std::env::var_os("INKU_RASTER_EQUIVALENCE_CASE")
-        .map(|value| value.into_string().expect("INKU_RASTER_EQUIVALENCE_CASE must be UTF-8"));
+    let selected = std::env::var_os("INKU_RASTER_EQUIVALENCE_CASE").map(|value| {
+        value
+            .into_string()
+            .expect("INKU_RASTER_EQUIVALENCE_CASE must be UTF-8")
+    });
     if let Some(selected) = selected.as_deref() {
-        assert!(cases.iter().any(|(name, _, _)| *name == selected),
-                "unknown INKU_RASTER_EQUIVALENCE_CASE: {selected}");
+        assert!(
+            cases.iter().any(|(name, _, _)| *name == selected),
+            "unknown INKU_RASTER_EQUIVALENCE_CASE: {selected}"
+        );
     }
     // Each image is drawn and compared on its own thread.
     std::thread::scope(|scope| {
         for (name, svg, side) in cases {
-            if selected.as_deref().is_some_and(|selected| selected != name) { continue; }
+            if selected.as_deref().is_some_and(|selected| selected != name) {
+                continue;
+            }
             scope.spawn(move || compare(name, svg, side));
         }
     });

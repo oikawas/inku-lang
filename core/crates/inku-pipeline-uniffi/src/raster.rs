@@ -31,34 +31,80 @@ pub struct RasterScene {
 
 #[uniffi::export]
 impl RasterScene {
-    pub fn source_byte_count(&self) -> u64 { self.scene.source_bytes() }
-    pub fn cache_cost_bytes(&self) -> u64 { self.scene.cache_cost_bytes() }
-    pub fn intrinsic_width(&self) -> f64 { self.scene.intrinsic_width() }
-    pub fn intrinsic_height(&self) -> f64 { self.scene.intrinsic_height() }
-
-    pub fn rasterize(&self, target_width: Option<u32>, target_height: Option<u32>) -> Result<RasterFrame, RasterFailure> {
-        catch_unwind(AssertUnwindSafe(|| {
-            self.scene.rasterize(RasterOptions { target_width, target_height }).map(frame).map_err(Into::into)
-        })).unwrap_or(Err(RasterFailure::InternalInvariant))
+    pub fn source_byte_count(&self) -> u64 {
+        self.scene.source_bytes()
+    }
+    pub fn cache_cost_bytes(&self) -> u64 {
+        self.scene.cache_cost_bytes()
+    }
+    pub fn intrinsic_width(&self) -> f64 {
+        self.scene.intrinsic_width()
+    }
+    pub fn intrinsic_height(&self) -> f64 {
+        self.scene.intrinsic_height()
     }
 
-    pub fn region(&self, full_width: u32, full_height: u32, x: u32, y: u32, width: u32, height: u32) -> Result<RasterFrame, RasterFailure> {
+    pub fn rasterize(
+        &self,
+        target_width: Option<u32>,
+        target_height: Option<u32>,
+    ) -> Result<RasterFrame, RasterFailure> {
         catch_unwind(AssertUnwindSafe(|| {
-            self.scene.region(inku_svg_raster::RasterRegionOptions { full_width, full_height, x, y, width, height }).map(frame).map_err(Into::into)
-        })).unwrap_or(Err(RasterFailure::InternalInvariant))
+            self.scene
+                .rasterize(RasterOptions {
+                    target_width,
+                    target_height,
+                })
+                .map(frame)
+                .map_err(Into::into)
+        }))
+        .unwrap_or(Err(RasterFailure::InternalInvariant))
+    }
+
+    pub fn region(
+        &self,
+        full_width: u32,
+        full_height: u32,
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+    ) -> Result<RasterFrame, RasterFailure> {
+        catch_unwind(AssertUnwindSafe(|| {
+            self.scene
+                .region(inku_svg_raster::RasterRegionOptions {
+                    full_width,
+                    full_height,
+                    x,
+                    y,
+                    width,
+                    height,
+                })
+                .map(frame)
+                .map_err(Into::into)
+        }))
+        .unwrap_or(Err(RasterFailure::InternalInvariant))
     }
 }
 
 #[uniffi::export]
 pub fn prepare_raster_scene(svg: String) -> Result<Arc<RasterScene>, RasterFailure> {
     catch_unwind(AssertUnwindSafe(|| {
-        Ok(Arc::new(RasterScene { scene: inku_svg_raster::prepare_scene(&svg)? }))
-    })).unwrap_or(Err(RasterFailure::InternalInvariant))
+        Ok(Arc::new(RasterScene {
+            scene: inku_svg_raster::prepare_scene(&svg)?,
+        }))
+    }))
+    .unwrap_or(Err(RasterFailure::InternalInvariant))
 }
 
 fn frame(output: inku_svg_raster::RasterOutput) -> RasterFrame {
-    RasterFrame { width: output.width, height: output.height, stride: output.stride,
-                  pixel_format: output.pixel_format.to_owned(), pixels: output.pixels }
+    RasterFrame {
+        width: output.width,
+        height: output.height,
+        stride: output.stride,
+        pixel_format: output.pixel_format.to_owned(),
+        pixels: output.pixels,
+    }
 }
 
 impl fmt::Display for RasterFailure {
@@ -137,12 +183,24 @@ pub fn rasterize_svg_region(
     height: u32,
 ) -> Result<RasterFrame, RasterFailure> {
     catch_unwind(AssertUnwindSafe(|| {
-        let output = inku_svg_raster::rasterize_region(&svg, inku_svg_raster::RasterRegionOptions {
-            full_width, full_height, x, y, width, height,
-        })?;
+        let output = inku_svg_raster::rasterize_region(
+            &svg,
+            inku_svg_raster::RasterRegionOptions {
+                full_width,
+                full_height,
+                x,
+                y,
+                width,
+                height,
+            },
+        )?;
         Ok(RasterFrame {
-            width: output.width, height: output.height, stride: output.stride,
-            pixel_format: output.pixel_format.to_owned(), pixels: output.pixels,
+            width: output.width,
+            height: output.height,
+            stride: output.stride,
+            pixel_format: output.pixel_format.to_owned(),
+            pixels: output.pixels,
         })
-    })).unwrap_or(Err(RasterFailure::InternalInvariant))
+    }))
+    .unwrap_or(Err(RasterFailure::InternalInvariant))
 }

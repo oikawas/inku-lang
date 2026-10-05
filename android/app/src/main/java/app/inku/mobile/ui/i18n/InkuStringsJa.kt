@@ -150,6 +150,7 @@ object InkuStringsJa : InkuStrings {
     override val refinementFailed = "候補の生成に失敗しました。"
     override val refinementTouchWordsRequired = "タッチを変える言葉を入力してください。"
     override val refinementNeedsDescription = "この作品には記述が無いため、推敲の候補を作れません。記述から描いた作品を選んでください。"
+    override val refinementNeedsDdl = "この作品には指示書が無いため、推敲の候補を作れません。"
     override val refinementNoOtherCatalog = "別の色カタログがありません。"
     override val refinementTouchFanoutRefusal =
         "同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。"

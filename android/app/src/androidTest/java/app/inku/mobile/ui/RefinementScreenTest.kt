@@ -154,8 +154,14 @@ class RefinementScreenTest {
 
     private fun vm(): InkuViewModel = requireNotNull(viewModel) { "openPanel() was not called" }
 
-    private fun paintParent(description: String = "赤い線を引く"): HistoryItemEntity = runBlocking {
-        repository.renderFromScore(
+    /**
+     * A work drawn from [score]. A replay keeps no DDL of its own, and every
+     * element but colour needs one (web's `refineNeedsDdl`), so [ddl] is
+     * written into the saved row the way a described work carries it; `null`
+     * leaves the work without one.
+     */
+    private fun paintParent(description: String = "赤い線を引く", ddl: String? = "赤い線を一本引く。"): HistoryItemEntity = runBlocking {
+        val drawn = repository.renderFromScore(
             description = description,
             scoreJson = score,
             catalogId = "ink_season",
@@ -164,10 +170,18 @@ class RefinementScreenTest {
             stage2ModelId = "s2",
             seeds = PaintSeeds(renderSeed = 4242L),
         )
+        if (ddl == null) return@runBlocking drawn
+        withContext(Dispatchers.IO) {
+            database.openHelper.writableDatabase.execSQL(
+                "UPDATE history_items SET normalized_ddl = ? WHERE id = ?",
+                arrayOf<Any>(ddl, drawn.id),
+            )
+        }
+        requireNotNull(repository.getHistoryById(drawn.id))
     }
 
-    private fun openPanel(description: String = "赤い線を引く"): HistoryItemEntity {
-        val parent = paintParent(description)
+    private fun openPanel(description: String = "赤い線を引く", ddl: String? = "赤い線を一本引く。"): HistoryItemEntity {
+        val parent = paintParent(description, ddl)
         val created = ViewModelStore()
         store = created
         val factory = object : ViewModelProvider.Factory {
@@ -422,6 +436,41 @@ class RefinementScreenTest {
         composeTestRule.runOnIdle {
             assertEquals(
                 "この作品には記述が無いため、推敲の候補を作れません。記述から描いた作品を選んでください。",
+                vm().state.value.refinementStatus,
+            )
+            assertTrue("nothing was drawn", vm().state.value.refinementCandidates.isEmpty())
+        }
+    }
+
+    /**
+     * A colour change replays the saved Score, so a work with no description
+     * still offers it, as web does since `2e9984c8`.
+     */
+    @Test
+    fun aWorkWithoutADescriptionStillChangesItsColour() {
+        openPanel(description = "")
+        composeTestRule.runOnIdle {
+            vm().setRefinementElement(RefinementElement.Color)
+            vm().generateRefinementCandidates()
+        }
+        awaitState("the colour candidates") { !it.refinementBusy && it.refinementCandidates.isNotEmpty() }
+        composeTestRule.runOnIdle {
+            assertNull("nothing was refused", vm().state.value.refinementStatus)
+        }
+    }
+
+    /** A layout draws the saved DDL; a work without one says so in web's words. */
+    @Test
+    fun aWorkWithoutDdlSaysWhyNoLayoutIsMade() {
+        openPanel(description = "", ddl = null)
+        composeTestRule.runOnIdle {
+            vm().setRefinementElement(RefinementElement.Layout)
+            vm().generateRefinementCandidates()
+        }
+        awaitState("the refusal") { it.refinementStatus != null && !it.refinementBusy }
+        composeTestRule.runOnIdle {
+            assertEquals(
+                "この作品には指示書が無いため、推敲の候補を作れません。",
                 vm().state.value.refinementStatus,
             )
             assertTrue("nothing was drawn", vm().state.value.refinementCandidates.isEmpty())

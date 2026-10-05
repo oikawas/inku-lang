@@ -140,6 +140,8 @@ interface InkuStrings {
     val refinementTouchWordsRequired: String
     /** The web's `refineNeedsDescription`, pointing at a work: Android refines a saved work's description. */
     val refinementNeedsDescription: String
+    /** The web's `refineNeedsDdl`: a layout, touch or reading needs the work's DDL. */
+    val refinementNeedsDdl: String
     val refinementNoOtherCatalog: String
     val refinementTouchFanoutRefusal: String
     val refinementElementLabel: (String) -> String

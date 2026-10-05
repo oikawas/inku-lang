@@ -5,6 +5,8 @@ import app.inku.mobile.data.db.LineageNodeEntity
 import app.inku.mobile.data.lineage.LineageDeclaration
 import app.inku.mobile.data.lineage.LineagePlanner
 import app.inku.mobile.pipeline.RecomposeMode
+import app.inku.mobile.ui.i18n.InkuFailure
+import app.inku.mobile.ui.i18n.InkuStringsJa
 import kotlin.reflect.full.memberProperties
 import kotlin.reflect.full.valueParameters
 import org.junit.Assert.assertEquals
@@ -292,5 +294,46 @@ class RefinementPlanTest {
         assertEquals(SeedFactory.renderSeedFromText("しずかに"), SeedFactory.renderSeedFromText(" しずかに "))
         assertNotEquals(SeedFactory.renderSeedFromText("しずかに"), SeedFactory.renderSeedFromText("はげしく"))
         assertNull("no words, no seed", SeedFactory.renderSeedFromText("   "))
+    }
+
+    // ── what the parent must have ─────────────────────────
+
+    /**
+     * web's order (`generateVariationCandidates`, `generateModelCandidates`):
+     * a colour and a layout need no description; touch, reading and the model
+     * comparison do; everything but colour needs the DDL. The refusal is read
+     * as the sentence it carries, so a refusal for the wrong reason fails too.
+     */
+    private fun refusal(element: RefinementElement?, parent: RefinementParent): String? = try {
+        RefinementPlanner.requireSource(element, parent)
+        null
+    } catch (failure: InkuFailure) {
+        failure.text(InkuStringsJa)
+    }
+
+    @Test
+    fun aWorkWithoutADescriptionCanStillChangeItsColourAndLayout() {
+        val parent = RefinementParent.of(parentItem(), description = "")
+
+        assertNull(refusal(RefinementElement.Color, parent))
+        assertNull(refusal(RefinementElement.Layout, parent))
+        assertEquals(InkuStringsJa.refinementNeedsDescription, refusal(RefinementElement.Touch, parent))
+        assertEquals(InkuStringsJa.refinementNeedsDescription, refusal(RefinementElement.Reading, parent))
+        assertEquals("the model comparison reads the description", InkuStringsJa.refinementNeedsDescription, refusal(null, parent))
+    }
+
+    @Test
+    fun everythingButColourNeedsTheDdlAndTheDescriptionIsAskedFirst() {
+        val noDdl = parentItem().copy(normalizedDdl = " \n")
+        val described = RefinementParent.of(noDdl, noDdl.originalInput)
+        val bare = RefinementParent.of(noDdl, description = "")
+
+        assertNull(refusal(RefinementElement.Color, bare))
+        assertEquals(InkuStringsJa.refinementNeedsDdl, refusal(RefinementElement.Layout, bare))
+        assertEquals("the description is asked first", InkuStringsJa.refinementNeedsDescription, refusal(RefinementElement.Touch, bare))
+        assertEquals(InkuStringsJa.refinementNeedsDdl, refusal(RefinementElement.Touch, described))
+        assertEquals(InkuStringsJa.refinementNeedsDdl, refusal(RefinementElement.Reading, described))
+        assertEquals(InkuStringsJa.refinementNeedsDdl, refusal(RefinementElement.Layout, described))
+        assertNull("the model comparison draws from the description alone", refusal(null, described))
     }
 }

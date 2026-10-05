@@ -1,5 +1,6 @@
 package app.inku.mobile.data.refinement
 
+import app.inku.mobile.data.DdlSource
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.drawnWild
 import app.inku.mobile.data.model.WorkColorSnapshot
@@ -237,6 +238,26 @@ object RefinementPlanner {
         if (element == RefinementElement.Touch) 1 else 4
 
     val TOUCH_FANOUT_REFUSAL: (InkuStrings) -> String = { it.refinementTouchFanoutRefusal }
+
+    /**
+     * Refuses a round the parent cannot feed, in web's order
+     * (`generateVariationCandidates`, `generateModelCandidates`). [element] is
+     * `null` for the model comparison.
+     *
+     * A colour change replays the saved Score and a layout draws the saved DDL,
+     * so neither needs a description: a work drawn from hand-written DDL can
+     * still take them. Touch, reading and the model comparison keep the
+     * description guard -- before it, a route through Stage 1 sent the core an
+     * empty description and the panel showed its bare `schema_violation`.
+     * Every element but colour then needs the DDL, as web asks for it.
+     */
+    fun requireSource(element: RefinementElement?, parent: RefinementParent) {
+        val needsDescription = element != RefinementElement.Color && element != RefinementElement.Layout
+        if (needsDescription && parent.description.isBlank()) inkuError { it.refinementNeedsDescription }
+        if (element != null && element != RefinementElement.Color && !DdlSource.hasBody(parent.ddl)) {
+            inkuError { it.refinementNeedsDdl }
+        }
+    }
 
     /**
      * The catalogues four colour candidates use. 「4案では可能な限り異なるカタログ

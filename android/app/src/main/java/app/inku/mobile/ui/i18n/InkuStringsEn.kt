@@ -156,6 +156,7 @@ object InkuStringsEn : InkuStrings {
     override val refinementFailed = "The candidates could not be made."
     override val refinementTouchWordsRequired = "Write the words that change the performance."
     override val refinementNeedsDescription = "This work has no description, so no refinement options can be made. Choose a work drawn from a description."
+    override val refinementNeedsDdl = "This work has no instructions, so no refinement options can be made."
     override val refinementNoOtherCatalog = "No other color catalog is available."
     override val refinementTouchFanoutRefusal =
         "The same words give the same performance (seed). Only one option can be made."

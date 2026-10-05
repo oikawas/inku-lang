@@ -52,6 +52,7 @@ struct AppCheck {
             try await runBatchUIPresentationChecks(); return
         }
         if CommandLine.arguments.contains("--library-release-only") { try await runLibraryReleaseChecks(); return }
+        if CommandLine.arguments.contains("--input-aids-only") { try await runInputAidChecks(); return }
         if CommandLine.arguments.contains("--library-browsing-only") {
             try await runLibraryBrowsingChecks(); return
         }

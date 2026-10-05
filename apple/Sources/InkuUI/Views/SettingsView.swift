@@ -2,7 +2,10 @@ import InkuHost
 import SwiftUI
 
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case display, making, demo, models, personalPlan, database, export, clipboard, plugins, unread, limits, about
+    case display, making, demo, models, personalPlan, database, export, clipboard, plugins, unread, limits
+    #if !os(macOS)
+    case about
+    #endif
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -12,7 +15,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .database: "DB設定"; case .clipboard: "クリップボード"; case .plugins: "プラグイン・歳時記"
         case .export: "エクスポート"
         case .unread: "未読語台帳"
-        case .limits: "制限値"; case .about: "inkuについて"
+        case .limits: "制限値"
+        #if !os(macOS)
+        case .about: "inkuについて"
+        #endif
         }
     }
     var symbol: String {
@@ -23,7 +29,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .database: "externaldrive"; case .export: "square.and.arrow.up"
         case .clipboard: "doc.on.clipboard"; case .plugins: "puzzlepiece.extension"
         case .unread: "text.magnifyingglass"; case .limits: "gauge.with.dots.needle.33percent"
+        #if !os(macOS)
         case .about: "info.circle"
+        #endif
         }
     }
 }
@@ -74,7 +82,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                             Section(model.display.localized("歳時記")) { SaijikiView(model: model).frame(minHeight: 480) }
                         case .unread: Section { UnreadWordsView(model: model) }
                         case .limits: OperationalLimitsView(model: model)
-                        case .about: about
+                        #if !os(macOS)
+                        case .about: AboutInkuView(model: model)
+                        #endif
                         }
                     }.formStyle(.grouped)
                 }
@@ -256,9 +266,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 Button(model.display.localized("もう一度保存")) { display.retrySave() }
             }
         }
-    }
-    private var about: some View {
-        AboutInkuView(model: model)
     }
     private func membership(_ item: String, in selection: Binding<Set<String>>, maximum: Int = .max) -> Binding<Bool> {
         Binding(get: { selection.wrappedValue.contains(item) }, set: { enabled in

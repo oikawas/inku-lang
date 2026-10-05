@@ -45,10 +45,18 @@ public extension FocusedValues {
 public struct InkuCommands: Commands {
     @FocusedValue(\.inkuCommandContext) private var context
     @Bindable private var display: DisplaySettings
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #endif
 
     public init(display: DisplaySettings) { self.display = display }
 
     public var body: some Commands {
+        #if os(macOS)
+        CommandGroup(replacing: .appInfo) {
+            Button(display.localized("inkuについて")) { openWindow(id: "about") }
+        }
+        #endif
         CommandGroup(replacing: .appSettings) {
             actionButton("設定…", action: .settings)
                 .keyboardShortcut(",", modifiers: .command)

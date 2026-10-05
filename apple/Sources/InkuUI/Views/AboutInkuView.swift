@@ -2,6 +2,26 @@ import Foundation
 import InkuCore
 import SwiftUI
 
+#if os(macOS)
+@MainActor
+public struct AboutInkuScreen: View {
+    @Bindable private var model: AppModel
+
+    public init(model: AppModel) { self.model = model }
+
+    public var body: some View {
+        Form {
+            AboutInkuView(model: model)
+        }
+        .formStyle(.grouped)
+        .environment(model.display)
+        .environment(\.locale, Locale(identifier: model.display.preferences.language))
+        .preferredColorScheme(model.display.colorScheme)
+        .font(.system(size: 13 * model.display.preferences.textScale))
+    }
+}
+#endif
+
 @MainActor
 struct AboutInkuView: View {
     @Bindable var model: AppModel

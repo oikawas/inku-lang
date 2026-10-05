@@ -14,6 +14,10 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-05 「inkuについて」をmacOSアプリメニューへ移動
+
+macOSではアプリメニューの「inkuについて」から専用ウインドウを開く。設定一覧から同項目を削除し、既存の版情報・概念説明・用語表・作者情報・repositoryリンクを引き継ぐ。繰り返し選択すると同じウインドウを前面へ出し、閉じた後も再度開ける。制作と同じアプリモデル、表示言語・テーマ・文字倍率を使い、設定画面の読込やmodel一覧取得を開始しない。iOSでは設定内の導線を維持する。
+
 ## 2026-10-05 macOS Universalビルドと固定アプリ更新
 
 作者のbuild指示により、接続断診断・背景バッチ中の閲覧／設定／表示作品のスターと、先行の共通Rust改修を含むReleaseアプリを生成した。同梱Server参照snapshotを保持し、追加のmain変更を取り込んでいない。Rust archiveとSwift bindingを再生成し、署名なしUniversalのarm64／x86_64、両CPUの最低macOS14を確認した。固定アプリの更新では既存bundle ID、DB指定、外側directory、incuアイコンとDock登録を保持し、通常起動1件と同じDB接続を確認した。

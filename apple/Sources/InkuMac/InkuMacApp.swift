@@ -26,5 +26,12 @@ struct InkuMacApp: App {
         }
         .defaultSize(width: 1320, height: 880)
         .commands { InkuCommands(display: model.display) }
+
+        Window(Text(model.display.localized("inkuについて")), id: "about") {
+            AboutInkuScreen(model: model)
+                .frame(minWidth: 620, minHeight: 560)
+        }
+        .defaultSize(width: 760, height: 720)
+        .windowResizability(.contentMinSize)
     }
 }

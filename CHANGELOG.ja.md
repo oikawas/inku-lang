@@ -6,6 +6,10 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-05 — macOSの「inkuについて」をアプリメニューへ移動
+
+設定一覧の「inkuについて」をアプリメニューへ移し、既存の版情報・概念説明・用語表・作者情報を専用ウインドウで表示する。繰り返し選択しても同じウインドウを使い、表示言語・テーマ・文字倍率を共有する。iOSの設定内の導線は維持。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[利用手順](apple/README.ja.md)の日英を同期した。
+
 ### 2026-10-05 — Swift追加改修のUniversalビルド・固定アプリ更新
 
 接続断診断、背景バッチ中の閲覧・設定・表示作品のスターと、先行共通Rust改修を含むRelease版を生成し、arm64／x86_64・両最低macOS14を確認した。Server参照snapshotを固定したままRust artifactとbindingを再生成し、同じ固定アプリへ更新。起動前の保存データと既存bundle ID・DB指定・外側directory・incuアイコン・Dock登録を保持し、通常起動1件と同じDB接続を確認した。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[利用手順](apple/README.ja.md)の日英を同期。新規描画・バッチ再送・実provider通信と試験実行は行わず、接続断解消・同時操作と画面の受入は未確認。

@@ -16,6 +16,8 @@ Personal ChatGPT is explicitly enabled and connected in its dedicated settings p
 
 This current-Server update follows Score 0.19/render engine 73, clears retained Stage 1 fallbacks before composition reading, and keeps work-specific immutable display snapshots. Five focused Rust selectors, one Host save/recreation/cancellation case, and the latest app typecheck passed. Final native interaction, same-input CLI comparison, and real-provider checks need separate evidence and do not imply complete iOS/physical Intel/macOS14 acceptance.
 
+On macOS, open the app menu → About inku to read version information, concept text, vocabulary, and creator information. It is no longer listed in Settings. Close the dedicated window and use the same menu to reopen it. On iOS, use About inku in Settings.
+
 ## When a drawing fails
 
 Open Drawing log in the toolbar and select the execution matching the failed description. It shows the time, pinned models, failed stage, retries and fallbacks. New ordinary API executions also retain OS connection error codes and HTTP refusal reasons. Details absent from older records are identified as unrecorded rather than invented. Opening logs does not perform or resend requests.

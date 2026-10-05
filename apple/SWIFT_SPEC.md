@@ -14,6 +14,10 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-05 Move About inku to the macOS app menu
+
+On macOS, About inku in the app menu opens a dedicated window, replacing its Settings entry. It retains existing version information, concept text, vocabulary, creator information, and repository link. Repeated selection brings the same window forward, and it can be reopened after closing. It shares the main app model, language, theme, and text scale without loading Settings or discovering models. The Settings entry remains available on iOS.
+
 ## 2026-10-05 macOS Universal build and fixed application update
 
 The author's build instruction produced a Release app containing connection-loss diagnostics, browsing/settings/displayed-work stars during background batches, and the preceding shared Rust changes. The bundled Server reference snapshot was retained without incorporating newer main changes. Rust archives and Swift bindings were regenerated, and the unsigned Universal app was verified for arm64/x86_64 with minimum macOS 14 on both architectures. Updating the fixed app retained its existing bundle ID, database path, outer directory, incu icon, and Dock registration. One normal app instance and the same database connection were confirmed.

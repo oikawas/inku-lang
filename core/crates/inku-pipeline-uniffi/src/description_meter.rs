@@ -63,10 +63,10 @@ fn japanese_dictionary(directory: &str) -> Result<Arc<JapaneseDictionary>, Strin
         .get_or_init(|| Mutex::new(None))
         .lock()
         .map_err(|_| "meter_internal_invariant")?;
-    if let Some((path, dictionary)) = cache.as_ref() {
-        if path == directory {
-            return Ok(dictionary.clone());
-        }
+    if let Some((path, dictionary)) = cache.as_ref()
+        && path == directory
+    {
+        return Ok(dictionary.clone());
     }
     let root = Path::new(directory);
     let config = Config::new(
@@ -149,27 +149,25 @@ fn english_dictionary(directory: &str) -> Result<Arc<HashMap<String, usize>>, St
         .get_or_init(|| Mutex::new(None))
         .lock()
         .map_err(|_| "meter_internal_invariant")?;
-    if let Some((path, dictionary)) = cache.as_ref() {
-        if path == directory {
-            return Ok(dictionary.clone());
-        }
+    if let Some((path, dictionary)) = cache.as_ref()
+        && path == directory
+    {
+        return Ok(dictionary.clone());
     }
     let text = std::fs::read_to_string(Path::new(directory).join("cmudict.dict"))
         .map_err(|_| "meter_english_dictionary_unavailable")?;
     let mut entries = HashMap::new();
     for line in text.lines() {
         let mut pieces = line.split('#').next().unwrap_or("").split_whitespace();
-        if let Some(word) = pieces.next() {
-            if !word.contains('(') {
-                entries.insert(
-                    word.to_owned(),
-                    pieces
-                        .filter(|phoneme| {
-                            phoneme.chars().last().is_some_and(|ch| ch.is_ascii_digit())
-                        })
-                        .count(),
-                );
-            }
+        if let Some(word) = pieces.next()
+            && !word.contains('(')
+        {
+            entries.insert(
+                word.to_owned(),
+                pieces
+                    .filter(|phoneme| phoneme.chars().last().is_some_and(|ch| ch.is_ascii_digit()))
+                    .count(),
+            );
         }
     }
     let entries = Arc::new(entries);

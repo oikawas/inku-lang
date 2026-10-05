@@ -615,6 +615,8 @@ DDLの語彙辞書は **Saijiki** と呼ぶ。英語版でもこの名称を維�
 
 ### 7.8 参照 Web アプリケーション
 
+情報ダイアログの「ライセンス」から「第三者ライセンスを表示」を開く。Swift版と同じく、左の分類された一覧で項目を選び、右で版・ライセンス・入手先と、選択・コピーできる通知全文を読む。Webに同梱されたMIT通知と、実行中のServerに同梱された配布通知・UniDicを含む辞書・フォントの通知を表示する。コンテナ専用のSQLite・CPython・Rust通知は、そのServerに実在する場合だけ表示する。一覧の片側が取得できなくても他方は読め、取得失敗と再試行を表示する。狭い画面では一覧を本文の上へ置く。通知の閲覧はログイン不要で、本文をHTMLとして実行しない。子ダイアログ内でTabを循環させ、Escapeまたは閉じる操作で情報ダイアログの入口へフォーカスを戻す。
+
 本節は**参照インターフェースが実際に何を提供しているか**の記録である。概念ではなく運用の面を持つ。
 
 Web実装では、`+page.svelte`をroute composition shellとし、route lifecycle、画面構成、history／lineageのcross-owner action、短い表示用projectionとowner配線を保持する。Session、単一作品、Batch、Demo、履歴／系譜、Canvas viewport、推敲、Settingsはrouteごとに1個のownerが可変stateと非同期identityを持つ。1回のPaint、履歴保存／再演、推敲候補の計画と適用は、解決済みinputと名前付きcapabilityだけを受けるstateless operationへ分ける。CanvasとSettingsのfocused viewは表示とlocal draftを所有するが、domain state、transport、request serialization、追加のawait境界を複製しない。作品を切り替えた後に古い非同期結果が戻っても、runまたはtarget identityが一致しない結果は現在画面へ適用しない。

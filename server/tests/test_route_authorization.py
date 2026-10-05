@@ -26,11 +26,14 @@ GUARDS = {"_current_user", "_admin_user", "_user_manager", "_session_token"}
 # used to say /api/color-catalogs was "needed to render the login screen"; the
 # login screen was then measured and receives no catalog at all, so what kept
 # the route public was the startup fetch running before anyone had logged in.
-# What is left is only what logging in genuinely needs.
+# The notice reader is also public: copyright and license texts do not require
+# a session, and these two read-only routes cannot address arbitrary files.
 PUBLIC = {  # every entry needs a reason
     "/health",  # container liveness probe, returns no data
     "/api/info",  # build/version and developer_mode, read by the login screen
     "/api/auth/login",  # the login endpoint itself
+    "/api/notices",  # the bundled distribution notice index
+    "/api/notices/{notice_id}",  # a fixed bundled notice's full text
 }
 
 # The count is part of the contract: a split that loses an endpoint is a
@@ -74,7 +77,8 @@ PUBLIC = {  # every entry needs a reason
 #   +2 for GET/PUT /api/me/chatgpt/models/settings (2026-10-04).
 #   -1 for retiring POST /api/variation/seeds (2026-10-04).
 #   +1 for GET /api/composition/ranges, the core's display table (2026-10-05).
-EXPECTED_ROUTE_COUNT = 119
+#   +2 for the public distribution notice index and text (2026-10-05).
+EXPECTED_ROUTE_COUNT = 121
 
 
 def _guard_names(dependant, seen=None) -> set[str]:
@@ -119,10 +123,10 @@ def test_the_share_route_is_guarded_and_the_public_list_did_not_grow():
     Named beside the count rather than left to the sweep above: the sweep says
     "everything not in PUBLIC is guarded", which stays true if the route were
     added to PUBLIC instead. Both halves are needed -- the route is guarded, AND
-    the allowlist is still the three entries logging in genuinely needs.
+    the allowlist has only the login/liveness entries and two notice readers.
     """
     path = "/api/history/{item_id}/for-share"
-    assert len(PUBLIC) == 3
+    assert len(PUBLIC) == 5
     assert path not in PUBLIC
     routes = [ctx for ctx in _api_routes() if ctx.route.path == path]
     assert len(routes) == 1, f"the share route is declared {len(routes)} times"

@@ -1,7 +1,7 @@
 {
-  "endpoint_count": 119,
-  "operation_count": 119,
-  "schema_count": 174,
+  "endpoint_count": 121,
+  "operation_count": 121,
+  "schema_count": 176,
   "operations": [
     {
       "path": "/api/admin/unread-words",
@@ -980,6 +980,29 @@
       }
     },
     {
+      "path": "/api/notices",
+      "method": "GET",
+      "operationId": "api_notices_api_notices_get",
+      "params": [],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/NoticesResponse\"}}},\"description\":\"Successful Response\"}"
+      }
+    },
+    {
+      "path": "/api/notices/{notice_id}",
+      "method": "GET",
+      "operationId": "api_notice_text_api_notices__notice_id__get",
+      "params": [
+        "path:notice_id:req"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"text/plain\":{\"schema\":{\"type\":\"string\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
       "path": "/api/paint",
       "method": "POST",
       "operationId": "api_paint_api_paint_post",
@@ -1841,6 +1864,8 @@
     "NamedPlacementAnchor": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"named\",\"title\":\"Kind\",\"type\":\"string\"},\"region\":{\"maxItems\":4,\"minItems\":4,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"},{\"type\":\"number\"},{\"type\":\"number\"}],\"title\":\"Region\",\"type\":\"array\"}},\"required\":[\"kind\",\"region\"],\"title\":\"NamedPlacementAnchor\",\"type\":\"object\"}",
     "NamedTargetOwner": "{\"additionalProperties\":false,\"properties\":{\"category\":{\"title\":\"Category\",\"type\":\"string\"},\"id\":{\"title\":\"Id\",\"type\":\"string\"},\"kind\":{\"const\":\"named\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"category\",\"id\"],\"title\":\"NamedTargetOwner\",\"type\":\"object\"}",
     "NewVariationBody": "{\"additionalProperties\":false,\"properties\":{\"canvas_aspect\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Canvas Aspect\"},\"canvas_format_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Canvas Format Id\"},\"kind\":{\"enum\":[\"description\",\"direct_ddl\"],\"title\":\"Kind\",\"type\":\"string\"},\"options\":{\"additionalProperties\":true,\"default\":{},\"title\":\"Options\",\"type\":\"object\"},\"text\":{\"title\":\"Text\",\"type\":\"string\"}},\"required\":[\"kind\",\"text\"],\"title\":\"NewVariationBody\",\"type\":\"object\"}",
+    "NoticeComponent": "{\"properties\":{\"group\":{\"enum\":[\"server\",\"resources\",\"rust\"],\"title\":\"Group\",\"type\":\"string\"},\"id\":{\"title\":\"Id\",\"type\":\"string\"},\"license\":{\"title\":\"License\",\"type\":\"string\"},\"name\":{\"title\":\"Name\",\"type\":\"string\"},\"source\":{\"title\":\"Source\",\"type\":\"string\"},\"version\":{\"title\":\"Version\",\"type\":\"string\"}},\"required\":[\"id\",\"group\",\"name\",\"version\",\"license\",\"source\"],\"title\":\"NoticeComponent\",\"type\":\"object\"}",
+    "NoticesResponse": "{\"properties\":{\"components\":{\"items\":{\"$ref\":\"#/components/schemas/NoticeComponent\"},\"title\":\"Components\",\"type\":\"array\"}},\"required\":[\"components\"],\"title\":\"NoticesResponse\",\"type\":\"object\"}",
     "NumericFillTargetAnchor": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"numeric\",\"title\":\"Kind\",\"type\":\"string\"},\"point\":{\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"}],\"title\":\"Point\",\"type\":\"array\"}},\"required\":[\"kind\",\"point\"],\"title\":\"NumericFillTargetAnchor\",\"type\":\"object\"}",
     "NumericPlacementAnchor": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"numeric\",\"title\":\"Kind\",\"type\":\"string\"},\"point\":{\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"}],\"title\":\"Point\",\"type\":\"array\"}},\"required\":[\"kind\",\"point\"],\"title\":\"NumericPlacementAnchor\",\"type\":\"object\"}",
     "NumericRangeTargetOwner": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"numeric_range\",\"title\":\"Kind\",\"type\":\"string\"},\"source\":{\"$ref\":\"#/components/schemas/ScoreSourceSite\"}},\"required\":[\"kind\",\"source\"],\"title\":\"NumericRangeTargetOwner\",\"type\":\"object\"}",
@@ -1919,5 +1944,5 @@
     "VisionRefineAdviceBody": "{\"properties\":{\"direction\":{\"default\":\"\",\"maxLength\":2000,\"title\":\"Direction\",\"type\":\"string\"},\"enabled_kinds\":{\"items\":{\"type\":\"string\"},\"maxItems\":4,\"minItems\":1,\"title\":\"Enabled Kinds\",\"type\":\"array\"},\"history_id\":{\"maxLength\":200,\"minLength\":1,\"title\":\"History Id\",\"type\":\"string\"},\"instruction\":{\"maxLength\":100000,\"minLength\":1,\"title\":\"Instruction\",\"type\":\"string\"},\"language\":{\"default\":\"ja\",\"pattern\":\"^(ja|en)$\",\"title\":\"Language\",\"type\":\"string\"},\"model\":{\"anyOf\":[{\"maxLength\":200,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Model\"}},\"required\":[\"history_id\",\"instruction\",\"enabled_kinds\"],\"title\":\"VisionRefineAdviceBody\",\"type\":\"object\"}",
     "VisionRefineAdviceResponse": "{\"properties\":{\"model\":{\"title\":\"Model\",\"type\":\"string\"},\"next_direction\":{\"title\":\"Next Direction\",\"type\":\"string\"},\"observation\":{\"title\":\"Observation\",\"type\":\"string\"},\"suggested_kind\":{\"title\":\"Suggested Kind\",\"type\":\"string\"}},\"required\":[\"observation\",\"next_direction\",\"suggested_kind\",\"model\"],\"title\":\"VisionRefineAdviceResponse\",\"type\":\"object\"}"
   },
-  "digest": "cec882f526b09230a0129936673a36e71a0f0a19d678aeeb7c44030c0e7f5ea8"
+  "digest": "4d0c13b41b4f43585f48efafd18c891e0f3f4cdd8a15ee9beddd024aa41dd7d6"
 }

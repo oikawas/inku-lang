@@ -5,7 +5,9 @@
 </script>
 
 <script lang="ts">
-	import { onMount, tick, untrack } from 'svelte';
+	import { onDestroy, onMount, tick, untrack } from 'svelte';
+	import { NoticeReader, EMPTY_NOTICE_STATE, type NoticeState } from '$lib/third-party-notices';
+	import ThirdPartyNoticesDialog from '$lib/components/ThirdPartyNoticesDialog.svelte';
 	import { pipelineDescription } from '$lib/description-labels';
 	import { highlightDDL } from '$lib/highlight';
 	import type { ImportedPlugin } from '$lib/features/ddl-editor/ddl-import';
@@ -202,6 +204,24 @@
 	// DDL-authored (standalone) artworks carry the display_label marker 'DDL'.
 	const DDL_ORIGIN_LABEL = 'DDL';
 	let appInfoOpen = $state(false);
+	let noticesOpen = $state(false);
+	let noticeState = $state<NoticeState>(EMPTY_NOTICE_STATE);
+	let noticesButton = $state<HTMLButtonElement>();
+	let noticeReader: NoticeReader | null = null;
+	function openNotices() {
+		noticeReader?.dispose();
+		noticeState = EMPTY_NOTICE_STATE;
+		noticeReader = new NoticeReader(fetch, (state) => { noticeState = state; });
+		noticesOpen = true;
+		void noticeReader.load();
+	}
+	function closeNotices() {
+		noticeReader?.dispose();
+		noticeReader = null;
+		noticesOpen = false;
+		void tick().then(() => { if (noticesButton?.isConnected) noticesButton.focus(); });
+	}
+	onDestroy(() => noticeReader?.dispose());
 	let leftPanelCollapsed = $state(false);
 	let userMenuOpen = $state(false);
 	let catalogOpen  = $state(false);
@@ -3266,7 +3286,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 {#if appInfoOpen}
 	<div class="modal-backdrop app-info-backdrop" onclick={() => (appInfoOpen = false)} aria-hidden="true"></div>
-	<div class="app-info-modal" role="dialog" aria-modal="true" aria-labelledby="app-info-title">
+	<div class="app-info-modal" role="dialog" aria-modal="true" aria-labelledby="app-info-title" inert={noticesOpen}>
 		<div class="app-info-head">
 			<div class="app-info-brand">
 				<img class="app-info-icon" src="/favicon-192.png" alt="" aria-hidden="true" />
@@ -3301,6 +3321,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					<dd><a href={REPOSITORY_URL} target="_blank" rel="noreferrer">{REPOSITORY_URL}</a></dd>
 				</div>
 			</dl>
+			<section class="app-info-licenses">
+				<h2>{t().appInfoLicenseTitle}</h2>
+				<p>inku · MIT License</p>
+				<button type="button" bind:this={noticesButton} onclick={openNotices}>{t().appInfoShowNotices}</button>
+			</section>
 			<section>
 				<h2>{t().appInfoConceptTitle}</h2>
 				<p>{t().appInfoConceptBody}</p>
@@ -3332,6 +3357,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			</section>
 		</div>
 	</div>
+{/if}
+
+{#if appInfoOpen && noticesOpen}
+	<ThirdPartyNoticesDialog state={noticeState} onClose={closeNotices}
+		onSelect={(id) => { void noticeReader?.select(id); }}
+		onReload={() => { void noticeReader?.load(); }}
+		onRetryText={() => { if (noticeState.selectedId) void noticeReader?.select(noticeState.selectedId); }} />
 {/if}
 
 {#if session.profileOpen && session.currentUser}
@@ -3968,6 +4000,21 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.app-info-body p {
 		margin: 0;
 		white-space: pre-line;
+	}
+	.app-info-licenses button {
+		margin-top: 8px;
+		font-family: inherit;
+		font-size: var(--btn-sm-font-size);
+		padding: var(--btn-sm-padding);
+		border-radius: var(--btn-sm-radius);
+		border: 1px solid var(--border);
+		background: transparent;
+		color: var(--accent);
+		cursor: pointer;
+	}
+	.app-info-licenses button:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
 	}
 	.app-info-creator {
 		margin-bottom: 4px;

@@ -87,6 +87,21 @@ export interface LangPack {
 	appInfoHintRenderEngine: string;
 	appInfoHintBindingProtocol: string;
 	appInfoClose: string;
+	appInfoLicenseTitle: string;
+	appInfoShowNotices: string;
+	noticesTitle: string;
+	noticesList: string;
+	noticesText: string;
+	noticesSource: string;
+	noticesGroupWeb: string;
+	noticesGroupServer: string;
+	noticesGroupResources: string;
+	noticesGroupRust: string;
+	noticesLoading: string;
+	noticesCatalogFailed: (groups: string) => string;
+	noticesTextFailed: string;
+	noticesRetry: string;
+	noticesSelect: string;
 	inputSectionHint: string;
 	/** Characters, the nearest verse form's length, and that form's name (before the sounds arrive). */
 	inputMeterVerse: (count: number, target: number | null, form: string | null) => string;

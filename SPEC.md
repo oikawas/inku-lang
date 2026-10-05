@@ -1080,6 +1080,8 @@ part I rewrote" and "the degree to which the LLM read it" on a single screen.
 
 ### 7.8 The Reference Web Application
 
+The information dialog's License section opens Show third-party licenses. Following the Swift layout, a grouped list on the left selects an item whose version, license, source, and selectable, copyable full notice appear on the right. The reader displays the Web's bundled MIT notices and the running Server's distribution notices, dictionaries including UniDic, and fonts. Container-specific SQLite, CPython, and Rust notices appear only when that Server actually ships the files. Failure to fetch one catalog leaves the other readable, with an error and retry action. Narrow screens place the list above the text. Reading notices requires no login, and notice text is never interpreted as HTML. Tab stays within the child dialog; Escape or Close returns focus to the information dialog's opener.
+
 What follows records what the reference interface actually provides.  It is
 operational rather than conceptual.
 

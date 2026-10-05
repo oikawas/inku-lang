@@ -7,7 +7,7 @@ import os
 import urllib.parse
 import urllib.request
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 from ...color_catalogs import RENAMED_COLOR_CATALOG_IDS, color_catalogs
 from ...layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
@@ -16,6 +16,7 @@ from ...plugins.document_format import preview_path_for_qualified_name
 from ...reference import build_reference, render_markdown
 from ...saijiki import display_categories
 from ...render_engines import current_render_engine
+from ...distribution_notices import NoticesResponse, notice_bytes, notice_catalog
 from ...model_settings import connection_for, model_provider_catalog, provider_for_model
 from ... import db as _db
 from ..common import MODEL_NOT_OFFERED_DETAIL, _APP_VERSION, _RELEASE_VERSION, _build_number, _env_flag, _model_offered_to, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _unexpected_http_error
@@ -105,6 +106,19 @@ def api_color_catalogs() -> ColorCatalogsResponse:
         catalogs=color_catalogs(),
         renamed_catalog_ids=dict(RENAMED_COLOR_CATALOG_IDS),
     )
+
+
+@router.get("/api/notices", response_model=NoticesResponse)
+def api_notices() -> NoticesResponse:
+    return notice_catalog(_RELEASE_VERSION)
+
+
+@router.get("/api/notices/{notice_id}", response_class=PlainTextResponse)
+def api_notice_text(notice_id: str) -> PlainTextResponse:
+    try:
+        return PlainTextResponse(notice_bytes(notice_id))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Notice not found") from None
 
 
 @router.get("/api/models", response_model=ModelSettingsResponse)

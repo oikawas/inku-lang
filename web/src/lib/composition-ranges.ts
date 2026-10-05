@@ -34,8 +34,8 @@ export function parseRangeNumber(source: string, lang: 'ja' | 'en'): Rational | 
 
 export function parseRangeBody(body: string, lang: 'ja' | 'en'): RangeBounds | null {
 	const match = lang === 'ja'
-		? /^\s*横\s*(.*?)\s*[〜～~]\s*(.*?)\s*[、，,]\s*縦\s*(.*?)\s*[〜～~]\s*(.*?)\s*$/.exec(body)
-		: /^\s*horizontal\s+(.+?)\s+to\s+(.+?)\s*,\s*vertical\s+(.+?)\s+to\s+(.+?)\s*$/i.exec(body);
+		? /^\s*横\s*(.*?)\s*[〜～~－-]\s*(.*?)\s*[、，,]\s*縦\s*(.*?)\s*[〜～~－-]\s*(.*?)\s*$/.exec(body)
+		: /^\s*horizontal\s+(.+?)(?:\s+to\s+|\s*[-–]\s*)(.+?)\s*,\s*vertical\s+(.+?)(?:\s+to\s+|\s*[-–]\s*)(.+?)\s*$/i.exec(body);
 	if (!match) return null;
 	const values = match.slice(1).map((value) => parseRangeNumber(value, lang));
 	if (values.some((value) => value === null)) return null;

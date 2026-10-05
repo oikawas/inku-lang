@@ -48,6 +48,26 @@ test('editing only the range follows matching names and preserves surrounding so
 	assert.deepEqual(readCompositionRanges({ schema: 'inku.composition-ranges.v1', ranges: [{ bounds: 'invalid' }] }), []);
 });
 
+test('Japanese hyphens accept the reported edit and follow the matching range name', () => {
+	assert.deepEqual(parseRangeBody('横1/3-2/3、縦2/3〜1', 'ja'), [[1n, 3n], [2n, 3n], [2n, 3n], [1n, 1n]]);
+	const source = '右下（横2/3〜1、縦2/3〜1）に、赤い円。';
+	for (const body of ['横0-1/3、縦0－1/3', '横０ － １／３、縦０ - １／３']) {
+		const edited = editNumericRange(source, scanNumericRanges(source)[0], body, ranges);
+		assert.equal(edited.source, `左上（${body}）に、赤い円。`);
+		assert.equal(matchingRange(scanNumericRanges(edited.source)[0], ranges)?.key, 'left');
+	}
+});
+
+test('English hyphens and en dashes follow matching range names with optional spaces', () => {
+	const source = 'A circle at the bottom right (horizontal 2/3 to 1, vertical 2/3 to 1).';
+	for (const body of ['horizontal 0-1/3, vertical 0–1/3', 'horizontal 0 – 1/3, vertical 0 - 1/3']) {
+		assert.deepEqual(parseRangeBody(body, 'en'), ranges[0].bounds);
+		const edited = editNumericRange(source, scanNumericRanges(source)[0], body, ranges);
+		assert.equal(edited.source, `A circle at the top left (${body}).`);
+		assert.equal(matchingRange(scanNumericRanges(edited.source)[0], ranges)?.key, 'left');
+	}
+});
+
 function dataModule(code: string): string { return 'data:text/javascript;base64,' + Buffer.from(code).toString('base64'); }
 function runeModule(path: string, mode: 'client' | 'server'): string {
 	const source = ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext } }).outputText;

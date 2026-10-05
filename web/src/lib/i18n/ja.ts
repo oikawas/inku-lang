@@ -468,7 +468,7 @@ export const ja: LangPack = {
 	tooltipCanvasVaryPerformance: '入力した言葉から、線の質感、太さの揺らぎ、インクの滲みなどのタッチだけを決めます。同じ言葉は同じタッチになり、読み取りとJSON Scoreは保たれ、LLMを呼びません',
 	tooltipCanvasVaryComposition: '保存した指示書の数で書いた範囲を、原理に沿うか偶然に委ねるかで選び直します。明示したかたむきと「隅」も候補のseedで選び直します。動かせないときは理由を示し、元の指示書で描き直します',
 	ddlRangeNumbers: '範囲の数',
-	ddlRangeInvalid: '0〜1の数で、始まりを終わりより小さくしてください。枠は最後の有効な範囲です',
+	ddlRangeInvalid: '横1/3〜2/3、縦2/3〜1 の形で、0〜1の数を、始まりを終わりより小さく書いてください。「-」「－」も使えます。枠は最後の有効な範囲です',
 	tooltipCanvasVaryInterpretation: 'AIによる言葉の読み取りからやり直し、新しい正規化DDLを生成します。配置とタッチは下流工程として再生成されます',
 	tooltipCanvasVaryColor: 'DDL、JSON Score、配置、タッチを保ったまま、色カタログだけを変更します',
 	tooltipCanvasNavNewer: '新しい作品へ',

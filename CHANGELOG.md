@@ -6,9 +6,17 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-05 — Accept hyphens in Web numeric range edits
+
+Numeric edits in the instructions accept `-` and `－` in Japanese, and `-` and `–` besides `to` in English. Detection, frames and matching names use the same parser. Invalid-range guidance gives an example in each language. English `~`, numeric limits, rejection of reversed or zero-width ranges, explicit drawing and full-source preservation remain unchanged.
+
 ### 2026-10-05 — Pin release API SQLite to the verified source deployment
 
 Future API images use SQLite 3.37.2 with Ubuntu security revision 3.37.2-2ubuntu0.8. A separate library and a matching, unchanged CPython SQLite module preserve the existing Debian Python platform. Both architecture builds and the API virtualenv reject mismatched versions or artifact checksums and retain the exact distribution notices. Database schemas, saved works, Web and native code remain unchanged.
+
+### 2026-10-05 — Join a numeric range with a hyphen too (core)
+
+When the author edited a range's numbers, `横1/3-2/3、縦2/3〜1` was an error: a Japanese range was joined only by `〜`, `～` or `~`, not by a hyphen. By the author's decision (2026-10-05) the ASCII `-` and the full-width `－` join a Japanese range too, and an English range takes the ASCII `-` and the en dash `–` besides `to` (`horizontal 1/3-2/3`). Bounds lie from 0 to 1 and are never negative, so a hyphen between two numbers can only join them. `~` is still not a range in English. Printing still writes `〜` and `to`. Writing that did not compile now compiles; saved works do not change. The Web and Android editors accept the same marks and show an example of the form in their error text (each host's part).
 
 ### v2.15.88 — Rechoose numeric ranges and fold their display (Build 1164, 2026-10-05)
 

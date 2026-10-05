@@ -468,7 +468,7 @@ export const en: LangPack = {
 	tooltipCanvasVaryPerformance: 'Same interpretation, same composition — only the performance sways: line texture, weight, ink bleed. The same words give the same touch. Instant, no LLM call',
 	tooltipCanvasVaryComposition: 'Chooses the saved instructions\' numeric ranges By principle or By chance. The option\'s seed also reselects explicit tilts and corners. When the ranges cannot move, it explains why and redraws the original instructions',
 	ddlRangeNumbers: 'Range numbers',
-	ddlRangeInvalid: 'Use numbers from 0 to 1, with each start below its end. The frame shows the last valid range',
+	ddlRangeInvalid: 'Use horizontal 1/3 to 2/3, vertical 2/3 to 1, with numbers from 0 to 1 and each start below its end. You may also join numbers with - or –. The frame shows the last valid range',
 	tooltipCanvasVaryInterpretation: 'Your sentence stays. The words are read anew and fresh instructions are written; composition and touch follow downstream',
 	tooltipCanvasVaryColor: 'Same performance — colors re-translated through a different catalog. The DDL, JSON Score, composition, and touch stay fixed',
 	tooltipCanvasNavNewer: 'To the newer work',

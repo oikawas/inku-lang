@@ -1,6 +1,5 @@
 package app.inku.mobile.llm
 
-import app.inku.mobile.security.DisplaySanitizer
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Base64
@@ -39,33 +38,12 @@ class AnthropicModelProvider(
             connection.setRequestProperty("Content-Type", "application/json")
             connection.doOutput = true
             connection.outputStream.writer(Charsets.UTF_8).use { it.write(payload(request).toString()) }
-            val status = connection.responseCode
-            val success = status in 200..299
-            val limit = if (success) MAX_RESPONSE_CHARS else MAX_ERROR_CHARS
-            val stream = if (success) connection.inputStream else connection.errorStream
-            val body = stream?.bufferedReader(Charsets.UTF_8)?.use { reader ->
-                val result = StringBuilder()
-                val buffer = CharArray(8192)
-                while (result.length <= limit) {
-                    val count = reader.read(buffer, 0, minOf(buffer.size, limit + 1 - result.length))
-                    if (count < 0) break
-                    result.append(buffer, 0, count)
-                }
-                result.toString()
-            }.orEmpty()
-            if (!success) {
-                throw ModelProviderHttpException(
-                    status,
-                    "HTTP $status from ${url.host}: ${DisplaySanitizer.redact(body).take(180)}",
-                    providerRefusal(body),
-                )
-            }
-            require(body.length <= limit) { "Remote response was too large." }
-            JSONObject(body)
+            JSONObject(readProviderBody(connection))
         } finally {
             connection.disconnect()
         }
-        val blocks = response.optJSONArray("content") ?: error("Claude response did not contain content.")
+        val blocks = response.optJSONArray("content")
+            ?: throw MalformedProviderResponseException("Claude response did not contain content.")
         val usage = response.optJSONObject("usage")
         ModelResponse(
             text = responseText(blocks, request.tool?.name),
@@ -109,8 +87,6 @@ class AnthropicModelProvider(
 
     internal companion object {
         const val ANTHROPIC_VERSION = "2023-06-01"
-        private const val MAX_RESPONSE_CHARS = 2_000_000
-        private const val MAX_ERROR_CHARS = 16_384
 
         /** Plain text, or one base64 JPEG ahead of the instruction, as the server sends Anthropic. */
         internal fun userContent(request: ModelRequest): Any {
@@ -152,7 +128,7 @@ class AnthropicModelProvider(
                 return input.toString()
             }
             val text = texts.joinToString("\n")
-            check(text.isNotBlank()) { "Claude response did not contain text." }
+            if (text.isBlank()) throw MalformedProviderResponseException("Claude response did not contain text.")
             return text
         }
 

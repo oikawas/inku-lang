@@ -20,7 +20,18 @@ import app.inku.mobile.security.DisplaySanitizer
  * [message] holds the Japanese so that logs, crash reports and any caller that
  * only knows `Throwable.message` keep reading what they read before.
  */
-class InkuFailure(val text: (InkuStrings) -> String) : RuntimeException(text(InkuStringsJa))
+class InkuFailure(val text: (InkuStrings) -> String) : RuntimeException(text(InkuStringsJa)) {
+    /**
+     * A stable machine reason for callers that classify rather than show the
+     * failure (`credentials_unavailable`, as the server's `failure_detail`).
+     */
+    var detail: String? = null
+        private set
+
+    constructor(detail: String, text: (InkuStrings) -> String) : this(text) {
+        this.detail = detail
+    }
+}
 
 /** Throws an [InkuFailure]; the shape of `error(...)`, with the language deferred. */
 fun inkuError(text: (InkuStrings) -> String): Nothing = throw InkuFailure(text)

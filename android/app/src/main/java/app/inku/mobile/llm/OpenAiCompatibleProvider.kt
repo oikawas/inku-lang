@@ -1,6 +1,5 @@
 package app.inku.mobile.llm
 
-import app.inku.mobile.security.DisplaySanitizer
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
@@ -14,24 +13,19 @@ class OpenAiCompatibleProvider(
     override val providerId: String,
     private val baseUrl: String,
     private val apiKey: String?,
+    private val openConnection: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection },
 ) : ModelProvider {
     override suspend fun generate(request: ModelRequest): ModelResponse = withContext(Dispatchers.IO) {
         val started = System.currentTimeMillis()
         val response = postJson(endpoint("/chat/completions"), requestBody(providerId, request, baseUrl), request.timeoutMs)
-        val choices = response.optJSONArray("choices") ?: error("Chat Completions response did not contain choices.")
-        val first = choices.optJSONObject(0) ?: error("Chat Completions response was empty.")
-        val message = first.optJSONObject("message")
-        val content = extractToolArguments(message, request.tool?.name)
-            ?: message?.optString("content")
-            ?: first.optString("text")
-        if (content.isBlank()) error("Chat Completions response did not contain text.")
+        val content = answerText(response, request.tool?.name)
         val usage = response.optJSONObject("usage")
         ModelResponse(
             text = content,
             modelId = request.modelId,
             promptTokens = usage?.optInt("prompt_tokens")?.takeIf { it > 0 },
             completionTokens = usage?.optInt("completion_tokens")?.takeIf { it > 0 },
-            outputTruncated = first.optString("finish_reason") == "length",
+            outputTruncated = response.optJSONArray("choices")?.optJSONObject(0)?.optString("finish_reason") == "length",
             elapsedMs = System.currentTimeMillis() - started,
         )
     }
@@ -44,61 +38,48 @@ class OpenAiCompatibleProvider(
             OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { writer ->
                 writer.write(payload.toString())
             }
-            return readJson(connection)
+            return JSONObject(readProviderBody(connection))
         } finally {
             connection.disconnect()
         }
     }
 
     private fun open(url: String, method: String, timeoutMs: Long?): HttpURLConnection {
-        val parsedUrl = URL(url)
-        ProviderUrlValidator.validateRemoteBaseUrl(parsedUrl.toString())
-        return (parsedUrl.openConnection() as HttpURLConnection).also { connection ->
-            configureRemoteConnection(connection, method, apiKey, timeoutMs)
+        // Validated before `URL(url)`, so an unparseable address is the
+        // reader's configuration failure rather than a transport one.
+        ProviderUrlValidator.validateRemoteBaseUrl(url)
+        return openConnection(URL(url)).also { connection ->
+            configureRemoteConnection(connection, method, apiKey = null, timeoutMs = timeoutMs)
+            // The server sends `"Bearer " + (key or "none")` to every
+            // OpenAI-compatible connection, keyed or not.
+            connection.setRequestProperty("Authorization", "Bearer ${apiKey?.takeIf { it.isNotBlank() } ?: "none"}")
         }
-    }
-
-    private fun readJson(connection: HttpURLConnection): JSONObject {
-        val success = connection.responseCode in 200..299
-        val stream = if (success) connection.inputStream else connection.errorStream
-        val (body, truncated) = readTextLimited(stream, if (success) MAX_RESPONSE_CHARS else MAX_ERROR_CHARS)
-        if (!success) {
-            val host = connection.url.host.orEmpty()
-            val suffix = if (truncated) " [truncated]" else ""
-            throw ModelProviderHttpException(
-                connection.responseCode,
-                "HTTP ${connection.responseCode} from $host: ${DisplaySanitizer.redact(body).take(180)}$suffix",
-                providerRefusal(body),
-            )
-        }
-        require(!truncated) { "Remote response was too large." }
-        return JSONObject(body)
     }
 
     private fun endpoint(path: String): String {
         return baseUrl.trimEnd('/') + path
     }
 
-    private fun readTextLimited(stream: java.io.InputStream?, maxChars: Int): Pair<String, Boolean> {
-        if (stream == null) return "" to false
-        stream.bufferedReader(Charsets.UTF_8).use { reader ->
-            val buffer = CharArray(8192)
-            val builder = StringBuilder()
-            while (true) {
-                val read = reader.read(buffer)
-                if (read < 0) return builder.toString() to false
-                val remaining = maxChars - builder.length
-                if (remaining <= 0) return builder.toString() to true
-                if (read > remaining) {
-                    builder.append(buffer, 0, remaining)
-                    return builder.toString() to true
-                }
-                builder.append(buffer, 0, read)
-            }
-        }
-    }
-
     internal companion object {
+        /**
+         * The answer in a Chat Completions response, read as the server reads
+         * `data["choices"][0]["message"]`: the offered tool's arguments, else
+         * the message's own text. No choice, no message, or no text in it is a
+         * [MalformedProviderResponseException]; a JSON null content is not the
+         * text "null".
+         */
+        internal fun answerText(response: JSONObject, toolName: String?): String {
+            val first = response.optJSONArray("choices")?.optJSONObject(0)
+                ?: throw MalformedProviderResponseException("Chat Completions response did not contain a choice.")
+            val message = first.optJSONObject("message")
+                ?: throw MalformedProviderResponseException("Chat Completions response did not contain a message.")
+            val content = extractToolArguments(message, toolName) ?: message.opt("content") as? String
+            if (content.isNullOrBlank()) {
+                throw MalformedProviderResponseException("Chat Completions response did not contain text.")
+            }
+            return content
+        }
+
         /** An offered tool may answer once, or the server reads the message text. */
         internal fun extractToolArguments(message: JSONObject?, expectedToolName: String?): String? {
             if (message == null || expectedToolName.isNullOrBlank()) return null
@@ -230,10 +211,15 @@ class OpenAiCompatibleProvider(
                 )
         }
 
-        /** The server's OpenAI-compatible pipeline sampling: 0.3 for Stage 1, 0.0 otherwise. */
+        /**
+         * The server's OpenAI-compatible pipeline sampling
+         * (`_STAGE1_SAMPLED_ACTIONS`): 0.3 for Stage 1 and for the composition
+         * reading, which is sent with Stage 1's model, limits and sampling;
+         * 0.0 for every other action.
+         */
         internal fun pipelineTemperature(action: String?): Double? = when (action) {
             null -> null
-            "generate_normalized_ddl" -> 0.3
+            "generate_normalized_ddl", "read_composition" -> 0.3
             else -> 0.0
         }
 
@@ -242,8 +228,6 @@ class OpenAiCompatibleProvider(
         private val OPENAI_FIXED_TEMPERATURE = Regex("^(gpt-5|o\\d)")
         private val OPENAI_REASONING_OFF = Regex("^gpt-5\\.\\d")
         private val REASONING_OFF_PROVIDER_IDS = setOf("ollama", "ollama-cloud")
-        private const val MAX_RESPONSE_CHARS = 2_000_000
-        private const val MAX_ERROR_CHARS = 16_384
     }
 }
 

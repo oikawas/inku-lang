@@ -2,9 +2,11 @@ package app.inku.mobile.pipeline
 
 import android.util.Log
 import app.inku.mobile.llm.ModelProvider
+import app.inku.mobile.llm.MalformedProviderResponseException
 import app.inku.mobile.llm.ModelProviderHttpException
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ModelTool
+import app.inku.mobile.ui.i18n.InkuFailure
 import java.io.IOException
 import java.net.SocketTimeoutException
 import kotlinx.coroutines.CancellationException
@@ -20,6 +22,14 @@ fun interface PipelineProviderEffect {
 /** Executes one action once. Retry, fallback, and response judgment stay in Rust. */
 class SingleAttemptModelEffectProvider(
     private val provider: ModelProvider,
+    /**
+     * Told of every failed attempt, with the failure class the core receives
+     * and the server's `failure_detail` when one applies
+     * (`credentials_unavailable`, `rate_limit_wait`). The core keeps only the
+     * class; this is where a screen can still say why.
+     */
+    private val onFailure: (actionId: String, failure: String, detail: String?, cause: Throwable) -> Unit =
+        { _, _, _, _ -> },
 ) : PipelineProviderEffect {
     override suspend fun perform(actionJson: String, models: PipelineModelSelection): String {
         val action = JSONObject(actionJson)
@@ -61,16 +71,23 @@ class SingleAttemptModelEffectProvider(
                 ).text
             }
             effectResult(resultTag, identity, response, elapsedMs(started)).toString()
-        } catch (_: TimeoutCancellationException) {
-            providerFailure(identity, "transport_timeout", elapsedMs(started)).toString()
+        } catch (timeout: TimeoutCancellationException) {
+            failed(identity, "transport_timeout", timeout, elapsedMs(started))
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
             if (error is ModelProviderHttpException) {
                 Log.w(PROVIDER_LOG_TAG, providerHttpErrorLine(tag, modelId, error))
             }
-            providerFailure(identity, failureCode(error), elapsedMs(started)).toString()
+            failed(identity, failureCode(error), error, elapsedMs(started))
         }
+    }
+
+    private fun failed(identity: JSONObject, failure: String, cause: Throwable, elapsedMs: Long): String {
+        val detail = (cause as? InkuFailure)?.detail
+        // An observer is told, never trusted: the core still gets its result.
+        runCatching { onFailure(identity.optString("action_id"), failure, detail, cause) }
+        return providerFailure(identity, failure, elapsedMs).toString()
     }
 
     private fun effectResult(tag: String, identity: JSONObject, response: String, elapsedMs: Long) =
@@ -88,8 +105,12 @@ class SingleAttemptModelEffectProvider(
             .put("elapsed_ms", elapsedMs.toString())
 
     // The core's failure classes. It retries every one within its budget but
-    // `provider_rejected`, so only a refusal that would repeat maps there.
+    // `provider_rejected`, so only a refusal that would repeat maps there. An
+    // [InkuFailure] is a configuration the reader has to change (no key, no
+    // base URL, an http URL, a model not downloaded): sending again cannot help.
     private fun failureCode(error: Throwable): String = when (error) {
+        is InkuFailure -> "provider_rejected"
+        is MalformedProviderResponseException -> "malformed_payload"
         is app.inku.mobile.llm.ChatGptException -> when (error.code) {
             "chatgpt_transport_unavailable", "chatgpt_auth_unavailable", "chatgpt_response_incomplete",
             "subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable", "chatgpt_refresh_not_ready" -> "transport_unavailable"

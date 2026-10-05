@@ -110,10 +110,50 @@ class OpenAiCompatibleRequestBodyTest {
         assertFalse(elsewhere.has("reasoning_effort"))
     }
 
+    /** Server `_STAGE1_SAMPLED_ACTIONS`: the composition reading is sampled as Stage 1 is. */
+    @Test
+    fun compositionReadingIsSampledLikeStageOne() {
+        fun body(providerId: String, url: String, model: String, action: String) =
+            OpenAiCompatibleProvider.requestBody(providerId, pipelineRequest("$providerId:$model").copy(pipelineAction = action), url)
+
+        assertEquals(0.3, body("nvidia", NVIDIA_URL, "gemma", "read_composition").getDouble("temperature"), 0.0)
+        assertEquals(0.0, body("nvidia", NVIDIA_URL, "gemma", "complete_visible_ddl_holes").getDouble("temperature"), 0.0)
+        assertEquals(0.0, body("nvidia", NVIDIA_URL, "gemma", "generate_sketch").getDouble("temperature"), 0.0)
+        assertEquals(0.3, body("openai", OPENAI_URL, "gpt-4.1", "read_composition").getDouble("temperature"), 0.0)
+        assertFalse(body("openai", OPENAI_URL, "gpt-5.6-luna", "read_composition").has("temperature"))
+    }
+
+    /** Server `pipeline_provider.py`: `"Bearer " + (key or "none")` on every OpenAI-compatible call. */
+    @Test
+    fun aConnectionWithoutAKeyStillSendsBearerNone() = kotlinx.coroutines.runBlocking {
+        val connections = mutableListOf<RecordingConnection>()
+        for (key in listOf(null, "")) {
+            OpenAiCompatibleProvider("ollama", OLLAMA_URL, key) { url -> RecordingConnection(url).also { connections += it } }
+                .generate(pipelineRequest("ollama:gemma"))
+        }
+        OpenAiCompatibleProvider("nvidia", NVIDIA_URL, "test-key") { url -> RecordingConnection(url).also { connections += it } }
+            .generate(pipelineRequest("nvidia:gemma"))
+        assertEquals(
+            listOf("Bearer none", "Bearer none", "Bearer test-key"),
+            connections.map { it.getRequestProperty("Authorization") },
+        )
+    }
+
     private companion object {
         const val OPENAI_URL = "https://api.openai.com/v1"
         const val NVIDIA_URL = "https://integrate.api.nvidia.com/v1"
         const val OLLAMA_URL = "http://127.0.0.1:11434/v1"
         const val OLLAMA_CLOUD_URL = "https://ollama.com/v1"
     }
+}
+
+private class RecordingConnection(url: java.net.URL) : java.net.HttpURLConnection(url) {
+    private val sent = java.io.ByteArrayOutputStream()
+    override fun getOutputStream() = sent
+    override fun getResponseCode() = 200
+    override fun getInputStream() =
+        """{"choices":[{"message":{"content":"{\"normalized_ddl\":\"circle\"}"}}]}""".byteInputStream()
+    override fun connect() = Unit
+    override fun disconnect() = Unit
+    override fun usingProxy() = false
 }

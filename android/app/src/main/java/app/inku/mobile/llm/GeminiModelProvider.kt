@@ -1,6 +1,5 @@
 package app.inku.mobile.llm
 
-import app.inku.mobile.security.DisplaySanitizer
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Base64
@@ -20,8 +19,7 @@ class GeminiModelProvider(
         val started = System.currentTimeMillis()
         ProviderUrlValidator.validateRemoteBaseUrl(baseUrl)
         val model = request.modelId.removePrefix("$providerId:").removePrefix("models/")
-        require(model.matches(Regex("[A-Za-z0-9._-]+"))) { "Invalid Gemini model ID." }
-        val url = URL("${baseUrl.trimEnd('/')}/v1beta/models/$model:generateContent")
+        val url = URL("${baseUrl.trimEnd('/')}/v1beta/models/${quotePathSegment(model)}:generateContent")
         val connection = openConnection(url)
         val response = try {
             configureRemoteConnection(connection, "POST", apiKey = null, timeoutMs = request.timeoutMs)
@@ -29,35 +27,13 @@ class GeminiModelProvider(
             connection.setRequestProperty("Content-Type", "application/json")
             connection.doOutput = true
             connection.outputStream.writer(Charsets.UTF_8).use { it.write(payload(request).toString()) }
-            val status = connection.responseCode
-            val success = status in 200..299
-            val limit = if (success) 2_000_000 else 16_384
-            val stream = if (success) connection.inputStream else connection.errorStream
-            val body = stream?.bufferedReader(Charsets.UTF_8)?.use { reader ->
-                val result = StringBuilder()
-                val buffer = CharArray(8192)
-                while (result.length <= limit) {
-                    val count = reader.read(buffer, 0, minOf(buffer.size, limit + 1 - result.length))
-                    if (count < 0) break
-                    result.append(buffer, 0, count)
-                }
-                result.toString()
-            }.orEmpty()
-            if (!success) {
-                throw ModelProviderHttpException(
-                    status,
-                    "HTTP $status from ${url.host}: ${DisplaySanitizer.redact(body).take(180)}",
-                    providerRefusal(body),
-                )
-            }
-            require(body.length <= limit) { "Remote response was too large." }
-            JSONObject(body)
+            JSONObject(readProviderBody(connection))
         } finally {
             connection.disconnect()
         }
         val parts = response.optJSONArray("candidates")?.optJSONObject(0)
             ?.optJSONObject("content")?.optJSONArray("parts")
-            ?: error("Gemini response did not contain content.")
+            ?: throw MalformedProviderResponseException("Gemini response did not contain content.")
         val usage = response.optJSONObject("usageMetadata")
         ModelResponse(
             text = responseText(parts, request.tool?.name),
@@ -137,6 +113,24 @@ class GeminiModelProvider(
         JSONObject().put("parts", JSONArray().put(JSONObject().put("text", text)))
 
     internal companion object {
+        /**
+         * One path segment as the server's `quote(model, safe="")` writes it:
+         * A-Z, a-z, 0-9 and `_.-~` stay, every other UTF-8 byte is `%XX`.
+         */
+        internal fun quotePathSegment(value: String): String = buildString {
+            for (byte in value.toByteArray(Charsets.UTF_8)) {
+                val code = byte.toInt() and 0xff
+                val char = code.toChar()
+                if (char in 'A'..'Z' || char in 'a'..'z' || char in '0'..'9' || char in "_.-~") {
+                    append(char)
+                } else {
+                    append('%').append(HEX[code shr 4]).append(HEX[code and 0x0f])
+                }
+            }
+        }
+
+        private const val HEX = "0123456789ABCDEF"
+
         /** A pipeline answer is exactly one requested function call, as on the server. */
         internal fun responseText(parts: JSONArray, toolName: String?): String {
             val objects = (0 until parts.length()).mapNotNull { parts.optJSONObject(it) }
@@ -150,7 +144,7 @@ class GeminiModelProvider(
             }
             val text = objects.filter { it.has("text") && !it.optBoolean("thought") }
                 .joinToString("\n") { it.getString("text") }
-            check(text.isNotBlank()) { "Gemini response did not contain text." }
+            if (text.isBlank()) throw MalformedProviderResponseException("Gemini response did not contain text.")
             return text
         }
     }

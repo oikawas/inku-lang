@@ -206,7 +206,7 @@ class SharedPipelineConfigBuilder(
                     .put("max_summary_bytes", 8_192)
                     .put("max_catalog_serialized_bytes", 1024 * 1024)
                     .put("max_source_bytes", 400_000)
-                    .put("max_response_bytes", 1024 * 1024),
+                    .put("max_response_bytes", app.inku.mobile.llm.MAX_PROVIDER_RESPONSE_BYTES),
             )
             .put("catalog_retry", JSONObject(retry.toString()))
             .put("stage1_retry", retryPolicy(policy.stage1AttemptTimeoutMs, policy.stage1TotalTimeoutMs))

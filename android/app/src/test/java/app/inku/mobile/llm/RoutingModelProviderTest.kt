@@ -92,6 +92,18 @@ class RoutingModelProviderTest {
         )
     }
 
+    /** Server builtins with `requires_api_key`; the cause is kept for the screen as `credentials_unavailable`. */
+    @Test
+    fun `every builtin that needs a key reports a missing key and local Ollama does not`() {
+        for (id in listOf("openai", "anthropic", "gemini", "nvidia", "ollama-cloud")) {
+            val missing = org.junit.Assert.assertThrows(id, app.inku.mobile.ui.i18n.InkuFailure::class.java) {
+                RoutingModelProvider.remoteProvider(provider(id).copy(baseUrl = "https://example.invalid"))
+            }
+            assertEquals(id, "credentials_unavailable", missing.detail)
+        }
+        RoutingModelProvider.remoteProvider(provider("ollama").copy(baseUrl = "http://127.0.0.1:11434/v1"))
+    }
+
     private fun provider(
         providerId: String,
         models: String = "[]",

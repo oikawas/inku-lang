@@ -1,5 +1,6 @@
 package app.inku.mobile.llm
 
+import app.inku.mobile.ui.i18n.InkuFailure
 import app.inku.mobile.ui.i18n.inkuError
 import app.inku.mobile.data.AndroidSecretBox
 import app.inku.mobile.data.db.InkuDatabase
@@ -35,8 +36,8 @@ class RoutingModelProvider(
         }
         val baseUrl = provider.baseUrl?.trim()?.ifBlank { null } ?: inkuError { it.errorProviderBaseUrlMissing(provider.displayName) }
         val apiKey = provider.encryptedApiKey?.let(AndroidSecretBox::decryptOrPlain)
-        if (provider.providerId in setOf("openai", "nvidia", "ollama-cloud") && apiKey.isNullOrBlank()) {
-            inkuError { it.errorProviderApiKeyMissing(provider.displayName) }
+        if (requiresApiKey(provider.providerId) && apiKey.isNullOrBlank()) {
+            throw InkuFailure(CREDENTIALS_UNAVAILABLE) { it.errorProviderApiKeyMissing(provider.displayName) }
         }
         return ProviderModelListFetcher.fetchModels(provider.kind, baseUrl, apiKey)
     }
@@ -44,20 +45,6 @@ class RoutingModelProvider(
     private suspend fun resolveProvider(modelId: String): ProviderSettingEntity {
         return resolveProviderForRouting(database.providerSettingDao().listAll(), modelId)
             ?: inkuError { it.errorProviderNotFoundForModel(modelId) }
-    }
-
-    private fun remoteProvider(provider: ProviderSettingEntity): ModelProvider {
-        val baseUrl = provider.baseUrl?.trim()?.ifBlank { null } ?: inkuError { it.errorProviderBaseUrlMissing(provider.displayName) }
-        val apiKey = provider.encryptedApiKey?.let(AndroidSecretBox::decryptOrPlain)
-        if (provider.providerId in setOf("openai", "nvidia", "ollama-cloud") && apiKey.isNullOrBlank()) {
-            inkuError { it.errorProviderApiKeyMissing(provider.displayName) }
-        }
-        // One transport per connection kind, as the server's `_request` has.
-        return when (provider.kind) {
-            "gemini" -> GeminiModelProvider(provider.providerId, baseUrl, apiKey)
-            "anthropic" -> AnthropicModelProvider(provider.providerId, baseUrl, apiKey)
-            else -> OpenAiCompatibleProvider(provider.providerId, baseUrl, apiKey)
-        }
     }
 
     internal companion object {
@@ -78,6 +65,21 @@ class RoutingModelProvider(
                 provider.providerId != "chatgpt" && provider.isEnabled && parsePublishedModelIds(provider.publishedModelsJson).contains(modelId)
             }
             return owners.singleOrNull() ?: providers.firstOrNull { it.isDefaultLocal }
+        }
+
+        internal fun remoteProvider(provider: ProviderSettingEntity): ModelProvider {
+            val baseUrl = provider.baseUrl?.trim()?.ifBlank { null } ?: inkuError { it.errorProviderBaseUrlMissing(provider.displayName) }
+            val apiKey = provider.encryptedApiKey?.let(AndroidSecretBox::decryptOrPlain)
+            if (requiresApiKey(provider.providerId) && apiKey.isNullOrBlank()) {
+                // The server's `failure_detail`, so a screen can name the cause.
+                throw InkuFailure(CREDENTIALS_UNAVAILABLE) { it.errorProviderApiKeyMissing(provider.displayName) }
+            }
+            // One transport per connection kind, as the server's `_request` has.
+            return when (provider.kind) {
+                "gemini" -> GeminiModelProvider(provider.providerId, baseUrl, apiKey)
+                "anthropic" -> AnthropicModelProvider(provider.providerId, baseUrl, apiKey)
+                else -> OpenAiCompatibleProvider(provider.providerId, baseUrl, apiKey)
+            }
         }
 
         internal fun canGenerateWith(provider: ProviderSettingEntity): Boolean = provider.isEnabled

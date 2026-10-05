@@ -123,7 +123,7 @@ const val SETTING_KEY_DISPLAY_SAFE_MARGINS = "display_safe_margins"
 const val SETTING_KEY_RENDER_WILD = "render_wild"
 /** Said by every generating entry point that refuses while candidates are drawn. */
 val REFINEMENT_IN_PROGRESS: (InkuStrings) -> String = { it.refinementInProgress }
-/** 「固定モードでは固定側を1モデル、比較側を最大4モデル選ぶ」(SPEC `:616`). */
+/** Up to four explicitly chosen models, each used for both stages (SPEC §7.8). */
 const val MAX_COMPARE_SELECTION = 4
 val MODEL_SELECT_PROMPT: (InkuStrings) -> String = { it.comparisonModelSelectPrompt }
 val MODEL_CHOICE_BLOCKED: (InkuStrings) -> String = { it.comparisonModelChoiceBlocked }

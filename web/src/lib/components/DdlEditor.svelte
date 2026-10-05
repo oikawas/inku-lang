@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
-	import { highlightDDL } from '$lib/highlight';
 	import { buildPluginNameIndex, unknownPluginNames } from '$lib/plugin-names';
 	import { resolveInstructionLang } from '$lib/instructionLang';
+	import { createDdlEditor, type DdlEditorControl, type DdlEditorOptions } from '$lib/features/ddl-editor/codemirror';
+	import type { RangeEditorStatus } from '$lib/features/ddl-editor/codemirror-ranges';
+	import type { CompositionRange } from '$lib/composition-ranges';
 	import Tooltip from './Tooltip.svelte';
 	import SaijikiInline from './SaijikiInline.svelte';
 	import type { PluginEntry, PreviewForPlugin, PreviewForWord, SaijikiPreview } from '$lib/features/ddl-editor/types';
@@ -15,6 +17,8 @@
 		pluginEntries?: PluginEntry[];
 		previewForWord: PreviewForWord;
 		previewForPlugin: PreviewForPlugin;
+		ranges?: CompositionRange[];
+		onRanges?: (status: RangeEditorStatus) => void;
 	};
 
 	let {
@@ -24,118 +28,44 @@
 		pluginEntries = [],
 		previewForWord,
 		previewForPlugin,
+		ranges = [],
+		onRanges,
 	}: Props = $props();
 
-	let selection = $state({ start: 0, end: 0 });
-	let textareaEl = $state<HTMLTextAreaElement | null>(null);
-	let highlightEl = $state<HTMLDivElement | null>(null);
-	let lineNumberEl = $state<HTMLDivElement | null>(null);
-	let lineMirrorEl = $state<HTMLDivElement | null>(null);
+	let editorHost = $state<HTMLDivElement | null>(null);
+	let control = $state.raw<DdlEditorControl | null>(null);
 	let activeSaijikiPreview = $state<SaijikiPreview | null>(null);
 	let showVocabulary = $state(true);
 	let showGuide = $state(false);
-	let lineMirrorWidth = $state(0);
-	let scrollbarWidth = $state(0);
-	let lineHeights = $state<number[]>([]);
-
-	const editorHorizontalPadding = 22;
 
 	const lineNumbers = $derived(value.split('\n'));
 	const pluginNameIndex = $derived(buildPluginNameIndex(pluginEntries));
-	const highlighted = $derived(highlightDDL(value, null, pluginNameIndex));
 	const unknownNames = $derived(unknownPluginNames(value, pluginNameIndex));
 	const wordLang = $derived(resolveInstructionLang(value, isJapanese ? 'ja' : 'en'));
 
+	function configuration(): DdlEditorOptions {
+		return { isJapanese, disabled, pluginEntries, pluginNameIndex, ranges, previewForWord, previewForPlugin,
+			label: t().ddlEditorInstructions, placeholder: t().ddlEditPlaceholder,
+			onChange: (next) => value = next, onPreview: (next) => activeSaijikiPreview = next, onRanges: (status) => onRanges?.(status) };
+	}
+
 	onMount(() => {
-		const observer = new ResizeObserver(() => {
-			updateTextMetrics();
-			measureLineHeights();
-		});
-		if (textareaEl) observer.observe(textareaEl);
-		if (lineMirrorEl) observer.observe(lineMirrorEl);
-		updateTextMetrics();
-		measureLineHeights();
-		return () => observer.disconnect();
+		if (!editorHost) return;
+		const mounted = createDdlEditor(editorHost, value, configuration());
+		control = mounted;
+		return () => { control = null; mounted.destroy(); onRanges?.({ preview: null, invalid: false, composing: false }); };
 	});
 
 	$effect(() => {
-		value;
-		lineMirrorWidth;
-		lineMirrorEl;
-		void tick().then(measureLineHeights);
+		control?.configure(configuration());
+		control?.setValue(value);
 	});
 
-	/** Focus the native text control after the editor has entered the document. */
-	export function focus(): void {
-		void tick().then(() => {
-			textareaEl?.focus();
-			rememberSelection();
-			syncScroll();
-		});
-	}
-
-	function updateTextMetrics(): void {
-		if (!textareaEl) return;
-		const nextScrollbarWidth = textareaEl.offsetWidth - textareaEl.clientWidth;
-		const nextMirrorWidth = Math.max(0, textareaEl.clientWidth - editorHorizontalPadding);
-		if (scrollbarWidth !== nextScrollbarWidth) scrollbarWidth = nextScrollbarWidth;
-		if (lineMirrorWidth !== nextMirrorWidth) lineMirrorWidth = nextMirrorWidth;
-	}
-
-	function measureLineHeights(): void {
-		if (!lineMirrorEl) return;
-		const nextHeights = Array.from(lineMirrorEl.children, (line) => line.getBoundingClientRect().height);
-		if (
-			nextHeights.length !== lineHeights.length ||
-			nextHeights.some((height, index) => height !== lineHeights[index])
-		) {
-			lineHeights = nextHeights;
-		}
-	}
-
-	function rememberSelection(): void {
-		if (!textareaEl) return;
-		selection = {
-			start: textareaEl.selectionStart ?? 0,
-			end: textareaEl.selectionEnd ?? 0,
-		};
-	}
-
-	function syncScroll(): void {
-		if (!textareaEl) return;
-		if (highlightEl) {
-			highlightEl.scrollTop = textareaEl.scrollTop;
-			highlightEl.scrollLeft = textareaEl.scrollLeft;
-		}
-		if (lineNumberEl) lineNumberEl.scrollTop = textareaEl.scrollTop;
-	}
-
-	function insertWord(word: string): void {
-		if (disabled) return;
-		const ta = textareaEl;
-		if (!ta) {
-			value += word;
-			selection = { start: value.length, end: value.length };
-			return;
-		}
-		const hasFocus = document.activeElement === ta;
-		const liveStart = ta.selectionStart ?? selection.start;
-		const liveEnd = ta.selectionEnd ?? selection.end;
-		const start = Math.max(0, Math.min(value.length, hasFocus ? liveStart : selection.start));
-		const end = Math.max(start, Math.min(value.length, hasFocus ? liveEnd : selection.end));
-		value = value.slice(0, start) + word + value.slice(end);
-		const caret = start + word.length;
-		selection = { start: caret, end: caret };
-		void tick().then(() => {
-			textareaEl?.focus();
-			textareaEl?.setSelectionRange(caret, caret);
-			rememberSelection();
-			syncScroll();
-		});
-	}
+	export function focus(): void { void tick().then(() => control?.focus()); }
+	function insertWord(word: string): void { if (!disabled) control?.insertWord(word); }
 </script>
 
-<section class="ddl-editor" style={`--ddl-editor-scrollbar-width: ${scrollbarWidth}px`}>
+<section class="ddl-editor">
 	<div class="ddl-editor-toolbar">
 		<!-- The Server resolves the language by the same rule when the DDL is drawn. -->
 		<Tooltip placement="bottom-right" text={t().tooltipDdlLang}>
@@ -161,44 +91,7 @@
 
 	<div class="ddl-editor-workspace" class:with-vocabulary={showVocabulary} class:with-support={showGuide || unknownNames.length > 0}>
 		<div class="ddl-editor-main">
-			<div class="ddl-editor-frame">
-				<div class="ddl-line-numbers" bind:this={lineNumberEl} aria-hidden="true">
-					{#each lineNumbers as _, i}
-						<span style:height={lineHeights[i] ? `${lineHeights[i]}px` : undefined}>{i + 1}</span>
-					{/each}
-				</div>
-				<div class="ddl-highlight-wrap">
-					<div class="ddl-highlight" bind:this={highlightEl} aria-hidden="true">{@html highlighted}{#if value.endsWith('\n')}{'\u200b'}{/if}</div>
-					<div
-						class="ddl-line-mirror"
-						bind:this={lineMirrorEl}
-						aria-hidden="true"
-						style:width={`${lineMirrorWidth}px`}
-					>
-						{#each lineNumbers as line}
-							<span>{line || '\u00a0'}</span>
-						{/each}
-					</div>
-					<textarea
-						class="ddl-edit-ta"
-						bind:this={textareaEl}
-						bind:value
-						rows="5"
-						spellcheck="false"
-						placeholder={t().ddlEditPlaceholder}
-						aria-label={t().ddlEditorInstructions}
-						{disabled}
-						onclick={rememberSelection}
-						onfocus={rememberSelection}
-						onblur={rememberSelection}
-						oninput={() => { rememberSelection(); syncScroll(); }}
-						onkeyup={rememberSelection}
-						onmouseup={rememberSelection}
-						onselect={rememberSelection}
-						onscroll={syncScroll}
-					></textarea>
-				</div>
-			</div>
+			<div class="ddl-editor-frame" class:readonly={disabled} bind:this={editorHost}></div>
 
 			{#if unknownNames.length > 0 || showGuide}
 				<div class="ddl-editor-support">
@@ -304,7 +197,7 @@
 		min-width: 0;
 	}
 	.ddl-editor-workspace.with-vocabulary {
-		grid-template-rows: minmax(100px, 22%) minmax(0, 1fr);
+		grid-template-rows: minmax(180px, 50%) minmax(0, 1fr);
 		gap: 10px;
 	}
 	.ddl-editor-workspace.with-vocabulary.with-support {
@@ -318,110 +211,26 @@
 		min-height: 0;
 	}
 	.ddl-editor-frame {
-		display: grid;
-		grid-template-columns: 48px minmax(0, 1fr);
 		flex: 1;
-		min-height: 0;
-	}
-	.ddl-line-numbers {
-		box-sizing: border-box;
-		overflow: hidden;
-		padding: 10px 8px 10px 6px;
-		border: 1px solid var(--border2);
-		border-right: 0;
-		border-radius: var(--r) 0 0 var(--r);
-		background: var(--bg2);
-		color: var(--fg3);
-		font-family: inherit;
-		font-size: var(--ui-font-size-14);
-		line-height: 1.7;
-		text-align: right;
-		user-select: none;
-	}
-	.ddl-line-numbers span {
-		display: block;
-		min-height: 1.7em;
-		line-height: 1.7;
-		font-variant-numeric: tabular-nums;
-	}
-	.ddl-highlight-wrap {
-		position: relative;
-		min-width: 0;
-		min-height: 0;
+		min-height: 80px;
 		border: 1px solid var(--accent);
-		border-left: 3px solid var(--border2);
-		border-radius: 0 var(--r) var(--r) 0;
+		border-radius: var(--r);
 		background: var(--panel);
 		overflow: hidden;
 	}
-	.ddl-highlight,
-	.ddl-edit-ta {
-		box-sizing: border-box;
-		width: 100%;
-		height: 100%;
-		min-width: 100%;
-		min-height: 100%;
-		margin: 0;
-		padding: 10px 11px;
-		font-family: inherit;
-		font-size: var(--ui-font-size-14);
-		font-weight: 400;
-		font-style: normal;
-		letter-spacing: 0;
-		line-height: 1.7;
-		white-space: pre-wrap;
-		overflow-wrap: break-word;
-		word-break: break-word;
-		tab-size: 4;
-		vertical-align: top;
-	}
-	.ddl-highlight {
-		position: absolute;
-		inset: 0;
-		z-index: 0;
-		overflow: hidden;
-		padding-right: calc(11px + var(--ddl-editor-scrollbar-width));
-		color: var(--fg);
-		pointer-events: none;
-		scrollbar-width: none;
-	}
-	.ddl-line-mirror {
-		position: absolute;
-		top: 10px;
-		left: 11px;
-		z-index: 0;
-		visibility: hidden;
-		pointer-events: none;
-		font-family: inherit;
-		font-size: var(--ui-font-size-14);
-		font-weight: 400;
-		font-style: normal;
-		letter-spacing: 0;
-		line-height: 1.7;
-		white-space: pre-wrap;
-		overflow-wrap: break-word;
-		word-break: break-word;
-		tab-size: 4;
-	}
-	.ddl-line-mirror span {
-		display: block;
-		min-height: 1.7em;
-	}
-	.ddl-edit-ta {
-		position: relative;
-		z-index: 1;
-		resize: none;
-		border: 0;
-		outline: 0;
-		background: transparent;
-		color: transparent;
-		caret-color: var(--fg);
-		overflow: auto;
-		scrollbar-gutter: stable;
-	}
-	.ddl-edit-ta::placeholder { color: var(--fg3); opacity: 0.7; }
-	.ddl-edit-ta::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
-	.ddl-edit-ta:disabled { cursor: not-allowed; opacity: 0.72; }
+	.ddl-editor-frame :global(.cm-editor) { height: 100%; color: var(--fg); font-size: var(--ui-font-size-14); }
+	.ddl-editor-frame :global(.cm-focused) { outline: none; }
+	.ddl-editor-frame :global(.cm-scroller) { font-family: inherit; line-height: 1.7; overflow: auto; scrollbar-gutter: stable; }
+	.ddl-editor-frame :global(.cm-content) { padding: 10px 11px; caret-color: var(--fg); }
+	.ddl-editor-frame :global(.cm-gutters) { background: var(--bg2); color: var(--fg3); border-right: 1px solid var(--border2); }
+	.ddl-editor-frame :global(.cm-lineNumbers .cm-gutterElement) { padding: 0 8px; min-width: 36px; font-variant-numeric: tabular-nums; }
+	.ddl-editor-frame :global(.cm-cursor) { border-left-color: var(--fg); }
+	.ddl-editor-frame :global(.cm-selectionBackground) { background: color-mix(in srgb, var(--accent) 28%, transparent) !important; }
+	.ddl-editor-frame :global(.cm-placeholder) { color: var(--fg3); }
+	.ddl-editor-frame :global(.cm-ddl-range-name) { text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
+	.ddl-editor-frame :global(.cm-tooltip) { border: 1px solid var(--border2); background: var(--panel); color: var(--fg); }
+	.ddl-editor-frame :global(.cm-tooltip-autocomplete li[aria-selected]) { background: var(--accent); color: var(--panel); }
+	.ddl-editor-frame.readonly { opacity: .72; }
 	.ddl-editor-support {
 		display: flex;
 		flex-direction: column;

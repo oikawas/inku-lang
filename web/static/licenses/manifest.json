@@ -1,15 +1,96 @@
 {
   "packages": {
-    "@sveltejs/kit": { "version": "2.70.3", "file": "sveltekit-MIT.txt" },
-    "@sveltejs/adapter-node": { "version": "5.5.7", "file": "adapter-node-MIT.txt" },
-    "svelte": { "version": "5.56.10", "file": "svelte-MIT.txt" },
-    "devalue": { "version": "5.8.1", "file": "devalue-MIT.txt" },
-    "cookie": { "version": "0.7.2", "file": "cookie-MIT.txt" },
-    "set-cookie-parser": { "version": "3.1.2", "file": "set-cookie-parser-MIT.txt" },
-    "clsx": { "version": "2.1.1", "file": "clsx-MIT.txt" },
-    "sirv": { "version": "3.0.2", "file": "lukeed-MIT.txt" },
-    "mrmime": { "version": "2.0.1", "file": "mrmime-MIT.txt" },
-    "totalist": { "version": "3.0.1", "file": "totalist-MIT.txt" },
-    "@polka/url": { "version": "1.0.0-next.29", "file": "lukeed-MIT.txt" }
+    "@sveltejs/kit": {
+      "version": "2.70.3",
+      "file": "sveltekit-MIT.txt"
+    },
+    "@sveltejs/adapter-node": {
+      "version": "5.5.7",
+      "file": "adapter-node-MIT.txt"
+    },
+    "svelte": {
+      "version": "5.56.10",
+      "file": "svelte-MIT.txt"
+    },
+    "devalue": {
+      "version": "5.8.1",
+      "file": "devalue-MIT.txt"
+    },
+    "cookie": {
+      "version": "0.7.2",
+      "file": "cookie-MIT.txt"
+    },
+    "set-cookie-parser": {
+      "version": "3.1.2",
+      "file": "set-cookie-parser-MIT.txt"
+    },
+    "clsx": {
+      "version": "2.1.1",
+      "file": "clsx-MIT.txt"
+    },
+    "sirv": {
+      "version": "3.0.2",
+      "file": "lukeed-MIT.txt"
+    },
+    "mrmime": {
+      "version": "2.0.1",
+      "file": "mrmime-MIT.txt"
+    },
+    "totalist": {
+      "version": "3.0.1",
+      "file": "totalist-MIT.txt"
+    },
+    "@polka/url": {
+      "version": "1.0.0-next.29",
+      "file": "lukeed-MIT.txt"
+    },
+    "@codemirror/autocomplete": {
+      "version": "6.20.3",
+      "file": "codemirror-autocomplete-MIT.txt"
+    },
+    "@codemirror/commands": {
+      "version": "6.11.1",
+      "file": "codemirror-commands-MIT.txt"
+    },
+    "@codemirror/language": {
+      "version": "6.12.4",
+      "file": "codemirror-language-MIT.txt"
+    },
+    "@codemirror/state": {
+      "version": "6.7.6",
+      "file": "codemirror-state-MIT.txt"
+    },
+    "@codemirror/view": {
+      "version": "6.43.13",
+      "file": "codemirror-view-MIT.txt"
+    },
+    "@lezer/common": {
+      "version": "1.5.3",
+      "file": "lezer-common-MIT.txt"
+    },
+    "@lezer/highlight": {
+      "version": "1.2.5",
+      "file": "lezer-highlight-MIT.txt"
+    },
+    "@lezer/lr": {
+      "version": "1.4.10",
+      "file": "lezer-lr-MIT.txt"
+    },
+    "@marijn/find-cluster-break": {
+      "version": "1.0.4",
+      "file": "marijn-find-cluster-break-MIT.txt"
+    },
+    "crelt": {
+      "version": "1.0.7",
+      "file": "crelt-MIT.txt"
+    },
+    "style-mod": {
+      "version": "4.1.4",
+      "file": "style-mod-MIT.txt"
+    },
+    "w3c-keyname": {
+      "version": "2.2.8",
+      "file": "w3c-keyname-MIT.txt"
+    }
   }
 }

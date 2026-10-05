@@ -2,6 +2,7 @@
 	import { onDestroy, tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import DdlEditor from './DdlEditor.svelte';
+	import DdlRangePreview from './DdlRangePreview.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import WildToggle from './WildToggle.svelte';
 	import ModelCardPicker from './ModelCardPicker.svelte';
@@ -10,6 +11,8 @@
 	import type { PluginEntry, PreviewForPlugin, PreviewForWord } from '$lib/features/ddl-editor/types';
 	import { parseDdlImport, type ImportedPlugin } from '$lib/features/ddl-editor/ddl-import';
 	import type { ProviderAttemptCount } from '$lib/paintStream';
+	import type { CompositionRange } from '$lib/composition-ranges';
+	import type { RangeEditorStatus } from '$lib/features/ddl-editor/codemirror-ranges';
 
 	type Props = {
 		open: boolean;
@@ -29,6 +32,8 @@
 		previewForWord: PreviewForWord;
 		previewForPlugin: PreviewForPlugin;
 		pluginEntries?: PluginEntry[];
+		ranges?: CompositionRange[];
+		artworkUrl?: string | null;
 		wildValue?: boolean;
 		wildInherited?: boolean;
 		onSelectWild?: (value: boolean) => void;
@@ -41,7 +46,7 @@
 		open, mode, isJapanese, initialDdl, returnFocusTo = null, drawing,
 		stage2ModelLabel, drawingModelId, drawingModelGroups, onSelectDrawingModel,
 		runTokensIn, runTokensOut, runAttempt = null, error, previewForWord, previewForPlugin,
-		pluginEntries = [], wildValue = false, wildInherited = true, onSelectWild, onDraw, onClose,
+		pluginEntries = [], ranges = [], artworkUrl = null, wildValue = false, wildInherited = true, onSelectWild, onDraw, onClose,
 	}: Props = $props();
 
 	let value = $state('');
@@ -49,6 +54,7 @@
 	let importedNames = $state<string[]>([]);
 	let importError = $state<string | null>(null);
 	let importInput = $state<HTMLInputElement>();
+	let rangeStatus = $state<RangeEditorStatus>({ preview: null, invalid: false, composing: false });
 
 	async function importFile(event: Event): Promise<void> {
 		const input = event.currentTarget as HTMLInputElement;
@@ -92,6 +98,7 @@
 			importedPlugins = [];
 			importedNames = [];
 			importError = null;
+			rangeStatus = { preview: null, invalid: false, composing: false };
 			void tick().then(() => editor?.focus());
 		} else if (!open && lastOpen) {
 			restoreFocus();
@@ -112,7 +119,7 @@
 	}
 
 	async function requestDraw(): Promise<void> {
-		if (drawing || drawController || !value.trim()) return;
+		if (drawing || drawController || rangeStatus.invalid || rangeStatus.composing || !value.trim()) return;
 		drawController = new AbortController();
 		try {
 			await onDraw(value, drawController.signal, mode === 'new' && importedPlugins.length ? importedPlugins : undefined);
@@ -129,7 +136,7 @@
 		// Nested model selection owns its keyboard events and focus boundary.
 		if (!dialogEl || (event.target as Element).closest('[role="dialog"]') !== dialogEl) return;
 		event.stopPropagation();
-		if (event.isComposing) return;
+		if (event.isComposing || event.defaultPrevented) return;
 		if (event.key === 'Escape') {
 			event.preventDefault();
 			requestClose();
@@ -163,8 +170,10 @@
 			<button class="ddled-close" type="button" disabled={drawing} onclick={requestClose} aria-label={t().closeLabel}>×</button>
 		</header>
 		<div class="ddled-body">
-			<DdlEditor bind:this={editor} bind:value {isJapanese} disabled={drawing} {pluginEntries} {previewForWord} {previewForPlugin} />
+			<DdlEditor bind:this={editor} bind:value {isJapanese} disabled={drawing} {pluginEntries} {ranges} {previewForWord} {previewForPlugin} onRanges={(status) => (rangeStatus = status)} />
+			<DdlRangePreview {artworkUrl} preview={rangeStatus.preview} />
 		</div>
+		{#if rangeStatus.invalid}<p class="ddled-range-invalid" role="alert">{t().ddlRangeInvalid}</p>{/if}
 		<div class="ddled-bottom">
 			<div class="ddled-conditions">
 				<div class="ddled-model">
@@ -191,7 +200,7 @@
 				{:else}
 					<div class="ddled-actions">
 						<button type="button" class="ddled-cancel" onclick={requestClose}>{t().pipelineCancel}</button>
-						<button type="button" class="ddled-draw" disabled={!value.trim()} onclick={requestDraw}>{t().submitBtn}</button>
+						<button type="button" class="ddled-draw" disabled={!value.trim() || rangeStatus.invalid || rangeStatus.composing} onclick={requestDraw}>{t().submitBtn}</button>
 					</div>
 				{/if}
 			</footer>
@@ -212,7 +221,8 @@
 	.ddled-head p { margin: 4px 0 0; color: var(--fg3); font-size: var(--ui-font-size-12); line-height: 1.5; }
 	.ddled-close { flex-shrink: 0; width: 30px; height: 30px; padding: 0; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--fg2); font-size: var(--ui-font-size-20); cursor: pointer; }
 	.ddled-close:hover:not(:disabled) { background: var(--bg2); }
-	.ddled-body { display: flex; min-height: 0; flex: 1; padding: 14px 18px; }
+	.ddled-body { display: flex; gap: 16px; min-height: 0; flex: 1; padding: 14px 18px; }
+	.ddled-range-invalid { margin: 0; padding: 0 18px 10px; color: var(--danger); font-size: var(--ui-font-size-12); }
 	.ddled-bottom { display: flex; align-items: flex-end; gap: 16px; padding: 10px 18px 14px; border-top: 1px solid var(--border); flex-shrink: 0; }
 	.ddled-conditions { display: flex; align-items: center; gap: 18px; min-width: 0; flex: 1; }
 	.ddled-model { flex: 1; min-width: 0; max-width: 520px; }
@@ -232,7 +242,7 @@
 	@media (max-width: 760px) {
 		.ddled-dialog { width: calc(100vw - 16px); height: calc(100dvh - 16px); }
 		.ddled-head { padding: 12px; gap: 8px; }
-		.ddled-body { padding: 10px 12px; }
+		.ddled-body { padding: 10px 12px; flex-direction: column; gap: 8px; }
 		.ddled-bottom { flex-direction: column; align-items: stretch; gap: 10px; padding: 8px 12px 12px; }
 		.ddled-conditions { gap: 8px; flex-wrap: wrap; max-height: 26dvh; overflow: auto; }
 		.ddled-model { flex-basis: 100%; max-width: none; }

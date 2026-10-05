@@ -3129,6 +3129,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			isJapanese={getLang() === 'ja'}
 			mode={ddlDialogMode}
 			initialDdl={ddlDialogInitial}
+			ranges={compositionRanges}
+			artworkUrl={ddlDialogNode?.history?.id ? `/api/history/${encodeURIComponent(ddlDialogNode.history.id)}/svg` : null}
 			returnFocusTo={ddlDialogReturnFocus}
 			drawing={ddlDialogDrawing}
 			stage2ModelLabel={work.stage2ModelLabel}

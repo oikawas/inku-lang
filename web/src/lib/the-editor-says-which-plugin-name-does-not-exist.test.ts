@@ -172,7 +172,11 @@ test('T-7: display callers pass no index, and the editor passes one', () => {
 	assert.match(page, /highlightDDL\(batch\.activeDdl\)/);
 	assert.match(page, /highlightDDL\(demo\.generatedDdl\)/);
 	const dialog = read('components/DdlEditor.svelte');
-	assert.match(dialog, /highlightDDL\(value, [^)]*, pluginNameIndex\)/);
+	assert.match(dialog, /pluginNameIndex = \$derived\(buildPluginNameIndex\(pluginEntries\)\)/);
+	assert.match(dialog, /return \{ isJapanese, disabled, pluginEntries, pluginNameIndex,/);
+	const model = read('features/ddl-editor/codemirror.ts');
+	assert.match(model, /annotate\(state\.doc\.toString\(\), state\.facet\(pluginNames\)\)/);
+	assert.match(model, /pluginNames\.of\(names\)/);
 });
 
 // ── T-8 / T-9: after the drawing ───────────────────────────────────────────

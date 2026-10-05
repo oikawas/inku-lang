@@ -37,7 +37,7 @@ test('editing only the range follows matching names and preserves surrounding so
 	const left = editNumericRange(source, range, '横０〜１／３、縦０〜１／３', ranges);
 	assert.equal(left.source, '  紙。\n［構図］左上（横０〜１／３、縦０〜１／３）に、赤い円。\n青い線。  ');
 	const custom = editNumericRange(left.source, left.range, '横0.1〜0.4、縦0.2〜0.5', ranges);
-	assert.equal(custom.range.name, '左上');
+	assert.equal(custom.range.name, '指定の範囲');
 	assert.equal(matchingRange(custom.range, ranges), undefined);
 	for (const body of ['横1〜0、縦0〜1', '横0〜1.1、縦0〜1', '横0〜0、縦0〜1', 'typing']) {
 		const invalid = editNumericRange(source, range, body, ranges);
@@ -77,6 +77,40 @@ function runeModule(path: string, mode: 'client' | 'server'): string {
 		.replaceAll("'./ja'", JSON.stringify(new URL('./i18n/ja.ts', import.meta.url).href))
 		.replaceAll("'./en'", JSON.stringify(new URL('./i18n/en.ts', import.meta.url).href)));
 }
+
+test('range names return to the opened words or the chosen place when numbers leave the table', async () => {
+	const { createRangeEditState } = await import(runeModule('./range-edit.svelte.ts', 'client'));
+	for (const lang of ['ja', 'en'] as const) {
+		const tableName = ranges[1].words[lang];
+		const chosen = lang === 'ja' ? '指定の範囲' : 'chosen place';
+		const customName = lang === 'ja' ? '月のあたり' : 'near the moon';
+		const originalBody = lang === 'ja' ? '横2/3〜1、縦2/3〜1' : 'horizontal 2/3 to 1, vertical 2/3 to 1';
+		const customBody = lang === 'ja' ? '横0〜0.5、縦0〜2/3' : 'horizontal 0 to 0.5, vertical 0 to 2/3';
+		const tableBody = lang === 'ja' ? '横0〜1/3、縦0〜1/3' : 'horizontal 0 to 1/3, vertical 0 to 1/3';
+		const text = (name: string, body: string) => lang === 'ja'
+			? `［構図］${name}（${body}）に、赤い円。`
+			: `A red circle at [composition] the ${name} (${body}).`;
+		for (const openedName of [tableName, chosen, customName]) {
+			let source = text(openedName, originalBody);
+			const state = createRangeEditState({ source: () => source, ranges: () => ranges, disabled: () => false,
+				change: (next: string) => source = next, preview() {}, invalid() {} });
+			state.open(scanNumericRanges(source)[0]);
+			assert.equal(source, text(openedName, originalBody), 'opening alone keeps saved words');
+			state.edit(customBody);
+			const expected = openedName === customName ? customName : chosen;
+			assert.equal(source, text(expected, customBody));
+			assert.equal(matchingRange(scanNumericRanges(source)[0], ranges), undefined);
+			state.edit(tableBody);
+			assert.equal(matchingRange(scanNumericRanges(source)[0], ranges)?.key, 'left');
+			state.edit('typing');
+			assert.equal(state.active.range.name, ranges[0].words[lang], 'invalid numbers keep the last words');
+			state.edit(customBody);
+			assert.equal(source, text(expected, customBody), 'passing through table numbers restores the opened custom words');
+			state.edit(tableBody);
+			assert.equal(source, text(ranges[0].words[lang], tableBody));
+		}
+	}
+});
 
 test('instance-scoped rune edits retain the last valid frame, honor locks, and clear on leaving', async () => {
 	const { createRangeEditState } = await import(runeModule('./range-edit.svelte.ts', 'client'));

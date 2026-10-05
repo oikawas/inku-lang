@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-06 — Follow range names when edited numbers leave the table
+
+In the instructions viewer and editor, valid numbers outside the range table change a table name to `the chosen place` and remain unfolded. Keep words the user wrote: in the reading view, if typing passes through table numbers and changes the name, numbers outside the table restore the words present when the range was opened. Returning to table numbers restores that name and folding. The editor follows names only when leaving a numeric edit; untouched saved words and words during invalid input remain unchanged.
+
 ## v2.15.91 (2026-10-05 / Build 1167)
 
 Thumbnail saving and rebuilding recover once from a broken child process pool. Stored SVG and Score and all engine versions remain unchanged.

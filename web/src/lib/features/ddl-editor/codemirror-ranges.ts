@@ -13,6 +13,7 @@ export type RangeEditorStatus = { preview: RangePreview | null; invalid: boolean
 export type RangeEditorState = RangeEditorStatus & {
 	ranges: NumericRange[];
 	active: NumericRange | null;
+	openedBody: string | null;
 	hover: number | null;
 	focused: boolean;
 	decorations: DecorationSet;
@@ -55,11 +56,12 @@ function decorationsFor(ranges: NumericRange[], state: EditorState, focused: boo
 
 function derive(state: EditorState, ranges: NumericRange[], previous: RangeEditorState | null, focused: boolean, hover: number | null): RangeEditorState {
 	const active = focused ? ranges.find((range) => contains(range, state.selection.main)) ?? null : null;
+	const openedBody = active ? previous?.active?.start === active.start ? previous.openedBody : active.body : null;
 	const shown = active ?? ranges.find((range) => range.start === hover) ?? null;
 	let preview: RangePreview | null = null;
 	if (shown?.bounds) preview = rangePreview(shown.bounds);
 	else if (shown && previous?.active?.start === shown.start && previous.preview) preview = { ...previous.preview, invalid: true };
-	return { ranges, active, hover, focused, preview, invalid: ranges.some((range) => range.bounds === null), composing: false,
+	return { ranges, active, openedBody, hover, focused, preview, invalid: ranges.some((range) => range.bounds === null), composing: false,
 		...decorationsFor(ranges, state, focused) };
 }
 
@@ -87,7 +89,7 @@ export const rangeEditorState = StateField.define<RangeEditorState>({
 		// A temporarily broken axis or parenthesis remains an invalid edit until
 		// the caret leaves it. Keep its last valid frame, never invent bounds.
 		if (!next.active && mapped?.active && focused && mapped.active.end > mapped.active.start && contains(mapped.active, tr.newSelection.main)) {
-			next = { ...next, active: { ...mapped.active, bounds: null }, invalid: true,
+			next = { ...next, active: { ...mapped.active, bounds: null }, openedBody: mapped.openedBody, invalid: true,
 				preview: mapped.preview ? { ...mapped.preview, invalid: true } : null };
 		}
 		return next;
@@ -106,7 +108,7 @@ const followNameOnLeaving = EditorState.transactionFilter.of((tr) => {
 	const start = tr.changes.mapPos(previous.active.start, -1);
 	const source = tr.newDoc.toString();
 	const range = scanNumericRanges(source).find((range) => range.start === start);
-	if (!range?.bounds || (focused && contains(range, tr.newSelection.main))) return tr;
+	if (!range?.bounds || range.body === previous.openedBody || (focused && contains(range, tr.newSelection.main))) return tr;
 	const edited = editNumericRange(source, range, range.body, [...tr.startState.facet(rangeTable)]);
 	const name = edited.source.slice(edited.range.nameStart, edited.range.nameEnd);
 	if (name === source.slice(range.nameStart, range.nameEnd)) return tr;

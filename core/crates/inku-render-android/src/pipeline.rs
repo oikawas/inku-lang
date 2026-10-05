@@ -3,10 +3,10 @@
 use std::ptr::null_mut;
 
 use jni::JNIEnv;
-use jni::objects::{JByteArray, JObject};
+use jni::objects::{JByteArray, JObject, JString};
 use jni::sys::{jbyteArray, jstring};
 
-use super::{BindingError, jni_boundary, new_java_string};
+use super::{BindingError, java_string, jni_boundary, new_java_string};
 
 fn read_bytes(env: &JNIEnv<'_>, value: JByteArray<'_>) -> Result<Vec<u8>, BindingError> {
     env.convert_byte_array(value)
@@ -148,4 +148,42 @@ pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_provid
     snapshot: JByteArray<'_>,
 ) -> jbyteArray {
     unary_bytes(env, snapshot, inku_pipeline_uniffi::provider_attempt)
+}
+
+/// The description every layer reads: Server's label cut, from the one shared copy.
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_pipelineDescription(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    text: JString<'_>,
+) -> jstring {
+    jni_boundary(env, null_mut(), |env| {
+        let text = java_string(env, text)?;
+        new_java_string(env, &inku_pipeline_uniffi::pipeline_description(&text))
+    })
+}
+
+/// A word-touch seed as Server derives it; null when the words carry no seed.
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_renderSeedFromText(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    seed_text: JString<'_>,
+) -> jstring {
+    jni_boundary(env, null_mut(), |env| {
+        let seed_text = java_string(env, seed_text)?;
+        match inku_pipeline_uniffi::render_seed_from_text(seed_text) {
+            None => Ok(null_mut()),
+            Some(seed) => new_java_string(
+                env,
+                &serde_json::json!({
+                    "render_seed": seed.render_seed,
+                    "seed_text": seed.seed_text,
+                })
+                .to_string(),
+            ),
+        }
+    })
 }

@@ -26,4 +26,20 @@ interface SharedPipelineBinding {
      */
     fun providerAttempt(snapshotBytes: ByteArray): ByteArray =
         """{"provider_attempt":null}""".encodeToByteArray()
+
+    /**
+     * The description every layer reads, with the author's leading numbers and
+     * bracketed comments cut by the one shared rule. A binding without it
+     * refuses rather than passing the labels through to the core.
+     */
+    fun pipelineDescription(text: String): String =
+        throw PipelineHostException("binding_description_labels_unavailable")
+
+    /**
+     * A word-touch seed as `{"render_seed": "<decimal>", "seed_text": "<normalized>"}`,
+     * or null when the words carry no seed. A binding without it refuses rather
+     * than deriving a different seed in Kotlin.
+     */
+    fun renderSeedFromText(seedText: String): String? =
+        throw PipelineHostException("binding_text_seed_unavailable")
 }

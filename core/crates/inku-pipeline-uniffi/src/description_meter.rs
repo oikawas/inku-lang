@@ -9,6 +9,8 @@ use sudachi::analysis::{Mode, Tokenize, stateless_tokenizer::StatelessTokenizer}
 use sudachi::config::Config;
 use sudachi::dic::dictionary::JapaneseDictionary;
 
+use crate::description_labels::pipeline_description;
+
 type JapaneseCache = Option<(String, Arc<JapaneseDictionary>)>;
 type EnglishCache = Option<(String, Arc<HashMap<String, usize>>)>;
 static JAPANESE: OnceLock<Mutex<JapaneseCache>> = OnceLock::new();
@@ -16,46 +18,6 @@ static ENGLISH: OnceLock<Mutex<EnglishCache>> = OnceLock::new();
 
 fn regex(pattern: &str) -> Regex {
     Regex::new(pattern).expect("static Server meter pattern")
-}
-
-/// Labels are retained in saved source, but are never read by the meter.
-fn pipeline_description(text: &str) -> String {
-    let number = regex(r"^[ \t]*[0-9０-９]+[.．、)）:：　][ \t　]*");
-    let comment = regex(r"\[[^\[\]\n]*\]|［[^［］\n]*］");
-    let mut spans = Vec::new();
-    let mut offset = 0;
-    for line in text.split_inclusive('\n') {
-        if let Some(found) = number.find(line) {
-            spans.push((offset + found.start(), offset + found.end()));
-        }
-        spans.extend(
-            comment
-                .find_iter(line)
-                .map(|m| (offset + m.start(), offset + m.end())),
-        );
-        offset += line.len();
-    }
-    if spans.is_empty() {
-        return text.to_owned();
-    }
-    spans.sort_unstable();
-    let mut kept = String::new();
-    let mut at = 0;
-    for (start, end) in spans {
-        kept.push_str(&text[at..start]);
-        at = end;
-    }
-    kept.push_str(&text[at..]);
-    let spaces = regex(r"[ \t　]{2,}");
-    kept.split('\n')
-        .map(|line| {
-            spaces
-                .replace_all(line, " ")
-                .trim_matches([' ', '\t', '　'])
-                .to_owned()
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
 }
 
 fn japanese_dictionary(directory: &str) -> Result<Arc<JapaneseDictionary>, String> {

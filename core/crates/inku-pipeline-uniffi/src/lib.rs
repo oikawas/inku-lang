@@ -4,6 +4,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use inku_pipeline::protocol::{ProtocolError, error_bytes};
 
+mod description_labels;
 #[cfg(not(target_os = "android"))]
 mod description_meter;
 mod macro_catalog;
@@ -14,6 +15,7 @@ mod standalone;
 
 #[cfg(not(target_os = "android"))]
 pub use description_meter::count_description_meter;
+pub use description_labels::pipeline_description;
 pub use macro_catalog::resolve_macro_catalog;
 pub use plugin_diagnostics::explain_plugin_diagnostics;
 pub use raster::{

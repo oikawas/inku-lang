@@ -149,7 +149,9 @@ public enum ExportService {
                 case .svg: data = Data(try source.svg(profile: options.svgProfile).utf8)
                 case .png:
                     let image = try ExportRaster.image(svg: source.work.svg, height: options.pixelHeight)
-                    data = try png(options.pngAlphaWhite ? ExportRaster.onWhite(image) : image)
+                    // The work's own generation time, not the export time, as Web's downloadPNG stamps it.
+                    data = PNGCaptureDate.stamp(try png(options.pngAlphaWhite ? ExportRaster.onWhite(image) : image),
+                                                date: Date(timeIntervalSince1970: Double(source.work.at) / 1000))
                 case .ddl: data = try ddl(source)
                 case .shareCard: data = try png(ExportSheets.card(source: source, options: options))
                 default: throw ExportFailure("この形式を単独の作品として書き出せません。")
@@ -184,11 +186,18 @@ public enum ExportService {
         }
     }
 
-    public static func ddl(_ source: ExportSource) throws -> Data {
+    /// The app's CFBundleVersion, standing where Server writes its web/BUILD_NUMBER; null when the bundle has none.
+    public static var applicationBuildNumber: String? {
+        (Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    /// Server ddl_export.build_ddl_export: a definition without a string namespace and heading is skipped.
+    public static func ddl(_ source: ExportSource, buildNumber: String? = applicationBuildNumber) throws -> Data {
         guard let text = source.work.ddl, DDLSource.hasBody(text) else { throw ExportFailure("この保存作品には書き出せるDDLがありません。") }
         var plugins: [ExactJSON] = []; var seen = Set<String>()
         for (index, definition) in source.pluginDefinitions.enumerated() {
-            guard let namespace = definition["namespace"].string, let heading = definition["heading"].string else { throw ExportFailure("保存されたプラグイン定義が不正です。") }
+            guard let namespace = definition["namespace"].string, let heading = definition["heading"].string else { continue }
             let name = namespace + "." + heading
             let visible = [name] + (definition["aliases"].array ?? []).compactMap { $0.string.map { namespace + "." + $0 } }
             if !seen.contains(name), visible.contains(where: text.contains) {
@@ -199,7 +208,7 @@ public enum ExportService {
         return ExactJSON.object([
             "schema": .string("inku.ddl-export.v1"), "language": .string(source.language),
             "ddl": .string(text), "plugins": .array(plugins),
-            "exported_from": .object(["work_id": .string(source.work.id), "render_hash": .optional(source.work.renderHash), "render_engine_version": .optional(source.work.renderEngineVersion)])
+            "exported_from": .object(["build_number": .optional(buildNumber), "render_engine_version": .optional(source.work.renderEngineVersion)])
         ]).data
     }
 

@@ -465,7 +465,7 @@ object InkuStringsJa : InkuStrings {
     override val tooltipDdlLang = "指示書はこの言語の文法で読みます。数値の範囲の書き方も日本語と英語で違います。平仮名・片仮名・漢字が1字でもあれば日本語DDLになるので、英語の指示書に日本語の名前が1つ入るだけで日本語として読みます。"
     override val rangeNumbers = "範囲の数"
     override val rangeEditNote = "枠で範囲を確認できます。絵は「DDLから描画」で描き直します。"
-    override val rangeInvalid = "0から1の数を、始まりが終わりより小さくなるように書いてください。枠は最後の有効な範囲を示しています。"
+    override val rangeInvalid = "例：日本語は（横1/3-2/3、縦2/3〜1）、英語は (horizontal 1/3 to 2/3, vertical 2/3 to 1)。日本語のつなぎは 〜・～・~・-・－、英語は to・-・– です。数は0から1で、始まりを終わりより小さくしてください。枠は最後の有効な範囲を示しています。"
     override val rangeClose = "範囲の編集を閉じる"
     override val awaitingInterpretation = "指示書を待機中…"
     override val miscSubtitle = "言語・文字の大きさ・表示"

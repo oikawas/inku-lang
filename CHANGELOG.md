@@ -6,6 +6,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+## v2.15.89 — 2026-10-05
+
 ### 2026-10-05 — Accept hyphens in Web numeric range edits
 
 Numeric edits in the instructions accept `-` and `－` in Japanese, and `-` and `–` besides `to` in English. Detection, frames and matching names use the same parser. Invalid-range guidance gives an example in each language. English `~`, numeric limits, rejection of reversed or zero-width ranges, explicit drawing and full-source preservation remain unchanged.

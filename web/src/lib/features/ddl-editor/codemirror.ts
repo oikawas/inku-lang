@@ -54,10 +54,11 @@ export function replaceDdlValue(state: EditorState, value: string): Transaction 
 		annotations: [externalDdlValue.of(true), Transaction.addToHistory.of(false)] });
 }
 
-export function insertDdlWord(state: EditorState, word: string): Transaction | null {
+export function insertDdlWord(state: EditorState, word: string, append = false): Transaction | null {
 	if (state.readOnly || state.field(rangeEditorState).composing) return null;
-	return state.update({ changes: { from: state.selection.main.from, to: state.selection.main.to, insert: word },
-		selection: EditorSelection.cursor(state.selection.main.from + word.length), scrollIntoView: true, userEvent: 'input.complete' });
+	const selection = append ? EditorSelection.cursor(state.doc.length) : state.selection.main;
+	return state.update({ changes: { from: selection.from, to: selection.to, insert: word },
+		selection: EditorSelection.cursor(selection.from + word.length), scrollIntoView: true, userEvent: 'input.complete' });
 }
 
 type CompletionOptions = {
@@ -119,6 +120,7 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 	let pendingValue: string | null = null;
 	let compositionTimer: ReturnType<typeof setTimeout> | null = null;
 	let nativeCompositionTarget: EventTarget | null = null;
+	let cursorPlaced = false;
 	const configuration = new Compartment();
 	const composing = () => view?.composing ?? false;
 	const configurable = () => [ddlEditorModel(options.ranges, options.pluginNameIndex, options.disabled, composing),
@@ -179,7 +181,7 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 				if (editor.state.field(rangeEditorState).hover !== start) editor.dispatch({ effects: hoveredRange.of(start) });
 			},
 			mouseleave(_event, editor) { if (editor.state.field(rangeEditorState).hover !== null) editor.dispatch({ effects: hoveredRange.of(null) }); },
-			focus(_event, editor) { editor.dispatch({ effects: rangeFocusChanged.of(true) }); },
+			focus(_event, editor) { cursorPlaced = true; editor.dispatch({ effects: rangeFocusChanged.of(true) }); },
 			blur(_event, editor) { editor.dispatch({ effects: rangeFocusChanged.of(false) }); }
 		}),
 		EditorView.updateListener.of((update) => {
@@ -219,7 +221,11 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 			const tr = replaceDdlValue(view.state, next);
 			if (tr) view.dispatch(tr);
 		},
-		insertWord(word) { if (view) { const tr = insertDdlWord(view.state, word); if (tr) { view.dispatch(tr); view.focus(); } } },
+		insertWord(word) {
+			if (!view) return;
+			const tr = insertDdlWord(view.state, word, options.cursorAtEnd === true && !cursorPlaced);
+			if (tr) { view.dispatch(tr); view.focus(); }
+		},
 		focus() { view?.focus(); },
 		destroy() {
 			destroyed = true;

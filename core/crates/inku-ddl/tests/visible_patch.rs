@@ -637,6 +637,7 @@ fn schema_fixture_and_patch_diagnostic_matrix_are_closed() {
         VisiblePatchDiagnostic::TargetUnresolved,
         VisiblePatchDiagnostic::NewDiagnostic,
         VisiblePatchDiagnostic::CandidateIntegrityFailure,
+        VisiblePatchDiagnostic::NumericRangeOutsideWords,
     ];
     assert_eq!(
         all.iter()
@@ -645,6 +646,144 @@ fn schema_fixture_and_patch_diagnostic_matrix_are_closed() {
             .len(),
         all.len()
     );
+}
+
+/// A1 (2026-10-06): a completion may keep the author's words and write the
+/// place in numbers after them. A position word read in those words keeps the
+/// established fact only when the numbers lie inside its range.
+#[test]
+fn completion_range_keeps_the_words_it_matches() {
+    let mut mismatches = Vec::new();
+    for (language, source, from, to, outside) in [
+        (
+            ResolvedInstructionLanguage::Ja,
+            "右下に橙色の小さな円を十個ランダムに散らす。",
+            "右下に",
+            "右下（横2/3〜1、縦2/3〜1）に",
+            "右下（横2/3〜1、縦0〜1/3）に",
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "scatter ten small orange circles randomly at the bottom right.",
+            "at the bottom right",
+            "at the bottom right (horizontal 2/3 to 1, vertical 2/3 to 1)",
+            "at the bottom right (horizontal 2/3 to 1, vertical 0 to 1/3)",
+        ),
+        (
+            ResolvedInstructionLanguage::Ja,
+            "右の隅に橙色の小さな円を十個ランダムに散らす。",
+            "右の隅に",
+            "右の隅（横4/5〜1、縦4/5〜1）に",
+            "右の隅（横2/3〜1、縦2/3〜1）に",
+        ),
+    ] {
+        let base = compiled(source, language);
+        let holes = source_ordered_holes(&base);
+        assert_eq!(holes.len(), 1, "{source}: {:?}", base.holes);
+        let replaced = |range: &str| {
+            let text = &source[holes[0].allowed_span.start_byte..holes[0].allowed_span.end_byte];
+            text.replace(from, range)
+                .replace("ランダムに", "")
+                .replace(" randomly", "")
+        };
+        let accepted = validate_visible_ddl_patch(
+            &base,
+            &patch(&base, vec![edit(holes[0], &replaced(to))]),
+            &[],
+            None,
+            LIMITS,
+        );
+        if let Err(reason) = &accepted {
+            mismatches.push(format!("{source} -> {}: {reason:?}", replaced(to)));
+        }
+        let rejected = validate_visible_ddl_patch(
+            &base,
+            &patch(&base, vec![edit(holes[0], &replaced(outside))]),
+            &[],
+            None,
+            LIMITS,
+        );
+        if rejected.as_ref().err() != Some(&VisiblePatchDiagnostic::NumericRangeOutsideWords) {
+            mismatches.push(format!(
+                "{source} -> {}: {:?}",
+                replaced(outside),
+                rejected.err()
+            ));
+        }
+    }
+    assert!(mismatches.is_empty(), "{mismatches:#?}");
+}
+
+/// Words without a position word are not matched: the numbers stand.
+#[test]
+fn completion_range_without_a_position_word_is_not_matched() {
+    let source = "右寄りに橙色の小さな円を十個ランダムに散らす。";
+    let base = compiled(source, ResolvedInstructionLanguage::Ja);
+    let holes = source_ordered_holes(&base);
+    assert_eq!(holes.len(), 1, "{:?}", base.holes);
+    let accepted = validate_visible_ddl_patch(
+        &base,
+        &patch(
+            &base,
+            vec![edit(
+                holes[0],
+                &source[holes[0].allowed_span.start_byte..holes[0].allowed_span.end_byte]
+                    .replace("右寄りに", "右寄り（横2/3〜1、縦0〜1）に")
+                    .replace("ランダムに", ""),
+            )],
+        ),
+        &[],
+        None,
+        LIMITS,
+    );
+    assert!(accepted.is_ok(), "{accepted:?}");
+}
+
+/// A numeric range already in the hole's clause is kept: a completion may not
+/// move its bounds.
+#[test]
+fn completion_keeps_a_numeric_range_in_the_hole_clause() {
+    let source = "右下（横2/3〜1、縦2/3〜1）に橙色の小さな円を十個ランダムに散らす。";
+    let base = compiled(source, ResolvedInstructionLanguage::Ja);
+    let holes = source_ordered_holes(&base);
+    assert_eq!(holes.len(), 1, "{:?}", base.holes);
+    let text = &source[holes[0].allowed_span.start_byte..holes[0].allowed_span.end_byte];
+    let kept = validate_visible_ddl_patch(
+        &base,
+        &patch(&base, vec![edit(holes[0], &text.replace("ランダムに", ""))]),
+        &[],
+        None,
+        LIMITS,
+    );
+    assert!(kept.is_ok(), "{kept:?}");
+    let moved = validate_visible_ddl_patch(
+        &base,
+        &patch(
+            &base,
+            vec![edit(
+                holes[0],
+                &text
+                    .replace("縦2/3〜1", "縦0〜1/3")
+                    .replace("ランダムに", ""),
+            )],
+        ),
+        &[],
+        None,
+        LIMITS,
+    );
+    assert_eq!(
+        moved.err(),
+        Some(VisiblePatchDiagnostic::OwnerAssociationChanged)
+    );
+}
+
+fn compiled(source: &str, language: ResolvedInstructionLanguage) -> inku_ddl::TypedDdlCompilation {
+    compile_typed_ddl(
+        NormalizedDdlDocument::new(source, language, Vec::new()).unwrap(),
+        &[],
+        None,
+        LIMITS,
+    )
 }
 
 fn base(source: &str) -> inku_ddl::TypedDdlCompilation {

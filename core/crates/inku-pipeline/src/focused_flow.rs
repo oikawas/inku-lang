@@ -1280,6 +1280,164 @@ fn independent_hole_results_keep_valid_subset_without_retry_after_ack() {
     }
 }
 
+/// A1 (2026-10-06, the author's decision Q3): when the completion's proposals
+/// are refused, the core asks once more with the reasons. Proposals that passed
+/// stay as they were; the second answer is final.
+#[test]
+fn refused_hole_proposals_are_asked_once_more_with_the_reasons() {
+    for second in ["9", "many"] {
+        let state = started_direct_ddl(
+            "ink wash ground. place one red circle at center. many square. many circle.",
+        );
+        let first = state.action.as_ref().unwrap().clone();
+        let asked = run(
+            Some(&state),
+            &hole_response(
+                &state,
+                json!({"results":[
+                    {"id":"h1","status":"proposed","replacement":"8"},
+                    {"id":"h2","status":"proposed","replacement":"many"}
+                ]}),
+            ),
+        );
+        let report = asked
+            .events
+            .iter()
+            .find(|event| event.tag == "hole_completion_checked")
+            .unwrap();
+        assert_eq!(report.payload["results"][0]["status"], "validated");
+        assert_eq!(report.payload["results"][1]["status"], "rejected");
+        let refused = report.payload["results"][1]["reason"].clone();
+        assert!(refused.as_str().is_some_and(|reason| !reason.is_empty()));
+        assert!(asked.events.iter().any(|event| {
+            event.tag == "retry_scheduled"
+                && event.payload["failure"] == "semantic_violation"
+                && event.payload["detail"] == refused
+        }));
+        let again = asked.snapshot.action.as_ref().expect("asked once more");
+        assert_eq!(again.tag, "complete_visible_ddl_holes");
+        assert_eq!(again.identity.attempt, 2);
+        assert_ne!(again.identity.action_id, first.identity.action_id);
+        let message: serde_json::Value =
+            serde_json::from_str(again.payload["prompt"]["message"].as_str().unwrap()).unwrap();
+        let feedback = &message["completion_feedback"];
+        assert_eq!(feedback[0]["id"], "h1");
+        assert_eq!(feedback[0]["status"], "validated");
+        assert_eq!(feedback[0]["replacement"], "8");
+        assert_eq!(feedback[1]["id"], "h2");
+        assert_eq!(feedback[1]["status"], "rejected");
+        assert_eq!(feedback[1]["reason"], refused);
+        assert_eq!(feedback[1]["replacement"], "many");
+        assert!(
+            again.payload["prompt"]["system"]
+                .as_str()
+                .unwrap()
+                .contains("completion_feedback")
+        );
+
+        // The second answer cannot change the proposal that passed.
+        let answered = run(
+            Some(&asked.snapshot),
+            &hole_response(
+                &asked.snapshot,
+                json!({"results":[
+                    {"id":"h1","status":"proposed","replacement":"many"},
+                    {"id":"h2","status":"proposed","replacement":second}
+                ]}),
+            ),
+        );
+        assert!(
+            !answered
+                .events
+                .iter()
+                .any(|event| event.tag == "retry_scheduled"),
+            "a second refusal is not asked again"
+        );
+        let PipelinePhase::AwaitingPatchApproval { patch, .. } = &answered.snapshot.phase else {
+            panic!("{:?}", answered.snapshot.phase)
+        };
+        let replacements = patch
+            .edits
+            .iter()
+            .map(|edit| edit.replacement.as_str())
+            .collect::<Vec<_>>();
+        if second == "9" {
+            assert_eq!(replacements, ["8", "9"]);
+        } else {
+            assert_eq!(replacements, ["8"]);
+        }
+    }
+
+    // Nothing passes twice: the run stops for the author's edit.
+    let state = started_direct_ddl(
+        "ink wash ground. place one red circle at center. many circles and many squares.",
+    );
+    let refusal = json!({"results":[
+        {"id":"h1","status":"proposed","replacement":"8"},
+        {"id":"h2","status":"proposed","replacement":"many"}
+    ]});
+    let asked = run(Some(&state), &hole_response(&state, refusal.clone())).snapshot;
+    assert_eq!(asked.action.as_ref().unwrap().identity.attempt, 2);
+    let stopped = run(Some(&asked), &hole_response(&asked, refusal)).snapshot;
+    assert!(matches!(stopped.phase, PipelinePhase::NeedsUserEdit { .. }));
+    assert!(stopped.action.is_none());
+
+    // Only "cannot write" answers are not asked again.
+    let state = started_direct_ddl(
+        "ink wash ground. place one red circle at center. many square. many circle.",
+    );
+    let unresolved = run(
+        Some(&state),
+        &hole_response(
+            &state,
+            json!({"results":[
+                {"id":"h1","status":"unresolved","reason":"unsupported"},
+                {"id":"h2","status":"unresolved","reason":"ambiguous"}
+            ]}),
+        ),
+    )
+    .snapshot;
+    assert!(matches!(
+        unresolved.phase,
+        PipelinePhase::NeedsUserEdit { .. }
+    ));
+}
+
+fn started_direct_ddl(source: &str) -> PipelineSnapshot {
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "asked-again".into(),
+            authoring_nonce: "asked-again-1".into(),
+            config: Box::new(config()),
+            authority: VariationAuthorityState::new_direct_ddl(),
+            authoring: AuthoringInput::DirectDdl {
+                source: source.into(),
+            },
+        },
+    );
+    let pending = run(None, &start).snapshot;
+    let state = run(Some(&pending), &envelope(Some(&pending), ack(&pending))).snapshot;
+    assert_eq!(
+        state.action.as_ref().map(|action| action.tag.as_str()),
+        Some("complete_visible_ddl_holes")
+    );
+    state
+}
+
+fn hole_response(state: &PipelineSnapshot, response: serde_json::Value) -> Envelope<PipelineInput> {
+    envelope(
+        Some(state),
+        PipelineInput::EffectResult {
+            result: EffectResult::VisibleDdlHolePatchGenerated {
+                identity: state.action.as_ref().unwrap().identity.clone(),
+                response: response.to_string(),
+                elapsed_ms: DecimalU64::new(20),
+            },
+        },
+    )
+}
+
 #[test]
 fn host_json_float_roundtrip_preserves_snapshot_number() {
     let parsed: f64 = serde_json::from_str("108.58661719879423").unwrap();

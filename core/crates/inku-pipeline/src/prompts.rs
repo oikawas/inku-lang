@@ -2322,6 +2322,55 @@ mod tests {
         }
     }
 
+    /// A1 (2026-10-06): the completion may write a place in numbers after the
+    /// author's words, inside the range of a position word those words keep.
+    #[test]
+    fn hole_completion_v4_writes_places_in_numbers_after_the_words() {
+        for (language, source, syntax, range, around, removed) in [
+            (
+                ResolvedInstructionLanguage::Ja,
+                "右下に橙色の小さな円を十個ランダムに散らす。",
+                "言葉（横a〜b、縦c〜d）に",
+                "下は縦2/3〜1",
+                "周り",
+                "数値座標は追加しない",
+            ),
+            (
+                ResolvedInstructionLanguage::En,
+                "scatter ten small orange circles randomly at the bottom right.",
+                "words (horizontal a to b, vertical c to d)",
+                "bottom is vertical 2/3 to 1",
+                "around",
+                "do not add numeric coordinates",
+            ),
+        ] {
+            let compilation = inku_ddl::compile_typed_ddl(
+                inku_ddl::NormalizedDdlDocument::new(source, language, Vec::new()).unwrap(),
+                &[],
+                Some(17),
+                inku_ddl::MacroExpansionLimits {
+                    max_invocations: 16,
+                    max_depth: 16,
+                    max_evaluation_steps: 1_000,
+                    max_nodes_per_invocation: 100,
+                    max_total_nodes: 500,
+                },
+            );
+            let holes = compilation.holes.clone();
+            assert_eq!(holes.len(), 1, "{source}: {holes:?}");
+            let prompt = build_hole_completion_prompt(&compilation, &holes, LIMITS).unwrap();
+            assert_eq!(
+                prompt.prompt_id,
+                "inku.visible-ddl-hole-completion-prompt.v4"
+            );
+            for expected in [syntax, range, around] {
+                assert!(prompt.system.contains(expected), "{source}: {expected}");
+            }
+            assert!(!prompt.system.contains(removed), "{source}");
+            assert!(!prompt.message.contains("completion_feedback"));
+        }
+    }
+
     #[test]
     fn stage1_initial_guidance_preserves_grammar_and_stage_boundaries() {
         for language in [

@@ -80,6 +80,9 @@ pub enum VisiblePatchDiagnostic {
     TargetUnresolved,
     NewDiagnostic,
     CandidateIntegrityFailure,
+    /// A completion wrote a numeric range outside the range of a position word
+    /// it kept before the parenthesis.
+    NumericRangeOutsideWords,
 }
 
 impl VisiblePatchDiagnostic {
@@ -110,6 +113,7 @@ impl VisiblePatchDiagnostic {
             Self::TargetUnresolved => "target_unresolved",
             Self::NewDiagnostic => "new_diagnostic",
             Self::CandidateIntegrityFailure => "candidate_integrity_failure",
+            Self::NumericRangeOutsideWords => "numeric_range_outside_words",
         }
     }
 }

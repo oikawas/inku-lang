@@ -45,7 +45,7 @@ struct ThirdPartyNoticesView: View {
     @State private var loaded = false
     @State private var selection: ThirdPartyNotices.Component.ID?
 
-    private static let groups = ["inku", "swift", "rust", "resources"]
+    private static let groups = ["inku", "swift", "rust", "native", "resources"]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -122,6 +122,7 @@ struct ThirdPartyNoticesView: View {
         switch group {
         case "swift": display.localized("Swiftパッケージ")
         case "rust": display.localized("Rustクレート")
+        case "native": display.localized("ネイティブライブラリ")
         case "resources": display.localized("同梱の辞書とフォント")
         default: "inku"
         }

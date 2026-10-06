@@ -33,6 +33,9 @@ struct AppCheck {
             } else { folder = nil }
             try await runAppParityContractChecks(fixtureDirectory: folder); return
         }
+        if CommandLine.arguments.contains("--canvas-detail-only") {
+            try runCanvasDetailChecks(); return
+        }
         if CommandLine.arguments.contains("--canvas-fit-only") {
             try runCanvasFitChecks(); return
         }
@@ -74,6 +77,12 @@ struct AppCheck {
         }
         if CommandLine.arguments.contains("--canvas-wheel-only") {
             try runCanvasWheelChecks(); return
+        }
+        if let index = CommandLine.arguments.firstIndex(of: "--display-only"), CommandLine.arguments.indices.contains(index + 1) {
+            let fixture = URL(fileURLWithPath: CommandLine.arguments[index + 1])
+            try runDisplayChecks(fixtureURL: fixture)
+            try await runDisplayCanvasChecks(svg: String(contentsOf: fixture, encoding: .utf8))
+            return
         }
         if let index = CommandLine.arguments.firstIndex(of: "--raster-only"), CommandLine.arguments.indices.contains(index + 1) {
             try await runRasterChecks(fixtureURL: URL(fileURLWithPath: CommandLine.arguments[index + 1]))

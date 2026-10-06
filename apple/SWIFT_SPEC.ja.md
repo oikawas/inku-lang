@@ -2,7 +2,7 @@
 
 このディレクトリは、macOS先行のnative SwiftUIクライアントとApple向け共通packageのworkspaceである。本書をSwift host固有の仕様正本とし、[SWIFT_SPEC.md](SWIFT_SPEC.md)を対応英語版とする。共有DDL、Score、prompt、authoring authority、pipeline状態遷移、seed、描画の意味は[製品仕様](../SPEC.ja.md)を正本とし、Serverを開発上のprimaryとして同じRust coreへ追随する。Swift側に意味処理を複製しない。
 
-最終更新: 2026-10-05。
+最終更新: 2026-10-06。
 
 binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。macOSアプリの版は`apple/VERSION`と`apple/BUILD_NUMBER`を正本とする独自の版で、Server／Webの版とは別に採番する（初回は1.0.0／Build 1）。対応するServerの版はアプリの「inkuについて」と変更履歴に併記する。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
 
@@ -13,6 +13,20 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 確定した実装変更と残る範囲は本書の日付付き節へ記し、製品の変更履歴は共通の[CHANGELOG.ja.md](../CHANGELOG.ja.md)／[CHANGELOG.md](../CHANGELOG.md)へ同期して記す。Swift専用CHANGELOGを分けない。
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
+
+## 2026-10-06 作品域をSkiaで描く
+
+作品を大きく見せる面（`ArtworkCanvas`の7箇所：制作の作品域、補助・一括・再現比較・ライブラリ・自動化の画面、プレゼンテーション）は、共有coreの表示部品[`inku-display`](../core/crates/inku-display/Cargo.toml)（Skia）で描く。WebのChromeと同じ見え方にするためで、保存SVGは変えない。表示の直前にメモリ上でだけ、3つの互換変換を掛ける。patternとuseの`href`を`xlink:href`へ、楕円を同じ形のpathへ、feTurbulenceの整数の`seed`をBlinkの読みの整数へ変える。
+
+- 描き手は[`DisplayRenderer`](Sources/InkuUI/DisplayRenderer.swift)。専用のqueueで描き、要求が別の要求の後ろに並ぶことはない。全体は、粗い256pxを先に出し、続けて512pxのタイルを並列に描いてつなぐ。取り消された要求は、次のタイルの境目で止まる。
+- 全体は100%の大きさで描く。拡大中は、見えている窓を画面の画素密度で描き直す。窓のタイルは中心から並列に描き、描けた分を0.15秒ごとに出す。描き終えた窓は作品に対する割合で位置を持ち、次の窓ができるまで同じ場所に残る。窓と全体の上限は、coreの値（`DisplayLayout`）に従う。
+- 「作品を表示中」の印は、今の作品の全体か窓を実際に描いている間だけ出す。要求ごとに世代番号を付け、古い結果は捨てる。
+- 照合表に無い要素・属性・style内の性質を含む作品と、Skiaで読めない作品は、resvg（共通raster）で描き、理由の符号を数える。数は画面には出さない。その作品は、拡大しても全体を引き伸ばす。
+- サムネイル、歳時記のプレビュー、PNGの書き出し、vision用の画像は、resvgのまま。
+- SVGの上限は12MiB（`inku-svg-raster`の`MAX_SVG_BYTES`。Skiaの表示とSwiftの書き出しの検査も同じ値）。
+- Skiaの事前ビルドは、SHA-256で固定した写しを`~/Library/Application Support/inku/build-cache/skia-binaries/`に置き、`build-core.sh`がbuildのたびに照合する。Skiaとその中の8部品を、通知の「ネイティブライブラリ」に載せる。アプリはstrip後で、各アーキテクチャ約14MB大きくなる。
+- 版は1.1.0（Build 2）。対応するServerはv2.15.86（Build 1162）のまま。
+- 確認：AppCheck `--display-only <SVG>`（描き手、タイルのつなぎ、resvgへの戻し、作品の切り替えと印、窓）と`--canvas-detail-only`（窓の計画）。共有coreの`inku-display`の試験（Chromeとの一致、互換変換、タイルの継ぎ目、現行coreの出力と照合表の突き合わせ）。
 
 ## 2026-10-05 「inkuについて」の導線と生成情報のJSON表示
 

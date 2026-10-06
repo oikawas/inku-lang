@@ -43,8 +43,12 @@ if [[ "$PROFILE" == release ]]; then
     # Keep host build dependencies loadable while target libraries stay optimized.
     PROFILE_ARGS+=(--release --config 'profile.release.build-override.strip="none"')
 fi
+# Skia screen display (inku-display): skia-bindings reads the prebuilt binaries from
+# copies checked against core/crates/inku-display/skia-binaries.sha256 on every build.
+SKIA_BINARIES_URL="$("$ROOT/scripts/skia-binaries.sh" "${TARGETS[@]}")"
+export SKIA_BINARIES_URL
 for target in "${TARGETS[@]}"; do
-    "$ROOT/scripts/rust-toolchain.sh" build --locked -p inku-pipeline-uniffi --lib --target "$target" "${PROFILE_ARGS[@]}"
+    "$ROOT/scripts/rust-toolchain.sh" build --locked -p inku-pipeline-uniffi --features display --lib --target "$target" "${PROFILE_ARGS[@]}"
 done
 
 # The Cargo.lock-pinned 0.32.0 generator inspects this exact archive's metadata.
@@ -118,6 +122,7 @@ identity = {
     "core_dirty": bool(git("status", "--porcelain", "--", "core")),
     "core_source_sha256": source.hexdigest(),
     "rust_toolchain": channel,
+    "features": ["display"],
     "uniffi_generator": generator,
     "profile": profile,
     "mode": mode,

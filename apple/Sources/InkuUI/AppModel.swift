@@ -116,6 +116,8 @@ public final class AppModel {
     public let display = DisplaySettings()
     public let descriptionMeter = DescriptionMeterModel()
     public let renderer = ArtworkRenderer()
+    /// The work area's painter (Skia); `renderer` keeps thumbnails and the saijiki preview.
+    public let displayRenderer = DisplayRenderer()
     @ObservationIgnored public var onSavedWork: (@MainActor (SavedWork) async -> Void)?
     @ObservationIgnored public var onDrawingLog: (@MainActor (DrawingLogRecord) async -> Void)?
     public let versionSummary: String = {

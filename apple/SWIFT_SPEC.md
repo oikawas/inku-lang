@@ -2,7 +2,7 @@
 
 This directory contains the native SwiftUI client, developed for macOS first, and the shared Apple packages. [SWIFT_SPEC.ja.md](SWIFT_SPEC.ja.md) is the canonical specification for Swift host behavior; this document is its maintained English version. The [product specification](../SPEC.md) defines shared DDL, Score, prompts, authoring authority, pipeline transitions, seeds, and rendering semantics. Server remains the primary development host, and Swift follows the same Rust core without duplicating semantic processing.
 
-Last updated: 2026-10-05.
+Last updated: 2026-10-06.
 
 Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The macOS app has its own version, defined by `apple/VERSION` and `apple/BUILD_NUMBER` and allocated separately from the Server and Web versions (the first release is 1.0.0, Build 1). The corresponding Server version is shown in the app's About inku window and in the changelog. Matching shared layer versions does not establish that host features and the native UI port are complete.
 
@@ -13,6 +13,20 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Record confirmed implementation changes and remaining scope in dated sections of this specification. Maintain product history in the shared [CHANGELOG.ja.md](../CHANGELOG.ja.md) and [CHANGELOG.md](../CHANGELOG.md). Do not create a separate Swift changelog.
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
+
+## 2026-10-06 Draw the work area with Skia
+
+The surfaces that show a work large (the seven uses of `ArtworkCanvas`: the creation work area; the auxiliary, batch, replay comparison, library and automation views; and the presentation) are drawn with the shared core's display component [`inku-display`](../core/crates/inku-display/Cargo.toml) (Skia), so they look as the Web does in Chrome. The saved SVG does not change. Just before display, and only in memory, three compatibility rewrites are applied: the `href` of pattern and use becomes `xlink:href`, an ellipse becomes a path of the same shape, and an integer feTurbulence `seed` becomes the integer Blink reads.
+
+- The painter is [`DisplayRenderer`](Sources/InkuUI/DisplayRenderer.swift). It draws on its own queue, and no request waits behind another. The whole is shown first as a coarse 256px picture, then drawn in 512px tiles in parallel and joined. A cancelled request stops at the next tile.
+- The whole is drawn for 100%. While zoomed in, the visible window is redrawn at the screen's pixel density, its tiles drawn in parallel from the centre, with what is drawn shown every 0.15 s. A finished window keeps its place as a fraction of the work and stays until the next one is ready. Window and whole limits follow the core's values (`DisplayLayout`).
+- The "showing the work" mark appears only while the current work's whole or window is actually being drawn. Every request has a generation number, and older results are dropped.
+- A work containing an element, attribute or style property outside the support table, or one Skia cannot read, is drawn with resvg (the shared raster) and the reason code is counted. The count is not shown on screen. Such a work is enlarged as a whole when zoomed in.
+- Thumbnails, the saijiki preview, PNG export and the vision image stay with resvg.
+- The SVG limit is 12 MiB (`MAX_SVG_BYTES` in `inku-svg-raster`; the Skia display and Swift's export check use the same value).
+- Skia's prebuilt binaries are kept as copies pinned by SHA-256 in `~/Library/Application Support/inku/build-cache/skia-binaries/`, and `build-core.sh` checks them on every build. Skia and the eight components inside it are listed under "Native libraries" in the notices. The app grows by about 14 MB per architecture after stripping.
+- The version is 1.1.0 (Build 2). The corresponding Server stays v2.15.86 (Build 1162).
+- Checks: AppCheck `--display-only <SVG>` (the painter, joining the tiles, the resvg fallback, switching works and the mark, the window) and `--canvas-detail-only` (the window plan). The shared core's `inku-display` tests (matching Chrome, the compatibility rewrites, tile seams, and the current core's output against the support table).
 
 ## 2026-10-05 Route to About inku and JSON in generation information
 

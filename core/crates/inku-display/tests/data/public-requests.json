@@ -1,0 +1,7318 @@
+{
+ "schema": "inku-display.public-requests.v1",
+ "note": "Public DDL from the product (product/main d9cd41978e26ce6d1cbce0c68e95ad5eecdea7a9), chosen in Skia display stage 1 so that the core writes every compatibility case: pattern href (brush marks), use href with a white alpha mask (burin dots), stitchTiles (ink spread), the paper ground's ellipse gradient and large seeds.",
+ "works": [
+  {
+   "id": "p00",
+   "from": "core/crates/inku-pipeline/tests/data/recompose-v1.json",
+   "at": "$.cases[24].source",
+   "why": "ビュランの点（useのhref＋alpha mask）と筆の模様",
+   "language": "ja",
+   "render_seed": "1",
+   "canvas": "square",
+   "size": [
+    1000.0,
+    1000.0
+   ],
+   "ddl": "紙。\n背景を白で埋める。\n中心に、灰の細い鉛筆の薄い粒の水平の普通の大きさの線を1個引く。\n上端に、白のチョークの程よい塗りの普通の大きさの円を1個置く。\n右端に、細かく揺れる細い細筆の薄い刷きの小さな弧を1個引く。\n下に、緑の太筆の濃い塗りの横長の大きな楕円を1個置く。\n下端に、クレヨンの程よい粒の回転の小さな四角を1個置く。\n右下（横2/3〜1、縦2/3〜1）に、黒のビュランの濃いとても小さな点を1個置く。\n上端に、黄のごく太い太筆の濃い刷きの垂直の大きな線を1個引く。\n下に、細かく小刻みに波打つ細いドライポイントの程よい粒の水平の普通の大きさの線を1個引く。",
+   "host": {
+    "background": "white",
+    "canvas_format_id": "square",
+    "canvas_format_registry_digest": "16fde66009a901ec65887303389a0253235467cb0437ab38084ff15ea4f8ae18",
+    "canvas_format_registry_id": "inku.canvas-format-registry.v1",
+    "catalog_mode": "default",
+    "palette": {
+     "background": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     },
+     "black": {
+      "abstract_color": "black",
+      "concrete_rgb": [
+       17,
+       17,
+       17
+      ],
+      "oklch_lightness": 0.1776377719172259
+     },
+     "observations": [
+      {
+       "abstract_color": "white",
+       "concrete_rgb": [
+        255,
+        255,
+        255
+       ],
+       "oklch_lightness": 0.9999999934735462
+      },
+      {
+       "abstract_color": "black",
+       "concrete_rgb": [
+        17,
+        17,
+        17
+       ],
+       "oklch_lightness": 0.1776377719172259
+      },
+      {
+       "abstract_color": "blue",
+       "concrete_rgb": [
+        44,
+        62,
+        145
+       ],
+       "oklch_lightness": 0.4003558670013452
+      },
+      {
+       "abstract_color": "red",
+       "concrete_rgb": [
+        124,
+        47,
+        38
+       ],
+       "oklch_lightness": 0.41377712966040187
+      },
+      {
+       "abstract_color": "green",
+       "concrete_rgb": [
+        47,
+        107,
+        58
+       ],
+       "oklch_lightness": 0.4745832705793881
+      },
+      {
+       "abstract_color": "gray",
+       "concrete_rgb": [
+        136,
+        136,
+        136
+       ],
+       "oklch_lightness": 0.6267535369160254
+      },
+      {
+       "abstract_color": "yellow",
+       "concrete_rgb": [
+        184,
+        144,
+        31
+       ],
+       "oklch_lightness": 0.6729916247985137
+      },
+      {
+       "abstract_color": "orange",
+       "concrete_rgb": [
+        185,
+        103,
+        30
+       ],
+       "oklch_lightness": 0.5961789129228193
+      },
+      {
+       "abstract_color": "purple",
+       "concrete_rgb": [
+        106,
+        77,
+        148
+       ],
+       "oklch_lightness": 0.4832468913471135
+      }
+     ],
+     "white": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     }
+    },
+    "resolved_catalog_id": "default"
+   },
+   "render_options": {
+    "canvas": {
+     "height": 1000.0,
+     "width": 1000.0
+    },
+    "canvas_aspect_id": "square",
+    "catalog_id": "default",
+    "composition_seed": null,
+    "error_policy": "omit_and_continue",
+    "render_seed": "1",
+    "resolved_color_map": {
+     "black": "#111111",
+     "blue": "#2c3e91",
+     "gray": "#888888",
+     "green": "#2f6b3a",
+     "orange": "#b9671e",
+     "palette:Black": "#111111",
+     "palette:Blue": "#2c3e91",
+     "palette:Deep Red": "#7c2f26",
+     "palette:Gray": "#888888",
+     "palette:Green": "#2f6b3a",
+     "palette:Orange": "#b9671e",
+     "palette:Purple": "#6a4d94",
+     "palette:Red": "#a2342a",
+     "palette:White": "#ffffff",
+     "palette:Yellow": "#b8901f",
+     "purple": "#6a4d94",
+     "red": "#a2342a",
+     "white": "#ffffff",
+     "yellow": "#b8901f"
+    },
+    "svg_profile": "display",
+    "wild": false
+   }
+  },
+  {
+   "id": "p01",
+   "from": "core/crates/inku-pipeline/tests/data/composition-port-v1.json",
+   "at": "$.cases[97].solve.s1.ddl_layers",
+   "why": "ビュランの点と筆の模様。縦長の用紙（a4）",
+   "language": "ja",
+   "render_seed": "1",
+   "canvas": "a4",
+   "size": [
+    707.0,
+    1000.0
+   ],
+   "ddl": "中心に、灰の細い鉛筆の薄い粒の水平の普通の大きさの線を1個引く。\n上端に、白のチョークの程よい塗りの小さな円を1個置く。\n中心（横1/3〜2/3、縦1/3〜2/3）に、細かく揺れる細い細筆の薄い刷きの小さな弧を1個引く。\n下に、緑の太筆の濃い塗りの横長の大きな楕円を1個置く。\n下端に、クレヨンの程よい粒の回転の小さな四角を1個置く。\n上に、黒のビュランの濃いとても小さな点を1個置く。\n左上の隅（横0〜1/5、縦0〜1/5）に、黄の太筆の濃い刷きの垂直の縦長の大きな四角を1個埋める。\n下に、細かく小刻みに波打つ細いドライポイントの程よい粒の水平の小さな線を1個引く。",
+   "host": {
+    "background": "white",
+    "canvas_format_id": "a4",
+    "canvas_format_registry_digest": "16fde66009a901ec65887303389a0253235467cb0437ab38084ff15ea4f8ae18",
+    "canvas_format_registry_id": "inku.canvas-format-registry.v1",
+    "catalog_mode": "default",
+    "palette": {
+     "background": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     },
+     "black": {
+      "abstract_color": "black",
+      "concrete_rgb": [
+       17,
+       17,
+       17
+      ],
+      "oklch_lightness": 0.1776377719172259
+     },
+     "observations": [
+      {
+       "abstract_color": "white",
+       "concrete_rgb": [
+        255,
+        255,
+        255
+       ],
+       "oklch_lightness": 0.9999999934735462
+      },
+      {
+       "abstract_color": "black",
+       "concrete_rgb": [
+        17,
+        17,
+        17
+       ],
+       "oklch_lightness": 0.1776377719172259
+      },
+      {
+       "abstract_color": "blue",
+       "concrete_rgb": [
+        44,
+        62,
+        145
+       ],
+       "oklch_lightness": 0.4003558670013452
+      },
+      {
+       "abstract_color": "red",
+       "concrete_rgb": [
+        124,
+        47,
+        38
+       ],
+       "oklch_lightness": 0.41377712966040187
+      },
+      {
+       "abstract_color": "green",
+       "concrete_rgb": [
+        47,
+        107,
+        58
+       ],
+       "oklch_lightness": 0.4745832705793881
+      },
+      {
+       "abstract_color": "gray",
+       "concrete_rgb": [
+        136,
+        136,
+        136
+       ],
+       "oklch_lightness": 0.6267535369160254
+      },
+      {
+       "abstract_color": "yellow",
+       "concrete_rgb": [
+        184,
+        144,
+        31
+       ],
+       "oklch_lightness": 0.6729916247985137
+      },
+      {
+       "abstract_color": "orange",
+       "concrete_rgb": [
+        185,
+        103,
+        30
+       ],
+       "oklch_lightness": 0.5961789129228193
+      },
+      {
+       "abstract_color": "purple",
+       "concrete_rgb": [
+        106,
+        77,
+        148
+       ],
+       "oklch_lightness": 0.4832468913471135
+      }
+     ],
+     "white": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     }
+    },
+    "resolved_catalog_id": "default"
+   },
+   "render_options": {
+    "canvas": {
+     "height": 1000.0,
+     "width": 707.0
+    },
+    "canvas_aspect_id": "a4",
+    "catalog_id": "default",
+    "composition_seed": null,
+    "error_policy": "omit_and_continue",
+    "render_seed": "1",
+    "resolved_color_map": {
+     "black": "#111111",
+     "blue": "#2c3e91",
+     "gray": "#888888",
+     "green": "#2f6b3a",
+     "orange": "#b9671e",
+     "palette:Black": "#111111",
+     "palette:Blue": "#2c3e91",
+     "palette:Deep Red": "#7c2f26",
+     "palette:Gray": "#888888",
+     "palette:Green": "#2f6b3a",
+     "palette:Orange": "#b9671e",
+     "palette:Purple": "#6a4d94",
+     "palette:Red": "#a2342a",
+     "palette:White": "#ffffff",
+     "palette:Yellow": "#b8901f",
+     "purple": "#6a4d94",
+     "red": "#a2342a",
+     "white": "#ffffff",
+     "yellow": "#b8901f"
+    },
+    "svg_profile": "display",
+    "wild": false
+   }
+  },
+  {
+   "id": "p02",
+   "from": "core/crates/inku-pipeline/tests/data/recompose-v1.json",
+   "at": "$.cases[9].source",
+   "why": "Nature.落葉 マクロ（にじみ → stitchTiles）",
+   "language": "ja",
+   "render_seed": "1",
+   "canvas": "square",
+   "size": [
+    1000.0,
+    1000.0
+   ],
+   "ddl": "和紙。\n背景を白で埋める。\nNature.落葉。\n下の3分の2（横0〜1、縦1/3〜1）に、灰の太筆の薄い刷きの全幅の雲形を1個埋める。\n左下（横0〜1/3、縦2/3〜1）に、細かく小刻みに揺れる橙の太い太筆の実線の濃い粒の斜めの大きな線を2個引く。\n左中央（横0〜1/3、縦1/3〜2/3）に、黒のペンの実線の濃い塗りの回転の横長の小さな楕円を1個置く。\n左下の四半分（横0〜1/2、縦1/2〜1）に、灰の鉛筆の程よいとても小さな点を15個散らす。",
+   "host": {
+    "background": "white",
+    "canvas_format_id": "square",
+    "canvas_format_registry_digest": "16fde66009a901ec65887303389a0253235467cb0437ab38084ff15ea4f8ae18",
+    "canvas_format_registry_id": "inku.canvas-format-registry.v1",
+    "catalog_mode": "default",
+    "palette": {
+     "background": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     },
+     "black": {
+      "abstract_color": "black",
+      "concrete_rgb": [
+       17,
+       17,
+       17
+      ],
+      "oklch_lightness": 0.1776377719172259
+     },
+     "observations": [
+      {
+       "abstract_color": "white",
+       "concrete_rgb": [
+        255,
+        255,
+        255
+       ],
+       "oklch_lightness": 0.9999999934735462
+      },
+      {
+       "abstract_color": "black",
+       "concrete_rgb": [
+        17,
+        17,
+        17
+       ],
+       "oklch_lightness": 0.1776377719172259
+      },
+      {
+       "abstract_color": "blue",
+       "concrete_rgb": [
+        44,
+        62,
+        145
+       ],
+       "oklch_lightness": 0.4003558670013452
+      },
+      {
+       "abstract_color": "red",
+       "concrete_rgb": [
+        124,
+        47,
+        38
+       ],
+       "oklch_lightness": 0.41377712966040187
+      },
+      {
+       "abstract_color": "green",
+       "concrete_rgb": [
+        47,
+        107,
+        58
+       ],
+       "oklch_lightness": 0.4745832705793881
+      },
+      {
+       "abstract_color": "gray",
+       "concrete_rgb": [
+        136,
+        136,
+        136
+       ],
+       "oklch_lightness": 0.6267535369160254
+      },
+      {
+       "abstract_color": "yellow",
+       "concrete_rgb": [
+        184,
+        144,
+        31
+       ],
+       "oklch_lightness": 0.6729916247985137
+      },
+      {
+       "abstract_color": "orange",
+       "concrete_rgb": [
+        185,
+        103,
+        30
+       ],
+       "oklch_lightness": 0.5961789129228193
+      },
+      {
+       "abstract_color": "purple",
+       "concrete_rgb": [
+        106,
+        77,
+        148
+       ],
+       "oklch_lightness": 0.4832468913471135
+      }
+     ],
+     "white": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     }
+    },
+    "resolved_catalog_id": "default"
+   },
+   "render_options": {
+    "canvas": {
+     "height": 1000.0,
+     "width": 1000.0
+    },
+    "canvas_aspect_id": "square",
+    "catalog_id": "default",
+    "composition_seed": null,
+    "error_policy": "omit_and_continue",
+    "render_seed": "1",
+    "resolved_color_map": {
+     "black": "#111111",
+     "blue": "#2c3e91",
+     "gray": "#888888",
+     "green": "#2f6b3a",
+     "orange": "#b9671e",
+     "palette:Black": "#111111",
+     "palette:Blue": "#2c3e91",
+     "palette:Deep Red": "#7c2f26",
+     "palette:Gray": "#888888",
+     "palette:Green": "#2f6b3a",
+     "palette:Orange": "#b9671e",
+     "palette:Purple": "#6a4d94",
+     "palette:Red": "#a2342a",
+     "palette:White": "#ffffff",
+     "palette:Yellow": "#b8901f",
+     "purple": "#6a4d94",
+     "red": "#a2342a",
+     "white": "#ffffff",
+     "yellow": "#b8901f"
+    },
+    "svg_profile": "display",
+    "wild": false
+   }
+  },
+  {
+   "id": "p03",
+   "from": "core/crates/inku-pipeline/tests/data/recompose-v1.json",
+   "at": "$.cases[36].source",
+   "why": "Nature.FallenLeaves（英語、stitchTiles）。横長の用紙（hd_monitor）",
+   "language": "en",
+   "render_seed": "1",
+   "canvas": "hd_monitor",
+   "size": [
+    1778.0,
+    1000.0
+   ],
+   "ddl": "Paper.\nFill the background with white.\nNature.FallenLeaves.\nScatter 40 broadly loosely swaying black extra-fine pen faint grain falling small lines at the lower left quarter (horizontal 0 to 1/2, vertical 1/2 to 1).",
+   "host": {
+    "background": "white",
+    "canvas_format_id": "hd_monitor",
+    "canvas_format_registry_digest": "16fde66009a901ec65887303389a0253235467cb0437ab38084ff15ea4f8ae18",
+    "canvas_format_registry_id": "inku.canvas-format-registry.v1",
+    "catalog_mode": "default",
+    "palette": {
+     "background": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     },
+     "black": {
+      "abstract_color": "black",
+      "concrete_rgb": [
+       17,
+       17,
+       17
+      ],
+      "oklch_lightness": 0.1776377719172259
+     },
+     "observations": [
+      {
+       "abstract_color": "white",
+       "concrete_rgb": [
+        255,
+        255,
+        255
+       ],
+       "oklch_lightness": 0.9999999934735462
+      },
+      {
+       "abstract_color": "black",
+       "concrete_rgb": [
+        17,
+        17,
+        17
+       ],
+       "oklch_lightness": 0.1776377719172259
+      },
+      {
+       "abstract_color": "blue",
+       "concrete_rgb": [
+        44,
+        62,
+        145
+       ],
+       "oklch_lightness": 0.4003558670013452
+      },
+      {
+       "abstract_color": "red",
+       "concrete_rgb": [
+        124,
+        47,
+        38
+       ],
+       "oklch_lightness": 0.41377712966040187
+      },
+      {
+       "abstract_color": "green",
+       "concrete_rgb": [
+        47,
+        107,
+        58
+       ],
+       "oklch_lightness": 0.4745832705793881
+      },
+      {
+       "abstract_color": "gray",
+       "concrete_rgb": [
+        136,
+        136,
+        136
+       ],
+       "oklch_lightness": 0.6267535369160254
+      },
+      {
+       "abstract_color": "yellow",
+       "concrete_rgb": [
+        184,
+        144,
+        31
+       ],
+       "oklch_lightness": 0.6729916247985137
+      },
+      {
+       "abstract_color": "orange",
+       "concrete_rgb": [
+        185,
+        103,
+        30
+       ],
+       "oklch_lightness": 0.5961789129228193
+      },
+      {
+       "abstract_color": "purple",
+       "concrete_rgb": [
+        106,
+        77,
+        148
+       ],
+       "oklch_lightness": 0.4832468913471135
+      }
+     ],
+     "white": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     }
+    },
+    "resolved_catalog_id": "default"
+   },
+   "render_options": {
+    "canvas": {
+     "height": 1000.0,
+     "width": 1778.0
+    },
+    "canvas_aspect_id": "hd_monitor",
+    "catalog_id": "default",
+    "composition_seed": null,
+    "error_policy": "omit_and_continue",
+    "render_seed": "1",
+    "resolved_color_map": {
+     "black": "#111111",
+     "blue": "#2c3e91",
+     "gray": "#888888",
+     "green": "#2f6b3a",
+     "orange": "#b9671e",
+     "palette:Black": "#111111",
+     "palette:Blue": "#2c3e91",
+     "palette:Deep Red": "#7c2f26",
+     "palette:Gray": "#888888",
+     "palette:Green": "#2f6b3a",
+     "palette:Orange": "#b9671e",
+     "palette:Purple": "#6a4d94",
+     "palette:Red": "#a2342a",
+     "palette:White": "#ffffff",
+     "palette:Yellow": "#b8901f",
+     "purple": "#6a4d94",
+     "red": "#a2342a",
+     "white": "#ffffff",
+     "yellow": "#b8901f"
+    },
+    "svg_profile": "display",
+    "wild": false
+   }
+  },
+  {
+   "id": "p04",
+   "from": "docs/guide/gallery.ja.md",
+   "at": "L32-32",
+   "why": "ギャラリーの作品。細筆の雲形（筆の模様）",
+   "language": "ja",
+   "render_seed": "2184785730279672",
+   "canvas": "square",
+   "size": [
+    1000.0,
+    1000.0
+   ],
+   "ddl": "背景を黒で塗りつぶす。白い細筆の雲形を中央に三つ、大きさの異なる順に並べる。波打つ軌跡に沿ってゆっくり揺れる。",
+   "host": {
+    "background": "white",
+    "canvas_format_id": "square",
+    "canvas_format_registry_digest": "16fde66009a901ec65887303389a0253235467cb0437ab38084ff15ea4f8ae18",
+    "canvas_format_registry_id": "inku.canvas-format-registry.v1",
+    "catalog_mode": "default",
+    "palette": {
+     "background": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     },
+     "black": {
+      "abstract_color": "black",
+      "concrete_rgb": [
+       17,
+       17,
+       17
+      ],
+      "oklch_lightness": 0.1776377719172259
+     },
+     "observations": [
+      {
+       "abstract_color": "white",
+       "concrete_rgb": [
+        255,
+        255,
+        255
+       ],
+       "oklch_lightness": 0.9999999934735462
+      },
+      {
+       "abstract_color": "black",
+       "concrete_rgb": [
+        17,
+        17,
+        17
+       ],
+       "oklch_lightness": 0.1776377719172259
+      },
+      {
+       "abstract_color": "blue",
+       "concrete_rgb": [
+        44,
+        62,
+        145
+       ],
+       "oklch_lightness": 0.4003558670013452
+      },
+      {
+       "abstract_color": "red",
+       "concrete_rgb": [
+        124,
+        47,
+        38
+       ],
+       "oklch_lightness": 0.41377712966040187
+      },
+      {
+       "abstract_color": "green",
+       "concrete_rgb": [
+        47,
+        107,
+        58
+       ],
+       "oklch_lightness": 0.4745832705793881
+      },
+      {
+       "abstract_color": "gray",
+       "concrete_rgb": [
+        136,
+        136,
+        136
+       ],
+       "oklch_lightness": 0.6267535369160254
+      },
+      {
+       "abstract_color": "yellow",
+       "concrete_rgb": [
+        184,
+        144,
+        31
+       ],
+       "oklch_lightness": 0.6729916247985137
+      },
+      {
+       "abstract_color": "orange",
+       "concrete_rgb": [
+        185,
+        103,
+        30
+       ],
+       "oklch_lightness": 0.5961789129228193
+      },
+      {
+       "abstract_color": "purple",
+       "concrete_rgb": [
+        106,
+        77,
+        148
+       ],
+       "oklch_lightness": 0.4832468913471135
+      }
+     ],
+     "white": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     }
+    },
+    "resolved_catalog_id": "default"
+   },
+   "render_options": {
+    "canvas": {
+     "height": 1000.0,
+     "width": 1000.0
+    },
+    "canvas_aspect_id": "square",
+    "catalog_id": "default",
+    "composition_seed": null,
+    "error_policy": "omit_and_continue",
+    "render_seed": "2184785730279672",
+    "resolved_color_map": {
+     "black": "#111111",
+     "blue": "#2c3e91",
+     "gray": "#888888",
+     "green": "#2f6b3a",
+     "orange": "#b9671e",
+     "palette:Black": "#111111",
+     "palette:Blue": "#2c3e91",
+     "palette:Deep Red": "#7c2f26",
+     "palette:Gray": "#888888",
+     "palette:Green": "#2f6b3a",
+     "palette:Orange": "#b9671e",
+     "palette:Purple": "#6a4d94",
+     "palette:Red": "#a2342a",
+     "palette:White": "#ffffff",
+     "palette:Yellow": "#b8901f",
+     "purple": "#6a4d94",
+     "red": "#a2342a",
+     "white": "#ffffff",
+     "yellow": "#b8901f"
+    },
+    "svg_profile": "display",
+    "wild": false
+   }
+  },
+  {
+   "id": "p05",
+   "from": "core/crates/inku-pipeline/tests/data/recompose-v1.json",
+   "at": "$.cases[29].source",
+   "why": "英語。筆の模様が多い（40）",
+   "language": "en",
+   "render_seed": "1",
+   "canvas": "square",
+   "size": [
+    1000.0,
+    1000.0
+   ],
+   "ddl": "Paper.\nFill the background with white.\nScatter 40 broadly loosely swaying yellow fine-brush temperate flat tall normal-sized ellipses at the top.\nScatter 30 narrowly tightly undulating yellow thick-brush dense sweep wide slightly small ellipses at the center right (horizontal 2/3 to 1, vertical 1/3 to 2/3).\nScatter 20 gray pencil faint very small points at the center left (horizontal 0 to 1/3, vertical 1/3 to 2/3).",
+   "host": {
+    "background": "white",
+    "canvas_format_id": "square",
+    "canvas_format_registry_digest": "16fde66009a901ec65887303389a0253235467cb0437ab38084ff15ea4f8ae18",
+    "canvas_format_registry_id": "inku.canvas-format-registry.v1",
+    "catalog_mode": "default",
+    "palette": {
+     "background": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     },
+     "black": {
+      "abstract_color": "black",
+      "concrete_rgb": [
+       17,
+       17,
+       17
+      ],
+      "oklch_lightness": 0.1776377719172259
+     },
+     "observations": [
+      {
+       "abstract_color": "white",
+       "concrete_rgb": [
+        255,
+        255,
+        255
+       ],
+       "oklch_lightness": 0.9999999934735462
+      },
+      {
+       "abstract_color": "black",
+       "concrete_rgb": [
+        17,
+        17,
+        17
+       ],
+       "oklch_lightness": 0.1776377719172259
+      },
+      {
+       "abstract_color": "blue",
+       "concrete_rgb": [
+        44,
+        62,
+        145
+       ],
+       "oklch_lightness": 0.4003558670013452
+      },
+      {
+       "abstract_color": "red",
+       "concrete_rgb": [
+        124,
+        47,
+        38
+       ],
+       "oklch_lightness": 0.41377712966040187
+      },
+      {
+       "abstract_color": "green",
+       "concrete_rgb": [
+        47,
+        107,
+        58
+       ],
+       "oklch_lightness": 0.4745832705793881
+      },
+      {
+       "abstract_color": "gray",
+       "concrete_rgb": [
+        136,
+        136,
+        136
+       ],
+       "oklch_lightness": 0.6267535369160254
+      },
+      {
+       "abstract_color": "yellow",
+       "concrete_rgb": [
+        184,
+        144,
+        31
+       ],
+       "oklch_lightness": 0.6729916247985137
+      },
+      {
+       "abstract_color": "orange",
+       "concrete_rgb": [
+        185,
+        103,
+        30
+       ],
+       "oklch_lightness": 0.5961789129228193
+      },
+      {
+       "abstract_color": "purple",
+       "concrete_rgb": [
+        106,
+        77,
+        148
+       ],
+       "oklch_lightness": 0.4832468913471135
+      }
+     ],
+     "white": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     }
+    },
+    "resolved_catalog_id": "default"
+   },
+   "render_options": {
+    "canvas": {
+     "height": 1000.0,
+     "width": 1000.0
+    },
+    "canvas_aspect_id": "square",
+    "catalog_id": "default",
+    "composition_seed": null,
+    "error_policy": "omit_and_continue",
+    "render_seed": "1",
+    "resolved_color_map": {
+     "black": "#111111",
+     "blue": "#2c3e91",
+     "gray": "#888888",
+     "green": "#2f6b3a",
+     "orange": "#b9671e",
+     "palette:Black": "#111111",
+     "palette:Blue": "#2c3e91",
+     "palette:Deep Red": "#7c2f26",
+     "palette:Gray": "#888888",
+     "palette:Green": "#2f6b3a",
+     "palette:Orange": "#b9671e",
+     "palette:Purple": "#6a4d94",
+     "palette:Red": "#a2342a",
+     "palette:White": "#ffffff",
+     "palette:Yellow": "#b8901f",
+     "purple": "#6a4d94",
+     "red": "#a2342a",
+     "white": "#ffffff",
+     "yellow": "#b8901f"
+    },
+    "svg_profile": "display",
+    "wild": false
+   }
+  },
+  {
+   "id": "p06",
+   "from": "server/tests/data/background-governor-cases.json",
+   "at": "$[57].stage2_input",
+   "why": "細筆の楕円（筆の模様）",
+   "language": "ja",
+   "render_seed": "1",
+   "canvas": "square",
+   "size": [
+    1000.0,
+    1000.0
+   ],
+   "ddl": "背景を青で埋める。\n青い細筆の小さな楕円を上から下へ二十個散らす。\n緑の細筆の短い縦線を横に三十本、等間隔に並べる。\n緑の細筆の短い縦線を、前の線に沿って右下がりへずらして三十本散らす。\n波打つ軌跡に沿って細かく揺れる。",
+   "host": {
+    "background": "white",
+    "canvas_format_id": "square",
+    "canvas_format_registry_digest": "16fde66009a901ec65887303389a0253235467cb0437ab38084ff15ea4f8ae18",
+    "canvas_format_registry_id": "inku.canvas-format-registry.v1",
+    "catalog_mode": "default",
+    "palette": {
+     "background": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     },
+     "black": {
+      "abstract_color": "black",
+      "concrete_rgb": [
+       17,
+       17,
+       17
+      ],
+      "oklch_lightness": 0.1776377719172259
+     },
+     "observations": [
+      {
+       "abstract_color": "white",
+       "concrete_rgb": [
+        255,
+        255,
+        255
+       ],
+       "oklch_lightness": 0.9999999934735462
+      },
+      {
+       "abstract_color": "black",
+       "concrete_rgb": [
+        17,
+        17,
+        17
+       ],
+       "oklch_lightness": 0.1776377719172259
+      },
+      {
+       "abstract_color": "blue",
+       "concrete_rgb": [
+        44,
+        62,
+        145
+       ],
+       "oklch_lightness": 0.4003558670013452
+      },
+      {
+       "abstract_color": "red",
+       "concrete_rgb": [
+        124,
+        47,
+        38
+       ],
+       "oklch_lightness": 0.41377712966040187
+      },
+      {
+       "abstract_color": "green",
+       "concrete_rgb": [
+        47,
+        107,
+        58
+       ],
+       "oklch_lightness": 0.4745832705793881
+      },
+      {
+       "abstract_color": "gray",
+       "concrete_rgb": [
+        136,
+        136,
+        136
+       ],
+       "oklch_lightness": 0.6267535369160254
+      },
+      {
+       "abstract_color": "yellow",
+       "concrete_rgb": [
+        184,
+        144,
+        31
+       ],
+       "oklch_lightness": 0.6729916247985137
+      },
+      {
+       "abstract_color": "orange",
+       "concrete_rgb": [
+        185,
+        103,
+        30
+       ],
+       "oklch_lightness": 0.5961789129228193
+      },
+      {
+       "abstract_color": "purple",
+       "concrete_rgb": [
+        106,
+        77,
+        148
+       ],
+       "oklch_lightness": 0.4832468913471135
+      }
+     ],
+     "white": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     }
+    },
+    "resolved_catalog_id": "default"
+   },
+   "render_options": {
+    "canvas": {
+     "height": 1000.0,
+     "width": 1000.0
+    },
+    "canvas_aspect_id": "square",
+    "catalog_id": "default",
+    "composition_seed": null,
+    "error_policy": "omit_and_continue",
+    "render_seed": "1",
+    "resolved_color_map": {
+     "black": "#111111",
+     "blue": "#2c3e91",
+     "gray": "#888888",
+     "green": "#2f6b3a",
+     "orange": "#b9671e",
+     "palette:Black": "#111111",
+     "palette:Blue": "#2c3e91",
+     "palette:Deep Red": "#7c2f26",
+     "palette:Gray": "#888888",
+     "palette:Green": "#2f6b3a",
+     "palette:Orange": "#b9671e",
+     "palette:Purple": "#6a4d94",
+     "palette:Red": "#a2342a",
+     "palette:White": "#ffffff",
+     "palette:Yellow": "#b8901f",
+     "purple": "#6a4d94",
+     "red": "#a2342a",
+     "white": "#ffffff",
+     "yellow": "#b8901f"
+    },
+    "svg_profile": "display",
+    "wild": false
+   }
+  },
+  {
+   "id": "p07",
+   "from": "core/crates/inku-pipeline/tests/data/recompose-v1.json",
+   "at": "$.cases[5].source",
+   "why": "太筆の塗りの四角（brush_thickの模様）",
+   "language": "ja",
+   "render_seed": "1",
+   "canvas": "square",
+   "size": [
+    1000.0,
+    1000.0
+   ],
+   "ddl": "画用紙。\n背景を白で埋める。\n下に、灰の太筆の薄い塗りの垂直の横長の特大のの四角を1個埋める。\n右上（横2/3〜1、縦0〜1/3）に、細かく小刻みに波打つ黒の細いペンの実線の濃い粒の小さな線を12個引く。\n右上（横2/3〜1、縦0〜1/3）に、大きくゆるやかに揺れる黄のごく細い銀筆の実線の程よい空の回転のとても小さな弧を40個引く。\n右上（横2/3〜1、縦0〜1/3）に、黄のクレヨンの実線の濃い普通の大きさの点を6個置く。",
+   "host": {
+    "background": "white",
+    "canvas_format_id": "square",
+    "canvas_format_registry_digest": "16fde66009a901ec65887303389a0253235467cb0437ab38084ff15ea4f8ae18",
+    "canvas_format_registry_id": "inku.canvas-format-registry.v1",
+    "catalog_mode": "default",
+    "palette": {
+     "background": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     },
+     "black": {
+      "abstract_color": "black",
+      "concrete_rgb": [
+       17,
+       17,
+       17
+      ],
+      "oklch_lightness": 0.1776377719172259
+     },
+     "observations": [
+      {
+       "abstract_color": "white",
+       "concrete_rgb": [
+        255,
+        255,
+        255
+       ],
+       "oklch_lightness": 0.9999999934735462
+      },
+      {
+       "abstract_color": "black",
+       "concrete_rgb": [
+        17,
+        17,
+        17
+       ],
+       "oklch_lightness": 0.1776377719172259
+      },
+      {
+       "abstract_color": "blue",
+       "concrete_rgb": [
+        44,
+        62,
+        145
+       ],
+       "oklch_lightness": 0.4003558670013452
+      },
+      {
+       "abstract_color": "red",
+       "concrete_rgb": [
+        124,
+        47,
+        38
+       ],
+       "oklch_lightness": 0.41377712966040187
+      },
+      {
+       "abstract_color": "green",
+       "concrete_rgb": [
+        47,
+        107,
+        58
+       ],
+       "oklch_lightness": 0.4745832705793881
+      },
+      {
+       "abstract_color": "gray",
+       "concrete_rgb": [
+        136,
+        136,
+        136
+       ],
+       "oklch_lightness": 0.6267535369160254
+      },
+      {
+       "abstract_color": "yellow",
+       "concrete_rgb": [
+        184,
+        144,
+        31
+       ],
+       "oklch_lightness": 0.6729916247985137
+      },
+      {
+       "abstract_color": "orange",
+       "concrete_rgb": [
+        185,
+        103,
+        30
+       ],
+       "oklch_lightness": 0.5961789129228193
+      },
+      {
+       "abstract_color": "purple",
+       "concrete_rgb": [
+        106,
+        77,
+        148
+       ],
+       "oklch_lightness": 0.4832468913471135
+      }
+     ],
+     "white": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     }
+    },
+    "resolved_catalog_id": "default"
+   },
+   "render_options": {
+    "canvas": {
+     "height": 1000.0,
+     "width": 1000.0
+    },
+    "canvas_aspect_id": "square",
+    "catalog_id": "default",
+    "composition_seed": null,
+    "error_policy": "omit_and_continue",
+    "render_seed": "1",
+    "resolved_color_map": {
+     "black": "#111111",
+     "blue": "#2c3e91",
+     "gray": "#888888",
+     "green": "#2f6b3a",
+     "orange": "#b9671e",
+     "palette:Black": "#111111",
+     "palette:Blue": "#2c3e91",
+     "palette:Deep Red": "#7c2f26",
+     "palette:Gray": "#888888",
+     "palette:Green": "#2f6b3a",
+     "palette:Orange": "#b9671e",
+     "palette:Purple": "#6a4d94",
+     "palette:Red": "#a2342a",
+     "palette:White": "#ffffff",
+     "palette:Yellow": "#b8901f",
+     "purple": "#6a4d94",
+     "red": "#a2342a",
+     "white": "#ffffff",
+     "yellow": "#b8901f"
+    },
+    "svg_profile": "display",
+    "wild": false
+   }
+  },
+  {
+   "id": "p08",
+   "from": "README.md",
+   "at": "L66-68",
+   "why": "READMEのギャラリー作品",
+   "language": "ja",
+   "render_seed": "7735827479582915",
+   "canvas": "square",
+   "size": [
+    1000.0,
+    1000.0
+   ],
+   "ddl": "背景を青で塗りつぶす。\n青い細筆の波打つ線を左から右へ横に四十本並べる。\n線はゆっくり揺れる。",
+   "host": {
+    "background": "white",
+    "canvas_format_id": "square",
+    "canvas_format_registry_digest": "16fde66009a901ec65887303389a0253235467cb0437ab38084ff15ea4f8ae18",
+    "canvas_format_registry_id": "inku.canvas-format-registry.v1",
+    "catalog_mode": "default",
+    "palette": {
+     "background": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     },
+     "black": {
+      "abstract_color": "black",
+      "concrete_rgb": [
+       17,
+       17,
+       17
+      ],
+      "oklch_lightness": 0.1776377719172259
+     },
+     "observations": [
+      {
+       "abstract_color": "white",
+       "concrete_rgb": [
+        255,
+        255,
+        255
+       ],
+       "oklch_lightness": 0.9999999934735462
+      },
+      {
+       "abstract_color": "black",
+       "concrete_rgb": [
+        17,
+        17,
+        17
+       ],
+       "oklch_lightness": 0.1776377719172259
+      },
+      {
+       "abstract_color": "blue",
+       "concrete_rgb": [
+        44,
+        62,
+        145
+       ],
+       "oklch_lightness": 0.4003558670013452
+      },
+      {
+       "abstract_color": "red",
+       "concrete_rgb": [
+        162,
+        52,
+        42
+       ],
+       "oklch_lightness": 0.48600919132812137
+      },
+      {
+       "abstract_color": "green",
+       "concrete_rgb": [
+        47,
+        107,
+        58
+       ],
+       "oklch_lightness": 0.4745832705793881
+      },
+      {
+       "abstract_color": "gray",
+       "concrete_rgb": [
+        136,
+        136,
+        136
+       ],
+       "oklch_lightness": 0.6267535369160254
+      },
+      {
+       "abstract_color": "yellow",
+       "concrete_rgb": [
+        184,
+        144,
+        31
+       ],
+       "oklch_lightness": 0.6729916247985137
+      },
+      {
+       "abstract_color": "orange",
+       "concrete_rgb": [
+        185,
+        103,
+        30
+       ],
+       "oklch_lightness": 0.5961789129228193
+      },
+      {
+       "abstract_color": "purple",
+       "concrete_rgb": [
+        106,
+        77,
+        148
+       ],
+       "oklch_lightness": 0.4832468913471135
+      }
+     ],
+     "white": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     }
+    },
+    "resolved_catalog_id": "default"
+   },
+   "render_options": {
+    "canvas": {
+     "height": 1000.0,
+     "width": 1000.0
+    },
+    "canvas_aspect_id": "square",
+    "catalog_id": "default",
+    "composition_seed": null,
+    "error_policy": "omit_and_continue",
+    "render_seed": "7735827479582915",
+    "resolved_color_map": {
+     "black": "#111111",
+     "blue": "#2c3e91",
+     "gray": "#888888",
+     "green": "#2f6b3a",
+     "orange": "#b9671e",
+     "palette:Black": "#111111",
+     "palette:Blue": "#2c3e91",
+     "palette:Deep Red": "#7c2f26",
+     "palette:Gray": "#888888",
+     "palette:Green": "#2f6b3a",
+     "palette:Orange": "#b9671e",
+     "palette:Purple": "#6a4d94",
+     "palette:Red": "#a2342a",
+     "palette:White": "#ffffff",
+     "palette:Yellow": "#b8901f",
+     "purple": "#6a4d94",
+     "red": "#a2342a",
+     "white": "#ffffff",
+     "yellow": "#b8901f"
+    },
+    "svg_profile": "display",
+    "wild": false
+   }
+  },
+  {
+   "id": "p09",
+   "from": "README.md",
+   "at": "L89-92",
+   "why": "READMEのギャラリー作品",
+   "language": "ja",
+   "render_seed": "1759981552357047",
+   "canvas": "square",
+   "size": [
+    1000.0,
+    1000.0
+   ],
+   "ddl": "背景を白で塗りつぶす。\n画面下半分に灰色の細筆の横線を二十本並べる。\n中央付近に白い小さな楕円を百二十個、波打つ軌跡に沿って散らす。\n右端に黒い鉛筆の縦線を一本引く。",
+   "host": {
+    "background": "white",
+    "canvas_format_id": "square",
+    "canvas_format_registry_digest": "16fde66009a901ec65887303389a0253235467cb0437ab38084ff15ea4f8ae18",
+    "canvas_format_registry_id": "inku.canvas-format-registry.v1",
+    "catalog_mode": "default",
+    "palette": {
+     "background": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     },
+     "black": {
+      "abstract_color": "black",
+      "concrete_rgb": [
+       17,
+       17,
+       17
+      ],
+      "oklch_lightness": 0.1776377719172259
+     },
+     "observations": [
+      {
+       "abstract_color": "white",
+       "concrete_rgb": [
+        255,
+        255,
+        255
+       ],
+       "oklch_lightness": 0.9999999934735462
+      },
+      {
+       "abstract_color": "black",
+       "concrete_rgb": [
+        17,
+        17,
+        17
+       ],
+       "oklch_lightness": 0.1776377719172259
+      },
+      {
+       "abstract_color": "blue",
+       "concrete_rgb": [
+        44,
+        62,
+        145
+       ],
+       "oklch_lightness": 0.4003558670013452
+      },
+      {
+       "abstract_color": "red",
+       "concrete_rgb": [
+        124,
+        47,
+        38
+       ],
+       "oklch_lightness": 0.41377712966040187
+      },
+      {
+       "abstract_color": "green",
+       "concrete_rgb": [
+        47,
+        107,
+        58
+       ],
+       "oklch_lightness": 0.4745832705793881
+      },
+      {
+       "abstract_color": "gray",
+       "concrete_rgb": [
+        136,
+        136,
+        136
+       ],
+       "oklch_lightness": 0.6267535369160254
+      },
+      {
+       "abstract_color": "yellow",
+       "concrete_rgb": [
+        184,
+        144,
+        31
+       ],
+       "oklch_lightness": 0.6729916247985137
+      },
+      {
+       "abstract_color": "orange",
+       "concrete_rgb": [
+        185,
+        103,
+        30
+       ],
+       "oklch_lightness": 0.5961789129228193
+      },
+      {
+       "abstract_color": "purple",
+       "concrete_rgb": [
+        106,
+        77,
+        148
+       ],
+       "oklch_lightness": 0.4832468913471135
+      }
+     ],
+     "white": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     }
+    },
+    "resolved_catalog_id": "default"
+   },
+   "render_options": {
+    "canvas": {
+     "height": 1000.0,
+     "width": 1000.0
+    },
+    "canvas_aspect_id": "square",
+    "catalog_id": "default",
+    "composition_seed": null,
+    "error_policy": "omit_and_continue",
+    "render_seed": "1759981552357047",
+    "resolved_color_map": {
+     "black": "#111111",
+     "blue": "#2c3e91",
+     "gray": "#888888",
+     "green": "#2f6b3a",
+     "orange": "#b9671e",
+     "palette:Black": "#111111",
+     "palette:Blue": "#2c3e91",
+     "palette:Deep Red": "#7c2f26",
+     "palette:Gray": "#888888",
+     "palette:Green": "#2f6b3a",
+     "palette:Orange": "#b9671e",
+     "palette:Purple": "#6a4d94",
+     "palette:Red": "#a2342a",
+     "palette:White": "#ffffff",
+     "palette:Yellow": "#b8901f",
+     "purple": "#6a4d94",
+     "red": "#a2342a",
+     "white": "#ffffff",
+     "yellow": "#b8901f"
+    },
+    "svg_profile": "display",
+    "wild": false
+   }
+  },
+  {
+   "id": "p10",
+   "from": "README.md",
+   "at": "L114-118",
+   "why": "READMEのギャラリー作品（ビュランは線と弧なので accepted fill にならない）",
+   "language": "ja",
+   "render_seed": "7251697323642884",
+   "canvas": "square",
+   "size": [
+    1000.0,
+    1000.0
+   ],
+   "ddl": "背景を白で塗りつぶす。\n黒いロットリングの縦長の四角を左右に三つずつ並べる。\n白いビュランの太い弧を中央に一本引く。\n白いビュランの短い線を弧に沿って二十本並べる。\n右上に黄色い大きな円を置く。",
+   "host": {
+    "background": "white",
+    "canvas_format_id": "square",
+    "canvas_format_registry_digest": "16fde66009a901ec65887303389a0253235467cb0437ab38084ff15ea4f8ae18",
+    "canvas_format_registry_id": "inku.canvas-format-registry.v1",
+    "catalog_mode": "default",
+    "palette": {
+     "background": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     },
+     "black": {
+      "abstract_color": "black",
+      "concrete_rgb": [
+       17,
+       17,
+       17
+      ],
+      "oklch_lightness": 0.1776377719172259
+     },
+     "observations": [
+      {
+       "abstract_color": "white",
+       "concrete_rgb": [
+        255,
+        255,
+        255
+       ],
+       "oklch_lightness": 0.9999999934735462
+      },
+      {
+       "abstract_color": "black",
+       "concrete_rgb": [
+        17,
+        17,
+        17
+       ],
+       "oklch_lightness": 0.1776377719172259
+      },
+      {
+       "abstract_color": "blue",
+       "concrete_rgb": [
+        44,
+        62,
+        145
+       ],
+       "oklch_lightness": 0.4003558670013452
+      },
+      {
+       "abstract_color": "red",
+       "concrete_rgb": [
+        162,
+        52,
+        42
+       ],
+       "oklch_lightness": 0.48600919132812137
+      },
+      {
+       "abstract_color": "green",
+       "concrete_rgb": [
+        47,
+        107,
+        58
+       ],
+       "oklch_lightness": 0.4745832705793881
+      },
+      {
+       "abstract_color": "gray",
+       "concrete_rgb": [
+        136,
+        136,
+        136
+       ],
+       "oklch_lightness": 0.6267535369160254
+      },
+      {
+       "abstract_color": "yellow",
+       "concrete_rgb": [
+        184,
+        144,
+        31
+       ],
+       "oklch_lightness": 0.6729916247985137
+      },
+      {
+       "abstract_color": "orange",
+       "concrete_rgb": [
+        185,
+        103,
+        30
+       ],
+       "oklch_lightness": 0.5961789129228193
+      },
+      {
+       "abstract_color": "purple",
+       "concrete_rgb": [
+        106,
+        77,
+        148
+       ],
+       "oklch_lightness": 0.4832468913471135
+      }
+     ],
+     "white": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     }
+    },
+    "resolved_catalog_id": "default"
+   },
+   "render_options": {
+    "canvas": {
+     "height": 1000.0,
+     "width": 1000.0
+    },
+    "canvas_aspect_id": "square",
+    "catalog_id": "default",
+    "composition_seed": null,
+    "error_policy": "omit_and_continue",
+    "render_seed": "7251697323642884",
+    "resolved_color_map": {
+     "black": "#111111",
+     "blue": "#2c3e91",
+     "gray": "#888888",
+     "green": "#2f6b3a",
+     "orange": "#b9671e",
+     "palette:Black": "#111111",
+     "palette:Blue": "#2c3e91",
+     "palette:Deep Red": "#7c2f26",
+     "palette:Gray": "#888888",
+     "palette:Green": "#2f6b3a",
+     "palette:Orange": "#b9671e",
+     "palette:Purple": "#6a4d94",
+     "palette:Red": "#a2342a",
+     "palette:White": "#ffffff",
+     "palette:Yellow": "#b8901f",
+     "purple": "#6a4d94",
+     "red": "#a2342a",
+     "white": "#ffffff",
+     "yellow": "#b8901f"
+    },
+    "svg_profile": "display",
+    "wild": false
+   }
+  },
+  {
+   "id": "p11",
+   "from": "docs/guide/gallery.ja.md",
+   "at": "L15-17",
+   "why": "ギャラリーの作品",
+   "language": "ja",
+   "render_seed": "6197114075822707",
+   "canvas": "square",
+   "size": [
+    1000.0,
+    1000.0
+   ],
+   "ddl": "背景を黒で塗りつぶす。\n黄色いクレヨンの小さな四角を画面全体に点々と四十八個散らす。\n四角は不揃いに並べる。",
+   "host": {
+    "background": "white",
+    "canvas_format_id": "square",
+    "canvas_format_registry_digest": "16fde66009a901ec65887303389a0253235467cb0437ab38084ff15ea4f8ae18",
+    "canvas_format_registry_id": "inku.canvas-format-registry.v1",
+    "catalog_mode": "default",
+    "palette": {
+     "background": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     },
+     "black": {
+      "abstract_color": "black",
+      "concrete_rgb": [
+       17,
+       17,
+       17
+      ],
+      "oklch_lightness": 0.1776377719172259
+     },
+     "observations": [
+      {
+       "abstract_color": "white",
+       "concrete_rgb": [
+        255,
+        255,
+        255
+       ],
+       "oklch_lightness": 0.9999999934735462
+      },
+      {
+       "abstract_color": "black",
+       "concrete_rgb": [
+        17,
+        17,
+        17
+       ],
+       "oklch_lightness": 0.1776377719172259
+      },
+      {
+       "abstract_color": "blue",
+       "concrete_rgb": [
+        44,
+        62,
+        145
+       ],
+       "oklch_lightness": 0.4003558670013452
+      },
+      {
+       "abstract_color": "red",
+       "concrete_rgb": [
+        162,
+        52,
+        42
+       ],
+       "oklch_lightness": 0.48600919132812137
+      },
+      {
+       "abstract_color": "green",
+       "concrete_rgb": [
+        47,
+        107,
+        58
+       ],
+       "oklch_lightness": 0.4745832705793881
+      },
+      {
+       "abstract_color": "gray",
+       "concrete_rgb": [
+        136,
+        136,
+        136
+       ],
+       "oklch_lightness": 0.6267535369160254
+      },
+      {
+       "abstract_color": "yellow",
+       "concrete_rgb": [
+        184,
+        144,
+        31
+       ],
+       "oklch_lightness": 0.6729916247985137
+      },
+      {
+       "abstract_color": "orange",
+       "concrete_rgb": [
+        185,
+        103,
+        30
+       ],
+       "oklch_lightness": 0.5961789129228193
+      },
+      {
+       "abstract_color": "purple",
+       "concrete_rgb": [
+        106,
+        77,
+        148
+       ],
+       "oklch_lightness": 0.4832468913471135
+      }
+     ],
+     "white": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     }
+    },
+    "resolved_catalog_id": "default"
+   },
+   "render_options": {
+    "canvas": {
+     "height": 1000.0,
+     "width": 1000.0
+    },
+    "canvas_aspect_id": "square",
+    "catalog_id": "default",
+    "composition_seed": null,
+    "error_policy": "omit_and_continue",
+    "render_seed": "6197114075822707",
+    "resolved_color_map": {
+     "black": "#111111",
+     "blue": "#2c3e91",
+     "gray": "#888888",
+     "green": "#2f6b3a",
+     "orange": "#b9671e",
+     "palette:Black": "#111111",
+     "palette:Blue": "#2c3e91",
+     "palette:Deep Red": "#7c2f26",
+     "palette:Gray": "#888888",
+     "palette:Green": "#2f6b3a",
+     "palette:Orange": "#b9671e",
+     "palette:Purple": "#6a4d94",
+     "palette:Red": "#a2342a",
+     "palette:White": "#ffffff",
+     "palette:Yellow": "#b8901f",
+     "purple": "#6a4d94",
+     "red": "#a2342a",
+     "white": "#ffffff",
+     "yellow": "#b8901f"
+    },
+    "svg_profile": "display",
+    "wild": false
+   }
+  },
+  {
+   "id": "p12",
+   "from": "docs/guide/gallery.ja.md",
+   "at": "L47-50",
+   "why": "ギャラリーの作品",
+   "language": "ja",
+   "render_seed": "6064752967664899",
+   "canvas": "square",
+   "size": [
+    1000.0,
+    1000.0
+   ],
+   "ddl": "背景を黒で塗りつぶす。\n白いロットリングの縦長の四角を横に二十本並べる。\n白い鉛筆の小さな四角を、前の四角の上に一つずつ、画面全体に点々と散らす。\n細かく震える。",
+   "host": {
+    "background": "white",
+    "canvas_format_id": "square",
+    "canvas_format_registry_digest": "16fde66009a901ec65887303389a0253235467cb0437ab38084ff15ea4f8ae18",
+    "canvas_format_registry_id": "inku.canvas-format-registry.v1",
+    "catalog_mode": "default",
+    "palette": {
+     "background": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     },
+     "black": {
+      "abstract_color": "black",
+      "concrete_rgb": [
+       17,
+       17,
+       17
+      ],
+      "oklch_lightness": 0.1776377719172259
+     },
+     "observations": [
+      {
+       "abstract_color": "white",
+       "concrete_rgb": [
+        255,
+        255,
+        255
+       ],
+       "oklch_lightness": 0.9999999934735462
+      },
+      {
+       "abstract_color": "black",
+       "concrete_rgb": [
+        17,
+        17,
+        17
+       ],
+       "oklch_lightness": 0.1776377719172259
+      },
+      {
+       "abstract_color": "blue",
+       "concrete_rgb": [
+        44,
+        62,
+        145
+       ],
+       "oklch_lightness": 0.4003558670013452
+      },
+      {
+       "abstract_color": "red",
+       "concrete_rgb": [
+        124,
+        47,
+        38
+       ],
+       "oklch_lightness": 0.41377712966040187
+      },
+      {
+       "abstract_color": "green",
+       "concrete_rgb": [
+        47,
+        107,
+        58
+       ],
+       "oklch_lightness": 0.4745832705793881
+      },
+      {
+       "abstract_color": "gray",
+       "concrete_rgb": [
+        136,
+        136,
+        136
+       ],
+       "oklch_lightness": 0.6267535369160254
+      },
+      {
+       "abstract_color": "yellow",
+       "concrete_rgb": [
+        184,
+        144,
+        31
+       ],
+       "oklch_lightness": 0.6729916247985137
+      },
+      {
+       "abstract_color": "orange",
+       "concrete_rgb": [
+        185,
+        103,
+        30
+       ],
+       "oklch_lightness": 0.5961789129228193
+      },
+      {
+       "abstract_color": "purple",
+       "concrete_rgb": [
+        106,
+        77,
+        148
+       ],
+       "oklch_lightness": 0.4832468913471135
+      }
+     ],
+     "white": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     }
+    },
+    "resolved_catalog_id": "default"
+   },
+   "render_options": {
+    "canvas": {
+     "height": 1000.0,
+     "width": 1000.0
+    },
+    "canvas_aspect_id": "square",
+    "catalog_id": "default",
+    "composition_seed": null,
+    "error_policy": "omit_and_continue",
+    "render_seed": "6064752967664899",
+    "resolved_color_map": {
+     "black": "#111111",
+     "blue": "#2c3e91",
+     "gray": "#888888",
+     "green": "#2f6b3a",
+     "orange": "#b9671e",
+     "palette:Black": "#111111",
+     "palette:Blue": "#2c3e91",
+     "palette:Deep Red": "#7c2f26",
+     "palette:Gray": "#888888",
+     "palette:Green": "#2f6b3a",
+     "palette:Orange": "#b9671e",
+     "palette:Purple": "#6a4d94",
+     "palette:Red": "#a2342a",
+     "palette:White": "#ffffff",
+     "palette:Yellow": "#b8901f",
+     "purple": "#6a4d94",
+     "red": "#a2342a",
+     "white": "#ffffff",
+     "yellow": "#b8901f"
+    },
+    "svg_profile": "display",
+    "wild": false
+   }
+  },
+  {
+   "id": "p13",
+   "from": "manual/ja/image-creation.md",
+   "at": "L96-98",
+   "why": "マニュアルの例",
+   "language": "ja",
+   "render_seed": "1",
+   "canvas": "square",
+   "size": [
+    1000.0,
+    1000.0
+   ],
+   "ddl": "背景を白で埋める。\n青い細い線を左下から右上へ三本引く。\n赤い小さな円を右上に三個置く。",
+   "host": {
+    "background": "white",
+    "canvas_format_id": "square",
+    "canvas_format_registry_digest": "16fde66009a901ec65887303389a0253235467cb0437ab38084ff15ea4f8ae18",
+    "canvas_format_registry_id": "inku.canvas-format-registry.v1",
+    "catalog_mode": "default",
+    "palette": {
+     "background": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     },
+     "black": {
+      "abstract_color": "black",
+      "concrete_rgb": [
+       17,
+       17,
+       17
+      ],
+      "oklch_lightness": 0.1776377719172259
+     },
+     "observations": [
+      {
+       "abstract_color": "white",
+       "concrete_rgb": [
+        255,
+        255,
+        255
+       ],
+       "oklch_lightness": 0.9999999934735462
+      },
+      {
+       "abstract_color": "black",
+       "concrete_rgb": [
+        17,
+        17,
+        17
+       ],
+       "oklch_lightness": 0.1776377719172259
+      },
+      {
+       "abstract_color": "blue",
+       "concrete_rgb": [
+        44,
+        62,
+        145
+       ],
+       "oklch_lightness": 0.4003558670013452
+      },
+      {
+       "abstract_color": "red",
+       "concrete_rgb": [
+        124,
+        47,
+        38
+       ],
+       "oklch_lightness": 0.41377712966040187
+      },
+      {
+       "abstract_color": "green",
+       "concrete_rgb": [
+        47,
+        107,
+        58
+       ],
+       "oklch_lightness": 0.4745832705793881
+      },
+      {
+       "abstract_color": "gray",
+       "concrete_rgb": [
+        136,
+        136,
+        136
+       ],
+       "oklch_lightness": 0.6267535369160254
+      },
+      {
+       "abstract_color": "yellow",
+       "concrete_rgb": [
+        184,
+        144,
+        31
+       ],
+       "oklch_lightness": 0.6729916247985137
+      },
+      {
+       "abstract_color": "orange",
+       "concrete_rgb": [
+        185,
+        103,
+        30
+       ],
+       "oklch_lightness": 0.5961789129228193
+      },
+      {
+       "abstract_color": "purple",
+       "concrete_rgb": [
+        106,
+        77,
+        148
+       ],
+       "oklch_lightness": 0.4832468913471135
+      }
+     ],
+     "white": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     }
+    },
+    "resolved_catalog_id": "default"
+   },
+   "render_options": {
+    "canvas": {
+     "height": 1000.0,
+     "width": 1000.0
+    },
+    "canvas_aspect_id": "square",
+    "catalog_id": "default",
+    "composition_seed": null,
+    "error_policy": "omit_and_continue",
+    "render_seed": "1",
+    "resolved_color_map": {
+     "black": "#111111",
+     "blue": "#2c3e91",
+     "gray": "#888888",
+     "green": "#2f6b3a",
+     "orange": "#b9671e",
+     "palette:Black": "#111111",
+     "palette:Blue": "#2c3e91",
+     "palette:Deep Red": "#7c2f26",
+     "palette:Gray": "#888888",
+     "palette:Green": "#2f6b3a",
+     "palette:Orange": "#b9671e",
+     "palette:Purple": "#6a4d94",
+     "palette:Red": "#a2342a",
+     "palette:White": "#ffffff",
+     "palette:Yellow": "#b8901f",
+     "purple": "#6a4d94",
+     "red": "#a2342a",
+     "white": "#ffffff",
+     "yellow": "#b8901f"
+    },
+    "svg_profile": "display",
+    "wild": false
+   }
+  },
+  {
+   "id": "p14",
+   "from": "server/reference/ddl-engine-1/a_expand/A-tenkei-auto.ddl",
+   "at": "whole file",
+   "why": "参照DDL",
+   "language": "ja",
+   "render_seed": "1",
+   "canvas": "square",
+   "size": [
+    1000.0,
+    1000.0
+   ],
+   "ddl": "赤い円を三つ置く。小さな点を画面全体に散らす。赤い鉛筆の短い線を画面全体へ三本散らす。細かく震える。\n",
+   "host": {
+    "background": "white",
+    "canvas_format_id": "square",
+    "canvas_format_registry_digest": "16fde66009a901ec65887303389a0253235467cb0437ab38084ff15ea4f8ae18",
+    "canvas_format_registry_id": "inku.canvas-format-registry.v1",
+    "catalog_mode": "default",
+    "palette": {
+     "background": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     },
+     "black": {
+      "abstract_color": "black",
+      "concrete_rgb": [
+       17,
+       17,
+       17
+      ],
+      "oklch_lightness": 0.1776377719172259
+     },
+     "observations": [
+      {
+       "abstract_color": "white",
+       "concrete_rgb": [
+        255,
+        255,
+        255
+       ],
+       "oklch_lightness": 0.9999999934735462
+      },
+      {
+       "abstract_color": "black",
+       "concrete_rgb": [
+        17,
+        17,
+        17
+       ],
+       "oklch_lightness": 0.1776377719172259
+      },
+      {
+       "abstract_color": "blue",
+       "concrete_rgb": [
+        44,
+        62,
+        145
+       ],
+       "oklch_lightness": 0.4003558670013452
+      },
+      {
+       "abstract_color": "red",
+       "concrete_rgb": [
+        124,
+        47,
+        38
+       ],
+       "oklch_lightness": 0.41377712966040187
+      },
+      {
+       "abstract_color": "green",
+       "concrete_rgb": [
+        47,
+        107,
+        58
+       ],
+       "oklch_lightness": 0.4745832705793881
+      },
+      {
+       "abstract_color": "gray",
+       "concrete_rgb": [
+        136,
+        136,
+        136
+       ],
+       "oklch_lightness": 0.6267535369160254
+      },
+      {
+       "abstract_color": "yellow",
+       "concrete_rgb": [
+        184,
+        144,
+        31
+       ],
+       "oklch_lightness": 0.6729916247985137
+      },
+      {
+       "abstract_color": "orange",
+       "concrete_rgb": [
+        185,
+        103,
+        30
+       ],
+       "oklch_lightness": 0.5961789129228193
+      },
+      {
+       "abstract_color": "purple",
+       "concrete_rgb": [
+        106,
+        77,
+        148
+       ],
+       "oklch_lightness": 0.4832468913471135
+      }
+     ],
+     "white": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     }
+    },
+    "resolved_catalog_id": "default"
+   },
+   "render_options": {
+    "canvas": {
+     "height": 1000.0,
+     "width": 1000.0
+    },
+    "canvas_aspect_id": "square",
+    "catalog_id": "default",
+    "composition_seed": null,
+    "error_policy": "omit_and_continue",
+    "render_seed": "1",
+    "resolved_color_map": {
+     "black": "#111111",
+     "blue": "#2c3e91",
+     "gray": "#888888",
+     "green": "#2f6b3a",
+     "orange": "#b9671e",
+     "palette:Black": "#111111",
+     "palette:Blue": "#2c3e91",
+     "palette:Deep Red": "#7c2f26",
+     "palette:Gray": "#888888",
+     "palette:Green": "#2f6b3a",
+     "palette:Orange": "#b9671e",
+     "palette:Purple": "#6a4d94",
+     "palette:Red": "#a2342a",
+     "palette:White": "#ffffff",
+     "palette:Yellow": "#b8901f",
+     "purple": "#6a4d94",
+     "red": "#a2342a",
+     "white": "#ffffff",
+     "yellow": "#b8901f"
+    },
+    "svg_profile": "display",
+    "wild": false
+   }
+  },
+  {
+   "id": "p15",
+   "from": "core/crates/inku-pipeline/tests/data/recompose-v1.json",
+   "at": "$.cases[22].source",
+   "why": "アクアチントの雲形。約1MB",
+   "language": "ja",
+   "render_seed": "1",
+   "canvas": "square",
+   "size": [
+    1000.0,
+    1000.0
+   ],
+   "ddl": "紙。\n背景を黄で埋める。\n下（横0〜1、縦2/3〜1）に、橙の太筆の薄いアクアチントの全幅の雲形を1個埋める。\n右上の四半分（横1/2〜1、縦0〜1/2）に、大きくゆるやかに揺れる赤の油彩の濃い塗りの縦長の普通の大きさの楕円を12個散らす。\n右下の四半分（横1/2〜1、縦1/2〜1）に、黒の太い太筆の実線の程よい刷きの水平の大きな線を1個引く。\n下に、細かく小刻みに波打つ灰の細い鉛筆の薄い粒の斜めの小さな線を4個引く。",
+   "host": {
+    "background": "white",
+    "canvas_format_id": "square",
+    "canvas_format_registry_digest": "16fde66009a901ec65887303389a0253235467cb0437ab38084ff15ea4f8ae18",
+    "canvas_format_registry_id": "inku.canvas-format-registry.v1",
+    "catalog_mode": "default",
+    "palette": {
+     "background": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     },
+     "black": {
+      "abstract_color": "black",
+      "concrete_rgb": [
+       17,
+       17,
+       17
+      ],
+      "oklch_lightness": 0.1776377719172259
+     },
+     "observations": [
+      {
+       "abstract_color": "white",
+       "concrete_rgb": [
+        255,
+        255,
+        255
+       ],
+       "oklch_lightness": 0.9999999934735462
+      },
+      {
+       "abstract_color": "black",
+       "concrete_rgb": [
+        17,
+        17,
+        17
+       ],
+       "oklch_lightness": 0.1776377719172259
+      },
+      {
+       "abstract_color": "blue",
+       "concrete_rgb": [
+        44,
+        62,
+        145
+       ],
+       "oklch_lightness": 0.4003558670013452
+      },
+      {
+       "abstract_color": "red",
+       "concrete_rgb": [
+        124,
+        47,
+        38
+       ],
+       "oklch_lightness": 0.41377712966040187
+      },
+      {
+       "abstract_color": "green",
+       "concrete_rgb": [
+        47,
+        107,
+        58
+       ],
+       "oklch_lightness": 0.4745832705793881
+      },
+      {
+       "abstract_color": "gray",
+       "concrete_rgb": [
+        136,
+        136,
+        136
+       ],
+       "oklch_lightness": 0.6267535369160254
+      },
+      {
+       "abstract_color": "yellow",
+       "concrete_rgb": [
+        184,
+        144,
+        31
+       ],
+       "oklch_lightness": 0.6729916247985137
+      },
+      {
+       "abstract_color": "orange",
+       "concrete_rgb": [
+        185,
+        103,
+        30
+       ],
+       "oklch_lightness": 0.5961789129228193
+      },
+      {
+       "abstract_color": "purple",
+       "concrete_rgb": [
+        106,
+        77,
+        148
+       ],
+       "oklch_lightness": 0.4832468913471135
+      }
+     ],
+     "white": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     }
+    },
+    "resolved_catalog_id": "default"
+   },
+   "render_options": {
+    "canvas": {
+     "height": 1000.0,
+     "width": 1000.0
+    },
+    "canvas_aspect_id": "square",
+    "catalog_id": "default",
+    "composition_seed": null,
+    "error_policy": "omit_and_continue",
+    "render_seed": "1",
+    "resolved_color_map": {
+     "black": "#111111",
+     "blue": "#2c3e91",
+     "gray": "#888888",
+     "green": "#2f6b3a",
+     "orange": "#b9671e",
+     "palette:Black": "#111111",
+     "palette:Blue": "#2c3e91",
+     "palette:Deep Red": "#7c2f26",
+     "palette:Gray": "#888888",
+     "palette:Green": "#2f6b3a",
+     "palette:Orange": "#b9671e",
+     "palette:Purple": "#6a4d94",
+     "palette:Red": "#a2342a",
+     "palette:White": "#ffffff",
+     "palette:Yellow": "#b8901f",
+     "purple": "#6a4d94",
+     "red": "#a2342a",
+     "white": "#ffffff",
+     "yellow": "#b8901f"
+    },
+    "svg_profile": "display",
+    "wild": false
+   }
+  },
+  {
+   "id": "p16",
+   "from": "server/tests/fixtures/thinness_carry_h5.json",
+   "at": "$.ddl",
+   "why": "太筆・細筆の線。横長の用紙（wide）",
+   "language": "ja",
+   "render_seed": "1",
+   "canvas": "wide",
+   "size": [
+    2350.0,
+    1000.0
+   ],
+   "ddl": "背景を黒で埋める。\n中央に黒い太筆の太い縦線を一本引く。\n黒い太筆の細い縦線を左右に百二十本並べる。\n白の細筆の細い縦線を、中央の太い線の周囲に二十四本、上から下へ並べる。\n白の細筆の細い線を、上から下へ波打つ軌跡に沿って六十本散らす。",
+   "host": {
+    "background": "white",
+    "canvas_format_id": "wide",
+    "canvas_format_registry_digest": "16fde66009a901ec65887303389a0253235467cb0437ab38084ff15ea4f8ae18",
+    "canvas_format_registry_id": "inku.canvas-format-registry.v1",
+    "catalog_mode": "default",
+    "palette": {
+     "background": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     },
+     "black": {
+      "abstract_color": "black",
+      "concrete_rgb": [
+       17,
+       17,
+       17
+      ],
+      "oklch_lightness": 0.1776377719172259
+     },
+     "observations": [
+      {
+       "abstract_color": "white",
+       "concrete_rgb": [
+        255,
+        255,
+        255
+       ],
+       "oklch_lightness": 0.9999999934735462
+      },
+      {
+       "abstract_color": "black",
+       "concrete_rgb": [
+        17,
+        17,
+        17
+       ],
+       "oklch_lightness": 0.1776377719172259
+      },
+      {
+       "abstract_color": "blue",
+       "concrete_rgb": [
+        44,
+        62,
+        145
+       ],
+       "oklch_lightness": 0.4003558670013452
+      },
+      {
+       "abstract_color": "red",
+       "concrete_rgb": [
+        124,
+        47,
+        38
+       ],
+       "oklch_lightness": 0.41377712966040187
+      },
+      {
+       "abstract_color": "green",
+       "concrete_rgb": [
+        47,
+        107,
+        58
+       ],
+       "oklch_lightness": 0.4745832705793881
+      },
+      {
+       "abstract_color": "gray",
+       "concrete_rgb": [
+        136,
+        136,
+        136
+       ],
+       "oklch_lightness": 0.6267535369160254
+      },
+      {
+       "abstract_color": "yellow",
+       "concrete_rgb": [
+        184,
+        144,
+        31
+       ],
+       "oklch_lightness": 0.6729916247985137
+      },
+      {
+       "abstract_color": "orange",
+       "concrete_rgb": [
+        185,
+        103,
+        30
+       ],
+       "oklch_lightness": 0.5961789129228193
+      },
+      {
+       "abstract_color": "purple",
+       "concrete_rgb": [
+        106,
+        77,
+        148
+       ],
+       "oklch_lightness": 0.4832468913471135
+      }
+     ],
+     "white": {
+      "abstract_color": "white",
+      "concrete_rgb": [
+       255,
+       255,
+       255
+      ],
+      "oklch_lightness": 0.9999999934735462
+     }
+    },
+    "resolved_catalog_id": "default"
+   },
+   "render_options": {
+    "canvas": {
+     "height": 1000.0,
+     "width": 2350.0
+    },
+    "canvas_aspect_id": "wide",
+    "catalog_id": "default",
+    "composition_seed": null,
+    "error_policy": "omit_and_continue",
+    "render_seed": "1",
+    "resolved_color_map": {
+     "black": "#111111",
+     "blue": "#2c3e91",
+     "gray": "#888888",
+     "green": "#2f6b3a",
+     "orange": "#b9671e",
+     "palette:Black": "#111111",
+     "palette:Blue": "#2c3e91",
+     "palette:Deep Red": "#7c2f26",
+     "palette:Gray": "#888888",
+     "palette:Green": "#2f6b3a",
+     "palette:Orange": "#b9671e",
+     "palette:Purple": "#6a4d94",
+     "palette:Red": "#a2342a",
+     "palette:White": "#ffffff",
+     "palette:Yellow": "#b8901f",
+     "purple": "#6a4d94",
+     "red": "#a2342a",
+     "white": "#ffffff",
+     "yellow": "#b8901f"
+    },
+    "svg_profile": "display",
+    "wild": false
+   }
+  }
+ ],
+ "shared": {
+  "definitions": [
+   {
+    "aliases": [
+     "若葉"
+    ],
+    "body": [
+     {
+      "body": [
+       {
+        "binding": "leaf_x",
+        "body": [
+         {
+          "binding": "leaf_y",
+          "body": [
+           {
+            "arguments": {
+             "lean": {
+              "expr": "cycle",
+              "index": {
+               "expr": "local",
+               "name": "leaf_index"
+              },
+              "items": [
+               {
+                "category": "angle",
+                "expr": "semantic_ref",
+                "id": "vertical"
+               },
+               {
+                "category": "angle",
+                "expr": "semantic_ref",
+                "id": "left_rising"
+               },
+               {
+                "category": "angle",
+                "expr": "semantic_ref",
+                "id": "vertical"
+               },
+               {
+                "category": "angle",
+                "expr": "semantic_ref",
+                "id": "rising"
+               },
+               {
+                "category": "angle",
+                "expr": "semantic_ref",
+                "id": "vertical"
+               },
+               {
+                "category": "angle",
+                "expr": "semantic_ref",
+                "id": "left_rising"
+               }
+              ]
+             },
+             "x": {
+              "expr": "local",
+              "name": "leaf_x"
+             },
+             "y": {
+              "expr": "local",
+              "name": "leaf_y"
+             }
+            },
+            "component": "leaf_form",
+            "op": "use"
+           }
+          ],
+          "choices": [
+           {
+            "expr": "cycle",
+            "index": {
+             "expr": "local",
+             "name": "leaf_index"
+            },
+            "items": [
+             {
+              "expr": "exact_decimal",
+              "value": "0.14"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.32"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.14"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.32"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.32"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.14"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.14"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.32"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.14"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.14"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.32"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.32"
+             }
+            ]
+           },
+           {
+            "expr": "cycle",
+            "index": {
+             "expr": "local",
+             "name": "leaf_index"
+            },
+            "items": [
+             {
+              "expr": "exact_decimal",
+              "value": "0.16"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.34"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.16"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.34"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.34"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.16"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.16"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.34"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.16"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.16"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.34"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.34"
+             }
+            ]
+           },
+           {
+            "expr": "cycle",
+            "index": {
+             "expr": "local",
+             "name": "leaf_index"
+            },
+            "items": [
+             {
+              "expr": "exact_decimal",
+              "value": "0.18"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.36"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.18"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.36"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.36"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.18"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.18"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.36"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.18"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.18"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.36"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.36"
+             }
+            ]
+           },
+           {
+            "expr": "cycle",
+            "index": {
+             "expr": "local",
+             "name": "leaf_index"
+            },
+            "items": [
+             {
+              "expr": "exact_decimal",
+              "value": "0.2"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.38"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.2"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.38"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.38"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.2"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.2"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.38"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.2"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.2"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.38"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.38"
+             }
+            ]
+           },
+           {
+            "expr": "cycle",
+            "index": {
+             "expr": "local",
+             "name": "leaf_index"
+            },
+            "items": [
+             {
+              "expr": "exact_decimal",
+              "value": "0.22"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.4"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.22"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.4"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.4"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.22"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.22"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.4"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.22"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.22"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.4"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.4"
+             }
+            ]
+           }
+          ],
+          "domain": "wakaba_cell_y",
+          "op": "vary",
+          "range": null
+         }
+        ],
+        "choices": [
+         {
+          "expr": "cycle",
+          "index": {
+           "expr": "local",
+           "name": "leaf_index"
+          },
+          "items": [
+           {
+            "expr": "exact_decimal",
+            "value": "0.2"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.76"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.536"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.424"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.2"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.76"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.424"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.536"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.312"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.648"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.312"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.648"
+           }
+          ]
+         },
+         {
+          "expr": "cycle",
+          "index": {
+           "expr": "local",
+           "name": "leaf_index"
+          },
+          "items": [
+           {
+            "expr": "exact_decimal",
+            "value": "0.22"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.78"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.556"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.444"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.22"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.78"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.444"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.556"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.332"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.668"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.332"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.668"
+           }
+          ]
+         },
+         {
+          "expr": "cycle",
+          "index": {
+           "expr": "local",
+           "name": "leaf_index"
+          },
+          "items": [
+           {
+            "expr": "exact_decimal",
+            "value": "0.24"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.8"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.576"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.464"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.24"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.8"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.464"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.576"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.352"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.688"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.352"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.688"
+           }
+          ]
+         }
+        ],
+        "domain": "wakaba_cell_x",
+        "op": "vary",
+        "range": null
+       }
+      ],
+      "count": {
+       "expr": "parameter",
+       "name": "leaf_count"
+      },
+      "index": "leaf_index",
+      "maximum": 12,
+      "op": "repeat"
+     }
+    ],
+    "components": {
+     "leaf_form": {
+      "body": [
+       {
+        "binding": "edge_a",
+        "fields": {
+         "angle": {
+          "expr": "parameter",
+          "name": "lean"
+         },
+         "chord": {
+          "expr": "exact_decimal",
+          "value": "0.095"
+         },
+         "color": {
+          "category": "color",
+          "expr": "semantic_ref",
+          "id": "green"
+         },
+         "fluctuation_amplitude": {
+          "category": "variation",
+          "expr": "semantic_ref",
+          "id": "narrowly"
+         },
+         "fluctuation_quality": {
+          "category": "variation",
+          "expr": "semantic_ref",
+          "id": "swaying"
+         },
+         "movement": {
+          "category": "movement",
+          "expr": "semantic_ref",
+          "id": "place"
+         },
+         "position_x": {
+          "expr": "parameter",
+          "name": "x"
+         },
+         "position_y": {
+          "expr": "parameter",
+          "name": "y"
+         },
+         "sagitta": {
+          "expr": "exact_decimal",
+          "value": "0.02"
+         },
+         "shape": {
+          "category": "shape",
+          "expr": "semantic_ref",
+          "id": "arc"
+         },
+         "surface": {
+          "category": "surface",
+          "expr": "semantic_ref",
+          "id": "solid"
+         },
+         "touch": {
+          "category": "touch",
+          "expr": "semantic_ref",
+          "id": "pencil"
+         }
+        },
+        "op": "emit"
+       },
+       {
+        "binding": "edge_b",
+        "fields": {
+         "chord": {
+          "expr": "exact_decimal",
+          "value": "0.095"
+         },
+         "color": {
+          "category": "color",
+          "expr": "semantic_ref",
+          "id": "green"
+         },
+         "fluctuation_amplitude": {
+          "category": "variation",
+          "expr": "semantic_ref",
+          "id": "narrowly"
+         },
+         "fluctuation_quality": {
+          "category": "variation",
+          "expr": "semantic_ref",
+          "id": "swaying"
+         },
+         "movement": {
+          "category": "movement",
+          "expr": "semantic_ref",
+          "id": "place"
+         },
+         "sagitta": {
+          "expr": "exact_decimal",
+          "value": "0.02"
+         },
+         "shape": {
+          "category": "shape",
+          "expr": "semantic_ref",
+          "id": "arc"
+         },
+         "surface": {
+          "category": "surface",
+          "expr": "semantic_ref",
+          "id": "solid"
+         },
+         "touch": {
+          "category": "touch",
+          "expr": "semantic_ref",
+          "id": "pencil"
+         }
+        },
+        "op": "emit"
+       },
+       {
+        "from": "edge_a",
+        "kind": "touching",
+        "op": "relation",
+        "to": "edge_b"
+       }
+      ],
+      "parameters": {
+       "lean": {
+        "category": "angle",
+        "type": "semantic_ref"
+       },
+       "x": {
+        "dimension": "position_x",
+        "type": "exact_decimal"
+       },
+       "y": {
+        "dimension": "position_y",
+        "type": "exact_decimal"
+       }
+      }
+     }
+    },
+    "heading": "YoungLeaves",
+    "namespace": "Nature",
+    "parameters": {
+     "leaf_count": {
+      "counter": "flat",
+      "maximum": 12,
+      "minimum": 1,
+      "omitted": [
+       4,
+       5,
+       6
+      ],
+      "receives": "count",
+      "type": "integer"
+     }
+    },
+    "schema": "inku.macro-definition.v1",
+    "version": "2.1.0"
+   },
+   {
+    "aliases": [
+     "下草"
+    ],
+    "body": [
+     {
+      "body": [
+       {
+        "binding": "clump_x",
+        "body": [
+         {
+          "binding": "clump_shape",
+          "body": [
+           {
+            "binding": "blade_count",
+            "body": [
+             {
+              "body": [
+               {
+                "arguments": {
+                 "chord": {
+                  "expr": "cycle",
+                  "index": {
+                   "expr": "local",
+                   "name": "clump_shape"
+                  },
+                  "items": [
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "blade_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.4"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.52"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.34"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.46"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.3"
+                     }
+                    ]
+                   },
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "blade_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.52"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.34"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.46"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.3"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.4"
+                     }
+                    ]
+                   },
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "blade_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.46"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.4"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.3"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.52"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.34"
+                     }
+                    ]
+                   },
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "blade_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.34"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.46"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.4"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.3"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.52"
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 "rotation": {
+                  "expr": "cycle",
+                  "index": {
+                   "expr": "local",
+                   "name": "clump_shape"
+                  },
+                  "items": [
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "blade_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "number",
+                      "value": -96.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -86.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -104.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -80.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -110.0
+                     }
+                    ]
+                   },
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "blade_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "number",
+                      "value": -86.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -104.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -80.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -110.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -96.0
+                     }
+                    ]
+                   },
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "blade_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "number",
+                      "value": -80.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -96.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -110.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -86.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -104.0
+                     }
+                    ]
+                   },
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "blade_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "number",
+                      "value": -104.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -80.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -96.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -110.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -86.0
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 "x": {
+                  "expr": "local",
+                  "name": "clump_x"
+                 },
+                 "y": {
+                  "expr": "exact_decimal",
+                  "value": "0.9"
+                 }
+                },
+                "component": "rooted_blade",
+                "op": "use"
+               }
+              ],
+              "count": {
+               "expr": "local",
+               "name": "blade_count"
+              },
+              "index": "blade_index",
+              "maximum": 5,
+              "op": "repeat"
+             }
+            ],
+            "choices": [
+             {
+              "expr": "integer",
+              "value": 3
+             },
+             {
+              "expr": "integer",
+              "value": 4
+             },
+             {
+              "expr": "integer",
+              "value": 5
+             }
+            ],
+            "domain": "shitakusa_blade_count",
+            "op": "vary",
+            "range": null
+           }
+          ],
+          "choices": [
+           {
+            "expr": "integer",
+            "value": 0
+           },
+           {
+            "expr": "integer",
+            "value": 1
+           },
+           {
+            "expr": "integer",
+            "value": 2
+           },
+           {
+            "expr": "integer",
+            "value": 3
+           }
+          ],
+          "domain": "shitakusa_clump_shape",
+          "op": "vary",
+          "range": null
+         }
+        ],
+        "choices": [
+         {
+          "expr": "cycle",
+          "index": {
+           "expr": "local",
+           "name": "clump_index"
+          },
+          "items": [
+           {
+            "expr": "exact_decimal",
+            "value": "0.27"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.69"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.48"
+           }
+          ]
+         },
+         {
+          "expr": "cycle",
+          "index": {
+           "expr": "local",
+           "name": "clump_index"
+          },
+          "items": [
+           {
+            "expr": "exact_decimal",
+            "value": "0.3"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.72"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.51"
+           }
+          ]
+         },
+         {
+          "expr": "cycle",
+          "index": {
+           "expr": "local",
+           "name": "clump_index"
+          },
+          "items": [
+           {
+            "expr": "exact_decimal",
+            "value": "0.33"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.75"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.54"
+           }
+          ]
+         }
+        ],
+        "domain": "shitakusa_clump_x",
+        "op": "vary",
+        "range": null
+       }
+      ],
+      "count": {
+       "expr": "parameter",
+       "name": "clump_count"
+      },
+      "index": "clump_index",
+      "maximum": 3,
+      "op": "repeat"
+     }
+    ],
+    "components": {
+     "rooted_blade": {
+      "body": [
+       {
+        "fields": {
+         "position_x": {
+          "expr": "parameter",
+          "name": "x"
+         },
+         "position_y": {
+          "expr": "parameter",
+          "name": "y"
+         }
+        },
+        "name": "root",
+        "op": "anchor"
+       },
+       {
+        "body": [
+         {
+          "binding": "edge_a",
+          "fields": {
+           "angle": {
+            "category": "angle",
+            "expr": "semantic_ref",
+            "id": "horizontal"
+           },
+           "chord": {
+            "expr": "parameter",
+            "name": "chord"
+           },
+           "color": {
+            "category": "color",
+            "expr": "semantic_ref",
+            "id": "green"
+           },
+           "movement": {
+            "category": "movement",
+            "expr": "semantic_ref",
+            "id": "place"
+           },
+           "sagitta": {
+            "expr": "exact_decimal",
+            "value": "0.012"
+           },
+           "shape": {
+            "category": "shape",
+            "expr": "semantic_ref",
+            "id": "arc"
+           },
+           "surface": {
+            "category": "surface",
+            "expr": "semantic_ref",
+            "id": "solid"
+           },
+           "touch": {
+            "category": "touch",
+            "expr": "semantic_ref",
+            "id": "brush_thin"
+           }
+          },
+          "op": "emit"
+         },
+         {
+          "binding": "edge_b",
+          "fields": {
+           "chord": {
+            "expr": "parameter",
+            "name": "chord"
+           },
+           "color": {
+            "category": "color",
+            "expr": "semantic_ref",
+            "id": "green"
+           },
+           "movement": {
+            "category": "movement",
+            "expr": "semantic_ref",
+            "id": "place"
+           },
+           "sagitta": {
+            "expr": "exact_decimal",
+            "value": "0.012"
+           },
+           "shape": {
+            "category": "shape",
+            "expr": "semantic_ref",
+            "id": "arc"
+           },
+           "surface": {
+            "category": "surface",
+            "expr": "semantic_ref",
+            "id": "solid"
+           },
+           "touch": {
+            "category": "touch",
+            "expr": "semantic_ref",
+            "id": "brush_thin"
+           }
+          },
+          "op": "emit"
+         },
+         {
+          "from": "root",
+          "kind": "connected",
+          "op": "relation",
+          "to": "edge_a"
+         },
+         {
+          "from": "edge_a",
+          "kind": "touching",
+          "op": "relation",
+          "to": "edge_b"
+         }
+        ],
+        "op": "transform",
+        "transform": {
+         "rotate_degrees": {
+          "expr": "parameter",
+          "name": "rotation"
+         },
+         "scale_x": null,
+         "scale_y": null,
+         "translate_x": null,
+         "translate_y": null
+        }
+       }
+      ],
+      "parameters": {
+       "chord": {
+        "dimension": "chord",
+        "type": "exact_decimal"
+       },
+       "rotation": {
+        "type": "number"
+       },
+       "x": {
+        "dimension": "position_x",
+        "type": "exact_decimal"
+       },
+       "y": {
+        "dimension": "position_y",
+        "type": "exact_decimal"
+       }
+      }
+     }
+    },
+    "heading": "Undergrowth",
+    "namespace": "Nature",
+    "parameters": {
+     "clump_count": {
+      "counter": "general",
+      "maximum": 3,
+      "minimum": 1,
+      "omitted": [
+       1,
+       2
+      ],
+      "receives": "count",
+      "type": "integer"
+     }
+    },
+    "schema": "inku.macro-definition.v1",
+    "version": "2.1.0"
+   },
+   {
+    "aliases": [
+     "青葉"
+    ],
+    "body": [
+     {
+      "binding": "branch",
+      "fields": {
+       "angle": {
+        "category": "angle",
+        "expr": "semantic_ref",
+        "id": "horizontal"
+       },
+       "color": {
+        "category": "color",
+        "expr": "semantic_ref",
+        "id": "gray"
+       },
+       "fluctuation_frequency": {
+        "category": "variation",
+        "expr": "semantic_ref",
+        "id": "loosely"
+       },
+       "fluctuation_quality": {
+        "category": "variation",
+        "expr": "semantic_ref",
+        "id": "undulating"
+       },
+       "length": {
+        "expr": "exact_decimal",
+        "value": "0.68"
+       },
+       "movement": {
+        "category": "movement",
+        "expr": "semantic_ref",
+        "id": "draw"
+       },
+       "position_x": {
+        "expr": "exact_decimal",
+        "value": "0.5"
+       },
+       "position_y": {
+        "expr": "exact_decimal",
+        "value": "0.5"
+       },
+       "shape": {
+        "category": "shape",
+        "expr": "semantic_ref",
+        "id": "line"
+       },
+       "touch": {
+        "category": "touch",
+        "expr": "semantic_ref",
+        "id": "brush_thick"
+       }
+      },
+      "op": "emit"
+     },
+     {
+      "body": [
+       {
+        "body": [
+         {
+          "binding": "edge_a",
+          "fields": {
+           "angle": {
+            "category": "angle",
+            "expr": "semantic_ref",
+            "id": "horizontal"
+           },
+           "chord": {
+            "expr": "cycle",
+            "index": {
+             "expr": "local",
+             "name": "leaf_index"
+            },
+            "items": [
+             {
+              "expr": "exact_decimal",
+              "value": "0.117"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.15"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.098"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.131"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.107"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.141"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.122"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.126"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.136"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.103"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.112"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.145"
+             }
+            ]
+           },
+           "color": {
+            "category": "color",
+            "expr": "semantic_ref",
+            "id": "green"
+           },
+           "movement": {
+            "category": "movement",
+            "expr": "semantic_ref",
+            "id": "place"
+           },
+           "sagitta": {
+            "expr": "exact_decimal",
+            "value": "0.03"
+           },
+           "shape": {
+            "category": "shape",
+            "expr": "semantic_ref",
+            "id": "arc"
+           },
+           "surface": {
+            "category": "surface",
+            "expr": "semantic_ref",
+            "id": "solid"
+           },
+           "touch": {
+            "category": "touch",
+            "expr": "semantic_ref",
+            "id": "brush_thin"
+           }
+          },
+          "op": "emit"
+         },
+         {
+          "binding": "edge_b",
+          "fields": {
+           "chord": {
+            "expr": "cycle",
+            "index": {
+             "expr": "local",
+             "name": "leaf_index"
+            },
+            "items": [
+             {
+              "expr": "exact_decimal",
+              "value": "0.117"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.15"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.098"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.131"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.107"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.141"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.122"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.126"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.136"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.103"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.112"
+             },
+             {
+              "expr": "exact_decimal",
+              "value": "0.145"
+             }
+            ]
+           },
+           "color": {
+            "category": "color",
+            "expr": "semantic_ref",
+            "id": "green"
+           },
+           "movement": {
+            "category": "movement",
+            "expr": "semantic_ref",
+            "id": "place"
+           },
+           "sagitta": {
+            "expr": "exact_decimal",
+            "value": "0.03"
+           },
+           "shape": {
+            "category": "shape",
+            "expr": "semantic_ref",
+            "id": "arc"
+           },
+           "surface": {
+            "category": "surface",
+            "expr": "semantic_ref",
+            "id": "solid"
+           },
+           "touch": {
+            "category": "touch",
+            "expr": "semantic_ref",
+            "id": "brush_thin"
+           }
+          },
+          "op": "emit"
+         },
+         {
+          "from": "branch",
+          "kind": "connected",
+          "op": "relation",
+          "target_path_position": {
+           "expr": "cycle",
+           "index": {
+            "expr": "local",
+            "name": "leaf_index"
+           },
+           "items": [
+            {
+             "expr": "number",
+             "value": 0.615
+            },
+            {
+             "expr": "number",
+             "value": 0.08
+            },
+            {
+             "expr": "number",
+             "value": 0.92
+            },
+            {
+             "expr": "number",
+             "value": 0.385
+            },
+            {
+             "expr": "number",
+             "value": 0.767
+            },
+            {
+             "expr": "number",
+             "value": 0.233
+            },
+            {
+             "expr": "number",
+             "value": 0.538
+            },
+            {
+             "expr": "number",
+             "value": 0.462
+            },
+            {
+             "expr": "number",
+             "value": 0.309
+            },
+            {
+             "expr": "number",
+             "value": 0.844
+            },
+            {
+             "expr": "number",
+             "value": 0.691
+            },
+            {
+             "expr": "number",
+             "value": 0.156
+            }
+           ]
+          },
+          "to": "edge_a"
+         },
+         {
+          "from": "edge_a",
+          "kind": "touching",
+          "op": "relation",
+          "to": "edge_b"
+         }
+        ],
+        "op": "transform",
+        "transform": {
+         "rotate_degrees": {
+          "expr": "cycle",
+          "index": {
+           "expr": "local",
+           "name": "leaf_index"
+          },
+          "items": [
+           {
+            "expr": "number",
+            "value": 39.0
+           },
+           {
+            "expr": "number",
+            "value": -52.0
+           },
+           {
+            "expr": "number",
+            "value": 32.0
+           },
+           {
+            "expr": "number",
+            "value": -45.0
+           },
+           {
+            "expr": "number",
+            "value": 36.0
+           },
+           {
+            "expr": "number",
+            "value": -48.0
+           },
+           {
+            "expr": "number",
+            "value": -41.0
+           },
+           {
+            "expr": "number",
+            "value": 43.0
+           },
+           {
+            "expr": "number",
+            "value": 47.0
+           },
+           {
+            "expr": "number",
+            "value": -34.0
+           },
+           {
+            "expr": "number",
+            "value": -37.0
+           },
+           {
+            "expr": "number",
+            "value": 50.0
+           }
+          ]
+         },
+         "scale_x": null,
+         "scale_y": null,
+         "translate_x": null,
+         "translate_y": null
+        }
+       }
+      ],
+      "count": {
+       "expr": "parameter",
+       "name": "leaf_count"
+      },
+      "index": "leaf_index",
+      "maximum": 12,
+      "op": "repeat"
+     }
+    ],
+    "components": {},
+    "heading": "SummerLeaves",
+    "namespace": "Nature",
+    "parameters": {
+     "leaf_count": {
+      "counter": "flat",
+      "maximum": 12,
+      "minimum": 1,
+      "omitted": [
+       6,
+       7,
+       8
+      ],
+      "receives": "count",
+      "type": "integer"
+     }
+    },
+    "schema": "inku.macro-definition.v1",
+    "version": "2.1.0"
+   },
+   {
+    "aliases": [
+     "紅葉"
+    ],
+    "body": [
+     {
+      "fields": {
+       "position_x": {
+        "expr": "exact_decimal",
+        "value": "0.5"
+       },
+       "position_y": {
+        "expr": "exact_decimal",
+        "value": "0.5"
+       }
+      },
+      "name": "palm_center",
+      "op": "anchor"
+     },
+     {
+      "binding": "blade_count",
+      "body": [
+       {
+        "body": [
+         {
+          "body": [
+           {
+            "binding": "edge_a",
+            "fields": {
+             "angle": {
+              "category": "angle",
+              "expr": "semantic_ref",
+              "id": "horizontal"
+             },
+             "chord": {
+              "expr": "cycle",
+              "index": {
+               "expr": "local",
+               "name": "blade_index"
+              },
+              "items": [
+               {
+                "expr": "exact_decimal",
+                "value": "0.23"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.205"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.205"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.155"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.155"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.085"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.085"
+               }
+              ]
+             },
+             "color": {
+              "category": "color",
+              "expr": "semantic_ref",
+              "id": "red"
+             },
+             "movement": {
+              "category": "movement",
+              "expr": "semantic_ref",
+              "id": "place"
+             },
+             "sagitta": {
+              "expr": "exact_decimal",
+              "value": "0.018"
+             },
+             "shape": {
+              "category": "shape",
+              "expr": "semantic_ref",
+              "id": "arc"
+             },
+             "surface": {
+              "category": "surface",
+              "expr": "semantic_ref",
+              "id": "solid"
+             },
+             "touch": {
+              "category": "touch",
+              "expr": "semantic_ref",
+              "id": "rotring"
+             }
+            },
+            "op": "emit"
+           },
+           {
+            "binding": "edge_b",
+            "fields": {
+             "chord": {
+              "expr": "cycle",
+              "index": {
+               "expr": "local",
+               "name": "blade_index"
+              },
+              "items": [
+               {
+                "expr": "exact_decimal",
+                "value": "0.23"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.205"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.205"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.155"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.155"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.085"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.085"
+               }
+              ]
+             },
+             "color": {
+              "category": "color",
+              "expr": "semantic_ref",
+              "id": "red"
+             },
+             "movement": {
+              "category": "movement",
+              "expr": "semantic_ref",
+              "id": "place"
+             },
+             "sagitta": {
+              "expr": "exact_decimal",
+              "value": "0.018"
+             },
+             "shape": {
+              "category": "shape",
+              "expr": "semantic_ref",
+              "id": "arc"
+             },
+             "surface": {
+              "category": "surface",
+              "expr": "semantic_ref",
+              "id": "solid"
+             },
+             "touch": {
+              "category": "touch",
+              "expr": "semantic_ref",
+              "id": "rotring"
+             }
+            },
+            "op": "emit"
+           },
+           {
+            "from": "palm_center",
+            "kind": "connected",
+            "op": "relation",
+            "to": "edge_a"
+           },
+           {
+            "from": "edge_a",
+            "kind": "touching",
+            "op": "relation",
+            "to": "edge_b"
+           }
+          ],
+          "op": "transform",
+          "transform": {
+           "rotate_degrees": {
+            "expr": "cycle",
+            "index": {
+             "expr": "local",
+             "name": "blade_index"
+            },
+            "items": [
+             {
+              "expr": "number",
+              "value": -90.0
+             },
+             {
+              "expr": "number",
+              "value": -50.0
+             },
+             {
+              "expr": "number",
+              "value": -130.0
+             },
+             {
+              "expr": "number",
+              "value": -14.0
+             },
+             {
+              "expr": "number",
+              "value": -166.0
+             },
+             {
+              "expr": "number",
+              "value": 22.0
+             },
+             {
+              "expr": "number",
+              "value": 158.0
+             }
+            ]
+           },
+           "scale_x": null,
+           "scale_y": null,
+           "translate_x": null,
+           "translate_y": null
+          }
+         }
+        ],
+        "count": {
+         "expr": "local",
+         "name": "blade_count"
+        },
+        "index": "blade_index",
+        "maximum": 7,
+        "op": "repeat"
+       }
+      ],
+      "choices": [
+       {
+        "expr": "integer",
+        "value": 5
+       },
+       {
+        "expr": "integer",
+        "value": 7
+       }
+      ],
+      "domain": "momiji_blade_count",
+      "op": "vary",
+      "range": null
+     },
+     {
+      "binding": "stem",
+      "fields": {
+       "angle": {
+        "category": "angle",
+        "expr": "semantic_ref",
+        "id": "vertical"
+       },
+       "color": {
+        "category": "color",
+        "expr": "semantic_ref",
+        "id": "red"
+       },
+       "length": {
+        "expr": "exact_decimal",
+        "value": "0.24"
+       },
+       "movement": {
+        "category": "movement",
+        "expr": "semantic_ref",
+        "id": "draw"
+       },
+       "shape": {
+        "category": "shape",
+        "expr": "semantic_ref",
+        "id": "line"
+       },
+       "touch": {
+        "category": "touch",
+        "expr": "semantic_ref",
+        "id": "rotring"
+       }
+      },
+      "op": "emit"
+     },
+     {
+      "from": "palm_center",
+      "kind": "connected",
+      "op": "relation",
+      "to": "stem"
+     }
+    ],
+    "components": {},
+    "heading": "AutumnLeaves",
+    "namespace": "Nature",
+    "parameters": {},
+    "schema": "inku.macro-definition.v1",
+    "version": "2.0.0"
+   },
+   {
+    "aliases": [
+     "落葉"
+    ],
+    "body": [
+     {
+      "body": [
+       {
+        "binding": "leaf_spot",
+        "body": [
+         {
+          "arguments": {
+           "color": {
+            "expr": "cycle",
+            "index": {
+             "expr": "local",
+             "name": "leaf_index"
+            },
+            "items": [
+             {
+              "category": "color",
+              "expr": "semantic_ref",
+              "id": "red"
+             },
+             {
+              "category": "color",
+              "expr": "semantic_ref",
+              "id": "gray"
+             },
+             {
+              "category": "color",
+              "expr": "semantic_ref",
+              "id": "red"
+             },
+             {
+              "category": "color",
+              "expr": "semantic_ref",
+              "id": "red"
+             },
+             {
+              "category": "color",
+              "expr": "semantic_ref",
+              "id": "red"
+             },
+             {
+              "category": "color",
+              "expr": "semantic_ref",
+              "id": "red"
+             },
+             {
+              "category": "color",
+              "expr": "semantic_ref",
+              "id": "gray"
+             },
+             {
+              "category": "color",
+              "expr": "semantic_ref",
+              "id": "gray"
+             },
+             {
+              "category": "color",
+              "expr": "semantic_ref",
+              "id": "gray"
+             },
+             {
+              "category": "color",
+              "expr": "semantic_ref",
+              "id": "gray"
+             },
+             {
+              "category": "color",
+              "expr": "semantic_ref",
+              "id": "gray"
+             },
+             {
+              "category": "color",
+              "expr": "semantic_ref",
+              "id": "gray"
+             },
+             {
+              "category": "color",
+              "expr": "semantic_ref",
+              "id": "gray"
+             },
+             {
+              "category": "color",
+              "expr": "semantic_ref",
+              "id": "red"
+             },
+             {
+              "category": "color",
+              "expr": "semantic_ref",
+              "id": "red"
+             },
+             {
+              "category": "color",
+              "expr": "semantic_ref",
+              "id": "red"
+             }
+            ]
+           },
+           "lean": {
+            "expr": "cycle",
+            "index": {
+             "expr": "local",
+             "name": "leaf_index"
+            },
+            "items": [
+             {
+              "category": "angle",
+              "expr": "semantic_ref",
+              "id": "rising"
+             },
+             {
+              "category": "angle",
+              "expr": "semantic_ref",
+              "id": "rotated"
+             },
+             {
+              "category": "angle",
+              "expr": "semantic_ref",
+              "id": "falling"
+             },
+             {
+              "category": "angle",
+              "expr": "semantic_ref",
+              "id": "diagonal"
+             },
+             {
+              "category": "angle",
+              "expr": "semantic_ref",
+              "id": "left_falling"
+             },
+             {
+              "category": "angle",
+              "expr": "semantic_ref",
+              "id": "horizontal"
+             },
+             {
+              "category": "angle",
+              "expr": "semantic_ref",
+              "id": "left_rising"
+             }
+            ]
+           },
+           "x": {
+            "expr": "cycle",
+            "index": {
+             "expr": "local",
+             "name": "leaf_spot"
+            },
+            "items": [
+             {
+              "expr": "cycle",
+              "index": {
+               "expr": "local",
+               "name": "leaf_index"
+              },
+              "items": [
+               {
+                "expr": "exact_decimal",
+                "value": "0.424"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.831"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.206"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.402"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.233"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.587"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.685"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.134"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.305"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.33"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.496"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.515"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.675"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.603"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.757"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.759"
+               }
+              ]
+             },
+             {
+              "expr": "cycle",
+              "index": {
+               "expr": "local",
+               "name": "leaf_index"
+              },
+              "items": [
+               {
+                "expr": "exact_decimal",
+                "value": "0.367"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.93"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.34"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.534"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.178"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.717"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.623"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.08"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.438"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.274"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.627"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.457"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.802"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.543"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.882"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.691"
+               }
+              ]
+             },
+             {
+              "expr": "cycle",
+              "index": {
+               "expr": "local",
+               "name": "leaf_index"
+              },
+              "items": [
+               {
+                "expr": "exact_decimal",
+                "value": "0.415"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.887"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.272"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.466"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.226"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.65"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.673"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.128"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.37"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.322"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.56"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.506"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.736"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.592"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.817"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.742"
+               }
+              ]
+             },
+             {
+              "expr": "cycle",
+              "index": {
+               "expr": "local",
+               "name": "leaf_index"
+              },
+              "items": [
+               {
+                "expr": "exact_decimal",
+                "value": "0.347"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.9"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.273"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.469"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.156"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.655"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.609"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.07"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.372"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.253"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.564"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.439"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.743"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.526"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.826"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.684"
+               }
+              ]
+             }
+            ]
+           },
+           "y": {
+            "expr": "cycle",
+            "index": {
+             "expr": "local",
+             "name": "leaf_spot"
+            },
+            "items": [
+             {
+              "expr": "cycle",
+              "index": {
+               "expr": "local",
+               "name": "leaf_index"
+              },
+              "items": [
+               {
+                "expr": "exact_decimal",
+                "value": "0.518"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.799"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.147"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.351"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.319"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.544"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.791"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.216"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.25"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.42"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.449"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.613"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.636"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.705"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.722"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.868"
+               }
+              ]
+             },
+             {
+              "expr": "cycle",
+              "index": {
+               "expr": "local",
+               "name": "leaf_index"
+              },
+              "items": [
+               {
+                "expr": "exact_decimal",
+                "value": "0.647"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.735"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.098"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.3"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.45"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.491"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.913"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.347"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.201"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.55"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.398"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.74"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.581"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.83"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.664"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.93"
+               }
+              ]
+             },
+             {
+              "expr": "cycle",
+              "index": {
+               "expr": "local",
+               "name": "leaf_index"
+              },
+              "items": [
+               {
+                "expr": "exact_decimal",
+                "value": "0.582"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.784"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.143"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.346"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.384"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.537"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.85"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.282"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.246"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.484"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.443"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.676"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.627"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.766"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.711"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.922"
+               }
+              ]
+             },
+             {
+              "expr": "cycle",
+              "index": {
+               "expr": "local",
+               "name": "leaf_index"
+              },
+              "items": [
+               {
+                "expr": "exact_decimal",
+                "value": "0.583"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.726"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.072"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.277"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.383"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.47"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.856"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.28"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.176"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.484"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.375"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.678"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.562"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.77"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.648"
+               },
+               {
+                "expr": "exact_decimal",
+                "value": "0.93"
+               }
+              ]
+             }
+            ]
+           }
+          },
+          "component": "fallen_leaf",
+          "op": "use"
+         }
+        ],
+        "choices": [
+         {
+          "expr": "integer",
+          "value": 0
+         },
+         {
+          "expr": "integer",
+          "value": 1
+         },
+         {
+          "expr": "integer",
+          "value": 2
+         },
+         {
+          "expr": "integer",
+          "value": 3
+         }
+        ],
+        "domain": "ochiba_spot",
+        "op": "vary",
+        "range": null
+       }
+      ],
+      "count": {
+       "expr": "parameter",
+       "name": "leaf_count"
+      },
+      "index": "leaf_index",
+      "maximum": 16,
+      "op": "repeat"
+     }
+    ],
+    "components": {
+     "fallen_leaf": {
+      "body": [
+       {
+        "binding": "edge_a",
+        "fields": {
+         "angle": {
+          "expr": "parameter",
+          "name": "lean"
+         },
+         "chord": {
+          "expr": "exact_decimal",
+          "value": "0.11"
+         },
+         "color": {
+          "expr": "parameter",
+          "name": "color"
+         },
+         "ink_spread": {
+          "category": "variation",
+          "expr": "semantic_ref",
+          "id": "bleeding"
+         },
+         "movement": {
+          "category": "movement",
+          "expr": "semantic_ref",
+          "id": "place"
+         },
+         "position_x": {
+          "expr": "parameter",
+          "name": "x"
+         },
+         "position_y": {
+          "expr": "parameter",
+          "name": "y"
+         },
+         "sagitta": {
+          "expr": "exact_decimal",
+          "value": "0.022"
+         },
+         "shape": {
+          "category": "shape",
+          "expr": "semantic_ref",
+          "id": "arc"
+         },
+         "surface": {
+          "category": "surface",
+          "expr": "semantic_ref",
+          "id": "solid"
+         },
+         "touch": {
+          "category": "touch",
+          "expr": "semantic_ref",
+          "id": "crayon"
+         }
+        },
+        "op": "emit"
+       },
+       {
+        "binding": "edge_b",
+        "fields": {
+         "chord": {
+          "expr": "exact_decimal",
+          "value": "0.11"
+         },
+         "color": {
+          "expr": "parameter",
+          "name": "color"
+         },
+         "ink_spread": {
+          "category": "variation",
+          "expr": "semantic_ref",
+          "id": "bleeding"
+         },
+         "movement": {
+          "category": "movement",
+          "expr": "semantic_ref",
+          "id": "place"
+         },
+         "sagitta": {
+          "expr": "exact_decimal",
+          "value": "0.022"
+         },
+         "shape": {
+          "category": "shape",
+          "expr": "semantic_ref",
+          "id": "arc"
+         },
+         "surface": {
+          "category": "surface",
+          "expr": "semantic_ref",
+          "id": "solid"
+         },
+         "touch": {
+          "category": "touch",
+          "expr": "semantic_ref",
+          "id": "crayon"
+         }
+        },
+        "op": "emit"
+       },
+       {
+        "from": "edge_a",
+        "kind": "touching",
+        "op": "relation",
+        "to": "edge_b"
+       }
+      ],
+      "parameters": {
+       "color": {
+        "category": "color",
+        "type": "semantic_ref"
+       },
+       "lean": {
+        "category": "angle",
+        "type": "semantic_ref"
+       },
+       "x": {
+        "dimension": "position_x",
+        "type": "exact_decimal"
+       },
+       "y": {
+        "dimension": "position_y",
+        "type": "exact_decimal"
+       }
+      }
+     }
+    },
+    "heading": "FallenLeaves",
+    "namespace": "Nature",
+    "parameters": {
+     "leaf_count": {
+      "counter": "flat",
+      "maximum": 16,
+      "minimum": 1,
+      "omitted": [
+       8,
+       9,
+       10,
+       11,
+       12
+      ],
+      "receives": "count",
+      "type": "integer"
+     }
+    },
+    "schema": "inku.macro-definition.v1",
+    "version": "2.1.0"
+   },
+   {
+    "aliases": [
+     "枯草"
+    ],
+    "body": [
+     {
+      "body": [
+       {
+        "binding": "clump_x",
+        "body": [
+         {
+          "binding": "clump_shape",
+          "body": [
+           {
+            "binding": "blade_count",
+            "body": [
+             {
+              "body": [
+               {
+                "arguments": {
+                 "chord": {
+                  "expr": "cycle",
+                  "index": {
+                   "expr": "local",
+                   "name": "clump_shape"
+                  },
+                  "items": [
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "blade_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.42"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.34"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.48"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.28"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.38"
+                     }
+                    ]
+                   },
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "blade_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.34"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.48"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.28"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.38"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.42"
+                     }
+                    ]
+                   },
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "blade_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.28"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.42"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.38"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.34"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.48"
+                     }
+                    ]
+                   },
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "blade_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.48"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.28"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.42"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.38"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.34"
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 "rotation": {
+                  "expr": "cycle",
+                  "index": {
+                   "expr": "local",
+                   "name": "clump_shape"
+                  },
+                  "items": [
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "blade_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "number",
+                      "value": -94.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -62.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -84.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -24.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -44.0
+                     }
+                    ]
+                   },
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "blade_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "number",
+                      "value": -62.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -84.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -24.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -44.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -94.0
+                     }
+                    ]
+                   },
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "blade_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "number",
+                      "value": -24.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -94.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -44.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -62.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -84.0
+                     }
+                    ]
+                   },
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "blade_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "number",
+                      "value": -84.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -24.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -94.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -44.0
+                     },
+                     {
+                      "expr": "number",
+                      "value": -62.0
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 "x": {
+                  "expr": "local",
+                  "name": "clump_x"
+                 },
+                 "y": {
+                  "expr": "exact_decimal",
+                  "value": "0.9"
+                 }
+                },
+                "component": "rooted_blade",
+                "op": "use"
+               }
+              ],
+              "count": {
+               "expr": "local",
+               "name": "blade_count"
+              },
+              "index": "blade_index",
+              "maximum": 5,
+              "op": "repeat"
+             }
+            ],
+            "choices": [
+             {
+              "expr": "integer",
+              "value": 3
+             },
+             {
+              "expr": "integer",
+              "value": 4
+             },
+             {
+              "expr": "integer",
+              "value": 5
+             }
+            ],
+            "domain": "karekusa_blade_count",
+            "op": "vary",
+            "range": null
+           }
+          ],
+          "choices": [
+           {
+            "expr": "integer",
+            "value": 0
+           },
+           {
+            "expr": "integer",
+            "value": 1
+           },
+           {
+            "expr": "integer",
+            "value": 2
+           },
+           {
+            "expr": "integer",
+            "value": 3
+           }
+          ],
+          "domain": "karekusa_clump_shape",
+          "op": "vary",
+          "range": null
+         }
+        ],
+        "choices": [
+         {
+          "expr": "cycle",
+          "index": {
+           "expr": "local",
+           "name": "clump_index"
+          },
+          "items": [
+           {
+            "expr": "exact_decimal",
+            "value": "0.27"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.69"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.48"
+           }
+          ]
+         },
+         {
+          "expr": "cycle",
+          "index": {
+           "expr": "local",
+           "name": "clump_index"
+          },
+          "items": [
+           {
+            "expr": "exact_decimal",
+            "value": "0.3"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.72"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.51"
+           }
+          ]
+         },
+         {
+          "expr": "cycle",
+          "index": {
+           "expr": "local",
+           "name": "clump_index"
+          },
+          "items": [
+           {
+            "expr": "exact_decimal",
+            "value": "0.33"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.75"
+           },
+           {
+            "expr": "exact_decimal",
+            "value": "0.54"
+           }
+          ]
+         }
+        ],
+        "domain": "karekusa_clump_x",
+        "op": "vary",
+        "range": null
+       }
+      ],
+      "count": {
+       "expr": "parameter",
+       "name": "clump_count"
+      },
+      "index": "clump_index",
+      "maximum": 3,
+      "op": "repeat"
+     }
+    ],
+    "components": {
+     "rooted_blade": {
+      "body": [
+       {
+        "fields": {
+         "position_x": {
+          "expr": "parameter",
+          "name": "x"
+         },
+         "position_y": {
+          "expr": "parameter",
+          "name": "y"
+         }
+        },
+        "name": "root",
+        "op": "anchor"
+       },
+       {
+        "body": [
+         {
+          "binding": "edge_a",
+          "fields": {
+           "angle": {
+            "category": "angle",
+            "expr": "semantic_ref",
+            "id": "horizontal"
+           },
+           "chord": {
+            "expr": "parameter",
+            "name": "chord"
+           },
+           "color": {
+            "category": "color",
+            "expr": "semantic_ref",
+            "id": "gray"
+           },
+           "fluctuation_frequency": {
+            "category": "variation",
+            "expr": "semantic_ref",
+            "id": "tightly"
+           },
+           "ink_spread": {
+            "category": "variation",
+            "expr": "semantic_ref",
+            "id": "bleeding"
+           },
+           "movement": {
+            "category": "movement",
+            "expr": "semantic_ref",
+            "id": "place"
+           },
+           "sagitta": {
+            "expr": "exact_decimal",
+            "value": "0.014"
+           },
+           "shape": {
+            "category": "shape",
+            "expr": "semantic_ref",
+            "id": "arc"
+           },
+           "surface": {
+            "category": "surface",
+            "expr": "semantic_ref",
+            "id": "solid"
+           },
+           "touch": {
+            "category": "touch",
+            "expr": "semantic_ref",
+            "id": "chalk"
+           }
+          },
+          "op": "emit"
+         },
+         {
+          "binding": "edge_b",
+          "fields": {
+           "chord": {
+            "expr": "parameter",
+            "name": "chord"
+           },
+           "color": {
+            "category": "color",
+            "expr": "semantic_ref",
+            "id": "gray"
+           },
+           "fluctuation_frequency": {
+            "category": "variation",
+            "expr": "semantic_ref",
+            "id": "tightly"
+           },
+           "ink_spread": {
+            "category": "variation",
+            "expr": "semantic_ref",
+            "id": "bleeding"
+           },
+           "movement": {
+            "category": "movement",
+            "expr": "semantic_ref",
+            "id": "place"
+           },
+           "sagitta": {
+            "expr": "exact_decimal",
+            "value": "0.014"
+           },
+           "shape": {
+            "category": "shape",
+            "expr": "semantic_ref",
+            "id": "arc"
+           },
+           "surface": {
+            "category": "surface",
+            "expr": "semantic_ref",
+            "id": "solid"
+           },
+           "touch": {
+            "category": "touch",
+            "expr": "semantic_ref",
+            "id": "chalk"
+           }
+          },
+          "op": "emit"
+         },
+         {
+          "from": "root",
+          "kind": "connected",
+          "op": "relation",
+          "to": "edge_a"
+         },
+         {
+          "from": "edge_a",
+          "kind": "touching",
+          "op": "relation",
+          "to": "edge_b"
+         }
+        ],
+        "op": "transform",
+        "transform": {
+         "rotate_degrees": {
+          "expr": "parameter",
+          "name": "rotation"
+         },
+         "scale_x": null,
+         "scale_y": null,
+         "translate_x": null,
+         "translate_y": null
+        }
+       }
+      ],
+      "parameters": {
+       "chord": {
+        "dimension": "chord",
+        "type": "exact_decimal"
+       },
+       "rotation": {
+        "type": "number"
+       },
+       "x": {
+        "dimension": "position_x",
+        "type": "exact_decimal"
+       },
+       "y": {
+        "dimension": "position_y",
+        "type": "exact_decimal"
+       }
+      }
+     }
+    },
+    "heading": "WitheredGrass",
+    "namespace": "Nature",
+    "parameters": {
+     "clump_count": {
+      "counter": "general",
+      "maximum": 3,
+      "minimum": 1,
+      "omitted": [
+       1,
+       2
+      ],
+      "receives": "count",
+      "type": "integer"
+     }
+    },
+    "schema": "inku.macro-definition.v1",
+    "version": "2.1.0"
+   },
+   {
+    "aliases": [
+     "枯葉"
+    ],
+    "body": [
+     {
+      "body": [
+       {
+        "binding": "leaf_side",
+        "body": [
+         {
+          "binding": "leaf_spot",
+          "body": [
+           {
+            "binding": "leaf_lean",
+            "body": [
+             {
+              "arguments": {
+               "color": {
+                "expr": "cycle",
+                "index": {
+                 "expr": "local",
+                 "name": "leaf_index"
+                },
+                "items": [
+                 {
+                  "category": "color",
+                  "expr": "semantic_ref",
+                  "id": "gray"
+                 },
+                 {
+                  "category": "color",
+                  "expr": "semantic_ref",
+                  "id": "yellow"
+                 }
+                ]
+               },
+               "lean": {
+                "expr": "local",
+                "name": "leaf_lean"
+               },
+               "x": {
+                "expr": "cycle",
+                "index": {
+                 "expr": "local",
+                 "name": "leaf_side"
+                },
+                "items": [
+                 {
+                  "expr": "cycle",
+                  "index": {
+                   "expr": "local",
+                   "name": "leaf_spot"
+                  },
+                  "items": [
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "leaf_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.115"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.4"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.305"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.21"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.115"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.4"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.21"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.305"
+                     }
+                    ]
+                   },
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "leaf_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.165"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.45"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.355"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.26"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.165"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.45"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.26"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.355"
+                     }
+                    ]
+                   },
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "leaf_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.16"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.445"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.35"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.255"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.16"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.445"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.255"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.35"
+                     }
+                    ]
+                   },
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "leaf_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.12"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.405"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.31"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.215"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.12"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.405"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.215"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.31"
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "expr": "cycle",
+                  "index": {
+                   "expr": "local",
+                   "name": "leaf_spot"
+                  },
+                  "items": [
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "leaf_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.885"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.6"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.695"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.79"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.885"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.6"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.79"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.695"
+                     }
+                    ]
+                   },
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "leaf_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.835"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.55"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.645"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.74"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.835"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.55"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.74"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.645"
+                     }
+                    ]
+                   },
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "leaf_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.84"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.555"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.65"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.745"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.84"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.555"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.745"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.65"
+                     }
+                    ]
+                   },
+                   {
+                    "expr": "cycle",
+                    "index": {
+                     "expr": "local",
+                     "name": "leaf_index"
+                    },
+                    "items": [
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.88"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.595"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.69"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.785"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.88"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.595"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.785"
+                     },
+                     {
+                      "expr": "exact_decimal",
+                      "value": "0.69"
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               "y": {
+                "expr": "cycle",
+                "index": {
+                 "expr": "local",
+                 "name": "leaf_spot"
+                },
+                "items": [
+                 {
+                  "expr": "cycle",
+                  "index": {
+                   "expr": "local",
+                   "name": "leaf_index"
+                  },
+                  "items": [
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.83"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.72"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.83"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.72"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.72"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.83"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.83"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.72"
+                   }
+                  ]
+                 },
+                 {
+                  "expr": "cycle",
+                  "index": {
+                   "expr": "local",
+                   "name": "leaf_index"
+                  },
+                  "items": [
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.87"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.76"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.87"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.76"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.76"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.87"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.87"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.76"
+                   }
+                  ]
+                 },
+                 {
+                  "expr": "cycle",
+                  "index": {
+                   "expr": "local",
+                   "name": "leaf_index"
+                  },
+                  "items": [
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.825"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.715"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.825"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.715"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.715"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.825"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.825"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.715"
+                   }
+                  ]
+                 },
+                 {
+                  "expr": "cycle",
+                  "index": {
+                   "expr": "local",
+                   "name": "leaf_index"
+                  },
+                  "items": [
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.875"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.765"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.875"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.765"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.765"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.875"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.875"
+                   },
+                   {
+                    "expr": "exact_decimal",
+                    "value": "0.765"
+                   }
+                  ]
+                 }
+                ]
+               }
+              },
+              "component": "withered_leaf",
+              "op": "use"
+             }
+            ],
+            "choices": [
+             {
+              "category": "angle",
+              "expr": "semantic_ref",
+              "id": "horizontal"
+             },
+             {
+              "category": "angle",
+              "expr": "semantic_ref",
+              "id": "falling"
+             },
+             {
+              "category": "angle",
+              "expr": "semantic_ref",
+              "id": "left_falling"
+             },
+             {
+              "category": "angle",
+              "expr": "semantic_ref",
+              "id": "diagonal"
+             },
+             {
+              "category": "angle",
+              "expr": "semantic_ref",
+              "id": "rotated"
+             }
+            ],
+            "domain": "kareha_fallen_lean",
+            "op": "vary",
+            "range": null
+           }
+          ],
+          "choices": [
+           {
+            "expr": "integer",
+            "value": 0
+           },
+           {
+            "expr": "integer",
+            "value": 1
+           },
+           {
+            "expr": "integer",
+            "value": 2
+           },
+           {
+            "expr": "integer",
+            "value": 3
+           }
+          ],
+          "domain": "kareha_spot",
+          "op": "vary",
+          "range": null
+         }
+        ],
+        "choices": [
+         {
+          "expr": "integer",
+          "value": 0
+         },
+         {
+          "expr": "integer",
+          "value": 1
+         }
+        ],
+        "domain": "kareha_side",
+        "op": "vary",
+        "range": null
+       }
+      ],
+      "count": {
+       "expr": "parameter",
+       "name": "leaf_count"
+      },
+      "index": "leaf_index",
+      "maximum": 8,
+      "op": "repeat"
+     }
+    ],
+    "components": {
+     "withered_leaf": {
+      "body": [
+       {
+        "binding": "edge_a",
+        "fields": {
+         "angle": {
+          "expr": "parameter",
+          "name": "lean"
+         },
+         "chord": {
+          "expr": "exact_decimal",
+          "value": "0.13"
+         },
+         "color": {
+          "expr": "parameter",
+          "name": "color"
+         },
+         "fluctuation_amplitude": {
+          "category": "variation",
+          "expr": "semantic_ref",
+          "id": "narrowly"
+         },
+         "fluctuation_quality": {
+          "category": "variation",
+          "expr": "semantic_ref",
+          "id": "swaying"
+         },
+         "movement": {
+          "category": "movement",
+          "expr": "semantic_ref",
+          "id": "place"
+         },
+         "position_x": {
+          "expr": "parameter",
+          "name": "x"
+         },
+         "position_y": {
+          "expr": "parameter",
+          "name": "y"
+         },
+         "sagitta": {
+          "expr": "exact_decimal",
+          "value": "0.034"
+         },
+         "shape": {
+          "category": "shape",
+          "expr": "semantic_ref",
+          "id": "arc"
+         },
+         "surface": {
+          "category": "surface",
+          "expr": "semantic_ref",
+          "id": "solid"
+         },
+         "touch": {
+          "category": "touch",
+          "expr": "semantic_ref",
+          "id": "chalk"
+         }
+        },
+        "op": "emit"
+       },
+       {
+        "binding": "edge_b",
+        "fields": {
+         "chord": {
+          "expr": "exact_decimal",
+          "value": "0.13"
+         },
+         "color": {
+          "expr": "parameter",
+          "name": "color"
+         },
+         "fluctuation_amplitude": {
+          "category": "variation",
+          "expr": "semantic_ref",
+          "id": "narrowly"
+         },
+         "fluctuation_quality": {
+          "category": "variation",
+          "expr": "semantic_ref",
+          "id": "swaying"
+         },
+         "movement": {
+          "category": "movement",
+          "expr": "semantic_ref",
+          "id": "place"
+         },
+         "sagitta": {
+          "expr": "exact_decimal",
+          "value": "0.01"
+         },
+         "shape": {
+          "category": "shape",
+          "expr": "semantic_ref",
+          "id": "arc"
+         },
+         "surface": {
+          "category": "surface",
+          "expr": "semantic_ref",
+          "id": "solid"
+         },
+         "touch": {
+          "category": "touch",
+          "expr": "semantic_ref",
+          "id": "chalk"
+         }
+        },
+        "op": "emit"
+       },
+       {
+        "from": "edge_a",
+        "kind": "touching",
+        "op": "relation",
+        "to": "edge_b"
+       }
+      ],
+      "parameters": {
+       "color": {
+        "category": "color",
+        "type": "semantic_ref"
+       },
+       "lean": {
+        "category": "angle",
+        "type": "semantic_ref"
+       },
+       "x": {
+        "dimension": "position_x",
+        "type": "exact_decimal"
+       },
+       "y": {
+        "dimension": "position_y",
+        "type": "exact_decimal"
+       }
+      }
+     }
+    },
+    "heading": "WitheredLeaves",
+    "namespace": "Nature",
+    "parameters": {
+     "leaf_count": {
+      "counter": "flat",
+      "maximum": 8,
+      "minimum": 1,
+      "omitted": [
+       2,
+       3,
+       4
+      ],
+      "receives": "count",
+      "type": "integer"
+     }
+    },
+    "schema": "inku.macro-definition.v1",
+    "version": "2.1.0"
+   }
+  ],
+  "macro_locks": [
+   {
+    "aliases": [
+     "Nature.若葉"
+    ],
+    "digest": "sha256:4dae9b777a717ed071e053e645660be980571d707fdf2eaf8da8fd265b97b179",
+    "qualified_name": "Nature.YoungLeaves",
+    "version": "2.1.0"
+   },
+   {
+    "aliases": [
+     "Nature.下草"
+    ],
+    "digest": "sha256:813cc3a9393067582f8aa404b2d62f34fd247d8c545562ffe6a1858ca1d6eb3c",
+    "qualified_name": "Nature.Undergrowth",
+    "version": "2.1.0"
+   },
+   {
+    "aliases": [
+     "Nature.青葉"
+    ],
+    "digest": "sha256:f15015e14fb6bcd781cf74e7b13868b4c5318b852c3bfbd19ab4ad813a7b1b89",
+    "qualified_name": "Nature.SummerLeaves",
+    "version": "2.1.0"
+   },
+   {
+    "aliases": [
+     "Nature.紅葉"
+    ],
+    "digest": "sha256:db2f532fddd2788f2c3fda0340a938a492ebc75daf7883785577f78eb24321aa",
+    "qualified_name": "Nature.AutumnLeaves",
+    "version": "2.0.0"
+   },
+   {
+    "aliases": [
+     "Nature.落葉"
+    ],
+    "digest": "sha256:3f5c9658a79c464c7099001d171cd5884a0198941f659aabb4c2b9990f2dcead",
+    "qualified_name": "Nature.FallenLeaves",
+    "version": "2.1.0"
+   },
+   {
+    "aliases": [
+     "Nature.枯草"
+    ],
+    "digest": "sha256:3b8eea62677c624e753601d618b536b0716abdf165e4a68a24fede95476fc326",
+    "qualified_name": "Nature.WitheredGrass",
+    "version": "2.1.0"
+   },
+   {
+    "aliases": [
+     "Nature.枯葉"
+    ],
+    "digest": "sha256:6aa9819f57d54a3e7e3f59dc98415ac088c96e1f0f38602b37ca7936ae0eedfe",
+    "qualified_name": "Nature.WitheredLeaves",
+    "version": "2.1.0"
+   }
+  ],
+  "saijiki": "inku.saijiki.v2",
+  "compiler": {
+   "composition_seed": null,
+   "error_policy": "omit_and_continue",
+   "hard_resource_policy": {
+    "budget": {
+     "maximum": {
+      "anchor_instances": 4096,
+      "fill_instances": 64,
+      "logical_objects": 4096,
+      "maximum_per_template_primitive_marks": 240,
+      "maximum_resolved_count": 2000,
+      "object_templates": 64,
+      "placement_instances": 64,
+      "primitive_marks": 400,
+      "template_nodes": 128,
+      "transform_instances": 4096
+     }
+    },
+    "identity": "host-settings:7f1399413dec8fa789348e9a8424af11e9177878ff8c2d780893ed73bc6bc0f4"
+   },
+   "host": null,
+   "macro_expansion_limits": {
+    "max_depth": "16",
+    "max_evaluation_steps": "8192",
+    "max_invocations": "64",
+    "max_nodes_per_invocation": "128",
+    "max_total_nodes": "128"
+   },
+   "operational_resource_budget": {
+    "maximum": {
+     "anchor_instances": 4096,
+     "fill_instances": 64,
+     "logical_objects": 4096,
+     "maximum_per_template_primitive_marks": 240,
+     "maximum_resolved_count": 2000,
+     "object_templates": 64,
+     "placement_instances": 64,
+     "primitive_marks": 400,
+     "template_nodes": 128,
+     "transform_instances": 4096
+    }
+   }
+  },
+  "clip": {
+   "max_flattened_points": "200000",
+   "max_nodes": "50000",
+   "max_output_vertices": "200000",
+   "max_path_elements": "200000",
+   "max_work": "10000000",
+   "tolerance_pixels": 0.1
+  }
+ }
+}

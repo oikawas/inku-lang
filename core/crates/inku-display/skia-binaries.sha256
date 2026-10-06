@@ -1,0 +1,10 @@
+# Skia prebuilt binaries for skia-safe/skia-bindings =0.153.3 with features svg, webp
+# (key suffix jpegd-jpege-pdf-svg-textlayout-webpd-webpe: CPU only). skia-bindings does
+# not verify what it downloads, so scripts/skia-binaries.sh checks each copy against
+# this list before every build. Source and digests: the GitHub release
+# https://github.com/rust-skia/skia-binaries/releases/tag/0.153.3 (asset digests, 2026-10-06).
+fd6e2fb21947724e91a0d41880b9560bfa92907656c73e85e190ae91b75af5d7  0.153.3/skia-binaries-b7f043e0b1e2a850e702-aarch64-apple-darwin-jpegd-jpege-pdf-svg-textlayout-webpd-webpe.tar.gz
+b5fdd83c442d0cf038ba4c91fc948f97885fab43bd52915a2cb6b8c8c7a204fb  0.153.3/skia-binaries-b7f043e0b1e2a850e702-x86_64-apple-darwin-jpegd-jpege-pdf-svg-textlayout-webpd-webpe.tar.gz
+c8b071286ad774aeb5f8223c126be3f23ee838ddd0a69fd3942a8cae3895f321  0.153.3/skia-binaries-b7f043e0b1e2a850e702-aarch64-apple-ios-jpegd-jpege-pdf-svg-textlayout-webpd-webpe.tar.gz
+d550d0cdc828daa5dad8bce99a03bb2dc93dc163c69d4998da0e7b380499ab3f  0.153.3/skia-binaries-b7f043e0b1e2a850e702-aarch64-apple-ios-sim-jpegd-jpege-pdf-svg-textlayout-webpd-webpe.tar.gz
+345b0606c7683ff6e889ab88750785cb87d7d25b7de1df51d1bf5cc1c5ee1f8f  0.153.3/skia-binaries-b7f043e0b1e2a850e702-x86_64-apple-ios-jpegd-jpege-pdf-svg-textlayout-webpd-webpe.tar.gz

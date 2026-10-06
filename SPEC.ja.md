@@ -1214,7 +1214,7 @@ renderer は JSON Score を SVG へ変換する。視覚的な実体化を持つ
 
 Rust core内では、host-neutralなrequest/output型と粗い`render`境界から、決定的seed、performance planning、arrangement／placement／relation、純粋な幾何、mark／stroke／surface／support、ground／presence layer／palette、SVG documentへ一方向に依存する。host SDKやPython runtimeへ依存せず、engine identityとrenderer-owned referenceもcoreが持つ。Engine 40のPython実装やruntime fallbackは持たず、過去のEngine 40 corpusは履歴根拠としてのみ保持する。この境界はServerの出力意味論を固定したままAndroidと将来のclientへ同じcoreを渡すportability boundaryである。Android bindingはEngine 42で統合済みであり、Android固有のKotlin rendererへfallbackしない。
 
-SVGからpixelへのpresentationはRender Engineと別の`core/crates/inku-svg-raster` APIが所有する。Androidのmain preview、履歴thumbnail、refinement preview、PNG exportは、保存済みまたは生成直後のcanonical SVGをresource非依存のpremultiplied RGBA8へ変換する。このraster APIの変更は、それ自体ではRender Engineの版を変えず、保存SVGや`rh3`の意味も変えない。
+SVGからpixelへのpresentationはRender Engineと別の`core/crates/inku-svg-raster` APIが所有する。Androidのmain preview、履歴thumbnail、refinement preview、PNG exportは、保存済みまたは生成直後のcanonical SVGをresource非依存のpremultiplied RGBA8へ変換する。このraster APIの変更は、それ自体ではRender Engineの版を変えず、保存SVGや`rh3`の意味も変えない。macOSの作品域（拡大表示を含む）は、表示専用の`core/crates/inku-display`（Skia）でpixel化する。表示の直前にメモリ上でだけ互換変換を掛け、照合表の外の作品は`inku-svg-raster`で描く。この表示部品も、Render Engineの版、保存SVG、`rh3`の意味を変えない。
 
 renderer は制御された揺らぎを生んでよいが、**JSON Score の意図は保たねばならない**。各描画は `render_seed` を持ちうる。同じ seed を与えれば再演は再現し、正本の Score は動かない。演奏の 2 つのスケールと render engine の版史は §13.8 と §13.11 にある。
 

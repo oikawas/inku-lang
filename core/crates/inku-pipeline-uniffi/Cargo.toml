@@ -13,9 +13,12 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 [features]
 default = []
 cli = ["uniffi/cli"]
+# Skia screen display; only apple/scripts/build-core.sh turns it on.
+display = ["dep:inku-display", "inku-display/skia"]
 
 [dependencies]
 inku-ddl = { path = "../inku-ddl" }
+inku-display = { path = "../inku-display", optional = true }
 inku-pipeline = { path = "../inku-pipeline" }
 inku-score = { path = "../inku-score" }
 inku-render = { path = "../inku-render" }

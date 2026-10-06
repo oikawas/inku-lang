@@ -111,7 +111,7 @@ private enum DemoModelPicker: String, Identifiable {
             }
             demoStatistics
             if let work = automation.demoWork {
-                ArtworkCanvas(svg: work.svg, renderer: model.renderer, caption: work.effectiveSourceText)
+                ArtworkCanvas(svg: work.svg, renderer: model.displayRenderer, caption: work.effectiveSourceText)
                     .frame(minHeight: 320)
                 HStack {
                     Text(model.display.localized(automation.demoCurrentSaved ? "保存済み" : "未保存")).inkuFont(12).foregroundStyle(.secondary)

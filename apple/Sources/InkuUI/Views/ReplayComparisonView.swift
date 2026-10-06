@@ -107,7 +107,7 @@ public struct ReplayComparisonView: View {
             }.frame(maxWidth: .infinity, minHeight: 64, alignment: .topLeading)
             Group {
                 if let svg {
-                    ArtworkCanvas(svg: svg, renderer: model.renderer)
+                    ArtworkCanvas(svg: svg, renderer: model.displayRenderer)
                 } else if comparison.running {
                     ProgressView(model.display.localized(replay ? "現行エンジンで描き直し中" : "保存時のSVGを読み込み中"))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -7,7 +7,7 @@ struct SVGDocument {
     let height: Double
 
     init(_ svg: String) throws {
-        guard !svg.isEmpty, svg.utf8.count <= 8 * 1024 * 1024,
+        guard !svg.isEmpty, svg.utf8.count <= 12 * 1024 * 1024,
               !svg.localizedCaseInsensitiveContains("<!DOCTYPE"), !svg.localizedCaseInsensitiveContains("<!ENTITY") else {
             throw ExportFailure("保存SVGが空・大きすぎる・外部定義を含むため書き出せません。")
         }

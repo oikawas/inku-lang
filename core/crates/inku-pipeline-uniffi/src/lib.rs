@@ -7,6 +7,8 @@ use inku_pipeline::protocol::{ProtocolError, error_bytes};
 mod description_labels;
 #[cfg(not(target_os = "android"))]
 mod description_meter;
+#[cfg(feature = "display")]
+mod display;
 mod macro_catalog;
 mod plugin_diagnostics;
 mod raster;
@@ -16,6 +18,11 @@ mod standalone;
 pub use description_labels::pipeline_description;
 #[cfg(not(target_os = "android"))]
 pub use description_meter::count_description_meter;
+#[cfg(feature = "display")]
+pub use display::{
+    DisplayFailure, DisplayLayout, DisplayRegion, DisplayRewrites, DisplayScene,
+    display_api_version, display_layout, display_tiles, prepare_display_scene,
+};
 pub use macro_catalog::resolve_macro_catalog;
 pub use plugin_diagnostics::explain_plugin_diagnostics;
 pub use raster::{

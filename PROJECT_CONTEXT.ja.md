@@ -145,6 +145,7 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 - **Render Engine 66** — 共有Rust coreが所有し、Serverの薄いPython adapterとAndroidの薄いJNI adapterが同じ1 requestで呼ぶSVGの演奏。
 Androidのmain preview、thumbnail、PNG exportはcanonicalな保存済み／現行SVGを別crate
 `inku-svg-raster`（`resvg`）でpixel化する。pixelは派生presentationであり、保存の正本はSVGのままである。
+macOSの作品域は、WebのChromeと同じ見え方にするため、表示専用の`inku-display`（Skia）で描く。
 **名前で呼んだ支持体は筆の走り方を変える** —— 地の 7 種はそれぞれ吸い方と歯の強さを持ち、
 その値が筆の合成へ渡るので、同じ記述でも和紙とカンバスでは痕が違う形で出る。
 `面: 粒` と `面: にじみ` は線や弧に付いたとき、その 1 命令だけ紙を強く働かせる指示として読まれ（上限 3.0 倍）、

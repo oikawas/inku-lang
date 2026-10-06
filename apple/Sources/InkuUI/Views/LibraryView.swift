@@ -932,7 +932,7 @@ struct LibraryWorkDetails: View {
                 HStack(alignment: .top, spacing: 14) { heading; Spacer(minLength: 12); workActions }
                 VStack(alignment: .leading, spacing: 10) { heading; workActions }
             }
-            ArtworkCanvas(svg: work.svg, renderer: model.renderer, caption: work.effectiveSourceText)
+            ArtworkCanvas(svg: work.svg, renderer: model.displayRenderer, caption: work.effectiveSourceText)
                 .frame(height: 280)
                 // HistoryManager.svelte:915-921: a double click on the preview opens the work.
                 .simultaneousGesture(TapGesture(count: 2).onEnded {

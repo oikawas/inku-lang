@@ -1,5 +1,6 @@
 import CoreGraphics
 import CoreText
+import InkuCore
 import InkuPersistence
 import SwiftUI
 #if os(macOS)
@@ -15,7 +16,7 @@ struct ArtworkCanvas: View {
     enum Style { case embedded, workspace }
 
     let svg: String
-    let renderer: ArtworkRenderer
+    let renderer: DisplayRenderer
     var caption = ""
     var style = Style.embedded
     var showsZoomControls = true
@@ -27,9 +28,7 @@ struct ArtworkCanvas: View {
     var viewport: Binding<CanvasViewport>? = nil
     @Environment(DisplaySettings.self) private var display
     @Environment(\.displayScale) private var displayScale
-    @State private var image: CGImage?
-    @State private var error: String?
-    @State private var loading = false
+    @State private var picture = CanvasPicture()
     @State private var localViewport = CanvasViewport()
     @State private var gestureScale: CGFloat = 1
     @State private var dragOrigin = CGSize.zero
@@ -73,7 +72,7 @@ struct ArtworkCanvas: View {
             if showsZoomControls { zoomCapsule.padding(zoomControlsAtTop ? .top : .bottom, 14) }
         }
         .onAppear { adoptViewport() }
-        .onChange(of: svg) { _, _ in image = nil; error = nil; reset() }
+        .onChange(of: svg) { _, _ in picture.clear(); reset() }
     }
 
     /// The Web fit for this canvas: the saved proportion, or the picture's own until a saved one is known.
@@ -105,7 +104,7 @@ struct ArtworkCanvas: View {
         .overlay(Capsule().stroke(InkuColor.border2))
         .clipShape(Capsule())
         .shadow(color: .black.opacity(0.1), radius: 3, y: 1)
-        .disabled(image == nil)
+        .disabled(picture.image == nil)
     }
 
     private var embeddedBody: some View {
@@ -138,9 +137,9 @@ struct ArtworkCanvas: View {
             }
             .buttonStyle(.borderless)
             .inkuFont(12)
-            .disabled(image == nil)
+            .disabled(picture.image == nil)
         }
-        .onChange(of: svg) { _, _ in image = nil; error = nil; reset() }
+        .onChange(of: svg) { _, _ in picture.clear(); reset() }
     }
 
     @ViewBuilder private func interactiveCanvas(size: CGSize, box: CGSize?) -> some View {
@@ -167,9 +166,13 @@ struct ArtworkCanvas: View {
     }
 
     private func canvasContent(size: CGSize, box: CGSize?) -> some View {
-              ZStack {
+              let plan = fittedRect(in: size, box: box).flatMap {
+                  CanvasInteraction.detailPlan(picture: $0, area: size, scale: scale, offset: offset, pixelScale: displayScale,
+                                               limits: InkuCore.displayLayout)
+              }
+              return ZStack {
                 if box == nil { RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.quaternary.opacity(0.3)) }
-                if let image {
+                if let image = picture.image {
                     fitted(image, box: box)
                         .scaleEffect(scale).offset(offset)
                         .gesture(MagnificationGesture()
@@ -186,50 +189,73 @@ struct ArtworkCanvas: View {
                             }
                             .onEnded { _ in dragOrigin = offset })
                         .accessibilityLabel(display.localized("作品"))
-                } else if loading {
+                    detailLayer(size: size, box: box)
+                } else if picture.loading {
                     ProgressView(display.localized("作品を表示中"))
-                } else if let error {
+                } else if let error = picture.error {
                     ContentUnavailableView(display.localized("作品を表示できません"), systemImage: "exclamationmark.triangle", description: Text(error))
                 } else {
                     ContentUnavailableView(display.localized("作品"), systemImage: "paintpalette", description: Text(display.localized("生成した作品や保存作品をここに表示します。")))
                 }
-                if image != nil, display.preferences.captionVisible, !caption.isEmpty {
+                if picture.image != nil, display.preferences.captionVisible, !caption.isEmpty {
                     if box == nil { captionOverlay(size: size) } else { workspaceCaption(size: size) }
                 }
-                if loading && image != nil { ProgressView().controlSize(.small).padding(12).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing) }
+                if (picture.loading || picture.windowLoading) && picture.image != nil { ProgressView().controlSize(.small).padding(12).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing) }
+              }
+              .frame(width: size.width, height: size.height)
+              .task(id: DetailRequest(svg: svg, plan: plan)) {
+                  await picture.loadWindow(svg: svg, plan: plan, renderer: renderer)
               }
     }
 
+    /// The fitted picture at 100% in the canvas area: centered in the Web box, or inside the embedded frame's margin.
+    private func fittedRect(in size: CGSize, box: CGSize?) -> CGRect? {
+        guard let image = picture.image, image.width > 0, image.height > 0 else { return nil }
+        let container = box.map { CGRect(x: (size.width - $0.width) / 2, y: (size.height - $0.height) / 2, width: $0.width, height: $0.height) }
+            ?? CGRect(origin: .zero, size: size).insetBy(dx: 18, dy: 18)
+        return CanvasInteraction.fittedPicture(aspect: CGFloat(image.width) / CGFloat(image.height), in: container)
+    }
+
+    /// The last complete window, and over it the one being drawn. Each keeps its place under later zoom and pan
+    /// until its replacement is drawn.
+    @ViewBuilder private func detailLayer(size: CGSize, box: CGSize?) -> some View {
+        if scale > 1.001, let fitted = fittedRect(in: size, box: box) {
+            let zoomed = CanvasInteraction.zoomedPicture(fitted, area: size, scale: scale, offset: offset)
+            ZStack(alignment: .topLeading) {
+                ForEach(Array([picture.window, picture.pendingWindow].compactMap { $0 }.enumerated()), id: \.offset) { _, window in
+                    Image(decorative: window.image, scale: 1)
+                        .resizable().interpolation(.high)
+                        .frame(width: window.unit.width * zoomed.width, height: window.unit.height * zoomed.height)
+                        .offset(x: zoomed.minX + window.unit.minX * zoomed.width, y: zoomed.minY + window.unit.minY * zoomed.height)
+                }
+            }
+            .frame(width: size.width, height: size.height, alignment: .topLeading)
+            .clipped()
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+
     private func applyWheel(_ deltaY: CGFloat) -> Bool {
-        guard image != nil, deltaY != 0 else { return false }
+        guard picture.image != nil, deltaY != 0 else { return false }
         setScale(CanvasInteraction.wheelScale(from: scale, deltaY: deltaY))
         return true
     }
 
     private struct RequestKey: Hashable { let svg: String; let width: UInt32; let height: UInt32 }
+    private struct DetailRequest: Equatable { let svg: String; let plan: CanvasDetailPlan? }
     private func requestKey(box: CGSize) -> RequestKey {
-        let magnification = min(3, max(1, scale))
-        var width = max(128, min(4096, ceil(max(1, box.width) * displayScale * magnification / 128) * 128))
-        var height = max(128, min(4096, ceil(max(1, box.height) * displayScale * magnification / 128) * 128))
+        // The whole is drawn for 100%; a zoomed canvas adds the visible window on top (detailLayer).
+        var width = max(128, min(4096, ceil(max(1, box.width) * displayScale / 128) * 128))
+        var height = max(128, min(4096, ceil(max(1, box.height) * displayScale / 128) * 128))
         let factor = min(1, sqrt(8_000_000 / (width * height)))
         width *= factor; height *= factor
         return RequestKey(svg: svg, width: UInt32(width), height: UInt32(height))
     }
     private func render(box: CGSize) async {
-        guard !svg.isEmpty else { image = nil; loading = false; return }
-        // Coalesce resize and pinch events; the old frame stays visible until its replacement is ready.
-        do {
-            try await Task.sleep(for: .milliseconds(120))
-            let request = requestKey(box: box)
-            loading = true; error = nil
-            let frame = try await renderer.image(svg: svg, targetWidth: request.width, targetHeight: request.height)
-            try Task.checkCancellation()
-            image = frame; loading = false
-            if frame.height > 0 { imageAspect = CGFloat(frame.width) / CGFloat(frame.height) }
-        } catch is CancellationError {} catch {
-            guard !Task.isCancelled else { return }
-            self.error = error.localizedDescription; loading = false
-        }
+        let request = requestKey(box: box)
+        await picture.load(svg: svg, width: request.width, height: request.height, renderer: renderer)
+        if let image = picture.image, image.height > 0 { imageAspect = CGFloat(image.width) / CGFloat(image.height) }
     }
     private func captionOverlay(size: CGSize) -> some View {
         HStack(alignment: .bottom) {
@@ -287,6 +313,81 @@ struct ArtworkCanvas: View {
     private func reset() {
         scale = 1; gestureScale = 1; offset = .zero; dragOrigin = .zero
         viewport?.wrappedValue.svgKey = svg.hashValue
+    }
+}
+
+/// What the canvas shows: the latest request's picture, and the progress mark only while that
+/// request is drawing. Every request takes a new generation; an older one changes nothing.
+@MainActor @Observable
+public final class CanvasPicture {
+    public private(set) var image: CGImage?
+    public private(set) var loading = false
+    public private(set) var error: String?
+    /// The work `image` belongs to. A coarse whole replaces only another work's picture or none.
+    public private(set) var imageSVG: String?
+    public private(set) var painter: DisplayRenderer.Painter?
+    private var generation: UInt64 = 0
+
+    /// A window of the zoomed picture and where it lies, as a fraction of the picture.
+    public struct Window: Sendable { public let image: CGImage; public let unit: CGRect }
+    /// The last complete window.
+    public private(set) var window: Window?
+    /// The window being drawn, its undrawn tiles transparent.
+    public private(set) var pendingWindow: Window?
+    public private(set) var windowLoading = false
+    private var windowGeneration: UInt64 = 0
+
+    public init() {}
+
+    public func clear() { image = nil; imageSVG = nil; painter = nil; error = nil; window = nil; pendingWindow = nil }
+
+    /// Draw the visible window of the zoomed picture, or drop the windows at 100% or below (`plan` nil).
+    /// A failed window leaves the enlarged whole in view.
+    public func loadWindow(svg: String, plan: CanvasDetailPlan?, renderer: DisplayRenderer) async {
+        windowGeneration &+= 1
+        let mine = windowGeneration
+        guard let plan, !svg.isEmpty else { window = nil; pendingWindow = nil; windowLoading = false; return }
+        do {
+            // Coalesce wheel and drag events; the windows already drawn stay until this one is ready.
+            try await Task.sleep(for: .milliseconds(120))
+            windowLoading = true
+            for try await frame in renderer.window(svg: svg, region: plan.region) {
+                guard windowGeneration == mine, imageSVG == svg else { return }
+                let drawn = Window(image: frame.image, unit: CanvasDetailPlan.unit(of: frame.region))
+                if frame.complete { window = drawn; pendingWindow = nil } else { pendingWindow = drawn }
+            }
+            try Task.checkCancellation()
+            guard windowGeneration == mine else { return }
+            windowLoading = false
+        } catch {
+            // A cancelled request with no request after it leaves no progress mark behind.
+            guard windowGeneration == mine else { return }
+            windowLoading = false
+        }
+    }
+
+    public func load(svg: String, width: UInt32, height: UInt32, renderer: DisplayRenderer) async {
+        generation &+= 1
+        let mine = generation
+        guard !svg.isEmpty else { clear(); loading = false; return }
+        do {
+            // Coalesce resize and pinch events; the old frame stays visible until its replacement is ready.
+            try await Task.sleep(for: .milliseconds(120))
+            loading = true; error = nil
+            for try await frame in renderer.whole(svg: svg, width: width, height: height) {
+                guard generation == mine else { return }
+                if frame.coarse, image != nil, imageSVG == svg { continue }
+                image = frame.image; imageSVG = svg; painter = frame.painter
+            }
+            try Task.checkCancellation()
+            guard generation == mine else { return }
+            loading = false
+        } catch {
+            // A cancelled request with no request after it leaves no progress mark behind.
+            guard generation == mine else { return }
+            loading = false
+            if !(error is CancellationError), !Task.isCancelled { self.error = error.localizedDescription }
+        }
     }
 }
 

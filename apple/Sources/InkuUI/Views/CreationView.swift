@@ -637,7 +637,7 @@ struct CreationView: View {
 
     private var artwork: some View {
         ZStack {
-            ArtworkCanvas(svg: workspaceWork?.svg ?? model.currentSVG, renderer: model.renderer,
+            ArtworkCanvas(svg: workspaceWork?.svg ?? model.currentSVG, renderer: model.displayRenderer,
                           caption: workspaceWork?.effectiveSourceText ?? "", style: .workspace,
                           showsZoomControls: display.visible("work_tools"),
                           // Below about 740pt the capsule would sit on the right corner row (seven 34pt buttons).

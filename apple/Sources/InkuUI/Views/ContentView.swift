@@ -579,7 +579,7 @@ public struct ContentView: View {
 
     private var presentationView: some View {
         VStack(spacing: 8) {
-            ArtworkCanvas(svg: presentationWork?.svg ?? "", renderer: model.renderer, caption: presentationWork?.effectiveSourceText ?? "",
+            ArtworkCanvas(svg: presentationWork?.svg ?? "", renderer: model.displayRenderer, caption: presentationWork?.effectiveSourceText ?? "",
                           style: .workspace, aspectRatio: presentationWork?.renderCanvasAspectRatio)
             // CanvasPresentationOverlay.svelte:76-133: navigation, the star and the caption switch, each with its bubble.
             HStack {

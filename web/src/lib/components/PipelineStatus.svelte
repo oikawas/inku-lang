@@ -3,6 +3,7 @@
 	import type { PipelinePhase } from '$lib/features/pipeline/api';
 	import { formatPipelineDiagnostic, type PipelineDiagnostic } from '$lib/features/pipeline/diagnostics';
 	import { pipelineAttentionText, type PipelineProviderFailure } from '$lib/features/pipeline/attention';
+	import type { HoleCompletionIssue } from '$lib/features/pipeline/hole-completion';
 
 	type Props = {
 		patch: PipelinePhase | null;
@@ -12,6 +13,7 @@
 		busy: boolean;
 		reason: string | null;
 		providerFailure?: PipelineProviderFailure | null;
+		completionIssues?: HoleCompletionIssue[];
 		onApprove: () => void | Promise<void>;
 		onDecline: () => void | Promise<void>;
 	};
@@ -24,6 +26,7 @@
 		busy,
 		reason,
 		providerFailure = null,
+		completionIssues = [],
 		onApprove,
 		onDecline,
 	}: Props = $props();
@@ -41,6 +44,20 @@
 			<button type="button" disabled={busy} onclick={onApprove}>{t().pipelineApprove}</button>
 			<button type="button" disabled={busy} onclick={onDecline}>{t().pipelineDecline}</button>
 		</div>
+	</section>
+{/if}
+
+{#if completionIssues.length > 0}
+	<section class="pipeline-notice" aria-labelledby="pipeline-completion-title">
+		<h3 id="pipeline-completion-title">{t().pipelineCompletionIssuesTitle}</h3>
+		<ul class="pipeline-completion-issues">
+			{#each completionIssues as issue (issue.holeId)}
+				<li>
+					{#if issue.source}<pre>{issue.source}</pre>{/if}
+					<p>{issue.reason}</p>
+				</li>
+			{/each}
+		</ul>
 	</section>
 {/if}
 
@@ -79,6 +96,9 @@
 	.pipeline-diagnostic-list { margin: .55rem 0 0; padding-left: 1.25rem; }
 	.pipeline-diagnostic-list li + li { margin-top: .7rem; }
 	.pipeline-diagnostic-list p { margin: 0 0 .25rem; }
+	.pipeline-completion-issues { margin: .55rem 0 0; padding-left: 1.25rem; }
+	.pipeline-completion-issues li + li { margin-top: .7rem; }
+	.pipeline-completion-issues pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 	.pipeline-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
 	.pipeline-comparison pre, .pipeline-diagnostic-list pre { max-height: 15rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: .3rem 0; padding: .55rem; background: color-mix(in srgb, currentColor 6%, transparent); }
 	.pipeline-actions { display: flex; gap: .5rem; margin-top: .6rem; }

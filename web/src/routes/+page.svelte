@@ -28,6 +28,7 @@
 	import { makeSavedWorkExportActions } from '$lib/features/export/saved-work-actions';
 	import type { LineageNode } from '$lib/features/history/types';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import { holeCompletionIssues } from '$lib/features/pipeline/hole-completion';
 	import { DEFAULT_SKETCH_MODE, normalizeSketchGrain, normalizeSketchState, sketchGrainLabel, sketchModeLabel, sketchModeOf, sketchStateNote, type SketchMode, type SketchState } from '$lib/sketch';
 	import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
 	import { needsFallbackRefineConfirm, rememberFallbackRefineConfirm, type FallbackRefineParent } from '$lib/fallbackRefineGate';
@@ -2807,6 +2808,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						busy={work.pipelineBusy}
 						reason={pipelineAttentionReason(work.pipelineView?.phase)}
 						providerFailure={work.pipelineView?.provider_failure ?? null}
+						completionIssues={holeCompletionIssues(work.pipelineView, t())}
 						onApprove={work.approvePipelinePatch}
 						onDecline={work.declinePipelinePatch}
 					/>

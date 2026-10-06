@@ -181,6 +181,8 @@ There are two entrances to the instruction dialog. Both use the same dialog and 
 
 `Draw from instructions` sends the displayed instructions to Stage 2 unchanged. Stage 1 does not run, so the interpretation does not change.
 
+On Web and Android, when instruction completion stops, `Gaps that could not be completed` shows the author's original text and a plain reason for each gap. The approval screen also shows these when a proposal leaves some gaps uncompleted. Gaps that passed are not listed. A context that is too long gets an explanation; an unknown reason reads `Refused by the check (code).` While the model is asked again with the reasons its proposal was refused, the running line reads, for example, `Asking again with the reasons the proposal was refused (2/4)`. A communication retry continues to read `Retrying`.
+
 ### See and edit a place's range
 
 When a range's name and numbers match the range table, for example `at the bottom right (horizontal 2/3 to 1, vertical 2/3 to 1)`, the display folds the numbers and gives `bottom right` a dotted underline. Hover over or press the name to show its rectangle on the work. Press it to open the muted numbers for editing. The rectangle follows valid numbers, and a match to another table entry changes the name too. Setting both axes to `0 to 1/3`, for example, changes the name to `top left`.

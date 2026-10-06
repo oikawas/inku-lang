@@ -35,10 +35,16 @@ export type PipelineProviderAttempt = {
 	/** One-based. */
 	attempt: number;
 	max_attempts: number;
+	/** The completion check refused the previous proposal, so this call asks again with its reasons. */
+	asked_again?: boolean;
 	delay_ms?: string;
 	timeout_ms?: string;
 	/** Epoch ms when the attempt gives up. */
 	deadline_at?: number;
+};
+
+export type PipelineHoleCompletionCheck = {
+	results: { hole_id: string; status: 'validated' | 'rejected' | 'unresolved'; reason: string | null; source?: string }[];
 };
 
 export type PipelineView = {
@@ -59,6 +65,7 @@ export type PipelineView = {
 	} | null;
 	busy: boolean;
 	provider_attempt?: PipelineProviderAttempt;
+	hole_completion_check?: PipelineHoleCompletionCheck;
 	/** The last model-call failure, kept so a failed stage can say what happened. */
 	provider_failure?: { failure: string; stage: string; attempt: number; elapsed_ms?: number; detail?: string; chatgpt?: { code: string; action: string; request_id?: string; param?: string } };
 	rendered: { svg: string } | null;

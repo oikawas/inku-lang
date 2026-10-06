@@ -151,3 +151,17 @@ test('a retry reads as a retry, not as a longer wait', async () => {
 	assert.deepEqual(shown, ['応答待ち（1/4回目）', '再試行中（2/4回目）', '']);
 	assert.equal(providerAttemptText({ attempt: 2, max_attempts: 4 }, en), 'Retrying (try 2/4)');
 });
+
+test('completion asked again is shown separately from a communication retry', async () => {
+	for (const strings of [ja, en]) {
+		const shown: string[] = [];
+		await readPaintStream(streamOf([
+			{ event: 'attempt', provider_attempt: { action: 'complete_visible_ddl_holes', attempt: 2, max_attempts: 4, asked_again: true } },
+			{ event: 'attempt', provider_attempt: { action: 'complete_visible_ddl_holes', attempt: 3, max_attempts: 4 } },
+			DONE,
+		]), { describeError, onAttempt: (event) => shown.push(providerAttemptText(event.provider_attempt, strings)) });
+		assert.deepEqual(shown, strings.code === 'ja'
+			? ['断られた案を理由を添えて問い直し中（2/4回目）', '再試行中（3/4回目）']
+			: ['Asking again with the reasons the proposal was refused (2/4)', 'Retrying (try 3/4)']);
+	}
+});

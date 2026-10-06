@@ -77,9 +77,28 @@ export const en: LangPack = {
 	pipelineDiagnostics: 'Drawing diagnostics and omitted parts',
 	pipelineDiagnosticsUnavailable: 'The drawing diagnostics for this saved work could not be read. The work is still shown.',
 	pipelineNeedsAttention: 'Review the result of this operation.',
+	pipelineCompletionIssuesTitle: 'Gaps that could not be completed',
+	pipelineCompletionReason: (reason) => {
+		const reasons: Record<string, string> = {
+			established_fact_changed: 'The proposal lost a word read in the original sentence (a place, count, colour, shape, action, …).',
+			owner_association_changed: 'The proposal changed which shape a word belongs to.',
+			target_unresolved: 'The proposal still had words that could not be read, so it could not be drawn.',
+			new_diagnostic: 'The proposal added a phrase that could not be read.',
+			numeric_range_outside_words: 'The numeric range fell outside the place word before the parenthesis.',
+			dependency_rejected: 'Another sentence that has to be fixed with it could not be completed.',
+			dependency_unresolved: 'Another sentence that has to be fixed with it could not be completed.',
+			outside_explicit_changed: 'The proposal changed what is written outside the gap.',
+			schema_violation: "The model's answer could not be read.",
+			unsupported: 'The model answered that the current grammar cannot write it.',
+			ambiguous: 'The model answered that the meaning cannot be decided.',
+			context_limit: 'The context was too long to complete.',
+		};
+		return Object.hasOwn(reasons, reason) ? reasons[reason] : `Refused by the check (${reason}).`;
+	},
 	pipelineAttentionReason: (reason) => `Reason: ${({
 		stage1_failed: 'the description could not be interpreted',
 		hole_completion_failed: 'a DDL completion proposal could not be prepared',
+		hole_completion_context_limit: 'the context was too long to prepare a DDL completion proposal',
 		patch_declined: 'the completion proposal was declined',
 		hole_request_unavailable: 'the parts requiring completion could not be prepared',
 		compiler_diagnostics: 'some parts need review or editing',
@@ -339,6 +358,7 @@ export const en: LangPack = {
 	runStatusProgress: (done, total) => `${done}/${total} done`,
 	runStatusAwaitingReply: (attempt, maxAttempts) => `Awaiting reply (try ${attempt}/${maxAttempts})`,
 	runStatusRetrying: (attempt, maxAttempts) => `Retrying (try ${attempt}/${maxAttempts})`,
+	runStatusAskingAgain: (attempt, maxAttempts) => `Asking again with the reasons the proposal was refused (${attempt}/${maxAttempts})`,
 	runStatusStage1: 'Interpretation',
 	runStatusStage2: 'Performance',
 	stageDdlGenerating: 'Interpreting your words…',

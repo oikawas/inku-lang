@@ -85,7 +85,11 @@ def _safe_hole_completion_check(value: object) -> dict | None:
         reason = _safe_compiler_failure_detail(row.get("reason"))
         if hole_id is None or status not in _HOLE_COMPLETION_STATUSES:
             continue
-        results.append({"hole_id": hole_id, "status": status, "reason": reason})
+        shown = {"hole_id": hole_id, "status": status, "reason": reason}
+        source = row.get("source")
+        if isinstance(source, str):
+            shown["source"] = source[:8192]
+        results.append(shown)
     return {"results": results} if results else None
 
 

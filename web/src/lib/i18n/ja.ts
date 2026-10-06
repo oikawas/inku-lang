@@ -77,9 +77,28 @@ export const ja: LangPack = {
 	pipelineDiagnostics: '描画の診断と省略した部分',
 	pipelineDiagnosticsUnavailable: 'この保存作品の描画診断を読み込めませんでした。作品はそのまま表示しています。',
 	pipelineNeedsAttention: '処理の結果を確認してください。',
+	pipelineCompletionIssuesTitle: '補えなかった箇所',
+	pipelineCompletionReason: (reason) => {
+		const reasons: Record<string, string> = {
+			established_fact_changed: '元の文で読めた語（位置・個数・色・形・動作など）が案で消えた',
+			owner_association_changed: '語と形の結びつきが案で変わった',
+			target_unresolved: '案にも読めない語が残り、描ける文にならなかった',
+			new_diagnostic: '案に新しい読めない語句が入った',
+			numeric_range_outside_words: '数の範囲が、括弧の前の位置の語の範囲から外れた',
+			dependency_rejected: '一緒に直す別の文が補えなかった',
+			dependency_unresolved: '一緒に直す別の文が補えなかった',
+			outside_explicit_changed: '案が穴の外の書いた内容を変えた',
+			schema_violation: 'モデルの答えが読めなかった',
+			unsupported: '今の文法では書けないと答えた',
+			ambiguous: '意味を一つに決められないと答えた',
+			context_limit: '文脈が長すぎて補えなかった',
+		};
+		return Object.hasOwn(reasons, reason) ? reasons[reason] : `検査で断られた（${reason}）`;
+	},
 	pipelineAttentionReason: (reason) => `理由: ${({
 		stage1_failed: '記述の解釈を完了できませんでした',
 		hole_completion_failed: 'DDLの補完候補を作れませんでした',
+		hole_completion_context_limit: '文脈が長すぎてDDLの補完候補を作れませんでした',
 		patch_declined: '補完候補を採用しませんでした',
 		hole_request_unavailable: '補完が必要な箇所を準備できませんでした',
 		compiler_diagnostics: '確認または修正が必要な箇所があります',
@@ -339,6 +358,7 @@ export const ja: LangPack = {
 	runStatusProgress: (done, total) => `完了 ${done}/${total}`,
 	runStatusAwaitingReply: (attempt, maxAttempts) => `応答待ち（${attempt}/${maxAttempts}回目）`,
 	runStatusRetrying: (attempt, maxAttempts) => `再試行中（${attempt}/${maxAttempts}回目）`,
+	runStatusAskingAgain: (attempt, maxAttempts) => `断られた案を理由を添えて問い直し中（${attempt}/${maxAttempts}回目）`,
 	runStatusStage1: '解釈',
 	runStatusStage2: '描画',
 	stageDdlGenerating: 'DDL生成',

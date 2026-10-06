@@ -48,6 +48,8 @@ export interface LangPack {
 	pipelineDiagnostics: string;
 	pipelineDiagnosticsUnavailable: string;
 	pipelineNeedsAttention: string;
+	pipelineCompletionIssuesTitle: string;
+	pipelineCompletionReason: (reason: string) => string;
 	pipelineAttentionReason: (reason: string) => string;
 	/** What happened to the model call behind a failed stage, as a parenthetical; empty when unknown. */
 	pipelineFailureCause: (failure: string, attempts: number, detail: string | null) => string;
@@ -235,6 +237,7 @@ export interface LangPack {
 	runStatusProgress: (done: number, total: number) => string;
 	runStatusAwaitingReply: (attempt: number, maxAttempts: number) => string;
 	runStatusRetrying: (attempt: number, maxAttempts: number) => string;
+	runStatusAskingAgain: (attempt: number, maxAttempts: number) => string;
 	runStatusStage1: string;
 	runStatusStage2: string;
 	stageDdlGenerating: string;

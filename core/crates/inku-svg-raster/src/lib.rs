@@ -14,7 +14,7 @@ pub const RASTER_API_VERSION: &str = "0.1.0";
 pub const PIXEL_FORMAT_RGBA8_PREMULTIPLIED: &str = "rgba8-premultiplied";
 
 /// Maximum accepted UTF-8 SVG payload size.
-pub const MAX_SVG_BYTES: usize = 8 * 1024 * 1024;
+pub const MAX_SVG_BYTES: usize = 12 * 1024 * 1024;
 /// Maximum accepted or derived output dimension.
 pub const MAX_RASTER_DIMENSION: u32 = 8_192;
 /// Maximum accepted output pixel allocation.

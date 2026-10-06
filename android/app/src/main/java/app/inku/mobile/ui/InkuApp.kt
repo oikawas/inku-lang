@@ -230,6 +230,7 @@ import app.inku.mobile.pipeline.SaijikiGenerated
 import app.inku.mobile.pipeline.Sketches
 import app.inku.mobile.pipeline.SketchMode
 import app.inku.mobile.pipeline.ProviderAttempt
+import app.inku.mobile.pipeline.HoleCompletionResult
 import app.inku.mobile.ui.export.PngCaptureDate
 import app.inku.mobile.ui.export.PngExportSize
 import app.inku.mobile.ui.i18n.InkuStrings
@@ -2454,11 +2455,12 @@ internal fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
 
 /**
  * What the running row says about the model call it waits on (web
- * `providerAttemptText`). A first attempt is a wait and any later one a retry,
- * so an attempt that timed out does not read as a slow answer.
+ * `providerAttemptText`). A second request with check feedback is distinct
+ * from a retry after a failed or timed-out call.
  */
 internal fun providerAttemptText(attempt: ProviderAttempt?, strings: InkuStrings): String = when {
     attempt == null -> ""
+    attempt.askedAgain -> strings.runStatusAskingAgain(attempt.attempt, attempt.maxAttempts)
     attempt.isRetry -> strings.runStatusRetrying(attempt.attempt, attempt.maxAttempts)
     else -> strings.runStatusAwaitingReply(attempt.attempt, attempt.maxAttempts)
 }
@@ -6728,6 +6730,7 @@ private fun DdlActionRow(state: InkuUiState, viewModel: InkuViewModel) {
 private fun PipelineStatusPanel(state: InkuUiState, viewModel: InkuViewModel) {
     val view = state.pipelineView
     val proposal = view?.patchProposal
+    val completionDetails = holeCompletionDetails(view)
     val savedCurrentRevision = remember(view?.executionId, view?.revision, state.selectedHistory?.renderMetadataJson) {
         runCatching {
             val metadata = JSONObject(state.selectedHistory?.renderMetadataJson ?: "{}")
@@ -6747,6 +6750,7 @@ private fun PipelineStatusPanel(state: InkuUiState, viewModel: InkuViewModel) {
                 RangeDdlText(proposal.candidateDdl, preview = { bounds ->
                     state.selectedHistory?.let { RangeArtworkPreview(it, bounds) }
                 })
+                HoleCompletionReasons(completionDetails)
                 WrapRow {
                     TextButton(onClick = viewModel::approvePipelinePatch, enabled = !state.isDrawing) { Text(S.pipelineApprove) }
                     TextButton(onClick = viewModel::declinePipelinePatch, enabled = !state.isDrawing) { Text(S.pipelineDecline) }
@@ -6756,6 +6760,7 @@ private fun PipelineStatusPanel(state: InkuUiState, viewModel: InkuViewModel) {
     } else if (view?.phaseTag == "score_ready" || (view?.phaseTag == "completed" && !savedCurrentRevision)) {
         TextButton(onClick = viewModel::resumePipeline, enabled = !state.isDrawing) { Text(S.pipelineResume) }
     }
+    if (proposal == null) HoleCompletionReasons(completionDetails)
     val diagnostics = remember(view?.deliveryJson, state.selectedHistory?.renderMetadataJson) {
         runCatching {
             view?.deliveryJson?.let(::JSONObject)
@@ -6826,6 +6831,24 @@ private fun PipelineStatusPanel(state: InkuUiState, viewModel: InkuViewModel) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
+        }
+    }
+}
+
+@Composable
+private fun HoleCompletionReasons(results: List<HoleCompletionResult>) {
+    if (results.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+        Text(S.pipelineUncompletedHoles, style = MaterialTheme.typography.labelMedium)
+        results.forEach { result ->
+            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+                if (result.source.isNotEmpty()) Text(result.source, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    S.pipelineHoleCompletionReason(result.reason.orEmpty()),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

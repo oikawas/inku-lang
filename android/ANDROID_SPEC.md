@@ -45,6 +45,28 @@ When updating Android specifications:
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
 
+## 2026-10-06 Completion reasons on screen (A1)
+
+Completion display follows "Completion reasons on screen" in shared
+[SPEC §12.7.1](../SPEC.md). The existing JNI byte envelope carries each hole's
+`source`, `status`, and `reason` from snapshot `hole_completion_check.results` into
+the screen's view. `source` is the author's original text, never a model proposal
+or a substitute from the current instructions. Reloading a stored snapshot reads
+the same fields.
+
+When completion stops with `hole_completion_failed` or `hole_completion_context_limit`,
+and on approval when some gaps were not completed, "Gaps that could not be completed"
+shows each `rejected` or `unresolved` gap's original text and a plain reason. On approval,
+these appear before the approve/decline buttons. `validated` gaps are omitted. Both
+languages follow the shared SPEC's reason table; an unknown code is included in
+"Refused by the check". The context-limit stop also has a plain explanation. An old
+check without `source` shows the available reason without inventing original text.
+
+JNI `provider_attempt` carries `asked_again`, shown as "Asking again with the reasons
+the proposal was refused (2/4)". A legacy report without that field reads it as `false`
+and retains the retry display. The screen does not change core checks, the number of
+second requests, communication retries, or saving and approval semantics.
+
 ## 2026-10-06 Work display with shared Skia
 
 The creation work area, full-screen view, Instruction editor, and refinement/model-comparison

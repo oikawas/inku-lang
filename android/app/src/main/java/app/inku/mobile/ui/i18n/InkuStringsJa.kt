@@ -104,6 +104,7 @@ object InkuStringsJa : InkuStrings {
     override fun pipelineAttentionReason(reason: String) = "理由: " + when (reason) {
         "stage1_failed" -> "記述の解釈を完了できませんでした"
         "hole_completion_failed" -> "DDLの補完候補を作れませんでした"
+        "hole_completion_context_limit" -> "文脈が長すぎて補えなかった"
         "patch_declined" -> "補完候補を採用しませんでした"
         "hole_request_unavailable" -> "補完が必要な箇所を準備できませんでした"
         "compiler_diagnostics" -> "確認または修正が必要な箇所があります"
@@ -461,6 +462,22 @@ object InkuStringsJa : InkuStrings {
     override val drawing = "描画中"
     override val runStatusAwaitingReply: (Int, Int) -> String = { attempt, maxAttempts -> "応答待ち（$attempt/${maxAttempts}回目）" }
     override val runStatusRetrying: (Int, Int) -> String = { attempt, maxAttempts -> "再試行中（$attempt/${maxAttempts}回目）" }
+    override val runStatusAskingAgain: (Int, Int) -> String = { attempt, maxAttempts -> "断られた案を理由を添えて問い直し中（$attempt/${maxAttempts}回目）" }
+    override val pipelineUncompletedHoles = "補えなかった箇所"
+    override fun pipelineHoleCompletionReason(reason: String): String = when (reason) {
+        "established_fact_changed" -> "元の文で読めた語（位置・個数・色・形・動作など）が案で消えた"
+        "owner_association_changed" -> "語と形の結びつきが案で変わった"
+        "target_unresolved" -> "案にも読めない語が残り、描ける文にならなかった"
+        "new_diagnostic" -> "案に新しい読めない語句が入った"
+        "numeric_range_outside_words" -> "数の範囲が、括弧の前の位置の語の範囲から外れた"
+        "dependency_rejected", "dependency_unresolved" -> "一緒に直す別の文が補えなかった"
+        "outside_explicit_changed" -> "案が穴の外の書いた内容を変えた"
+        "schema_violation" -> "モデルの答えが読めなかった"
+        "unsupported" -> "今の文法では書けないと答えた"
+        "ambiguous" -> "意味を一つに決められないと答えた"
+        "context_limit" -> "文脈が長すぎて補えなかった"
+        else -> if (reason.isEmpty()) "検査で断られた" else "検査で断られた（$reason）"
+    }
     override val renderExpression = "描画表現"
     override val refinementElements = "描画要素"
     override val newApiKey = "新しいAPIキー"

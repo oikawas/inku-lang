@@ -110,6 +110,7 @@ object InkuStringsEn : InkuStrings {
     override fun pipelineAttentionReason(reason: String) = "Reason: " + when (reason) {
         "stage1_failed" -> "the description could not be interpreted"
         "hole_completion_failed" -> "a DDL completion proposal could not be prepared"
+        "hole_completion_context_limit" -> "The context was too long to complete."
         "patch_declined" -> "the completion proposal was declined"
         "hole_request_unavailable" -> "the parts requiring completion could not be prepared"
         "compiler_diagnostics" -> "some parts need review or editing"
@@ -488,6 +489,22 @@ object InkuStringsEn : InkuStrings {
     override val drawing = "Drawing"
     override val runStatusAwaitingReply: (Int, Int) -> String = { attempt, maxAttempts -> "Awaiting reply (try $attempt/$maxAttempts)" }
     override val runStatusRetrying: (Int, Int) -> String = { attempt, maxAttempts -> "Retrying (try $attempt/$maxAttempts)" }
+    override val runStatusAskingAgain: (Int, Int) -> String = { attempt, maxAttempts -> "Asking again with the reasons the proposal was refused ($attempt/$maxAttempts)" }
+    override val pipelineUncompletedHoles = "Gaps that could not be completed"
+    override fun pipelineHoleCompletionReason(reason: String): String = when (reason) {
+        "established_fact_changed" -> "The proposal lost a word read in the original sentence (a place, count, colour, shape, action, …)."
+        "owner_association_changed" -> "The proposal changed which shape a word belongs to."
+        "target_unresolved" -> "The proposal still had words that could not be read, so it could not be drawn."
+        "new_diagnostic" -> "The proposal added a phrase that could not be read."
+        "numeric_range_outside_words" -> "The numeric range fell outside the place word before the parenthesis."
+        "dependency_rejected", "dependency_unresolved" -> "Another sentence that has to be fixed with it could not be completed."
+        "outside_explicit_changed" -> "The proposal changed what is written outside the gap."
+        "schema_violation" -> "The model's answer could not be read."
+        "unsupported" -> "The model answered that the current grammar cannot write it."
+        "ambiguous" -> "The model answered that the meaning cannot be decided."
+        "context_limit" -> "The context was too long to complete."
+        else -> if (reason.isEmpty()) "Refused by the check." else "Refused by the check ($reason)."
+    }
     override val renderExpression = "Stroke"
     override val refinementElements = "Refinement elements"
     override val newApiKey = "New API key"

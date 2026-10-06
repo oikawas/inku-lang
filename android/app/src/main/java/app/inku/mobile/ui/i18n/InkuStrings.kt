@@ -358,6 +358,10 @@ interface InkuStrings {
     val runStatusAwaitingReply: (attempt: Int, maxAttempts: Int) -> String
     /** A later attempt: the one before failed or timed out (web `runStatusRetrying`). */
     val runStatusRetrying: (attempt: Int, maxAttempts: Int) -> String
+    /** A proposal refused by the check is being asked again with feedback. */
+    val runStatusAskingAgain: (attempt: Int, maxAttempts: Int) -> String
+    val pipelineUncompletedHoles: String
+    fun pipelineHoleCompletionReason(reason: String): String
     val renderExpression: String
     val refinementElements: String
     val newApiKey: String

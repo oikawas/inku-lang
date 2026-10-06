@@ -30,6 +30,25 @@ Androidはpremultiplied RGBAをNDK Bitmapへ直接転送する。Kotlin Engine 3
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
 
+## 2026-10-06 補完の理由の表示（A1）
+
+補完の表示は共通 [SPEC §12.7.1](../SPEC.ja.md) の「補完の理由の表示」に従う。
+JNI の既存 byte envelope から、snapshot の `hole_completion_check.results` にある
+穴ごとの `source`・`status`・`reason` を画面の view へ通す。`source` は作者の原文であり、
+モデルの案や現在の指示書で代用しない。保存した snapshot の復元でも同じ欄を読む。
+
+補完が `hole_completion_failed`・`hole_completion_context_limit` で止まったときと、
+一部だけ補えた承認画面では、「補えなかった箇所」に `rejected`・`unresolved` の穴の原文と
+平易な理由を示す。承認画面では承認／辞退のボタンの前に示す。`validated` の穴は示さない。
+理由の日英の文は共通SPECの表に合わせ、未知codeはcodeを添えて「検査で断られた」とする。
+文脈の上限で止まった理由も平易な文で示す。古い検査結果に `source` がない場合は、
+原文を作り足さず、残っている理由だけを示す。
+
+JNI の `provider_attempt` の `asked_again` を読み、問い直しは
+「断られた案を理由を添えて問い直し中（2/4回目）」と示す。欄のない従来の試行は
+`false` として読み、通信の再試行の表示を使う。coreの検査、問い直しの回数、通信の再試行、
+保存・承認の意味は画面側で変更しない。
+
 ## 2026-10-06 共有Skiaによる作品表示
 
 制作の作品域、全画面、指示書エディタの作品、推敲・モデル比較の候補画像は、共有coreの

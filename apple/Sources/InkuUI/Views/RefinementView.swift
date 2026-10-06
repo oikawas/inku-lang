@@ -88,7 +88,7 @@ public struct RefinementView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(model.display.localized("元の作品")).inkuFont(14, weight: .semibold)
             HStack(alignment: .top, spacing: 14) {
-                ArtworkThumbnail(work: refinement.work, renderer: model.renderer)
+                ArtworkThumbnail(work: refinement.work, thumbnails: model.thumbnails)
                     .frame(width: 120, height: 120).clipped()
                     .accessibilityLabel(model.display.localized("元の作品"))
                 Text(refinement.work.effectiveSourceText).inkuFont(13).lineLimit(4)
@@ -286,7 +286,7 @@ public struct RefinementView: View {
     private func candidateCard(_ candidate: RefinementCandidate) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Button { refinement.preview(refinement.previewID == candidate.id ? nil : candidate.id) } label: {
-                ArtworkThumbnail(work: candidate.work, renderer: model.renderer)
+                ArtworkThumbnail(work: candidate.work, thumbnails: model.thumbnails)
                     .frame(height: refinement.previewID == candidate.id ? 300 : 185)
             }.buttonStyle(.plain).disabled(controlsDisabled)
                 .accessibilityLabel(model.display.localizedFormat(refinement.previewID == candidate.id ? "候補 %ld の拡大を戻す" : "候補 %ld を拡大", candidate.number))

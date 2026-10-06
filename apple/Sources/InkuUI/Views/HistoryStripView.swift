@@ -182,7 +182,7 @@ import SwiftUI
             Task { await model.selectWork(work) }
         } label: {
             VStack(alignment: .leading, spacing: 0) {
-                ArtworkThumbnail(work: work, renderer: model.renderer)
+                ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
                     .frame(width: 82, height: 58)
                     .overlay(alignment: .topLeading) {
                         // HistoryStrip.svelte:264-266: a work held by its edited DDL carries a lock, a mark rather than a control.

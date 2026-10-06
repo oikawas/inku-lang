@@ -207,6 +207,12 @@ swift run --package-path apple InkuAppCheck --display-only core/crates/inku-disp
 swift run --package-path apple InkuAppCheck --canvas-detail-only
 ```
 
+サムネイルを焼いて持つ処理は、`--thumbnails-only <SVG path>`で確かめます。仮のDBに作品を置き、起動の後の一括でDBの隣の`thumbs.sqlite`に幅512pxのPNGが焼かれること、次の起動では描かずに読むこと、元が変わった作品だけ焼き直すこと、表示した作品が無ければその場で描いて保存すること、保存した作品が焼かれること、完全に削除した作品の分が消えること、開けない保存先が空の保存先に置き換わることを確かめます。
+
+```sh
+swift run --package-path apple InkuAppCheck --thumbnails-only core/crates/inku-display/tests/data/public/p07.svg
+```
+
 Swift packageを直接buildする場合は、commit済みreferenceに加えてRust artifactと固定辞書を先に用意してください。reference更新は通常の準備に含めません。
 
 ```sh

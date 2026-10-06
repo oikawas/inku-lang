@@ -87,6 +87,30 @@ public actor InkuDatabase {
         }
     }
 
+    /// Every stored work, trashed ones included, with the render hash of the SVG it holds (Server
+    /// `history_render_hashes`). The thumbnail store compares these without reading any SVG.
+    public func thumbnailSources() throws -> [(id: String, renderHash: String?)] {
+        try queue.read { db in
+            try Row.fetchAll(db, sql: "SELECT id, render_hash FROM history").map { (id: $0["id"], renderHash: $0["render_hash"]) }
+        }
+    }
+
+    /// The stored SVG of each id, for baking thumbnails in batches (one SVG can be megabytes).
+    public func svgs(ids: [String]) throws -> [String: String] {
+        guard !ids.isEmpty else { return [:] }
+        return try queue.read { db in
+            var result: [String: String] = [:]
+            for start in stride(from: 0, to: ids.count, by: 500) {
+                let chunk = Array(ids[start..<min(ids.count, start + 500)])
+                for row in try Row.fetchAll(db, sql: "SELECT id, svg FROM history WHERE id IN (\(chunk.map { _ in "?" }.joined(separator: ",")))",
+                                            arguments: StatementArguments(chunk)) {
+                    result[row["id"]] = row["svg"]
+                }
+            }
+            return result
+        }
+    }
+
     public func node(id: String) throws -> LineageNode? {
         try queue.read { try LineageNode.fetchOne($0, key: id) }
     }

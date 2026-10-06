@@ -14,6 +14,18 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-06 サムネイルを保存時にPNGへ焼いて持つ
+
+サムネイル（`ArtworkThumbnail`の14箇所）は、Serverと同じく、作品ごとに一度PNGへ焼いて持つ（台帳I-718）。表示のたびに保存SVGを描き直すことはしない。
+
+- 置き場所は、DBと同じフォルダの`thumbs.sqlite`（[`ThumbnailStore`](Packages/InkuPersistence/Sources/InkuPersistence/ThumbnailStore.swift)）。表の形はServerの`thumbs`と同じで、作品ID・scale・PNG・焼いた元のrender hash・焼いた時刻を持つ。正本のDBではなく派生物なので、バックアップには含めない。開けないファイルは空の保存先に置き換える。
+- 大きさは幅512px（Serverのscale 2）。高さは作品の縦横比に従う。描き手はresvgで、Serverのサムネイルと同じ絵になる。
+- 焼く時は3つ。保存の直後に裏で焼く。起動の後（と復元の後）に、裏で、無い作品と元のrender hashが変わった作品を4並列で焼き、消えた作品の分を捨てる。どちらより先に表示された作品は、その場で描いて保存する。
+- 完全に削除した作品のサムネイルは、削除の後に捨てる。
+- 読んだ画像はメモリにも控える（96MBまで）。描き手は[`ArtworkThumbnails`](Sources/InkuUI/ArtworkThumbnails.swift)。歳時記のプレビューは、今までどおり`ArtworkRenderer`で表示のたびに描く。
+- 測定（Apple M5 Pro、作者の作品の写しで、ライブラリ1ページ分の24件が出揃うまで）：改修前は起動直後が1.10秒、2回目がメモリから0.003秒。改修後は、保存済みなら起動直後が0.037秒。更新の後に初めて起動し、まだ焼いていない作品を表示した場合は、その場で512pxを描くので1.7秒かかる。124件を裏で焼くのに17〜19秒かかり、保存先は21MB（1件あたり約170KB）。
+- 確認：AppCheck `--thumbnails-only <SVG>`。
+
 ## 2026-10-06 作品域をSkiaで描く
 
 作品を大きく見せる面（`ArtworkCanvas`の7箇所：制作の作品域、補助・一括・再現比較・ライブラリ・自動化の画面、プレゼンテーション）は、共有coreの表示部品[`inku-display`](../core/crates/inku-display/Cargo.toml)（Skia）で描く。WebのChromeと同じ見え方にするためで、保存SVGは変えない。表示の直前にメモリ上でだけ、3つの互換変換を掛ける。patternとuseの`href`を`xlink:href`へ、楕円を同じ形のpathへ、feTurbulenceの整数の`seed`をBlinkの読みの整数へ変える。
@@ -456,7 +468,7 @@ restoreは生成中のUIから開始できず、hostの実行を停止してか�
 
 [共通raster crate](../core/crates/inku-svg-raster/Cargo.toml)でSVGを描画し、幅・高さ・stride・pixel formatを伴うowned premultiplied RGBA8をSwiftへ返す。SwiftはsRGBの`CGImage`へ機械変換し、pixelの所有をimageの生存期間まで保持する。表示経路でfilterや画材効果を省略しない。rasterは共通のSVGサイズ・寸法・pixel数制限に従い、外部networkやfilesystemからresourceを補わない。
 
-[ArtworkRenderer](Sources/InkuUI/ArtworkRenderer.swift) actorはSVG digest、raster API版、要求寸法と色空間をkeyとする上限付きcacheを持つ。canvasとthumbnailは必要な表示時にrasterを要求する。現行PNG書出しは保存SVGを高さ1024でraster化し、SVG書出しは保存canonical SVGをそのまま出力する。custom寸法・animated exportなどの全export仕様を実装済みとはしない。
+[ArtworkRenderer](Sources/InkuUI/ArtworkRenderer.swift) actorはSVG digest、raster API版、要求寸法と色空間をkeyとする上限付きcacheを持つ。歳時記のプレビューは必要な表示時にrasterを要求する。作品域は2026-10-06から`DisplayRenderer`（Skia）で描き、サムネイルは同日から焼いて持つPNGを読む（上の日付付きの節）。現行PNG書出しは保存SVGを高さ1024でraster化し、SVG書出しは保存canonical SVGをそのまま出力する。custom寸法・animated exportなどの全export仕様を実装済みとはしない。
 
 ### 初期macOS UIと未接続項目
 

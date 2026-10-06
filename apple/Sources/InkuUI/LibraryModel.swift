@@ -81,6 +81,8 @@ public final class LibraryModel {
     }
     @ObservationIgnored public var onMutation: (@MainActor () async -> Void)?
     @ObservationIgnored private var database: InkuDatabase?
+    /// Told when works are deleted for good, to drop their thumbnails.
+    @ObservationIgnored public var thumbnails: ArtworkThumbnails?
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var refreshToken = UUID()
     @ObservationIgnored private var selectedAnnotationToken = UUID()
@@ -337,12 +339,14 @@ public final class LibraryModel {
         let ids = ids ?? selectedIDs.sorted()
         if await mutate({ let count = try await $0.permanentlyDelete(ids: ids); return "\(count) 件を完全に削除しました" }) {
             selectedIDs.subtract(ids)
+            await thumbnails?.pruneOrphans()
         }
     }
 
     public func emptyTrash() async {
         if await mutate({ let count = try await $0.emptyTrash(); return "\(count) 件を完全に削除しました" }) {
             selectedIDs.removeAll()
+            await thumbnails?.pruneOrphans()
         }
     }
 

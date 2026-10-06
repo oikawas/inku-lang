@@ -27,7 +27,7 @@ public struct ComparisonView: View {
                 }
                 if let work = comparison.original {
                     HStack(alignment: .top, spacing: 14) {
-                        ArtworkThumbnail(work: work, renderer: model.renderer).frame(width: 150, height: 130)
+                        ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(width: 150, height: 130)
                         VStack(alignment: .leading, spacing: 8) {
                             Text(model.display.localized("元の作品")).inkuFont(14, weight: .semibold)
                             Text(work.effectiveSourceText).textSelection(.enabled)
@@ -158,7 +158,7 @@ public struct ComparisonView: View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 210))], alignment: .leading, spacing: 16) {
             ForEach(comparison.candidates) { candidate in
                 VStack(alignment: .leading, spacing: 10) {
-                    ArtworkThumbnail(work: candidate.work, renderer: model.renderer).frame(height: 185)
+                    ArtworkThumbnail(work: candidate.work, thumbnails: model.thumbnails).frame(height: 185)
                     Text(candidate.label).inkuFont(14, weight: .semibold).textSelection(.enabled)
                     ProviderObservationView(model: model, metrics: candidate.prepared.providerMetrics,
                         workID: candidate.savedWork?.id, executionID: candidate.prepared.executionID)

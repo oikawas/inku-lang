@@ -452,7 +452,7 @@ private struct VerticalCaption: View {
 @MainActor
 struct ArtworkThumbnail: View {
     let work: SavedWork
-    let renderer: ArtworkRenderer
+    let thumbnails: ArtworkThumbnails
     @Environment(DisplaySettings.self) private var display: DisplaySettings?
     @State private var image: CGImage?
     @State private var failed = false
@@ -490,7 +490,7 @@ struct ArtworkThumbnail: View {
         .task(id: work.svg) {
             image = nil; failed = false
             do {
-                let rendered = try await renderer.image(svg: work.svg, targetWidth: 160, targetHeight: 160)
+                let rendered = try await thumbnails.image(for: work)
                 guard !Task.isCancelled else { return }
                 image = rendered
             } catch {

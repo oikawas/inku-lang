@@ -6,7 +6,9 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
-## macOS (unreleased; the version is settled at integration)
+## macOS 1.1.1 (2026-10-06 / Build 3)
+
+The corresponding Server stays v2.15.86 (Build 1162).
 
 ### 2026-10-06 — Stop without resvg when Skia fails in the work area, and record the cause
 
@@ -19,6 +21,15 @@ In response to the author's ruling: when Skia fails, do not fall back; write the
 ### 2026-10-06 — Share the window calculation and tile joining with Android
 
 The macOS work area's window density and rounding and its tile joining moved to the shared core implementation Android uses. Tiles are drawn and joined inside the core, and the finished image is shown from the core's pixels without copying them. What is shown and how fast are unchanged (the author's largest work: 0.67 s → 0.66 s for the 2000px whole). The notices for Skia and its components are built from the inventory shared with Android (same content).
+
+### 2026-10-06 — Bake thumbnails to PNG when a work is saved
+
+In response to the author's request to make thumbnails respond faster the way Server does (ledger I-718). macOS drew the saved SVG again for every thumbnail shown. As on Server, each work is now baked to PNG once and kept in `thumbs.sqlite` in the database's folder.
+
+- The width is 512px (Server's scale 2) and the height follows the work's proportions, finer than the previous 160×160px. They are drawn with resvg, the same picture as Server's thumbnails.
+- A work is baked in the background right after it is saved. After launch, works with no thumbnail or a changed source are baked in the background. A work shown before that is drawn on the spot and stored. Thumbnails of works deleted for good are dropped.
+- `thumbs.sqlite` is derived and can be baked again, so backups leave it out; it is baked again after a restore.
+- Time until one library page (24 works) is complete (Apple M5 Pro, the author's works): from 1.10 s right after launch to 0.037 s. Only on the first launch after the update, until the background bake finishes (about 18 s for 124 works), a work shown is drawn on the spot.
 
 ## Android 2.1.4-android.91 (2026-10-06 / Build 148378)
 
@@ -35,19 +46,6 @@ The Android arm64 JNI build explicitly enables the existing shared Skia display 
 Window density limiting and outward rounding now live in the shared core, together with a pixel allocation that draws and joins tiles concurrently. Tile pixels stay in Rust; the finished image takes ownership of the original allocation. Hosts own cancellation, parallelism, snapshot timing and native-image lifetimes. The macOS resvg fallback scope is preserved.
 
 Skia native notices now have a shared inventory and license texts, including Android's FreeType, Vulkan Memory Allocator and static C++ runtime. Android screen integration and Apple's adapter/reference migration follow separately. This foundation alone does not switch the existing display, thumbnails or PNG export.
-
-## macOS 1.1.1 (2026-10-06 / Build 3)
-
-The corresponding Server stays v2.15.86 (Build 1162).
-
-### 2026-10-06 — Bake thumbnails to PNG when a work is saved
-
-In response to the author's request to make thumbnails respond faster the way Server does (ledger I-718). macOS drew the saved SVG again for every thumbnail shown. As on Server, each work is now baked to PNG once and kept in `thumbs.sqlite` in the database's folder.
-
-- The width is 512px (Server's scale 2) and the height follows the work's proportions, finer than the previous 160×160px. They are drawn with resvg, the same picture as Server's thumbnails.
-- A work is baked in the background right after it is saved. After launch, works with no thumbnail or a changed source are baked in the background. A work shown before that is drawn on the spot and stored. Thumbnails of works deleted for good are dropped.
-- `thumbs.sqlite` is derived and can be baked again, so backups leave it out; it is baked again after a restore.
-- Time until one library page (24 works) is complete (Apple M5 Pro, the author's works): from 1.10 s right after launch to 0.037 s. Only on the first launch after the update, until the background bake finishes (about 18 s for 124 works), a work shown is drawn on the spot.
 
 ## macOS 1.1.0 (2026-10-06 / Build 2)
 

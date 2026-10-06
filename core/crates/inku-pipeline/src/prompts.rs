@@ -2440,7 +2440,7 @@ mod tests {
     /// author's words, inside the range of a position word those words keep.
     #[test]
     fn hole_completion_v4_writes_places_in_numbers_after_the_words() {
-        for (language, source, syntax, range, around, removed) in [
+        for (language, source, syntax, range, around, removed, axes, unread_word) in [
             (
                 ResolvedInstructionLanguage::Ja,
                 "右下に橙色の小さな円を十個ランダムに散らす。",
@@ -2448,6 +2448,8 @@ mod tests {
                 "下は縦2/3〜1",
                 "周り",
                 "数値座標は追加しない",
+                "横と縦の両方",
+                "右",
             ),
             (
                 ResolvedInstructionLanguage::En,
@@ -2456,6 +2458,8 @@ mod tests {
                 "bottom is vertical 2/3 to 1",
                 "around",
                 "do not add numeric coordinates",
+                "both horizontal and vertical",
+                "right",
             ),
         ] {
             let compilation = inku_ddl::compile_typed_ddl(
@@ -2477,11 +2481,20 @@ mod tests {
                 prompt.prompt_id,
                 "inku.visible-ddl-hole-completion-prompt.v4"
             );
-            for expected in [syntax, range, around] {
+            for expected in [syntax, range, around, axes] {
                 assert!(prompt.system.contains(expected), "{source}: {expected}");
             }
             assert!(!prompt.system.contains(removed), "{source}");
             assert!(!prompt.message.contains("completion_feedback"));
+            // The words the compiler could not read are named (A1 stage 3).
+            let message: Value = serde_json::from_str(&prompt.message).unwrap();
+            let unread = message["selected_holes"][0]["unread"].as_array().unwrap();
+            assert!(
+                unread
+                    .iter()
+                    .any(|word| word.as_str().is_some_and(|word| word.contains(unread_word))),
+                "{source}: {unread:?}"
+            );
         }
     }
 

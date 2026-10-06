@@ -1392,6 +1392,37 @@ fn refused_hole_proposals_are_asked_once_more_with_the_reasons() {
     ));
 }
 
+/// A1 stage 3: a refused proposal that leaves words the compiler cannot read
+/// is asked again with those words named.
+#[test]
+fn a_second_request_names_the_words_a_refused_proposal_left_unread() {
+    let state = started_direct_ddl(
+        "ink wash ground. place one red circle at center. many square. many circle.",
+    );
+    let asked = run(
+        Some(&state),
+        &hole_response(
+            &state,
+            json!({"results":[
+                {"id":"h1","status":"proposed","replacement":"8"},
+                {"id":"h2","status":"proposed","replacement":"zzz"}
+            ]}),
+        ),
+    );
+    let again = asked.snapshot.action.as_ref().expect("asked once more");
+    let message: serde_json::Value =
+        serde_json::from_str(again.payload["prompt"]["message"].as_str().unwrap()).unwrap();
+    let feedback = &message["completion_feedback"][1];
+    assert_eq!(feedback["status"], "rejected", "{feedback}");
+    assert!(
+        feedback["unread"]
+            .as_array()
+            .is_some_and(|words| words.iter().any(|word| word == "zzz")),
+        "{feedback}"
+    );
+    assert!(message["completion_feedback"][0].get("unread").is_none());
+}
+
 fn started_direct_ddl(source: &str) -> PipelineSnapshot {
     let start = envelope(
         None,

@@ -152,7 +152,7 @@ An ambiguous reference, a reference with no candidate, or several candidates are
 
 ## Known-hole completion (Stage 2)
 
-When the lock of the saved DDL carries known holes, core requests the hole completion effect without waiting for a separate author command (prompt `inku.visible-ddl-hole-completion-prompt.v3`). Before that request, the host saves the safe performance if a Score exists (Server and Android alike).
+When the lock of the saved DDL carries known holes, core requests the hole completion effect without waiting for a separate author command (prompt `inku.visible-ddl-hole-completion-prompt.v4`). Before that request, the host saves the safe performance if a Score exists (Server and Android alike).
 
 - The request carries only the target source text, confirmed typed facts, the finite vocabulary, and the accepted syntax. It carries no description, unrelated clauses, Score, or renderer instructions.
 - The response is one correction or unresolved reason per short target ID. Core checks that the IDs match, with no duplicates or omissions, and restores the actual hole IDs, allowed spans, and digests from the saved request and the lock.

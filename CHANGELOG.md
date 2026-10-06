@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+## Unreleased
+
+### 2026-10-06 — Completion writes places as numeric ranges (A1)
+
+Following the author's decisions (match the words, ask once more), the completion prompt for holes in saved DDL is now v4. A place the existing position words cannot say (bottom right, toward the right, and so on) keeps the author's words and gets a numeric range in parentheses after them (`at the bottom right (horizontal 2/3 to 1, vertical 2/3 to 1)`). The prompt shows the ranges of the existing position words from the compiler's table, and a phrase arranging marks around the previous shape is returned as not writable. The proposal check reads the words before the parenthesis; when a position word is read, the numeric range must lie inside that word's range, or the proposal is refused with `numeric_range_outside_words`. Inside, the position word counts as kept, so a proposal once refused because the "bottom" of "bottom right" was lost now passes. When the check refuses a proposal, the core asks once more for the same holes with the reasons, keeping a proposal that passed. Ranges written by the author or the composition, the compiler's reading, the saved formats, and the engine versions are unchanged.
+
 ## v2.15.94 (2026-10-06 / Build 1170)
 
 Add Discard edits to the instructions box and Instruction editor. After confirmation, return to the target work's saved text; ⌘Z restores the text from before the discard.

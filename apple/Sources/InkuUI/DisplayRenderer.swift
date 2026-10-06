@@ -11,6 +11,9 @@ import os
 /// behind another request: one Skia draw cannot be stopped, so a work the viewer left must not
 /// hold up the next one. A request yields a coarse whole first, then the whole drawn in tiles on
 /// several threads; a cancelled request stops at the next tile.
+///
+/// A work Skia cannot draw is not drawn another way (the author's ruling, 2026-10-06): the request
+/// stops with `Failed`, and the cause is appended to the failure log so the display can be fixed.
 public final class DisplayRenderer: Sendable {
     /// The one switch back to resvg for the work area.
     static let drawsWithSkia = true
@@ -32,13 +35,22 @@ public final class DisplayRenderer: Sendable {
         public let complete: Bool
     }
 
-    /// Not shown on screen: how often the work area fell back to resvg, and why.
+    /// Not shown on screen: what was drawn, and how often Skia failed and why.
     public struct Diagnostics: Sendable, Equatable {
         public var skiaWholes = 0
         public var skiaWindows = 0
+        /// Drawn with resvg because `drawsWithSkia` is off, never because Skia failed.
         public var resvgWholes = 0
-        public var fallbacks: [String: Int] = [:]
+        public var failures: [String: Int] = [:]
         public var tilesDrawn = 0
+    }
+
+    /// A whole or window Skia could not draw. Its cause is in the failure log.
+    public struct Failed: LocalizedError, Sendable {
+        public let code: String
+        public var errorDescription: String? {
+            "Skiaで描けませんでした（\(code)）。原因を表示の失敗ログ（display-failures）に書きました。"
+        }
     }
 
     private struct Entry<Value: Sendable>: Sendable {
@@ -57,6 +69,8 @@ public final class DisplayRenderer: Sendable {
 
     private let queue = DispatchQueue(label: "app.inku.display", qos: .userInitiated, attributes: .concurrent)
     private let state = OSAllocatedUnfairLock(initialState: State())
+    private let failureLog = OSAllocatedUnfairLock<FailureLog?>(initialState: nil)
+    private static let logger = Logger(subsystem: "app.inku", category: "display")
     private let sceneCostLimit: Int
     private let wholeByteLimit: Int
 
@@ -84,7 +98,7 @@ public final class DisplayRenderer: Sendable {
 
     /// A window of the zoomed picture, its tiles drawn from the window's centre outwards on several threads.
     /// The joined pixels so far are yielded every `progressInterval`, then the complete window. A work the Skia
-    /// display does not take has no window (the enlarged whole stays). Ending the iteration cancels the drawing.
+    /// display cannot draw stops with `Failed` and is logged (the enlarged whole stays). Ending the iteration cancels the drawing.
     public func window(svg: String, region: DisplayRegion,
                        progressInterval: Duration = .milliseconds(150)) -> AsyncThrowingStream<WindowFrame, Error> {
         AsyncThrowingStream { continuation in
@@ -103,14 +117,24 @@ public final class DisplayRenderer: Sendable {
                     state.withLock { $0.diagnostics.skiaWindows += 1 }
                     continuation.yield(WindowFrame(image: image, region: region, complete: true))
                     continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish(throwing: CancellationError())
                 } catch {
-                    continuation.finish(throwing: error)
+                    continuation.finish(throwing: failed(error, svg: svg, stage: "window", request: [
+                        "full_width": Int(region.fullWidth), "full_height": Int(region.fullHeight), "x": Int(region.x),
+                        "y": Int(region.y), "width": Int(region.width), "height": Int(region.height)]))
                 }
             }
         }
     }
 
     public func diagnostics() -> Diagnostics { state.withLock { $0.diagnostics } }
+
+    /// Failures are appended to `display-failures/failures.jsonl` in `directory`, with one copy of
+    /// each failing SVG beside it. Without a directory they go to the system log only.
+    public func connectFailureLog(directory: URL) {
+        failureLog.withLock { $0 = FailureLog(folder: directory.appendingPathComponent("display-failures", isDirectory: true)) }
+    }
 
     public func purge() {
         state.withLock { state in
@@ -125,7 +149,7 @@ public final class DisplayRenderer: Sendable {
         let wholeKey = "\(digest):\(width):\(height)"
         if let kept = state.withLock({ Self.take(&$0.wholes, wholeKey, &$0.clock) }) { yield(kept); return }
         guard Self.drawsWithSkia else {
-            return try fallback(svg: svg, width: width, height: height, key: wholeKey, code: "disabled", yield: yield)
+            return try fallback(svg: svg, width: width, height: height, key: wholeKey, yield: yield)
         }
         do {
             let scene = try prepared(svg: svg, digest: digest)
@@ -151,7 +175,7 @@ public final class DisplayRenderer: Sendable {
             throw CancellationError()
         } catch {
             try checkCancellation()
-            try fallback(svg: svg, width: width, height: height, key: wholeKey, code: Self.code(error), yield: yield)
+            throw failed(error, svg: svg, stage: "whole", request: ["width": Int(width), "height": Int(height)])
         }
     }
 
@@ -194,10 +218,21 @@ public final class DisplayRenderer: Sendable {
         return try composite.finish()
     }
 
-    /// resvg, as before, for a work the Skia display does not take. The code is counted.
-    private func fallback(svg: String, width: UInt32, height: UInt32, key: String, code: String,
-                          yield: (Frame) -> Void) throws {
-        state.withLock { $0.diagnostics.fallbacks[code, default: 0] += 1 }
+    /// Counts and logs a Skia failure, and returns the error the request stops with.
+    private func failed(_ error: any Error, svg: String, stage: String, request: [String: Int]) -> Failed {
+        let code = Self.code(error)
+        state.withLock { $0.diagnostics.failures[code, default: 0] += 1 }
+        let message: String = switch error {
+        case CoreFailure.displayUnsupported(_, let message), CoreFailure.displayRefused(_, let message): message
+        default: String(describing: error)
+        }
+        Self.logger.error("Skia display failed: \(stage, privacy: .public) \(code, privacy: .public) \(message, privacy: .public)")
+        failureLog.withLock { $0?.append(svg: svg, stage: stage, code: code, message: message, request: request) }
+        return Failed(code: code)
+    }
+
+    /// resvg for the work area while `drawsWithSkia` is off.
+    private func fallback(svg: String, width: UInt32, height: UInt32, key: String, yield: (Frame) -> Void) throws {
         guard let image = try InkuCore.prepareSVG(svg: svg).rasterize(targetWidth: width, targetHeight: height).makeCGImage()
         else { throw ArtworkError.imageUnavailable }
         let frame = Frame(image: image, coarse: false, painter: .resvg)
@@ -234,5 +269,42 @@ public final class DisplayRenderer: Sendable {
         }
         clock &+= 1
         entries[key] = Entry(value: value, cost: cost, use: clock)
+    }
+}
+
+/// The display's failure log: one JSON line per failure, and one copy of each failing SVG named by
+/// its SHA-256, so the work can be drawn again while the display is fixed. A failure repeated in one
+/// run (the same SVG, stage and code) is written once.
+private struct FailureLog: Sendable {
+    let folder: URL
+    private var written: Set<String> = []
+
+    init(folder: URL) { self.folder = folder }
+
+    mutating func append(svg: String, stage: String, code: String, message: String, request: [String: Int]) {
+        let digest = SHA256.hash(data: Data(svg.utf8)).map { String(format: "%02x", $0) }.joined()
+        guard written.insert("\(digest):\(stage):\(code)").inserted else { return }
+        let info = Bundle.main.infoDictionary
+        let record: [String: Any] = [
+            "at": ISO8601DateFormatter().string(from: Date()), "stage": stage, "code": code, "message": message,
+            "request": request, "svg_sha256": digest, "svg_bytes": svg.utf8.count, "svg_file": digest + ".svg",
+            "display_api_version": InkuCore.displayAPIVersion,
+            "app_version": info?["CFBundleShortVersionString"] as? String ?? "", "app_build": info?["CFBundleVersion"] as? String ?? "",
+        ]
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let copy = folder.appendingPathComponent(digest + ".svg")
+            if !FileManager.default.fileExists(atPath: copy.path) { try Data(svg.utf8).write(to: copy, options: .atomic) }
+            var line = try JSONSerialization.data(withJSONObject: record, options: [.sortedKeys])
+            line.append(0x0A)
+            let log = folder.appendingPathComponent("failures.jsonl")
+            if !FileManager.default.fileExists(atPath: log.path) { FileManager.default.createFile(atPath: log.path, contents: nil) }
+            let handle = try FileHandle(forWritingTo: log)
+            defer { try? handle.close() }
+            try handle.seekToEnd()
+            try handle.write(contentsOf: line)
+        } catch {
+            Logger(subsystem: "app.inku", category: "display").error("Display failure log not written: \(error.localizedDescription, privacy: .public)")
+        }
     }
 }

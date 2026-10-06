@@ -14,13 +14,23 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-06 Skiaで描けない作品はresvgへ戻さず止め、原因を記録する
+
+作者の裁定（2026-10-06）：「skiaが失敗した場合、フォールバックせずに、エラーの原因をログに書いて停止。それを元に、改修作業を行う。」
+
+- 作品域（`DisplayRenderer`）は、Skiaで描けなかった全体・窓をresvgで描き直さない。照合表の外の作品、解析できない・Skiaで読めない作品、入力の上限、画素の領域を確保できない、coreの内部の不整合、CGImageを作れない、のどれでも同じ。全体は「作品を表示できません」と符号を出して止まる。窓は描かず、表示済みの全体を残す。
+- 原因は、DBと同じフォルダの`display-failures/failures.jsonl`に1行ずつ書く（時刻、全体か窓か、符号、文、要求の大きさ、SVGのSHA-256と大きさ、表示APIの版、アプリの版とBuild）。失敗したSVGの写しを同じフォルダに`<SHA-256>.svg`として1つ置く。同じ起動の中で同じSVG・同じ段・同じ符号の失敗は1回だけ書く。設定に関係なく書く。システムのログ（subsystem `app.inku`、category `display`）にも出す。
+- 診断の数は`fallbacks`から`failures`に改めた。`drawsWithSkia`を切ったときのresvgの経路（1箇所の切り替え）は残す。
+- サムネイル、歳時記のプレビュー、書き出しはresvgのまま（変更なし）。
+- 確認：AppCheck `--display-only`で、照合表の外の作品が止まり、ログに1行とSVGの写しが残ることを見る。
+
 ## 2026-10-06 窓の計算とタイルの合成をAndroidと共有する
 
 作品域のSkia表示のうち、窓の密度・丸めとタイルの合成を共有coreへ移し、Androidと同じ実装を使う（AndroidへのSkia表示の導入のうち、Appleの受け持ち）。表示の結果と操作は変えない。
 
 - `CanvasInteraction.detailPlan`は、拡大後の作品の矩形と見えている矩形をcoreの`display_detail_region`へ渡す。拡大率の判定と矩形の交差はSwiftに残る。式は前と同じ。
 - `DisplayRenderer`は、タイルを複数のthreadからcoreの合成（`DisplayScene.composite`）へ渡す。タイルはcoreの中で描かれ、つないだ領域へ写される。タイルの画素はSwiftへ渡らない。完成した画像は、coreの領域をそのまま`CGImage`にする（写さない）。`CGDataProvider`がcoreの画像objectを保持し、最後の画像を手放すと領域も解放される。途中の絵はcoreで1回写したもの。取消はこれまでどおりタイルの境目で行う。
-- Skiaで描けない作品は、これまでどおりすべてresvgへ戻す。coreは準備の失敗を`Unsupported`（照合表外・解析不可・Skiaで読めない）と`Refused`（入力の上限など）に分けるようになったので、後者の診断の符号は`refused_<code>`になる。
+- coreは準備の失敗を`Unsupported`（照合表外・解析不可・Skiaで読めない）と`Refused`（入力の上限など）に分ける。Swiftの符号は前者が`code`のまま、後者が`refused_<code>`。失敗したときの扱いは次の節。
 - Skiaとその中の部品の通知は、Androidと共有する一覧（`core/crates/inku-display/licenses/`、`scripts/skia_notices.py`）から読む。通知の内容は変わらない。
 - 重さは変えていない（段5と同じ条件で、作者の最大の作品の全体2000pxが0.67秒→0.66秒、4倍の窓が0.52秒→0.51秒）。確認：AppCheck `--canvas-detail-only`、`--display-only`（debug・release。完成画像の領域の寿命も見る）、`build-macos-notices.py --check`。
 
@@ -43,7 +53,7 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 描き手は[`DisplayRenderer`](Sources/InkuUI/DisplayRenderer.swift)。専用のqueueで描き、要求が別の要求の後ろに並ぶことはない。全体は、粗い256pxを先に出し、続けて512pxのタイルを並列に描いてつなぐ。取り消された要求は、次のタイルの境目で止まる。
 - 全体は100%の大きさで描く。拡大中は、見えている窓を画面の画素密度で描き直す。窓のタイルは中心から並列に描き、描けた分を0.15秒ごとに出す。描き終えた窓は作品に対する割合で位置を持ち、次の窓ができるまで同じ場所に残る。窓と全体の上限は、coreの値（`DisplayLayout`）に従う。
 - 「作品を表示中」の印は、今の作品の全体か窓を実際に描いている間だけ出す。要求ごとに世代番号を付け、古い結果は捨てる。
-- 照合表に無い要素・属性・style内の性質を含む作品と、Skiaで読めない作品は、resvg（共通raster）で描き、理由の符号を数える。数は画面には出さない。その作品は、拡大しても全体を引き伸ばす。
+- 照合表に無い要素・属性・style内の性質を含む作品と、Skiaで読めない作品は、resvg（共通raster）で描き、理由の符号を数える。数は画面には出さない。その作品は、拡大しても全体を引き伸ばす。（2026-10-06の後の節で、resvgへ戻さず止める扱いに変えた。）
 - サムネイル、歳時記のプレビュー、PNGの書き出し、vision用の画像は、resvgのまま。
 - SVGの上限は12MiB（`inku-svg-raster`の`MAX_SVG_BYTES`。Skiaの表示とSwiftの書き出しの検査も同じ値）。
 - Skiaの事前ビルドは、SHA-256で固定した写しを`~/Library/Application Support/inku/build-cache/skia-binaries/`に置き、`build-core.sh`がbuildのたびに照合する。Skiaとその中の8部品を、通知の「ネイティブライブラリ」に載せる。アプリはstrip後で、各アーキテクチャ約14MB大きくなる。

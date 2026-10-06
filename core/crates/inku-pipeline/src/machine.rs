@@ -1632,6 +1632,14 @@ impl PipelineSnapshot {
                 if !result["reason"].is_null() {
                     entry["reason"] = result["reason"].clone();
                 }
+                if result["status"] == "rejected"
+                    && let Some(proposal) = proposal
+                {
+                    let unread = self.unread_in_proposal(index, proposal);
+                    if !unread.is_empty() {
+                        entry["unread"] = json!(unread);
+                    }
+                }
                 entry
             })
             .collect::<Vec<_>>();
@@ -1678,6 +1686,55 @@ impl PipelineSnapshot {
             }),
         )?;
         Ok(true)
+    }
+
+    /// The words the compiler cannot read once a refused proposal replaces its
+    /// hole alone (A1 stage 3), named in the second request. The holes are in
+    /// the source order the short ids use.
+    fn unread_in_proposal(&self, index: usize, proposal: &str) -> Vec<String> {
+        let Ok(base) = self.compilation() else {
+            return vec![];
+        };
+        let PipelinePhase::AwaitingLlm { hole_ids, .. } = &self.phase else {
+            return vec![];
+        };
+        let mut holes = hole_ids
+            .iter()
+            .filter_map(|id| base.holes.iter().find(|hole| &hole.id == id))
+            .collect::<Vec<_>>();
+        holes.sort_by_key(|hole| (hole.allowed_span.start_byte, hole.allowed_span.end_byte));
+        let Some(hole) = holes.get(index) else {
+            return vec![];
+        };
+        let source = base.document.source();
+        let span = hole.allowed_span;
+        let candidate = format!(
+            "{}{}{}",
+            &source[..span.start_byte],
+            proposal,
+            &source[span.end_byte..]
+        );
+        let (Ok(seed), Ok(limits)) = (
+            self.config.compiler.composition_seed(),
+            self.config.compiler.macro_limits(),
+        ) else {
+            return vec![];
+        };
+        let Ok(document) = NormalizedDdlDocument::new(
+            candidate,
+            base.document.language(),
+            base.document.macro_locks().to_vec(),
+        ) else {
+            return vec![];
+        };
+        let compiled = compile_typed_ddl(document, &self.config.definitions, seed, limits);
+        crate::hole_completion::unread_words(
+            &compiled,
+            inku_ddl::SourceSpan {
+                start_byte: span.start_byte,
+                end_byte: span.start_byte + proposal.len(),
+            },
+        )
     }
 
     fn hole_response(

@@ -12,6 +12,34 @@ fn contains(outer: SourceSpan, inner: SourceSpan) -> bool {
     outer.start_byte <= inner.start_byte && inner.end_byte <= outer.end_byte
 }
 
+/// The words the compiler could not read inside `span`, in source order (A1
+/// stage 3, 2026-10-06): a completion told which words were unread can rewrite
+/// them instead of copying them.
+pub(crate) fn unread_words(compilation: &TypedDdlCompilation, span: SourceSpan) -> Vec<String> {
+    let Some(semantic) = &compilation.semantic_document else {
+        return vec![];
+    };
+    let source = compilation.document.source();
+    semantic
+        .instruction_association
+        .association
+        .clause_stream
+        .clauses
+        .iter()
+        .flat_map(|clause| &clause.atoms)
+        .filter_map(|atom| match atom {
+            inku_ddl::ClauseAtom::UnresolvedDiagnostic(diagnostic)
+                if !diagnostic.recognized && contains(span, diagnostic.span) =>
+            {
+                source
+                    .get(diagnostic.span.start_byte..diagnostic.span.end_byte)
+                    .map(str::to_owned)
+            }
+            _ => None,
+        })
+        .collect()
+}
+
 pub(crate) fn confirmed_bindings(
     compilation: &TypedDdlCompilation,
     span: SourceSpan,

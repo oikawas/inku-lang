@@ -13,7 +13,7 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 [features]
 default = []
 cli = ["uniffi/cli"]
-# Skia screen display; only apple/scripts/build-core.sh turns it on.
+# Skia screen display; enabled explicitly by the Apple and Android host builds.
 display = ["dep:inku-display", "inku-display/skia"]
 
 [dependencies]

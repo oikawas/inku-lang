@@ -154,9 +154,29 @@ val rustLibrary = rustTargetDirectory.map {
     it.file("$rustAndroidTarget/release/$rustNativeLibraryName")
 }
 
+val skiaBinaryHelper = rootProject.file("../scripts/skia-binaries.sh")
+val skiaBinaryDigests = rootProject.file("../core/crates/inku-display/skia-binaries.sha256")
+val verifiedSkiaBinariesUrl = objects.property<String>()
+val verifySkiaAndroidBinaries = tasks.register("verifySkiaAndroidBinaries") {
+    group = "build"
+    description = "Verify the pinned Android Skia binary before every native build, including up-to-date builds."
+    inputs.files(skiaBinaryHelper, skiaBinaryDigests)
+    // No output is declared: a cached native library must not bypass the digest check.
+    doLast {
+        val value = providers.exec {
+            commandLine("bash", skiaBinaryHelper.absolutePath, rustAndroidTarget)
+        }.standardOutput.asText.get().trim()
+        check(value.startsWith("file://") && value.contains("{tag}") && value.contains("{key}")) {
+            "The Skia verifier did not return its local binary URL template"
+        }
+        verifiedSkiaBinariesUrl.set(value)
+    }
+}
+
 val buildRustAndroidArm64 = tasks.register<Exec>("buildRustAndroidArm64") {
     group = "build"
-    description = "Build the shared Rust render/raster JNI library for arm64-v8a without packaging the app."
+    description = "Build the shared Rust render/raster/display JNI library for arm64-v8a without packaging the app."
+    dependsOn(verifySkiaAndroidBinaries)
     workingDir(rootProject.file("../core"))
     inputs.files(
         rootProject.fileTree("../core") {
@@ -164,6 +184,7 @@ val buildRustAndroidArm64 = tasks.register<Exec>("buildRustAndroidArm64") {
             exclude("target/**")
         },
     )
+    inputs.files(skiaBinaryHelper, skiaBinaryDigests)
     outputs.file(rustLibrary)
 
     doFirst {
@@ -183,6 +204,9 @@ val buildRustAndroidArm64 = tasks.register<Exec>("buildRustAndroidArm64") {
         // `rustup run ... cargo` pins Cargo but Cargo can still resolve a
         // different `rustc` from PATH, so pin the compiler explicitly too.
         environment("RUSTC", pinnedRustc)
+        environment("ANDROID_NDK", rustNdkDirectory.get().asFile.absolutePath)
+        environment("SKIA_BINARIES_URL", verifiedSkiaBinariesUrl.get())
+        // The Android-only no-compile feature refuses any source-build fallback.
         environment("CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER", clang.absolutePath)
         environment("CC_aarch64_linux_android", clang.absolutePath)
         environment("CXX_aarch64_linux_android", clangxx.absolutePath)
@@ -198,6 +222,8 @@ val buildRustAndroidArm64 = tasks.register<Exec>("buildRustAndroidArm64") {
         "--locked",
         "--package",
         "inku-render-android",
+        "--features",
+        "display",
         "--target",
         rustAndroidTarget,
         "--release",

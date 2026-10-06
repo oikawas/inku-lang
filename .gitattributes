@@ -1,2 +1,4 @@
 server/reference/ export-ignore
 web/BUILD_NUMBER merge=buildnumber
+# Keep the upstream WebP notice's closing blank line byte-for-byte.
+core/crates/inku-display/licenses/skia-m153/libwebp-COPYING whitespace=-blank-at-eof

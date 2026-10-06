@@ -20,8 +20,9 @@ pub use description_labels::pipeline_description;
 pub use description_meter::count_description_meter;
 #[cfg(feature = "display")]
 pub use display::{
-    DisplayFailure, DisplayLayout, DisplayRegion, DisplayRewrites, DisplayScene,
-    display_api_version, display_layout, display_tiles, prepare_display_scene,
+    DisplayComposite, DisplayFailure, DisplayImage, DisplayLayout, DisplayRect, DisplayRegion,
+    DisplayRewrites, DisplayScene, display_api_version, display_detail_region, display_layout,
+    display_tiles, prepare_display_scene,
 };
 pub use macro_catalog::resolve_macro_catalog;
 pub use plugin_diagnostics::explain_plugin_diagnostics;

@@ -6,11 +6,9 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
-## v2.15.94 (2026-10-06 / Build 1170)
+## macOS 1.1.0 (2026-10-06 / Build 2)
 
-Add Discard edits to the instructions box and Instruction editor. After confirmation, return to the target work's saved text; ⌘Z restores the text from before the discard.
-
-### 2026-10-06 — macOS 1.1.0 (Build 2): draw the work area with Skia and redraw the visible part while zoomed
+### 2026-10-06 — Draw the work area with Skia and redraw the visible part while zoomed
 
 In answer to the author's report that a zoomed canvas looked like an enlarged bitmap rather than SVG. The seven macOS surfaces that show a work large (the creation work area; the auxiliary, batch, replay comparison, library and automation views; and the presentation) are drawn with the display component added to the shared core, `core/crates/inku-display` (Skia, behind a feature only the Apple build enables). To look as the Web does in Chrome, three compatibility rewrites are applied in memory just before display (the `href` of pattern and use, ellipses, and integer feTurbulence `seed`s). The saved SVG and the Render Engine do not change.
 
@@ -21,6 +19,10 @@ In answer to the author's report that a zoomed canvas looked like an enlarged bi
 - Skia's prebuilt binaries are copies pinned by SHA-256 and checked on every build. Skia and the eight components inside it are listed in the notices as native libraries. The app grows by about 14 MB per architecture after stripping.
 - Cost (Apple M5 Pro): for the author's largest work, the 2000px whole takes 0.67 s and a Retina-sized zoomed window 0.50 s (6.5 s and 4.2 s drawn as one picture without tiles).
 - This version also carries the two changes after 1.0.0 (tooltips no longer raise the main window behind another window; the rail drops the inku logo and generation information colors its JSON). The corresponding Server stays v2.15.86 (Build 1162).
+
+## v2.15.94 (2026-10-06 / Build 1170)
+
+Add Discard edits to the instructions box and Instruction editor. After confirmation, return to the target work's saved text; ⌘Z restores the text from before the discard.
 
 ### 2026-10-06 — Discard edits on the Web
 

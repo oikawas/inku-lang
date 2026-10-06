@@ -75,9 +75,76 @@ func runDisplayCanvasChecks(svg: String) async throws {
     await lone.value
     guard !picture.loading else { throw fail("The progress mark stayed after the request was cancelled") }
 
+    // C3 (drawn): a window of the zoomed picture, tiles shown as they finish, matches the same pixels of the whole.
+    let region = DisplayRegion(fullWidth: 1500, fullHeight: 1500, x: 300, y: 400, width: 1100, height: 700)
+    var windowFrames: [DisplayRenderer.WindowFrame] = []
+    for try await frame in renderer.window(svg: svg, region: region, progressInterval: .zero) { windowFrames.append(frame) }
+    guard let drawnWindow = windowFrames.last, drawnWindow.complete, windowFrames.dropLast().allSatisfy({ !$0.complete }),
+          windowFrames.count > 1, let windowPixels = drawnWindow.image.dataProvider?.data as Data? else {
+        throw fail("The window was not handed over tile by tile and then complete: \(windowFrames.map(\.complete))")
+    }
+    let crop = crop(whole, x: 300, y: 400, width: 1100, height: 700)
+    let (windowBlock, windowFar) = difference(windowPixels, crop, width: 1100, height: 700)
+    guard windowBlock <= 16, windowFar <= 0.005 else {
+        throw fail("The window differs from the same pixels of the whole: worst block \(windowBlock), far \(windowFar)")
+    }
+
+    // C5 (zoom): switching works while a large window is drawing shows the new work without waiting for the window.
+    // A cancelled window still finishes the tiles in flight, at most one round of them: the window is the largest
+    // the core draws (64 tiles), so one round is well under half of it, and it is cancelled mid-drawing.
+    let deep = DisplayRegion(fullWidth: 12_000, fullHeight: 12_000, x: 4000, y: 4000, width: 4096, height: 4096)
+    let deepPlan = CanvasDetailPlan(fullWidth: 12_000, fullHeight: 12_000, x: 4000, y: 4000, width: 4096, height: 4096)
+    let windowStarted = ContinuousClock.now
+    for try await _ in DisplayRenderer().window(svg: svg, region: deep) {}
+    let windowAlone = ContinuousClock.now - windowStarted
+    let zoomed = CanvasPicture()
+    let zoomRenderer = DisplayRenderer()
+    await zoomed.load(svg: svg, width: 1000, height: 1000, renderer: zoomRenderer)
+    let deepTask = Task { await zoomed.loadWindow(svg: svg, plan: deepPlan, renderer: zoomRenderer) }
+    try await waitUntil("the first tiles of the window") { zoomed.pendingWindow != nil }
+    deepTask.cancel()
+    zoomed.clear()
+    let windowSwitched = ContinuousClock.now
+    await zoomed.load(svg: next, width: 640, height: 640, renderer: zoomRenderer)
+    let afterWindow = ContinuousClock.now - windowSwitched
+    await deepTask.value
+    guard zoomed.imageSVG == next, zoomed.window == nil, zoomed.pendingWindow == nil, !zoomed.windowLoading,
+          zoomRenderer.diagnostics().skiaWindows == 0 else {
+        throw fail("After switching during a window the canvas shows \(zoomed.imageSVG == next ? "the new work" : "another picture"), "
+            + "window \(zoomed.window != nil), loading \(zoomed.windowLoading), windows finished \(zoomRenderer.diagnostics().skiaWindows)")
+    }
+    guard afterWindow < windowAlone / 2 else {
+        throw fail("The new work took \(afterWindow); the window alone takes \(windowAlone)")
+    }
+
+    // C5 (zoom): after a cancelled window, a new zoom is requested and drawn.
+    let shallow = CanvasDetailPlan(fullWidth: 2000, fullHeight: 2000, x: 500, y: 600, width: 900, height: 700)
+    await zoomed.load(svg: svg, width: 1000, height: 1000, renderer: zoomRenderer)
+    let cancelledWindow = Task { await zoomed.loadWindow(svg: svg, plan: deepPlan, renderer: zoomRenderer) }
+    try await waitUntil("the window to start") { zoomed.windowLoading }
+    cancelledWindow.cancel()
+    await cancelledWindow.value
+    guard !zoomed.windowLoading else { throw fail("The progress mark stayed after the window was cancelled") }
+    await zoomed.loadWindow(svg: svg, plan: shallow, renderer: zoomRenderer)
+    guard let shown = zoomed.window, shown.unit == CanvasDetailPlan.unit(of: shallow.region), zoomed.pendingWindow == nil,
+          !zoomed.windowLoading else {
+        throw fail("A new zoom after a cancelled window was not drawn")
+    }
+
     print("Display canvas passed: Skia, coarse then \(tileCount) tiles (worst block \(worstBlock)), "
         + "resvg fallback counted; new work in \(nextTook) while the left whole takes \(largeAlone) alone; "
-        + "no progress mark after cancelling.")
+        + "no progress mark after cancelling; window in \(windowFrames.count - 1) steps (worst block \(windowBlock)); "
+        + "new work in \(afterWindow) while the window takes \(windowAlone) alone; a new zoom drawn after a cancelled window.")
+}
+
+/// The premultiplied RGBA pixels of a rectangle of a raster.
+private func crop(_ image: RasterImage, x: Int, y: Int, width: Int, height: Int) -> Data {
+    var out = Data(capacity: width * height * 4)
+    for row in y..<(y + height) {
+        let start = row * Int(image.stride) + x * 4
+        out.append(image.pixels[start..<(start + width * 4)])
+    }
+    return out
 }
 
 @MainActor

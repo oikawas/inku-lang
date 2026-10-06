@@ -38,11 +38,15 @@ pub struct DisplayRegion {
     pub height: u32,
 }
 
-/// The sides the display is drawn in: a coarse whole first, then tiles.
+/// The sides the display is drawn in (a coarse whole first, then tiles), and the
+/// largest window and full canvas a window is cut from.
 #[derive(uniffi::Record)]
 pub struct DisplayLayout {
     pub coarse_side: u32,
     pub tile_side: u32,
+    pub max_window_side: u32,
+    pub max_window_pixels: u64,
+    pub max_canvas_side: u32,
 }
 
 /// One recorded work. Its windows may be drawn on several threads at once.
@@ -139,6 +143,9 @@ pub fn display_layout() -> DisplayLayout {
     DisplayLayout {
         coarse_side: inku_display::geometry::COARSE_SIDE,
         tile_side: inku_display::geometry::TILE_SIDE,
+        max_window_side: inku_display::MAX_RASTER_DIMENSION,
+        max_window_pixels: inku_display::MAX_RASTER_PIXELS,
+        max_canvas_side: inku_display::geometry::MAX_CANVAS_SIDE,
     }
 }
 

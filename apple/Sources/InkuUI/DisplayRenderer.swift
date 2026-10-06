@@ -24,9 +24,18 @@ public final class DisplayRenderer: Sendable {
         public let painter: Painter
     }
 
+    /// A window of the zoomed picture at the screen's density.
+    public struct WindowFrame: Sendable {
+        public let image: CGImage
+        public let region: DisplayRegion
+        /// False while tiles are still being drawn; the parts not drawn yet are transparent.
+        public let complete: Bool
+    }
+
     /// Not shown on screen: how often the work area fell back to resvg, and why.
     public struct Diagnostics: Sendable, Equatable {
         public var skiaWholes = 0
+        public var skiaWindows = 0
         public var resvgWholes = 0
         public var fallbacks: [String: Int] = [:]
         public var tilesDrawn = 0
@@ -65,6 +74,34 @@ public final class DisplayRenderer: Sendable {
             queue.async { [self] in
                 do {
                     try draw(svg: svg, width: width, height: height, cancelled: cancelled) { continuation.yield($0) }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+
+    /// A window of the zoomed picture, its tiles drawn from the window's centre outwards on several threads.
+    /// The joined pixels so far are yielded every `progressInterval`, then the complete window. A work the Skia
+    /// display does not take has no window (the enlarged whole stays). Ending the iteration cancels the drawing.
+    public func window(svg: String, region: DisplayRegion,
+                       progressInterval: Duration = .milliseconds(150)) -> AsyncThrowingStream<WindowFrame, Error> {
+        AsyncThrowingStream { continuation in
+            let cancelled = OSAllocatedUnfairLock(initialState: false)
+            continuation.onTermination = { _ in cancelled.withLock { $0 = true } }
+            queue.async { [self] in
+                do {
+                    guard Self.drawsWithSkia else { return continuation.finish() }
+                    let digest = SHA256.hash(data: Data(svg.utf8)).map { String(format: "%02x", $0) }.joined()
+                    let scene = try prepared(svg: svg, digest: digest)
+                    if cancelled.withLock({ $0 }) { throw CancellationError() }
+                    let image = try tiled(scene, window: region, side: InkuCore.displayLayout.tileSide, cancelled: cancelled,
+                                          progressInterval: progressInterval) { partial in
+                        continuation.yield(WindowFrame(image: partial, region: region, complete: false))
+                    }
+                    state.withLock { $0.diagnostics.skiaWindows += 1 }
+                    continuation.yield(WindowFrame(image: image, region: region, complete: true))
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
@@ -126,13 +163,17 @@ public final class DisplayRenderer: Sendable {
         return scene
     }
 
-    /// The window drawn tile by tile on several threads and joined into one image.
-    private func tiled(_ scene: PreparedDisplay, window: DisplayRegion, side: UInt32,
-                       cancelled: OSAllocatedUnfairLock<Bool>) throws -> CGImage {
+    /// The window drawn tile by tile on several threads and joined into one image. With `progress`, the pixels
+    /// joined so far are handed over at most once every `progressInterval`.
+    private func tiled(_ scene: PreparedDisplay, window: DisplayRegion, side: UInt32, cancelled: OSAllocatedUnfairLock<Bool>,
+                       progressInterval: Duration = .zero, progress: (@Sendable (CGImage) -> Void)? = nil) throws -> CGImage {
         let tiles = InkuCore.displayTiles(window: window, side: side)
         let stride = Int(window.width) * 4
-        var pixels = Data(count: stride * Int(window.height))
+        let length = stride * Int(window.height)
+        var pixels = Data(count: length)
         let failure = OSAllocatedUnfairLock<(any Error)?>(initialState: nil)
+        // Guards the joined pixels and the time of the last hand-over.
+        let joined = OSAllocatedUnfairLock(initialState: ContinuousClock.now)
         pixels.withUnsafeMutableBytes { buffer in
             guard let base = buffer.baseAddress.map(TileTarget.init) else { return }
             DispatchQueue.concurrentPerform(iterations: tiles.count) { index in
@@ -141,14 +182,23 @@ public final class DisplayRenderer: Sendable {
                 do {
                     let drawn = try scene.region(tile)
                     let rowBytes = Int(tile.width) * 4
-                    drawn.pixels.withUnsafeBytes { source in
-                        guard let from = source.baseAddress else { return }
-                        for row in 0..<Int(tile.height) {
-                            let target = (Int(tile.y - window.y) + row) * stride + Int(tile.x - window.x) * 4
-                            (base.pointer + target).copyMemory(from: from + row * Int(drawn.stride), byteCount: rowBytes)
+                    let snapshot: Data? = joined.withLock { handedOver in
+                        drawn.pixels.withUnsafeBytes { source in
+                            guard let from = source.baseAddress else { return }
+                            for row in 0..<Int(tile.height) {
+                                let target = (Int(tile.y - window.y) + row) * stride + Int(tile.x - window.x) * 4
+                                (base.pointer + target).copyMemory(from: from + row * Int(drawn.stride), byteCount: rowBytes)
+                            }
                         }
+                        guard progress != nil, ContinuousClock.now - handedOver >= progressInterval else { return nil }
+                        handedOver = .now
+                        return Data(bytes: base.pointer, count: length)
                     }
                     state.withLock { $0.diagnostics.tilesDrawn += 1 }
+                    if let snapshot, let progress, !cancelled.withLock({ $0 }),
+                       let image = RasterImage(premultipliedRGBA: snapshot, width: window.width, height: window.height).makeCGImage() {
+                        progress(image)
+                    }
                 } catch {
                     failure.withLock { if $0 == nil { $0 = error } }
                 }

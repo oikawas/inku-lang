@@ -88,6 +88,25 @@ public struct DisplayRegion: Sendable, Equatable {
 }
 
 /// One work recorded by Skia for the screen. Its windows may be drawn on several threads at once.
+/// The sides the display is drawn in, and the largest window and full canvas the core draws.
+public struct DisplayLayout: Sendable {
+    /// The coarse whole's longest side.
+    public let coarseSide: UInt32
+    public let tileSide: UInt32
+    public let maxWindowSide: UInt32
+    public let maxWindowPixels: UInt64
+    /// The full canvas a window is cut from.
+    public let maxCanvasSide: UInt32
+
+    fileprivate init(_ layout: InkuCoreBindings.DisplayLayout) {
+        coarseSide = layout.coarseSide
+        tileSide = layout.tileSide
+        maxWindowSide = layout.maxWindowSide
+        maxWindowPixels = layout.maxWindowPixels
+        maxCanvasSide = layout.maxCanvasSide
+    }
+}
+
 public struct PreparedDisplay: Sendable {
     private let scene: InkuCoreBindings.DisplayScene
     fileprivate init(_ scene: InkuCoreBindings.DisplayScene) { self.scene = scene }
@@ -157,11 +176,7 @@ public enum InkuCore {
     }
 
     public static var displayAPIVersion: String { InkuCoreBindings.displayApiVersion() }
-    /// The coarse whole's longest side and the tile side the display is drawn in.
-    public static var displayLayout: (coarseSide: UInt32, tileSide: UInt32) {
-        let layout = InkuCoreBindings.displayLayout()
-        return (layout.coarseSide, layout.tileSide)
-    }
+    public static var displayLayout: DisplayLayout { DisplayLayout(InkuCoreBindings.displayLayout()) }
 
     public static func prepareDisplay(svg: String) throws -> PreparedDisplay {
         do { return PreparedDisplay(try InkuCoreBindings.prepareDisplayScene(svg: svg)) }

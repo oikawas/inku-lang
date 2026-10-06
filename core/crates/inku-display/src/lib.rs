@@ -24,8 +24,8 @@ mod scene;
 
 pub use check::Unsupported;
 pub use inku_svg_raster::{
-    MAX_SVG_BYTES, PIXEL_FORMAT_RGBA8_PREMULTIPLIED, RasterOptions, RasterOutput,
-    RasterRegionOptions,
+    MAX_RASTER_DIMENSION, MAX_RASTER_PIXELS, MAX_SVG_BYTES, PIXEL_FORMAT_RGBA8_PREMULTIPLIED,
+    RasterOptions, RasterOutput, RasterRegionOptions,
 };
 pub use rewrite::Rewrites;
 #[cfg(feature = "skia")]

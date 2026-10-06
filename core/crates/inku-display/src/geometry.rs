@@ -15,10 +15,10 @@ use crate::DisplayError;
 pub const COARSE_SIDE: u32 = 256;
 /// Side of one tile.
 pub const TILE_SIDE: u32 = 512;
-/// Largest side of the full canvas a window is cut from (as the export tiles).
+/// Largest side of the full canvas a window is cut from. Skia draws only the window,
+/// so the full canvas sets just the scale and has no pixel limit; below 2^17 a
+/// position in `f32` is still finer than 1/100 pixel.
 pub const MAX_CANVAS_SIDE: u32 = 120_000;
-/// Largest full canvas a window is cut from (as the export tiles).
-pub const MAX_CANVAS_PIXELS: u64 = 144_000_000;
 
 /// A window on a canvas `full_width` × `full_height` pixels, with the scale that
 /// maps the work's user units to those pixels.
@@ -107,13 +107,6 @@ pub fn region(intrinsic: (f64, f64), region: RasterRegionOptions) -> Result<Wind
             .is_none_or(|end| end > region.full_height)
     {
         return Err(DisplayError::InvalidTargetDimension);
-    }
-    let full = u64::from(region.full_width) * u64::from(region.full_height);
-    if full > MAX_CANVAS_PIXELS {
-        return Err(DisplayError::PixelCountTooLarge {
-            actual: full,
-            maximum: MAX_CANVAS_PIXELS,
-        });
     }
     check_dimension(Some(region.width))?;
     check_dimension(Some(region.height))?;

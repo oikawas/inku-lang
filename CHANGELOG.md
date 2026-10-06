@@ -6,10 +6,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
-### 2026-10-06 — Redraw the zoomed macOS canvas from the SVG
-
-Zooming the work enlarged the image drawn for the fitted size (capped at 3× and 8 million pixels), so SVG works looked blurred (about half the screen density at 500% on Retina). While zoomed in, only the visible part is redrawn with the shared core's region rendering at the screen's pixel density, replacing the enlarged image 0.12 s after wheel or drag input stops. The whole image is drawn for 100% and is not redrawn on zoom. Synchronized both languages of the [Swift specification](apple/SWIFT_SPEC.md).
-
 ## v2.15.91 (2026-10-05 / Build 1167)
 
 Thumbnail saving and rebuilding recover once from a broken child process pool. Stored SVG and Score and all engine versions remain unchanged.

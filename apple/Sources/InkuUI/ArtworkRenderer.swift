@@ -55,7 +55,22 @@ public actor ArtworkRenderer {
             if var scene = scenes[digest] { scene.use = clock; scenes[digest] = scene }
             return cached.image
         }
-        let scene = try preparedScene(svg: svg, digest: digest)
+        let scene: PreparedSVG
+        if var cached = scenes[digest] {
+            cached.use = clock; scenes[digest] = cached; scene = cached.scene; sceneHits &+= 1
+        } else {
+            scene = try InkuCore.prepareSVG(svg: svg)
+            scenePreparations &+= 1
+            try Task.checkCancellation()
+            let cost = scene.cacheCostBytes
+            if cost <= sceneCostLimit, sceneCountLimit > 0 {
+                while cost > sceneCostLimit - retainedSceneCost || scenes.count >= sceneCountLimit {
+                    guard let oldest = scenes.min(by: { $0.value.use < $1.value.use }) else { break }
+                    retainedSceneCost -= oldest.value.cost; scenes.removeValue(forKey: oldest.key)
+                }
+                scenes[digest] = SceneEntry(scene: scene, cost: cost, use: clock); retainedSceneCost += cost
+            }
+        }
         let raster = try scene.rasterize(targetWidth: targetWidth, targetHeight: targetHeight)
         // A synchronous Rust frame can finish after its Swift caller was cancelled.
         try Task.checkCancellation()
@@ -73,39 +88,6 @@ public actor ArtworkRenderer {
             retainedBytes += bytes
         }
         return image
-    }
-
-    /// One window of the picture drawn at `fullWidth`×`fullHeight`, for a zoomed canvas. Windows change with every
-    /// pan, so they share the prepared scene but are not kept in the image cache.
-    public func region(svg: String, fullWidth: UInt32, fullHeight: UInt32,
-                       x: UInt32, y: UInt32, width: UInt32, height: UInt32) throws -> CGImage {
-        try Task.checkCancellation()
-        let digest = SHA256.hash(data: Data(svg.utf8)).map { String(format: "%02x", $0) }.joined()
-        clock &+= 1
-        let scene = try preparedScene(svg: svg, digest: digest)
-        let raster = try scene.region(fullWidth: fullWidth, fullHeight: fullHeight, x: x, y: y, width: width, height: height)
-        try Task.checkCancellation()
-        guard let image = raster.makeCGImage() else { throw ArtworkError.imageUnavailable }
-        return image
-    }
-
-    private func preparedScene(svg: String, digest: String) throws -> PreparedSVG {
-        if var cached = scenes[digest] {
-            cached.use = clock; scenes[digest] = cached; sceneHits &+= 1
-            return cached.scene
-        }
-        let scene = try InkuCore.prepareSVG(svg: svg)
-        scenePreparations &+= 1
-        try Task.checkCancellation()
-        let cost = scene.cacheCostBytes
-        if cost <= sceneCostLimit, sceneCountLimit > 0 {
-            while cost > sceneCostLimit - retainedSceneCost || scenes.count >= sceneCountLimit {
-                guard let oldest = scenes.min(by: { $0.value.use < $1.value.use }) else { break }
-                retainedSceneCost -= oldest.value.cost; scenes.removeValue(forKey: oldest.key)
-            }
-            scenes[digest] = SceneEntry(scene: scene, cost: cost, use: clock); retainedSceneCost += cost
-        }
-        return scene
     }
 
     public func purge() {

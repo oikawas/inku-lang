@@ -8,7 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-10-06 — Share Skia window planning, composition and notices on macOS and Android
 
-macOS now delegates zoomed-window density limiting, rounding and tile composition to the same core as Android. Tile pixels do not cross through Swift; the finished CGImage uses the shared allocation retained by its CGDataProvider. Only progress snapshots copy the pixels once. Hosts decide cancellation at tile boundaries. The macOS resvg fallback scope and its `image_unavailable` diagnostic for native image creation failures are preserved.
+macOS now delegates zoomed-window density limiting, rounding and tile composition to the same core as Android. Tile pixels do not cross through Swift; the finished CGImage uses the shared allocation retained by its CGDataProvider. Only progress snapshots copy the pixels once. Hosts decide cancellation at tile boundaries. The initial shared candidate preserved the macOS resvg fallback scope and its `image_unavailable` diagnostic for native image creation failures. Under the subsequent author ruling, macOS stops the work area and records the cause for every Skia failure, including unsupported works, without returning to resvg.
 
 Both platforms read the same Skia notice inventory and texts. Apple's existing nine entries retain their order and contents, while Android adds three platform-specific components. Rust notices for skia-bindings, skia-safe and skia-svg-macros, whose crate archives omit a license file, are supplemented with the same shared MIT text.
 
@@ -16,7 +16,7 @@ Both platforms read the same Skia notice inventory and texts. Apple's existing n
 
 Creation, full-screen, Instruction editor and refinement/comparison candidate views use shared Skia. A coarse whole appears first; zoom, pan and rotation redraw the visible window from the original SVG. Two dedicated threads use shared tile composition. Obsolete results are not adopted after cancellation, and the views show a display mark or a short failure message.
 
-Android returns only unsupported display to existing resvg. History thumbnails, PNG and model images retain their paths. JNI calls the shared API directly and owns only scene references and NDK Bitmap transfer. Development image checks share Rust's comparison criteria; their library does not enter the ordinary APK. macOS also uses shared window planning, composition and notices; its existing fallback is preserved.
+Android returns only unsupported display to existing resvg. History thumbnails, PNG and model images retain their paths. JNI calls the shared API directly and owns only scene references and NDK Bitmap transfer. Development image checks share Rust's comparison criteria; their library does not enter the ordinary APK. macOS also uses shared window planning, composition and notices, while each host owns its failure policy. The subsequent ruling applies only to macOS and does not change Android's unsupported-only fallback.
 
 ### 2026-10-06 — Foundation for shared Skia display on Android
 

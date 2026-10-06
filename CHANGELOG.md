@@ -8,7 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-10-06 — Follow range names when edited numbers leave the table
 
-In the instructions viewer and editor, valid numbers outside the range table change a table name to `the chosen place` and remain unfolded. Keep words the user wrote: in the reading view, if typing passes through table numbers and changes the name, numbers outside the table restore the words present when the range was opened. Returning to table numbers restores that name and folding. The editor follows names only when leaving a numeric edit; untouched saved words and words during invalid input remain unchanged.
+In the instructions viewer and editor, valid numbers outside the range table change a table name to `the chosen place` and remain unfolded. Keep words the user wrote: in the reading view, if typing passes through table numbers and changes the name, numbers outside the table restore the words present when the range was opened. Returning to table numbers restores that name and folding. The editor schedules name following after numeric edits and applies it only when leaving the range. Editing the words cancels it; untouched saved words and words during invalid input remain unchanged.
 
 ## v2.15.91 (2026-10-05 / Build 1167)
 

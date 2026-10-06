@@ -106,6 +106,32 @@ test('untouched ranges keep saved words and edited custom ranges follow names on
 	}
 });
 
+test('numeric name following is cancelled by word edits and scheduled again by numeric edits', () => {
+	for (const lang of ['ja', 'en'] as const) {
+		const customName = lang === 'ja' ? '月のあたり' : 'near the moon';
+		const leftBody = lang === 'ja' ? '横0〜1/3、縦0〜1/3' : 'horizontal 0 to 1/3, vertical 0 to 1/3';
+		const rightBody = lang === 'ja' ? '横2/3〜1、縦2/3〜1' : 'horizontal 2/3 to 1, vertical 2/3 to 1';
+		const text = (name: string, body: string) => lang === 'ja'
+			? `［構図］${name}（${body}）に、赤い円。`
+			: `A red circle at [composition] the ${name} (${body}).`;
+		for (const leaveWithWordEdit of [false, true]) {
+			let state = changeBody(open(editor(text(ranges[1].words[lang], rightBody))), leftBody);
+			const range = state.field(rangeEditorState).active!;
+			const start = range.nameStart + state.doc.sliceString(range.nameStart, range.nameEnd).lastIndexOf(range.name);
+			state = state.update({ changes: { from: start, to: start + range.name.length, insert: customName },
+				selection: { anchor: leaveWithWordEdit ? state.doc.length + customName.length - range.name.length : start + customName.length },
+				userEvent: 'input' }).state;
+			if (!leaveWithWordEdit) state = state.update({ effects: rangeFocusChanged.of(false) }).state;
+			assert.equal(state.doc.toString(), text(customName, leftBody), 'user words cancel the queued table name');
+			assert.equal(hidden(state).length, 0, 'custom words stay visible even when the numbers match the table');
+			state = changeBody(open(state), rightBody);
+			state = state.update({ effects: rangeFocusChanged.of(false) }).state;
+			assert.equal(state.doc.toString(), text(ranges[1].words[lang], rightBody), 'later numeric edits schedule name following again');
+			assert.ok(hidden(state).length > 0);
+		}
+	}
+});
+
 test('invalid and temporarily incomplete numbers keep the last valid frame until the edit is left', () => {
 	let state = changeBody(open(editor()), '横0〜1/3、縦0〜1/3');
 	const frame = state.field(rangeEditorState).preview!.bounds;

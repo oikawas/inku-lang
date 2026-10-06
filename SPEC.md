@@ -2093,7 +2093,11 @@ materials, sway, primitives, texture, and canvas ratio without inventing visual
 content absent from Score. The current authority is the platform-independent
 Rust `inku-render` core (Render Engine 66); Python and Android are hosts that
 pass resolved options into the same core. Native rasterization belongs to the
-separate `inku-svg-raster` boundary.
+separate `inku-svg-raster` boundary. The macOS work area, zoomed view included,
+is rasterized for display by the separate `core/crates/inku-display` (Skia): it
+rewrites compatibility points in memory just before display and leaves works
+outside its support table to `inku-svg-raster`. Neither changes the Render
+Engine version, saved SVG, or the meaning of `rh3`.
 
 Shared Rust owns Score structure and meaning. Python retains saved-format read compatibility, including finite actions such as a warned drop of an invalid legacy relation. Hosts must not add a visual event, composition anchor, density floor, or accent shape.
 Compatibility exceptions for replaying old works are limited to those needed to keep them drawable (the author's decision, 2026-10-06). Retire host-side clamping of Score `at.region` to 0–1 and reordering of its bounds to preserve the old Server's appearance. Saved bounds reach the shared Renderer unchanged, including versionless Scores and editions before 0.10. Stored Score and SVG remain unchanged; replay does not promise byte-identical SVG or an identical appearance to the old Server's replay. Keep ordinary DDL numeric-range validation, the shared Renderer's performance-time coordinate resolution, necessary saved-format reading compatibility, and resource limits.

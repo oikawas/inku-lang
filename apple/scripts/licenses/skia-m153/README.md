@@ -21,6 +21,9 @@ Each library was found by its symbols in the built `libskia*.a` archives
 | `libwebp-COPYING`, `libwebp-PATENTS` | libwebp | 1.4.0 | `845d5476a866141ba35ac133f856fa62f0b7445f` |
 | `wuffs-LICENSE` | Wuffs | 0.3.3 (`wuffs-v0.3.c`) | `e3f919ccfe3ef542cfc983a82146070258fb57f8` |
 
+The texts are as published, except that the link to `README.ijg` in
+`libjpeg-turbo-LICENSE.md` points to `libjpeg-turbo-README.ijg`, the name that file has here.
+
 HarfBuzz builds `hb-ot-shaper-use.cc`, whose table is generated in part from the
 Microsoft data under `src/ms-use`, so that MIT text is included. The other
 `COPYING` files under HarfBuzz belong to its tests, which are not built.

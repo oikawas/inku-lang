@@ -200,6 +200,13 @@ Rust artifactは作品表示のSkia（`core/crates/inku-display`、feature `disp
 SKIA_BINARIES_URL="$(scripts/skia-binaries.sh aarch64-apple-darwin)" scripts/rust-toolchain.sh test --locked -p inku-display --features skia
 ```
 
+作品域の表示（Skia）は、Rust artifactを用意した後に、AppCheckの`--display-only <SVG path>`と`--canvas-detail-only`で確かめます。前者は、照合表に入る作品のSVGを1つ取ります（例：`core/crates/inku-display/tests/data/public/p07.svg`）。描き手がSkiaであること、タイルをつないだ全体と窓が一括の絵と一致すること、照合の外の作品がresvgへ戻って数えられること、描画中に作品を替えても新しい作品が待たされず、印が残らないことを確かめます。後者は、拡大した窓の計画が画面の画素密度になり、coreの上限に収まることを確かめます。
+
+```sh
+swift run --package-path apple InkuAppCheck --display-only core/crates/inku-display/tests/data/public/p07.svg
+swift run --package-path apple InkuAppCheck --canvas-detail-only
+```
+
 Swift packageを直接buildする場合は、commit済みreferenceに加えてRust artifactと固定辞書を先に用意してください。reference更新は通常の準備に含めません。
 
 ```sh

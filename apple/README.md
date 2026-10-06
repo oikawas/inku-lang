@@ -200,6 +200,13 @@ The Rust artifact includes Skia for showing works (`core/crates/inku-display`, f
 SKIA_BINARIES_URL="$(scripts/skia-binaries.sh aarch64-apple-darwin)" scripts/rust-toolchain.sh test --locked -p inku-display --features skia
 ```
 
+The work area's display (Skia) is checked, once the Rust artifact is prepared, with AppCheck `--display-only <SVG path>` and `--canvas-detail-only`. The first takes the SVG of one work inside the support table (for example `core/crates/inku-display/tests/data/public/p07.svg`). It checks that the painter is Skia, that the whole and the window joined from tiles match the one-piece picture, that a work outside the table falls back to resvg and is counted, and that switching works while drawing neither keeps the new work waiting nor leaves the progress mark behind. The second checks that a zoomed window is planned at the screen's pixel density and inside the core's limits.
+
+```sh
+swift run --package-path apple InkuAppCheck --display-only core/crates/inku-display/tests/data/public/p07.svg
+swift run --package-path apple InkuAppCheck --canvas-detail-only
+```
+
 Direct Swift package builds use committed references and require prepared Rust artifacts and pinned dictionaries. Ordinary preparation does not refresh references:
 
 ```sh

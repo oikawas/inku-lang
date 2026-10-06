@@ -10,6 +10,17 @@ This file records changes chronologically. If a historical note conflicts with t
 
 Add Discard edits to the instructions box and Instruction editor. After confirmation, return to the target work's saved text; ⌘Z restores the text from before the discard.
 
+### 2026-10-06 — Draw the macOS work area with Skia and redraw the visible part while zoomed
+
+In answer to the author's report that a zoomed canvas looked like an enlarged bitmap rather than SVG. The seven macOS surfaces that show a work large (the creation work area; the auxiliary, batch, replay comparison, library and automation views; and the presentation) are drawn with the display component added to the shared core, `core/crates/inku-display` (Skia, behind a feature only the Apple build enables). To look as the Web does in Chrome, three compatibility rewrites are applied in memory just before display (the `href` of pattern and use, ellipses, and integer feTurbulence `seed`s). The saved SVG and the Render Engine do not change.
+
+- The whole is shown first as a coarse 256px picture, then drawn in 512px tiles in parallel. While zoomed in, the visible part is redrawn at the screen's pixel density, tiles in parallel from the centre, appearing as they are drawn.
+- Drawing runs on its own threads. Fixed: switching works during a draw waited for the previous work's draw to finish, leaving no work and the "showing the work" mark on screen. A cancelled draw stops at the next tile and clears the mark when no draw follows it.
+- A work outside the support table, or one Skia cannot read, is drawn with resvg as before and the reason is counted (none among the author's 124 works or the 17 public check works). Thumbnails, the saijiki preview and export stay with resvg.
+- The SVG limit is raised from the shared 8 MiB to 12 MiB (the author's decision). The resvg path (thumbnails, export, Android) accepts up to 12 MiB too.
+- Skia's prebuilt binaries are copies pinned by SHA-256 and checked on every build. Skia and the eight components inside it are listed in the notices as native libraries. The app grows by about 14 MB per architecture after stripping.
+- Cost (Apple M5 Pro): for the author's largest work, the 2000px whole takes 0.67 s and a Retina-sized zoomed window 0.50 s (6.5 s and 4.2 s drawn as one picture without tiles).
+
 ### 2026-10-06 — Discard edits on the Web
 
 The Describe tab's instructions box and Instruction editor now have Discard edits. After confirmation, it returns to the target work's saved instructions. It is disabled for matching text, read-only text and drawing, and is absent from New instructions. An editor opened from the box also returns to the target work rather than the draft; returning in the editor leaves the box's draft unchanged. Returning never draws, and the range frames follow the text. The discard is one undo step, so ⌘Z (Ctrl+Z) restores the complete text from before the discard.

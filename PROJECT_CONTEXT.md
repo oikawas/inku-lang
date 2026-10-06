@@ -168,6 +168,7 @@ inside.
 - **Render Engine 66** — the SVG performance, owned by the shared Rust core and called through the same one-request boundary by the server's thin Python adapter and Android's thin JNI adapter.
 Android main preview, thumbnails, and PNG export rasterize canonical saved/current SVG through the
 separate `inku-svg-raster` (`resvg`) crate. Pixels are derived presentation; SVG remains canonical storage.
+The macOS work area is drawn by the display-only `inku-display` (Skia) crate, so it looks as the Web does in Chrome.
 **A sheet called by name changes how the brush runs**: each of the seven grounds carries its own
 absorbency and tooth, and those values reach the stroke synthesizer, so the same description leaves
 a different mark on washi than on canvas. `面: 粒` and `面: にじみ` on a line or an arc are read as

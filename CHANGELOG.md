@@ -6,29 +6,21 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
-### 2026-10-06 — Share Skia window planning, composition and notices on macOS and Android
-
-macOS now delegates zoomed-window density limiting, rounding and tile composition to the same core as Android. Tile pixels do not cross through Swift; the finished CGImage uses the shared allocation retained by its CGDataProvider. Only progress snapshots copy the pixels once. Hosts decide cancellation at tile boundaries. The initial shared candidate preserved the macOS resvg fallback scope and its `image_unavailable` diagnostic for native image creation failures. Under the subsequent author ruling, macOS stops the work area and records the cause for every Skia failure, including unsupported works, without returning to resvg.
-
-Both platforms read the same Skia notice inventory and texts. Apple's existing nine entries retain their order and contents, while Android adds three platform-specific components. Rust notices for skia-bindings, skia-safe and skia-svg-macros, whose crate archives omit a license file, are supplemented with the same shared MIT text.
-
-### 2026-10-06 — Connect Android work views to shared Skia
-
-Creation, full-screen, Instruction editor and refinement/comparison candidate views use shared Skia. A coarse whole appears first; zoom, pan and rotation redraw the visible window from the original SVG. Two dedicated threads use shared tile composition. Obsolete results are not adopted after cancellation, and the views show a display mark or a short failure message.
-
-Android returns only unsupported display to existing resvg. History thumbnails, PNG and model images retain their paths. JNI calls the shared API directly and owns only scene references and NDK Bitmap transfer. Development image checks share Rust's comparison criteria; their library does not enter the ordinary APK. macOS also uses shared window planning, composition and notices, while each host owns its failure policy. The subsequent ruling applies only to macOS and does not change Android's unsupported-only fallback.
-
-### 2026-10-06 — Foundation for shared Skia display on Android
-
-The Android arm64 JNI build explicitly enables the existing shared Skia display component. Every build verifies the pinned Android binary's SHA-256 and refuses a source-build fallback if it cannot use that binary. Apple's CPU binary keys and the default builds without Skia are preserved.
-
-Window density limiting and outward rounding now live in the shared core, together with a pixel allocation that draws and joins tiles concurrently. Tile pixels stay in Rust; the finished image takes ownership of the original allocation. Hosts own cancellation, parallelism, snapshot timing and native-image lifetimes. The macOS resvg fallback scope is preserved.
-
-Skia native notices now have a shared inventory and license texts, including Android's FreeType, Vulkan Memory Allocator and static C++ runtime. Android screen integration and Apple's adapter/reference migration follow separately. This foundation alone does not switch the existing display, thumbnails or PNG export.
-
 ## macOS 1.1.1 (2026-10-06 / Build 3)
 
 The corresponding Server stays v2.15.86 (Build 1162).
+
+### 2026-10-06 — Stop without resvg when Skia fails in the work area, and record the cause
+
+In response to the author's ruling: when Skia fails, do not fall back; write the cause to a log, stop, and fix the display from it. The macOS work area no longer draws a work Skia cannot draw with resvg; it stops with "the work cannot be shown" and the code. A zoomed window is not drawn, and the whole already shown stays.
+
+- The cause is appended, one line each, to `display-failures/failures.jsonl` in the database's folder, with a copy of the failing SVG beside it, whatever the settings say.
+- A work outside the support table (for example one with a linearGradient) also stops. Among the author's 124 works and the 17 public check works, none failed in Skia.
+- Thumbnails, the saijiki preview and export stay with resvg.
+
+### 2026-10-06 — Share the window calculation and tile joining with Android
+
+The macOS work area's window density and rounding and its tile joining moved to the shared core implementation Android uses. Tiles are drawn and joined inside the core, and the finished image is shown from the core's pixels without copying them. What is shown and how fast are unchanged (the author's largest work: 0.67 s → 0.66 s for the 2000px whole). The notices for Skia and its components are built from the inventory shared with Android (same content).
 
 ### 2026-10-06 — Bake thumbnails to PNG when a work is saved
 
@@ -38,6 +30,22 @@ In response to the author's request to make thumbnails respond faster the way Se
 - A work is baked in the background right after it is saved. After launch, works with no thumbnail or a changed source are baked in the background. A work shown before that is drawn on the spot and stored. Thumbnails of works deleted for good are dropped.
 - `thumbs.sqlite` is derived and can be baked again, so backups leave it out; it is baked again after a restore.
 - Time until one library page (24 works) is complete (Apple M5 Pro, the author's works): from 1.10 s right after launch to 0.037 s. Only on the first launch after the update, until the background bake finishes (about 18 s for 124 works), a work shown is drawn on the spot.
+
+## Android 2.1.4-android.91 (2026-10-06 / Build 148378)
+
+### 2026-10-06 — Connect Android work views to shared Skia
+
+Creation, full-screen, Instruction editor and refinement/comparison candidate views use shared Skia. A coarse whole appears first; zoom, pan and rotation redraw the visible window from the original SVG. Two dedicated threads use shared tile composition. Obsolete results are not adopted after cancellation, and the views show a display mark or a short failure message.
+
+Android returns only unsupported display to existing resvg. History thumbnails, PNG and model images retain their paths. JNI calls the shared API directly and owns only scene references and NDK Bitmap transfer. Development image checks share Rust's comparison criteria; their library does not enter the ordinary APK. The macOS sharing changes and failure policy are recorded separately under macOS 1.1.1.
+
+### 2026-10-06 — Foundation for shared Skia display on Android
+
+The Android arm64 JNI build explicitly enables the existing shared Skia display component. Every build verifies the pinned Android binary's SHA-256 and refuses a source-build fallback if it cannot use that binary. The default builds without Skia are preserved.
+
+Window density limiting and outward rounding now live in the shared core, together with a pixel allocation that draws and joins tiles concurrently. Tile pixels stay in Rust; Android transfers the finished allocation into a Bitmap through the NDK writer. The Android host owns cancellation, parallelism, snapshot timing and the Bitmap lifetime.
+
+Skia native notices now have a shared inventory and license texts, including Android's FreeType, Vulkan Memory Allocator and static C++ runtime. Android's Cargo notices supplement skia-bindings, skia-safe and skia-svg-macros, whose crate archives omit a license file, with the same shared MIT text. This foundation alone does not switch the existing display, thumbnails or PNG export.
 
 ## macOS 1.1.0 (2026-10-06 / Build 2)
 

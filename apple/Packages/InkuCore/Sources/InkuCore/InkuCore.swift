@@ -16,15 +16,6 @@ public struct RasterImage: Sendable {
         pixelFormat = frame.pixelFormat
         pixels = frame.pixels
     }
-
-    /// Pixels a host joined from display tiles, laid out as the core returns them.
-    public init(premultipliedRGBA pixels: Data, width: UInt32, height: UInt32) {
-        self.width = width
-        self.height = height
-        stride = width * 4
-        pixelFormat = "rgba8-premultiplied"
-        self.pixels = pixels
-    }
 }
 
 public enum CoreFailure: Error, Sendable {
@@ -77,12 +68,12 @@ public struct DisplayRegion: Sendable, Equatable {
         self.height = height
     }
 
-    fileprivate init(_ region: InkuCoreBindings.DisplayRegion) {
+    init(_ region: InkuCoreBindings.DisplayRegion) {
         self.init(fullWidth: region.fullWidth, fullHeight: region.fullHeight, x: region.x, y: region.y,
                   width: region.width, height: region.height)
     }
 
-    fileprivate var binding: InkuCoreBindings.DisplayRegion {
+    var binding: InkuCoreBindings.DisplayRegion {
         InkuCoreBindings.DisplayRegion(fullWidth: fullWidth, fullHeight: fullHeight, x: x, y: y, width: width, height: height)
     }
 }
@@ -104,6 +95,11 @@ public struct DisplayLayout: Sendable {
         maxWindowSide = layout.maxWindowSide
         maxWindowPixels = layout.maxWindowPixels
         maxCanvasSide = layout.maxCanvasSide
+    }
+
+    var binding: InkuCoreBindings.DisplayLayout {
+        InkuCoreBindings.DisplayLayout(coarseSide: coarseSide, tileSide: tileSide, maxWindowSide: maxWindowSide,
+                                       maxWindowPixels: maxWindowPixels, maxCanvasSide: maxCanvasSide)
     }
 }
 
@@ -132,13 +128,18 @@ public struct PreparedDisplay: Sendable {
     public func region(_ region: DisplayRegion) throws -> RasterImage {
         try lift { try scene.region(region: region.binding) }
     }
+    /// One window joined in the core from tiles drawn on several threads.
+    public func composite(window: DisplayRegion) throws -> DisplayComposite {
+        do { return DisplayComposite(try scene.composite(window: window.binding)) }
+        catch let failure as InkuCoreBindings.DisplayFailure { throw CoreFailure(failure) }
+    }
     private func lift(_ body: () throws -> InkuCoreBindings.RasterFrame) throws -> RasterImage {
         do { return RasterImage(try body()) }
         catch let failure as InkuCoreBindings.DisplayFailure { throw CoreFailure(failure) }
     }
 }
 
-private extension CoreFailure {
+extension CoreFailure {
     init(_ failure: InkuCoreBindings.DisplayFailure) {
         switch failure {
         case .Unsupported(let code, let message): self = .displayUnsupported(code: code, message: message)

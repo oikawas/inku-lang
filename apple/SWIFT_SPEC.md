@@ -14,6 +14,26 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-06 Stop without resvg when Skia cannot draw a work, and record the cause
+
+The author's ruling (2026-10-06): when Skia fails, do not fall back; write the cause to a log and stop, and fix the display from that log.
+
+- The work area (`DisplayRenderer`) no longer draws a whole or window Skia could not draw with resvg. This holds for a work outside the support table, an unparsable work or one Skia cannot read, input limits, a pixel allocation that cannot be made, an internal inconsistency in the core, and a CGImage that cannot be made. The whole stops with "the work cannot be shown" and the code. A window is not drawn, and the whole already shown stays.
+- The cause is appended, one line each, to `display-failures/failures.jsonl` in the database's folder (time, whole or window, code, message, requested size, the SVG's SHA-256 and size, display API version, app version and Build). One copy of the failing SVG is kept beside it as `<SHA-256>.svg`. A failure with the same SVG, stage and code is written once per run. It is written whatever the settings say, and also goes to the system log (subsystem `app.inku`, category `display`).
+- The diagnostic counts are renamed from `fallbacks` to `failures`. The resvg path for when `drawsWithSkia` is switched off (the one switch) stays.
+- Thumbnails, the saijiki preview and export stay with resvg (unchanged).
+- Check: AppCheck `--display-only` checks that a work outside the support table stops and leaves one log line and a copy of its SVG.
+
+## 2026-10-06 Share the window calculation and tile joining with Android
+
+Of the work area's Skia display, the window's density and rounding and the joining of tiles move to the shared core, and Android uses the same implementation (Apple's share of bringing the Skia display to Android). What is shown and how it is operated do not change.
+
+- `CanvasInteraction.detailPlan` passes the zoomed picture's rectangle and the visible rectangle to the core's `display_detail_region`. The zoom threshold and the intersection stay in Swift. The formula is unchanged.
+- `DisplayRenderer` hands the tiles from several threads to the core's composite (`DisplayScene.composite`). Each tile is drawn inside the core and copied into the joined allocation; tile pixels never reach Swift. The finished image is the core's allocation turned into a `CGImage` as it is, not copied: the `CGDataProvider` holds the core's image object, and the allocation is freed when the last image lets go. An intermediate picture is copied once in the core. Cancelling still happens at tile boundaries.
+- The core separates preparation failures into `Unsupported` (outside the support table, unparsable, unreadable by Skia) and `Refused` (input limits and the like). Swift's code is the core's `code` for the former and `refused_<code>` for the latter. What happens on failure is in the next section.
+- The notices for Skia and the components inside it are read from the inventory shared with Android (`core/crates/inku-display/licenses/`, `scripts/skia_notices.py`). The notices themselves do not change.
+- Speed is unchanged (under stage 5's conditions, the author's largest work takes 0.67 s → 0.66 s for the 2000px whole and 0.52 s → 0.51 s for the 4× window). Checks: AppCheck `--canvas-detail-only`, `--display-only` (debug and release; it also checks the lifetime of the finished image's allocation), and `build-macos-notices.py --check`.
+
 ## 2026-10-06 Bake thumbnails to PNG when a work is saved
 
 Thumbnails (the 14 uses of `ArtworkThumbnail`) are baked to PNG once per work and kept, as Server does (ledger I-718). The saved SVG is no longer drawn again for every display.
@@ -33,7 +53,7 @@ The surfaces that show a work large (the seven uses of `ArtworkCanvas`: the crea
 - The painter is [`DisplayRenderer`](Sources/InkuUI/DisplayRenderer.swift). It draws on its own queue, and no request waits behind another. The whole is shown first as a coarse 256px picture, then drawn in 512px tiles in parallel and joined. A cancelled request stops at the next tile.
 - The whole is drawn for 100%. While zoomed in, the visible window is redrawn at the screen's pixel density, its tiles drawn in parallel from the centre, with what is drawn shown every 0.15 s. A finished window keeps its place as a fraction of the work and stays until the next one is ready. Window and whole limits follow the core's values (`DisplayLayout`).
 - The "showing the work" mark appears only while the current work's whole or window is actually being drawn. Every request has a generation number, and older results are dropped.
-- A work containing an element, attribute or style property outside the support table, or one Skia cannot read, is drawn with resvg (the shared raster) and the reason code is counted. The count is not shown on screen. Such a work is enlarged as a whole when zoomed in.
+- A work containing an element, attribute or style property outside the support table, or one Skia cannot read, is drawn with resvg (the shared raster) and the reason code is counted. The count is not shown on screen. Such a work is enlarged as a whole when zoomed in. (A later 2026-10-06 section changes this to stopping without resvg.)
 - Thumbnails, the saijiki preview, PNG export and the vision image stay with resvg.
 - The SVG limit is 12 MiB (`MAX_SVG_BYTES` in `inku-svg-raster`; the Skia display and Swift's export check use the same value).
 - Skia's prebuilt binaries are kept as copies pinned by SHA-256 in `~/Library/Application Support/inku/build-cache/skia-binaries/`, and `build-core.sh` checks them on every build. Skia and the eight components inside it are listed under "Native libraries" in the notices. The app grows by about 14 MB per architecture after stripping.

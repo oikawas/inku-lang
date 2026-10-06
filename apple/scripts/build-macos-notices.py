@@ -21,9 +21,13 @@ from pathlib import Path
 import re
 import struct
 import subprocess
+import sys
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts"))
+from skia_notices import RUST_SKIA_LICENSE, SKIA_LICENSES, native_libraries  # noqa: E402
+
 APPLE = ROOT / "apple"
 OUTPUT = APPLE / "Sources/InkuUI/Resources/third-party-notices.json"
 TARGETS = ("aarch64-apple-darwin", "x86_64-apple-darwin")
@@ -35,37 +39,13 @@ LICENSE_NAME = re.compile(r"^(licen[cs]e|copying|notice|copyright)", re.IGNORECA
 # Crate archives without a license file, supplemented from the upstream repository's
 # own file at the same release (the published crates are unmodified).
 SUDACHIDICT_LEGAL = APPLE / "scripts/licenses/SudachiDict-v20260723-LEGAL"
-RUST_SKIA_LICENSE = APPLE / "scripts/licenses/rust-skia-0.153.3-LICENSE"
 UPSTREAM_LICENSES = {("https://github.com/mozilla/uniffi-rs", "0.32.0"): APPLE / "scripts/licenses/uniffi-rs-v0.32.0-LICENSE",
                      ("https://github.com/rust-skia/rust-skia", "0.153.3"): RUST_SKIA_LICENSE,
                      ("https://github.com/rust-skia/rust-skia", "0.2.0"): RUST_SKIA_LICENSE}
 # Skia and the third-party code in its prebuilt binaries (skia-bindings 0.153.3 =
-# Skia m153-0.101.2). Each was found by its symbols in the linked archives; the texts
-# and their revisions are described in scripts/licenses/skia-m153/README.md.
-SKIA_LICENSES = APPLE / "scripts/licenses/skia-m153"
-SKIA_SOURCE = "https://github.com/rust-skia/skia/tree/m153-0.101.2"
-NATIVE_LIBRARIES = (
-    ("Skia", "m153", "BSD-3-Clause", SKIA_SOURCE, ["skia-LICENSE"], ""),
-    ("Expat", "2.7.4", "MIT", "https://github.com/libexpat/libexpat/tree/6154446fccefbf3ca644894f598969113b0c7bcd",
-     ["expat-COPYING"], ""),
-    ("HarfBuzz", "13.1.0", "MIT-Modern-Variant AND MIT",
-     "https://github.com/harfbuzz/harfbuzz/tree/9cb1fee51069b206effb4736e443b038d230789d",
-     ["harfbuzz-COPYING", "harfbuzz-ms-use-COPYING"],
-     "The Universal Shaping Engine table is generated in part from Microsoft data under src/ms-use (MIT)."),
-    ("ICU", "78.2", "Unicode-3.0", "https://chromium.googlesource.com/chromium/deps/icu/+/d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738",
-     ["icu-LICENSE"], "Includes the ICU data."),
-    ("libpng", "1.6.56", "libpng-2.0", "https://skia.googlesource.com/third_party/libpng/+/d5515b5b8be3901aac04e5bd8bd5c89f287bcd33", ["libpng-LICENSE"], ""),
-    ("zlib (Chromium)", "1.3.0.1", "Zlib", "https://chromium.googlesource.com/chromium/src/third_party/zlib/+/646b7f569718921d7d4b5b8e22572ff6c76f2596",
-     ["zlib-LICENSE"], ""),
-    ("libjpeg-turbo", "3.1.0", "IJG AND BSD-3-Clause AND Zlib",
-     "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
-     ["libjpeg-turbo-LICENSE.md", "libjpeg-turbo-README.ijg"],
-     "This software is based in part on the work of the Independent JPEG Group."),
-    ("libwebp", "1.4.0", "BSD-3-Clause", "https://chromium.googlesource.com/webm/libwebp/+/845d5476a866141ba35ac133f856fa62f0b7445f",
-     ["libwebp-COPYING", "libwebp-PATENTS"], "With the additional grant of patent rights in PATENTS."),
-    ("Wuffs", "0.3.3", "Apache-2.0", "https://github.com/google/wuffs-mirror-release-c/tree/e3f919ccfe3ef542cfc983a82146070258fb57f8",
-     ["wuffs-LICENSE"], ""),
-)
+# Skia m153-0.101.2), with rust-skia's own license, come from the inventory shared with
+# Android: core/crates/inku-display/licenses/ (read by scripts/skia_notices.py).
+NATIVE_LIBRARIES = native_libraries("apple")
 # A new Swift package must be reviewed and named here before it can ship.
 SWIFT_LICENSES = {"grdb.swift": "MIT"}
 TREE_LINE = re.compile(r"^(\S+) v(\S+)(?: \(([^)]*)\))?$")

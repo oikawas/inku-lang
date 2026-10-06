@@ -1,7 +1,7 @@
 {
  "schema": "inku.macos-third-party-notices.v1",
  "inputs": {
-  "core/Cargo.lock": "4ad6c353264b01ac046dde7aa33ad8080459e79375d1a3f280a66ade212d2b7e",
+  "core/Cargo.lock": "933d6dd4861c7711685132a18776766d435355d237d844ff6090fc0dcd300ad4",
   "apple/Package.resolved": "23397c5afe667533ac1394c1e35f27136e80cb6a872ad93e6a789727d9162acb"
  },
  "components": [

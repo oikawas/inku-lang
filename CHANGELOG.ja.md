@@ -6,11 +6,17 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-06 — macOSとAndroidでSkiaの窓計算・合成・通知を共用
+
+macOSの拡大窓の密度調整・丸めとタイルの画素合成を、Androidと同じ共有coreへ委譲した。タイルの画素をSwiftへ往復させず、完成画像は共有領域をCGDataProviderが保持して使う。途中の画像だけを一度コピーし、取消はhostがタイルの境目で判断する。macOSのresvgへ戻す範囲と、画像生成失敗の診断`image_unavailable`は維持する。
+
+Skiaの通知一覧と本文も両platformから共用する。Appleの既存9項目の順と内容を保ち、Androidは固有の3部品を加える。crate archiveに本文のないskia-bindings・skia-safe・skia-svg-macrosのRust通知は、同じ共有MIT本文で補う。
+
 ### 2026-10-06 — Androidの作品表示を共有Skiaへ接続
 
 制作・全画面・指示書エディタと推敲／比較の候補画像を共有Skiaで表示する。粗い全体を先に出し、全画面の拡大・移動・回転では見える窓を元のSVGから描き直す。専用2 threadと共有タイル合成を使い、取消後の古い結果を採らず、描画中の印と表示エラーを出す。
 
-Androidは共通分類の対応外だけ既存resvgへ戻す。履歴thumbnail・PNG・LLM画像の経路は維持する。JNIは共有APIを直接呼び、sceneの参照とNDK Bitmap転送だけを管理する。画像比較のRust判定は開発用に共用し、通常APKへ比較libraryを入れない。Apple adapterの移行とmacOSの確認は別担当の作業で、現行のmacOS fallbackは保持する。
+Androidは共通分類の対応外だけ既存resvgへ戻す。履歴thumbnail・PNG・LLM画像の経路は維持する。JNIは共有APIを直接呼び、sceneの参照とNDK Bitmap転送だけを管理する。画像比較のRust判定は開発用に共用し、通常APKへ比較libraryを入れない。macOSも共通の窓計算・合成・通知を使い、現行のmacOS fallbackは保持する。
 
 ### 2026-10-06 — Androidの共有Skia表示を接続する土台
 

@@ -57,7 +57,7 @@ test('T-16: a stored value that is not a boolean falls back to that section, not
 test('T-17: the viewer has one visible source and no expanded fold', () => {
 	const viewer = read('../../components/DdlViewer.svelte');
 	// The instance-local fold is what made it forget on every reload.
-	assert.match(viewer, /highlightDDL\(ddl\)/);
+	assert.match(viewer, /<DdlEditor[\s\S]*?value=\{ddl\}/);
 	assert.doesNotMatch(viewer, /expandedDdl|expandedOpen|toggleDdlExpanded/);
 });
 

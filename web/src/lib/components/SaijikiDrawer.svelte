@@ -36,6 +36,7 @@
 		previewForWord: (categoryKey: string, canonicalWord: string, word: string, wordLang: ResolvedInstructionLang) => SaijikiPreview;
 		/** The same preview a built-in word gets, built from the plugin document. */
 		previewForPlugin: (entry: PluginEntry, wordLang: ResolvedInstructionLang) => SaijikiPreview;
+		onInsertWord?: (word: string) => void;
 	};
 
 	let {
@@ -45,15 +46,19 @@
 		onClose,
 		previewForWord,
 		previewForPlugin,
+		onInsertWord,
 	}: Props = $props();
 
 	let drawerEl = $state<HTMLDivElement | null>(null);
 
-	// This drawer is the reference, not an editor: no DDL is being written here,
-	// so the words are the reader's language. The DDL editor's panel resolves
-	// its own language from the DDL instead, which is why both now say which
-	// language they are offering rather than letting the callee assume one.
+	// The reference keeps the reader's language even when its clicked word is
+	// inserted into the instructions box. The editor's own panel follows DDL.
 	const wordLang = $derived(instructionLangOf(getLang()));
+
+	function selectWord(word: string, preview: SaijikiPreview): void {
+		onInsertWord?.(word);
+		activePreview = preview;
+	}
 </script>
 
 <svelte:window
@@ -123,7 +128,7 @@
 								class="saijiki-chip"
 								class:plugin-chip={cat.key.startsWith("plugin-")}
 								onpointerdown={(e) => e.preventDefault()}
-								onclick={() => (activePreview = previewForWord(cat.key, canonicalWord, word, wordLang))}
+								onclick={() => selectWord(word, previewForWord(cat.key, canonicalWord, word, wordLang))}
 								onpointerenter={() => (activePreview = previewForWord(cat.key, canonicalWord, word, wordLang))}
 								onfocus={() => (activePreview = previewForWord(cat.key, canonicalWord, word, wordLang))}
 							>{word}</button>
@@ -145,7 +150,7 @@
 							<button
 								class="saijiki-chip plugin-chip"
 								onpointerdown={(e) => e.preventDefault()}
-								onclick={() => (activePreview = previewForPlugin(entry, wordLang))}
+								onclick={() => selectWord(pluginDisplayName(entry, wordLang), previewForPlugin(entry, wordLang))}
 								onpointerenter={() => (activePreview = previewForPlugin(entry, wordLang))}
 								onfocus={() => (activePreview = previewForPlugin(entry, wordLang))}
 							>{pluginDisplayName(entry, wordLang)}</button>

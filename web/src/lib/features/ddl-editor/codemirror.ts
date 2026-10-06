@@ -94,6 +94,8 @@ export function ddlCompletions(options: () => CompletionOptions): CompletionSour
 
 export type DdlEditorOptions = CompletionOptions & {
 	disabled: boolean;
+	lineNumbers?: boolean;
+	cursorAtEnd?: boolean;
 	pluginNameIndex: PluginNameIndex;
 	ranges: readonly CompositionRange[];
 	label: string;
@@ -121,7 +123,7 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 	const composing = () => view?.composing ?? false;
 	const configurable = () => [ddlEditorModel(options.ranges, options.pluginNameIndex, options.disabled, composing),
 		EditorView.editable.of(!options.disabled), EditorView.contentAttributes.of({ 'aria-label': options.label, spellcheck: 'false', tabindex: options.disabled ? '-1' : '0' }),
-		placeholder(options.placeholder)];
+		placeholder(options.placeholder), options.lineNumbers === false ? [] : lineNumbers()];
 	const reportRanges = () => {
 		if (!view) return;
 		const { preview, invalid, composing } = view.state.field(rangeEditorState);
@@ -157,9 +159,11 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 		next?.addEventListener('compositionstart', beginComposition);
 		next?.addEventListener('compositionend', endComposition);
 	}
-	view = new EditorView({ parent, state: EditorState.create({ doc: value, extensions: [
+	view = new EditorView({ parent, state: EditorState.create({ doc: value,
+		selection: initial.cursorAtEnd ? EditorSelection.cursor(value.length) : undefined,
+		extensions: [
 		configuration.of(configurable()), history(), keymap.of([...defaultKeymap, ...historyKeymap]),
-		lineNumbers(), drawSelection(), EditorView.lineWrapping,
+		drawSelection(), EditorView.lineWrapping,
 		autocompletion({ override: [ddlCompletions(() => options)] }),
 		EditorView.domEventHandlers({
 			mousedown(event, editor) {
@@ -207,7 +211,7 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 			const previous = options;
 			options = next;
 			if (view && (previous.disabled !== next.disabled || previous.pluginNameIndex !== next.pluginNameIndex || previous.ranges !== next.ranges
-				|| previous.label !== next.label || previous.placeholder !== next.placeholder)) view.dispatch({ effects: configuration.reconfigure(configurable()) });
+				|| previous.label !== next.label || previous.placeholder !== next.placeholder || previous.lineNumbers !== next.lineNumbers)) view.dispatch({ effects: configuration.reconfigure(configurable()) });
 		},
 		setValue(next) {
 			if (!view || view.state.doc.toString() === next) return;

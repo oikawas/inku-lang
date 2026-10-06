@@ -164,9 +164,9 @@ test('T-7: without the index the output is byte-identical to the branch point', 
 	assert.equal(declared, 8, 'the declared changes cover four paper and four 中央 cases, no more and no fewer');
 });
 
-test('T-7: display callers pass no index, and the editor passes one', () => {
+test('T-7: reading displays pass no index, and both instruction editors pass one', () => {
 	const viewer = read('components/DdlViewer.svelte');
-	assert.match(viewer, /highlightDDL\(ddl\)/);
+	assert.match(viewer, /<DdlEditor[\s\S]*?\{pluginEntries\}/);
 	assert.doesNotMatch(viewer, /expandedDdl/);
 	const page = read('../routes/+page.svelte');
 	assert.match(page, /highlightDDL\(batch\.activeDdl\)/);

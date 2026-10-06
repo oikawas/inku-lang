@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { highlightDDL } from '$lib/highlight';
 	import Tooltip from './Tooltip.svelte';
 	import type { ResolvedInstructionLang } from '$lib/instructionLang';
 	import { t } from '$lib/i18n/index.svelte';
 	import { hasDdlBody } from '$lib/ddl-source';
-	import RangeDdlBody from './RangeDdlBody.svelte';
+	import DdlEditor from './DdlEditor.svelte';
+	import type { RangeEditorStatus } from '$lib/features/ddl-editor/codemirror-ranges';
+	import type { PluginEntry, PreviewForPlugin, PreviewForWord } from '$lib/features/ddl-editor/types';
 	import { scanNumericRanges, type CompositionRange, type RangePreview } from '$lib/composition-ranges';
 
 	type Props = {
@@ -25,15 +26,25 @@
 		workKey?: unknown;
 		onDdlChange?: ((ddl: string) => void) | null;
 		onRangePreview?: ((preview: RangePreview | null) => void) | null;
+		pluginEntries?: PluginEntry[];
+		previewForWord: PreviewForWord;
+		previewForPlugin: PreviewForPlugin;
 	};
 
-	let { ddl, label, onEdit = null, editDisabled = false, onPaint = null, paintDisabled = false, runStatus = null, lang = null, ranges = [], workKey = null, onDdlChange = null, onRangePreview = null }: Props = $props();
-	let invalidRange = $state(false);
+	let { ddl, label, onEdit = null, editDisabled = false, onPaint = null, paintDisabled = false, runStatus = null, lang = null, ranges = [], workKey = null, onDdlChange = null, onRangePreview = null, pluginEntries = [], previewForWord, previewForPlugin }: Props = $props();
+	let editor = $state<DdlEditor | null>(null);
+	let rangeStatus = $state<RangeEditorStatus>({ preview: null, invalid: false, composing: false });
 
 	const primaryLabel = $derived(lang ? t().ddlLabelIn(lang) : label);
-	const highlighted = $derived(highlightDDL(ddl));
-	const invalidSource = $derived(invalidRange || (ranges.length > 0 && scanNumericRanges(ddl).some((range) => (!lang || range.lang === lang) && !range.bounds)));
-	const paintBlocked = $derived(paintDisabled || !hasDdlBody(ddl) || invalidSource);
+	const readOnly = $derived(editDisabled || !onDdlChange);
+	const invalidSource = $derived(rangeStatus.invalid || scanNumericRanges(ddl).some((range) => !range.bounds));
+	const paintBlocked = $derived(paintDisabled || !hasDdlBody(ddl) || invalidSource || rangeStatus.composing);
+
+	function updateRangeStatus(status: RangeEditorStatus): void {
+		rangeStatus = status;
+		onRangePreview?.(status.preview);
+	}
+	export function insertWord(word: string): void { if (!readOnly) editor?.insertWord(word); }
 </script>
 
 <div class="ddl-viewer">
@@ -56,11 +67,24 @@
 			</Tooltip>
 		{/if}
 	</div>
-	<div class="ddl-viewer-body ddl-highlight">
-		{#if ranges.length}
-			<RangeDdlBody {ddl} {ranges} {workKey} {lang} disabled={editDisabled} onChange={onDdlChange} onPreview={onRangePreview} onInvalid={(invalid) => invalidRange = invalid} />
-		{:else}{@html highlighted}{/if}
+	<div class="ddl-viewer-body">
+		{#key workKey}
+			<DdlEditor
+				bind:this={editor}
+				value={ddl}
+				isJapanese={t().code === 'ja'}
+				disabled={readOnly}
+				compact
+				{ranges}
+				{pluginEntries}
+				{previewForWord}
+				{previewForPlugin}
+				onChange={onDdlChange ?? undefined}
+				onRanges={updateRangeStatus}
+			/>
+		{/key}
 	</div>
+	{#if invalidSource}<div class="ddl-range-error" role="status">{t().ddlRangeInvalid}</div>{/if}
 	{#if onPaint}
 		<div class="ddl-viewer-actions">
 			<Tooltip placement="left" text={t().tooltipDdlPaint}>
@@ -109,4 +133,5 @@
 		display: flex;
 		justify-content: flex-end;
 	}
+	.ddl-range-error { color: var(--error); font-size: var(--ui-font-size-12); }
 </style>

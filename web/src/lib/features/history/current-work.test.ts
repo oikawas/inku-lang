@@ -65,7 +65,7 @@ test('I-706: the single source is replayed and fixed-contract whitespace has no 
 	assert.match(state, /const view = await authorDdl\(ddl, /);
 	assert.doesNotMatch(state, /expandedDdl|source_ddl/);
 	const viewer = read('../../components/DdlViewer.svelte');
-	assert.match(viewer, /highlightDDL\(ddl\)/);
+	assert.match(viewer, /<DdlEditor[\s\S]*?value=\{ddl\}/);
 	assert.match(viewer, /paintDisabled \|\| !hasDdlBody\(ddl\)/);
 	assert.doesNotMatch(viewer, /legacyExpandedOnly|expandedDdl/);
 });

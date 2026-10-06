@@ -141,9 +141,9 @@ If the layer does not answer, the description goes to interpretation unchanged a
 
 ## 5. Consult the Saijiki
 
-The `Saijiki` is inku's vocabulary dictionary. Open `New instructions` or `Edit instructions` to find the shared instruction editor, with a broad Saijiki list beneath it. Close the vocabulary to make more room for the text.
+The `Saijiki` is inku's vocabulary dictionary. Open `New instructions` or `Instruction editor` to find the shared instruction editor, with a broad Saijiki list beneath it. Close the vocabulary to make more room for the text.
 
-1. `New instructions` starts with an empty text; `Edit instructions` starts with the displayed work's text.
+1. `New instructions` starts with an empty text; `Instruction editor` starts with the displayed work's text.
 2. Review the categories and words. Hover over or click a word to read its effect and example in the separate preview.
 3. Pick a word to insert it into the selected text or at the cursor.
 
@@ -168,12 +168,14 @@ The headings of the instructions section on the left and of the instructions edi
 
 `Auto-repair` enables or disables the deterministic repairs for invisible colors, overcrowding, contract violations, and the like. The repairs are: making colors that merge with the background visible; damping overcrowded lines, grains, and fills; filling in missing shape parameters; tidying duplicate instructions; removing invalid contact and positional relations; supplying colors and shapes the DDL left short; and supplying the composition's fulcrum, motion, and rhythm.
 
-There are two entrances to the instructions. Both use the same dialog and editor. The text shows line numbers, syntax color, line and character counts; choose the painting model and `Wild` outside the text. While painting, the text, Saijiki, condition changes and close control are unavailable. A failed or stopped painting keeps the text.
+The instructions box on the Describe tab also lets you edit the whole text directly. The box and Instruction editor share highlighting, completions, range folding and editing, IME composition, and copying. Line numbers appear only in the Instruction editor. When the box is editable, clicking a Saijiki drawer word inserts it at the box's caret and also shows its preview. Before you place the caret, words append at the end. While the box is read-only, in batch mode, or while the editor dialog is open, the drawer only previews. Editing the box alone never draws; press `Draw from instructions` to redraw once.
+
+There are two entrances to the instruction dialog. Both use the same dialog and editor. The text shows line numbers, syntax color, line and character counts; choose the painting model and `Wild` outside the text. While painting, the text, Saijiki, condition changes and close control are unavailable. A failed or stopped painting keeps the text.
 
 | Action | Contents |
 |---|---|
 | New instructions | Open it from the Describe side. Write instructions directly, without a description, and paint them as an independent work |
-| Edit instructions | Open it beside the displayed work's instructions heading or from the work editing menu. Edit the text and repaint it as that work's child |
+| Instruction editor | Open it beside the displayed work's instructions heading or from the work editing menu. Edit the text and repaint it as that work's child |
 
 `Draw from instructions` sends the displayed instructions to Stage 2 unchanged. Stage 1 does not run, so the interpretation does not change.
 
@@ -181,7 +183,7 @@ There are two entrances to the instructions. Both use the same dialog and editor
 
 When a range's name and numbers match the range table, for example `at the bottom right (horizontal 2/3 to 1, vertical 2/3 to 1)`, the display folds the numbers and gives `bottom right` a dotted underline. Hover over or press the name to show its rectangle on the work. Press it to open the muted numbers for editing. The rectangle follows valid numbers, and a match to another table entry changes the name too. Setting both axes to `0 to 1/3`, for example, changes the name to `top left`.
 
-Numbers outside the table or a name that disagrees with its numbers stay unfolded. Editing to numbers outside the table replaces a table name with `the chosen place` and shows the numbers. Words you wrote yourself are kept: if typing in the reading view passes through table numbers, they return to the words present when the range was opened once the numbers leave the table. In the editor, the name follows when you leave the range; ranges whose numbers you did not edit keep their words. If you edit the words after editing the numbers, those words are kept. Editing the numbers again makes the name follow again. Numbers outside 0–1, an end that is not greater than its start, or unreadable numbers show an invalid state; the rectangle stays at its last valid place.
+Numbers outside the table or a name that disagrees with its numbers stay unfolded. Editing to numbers outside the table replaces a table name with `the chosen place` and shows the numbers. Words you wrote yourself are kept. In both the box and the editor, the name follows when you leave the range; ranges whose numbers you did not edit keep their words. If you edit the words after editing the numbers, those words are kept. Editing the numbers again makes the name follow again. Numbers outside 0–1, an end that is not greater than its start, or unreadable numbers show an invalid state; the rectangle stays at its last valid place.
 
 Changing the numbers edits the instructions. Typing does not draw; press `Draw from instructions` to redraw once. Saving, copying, and the text editor use the complete source with its numbers. Only the display folds them. An older drawing engine without a range table keeps the complete display.
 

@@ -89,6 +89,22 @@ func runDisplayCanvasChecks(svg: String) async throws {
         throw fail("The window differs from the same pixels of the whole: worst block \(windowBlock), far \(windowFar)")
     }
 
+    // The finished window is the core's own allocation: it outlives the composite and is let go with the last image.
+    let leasesBefore = InkuCore.displayPixelLeases
+    var finished: CGImage? = try {
+        let composite = try display.composite(window: region)
+        for tile in InkuCore.displayTiles(window: region, side: InkuCore.displayLayout.tileSide) { try composite.renderTile(tile) }
+        return try composite.finish()
+    }()
+    guard InkuCore.displayPixelLeases == leasesBefore + 1, let finishedPixels = finished?.dataProvider?.data as Data?,
+          difference(finishedPixels, crop, width: 1100, height: 700).worstBlock <= 16 else {
+        throw fail("The finished window did not keep its pixels after the composite was gone")
+    }
+    finished = nil
+    guard InkuCore.displayPixelLeases == leasesBefore else {
+        throw fail("The core's pixels were not let go with the last image: \(InkuCore.displayPixelLeases - leasesBefore) left")
+    }
+
     // C5 (zoom): switching works while a large window is drawing shows the new work without waiting for the window.
     // A cancelled window still finishes the tiles in flight, at most one round of them: the window is the largest
     // the core draws (64 tiles), so one round is well under half of it, and it is cancelled mid-drawing.

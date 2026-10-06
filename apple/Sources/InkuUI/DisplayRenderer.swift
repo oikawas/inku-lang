@@ -163,56 +163,36 @@ public final class DisplayRenderer: Sendable {
         return scene
     }
 
-    /// The window drawn tile by tile on several threads and joined into one image. With `progress`, the pixels
-    /// joined so far are handed over at most once every `progressInterval`.
+    /// The window drawn tile by tile on several threads and joined into one image in the core, so the tile
+    /// pixels and the finished image are never copied into Swift. With `progress`, the pixels joined so far
+    /// are handed over at most once every `progressInterval`.
     private func tiled(_ scene: PreparedDisplay, window: DisplayRegion, side: UInt32, cancelled: OSAllocatedUnfairLock<Bool>,
                        progressInterval: Duration = .zero, progress: (@Sendable (CGImage) -> Void)? = nil) throws -> CGImage {
         let tiles = InkuCore.displayTiles(window: window, side: side)
-        let stride = Int(window.width) * 4
-        let length = stride * Int(window.height)
-        var pixels = Data(count: length)
+        let composite = try scene.composite(window: window)
         let failure = OSAllocatedUnfairLock<(any Error)?>(initialState: nil)
-        // Guards the joined pixels and the time of the last hand-over.
-        let joined = OSAllocatedUnfairLock(initialState: ContinuousClock.now)
-        pixels.withUnsafeMutableBytes { buffer in
-            guard let base = buffer.baseAddress.map(TileTarget.init) else { return }
-            DispatchQueue.concurrentPerform(iterations: tiles.count) { index in
-                guard !cancelled.withLock({ $0 }), failure.withLock({ $0 == nil }) else { return }
-                let tile = tiles[index]
-                do {
-                    let drawn = try scene.region(tile)
-                    let rowBytes = Int(tile.width) * 4
-                    let snapshot: Data? = joined.withLock { handedOver in
-                        drawn.pixels.withUnsafeBytes { source in
-                            guard let from = source.baseAddress else { return }
-                            for row in 0..<Int(tile.height) {
-                                let target = (Int(tile.y - window.y) + row) * stride + Int(tile.x - window.x) * 4
-                                (base.pointer + target).copyMemory(from: from + row * Int(drawn.stride), byteCount: rowBytes)
-                            }
-                        }
-                        guard progress != nil, ContinuousClock.now - handedOver >= progressInterval else { return nil }
-                        handedOver = .now
-                        return Data(bytes: base.pointer, count: length)
-                    }
-                    state.withLock { $0.diagnostics.tilesDrawn += 1 }
-                    if let snapshot, let progress, !cancelled.withLock({ $0 }),
-                       let image = RasterImage(premultipliedRGBA: snapshot, width: window.width, height: window.height).makeCGImage() {
-                        progress(image)
-                    }
-                } catch {
-                    failure.withLock { if $0 == nil { $0 = error } }
-                }
+        // The time of the last hand-over.
+        let handedOver = OSAllocatedUnfairLock(initialState: ContinuousClock.now)
+        DispatchQueue.concurrentPerform(iterations: tiles.count) { index in
+            guard !cancelled.withLock({ $0 }), failure.withLock({ $0 == nil }) else { return }
+            do {
+                try composite.renderTile(tiles[index])
+                state.withLock { $0.diagnostics.tilesDrawn += 1 }
+                guard let progress, handedOver.withLock({ last in
+                    guard ContinuousClock.now - last >= progressInterval else { return false }
+                    last = .now
+                    return true
+                }) else { return }
+                // A snapshot that cannot be made only skips this hand-over.
+                if let image = try? composite.snapshot(), !cancelled.withLock({ $0 }) { progress(image) }
+            } catch {
+                failure.withLock { if $0 == nil { $0 = error } }
             }
         }
         if cancelled.withLock({ $0 }) { throw CancellationError() }
         if let error = failure.withLock({ $0 }) { throw error }
-        guard let image = RasterImage(premultipliedRGBA: pixels, width: window.width, height: window.height).makeCGImage()
-        else { throw ArtworkError.imageUnavailable }
-        return image
+        return try composite.finish()
     }
-
-    /// The joined image's pixels. Each tile writes only its own rectangle.
-    private struct TileTarget: @unchecked Sendable { let pointer: UnsafeMutableRawPointer }
 
     /// resvg, as before, for a work the Skia display does not take. The code is counted.
     private func fallback(svg: String, width: UInt32, height: UInt32, key: String, code: String,

@@ -49,20 +49,11 @@ public enum CanvasInteraction {
         let zoomed = zoomedPicture(picture, area: area, scale: scale, offset: offset)
         let visible = zoomed.intersection(CGRect(origin: .zero, size: area))
         guard !visible.isNull, visible.width >= 1, visible.height >= 1 else { return nil }
-        // Rounding outward adds up to two pixels a side, so the pixel counts keep 1% in hand.
-        let windowSide = CGFloat(limits.maxWindowSide) - 2, windowPixels = CGFloat(limits.maxWindowPixels) * 0.99
-        let canvasSide = CGFloat(limits.maxCanvasSide)
-        var density = pixelScale
-        density *= min(1, canvasSide / (max(zoomed.width, zoomed.height) * density))
-        density *= min(1, sqrt(windowPixels / (visible.width * density * visible.height * density)))
-        density *= min(1, windowSide / (max(visible.width, visible.height) * density))
-        let fullWidth = max(1, (zoomed.width * density).rounded()), fullHeight = max(1, (zoomed.height * density).rounded())
-        let left = min(fullWidth - 1, max(0, ((visible.minX - zoomed.minX) * density).rounded(.down)))
-        let top = min(fullHeight - 1, max(0, ((visible.minY - zoomed.minY) * density).rounded(.down)))
-        let right = max(left + 1, min(fullWidth, ((visible.maxX - zoomed.minX) * density).rounded(.up)))
-        let bottom = max(top + 1, min(fullHeight, ((visible.maxY - zoomed.minY) * density).rounded(.up)))
-        return CanvasDetailPlan(fullWidth: UInt32(fullWidth), fullHeight: UInt32(fullHeight),
-                                x: UInt32(left), y: UInt32(top), width: UInt32(right - left), height: UInt32(bottom - top))
+        // The core limits the density to its window and canvas and rounds outward (shared with Android).
+        guard let region = InkuCore.displayDetailRegion(zoomed: zoomed, visible: visible, pixelScale: Double(pixelScale),
+                                                        limits: limits) else { return nil }
+        return CanvasDetailPlan(fullWidth: region.fullWidth, fullHeight: region.fullHeight,
+                                x: region.x, y: region.y, width: region.width, height: region.height)
     }
 
     public static func supportsVerticalCaption(_ text: String) -> Bool {

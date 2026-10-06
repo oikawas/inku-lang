@@ -14,6 +14,16 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-06 窓の計算とタイルの合成をAndroidと共有する
+
+作品域のSkia表示のうち、窓の密度・丸めとタイルの合成を共有coreへ移し、Androidと同じ実装を使う（AndroidへのSkia表示の導入のうち、Appleの受け持ち）。表示の結果と操作は変えない。
+
+- `CanvasInteraction.detailPlan`は、拡大後の作品の矩形と見えている矩形をcoreの`display_detail_region`へ渡す。拡大率の判定と矩形の交差はSwiftに残る。式は前と同じ。
+- `DisplayRenderer`は、タイルを複数のthreadからcoreの合成（`DisplayScene.composite`）へ渡す。タイルはcoreの中で描かれ、つないだ領域へ写される。タイルの画素はSwiftへ渡らない。完成した画像は、coreの領域をそのまま`CGImage`にする（写さない）。`CGDataProvider`がcoreの画像objectを保持し、最後の画像を手放すと領域も解放される。途中の絵はcoreで1回写したもの。取消はこれまでどおりタイルの境目で行う。
+- Skiaで描けない作品は、これまでどおりすべてresvgへ戻す。coreは準備の失敗を`Unsupported`（照合表外・解析不可・Skiaで読めない）と`Refused`（入力の上限など）に分けるようになったので、後者の診断の符号は`refused_<code>`になる。
+- Skiaとその中の部品の通知は、Androidと共有する一覧（`core/crates/inku-display/licenses/`、`scripts/skia_notices.py`）から読む。通知の内容は変わらない。
+- 重さは変えていない（段5と同じ条件で、作者の最大の作品の全体2000pxが0.67秒→0.66秒、4倍の窓が0.52秒→0.51秒）。確認：AppCheck `--canvas-detail-only`、`--display-only`（debug・release。完成画像の領域の寿命も見る）、`build-macos-notices.py --check`。
+
 ## 2026-10-06 サムネイルを保存時にPNGへ焼いて持つ
 
 サムネイル（`ArtworkThumbnail`の14箇所）は、Serverと同じく、作品ごとに一度PNGへ焼いて持つ（台帳I-718）。表示のたびに保存SVGを描き直すことはしない。

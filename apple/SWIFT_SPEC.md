@@ -14,6 +14,16 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-06 Share the window calculation and tile joining with Android
+
+Of the work area's Skia display, the window's density and rounding and the joining of tiles move to the shared core, and Android uses the same implementation (Apple's share of bringing the Skia display to Android). What is shown and how it is operated do not change.
+
+- `CanvasInteraction.detailPlan` passes the zoomed picture's rectangle and the visible rectangle to the core's `display_detail_region`. The zoom threshold and the intersection stay in Swift. The formula is unchanged.
+- `DisplayRenderer` hands the tiles from several threads to the core's composite (`DisplayScene.composite`). Each tile is drawn inside the core and copied into the joined allocation; tile pixels never reach Swift. The finished image is the core's allocation turned into a `CGImage` as it is, not copied: the `CGDataProvider` holds the core's image object, and the allocation is freed when the last image lets go. An intermediate picture is copied once in the core. Cancelling still happens at tile boundaries.
+- A work Skia cannot draw still falls back to resvg in every case. The core now separates preparation failures into `Unsupported` (outside the support table, unparsable, unreadable by Skia) and `Refused` (input limits and the like), so the diagnostic code of the latter becomes `refused_<code>`.
+- The notices for Skia and the components inside it are read from the inventory shared with Android (`core/crates/inku-display/licenses/`, `scripts/skia_notices.py`). The notices themselves do not change.
+- Speed is unchanged (under stage 5's conditions, the author's largest work takes 0.67 s → 0.66 s for the 2000px whole and 0.52 s → 0.51 s for the 4× window). Checks: AppCheck `--canvas-detail-only`, `--display-only` (debug and release; it also checks the lifetime of the finished image's allocation), and `build-macos-notices.py --check`.
+
 ## 2026-10-06 Bake thumbnails to PNG when a work is saved
 
 Thumbnails (the 14 uses of `ArtworkThumbnail`) are baked to PNG once per work and kept, as Server does (ledger I-718). The saved SVG is no longer drawn again for every display.

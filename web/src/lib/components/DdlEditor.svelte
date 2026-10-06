@@ -14,22 +14,27 @@
 		value?: string;
 		isJapanese: boolean;
 		disabled?: boolean;
+		/** The Describe box uses the same editor without the dialog's panels. */
+		compact?: boolean;
 		pluginEntries?: PluginEntry[];
 		previewForWord: PreviewForWord;
 		previewForPlugin: PreviewForPlugin;
 		ranges?: CompositionRange[];
 		onRanges?: (status: RangeEditorStatus) => void;
+		onChange?: (value: string) => void;
 	};
 
 	let {
 		value = $bindable(''),
 		isJapanese,
 		disabled = false,
+		compact = false,
 		pluginEntries = [],
 		previewForWord,
 		previewForPlugin,
 		ranges = [],
 		onRanges,
+		onChange,
 	}: Props = $props();
 
 	let editorHost = $state<HTMLDivElement | null>(null);
@@ -45,8 +50,9 @@
 
 	function configuration(): DdlEditorOptions {
 		return { isJapanese, disabled, pluginEntries, pluginNameIndex, ranges, previewForWord, previewForPlugin,
+			lineNumbers: !compact, cursorAtEnd: compact,
 			label: t().ddlEditorInstructions, placeholder: t().ddlEditPlaceholder,
-			onChange: (next) => value = next, onPreview: (next) => activeSaijikiPreview = next, onRanges: (status) => onRanges?.(status) };
+			onChange: (next) => { value = next; onChange?.(next); }, onPreview: (next) => activeSaijikiPreview = next, onRanges: (status) => onRanges?.(status) };
 	}
 
 	onMount(() => {
@@ -62,10 +68,11 @@
 	});
 
 	export function focus(): void { void tick().then(() => control?.focus()); }
-	function insertWord(word: string): void { if (!disabled) control?.insertWord(word); }
+	export function insertWord(word: string): void { if (!disabled) control?.insertWord(word); }
 </script>
 
-<section class="ddl-editor">
+<section class="ddl-editor" class:compact>
+	{#if !compact}
 	<div class="ddl-editor-toolbar">
 		<!-- The Server resolves the language by the same rule when the DDL is drawn. -->
 		<Tooltip placement="bottom-right" text={t().tooltipDdlLang}>
@@ -88,12 +95,13 @@
 		</div>
 		<div class="ddl-editor-status">{t().ddlEditorStatus(lineNumbers.length, value.length)}</div>
 	</div>
+	{/if}
 
-	<div class="ddl-editor-workspace" class:with-vocabulary={showVocabulary} class:with-support={showGuide || unknownNames.length > 0}>
+	<div class="ddl-editor-workspace" class:with-vocabulary={!compact && showVocabulary} class:with-support={!compact && (showGuide || unknownNames.length > 0)}>
 		<div class="ddl-editor-main">
 			<div class="ddl-editor-frame" class:readonly={disabled} bind:this={editorHost}></div>
 
-			{#if unknownNames.length > 0 || showGuide}
+			{#if !compact && (unknownNames.length > 0 || showGuide)}
 				<div class="ddl-editor-support">
 					{#if unknownNames.length > 0}
 						<div class="ddl-unknown-names">
@@ -120,7 +128,7 @@
 			{/if}
 		</div>
 
-		{#if showVocabulary}
+		{#if !compact && showVocabulary}
 			<div class="ddl-editor-vocabulary">
 				<SaijikiInline
 					bind:activePreview={activeSaijikiPreview}
@@ -231,6 +239,17 @@
 	.ddl-editor-frame :global(.cm-tooltip) { border: 1px solid var(--border2); background: var(--panel); color: var(--fg); }
 	.ddl-editor-frame :global(.cm-tooltip-autocomplete li[aria-selected]) { background: var(--accent); color: var(--panel); }
 	.ddl-editor-frame.readonly { opacity: .72; }
+	.compact { gap: 0; }
+	.compact .ddl-editor-frame {
+		min-height: 2.5em;
+		border: none;
+		border-radius: 0;
+		background: transparent;
+	}
+	.compact .ddl-editor-frame :global(.cm-editor) { height: auto; }
+	.compact .ddl-editor-frame :global(.cm-scroller) { max-height: 50vh; scrollbar-gutter: auto; }
+	.compact .ddl-editor-frame :global(.cm-content) { padding: 2px 0; }
+	.compact .ddl-editor-frame.readonly { opacity: 1; }
 	.ddl-editor-support {
 		display: flex;
 		flex-direction: column;

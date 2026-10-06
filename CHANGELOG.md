@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-06 — Edit the whole text in the instructions box
+
+The Describe tab's instructions box now uses the same CodeMirror editor as the dialog. It edits the complete draft and shares range folding, name following, completions, IME composition, copying, and read-only drawing. Only the dialog shows line numbers. The former Edit instructions button, work-editing menu item, and dialog title become Instruction editor. Clicking a Saijiki drawer word inserts it at an editable box's caret, or at the end before any caret is placed, and also previews it. With no box, a read-only box, or an open editor dialog, the drawer only previews. Typing does not draw; Draw from instructions redraws once.
+
 ### 2026-10-06 — Retire saved Score region clamping
 
 By the author's decision, Server no longer clamps Score `at.region` to 0–1 or reorders its bounds when reading it. Versionless and old saved values reach the shared Renderer unchanged; Android does not gain a correction to match the old Server's appearance. Exact visual compatibility with old works is no longer a replay requirement. Necessary compatibility to keep them drawable and resource limits remain. Stored Score, SVG and the database are unchanged.

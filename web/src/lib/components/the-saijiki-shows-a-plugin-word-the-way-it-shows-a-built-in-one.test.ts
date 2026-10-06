@@ -87,10 +87,10 @@ test('T-21: a plugin chip reaches the preview the same ways a built-in one does'
 });
 
 test('T-21: clicking keeps each panel\'s own job', () => {
-	// The drawer is read-only, so a click previews; the editor inserts the word
-	// by the name its DDL language reads (the Japanese alias in Japanese DDL).
+	// A drawer click offers insertion to the editable box and also previews;
+	// the inline panel inserts the word by the name its DDL language reads.
 	const drawer = pluginSection(read('./SaijikiDrawer.svelte'));
-	assert.match(drawer, /onclick=\{\(\) => \(activePreview = previewForPlugin\(entry, wordLang\)\)\}/);
+	assert.match(drawer, /onclick=\{\(\) => selectWord\(pluginDisplayName\(entry, wordLang\), previewForPlugin\(entry, wordLang\)\)\}/);
 	const inline = pluginSection(read('./SaijikiInline.svelte'));
 	assert.match(inline, /onclick=\{\(\) => onInsertWord\(pluginDisplayName\(entry, wordLang\)\)\}/);
 });
@@ -120,9 +120,8 @@ test('T-22: a plugin preview is built from the document, not invented', () => {
 test('T-22: both panels are given the builder, or one of them shows nothing', () => {
 	const page = read('../../routes/+page.svelte');
 	const wired = page.match(/previewForPlugin=\{pluginPreview\}/g) ?? [];
-	// The drawer takes it directly; the dialog passes it through the shared
-	// editor to the inline panel. A missing handoff is a silent dead panel.
-	assert.equal(wired.length, 2);
+	// The box, drawer, and dialog all receive the same preview builder.
+	assert.equal(wired.length, 3);
 	const dialog = read('./DdlEditorDialog.svelte');
 	assert.match(dialog, /\{previewForPlugin\}/);
 	assert.match(read('./DdlEditor.svelte'), /\{previewForPlugin\}/);

@@ -41,8 +41,7 @@ test('the browser owns every module-scoped reactive setting', () => {
 		'features/settings/server-administration.svelte.ts',
 		'features/settings/user-administration.svelte.ts',
 		'features/work/state.svelte.ts',
-		'historyManagerState.svelte.ts',
-		'range-edit.svelte.ts'
+		'historyManagerState.svelte.ts'
 	];
 	const moduleScoped = [
 		'descriptionMeter.svelte.ts',

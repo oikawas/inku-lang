@@ -1143,6 +1143,7 @@
 
 	let compositionRanges = $state<CompositionRange[]>([]);
 	let ddlRangePreview = $state<RangePreview | null>(null);
+	let ddlViewer = $state<DdlViewer | null>(null);
 	async function loadCompositionRanges(): Promise<void> {
 		compositionRanges = [];
 		try {
@@ -1875,6 +1876,10 @@ const currentLineageNodeId = $derived(work.displayedHistoryItem?.lineage_node_id
 	});
 const canEditCurrentDdl = $derived(!!currentLineageNodeId && !!(work.displayedHistoryItem?.ddl ?? work.ddl));
 	const rangeEditingLocked = $derived(demoRunning || work.loading || work.reloading || refinementSession.gridBusy);
+	function insertDdlWordFromDrawer(word: string): void {
+		if (ddlDialogOpen || !canEditCurrentDdl || rangeEditingLocked) return;
+		ddlViewer?.insertWord(word);
+	}
 	$effect(() => {
 		work.result;
 		work.displayedHistoryItem;
@@ -2859,17 +2864,21 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						</section>
 					{/if}
 
-					<!-- Interpretation: normalized DDL, read-only. -->
+					<!-- The complete DDL draft uses the same editor as the dialog. -->
 					{#if work.ddl !== null && work.inputMode === 'single'}
 						<section class="panel-section">
 							<DdlViewer
+								bind:this={ddlViewer}
 								ddl={work.ddl}
 								label={t().ddlLabel}
 								lang={shownDdlLang}
 								ranges={compositionRanges}
 								workKey={work.result}
-								onDdlChange={(ddl) => { if (!rangeEditingLocked) work.ddl = ddl; }}
+								onDdlChange={(ddl) => { if (canEditCurrentDdl && !rangeEditingLocked) work.ddl = ddl; }}
 								onRangePreview={(preview) => { ddlRangePreview = preview; }}
+								{pluginEntries}
+								previewForWord={saijikiPreview}
+								previewForPlugin={pluginPreview}
 								onEdit={openCurrentDdlEditor}
 								editDisabled={!canEditCurrentDdl || rangeEditingLocked}
 								onPaint={() => { void work.replay(); }}
@@ -3139,6 +3148,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		onClose={() => (saijikiOpen = false)}
 		previewForWord={saijikiPreview}
 		previewForPlugin={pluginPreview}
+		onInsertWord={insertDdlWordFromDrawer}
 	/>
 {/await}
 

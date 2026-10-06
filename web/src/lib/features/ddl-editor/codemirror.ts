@@ -54,10 +54,11 @@ export function replaceDdlValue(state: EditorState, value: string): Transaction 
 		annotations: [externalDdlValue.of(true), Transaction.addToHistory.of(false)] });
 }
 
-export function insertDdlWord(state: EditorState, word: string): Transaction | null {
+export function insertDdlWord(state: EditorState, word: string, append = false): Transaction | null {
 	if (state.readOnly || state.field(rangeEditorState).composing) return null;
-	return state.update({ changes: { from: state.selection.main.from, to: state.selection.main.to, insert: word },
-		selection: EditorSelection.cursor(state.selection.main.from + word.length), scrollIntoView: true, userEvent: 'input.complete' });
+	const selection = append ? EditorSelection.cursor(state.doc.length) : state.selection.main;
+	return state.update({ changes: { from: selection.from, to: selection.to, insert: word },
+		selection: EditorSelection.cursor(selection.from + word.length), scrollIntoView: true, userEvent: 'input.complete' });
 }
 
 type CompletionOptions = {
@@ -94,6 +95,8 @@ export function ddlCompletions(options: () => CompletionOptions): CompletionSour
 
 export type DdlEditorOptions = CompletionOptions & {
 	disabled: boolean;
+	lineNumbers?: boolean;
+	cursorAtEnd?: boolean;
 	pluginNameIndex: PluginNameIndex;
 	ranges: readonly CompositionRange[];
 	label: string;
@@ -117,11 +120,12 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 	let pendingValue: string | null = null;
 	let compositionTimer: ReturnType<typeof setTimeout> | null = null;
 	let nativeCompositionTarget: EventTarget | null = null;
+	let cursorPlaced = false;
 	const configuration = new Compartment();
 	const composing = () => view?.composing ?? false;
 	const configurable = () => [ddlEditorModel(options.ranges, options.pluginNameIndex, options.disabled, composing),
 		EditorView.editable.of(!options.disabled), EditorView.contentAttributes.of({ 'aria-label': options.label, spellcheck: 'false', tabindex: options.disabled ? '-1' : '0' }),
-		placeholder(options.placeholder)];
+		placeholder(options.placeholder), options.lineNumbers === false ? [] : lineNumbers()];
 	const reportRanges = () => {
 		if (!view) return;
 		const { preview, invalid, composing } = view.state.field(rangeEditorState);
@@ -157,9 +161,11 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 		next?.addEventListener('compositionstart', beginComposition);
 		next?.addEventListener('compositionend', endComposition);
 	}
-	view = new EditorView({ parent, state: EditorState.create({ doc: value, extensions: [
+	view = new EditorView({ parent, state: EditorState.create({ doc: value,
+		selection: initial.cursorAtEnd ? EditorSelection.cursor(value.length) : undefined,
+		extensions: [
 		configuration.of(configurable()), history(), keymap.of([...defaultKeymap, ...historyKeymap]),
-		lineNumbers(), drawSelection(), EditorView.lineWrapping,
+		drawSelection(), EditorView.lineWrapping,
 		autocompletion({ override: [ddlCompletions(() => options)] }),
 		EditorView.domEventHandlers({
 			mousedown(event, editor) {
@@ -175,7 +181,7 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 				if (editor.state.field(rangeEditorState).hover !== start) editor.dispatch({ effects: hoveredRange.of(start) });
 			},
 			mouseleave(_event, editor) { if (editor.state.field(rangeEditorState).hover !== null) editor.dispatch({ effects: hoveredRange.of(null) }); },
-			focus(_event, editor) { editor.dispatch({ effects: rangeFocusChanged.of(true) }); },
+			focus(_event, editor) { cursorPlaced = true; editor.dispatch({ effects: rangeFocusChanged.of(true) }); },
 			blur(_event, editor) { editor.dispatch({ effects: rangeFocusChanged.of(false) }); }
 		}),
 		EditorView.updateListener.of((update) => {
@@ -207,7 +213,7 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 			const previous = options;
 			options = next;
 			if (view && (previous.disabled !== next.disabled || previous.pluginNameIndex !== next.pluginNameIndex || previous.ranges !== next.ranges
-				|| previous.label !== next.label || previous.placeholder !== next.placeholder)) view.dispatch({ effects: configuration.reconfigure(configurable()) });
+				|| previous.label !== next.label || previous.placeholder !== next.placeholder || previous.lineNumbers !== next.lineNumbers)) view.dispatch({ effects: configuration.reconfigure(configurable()) });
 		},
 		setValue(next) {
 			if (!view || view.state.doc.toString() === next) return;
@@ -215,7 +221,11 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 			const tr = replaceDdlValue(view.state, next);
 			if (tr) view.dispatch(tr);
 		},
-		insertWord(word) { if (view) { const tr = insertDdlWord(view.state, word); if (tr) { view.dispatch(tr); view.focus(); } } },
+		insertWord(word) {
+			if (!view) return;
+			const tr = insertDdlWord(view.state, word, options.cursorAtEnd === true && !cursorPlaced);
+			if (tr) { view.dispatch(tr); view.focus(); }
+		},
 		focus() { view?.focus(); },
 		destroy() {
 			destroyed = true;

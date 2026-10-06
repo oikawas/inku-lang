@@ -1947,74 +1947,18 @@ fn hole_system_grammar(language: ResolvedInstructionLanguage) -> String {
 }
 
 /// How a completion writes a place the position words cannot say: the
-/// author's words, then a numeric range (A1, 2026-10-06). The ranges of the
-/// position words come from the compiler's own table, so the completion knows
-/// what the check matches its numbers against; no range is given for a new word.
+/// author's words, then a numeric range (A1, 2026-10-06). No range is listed
+/// for any word: a listed range of an accepted word led the model to write
+/// that word in place of the author's (A1 stage 4).
 fn hole_numeric_ranges(language: ResolvedInstructionLanguage) -> String {
-    let fraction = |(n, d): (u8, u8)| match (n, d) {
-        (0, _) => "0".to_owned(),
-        (n, d) if n == d => "1".to_owned(),
-        (n, d) => format!("{n}/{d}"),
-    };
     let ja = language == ResolvedInstructionLanguage::Ja;
-    let words = inku_ddl::saijiki_asset()
-        .categories
-        .iter()
-        .filter(|category| category.key == "basho")
-        .flat_map(|category| &category.words)
-        .filter_map(|word| {
-            let id = inku_ddl::project_macro_semantic_ref("basho", &word.surface_ja)?.canonical_id;
-            let ranges = inku_ddl::geometry::place_word_ranges(&id);
-            let surface = if ja {
-                word.surface_ja.clone()
-            } else {
-                word.surface_en.clone()?.replace(['-', '_'], " ")
-            };
-            let range = match ranges.as_slice() {
-                [] => return None,
-                [one] => {
-                    let mut axes = Vec::new();
-                    for (axis_ja, axis_en, start, end) in [
-                        ("横", "horizontal", one[0], one[2]),
-                        ("縦", "vertical", one[1], one[3]),
-                    ] {
-                        if start.0 == 0 && end.0 == end.1 {
-                            continue;
-                        }
-                        axes.push(if ja {
-                            format!("{axis_ja}{}〜{}", fraction(start), fraction(end))
-                        } else {
-                            format!("{axis_en} {} to {}", fraction(start), fraction(end))
-                        });
-                    }
-                    axes.join(if ja { "・" } else { " and " })
-                }
-                [first, ..] => {
-                    // The first corner is the top left: its end is its side.
-                    let side = fraction(first[2]);
-                    if ja {
-                        format!("四隅のどれか一つで一辺{side}")
-                    } else {
-                        format!("any one of the four corners, {side} on a side")
-                    }
-                }
-            };
-            Some(if ja {
-                format!("{surface}は{range}")
-            } else {
-                format!("{surface} is {range}")
-            })
-        })
-        .collect::<Vec<_>>();
     if ja {
-        format!(
-            "受理済みの位置の語で言えない位置（右下、右寄り、下の方など）は、作者の言葉を残し、その直後に括弧で数値の範囲を書く: 言葉（横a〜b、縦c〜d）に。a〜b・c〜dは画面の左上を0、右下を1とする割合で、小数か分数で書き、始まりを終わりより小さくする。横・縦それぞれを3等分した格子を目安にする。括弧の前の言葉に受理済みの位置の語があれば、範囲をその語の範囲の中に置く（{}）。括弧の前には、原文の位置の言い方を一字も変えずに書き、既存の位置の語（下・右端・隅など）に置き換えない。括弧の前の言葉はcompilerが読まないので、読めない位置の言い方もそこに残してよい。例: 原文「右下に…散らす」は「右下（横a〜b、縦c〜d）に…散らす」と書く。数値の範囲は横と縦の両方を必ず書く（片方だけでは読めない）。範囲を狭めない軸は0〜1と書く。節に既にある数値の範囲は、言葉も数もそのまま保つ。前の形の周り・周囲・等間隔など、前の形との並び方は書けないので、unresolved/unsupportedとする。selected_holesのunreadは、compilerが読めなかった語である。unreadの語は受理形へ直すか、意味を保つ受理済みの言い方に言い換える。ただしunreadの語が位置の言い方（「右下」の「右」など）なら書き換えず、その言い方を括弧の前に残して数値の範囲を足す。そのまま写すと再び断られる。直せないときはunresolvedとする。",
-            words.join("、")
+        String::from(
+            "受理済みの位置の語で言えない位置（右下、右寄り、下の方など）は、作者の言葉を残し、その直後に括弧で数値の範囲を書く: 言葉（横a〜b、縦c〜d）に。a〜b・c〜dは画面の左上を0、右下を1とする割合で、小数か分数で書き、始まりを終わりより小さくする。横・縦それぞれを3等分した格子を目安にする。括弧の前の言葉に受理済みの位置の語があれば、範囲をその語の範囲の中に置く。括弧の前には、原文の位置の言い方を一字も変えずに書き、既存の位置の語（下・右端・隅など）に置き換えない。括弧の前の言葉はcompilerが読まないので、読めない位置の言い方もそこに残してよい。例: 原文「右下に…散らす」は「右下（横a〜b、縦c〜d）に…散らす」と書く。数値の範囲は横と縦の両方を必ず書く（片方だけでは読めない）。範囲を狭めない軸は0〜1と書く。節に既にある数値の範囲は、言葉も数もそのまま保つ。前の形の周り・周囲・等間隔など、前の形との並び方は書けないので、unresolved/unsupportedとする。selected_holesのunreadは、compilerが読めなかった語である。unreadの語は受理形へ直すか、意味を保つ受理済みの言い方に言い換える。ただしunreadの語が位置の言い方（「右下」の「右」など）なら書き換えず、その言い方を括弧の前に残して数値の範囲を足す。そのまま写すと再び断られる。直せないときはunresolvedとする。",
         )
     } else {
-        format!(
-            "A place the accepted position words cannot say (bottom right, toward the right, the lower part, and so on) keeps the author's words and writes a numeric range right after them: at, in, or on words (horizontal a to b, vertical c to d). a to b and c to d are fractions of the canvas from 0 at the top left to 1 at the bottom right, written as decimals or fractions, each start below its end. Use thirds on each axis as a guide. When the words before the parenthesis hold an accepted position word, keep the range inside that word's range ({}). Before the parenthesis, write the original place wording exactly as written, and do not replace it with an accepted position word (bottom, right edge, corner, and so on). The compiler does not read the words before the parenthesis, so unread place wording may stay there. For example, an original 'scatter ... at the bottom right' becomes 'scatter ... at the bottom right (horizontal a to b, vertical c to d)'. Always write both horizontal and vertical: one axis alone cannot be read. Write 0 to 1 for an axis the place does not narrow. Keep a numeric range already in the clause, words and numbers, as it is. An arrangement relative to the previous shape (around it, surrounding it, evenly spaced around it) cannot be written: return unresolved/unsupported. unread in selected_holes lists the words the compiler could not read. Rewrite each into the accepted grammar or an accepted phrase with the same meaning; copying it unchanged is refused again. When an unread word is place wording (such as 'right' in 'bottom right'), do not rewrite it: keep the wording before the parenthesis and add the numeric range. When it cannot be rewritten, return unresolved.",
-            words.join("; ")
+        String::from(
+            "A place the accepted position words cannot say (bottom right, toward the right, the lower part, and so on) keeps the author's words and writes a numeric range right after them: at, in, or on words (horizontal a to b, vertical c to d). a to b and c to d are fractions of the canvas from 0 at the top left to 1 at the bottom right, written as decimals or fractions, each start below its end. Use thirds on each axis as a guide. When the words before the parenthesis hold an accepted position word, keep the range inside that word's range. Before the parenthesis, write the original place wording exactly as written, and do not replace it with an accepted position word (bottom, right edge, corner, and so on). The compiler does not read the words before the parenthesis, so unread place wording may stay there. For example, an original 'scatter ... at the bottom right' becomes 'scatter ... at the bottom right (horizontal a to b, vertical c to d)'. Always write both horizontal and vertical: one axis alone cannot be read. Write 0 to 1 for an axis the place does not narrow. Keep a numeric range already in the clause, words and numbers, as it is. An arrangement relative to the previous shape (around it, surrounding it, evenly spaced around it) cannot be written: return unresolved/unsupported. unread in selected_holes lists the words the compiler could not read. Rewrite each into the accepted grammar or an accepted phrase with the same meaning; copying it unchanged is refused again. When an unread word is place wording (such as 'right' in 'bottom right'), do not rewrite it: keep the wording before the parenthesis and add the numeric range. When it cannot be rewritten, return unresolved.",
         )
     }
 }
@@ -2486,9 +2430,11 @@ mod tests {
                 prompt.prompt_id,
                 "inku.visible-ddl-hole-completion-prompt.v4"
             );
-            for expected in [syntax, range, around, axes, keep] {
+            for expected in [syntax, around, axes, keep] {
                 assert!(prompt.system.contains(expected), "{source}: {expected}");
             }
+            // No range is listed for an accepted position word (A1 stage 4, Y).
+            assert!(!prompt.system.contains(range), "{source}: {range}");
             assert!(!prompt.system.contains(removed), "{source}");
             assert!(!prompt.message.contains("completion_feedback"));
             // The words the compiler could not read are named (A1 stage 3).

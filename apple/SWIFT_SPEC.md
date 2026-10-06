@@ -25,6 +25,7 @@ The surfaces that show a work large (the seven uses of `ArtworkCanvas`: the crea
 - Thumbnails, the saijiki preview, PNG export and the vision image stay with resvg.
 - The SVG limit is 12 MiB (`MAX_SVG_BYTES` in `inku-svg-raster`; the Skia display and Swift's export check use the same value).
 - Skia's prebuilt binaries are kept as copies pinned by SHA-256 in `~/Library/Application Support/inku/build-cache/skia-binaries/`, and `build-core.sh` checks them on every build. Skia and the eight components inside it are listed under "Native libraries" in the notices. The app grows by about 14 MB per architecture after stripping.
+- The version is 1.1.0 (Build 2). The corresponding Server stays v2.15.86 (Build 1162).
 - Checks: AppCheck `--display-only <SVG>` (the painter, joining the tiles, the resvg fallback, switching works and the mark, the window) and `--canvas-detail-only` (the window plan). The shared core's `inku-display` tests (matching Chrome, the compatibility rewrites, tile seams, and the current core's output against the support table).
 
 ## 2026-10-05 Route to About inku and JSON in generation information

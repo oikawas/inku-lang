@@ -25,6 +25,7 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - サムネイル、歳時記のプレビュー、PNGの書き出し、vision用の画像は、resvgのまま。
 - SVGの上限は12MiB（`inku-svg-raster`の`MAX_SVG_BYTES`。Skiaの表示とSwiftの書き出しの検査も同じ値）。
 - Skiaの事前ビルドは、SHA-256で固定した写しを`~/Library/Application Support/inku/build-cache/skia-binaries/`に置き、`build-core.sh`がbuildのたびに照合する。Skiaとその中の8部品を、通知の「ネイティブライブラリ」に載せる。アプリはstrip後で、各アーキテクチャ約14MB大きくなる。
+- 版は1.1.0（Build 2）。対応するServerはv2.15.86（Build 1162）のまま。
 - 確認：AppCheck `--display-only <SVG>`（描き手、タイルのつなぎ、resvgへの戻し、作品の切り替えと印、窓）と`--canvas-detail-only`（窓の計画）。共有coreの`inku-display`の試験（Chromeとの一致、互換変換、タイルの継ぎ目、現行coreの出力と照合表の突き合わせ）。
 
 ## 2026-10-05 「inkuについて」の導線と生成情報のJSON表示

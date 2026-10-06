@@ -6,6 +6,20 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+## macOS (unreleased; the version is settled at integration)
+
+### 2026-10-06 — Stop without resvg when Skia fails in the work area, and record the cause
+
+In response to the author's ruling: when Skia fails, do not fall back; write the cause to a log, stop, and fix the display from it. The macOS work area no longer draws a work Skia cannot draw with resvg; it stops with "the work cannot be shown" and the code. A zoomed window is not drawn, and the whole already shown stays.
+
+- The cause is appended, one line each, to `display-failures/failures.jsonl` in the database's folder, with a copy of the failing SVG beside it, whatever the settings say.
+- A work outside the support table (for example one with a linearGradient) also stops. Among the author's 124 works and the 17 public check works, none failed in Skia.
+- Thumbnails, the saijiki preview and export stay with resvg.
+
+### 2026-10-06 — Share the window calculation and tile joining with Android
+
+The macOS work area's window density and rounding and its tile joining moved to the shared core implementation Android uses. Tiles are drawn and joined inside the core, and the finished image is shown from the core's pixels without copying them. What is shown and how fast are unchanged (the author's largest work: 0.67 s → 0.66 s for the 2000px whole). The notices for Skia and its components are built from the inventory shared with Android (same content).
+
 ## Android 2.1.4-android.91 (2026-10-06 / Build 148378)
 
 ### 2026-10-06 — Connect Android work views to shared Skia

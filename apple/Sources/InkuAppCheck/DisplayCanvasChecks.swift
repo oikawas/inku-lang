@@ -6,7 +6,8 @@ import InkuUI
 private enum DisplayCanvasCheckFailure: Error { case failed(String) }
 
 /// The work area's painter and request flow, on `svg` (a supported work).
-/// Failure (C1): the work area silently draws with resvg, or joins its tiles wrongly.
+/// Failure (C1): the work area silently draws with resvg, or joins its tiles wrongly; a work Skia cannot
+/// draw is drawn another way instead of stopping with its cause logged.
 /// Failure (C5): a new work waits behind the one the viewer left, or a cancelled request
 /// leaves the progress mark behind.
 @MainActor
@@ -14,11 +15,14 @@ func runDisplayCanvasChecks(svg: String) async throws {
     func fail(_ message: String) -> DisplayCanvasCheckFailure { .failed(message) }
 
     // C1: Skia draws the work area, coarse whole first; the tiles join into the one-piece whole.
+    let logFolder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-display-failures-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: logFolder) }
     let renderer = DisplayRenderer()
+    renderer.connectFailureLog(directory: logFolder)
     var frames: [DisplayRenderer.Frame] = []
     for try await frame in renderer.whole(svg: svg, width: 1500, height: 1500) { frames.append(frame) }
     guard frames.map(\.coarse) == [true, false], frames.allSatisfy({ $0.painter == .skia }),
-          renderer.diagnostics().fallbacks.isEmpty, let joined = frames.last?.image else {
+          renderer.diagnostics().failures.isEmpty, let joined = frames.last?.image else {
         throw fail("The work area did not draw a coarse and a full whole with Skia: \(frames.map { ($0.coarse, $0.painter) })")
     }
     let display = try InkuCore.prepareDisplay(svg: svg)
@@ -33,10 +37,18 @@ func runDisplayCanvasChecks(svg: String) async throws {
         throw fail("Joined \(tileCount) tiles differ from the one-piece whole: worst block \(worstBlock), far \(farShare)")
     }
     let unsupported = #"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><text>a</text></svg>"#
-    var fallback: [DisplayRenderer.Frame] = []
-    for try await frame in renderer.whole(svg: unsupported, width: 64, height: 64) { fallback.append(frame) }
-    guard fallback.map(\.painter) == [.resvg], renderer.diagnostics().fallbacks == ["element": 1] else {
-        throw fail("A work outside the support table was not shown with resvg and counted: \(renderer.diagnostics())")
+    var stopped: [DisplayRenderer.Frame] = []
+    var stoppedWith: DisplayRenderer.Failed?
+    do { for try await frame in renderer.whole(svg: unsupported, width: 64, height: 64) { stopped.append(frame) } }
+    catch let failed as DisplayRenderer.Failed { stoppedWith = failed }
+    let failureLines = (try? String(contentsOf: logFolder.appendingPathComponent("display-failures/failures.jsonl"), encoding: .utf8))?
+        .split(separator: "\n") ?? []
+    let logged = failureLines.first.flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] }
+    guard stopped.isEmpty, stoppedWith?.code == "element", renderer.diagnostics().failures == ["element": 1],
+          renderer.diagnostics().resvgWholes == 0, failureLines.count == 1, logged?["code"] as? String == "element",
+          logged?["stage"] as? String == "whole", let copy = logged?["svg_file"] as? String,
+          (try? String(contentsOf: logFolder.appendingPathComponent("display-failures/\(copy)"), encoding: .utf8)) == unsupported else {
+        throw fail("A work outside the support table did not stop with its cause logged: \(renderer.diagnostics()), \(failureLines)")
     }
 
     // C5: switching works while a large whole is drawing shows the new work without waiting for the old.
@@ -148,7 +160,7 @@ func runDisplayCanvasChecks(svg: String) async throws {
     }
 
     print("Display canvas passed: Skia, coarse then \(tileCount) tiles (worst block \(worstBlock)), "
-        + "resvg fallback counted; new work in \(nextTook) while the left whole takes \(largeAlone) alone; "
+        + "unsupported work stopped and logged; new work in \(nextTook) while the left whole takes \(largeAlone) alone; "
         + "no progress mark after cancelling; window in \(windowFrames.count - 1) steps (worst block \(windowBlock)); "
         + "new work in \(afterWindow) while the window takes \(windowAlone) alone; a new zoom drawn after a cancelled window.")
 }

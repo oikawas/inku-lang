@@ -248,6 +248,9 @@ import app.inku.mobile.ui.camera.cameraDevelopmentPresentation
 import app.inku.mobile.ui.camera.locksCameraInteraction
 import app.inku.mobile.render.NativeRenderBridge
 import app.inku.mobile.render.RustArtworkRasterizer
+import app.inku.mobile.render.AndroidDisplayRenderer
+import app.inku.mobile.render.displayWindowInput
+import app.inku.mobile.render.displayedWindowFraction
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.security.MessageDigest
@@ -353,59 +356,16 @@ private object HistoryThumbnailCache {
 private object ArtworkBitmapCache {
     private const val MAX_RENDER_PX = 2048
     private const val CANDIDATE_PX = 512
-    private const val MAX_CACHE_BYTES = 64L * 1024L * 1024L
-    private data class Key(
-        val renderHash: String,
-        val rasterApiVersion: String,
-        val sourceWidth: Int,
-        val sourceHeight: Int,
-        val rotation: Int,
-    )
+    val renderer = AndroidDisplayRenderer()
 
-    private val cache = SharedRenderCache<Key, Bitmap>(
-        maxWeight = MAX_CACHE_BYTES,
-        weightOf = { it.allocationByteCount.toLong() },
-        maxConcurrentRenders = 2,
-    )
-    private val rasterizer = RustArtworkRasterizer()
-
-    suspend fun get(item: HistoryItemEntity, size: IntSize, rotationDegrees: Int): ImageBitmap? {
-        if (size.width <= 0 || size.height <= 0) return null
+    fun frames(svg: String, size: IntSize, rotationDegrees: Int) = run {
         val scale = minOf(1f, MAX_RENDER_PX.toFloat() / maxOf(size.width, size.height).toFloat())
         val width = maxOf(1, (size.width * scale).toInt())
         val height = maxOf(1, (size.height * scale).toInt())
-        return getBitmap(item.renderHash, item.displaySvg, width, height, rotationDegrees)?.asImageBitmap()
+        renderer.whole(svg, width, height, rotationDegrees)
     }
 
-    suspend fun getCandidate(renderHash: String, svg: String): ImageBitmap? =
-        getBitmap(renderHash, svg, CANDIDATE_PX, CANDIDATE_PX, 0)?.asImageBitmap()
-
-    private suspend fun getBitmap(
-        renderHash: String,
-        svg: String,
-        width: Int,
-        height: Int,
-        rotationDegrees: Int,
-    ): Bitmap? {
-        val rotation = rotationDegrees.floorMod360()
-        val sourceWidth = if (rotation.swapsAxes()) height else width
-        val sourceHeight = if (rotation.swapsAxes()) width else height
-        val sourceKey = Key(renderHash, NativeRenderBridge.rasterApiVersion(), sourceWidth, sourceHeight, 0)
-        if (rotation != 0) {
-            cache.peek(sourceKey.copy(rotation = rotation))?.let { return it }
-        }
-        val source = cache.get(sourceKey) {
-            runCatching { rasterizer.rasterize(svg, targetWidth = sourceWidth, targetHeight = sourceHeight) }.getOrNull()
-        } ?: return null
-        if (rotation == 0) return source
-        // The source can still be held by another preview, so keep it alive after eviction.
-        return cache.get(sourceKey.copy(rotation = rotation)) {
-            runCatching {
-                val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
-                Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
-            }.getOrNull()
-        }
-    }
+    fun candidateFrames(svg: String) = renderer.whole(svg, CANDIDATE_PX, CANDIDATE_PX)
 }
 
 /**
@@ -2564,6 +2524,7 @@ private fun CanvasHeroCard(
         mutableStateOf(if (state.presentationHistory != null) false else presentationPreferences.getBoolean(PRESENTATION_CAPTION_VISIBLE_KEY, true))
     }
     var presentationChromeVisible by remember(state.canvasPresentationMode) { mutableStateOf(true) }
+    var previewStatus by remember(item?.id, item?.renderHash, item?.displaySvg, state.canvasPresentationMode) { mutableStateOf(ArtworkPreviewStatus()) }
     val presentation = state.canvasPresentationMode
     val historyItems by viewModel.historyItems.collectAsState()
     val canvasBoundsModifier = if (presentation && state.displaySafeMarginsEnabled) {
@@ -2696,6 +2657,11 @@ private fun CanvasHeroCard(
                                 presentationMode = presentation,
                                 presentationBackground = presentationBackground,
                                 rotationDegrees = presentationArtworkRotation,
+                                zoom = if (presentation) state.canvasZoom else 1f,
+                                panX = if (presentation) state.canvasPanX else 0f,
+                                panY = if (presentation) state.canvasPanY else 0f,
+                                viewportSize = with(LocalDensity.current) { IntSize(screenWidth.roundToPx(), screenHeight.roundToPx()) },
+                                onStatus = { previewStatus = it },
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .historySwipeNavigation(
@@ -2740,6 +2706,7 @@ private fun CanvasHeroCard(
                             )
                         }
                     }
+                    if (presentation) ArtworkDisplayStatus(previewStatus, Modifier.align(Alignment.Center))
                     if (presentation && state.demoWaitingSeconds != null) {
                         Surface(
                             modifier = Modifier
@@ -4167,18 +4134,33 @@ internal fun recompositionLines(info: RecompositionInfo?, strings: InkuStrings):
 @Composable
 private fun RefinementCandidateImage(renderHash: String, svg: String, modifier: Modifier = Modifier,
     rangeBounds: DdlRangeBounds? = null) {
-    val image by produceState<ImageBitmap?>(initialValue = null, renderHash, svg) {
-        value = ArtworkBitmapCache.getCandidate(renderHash, svg)
+    val source = remember(renderHash, svg) { Any() }
+    val state by produceState<ArtworkDisplayState>(initialValue = ArtworkDisplayState(), source) {
+        val request = Any()
+        value = ArtworkDisplayState(source, request, loading = true)
+        try {
+            ArtworkBitmapCache.candidateFrames(svg).collect {
+                value = ArtworkDisplayState(source, request, it, loading = it.coarse)
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            android.util.Log.w("InkuDisplay", "Candidate display failed", failure)
+            if (value.request === request) value = value.copy(failed = true)
+        } finally {
+            if (value.request === request) value = value.copy(loading = false)
+        }
     }
     Surface(color = Color.White, shape = RoundedCornerShape(0.dp), modifier = modifier) {
-        val bitmap = image
-        if (bitmap != null) {
-            Box(Modifier.fillMaxSize()) {
+        val current = state.takeIf { it.source === source }
+        val bitmap = current?.frame?.bitmap?.asImageBitmap()
+        Box(Modifier.fillMaxSize()) {
+            Canvas(modifier = Modifier.fillMaxSize()) { drawRect(Color.White) }
+            if (bitmap != null) {
                 Image(bitmap = bitmap, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                 RangeFrameOverlay(rangeBounds, bitmap)
             }
-        } else {
-            Canvas(modifier = Modifier.fillMaxSize()) { drawRect(Color.White) }
+            ArtworkDisplayStatus(ArtworkPreviewStatus(loading = current?.loading == true, wholeFailed = current?.failed == true),
+                Modifier.align(Alignment.Center))
         }
     }
 }
@@ -7721,11 +7703,63 @@ private fun ArtworkPreview(
     rotationDegrees: Int = 0,
     rangeBounds: DdlRangeBounds? = null,
     fitArtwork: Boolean = false,
+    zoom: Float = 1f,
+    panX: Float = 0f,
+    panY: Float = 0f,
+    viewportSize: IntSize = IntSize.Zero,
+    onStatus: ((ArtworkPreviewStatus) -> Unit)? = null,
 ) {
     var pixelSize by remember { mutableStateOf(IntSize.Zero) }
-    val bitmap by produceState<ImageBitmap?>(initialValue = null, item.id, item.renderHash, pixelSize, rotationDegrees) {
-        value = ArtworkBitmapCache.get(item, pixelSize, rotationDegrees)
+    val source = remember(item.id, item.renderHash, item.displaySvg) { Any() }
+    val whole by produceState<ArtworkDisplayState>(initialValue = ArtworkDisplayState(), source, pixelSize, rotationDegrees) {
+        val request = Any()
+        value = ArtworkDisplayState(source, request, loading = true)
+        try {
+            if (pixelSize.width > 0 && pixelSize.height > 0) {
+                ArtworkBitmapCache.frames(item.displaySvg, pixelSize, rotationDegrees).collect {
+                    value = ArtworkDisplayState(source, request, it, loading = it.coarse)
+                }
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            android.util.Log.w("InkuDisplay", "Whole display failed", failure)
+            if (value.request === request) value = value.copy(failed = true)
+        } finally {
+            if (value.request === request) value = value.copy(loading = false)
+        }
     }
+    val painter = whole.takeIf { it.source === source }?.frame?.painter
+    val detail by produceState<ArtworkDisplayState>(initialValue = ArtworkDisplayState(),
+        source, pixelSize, rotationDegrees, zoom, panX, panY, viewportSize, painter) {
+        val request = Any()
+        val previous = value.frame.takeIf { value.source === source }
+        value = ArtworkDisplayState(source, request, previous)
+        try {
+            val input = if (presentationMode && painter == AndroidDisplayRenderer.Painter.Skia) displayWindowInput(
+                pixelSize.width.toDouble(), pixelSize.height.toDouble(), viewportSize.width.toDouble(), viewportSize.height.toDouble(),
+                zoom.toDouble(), panX.toDouble(), panY.toDouble(), rotationDegrees,
+            ) else null
+            if (input == null) { value = value.copy(frame = null); return@produceState }
+            value = value.copy(loading = true)
+            val region = ArtworkBitmapCache.renderer.detailRegion(input.zoomed, input.visible)
+            if (region == null) { value = value.copy(frame = null); return@produceState }
+            ArtworkBitmapCache.renderer.window(item.displaySvg, region, rotationDegrees).collect {
+                value = ArtworkDisplayState(source, request, it, loading = !it.complete)
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            android.util.Log.w("InkuDisplay", "Window display failed", failure)
+            if (value.request === request) value = value.copy(failed = true)
+        } finally {
+            if (value.request === request) value = value.copy(loading = false)
+        }
+    }
+    val currentWhole = whole.takeIf { it.source === source }
+    val currentDetail = detail.takeIf { it.source === source }
+    val status = ArtworkPreviewStatus(currentWhole?.loading == true || currentDetail?.loading == true,
+        currentWhole?.failed == true, currentDetail?.failed == true)
+    LaunchedEffect(status, source) { onStatus?.invoke(status) }
+    val bitmap = currentWhole?.frame?.bitmap?.asImageBitmap()
     Surface(color = ServerCanvasBoxColor, shape = RoundedCornerShape(0.dp), modifier = modifier) {
         Box(
             modifier = Modifier
@@ -7742,9 +7776,38 @@ private fun ArtworkPreview(
                     modifier = Modifier.fillMaxSize(),
                     contentScale = if (fitArtwork) ContentScale.Fit else ContentScale.FillBounds,
                 )
+                currentDetail?.frame?.let { frame ->
+                    frame.region?.let { region ->
+                        val unit = displayedWindowFraction(region, rotationDegrees)
+                        val tileImage = frame.bitmap.asImageBitmap()
+                        Canvas(Modifier.fillMaxSize()) {
+                            drawImage(tileImage,
+                                dstOffset = IntOffset((unit.x * size.width).roundToInt(), (unit.y * size.height).roundToInt()),
+                                dstSize = IntSize(maxOf(1, (unit.width * size.width).roundToInt()), maxOf(1, (unit.height * size.height).roundToInt())))
+                        }
+                    }
+                }
                 RangeFrameOverlay(rangeBounds, image, rotationDegrees, fitArtwork)
             }
+            if (!presentationMode) ArtworkDisplayStatus(status, Modifier.align(Alignment.Center))
         }
+    }
+}
+
+private data class ArtworkDisplayState(val source: Any? = null, val request: Any? = null,
+    val frame: AndroidDisplayRenderer.Frame? = null, val loading: Boolean = false, val failed: Boolean = false)
+
+private data class ArtworkPreviewStatus(val loading: Boolean = false, val wholeFailed: Boolean = false,
+    val detailFailed: Boolean = false)
+
+@Composable
+private fun ArtworkDisplayStatus(status: ArtworkPreviewStatus, modifier: Modifier = Modifier) {
+    if (status.loading) {
+        val label = S.artworkDisplaying
+        CircularProgressIndicator(modifier = modifier.semantics { contentDescription = label })
+    } else if (status.wholeFailed || status.detailFailed) {
+        Text(if (status.wholeFailed) S.artworkDisplayFailed else S.artworkDetailFailed,
+            modifier = modifier, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
     }
 }
 

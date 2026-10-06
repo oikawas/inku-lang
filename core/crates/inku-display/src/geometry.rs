@@ -20,6 +20,98 @@ pub const TILE_SIDE: u32 = 512;
 /// position in `f32` is still finer than 1/100 pixel.
 pub const MAX_CANVAS_SIDE: u32 = 120_000;
 
+/// Host rectangles in the same screen units (points or pixels). The host owns
+/// fitting, gestures and rotation; the core owns density limits and rounding.
+#[derive(Clone, Copy, Debug)]
+pub struct Rect {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct DetailLimits {
+    pub max_window_side: u32,
+    pub max_window_pixels: u64,
+    pub max_canvas_side: u32,
+}
+
+/// The visible part of a zoomed picture at the host's screen density. Extracted
+/// from Apple's CanvasInteraction.detailPlan: reserve two pixels a side and 1%
+/// of the pixel budget for outward rounding. The host handles the zoom threshold
+/// and intersects the picture with its viewport before calling this function.
+pub fn detail_region(
+    zoomed: Rect,
+    visible: Rect,
+    pixel_scale: f64,
+    limits: DetailLimits,
+) -> Option<RasterRegionOptions> {
+    let values = [
+        zoomed.x,
+        zoomed.y,
+        zoomed.width,
+        zoomed.height,
+        visible.x,
+        visible.y,
+        visible.width,
+        visible.height,
+        pixel_scale,
+    ];
+    if !values.iter().all(|value| value.is_finite())
+        || zoomed.width <= 0.0
+        || zoomed.height <= 0.0
+        || pixel_scale <= 0.0
+        || visible.width < 1.0
+        || visible.height < 1.0
+        || limits.max_window_side <= 2
+        || limits.max_window_pixels == 0
+        || limits.max_canvas_side == 0
+    {
+        return None;
+    }
+    let window_side = f64::from(limits.max_window_side.min(MAX_RASTER_DIMENSION)) - 2.0;
+    let window_pixels = limits.max_window_pixels.min(MAX_RASTER_PIXELS) as f64 * 0.99;
+    let canvas_side = f64::from(limits.max_canvas_side.min(MAX_CANVAS_SIDE));
+    let mut density = pixel_scale;
+    density *= (canvas_side / (zoomed.width.max(zoomed.height) * density)).min(1.0);
+    density *= (window_pixels / (visible.width * density * visible.height * density))
+        .sqrt()
+        .min(1.0);
+    density *= (window_side / (visible.width.max(visible.height) * density)).min(1.0);
+    let full_width = (zoomed.width * density).round().max(1.0);
+    let full_height = (zoomed.height * density).round().max(1.0);
+    let left = ((visible.x - zoomed.x) * density)
+        .floor()
+        .max(0.0)
+        .min(full_width - 1.0);
+    let top = ((visible.y - zoomed.y) * density)
+        .floor()
+        .max(0.0)
+        .min(full_height - 1.0);
+    let right = ((visible.x + visible.width - zoomed.x) * density)
+        .ceil()
+        .min(full_width)
+        .max(left + 1.0);
+    let bottom = ((visible.y + visible.height - zoomed.y) * density)
+        .ceil()
+        .min(full_height)
+        .max(top + 1.0);
+    if !(density.is_finite() && density > 0.0)
+        || (right - left) * (bottom - top) > limits.max_window_pixels as f64
+    {
+        return None;
+    }
+    Some(RasterRegionOptions {
+        full_width: full_width as u32,
+        full_height: full_height as u32,
+        x: left as u32,
+        y: top as u32,
+        width: (right - left) as u32,
+        height: (bottom - top) as u32,
+    })
+}
+
 /// A window on a canvas `full_width` × `full_height` pixels, with the scale that
 /// maps the work's user units to those pixels.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -204,6 +296,66 @@ fn rounded(value: f64) -> Result<u32, DisplayError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // C3 from Apple's canvas check: extracting the numeric calculation must not
+    // change its visible window or its screen density at a deep zoom.
+    #[test]
+    fn shared_display_detail_region_matches_the_apple_canvas_examples() {
+        let limits = DetailLimits {
+            max_window_side: MAX_RASTER_DIMENSION,
+            max_window_pixels: MAX_RASTER_PIXELS,
+            max_canvas_side: MAX_CANVAS_SIDE,
+        };
+        let region = detail_region(
+            Rect {
+                x: -541.0,
+                y: -951.5,
+                width: 2500.0,
+                height: 2500.0,
+            },
+            Rect {
+                x: 0.0,
+                y: 0.0,
+                width: 818.0,
+                height: 597.0,
+            },
+            2.0,
+            limits,
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                region.full_width,
+                region.full_height,
+                region.x,
+                region.y,
+                region.width,
+                region.height
+            ),
+            (5000, 5000, 1082, 1903, 1636, 1194)
+        );
+        let deep = detail_region(
+            Rect {
+                x: -6220.0,
+                y: -6700.0,
+                width: 15000.0,
+                height: 15000.0,
+            },
+            Rect {
+                x: 0.0,
+                y: 0.0,
+                width: 2560.0,
+                height: 1600.0,
+            },
+            2.0,
+            limits,
+        )
+        .unwrap();
+        assert_eq!(
+            (deep.full_width, deep.full_height, deep.width, deep.height),
+            (30000, 30000, 5120, 3200)
+        );
+    }
 
     fn window(x: u32, y: u32, width: u32, height: u32) -> RasterRegionOptions {
         RasterRegionOptions {

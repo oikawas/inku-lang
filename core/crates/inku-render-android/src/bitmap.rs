@@ -2,11 +2,45 @@ use inku_svg_raster::RasterOutput;
 
 use crate::BindingError;
 
-fn copy_rgba_rows(
-    output: &RasterOutput,
+#[derive(Clone, Copy)]
+pub(crate) struct BitmapRaster<'a> {
+    width: u32,
+    height: u32,
+    stride: u32,
+    pixel_format: &'a str,
+    pixels: &'a [u8],
+}
+
+impl<'a> From<&'a RasterOutput> for BitmapRaster<'a> {
+    fn from(output: &'a RasterOutput) -> Self {
+        Self {
+            width: output.width,
+            height: output.height,
+            stride: output.stride,
+            pixel_format: output.pixel_format,
+            pixels: &output.pixels,
+        }
+    }
+}
+
+impl<'a> From<&'a inku_pipeline_uniffi::RasterFrame> for BitmapRaster<'a> {
+    fn from(output: &'a inku_pipeline_uniffi::RasterFrame) -> Self {
+        Self {
+            width: output.width,
+            height: output.height,
+            stride: output.stride,
+            pixel_format: &output.pixel_format,
+            pixels: &output.pixels,
+        }
+    }
+}
+
+fn copy_rgba_rows<'a>(
+    output: impl Into<BitmapRaster<'a>>,
     destination: &mut [u8],
     destination_stride: usize,
 ) -> Result<(), BindingError> {
+    let output = output.into();
     if output.pixel_format != inku_svg_raster::PIXEL_FORMAT_RGBA8_PREMULTIPLIED {
         return Err(BindingError::state("unsupported raster pixel format"));
     }
@@ -135,10 +169,11 @@ mod android {
         }
     }
 
-    pub(crate) fn bitmap_from_raster(
+    pub(crate) fn bitmap_from_raster<'a>(
         env: &mut JNIEnv<'_>,
-        output: &RasterOutput,
+        output: impl Into<BitmapRaster<'a>>,
     ) -> Result<jobject, BindingError> {
+        let output = output.into();
         let config = env
             .get_static_field(
                 "android/graphics/Bitmap$Config",
@@ -210,7 +245,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn copies_premultiplied_rgba_by_row_without_touching_padding() {
+    fn display_and_resvg_share_premultiplied_rows_without_touching_padding() {
         let raster = RasterOutput {
             width: 2,
             height: 2,
@@ -223,6 +258,16 @@ mod tests {
         };
         let mut destination = vec![42; 32];
         copy_rgba_rows(&raster, &mut destination, 16).expect("rows");
+        let frame = inku_pipeline_uniffi::RasterFrame {
+            width: raster.width,
+            height: raster.height,
+            stride: raster.stride,
+            pixel_format: raster.pixel_format.to_owned(),
+            pixels: raster.pixels.clone(),
+        };
+        let mut display_destination = vec![42; 32];
+        copy_rgba_rows(&frame, &mut display_destination, 16).expect("display rows");
+        assert_eq!(display_destination, destination);
         assert_eq!(
             destination,
             vec![

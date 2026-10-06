@@ -17,12 +17,16 @@ use std::fmt;
 use roxmltree::{Document, ParsingOptions};
 
 mod check;
+#[cfg(any(feature = "skia", test))]
+mod composite;
 pub mod geometry;
 mod rewrite;
 #[cfg(feature = "skia")]
 mod scene;
 
 pub use check::Unsupported;
+#[cfg(feature = "skia")]
+pub use composite::DisplayComposite;
 pub use inku_svg_raster::{
     MAX_RASTER_DIMENSION, MAX_RASTER_PIXELS, MAX_SVG_BYTES, PIXEL_FORMAT_RGBA8_PREMULTIPLIED,
     RasterOptions, RasterOutput, RasterRegionOptions,
@@ -68,6 +72,8 @@ pub enum DisplayError {
     /// Skia could not read the rewritten SVG or record it.
     SkiaLoad,
     AllocationFailed,
+    /// A joined window has already transferred its pixels to a finished image.
+    CompositeFinished,
 }
 
 impl DisplayError {
@@ -86,6 +92,7 @@ impl DisplayError {
             Self::PixelCountTooLarge { .. } => "pixel_count_too_large",
             Self::SkiaLoad => "skia_load",
             Self::AllocationFailed => "allocation_failed",
+            Self::CompositeFinished => "composite_finished",
         }
     }
 }
@@ -131,6 +138,7 @@ impl fmt::Display for DisplayError {
             }
             Self::SkiaLoad => formatter.write_str("Skia could not read the SVG"),
             Self::AllocationFailed => formatter.write_str("raster allocation failed"),
+            Self::CompositeFinished => formatter.write_str("display composite is already finished"),
         }
     }
 }

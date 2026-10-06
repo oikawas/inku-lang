@@ -5,7 +5,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LIST="$ROOT/core/crates/inku-display/skia-binaries.sha256"
 CACHE="${INKU_SKIA_BINARIES_DIR:-$HOME/Library/Application Support/inku/build-cache/skia-binaries}"
-FEATURES=jpegd-jpege-pdf-svg-textlayout-webpd-webpe
 RELEASES=https://github.com/rust-skia/skia-binaries/releases/download
 
 usage() {
@@ -31,7 +30,8 @@ digest() {
 }
 
 for target in "$@"; do
-    line="$(awk -v suffix="-$target-$FEATURES.tar.gz" '!/^#/ && length($2) > length(suffix) && substr($2, length($2) - length(suffix) + 1) == suffix' "$LIST")"
+    # The digest list owns each target's complete feature key, including Android's.
+    line="$(awk -v marker="-$target-" '!/^#/ && NF == 2 && index($2, marker) && $2 ~ /[.]tar[.]gz$/ { print }' "$LIST")"
     [[ -n "$line" && "$(printf '%s\n' "$line" | wc -l | tr -d ' ')" == 1 ]] || {
         printf 'no Skia binaries listed for %s in %s\n' "$target" "$LIST" >&2
         exit 2

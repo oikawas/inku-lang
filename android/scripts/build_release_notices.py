@@ -16,6 +16,8 @@ from pathlib import Path
 
 NS = {"m": "http://maven.apache.org/POM/4.0.0"}
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts"))
+from skia_notices import bundle_android  # noqa: E402 - product-root script import
 
 
 def pom(cache, group, name, version):
@@ -112,6 +114,7 @@ def main():
     write("INKU-LICENSE.txt", (ROOT / "LICENSE").read_bytes())
     for name in ("LICENSE-MIT", "LICENSE-APACHE", "INKU_PATCHES.md"):
         write(f"resvg/{name}", (ROOT / "core/vendor/resvg" / name).read_bytes())
+    bundle_android(write)
     rust_output = output / "RUST_THIRD_PARTY_NOTICES.txt"
     subprocess.run([sys.executable, str(ROOT / "server/scripts/build_rust_notices.py"),
                     str(ROOT / "core/Cargo.lock"), str(rust_output)], check=True)
@@ -133,6 +136,9 @@ def main():
         "declared licenses and source archives. Embedded LICENSE and NOTICE files,\n"
         "including LiteRT-LM's complete native THIRD_PARTY_NOTICE, are retained.\n"
         "The Rust inventory conservatively includes Cargo.lock registry sources.\n"
+        "The shared Skia inventory lists the native libraries in the pinned Android\n"
+        "prebuilt, their source revisions, license texts, and the static C++ runtime.\n"
+        "rust-skia's upstream MIT text supplements crate archives without that file.\n"
         f"Rust {toolchain}'s standard-library copyright and license collection is included.\n"
         f"Standard-library source: https://github.com/rust-lang/rust/tree/{toolchain}/library\n"
         "UniFFI 0.32.0 is MPL-2.0; terms: https://www.mozilla.org/en-US/MPL/2.0/\n"

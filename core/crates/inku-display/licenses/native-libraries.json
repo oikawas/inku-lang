@@ -1,0 +1,78 @@
+{
+  "binding_version": "0.153.3",
+  "svg_macros_version": "0.2.0",
+  "skia_tag": "m153-0.101.2",
+  "libraries": [
+    {
+      "name": "Skia", "version": "m153", "license": "BSD-3-Clause",
+      "source": "https://github.com/rust-skia/skia/tree/m153-0.101.2",
+      "files": ["skia-LICENSE"], "note": "", "platforms": ["apple", "android"]
+    },
+    {
+      "name": "Expat", "version": "2.7.4", "license": "MIT",
+      "source": "https://github.com/libexpat/libexpat/tree/6154446fccefbf3ca644894f598969113b0c7bcd",
+      "files": ["expat-COPYING"], "note": "", "platforms": ["apple", "android"]
+    },
+    {
+      "name": "HarfBuzz", "version": "13.1.0", "license": "MIT-Modern-Variant AND MIT",
+      "source": "https://github.com/harfbuzz/harfbuzz/tree/9cb1fee51069b206effb4736e443b038d230789d",
+      "files": ["harfbuzz-COPYING", "harfbuzz-ms-use-COPYING"],
+      "note": "The Universal Shaping Engine table is generated in part from Microsoft data under src/ms-use (MIT).",
+      "platforms": ["apple", "android"]
+    },
+    {
+      "name": "ICU", "version": "78.2", "license": "Unicode-3.0",
+      "source": "https://chromium.googlesource.com/chromium/deps/icu/+/d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738",
+      "files": ["icu-LICENSE"], "note": "Includes the ICU data.", "platforms": ["apple", "android"]
+    },
+    {
+      "name": "libpng", "version": "1.6.56", "license": "libpng-2.0",
+      "source": "https://skia.googlesource.com/third_party/libpng/+/d5515b5b8be3901aac04e5bd8bd5c89f287bcd33",
+      "files": ["libpng-LICENSE"], "note": "", "platforms": ["apple", "android"]
+    },
+    {
+      "name": "zlib (Chromium)", "version": "1.3.0.1", "license": "Zlib",
+      "source": "https://chromium.googlesource.com/chromium/src/third_party/zlib/+/646b7f569718921d7d4b5b8e22572ff6c76f2596",
+      "files": ["zlib-LICENSE"], "note": "", "platforms": ["apple", "android"]
+    },
+    {
+      "name": "libjpeg-turbo", "version": "3.1.0", "license": "IJG AND BSD-3-Clause AND Zlib",
+      "source": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+      "files": ["libjpeg-turbo-LICENSE.md", "libjpeg-turbo-README.ijg"],
+      "note": "This software is based in part on the work of the Independent JPEG Group.",
+      "platforms": ["apple", "android"]
+    },
+    {
+      "name": "libwebp", "version": "1.4.0", "license": "BSD-3-Clause",
+      "source": "https://chromium.googlesource.com/webm/libwebp/+/845d5476a866141ba35ac133f856fa62f0b7445f",
+      "files": ["libwebp-COPYING", "libwebp-PATENTS"], "note": "With the additional grant of patent rights in PATENTS.",
+      "platforms": ["apple", "android"]
+    },
+    {
+      "name": "Wuffs", "version": "0.3.3", "license": "Apache-2.0",
+      "source": "https://github.com/google/wuffs-mirror-release-c/tree/e3f919ccfe3ef542cfc983a82146070258fb57f8",
+      "files": ["wuffs-LICENSE"], "note": "", "platforms": ["apple", "android"]
+    },
+    {
+      "name": "FreeType", "version": "2.14.2", "license": "FTL AND MIT AND Zlib",
+      "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+      "files": ["freetype-LICENSE.TXT", "freetype-FTL.TXT", "freetype-bdf-README", "freetype-pcf-README", "freetype-fthash-LICENSE", "freetype-hb-ft-LICENSE", "freetype-zlib-LICENSE"],
+      "note": "This software is based in part on the work of the FreeType Team (https://freetype.org). The FreeType License option is selected; additional MIT and zlib notices are retained.",
+      "platforms": ["android"]
+    },
+    {
+      "name": "Vulkan Memory Allocator", "version": "3.4.0", "license": "MIT",
+      "source": "https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/tree/eb744ea7a2b17040121b4bbb4d6f9e8a77e3cae7",
+      "files": ["vulkanmemoryallocator-LICENSE.txt"],
+      "note": "Compiled into the Android ganesh/vulkan prebuilt. The display renderer uses CPU surfaces and does not create a Vulkan context.",
+      "platforms": ["android"]
+    },
+    {
+      "name": "LLVM C++ runtime (Android NDK)", "version": "29.0.14206865", "license": "Apache-2.0 WITH LLVM-exception AND MIT",
+      "source": "https://android.googlesource.com/toolchain/llvm-project/",
+      "files": ["android-ndk-r29-LLVM-NOTICE"],
+      "note": "libc++ and libc++abi are statically linked. The pinned NDK's complete LLVM notice collection is retained, including its legacy MIT option; this collection also covers toolchain components not shipped in the application.",
+      "platforms": ["android"]
+    }
+  ]
+}

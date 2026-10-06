@@ -553,6 +553,8 @@ dependencies = [
  "inku-ddl",
  "inku-pipeline",
  "inku-svg-raster",
+ "jni",
+ "png",
  "roxmltree",
  "serde_json",
  "skia-safe",
@@ -607,6 +609,7 @@ dependencies = [
  "inku-render",
  "inku-svg-raster",
  "jni",
+ "serde",
  "serde_json",
 ]
 

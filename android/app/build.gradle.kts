@@ -74,6 +74,8 @@ val rustNativeLibraryName = "libinku_render_android.so"
 val rustTargetDirectory = layout.buildDirectory.dir("rust-target")
 val rustGeneratedJniLibsDirectory = layout.buildDirectory.dir("generated/rustJniLibs")
 val rustParityAssetsDirectory = layout.buildDirectory.dir("generated/rustParityAssets")
+val displayCheckAssetsDirectory = layout.buildDirectory.dir("generated/displayCheckAssets")
+val displayCheckJniDirectory = layout.buildDirectory.dir("generated/displayCheckJniLibs")
 val rustParityExpectedDirectory = layout.buildDirectory.dir("generated/rustParityExpected")
 val importedRustParityExpectedDirectory = providers.gradleProperty("inkuRustParityExpectedDir")
     .map { file(it) }
@@ -135,6 +137,8 @@ android {
     sourceSets.getByName("androidTest") {
         assets.srcDir("$projectDir/schemas")
         assets.srcDir(rustParityAssetsDirectory)
+        assets.srcDir(displayCheckAssetsDirectory)
+        jniLibs.srcDir(displayCheckJniDirectory)
     }
     sourceSets.getByName("main") {
         jniLibs.srcDir(rustGeneratedJniLibsDirectory)
@@ -154,9 +158,51 @@ val rustLibrary = rustTargetDirectory.map {
     it.file("$rustAndroidTarget/release/$rustNativeLibraryName")
 }
 
+fun Exec.configureRustAndroidCompiler() {
+    val pinnedRustc = providers.exec {
+        commandLine("rustup", "which", "--toolchain", "1.95.0", "rustc")
+    }.standardOutput.asText.get().trim()
+    require(file(pinnedRustc).isFile) { "Pinned Rust 1.95.0 rustc was not found" }
+    val toolchainBin = rustNdkDirectory.get()
+        .dir("toolchains/llvm/prebuilt/$rustNdkHostTag/bin").asFile
+    val clang = toolchainBin.resolve("aarch64-linux-android${rustAndroidApi}-clang")
+    val clangxx = toolchainBin.resolve("aarch64-linux-android${rustAndroidApi}-clang++")
+    val archiveTool = toolchainBin.resolve("llvm-ar")
+    require(clang.isFile) { "Pinned NDK clang was not found: ${clang.name}" }
+    require(clangxx.isFile) { "Pinned NDK clang++ was not found: ${clangxx.name}" }
+    require(archiveTool.isFile) { "Pinned NDK llvm-ar was not found" }
+    // Pin rustc as well as Cargo; a different compiler may otherwise be on PATH.
+    environment("RUSTC", pinnedRustc)
+    environment("ANDROID_NDK", rustNdkDirectory.get().asFile.absolutePath)
+    environment("CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER", clang.absolutePath)
+    environment("CC_aarch64_linux_android", clang.absolutePath)
+    environment("CXX_aarch64_linux_android", clangxx.absolutePath)
+    environment("AR_aarch64_linux_android", archiveTool.absolutePath)
+}
+
+val skiaBinaryHelper = rootProject.file("../scripts/skia-binaries.sh")
+val skiaBinaryDigests = rootProject.file("../core/crates/inku-display/skia-binaries.sha256")
+val verifiedSkiaBinariesUrl = objects.property<String>()
+val verifySkiaAndroidBinaries = tasks.register("verifySkiaAndroidBinaries") {
+    group = "build"
+    description = "Verify the pinned Android Skia binary before every native build, including up-to-date builds."
+    inputs.files(skiaBinaryHelper, skiaBinaryDigests)
+    // No output is declared: a cached native library must not bypass the digest check.
+    doLast {
+        val value = providers.exec {
+            commandLine("bash", skiaBinaryHelper.absolutePath, rustAndroidTarget)
+        }.standardOutput.asText.get().trim()
+        check(value.startsWith("file://") && value.contains("{tag}") && value.contains("{key}")) {
+            "The Skia verifier did not return its local binary URL template"
+        }
+        verifiedSkiaBinariesUrl.set(value)
+    }
+}
+
 val buildRustAndroidArm64 = tasks.register<Exec>("buildRustAndroidArm64") {
     group = "build"
-    description = "Build the shared Rust render/raster JNI library for arm64-v8a without packaging the app."
+    description = "Build the shared Rust render/raster/display JNI library for arm64-v8a without packaging the app."
+    dependsOn(verifySkiaAndroidBinaries)
     workingDir(rootProject.file("../core"))
     inputs.files(
         rootProject.fileTree("../core") {
@@ -164,29 +210,13 @@ val buildRustAndroidArm64 = tasks.register<Exec>("buildRustAndroidArm64") {
             exclude("target/**")
         },
     )
+    inputs.files(skiaBinaryHelper, skiaBinaryDigests)
     outputs.file(rustLibrary)
 
     doFirst {
-        val pinnedRustc = providers.exec {
-            commandLine("rustup", "which", "--toolchain", "1.95.0", "rustc")
-        }.standardOutput.asText.get().trim()
-        require(file(pinnedRustc).isFile) { "Pinned Rust 1.95.0 rustc was not found" }
-        val toolchainBin = rustNdkDirectory.get()
-            .dir("toolchains/llvm/prebuilt/$rustNdkHostTag/bin")
-            .asFile
-        val clang = toolchainBin.resolve("aarch64-linux-android${rustAndroidApi}-clang")
-        val clangxx = toolchainBin.resolve("aarch64-linux-android${rustAndroidApi}-clang++")
-        val archiveTool = toolchainBin.resolve("llvm-ar")
-        require(clang.isFile) { "Pinned NDK clang was not found: ${clang.name}" }
-        require(clangxx.isFile) { "Pinned NDK clang++ was not found: ${clangxx.name}" }
-        require(archiveTool.isFile) { "Pinned NDK llvm-ar was not found" }
-        // `rustup run ... cargo` pins Cargo but Cargo can still resolve a
-        // different `rustc` from PATH, so pin the compiler explicitly too.
-        environment("RUSTC", pinnedRustc)
-        environment("CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER", clang.absolutePath)
-        environment("CC_aarch64_linux_android", clang.absolutePath)
-        environment("CXX_aarch64_linux_android", clangxx.absolutePath)
-        environment("AR_aarch64_linux_android", archiveTool.absolutePath)
+        configureRustAndroidCompiler()
+        environment("SKIA_BINARIES_URL", verifiedSkiaBinariesUrl.get())
+        // The Android-only no-compile feature refuses any source-build fallback.
     }
 
     commandLine(
@@ -198,6 +228,8 @@ val buildRustAndroidArm64 = tasks.register<Exec>("buildRustAndroidArm64") {
         "--locked",
         "--package",
         "inku-render-android",
+        "--features",
+        "display",
         "--target",
         rustAndroidTarget,
         "--release",
@@ -212,6 +244,40 @@ val syncRustAndroidArm64 = tasks.register<Sync>("syncRustAndroidArm64") {
     dependsOn(buildRustAndroidArm64)
     from(rustLibrary)
     into(rustGeneratedJniLibsDirectory.map { it.dir("arm64-v8a") })
+}
+
+val displayCheckLibrary = rustTargetDirectory.map {
+    it.file("$rustAndroidTarget/release/examples/libdisplay_check_android.so")
+}
+val buildDisplayCheckAndroid = tasks.register<Exec>("buildDisplayCheckAndroid") {
+    group = "verification"
+    description = "Build the development-only shared image comparison for the instrumentation APK."
+    workingDir(rootProject.file("../core"))
+    inputs.files(rootProject.fileTree("../core") {
+        include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml",
+            "crates/**/src/**/*.rs", "crates/inku-display/examples/display_check_android.rs",
+            "crates/inku-display/tests/common/**/*.rs", "vendor/resvg/Cargo.toml", "vendor/resvg/src/**/*.rs")
+        exclude("target/**")
+    })
+    outputs.file(displayCheckLibrary)
+    doFirst { configureRustAndroidCompiler() }
+    commandLine("rustup", "run", "1.95.0", "cargo", "build", "--locked", "--package", "inku-display",
+        "--example", "display_check_android", "--target", rustAndroidTarget, "--release",
+        "--target-dir", rustTargetDirectory.get().asFile.absolutePath)
+}
+val syncDisplayCheckAndroid = tasks.register<Sync>("syncDisplayCheckAndroid") {
+    dependsOn(buildDisplayCheckAndroid)
+    from(displayCheckLibrary)
+    into(displayCheckJniDirectory.map { it.dir("arm64-v8a") })
+}
+val prepareDisplayCheckAssets = tasks.register<Sync>("prepareDisplayCheckAssets") {
+    from(rootProject.file("../core/crates/inku-display/tests/data/public")) {
+        listOf("p00", "p02", "p07", "p11").forEach {
+            include("$it.svg", "$it-chrome.png")
+        }
+        into("display")
+    }
+    into(displayCheckAssetsDirectory)
 }
 
 val releaseNoticeDirectory = layout.buildDirectory.dir("generated/releaseNotices")
@@ -334,7 +400,11 @@ tasks.configureEach {
         dependsOn(syncRustAndroidArm64)
     }
     if (name.startsWith("merge") && name.endsWith("AndroidTestAssets")) {
-        dependsOn(prepareRustParityAssets)
+        dependsOn(prepareRustParityAssets, prepareDisplayCheckAssets)
+    }
+    if (name.startsWith("merge") &&
+        (name.endsWith("AndroidTestNativeLibs") || name.endsWith("AndroidTestJniLibFolders"))) {
+        dependsOn(syncDisplayCheckAndroid)
     }
 }
 

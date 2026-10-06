@@ -460,6 +460,11 @@ pub struct ProviderAttempt {
     pub delay_ms: DecimalU64,
     /// The time the attempt may take, already capped by the stage's total budget.
     pub timeout_ms: DecimalU64,
+    /// Whether this attempt asks the completion once more because the check
+    /// refused a proposal, rather than retrying after a failure (A1, 2026-10-06).
+    /// Present only when true.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub asked_again: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -836,6 +841,7 @@ impl PipelineSnapshot {
                     max_attempts: self.retry_policy(*stage).max_attempts,
                     delay_ms: action.delay_ms,
                     timeout_ms: action.timeout_ms,
+                    asked_again: false,
                 })
             }
             _ => None,

@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+## v2.15.93 (2026-10-06 / Build 1169)
+
+Edit the whole draft in the Describe tab's instructions box and insert Saijiki words at its caret. This version also applies the Server changes that inherit saved settings for composition forks and retain saved Score range values. Storage formats and all engine versions remain unchanged.
+
 ### 2026-10-06 — Edit the whole text in the instructions box
 
 The Describe tab's instructions box now uses the same CodeMirror editor as the dialog. It edits the complete draft and shares range folding, name following, completions, IME composition, copying, and read-only drawing. Only the dialog shows line numbers. The former Edit instructions button, work-editing menu item, and dialog title become Instruction editor. Clicking a Saijiki drawer word inserts it at an editable box's caret, or at the end before any caret is placed, and also previews it. With no box, a read-only box, or an open editor dialog, the drawer only previews. Typing does not draw; Draw from instructions redraws once.

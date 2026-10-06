@@ -25,11 +25,11 @@ use crate::core_boundary::{CompiledDelivery, CompilerOptions, ResolvedHostOption
 use crate::prompts::{
     DescriptionCatalogEntry, HOLE_COMPLETION_PROMPT_ID, HoleCompletionResult,
     HolePatchEditResponse, HolePatchResponse, LEGACY_HOLE_COMPLETION_PROMPT_ID, LlmPrompt,
-    LlmStage, MacroPromptEntry, PromptLimits, Stage1Context, build_catalog_selection_prompt,
-    build_hole_completion_prompt, build_sketch_prompt, build_stage1_prompt_for_run,
-    parse_catalog_selection_response, parse_hole_completion_response, parse_hole_patch_response,
-    parse_sketch_response, parse_stage1_response_and_plan_with_plugins,
-    with_stage1_background_feedback, with_stage1_compiler_feedback,
+    LlmStage, MacroPromptEntry, PREVIOUS_HOLE_COMPLETION_PROMPT_ID, PromptLimits, Stage1Context,
+    build_catalog_selection_prompt, build_hole_completion_prompt, build_sketch_prompt,
+    build_stage1_prompt_for_run, parse_catalog_selection_response, parse_hole_completion_response,
+    parse_hole_patch_response, parse_sketch_response, parse_stage1_response_and_plan_with_plugins,
+    with_hole_completion_feedback, with_stage1_background_feedback, with_stage1_compiler_feedback,
 };
 use crate::protocol::{
     ActionEcho, DecimalU64, EffectAction, EffectResult, Envelope, PROTOCOL_NAME, PROTOCOL_VERSION,
@@ -1589,6 +1589,154 @@ impl PipelineSnapshot {
         }
     }
 
+    /// Ask the completion once more when the check refused a proposal (A1,
+    /// 2026-10-06, the author's decision Q3). The request keeps the stage's
+    /// attempt budget, as the Stage 1 compiler feedback does; when the budget is
+    /// spent the first answer stands.
+    fn ask_holes_again(
+        &mut self,
+        prompt: &LlmPrompt,
+        results: &[serde_json::Value],
+        proposals: &[Option<String>],
+        hole_ids: &[String],
+        spent_ms: u64,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<bool, ProtocolError> {
+        let PipelinePhase::AwaitingLlm { elapsed_ms, .. } = &self.phase else {
+            return Err(ProtocolError::InvalidState);
+        };
+        let total = elapsed_ms
+            .get()
+            .checked_add(spent_ms)
+            .ok_or(ProtocolError::InvalidPolicy)?;
+        let policy = self.config.hole_retry;
+        let attempt = self
+            .action
+            .as_ref()
+            .ok_or(ProtocolError::InvalidState)?
+            .identity
+            .attempt;
+        let Some(next) = policy.next_budgeted_attempt(attempt, total) else {
+            return Ok(false);
+        };
+        let feedback = results
+            .iter()
+            .zip(proposals)
+            .enumerate()
+            .map(|(index, (result, proposal))| {
+                let mut entry =
+                    json!({"id": format!("h{}", index + 1), "status": result["status"]});
+                if let Some(proposal) = proposal {
+                    entry["replacement"] = json!(proposal);
+                }
+                if !result["reason"].is_null() {
+                    entry["reason"] = result["reason"].clone();
+                }
+                if result["status"] == "rejected"
+                    && let Some(proposal) = proposal
+                {
+                    let unread = self.unread_in_proposal(index, proposal);
+                    if !unread.is_empty() {
+                        entry["unread"] = json!(unread);
+                    }
+                }
+                entry
+            })
+            .collect::<Vec<_>>();
+        let Ok(asked) = with_hole_completion_feedback(
+            prompt.clone(),
+            json!(feedback),
+            self.config.prompt_limits,
+        ) else {
+            return Ok(false);
+        };
+        let detail = results
+            .iter()
+            .find(|result| result["status"] == "rejected")
+            .and_then(|result| result["reason"].as_str())
+            .unwrap_or("holes_unresolved")
+            .to_owned();
+        let total = total
+            .checked_add(policy.retry_delay_ms.get())
+            .ok_or(ProtocolError::InvalidPolicy)?;
+        self.phase = PipelinePhase::AwaitingLlm {
+            stage: LlmStage::CompleteVisibleDdlHoles,
+            description: None,
+            hole_ids: hole_ids.to_vec(),
+            elapsed_ms: DecimalU64::new(total),
+        };
+        self.issue_attempt(
+            LlmStage::CompleteVisibleDdlHoles.action_name(),
+            json!({"prompt": asked, "policy": policy}),
+            policy.remaining_attempt_timeout(total),
+            next,
+            events,
+        )?;
+        self.action
+            .as_mut()
+            .ok_or(ProtocolError::InternalInvariant)?
+            .delay_ms = policy.retry_delay_ms;
+        self.event(
+            events,
+            "retry_scheduled",
+            json!({
+                "identity": self.action.as_ref().unwrap().identity,
+                "failure": ProviderFailure::SemanticViolation,
+                "detail": detail,
+            }),
+        )?;
+        Ok(true)
+    }
+
+    /// The words the compiler cannot read once a refused proposal replaces its
+    /// hole alone (A1 stage 3), named in the second request. The holes are in
+    /// the source order the short ids use.
+    fn unread_in_proposal(&self, index: usize, proposal: &str) -> Vec<String> {
+        let Ok(base) = self.compilation() else {
+            return vec![];
+        };
+        let PipelinePhase::AwaitingLlm { hole_ids, .. } = &self.phase else {
+            return vec![];
+        };
+        let mut holes = hole_ids
+            .iter()
+            .filter_map(|id| base.holes.iter().find(|hole| &hole.id == id))
+            .collect::<Vec<_>>();
+        holes.sort_by_key(|hole| (hole.allowed_span.start_byte, hole.allowed_span.end_byte));
+        let Some(hole) = holes.get(index) else {
+            return vec![];
+        };
+        let source = base.document.source();
+        let span = hole.allowed_span;
+        let candidate = format!(
+            "{}{}{}",
+            &source[..span.start_byte],
+            proposal,
+            &source[span.end_byte..]
+        );
+        let (Ok(seed), Ok(limits)) = (
+            self.config.compiler.composition_seed(),
+            self.config.compiler.macro_limits(),
+        ) else {
+            return vec![];
+        };
+        let Ok(document) = NormalizedDdlDocument::new(
+            candidate,
+            base.document.language(),
+            base.document.macro_locks().to_vec(),
+        ) else {
+            return vec![];
+        };
+        let compiled = compile_typed_ddl(document, &self.config.definitions, seed, limits);
+        crate::hole_completion::unread_words(
+            &compiled,
+            inku_ddl::SourceSpan {
+                start_byte: span.start_byte,
+                end_byte: span.start_byte + proposal.len(),
+            },
+        )
+    }
+
     fn hole_response(
         &mut self,
         response: &str,
@@ -1634,13 +1782,36 @@ impl PipelineSnapshot {
             base_compiler_lock_digest: lock.full_digest.clone(),
             edits: vec![],
         };
-        let parsed = if prompt.prompt_id == HOLE_COMPLETION_PROMPT_ID {
+        let current = prompt.prompt_id == HOLE_COMPLETION_PROMPT_ID
+            || prompt.prompt_id == PREVIOUS_HOLE_COMPLETION_PROMPT_ID;
+        // A second request carries the first answer's check; what passed then stays.
+        let previous = serde_json::from_str::<serde_json::Value>(&prompt.message)
+            .ok()
+            .and_then(|message| message.get("completion_feedback").cloned());
+        let passed = previous
+            .iter()
+            .flat_map(|feedback| feedback.as_array().into_iter().flatten())
+            .filter(|entry| entry["status"] == "validated")
+            .filter_map(|entry| {
+                Some((
+                    entry["id"].as_str()?.to_owned(),
+                    entry["replacement"].as_str()?.to_owned(),
+                ))
+            })
+            .collect::<BTreeMap<_, _>>();
+        let mut proposals = vec![None; holes.len()];
+        let parsed = if current {
             parse_hole_completion_response(response, holes.len(), self.config.prompt_limits).map(|response| {
                 for result in response.results {
                     let index = result.id()[1..].parse::<usize>().expect("verified local ID") - 1;
                     let hole = holes[index];
+                    let result = match passed.get(result.id()) {
+                        Some(replacement) => HoleCompletionResult::Proposed { id: result.id().to_owned(), replacement: replacement.clone() },
+                        None => result,
+                    };
                     match result {
                         HoleCompletionResult::Proposed { replacement, .. } => {
+                            proposals[index] = Some(replacement.clone());
                             patch.edits.push(HolePatchEditResponse { hole_id:hole.id.clone(), allowed_span:hole.allowed_span.into(), expected_range_digest:hole.expected_range_digest.clone(), replacement });
                             results[index] = json!({"hole_id":hole.id,"status":"validated","reason":null});
                         }
@@ -1685,7 +1856,7 @@ impl PipelineSnapshot {
             return self.failure(ProviderFailure::SchemaViolation, spent_ms, events);
         }
         patch.edits.sort_by_key(|edit| edit.allowed_span.start_byte);
-        let units = if prompt.prompt_id == HOLE_COMPLETION_PROMPT_ID {
+        let units = if current {
             crate::hole_completion::independent_units(&base, &holes)
         } else {
             vec![hole_ids.to_vec()]
@@ -1751,7 +1922,7 @@ impl PipelineSnapshot {
                 )
                 .map_err(|failure| (failure.diagnostic.kind(), failure.hole_id))
                 .and_then(|validated| {
-                    if prompt.prompt_id != HOLE_COMPLETION_PROMPT_ID || unit.len() != 1 {
+                    if !current || unit.len() != 1 {
                         return Ok(validated);
                     }
                     if let Some(hole) = holes.iter().find(|hole| {
@@ -1838,6 +2009,13 @@ impl PipelineSnapshot {
         let report = json!({"results":results,"base_source_digest":lock.visible_source_digest,"base_compiler_lock_digest":lock.full_digest});
         self.hole_completion_check = Some(report.clone());
         self.event(events, "hole_completion_checked", report)?;
+        if current
+            && previous.is_none()
+            && results.iter().any(|result| result["status"] == "rejected")
+            && self.ask_holes_again(&prompt, &results, &proposals, hole_ids, spent_ms, events)?
+        {
+            return Ok(());
+        }
         let Some(candidate) = candidate.filter(|_| !patch.edits.is_empty()) else {
             let detail = results
                 .iter()

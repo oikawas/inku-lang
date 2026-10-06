@@ -964,19 +964,16 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
     let hole = base.holes.first().expect("known quantity hole").clone();
     let unresolved_patch =
         json!({"results":[{"id":"h1","status":"proposed","replacement":"many square."}]});
-    let unresolved = run(
+    // A refused proposal is asked once more with the reason (A1, 2026-10-06);
+    // the same refusal then stops for the author's edit.
+    let asked = run(
         Some(&state),
-        &envelope(
-            Some(&state),
-            PipelineInput::EffectResult {
-                result: EffectResult::VisibleDdlHolePatchGenerated {
-                    identity: state.action.as_ref().unwrap().identity.clone(),
-                    response: serde_json::to_string(&unresolved_patch).unwrap(),
-                    elapsed_ms: DecimalU64::new(20),
-                },
-            },
-        ),
-    );
+        &hole_response(&state, unresolved_patch.clone()),
+    )
+    .snapshot;
+    assert_eq!(asked.action.as_ref().unwrap().identity.attempt, 2);
+    assert_eq!(asked.delivery.as_ref(), Some(&current_safe_delivery));
+    let unresolved = run(Some(&asked), &hole_response(&asked, unresolved_patch));
     assert!(matches!(
         unresolved.snapshot.phase,
         PipelinePhase::NeedsUserEdit { .. }
@@ -1185,19 +1182,11 @@ fn independent_hole_results_keep_valid_subset_without_retry_after_ack() {
             {"id":"h1","status":"proposed","replacement":"8"},
             {"id":"h2","status":"proposed","replacement":"many"}
         ]});
-        let checked = run(
-            Some(&state),
-            &envelope(
-                Some(&state),
-                PipelineInput::EffectResult {
-                    result: EffectResult::VisibleDdlHolePatchGenerated {
-                        identity: state.action.as_ref().unwrap().identity.clone(),
-                        response: response.to_string(),
-                        elapsed_ms: DecimalU64::new(20),
-                    },
-                },
-            ),
-        );
+        // The refused proposal is asked once more (A1, 2026-10-06); the same
+        // answer is final.
+        let asked = run(Some(&state), &hole_response(&state, response.clone())).snapshot;
+        assert_eq!(asked.action.as_ref().unwrap().identity.attempt, 2);
+        let checked = run(Some(&asked), &hole_response(&asked, response));
         assert_eq!(checked.snapshot.delivery, retained);
         let report = checked
             .events

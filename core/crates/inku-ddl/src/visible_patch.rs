@@ -460,9 +460,9 @@ fn target_resolution_failure(
     range: SourceSpan,
 ) -> Option<VisiblePatchDiagnostic> {
     if hole.kind != "unresolved_clause"
-        && let Err(diagnostic) = matched_range_words(base, hole.span, candidate, range)
+        && matched_range_words(base, hole.span, candidate, range).outside
     {
-        return Some(diagnostic);
+        return Some(VisiblePatchDiagnostic::NumericRangeOutsideWords);
     }
     if hole.kind == "unresolved_clause" {
         // A support-only proposal cannot introduce drawable owners or alter the
@@ -495,13 +495,9 @@ fn target_resolution_failure(
         }
         let required = typed_fact_counts(base, hole.span);
         let mut delivered = typed_fact_counts(candidate, range);
-        match matched_range_words(base, hole.span, candidate, range) {
-            Ok(kept) => {
-                for (fact, count) in kept {
-                    *delivered.entry(fact).or_default() += count;
-                }
-            }
-            Err(diagnostic) => return Some(diagnostic),
+        let matched = matched_range_words(base, hole.span, candidate, range);
+        for (fact, count) in &matched.facts {
+            *delivered.entry(fact.clone()).or_default() += count;
         }
         let reference_facts = reclassified_reference_facts(base, hole.span, candidate, range);
         if required.iter().any(|(fact, count)| {
@@ -509,10 +505,20 @@ fn target_resolution_failure(
                 + reference_facts.get(fact).copied().unwrap_or_default()
                 < *count
         }) {
-            return Some(VisiblePatchDiagnostic::EstablishedFactChanged);
+            // A position word lost to a range outside it is the range's fault.
+            return Some(if matched.outside {
+                VisiblePatchDiagnostic::NumericRangeOutsideWords
+            } else {
+                VisiblePatchDiagnostic::EstablishedFactChanged
+            });
         }
         let required_associations = resolved_association_counts(base, hole.span);
-        let delivered_associations = resolved_association_counts(candidate, range);
+        let mut delivered_associations = resolved_association_counts(candidate, range);
+        for (association, count) in &matched.associations {
+            *delivered_associations
+                .entry(association.clone())
+                .or_default() += count;
+        }
         if required_associations.iter().any(|(association, count)| {
             delivered_associations
                 .get(association)
@@ -521,6 +527,9 @@ fn target_resolution_failure(
                 < *count
         }) {
             return Some(VisiblePatchDiagnostic::OwnerAssociationChanged);
+        }
+        if matched.outside {
+            return Some(VisiblePatchDiagnostic::NumericRangeOutsideWords);
         }
         let owners = candidate
             .deliveries
@@ -1155,21 +1164,33 @@ const fn span_within(span: SourceSpan, range: SourceSpan) -> bool {
     range.start_byte <= span.start_byte && span.end_byte <= range.end_byte
 }
 
+/// What the words before a completion's numeric range kept (A1, 2026-10-06).
+#[derive(Default)]
+struct MatchedRangeWords {
+    /// The position words read in the words, counted as typed facts.
+    facts: BTreeMap<String, usize>,
+    /// The same words bound to the shape the range places, as associations.
+    associations: BTreeMap<String, usize>,
+    /// A position word whose range does not contain the numbers.
+    outside: bool,
+}
+
 /// Match a completion's numeric range against the author's words it keeps
-/// before the parenthesis (A1, 2026-10-06, the author's decision Q2). The words
+/// before the parenthesis (the author's decision Q2 of 2026-10-05). The words
 /// are read as they would be without the parenthesis; a position word that has
 /// a range must contain the numbers, and then counts as the established fact
-/// the words kept. Words without such a word are not matched, and a range the
-/// base clause already had, with the same words and numbers, is left alone.
+/// and binding the words kept. Words without such a word are not matched, and
+/// a range the base clause already had, with the same words and numbers, is
+/// left alone: only a completion's range is matched.
 fn matched_range_words(
     base: &TypedDdlCompilation,
     base_range: SourceSpan,
     candidate: &TypedDdlCompilation,
     range: SourceSpan,
-) -> Result<BTreeMap<String, usize>, VisiblePatchDiagnostic> {
-    let mut kept = BTreeMap::new();
+) -> MatchedRangeWords {
+    let mut matched = MatchedRangeWords::default();
     let Some(semantic) = &candidate.semantic_document else {
-        return Ok(kept);
+        return matched;
     };
     let words_of = |compilation: &TypedDdlCompilation, numeric: &crate::SemanticNumericRange| {
         numeric.annotation.and_then(|span| {
@@ -1189,12 +1210,18 @@ fn matched_range_words(
         .map(|numeric| (numeric.rational_bounds(), words_of(base, numeric)))
         .collect::<Vec<_>>();
     let language = candidate.document.language();
-    for numeric in semantic
-        .ast
-        .instructions
+    let instructions = &semantic.ast.instructions;
+    for (index, numeric) in instructions
         .iter()
-        .filter_map(|instruction| instruction.entity.numeric_range.as_ref())
-        .filter(|numeric| span_within(numeric.source().span, range))
+        .enumerate()
+        .filter_map(|(index, instruction)| {
+            instruction
+                .entity
+                .numeric_range
+                .as_ref()
+                .filter(|numeric| span_within(numeric.source().span, range))
+                .map(|numeric| (index, numeric))
+        })
     {
         let Some(words) = words_of(candidate, numeric) else {
             continue;
@@ -1220,27 +1247,35 @@ fn matched_range_words(
                 _ => None,
             })
         {
-            let Some(id) =
+            let Some(identity) =
                 crate::project_macro_semantic_ref(&term.category_key, &term.canonical_surface_ja)
             else {
                 continue;
             };
-            let ranges = crate::geometry::place_word_ranges(&id.canonical_id);
+            let ranges = crate::geometry::place_word_ranges(&identity.canonical_id);
             if ranges.is_empty() {
                 continue;
             }
             if !ranges.iter().any(|outer| range_contains(*outer, bounds)) {
-                return Err(VisiblePatchDiagnostic::NumericRangeOutsideWords);
+                matched.outside = true;
+                continue;
             }
-            *kept
+            *matched
+                .facts
                 .entry(format!(
                     "remaining:{:?}:{}:{}:{}",
                     term.role, term.asset_id, term.category_key, term.canonical_surface_ja
                 ))
                 .or_default() += 1;
+            record_association(
+                &mut matched.associations,
+                &semantic_target_value(index, instructions),
+                "position",
+                serde_json::json!({"category": identity.category, "id": identity.canonical_id}),
+            );
         }
     }
-    Ok(kept)
+    matched
 }
 
 /// Whether `inner` lies inside `outer`; both are horizontal start, vertical

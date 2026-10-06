@@ -2405,9 +2405,11 @@ mod tests {
         assert!(facts.contains(&("quantity", "30")));
         assert!(facts.contains(&("touch", "tezawari:クレヨン")));
         assert!(facts.contains(&("touch", "tezawari:コンピュータ")));
-        // Completion normalizes wording without inventing coordinates,
-        // alternation, or count splits.
-        assert!(prompt.system.contains("数値座標は追加しない"));
+        // Completion normalizes wording without inventing alternation or count
+        // splits. Since v4 (A1, 2026-10-06) it may write a place in numbers
+        // after the author's words.
+        assert!(!prompt.system.contains("数値座標は追加しない"));
+        assert!(prompt.system.contains("言葉（横a〜b、縦c〜d）に"));
         assert!(prompt.system.contains("交互配置や数量分配を新たに指定せず"));
         assert!(prompt.system.contains("unresolved/ambiguous"));
         assert!(!prompt.system.contains("各修飾語をheadまで含む完全なmember"));

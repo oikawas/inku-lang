@@ -13,6 +13,7 @@ export type RangeEditorStatus = { preview: RangePreview | null; invalid: boolean
 export type RangeEditorState = RangeEditorStatus & {
 	ranges: NumericRange[];
 	active: NumericRange | null;
+	pendingName: boolean;
 	hover: number | null;
 	focused: boolean;
 	decorations: DecorationSet;
@@ -37,6 +38,22 @@ function isComposing(tr: Transaction, previous: RangeEditorState): boolean {
 	return composing || tr.startState.facet(compositionGuard)();
 }
 
+function pendingNameAfter(previous: RangeEditorState, tr: Transaction): boolean {
+	if (!previous.active || tr.reconfigured || tr.annotation(externalDdlValue) || tr.isUserEvent('undo') || tr.isUserEvent('redo')) return false;
+	if (!tr.docChanged || tr.startState.doc.eq(tr.newDoc)) return previous.pendingName;
+	const range = previous.active;
+	let wordsEdited = false;
+	let numbersEdited = false;
+	tr.changes.iterChangedRanges((from, to) => {
+		const touches = (start: number, end: number, includeEnd = false) => from === to
+			? from >= start && (from < end || (includeEnd && from === end))
+			: from < end && to > start;
+		wordsEdited ||= touches(range.nameStart, range.nameEnd);
+		numbersEdited ||= touches(range.bodyStart, range.bodyEnd, true);
+	});
+	return wordsEdited ? false : previous.pendingName || numbersEdited;
+}
+
 function decorationsFor(ranges: NumericRange[], state: EditorState, focused: boolean): { decorations: DecorationSet; atomic: DecorationSet } {
 	const visible = [];
 	const hidden = [];
@@ -55,11 +72,12 @@ function decorationsFor(ranges: NumericRange[], state: EditorState, focused: boo
 
 function derive(state: EditorState, ranges: NumericRange[], previous: RangeEditorState | null, focused: boolean, hover: number | null): RangeEditorState {
 	const active = focused ? ranges.find((range) => contains(range, state.selection.main)) ?? null : null;
+	const pendingName = !!active && !!previous && previous.active?.start === active.start && previous.pendingName;
 	const shown = active ?? ranges.find((range) => range.start === hover) ?? null;
 	let preview: RangePreview | null = null;
 	if (shown?.bounds) preview = rangePreview(shown.bounds);
 	else if (shown && previous?.active?.start === shown.start && previous.preview) preview = { ...previous.preview, invalid: true };
-	return { ranges, active, hover, focused, preview, invalid: ranges.some((range) => range.bounds === null), composing: false,
+	return { ranges, active, pendingName, hover, focused, preview, invalid: ranges.some((range) => range.bounds === null), composing: false,
 		...decorationsFor(ranges, state, focused) };
 }
 
@@ -73,8 +91,9 @@ export const rangeEditorState = StateField.define<RangeEditorState>({
 			if (effect.is(rangeFocusChanged)) focused = effect.value;
 			if (effect.is(hoveredRange)) hover = effect.value;
 		}
+		const pendingName = pendingNameAfter(previous, tr);
 		if (isComposing(tr, previous) && !tr.annotation(externalDdlValue)) {
-			return { ...previous, focused, hover, composing: true,
+			return { ...previous, focused, hover, pendingName, composing: true,
 				ranges: previous.ranges.map((range) => mappedRange(range, tr)),
 				active: previous.active ? mappedRange(previous.active, tr) : null,
 				decorations: previous.decorations.map(tr.changes), atomic: previous.atomic.map(tr.changes) };
@@ -82,12 +101,12 @@ export const rangeEditorState = StateField.define<RangeEditorState>({
 		const reset = tr.annotation(externalDdlValue);
 		const ranges = tr.docChanged || tr.reconfigured || previous.composing || reset
 			? scanNumericRanges(tr.newDoc.toString()) : previous.ranges;
-		const mapped = reset ? null : { ...previous, active: previous.active ? mappedRange(previous.active, tr) : null };
+		const mapped = reset ? null : { ...previous, pendingName, active: previous.active ? mappedRange(previous.active, tr) : null };
 		let next = derive(tr.state, ranges, mapped, focused, reset ? null : hover);
 		// A temporarily broken axis or parenthesis remains an invalid edit until
 		// the caret leaves it. Keep its last valid frame, never invent bounds.
 		if (!next.active && mapped?.active && focused && mapped.active.end > mapped.active.start && contains(mapped.active, tr.newSelection.main)) {
-			next = { ...next, active: { ...mapped.active, bounds: null }, invalid: true,
+			next = { ...next, active: { ...mapped.active, bounds: null }, pendingName: mapped.pendingName, invalid: true,
 				preview: mapped.preview ? { ...mapped.preview, invalid: true } : null };
 		}
 		return next;
@@ -106,7 +125,7 @@ const followNameOnLeaving = EditorState.transactionFilter.of((tr) => {
 	const start = tr.changes.mapPos(previous.active.start, -1);
 	const source = tr.newDoc.toString();
 	const range = scanNumericRanges(source).find((range) => range.start === start);
-	if (!range?.bounds || (focused && contains(range, tr.newSelection.main))) return tr;
+	if (!range?.bounds || !pendingNameAfter(previous, tr) || (focused && contains(range, tr.newSelection.main))) return tr;
 	const edited = editNumericRange(source, range, range.body, [...tr.startState.facet(rangeTable)]);
 	const name = edited.source.slice(edited.range.nameStart, edited.range.nameEnd);
 	if (name === source.slice(range.nameStart, range.nameEnd)) return tr;

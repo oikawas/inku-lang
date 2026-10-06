@@ -10,6 +10,18 @@ This file records changes chronologically. If a historical note conflicts with t
 
 Android now hands the shared core what Server hands it and treats the result as Server does. Description numbering and bracketed notes are cut by the shared core's rule before drawing, and a description of labels alone is refused. The instruction language is read from the label-free description or the DDL itself, inheriting the parent's or `auto` when unstated. Word-touch seeds come from the shared core. Forks draw in today's catalog colors, and Another composition uses Server's work identity and seed. Before a known-hole completion is requested the Score is drawn and saved, so the drawing stays while a proposal waits and after a decline. A proposal is approved as shown, and a stopped run says why, including a missing API key, in the Web's words. Provider temperature, failure classes, response limits and waiting after a 429 follow Server, and saved records gain the color profile, limits, interface language and per-stage model time. Works without a description can take color and layout refinements, and the color refinement draws every other catalog in list order. PNG export stops at 2160px and carries the Web's creation time. On Server, Another composition forks from a saved work's settings and seeds, and description labels break lines at `\n` only. Saved works keep their SVG, Score and hash.
 
+## v2.15.92 (2026-10-06 / Build 1168)
+
+Web and Android show the chosen place for valid edited bounds outside the range table. Drawing, storage formats, and all engine versions remain unchanged.
+
+### 2026-10-06 — Follow range names when edited numbers leave the table
+
+In the instructions viewer and editor, valid numbers outside the range table change a table name to `the chosen place` and remain unfolded. Keep words the user wrote: in the reading view, if typing passes through table numbers and changes the name, numbers outside the table restore the words present when the range was opened. Returning to table numbers restores that name and folding. The editor schedules name following after numeric edits and applies it only when leaving the range. Editing the words cancels it; untouched saved words and words during invalid input remain unchanged.
+
+### 2026-10-06 — Follow edited range numbers on Android
+
+Valid edited bounds outside the table replace a table name with the chosen place and keep the numbers visible. Returning to table bounds restores the name and folds the numbers. Instruction views retain user-written opening words through intermediate table matches and restore them for custom bounds. The editor uses the same rule only for numerically edited ranges after the caret and Japanese composition leave. Merely opening saved ranges and invalid input leave names unchanged. Synchronized the Japanese and English Android specifications.
+
 ## v2.15.91 (2026-10-05 / Build 1167)
 
 Thumbnail saving and rebuilding recover once from a broken child process pool. Stored SVG and Score and all engine versions remain unchanged.
@@ -39,6 +51,14 @@ The work header and Lineage cards now open a dedicated composition dialog direct
 ### 2026-10-05 — Read third-party notices from Web information
 
 The information dialog now opens a third-party license reader from its License section. A grouped list and full-text pane follow the Swift layout, showing existing Web MIT notices and the Server's distribution, UniDic, CMU dictionary, and Noto font notices. SQLite, CPython, and Rust notices join the list when present in the container. Public read-only API routes serve fixed bundled notices only. Loading failures and retry, stale-response protection, keyboard operation, narrow layouts, and both languages are supported. Original notices, dependencies, drawing, storage, and authentication semantics are unchanged.
+
+### 2026-10-05 — Stop macOS tooltips from raising the main window behind another window
+
+Moving the pointer from a separate window such as About inku onto the main window behind it showed a tooltip and brought the main window to the front. Tooltips now appear only over the key window. Synchronized both languages of the [Swift specification](apple/SWIFT_SPEC.md).
+
+### 2026-10-05 — Drop the inku logo from the macOS rail and color JSON in generation information
+
+About inku now opens only from the app menu in the menu bar. The Score (JSON) tab of generation information colors keys, strings, numbers, booleans, and null with the Web rule and colors for light and dark, with the Web line-number gutter. Synchronized both languages of the [Swift specification](apple/SWIFT_SPEC.md).
 
 ### 2026-10-05 — macOS 1.0.0 (Build 1): Web alignment and distribution for the first release
 

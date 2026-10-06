@@ -4,7 +4,7 @@ export function createRangeEditState(deps: {
 	source: () => string; ranges: () => CompositionRange[]; disabled: () => boolean;
 	change: (source: string) => void; preview: (preview: RangePreview | null) => void; invalid: (invalid: boolean) => void;
 }) {
-	let active = $state<{ range: NumericRange; source: string; lastValid: RangePreview | null } | null>(null);
+	let active = $state<{ range: NumericRange; source: string; openedName: string; lastValid: RangePreview | null } | null>(null);
 	const invalidEdits = new Set<string>();
 	function sync(source = deps.source()): void {
 		for (const edited of invalidEdits) if (!source.includes(edited)) invalidEdits.delete(edited);
@@ -23,15 +23,15 @@ export function createRangeEditState(deps: {
 	function open(range: NumericRange): void {
 		show(range);
 		sync();
-		if (!deps.disabled()) active = { range, source: deps.source(), lastValid: range.bounds ? rangePreview(range.bounds) : null };
+		if (!deps.disabled()) active = { range, source: deps.source(), openedName: range.name, lastValid: range.bounds ? rangePreview(range.bounds) : null };
 	}
 	function edit(body: string): void {
 		if (!active || deps.disabled()) return;
-		const next = editNumericRange(deps.source(), active.range, body, deps.ranges());
+		const next = editNumericRange(deps.source(), active.range, body, deps.ranges(), active.openedName);
 		invalidEdits.delete(deps.source().slice(active.range.start, active.range.end));
 		if (!next.range.bounds) invalidEdits.add(next.source.slice(next.range.start, next.range.end));
 		const preview = next.range.bounds ? rangePreview(next.range.bounds) : active.lastValid;
-		active = { ...next, lastValid: preview };
+		active = { ...next, openedName: active.openedName, lastValid: preview };
 		sync(next.source);
 		deps.preview(preview ? { ...preview, invalid: !next.range.bounds } : null);
 		deps.change(next.source);

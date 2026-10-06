@@ -77,6 +77,8 @@ struct AppRailView: View {
             .accessibilityLabel(display.webCopy(expanded ? "railCollapseLabel" : "railExpandLabel",
                                                 expanded ? "サイドバーを格納する" : "サイドバーを伸ばす"))
             .inkuTooltip(display.tooltip("サイドバーを展開 / 折りたたむ", serverKey: "tooltipAppRailToggle"), placement: .right)
+            // macOS opens About inku only from the app menu; the rail logo stays on iOS.
+            #if !os(macOS)
             if showAuxiliary {
                 Button(action: onOpenAbout) {
                     HStack(spacing: 0) {
@@ -99,8 +101,11 @@ struct AppRailView: View {
                         .lineLimit(1).padding(.top, 4)
                 }
             }
+            #endif
         }
+        #if !os(macOS)
         .frame(minHeight: 78, alignment: .topLeading)
+        #endif
     }
 
     private var uiModeLabel: String {

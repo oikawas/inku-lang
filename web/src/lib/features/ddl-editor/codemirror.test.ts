@@ -67,11 +67,69 @@ test('entering opens ordinary text; name follows on leaving, with source and und
 	assert.equal(state.doc.toString(), source, 'undo does not immediately rename the restored source');
 	state = changeBody(open(state), '横0.1〜0.4、縦0.2〜0.5');
 	state = state.update({ effects: rangeFocusChanged.of(false) }).state;
-	assert.match(state.doc.toString(), /右下（横0.1/);
+	assert.match(state.doc.toString(), /指定の範囲（横0.1/);
 	assert.equal(hidden(state).length, 0, 'custom bounds remain visible after blur');
 	const en = changeBody(open(editor('A circle at the bottom right (horizontal 2/3 to 1, vertical 2/3 to 1).')), 'horizontal 0 to 1/3, vertical 0 to 1/3');
 	assert.match(en.doc.toString(), /bottom right/);
 	assert.match(en.update({ effects: rangeFocusChanged.of(false) }).newDoc.toString(), /top left/);
+});
+
+test('untouched ranges keep saved words and edited custom ranges follow names only on leaving', () => {
+	for (const lang of ['ja', 'en'] as const) {
+		const tableName = ranges[1].words[lang];
+		const chosen = lang === 'ja' ? '指定の範囲' : 'chosen place';
+		const customName = lang === 'ja' ? '月のあたり' : 'near the moon';
+		const tableBody = lang === 'ja' ? '横0〜1/3、縦0〜1/3' : 'horizontal 0 to 1/3, vertical 0 to 1/3';
+		const customBody = lang === 'ja' ? '横0〜0.5、縦0〜2/3' : 'horizontal 0 to 0.5, vertical 0 to 2/3';
+		const text = (name: string, body: string) => lang === 'ja'
+			? `［構図］${name}（${body}）に、赤い円。`
+			: `A red circle at [composition] the ${name} (${body}).`;
+		for (const body of [tableBody, customBody]) {
+			const doc = text(tableName, body);
+			const untouched = open(editor(doc)).update({ effects: rangeFocusChanged.of(false) }).state;
+			assert.equal(untouched.doc.toString(), doc, 'opening and leaving alone must not rename a saved mismatch');
+		}
+		for (const openedName of [tableName, chosen, customName]) {
+			let state = open(editor(text(openedName, customBody)));
+			state = changeBody(state, tableBody);
+			state = changeBody(state, customBody.replace('0.5', '0.4'));
+			assert.equal(scanNumericRanges(state.doc.toString())[0].name, openedName, 'typing does not rename');
+			state = state.update({ effects: rangeFocusChanged.of(false) }).state;
+			const expected = openedName === customName ? customName : chosen;
+			assert.equal(state.doc.toString(), text(expected, customBody.replace('0.5', '0.4')));
+			assert.equal(hidden(state).length, 0, 'chosen and custom ranges stay unfolded');
+			state = changeBody(open(state), tableBody);
+			state = state.update({ effects: rangeFocusChanged.of(false) }).state;
+			assert.equal(state.doc.toString(), text(ranges[0].words[lang], tableBody));
+			assert.ok(hidden(state).length > 0, 'table names fold again after leaving');
+		}
+	}
+});
+
+test('numeric name following is cancelled by word edits and scheduled again by numeric edits', () => {
+	for (const lang of ['ja', 'en'] as const) {
+		const customName = lang === 'ja' ? '月のあたり' : 'near the moon';
+		const leftBody = lang === 'ja' ? '横0〜1/3、縦0〜1/3' : 'horizontal 0 to 1/3, vertical 0 to 1/3';
+		const rightBody = lang === 'ja' ? '横2/3〜1、縦2/3〜1' : 'horizontal 2/3 to 1, vertical 2/3 to 1';
+		const text = (name: string, body: string) => lang === 'ja'
+			? `［構図］${name}（${body}）に、赤い円。`
+			: `A red circle at [composition] the ${name} (${body}).`;
+		for (const leaveWithWordEdit of [false, true]) {
+			let state = changeBody(open(editor(text(ranges[1].words[lang], rightBody))), leftBody);
+			const range = state.field(rangeEditorState).active!;
+			const start = range.nameStart + state.doc.sliceString(range.nameStart, range.nameEnd).lastIndexOf(range.name);
+			state = state.update({ changes: { from: start, to: start + range.name.length, insert: customName },
+				selection: { anchor: leaveWithWordEdit ? state.doc.length + customName.length - range.name.length : start + customName.length },
+				userEvent: 'input' }).state;
+			if (!leaveWithWordEdit) state = state.update({ effects: rangeFocusChanged.of(false) }).state;
+			assert.equal(state.doc.toString(), text(customName, leftBody), 'user words cancel the queued table name');
+			assert.equal(hidden(state).length, 0, 'custom words stay visible even when the numbers match the table');
+			state = changeBody(open(state), rightBody);
+			state = state.update({ effects: rangeFocusChanged.of(false) }).state;
+			assert.equal(state.doc.toString(), text(ranges[1].words[lang], rightBody), 'later numeric edits schedule name following again');
+			assert.ok(hidden(state).length > 0);
+		}
+	}
 });
 
 test('invalid and temporarily incomplete numbers keep the last valid frame until the edit is left', () => {

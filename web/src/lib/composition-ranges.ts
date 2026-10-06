@@ -95,12 +95,19 @@ export function matchingRange(range: NumericRange, ranges: CompositionRange[]): 
 	return range.bounds ? ranges.find((entry) => entry.words[range.lang] === range.name && sameBounds(entry.bounds, range.bounds!)) : undefined;
 }
 
-export function editNumericRange(source: string, range: NumericRange, body: string, ranges: CompositionRange[]): { source: string; range: NumericRange } {
+export function followedName(bounds: RangeBounds | null, currentName: string, openedName: string, lang: 'ja' | 'en', ranges: readonly CompositionRange[]): string {
+	if (!bounds) return currentName;
+	const match = ranges.find((entry) => sameBounds(entry.bounds, bounds));
+	if (match) return match.words[lang];
+	const chosen = lang === 'ja' ? '指定の範囲' : 'chosen place';
+	return openedName === chosen || ranges.some((entry) => entry.words[lang] === openedName) ? chosen : openedName;
+}
+
+export function editNumericRange(source: string, range: NumericRange, body: string, ranges: CompositionRange[], openedName = range.name): { source: string; range: NumericRange } {
 	const bounds = parseRangeBody(body, range.lang);
-	const match = bounds ? ranges.find((entry) => sameBounds(entry.bounds, bounds)) : undefined;
 	const rawName = source.slice(range.nameStart, range.nameEnd);
-	const name = match?.words[range.lang] ?? range.name;
-	const nextName = match ? rawName.replace(range.name, name) : rawName;
+	const name = followedName(bounds, range.name, openedName, range.lang, ranges);
+	const nextName = rawName.replace(range.name, name);
 	const nextSource = source.slice(0, range.nameStart) + nextName + source.slice(range.nameEnd, range.bodyStart) + body + source.slice(range.bodyEnd);
 	const shift = nextName.length - rawName.length;
 	return { source: nextSource, range: { ...range, name, nameEnd: range.nameEnd + shift, bodyStart: range.bodyStart + shift,

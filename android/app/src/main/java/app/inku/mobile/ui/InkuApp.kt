@@ -4132,7 +4132,7 @@ internal fun recompositionLines(info: RecompositionInfo?, strings: InkuStrings):
 }
 
 @Composable
-private fun RefinementCandidateImage(renderHash: String, svg: String, modifier: Modifier = Modifier,
+internal fun RefinementCandidateImage(renderHash: String, svg: String, modifier: Modifier = Modifier,
     rangeBounds: DdlRangeBounds? = null) {
     val source = remember(renderHash, svg) { Any() }
     val state by produceState<ArtworkDisplayState>(initialValue = ArtworkDisplayState(), source) {
@@ -7695,7 +7695,7 @@ private fun Int.floorMod360(): Int = ((this % 360) + 360) % 360
 private fun Int.swapsAxes(): Boolean = floorMod360() == 90 || floorMod360() == 270
 
 @Composable
-private fun ArtworkPreview(
+internal fun ArtworkPreview(
     item: HistoryItemEntity,
     modifier: Modifier = Modifier,
     presentationMode: Boolean = false,
@@ -7797,7 +7797,7 @@ private fun ArtworkPreview(
 private data class ArtworkDisplayState(val source: Any? = null, val request: Any? = null,
     val frame: AndroidDisplayRenderer.Frame? = null, val loading: Boolean = false, val failed: Boolean = false)
 
-private data class ArtworkPreviewStatus(val loading: Boolean = false, val wholeFailed: Boolean = false,
+internal data class ArtworkPreviewStatus(val loading: Boolean = false, val wholeFailed: Boolean = false,
     val detailFailed: Boolean = false)
 
 @Composable

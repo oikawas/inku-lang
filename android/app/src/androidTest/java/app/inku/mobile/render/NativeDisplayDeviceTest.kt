@@ -167,6 +167,75 @@ class NativeDisplayDeviceTest {
         assertEquals(handlesBefore, NativeDisplayBridge.liveHandles())
     }
 
+    /** One cold p07 window separates native drawing from host snapshot/Bitmap costs. */
+    @Test
+    fun heavyWindowStageCostsAreRecordedOnce() = runBlocking {
+        val handlesBefore = NativeDisplayBridge.liveHandles()
+        val prepareNanos = AtomicLong()
+        val tileNanos = AtomicLong()
+        val longestTile = AtomicLong()
+        val snapshotNanos = AtomicLong()
+        val finishNanos = AtomicLong()
+        val snapshots = AtomicInteger()
+        val measured = object : DisplayBridge by NativeDisplayBridge {
+            override fun prepare(svg: String): NativeDisplayScene {
+                val start = System.nanoTime()
+                return NativeDisplayBridge.prepare(svg).also { prepareNanos.addAndGet(System.nanoTime() - start) }
+            }
+            override fun renderTile(composite: Long, region: String) {
+                val start = System.nanoTime()
+                NativeDisplayBridge.renderTile(composite, region)
+                val duration = System.nanoTime() - start
+                tileNanos.addAndGet(duration)
+                longestTile.accumulateAndGet(duration, ::maxOf)
+            }
+            override fun snapshot(composite: Long): android.graphics.Bitmap {
+                val start = System.nanoTime()
+                return NativeDisplayBridge.snapshot(composite).also {
+                    snapshotNanos.addAndGet(System.nanoTime() - start)
+                    snapshots.incrementAndGet()
+                }
+            }
+            override fun finish(composite: Long): android.graphics.Bitmap {
+                val start = System.nanoTime()
+                return NativeDisplayBridge.finish(composite).also { finishNanos.addAndGet(System.nanoTime() - start) }
+            }
+        }
+        val renderer = AndroidDisplayRenderer(measured)
+        val source = svg("p07")
+        val region = DisplayRegion(8000, 8000, 2400, 2800, 1800, 1400)
+        try {
+            val start = System.nanoTime()
+            var firstMillis: Long? = null
+            val final = renderer.window(source, region, 0).onEach {
+                if (firstMillis == null) firstMillis = elapsed(start)
+            }.filter { it.complete }.last()
+            assertEquals(1800, final.bitmap.width)
+            assertEquals(1400, final.bitmap.height)
+            assertEquals(AndroidDisplayRenderer.Painter.Skia, final.painter)
+            Log.i(TAG, "p07 cold_window first_ms=$firstMillis complete_ms=${elapsed(start)} " +
+                "prepare_ms=${prepareNanos.get() / 1_000_000} tile_sum_ms=${tileNanos.get() / 1_000_000} " +
+                "longest_tile_ms=${longestTile.get() / 1_000_000} snapshots=${snapshots.get()} " +
+                "snapshot_sum_ms=${snapshotNanos.get() / 1_000_000} finish_ms=${finishNanos.get() / 1_000_000} " +
+                "native_heap=${Debug.getNativeHeapAllocatedSize()} diagnostics=${renderer.diagnostics()}")
+            // The existing pixel check passed. Time a single replay to distinguish
+            // per-tile work from the cost of the same large viewport drawn at once.
+            val scene = NativeDisplayBridge.prepare(source)
+            val single = NativeDisplayBridge.begin(scene.handle, region.json())
+            try {
+                val singleStart = System.nanoTime()
+                NativeDisplayBridge.renderTile(single, region.json())
+                val image = NativeDisplayBridge.finish(single)
+                Log.i(TAG, "p07 single_window complete_ms=${elapsed(singleStart)}")
+                image.recycle()
+            } finally {
+                NativeDisplayBridge.close(single)
+                NativeDisplayBridge.close(scene.handle)
+            }
+        } finally { renderer.purgeScenes() }
+        assertEquals(handlesBefore, NativeDisplayBridge.liveHandles())
+    }
+
     private fun svg(name: String) = assets.open("display/$name.svg").bufferedReader().use { it.readText() }
     private fun elapsed(start: Long) = (System.nanoTime() - start) / 1_000_000
 

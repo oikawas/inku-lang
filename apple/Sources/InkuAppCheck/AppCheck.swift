@@ -76,7 +76,9 @@ struct AppCheck {
             try runCanvasWheelChecks(); return
         }
         if let index = CommandLine.arguments.firstIndex(of: "--display-only"), CommandLine.arguments.indices.contains(index + 1) {
-            try runDisplayChecks(fixtureURL: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
+            let fixture = URL(fileURLWithPath: CommandLine.arguments[index + 1])
+            try runDisplayChecks(fixtureURL: fixture)
+            try await runDisplayCanvasChecks(svg: String(contentsOf: fixture, encoding: .utf8))
             return
         }
         if let index = CommandLine.arguments.firstIndex(of: "--raster-only"), CommandLine.arguments.indices.contains(index + 1) {

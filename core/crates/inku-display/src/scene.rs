@@ -70,6 +70,11 @@ impl DisplayScene {
         self.draw(geometry::fit((self.width, self.height), options)?)
     }
 
+    /// The whole work fitted to the box, as a window to draw in tiles.
+    pub fn whole(&self, options: RasterOptions) -> Result<RasterRegionOptions, DisplayError> {
+        geometry::whole((self.width, self.height), options)
+    }
+
     /// A window on a canvas `full_width` × `full_height` pixels.
     pub fn region(&self, region: RasterRegionOptions) -> Result<RasterOutput, DisplayError> {
         self.draw(geometry::region((self.width, self.height), region)?)

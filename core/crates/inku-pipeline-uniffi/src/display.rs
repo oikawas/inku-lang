@@ -90,6 +90,23 @@ impl DisplayScene {
         })
     }
 
+    /// The whole work fitted to the box, as a window to draw in tiles.
+    pub fn whole(
+        &self,
+        target_width: Option<u32>,
+        target_height: Option<u32>,
+    ) -> Result<DisplayRegion, DisplayFailure> {
+        guarded(|| {
+            self.scene
+                .whole(RasterOptions {
+                    target_width,
+                    target_height,
+                })
+                .map(DisplayRegion::from)
+                .map_err(refused)
+        })
+    }
+
     pub fn region(&self, region: DisplayRegion) -> Result<RasterFrame, DisplayFailure> {
         guarded(|| self.scene.region(region.into()).map(frame).map_err(refused))
     }

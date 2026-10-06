@@ -242,7 +242,7 @@ public struct AuxiliaryView: View {
                 }
                 if let work = observedGeneration, auxiliary.generatedWorks.contains(where: { $0.id == work.id }) {
                     Text(model.display.localized("観察する作品")).inkuFont(12, weight: .semibold)
-                    ArtworkCanvas(svg: work.svg, renderer: model.renderer, caption: work.effectiveSourceText)
+                    ArtworkCanvas(svg: work.svg, renderer: model.displayRenderer, caption: work.effectiveSourceText)
                         .frame(height: 260)
                     HStack {
                         Button(model.display.localized("観察を閉じる")) { observedGeneration = nil }

@@ -16,6 +16,15 @@ public struct RasterImage: Sendable {
         pixelFormat = frame.pixelFormat
         pixels = frame.pixels
     }
+
+    /// Pixels a host joined from display tiles, laid out as the core returns them.
+    public init(premultipliedRGBA pixels: Data, width: UInt32, height: UInt32) {
+        self.width = width
+        self.height = height
+        stride = width * 4
+        pixelFormat = "rgba8-premultiplied"
+        self.pixels = pixels
+    }
 }
 
 public enum CoreFailure: Error, Sendable {
@@ -95,6 +104,11 @@ public struct PreparedDisplay: Sendable {
 
     public func rasterize(targetWidth: UInt32? = nil, targetHeight: UInt32? = nil) throws -> RasterImage {
         try lift { try scene.rasterize(targetWidth: targetWidth, targetHeight: targetHeight) }
+    }
+    /// The whole work fitted to the box, as a window to draw in tiles.
+    public func whole(targetWidth: UInt32? = nil, targetHeight: UInt32? = nil) throws -> DisplayRegion {
+        do { return DisplayRegion(try scene.whole(targetWidth: targetWidth, targetHeight: targetHeight)) }
+        catch let failure as InkuCoreBindings.DisplayFailure { throw CoreFailure(failure) }
     }
     public func region(_ region: DisplayRegion) throws -> RasterImage {
         try lift { try scene.region(region: region.binding) }

@@ -72,6 +72,23 @@ pub fn fit(intrinsic: (f64, f64), options: RasterOptions) -> Result<Window, Disp
     })
 }
 
+/// The whole work fitted to the box, as a window covering its own canvas, so a host
+/// can draw the whole in tiles of the same size [`fit`] gives.
+pub fn whole(
+    intrinsic: (f64, f64),
+    options: RasterOptions,
+) -> Result<RasterRegionOptions, DisplayError> {
+    let fitted = fit(intrinsic, options)?;
+    Ok(RasterRegionOptions {
+        full_width: fitted.width,
+        full_height: fitted.height,
+        x: 0,
+        y: 0,
+        width: fitted.width,
+        height: fitted.height,
+    })
+}
+
 /// A window on a full canvas, as `inku_svg_raster::rasterize_region` takes it.
 pub fn region(intrinsic: (f64, f64), region: RasterRegionOptions) -> Result<Window, DisplayError> {
     if region.full_width == 0
@@ -245,6 +262,20 @@ mod tests {
             ),
             Err(DisplayError::TargetDimensionTooLarge { .. })
         ));
+        let options = RasterOptions {
+            target_width: Some(640),
+            target_height: Some(640),
+        };
+        let covering = whole((1000.0, 601.0), options).unwrap();
+        assert_eq!((covering.full_width, covering.full_height), (640, 385));
+        assert_eq!(
+            (covering.x, covering.y, covering.width, covering.height),
+            (0, 0, 640, 385)
+        );
+        assert_eq!(
+            region((1000.0, 601.0), covering).unwrap().scale,
+            fit((1000.0, 601.0), options).unwrap().scale
+        );
         let large = RasterRegionOptions {
             full_width: 8000,
             full_height: 8000,

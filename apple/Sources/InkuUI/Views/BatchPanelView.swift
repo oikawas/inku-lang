@@ -487,7 +487,7 @@ struct BatchPanelView: View {
                 Text(savedSummary(work)).inkuFont(12).foregroundStyle(.secondary)
                     .lineLimit(2).textSelection(.enabled)
                 if workspaceTab.wrappedValue == "work" {
-                    ArtworkCanvas(svg: work.svg, renderer: model.renderer, caption: work.effectiveSourceText)
+                    ArtworkCanvas(svg: work.svg, renderer: model.displayRenderer, caption: work.effectiveSourceText)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if workspaceTab.wrappedValue == "ddl" {
                     observedText(work.ddl, empty: "この作品には保存されたDDLがありません。", monospaced: true)

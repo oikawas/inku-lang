@@ -160,14 +160,28 @@ internal fun displayDdlRanges(source: String, table: CompositionRangeTable, expa
     return RangeDisplay(display, spans)
 }
 
+/** Preserve opening words when valid custom bounds follow an intermediate table match. */
+internal fun followedRangeName(
+    bounds: DdlRangeBounds?, currentName: String, openedName: String,
+    language: String, table: CompositionRangeTable,
+): String {
+    if (bounds == null) return currentName
+    table.at(bounds)?.let { return it.words(language) }
+    val chosen = if (language == "en") "chosen place" else "指定の範囲"
+    val isTableName = table.ranges.any { it.words(language).equals(openedName, ignoreCase = language == "en") }
+    return if (isTableName || chosen.equals(openedName, ignoreCase = language == "en")) chosen else openedName
+}
+
 /** One in-place editor. Outside this span the source bytes are retained verbatim. */
 internal data class DdlRangeEdit(
     val before: String, val after: String, val range: DdlNamedRange,
     val numbers: String, val source: String, val lastValidBounds: DdlRangeBounds?, val valid: Boolean,
+    val openedName: String = range.name,
 ) {
     fun update(value: String, table: CompositionRangeTable): DdlRangeEdit {
+        if (value == numbers) return this
         val bounds = rangeNumbersBounds(value, range.language)
-        val name = bounds?.let { table.at(it)?.words(range.language) } ?: range.name
+        val name = followedRangeName(bounds, range.name, openedName, range.language, table)
         val updated = before + range.article + name + (if (range.language == "en") " " else "") + value + after
         return copy(range = range.copy(name = name), numbers = value, source = updated,
             lastValidBounds = bounds ?: lastValidBounds, valid = bounds != null)

@@ -91,8 +91,8 @@ class DdlRangeEditorTest {
         val entering = unmodified.update(DdlEditorSnapshot(edited, TextRange(edited.indexOf("horizontal") + 12)))
         assertTrue(entering.names.isEmpty())
         val exiting = unmodified.update(DdlEditorSnapshot(edited, TextRange(edited.length)))
-        assertEquals(expected, exiting.snapshot.source)
-        assertEquals(1, exiting.names.size)
+        assertEquals(edited, exiting.snapshot.source)
+        assertTrue(exiting.names.isEmpty())
     }
 
     @Test
@@ -115,9 +115,30 @@ class DdlRangeEditorTest {
         assertFalse(editing.status.invalid)
         assertNotNull(editing.status.bounds)
         val leaving = session.update(DdlEditorSnapshot(custom, TextRange(custom.length)))
-        assertTrue(leaving.names.isEmpty())
-        assertEquals(custom, leaving.snapshot.source)
+        assertEquals(1, leaving.names.size)
+        assertEquals("指定の範囲（横0.2〜0.5、縦0〜0.3）に、円。", leaving.snapshot.source)
+        assertEquals(TextRange(leaving.snapshot.source.length), leaving.snapshot.selection)
         assertTrue(ddlEditorProjection(leaving.snapshot, table).deletions.isEmpty())
+    }
+
+    @Test
+    fun uneditedCustomRangesAndUserWrittenWordsArePreservedOnLeaving() {
+        val source = "右下（横0.9〜1、縦0.1〜0.2）に、円。"
+        val session = DdlRangeEditorSession(table)
+        session.update(DdlEditorSnapshot(source, TextRange(source.indexOf("横") + 1)))
+        val unedited = session.update(DdlEditorSnapshot(source, TextRange(source.length)))
+        assertTrue(unedited.names.isEmpty())
+        assertEquals(source, unedited.snapshot.source)
+
+        session.reset()
+        session.update(DdlEditorSnapshot(source, TextRange(source.indexOf("横") + 1)))
+        val numbers = source.replace("横0.9〜1", "横0.2〜0.5")
+        session.update(DdlEditorSnapshot(numbers, TextRange(numbers.indexOf("横") + 1)))
+        val words = numbers.replace("右下", "月のあたり")
+        session.update(DdlEditorSnapshot(words, TextRange(words.indexOf("横") + 1)))
+        val leaving = session.update(DdlEditorSnapshot(words, TextRange(words.length)))
+        assertTrue(leaving.names.isEmpty())
+        assertEquals(words, leaving.snapshot.source)
     }
 
     @Test

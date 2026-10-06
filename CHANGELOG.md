@@ -10,6 +10,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 In the instructions viewer and editor, valid numbers outside the range table change a table name to `the chosen place` and remain unfolded. Keep words the user wrote: in the reading view, if typing passes through table numbers and changes the name, numbers outside the table restore the words present when the range was opened. Returning to table numbers restores that name and folding. The editor schedules name following after numeric edits and applies it only when leaving the range. Editing the words cancels it; untouched saved words and words during invalid input remain unchanged.
 
+### 2026-10-06 — Follow edited range numbers on Android
+
+Valid edited bounds outside the table replace a table name with the chosen place and keep the numbers visible. Returning to table bounds restores the name and folds the numbers. Instruction views retain user-written opening words through intermediate table matches and restore them for custom bounds. The editor uses the same rule only for numerically edited ranges after the caret and Japanese composition leave. Merely opening saved ranges and invalid input leave names unchanged. Synchronized the Japanese and English Android specifications.
+
 ## v2.15.91 (2026-10-05 / Build 1167)
 
 Thumbnail saving and rebuilding recover once from a broken child process pool. Stored SVG and Score and all engine versions remain unchanged.

@@ -459,6 +459,11 @@ fn target_resolution_failure(
     candidate: &TypedDdlCompilation,
     range: SourceSpan,
 ) -> Option<VisiblePatchDiagnostic> {
+    if hole.kind != "unresolved_clause"
+        && let Err(diagnostic) = matched_range_words(base, hole.span, candidate, range)
+    {
+        return Some(diagnostic);
+    }
     if hole.kind == "unresolved_clause" {
         // A support-only proposal cannot introduce drawable owners or alter the
         // source-ordered reference namespace. This also permits independent
@@ -489,7 +494,15 @@ fn target_resolution_failure(
             }
         }
         let required = typed_fact_counts(base, hole.span);
-        let delivered = typed_fact_counts(candidate, range);
+        let mut delivered = typed_fact_counts(candidate, range);
+        match matched_range_words(base, hole.span, candidate, range) {
+            Ok(kept) => {
+                for (fact, count) in kept {
+                    *delivered.entry(fact).or_default() += count;
+                }
+            }
+            Err(diagnostic) => return Some(diagnostic),
+        }
         let reference_facts = reclassified_reference_facts(base, hole.span, candidate, range);
         if required.iter().any(|(fact, count)| {
             delivered.get(fact).copied().unwrap_or_default()
@@ -1140,6 +1153,107 @@ fn record_association(
 
 const fn span_within(span: SourceSpan, range: SourceSpan) -> bool {
     range.start_byte <= span.start_byte && span.end_byte <= range.end_byte
+}
+
+/// Match a completion's numeric range against the author's words it keeps
+/// before the parenthesis (A1, 2026-10-06, the author's decision Q2). The words
+/// are read as they would be without the parenthesis; a position word that has
+/// a range must contain the numbers, and then counts as the established fact
+/// the words kept. Words without such a word are not matched, and a range the
+/// base clause already had, with the same words and numbers, is left alone.
+fn matched_range_words(
+    base: &TypedDdlCompilation,
+    base_range: SourceSpan,
+    candidate: &TypedDdlCompilation,
+    range: SourceSpan,
+) -> Result<BTreeMap<String, usize>, VisiblePatchDiagnostic> {
+    let mut kept = BTreeMap::new();
+    let Some(semantic) = &candidate.semantic_document else {
+        return Ok(kept);
+    };
+    let words_of = |compilation: &TypedDdlCompilation, numeric: &crate::SemanticNumericRange| {
+        numeric.annotation.and_then(|span| {
+            compilation
+                .document
+                .source()
+                .get(span.start_byte..span.end_byte)
+                .map(str::to_owned)
+        })
+    };
+    let existing = base
+        .semantic_document
+        .iter()
+        .flat_map(|semantic| &semantic.ast.instructions)
+        .filter_map(|instruction| instruction.entity.numeric_range.as_ref())
+        .filter(|numeric| span_within(numeric.source().span, base_range))
+        .map(|numeric| (numeric.rational_bounds(), words_of(base, numeric)))
+        .collect::<Vec<_>>();
+    let language = candidate.document.language();
+    for numeric in semantic
+        .ast
+        .instructions
+        .iter()
+        .filter_map(|instruction| instruction.entity.numeric_range.as_ref())
+        .filter(|numeric| span_within(numeric.source().span, range))
+    {
+        let Some(words) = words_of(candidate, numeric) else {
+            continue;
+        };
+        let bounds = numeric.rational_bounds();
+        if existing.contains(&(bounds, Some(words.clone()))) {
+            continue;
+        }
+        let Ok(document) = NormalizedDdlDocument::new(words, language, Vec::new()) else {
+            continue;
+        };
+        let Ok(stream) = crate::parse_clause_stream(&document) else {
+            continue;
+        };
+        for term in stream
+            .clauses
+            .iter()
+            .flat_map(|clause| &clause.atoms)
+            .filter_map(|atom| match atom {
+                ClauseAtom::RemainingRole(term) if term.role == RemainingRoleKind::Place => {
+                    Some(term)
+                }
+                _ => None,
+            })
+        {
+            let Some(id) =
+                crate::project_macro_semantic_ref(&term.category_key, &term.canonical_surface_ja)
+            else {
+                continue;
+            };
+            let ranges = crate::geometry::place_word_ranges(&id.canonical_id);
+            if ranges.is_empty() {
+                continue;
+            }
+            if !ranges.iter().any(|outer| range_contains(*outer, bounds)) {
+                return Err(VisiblePatchDiagnostic::NumericRangeOutsideWords);
+            }
+            *kept
+                .entry(format!(
+                    "remaining:{:?}:{}:{}:{}",
+                    term.role, term.asset_id, term.category_key, term.canonical_surface_ja
+                ))
+                .or_default() += 1;
+        }
+    }
+    Ok(kept)
+}
+
+/// Whether `inner` lies inside `outer`; both are horizontal start, vertical
+/// start, horizontal end, vertical end, compared exactly.
+fn range_contains(outer: [(u8, u8); 4], inner: [(u64, u64); 4]) -> bool {
+    let below = |(an, ad): (u64, u64), (bn, bd): (u64, u64)| {
+        u128::from(an) * u128::from(bd) <= u128::from(bn) * u128::from(ad)
+    };
+    let outer = outer.map(|(n, d)| (u64::from(n), u64::from(d)));
+    below(outer[0], inner[0])
+        && below(outer[1], inner[1])
+        && below(inner[2], outer[2])
+        && below(inner[3], outer[3])
 }
 
 fn typed_fact_counts(

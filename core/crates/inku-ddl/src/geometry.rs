@@ -143,6 +143,21 @@ pub(crate) fn numeric_range_bounds(range: &SemanticNumericRange) -> [f64; 4] {
     rational_bounds_as_f64(range.rational_bounds())
 }
 
+/// The ranges a position word may denote: one for a named position, the four
+/// corners for the corner, and none for a place on a path (start, end, partway).
+/// A completion's numeric range must lie inside one of them (A1, 2026-10-06).
+pub fn place_word_ranges(id: &str) -> Vec<[(u8, u8); 4]> {
+    if id == "corner" {
+        CORNER_REGIONS.to_vec()
+    } else {
+        NAMED_REGIONS
+            .iter()
+            .filter(|(name, _)| *name == id)
+            .map(|(_, bounds)| *bounds)
+            .collect()
+    }
+}
+
 pub(crate) fn named_region_rational_bounds(
     id: &str,
     context: crate::score_angle::ScoreAngleContext<'_>,

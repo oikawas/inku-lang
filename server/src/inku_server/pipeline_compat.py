@@ -389,6 +389,8 @@ def _progress(owner: str, view: dict, started: float, sent: set[str]) -> Iterato
         if running is not None:
             sent.add(running)
         shown = None if attempt is None else {key: attempt[key] for key in ("action", "attempt", "max_attempts")}
+        if shown is not None and attempt.get("asked_again") is True:
+            shown["asked_again"] = True
         yield {"event": "attempt", "provider_attempt": shown, "elapsed_ms": elapsed}
 
 

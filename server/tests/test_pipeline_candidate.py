@@ -94,14 +94,17 @@ def test_core_compiler_failure_detail_is_allowlisted():
 def test_hole_completion_event_projects_only_safe_per_hole_diagnostics():
     first_hole = "hole:" + "a" * 64
     second_hole = "hole:" + "b" * 64
+    third_hole = "hole:" + "c" * 64
+    author_source = "右下に、青い円。\r\n線。"
     result = {
         "events": [
             {
                 "tag": "hole_completion_checked",
                 "payload": {
                     "results": [
-                        {"hole_id": first_hole, "status": "rejected", "reason": "owner_changed"},
-                        {"hole_id": second_hole, "status": "unresolved", "reason": "ambiguous"},
+                        {"hole_id": first_hole, "status": "rejected", "reason": "owner_changed", "source": author_source, "proposal": "model text must not be retained"},
+                        {"hole_id": second_hole, "status": "unresolved", "reason": "ambiguous", "source": "空" * 8193},
+                        {"hole_id": third_hole, "status": "unresolved", "reason": "unsupported", "source": {"model": "not author text"}},
                         {"hole_id": "hole:not-hex", "status": "rejected", "reason": "owner_changed"},
                     ],
                     "raw_response": "must not be retained",
@@ -113,8 +116,9 @@ def test_hole_completion_event_projects_only_safe_per_hole_diagnostics():
 
     expected = {
         "results": [
-            {"hole_id": first_hole, "status": "rejected", "reason": "owner_changed"},
-            {"hole_id": second_hole, "status": "unresolved", "reason": "ambiguous"},
+            {"hole_id": first_hole, "status": "rejected", "reason": "owner_changed", "source": author_source},
+            {"hole_id": second_hole, "status": "unresolved", "reason": "ambiguous", "source": "空" * 8192},
+            {"hole_id": third_hole, "status": "unresolved", "reason": "unsupported"},
         ]
     }
     assert _hole_completion_checks(result) == [expected]

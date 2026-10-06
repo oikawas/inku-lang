@@ -51,12 +51,12 @@ export type PaintScoreEvent = {
 /** The attempt that began, or null once the last one has ended. */
 export type PaintAttemptEvent = {
 	event: 'attempt';
-	provider_attempt: Pick<PipelineProviderAttempt, 'action' | 'attempt' | 'max_attempts'> | null;
+	provider_attempt: Pick<PipelineProviderAttempt, 'action' | 'attempt' | 'max_attempts' | 'asked_again'> | null;
 	elapsed_ms: number;
 };
 
 /** What the running indicator counts: this attempt of at most so many. */
-export type ProviderAttemptCount = Pick<PipelineProviderAttempt, 'attempt' | 'max_attempts'>;
+export type ProviderAttemptCount = Pick<PipelineProviderAttempt, 'attempt' | 'max_attempts' | 'asked_again'>;
 
 export type PaintStreamHandlers = {
 	/** Stage 0.5 settled. Absent from a run where the layer did not contribute. */
@@ -163,14 +163,15 @@ export function paintStageLabel(
 
 /**
  * What the indicator says about the model call it waits on. A first attempt
- * is a wait; any later one is a retry, so an attempt that timed out does not
- * read as a slow answer.
+ * is a wait; later ones retry communication or ask again after a refused
+ * completion proposal.
  */
 export function providerAttemptText(
 	attempt: ProviderAttemptCount | null | undefined,
 	strings: LangPack
 ): string {
 	if (!attempt) return '';
+	if (attempt.asked_again === true) return strings.runStatusAskingAgain(attempt.attempt, attempt.max_attempts);
 	return attempt.attempt > 1
 		? strings.runStatusRetrying(attempt.attempt, attempt.max_attempts)
 		: strings.runStatusAwaitingReply(attempt.attempt, attempt.max_attempts);

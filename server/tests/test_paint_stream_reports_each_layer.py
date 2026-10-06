@@ -124,6 +124,21 @@ def test_a_retry_is_reported_as_its_own_attempt(monkeypatch) -> None:
     ]
 
 
+def test_a_completion_asked_again_is_kept_in_the_stream_attempt(monkeypatch) -> None:
+    first = {**_running(1), "provider_attempt": {**_running(1)["provider_attempt"], "action": "complete_visible_ddl_holes", "asked_again": False}}
+    second = {**_running(2), "provider_attempt": {**_running(2)["provider_attempt"], "action": "complete_visible_ddl_holes", "asked_again": True}}
+    service = _Service([
+        first, second,
+        _view(busy=False, document=DDL, score={"instructions": [{}]}, phase="score_ready"),
+    ])
+    events = _events(_client(monkeypatch, service).post("/api/paint/stream", json={"description": "円"}))
+    assert [event["provider_attempt"] for event in events if event["event"] == "attempt"] == [
+        {"action": "complete_visible_ddl_holes", "attempt": 1, "max_attempts": 4},
+        {"action": "complete_visible_ddl_holes", "attempt": 2, "max_attempts": 4, "asked_again": True},
+        None,
+    ]
+
+
 def test_a_reader_that_leaves_cancels_the_run(monkeypatch) -> None:
     # A stopped batch or a closed page left the run holding a pipeline worker
     # and calling the model through every retry.

@@ -286,20 +286,6 @@ class AtRegion(BaseModel):
         description="[x0,y0,x1,y1] の正規化領域。Renderer が render_seed で実座標へ解決する",
     )
 
-    @field_validator("region", mode="before")
-    @classmethod
-    def _normalize_region(cls, v: object) -> object:
-        if not isinstance(v, (list, tuple)) or len(v) != 4:
-            return v
-        vals = [float(item) for item in v]
-        x0, y0, x1, y1 = vals
-        return (
-            max(0.0, min(1.0, min(x0, x1))),
-            max(0.0, min(1.0, min(y0, y1))),
-            max(0.0, min(1.0, max(x0, x1))),
-            max(0.0, min(1.0, max(y0, y1))),
-        )
-
 
 class AnchorPoint(BaseModel):
     """A non-drawing explicit point that Relations may target."""

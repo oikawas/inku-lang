@@ -1,5 +1,32 @@
+import pytest
+
 from inku_server.limits import DEFAULT_LIMITS
 from inku_server.saved_score_compat import coerce_saved_score
+from inku_server.schema import Score
+
+
+@pytest.mark.parametrize("version", [None, "0.1.0"])
+def test_saved_score_keeps_region_bounds_without_host_clamping(version) -> None:
+    region = [0.0, 0.7, 1.0, 1.0001]
+    payload = {
+        "instructions": [
+            {
+                "primitive": "circle",
+                "center": [0.5, 0.8],
+                "radius": 0.08,
+                "at": {"region": region},
+            }
+        ]
+    }
+    if version is not None:
+        payload["version"] = version
+
+    validated = Score.model_validate(payload)
+    compatible = coerce_saved_score(payload, limits=DEFAULT_LIMITS)
+
+    assert validated.instructions[0].at.region == tuple(region)
+    assert compatible.instructions[0].at.region == tuple(region)
+    assert payload["instructions"][0]["at"]["region"] == region
 
 
 def test_versionless_saved_score_keeps_explicit_geometry_and_count() -> None:

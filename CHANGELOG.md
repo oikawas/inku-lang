@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-06 — Retire saved Score region clamping
+
+By the author's decision, Server no longer clamps Score `at.region` to 0–1 or reorders its bounds when reading it. Versionless and old saved values reach the shared Renderer unchanged; Android does not gain a correction to match the old Server's appearance. Exact visual compatibility with old works is no longer a replay requirement. Necessary compatibility to keep them drawable and resource limits remain. Stored Score, SVG and the database are unchanged.
+
 ## v2.15.92 (2026-10-06 / Build 1168)
 
 Web and Android show the chosen place for valid edited bounds outside the range table. Drawing, storage formats, and all engine versions remain unchanged.

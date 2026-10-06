@@ -63,7 +63,7 @@ Server／Webとの差の監査で見つけた差を、次の規則に揃えた�
   - fork contextの形: `inku.pipeline-history-fork-context.v2`の名前のまま、`authority`と`color_maps`を足した10鍵を端末内でだけ読む。hostをまたぐ経路は無く、名前を変えると全行の書き換えになる。
   - MLXの接続: 端末のloopbackは端末自身で、LANのhttpは断るので、MacのMLXに届かない（ローカルOllamaと同じ理由）。
   - 開発者向けのprovider入出力の記録と再試行の無効化: Androidには開発者モードが無い。
-  - 版0.1.0のScoreの再演: Serverは型検証とcoerceを通してから描き、Androidは共有coreの`render_saved`で描く。2026-10-06のバックアップにある28件をLinuxで比べ、27件はSVGが一致した。1件はServerの型検証が座標`1.0001`を`1.0`へ丸めるために違い、coerceの4段はどれも発火しなかった。
+  - 版0.1.0のScoreの再演: Serverは型検証とcoerceを通してから描き、Androidは共有coreの`render_saved`で描く。2026-10-06のバックアップにある28件をLinuxで比べ、27件はSVGが一致した。1件は、Serverが読むときに範囲の座標を0〜1へ収めていた（`1.0001`を`1.0`へ）ために違い、coerceの4段はどれも発火しなかった。2026-10-06の作者の裁定でServerもこの範囲の丸めを撤廃し、保存された範囲の値をそのまま使う。Androidにも丸めを足さない。完全な見た目の互換は保つ条件にせず、描けなくなるのを防ぐ最小限の互換処理と資源の上限は保つ。
 
 ## 2026-10-05 数で書いた範囲の表示と編集
 

@@ -79,7 +79,7 @@ The differences found by the Server/Web parity audit now follow the rules below.
   - The fork context shape: `inku.pipeline-history-fork-context.v2` keeps ten keys, adding `authority` and `color_maps`, and is read only on the device. No path carries it between hosts, and renaming it would rewrite every row.
   - MLX connections: the device's loopback is the device itself and LAN http is refused, so a Mac's MLX is unreachable (the same reason as local Ollama).
   - Developer provider I/O capture and retry disabling: Android has no developer mode.
-  - Replaying version 0.1.0 Scores: Server validates and coerces before drawing, while Android draws through the shared core's `render_saved`. The 28 such works in the 2026-10-06 backup were compared on Linux: 27 drew the same SVG, and one differs because Server's validation rounds a coordinate of `1.0001` to `1.0`; none of the four coerce stages fired.
+  - Replaying version 0.1.0 Scores: Server validates and coerces before drawing, while Android draws through the shared core's `render_saved`. The 28 such works in the 2026-10-06 backup were compared on Linux: 27 drew the same SVG, and one differed because Server clamped range coordinates into 0–1 when reading them (`1.0001` to `1.0`); none of the four coerce stages fired. By the author's ruling of 2026-10-06 Server no longer clamps ranges and uses the saved range values as they are, and Android adds no clamp either. Full visual compatibility is not a condition; the minimum compatibility that keeps a Score drawable and the resource limits remain.
 
 ## 2026-10-05 Displaying and editing numeric ranges
 

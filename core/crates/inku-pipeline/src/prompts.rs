@@ -2443,7 +2443,7 @@ mod tests {
     /// author's words, inside the range of a position word those words keep.
     #[test]
     fn hole_completion_v4_writes_places_in_numbers_after_the_words() {
-        for (language, source, syntax, range, around, removed, axes, unread_word) in [
+        for (language, source, syntax, range, around, removed, axes, unread_word, keep) in [
             (
                 ResolvedInstructionLanguage::Ja,
                 "右下に橙色の小さな円を十個ランダムに散らす。",
@@ -2453,6 +2453,7 @@ mod tests {
                 "数値座標は追加しない",
                 "横と縦の両方",
                 "右",
+                "一字も変えずに",
             ),
             (
                 ResolvedInstructionLanguage::En,
@@ -2463,6 +2464,7 @@ mod tests {
                 "do not add numeric coordinates",
                 "both horizontal and vertical",
                 "right",
+                "exactly as written",
             ),
         ] {
             let compilation = inku_ddl::compile_typed_ddl(
@@ -2484,7 +2486,7 @@ mod tests {
                 prompt.prompt_id,
                 "inku.visible-ddl-hole-completion-prompt.v4"
             );
-            for expected in [syntax, range, around, axes] {
+            for expected in [syntax, range, around, axes, keep] {
                 assert!(prompt.system.contains(expected), "{source}: {expected}");
             }
             assert!(!prompt.system.contains(removed), "{source}");

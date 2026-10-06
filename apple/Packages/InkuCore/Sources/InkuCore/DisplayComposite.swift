@@ -28,9 +28,12 @@ public struct DisplayComposite: @unchecked Sendable {
         let pixels: InkuCoreBindings.DisplayImage
         do { pixels = try body() }
         catch let failure as InkuCoreBindings.DisplayFailure { throw CoreFailure(failure) }
-        guard let image = DisplayPixels.makeCGImage(pixels) else { throw CoreFailure.internalInvariant }
+        guard let image = DisplayPixels.makeCGImage(pixels) else { throw ImageUnavailable() }
         return image
     }
+
+    /// CoreGraphics could not make the image: a host failure, not one of the core's.
+    private struct ImageUnavailable: Error {}
 }
 
 /// The bridge from the core's immutable pixel allocation to a `CGImage` without copying it. The

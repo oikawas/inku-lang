@@ -2,6 +2,10 @@
 
 #[cfg(any(target_os = "android", test))]
 mod bitmap;
+#[cfg(all(feature = "display", target_os = "android"))]
+mod display;
+#[cfg(any(all(feature = "display", target_os = "android"), test))]
+mod handles;
 mod pipeline;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};

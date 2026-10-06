@@ -15,9 +15,9 @@ use inku_display::{RasterOptions, RasterOutput, RasterRegionOptions, prepare_sce
 use skia_safe::svg::Dom;
 use skia_safe::{AlphaType, ColorType, Data, FontMgr, Image, ImageInfo};
 
-const BLOCK: usize = 16;
-const WORST_BLOCK: f64 = 16.0;
-const DIFFERING_PIXELS: f64 = 0.005;
+#[path = "common/difference.rs"]
+mod comparison;
+use comparison::{difference, over_white};
 
 fn data(path: &str) -> Vec<u8> {
     std::fs::read(format!("{}/tests/data/{path}", env!("CARGO_MANIFEST_DIR"))).expect(path)
@@ -49,53 +49,6 @@ fn chrome(path: &str) -> (usize, usize, Vec<[f64; 3]>) {
         })
         .collect();
     (width, height, pixels)
-}
-
-/// RGB over white, from premultiplied RGBA8.
-fn over_white(output: &RasterOutput) -> Vec<[f64; 3]> {
-    output
-        .pixels
-        .chunks(4)
-        .map(|p| [0, 1, 2].map(|i| f64::from(p[i]) + 255.0 - f64::from(p[3])))
-        .collect()
-}
-
-#[derive(Debug)]
-struct Difference {
-    worst_block: f64,
-    differing: f64,
-}
-
-impl Difference {
-    fn passes(&self) -> bool {
-        self.worst_block <= WORST_BLOCK && self.differing <= DIFFERING_PIXELS
-    }
-}
-
-fn difference(width: usize, height: usize, a: &[[f64; 3]], b: &[[f64; 3]]) -> Difference {
-    assert_eq!((a.len(), b.len()), (width * height, width * height));
-    let columns = width.div_ceil(BLOCK);
-    let mut blocks = vec![(0.0, 0usize); columns * height.div_ceil(BLOCK)];
-    let mut differing = 0;
-    for y in 0..height {
-        for x in 0..width {
-            let i = y * width + x;
-            let channels = [0, 1, 2].map(|c| (a[i][c] - b[i][c]).abs());
-            if channels.iter().copied().fold(0.0, f64::max) > 32.5 {
-                differing += 1;
-            }
-            let block = &mut blocks[(y / BLOCK) * columns + x / BLOCK];
-            block.0 += channels.iter().sum::<f64>() / 3.0;
-            block.1 += 1;
-        }
-    }
-    Difference {
-        worst_block: blocks
-            .iter()
-            .map(|(sum, n)| sum / *n as f64)
-            .fold(0.0, f64::max),
-        differing: differing as f64 / (width * height) as f64,
-    }
 }
 
 fn whole(svg: &str, width: usize, height: usize) -> RasterOutput {

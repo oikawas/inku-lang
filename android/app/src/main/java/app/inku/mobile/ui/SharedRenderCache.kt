@@ -3,6 +3,7 @@ package app.inku.mobile.ui
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -18,6 +19,7 @@ internal class SharedRenderCache<K : Any, V : Any>(
     private val maxWeight: Long,
     private val weightOf: (V) -> Long,
     maxConcurrentRenders: Int,
+    dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private class Flight<V>(val result: CompletableDeferred<V?> = CompletableDeferred()) {
         var waiters = 1
@@ -27,7 +29,7 @@ internal class SharedRenderCache<K : Any, V : Any>(
     private val lock = Any()
     private val cache = LinkedHashMap<K, V>(16, 0.75f, true)
     private val flights = mutableMapOf<K, Flight<V>>()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val permits = Semaphore(maxConcurrentRenders)
     private var weight = 0L
 
@@ -39,6 +41,10 @@ internal class SharedRenderCache<K : Any, V : Any>(
     fun peek(key: K): V? = synchronized(lock) { cache[key] }
 
     suspend fun get(key: K, render: () -> V?): V? {
+        return getSuspending(key) { render() }
+    }
+
+    suspend fun getSuspending(key: K, render: suspend () -> V?): V? {
         currentCoroutineContext().ensureActive()
         val flight = synchronized(lock) {
             cache[key]?.let { return it }

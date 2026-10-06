@@ -245,6 +245,9 @@ interface InkuStrings {
     val batchDrawButton: String
     val starredOnly: String
     val fullScreen: String
+    val artworkDisplaying: String
+    val artworkDisplayFailed: String
+    val artworkDetailFailed: String
     val exportButton: String
     val settingsMisc: String
     val replaceSuffix: String

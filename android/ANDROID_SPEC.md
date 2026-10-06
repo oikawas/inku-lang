@@ -21,11 +21,10 @@ builds do not generate comparison images or SVG on macOS. Frozen corpora supply 
 bump needs no new expectations.
 
 **The shared-Rust cutover is complete**: production Score-to-SVG/metadata calls
-`core/crates/inku-render/` through one JNI request owned by `AndroidRenderHost`. Preview,
-thumbnail, and PNG presentation rasterize saved/current SVG through the separate host-neutral
-`core/crates/inku-svg-raster/` crate. Kotlin Engine 35 and AndroidSVG have been retired from
-production, with no runtime fallback. Saved SVG, Room and Score schemas, DDL engine, and `rh3`
-semantics are unchanged.
+`core/crates/inku-render/` through one JNI request owned by `AndroidRenderHost`. Large work
+views use shared Skia in `inku-display`; thumbnails and PNG output use resvg in `inku-svg-raster`.
+Android transfers premultiplied RGBA directly into an NDK Bitmap. Kotlin Engine 35 and AndroidSVG
+have been retired from production. Saved SVG, Room and Score schemas, DDL engine, and `rh3` semantics are unchanged.
 
 **Matching layer versions is not the same as a finished port.** The version number asserts that
 drawing is identical; it says nothing about the UI, storage, or vocabulary. **The gaps that remain
@@ -45,6 +44,39 @@ When updating Android specifications:
    adaptation of the Japanese source.
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
+
+## 2026-10-06 Work display with shared Skia
+
+The creation work area, full-screen view, Instruction editor, and refinement/model-comparison
+candidates call shared `inku-display` through `NativeDisplayBridge`. Compatibility rewrites run
+only in memory immediately before display. The ordinary whole is capped at a 2048px long side,
+candidates at 512px. A coarse 256px whole appears first, followed by shared 512px tiles.
+In full screen, zoom, pan and rotation request the visible window from the original SVG at screen
+density. The host transforms and intersects coordinates; shared core limits density, rounds outward,
+and joins the tile pixels.
+
+Display uses two dedicated threads. Cancellation is checked between tiles, and results belonging
+to an old work or request are not adopted. Copied window snapshots appear about every 150ms.
+A mark appears during display; failures show a short message in the work area. A failed detail
+update retains the whole. Existing full-screen gestures and range frames remain the host UI.
+Completed Bitmaps share a 64MiB cache with two simultaneous requests; the scene cache holds at
+most one estimated 16MiB scene. Eviction releases its cache reference without closing an active
+request's reference. Windows are limited to an 8192px side and about 4Mi pixels, below the common
+pixel limit; the virtual whole is limited to a 120,000px side. Density-limited requests are counted.
+
+Only shared `Unsupported` failures return to resvg once, with diagnostic reason counts. `Refused`,
+caught panics and JNI/Bitmap failures show an error. This host policy differs from macOS's existing
+broader fallback. Both paths accept at most 12MiB of SVG. Saved history/lineage thumbnails, small
+saijiki previews, PNG output, model images and headless rasterization use existing resvg.
+`AndroidDisplayRenderer.drawsWithSkia` selects display rollback.
+
+The shared SHA inventory and `scripts/skia-binaries.sh` verify Android's pinned binary on every
+build. That binary includes Ganesh/Vulkan, while display uses CPU only; `no-compile` refuses a
+source-build fallback. Native notices use `core/crates/inku-display/licenses/` and
+`scripts/skia_notices.py`, including Android's FreeType, VMA and static C++ runtime.
+`NativeDisplayDeviceTest` compares four public SVGs with fixed Chrome references and checks
+windows. Its comparison library and assets enter only the instrumentation APK. The criteria in
+Rust's `tests/common/difference.rs` are shared with the existing Skia checks.
 
 ## 2026-10-06 Closing the differences from Server and Web
 
@@ -378,11 +410,11 @@ Implemented:
   and stores the four channels' gradients contiguously. Random values, per-channel operation
   order, rounding, and output resolution are preserved. The patch and upgrade procedure are
   documented in `core/vendor/resvg/INKU_PATCHES.md`.
-- Main preview, history thumbnails, refinement preview, and PNG export use
-  `RustArtworkRasterizer`. Its cache key includes SVG identity, target size, raster API, and
-  options so ordinary recomposition does not rerasterize an unchanged work.
-- Rust render and raster work runs on background coroutine dispatchers. There is no runtime
-  renderer or rasterizer fallback.
+- Main and refinement previews use `AndroidDisplayRenderer` (shared Skia); history thumbnails
+  and PNG export use `RustArtworkRasterizer`. Display cache keys include the SVG content hash,
+  API version, dimensions, rotation and window, avoiding redraws for ordinary recomposition.
+- Rust render and raster work runs on background coroutine dispatchers. Only unsupported
+  Skia display returns to existing resvg.
 - Normal Android rendering consumes visible DDL, typed meaning, Score, and diagnostics returned by
   shared Rust. The Kotlin host performs provider transport, requests SVG performance, generates the
   render hash, persists Room history, and applies UI side effects.

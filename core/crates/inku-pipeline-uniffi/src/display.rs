@@ -26,7 +26,7 @@ pub struct DisplayRewrites {
 }
 
 /// A window on a canvas `full_width` × `full_height` pixels.
-#[derive(Clone, Copy, uniffi::Record)]
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
 pub struct DisplayRegion {
     pub full_width: u32,
     pub full_height: u32,
@@ -38,7 +38,7 @@ pub struct DisplayRegion {
 
 /// The sides the display is drawn in (a coarse whole first, then tiles), and the
 /// largest window and full canvas a window is cut from.
-#[derive(Clone, Copy, uniffi::Record)]
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
 pub struct DisplayLayout {
     pub coarse_side: u32,
     pub tile_side: u32,
@@ -49,7 +49,7 @@ pub struct DisplayLayout {
 
 /// Host screen rectangles in one unit system, after its fit/zoom/rotation and
 /// viewport intersection. No platform coordinate type crosses the core boundary.
-#[derive(Clone, Copy, uniffi::Record)]
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
 pub struct DisplayRect {
     pub x: f64,
     pub y: f64,

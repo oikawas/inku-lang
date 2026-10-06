@@ -34,3 +34,10 @@ skia-safe = { version = "=0.153.3", features = ["ganesh", "vulkan", "svg", "webp
 inku-ddl.workspace = true
 inku-pipeline.workspace = true
 serde_json.workspace = true
+jni.workspace = true
+png = "=0.18.1"
+
+# Only the instrumentation APK carries this JNI library and the comparison API.
+[[example]]
+name = "display_check_android"
+crate-type = ["cdylib"]

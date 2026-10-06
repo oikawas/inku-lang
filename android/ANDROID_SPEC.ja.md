@@ -13,10 +13,10 @@ DDL SpecとDDL engineの版はServerの`server/src/inku_server/layer_versions.py
 実機の`NativeRenderDeviceTest`は、同梱ライブラリのSVG・版・renderer referenceを、同じcommitのLinux host coreが`render-parity-expected`で生成した期待値と比べる。Linux以外でその比較を組み込む場合は、生成済みのディレクトリを`-PinkuRustParityExpectedDir=<directory>`で明示して取り込む。通常の実機計装ビルドはMacで比較画像やSVGを生成しない。凍結corpusはScore入力とraster入力にだけ使い、render engineの版上げで期待値を作り直す必要はない。
 
 **共有Rust切替は完了した**: productionのScore → SVG / metadataは
-`AndroidRenderHost`から1回のJNI requestで`core/crates/inku-render/`を呼ぶ。保存済み／現行SVGの
-preview、thumbnail、PNG出力は、別のhost-neutral crate `core/crates/inku-svg-raster/` が
-`resvg`で生成するpixelをBitmapへ機械変換する。Kotlin Engine 35とAndroidSVGはproductionから撤去し、
-runtime fallbackを持たない。保存済みSVG、Room schema、Score schema、DDL engine、`rh3`の意味は変更しない。
+`AndroidRenderHost`から1回のJNI requestで`core/crates/inku-render/`を呼ぶ。作品の大きな表示は
+共有`inku-display`のSkia、thumbnailとPNG出力は`inku-svg-raster`のresvgで生成する。
+Androidはpremultiplied RGBAをNDK Bitmapへ直接転送する。Kotlin Engine 35とAndroidSVGはproductionから撤去済み。
+保存済みSVG、Room schema、Score schema、DDL engine、`rh3`の意味は変更しない。
 
 **ただし「層の版が同じ」は「移植が終わった」ではない。**
 版の数字は描画の同一性を主張するものであって、UI・保存・語彙の差までは覆わない。
@@ -29,6 +29,34 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 - `ANDROID_SPEC.md` は英語版として、`ANDROID_SPEC.ja.md` の意図を保った翻訳・要約として更新する。
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
+
+## 2026-10-06 共有Skiaによる作品表示
+
+制作の作品域、全画面、指示書エディタの作品、推敲・モデル比較の候補画像は、共有coreの
+`inku-display`を`NativeDisplayBridge`から呼ぶ。Skiaの互換変換は表示直前のメモリ上だけで行う。
+通常表示は長辺2048pxまで、候補は512pxまで。粗い256pxの全体を先に出し、共通APIが決めた
+512pxのタイルで完成させる。全画面では拡大・移動・回転から見える範囲を求め、元のSVGから
+画面密度で窓を描き直す。hostは座標変換と交差を行い、密度制限・外向きの丸め・タイル合成は共有coreが行う。
+
+表示は専用の2 threadで行う。取消はタイルの境目で判断し、別の作品・要求になった後の結果を画面へ採らない。
+途中の窓は約150msごとにコピーした画像を出す。描画中は表示の印を出し、失敗は作品域に短い文を出す。
+窓だけの失敗では全体画像を残す。全画面の操作と範囲枠は既存のhost UIを使う。
+完成Bitmapのcacheは64MiB、同時要求は2件、sceneのcacheは16MiBで1件までとする。
+sceneのcache退避は使用中の参照を閉じず、最後の要求が終わってから解放する。
+窓は長辺8192px・約4Mi画素まで（共通上限以下）、仮想全体は長辺120,000pxまで。
+上限で密度を落とした要求は診断へ数える。
+
+共通APIの`Unsupported`だけ一度resvgへ戻し、理由を診断へ数える。`Refused`、捕捉panic、
+JNI／Bitmap作成失敗は戻さず表示エラーにする。macOSの既存の広い戻し方とはhost方針が異なる。
+入力上限は両表示経路とも12MiB。履歴・系譜の保存thumbnail、歳時記の小さな画像、PNG出力、
+LLM画像とheadless画像化は既存resvgを使う。表示のrollbackは`AndroidDisplayRenderer.drawsWithSkia`で選ぶ。
+
+Androidの固定Skia配布物は共通SHA一覧と`scripts/skia-binaries.sh`で毎build照合する。
+配布物はganesh・vulkanを含むが、描画はCPUのみ。`no-compile`によりsource buildへ戻らない。
+native通知は`core/crates/inku-display/licenses/`と`scripts/skia_notices.py`を正本とし、
+Android固有のFreeType・VMA・静的C++ runtimeもrelease通知へ加える。
+公開SVG4件のChrome参照と窓の比較は`NativeDisplayDeviceTest`で行う。比較libraryと素材は
+計装APKだけに入り、判定はRustの`tests/common/difference.rs`を既存Skia試験と共用する。
 
 ## 2026-10-06 Server／Webとの差の解消
 
@@ -349,12 +377,12 @@ Rust authoring pipelineとraster presentationを導入済みである。以下�
 - `AndroidRenderHost`が、coerce済みScore、解決済みcanvas／色map、catalog、profile、seed、`wild`を
   1個のcanonical JSON requestへまとめ、`NativeRenderBridge`から共有Rust描画engine（Serverと同じ`inku-render`。版はbindingが名乗る）を呼ぶ。
 - `inku-svg-raster`は`core/Cargo.toml`で固定した`resvg`（0.48.1、`core/vendor/resvg/`に同梱）を使い、保存済み／現行SVGを明示的な
-  premultiplied RGBA8、width、height、strideへ変換する。Android側はBitmapのBGRA byte順へだけ変換する。
+  premultiplied RGBA8、width、height、strideへ変換する。Android側はNDKのRGBA_8888 Bitmapへstrideに従って直接コピーする。
   同梱版の`feTurbulence`はRGBAに共通する座標・補間の計算をまとめ、4色の勾配を連続した領域に置く。
   乱数・色ごとの演算順・丸め・出力解像度は維持する。差分と更新手順は`core/vendor/resvg/INKU_PATCHES.md`に記す。
-- main preview、履歴thumbnail、refinement preview、PNG exportは`RustArtworkRasterizer`を使う。
-  raster cache keyはSVG identity、target size、raster API/optionsを含み、通常recompositionで再rasterしない。
-- Rust render/raster native処理はcoroutineのbackground dispatcherで実行し、runtime renderer/raster fallbackを持たない。
+- main previewとrefinement previewは`AndroidDisplayRenderer`（共有Skia）を使い、履歴thumbnailとPNG exportは`RustArtworkRasterizer`を使う。
+  display cache keyはSVG内容のhash、API版、寸法、回転、窓を含み、通常recompositionで再描画しない。
+- Rust render/raster native処理はbackground dispatcherで実行する。Skia表示の対応外だけ既存resvgへ戻す。
 - Androidの通常描画は共有Rustが返すvisible DDL、typed meaning、Score、診断を使用し、
   Kotlin hostがprovider transport、SVG演奏要求、render hash生成、Room履歴保存とUI副作用を実行する。
 - Web/server 比較用 headless render execution:

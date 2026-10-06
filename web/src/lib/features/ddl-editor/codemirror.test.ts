@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EditorSelection, EditorState } from '@codemirror/state';
-import { history, undo } from '@codemirror/commands';
+import { history, redo, undo } from '@codemirror/commands';
 import { CompletionContext } from '@codemirror/autocomplete';
 import { readCompositionRanges, scanNumericRanges } from '../../composition-ranges.ts';
 import { buildPluginNameIndex, unknownPluginNames } from '../../plugin-names.ts';
 import { ddlPartClass, highlightDDL } from '../../highlight.ts';
 import { ddlCompletions, ddlEditorModel, ddlSyntax, insertDdlWord, replaceDdlValue } from './codemirror.ts';
+import * as ddlControls from './codemirror.ts';
 import { compositionChanged, openRangeAt, rangeEditorState, rangeFocusChanged } from './codemirror-ranges.ts';
 
 const ranges = readCompositionRanges({ schema: 'inku.composition-ranges.v1', ranges: [
@@ -209,4 +210,37 @@ test('cursor completions use the DDL language and canonical Macro names, and yie
 	assert.equal(await source(new CompletionContext(numeric, numeric.selection.main.head, true)), null);
 	assert.equal(await source(new CompletionContext(editor('', true), 0, true)), null);
 	assert.equal(previews, 0);
+});
+
+test('discard edits restores exact source and range state as one undoable replacement', () => {
+	const replace = Reflect.get(ddlControls, 'replaceDdlWithHistory') as (state: EditorState, value: string) => ReturnType<EditorState['update']> | null;
+	assert.equal(typeof replace, 'function', 'discard needs a replacement that enters undo history');
+	let state = editor('赤い円。');
+	state = insertDdlWord(state, '青い線。')!.state;
+	const draft = state.doc.toString();
+	const saved = '  紙。\r\n右下（横2/3〜1、縦2/3〜1）に、円。  ';
+	state = replace(state, saved)!.state;
+	assert.equal(state.doc.toString(), saved);
+	assert.equal(undo({ state, dispatch: (tr) => state = tr.state }), true);
+	assert.equal(state.doc.toString(), draft, 'one undo restores the complete draft, including the latest typing');
+	assert.equal(redo({ state, dispatch: (tr) => state = tr.state }), true);
+	assert.equal(state.doc.toString(), saved);
+	state = insertDdlWord(state, '線。')!.state;
+	assert.equal(undo({ state, dispatch: (tr) => state = tr.state }), true);
+	assert.equal(state.doc.toString(), saved, 'later typing does not merge with the discard');
+	assert.equal(undo({ state, dispatch: (tr) => state = tr.state }), true);
+	assert.equal(state.doc.toString(), draft);
+	const broken = changeBody(open(editor()), '横0〜');
+	assert.equal(broken.field(rangeEditorState).invalid, true);
+	const restored = replace(broken, '保存した円。')!.state;
+	assert.equal(restored.field(rangeEditorState).invalid, false, 'discard clears the old incomplete range');
+	assert.equal(restored.field(rangeEditorState).preview, null);
+	const range = replace(broken, saved)!.state;
+	assert.equal(range.field(rangeEditorState).invalid, false);
+	assert.deepEqual(range.field(rangeEditorState).ranges[0].bounds, [[2n, 3n], [2n, 3n], [1n, 1n], [1n, 1n]]);
+	assert.equal(replace(editor(saved), saved), null);
+	assert.equal(replace(editor('下書き。', true), saved), null);
+	assert.equal(replace(editor().update({ effects: compositionChanged.of(true) }).state, saved), null);
+	const synced = replaceDdlValue(editor('元の本文。'), saved)!.state;
+	assert.equal(undo({ state: synced, dispatch() {} }), false, 'external synchronization still creates no undo entry');
 });

@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+## Unreleased
+
+### 2026-10-06 — Discard edits on the Web
+
+The Describe tab's instructions box and Instruction editor now have Discard edits. After confirmation, it returns to the target work's saved instructions. It is disabled for matching text, read-only text and drawing, and is absent from New instructions. An editor opened from the box also returns to the target work rather than the draft; returning in the editor leaves the box's draft unchanged. Returning never draws, and the range frames follow the text. The discard is one undo step, so ⌘Z (Ctrl+Z) restores the complete text from before the discard.
+
 ## v2.15.93 (2026-10-06 / Build 1169)
 
 Edit the whole draft in the Describe tab's instructions box and insert Saijiki words at its caret. This version also applies the Server changes that inherit saved settings for composition forks and retain saved Score range values. Storage formats and all engine versions remain unchanged.

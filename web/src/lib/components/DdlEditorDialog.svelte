@@ -19,6 +19,9 @@
 		mode: 'new' | 'edit';
 		isJapanese: boolean;
 		initialDdl: string;
+		savedDdl?: string | null;
+		discardDisabled?: boolean;
+		onConfirmDiscard?: (run: () => void, cancel: () => void) => void;
 		returnFocusTo?: HTMLElement | null;
 		drawing: boolean;
 		stage2ModelLabel: string;
@@ -43,7 +46,7 @@
 	};
 
 	let {
-		open, mode, isJapanese, initialDdl, returnFocusTo = null, drawing,
+		open, mode, isJapanese, initialDdl, savedDdl = null, discardDisabled = false, onConfirmDiscard, returnFocusTo = null, drawing,
 		stage2ModelLabel, drawingModelId, drawingModelGroups, onSelectDrawingModel,
 		runTokensIn, runTokensOut, runAttempt = null, error, previewForWord, previewForPlugin,
 		pluginEntries = [], ranges = [], artworkUrl = null, wildValue = false, wildInherited = true, onSelectWild, onDraw, onClose,
@@ -116,6 +119,19 @@
 
 	function requestClose(): void {
 		if (!drawing) onClose();
+	}
+
+	function canDiscardEdits(): boolean {
+		return open && mode === 'edit' && savedDdl !== null && !!onConfirmDiscard
+			&& !drawing && !discardDisabled && !rangeStatus.composing && value !== savedDdl;
+	}
+	function requestDiscardEdits(): void {
+		const target = editor, original = savedDdl;
+		if (!canDiscardEdits() || !target || original === null) return;
+		onConfirmDiscard?.(() => {
+			if (!canDiscardEdits() || editor !== target || savedDdl !== original) return;
+			target.replaceValueWithHistory(original);
+		}, () => { if (open && editor === target) target.focus(); });
 	}
 
 	async function requestDraw(): Promise<void> {
@@ -199,6 +215,9 @@
 					<RunStatus variant="inline" label={t().stageImageGenerating} stage2Model={stage2ModelLabel} {elapsedMs} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} onStop={stopDraw} />
 				{:else}
 					<div class="ddled-actions">
+						{#if mode === 'edit' && savedDdl !== null && onConfirmDiscard}
+							<button type="button" disabled={!canDiscardEdits()} onclick={requestDiscardEdits}>{t().ddlDiscardEdits}</button>
+						{/if}
 						<button type="button" class="ddled-cancel" onclick={requestClose}>{t().pipelineCancel}</button>
 						<button type="button" class="ddled-draw" disabled={!value.trim() || rangeStatus.invalid || rangeStatus.composing} onclick={requestDraw}>{t().submitBtn}</button>
 					</div>
@@ -233,7 +252,7 @@
 	.ddled-settings[inert] { opacity: .5; }
 	.ddled-foot { display: flex; flex-direction: column; gap: 8px; min-width: 0; max-width: 44%; }
 	.ddled-error { max-height: 80px; overflow: auto; color: var(--danger); font-size: var(--ui-font-size-12); overflow-wrap: anywhere; }
-	.ddled-actions { display: flex; justify-content: flex-end; gap: 8px; }
+	.ddled-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 	.ddled-actions button { border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); padding: 8px 18px; background: var(--panel); color: var(--fg2); font: inherit; font-size: var(--btn-sm-font-size); cursor: pointer; }
 	.ddled-actions .ddled-draw { border-color: var(--action-bg); background: var(--action-bg); color: var(--action-fg); min-width: 96px; }
 	.ddled-actions .ddled-draw:hover:not(:disabled) { background: var(--action-hover); }

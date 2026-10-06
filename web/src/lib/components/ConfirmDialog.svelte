@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
+	import { onMount } from 'svelte';
 
 type ConfirmAction = {
 	message: string;
@@ -15,14 +16,28 @@ type ConfirmAction = {
 		action: ConfirmAction;
 		onCancel: () => void;
 		onRun: () => void;
+		focusOnOpen?: boolean;
 	};
 
-	let { action, onCancel, onRun }: Props = $props();
+	let { action, onCancel, onRun, focusOnOpen = false }: Props = $props();
+	let dialog = $state<HTMLDivElement>();
+	onMount(() => { if (focusOnOpen) dialog?.querySelector<HTMLButtonElement>('button')?.focus(); });
+	function handleKeydown(event: KeyboardEvent): void {
+		if (!focusOnOpen || !dialog || event.isComposing) return;
+		if (event.key === 'Escape') {
+			event.preventDefault(); event.stopPropagation(); onCancel();
+		} else if (event.key === 'Tab') {
+			const controls = [...dialog.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
+			const first = controls[0], last = controls.at(-1);
+			if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+			else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+		}
+	}
 </script>
 
 <div class="confirm-layer">
 	<div class="confirm-backdrop" role="button" tabindex="0" aria-label={t().confirmCancel} onclick={onCancel} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') onCancel(); }}></div>
-	<div class="confirm-box" role="dialog" aria-modal="true" tabindex="-1">
+	<div class="confirm-box" role="dialog" aria-modal="true" tabindex="-1" bind:this={dialog} onkeydown={handleKeydown}>
 		<p>{action.message}</p>
 		<div class="confirm-actions">
 			{#if !action.hideCancel}

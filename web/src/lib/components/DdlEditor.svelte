@@ -69,6 +69,7 @@
 
 	export function focus(): void { void tick().then(() => control?.focus()); }
 	export function insertWord(word: string): void { if (!disabled) control?.insertWord(word); }
+	export function replaceValueWithHistory(next: string): void { if (!disabled) control?.replaceValueWithHistory(next); }
 </script>
 
 <section class="ddl-editor" class:compact>

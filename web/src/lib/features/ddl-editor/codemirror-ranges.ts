@@ -39,7 +39,7 @@ function isComposing(tr: Transaction, previous: RangeEditorState): boolean {
 }
 
 function pendingNameAfter(previous: RangeEditorState, tr: Transaction): boolean {
-	if (!previous.active || tr.reconfigured || tr.annotation(externalDdlValue) || tr.isUserEvent('undo') || tr.isUserEvent('redo')) return false;
+	if (!previous.active || tr.reconfigured || tr.annotation(externalDdlValue) || tr.isUserEvent('input.discard') || tr.isUserEvent('undo') || tr.isUserEvent('redo')) return false;
 	if (!tr.docChanged || tr.startState.doc.eq(tr.newDoc)) return previous.pendingName;
 	const range = previous.active;
 	let wordsEdited = false;
@@ -98,7 +98,7 @@ export const rangeEditorState = StateField.define<RangeEditorState>({
 				active: previous.active ? mappedRange(previous.active, tr) : null,
 				decorations: previous.decorations.map(tr.changes), atomic: previous.atomic.map(tr.changes) };
 		}
-		const reset = tr.annotation(externalDdlValue);
+		const reset = tr.annotation(externalDdlValue) || tr.isUserEvent('input.discard');
 		const ranges = tr.docChanged || tr.reconfigured || previous.composing || reset
 			? scanNumericRanges(tr.newDoc.toString()) : previous.ranges;
 		const mapped = reset ? null : { ...previous, pendingName, active: previous.active ? mappedRange(previous.active, tr) : null };

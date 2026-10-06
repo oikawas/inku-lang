@@ -11,6 +11,8 @@
 	type Props = {
 		/** The single source used for display, editing, and replay. */
 		ddl: string;
+		savedDdl?: string | null;
+		onConfirmDiscard?: (run: () => void, cancel: () => void) => void;
 		label: string;
 		onEdit?: (() => void) | null;
 		editDisabled?: boolean;
@@ -31,7 +33,7 @@
 		previewForPlugin: PreviewForPlugin;
 	};
 
-	let { ddl, label, onEdit = null, editDisabled = false, onPaint = null, paintDisabled = false, runStatus = null, lang = null, ranges = [], workKey = null, onDdlChange = null, onRangePreview = null, pluginEntries = [], previewForWord, previewForPlugin }: Props = $props();
+	let { ddl, savedDdl = null, onConfirmDiscard, label, onEdit = null, editDisabled = false, onPaint = null, paintDisabled = false, runStatus = null, lang = null, ranges = [], workKey = null, onDdlChange = null, onRangePreview = null, pluginEntries = [], previewForWord, previewForPlugin }: Props = $props();
 	let editor = $state<DdlEditor | null>(null);
 	let rangeStatus = $state<RangeEditorStatus>({ preview: null, invalid: false, composing: false });
 
@@ -45,6 +47,17 @@
 		onRangePreview?.(status.preview);
 	}
 	export function insertWord(word: string): void { if (!readOnly) editor?.insertWord(word); }
+	function canDiscardEdits(): boolean {
+		return savedDdl !== null && !!onConfirmDiscard && !readOnly && !paintDisabled && !rangeStatus.composing && ddl !== savedDdl;
+	}
+	function requestDiscardEdits(): void {
+		const target = editor, original = savedDdl, targetWork = workKey;
+		if (!canDiscardEdits() || !target || original === null) return;
+		onConfirmDiscard?.(() => {
+			if (!canDiscardEdits() || editor !== target || workKey !== targetWork || savedDdl !== original) return;
+			target.replaceValueWithHistory(original);
+		}, () => { if (editor === target && workKey === targetWork) target.focus(); });
+	}
 </script>
 
 <div class="ddl-viewer">
@@ -85,11 +98,16 @@
 		{/key}
 	</div>
 	{#if invalidSource}<div class="ddl-range-error" role="status">{t().ddlRangeInvalid}</div>{/if}
-	{#if onPaint}
+	{#if onPaint || (savedDdl !== null && onConfirmDiscard)}
 		<div class="ddl-viewer-actions">
-			<Tooltip placement="left" text={t().tooltipDdlPaint}>
-				<button class="ghost-btn" type="button" disabled={paintBlocked} onclick={() => onPaint?.()}>{t().replayFromDdlButton}</button>
-			</Tooltip>
+			{#if savedDdl !== null && onConfirmDiscard}
+				<button class="ghost-btn" type="button" disabled={!canDiscardEdits()} onclick={requestDiscardEdits}>{t().ddlDiscardEdits}</button>
+			{/if}
+			{#if onPaint}
+				<Tooltip placement="left" text={t().tooltipDdlPaint}>
+					<button class="ghost-btn" type="button" disabled={paintBlocked} onclick={() => onPaint?.()}>{t().replayFromDdlButton}</button>
+				</Tooltip>
+			{/if}
 		</div>
 	{/if}
 	{#if runStatus}{@render runStatus()}{/if}
@@ -131,6 +149,8 @@
 	}
 	.ddl-viewer-actions {
 		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
 		justify-content: flex-end;
 	}
 	.ddl-range-error { color: var(--error); font-size: var(--ui-font-size-12); }

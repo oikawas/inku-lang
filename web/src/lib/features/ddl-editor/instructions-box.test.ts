@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { EditorSelection, EditorState } from '@codemirror/state';
 import { ddlEditorModel, insertDdlWord, replaceDdlValue } from './codemirror.ts';
+import * as ddlControls from './codemirror.ts';
+import { history, undo } from '@codemirror/commands';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 function actualFunction(path: string, name: string): string {
@@ -127,4 +129,121 @@ test('the drawer inserts at the box caret, appends before focus, and only previe
 	assert.match(component, /selectWord\(word, previewForWord\(/, 'a built-in click inserts its displayed word');
 	assert.match(component, /selectWord\(pluginDisplayName\(entry, wordLang\), previewForPlugin\(/, 'a Macro click inserts its displayed name');
 	assert.equal((component.match(/onpointerdown=\{\(e\) => e\.preventDefault\(\)\}/g) ?? []).length, 2, 'clicking keeps the box selection');
+});
+
+test('discard edits in the box confirms before changing the draft and guards the target', async () => {
+	const { setup } = await harness(`export function setup(props, onConfirmDiscard) {
+		let { ddl, savedDdl, readOnly = false, paintDisabled = false, rangeStatus = { composing: false }, workKey, editor } = props;
+		${actualFunction('../../components/DdlViewer.svelte', 'canDiscardEdits')}
+		${actualFunction('../../components/DdlViewer.svelte', 'requestDiscardEdits')}
+		return { canDiscardEdits, requestDiscardEdits, set(patch) {
+			({ ddl = ddl, savedDdl = savedDdl, readOnly = readOnly, paintDisabled = paintDisabled, rangeStatus = rangeStatus, workKey = workKey, editor = editor } = patch);
+		} };
+	}`);
+	const { control } = await harness(`export function control(view, replaceDdlWithHistory) {
+		return { ${actualMethod('./codemirror.ts', 'replaceValueWithHistory')} };
+	}`);
+	const saved = '保存した円。\r\n青い線。';
+	const draft = saved + '\r\n下書き。';
+	let state = EditorState.create({ doc: draft, extensions: [ddlEditorModel([], { names: [], firesOn: [] }), history()] });
+	let workDdl = draft, focuses = 0;
+	let confirmation: { run: () => void; cancel: () => void } | null = null;
+	const view = { get state() { return state; }, composing: false, dispatch(tr: { state: EditorState }) { state = tr.state; workDdl = state.doc.toString(); box.set({ ddl: workDdl }); }, focus() { focuses++; } };
+	const editor = { ...control(view, Reflect.get(ddlControls, 'replaceDdlWithHistory')), focus() { focuses++; } };
+	const box = setup({ ddl: draft, savedDdl: saved, editor, workKey: 'work-1' }, (run: () => void, cancel: () => void) => confirmation = { run, cancel });
+	assert.equal(box.canDiscardEdits(), true);
+	box.requestDiscardEdits();
+	assert.equal(workDdl, draft, 'asking does not discard or draw');
+	assert.ok(confirmation);
+	(confirmation as { cancel: () => void }).cancel();
+	assert.equal(workDdl, draft);
+	assert.equal(focuses, 1);
+	box.requestDiscardEdits();
+	(confirmation as { run: () => void }).run();
+	assert.equal(workDdl, saved);
+	assert.equal(box.canDiscardEdits(), false);
+	assert.equal(undo({ state, dispatch: (tr) => view.dispatch(tr) }), true);
+	assert.equal(workDdl, draft);
+	for (const patch of [{ readOnly: true }, { paintDisabled: true }, { rangeStatus: { composing: true } }, { savedDdl: null }, { ddl: saved }]) {
+		box.set({ ddl: draft, savedDdl: saved, readOnly: false, paintDisabled: false, rangeStatus: { composing: false }, ...patch });
+		confirmation = null;
+		assert.equal(box.canDiscardEdits(), false);
+		box.requestDiscardEdits();
+		assert.equal(confirmation, null);
+	}
+	box.set({ ddl: draft, savedDdl: saved });
+	box.requestDiscardEdits();
+	assert.ok(confirmation);
+	box.set({ workKey: 'work-2' });
+	(confirmation as { run: () => void }).run();
+	assert.equal(workDdl, draft, 'a confirmation for a different work cannot discard this draft');
+	box.set({ workKey: 'work-1' });
+	box.requestDiscardEdits();
+	box.set({ paintDisabled: true });
+	(confirmation as { run: () => void }).run();
+	assert.equal(workDdl, draft, 'drawing that started during confirmation blocks the discard');
+	const { ask } = await harness(`export function ask(t, confirmationDialog, tick) {
+		let confirmAction = null;
+		${actualFunction('../../../routes/+page.svelte', 'confirmDiscardEdits')}
+		return { run: confirmDiscardEdits, action: () => confirmAction };
+	}`);
+	const action = ask(() => ({ ddlDiscardMessage: 'saved work', ddlDiscardConfirm: 'Discard' }));
+	action.run(() => {}, () => {});
+	assert.equal(action.action().message, 'saved work');
+	assert.equal(action.action().runLabel, 'Discard');
+	assert.equal(action.action().destructive, true);
+	assert.equal(action.action().focusOnOpen, true);
+	const { keys } = await harness(`export function keys(dialog, document, onCancel) {
+		const focusOnOpen = true;
+		${actualFunction('../../components/ConfirmDialog.svelte', 'handleKeydown')}
+		return handleKeydown;
+	}`);
+	let active = '', cancelled = false, prevented = false, stopped = false;
+	const cancel = { focus() { active = 'cancel'; } }, discard = { focus() { active = 'discard'; } };
+	const keydown = keys({ querySelectorAll: () => [cancel, discard] }, { activeElement: discard }, () => cancelled = true);
+	keydown({ key: 'Tab', preventDefault() { prevented = true; } });
+	assert.equal(active, 'cancel');
+	assert.equal(prevented, true);
+	keydown({ key: 'Escape', preventDefault() {}, stopPropagation() { stopped = true; } });
+	assert.equal(cancelled, true);
+	assert.equal(stopped, true, 'Escape cancels the confirmation before reaching the editor');
+	const page = read('../../../routes/+page.svelte');
+	assert.match(page, /savedDdl=\{work\.ddlGeneratedBaseline\}/);
+	assert.match(read('../../components/DdlViewer.svelte'), /disabled=\{!canDiscardEdits\(\)\}/);
+});
+
+test('discard edits in the dialog uses the saved target, leaves the box alone, and is absent in new mode', async () => {
+	const { setup } = await harness(`export function setup(props, onConfirmDiscard) {
+		let { open = true, mode = 'edit', value, savedDdl, drawing = false, discardDisabled = false, rangeStatus = { composing: false }, editor } = props;
+		${actualFunction('../../components/DdlEditorDialog.svelte', 'canDiscardEdits')}
+		${actualFunction('../../components/DdlEditorDialog.svelte', 'requestDiscardEdits')}
+		return { canDiscardEdits, requestDiscardEdits, set(patch) {
+			({ mode = mode, value = value, savedDdl = savedDdl, drawing = drawing, discardDisabled = discardDisabled, rangeStatus = rangeStatus, editor = editor } = patch);
+		} };
+	}`);
+	const boxDraft = '箱の下書き。', saved = '対象作品の保存した本文。';
+	let dialogValue = boxDraft, confirmation: { run: () => void; cancel: () => void } | null = null;
+	const editor = { replaceValueWithHistory(next: string) { dialogValue = next; dialog.set({ value: next }); }, focus() {} };
+	const dialog = setup({ value: boxDraft, savedDdl: saved, editor }, (run: () => void, cancel: () => void) => confirmation = { run, cancel });
+	dialog.requestDiscardEdits();
+	assert.ok(confirmation);
+	assert.equal(dialogValue, boxDraft);
+	(confirmation as { cancel: () => void }).cancel();
+	assert.equal(dialogValue, boxDraft);
+	dialog.requestDiscardEdits();
+	(confirmation as { run: () => void }).run();
+	assert.equal(dialogValue, saved, 'return to the saved target rather than the opening draft');
+	assert.equal(boxDraft, '箱の下書き。');
+	assert.equal(dialog.canDiscardEdits(), false);
+	for (const patch of [{ mode: 'new' }, { drawing: true }, { discardDisabled: true }, { rangeStatus: { composing: true } }, { value: saved }, { savedDdl: null }]) {
+		dialog.set({ mode: 'edit', value: boxDraft, savedDdl: saved, drawing: false, discardDisabled: false, rangeStatus: { composing: false }, ...patch });
+		confirmation = null;
+		assert.equal(dialog.canDiscardEdits(), false);
+		dialog.requestDiscardEdits();
+		assert.equal(confirmation, null);
+	}
+	const component = read('../../components/DdlEditorDialog.svelte');
+	assert.match(component, /\{#if mode === 'edit' && savedDdl !== null && onConfirmDiscard\}/);
+	assert.match(component, /disabled=\{!canDiscardEdits\(\)\}/);
+	assert.match(read('../../../routes/+page.svelte'), /savedDdl=\{ddlDialogNode\?\.history\?\.ddl \?\? null\}/);
 });

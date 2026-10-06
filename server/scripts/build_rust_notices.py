@@ -5,6 +5,10 @@ from pathlib import Path
 import sys
 import tomllib
 
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts"))
+from skia_notices import rust_skia_license  # noqa: E402 - product-root script import
+
 
 def main() -> None:
     if len(sys.argv) != 3:
@@ -37,8 +41,13 @@ def main() -> None:
         entries.append(f"\n{'=' * 72}\n{name} {version}\nLicense: {license_expression}\n")
         entries.append(f"Exact source: https://crates.io/api/v1/crates/{name}/{version}/download\n")
         if not files:
-            entries.append("No standalone license file is present in this crate archive.\n")
-            continue
+            upstream = rust_skia_license(name, version, manifest["package"].get("repository"))
+            if upstream is None:
+                entries.append("No standalone license file is present in this crate archive.\n")
+                continue
+            entries.append("The crate archive has no standalone license file; the upstream\n"
+                           "rust-skia text is supplied from the shared Skia notice inventory.\n")
+            files = [upstream]
         for file in files:
             entries.append(f"\n--- {file.name} ---\n")
             entries.append(file.read_text(errors="replace"))

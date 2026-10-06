@@ -14,6 +14,19 @@ SKIA_LICENSES = LICENSES / "skia-m153"
 RUST_SKIA_LICENSE = LICENSES / "rust-skia-0.153.3-LICENSE"
 
 
+def rust_skia_license(name: str, version: str, repository: str | None) -> Path | None:
+    """Supplement only the reviewed rust-skia crate archives without a license."""
+    if name not in {"skia-bindings", "skia-safe", "skia-svg-macros"}:
+        return None
+    manifest = json.loads((LICENSES / "native-libraries.json").read_text())
+    expected = manifest["svg_macros_version" if name == "skia-svg-macros" else "binding_version"]
+    if version != expected or repository != "https://github.com/rust-skia/rust-skia":
+        raise ValueError(f"rust-skia crate notice requires review: {name} {version} {repository}")
+    if not RUST_SKIA_LICENSE.read_bytes():
+        raise ValueError("empty rust-skia license")
+    return RUST_SKIA_LICENSE
+
+
 def native_libraries(platform: str) -> tuple:
     if platform not in {"apple", "android"}:
         raise ValueError(f"unknown Skia notice platform: {platform}")

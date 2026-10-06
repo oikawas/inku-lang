@@ -1,5 +1,6 @@
 {
   "binding_version": "0.153.3",
+  "svg_macros_version": "0.2.0",
   "skia_tag": "m153-0.101.2",
   "libraries": [
     {

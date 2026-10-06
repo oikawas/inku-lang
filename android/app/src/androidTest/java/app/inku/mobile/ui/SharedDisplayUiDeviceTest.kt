@@ -14,7 +14,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -89,7 +89,7 @@ class SharedDisplayUiDeviceTest {
     }
 
     private fun save(name: String, image: ImageBitmap) {
-        val directory = File(InstrumentationRegistry.getInstrumentation().context.getExternalFilesDir(null), "skia-display-check")
+        val directory = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "skia-display-check")
         check(directory.mkdirs() || directory.isDirectory)
         File(directory, "$name.png").outputStream().use { image.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
     }

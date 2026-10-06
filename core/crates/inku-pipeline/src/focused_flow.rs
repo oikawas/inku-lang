@@ -1423,6 +1423,43 @@ fn a_second_request_names_the_words_a_refused_proposal_left_unread() {
     assert!(message["completion_feedback"][0].get("unread").is_none());
 }
 
+/// A1 screens (2026-10-06): the check names each hole's own source text, and
+/// the attempt view tells a second request from a retry after a failure.
+#[test]
+fn the_check_names_hole_text_and_the_attempt_tells_a_second_request() {
+    let state = started_direct_ddl(
+        "ink wash ground. place one red circle at center. many square. many circle.",
+    );
+    let first = state.provider_attempt().unwrap().unwrap();
+    assert!(!first.asked_again);
+    assert!(
+        serde_json::to_value(first)
+            .unwrap()
+            .get("asked_again")
+            .is_none()
+    );
+    let asked = run(
+        Some(&state),
+        &hole_response(
+            &state,
+            json!({"results":[
+                {"id":"h1","status":"proposed","replacement":"8"},
+                {"id":"h2","status":"proposed","replacement":"many"}
+            ]}),
+        ),
+    );
+    let report = asked
+        .events
+        .iter()
+        .find(|event| event.tag == "hole_completion_checked")
+        .unwrap();
+    assert_eq!(report.payload["results"][0]["source"], "many");
+    assert_eq!(report.payload["results"][1]["source"], "many");
+    let again = asked.snapshot.provider_attempt().unwrap().unwrap();
+    assert!(again.asked_again);
+    assert_eq!(again.attempt, 2);
+}
+
 fn started_direct_ddl(source: &str) -> PipelineSnapshot {
     let start = envelope(
         None,

@@ -460,6 +460,11 @@ pub struct ProviderAttempt {
     pub delay_ms: DecimalU64,
     /// The time the attempt may take, already capped by the stage's total budget.
     pub timeout_ms: DecimalU64,
+    /// Whether this attempt asks the completion once more because the check
+    /// refused a proposal, rather than retrying after a failure (A1, 2026-10-06).
+    /// Present only when true.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub asked_again: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -836,6 +841,13 @@ impl PipelineSnapshot {
                     max_attempts: self.retry_policy(*stage).max_attempts,
                     delay_ms: action.delay_ms,
                     timeout_ms: action.timeout_ms,
+                    asked_again: *stage == LlmStage::CompleteVisibleDdlHoles
+                        && action.payload["prompt"]["message"]
+                            .as_str()
+                            .and_then(|message| {
+                                serde_json::from_str::<serde_json::Value>(message).ok()
+                            })
+                            .is_some_and(|message| message.get("completion_feedback").is_some()),
                 })
             }
             _ => None,
@@ -1444,7 +1456,7 @@ impl PipelineSnapshot {
                     .as_ref()
                     .ok_or(ProtocolError::InternalInvariant)?;
                 let report = json!({
-                    "results":selected.iter().map(|hole| json!({"hole_id":hole.id,"status":"unresolved","reason":"context_limit"})).collect::<Vec<_>>(),
+                    "results":selected.iter().map(|hole| json!({"hole_id":hole.id,"status":"unresolved","reason":"context_limit","source":base.document.source().get(hole.allowed_span.start_byte..hole.allowed_span.end_byte)})).collect::<Vec<_>>(),
                     "base_source_digest":lock.visible_source_digest,
                     "base_compiler_lock_digest":lock.full_digest,
                 });
@@ -1774,7 +1786,7 @@ impl PipelineSnapshot {
         holes.sort_by_key(|hole| (hole.allowed_span.start_byte, hole.allowed_span.end_byte));
         let mut results = holes
             .iter()
-            .map(|hole| json!({"hole_id":hole.id,"status":"rejected","reason":"schema_violation"}))
+            .map(|hole| json!({"hole_id":hole.id,"status":"rejected","reason":"schema_violation","source":base.document.source().get(hole.allowed_span.start_byte..hole.allowed_span.end_byte)}))
             .collect::<Vec<_>>();
         let mut patch = HolePatchResponse {
             schema_id: inku_ddl::VISIBLE_DDL_PATCH_SCHEMA_ID.into(),
@@ -1801,26 +1813,41 @@ impl PipelineSnapshot {
             .collect::<BTreeMap<_, _>>();
         let mut proposals = vec![None; holes.len()];
         let parsed = if current {
-            parse_hole_completion_response(response, holes.len(), self.config.prompt_limits).map(|response| {
-                for result in response.results {
-                    let index = result.id()[1..].parse::<usize>().expect("verified local ID") - 1;
-                    let hole = holes[index];
-                    let result = match passed.get(result.id()) {
-                        Some(replacement) => HoleCompletionResult::Proposed { id: result.id().to_owned(), replacement: replacement.clone() },
-                        None => result,
-                    };
-                    match result {
-                        HoleCompletionResult::Proposed { replacement, .. } => {
-                            proposals[index] = Some(replacement.clone());
-                            patch.edits.push(HolePatchEditResponse { hole_id:hole.id.clone(), allowed_span:hole.allowed_span.into(), expected_range_digest:hole.expected_range_digest.clone(), replacement });
-                            results[index] = json!({"hole_id":hole.id,"status":"validated","reason":null});
-                        }
-                        HoleCompletionResult::Unresolved { reason, .. } => {
-                            results[index] = json!({"hole_id":hole.id,"status":"unresolved","reason":reason});
+            parse_hole_completion_response(response, holes.len(), self.config.prompt_limits).map(
+                |response| {
+                    for result in response.results {
+                        let index = result.id()[1..]
+                            .parse::<usize>()
+                            .expect("verified local ID")
+                            - 1;
+                        let hole = holes[index];
+                        let result = match passed.get(result.id()) {
+                            Some(replacement) => HoleCompletionResult::Proposed {
+                                id: result.id().to_owned(),
+                                replacement: replacement.clone(),
+                            },
+                            None => result,
+                        };
+                        match result {
+                            HoleCompletionResult::Proposed { replacement, .. } => {
+                                proposals[index] = Some(replacement.clone());
+                                patch.edits.push(HolePatchEditResponse {
+                                    hole_id: hole.id.clone(),
+                                    allowed_span: hole.allowed_span.into(),
+                                    expected_range_digest: hole.expected_range_digest.clone(),
+                                    replacement,
+                                });
+                                results[index]["status"] = json!("validated");
+                                results[index]["reason"] = serde_json::Value::Null;
+                            }
+                            HoleCompletionResult::Unresolved { reason, .. } => {
+                                results[index]["status"] = json!("unresolved");
+                                results[index]["reason"] = json!(reason);
+                            }
                         }
                     }
-                }
-            })
+                },
+            )
         } else if prompt.prompt_id == LEGACY_HOLE_COMPLETION_PROMPT_ID {
             // An already persisted v2 request keeps its exact wire contract. Never
             // try this decoder after a v3 parse or semantic failure.

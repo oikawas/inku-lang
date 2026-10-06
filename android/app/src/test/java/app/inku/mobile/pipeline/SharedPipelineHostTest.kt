@@ -26,6 +26,30 @@ import org.junit.Test
 
 class SharedPipelineHostTest {
     @Test
+    fun aHolesAuthorSourceAndCheckSurviveViewProjectionAndReload() = runBlocking {
+        val original = "  右下に、赤い円。\n"
+        val binding = ScriptedBinding().apply {
+            holeCompletionCheck = JSONObject().put("results", JSONArray().put(
+                JSONObject().put("hole_id", "hole-1").put("source", original)
+                    .put("status", "rejected").put("reason", "numeric_range_outside_words")
+                    .put("replacement", "a different model proposal"),
+            ))
+        }
+        val provider = RecordingEffectProvider()
+        val executions = MemoryExecutionStore()
+        val runningHost = host(binding, provider, RecordingCommitStore(), executions)
+        val pending = runningHost.start(startRequest(PipelineAuthoring.Description("mist", false)))
+        val expected = listOf(HoleCompletionResult("hole-1", original, "rejected", "numeric_range_outside_words"))
+        assertEquals("awaiting_patch_approval", pending.phaseTag)
+        assertEquals(expected, pending.holeCompletionResults)
+
+        val calls = provider.tags.toList()
+        val restored = host(binding, provider, RecordingCommitStore(), executions).restore(OWNER, pending.executionId)
+        assertEquals(expected, restored.holeCompletionResults)
+        assertEquals("reload must not call the model", calls, provider.tags)
+    }
+
+    @Test
     fun recompositionRewritesANewRunWithTheSamePreparedSeedWithoutAModelCall() = runBlocking {
         val binding = ScriptedBinding(uniqueExecutions = true)
         val original = "Place one red circle at the bottom right (horizontal 2/3 to 1, vertical 2/3 to 1)."
@@ -774,6 +798,7 @@ class SharedPipelineHostTest {
         }
         /** A known-hole run whose Score is delivered while it waits, as the core delivers one. */
         var holeDelivers = false
+        var holeCompletionCheck: JSONObject? = null
         override fun pipelineDescription(text: String) = labelCut(text)
         override fun renderSeedFromText(seedText: String) = wordSeed(seedText)
         val recompositionRequests = mutableListOf<JSONObject>()
@@ -845,6 +870,7 @@ class SharedPipelineHostTest {
                 else -> previous?.optJSONObject("sketch")
             }
             snapshot.put("sketch", sketch ?: JSONObject.NULL)
+            if (state == State.AwaitingPatch) snapshot.put("hole_completion_check", holeCompletionCheck)
             val rendered = if (state == State.Completed || payload.optString("tag") == "render") {
                 JSONObject().put("svg", "<svg/>").put("metadata", JSONObject())
             } else {

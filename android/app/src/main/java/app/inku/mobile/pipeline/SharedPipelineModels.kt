@@ -117,6 +117,31 @@ data class PipelinePatchProposal(
     val candidateDdl: String,
 )
 
+/** A hole's check, with the author's source text; never a model replacement. */
+data class HoleCompletionResult(
+    val holeId: String,
+    val source: String,
+    val status: String,
+    val reason: String?,
+) {
+    companion object {
+        fun fromCheck(check: JSONObject?): List<HoleCompletionResult> {
+            val results = check?.optJSONArray("results") ?: return emptyList()
+            return (0 until results.length()).mapNotNull { index ->
+                val result = results.optJSONObject(index) ?: return@mapNotNull null
+                val holeId = result.opt("hole_id") as? String ?: return@mapNotNull null
+                val status = result.opt("status") as? String ?: return@mapNotNull null
+                HoleCompletionResult(
+                    holeId = holeId,
+                    source = result.opt("source") as? String ?: "",
+                    status = status,
+                    reason = result.opt("reason") as? String,
+                )
+            }
+        }
+    }
+}
+
 /** UI projection only. The durable resume token remains the opaque stored state. */
 data class PipelineView(
     val executionId: String,
@@ -141,6 +166,7 @@ data class PipelineView(
     /** Why a stopped run stopped (`needs_user_edit` / `failed` only), as web's `pipelineAttentionReason`. */
     val phaseReason: String? = null,
     val providerFailure: PipelineProviderFailure? = null,
+    val holeCompletionResults: List<HoleCompletionResult> = emptyList(),
 )
 
 class PipelineHostException(
@@ -160,8 +186,9 @@ data class ProviderAttempt(
     val action: String,
     val attempt: Int,
     val maxAttempts: Int,
+    val askedAgain: Boolean = false,
 ) {
-    val isRetry: Boolean get() = attempt > 1
+    val isRetry: Boolean get() = attempt > 1 && !askedAgain
 
     companion object {
         /** The core's report, or null for none, a broken snapshot, or an answer that cannot be read. */
@@ -171,7 +198,7 @@ data class ProviderAttempt(
             val attempt = value.getInt("attempt")
             val maxAttempts = value.getInt("max_attempts")
             if (attempt < 1 || maxAttempts < attempt) return null
-            ProviderAttempt(executionId, value.getString("action"), attempt, maxAttempts)
+            ProviderAttempt(executionId, value.getString("action"), attempt, maxAttempts, value.optBoolean("asked_again"))
         }.getOrNull()
     }
 }

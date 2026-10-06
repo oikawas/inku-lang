@@ -528,6 +528,7 @@ class SharedPipelineHost(
             sketch = PipelineSketchResult.from(snapshot.optJSONObject("sketch")),
             phaseReason = phase.optionalString("reason")?.takeIf { phaseTag in STOPPED_PHASES },
             providerFailure = session.providerFailure,
+            holeCompletionResults = HoleCompletionResult.fromCheck(snapshot.optJSONObject("hole_completion_check")),
         )
     }
 

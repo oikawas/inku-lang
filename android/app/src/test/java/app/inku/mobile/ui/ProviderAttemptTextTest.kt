@@ -29,6 +29,23 @@ class ProviderAttemptTextTest {
     }
 
     @Test
+    fun askingAgainWithCheckReasonsIsDistinctFromATransportRetry() {
+        val askingAgain = report(
+            """{"provider_attempt":{"action":"complete_visible_ddl_holes","attempt":2,"max_attempts":4,"asked_again":true}}""",
+        )
+        assertEquals(true, askingAgain?.askedAgain)
+        assertEquals(false, askingAgain?.isRetry)
+        assertEquals("断られた案を理由を添えて問い直し中（2/4回目）", providerAttemptText(askingAgain, InkuStringsJa))
+        assertEquals("Asking again with the reasons the proposal was refused (2/4)", providerAttemptText(askingAgain, InkuStringsEn))
+
+        val retry = report(attempt(2))
+        assertEquals(false, retry?.askedAgain)
+        assertEquals(true, retry?.isRetry)
+        assertEquals("再試行中（2/4回目）", providerAttemptText(retry, InkuStringsJa))
+        assertEquals("Retrying (try 2/4)", providerAttemptText(retry, InkuStringsEn))
+    }
+
+    @Test
     fun noCallABrokenSnapshotOrAnUnreadableAnswerShowNothing() {
         assertNull(report("""{"provider_attempt":null}"""))
         assertNull(report("""{"error":"invalid_snapshot"}"""))

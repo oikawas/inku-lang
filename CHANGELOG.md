@@ -12,6 +12,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 When completion stops, or a proposal awaits approval with some gaps still uncompleted, show the author's original text and a plain reason for each uncompleted gap. Gaps that passed are not listed. A context that is too long gets an explanation; an unknown reason keeps its code. After the check refuses a proposal, the running attempt reads “Asking again with the reasons the proposal was refused (2/4)”, separately from a communication retry.
 
+## 2026-10-06 — Show original text, reasons, and second requests for Android completion (A1)
+
+When completion stops, and on approval when some gaps were not completed, each incomplete gap shows the author's original text and a plain reason. Completed gaps are omitted; a context that is too long also has an explanation. Asking again with feedback reads "Asking again with the reasons the proposal was refused (2/4)", separately from a communication retry. Following shared SPEC §12.7.1, the screen reads the original text and attempt distinction supplied by the core.
+
 ## v2.15.95 (2026-10-06 / Build 1171)
 
 ### 2026-10-06 — Completion writes places as numeric ranges (A1)

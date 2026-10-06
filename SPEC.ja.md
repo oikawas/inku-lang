@@ -1208,6 +1208,8 @@ renderer は JSON Score を SVG へ変換する。視覚的な実体化を持つ
 
 現行の標準実装は共有Rust rendererであり、platform-independentなRust crate `core/crates/inku-render`が演奏の正本である。Scoreの構造と意味は共有Rustを正本とし、Pythonは保存形式の読取互換、host側canvas/profileの解決、fresh seedの発行、engine registryを所有する。薄い`render_engines/default/adapter.py`は、検証済みScoreと解決済みoptionを1個の正規JSON requestへまとめ、独立した`inku-render-python` CPython wheelを1回だけ呼び、SVGとmetadataを一緒に受け取る。AndroidはKotlin hostで共有coreのScore、canvas、色map、profile、seedを解決し、薄い`inku-render-android` JNIを同じ粗いrequestで呼ぶ。`renderer.py`はSVGだけを必要とする既存Server callerの互換facadeであり、第二の描画実装ではない。
 
+過去作品の再演の互換例外は、描画不能を防ぐための必要最小限とする（2026-10-06 作者判断）。旧Serverの見た目へ一致させるために、hostがScoreの`at.region`を0〜1へクランプしたり、境界の順序を並べ替えたりする処理は撤廃する。版の無い旧形式を含むScore 0.10未満も、保存された範囲値をそのまま共有Rendererへ渡す。保存Score・SVGは書き換えず、旧Serverから再演したSVGとのバイト一致や見た目の完全一致を保証しない。通常DDLの数値範囲の検査、共有Renderer自身の演奏時の座標解決、描画に必要な旧形式の読取互換と資源上限は維持する。
+
 Rust core内では、host-neutralなrequest/output型と粗い`render`境界から、決定的seed、performance planning、arrangement／placement／relation、純粋な幾何、mark／stroke／surface／support、ground／presence layer／palette、SVG documentへ一方向に依存する。host SDKやPython runtimeへ依存せず、engine identityとrenderer-owned referenceもcoreが持つ。Engine 40のPython実装やruntime fallbackは持たず、過去のEngine 40 corpusは履歴根拠としてのみ保持する。この境界はServerの出力意味論を固定したままAndroidと将来のclientへ同じcoreを渡すportability boundaryである。Android bindingはEngine 42で統合済みであり、Android固有のKotlin rendererへfallbackしない。
 
 SVGからpixelへのpresentationはRender Engineと別の`core/crates/inku-svg-raster` APIが所有する。Androidのmain preview、履歴thumbnail、refinement preview、PNG exportは、保存済みまたは生成直後のcanonical SVGをresource非依存のpremultiplied RGBA8へ変換する。このraster APIの変更は、それ自体ではRender Engineの版を変えず、保存SVGや`rh3`の意味も変えない。

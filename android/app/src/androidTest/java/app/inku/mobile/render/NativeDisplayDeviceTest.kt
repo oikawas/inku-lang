@@ -9,6 +9,8 @@ import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.collect
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -97,7 +100,16 @@ class NativeDisplayDeviceTest {
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
         val started = AtomicInteger()
+        val sceneHandle = AtomicLong()
+        val sceneReleased = CompletableDeferred<Unit>()
         val gated = object : DisplayBridge by NativeDisplayBridge {
+            override fun prepare(svg: String): NativeDisplayScene = NativeDisplayBridge.prepare(svg).also {
+                sceneHandle.set(it.handle)
+            }
+            override fun close(handle: Long) {
+                NativeDisplayBridge.close(handle)
+                if (sceneHandle.get() == handle) sceneReleased.complete(Unit)
+            }
             override fun renderTile(composite: Long, region: String) {
                 started.incrementAndGet()
                 entered.countDown()
@@ -148,6 +160,9 @@ class NativeDisplayDeviceTest {
             old.cancelAndJoin()
             oldRenderer.purgeScenes()
             renderer.purgeScenes()
+            // A canceled collector returns before its independent cache flight's
+            // synchronous JNI call. That call retains the scene until it unwinds.
+            if (sceneHandle.get() != 0L) withTimeout(10_000) { sceneReleased.await() }
         }
         assertEquals(handlesBefore, NativeDisplayBridge.liveHandles())
     }

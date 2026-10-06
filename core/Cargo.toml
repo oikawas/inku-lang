@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/inku-ddl",
+    "crates/inku-display",
     "crates/inku-pipeline",
     "crates/inku-pipeline-uniffi",
     "crates/inku-score",
@@ -20,6 +21,7 @@ license = "MIT"
 
 [workspace.dependencies]
 inku-ddl = { path = "crates/inku-ddl" }
+inku-display = { path = "crates/inku-display" }
 inku-pipeline = { path = "crates/inku-pipeline" }
 inku-score = { path = "crates/inku-score" }
 inku-render = { path = "crates/inku-render" }

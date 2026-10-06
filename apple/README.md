@@ -194,6 +194,12 @@ apple/scripts/build-core.sh all
 
 The XCFramework keeps macOS arm64/x86_64, iOS arm64 device, and iOS arm64/x86_64 simulator in separate variants. Slices from different platforms are never combined with lipo. `Packages/InkuCore/Artifacts/build-manifest.json` records the product commit, core source fingerprint, toolchain/generator, archive hashes, profile, and deployment minimums. Running `macos` again replaces the artifact with a Mac-only version, so run `all` before an iOS build.
 
+The Rust artifact includes Skia for showing works (`core/crates/inku-display`, feature `display`). `build-core.sh` keeps a copy of each target's Skia prebuilt binaries in `~/Library/Application Support/inku/build-cache/skia-binaries/` and checks it against `core/crates/inku-display/skia-binaries.sha256` on every build, fetching from GitHub only when the copy is missing (`scripts/skia-binaries.sh`). A copy that does not match stops the build. CI and the Server build do not use this feature and never fetch Skia. Run the Skia tests on macOS with:
+
+```sh
+SKIA_BINARIES_URL="$(scripts/skia-binaries.sh aarch64-apple-darwin)" scripts/rust-toolchain.sh test --locked -p inku-display --features skia
+```
+
 Direct Swift package builds use committed references and require prepared Rust artifacts and pinned dictionaries. Ordinary preparation does not refresh references:
 
 ```sh

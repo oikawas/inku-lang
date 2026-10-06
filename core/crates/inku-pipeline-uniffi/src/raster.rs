@@ -97,7 +97,7 @@ pub fn prepare_raster_scene(svg: String) -> Result<Arc<RasterScene>, RasterFailu
     .unwrap_or(Err(RasterFailure::InternalInvariant))
 }
 
-fn frame(output: inku_svg_raster::RasterOutput) -> RasterFrame {
+pub(crate) fn frame(output: inku_svg_raster::RasterOutput) -> RasterFrame {
     RasterFrame {
         width: output.width,
         height: output.height,

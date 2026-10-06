@@ -1440,6 +1440,7 @@
 "ライセンス一覧を読み込めません。" = "Could not load the license list.";
 "Swiftパッケージ" = "Swift packages";
 "Rustクレート" = "Rust crates";
+"ネイティブライブラリ" = "Native libraries";
 "同梱の辞書とフォント" = "Bundled dictionaries and font";
 "作品の派生関係を表示" = "Show how this work was derived";
 "チェックした作品をゴミ箱へ移動" = "Move checked works to trash";

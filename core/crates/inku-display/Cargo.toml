@@ -1,0 +1,29 @@
+[package]
+name = "inku-display"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Screen display of inku SVG artifacts with Skia, matching the Web's Chrome"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+# Skia is opt-in: CI and the Server build the pure part only. The Apple host
+# enables it through `inku-pipeline-uniffi/display`.
+skia = ["dep:skia-safe"]
+
+[dependencies]
+inku-svg-raster.workspace = true
+roxmltree = "=0.21.1"
+# Apple's prebuilt binaries for these features are CPU only
+# (`jpegd-jpege-pdf-svg-textlayout-webpd-webpe`); see `skia-binaries.sha256`.
+skia-safe = { version = "=0.153.3", features = ["svg", "webp"], optional = true }
+
+[dev-dependencies]
+inku-ddl.workspace = true
+inku-pipeline.workspace = true
+serde_json.workspace = true

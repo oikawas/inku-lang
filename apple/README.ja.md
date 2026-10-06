@@ -194,6 +194,12 @@ apple/scripts/build-core.sh all
 
 XCFrameworkはmacOS arm64／x86_64、iOS arm64 device、iOS arm64／x86_64 simulatorを別variantに保持します。異なるplatformのsliceをlipoで混ぜません。`Packages/InkuCore/Artifacts/build-manifest.json`にproduct commit、core source fingerprint、toolchain／generator、archive hash、profileと最低OSを記録します。`macos`を再実行するとMacのみのartifactへ置き換わるため、iOS build前には`all`を実行してください。
 
+Rust artifactは作品表示のSkia（`core/crates/inku-display`、feature `display`）を含みます。`build-core.sh`は、対象ごとのSkia事前ビルドの写しを`~/Library/Application Support/inku/build-cache/skia-binaries/`に置き、`core/crates/inku-display/skia-binaries.sha256`と毎回照合します。写しが無いときだけGitHubから取得します（`scripts/skia-binaries.sh`）。一致しない写しがあると止まります。CIとServerのbuildはこのfeatureを使わず、Skiaを取得しません。Skiaを含む試験はmacOSで次のように走らせます。
+
+```sh
+SKIA_BINARIES_URL="$(scripts/skia-binaries.sh aarch64-apple-darwin)" scripts/rust-toolchain.sh test --locked -p inku-display --features skia
+```
+
 Swift packageを直接buildする場合は、commit済みreferenceに加えてRust artifactと固定辞書を先に用意してください。reference更新は通常の準備に含めません。
 
 ```sh

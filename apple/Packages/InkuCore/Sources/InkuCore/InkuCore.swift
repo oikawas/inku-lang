@@ -20,6 +20,9 @@ public struct RasterImage: Sendable {
 
 public enum CoreFailure: Error, Sendable {
     case rasterRefused(code: String, message: String)
+    /// Skia display does not take this work; show it with `PreparedSVG` and count the code.
+    case displayUnsupported(code: String, message: String)
+    case displayRefused(code: String, message: String)
     case emptySeedText
     case internalInvariant
 }
@@ -44,6 +47,71 @@ public struct PreparedSVG: Sendable {
         do { return RasterImage(try body()) }
         catch InkuCoreBindings.RasterFailure.Refused(let code, let message) { throw CoreFailure.rasterRefused(code: code, message: message) }
         catch InkuCoreBindings.RasterFailure.InternalInvariant { throw CoreFailure.internalInvariant }
+    }
+}
+
+/// A window on a canvas `fullWidth` × `fullHeight` pixels.
+public struct DisplayRegion: Sendable, Equatable {
+    public let fullWidth: UInt32
+    public let fullHeight: UInt32
+    public let x: UInt32
+    public let y: UInt32
+    public let width: UInt32
+    public let height: UInt32
+
+    public init(fullWidth: UInt32, fullHeight: UInt32, x: UInt32, y: UInt32, width: UInt32, height: UInt32) {
+        self.fullWidth = fullWidth
+        self.fullHeight = fullHeight
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+    }
+
+    fileprivate init(_ region: InkuCoreBindings.DisplayRegion) {
+        self.init(fullWidth: region.fullWidth, fullHeight: region.fullHeight, x: region.x, y: region.y,
+                  width: region.width, height: region.height)
+    }
+
+    fileprivate var binding: InkuCoreBindings.DisplayRegion {
+        InkuCoreBindings.DisplayRegion(fullWidth: fullWidth, fullHeight: fullHeight, x: x, y: y, width: width, height: height)
+    }
+}
+
+/// One work recorded by Skia for the screen. Its windows may be drawn on several threads at once.
+public struct PreparedDisplay: Sendable {
+    private let scene: InkuCoreBindings.DisplayScene
+    fileprivate init(_ scene: InkuCoreBindings.DisplayScene) { self.scene = scene }
+    public var sourceByteCount: UInt64 { scene.sourceByteCount() }
+    /// Skia's estimate of the recorded picture, for cache weight.
+    public var pictureByteCount: UInt64 { scene.pictureByteCount() }
+    public var intrinsicWidth: Double { scene.intrinsicWidth() }
+    public var intrinsicHeight: Double { scene.intrinsicHeight() }
+    /// How many places the display-time compatibility rewrite changed (href, ellipse, seed).
+    public var rewrites: (href: UInt64, ellipse: UInt64, seed: UInt64) {
+        let rewrites = scene.rewrites()
+        return (rewrites.href, rewrites.ellipse, rewrites.seed)
+    }
+
+    public func rasterize(targetWidth: UInt32? = nil, targetHeight: UInt32? = nil) throws -> RasterImage {
+        try lift { try scene.rasterize(targetWidth: targetWidth, targetHeight: targetHeight) }
+    }
+    public func region(_ region: DisplayRegion) throws -> RasterImage {
+        try lift { try scene.region(region: region.binding) }
+    }
+    private func lift(_ body: () throws -> InkuCoreBindings.RasterFrame) throws -> RasterImage {
+        do { return RasterImage(try body()) }
+        catch let failure as InkuCoreBindings.DisplayFailure { throw CoreFailure(failure) }
+    }
+}
+
+private extension CoreFailure {
+    init(_ failure: InkuCoreBindings.DisplayFailure) {
+        switch failure {
+        case .Unsupported(let code, let message): self = .displayUnsupported(code: code, message: message)
+        case .Refused(let code, let message): self = .displayRefused(code: code, message: message)
+        case .InternalInvariant: self = .internalInvariant
+        }
     }
 }
 
@@ -72,6 +140,23 @@ public enum InkuCore {
         do { return PreparedSVG(try InkuCoreBindings.prepareRasterScene(svg: svg)) }
         catch InkuCoreBindings.RasterFailure.Refused(let code, let message) { throw CoreFailure.rasterRefused(code: code, message: message) }
         catch InkuCoreBindings.RasterFailure.InternalInvariant { throw CoreFailure.internalInvariant }
+    }
+
+    public static var displayAPIVersion: String { InkuCoreBindings.displayApiVersion() }
+    /// The coarse whole's longest side and the tile side the display is drawn in.
+    public static var displayLayout: (coarseSide: UInt32, tileSide: UInt32) {
+        let layout = InkuCoreBindings.displayLayout()
+        return (layout.coarseSide, layout.tileSide)
+    }
+
+    public static func prepareDisplay(svg: String) throws -> PreparedDisplay {
+        do { return PreparedDisplay(try InkuCoreBindings.prepareDisplayScene(svg: svg)) }
+        catch let failure as InkuCoreBindings.DisplayFailure { throw CoreFailure(failure) }
+    }
+
+    /// The tiles covering a window, nearest to its centre first.
+    public static func displayTiles(window: DisplayRegion, side: UInt32) -> [DisplayRegion] {
+        InkuCoreBindings.displayTiles(window: window.binding, side: side).map(DisplayRegion.init)
     }
 
     public static func step(snapshot: Data, input: Data) -> Data {

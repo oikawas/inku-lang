@@ -274,6 +274,9 @@ export interface LangPack {
 	ddlEditSectionLabel: string;
 	ddlNewButton: string;
 	ddlEditButton: string;
+	ddlDiscardEdits: string;
+	ddlDiscardMessage: string;
+	ddlDiscardConfirm: string;
 	ddlImportButton: string;
 	ddlImportedPlugins: (names: string[]) => string;
 	ddlImportInvalid: string;

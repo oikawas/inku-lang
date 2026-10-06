@@ -170,6 +170,8 @@ The headings of the instructions section on the left and of the instructions edi
 
 The instructions box on the Describe tab also lets you edit the whole text directly. The box and Instruction editor share highlighting, completions, range folding and editing, IME composition, and copying. Line numbers appear only in the Instruction editor. When the box is editable, clicking a Saijiki drawer word inserts it at the box's caret and also shows its preview. Before you place the caret, words append at the end. While the box is read-only, in batch mode, or while the editor dialog is open, the drawer only previews. Editing the box alone never draws; press `Draw from instructions` to redraw once.
 
+`Discard edits` in the box and `Instruction editor` asks for confirmation. Press `Discard` to return to the saved instructions the target work was drawn from. Opening the editor from the box still returns to that work's instructions, rather than the box's draft. The box returns its draft; the editor returns only its own text and leaves the box's draft unchanged. Returning never draws. The button is disabled when the text matches, while read-only or while drawing, and is absent from `New instructions`. Cancel leaves the text unchanged. After discarding, ⌘Z (Ctrl+Z) in that editor restores the text from before the discard.
+
 There are two entrances to the instruction dialog. Both use the same dialog and editor. The text shows line numbers, syntax color, line and character counts; choose the painting model and `Wild` outside the text. While painting, the text, Saijiki, condition changes and close control are unavailable. A failed or stopped painting keeps the text.
 
 | Action | Contents |

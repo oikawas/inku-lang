@@ -1,6 +1,6 @@
 import { Compartment, EditorSelection, EditorState, Facet, StateField, Transaction, type Extension } from '@codemirror/state';
 import { Decoration, EditorView, drawSelection, keymap, lineNumbers, placeholder, type DecorationSet } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, isolateHistory } from '@codemirror/commands';
 import { autocompletion, completeFromList, type Completion, type CompletionSource } from '@codemirror/autocomplete';
 import { annotate, ddlPartClass, type Part } from '../../highlight';
 import { pluginDisplayName, type PluginNameIndex } from '../../plugin-names';
@@ -52,6 +52,14 @@ export function replaceDdlValue(state: EditorState, value: string): Transaction 
 	return state.update({ changes: { from: 0, to: state.doc.length, insert: value },
 		selection: EditorSelection.cursor(Math.min(state.selection.main.head, value.length)),
 		annotations: [externalDdlValue.of(true), Transaction.addToHistory.of(false)] });
+}
+
+/** A user-requested return is one undo step, unlike external synchronization. */
+export function replaceDdlWithHistory(state: EditorState, value: string): Transaction | null {
+	if (state.readOnly || state.field(rangeEditorState).composing || state.doc.toString() === value) return null;
+	return state.update({ changes: { from: 0, to: state.doc.length, insert: value },
+		selection: EditorSelection.cursor(Math.min(state.selection.main.head, value.length)),
+		annotations: isolateHistory.of('full'), userEvent: 'input.discard' });
 }
 
 export function insertDdlWord(state: EditorState, word: string, append = false): Transaction | null {
@@ -108,6 +116,7 @@ export type DdlEditorOptions = CompletionOptions & {
 export type DdlEditorControl = {
 	configure: (options: DdlEditorOptions) => void;
 	setValue: (value: string) => void;
+	replaceValueWithHistory: (value: string) => void;
 	insertWord: (word: string) => void;
 	focus: () => void;
 	destroy: () => void;
@@ -220,6 +229,11 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 			if (view.composing || view.state.field(rangeEditorState).composing) { pendingValue = next; return; }
 			const tr = replaceDdlValue(view.state, next);
 			if (tr) view.dispatch(tr);
+		},
+		replaceValueWithHistory(next) {
+			if (!view || view.composing) return;
+			const tr = replaceDdlWithHistory(view.state, next);
+			if (tr) { view.dispatch(tr); view.focus(); }
 		},
 		insertWord(word) {
 			if (!view) return;

@@ -1338,7 +1338,11 @@
 	const historyStripFiltered = $derived(history.filtered);
 	const trashItems = $derived(history.trashItems);
 	const trashTotal = $derived(history.trashTotal);
-	let confirmAction = $state<{ message: string; run: () => void; destructive?: boolean; runLabel?: string; secondaryLabel?: string; secondaryRun?: () => void; hideCancel?: boolean; cancelRun?: () => void } | null>(null);
+	let confirmAction = $state<{ message: string; run: () => void; destructive?: boolean; runLabel?: string; secondaryLabel?: string; secondaryRun?: () => void; hideCancel?: boolean; cancelRun?: () => void; focusOnOpen?: boolean } | null>(null);
+	function confirmDiscardEdits(run: () => void, cancelRun: () => void): void {
+		if (confirmAction) return;
+		confirmAction = { message: t().ddlDiscardMessage, runLabel: t().ddlDiscardConfirm, destructive: true, focusOnOpen: true, run, cancelRun };
+	}
 
 	// ── Batch derived ────────────────────────────────────────
 	const batchRunning = $derived(batch.running);
@@ -2870,6 +2874,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 							<DdlViewer
 								bind:this={ddlViewer}
 								ddl={work.ddl}
+								savedDdl={work.ddlGeneratedBaseline}
+								onConfirmDiscard={confirmDiscardEdits}
 								label={t().ddlLabel}
 								lang={shownDdlLang}
 								ranges={compositionRanges}
@@ -3159,6 +3165,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			isJapanese={getLang() === 'ja'}
 			mode={ddlDialogMode}
 			initialDdl={ddlDialogInitial}
+			savedDdl={ddlDialogNode?.history?.ddl ?? null}
+			discardDisabled={rangeEditingLocked}
+			onConfirmDiscard={confirmDiscardEdits}
 			ranges={compositionRanges}
 			artworkUrl={ddlDialogNode?.history?.id ? `/api/history/${encodeURIComponent(ddlDialogNode.history.id)}/svg` : null}
 			returnFocusTo={ddlDialogReturnFocus}
@@ -3520,6 +3529,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {#if confirmAction}
 	<ConfirmDialog
 		action={confirmAction}
+		focusOnOpen={confirmAction.focusOnOpen ?? false}
 		onCancel={() => { const cancel = confirmAction?.cancelRun; confirmAction = null; cancel?.(); }}
 		onRun={() => { const run = confirmAction?.run; confirmAction = null; run?.(); }}
 	/>

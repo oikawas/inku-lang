@@ -52,7 +52,7 @@ public struct WorkEditView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(model.display.localized("元の作品")).inkuFont(14, weight: .semibold)
             HStack(alignment: .top, spacing: 14) {
-                ArtworkThumbnail(work: editor.work, renderer: model.renderer)
+                ArtworkThumbnail(work: editor.work, thumbnails: model.thumbnails)
                     .frame(width: 120, height: 120).clipped()
                     .accessibilityLabel(model.display.localized("元の作品"))
                 Text(editor.work.effectiveSourceText).inkuFont(13).lineLimit(4)

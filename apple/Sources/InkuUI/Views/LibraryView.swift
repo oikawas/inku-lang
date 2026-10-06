@@ -389,7 +389,7 @@ struct LibraryView: View {
         let selected = library.selectedIDs.contains(work.id)
         return VStack(alignment: .leading, spacing: 5) {
             Button { openWork(work) } label: {
-                ArtworkThumbnail(work: work, renderer: model.renderer)
+                ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
                     .aspectRatio(82.0 / 58.0, contentMode: .fit)
                     .frame(maxWidth: .infinity)
             }
@@ -498,7 +498,7 @@ struct LibraryView: View {
         )) {
             TableColumn("") { row in selectionCheck(row.work) }.width(32)
             TableColumn(display.webCopy("historyImageHeader", fallback: "画像")) { row in
-                ArtworkThumbnail(work: row.work, renderer: model.renderer).frame(width: 48, height: 36)
+                ArtworkThumbnail(work: row.work, thumbnails: model.thumbnails).frame(width: 48, height: 36)
                     .overlay(alignment: .topTrailing) {
                         if row.work.starred { Image(systemName: "star.fill").font(.system(size: 9)).foregroundStyle(.yellow).padding(2) }
                     }
@@ -597,7 +597,7 @@ struct LibraryView: View {
             HStack(spacing: 10) {
                 if !thumbs {
                     Button { openWork(group.representative.work) } label: {
-                        ArtworkThumbnail(work: group.representative.work, renderer: model.renderer).frame(width: 56, height: 56)
+                        ArtworkThumbnail(work: group.representative.work, thumbnails: model.thumbnails).frame(width: 56, height: 56)
                     }
                     .buttonStyle(.plain)
                     .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
@@ -695,7 +695,7 @@ struct LibraryView: View {
         return VStack(alignment: .leading, spacing: 4) {
             Button { openWork(work) } label: {
                 VStack(alignment: .leading, spacing: 4) {
-                    ArtworkThumbnail(work: work, renderer: model.renderer)
+                    ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
                         .aspectRatio(82.0 / 58.0, contentMode: .fit)
                         .frame(maxWidth: .infinity, maxHeight: 110)
                     Text(LibraryWorkPresentation.title(work, untitled: display.localized("無題")))
@@ -733,7 +733,7 @@ struct LibraryView: View {
             selectionCheck(work)
             Button { openWork(work) } label: {
                 HStack(spacing: 8) {
-                    ArtworkThumbnail(work: work, renderer: model.renderer).frame(width: 48, height: 48)
+                    ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(width: 48, height: 48)
                     Text(LibraryWorkPresentation.title(work, untitled: display.localized("無題")))
                         .inkuFont(10).foregroundStyle(.secondary).lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)

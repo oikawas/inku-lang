@@ -207,6 +207,12 @@ swift run --package-path apple InkuAppCheck --display-only core/crates/inku-disp
 swift run --package-path apple InkuAppCheck --canvas-detail-only
 ```
 
+Baking and keeping thumbnails is checked with `--thumbnails-only <SVG path>`. It puts works in a temporary database and checks that the launch pass bakes 512px-wide PNGs into `thumbs.sqlite` beside it, that the next launch reads them without drawing, that only a work with a changed source is baked again, that a work shown with nothing stored is drawn on the spot and stored, that a saved work is baked, that a work deleted for good loses its thumbnail, and that a store that cannot be opened is replaced by an empty one.
+
+```sh
+swift run --package-path apple InkuAppCheck --thumbnails-only core/crates/inku-display/tests/data/public/p07.svg
+```
+
 Direct Swift package builds use committed references and require prepared Rust artifacts and pinned dictionaries. Ordinary preparation does not refresh references:
 
 ```sh

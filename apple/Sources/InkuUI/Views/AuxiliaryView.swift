@@ -33,7 +33,7 @@ public struct AuxiliaryView: View {
                 }
                 if let work = auxiliary.sourceWork ?? work {
                     HStack(spacing: 14) {
-                        ArtworkThumbnail(work: work, renderer: model.renderer).frame(width: 110, height: 95)
+                        ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(width: 110, height: 95)
                         VStack(alignment: .leading, spacing: 5) {
                             Text(work.effectiveSourceText).lineLimit(3)
                             Text(model.display.localized("元の作品は保持し、新しい子を系譜に保存します。")).inkuFont(12).foregroundStyle(.secondary)
@@ -231,7 +231,7 @@ public struct AuxiliaryView: View {
                         ForEach(auxiliary.generatedWorks, id: \.id) { work in
                             Button { observedGeneration = work } label: {
                                 VStack {
-                                    ArtworkThumbnail(work: work, renderer: model.renderer).frame(width: 130, height: 115)
+                                    ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(width: 130, height: 115)
                                     Text(work.effectiveSourceText).inkuFont(12).lineLimit(2).frame(width: 130)
                                 }.padding(6)
                                     .background(observedGeneration?.id == work.id ? Color.accentColor.opacity(0.12) : Color.clear,

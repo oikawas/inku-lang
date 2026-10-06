@@ -115,9 +115,12 @@ public final class AppModel {
     public let library = LibraryModel()
     public let display = DisplaySettings()
     public let descriptionMeter = DescriptionMeterModel()
+    /// The saijiki preview's painter.
     public let renderer = ArtworkRenderer()
-    /// The work area's painter (Skia); `renderer` keeps thumbnails and the saijiki preview.
+    /// The work area's painter (Skia).
     public let displayRenderer = DisplayRenderer()
+    /// Thumbnails baked to PNG beside the database (I-718).
+    public let thumbnails = ArtworkThumbnails()
     @ObservationIgnored public var onSavedWork: (@MainActor (SavedWork) async -> Void)?
     @ObservationIgnored public var onDrawingLog: (@MainActor (DrawingLogRecord) async -> Void)?
     public let versionSummary: String = {
@@ -240,6 +243,10 @@ public final class AppModel {
             let bootstrap = try Bootstrap()
             let settings = try await store.load(installingDefaults: BundledProviderDefaults.loadBundled())
             self.database = database
+            // A derived store: without it thumbnails are drawn and kept in memory, and nothing else stops.
+            await thumbnails.connect(store: try? ThumbnailStore(url: ThumbnailStore.url(besideDatabase: url)), database: database)
+            await thumbnails.synchronize()
+            library.thumbnails = thumbnails
             let personalRuntime = ChatGPTPlanRuntime(directory: url.deletingLastPathComponent().appendingPathComponent("personal-chatgpt", isDirectory: true))
             let ordinary: any ProviderTransport
             if let native = transport as? URLSessionProviderTransport { ordinary = native.withRateDatabase(database) }
@@ -1633,6 +1640,7 @@ public final class AppModel {
             currentView = nil
             workActionStates = [:]
             await library.resetAfterRestore()
+            await thumbnails.synchronize()
             restorationRevision &+= 1
             try await reloadWorks()
             status = "復元しました"
@@ -1737,6 +1745,7 @@ public final class AppModel {
         else if let work = try? await database?.work(id: id) { await notifySavedWork(work) }
     }
     private func notifySavedWork(_ work: SavedWork) async {
+        await thumbnails.bakeSaved(work)
         guard let callback = onSavedWork else { return }
         // A separate task makes the committed snapshot independent of later caller cancellation.
         await Task { @MainActor in await callback(work) }.value

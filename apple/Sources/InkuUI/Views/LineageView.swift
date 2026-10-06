@@ -339,7 +339,7 @@ struct LineageView: View {
             if let work = item.work {
                 Button { openWork(item) } label: {
                     VStack(alignment: .leading, spacing: 6) {
-                        ArtworkThumbnail(work: work, renderer: model.renderer).frame(height: 148)
+                        ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(height: 148)
                         LibraryWorkTitle(work: work, untitled: model.display.localized("無題"), lineLimit: 3)
                             // LineagePanel.svelte:853: the whole text on hover.
                             .inkuTooltip(model.display.tooltipValue(work.effectiveSourceText.isEmpty ? (work.descriptionHash ?? "") : work.effectiveSourceText))

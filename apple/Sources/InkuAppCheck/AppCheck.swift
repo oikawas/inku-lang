@@ -84,6 +84,10 @@ struct AppCheck {
             try await runDisplayCanvasChecks(svg: String(contentsOf: fixture, encoding: .utf8))
             return
         }
+        if let index = CommandLine.arguments.firstIndex(of: "--thumbnails-only"), CommandLine.arguments.indices.contains(index + 1) {
+            try await runThumbnailChecks(svg: String(contentsOf: URL(fileURLWithPath: CommandLine.arguments[index + 1]), encoding: .utf8))
+            return
+        }
         if let index = CommandLine.arguments.firstIndex(of: "--raster-only"), CommandLine.arguments.indices.contains(index + 1) {
             try await runRasterChecks(fixtureURL: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
             return

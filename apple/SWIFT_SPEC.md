@@ -14,6 +14,18 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-06 Bake thumbnails to PNG when a work is saved
+
+Thumbnails (the 14 uses of `ArtworkThumbnail`) are baked to PNG once per work and kept, as Server does (ledger I-718). The saved SVG is no longer drawn again for every display.
+
+- They are kept in `thumbs.sqlite` in the database's folder ([`ThumbnailStore`](Packages/InkuPersistence/Sources/InkuPersistence/ThumbnailStore.swift)). The table has the shape of Server's `thumbs`: work ID, scale, PNG, the render hash it was baked from, and when it was baked. It is derived rather than canonical, so backups leave it out, and a file that cannot be opened is replaced by an empty store.
+- The width is 512px (Server's scale 2); the height follows the work's proportions. They are drawn with resvg, the same picture as Server's thumbnails.
+- They are baked at three times: in the background right after a save; in the background after launch (and after a restore), four at a time, for works with none or with one baked from another render hash, dropping those of works that are gone; and on the spot, then stored, for a work shown before either reached it.
+- The thumbnails of works deleted for good are dropped after the deletion.
+- Images read are also kept in memory (up to 96 MB). The painter is [`ArtworkThumbnails`](Sources/InkuUI/ArtworkThumbnails.swift). The saijiki preview is still drawn by `ArtworkRenderer` for every display.
+- Measured (Apple M5 Pro, copies of the author's works, until one library page of 24 is complete): before the change, 1.10 s right after launch and 0.003 s from memory the second time. After it, 0.037 s right after launch once stored. On the first launch after the update, a work shown before it was baked is drawn at 512px on the spot, taking 1.7 s for the page. Baking 124 works in the background took 17–19 s, and the store is 21 MB (about 170 KB per work).
+- Check: AppCheck `--thumbnails-only <SVG>`.
+
 ## 2026-10-06 Draw the work area with Skia
 
 The surfaces that show a work large (the seven uses of `ArtworkCanvas`: the creation work area; the auxiliary, batch, replay comparison, library and automation views; and the presentation) are drawn with the shared core's display component [`inku-display`](../core/crates/inku-display/Cargo.toml) (Skia), so they look as the Web does in Chrome. The saved SVG does not change. Just before display, and only in memory, three compatibility rewrites are applied: the `href` of pattern and use becomes `xlink:href`, an ellipse becomes a path of the same shape, and an integer feTurbulence `seed` becomes the integer Blink reads.
@@ -456,7 +468,7 @@ Automatic backup generations are handled by the local maintenance feature above.
 
 The [shared raster crate](../core/crates/inku-svg-raster/Cargo.toml) renders SVG and returns owned premultiplied RGBA8 with width, height, stride, and pixel format. Swift mechanically converts this to an sRGB `CGImage` and retains the pixels for the image's lifetime. The display path does not omit filters or medium effects. Raster requests obey shared SVG size, dimension, and pixel limits and do not obtain resources from external networks or filesystems.
 
-The [ArtworkRenderer](Sources/InkuUI/ArtworkRenderer.swift) actor maintains a bounded cache keyed by SVG digest, raster API version, requested dimensions, and color space. Canvas and thumbnails request rasters when needed for display. Current PNG export rasterizes the saved SVG at height 1024; SVG export writes the saved canonical SVG unchanged. This does not implement the full custom-size or animated export specification.
+The [ArtworkRenderer](Sources/InkuUI/ArtworkRenderer.swift) actor maintains a bounded cache keyed by SVG digest, raster API version, requested dimensions, and color space. The saijiki preview requests rasters when needed for display. Since 2026-10-06 the work area is drawn by `DisplayRenderer` (Skia) and thumbnails read the PNGs baked and kept (the dated sections above). Current PNG export rasterizes the saved SVG at height 1024; SVG export writes the saved canonical SVG unchanged. This does not implement the full custom-size or animated export specification.
 
 ### Initial macOS UI and disconnected features
 

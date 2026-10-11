@@ -78,6 +78,12 @@ export const en: LangPack = {
 	pipelineDiagnosticsUnavailable: 'The drawing diagnostics for this saved work could not be read. The work is still shown.',
 	pipelineNeedsAttention: 'Review the result of this operation.',
 	pipelineCompletionIssuesTitle: 'Gaps that could not be completed',
+	ddlCompletionTag: 'completion',
+	ddlCompletionNumbersTag: 'numbers edited',
+	ddlCompletionWordsTag: 'words edited',
+	ddlCompletionWordsHint: (count) => count === 1
+		? 'One range has edited words. Drawing asks the completion to rewrite its numbers and asks for your approval.'
+		: `${count} ranges have edited words. Drawing asks the completion to rewrite their numbers and asks for your approval.`,
 	pipelineCompletionReason: (reason) => {
 		const reasons: Record<string, string> = {
 			established_fact_changed: 'The proposal lost a word read in the original sentence (a place, count, colour, shape, action, …).',
@@ -85,6 +91,7 @@ export const en: LangPack = {
 			target_unresolved: 'The proposal still had words that could not be read, so it could not be drawn.',
 			new_diagnostic: 'The proposal added a phrase that could not be read.',
 			numeric_range_outside_words: 'The numeric range fell outside the place word before the parenthesis.',
+			range_words_not_kept: 'The proposal changed the edited words before the parenthesis, or the form of the range.',
 			dependency_rejected: 'Another sentence that has to be fixed with it could not be completed.',
 			dependency_unresolved: 'Another sentence that has to be fixed with it could not be completed.',
 			outside_explicit_changed: 'The proposal changed what is written outside the gap.',

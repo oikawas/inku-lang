@@ -78,6 +78,10 @@ export const ja: LangPack = {
 	pipelineDiagnosticsUnavailable: 'この保存作品の描画診断を読み込めませんでした。作品はそのまま表示しています。',
 	pipelineNeedsAttention: '処理の結果を確認してください。',
 	pipelineCompletionIssuesTitle: '補えなかった箇所',
+	ddlCompletionTag: '補完',
+	ddlCompletionNumbersTag: '数を直した',
+	ddlCompletionWordsTag: '言葉を直した',
+	ddlCompletionWordsHint: (count) => `言葉を直した範囲が ${count} つあります。描くと補完がその範囲の数を書き直し、承認を求めます。`,
 	pipelineCompletionReason: (reason) => {
 		const reasons: Record<string, string> = {
 			established_fact_changed: '元の文で読めた語（位置・個数・色・形・動作など）が案で消えた',
@@ -85,6 +89,7 @@ export const ja: LangPack = {
 			target_unresolved: '案にも読めない語が残り、描ける文にならなかった',
 			new_diagnostic: '案に新しい読めない語句が入った',
 			numeric_range_outside_words: '数の範囲が、括弧の前の位置の語の範囲から外れた',
+			range_words_not_kept: '言葉を直した範囲の、括弧の前の言葉か範囲の形が案で変わった',
 			dependency_rejected: '一緒に直す別の文が補えなかった',
 			dependency_unresolved: '一緒に直す別の文が補えなかった',
 			outside_explicit_changed: '案が穴の外の書いた内容を変えた',

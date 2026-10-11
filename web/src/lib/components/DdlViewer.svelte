@@ -5,6 +5,8 @@
 	import { hasDdlBody } from '$lib/ddl-source';
 	import DdlEditor from './DdlEditor.svelte';
 	import type { RangeEditorStatus } from '$lib/features/ddl-editor/codemirror-ranges';
+	import type { CompletionRangeWork } from '$lib/features/ddl-editor/completion-range-states';
+	import type { ApiFetch } from '$lib/transport/api-fetch';
 	import type { PluginEntry, PreviewForPlugin, PreviewForWord } from '$lib/features/ddl-editor/types';
 	import { scanNumericRanges, type CompositionRange, type RangePreview } from '$lib/composition-ranges';
 
@@ -25,6 +27,8 @@
 		/** The language the DDL is read in; it names the heading. Omitted = `label`. */
 		lang?: ResolvedInstructionLang | null;
 		ranges?: CompositionRange[];
+		completionWork?: CompletionRangeWork | null;
+		apiFetch?: ApiFetch;
 		workKey?: unknown;
 		onDdlChange?: ((ddl: string) => void) | null;
 		onRangePreview?: ((preview: RangePreview | null) => void) | null;
@@ -33,7 +37,7 @@
 		previewForPlugin: PreviewForPlugin;
 	};
 
-	let { ddl, savedDdl = null, onConfirmDiscard, label, onEdit = null, editDisabled = false, onPaint = null, paintDisabled = false, runStatus = null, lang = null, ranges = [], workKey = null, onDdlChange = null, onRangePreview = null, pluginEntries = [], previewForWord, previewForPlugin }: Props = $props();
+	let { ddl, savedDdl = null, onConfirmDiscard, label, onEdit = null, editDisabled = false, onPaint = null, paintDisabled = false, runStatus = null, lang = null, ranges = [], completionWork = null, apiFetch, workKey = null, onDdlChange = null, onRangePreview = null, pluginEntries = [], previewForWord, previewForPlugin }: Props = $props();
 	let editor = $state<DdlEditor | null>(null);
 	let rangeStatus = $state<RangeEditorStatus>({ preview: null, invalid: false, composing: false });
 
@@ -89,6 +93,8 @@
 				disabled={readOnly}
 				compact
 				{ranges}
+				{completionWork}
+				{apiFetch}
 				{pluginEntries}
 				{previewForWord}
 				{previewForPlugin}

@@ -13,6 +13,8 @@
 	import type { ProviderAttemptCount } from '$lib/paintStream';
 	import type { CompositionRange } from '$lib/composition-ranges';
 	import type { RangeEditorStatus } from '$lib/features/ddl-editor/codemirror-ranges';
+	import type { CompletionRangeWork } from '$lib/features/ddl-editor/completion-range-states';
+	import type { ApiFetch } from '$lib/transport/api-fetch';
 
 	type Props = {
 		open: boolean;
@@ -36,6 +38,8 @@
 		previewForPlugin: PreviewForPlugin;
 		pluginEntries?: PluginEntry[];
 		ranges?: CompositionRange[];
+		completionWork?: CompletionRangeWork | null;
+		apiFetch?: ApiFetch;
 		artworkUrl?: string | null;
 		wildValue?: boolean;
 		wildInherited?: boolean;
@@ -49,7 +53,7 @@
 		open, mode, isJapanese, initialDdl, savedDdl = null, discardDisabled = false, onConfirmDiscard, returnFocusTo = null, drawing,
 		stage2ModelLabel, drawingModelId, drawingModelGroups, onSelectDrawingModel,
 		runTokensIn, runTokensOut, runAttempt = null, error, previewForWord, previewForPlugin,
-		pluginEntries = [], ranges = [], artworkUrl = null, wildValue = false, wildInherited = true, onSelectWild, onDraw, onClose,
+		pluginEntries = [], ranges = [], completionWork = null, apiFetch, artworkUrl = null, wildValue = false, wildInherited = true, onSelectWild, onDraw, onClose,
 	}: Props = $props();
 
 	let value = $state('');
@@ -186,7 +190,7 @@
 			<button class="ddled-close" type="button" disabled={drawing} onclick={requestClose} aria-label={t().closeLabel}>×</button>
 		</header>
 		<div class="ddled-body">
-			<DdlEditor bind:this={editor} bind:value {isJapanese} disabled={drawing} {pluginEntries} {ranges} {previewForWord} {previewForPlugin} onRanges={(status) => (rangeStatus = status)} />
+			<DdlEditor bind:this={editor} bind:value {isJapanese} disabled={drawing} {pluginEntries} {ranges} {completionWork} {apiFetch} {previewForWord} {previewForPlugin} onRanges={(status) => (rangeStatus = status)} />
 			<DdlRangePreview {artworkUrl} preview={rangeStatus.preview} />
 		</div>
 		{#if rangeStatus.invalid}<p class="ddled-range-invalid" role="alert">{t().ddlRangeInvalid}</p>{/if}

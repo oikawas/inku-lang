@@ -25,6 +25,20 @@ from .provider_observation import ProviderObservationStore
 _logger = logging.getLogger(__name__)
 
 
+def _performance_idempotency(settings: dict, snapshot: dict, render_hash: str) -> str:
+    """Two performances with different completion records are distinct works."""
+    requested = settings.get("request_idempotency_key")
+    record = snapshot.get("completion_ranges")
+    if requested and record is None:
+        return requested
+    identity = {"variation": snapshot["variation_id"], "revision": snapshot["authority"]["revision"], "render": render_hash}
+    if requested:
+        identity = {"request": requested}
+    if record is not None:
+        identity["completion_ranges"] = record
+    return "pipeline:" + hashlib.sha256(_bytes(identity)).hexdigest()
+
+
 def _apply_developer_options(config: dict, options: dict, *, developer_mode: bool) -> None:
     requested = any(options.get(name) is True for name in (
         "developer_disable_llm_retries", "developer_capture_provider_io",
@@ -488,9 +502,7 @@ class ProductPipelineEffects:
             if settings.get("count_generation") is not False:
                 result["user_generation_count"] = db.increment_user_generation_count(owner)
             return result
-        idempotency = settings.get("request_idempotency_key") or "pipeline:" + hashlib.sha256(_bytes({
-            "variation": snapshot["variation_id"], "revision": snapshot["authority"]["revision"], "render": result["render_hash"],
-        })).hexdigest()
+        idempotency = _performance_idempotency(settings, snapshot, result["render_hash"])
         at = settings.get("history_at")
         if at is None:
             at = int(time.time() * 1000)

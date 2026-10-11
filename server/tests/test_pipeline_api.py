@@ -51,6 +51,7 @@ def _wait_for(
 
 def test_hole_provider_runs_after_current_safe_render_is_persisted() -> None:
     order: list[str] = []
+    record = {"schema": "inku.completion-ranges.v1", "ranges": [{"opaque": "kept"}]}
 
     class Binding:
         canvas_registry = {"registry": {"formats": []}}
@@ -63,6 +64,7 @@ def test_hole_provider_runs_after_current_safe_render_is_persisted() -> None:
             if not snapshot_bytes:
                 snapshot = {
                     "execution_id": "execution-1",
+                    "completion_ranges": record,
                     "variation_id": "variation-1",
                     "sequence": request["sequence"],
                     "authority": {"revision": "1"},
@@ -138,6 +140,7 @@ def test_hole_provider_runs_after_current_safe_render_is_persisted() -> None:
         saved = store.saved[-1]
         assert saved["rendered"]["svg"] == "<svg><circle/></svg>"
         assert saved["context"]["result"]["svg"] == "<svg><circle/></svg>"
+        assert saved["snapshot"]["completion_ranges"] == record
         order.append("provider")
         return {
             "tag": "provider_failed",
@@ -147,6 +150,7 @@ def test_hole_provider_runs_after_current_safe_render_is_persisted() -> None:
         }
 
     def project(_owner, _snapshot, _context, rendered):
+        assert _snapshot["completion_ranges"] == record
         order.append("project")
         return {"svg": rendered["svg"], "render_seed": 2**63 - 1}
 

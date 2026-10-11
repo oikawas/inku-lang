@@ -5,6 +5,8 @@
 	import { resolveInstructionLang } from '$lib/instructionLang';
 	import { createDdlEditor, type DdlEditorControl, type DdlEditorOptions } from '$lib/features/ddl-editor/codemirror';
 	import type { RangeEditorStatus } from '$lib/features/ddl-editor/codemirror-ranges';
+	import { CompletionRangeStatesQuery, completionWordsHint, type CompletionRangeState, type CompletionRangeWork } from '$lib/features/ddl-editor/completion-range-states';
+	import type { ApiFetch } from '$lib/transport/api-fetch';
 	import type { CompositionRange } from '$lib/composition-ranges';
 	import Tooltip from './Tooltip.svelte';
 	import SaijikiInline from './SaijikiInline.svelte';
@@ -20,6 +22,8 @@
 		previewForWord: PreviewForWord;
 		previewForPlugin: PreviewForPlugin;
 		ranges?: CompositionRange[];
+		completionWork?: CompletionRangeWork | null;
+		apiFetch?: ApiFetch;
 		onRanges?: (status: RangeEditorStatus) => void;
 		onChange?: (value: string) => void;
 	};
@@ -33,6 +37,8 @@
 		previewForWord,
 		previewForPlugin,
 		ranges = [],
+		completionWork = null,
+		apiFetch,
 		onRanges,
 		onChange,
 	}: Props = $props();
@@ -42,6 +48,23 @@
 	let activeSaijikiPreview = $state<SaijikiPreview | null>(null);
 	let showVocabulary = $state(true);
 	let showGuide = $state(false);
+	let completionStates = $state.raw<CompletionRangeState[]>([]);
+	let completionSource = $state('');
+	const completionQuery = new CompletionRangeStatesQuery();
+	const completionLabels = $derived({ completed: t().ddlCompletionTag, numbers_changed: t().ddlCompletionNumbersTag, words_changed: t().ddlCompletionWordsTag });
+	const completionHint = $derived(completionWordsHint(completionStates, t()));
+
+	$effect(() => {
+		const source = value, work = completionWork, fetchStates = apiFetch;
+		completionQuery.cancel();
+		completionStates = [];
+		completionSource = source;
+		if (!work || !fetchStates) return;
+		const timer = setTimeout(() => {
+			void completionQuery.load(fetchStates, work, source, (ranges) => { completionStates = ranges; });
+		}, 180);
+		return () => { clearTimeout(timer); completionQuery.cancel(); };
+	});
 
 	const lineNumbers = $derived(value.split('\n'));
 	const pluginNameIndex = $derived(buildPluginNameIndex(pluginEntries));
@@ -50,6 +73,7 @@
 
 	function configuration(): DdlEditorOptions {
 		return { isJapanese, disabled, pluginEntries, pluginNameIndex, ranges, previewForWord, previewForPlugin,
+			completionSource, completionStates, completionLabels,
 			lineNumbers: !compact, cursorAtEnd: compact,
 			label: t().ddlEditorInstructions, placeholder: t().ddlEditPlaceholder,
 			onChange: (next) => { value = next; onChange?.(next); }, onPreview: (next) => activeSaijikiPreview = next, onRanges: (status) => onRanges?.(status) };
@@ -101,6 +125,7 @@
 	<div class="ddl-editor-workspace" class:with-vocabulary={!compact && showVocabulary} class:with-support={!compact && (showGuide || unknownNames.length > 0)}>
 		<div class="ddl-editor-main">
 			<div class="ddl-editor-frame" class:readonly={disabled} bind:this={editorHost}></div>
+			{#if completionHint}<p class="ddl-completion-hint" role="status">{completionHint}</p>{/if}
 
 			{#if !compact && (unknownNames.length > 0 || showGuide)}
 				<div class="ddl-editor-support">
@@ -146,6 +171,8 @@
 </section>
 
 <style>
+	.ddl-completion-hint { margin: 6px 0 0; color: var(--fg2); font-size: var(--ui-font-size-12); white-space: normal; }
+	:global(.cm-ddl-completion-tag) { margin-left: 0.35em; padding: 0.08em 0.4em; border: 1px solid var(--border2); border-radius: 4px; color: var(--fg2); background: var(--bg2); font-size: var(--ui-font-size-11); white-space: nowrap; user-select: none; }
 	.ddl-editor {
 		display: flex;
 		flex: 1;

@@ -11,6 +11,7 @@
 	import { pipelineDescription } from '$lib/description-labels';
 	import { highlightDDL } from '$lib/highlight';
 	import type { ImportedPlugin } from '$lib/features/ddl-editor/ddl-import';
+	import type { CompletionRangeWork } from '$lib/features/ddl-editor/completion-range-states';
 	import { pluginDisplayName } from '$lib/plugin-names';
 	import { pluginWarningsToShow } from '$lib/plugin-names';
 	import { limitNotesToShow } from '$lib/limitNotes';
@@ -1883,6 +1884,18 @@ function detachLineage(): void {
 }
 
 const currentLineageNodeId = $derived(work.displayedHistoryItem?.lineage_node_id ?? work.result?.lineage_node_id ?? null);
+const currentCompletionWork: CompletionRangeWork | null = $derived.by(() => {
+	const historyId = work.displayedHistoryItem?.id ?? work.result?.history_id;
+	const view = work.pipelineView;
+	if (view && (!historyId || view.result?.history_id === historyId)) return { execution_id: view.execution_id };
+	return historyId ? { history_id: historyId } : null;
+});
+const dialogCompletionWork: CompletionRangeWork | null = $derived.by(() => {
+	const historyId = ddlDialogMode === 'edit' ? ddlDialogNode?.history?.id : null;
+	if (!historyId) return null;
+	const view = work.pipelineView;
+	return view?.result?.history_id === historyId ? { execution_id: view.execution_id } : { history_id: historyId };
+});
 // The description tab's edit button needs both a node to branch from and a DDL
 // to load into the editor.
 	// The language the shown DDL is read in: the one recorded when it was
@@ -2897,6 +2910,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 								label={t().ddlLabel}
 								lang={shownDdlLang}
 								ranges={compositionRanges}
+								completionWork={currentCompletionWork}
+								{apiFetch}
 								workKey={work.result}
 								onDdlChange={(ddl) => { if (canEditCurrentDdl && !rangeEditingLocked) work.ddl = ddl; }}
 								onRangePreview={(preview) => { ddlRangePreview = preview; }}
@@ -3187,6 +3202,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			discardDisabled={rangeEditingLocked}
 			onConfirmDiscard={confirmDiscardEdits}
 			ranges={compositionRanges}
+			completionWork={dialogCompletionWork}
+			{apiFetch}
 			artworkUrl={ddlDialogNode?.history?.id ? `/api/history/${encodeURIComponent(ddlDialogNode.history.id)}/svg` : null}
 			returnFocusTo={ddlDialogReturnFocus}
 			drawing={ddlDialogDrawing}

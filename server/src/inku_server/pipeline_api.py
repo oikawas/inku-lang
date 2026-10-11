@@ -13,7 +13,7 @@ from typing import Callable, Literal
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from .description_labels import pipeline_description
 from .pipeline_candidate import CandidateExecution, CandidateHostError, PipelineBinding
@@ -94,6 +94,19 @@ class LinkedHistoryForkBody(BaseModel):
     options: dict = {}
 
 
+class CompletionRangeStatesBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    source: str
+    history_id: str | None = None
+    execution_id: str | None = None
+
+    @model_validator(mode="after")
+    def one_work(self):
+        if bool(self.history_id) == bool(self.execution_id):
+            raise ValueError("choose one saved work or execution")
+        return self
+
+
 class AuthorDdlBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_revision: str
@@ -159,7 +172,10 @@ class PipelineService:
                 host_context.pop("result", None)
                 host_context.pop("render_digest", None)
             elif self.project_result is not None:
-                digest = hashlib.sha256(json.dumps(rendered, sort_keys=True).encode()).hexdigest()
+                projection = rendered
+                if snapshot.get("completion_ranges") is not None:
+                    projection = {"rendered": rendered, "completion_ranges": snapshot["completion_ranges"]}
+                digest = hashlib.sha256(json.dumps(projection, sort_keys=True).encode()).hexdigest()
                 if digest != host_context.get("render_digest"):
                     host_context["result"] = self.project_result(owner, snapshot, host_context, rendered)
                     host_context["render_digest"] = digest
@@ -217,6 +233,8 @@ class PipelineService:
                 config = select_canvas(config, self.binding.canvas_registry, selected)
             run = self._host(owner, config, context)
             authoring = {"tag": "description", "description": drawn, "auto_catalog": context.get("auto_catalog", self.auto_catalog)} if kind == "description" else {"tag": "direct_ddl", "source": text}
+            if kind == "direct_ddl" and source_work and source_work.get("completion_ranges") is not None:
+                authoring["completion_ranges"] = deepcopy(source_work["completion_ranges"])
             sketch = context.get("sketch_request") or {"mode": "off"}
             if kind == "description" and sketch["mode"] != "off":
                 authoring["sketch"] = sketch
@@ -271,6 +289,8 @@ class PipelineService:
         # A changed performance configuration is a new edition, just like a
         # DDL fork from saved history. The original source and authority stay
         # intact; the new direct-DDL variation starts with DDL authority.
+        if run.snapshot().get("completion_ranges") is not None:
+            source_work["completion_ranges"] = run.snapshot()["completion_ranges"]
         return self.start(
             owner, "direct_ddl", body.source,
             parent={"kind": "variation", "id": previous["variation_id"]},
@@ -366,6 +386,33 @@ class PipelineService:
                 self._runs[key] = run
                 self._schedule(key, run)
             return run
+
+    def completion_range_states(self, owner: str, body: CompletionRangeStatesBody) -> dict:
+        """Read this owner's trusted inputs without starting or resuming work."""
+        if body.history_id:
+            linked = self.store.read_linked_history(owner, body.history_id)
+            if linked is None:
+                if self.store.read_legacy_history(owner, body.history_id) is None:
+                    raise HTTPException(404, "history_not_found")
+                config, record = None, None
+            else:
+                config, record = linked.saved_config, linked.completion_ranges
+        else:
+            with self._lock:
+                run = self._runs.get((owner, body.execution_id))
+            if run is not None:
+                snapshot = run.snapshot()
+            else:
+                saved = self.store.read_execution(owner, body.execution_id)
+                if saved is None:
+                    raise HTTPException(404, "variation_not_found")
+                snapshot = json.loads(saved.state_bytes)["snapshot"]
+            config, record = snapshot["config"], snapshot.get("completion_ranges")
+        states = getattr(self.binding, "completion_range_states", None)
+        if record is None or states is None:
+            return {"schema": "inku.completion-range-states.v1", "ranges": []}
+        request = {"config": config, "source": body.source, "completion_ranges": record}
+        return json.loads(states(json.dumps(request, ensure_ascii=False, allow_nan=False).encode("utf-8")))
 
     def provider_capture_status(self, owner: str, execution_id: str) -> dict:
         """Read saved state only; transcript inspection must not resume work."""
@@ -518,6 +565,7 @@ def linked_source_work(linked) -> dict:
         "saved_config": linked.saved_config,
         "host_options": linked.host_options,
         "macro_catalog": linked.macro_catalog,
+        **({"completion_ranges": linked.completion_ranges} if linked.completion_ranges is not None else {}),
         "result": {"lineage_node_id": history["metadata"].get("lineage_node_id")},
     }
 
@@ -551,6 +599,10 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
     @router.get("/canvas-formats")
     def canvas_formats(actor: dict = Depends(actor_dependency)):
         return (binding_for() if binding_for else current_service().binding).canvas_registry
+
+    @router.post("/completion-range-states")
+    def completion_range_states(body: CompletionRangeStatesBody, actor: dict = Depends(actor_dependency)):
+        return current_service().completion_range_states(actor["id"], body)
 
     @router.get("/history/{history_id}")
     def history_link(history_id: str, actor: dict = Depends(actor_dependency)):

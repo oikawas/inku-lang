@@ -49,6 +49,10 @@ export interface LangPack {
 	pipelineDiagnosticsUnavailable: string;
 	pipelineNeedsAttention: string;
 	pipelineCompletionIssuesTitle: string;
+	ddlCompletionTag: string;
+	ddlCompletionNumbersTag: string;
+	ddlCompletionWordsTag: string;
+	ddlCompletionWordsHint: (count: number) => string;
 	pipelineCompletionReason: (reason: string) => string;
 	pipelineAttentionReason: (reason: string) => string;
 	/** What happened to the model call behind a failed stage, as a parenthetical; empty when unknown. */

@@ -9,6 +9,8 @@ import { SAIJIKI, saijikiWordsFor } from '../../saijiki';
 import type { CompositionRange } from '../../composition-ranges';
 import type { PluginEntry, PreviewForPlugin, PreviewForWord, SaijikiPreview } from './types';
 import { compositionChanged, externalDdlValue, hoveredRange, numericRangeEditing, openRangeAt, rangeEditorState, rangeFocusChanged, type RangeEditorStatus } from './codemirror-ranges';
+import { completionRangeTagState, completionRangeTagsChanged, type CompletionRangeLabels } from './completion-range-tags';
+import type { CompletionRangeState } from './completion-range-states';
 
 const pluginNames = Facet.define<PluginNameIndex, PluginNameIndex>({ combine: (values) => values[0] ?? { names: [], firesOn: [] } });
 type Token = { from: number; to: number; part: Part };
@@ -102,6 +104,9 @@ export function ddlCompletions(options: () => CompletionOptions): CompletionSour
 }
 
 export type DdlEditorOptions = CompletionOptions & {
+	completionSource?: string;
+	completionStates?: readonly CompletionRangeState[];
+	completionLabels?: CompletionRangeLabels;
 	disabled: boolean;
 	lineNumbers?: boolean;
 	cursorAtEnd?: boolean;
@@ -173,6 +178,7 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 	view = new EditorView({ parent, state: EditorState.create({ doc: value,
 		selection: initial.cursorAtEnd ? EditorSelection.cursor(value.length) : undefined,
 		extensions: [
+		completionRangeTagState,
 		configuration.of(configurable()), history(), keymap.of([...defaultKeymap, ...historyKeymap]),
 		drawSelection(), EditorView.lineWrapping,
 		autocompletion({ override: [ddlCompletions(() => options)] }),
@@ -223,6 +229,9 @@ export function createDdlEditor(parent: HTMLElement, value: string, initial: Ddl
 			options = next;
 			if (view && (previous.disabled !== next.disabled || previous.pluginNameIndex !== next.pluginNameIndex || previous.ranges !== next.ranges
 				|| previous.label !== next.label || previous.placeholder !== next.placeholder || previous.lineNumbers !== next.lineNumbers)) view.dispatch({ effects: configuration.reconfigure(configurable()) });
+			if (view && next.completionLabels && (previous.completionSource !== next.completionSource || previous.completionStates !== next.completionStates || previous.completionLabels !== next.completionLabels)) {
+				view.dispatch({ effects: completionRangeTagsChanged.of({ source: next.completionSource ?? '', ranges: next.completionStates ?? [], labels: next.completionLabels }) });
+			}
 		},
 		setValue(next) {
 			if (!view || view.state.doc.toString() === next) return;

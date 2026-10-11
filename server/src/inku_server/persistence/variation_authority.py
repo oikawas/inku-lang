@@ -39,7 +39,8 @@ from .schema import (
 AUTHORITY_PROTOCOL = "inku.variation-authority.v1"
 COMMIT_ACTION_TAG = "commit_visible_normalized_ddl"
 _LEGACY_HISTORY_FORK_CONTEXT_PROTOCOL = "inku.pipeline-history-fork-context.v1"
-HISTORY_FORK_CONTEXT_PROTOCOL = "inku.pipeline-history-fork-context.v2"
+_DIAGNOSTICS_HISTORY_FORK_CONTEXT_PROTOCOL = "inku.pipeline-history-fork-context.v2"
+HISTORY_FORK_CONTEXT_PROTOCOL = "inku.pipeline-history-fork-context.v3"
 _PIPELINE_DIAGNOSTIC_KEYS = frozenset(
     {
         "upstream_diagnostics",
@@ -169,6 +170,7 @@ class LinkedHistoryForkRecord:
     host_options: dict[str, object]
     macro_catalog: dict[str, object]
     pipeline_diagnostics: dict[str, object] | None
+    completion_ranges: object | None = None
 
 
 @dataclass(frozen=True)
@@ -653,6 +655,8 @@ def _history_fork_context_bytes(
             pipeline_diagnostics
         ),
     }
+    if snapshot.get("completion_ranges") is not None:
+        payload["completion_ranges"] = snapshot["completion_ranges"]
     encoded = _canonical_json(payload, sort_keys=True).encode("utf-8")
     return encoded, hashlib.sha256(encoded).hexdigest()
 
@@ -720,8 +724,10 @@ def _decode_history_fork_context_payload(
     if protocol == _LEGACY_HISTORY_FORK_CONTEXT_PROTOCOL:
         expected_keys = legacy_keys
         pipeline_diagnostics = None
-    elif protocol == HISTORY_FORK_CONTEXT_PROTOCOL:
+    elif protocol in {_DIAGNOSTICS_HISTORY_FORK_CONTEXT_PROTOCOL, HISTORY_FORK_CONTEXT_PROTOCOL}:
         expected_keys = legacy_keys | {"pipeline_diagnostics"}
+        if protocol == HISTORY_FORK_CONTEXT_PROTOCOL and "completion_ranges" in payload:
+            expected_keys |= {"completion_ranges"}
         pipeline_diagnostics = _validate_pipeline_diagnostics(
             payload.get("pipeline_diagnostics")
         )
@@ -776,6 +782,7 @@ def _decode_history_fork_context(
         host_options=payload["host_options"],
         macro_catalog=payload["macro_catalog"],
         pipeline_diagnostics=pipeline_diagnostics,
+        completion_ranges=payload.get("completion_ranges"),
     )
 
 

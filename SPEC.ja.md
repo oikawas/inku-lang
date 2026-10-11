@@ -116,6 +116,8 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 
 `左上がり` / `left-rising` と `左下がり` / `left-falling` は、typed direct DDLとMacro参照で左右の意味を保つhidden markerである。現時点ではStage 1 promptと歳時記表示へ公開せず、既存の六つの表示語を変えない。
 
+英語の端の語はハイフンで書く（`left-edge`・`right-edge`・`top-edge`・`bottom-edge`）。空白で書いた`left edge`・`right edge`・`top edge`・`bottom edge`も同じ位置の語として読む（DDL 17）。`line-up`に対する`line up`と同じく、空白の書き方はparserだけが読む別の書き方で、Stage 1 promptと歳時記の表示はハイフンの語のままである。
+
 ペン・実線・空・黒は legacy Score / coerce と比較するための historical baseline であり、typed meaningへ挿入する既定値ではない。Visible DDL に該当 field が無ければ typed meaning は `unspecified` のままで、parser / semantic association は補わない。Lock検証済みviewからactual Scoreへ解決する現行subsetだけは、数値位置または`place:center`（画面中央の領域）と、place actionを持つcount1のcircle / square / ellipse / cloudform / triangle / polygonについて、省略countを1、touchをpen、continuityをsolid、閉じた面を塗りとして解決する。色の省略は実際のwork paletteで解決したbackgroundとblack / whiteのOKLCH L差を比較し、大きい側（同差はblack）を選ぶ。明示値は項目ごとに優先し、この解決をsource meaningへ書き戻さない。旧Stop / OmitAndContinue入力は互換で受けるが、recoverableなfieldまたは実行単位の不成立は共通の局所回復としてtyped診断つきで省略し、残る描画を続ける。この規則は Renderer 内部の物理 fallbackや既存作品のread compatibilityを遡及変更しない。
 
 図形の大小は歳時記語彙ではなく、typed DDL compilerが所有する有限の局所modifierである。現行classは`slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large`の7つで、JAの普通・大小表現とENの`normal-sized`、`slightly` / `very`を含む対応表面をsource spanごと保持する。自由なdegree同義語やsource substring後処理へ広げない。
@@ -1984,7 +1986,7 @@ PoC と初期機能の完了記録は [CHANGELOG.ja.md](CHANGELOG.ja.md) と [�
 | center | [1/3,1/3,2/3,2/3]（中の升目） |
 | corner | 左上[0,0,1/5,1/5]、右上[4/5,0,1,1/5]、左下[0,4/5,1/5,1]、右下[4/5,4/5,1,1]の一つ |
 
-`center`（中心）は中の升目で、置くときの基準点は`[7/18,7/18,11/18,11/18]`から選ぶ。位置を省いて置いた図形と同じである。Anchorの`center`だけは一点(0.5, 0.5)である。四辺は狭い帯であり固定点ではない。
+`center`（中心）は中の升目で、置くときの基準点は`[7/18,7/18,11/18,11/18]`から選ぶ。位置を省いて置いた図形と同じである。Anchorの`center`だけは一点(0.5, 0.5)である。四辺は狭い帯であり固定点ではない。英語では端をハイフンでも空白でも書ける（`left-edge`と`left edge`、右・上・下も同じ。DDL 17）。補完が範囲の括弧の前に残す言葉も、どちらの書き方でもその端の範囲と照合する（§12.7.1）。
 隅はStage 2が`inku.score-place-selection.v1`専用domainで選ぶ。Verified original pre / expanded meaning
 digest、NoneとSome(0)を区別するtag付きcomposition seed、directの元logical ordinalまたはMacroのsemantic
 ordinal / expansion path / generated ordinalをframeし、SHA-256先頭byteのmodulo 4を左上・右上・左下・右下へ写す。

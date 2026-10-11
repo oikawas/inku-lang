@@ -1002,6 +1002,9 @@
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
+          "parser_surfaces_en": [
+            "left edge"
+          ],
           "prompt": true,
           "score_value": null,
           "surface_en": "left-edge",
@@ -1013,6 +1016,9 @@
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
+          "parser_surfaces_en": [
+            "right edge"
+          ],
           "prompt": true,
           "score_value": null,
           "surface_en": "right-edge",
@@ -1024,6 +1030,9 @@
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
+          "parser_surfaces_en": [
+            "top edge"
+          ],
           "prompt": true,
           "score_value": null,
           "surface_en": "top-edge",
@@ -1035,6 +1044,9 @@
           "marker": null,
           "marker_surfaces_en": null,
           "marker_surfaces_ja": null,
+          "parser_surfaces_en": [
+            "bottom edge"
+          ],
           "prompt": true,
           "score_value": null,
           "surface_en": "bottom-edge",

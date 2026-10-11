@@ -364,4 +364,7 @@ DDL_ENGINE_VERSION = "57"
 # the wave spacing and amplitude. The v1 aliases (点 for stipple, 震える, 滲む,
 # 中央, trembling, blurring, middle) are not read. Saved documents and Macro
 # definitions are rewritten once to the v2 words.
-DDL_VERSION = "16"
+# 17 (2026-10-12): The English edges may also be written with a space (`left
+# edge`, `right edge`, `top edge`, `bottom edge`) and are the same position
+# words as `left-edge` and the others.
+DDL_VERSION = "17"

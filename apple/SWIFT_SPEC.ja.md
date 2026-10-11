@@ -2,7 +2,7 @@
 
 このディレクトリは、macOS先行のnative SwiftUIクライアントとApple向け共通packageのworkspaceである。本書をSwift host固有の仕様正本とし、[SWIFT_SPEC.md](SWIFT_SPEC.md)を対応英語版とする。共有DDL、Score、prompt、authoring authority、pipeline状態遷移、seed、描画の意味は[製品仕様](../SPEC.ja.md)を正本とし、Serverを開発上のprimaryとして同じRust coreへ追随する。Swift側に意味処理を複製しない。
 
-最終更新: 2026-10-06。
+最終更新: 2026-10-11。
 
 binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。macOSアプリの版は`apple/VERSION`と`apple/BUILD_NUMBER`を正本とする独自の版で、Server／Webの版とは別に採番する（初回は1.0.0／Build 1）。対応するServerの版はアプリの「inkuについて」と変更履歴に併記する。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
 
@@ -13,6 +13,18 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 確定した実装変更と残る範囲は本書の日付付き節へ記し、製品の変更履歴は共通の[CHANGELOG.ja.md](../CHANGELOG.ja.md)／[CHANGELOG.md](../CHANGELOG.md)へ同期して記す。Swift専用CHANGELOGを分けない。
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
+
+## 2026-10-11 拡大の窓をApple SiliconではGraphiteで別のプロセスに描かせる
+
+作者の指示「Graphiteを導入して」と、作者の決定（2026-10-11）による。拡大の速さをWebのChromeに近づけるため。
+
+- 範囲：Apple Siliconの作品域で、拡大した窓だけをSkiaのGraphite（GPU、Metal）で描く。100%の全体は今までどおりCPUのSkia（粗い全体の後にタイル）。Intel（x86_64）とRosettaでは、窓も今までどおりCPUのタイル並列。
+- 別のプロセス：窓は、アプリの`Contents/MacOS/inku-display-gpu`（Rust。共有coreの[`inku-display-gpu`](../core/crates/inku-display-gpu/Cargo.toml)、arm64だけ）が描く。[`DisplayRenderer`](Sources/InkuUI/DisplayRenderer.swift)は最初の窓で起動し、標準入力でSVGのSHA-256・窓・SVG（そのプロセスに初めての作品だけ）を渡し、標準出力から窓の画素（premultiplied RGBA8）を受け取る（[`DisplayGPUProcess`](Sources/InkuUI/DisplayGPUProcess.swift)）。窓の置き方はCPUの窓と同じ関数（`DisplayScene::paint_region`）を通る。頼みは1度に1つで、待つ間に画面が先へ進んだ頼みは送らない。窓は途中の絵を出さず、完成した窓を1回渡す。
+- 落ちたとき：GPUのドライバが描画用のプロセスを終わらせても、アプリは終わらない。その頼みは`gpu_process_exited`（60秒答えなければ止めて`gpu_process_timeout`）の失敗になり、表示の失敗ログ（`display-failures`）に終わり方と描画用のプロセスの標準エラーの末尾を書く。窓は描かず、引き伸ばした全体を残す（2026-10-06の裁定と同じく、CPUで描き直さない）。その作品はその起動の間は頼み直さず、別の作品の窓で描画用のプロセスを起動し直す。描画用のプロセスが描けなかったとき（`gpu_*`の符号）も、止めてログに書く。
+- 見え方：Graphiteの窓は、feTurbulenceで作る質感の粒の位置が、CPUとChromeとわずかに違う（2026-10-11の調査で、作者の124件のうち43件がChromeとの一致の基準の外。縮小した全体ではほとんど同じ）。100%の全体はCPUのままなので、Chromeとの一致の確認（C1）は全体について今までどおり。
+- 重さ（Apple M5 Pro、4倍の窓1800×1400）：作者の最大の作品で0.03秒（CPUのタイル並列は0.52秒）。描画用のプロセスの起動を含む最初の窓は0.45〜0.73秒。
+- 部品：Graphite・Metal・SVG・WebPを一緒に含むSkiaの事前ビルドは公開されていない。`scripts/skia-graphite-binaries.sh`がskia-bindings 0.153.3のsourceから組み（macOS 26.5のSDKとninja v1.13.2が要る。Xcode 27のSDKではbindgenの出力がコンパイルできない）、ほかの事前ビルドと同じ置き場に置く。SHA-256は`core/crates/inku-display-gpu/skia-binaries.sha256`に書き、`build-core.sh`がbuildのたびに照合する。`build-core.sh`は置き場の部品だけを使い（`no-compile`）、Skiaを組まない。アプリはarm64の描画用のプロセスの分（strip前で約17MB）大きくなる。通知は自前のcrateが1件増えて136件。
+- 確認：共有coreの`inku-display`のSkiaの試験（C1・C2・C4。CPUの描画を共有の関数に替えた後）、`inku-display-gpu`の試験（ノイズのない作品でGPUとCPUの窓が一致すること、受け渡しの形式）、AppCheck `--display-only <SVG>`（Apple Siliconでは加えて、窓が描画用のプロセスで1枚で描けること、画素の受け渡し、描画用のプロセスが落ちたときの扱い）。
 
 ## 2026-10-06 Skiaで描けない作品はresvgへ戻さず止め、原因を記録する
 

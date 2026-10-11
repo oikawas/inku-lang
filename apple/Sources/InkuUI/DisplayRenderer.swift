@@ -12,6 +12,9 @@ import os
 /// hold up the next one. A request yields a coarse whole first, then the whole drawn in tiles on
 /// several threads; a cancelled request stops at the next tile.
 ///
+/// The zoomed windows are drawn by Skia Graphite on Apple silicon, in a process of their own
+/// (`DisplayGPUProcess`), and in tiles on the CPU on Intel Macs (author's decisions, 2026-10-11).
+///
 /// A work Skia cannot draw is not drawn another way (the author's ruling, 2026-10-06): the request
 /// stops with `Failed`, and the cause is appended to the failure log so the display can be fixed.
 public final class DisplayRenderer: Sendable {
@@ -19,6 +22,28 @@ public final class DisplayRenderer: Sendable {
     static let drawsWithSkia = true
 
     public enum Painter: String, Sendable { case skia, resvg }
+
+    /// Where the zoomed windows are drawn.
+    public enum WindowPainter: Sendable {
+        /// The CPU, in tiles on this renderer's threads (Intel Macs, and the checks' reference).
+        case cpu
+        /// Skia Graphite in the `inku-display-gpu` program at this path (nil: it is not there).
+        /// `environment` is added to the program's own, for checks.
+        case gpu(helper: URL?, environment: [String: String] = [:])
+
+        /// Apple silicon: the program next to the app (`INKU_DISPLAY_GPU_HELPER` names another, for
+        /// runs outside the app bundle). Intel, and Rosetta: the CPU.
+        public static var standard: WindowPainter {
+            #if arch(arm64)
+            if let path = ProcessInfo.processInfo.environment["INKU_DISPLAY_GPU_HELPER"], !path.isEmpty {
+                return .gpu(helper: URL(fileURLWithPath: path))
+            }
+            return .gpu(helper: Bundle.main.url(forAuxiliaryExecutable: "inku-display-gpu"))
+            #else
+            return .cpu
+            #endif
+        }
+    }
 
     public struct Frame: Sendable {
         public let image: CGImage
@@ -39,6 +64,8 @@ public final class DisplayRenderer: Sendable {
     public struct Diagnostics: Sendable, Equatable {
         public var skiaWholes = 0
         public var skiaWindows = 0
+        /// Of `skiaWindows`, drawn by Graphite in `inku-display-gpu`.
+        public var gpuWindows = 0
         /// Drawn with resvg because `drawsWithSkia` is off, never because Skia failed.
         public var resvgWholes = 0
         public var failures: [String: Int] = [:]
@@ -73,11 +100,24 @@ public final class DisplayRenderer: Sendable {
     private static let logger = Logger(subsystem: "app.inku", category: "display")
     private let sceneCostLimit: Int
     private let wholeByteLimit: Int
+    private let gpu: DisplayGPUProcess?
 
-    public init(sceneCostLimit: Int = 256 * 1024 * 1024, wholeByteLimit: Int = 128 * 1024 * 1024) {
+    public init(sceneCostLimit: Int = 256 * 1024 * 1024, wholeByteLimit: Int = 128 * 1024 * 1024,
+                windows: WindowPainter = .standard) {
         self.sceneCostLimit = sceneCostLimit
         self.wholeByteLimit = wholeByteLimit
+        gpu = switch windows {
+        case .cpu: nil
+        case .gpu(let helper, let environment): DisplayGPUProcess(helper: helper, environment: environment)
+        }
     }
+
+    /// How many times `inku-display-gpu` was started (nil: windows are drawn on the CPU).
+    public var gpuLaunches: Int? { gpu?.launches }
+
+    /// For checks: set in `WindowPainter.gpu`'s environment to an SVG's SHA-256 (hex), the program stops
+    /// on that work's request, as a GPU driver that ends the process would.
+    public static let gpuCheckAbortVariable = DisplayGPUProcess.checkAbortVariable
 
     /// The whole work fitted to `width` × `height` pixels: the coarse whole (unless the full one
     /// is kept), then the full one. Ending the iteration cancels the drawing.
@@ -96,9 +136,11 @@ public final class DisplayRenderer: Sendable {
         }
     }
 
-    /// A window of the zoomed picture, its tiles drawn from the window's centre outwards on several threads.
-    /// The joined pixels so far are yielded every `progressInterval`, then the complete window. A work the Skia
-    /// display cannot draw stops with `Failed` and is logged (the enlarged whole stays). Ending the iteration cancels the drawing.
+    /// A window of the zoomed picture. With Graphite, the complete window once. On the CPU, its tiles are drawn
+    /// from the window's centre outwards on several threads, the joined pixels so far yielded every
+    /// `progressInterval`, then the complete window. A work the Skia display cannot draw, or a Graphite process
+    /// that ends or fails, stops with `Failed` and is logged (the enlarged whole stays). Ending the iteration
+    /// cancels the drawing.
     public func window(svg: String, region: DisplayRegion,
                        progressInterval: Duration = .milliseconds(150)) -> AsyncThrowingStream<WindowFrame, Error> {
         AsyncThrowingStream { continuation in
@@ -107,7 +149,14 @@ public final class DisplayRenderer: Sendable {
             queue.async { [self] in
                 do {
                     guard Self.drawsWithSkia else { return continuation.finish() }
-                    let digest = SHA256.hash(data: Data(svg.utf8)).map { String(format: "%02x", $0) }.joined()
+                    let hash = Array(SHA256.hash(data: Data(svg.utf8)))
+                    if let gpu {
+                        let image = try gpu.window(svg: svg, digest: hash, region: region) { cancelled.withLock { $0 } }
+                        state.withLock { $0.diagnostics.skiaWindows += 1; $0.diagnostics.gpuWindows += 1 }
+                        continuation.yield(WindowFrame(image: image, region: region, complete: true))
+                        return continuation.finish()
+                    }
+                    let digest = hash.map { String(format: "%02x", $0) }.joined()
                     let scene = try prepared(svg: svg, digest: digest)
                     if cancelled.withLock({ $0 }) { throw CancellationError() }
                     let image = try tiled(scene, window: region, side: InkuCore.displayLayout.tileSide, cancelled: cancelled,
@@ -224,6 +273,7 @@ public final class DisplayRenderer: Sendable {
         state.withLock { $0.diagnostics.failures[code, default: 0] += 1 }
         let message: String = switch error {
         case CoreFailure.displayUnsupported(_, let message), CoreFailure.displayRefused(_, let message): message
+        case let failure as DisplayGPUProcess.Failure: failure.message
         default: String(describing: error)
         }
         Self.logger.error("Skia display failed: \(stage, privacy: .public) \(code, privacy: .public) \(message, privacy: .public)")
@@ -248,6 +298,7 @@ public final class DisplayRenderer: Sendable {
         case CoreFailure.displayUnsupported(let code, _): code
         case CoreFailure.displayRefused(let code, _): "refused_\(code)"
         case CoreFailure.internalInvariant: "internal_invariant"
+        case let failure as DisplayGPUProcess.Failure: failure.code
         default: "image_unavailable"
         }
     }

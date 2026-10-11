@@ -2,7 +2,7 @@
 
 This directory contains the native SwiftUI client, developed for macOS first, and the shared Apple packages. [SWIFT_SPEC.ja.md](SWIFT_SPEC.ja.md) is the canonical specification for Swift host behavior; this document is its maintained English version. The [product specification](../SPEC.md) defines shared DDL, Score, prompts, authoring authority, pipeline transitions, seeds, and rendering semantics. Server remains the primary development host, and Swift follows the same Rust core without duplicating semantic processing.
 
-Last updated: 2026-10-06.
+Last updated: 2026-10-11.
 
 Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The macOS app has its own version, defined by `apple/VERSION` and `apple/BUILD_NUMBER` and allocated separately from the Server and Web versions (the first release is 1.0.0, Build 1). The corresponding Server version is shown in the app's About inku window and in the changelog. Matching shared layer versions does not establish that host features and the native UI port are complete.
 
@@ -13,6 +13,18 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Record confirmed implementation changes and remaining scope in dated sections of this specification. Maintain product history in the shared [CHANGELOG.ja.md](../CHANGELOG.ja.md) and [CHANGELOG.md](../CHANGELOG.md). Do not create a separate Swift changelog.
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
+
+## 2026-10-11 Draw zoomed windows with Graphite in a separate process on Apple silicon
+
+At the author's instruction "introduce Graphite" and decisions (2026-10-11), to bring zooming closer to the Web's Chrome in speed.
+
+- Scope: in the work area on Apple silicon, only the zoomed windows are drawn with Skia's Graphite (GPU, Metal). The 100% whole stays on Skia's CPU path (a coarse whole, then tiles). On Intel (x86_64) and under Rosetta, windows also stay on the CPU in tiles.
+- A separate process: windows are drawn by the app's `Contents/MacOS/inku-display-gpu` (Rust, the shared core's [`inku-display-gpu`](../core/crates/inku-display-gpu/Cargo.toml), arm64 only). [`DisplayRenderer`](Sources/InkuUI/DisplayRenderer.swift) starts it at the first window, writes the SVG's SHA-256, the window and the SVG (only for a work new to that process) to its standard input, and reads the window's pixels (premultiplied RGBA8) from its standard output ([`DisplayGPUProcess`](Sources/InkuUI/DisplayGPUProcess.swift)). A window is placed through the same function as a CPU window (`DisplayScene::paint_region`). One request at a time; a request whose canvas moved on while it waited is not sent. A window comes complete, once, with no partial pictures.
+- When it ends: a GPU driver that ends the drawing process does not end the app. The request fails with `gpu_process_exited` (or, after 60 seconds without an answer, the process is stopped and it fails with `gpu_process_timeout`), and the display failure log (`display-failures`) records how the process ended and the end of its standard error. The window is not drawn and the enlarged whole stays (as with the 2026-10-06 ruling, it is not redrawn on the CPU). That work is not sent again in this run; another work's window starts the process again. A window the process could not draw (`gpu_*` codes) also stops and is logged.
+- Look: in a Graphite window, the grain feTurbulence makes sits slightly differently from the CPU and Chrome (in the 2026-10-11 survey, 43 of the author's 124 works fell outside the Chrome match yardstick; scaled down, the wholes look nearly the same). The 100% whole stays on the CPU, so the Chrome match check (C1) still covers the whole.
+- Speed (Apple M5 Pro, a 4x window of 1800 x 1400): 0.03 s for the author's largest work (CPU tiles: 0.52 s). The first window, including the process start, takes 0.45 to 0.73 s.
+- Binaries: no published Skia prebuilt has Graphite, Metal, SVG and WebP together. `scripts/skia-graphite-binaries.sh` builds one from the source of skia-bindings 0.153.3 (it needs the macOS 26.5 SDK and ninja v1.13.2; with Xcode 27's SDK, bindgen's output does not compile) into the same cache as the other prebuilt binaries. Its SHA-256 is in `core/crates/inku-display-gpu/skia-binaries.sha256`, and `build-core.sh` checks it on every build. `build-core.sh` only uses the cached archive (`no-compile`) and never compiles Skia. The app grows by the arm64 drawing process (about 17 MB before stripping). The notices gain one entry, this repository's own crate: 136.
+- Checks: the shared core's `inku-display` Skia tests (C1, C2, C4, after the CPU drawing moved to the shared function), the `inku-display-gpu` tests (GPU and CPU windows agree on works without noise; the pipe format), and AppCheck `--display-only <SVG>` (on Apple silicon also: a window drawn in one piece by the process, the pixels across the pipe, and the handling of a process that ends).
 
 ## 2026-10-06 Stop without resvg when Skia cannot draw a work, and record the cause
 

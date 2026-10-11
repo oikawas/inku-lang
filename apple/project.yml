@@ -23,6 +23,11 @@ targets:
       - path: Sources/InkuMac
       - path: Resources/AppIcon.icns
         buildPhase: resources
+      # The zoomed windows' program (Apple silicon), built by scripts/build-core.sh.
+      - path: scripts/.build/core/display-gpu/inku-display-gpu
+        buildPhase:
+          copyFiles:
+            destination: executables
     dependencies:
       - package: InkuApple
         product: InkuUI

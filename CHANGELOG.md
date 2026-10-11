@@ -6,6 +6,16 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+## macOS (unreleased; the version is settled at integration)
+
+### 2026-10-11 — Draw zoomed windows with Graphite on Apple silicon
+
+Zooming comes closer to the Web's Chrome in speed (the author's instruction and decisions). On Apple silicon, the work area's zoomed windows are drawn with Skia's Graphite (GPU) by a separate process bundled with the app (`inku-display-gpu`). A 4x window of the author's largest work went from 0.52 s to 0.03 s. The 100% whole, and windows on Intel and under Rosetta, are drawn on the CPU as before.
+
+- When the drawing process ends (including a GPU driver ending it), the app goes on. That window is not drawn, the cause goes to the display failure log, and that work is not sent again in this run.
+- In a Graphite window, the grain feTurbulence makes sits slightly differently from Chrome. The 100% whole looks the same as before.
+- No published Skia prebuilt has Graphite with SVG, so `scripts/skia-graphite-binaries.sh` builds it and builds check it by SHA-256.
+
 ## v2.15.96 (2026-10-06 / Build 1172)
 
 ### 2026-10-06 — Show completion originals and reasons on Web

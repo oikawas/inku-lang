@@ -1,0 +1,28 @@
+[package]
+name = "inku-display-gpu"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The macOS app's zoomed windows drawn with Skia Graphite in a separate process"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "inku-display-gpu"
+path = "src/main.rs"
+
+[features]
+default = []
+# Graphite on Metal. Only the macOS app build (Apple silicon) enables it; without it
+# the program only answers that it cannot draw, so the workspace builds everywhere.
+graphite = ["dep:inku-display", "inku-display/skia", "dep:skia-safe"]
+
+# Skia with Graphite and Metal has no published prebuilt binaries next to SVG and
+# WebP; scripts/skia-graphite-binaries.sh builds them once into the checked cache
+# (digests in skia-binaries.sha256 here).
+[target.'cfg(target_os = "macos")'.dependencies]
+inku-display = { workspace = true, optional = true }
+skia-safe = { version = "=0.153.3", features = ["svg", "webp", "metal", "graphite"], optional = true }

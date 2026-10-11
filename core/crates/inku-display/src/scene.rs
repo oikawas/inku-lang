@@ -80,6 +80,24 @@ impl DisplayScene {
         self.draw(geometry::region((self.width, self.height), region)?)
     }
 
+    /// The same window drawn into a canvas of `region.width` × `region.height` pixels
+    /// the host owns (the macOS GPU windows), placed exactly as `region` places it.
+    pub fn paint_region(
+        &self,
+        canvas: &Canvas,
+        region: RasterRegionOptions,
+    ) -> Result<(), DisplayError> {
+        self.paint(canvas, geometry::region((self.width, self.height), region)?);
+        Ok(())
+    }
+
+    fn paint(&self, canvas: &Canvas, window: Window) {
+        canvas.clear(Color::TRANSPARENT);
+        canvas.translate((-(window.x as f32), -(window.y as f32)));
+        canvas.scale((window.scale, window.scale));
+        canvas.draw_picture(&self.picture, None, None);
+    }
+
     fn draw(&self, window: Window) -> Result<RasterOutput, DisplayError> {
         let stride = window.width as usize * 4;
         let length = stride * window.height as usize;
@@ -97,10 +115,7 @@ impl DisplayScene {
         {
             let canvas = Canvas::from_raster_direct(&info, &mut pixels, stride, None)
                 .ok_or(DisplayError::AllocationFailed)?;
-            canvas.clear(Color::TRANSPARENT);
-            canvas.translate((-(window.x as f32), -(window.y as f32)));
-            canvas.scale((window.scale, window.scale));
-            canvas.draw_picture(&self.picture, None, None);
+            self.paint(&canvas, window);
         }
         Ok(RasterOutput {
             width: window.width,

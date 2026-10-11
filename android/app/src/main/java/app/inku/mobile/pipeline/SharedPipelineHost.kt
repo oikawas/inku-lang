@@ -81,6 +81,7 @@ class SharedPipelineHost(
                     is PipelineAuthoring.DirectDdl -> JSONObject()
                         .put("tag", "direct_ddl")
                         .put("source", authoring.source)
+                        .also { value -> authoring.completionRangesJson?.let { value.put("completion_ranges", JSONObject(it)) } }
                 },
             )
         val messageId = newId()
@@ -529,6 +530,7 @@ class SharedPipelineHost(
             phaseReason = phase.optionalString("reason")?.takeIf { phaseTag in STOPPED_PHASES },
             providerFailure = session.providerFailure,
             holeCompletionResults = HoleCompletionResult.fromCheck(snapshot.optJSONObject("hole_completion_check")),
+            completionRangesJson = snapshot.optJSONObject("completion_ranges")?.toString(),
         )
     }
 

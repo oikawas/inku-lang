@@ -81,6 +81,19 @@ class AndroidWorkPipeline(
     )
     private val authoring = SharedAuthoringPipeline(host, configBuilder)
 
+    /** The edited work's own configuration and opaque record go to the shared core. */
+    suspend fun completionRangeStates(source: String, executionId: String?, historyId: String?): List<CompletionRangeState> {
+        if (executionId != null) {
+            val execution = host.executionContext(OWNER_ID, executionId)
+            val record = JSONObject(execution.snapshotJson).optJSONObject("completion_ranges")?.toString()
+            return completionRangeStates(binding, execution.configJson, source, record)
+        }
+        val history = historyId?.let { readHistory(it) } ?: return emptyList()
+        val config = history.forkContextJson?.let(::JSONObject)?.optJSONObject("config") ?: return emptyList()
+        val record = JSONObject(history.history.renderMetadataJson).optJSONObject("completion_ranges")?.toString()
+        return completionRangeStates(binding, config.toString(), source, record)
+    }
+
     /**
      * The bundled package's words for display: the Japanese alias in Japanese,
      * the canonical English heading otherwise (DDL Spec 14).
@@ -156,6 +169,7 @@ class AndroidWorkPipeline(
                     seedText = stored.resultOptions.optionalString("seed_text"),
                     instructionLang = stored.resultOptions.optionalString("instruction_lang_requested"),
                     uiLang = stored.resultOptions.optionalString("ui_lang"),
+                    completionRangesJson = current.completionRangesJson,
                 ),
             )
             return composePrepared(ddl, fork, request.recomposeMode)
@@ -509,6 +523,7 @@ class AndroidWorkPipeline(
         // Kept with the work only when there are any, as the server keeps them.
         loggedRenderWarnings(metadata, "pipeline performance")?.let { diagnostics.put("render_warnings", it) }
         metadata.put("pipeline_diagnostics", diagnostics)
+        snapshot.optJSONObject("completion_ranges")?.let { metadata.put("completion_ranges", it) }
         val renderHash = renderHash(delivery.requiredObject("score"), metadata, catalogId)
         metadata.put("render_hash", renderHash).put("render_hash_short", renderHash.takeLast(4).uppercase())
         return PaintResult(
@@ -552,6 +567,8 @@ class AndroidWorkPipeline(
         source: ManagedHistoryRead?,
         managedReplay: ManagedHistoryReplayInput? = null,
     ): PaintResult {
+        source?.history?.renderMetadataJson?.let { JSONObject(it).optJSONObject("completion_ranges") }
+            ?.let { metadata.put("completion_ranges", it) }
         val hash = renderHash(JSONObject(scoreJson), metadata, metadata.optString("catalog_id", "default"))
         metadata.put("render_hash", hash).put("render_hash_short", hash.takeLast(4).uppercase())
         return PaintResult(
@@ -744,6 +761,11 @@ class AndroidWorkPipeline(
                 sketch = PipelineSketchRequest.from(request.sketch),
                 parentHistoryId = request.parentHistoryId,
                 inputProvenanceJson = request.inputProvenance?.toJson()?.toString(),
+                completionRangesJson = when {
+                    descriptionFlow -> null
+                    inherited != null -> inherited.completionRangesJson
+                    else -> parentMetadata?.optJSONObject("completion_ranges")?.toString()?.takeIf { saved != null }
+                },
             ),
             instructionLangRequested = requestedLang,
             instructionLangResolved = resolvedLang,
@@ -1072,6 +1094,7 @@ class AndroidWorkPipeline(
         val seedText: String?,
         val instructionLang: String?,
         val uiLang: String?,
+        val completionRangesJson: String? = null,
     )
 
     private data class RestoredRun(

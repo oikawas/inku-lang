@@ -16,6 +16,10 @@ interface SharedPipelineBinding {
     fun recompose(inputBytes: ByteArray): ByteArray =
         """{"error":"unavailable"}""".encodeToByteArray()
 
+    /** The shared record's three states; an older binding reports no recorded ranges. */
+    fun completionRangeStates(inputBytes: ByteArray): ByteArray =
+        """{"schema":"inku.completion-range-states.v1","ranges":[]}""".encodeToByteArray()
+
     /** Author-facing reasons for withheld plugin sentences; a host without it has none. */
     fun explainPluginDiagnostics(inputBytes: ByteArray): ByteArray =
         """{"schema":"inku.plugin-diagnostics.v1","plugins":[]}""".encodeToByteArray()

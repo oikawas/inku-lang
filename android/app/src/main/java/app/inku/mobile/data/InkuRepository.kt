@@ -223,6 +223,9 @@ class InkuRepository(
         return executionId.takeIf { it.isNotBlank() }?.let { pipeline.view(it) }
     }
 
+    suspend fun completionRangeStates(source: String, executionId: String?, historyId: String?) =
+        pipeline.completionRangeStates(source, executionId, historyId)
+
     /**
      * The drawing to put back on screen at start, if one was left behind: an
      * execution still running or waiting on the author, or one that completed

@@ -3,7 +3,7 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-10-06。
+最終更新: 2026-10-11。
 
 **追随状況**: Android は `2.1.4-android.80` の世代にある。DDLの変換とScore → SVGの描画は、
 同じcommitの共有Rust core（`core/crates/`）を同梱してServerと同じ実装で行い、Android独自の版定数を持たない。
@@ -29,6 +29,23 @@ Androidはpremultiplied RGBAをNDK Bitmapへ直接転送する。Kotlin Engine 3
 - `ANDROID_SPEC.md` は英語版として、`ANDROID_SPEC.ja.md` の意図を保った翻訳・要約として更新する。
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
+
+## 2026-10-11 補完が書いた範囲の控え（A3）
+
+共通SPEC §12.7.1の控えを、描いた作品の `render_metadata_json.completion_ranges` に
+snapshotからJSONのまま保存する。補完前の安全な演奏も同じ保存経路を使う。
+保存作品を演奏し直して保存するときも、元の作品の控えを引き継ぐ。
+Roomの版・表とfork contextの版は変更しない。旧作品と指示書だけの読み込みには控えを作らない。
+保存作品からの直接DDL forkは作品の控え、設定変更で新variationを作る場合は現在snapshotの控えを
+Startの `authoring.completion_ranges` に渡す。同じ実行の続きには新しい控えを渡さない。
+
+JNI `completionRangeStates` は共有coreの `completion_range_states` のbyte要求・応答をそのまま運ぶ。
+編集原文、その作品のconfig、控えを渡し、coreが返したUTF-16位置と3状態だけを画面へ投影する。
+hostは範囲の結び方を写さない。控え無し・古いbindingでは札を出さない。
+DDL編集では範囲の後ろに「補完」「数を直した」「言葉を直した」の札を表示変換として置く。
+言葉を直した範囲があるときだけ、その数と描いたときの補完・承認を説明する1行を下に示す。
+原文・コピー・選択・IME・数の畳み・名前の追従を維持し、札は指示書に保存しない。
+理由 `range_words_not_kept` の日英の文も共通SPECに揃える。
 
 ## 2026-10-06 補完の理由の表示（A1）
 

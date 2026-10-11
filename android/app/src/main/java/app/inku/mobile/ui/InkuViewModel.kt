@@ -1441,6 +1441,14 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = localState.value.copy(ddl = value, ddlEditedAfterGeneration = true, message = null)
     }
 
+    internal suspend fun completionRangeStates(source: String): List<app.inku.mobile.pipeline.CompletionRangeState> {
+        val current = localState.value
+        return withContext(Dispatchers.IO) {
+            repository.completionRangeStates(source, matchingPipelineExecutionId(current),
+                current.selectedHistory?.id?.takeUnless { current.lineageDetached })
+        }
+    }
+
     internal fun previewDdlRange(preview: DdlRangePreview?) {
         localState.value = localState.value.copy(ddlRangePreview = preview)
     }

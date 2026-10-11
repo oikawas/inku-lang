@@ -4,7 +4,7 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-10-06.
+Last updated: 2026-10-11.
 
 **Catch-up status**: Android sits at generation `2.1.4-android.80`. DDL conversion and Score → SVG
 rendering run in the shared Rust core (`core/crates/`) of the same commit, packaged with the app, so
@@ -44,6 +44,24 @@ When updating Android specifications:
    adaptation of the Japanese source.
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
+
+## 2026-10-11 Completion range records (A3)
+
+Keep the shared SPEC §12.7.1 record as opaque snapshot JSON in each drawn work's
+`render_metadata_json.completion_ranges`, including a safe performance saved before completion.
+When a saved work is performed again and saved, preserve its source work's record too.
+Do not change the Room schema or fork-context protocol. Older works and imported instructions alone get no record.
+A direct-DDL fork from a saved work passes that work's record in Start's `authoring.completion_ranges`;
+a new variation caused by changed run settings passes the current snapshot's record.
+Continuing the same execution passes no new record.
+
+JNI `completionRangeStates` transports the shared core's `completion_range_states` bytes unchanged.
+Pass the editor source, the work's own configuration, and its record. Project only the returned UTF-16 positions
+and states; Kotlin does not reproduce the matching rules. Without a record or with an older binding, show no tags.
+The DDL editor places display-only tags after recorded ranges: "completion", "numbers edited", and "words edited".
+Only edited words add the one line below the editor explaining the count, completion, and approval.
+Keep raw instructions, clipboard selections, IME, folding, and name following unchanged; tags are never saved as DDL.
+Use the shared SPEC's Japanese and English reason for `range_words_not_kept`.
 
 ## 2026-10-06 Completion reasons on screen (A1)
 

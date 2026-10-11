@@ -26,6 +26,95 @@ import org.junit.Test
 
 class SharedPipelineHostTest {
     @Test
+    fun completionRecordSurvivesSavedWorkForkAndExecutionForkButNotANewImportedRun() = runBlocking {
+        val record = JSONObject("""{"schema":"inku.completion-ranges.v1","ranges":[{"words":"右下","horizontal":["2/3","1"],"vertical":["2/3","1"],"sentence":"\uFFFCに、赤い円。"}],"future":{"keep":"opaque"}}""")
+        val binding = ScriptedBinding(uniqueExecutions = true).apply { completionRecord = record }
+        val source = "右下（横2/3〜1、縦2/3〜1）に、赤い円。"
+        val initial = androidPipeline(binding).composeFromDdl(source, describe(""))
+        assertEquals(record.toString(), JSONObject(initial.renderMetadataJson).getJSONObject("completion_ranges").toString())
+        assertEquals(record.toString(), initial.pipelineView!!.completionRangesJson)
+        val link = initial.managedHistoryLink!!
+        val savedContext = JSONObject(link.contextJson).put("config", JSONObject(link.snapshotJson).getJSONObject("config"))
+        val parent = HistoryItemEntity(
+            id = "parent", createdAt = 1, updatedAt = 2, originalInput = "", normalizedDdl = source,
+            scoreJson = initial.scoreJson, displaySvg = initial.displaySvg, stage1Model = null, stage2Model = null,
+            renderMetadataJson = initial.renderMetadataJson, renderHash = "hash", renderHashShort = "0000",
+            colorCatalogId = "default", canvasAspect = "square", starred = false, trashed = false,
+            elapsedMs = null, tokenMetadataJson = null,
+        )
+        val saved = ManagedHistoryRead(parent, "ddl_authoritative", variationId = link.variationId, forkContextJson = savedContext.toString())
+        val replayBinding = object : SharedPipelineBinding by binding {
+            override fun renderSaved(inputBytes: ByteArray) =
+                """{"svg":"<svg/>","metadata":{}}""".encodeToByteArray()
+        }
+        val replayContext = JSONObject(savedContext.toString()).put("pipeline_diagnostics", JSONObject()
+            .put("upstream_diagnostics", JSONArray()).put("downstream_diagnostics", JSONArray())
+            .put("resource_omissions", JSONArray()).put("relation_omissions", JSONArray()))
+        val replay = androidPipeline(replayBinding) { saved.copy(forkContextJson = replayContext.toString()) }
+            .renderFromScore(initial.scoreJson, describe("").copy(parentHistoryId = "parent"))
+        assertEquals(record.toString(), JSONObject(replay.renderMetadataJson).getJSONObject("completion_ranges").toString())
+        val safe = mutableListOf<PaintResult>()
+        val safeBinding = ScriptedBinding().apply { completionRecord = record; holeDelivers = true }
+        val waiting = runCatching { answeringPipeline(safeBinding) { safe += it }.paint(describe("a circle")) }.exceptionOrNull()
+        assertTrue(waiting is PipelineInteractionRequired)
+        assertEquals(record.toString(), JSONObject(safe.single().renderMetadataJson).getJSONObject("completion_ranges").toString())
+        binding.completionRecord = null
+        val pipeline = androidPipeline(binding) { saved }
+        pipeline.completionRangeStates(source, null, "parent")
+        assertEquals(record.toString(), binding.completionStatesRequests.single().getJSONObject("completion_ranges").toString())
+        assertEquals(savedContext.getJSONObject("config").toString(), binding.completionStatesRequests.single().getJSONObject("config").toString())
+        val fork = pipeline.composeFromDdl(source, describe("").copy(parentHistoryId = "parent"))
+        assertEquals(record.toString(), binding.inputs.last { it.optString("tag") == "start" }
+            .getJSONObject("authoring").getJSONObject("completion_ranges").toString())
+        assertEquals(record.toString(), JSONObject(fork.renderMetadataJson).getJSONObject("completion_ranges").toString())
+        val starts = binding.inputs.count { it.optString("tag") == "start" }
+        pipeline.composeFromDdl(source, describe("").copy(parentHistoryId = "parent", executionId = fork.pipelineView!!.executionId))
+        assertEquals(starts, binding.inputs.count { it.optString("tag") == "start" })
+
+        val currentRecord = JSONObject(record.toString()).put("future", JSONObject().put("keep", "current snapshot"))
+        binding.completionRecord = currentRecord
+        val current = pipeline.composeFromDdl(source, describe("").copy(parentHistoryId = "parent"))
+        binding.completionRecord = null
+        pipeline.composeFromDdl(source, describe("").copy(parentHistoryId = "parent",
+            executionId = current.pipelineView!!.executionId, compositionSeed = 43L))
+        assertEquals(currentRecord.toString(), binding.inputs.last { it.optString("tag") == "start" }
+            .getJSONObject("authoring").getJSONObject("completion_ranges").toString())
+
+        androidPipeline(binding).composeFromDdl(source, describe(""))
+        assertFalse(binding.inputs.last { it.optString("tag") == "start" }.getJSONObject("authoring").has("completion_ranges"))
+        val older = saved.copy(history = parent.copy(renderMetadataJson = "{}"))
+        androidPipeline(binding) { older }.composeFromDdl(source, describe("").copy(parentHistoryId = "parent"))
+        assertFalse(binding.inputs.last { it.optString("tag") == "start" }.getJSONObject("authoring").has("completion_ranges"))
+    }
+
+    @Test
+    fun completionRangeStatesPassTheWorksConfigAndOpaqueRecordWithCoreUtf16Positions() = runBlocking {
+        val record = JSONObject("""{"schema":"inku.completion-ranges.v1","ranges":[],"future":"keep"}""")
+        val binding = ScriptedBinding(uniqueExecutions = true).apply { completionRecord = record }
+        val pipeline = androidPipeline(binding)
+        val work = pipeline.composeFromDdl("place one red circle.", describe(""))
+        val source = "🖼 completed range, numbers range, words range"
+        binding.completionStatesResponse = """{"schema":"inku.completion-range-states.v1","ranges":[
+            {"utf16_start":3,"utf16_end":18,"state":"completed"},
+            {"utf16_start":20,"utf16_end":33,"state":"numbers_changed"},
+            {"utf16_start":35,"utf16_end":46,"state":"words_changed"}
+        ]}"""
+        val answer = pipeline.completionRangeStates(source, work.pipelineView!!.executionId, null)
+        assertEquals(listOf(CompletionRangeState(3, 18, "completed"), CompletionRangeState(20, 33, "numbers_changed"),
+            CompletionRangeState(35, 46, "words_changed")), answer)
+        val input = binding.completionStatesRequests.single()
+        assertEquals(source, input.getString("source"))
+        assertEquals(record.toString(), input.getJSONObject("completion_ranges").toString())
+        assertEquals(JSONObject(work.managedHistoryLink!!.snapshotJson).getJSONObject("config").toString(), input.getJSONObject("config").toString())
+        assertTrue(completionRangeStates(binding, "{}", source, null).isEmpty())
+        assertEquals(1, binding.completionStatesRequests.size)
+        binding.completionStatesResponse = null
+        assertTrue(pipeline.completionRangeStates(source, work.pipelineView!!.executionId, null).isEmpty())
+        binding.completionStatesResponse = """{"error":"invalid_request"}"""
+        assertTrue(pipeline.completionRangeStates(source, work.pipelineView!!.executionId, null).isEmpty())
+    }
+
+    @Test
     fun aHolesAuthorSourceAndCheckSurviveViewProjectionAndReload() = runBlocking {
         val original = "  右下に、赤い円。\n"
         val binding = ScriptedBinding().apply {
@@ -347,13 +436,13 @@ class SharedPipelineHostTest {
         compositionSeed = seed, recomposeMode = mode, instructionLang = "en",
     )
 
-    private fun androidPipeline(binding: SharedPipelineBinding) = AndroidWorkPipeline(
+    private fun androidPipeline(binding: SharedPipelineBinding, readHistory: suspend (String) -> ManagedHistoryRead? = { null }) = AndroidWorkPipeline(
         binding = binding,
         modelProvider = object : ModelProvider {
             override val providerId = "test"
             override suspend fun generate(request: ModelRequest): ModelResponse = error("recomposition must not call a model")
         },
-        commitStore = RecordingCommitStore(), executionStore = MemoryExecutionStore(), readHistory = { null },
+        commitStore = RecordingCommitStore(), executionStore = MemoryExecutionStore(), readHistory = readHistory,
         legacyRenderer = object : SvgRenderer {
             override fun render(request: RenderRequest): RenderResult = error("the shared pipeline renders this run")
         },
@@ -799,6 +888,13 @@ class SharedPipelineHostTest {
         /** A known-hole run whose Score is delivered while it waits, as the core delivers one. */
         var holeDelivers = false
         var holeCompletionCheck: JSONObject? = null
+        var completionRecord: JSONObject? = null
+        val completionStatesRequests = mutableListOf<JSONObject>()
+        var completionStatesResponse: String? = null
+        override fun completionRangeStates(inputBytes: ByteArray): ByteArray {
+            completionStatesRequests += JSONObject(inputBytes.toString(Charsets.UTF_8))
+            return completionStatesResponse?.encodeToByteArray() ?: super.completionRangeStates(inputBytes)
+        }
         override fun pipelineDescription(text: String) = labelCut(text)
         override fun renderSeedFromText(seedText: String) = wordSeed(seedText)
         val recompositionRequests = mutableListOf<JSONObject>()
@@ -870,6 +966,9 @@ class SharedPipelineHostTest {
                 else -> previous?.optJSONObject("sketch")
             }
             snapshot.put("sketch", sketch ?: JSONObject.NULL)
+            val record = completionRecord ?: if (payload.optString("tag") == "start")
+                payload.getJSONObject("authoring").optJSONObject("completion_ranges") else previous?.optJSONObject("completion_ranges")
+            if (record != null) snapshot.put("completion_ranges", record)
             if (state == State.AwaitingPatch) snapshot.put("hole_completion_check", holeCompletionCheck)
             val rendered = if (state == State.Completed || payload.optString("tag") == "render") {
                 JSONObject().put("svg", "<svg/>").put("metadata", JSONObject())

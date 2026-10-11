@@ -404,6 +404,8 @@ interface InkuStrings {
     val tooltipDdlLang: String
     val rangeNumbers: String
     val rangeEditNote: String
+    fun completionRangeState(state: String): String
+    fun completionRangeWordsEdited(count: Int): String
     val rangeInvalid: String
     val rangeClose: String
     val awaitingInterpretation: String

@@ -58,22 +58,40 @@ internal data class DdlSourceChange(val start: Int, val end: Int, val replacemen
 
 internal data class DdlEditorLabel(val range: DdlNamedRange, val start: Int, val end: Int, val dotted: Boolean)
 
-/** Only presentation deletions. BasicTextField owns their bidirectional offset mapping. */
+internal data class DdlEditorCompletionTag(val offset: Int, val text: String)
+
+internal fun completionRangeEditorTags(
+    ranges: List<app.inku.mobile.pipeline.CompletionRangeState>,
+    strings: app.inku.mobile.ui.i18n.InkuStrings,
+): List<DdlEditorCompletionTag> = ranges.map { DdlEditorCompletionTag(it.end, " ［${strings.completionRangeState(it.state)}］") }
+
+internal fun completionRangeEditorNote(
+    ranges: List<app.inku.mobile.pipeline.CompletionRangeState>,
+    strings: app.inku.mobile.ui.i18n.InkuStrings,
+): String? = ranges.count { it.state == "words_changed" }.takeIf { it > 0 }?.let(strings::completionRangeWordsEdited)
+
+/** Presentation changes only. BasicTextField owns their bidirectional offset mapping. */
 internal class DdlEditorProjection(
     val source: String,
     val deletions: List<DdlSourceChange>,
     val labels: List<DdlEditorLabel>,
+    val tags: List<DdlEditorCompletionTag> = emptyList(),
 ) {
     fun applyTo(buffer: TextFieldBuffer) {
-        deletions.asReversed().forEach { buffer.replace(it.start, it.end, "") }
+        (deletions + tags.map { DdlSourceChange(it.offset, it.offset, it.text) })
+            .sortedBy { it.start }.asReversed().forEach { buffer.replace(it.start, it.end, it.replacement) }
     }
 
     fun displayOffset(original: Int): Int = original - deletions.sumOf {
         (original - it.start).coerceIn(0, it.end - it.start)
-    }
+    } + tags.filter { it.offset < original }.sumOf { it.text.length }
 }
 
-internal fun ddlEditorProjection(snapshot: DdlEditorSnapshot, table: CompositionRangeTable): DdlEditorProjection {
+internal fun ddlEditorProjection(
+    snapshot: DdlEditorSnapshot,
+    table: CompositionRangeTable,
+    completionTags: List<DdlEditorCompletionTag> = emptyList(),
+): DdlEditorProjection {
     val ranges = ddlNamedRanges(snapshot.source, table)
     val deletions = mutableListOf<DdlSourceChange>()
     // Copy/cut use the presented text in Foundation. Keep every selected range raw,
@@ -90,12 +108,15 @@ internal fun ddlEditorProjection(snapshot: DdlEditorSnapshot, table: Composition
         if (articleEnd < nameStart) deletions += DdlSourceChange(articleEnd, nameStart, "")
         deletions += DdlSourceChange(nameStart + range.name.length, range.end, "")
     }
-    val projection = DdlEditorProjection(snapshot.source, deletions.sortedBy { it.start }, emptyList())
+    // Clipboard selections and in-progress IME text remain the author's raw text.
+    val tags = if (!snapshot.selection.collapsed || snapshot.composition != null) emptyList() else
+        completionTags.filter { it.offset in 0..snapshot.source.length }.sortedBy { it.offset }
+    val projection = DdlEditorProjection(snapshot.source, deletions.sortedBy { it.start }, emptyList(), tags)
     return DdlEditorProjection(snapshot.source, projection.deletions, ranges.map { range ->
         val nameStart = range.nameStart(snapshot.source)
         DdlEditorLabel(range, projection.displayOffset(nameStart), projection.displayOffset(nameStart + range.name.length),
             range.foldable || open(range))
-    })
+    }, tags)
 }
 
 internal data class DdlEditorRangeStatus(

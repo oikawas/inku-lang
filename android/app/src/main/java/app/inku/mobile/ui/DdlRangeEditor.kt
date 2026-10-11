@@ -56,6 +56,7 @@ internal fun DdlRangeEditor(
     modifier: Modifier = Modifier,
     readOnly: Boolean = false,
     onWordTap: () -> Unit = {},
+    completionTags: List<DdlEditorCompletionTag> = emptyList(),
 ) {
     val table = LocalCompositionRangeTable.current
     val focusRequester = remember { FocusRequester() }
@@ -65,18 +66,21 @@ internal fun DdlRangeEditor(
     val scroll = rememberScrollState()
     var getLayout by remember { mutableStateOf<(() -> TextLayoutResult?)?>(null) }
     val snapshot = DdlEditorSnapshot(state.text.toString(), state.selection, state.composition, focused, !readOnly)
-    val projection = remember(snapshot, table) { ddlEditorProjection(snapshot, table) }
+    val projection = remember(snapshot, table, completionTags) { ddlEditorProjection(snapshot, table, completionTags) }
     val currentProjection by rememberUpdatedState(projection)
+    val currentCompletionTags by rememberUpdatedState(completionTags)
     val currentFocused by rememberUpdatedState(focused)
     val wordTap by rememberUpdatedState(onWordTap)
     val placeColor = tokens.firstOrNull { it.group.key == "basho" }?.color ?: MaterialTheme.colorScheme.primaryContainer
     val placeInk = if (isLightColor(placeColor)) PillInkOnLight else PillInkOnDark
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    val output = remember(state, table, tokens, placeColor, placeInk, muted) {
+    val tagColor = MaterialTheme.colorScheme.primaryContainer
+    val tagInk = MaterialTheme.colorScheme.onPrimaryContainer
+    val output = remember(state, table, tokens, placeColor, placeInk, muted, tagColor, tagInk) {
         OutputTransformation {
             val displayed = ddlEditorProjection(DdlEditorSnapshot(
                 state.text.toString(), state.selection, state.composition, currentFocused,
-            ), table)
+            ), table, currentCompletionTags)
             displayed.applyTo(this)
             val text = asCharSequence().toString()
             val occupied = BooleanArray(text.length)
@@ -102,6 +106,10 @@ internal fun DdlRangeEditor(
                 if (end > start) {
                     addStyle(SpanStyle(color = muted), start, end)
                 }
+            }
+            displayed.tags.forEach { tag ->
+                val start = displayed.displayOffset(tag.offset)
+                addStyle(SpanStyle(background = tagColor, color = tagInk), start, start + tag.text.length)
             }
         }
     }

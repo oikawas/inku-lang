@@ -1129,6 +1129,52 @@ fn numeric_ranges_draw_like_the_named_range_they_spell() {
     }
 }
 
+/// E1 (DDL 17, 2026-10-12): an English edge is written with a hyphen or with a
+/// space. `the left edge` is the position word `left-edge`, read in full and
+/// drawn in the same place.
+#[test]
+fn spaced_edge_words_are_the_hyphenated_position_words() {
+    let language = ResolvedInstructionLanguage::En;
+    let places = |source: &str| {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        compose_remaining_roles(compose_core_roles(parse_neutral_lexemes(&document)))
+            .remaining_roles
+            .into_iter()
+            .filter(|term| term.role == RemainingRoleKind::Place)
+            .map(|term| term.canonical_surface_ja)
+            .collect::<Vec<_>>()
+    };
+    for (hyphenated, spaced, word) in [
+        ("left-edge", "left edge", "左端"),
+        ("right-edge", "right edge", "右端"),
+        ("top-edge", "top edge", "上端"),
+        ("bottom-edge", "bottom edge", "下端"),
+    ] {
+        let named = format!("line up three gray arcs at the {hyphenated}.");
+        let spelled = format!("line up three gray arcs at the {spaced}.");
+        assert_eq!(places(&named), [word], "{named}");
+        assert_eq!(places(&spelled), [word], "{spelled}");
+        let compiled = compile(&spelled, language, &[]);
+        assert!(compiled.holes.is_empty(), "{spelled}: {:?}", compiled.holes);
+        let named_result = plan_verified_stage15(
+            stage(&named, language, &[]).verified_effective_view(),
+            context("golden"),
+        );
+        let spelled_result = plan_verified_stage15(
+            stage(&spelled, language, &[]).verified_effective_view(),
+            context("golden"),
+        );
+        let named_object = &named_result
+            .objects()
+            .unwrap_or_else(|| panic!("{named}: {:?}", named_result.diagnostics()))[0];
+        let spelled_object = &spelled_result
+            .objects()
+            .unwrap_or_else(|| panic!("{spelled}: {:?}", spelled_result.diagnostics()))[0];
+        assert_eq!(spelled_object.anchor(), named_object.anchor(), "{spelled}");
+        assert_eq!(spelled_object.domain(), named_object.domain(), "{spelled}");
+    }
+}
+
 #[test]
 fn numeric_ranges_are_checked_kept_to_their_language_and_limited_to_shared_paths() {
     let invalid = compile(

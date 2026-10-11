@@ -870,6 +870,47 @@ fn one_of_two_ranges_whose_words_changed_can_take_its_numbers_alone() {
     );
 }
 
+/// E2 (DDL 17, 2026-10-12): an English edge written with a space is a position
+/// word, so a range whose words now say it takes numbers inside that edge. The
+/// A3 measurement en-3 kept the old numbers for `the left edge`.
+#[test]
+fn a_range_renamed_to_a_spaced_edge_takes_numbers_inside_the_edge() {
+    use VisiblePatchDiagnostic::NumericRangeOutsideWords;
+    let en = ResolvedInstructionLanguage::En;
+    let completed =
+        "arrange three red circles at the right side (horizontal 2/3 to 1, vertical 0 to 1).";
+    let record = record_of(completed, en);
+    let mut mismatches = Vec::new();
+    for words in ["the left-edge", "the left edge"] {
+        let edited = completed.replace("the right side", words);
+        let base = with_completion_record(compiled(&edited, en), &record, &[]);
+        let holes = words_changed_holes(&base);
+        assert_eq!(holes.len(), 1, "{edited}: {:?}", base.holes);
+        for (numbers, expected) in [
+            (
+                "(horizontal 2/3 to 1, vertical 0 to 1)",
+                Some(NumericRangeOutsideWords),
+            ),
+            ("(horizontal 0 to 1/10, vertical 0 to 1)", None),
+        ] {
+            let replacement = format!("{words} {numbers}");
+            let result = validate_visible_ddl_patch(
+                &base,
+                &patch(&base, vec![edit(holes[0], &replacement)]),
+                &[],
+                None,
+                LIMITS,
+            );
+            match (&result, expected) {
+                (Ok(_), None) => {}
+                (Err(reason), Some(expected)) if *reason == expected => {}
+                _ => mismatches.push(format!("{edited} -> {replacement}: {result:?}")),
+            }
+        }
+    }
+    assert!(mismatches.is_empty(), "{mismatches:#?}");
+}
+
 fn record_of(source: &str, language: ResolvedInstructionLanguage) -> CompletionRangeRecord {
     CompletionRangeRecord {
         ranges: written_ranges(&compiled(source, language))

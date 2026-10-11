@@ -74,7 +74,7 @@
 ### F-12 hole補完のAPI testの偽provider（解消）
 
 - `server/tests/test_pipeline_api.py::test_managed_api_persists_approved_patch_reload_and_legacy_fork`の偽providerは、hole補完要求の本文から`base_source_digest`等を読んで応答する。
-- 現行のhole補完prompt（`inku.visible-ddl-hole-completion-prompt.v4`）はdigestやbyte位置をproviderへ渡さない（`SPEC.ja.md` §12.7.1）。このtestは修正前のcommit（`f910a11e`）でも`KeyError: 'base_source_digest'`で失敗する。
+- 現行のhole補完prompt（`inku.visible-ddl-hole-completion-prompt.v5`）はdigestやbyte位置をproviderへ渡さない（`SPEC.ja.md` §12.7.1）。このtestは修正前のcommit（`f910a11e`）でも`KeyError: 'base_source_digest'`で失敗する。
 - 2026-09-25に、偽providerがv3の形（短いID `h1` ごとの`proposed`と置換文）で答え、promptがv3であることを確かめるよう直した。あわせて、承認待ちの時点で独立した描画（赤い円）のScoreが`complete_with_omissions`として残ることを確かめる検査へ改めた（旧testは承認待ちでScoreが無いことを期待していた）。
 - 判定: **解消済み**。
 

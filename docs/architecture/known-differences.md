@@ -74,7 +74,7 @@
 ### F-12 Fake provider in the hole-completion API test (resolved)
 
 - The fake provider in `server/tests/test_pipeline_api.py::test_managed_api_persists_approved_patch_reload_and_legacy_fork` reads `base_source_digest` and similar fields from the hole-completion request body to answer it.
-- The current hole-completion prompt (`inku.visible-ddl-hole-completion-prompt.v4`) does not pass digests or byte positions to the provider (`SPEC.md` §12.7.1). The test also fails at the commit before the fixes (`f910a11e`) with `KeyError: 'base_source_digest'`.
+- The current hole-completion prompt (`inku.visible-ddl-hole-completion-prompt.v5`) does not pass digests or byte positions to the provider (`SPEC.md` §12.7.1). The test also fails at the commit before the fixes (`f910a11e`) with `KeyError: 'base_source_digest'`.
 - On 2026-09-25 the fake provider was changed to answer in the v3 shape (`proposed` with replacement text per short ID `h1`) and to check that the prompt is v3. The test now also checks that, while approval is pending, the Score of the independent drawing (the red circle) remains as `complete_with_omissions` (the old test expected no Score during the wait).
 - Result: **resolved**.
 

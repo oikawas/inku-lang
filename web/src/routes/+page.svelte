@@ -534,6 +534,8 @@
 		signedIn: () => session.currentUser !== null,
 		paintable: (text) => !!pipelineDescription(text).trim(),
 		setFailureReport: batchFailureReportStore.set,
+		getFailureReport: () => batchFailureReportStore.report,
+		retryUnavailableMessage: () => t().batchRetryUnavailable,
 		describeApiError,
 	});
 	const demo = new DemoState({
@@ -750,6 +752,18 @@
 				blocked: () => work.loading || work.reloading || refinementSession.gridBusy,
 				applyConditions: applyBatchRunConditions,
 				run: (lines) => work.submit({ resumeLines: lines }),
+			});
+		} catch (e) {
+			work.error = e instanceof Error ? e.message : String(e);
+		}
+	}
+
+	async function retryFailedBatch() {
+		try {
+			await batch.retryFailed({
+				blocked: () => work.loading || work.reloading || refinementSession.gridBusy || demoRunning,
+				applyConditions: applyBatchRunConditions,
+				run: (lines) => work.submit({ retryFailedLines: lines }),
 			});
 		} catch (e) {
 			work.error = e instanceof Error ? e.message : String(e);
@@ -2752,11 +2766,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						batchFailureReport={batchFailureReportStore.report}
 						batchPromptHistory={batch.promptHistory}
 						canResumeBatch={batch.canResume}
+						canRetryBatchFailures={batch.canRetryFailures}
 						batchResumeInfo={batch.resumeInfo}
 						batchResuming={batch.resuming}
 						batchInterrupted={batch.interrupted}
 						batchSuccess={batch.success}
 						onResumeBatch={() => void resumeInterruptedBatch()}
+						onRetryBatchFailures={() => void retryFailedBatch()}
 						canSubmit={work.canSubmit}
 						generationDisabled={refinementSession.gridBusy || work.reloading || demoRunning || batch.resuming}
 						error={work.error}

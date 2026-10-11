@@ -300,6 +300,8 @@ export const ja: LangPack = {
 	colorCatalogNote: (name: string, notes: string[]) => `${name}（${notes.join('・')}）`,
 	batchSummary: (success, failed, total) => `成功 ${success} / 失敗 ${failed} / 全 ${total}`,
 	batchFailureTitle: '失敗した行',
+	batchRetryFailuresBtn: 'エラー作品を再描画',
+	batchRetryUnavailable: '前回のバッチの全文を確認できないため、エラー作品を再描画できません。',
 	batchFailureLine: (line) => `${line}行目`,
 	batchActiveDdlLabel: '処理中の指示書',
 	batchActiveDdlPending: '指示書を待機中…',

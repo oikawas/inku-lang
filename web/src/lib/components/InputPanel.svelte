@@ -60,11 +60,13 @@
 		error: string | null;
 		batchPromptHistory: string[];
 		canResumeBatch: boolean;
+		canRetryBatchFailures: boolean;
 		batchResumeInfo: { nextLine: number | null; pending: number | null; total: number } | null;
 		batchResuming: boolean;
 		batchInterrupted: boolean;
 		batchSuccess: number;
 		onResumeBatch: () => void;
+		onRetryBatchFailures: () => void;
 		stageLabel: string;
 		canvasAspectId: CanvasAspectId;
 		canvasAspectOptions: CanvasAspectOption[];
@@ -124,11 +126,13 @@
 		error,
 		batchPromptHistory,
 		canResumeBatch,
+		canRetryBatchFailures,
 		batchResumeInfo,
 		batchResuming,
 		batchInterrupted,
 		batchSuccess,
 		onResumeBatch,
+		onRetryBatchFailures,
 		stageLabel,
 		canvasAspectId,
 		canvasAspectOptions,
@@ -374,11 +378,13 @@
 			{error}
 			{batchPromptHistory}
 			{canResumeBatch}
+			{canRetryBatchFailures}
 			{batchResumeInfo}
 			{batchResuming}
 			{batchInterrupted}
 			{batchSuccess}
 			{onResumeBatch}
+			{onRetryBatchFailures}
 			{stage1ModelLabel}
 			{stage2ModelLabel}
 			{onRememberBatchPrompt}

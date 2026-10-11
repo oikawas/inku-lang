@@ -300,6 +300,8 @@ export const en: LangPack = {
 	colorCatalogNote: (name: string, notes: string[]) => `${name} (${notes.join(', ')})`,
 	batchSummary: (success, failed, total) => `${success} succeeded / ${failed} failed / ${total} total`,
 	batchFailureTitle: 'Failed lines',
+	batchRetryFailuresBtn: 'Retry failed works',
+	batchRetryUnavailable: 'The full descriptions from the last batch are unavailable, so its failed works cannot be retried.',
 	batchFailureLine: (line) => `line ${line}`,
 	batchActiveDdlLabel: 'Current instructions',
 	batchActiveDdlPending: 'waiting for instructions…',

@@ -3661,6 +3661,16 @@ per user. **The history keeps fifty entries
 both the read and the write.**  The list is capped at half the window height and
 scrolls when it does not fit.
 
+On Web, an idle batch with drawing errors from its last run offers **Retry failed
+works** in the failure report. It retries only failed lines, keeping their full
+descriptions, original line numbers, run ID, and starting conditions. Saved
+successes, aborted lines, and unattempted lines are excluded. Recovered lines
+leave the error list; remaining errors can be retried again, including after
+stopping a retry. New failure reports retain the full source and conditions for
+this action. An older report's shortened display text is never painted as a
+description; if the original text cannot be verified, the UI explains why retry
+is unavailable.
+
 **A batch that stopped part-way can be carried on from where it stopped.** In
 one session it retains the original prompt, a stable run ID, the Stage 1/2
 models, color catalog, sketch, Wild, and canvas selected at start, plus the

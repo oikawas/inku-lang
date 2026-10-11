@@ -46,6 +46,7 @@
 		batchPromptHistory: string[];
 		/** Set when the last run stopped before the end of its prompt. */
 		canResumeBatch: boolean;
+		canRetryBatchFailures?: boolean;
 		/** The stopped batch's remaining work, found without changing the editor. */
 		batchResumeInfo?: { nextLine: number | null; pending: number | null; total: number } | null;
 		/** A resume scan is in progress; its result has not yet replaced the editor. */
@@ -55,6 +56,7 @@
 		/** Completed works from the most recent batch, including a stopped one. */
 		batchSuccess?: number;
 		onResumeBatch: () => void;
+		onRetryBatchFailures?: () => void;
 		stage1ModelLabel: string;
 		stage2ModelLabel: string;
 		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
@@ -93,11 +95,13 @@
 		error,
 		batchPromptHistory,
 		canResumeBatch,
+		canRetryBatchFailures = false,
 		batchResumeInfo = null,
 		batchResuming = false,
 		batchInterrupted = false,
 		batchSuccess = 0,
 		onResumeBatch,
+		onRetryBatchFailures,
 		stage1ModelLabel,
 		stage2ModelLabel,
 		onRememberBatchPrompt,
@@ -326,6 +330,11 @@
 {#if batchFailureReport && !batchRunning}
 	<div class="batch-summary has-failures">
 		<div class="batch-summary-line">{t().batchSummary(batchFailureReport.success, batchFailureReport.failures.length, batchFailureReport.total)}</div>
+		{#if canRetryBatchFailures}
+			<button type="button" class="ghost-btn" onclick={onRetryBatchFailures} disabled={actionDisabled || batchResuming}>
+				{t().batchRetryFailuresBtn}
+			</button>
+		{/if}
 		<div class="batch-failure-title">{t().batchFailureTitle}</div>
 		<ul class="batch-failure-list">
 			{#each batchFailureReport.failures as failure (failure.line)}

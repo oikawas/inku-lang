@@ -63,6 +63,8 @@ export type BatchStateDependencies = {
 	signedIn: () => boolean;
 	paintable: (text: string) => boolean;
 	setFailureReport: (report: BatchFailureReport | null) => void;
+	getFailureReport?: () => BatchFailureReport | null;
+	retryUnavailableMessage?: () => string;
 	describeApiError?: (detail: unknown, status: number) => string;
 	createRunId?: () => string;
 	warn?: (message: string, cause: unknown) => void;
@@ -70,6 +72,7 @@ export type BatchStateDependencies = {
 
 export type BatchRunOptions<TResult extends BatchLineResult> = {
 	resumeLines?: NumberedLine[];
+	retryFailedLines?: NumberedLine[];
 	/** Captured when a fresh run starts, then reapplied by every in-session resume. */
 	runConditions?: BatchRunConditions;
 	canvasAspectId: PaintOptions['canvasAspectId'];
@@ -136,6 +139,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 	private stopRequested = false;
 	private abortController: AbortController | null = null;
 	private interruptedSnapshot: InterruptedBatchSnapshot<TWork> | null = null;
+	private lastSnapshot: InterruptedBatchSnapshot<TWork> | null = null;
 	resuming = $state(false);
 
 	constructor(deps: BatchStateDependencies) {
@@ -162,6 +166,11 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 		return this.resume !== null;
 	}
 
+	get canRetryFailures(): boolean {
+		return !this.running && (this.failures.length > 0 ||
+			(this.deps.getFailureReport?.()?.failures.length ?? 0) > 0);
+	}
+
 	/** Enough progress for the button to explain an in-session continuation. */
 	get resumeInfo(): { nextLine: number | null; pending: number | null; total: number } {
 		const candidate = this.resume;
@@ -186,11 +195,14 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 		this.promptHistory = [];
 		this.resume = null;
 		this.interruptedSnapshot = null;
+		this.lastSnapshot = null;
+		this.failures = [];
 	}
 
 	clearInput(): void {
 		this.input = '';
 		this.failures = [];
+		this.lastSnapshot = null;
 		this.activeLine = null;
 		this.observedLine = null;
 		this.activeDdl = null;
@@ -330,9 +342,56 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 		}
 	}
 
+	async retryFailed(options: ResumeInterruptedOptions): Promise<void> {
+		if (!this.canRetryFailures || options.blocked() || this.resuming) return;
+		const report = this.deps.getFailureReport?.();
+		const restoreConditions = this.lastSnapshot !== null || report?.retry !== undefined || this.resume !== null;
+		let snapshot = this.lastSnapshot;
+		let failures = this.failures;
+		if (!snapshot || failures.length === 0) {
+			if (!report?.failures.length) return;
+			const context = report.retry;
+			const prompt = context?.prompt ?? this.promptHistory[0] ?? '';
+			const lines = numberedBatchLines(prompt, this.deps.paintable);
+			const failedNumbers = context?.failedLines ?? report.failures.map((failure) => failure.line);
+			const selected = lines.filter((line) => failedNumbers.includes(line.line));
+			// Legacy reports may truncate the displayed input. Recover it only
+			// from a matching original prompt, never by painting the excerpt.
+			if (selected.length === 0 || selected.length !== new Set(failedNumbers).size ||
+				(!context && report.failures.some((failure) =>
+					!selected.some((line) => line.line === failure.line && line.input === failure.input)))) {
+				throw new Error(this.deps.retryUnavailableMessage?.() ?? 'Original batch descriptions are unavailable for retry.');
+			}
+			const pending = context ? lines.filter((line) => context.pendingLines.includes(line.line)) : selected;
+			snapshot = {
+				prompt, lines, pending,
+				completed: lines.filter((line) => !pending.some((item) => item.line === line.line)),
+				runId: context?.runId ?? this.resume?.runId ?? (this.deps.createRunId ?? defaultRunId)(),
+				conditions: context?.conditions ?? this.resume?.conditions ?? this.emptyConditions(),
+				lastWork: this.resume?.work ?? null,
+			};
+			failures = selected.map((line) => ({ ...line,
+				message: report.failures.find((failure) => failure.line === line.line)?.message ?? '' }));
+		}
+		this.resuming = true;
+		try {
+			this.lastSnapshot = snapshot;
+			this.failures = failures;
+			this.input = snapshot.prompt;
+			if (restoreConditions) {
+				options.applyConditions(snapshot.conditions);
+			}
+			await options.run(failures.map(({ line, input }) => ({ line, input })));
+		} finally {
+			this.resuming = false;
+		}
+	}
+
 	async run(options: BatchRunOptions<TResult>): Promise<void> {
 		if (this.running) return;
-		const resumingSnapshot = options.resumeLines ? this.interruptedSnapshot : null;
+		const retrying = options.retryFailedLines !== undefined;
+		const previousFailures = retrying ? this.failures : [];
+		const resumingSnapshot = retrying ? this.lastSnapshot : options.resumeLines ? this.interruptedSnapshot : null;
 		if (!resumingSnapshot) {
 			this.resumeDiscovery += 1;
 			this.resume = null;
@@ -346,9 +405,10 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 		// owner. Keep the selection guarded until this run has claimed `running`.
 		if (resumingSnapshot) this.resuming = false;
 		this.resetForRun();
+		if (retrying) this.failures = previousFailures;
 
 		const lines = numberedBatchLines(this.input, this.deps.paintable);
-		const paintLines = options.resumeLines ?? lines;
+		const paintLines = options.retryFailedLines ?? options.resumeLines ?? lines;
 		const lineTotal = paintLines.length;
 		const snapshot = resumingSnapshot ?? {
 			prompt: this.input,
@@ -360,6 +420,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 			lastWork: null,
 		};
 		this.interruptedSnapshot = snapshot;
+		this.lastSnapshot = snapshot;
 		const batchRunId = snapshot.runId;
 		this.total = lineTotal;
 		let interrupted = false;
@@ -425,7 +486,11 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 			// Progress is repointed at each retry round; reports retain the run total.
 			this.deps.setFailureReport(
 				this.failures.length > 0
-					? { success: this.success, total: lineTotal, failures: this.failures }
+					? { success: retrying ? snapshot.completed.length : this.success,
+						total: retrying ? snapshot.lines.length : lineTotal, failures: this.failures,
+						retry: { prompt: snapshot.prompt, runId: snapshot.runId, conditions: snapshot.conditions,
+							failedLines: this.failures.map((failure) => failure.line),
+							pendingLines: snapshot.pending.map((line) => line.line) } }
 					: null,
 			);
 		};
@@ -438,9 +503,11 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 				if (outcome === null) { interrupted = true; this.interrupted = true; break; }
 				if (outcome !== true) {
 					this.failures = [
-						...this.failures,
+						...dropFailedLine(this.failures, paintLines[index].line),
 						{ line: paintLines[index].line, input: paintLines[index].input, message: outcome },
 					];
+				} else if (retrying) {
+					this.failures = dropFailedLine(this.failures, paintLines[index].line);
 				}
 				publishFailureReport();
 			}
@@ -487,7 +554,8 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 				this.warn('failed to refresh history after batch run', cause);
 			}
 			publishFailureReport();
-			if (!interrupted && isCurrent()) this.interruptedSnapshot = null;
+			if (!interrupted && isCurrent() && !(retrying && snapshot.pending.some((line) =>
+				!paintLines.some((item) => item.line === line.line)))) this.interruptedSnapshot = null;
 			await this.refreshResume();
 		} finally {
 			if (this.abortController === abortController) {

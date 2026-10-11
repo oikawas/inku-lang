@@ -186,6 +186,8 @@ export interface LangPack {
 	colorCatalogNote: (name: string, notes: string[]) => string;
 	batchSummary: (success: number, failed: number, total: number) => string;
 	batchFailureTitle: string;
+	batchRetryFailuresBtn: string;
+	batchRetryUnavailable: string;
 	batchFailureLine: (line: number) => string;
 	batchActiveDdlLabel: string;
 	batchActiveDdlPending: string;

@@ -51,6 +51,102 @@ function makeState(
 	return { state, reports };
 }
 
+test('manual failure retry paints only errors, keeps original conditions and numbering, and removes recovered errors', async () => {
+	const { state, reports } = makeState();
+	const original = 'saved\n\nfailed\nother failure';
+	const conditions = {
+		stage1Model: 'provider/original', stage2Model: null, catalogId: 'sumi', catalogMode: 'fixed' as const,
+		sketchGrain: 'fine', wild: true, canvasAspectId: 'square',
+	};
+	state.input = original;
+	const calls: Array<{ text: string; line: number; id: string }> = [];
+	let manualRound = 0;
+	const run = (retryFailedLines?: Array<{ line: number; input: string }>) => state.run({
+		retryFailedLines, runConditions: conditions, canvasAspectId: 'square', maxRetries: 0,
+		paintLine: async (text, options) => {
+			const line = options.batchLineNumber!;
+			calls.push({ text, line, id: options.batchRunId! });
+			if (line !== 1 && (manualRound === 0 || (line === 4 && manualRound === 1))) throw new Error(`failure-${manualRound}`);
+			return result(line);
+		},
+		onLatestResult: () => {}, refreshAfterServerSave: async () => {}, refreshAfterRun: async () => {},
+	});
+	await run();
+	assert.equal(state.canRetryFailures, true);
+	state.input = 'edited input that must not be painted';
+	const applied: unknown[] = [];
+	const retry = () => state.retryFailed({
+		blocked: () => false, applyConditions: (value) => applied.push(value), run,
+	});
+	manualRound = 1;
+	await retry();
+	assert.deepEqual(calls.slice(3), [
+		{ text: 'failed', line: 3, id: 'run-fixed' }, { text: 'other failure', line: 4, id: 'run-fixed' },
+	]);
+	assert.equal(state.input, original);
+	assert.deepEqual(applied, [conditions]);
+	assert.deepEqual(state.failures, [{ line: 4, input: 'other failure', message: 'failure-1' }]);
+	assert.equal((reports.at(-1) as { success: number }).success, 2);
+	manualRound = 2;
+	await retry();
+	assert.deepEqual(calls.slice(5), [{ text: 'other failure', line: 4, id: 'run-fixed' }]);
+	assert.equal(state.canRetryFailures, false);
+	assert.equal(reports.at(-1), null);
+});
+
+test('manual failure retry after stop excludes aborted and unattempted lines and preserves errors when stopped again', async () => {
+	const { state } = makeState();
+	state.input = 'saved\nfailed\nsecond failure\naborted\nunattempted';
+	let manual = false;
+	let stopRetry = true;
+	const calls: number[] = [];
+	const run = (retryFailedLines?: Array<{ line: number; input: string }>) => state.run({
+		retryFailedLines, canvasAspectId: 'square', maxRetries: 0,
+		paintLine: async (_text, options) => {
+			const line = options.batchLineNumber!;
+			calls.push(line);
+			if ((!manual && line === 4) || (manual && stopRetry)) { state.stop(); return result(line); }
+			if (!manual && line !== 1) throw new Error('failed');
+			return result(line);
+		},
+		onLatestResult: () => {}, refreshAfterServerSave: async () => {}, refreshAfterRun: async () => {},
+	});
+	await run();
+	manual = true;
+	const retry = () => state.retryFailed({ blocked: () => false, applyConditions: () => {}, run });
+	await retry();
+	assert.deepEqual(calls, [1, 2, 3, 4, 2]);
+	assert.deepEqual(state.failures.map((failure) => failure.line), [2, 3]);
+	stopRetry = false;
+	await retry();
+	assert.deepEqual(calls.slice(5), [2, 3]);
+	assert.deepEqual(state.resume?.pending?.map((line) => line.line), [4, 5]);
+	assert.equal(state.canRetryFailures, false);
+});
+
+test('manual failure retry restores full persisted descriptions beyond the display excerpt and ignores the edited box', async () => {
+	const full = '長い記述'.repeat(100);
+	const conditions = { stage1Model: 'provider/original', stage2Model: null, catalogId: null,
+		catalogMode: null, sketchGrain: null, wild: false, canvasAspectId: 'square' };
+	let report = { success: 1, total: 2, failures: [{ line: 3, input: full.slice(0, 300), message: 'failed' }],
+		retry: { prompt: `saved\n\n${full}`, runId: 'persisted-run', conditions, failedLines: [3], pendingLines: [3] } };
+	const state = new BatchState({ apiFetch: async () => jsonResponse({ items: [] }), signedIn: () => true,
+		paintable: (text) => text.trim().length > 0,
+		getFailureReport: () => report,
+		setFailureReport: (value) => { report = value as typeof report; },
+	});
+	state.input = 'different prompt';
+	const calls: unknown[] = [];
+	await state.retryFailed({ blocked: () => false, applyConditions: (value) => assert.deepEqual(value, conditions),
+		run: (retryFailedLines) => state.run({ retryFailedLines, canvasAspectId: 'square', maxRetries: 0,
+			paintLine: async (text, options) => { calls.push([text, options.batchLineNumber, options.batchRunId]); return result(3); },
+			onLatestResult: () => {}, refreshAfterServerSave: async () => {}, refreshAfterRun: async () => {},
+		}),
+	});
+	assert.deepEqual(calls, [[full, 3, 'persisted-run']]);
+	assert.equal(state.canRetryFailures, false);
+});
+
 test('T-802/T-803/T-804: line identity, retry recovery, totals, and latest work stay one run', async () => {
 	const { state, reports } = makeState();
 	state.input = 'first\n\nthird';

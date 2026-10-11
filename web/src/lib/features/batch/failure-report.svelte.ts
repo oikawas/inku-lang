@@ -2,6 +2,7 @@
 // still read it after closing the tab.  Key, caps, compaction, parser and state
 // stay together -- see features/color-catalog/settings.svelte.ts for why.
 import { registerPersistedSetting } from '$lib/features/persisted-settings';
+import type { BatchRunConditions } from './resume.ts';
 
 const BATCH_FAILURE_REPORT_KEY = 'inku-batch-failure-report';
 const BATCH_FAILURE_REPORT_MAX_ITEMS = 100;
@@ -17,6 +18,14 @@ export type BatchFailureReport = {
 	success: number;
 	total: number;
 	failures: BatchFailure[];
+	/** Full source and failed line identities survive the display compaction. */
+	retry?: {
+		prompt: string;
+		runId: string;
+		conditions: BatchRunConditions;
+		failedLines: number[];
+		pendingLines: number[];
+	};
 };
 
 function compact(report: BatchFailureReport): BatchFailureReport {
@@ -28,6 +37,7 @@ function compact(report: BatchFailureReport): BatchFailureReport {
 			input: failure.input.slice(0, BATCH_FAILURE_REPORT_MAX_TEXT),
 			message: failure.message.slice(0, BATCH_FAILURE_REPORT_MAX_TEXT),
 		})),
+		...(report.retry ? { retry: report.retry } : {}),
 	};
 }
 
@@ -70,7 +80,19 @@ class BatchFailureReportStore {
 					typeof failure.message === 'string'
 				);
 			if (failures.length === 0) return null;
-			return compact({ success: report.success, total: report.total, failures });
+			// Older reports have only compact display text. Do not mistake that
+			// truncated text for a complete description when retrying a work.
+			const retry = report.retry;
+			const validRetry = retry && typeof retry.prompt === 'string' && typeof retry.runId === 'string'
+				&& retry.conditions && typeof retry.conditions === 'object'
+				&& (['stage1Model', 'stage2Model', 'catalogId', 'catalogMode', 'sketchGrain', 'canvasAspectId'] as const)
+					.every((key) => retry.conditions[key] === null || typeof retry.conditions[key] === 'string')
+				&& (retry.conditions.wild === null || typeof retry.conditions.wild === 'boolean')
+				&& Array.isArray(retry.failedLines) && retry.failedLines.every((line) => Number.isInteger(line) && line > 0)
+				&& Array.isArray(retry.pendingLines) && retry.pendingLines.every((line) => Number.isInteger(line) && line > 0)
+				&& retry.failedLines.every((line) => retry.pendingLines.includes(line));
+			return compact({ success: report.success, total: report.total, failures,
+				...(validRetry ? { retry } : {}) });
 		} catch {
 			return null;
 		}

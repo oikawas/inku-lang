@@ -696,8 +696,9 @@ export function createWorkState(deps: WorkStateDeps) {
 	 * painted in place of the whole box, each keeping the number the prompt gave
 	 * it. Everything else about the run is unchanged.
 	 */
-	async function submit(options: { resumeLines?: NumberedLine[]; fork?: boolean; } = {}) {
-		if (!canSubmit || loading || refinementSession.gridBusy || (batch.resuming && !options.resumeLines)) return;
+	async function submit(options: { resumeLines?: NumberedLine[]; retryFailedLines?: NumberedLine[]; fork?: boolean; } = {}) {
+		if (options.retryFailedLines && inputMode !== 'batch') return;
+		if (!canSubmit || loading || refinementSession.gridBusy || (batch.resuming && !options.resumeLines && !options.retryFailedLines)) return;
 		// Drawing a held work from its description happens only as the explicit fork.
 		if (inputMode === 'single' && descriptionLocked && !options.fork) return;
 		// Ask before resetTargetScopedState and before any intermediate save.
@@ -711,7 +712,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		}
 
 		// The lineage lookup may yield to a different drawing action.
-		if (loading || reloading || refinementSession.gridBusy || (batch.resuming && !options.resumeLines)) return;
+		if (options.retryFailedLines && inputMode !== 'batch') return;
+		if (loading || reloading || refinementSession.gridBusy || (batch.resuming && !options.resumeLines && !options.retryFailedLines)) return;
 		if (inputMode === 'batch') {
 			await submitBatch(options);
 			return;
@@ -773,7 +775,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		}
 	}
 
-	async function submitBatch(options: { resumeLines?: NumberedLine[]; }): Promise<void> {
+	async function submitBatch(options: { resumeLines?: NumberedLine[]; retryFailedLines?: NumberedLine[]; }): Promise<void> {
 		const batchCanvasAspectId = effectiveCanvasAspectId();
 		const batchCatalogId = colorCatalogSettings.selected;
 		const batchStage1Model = qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model());
@@ -795,6 +797,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		try {
 			await batch.run({
 				resumeLines: options.resumeLines,
+				retryFailedLines: options.retryFailedLines,
 				runConditions: {
 					stage1Model: batchStage1Model,
 					stage2Model: batchStage2Model,

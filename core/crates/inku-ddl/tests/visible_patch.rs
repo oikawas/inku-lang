@@ -1,10 +1,12 @@
 use std::collections::HashSet;
 
 use inku_ddl::{
-    CompilerLockState, MacroDefinition, MacroExpansionLimits, NormalizedDdlDocument,
+    CompilerLockState, CompletionRangeRecord, MacroDefinition, MacroExpansionLimits,
+    NormalizedDdlDocument, RANGE_WORDS_CHANGED_HOLE_KIND, RecordedRange,
     ResolvedInstructionLanguage, SemanticDeliveryOwner, SemanticIssueCausalProvenance,
     SemanticUpstreamCausalRelation, SourceSpan, VISIBLE_DDL_PATCH_SCHEMA_ID, VisibleDdlPatch,
     VisibleDdlPatchEdit, VisiblePatchDiagnostic, compile_typed_ddl, validate_visible_ddl_patch,
+    with_completion_record, written_ranges,
 };
 use serde::Deserialize;
 
@@ -638,6 +640,7 @@ fn schema_fixture_and_patch_diagnostic_matrix_are_closed() {
         VisiblePatchDiagnostic::NewDiagnostic,
         VisiblePatchDiagnostic::CandidateIntegrityFailure,
         VisiblePatchDiagnostic::NumericRangeOutsideWords,
+        VisiblePatchDiagnostic::RangeWordsNotKept,
     ];
     assert_eq!(
         all.iter()
@@ -775,6 +778,109 @@ fn completion_keeps_a_numeric_range_in_the_hole_clause() {
         moved.err(),
         Some(VisiblePatchDiagnostic::OwnerAssociationChanged)
     );
+}
+
+/// A3 (2026-10-11): a range whose words the author changed takes new numbers
+/// only. Its words stay to the letter, and a position word they hold must
+/// contain the numbers, even the old ones; the same numbers pass for words that
+/// mean the same place (T3).
+#[test]
+fn a_range_whose_words_changed_takes_new_numbers_only() {
+    use VisiblePatchDiagnostic::{NumericRangeOutsideWords, RangeWordsNotKept};
+    let ja = ResolvedInstructionLanguage::Ja;
+    let completed =
+        "白い四角を中心に置く。右下（横2/3〜1、縦2/3〜1）に橙色の小さな円を十個散らす。";
+    let record = record_of(completed, ja);
+    let mut mismatches = Vec::new();
+    for (words, replacement, expected) in [
+        ("左上", "左上（横0〜1/3、縦0〜1/3）", None),
+        (
+            "左上",
+            "左の上（横0〜1/3、縦0〜1/3）",
+            Some(RangeWordsNotKept),
+        ),
+        (
+            "上",
+            "上（横2/3〜1、縦2/3〜1）",
+            Some(NumericRangeOutsideWords),
+        ),
+        ("上", "上（横0〜1、縦0〜1/3）", None),
+        ("右下のあたり", "右下のあたり（横2/3〜1、縦2/3〜1）", None),
+    ] {
+        let edited = completed.replace("右下", words);
+        let base = with_completion_record(compiled(&edited, ja), &record, &[]);
+        let holes = words_changed_holes(&base);
+        assert_eq!(holes.len(), 1, "{edited}: {:?}", base.holes);
+        let result = validate_visible_ddl_patch(
+            &base,
+            &patch(&base, vec![edit(holes[0], replacement)]),
+            &[],
+            None,
+            LIMITS,
+        );
+        match (&result, expected) {
+            (Ok(candidate), None) => {
+                // The range the patch wrote is the answer, not a hole again.
+                assert!(words_changed_holes(&candidate.compilation).is_empty());
+                let range = candidate.resolved_ranges[0];
+                assert_eq!(
+                    &candidate.document.source()[range.start_byte..range.end_byte],
+                    replacement
+                );
+            }
+            (Err(reason), Some(expected)) if *reason == expected => {}
+            _ => mismatches.push(format!("{edited} -> {replacement}: {result:?}")),
+        }
+    }
+    assert!(mismatches.is_empty(), "{mismatches:#?}");
+}
+
+/// T3: of two ranges whose words changed, one may take its numbers alone; the
+/// other stays a hole on both sides, so no new diagnostic is reported.
+#[test]
+fn one_of_two_ranges_whose_words_changed_can_take_its_numbers_alone() {
+    let ja = ResolvedInstructionLanguage::Ja;
+    let completed = "右寄り（横2/3〜1、縦0〜1）に赤い円を置く。右下（横2/3〜1、縦2/3〜1）に橙色の小さな円を十個散らす。";
+    let record = record_of(completed, ja);
+    let edited = completed
+        .replace("右寄り", "左寄り")
+        .replace("右下", "左上");
+    let base = with_completion_record(compiled(&edited, ja), &record, &[]);
+    let holes = words_changed_holes(&base);
+    assert_eq!(holes.len(), 2, "{:?}", base.holes);
+    let candidate = validate_visible_ddl_patch(
+        &base,
+        &patch(&base, vec![edit(holes[1], "左上（横0〜1/3、縦0〜1/3）")]),
+        &[],
+        None,
+        LIMITS,
+    )
+    .expect("one range alone");
+    let left = words_changed_holes(&candidate.compilation);
+    assert_eq!(left.len(), 1);
+    assert!(
+        candidate.document.source()[left[0].span.start_byte..left[0].span.end_byte]
+            .starts_with("左寄り")
+    );
+}
+
+fn record_of(source: &str, language: ResolvedInstructionLanguage) -> CompletionRangeRecord {
+    CompletionRangeRecord {
+        ranges: written_ranges(&compiled(source, language))
+            .iter()
+            .map(RecordedRange::from)
+            .collect(),
+    }
+}
+
+fn words_changed_holes(compilation: &inku_ddl::TypedDdlCompilation) -> Vec<&inku_ddl::TypedHole> {
+    let mut holes = compilation
+        .holes
+        .iter()
+        .filter(|hole| hole.kind == RANGE_WORDS_CHANGED_HOLE_KIND)
+        .collect::<Vec<_>>();
+    holes.sort_by_key(|hole| hole.span.start_byte);
+    holes
 }
 
 fn compiled(source: &str, language: ResolvedInstructionLanguage) -> inku_ddl::TypedDdlCompilation {

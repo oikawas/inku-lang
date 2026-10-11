@@ -240,6 +240,17 @@ fn pipeline_composition_ranges() -> String {
     inku_pipeline_uniffi::composition_ranges()
 }
 
+/// The states of a work's completion ranges, for the instruction editor (A3).
+#[pyfunction]
+fn pipeline_completion_range_states<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::completion_range_states(input));
+    PyBytes::new(py, &output)
+}
+
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(core_api_version, module)?)?;
@@ -265,5 +276,6 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pipeline_migrate_saijiki_v1, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_recompose, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_composition_ranges, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_completion_range_states, module)?)?;
     Ok(())
 }

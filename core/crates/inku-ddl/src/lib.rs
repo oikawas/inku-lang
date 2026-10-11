@@ -6,6 +6,7 @@ pub mod attachment;
 pub mod clause;
 pub mod compiler_execution;
 pub mod compiler_lock;
+pub mod completion_record;
 pub mod composition;
 pub mod composition_plan;
 pub mod document;
@@ -73,6 +74,11 @@ pub mod semantic_instruction;
 pub mod stage15_transform;
 pub mod visible_patch;
 pub mod work_plan;
+pub use completion_record::{
+    COMPLETION_RANGES_SCHEMA_ID, CompletionRangeMatch, CompletionRangeRecord, CompletionRangeState,
+    RANGE_WORDS_CHANGED_HOLE_KIND, RecordedRange, WrittenRange, match_completion_ranges,
+    record_after_patch, settle_completion_record, with_completion_record, written_ranges,
+};
 pub use visible_patch::visible_ddl_patch_available;
 
 pub use attachment::{

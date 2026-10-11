@@ -205,6 +205,7 @@ fn canonical_macro_crosses_owned_start_and_commit() {
             authority: VariationAuthorityState::new_direct_ddl(),
             authoring: AuthoringInput::DirectDdl {
                 source: "Example.Circle.".into(),
+                completion_ranges: None,
             },
         },
     );
@@ -230,6 +231,7 @@ fn a_saved_unit_of_the_retired_saijiki_waits_for_its_host_to_migrate_it() {
             authority: VariationAuthorityState::new_direct_ddl(),
             authoring: AuthoringInput::DirectDdl {
                 source: "place one red circle at center.".into(),
+                completion_ranges: None,
             },
         },
     );
@@ -295,6 +297,7 @@ fn a_saved_unit_of_the_retired_saijiki_waits_for_its_host_to_migrate_it() {
                 authority: VariationAuthorityState::new_direct_ddl(),
                 authoring: AuthoringInput::DirectDdl {
                     source: "Saved.Sway.".into(),
+                    completion_ranges: None,
                 },
             },
         );
@@ -319,6 +322,7 @@ fn unresolved_qualified_macro_blocks_without_stage2_completion() {
             authority: VariationAuthorityState::new_direct_ddl(),
             authoring: AuthoringInput::DirectDdl {
                 source: "Nature.若葉 を置く".into(),
+                completion_ranges: None,
             },
         },
     );
@@ -751,6 +755,7 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
             authority: VariationAuthorityState::new_direct_ddl(),
             authoring: AuthoringInput::DirectDdl {
                 source: source.into(),
+                completion_ranges: None,
             },
         },
     );
@@ -1108,6 +1113,7 @@ fn committed_hole_with_local_diagnostics_still_requests_bounded_completion() {
             authority: VariationAuthorityState::new_direct_ddl(),
             authoring: AuthoringInput::DirectDdl {
                 source: "出力: 黒い背景に、粗筆の黒い四角を中心に置く。面: 粗く塗りつぶす。".into(),
+                completion_ranges: None,
             },
         },
     );
@@ -1157,6 +1163,7 @@ fn independent_hole_results_keep_valid_subset_without_retry_after_ack() {
                 authority: VariationAuthorityState::new_direct_ddl(),
                 authoring: AuthoringInput::DirectDdl {
                     source: source.into(),
+                    completion_ranges: None,
                 },
             },
         );
@@ -1460,6 +1467,165 @@ fn the_check_names_hole_text_and_the_attempt_tells_a_second_request() {
     assert_eq!(again.attempt, 2);
 }
 
+/// A3 (T5): an approved completion leaves the ranges it wrote in the work's
+/// record, with their words, numbers and sentence, once the commit is
+/// acknowledged.
+#[test]
+fn an_approved_completion_records_the_ranges_it_wrote() {
+    let state =
+        started_direct_ddl("scatter ten small orange circles randomly at the bottom right.");
+    let replacement = hole_source(&state, 0).replace(" randomly", "").replace(
+        "at the bottom right",
+        "at the bottom right (horizontal 2/3 to 1, vertical 2/3 to 1)",
+    );
+    let proposed = run(
+        Some(&state),
+        &hole_response(
+            &state,
+            json!({"results":[{"id":"h1","status":"proposed","replacement":replacement}]}),
+        ),
+    )
+    .snapshot;
+    let approved = approve(&proposed);
+    assert!(
+        approved.completion_ranges.is_none(),
+        "kept only after the ACK"
+    );
+    let committed = run(Some(&approved), &envelope(Some(&approved), ack(&approved))).snapshot;
+    assert!(committed.action.is_none());
+    assert!(matches!(committed.phase, PipelinePhase::ScoreReady));
+    let record =
+        serde_json::to_value(committed.completion_ranges.as_ref().expect("a record")).unwrap();
+    assert_eq!(record["schema"], "inku.completion-ranges.v1");
+    assert_eq!(record["ranges"].as_array().map(Vec::len), Some(1));
+    assert_eq!(record["ranges"][0]["words"], "the bottom right");
+    assert_eq!(record["ranges"][0]["horizontal"], json!(["2/3", "1"]));
+    assert_eq!(record["ranges"][0]["vertical"], json!(["2/3", "1"]));
+    assert!(
+        record["ranges"][0]["sentence"]
+            .as_str()
+            .is_some_and(|sentence| sentence.contains('\u{FFFC}') && sentence.contains("orange"))
+    );
+}
+
+/// A3 (T4): a direct DDL from a work whose completion range the author renamed
+/// asks the completion for that range's numbers again, while the text is drawn
+/// as written; once approved, the record takes the new numbers and the run
+/// settles without asking again.
+#[test]
+fn a_range_whose_words_changed_is_completed_again_and_recorded() {
+    let completed = "scatter ten small orange circles at the bottom right (horizontal 2/3 to 1, vertical 2/3 to 1).";
+    let compiled = inku_ddl::compile_typed_ddl(
+        inku_ddl::NormalizedDdlDocument::new(
+            completed,
+            inku_ddl::ResolvedInstructionLanguage::En,
+            Vec::new(),
+        )
+        .unwrap(),
+        &[],
+        None,
+        config().compiler.macro_limits().unwrap(),
+    );
+    let record = inku_ddl::CompletionRangeRecord {
+        ranges: inku_ddl::written_ranges(&compiled)
+            .iter()
+            .map(inku_ddl::RecordedRange::from)
+            .collect(),
+    };
+    assert_eq!(record.ranges.len(), 1);
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "words-changed".into(),
+            authoring_nonce: "words-changed-1".into(),
+            config: Box::new(config()),
+            authority: VariationAuthorityState::new_direct_ddl(),
+            authoring: AuthoringInput::DirectDdl {
+                source: completed.replace("the bottom right", "the top left"),
+                completion_ranges: Some(record.clone()),
+            },
+        },
+    );
+    let pending = run(None, &start).snapshot;
+    let state = run(Some(&pending), &envelope(Some(&pending), ack(&pending))).snapshot;
+    let action = state.action.as_ref().expect("the completion is asked");
+    assert_eq!(action.tag, "complete_visible_ddl_holes");
+    assert_eq!(
+        action.payload["prompt"]["prompt_id"],
+        "inku.visible-ddl-hole-completion-prompt.v5"
+    );
+    let message: serde_json::Value =
+        serde_json::from_str(action.payload["prompt"]["message"].as_str().unwrap()).unwrap();
+    assert_eq!(message["selected_holes"].as_array().map(Vec::len), Some(1));
+    assert_eq!(message["selected_holes"][0]["kind"], "range_words_changed");
+    assert_eq!(
+        message["selected_holes"][0]["source"],
+        "the top left (horizontal 2/3 to 1, vertical 2/3 to 1)"
+    );
+    assert!(state.delivery.as_ref().unwrap().score.is_some());
+    assert_eq!(state.completion_ranges.as_ref(), Some(&record));
+    let proposed = run(
+        Some(&state),
+        &hole_response(
+            &state,
+            json!({"results":[{"id":"h1","status":"proposed",
+                "replacement":"the top left (horizontal 0 to 1/3, vertical 0 to 1/3)"}]}),
+        ),
+    )
+    .snapshot;
+    let approved = approve(&proposed);
+    let committed = run(Some(&approved), &envelope(Some(&approved), ack(&approved))).snapshot;
+    assert!(committed.action.is_none(), "not asked again");
+    assert!(matches!(committed.phase, PipelinePhase::ScoreReady));
+    assert!(
+        committed
+            .document
+            .as_ref()
+            .unwrap()
+            .source
+            .contains("the top left (horizontal 0 to 1/3, vertical 0 to 1/3)")
+    );
+    let kept = committed.completion_ranges.as_ref().expect("a record");
+    assert_eq!(kept.ranges.len(), 1);
+    assert_eq!(kept.ranges[0].words, "the top left");
+    assert_eq!(
+        serde_json::to_value(kept).unwrap()["ranges"][0]["horizontal"],
+        json!(["0", "1/3"])
+    );
+}
+
+/// The source of the `index`-th hole the running completion asks for.
+fn hole_source(state: &PipelineSnapshot, index: usize) -> String {
+    let action = state.action.as_ref().unwrap();
+    let message: serde_json::Value =
+        serde_json::from_str(action.payload["prompt"]["message"].as_str().unwrap()).unwrap();
+    message["selected_holes"][index]["source"]
+        .as_str()
+        .unwrap()
+        .to_owned()
+}
+
+/// Approve the proposal the run waits on.
+fn approve(state: &PipelineSnapshot) -> PipelineSnapshot {
+    let PipelinePhase::AwaitingPatchApproval {
+        proposal_digest, ..
+    } = &state.phase
+    else {
+        panic!("{:?}; {:?}", state.phase, state.hole_completion_check)
+    };
+    run(
+        Some(state),
+        &envelope(
+            Some(state),
+            PipelineInput::ApprovePatch {
+                expected_revision: DecimalU64::new(state.authority.revision()),
+                proposal_digest: proposal_digest.clone(),
+            },
+        ),
+    )
+    .snapshot
+}
+
 fn started_direct_ddl(source: &str) -> PipelineSnapshot {
     let start = envelope(
         None,
@@ -1470,6 +1636,7 @@ fn started_direct_ddl(source: &str) -> PipelineSnapshot {
             authority: VariationAuthorityState::new_direct_ddl(),
             authoring: AuthoringInput::DirectDdl {
                 source: source.into(),
+                completion_ranges: None,
             },
         },
     );

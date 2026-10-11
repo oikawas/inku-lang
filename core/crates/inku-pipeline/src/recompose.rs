@@ -90,7 +90,9 @@ struct ReadLayer {
     current: Option<usize>,
 }
 
-fn document(
+/// The visible source as a document, with the locks of the definitions the
+/// pipeline configuration carries.
+pub(crate) fn document(
     source: &str,
     language: ResolvedInstructionLanguage,
     definitions: &[MacroDefinition],

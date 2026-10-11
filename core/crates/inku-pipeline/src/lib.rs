@@ -4,6 +4,7 @@
 
 pub mod authority;
 pub mod byte_envelope;
+pub mod completion_ranges;
 pub mod composition;
 pub mod composition_reading;
 pub mod core_boundary;

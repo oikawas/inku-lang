@@ -186,7 +186,14 @@ pub(crate) fn independent_units(
     // declarations of the same support kind together and revalidate the union.
     let mut supports = BTreeMap::<Owner, Vec<String>>::new();
     let mut drawing_holes = Vec::new();
+    let mut ranges = Vec::new();
     for hole in holes {
+        // A range whose words the author changed takes new numbers only: no
+        // shape, count or reference moves, so it stands alone (A3).
+        if hole.kind == inku_ddl::RANGE_WORDS_CHANGED_HOLE_KIND {
+            ranges.push(vec![hole.id.clone()]);
+            continue;
+        }
         let support = compilation.semantic_document.as_ref().and_then(|semantic| {
             semantic
                 .instruction_association
@@ -216,6 +223,7 @@ pub(crate) fn independent_units(
     if !coupled.is_empty() {
         units.extend(independent_drawing_units(compilation, &coupled));
     }
+    units.extend(ranges);
     units
 }
 

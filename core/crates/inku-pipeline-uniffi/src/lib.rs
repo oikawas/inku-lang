@@ -72,6 +72,22 @@ pub fn recompose(input_bytes: Vec<u8>) -> Vec<u8> {
     .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
 }
 
+/// The states of a work's completion ranges for the instruction editors (A3):
+/// the request names the pipeline configuration, the editor's source and the
+/// work's record (`completion_ranges`, schema `inku.completion-ranges.v1`). The
+/// answer carries the schema `inku.completion-range-states.v1` and, for each
+/// range the record knows, its place in UTF-8 and UTF-16 offsets and its state
+/// (`completed`, `numbers_changed` or `words_changed`); an unreadable request is
+/// `{"error": "invalid_request"}` and a panic `{"error": "internal_invariant"}`.
+/// The binding version is unchanged: this only adds a call.
+#[uniffi::export]
+pub fn completion_range_states(input_bytes: Vec<u8>) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::completion_ranges::completion_range_states_json(&input_bytes)
+    }))
+    .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
+}
+
 /// The ranges the composition writes by name (schema `inku.composition-ranges.v1`):
 /// the hosts fold a written range whose words and numbers are one of them, and
 /// rename numbers the author edits. The binding version is unchanged: this only

@@ -4,10 +4,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use inku_ddl::work_plan::{WorkPlan, print_work_plan_composed};
 use inku_ddl::{
-    CompilerLockState, MacroDefinition, MacroLock, NormalizedDdlDocument,
-    ResolvedInstructionLanguage, SAIJIKI_ASSET_ID, SAIJIKI_V1_ASSET_ID, TypedDdlCompilation,
-    compile_typed_ddl, migrate_macro_definition_from_saijiki_v1, validate_visible_ddl_patch,
-    validate_visible_ddl_patch_detailed, visible_ddl_patch_available,
+    CompilerLockState, CompletionRangeRecord, MacroDefinition, MacroLock, NormalizedDdlDocument,
+    RANGE_WORDS_CHANGED_HOLE_KIND, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID,
+    SAIJIKI_V1_ASSET_ID, TypedDdlCompilation, compile_typed_ddl,
+    migrate_macro_definition_from_saijiki_v1, record_after_patch, settle_completion_record,
+    validate_visible_ddl_patch, validate_visible_ddl_patch_detailed, visible_ddl_patch_available,
+    with_completion_record,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -25,7 +27,7 @@ use crate::core_boundary::{CompiledDelivery, CompilerOptions, ResolvedHostOption
 use crate::prompts::{
     DescriptionCatalogEntry, HOLE_COMPLETION_PROMPT_ID, HoleCompletionResult,
     HolePatchEditResponse, HolePatchResponse, LEGACY_HOLE_COMPLETION_PROMPT_ID, LlmPrompt,
-    LlmStage, MacroPromptEntry, PREVIOUS_HOLE_COMPLETION_PROMPT_ID, PromptLimits, Stage1Context,
+    LlmStage, MacroPromptEntry, PREVIOUS_HOLE_COMPLETION_PROMPT_IDS, PromptLimits, Stage1Context,
     build_catalog_selection_prompt, build_hole_completion_prompt, build_sketch_prompt,
     build_stage1_prompt_for_run, parse_catalog_selection_response, parse_hole_completion_response,
     parse_hole_patch_response, parse_sketch_response, parse_stage1_response_and_plan_with_plugins,
@@ -291,6 +293,11 @@ impl SketchRecord {
 pub enum AuthoringInput {
     DirectDdl {
         source: String,
+        /// The record of the ranges completions wrote, kept with the work this
+        /// DDL comes from (A3). A text alone, or a work without completions,
+        /// has none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        completion_ranges: Option<CompletionRangeRecord>,
     },
     Description {
         description: String,
@@ -395,6 +402,10 @@ pub enum PipelinePhase {
         document: VisibleDocument,
         authority: AuthorityTransitionProposal,
         reason: String,
+        /// The completion record an approved patch leaves (A3), kept once the
+        /// host acknowledges the commit.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        completion_ranges: Option<CompletionRangeRecord>,
     },
     AwaitingPatchApproval {
         patch: HolePatchResponse,
@@ -444,6 +455,11 @@ pub struct PipelineSnapshot {
     /// A settled Stage 1 result waiting for its composition reading.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub composition: Option<PendingComposition>,
+    /// The record of the ranges completions wrote into this work's DDL (A3):
+    /// a host keeps it with each saved work and brings it back with a direct
+    /// DDL from that work. Absent when there is none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completion_ranges: Option<CompletionRangeRecord>,
     pub snapshot_digest: String,
 }
 
@@ -756,6 +772,7 @@ impl PipelineSnapshot {
             document,
             authority,
             reason: reason.into(),
+            completion_ranges: None,
         };
         // The proposed bytes are not authoritative until the host ACK. Keep
         // the last acknowledged delivery available if that compare-and-set
@@ -1396,13 +1413,15 @@ impl PipelineSnapshot {
         Ok(())
     }
 
+    /// The committed document compiled, with the work's completion record laid
+    /// over it (A3): a range whose words alone changed is a hole there.
     fn compilation(&self) -> Result<inku_ddl::TypedDdlCompilation, ProtocolError> {
         let document = self
             .document
             .as_ref()
             .ok_or(ProtocolError::InvalidState)?
             .document()?;
-        Ok(compile_typed_ddl(
+        let compilation = compile_typed_ddl(
             document,
             &self.config.definitions,
             self.config
@@ -1413,7 +1432,22 @@ impl PipelineSnapshot {
                 .compiler
                 .macro_limits()
                 .map_err(|_| ProtocolError::InvalidPolicy)?,
-        ))
+        );
+        Ok(match &self.completion_ranges {
+            Some(record) => with_completion_record(compilation, record, &[]),
+            None => compilation,
+        })
+    }
+
+    /// Keep the record entries the committed document still has (A3). A record
+    /// left empty is dropped.
+    fn settle_completion_ranges(&mut self) -> Result<(), ProtocolError> {
+        let Some(record) = self.completion_ranges.take() else {
+            return Ok(());
+        };
+        let settled = settle_completion_record(&self.compilation()?, &record);
+        self.completion_ranges = (!settled.is_empty()).then_some(settled);
+        Ok(())
     }
 
     fn complete_holes(
@@ -1795,7 +1829,7 @@ impl PipelineSnapshot {
             edits: vec![],
         };
         let current = prompt.prompt_id == HOLE_COMPLETION_PROMPT_ID
-            || prompt.prompt_id == PREVIOUS_HOLE_COMPLETION_PROMPT_ID;
+            || PREVIOUS_HOLE_COMPLETION_PROMPT_IDS.contains(&prompt.prompt_id.as_str());
         // A second request carries the first answer's check; what passed then stays.
         let previous = serde_json::from_str::<serde_json::Value>(&prompt.message)
             .ok()
@@ -2372,7 +2406,20 @@ pub fn advance(
                         .propose_committed_user_ddl_mutation(expected_revision.get(), changed),
                 )?
                 .ok_or(ProtocolError::SemanticViolation)?;
+                // The ranges this completion wrote join the work's record (A3).
+                let empty = CompletionRangeRecord::default();
+                let record = record_after_patch(
+                    &base,
+                    &validated,
+                    state.completion_ranges.as_ref().unwrap_or(&empty),
+                );
                 state.commit_document(candidate, next, "user_approved_patch", &mut events)?;
+                if let PipelinePhase::AwaitingVisibleDdlCommit {
+                    completion_ranges, ..
+                } = &mut state.phase
+                {
+                    *completion_ranges = (!record.is_empty()).then_some(record);
+                }
             }
             PipelineInput::DeclinePatch { proposal_digest } => {
                 let PipelinePhase::AwaitingPatchApproval {
@@ -2479,6 +2526,7 @@ pub fn advance(
             stage1_fallback: None,
             stage1_fallback_plan: None,
             composition: None,
+            completion_ranges: None,
             snapshot_digest: String::new(),
         };
         state.event(
@@ -2487,7 +2535,11 @@ pub fn advance(
             json!({"state": "authoring_started"}),
         )?;
         match authoring {
-            AuthoringInput::DirectDdl { source } => {
+            AuthoringInput::DirectDdl {
+                source,
+                completion_ranges,
+            } => {
+                state.completion_ranges = completion_ranges.filter(|record| !record.is_empty());
                 if matches!(
                     state.config.compiler.host.catalog_mode(),
                     CatalogMode::AutoSelected | CatalogMode::AutoFallbackDefault
@@ -2606,6 +2658,7 @@ impl PipelineSnapshot {
                     document,
                     authority,
                     reason,
+                    completion_ranges,
                 } = self.phase.clone()
                 else {
                     return Err(ProtocolError::StaleResult);
@@ -2621,6 +2674,10 @@ impl PipelineSnapshot {
                 self.authority = authority.next_state;
                 self.document = Some(document.clone());
                 self.action = None;
+                // An approved patch leaves the record its completion wrote (A3).
+                if reason == "user_approved_patch" {
+                    self.completion_ranges = completion_ranges;
+                }
                 // Only acknowledged visible bytes enter the actual Score compiler.
                 let delivery = match crate::core_boundary::compile_committed(
                     document.document()?,
@@ -2647,22 +2704,38 @@ impl PipelineSnapshot {
                     "typed_ddl_parsed",
                     json!({"source_digest": document.source_digest(), "revision": revision}),
                 )?;
+                // The record keeps only the ranges this document still has (A3).
+                self.settle_completion_ranges()?;
+                let compiler_holes = delivery.compiler_lock.as_ref().filter(|lock| {
+                    lock.get("hole_identities")
+                        .and_then(serde_json::Value::as_array)
+                        .is_some_and(|identities| !identities.is_empty())
+                });
+                let completing =
+                    reason != "user_approved_patch" && reason != "stage1_residual_execution";
+                // A range whose words alone the author changed is a hole the
+                // completion writes the numbers of again (A3).
+                let words_changed = if completing && self.completion_ranges.is_some() {
+                    self.compilation()?
+                        .holes
+                        .into_iter()
+                        .filter(|hole| hole.kind == RANGE_WORDS_CHANGED_HOLE_KIND)
+                        .map(|hole| hole.id)
+                        .collect()
+                } else {
+                    Vec::new()
+                };
                 if reason == "user_approved_patch" {
                     if let Some(report) = self.hole_completion_check.clone() {
                         self.event(events, "hole_completion_checked", report)?;
                     }
-                } else if reason != "stage1_residual_execution"
-                    && let Some(lock) = delivery.compiler_lock.as_ref().filter(|lock| {
-                        lock.get("hole_identities")
-                            .and_then(serde_json::Value::as_array)
-                            .is_some_and(|identities| !identities.is_empty())
-                    })
-                {
-                    let hole_ids = lock
-                        .get("hole_identities")
+                } else if completing && (compiler_holes.is_some() || !words_changed.is_empty()) {
+                    let mut hole_ids = compiler_holes
+                        .and_then(|lock| lock.get("hole_identities"))
                         .cloned()
                         .and_then(|ids| serde_json::from_value::<Vec<String>>(ids).ok())
                         .unwrap_or_default();
+                    hole_ids.extend(words_changed);
                     // Known holes enter the shared completion policy without a
                     // separate user command. Declines and failures do not re-enter
                     // this commit-only branch; any retry is bounded by its action.

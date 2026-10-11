@@ -446,6 +446,9 @@ pub struct TypedDdlCompilation {
     pub derived_seeds: Vec<MacroSeed>,
     pub macro_expansion: Option<MacroExpansionResult>,
     pub compiler_lock: Option<TypedDdlCompilerLock>,
+    /// The work's record of the ranges its completions wrote, when one is laid
+    /// over this compilation (A3). The compiler never sets it.
+    pub completion_record: Option<crate::completion_record::CompletionRangeRecord>,
 }
 
 impl TypedDdlCompilation {
@@ -671,6 +674,7 @@ pub fn compile_typed_ddl(
         derived_seeds: seeds,
         macro_expansion: expansion,
         compiler_lock: Some(lock),
+        completion_record: None,
     }
 }
 
@@ -734,6 +738,7 @@ fn integrity_failure(document: NormalizedDdlDocument, kind: &str) -> TypedDdlCom
         derived_seeds: Vec::new(),
         macro_expansion: None,
         compiler_lock: None,
+        completion_record: None,
     }
 }
 
@@ -2400,6 +2405,31 @@ fn add_hole(
         span: Some(span),
         source_independent: true,
     });
+}
+
+/// The hole a range becomes when the author changed only its words (A3): it
+/// spans the range from its words to its closing parenthesis and expects a
+/// numeric range there again. It is laid over a compilation from the work's
+/// record, never projected by the compiler.
+pub(crate) fn range_words_changed_hole(
+    document: &NormalizedDdlDocument,
+    span: SourceSpan,
+) -> TypedHole {
+    let kind = crate::completion_record::RANGE_WORDS_CHANGED_HOLE_KIND;
+    let range = document
+        .source()
+        .get(span.start_byte..span.end_byte)
+        .unwrap_or_default();
+    let range_digest = sha256_hex(range.as_bytes());
+    TypedHole {
+        id: ranged_identity("hole", kind, span, &range_digest),
+        kind: kind.to_owned(),
+        span,
+        allowed_span: span,
+        expected_range_digest: range_digest,
+        expected_owner: SemanticDeliveryOwner::NumericRange,
+        upstream_diagnostic_identity: "completion_record:range_words_changed".to_owned(),
+    }
 }
 
 fn add_conflict(

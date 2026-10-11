@@ -152,7 +152,7 @@ coreは可視DDLとauthorityの次状態を1つのCAS保存effectとしてhost�
 
 ## known-hole補完（Stage 2）
 
-保存済みDDLのlockがknown holeを持つと、coreは別の作者操作を待たずにhole補完effectを要求する（prompt `inku.visible-ddl-hole-completion-prompt.v4`）。hostはこの要求の前に、Scoreが成立していれば安全な演奏を保存する（ServerもAndroidも同じ）。
+保存済みDDLのlockがknown holeを持つとき、または作品の控えと比べて言葉だけを直した範囲があるとき（A3）、coreは別の作者操作を待たずにhole補完effectを要求する（prompt `inku.visible-ddl-hole-completion-prompt.v5`）。hostはこの要求の前に、Scoreが成立していれば安全な演奏を保存する（ServerもAndroidも同じ）。
 
 - 要求は対象の原文、確定済みtyped fact、有限語彙と受理構文だけを持ち、description、無関係なclause、Score、renderer指示を持たない。
 - 応答は短い対象IDごとの修正候補か未解決理由で、coreがIDの一致・重複・欠落を検査し、保存済み要求とlockから実hole ID、許可span、digestを復元する。

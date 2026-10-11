@@ -216,7 +216,7 @@ def test_managed_api_persists_approved_patch_reload_and_legacy_fork(
         # Prompt v3 and later name each hole by a short ID and keep source ranges
         # and digests in the core; the provider answers only with replacement text.
         assert action["payload"]["prompt"]["prompt_id"] == (
-            "inku.visible-ddl-hole-completion-prompt.v4"
+            "inku.visible-ddl-hole-completion-prompt.v5"
         )
         answer = {"results": [{"id": "h1", "status": "proposed", "replacement": "8"}]}
         return {

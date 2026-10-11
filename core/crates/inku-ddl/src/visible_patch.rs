@@ -83,6 +83,9 @@ pub enum VisiblePatchDiagnostic {
     /// A completion wrote a numeric range outside the range of a position word
     /// it kept before the parenthesis.
     NumericRangeOutsideWords,
+    /// A completion rewrote the words before the parenthesis of a range whose
+    /// words the author changed (A3): only the numbers are to be written again.
+    RangeWordsNotKept,
 }
 
 impl VisiblePatchDiagnostic {
@@ -114,6 +117,7 @@ impl VisiblePatchDiagnostic {
             Self::NewDiagnostic => "new_diagnostic",
             Self::CandidateIntegrityFailure => "candidate_integrity_failure",
             Self::NumericRangeOutsideWords => "numeric_range_outside_words",
+            Self::RangeWordsNotKept => "range_words_not_kept",
         }
     }
 }
@@ -124,6 +128,9 @@ pub struct ValidatedVisibleDdlCandidate {
     pub document: NormalizedDdlDocument,
     pub compilation: TypedDdlCompilation,
     pub resolved_hole_ids: Vec<String>,
+    /// Where each resolved hole's replacement lies in the candidate, in the
+    /// order of `resolved_hole_ids`.
+    pub resolved_ranges: Vec<SourceSpan>,
 }
 
 /// One fail-closed patch outcome with the exact target hole when attribution is certain.
@@ -150,6 +157,8 @@ impl VisiblePatchFailure {
 }
 
 /// Whether the compilation has known holes and no global failure that forbids a bounded patch.
+/// A text the compiler reads whole has holes only when a work's record lays
+/// `range_words_changed` holes over it (A3).
 pub fn visible_ddl_patch_available(compilation: &TypedDdlCompilation) -> bool {
     let Some(lock) = compilation.compiler_lock.as_ref() else {
         return false;
@@ -160,6 +169,7 @@ pub fn visible_ddl_patch_available(compilation: &TypedDdlCompilation) -> bool {
             CompilerLockState::IncompleteKnownHole
                 | CompilerLockState::BlockedConflict
                 | CompilerLockState::BlockedDiagnostic
+                | CompilerLockState::CanonicalReady
         )
         && compilation
             .conflicts
@@ -357,6 +367,14 @@ pub fn validate_visible_ddl_patch_detailed(
         composition_seed,
         limits,
     );
+    // The candidate stands against the same record (A3). A range the patch wrote
+    // is the completion's answer, so it does not become a hole again.
+    let candidate = match &base.completion_record {
+        Some(record) => {
+            crate::completion_record::with_completion_record(candidate, record, &candidate_ranges)
+        }
+        None => candidate,
+    };
     if candidate.compiler_lock.is_none() {
         return Err(VisiblePatchFailure::global(
             VisiblePatchDiagnostic::CandidateIntegrityFailure,
@@ -450,6 +468,7 @@ pub fn validate_visible_ddl_patch_detailed(
             .iter()
             .map(|edit| edit.hole_id.clone())
             .collect(),
+        resolved_ranges: candidate_ranges,
     })
 }
 
@@ -459,7 +478,13 @@ fn target_resolution_failure(
     candidate: &TypedDdlCompilation,
     range: SourceSpan,
 ) -> Option<VisiblePatchDiagnostic> {
+    if hole.kind == crate::completion_record::RANGE_WORDS_CHANGED_HOLE_KIND
+        && let Some(diagnostic) = range_words_changed_failure(hole, base, candidate, range)
+    {
+        return Some(diagnostic);
+    }
     if hole.kind != "unresolved_clause"
+        && hole.kind != crate::completion_record::RANGE_WORDS_CHANGED_HOLE_KIND
         && matched_range_words(base, hole.span, candidate, range).outside
     {
         return Some(VisiblePatchDiagnostic::NumericRangeOutsideWords);
@@ -1230,52 +1255,109 @@ fn matched_range_words(
         if existing.contains(&(bounds, Some(words.clone()))) {
             continue;
         }
-        let Ok(document) = NormalizedDdlDocument::new(words, language, Vec::new()) else {
-            continue;
-        };
-        let Ok(stream) = crate::parse_clause_stream(&document) else {
-            continue;
-        };
-        for term in stream
-            .clauses
-            .iter()
-            .flat_map(|clause| &clause.atoms)
-            .filter_map(|atom| match atom {
-                ClauseAtom::RemainingRole(term) if term.role == RemainingRoleKind::Place => {
-                    Some(term)
-                }
-                _ => None,
-            })
-        {
-            let Some(identity) =
-                crate::project_macro_semantic_ref(&term.category_key, &term.canonical_surface_ja)
-            else {
-                continue;
-            };
-            let ranges = crate::geometry::place_word_ranges(&identity.canonical_id);
-            if ranges.is_empty() {
-                continue;
-            }
-            if !ranges.iter().any(|outer| range_contains(*outer, bounds)) {
+        for place in place_words(&words, language, bounds) {
+            if !place.holds_range {
                 matched.outside = true;
                 continue;
             }
-            *matched
-                .facts
-                .entry(format!(
-                    "remaining:{:?}:{}:{}:{}",
-                    term.role, term.asset_id, term.category_key, term.canonical_surface_ja
-                ))
-                .or_default() += 1;
+            *matched.facts.entry(place.fact).or_default() += 1;
             record_association(
                 &mut matched.associations,
                 &semantic_target_value(index, instructions),
                 "position",
-                serde_json::json!({"category": identity.category, "id": identity.canonical_id}),
+                serde_json::json!({"category": place.category, "id": place.id}),
             );
         }
     }
     matched
+}
+
+/// A position word read in the words before a parenthesis, when it has a range.
+struct PlaceWord {
+    /// The typed fact the word is, as the original clause counts it.
+    fact: String,
+    category: String,
+    id: String,
+    /// Whether one of the word's ranges holds the numbers.
+    holds_range: bool,
+}
+
+/// Read the words before a parenthesis as they would be read without it, and
+/// return each position word that has a range (A1, the author's decision Q2 of
+/// 2026-10-05). Words without such a word give nothing: their numbers stand.
+fn place_words(
+    words: &str,
+    language: crate::ResolvedInstructionLanguage,
+    bounds: [(u64, u64); 4],
+) -> Vec<PlaceWord> {
+    let Ok(document) = NormalizedDdlDocument::new(words, language, Vec::new()) else {
+        return Vec::new();
+    };
+    let Ok(stream) = crate::parse_clause_stream(&document) else {
+        return Vec::new();
+    };
+    stream
+        .clauses
+        .iter()
+        .flat_map(|clause| &clause.atoms)
+        .filter_map(|atom| match atom {
+            ClauseAtom::RemainingRole(term) if term.role == RemainingRoleKind::Place => Some(term),
+            _ => None,
+        })
+        .filter_map(|term| {
+            let identity =
+                crate::project_macro_semantic_ref(&term.category_key, &term.canonical_surface_ja)?;
+            let ranges = crate::geometry::place_word_ranges(&identity.canonical_id);
+            (!ranges.is_empty()).then(|| PlaceWord {
+                fact: format!(
+                    "remaining:{:?}:{}:{}:{}",
+                    term.role, term.asset_id, term.category_key, term.canonical_surface_ja
+                ),
+                category: identity.category.to_string(),
+                id: identity.canonical_id.clone(),
+                holds_range: ranges.iter().any(|outer| range_contains(*outer, bounds)),
+            })
+        })
+        .collect()
+}
+
+/// Check a proposal for a range whose words the author changed (A3): the
+/// replacement must be exactly one range with words, its words must be the
+/// hole's to the letter, and a position word the words hold must contain the
+/// numbers, whatever the numbers were before.
+fn range_words_changed_failure(
+    hole: &crate::TypedHole,
+    base: &TypedDdlCompilation,
+    candidate: &TypedDdlCompilation,
+    range: SourceSpan,
+) -> Option<VisiblePatchDiagnostic> {
+    let written = |compilation: &TypedDdlCompilation, span: SourceSpan| {
+        crate::completion_record::written_ranges(compilation)
+            .into_iter()
+            .find(|written| written.span == span)
+    };
+    let Some(before) = written(base, hole.span) else {
+        return Some(VisiblePatchDiagnostic::TargetUnresolved);
+    };
+    // A replacement that is not exactly one range with words (a preposition or
+    // particle added around it, or no parenthesis) did not keep the range.
+    let Some(after) = written(candidate, range) else {
+        return Some(VisiblePatchDiagnostic::RangeWordsNotKept);
+    };
+    if after.words != before.words {
+        return Some(VisiblePatchDiagnostic::RangeWordsNotKept);
+    }
+    if place_words(
+        &after.words,
+        candidate.document.language(),
+        after.rational_bounds(),
+    )
+    .iter()
+    .any(|place| !place.holds_range)
+    {
+        return Some(VisiblePatchDiagnostic::NumericRangeOutsideWords);
+    }
+    None
 }
 
 /// Whether `inner` lies inside `outer`; both are horizontal start, vertical

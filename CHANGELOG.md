@@ -12,6 +12,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 An idle Web batch with drawing errors offers "Retry failed works". It keeps the original descriptions, line numbers, and drawing conditions while excluding saved successes, aborted lines, and unattempted lines. Recovered lines leave the error list, and remaining errors can be tried again.
 
+### 2026-10-11 — A record of completion ranges and their three states (A3)
+
+At the author's instruction (make A3). For each numeric range an approved completion wrote, the work keeps the words before the parenthesis, the numbers, and the sentence. When instructions from a saved work are drawn again, the shared core compares each range with the record and tells completed ranges, edited numbers, and edited words apart. A range whose words alone were edited goes to the completion when drawn, which asks for approval of new numbers for the new words (completion prompt v5; a proposal that changes the words is refused with `range_words_not_kept`). A range with edited numbers is drawn by its numbers as before. The record is only laid over the compilation: the result the instructions alone give, the saved formats, and the engine versions do not change. Instructions exported or imported alone carry no record and are drawn by their numbers as before. Edit screens read the states from the shared core's `completion_range_states`. Saving and screens on Server and Android follow separately.
+
 ## v2.15.96 (2026-10-06 / Build 1172)
 
 ### 2026-10-06 — Show completion originals and reasons on Web

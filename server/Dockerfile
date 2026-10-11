@@ -4,7 +4,8 @@ FROM ghcr.io/pyo3/maturin@sha256:2519833ac5bf071e02fa231ce368b5b69fac8be1b077437
 
 WORKDIR /build
 COPY core/ /build/core/
-COPY server/scripts/build_rust_notices.py /build/build_rust_notices.py
+COPY server/scripts/build_rust_notices.py /build/server/scripts/
+COPY scripts/skia_notices.py /build/scripts/
 RUN cargo fetch --manifest-path /build/core/Cargo.toml --locked \
     && maturin build \
     --manifest-path /build/core/crates/inku-render-python/Cargo.toml \
@@ -12,7 +13,7 @@ RUN cargo fetch --manifest-path /build/core/Cargo.toml --locked \
     --locked \
     --compatibility manylinux2014 \
     --out /wheelhouse \
-    && python3.12 /build/build_rust_notices.py \
+    && python3.12 /build/server/scripts/build_rust_notices.py \
        /build/core/Cargo.lock /wheelhouse/RUST_THIRD_PARTY_NOTICES.txt
 
 # Preserve Ubuntu's security fixes as well as the engine version used by 5173.

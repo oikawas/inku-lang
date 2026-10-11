@@ -15,6 +15,7 @@ object NativePipelineBridge : SharedPipelineBinding {
     external override fun renderSaved(inputBytes: ByteArray): ByteArray
     external override fun explainPluginDiagnostics(inputBytes: ByteArray): ByteArray
     external override fun recompose(inputBytes: ByteArray): ByteArray
+    external override fun completionRangeStates(inputBytes: ByteArray): ByteArray
     external override fun providerAttempt(snapshotBytes: ByteArray): ByteArray
     external override fun pipelineDescription(text: String): String
     external override fun renderSeedFromText(seedText: String): String?

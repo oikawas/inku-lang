@@ -497,6 +497,7 @@ object InkuStringsEn : InkuStrings {
         "target_unresolved" -> "The proposal still had words that could not be read, so it could not be drawn."
         "new_diagnostic" -> "The proposal added a phrase that could not be read."
         "numeric_range_outside_words" -> "The numeric range fell outside the place word before the parenthesis."
+        "range_words_not_kept" -> "The proposal changed the edited words before the parenthesis, or the form of the range."
         "dependency_rejected", "dependency_unresolved" -> "Another sentence that has to be fixed with it could not be completed."
         "outside_explicit_changed" -> "The proposal changed what is written outside the gap."
         "schema_violation" -> "The model's answer could not be read."
@@ -543,6 +544,15 @@ object InkuStringsEn : InkuStrings {
     override val tooltipDdlLang = "The instructions are read with this language's grammar, and numeric ranges are written differently in Japanese and English. A single hiragana, katakana, or kanji character makes it Japanese DDL, so one Japanese name in English instructions has them read as Japanese."
     override val rangeNumbers = "Range numbers"
     override val rangeEditNote = "The frame previews the range. Use Draw from instructions to redraw the work."
+    override fun completionRangeState(state: String) = when (state) {
+        "completed" -> "completion"
+        "numbers_changed" -> "numbers edited"
+        "words_changed" -> "words edited"
+        else -> ""
+    }
+    override fun completionRangeWordsEdited(count: Int) = if (count == 1)
+        "One range has edited words. Drawing asks the completion to rewrite its numbers and asks for your approval."
+    else "$count ranges have edited words. Drawing asks the completion to rewrite their numbers and asks for your approval."
     override val rangeInvalid = "Example: (horizontal 1/3 to 2/3, vertical 2/3 to 1). Join numbers with to, - or –. Use numbers from 0 to 1, with each start below its end. The frame shows the last valid range."
     override val rangeClose = "Close range editing"
     override val awaitingInterpretation = "Waiting for instructions…"

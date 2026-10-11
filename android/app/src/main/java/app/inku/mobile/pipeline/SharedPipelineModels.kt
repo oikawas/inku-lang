@@ -46,7 +46,7 @@ sealed interface PipelineAuthoring {
         val autoCatalog: Boolean,
         val sketch: PipelineSketchRequest = PipelineSketchRequest.Off,
     ) : PipelineAuthoring
-    data class DirectDdl(val source: String) : PipelineAuthoring
+    data class DirectDdl(val source: String, val completionRangesJson: String? = null) : PipelineAuthoring
 }
 
 data class PipelineStartRequest(
@@ -167,6 +167,8 @@ data class PipelineView(
     val phaseReason: String? = null,
     val providerFailure: PipelineProviderFailure? = null,
     val holeCompletionResults: List<HoleCompletionResult> = emptyList(),
+    /** Opaque core record; a host never invents records for an older work. */
+    val completionRangesJson: String? = null,
 )
 
 class PipelineHostException(

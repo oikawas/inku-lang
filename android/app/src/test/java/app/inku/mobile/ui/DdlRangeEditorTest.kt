@@ -7,6 +7,39 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DdlRangeEditorTest {
+    @Test
+    fun completionTagsKeepUtf16OffsetsRawClipboardAndImeAndOnlyEditedWordsHaveANote() {
+        val ja = app.inku.mobile.ui.i18n.InkuStringsJa
+        val en = app.inku.mobile.ui.i18n.InkuStringsEn
+        val source = "🖼\n右下（横2/3〜1、縦2/3〜1）に、円。\n左上（横0〜1/3、縦0〜1/3）に、点。\n下中央（横1/3〜2/3、縦2/3〜1）に、線。"
+        val names = listOf("右下", "左上", "下中央")
+        val ranges = names.mapIndexed { index, name ->
+            val start = source.indexOf(name)
+            app.inku.mobile.pipeline.CompletionRangeState(start, source.indexOf('）', start) + 1,
+                listOf("completed", "numbers_changed", "words_changed")[index])
+        }
+        val state = TextFieldState(source, initialSelection = TextRange(source.length))
+        val projection = ddlEditorProjection(DdlEditorSnapshot(source, state.selection, focused = false), table,
+            completionRangeEditorTags(ranges, ja))
+        val output = state.toTextFieldBuffer()
+        projection.applyTo(output)
+        assertEquals("🖼\n右下 ［補完］に、円。\n左上 ［数を直した］に、点。\n下中央 ［言葉を直した］に、線。", output.toString())
+        assertEquals(source, state.text.toString())
+        assertEquals("言葉を直した範囲が 1 つあります。描くと補完がその範囲の数を書き直し、承認を求めます。", completionRangeEditorNote(ranges, ja))
+        assertEquals("One range has edited words. Drawing asks the completion to rewrite its numbers and asks for your approval.", completionRangeEditorNote(ranges, en))
+        assertEquals("2 ranges have edited words. Drawing asks the completion to rewrite their numbers and asks for your approval.", completionRangeEditorNote(listOf(ranges.last(), ranges.last()), en))
+        assertNull(completionRangeEditorNote(ranges.take(2), ja))
+        assertEquals(listOf(" ［completion］", " ［numbers edited］", " ［words edited］"), completionRangeEditorTags(ranges, en).map { it.text })
+        val selected = TextFieldState(source, initialSelection = TextRange(0, source.length))
+        val selectedOutput = selected.toTextFieldBuffer()
+        ddlEditorProjection(DdlEditorSnapshot(source, selected.selection), table, completionRangeEditorTags(ranges, ja)).applyTo(selectedOutput)
+        assertEquals(source, selectedOutput.toString())
+        val composing = ddlEditorProjection(DdlEditorSnapshot(source, TextRange(source.length), TextRange(3, 5)), table,
+            completionRangeEditorTags(ranges, ja))
+        assertTrue(composing.tags.isEmpty())
+        assertEquals(source, state.text.toString())
+    }
+
     private val table = CompositionRangeTable.load {
         """{"schema":"inku.composition-ranges.v1","ranges":[
           {"key":"cell-22","words":{"ja":"右下","en":"bottom right"},"bounds":[[2,3],[2,3],[1,1],[1,1]]},

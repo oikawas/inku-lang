@@ -10,6 +10,13 @@ import org.junit.Test
 
 class HoleCompletionDetailsTest {
     @Test
+    fun editedRangeWordsAreExplainedWithTheSpecsPlainReason() {
+        assertEquals("言葉を直した範囲の、括弧の前の言葉か範囲の形が案で変わった",
+            InkuStringsJa.pipelineHoleCompletionReason("range_words_not_kept"))
+        assertEquals("The proposal changed the edited words before the parenthesis, or the form of the range.",
+            InkuStringsEn.pipelineHoleCompletionReason("range_words_not_kept"))
+    }
+    @Test
     fun approvalAndStoppedCompletionExplainOnlyIncompleteHolesInTheAuthorsWords() {
         val checked = listOf(
             HoleCompletionResult("h1", "通った文", "validated", null),

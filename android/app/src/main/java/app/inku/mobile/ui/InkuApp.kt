@@ -763,6 +763,12 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
     var focused by remember { mutableStateOf(false) }
     var rangeStatus by remember { mutableStateOf(DdlEditorRangeStatus()) }
     val editorValue = TextFieldValue(editorState.text.toString(), editorState.selection, editorState.composition)
+    var completionStates by remember { mutableStateOf(emptyList<app.inku.mobile.pipeline.CompletionRangeState>()) }
+    LaunchedEffect(editorValue.text, state.selectedHistory?.id, state.lineageDetached,
+        state.pipelineView?.executionId, state.pipelineView?.sequence) {
+        completionStates = emptyList()
+        completionStates = viewModel.completionRangeStates(editorValue.text)
+    }
     var vocabularyOpen by remember { mutableStateOf(false) }
     var vocabularyQuery by remember { mutableStateOf("") }
     val lang = LocalUiLanguage.current
@@ -914,12 +920,17 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     readOnly = state.isDrawing,
                     tokens = vocabularyTokens,
+                    completionTags = completionRangeEditorTags(completionStates, S),
                     onWordTap = {
                         val current = TextFieldValue(editorState.text.toString(), editorState.selection)
                         val selected = selectVocabularyAtOffset(current, current.selection.start, allVocabularyWords)
                         if (current.selection != selected.selection) editorState.edit { selection = selected.selection }
                     },
                 )
+                completionRangeEditorNote(completionStates, S)?.let { note ->
+                    Text(note, style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 DdlVocabularyBar(
                     open = vocabularyOpen,
                     query = vocabularyQuery,

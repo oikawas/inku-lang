@@ -470,6 +470,7 @@ object InkuStringsJa : InkuStrings {
         "target_unresolved" -> "案にも読めない語が残り、描ける文にならなかった"
         "new_diagnostic" -> "案に新しい読めない語句が入った"
         "numeric_range_outside_words" -> "数の範囲が、括弧の前の位置の語の範囲から外れた"
+        "range_words_not_kept" -> "言葉を直した範囲の、括弧の前の言葉か範囲の形が案で変わった"
         "dependency_rejected", "dependency_unresolved" -> "一緒に直す別の文が補えなかった"
         "outside_explicit_changed" -> "案が穴の外の書いた内容を変えた"
         "schema_violation" -> "モデルの答えが読めなかった"
@@ -516,6 +517,14 @@ object InkuStringsJa : InkuStrings {
     override val tooltipDdlLang = "指示書はこの言語の文法で読みます。数値の範囲の書き方も日本語と英語で違います。平仮名・片仮名・漢字が1字でもあれば日本語DDLになるので、英語の指示書に日本語の名前が1つ入るだけで日本語として読みます。"
     override val rangeNumbers = "範囲の数"
     override val rangeEditNote = "枠で範囲を確認できます。絵は「DDLから描画」で描き直します。"
+    override fun completionRangeState(state: String) = when (state) {
+        "completed" -> "補完"
+        "numbers_changed" -> "数を直した"
+        "words_changed" -> "言葉を直した"
+        else -> ""
+    }
+    override fun completionRangeWordsEdited(count: Int) =
+        "言葉を直した範囲が $count つあります。描くと補完がその範囲の数を書き直し、承認を求めます。"
     override val rangeInvalid = "例：日本語は（横1/3-2/3、縦2/3〜1）、英語は (horizontal 1/3 to 2/3, vertical 2/3 to 1)。日本語のつなぎは 〜・～・~・-・－、英語は to・-・– です。数は0から1で、始まりを終わりより小さくしてください。枠は最後の有効な範囲を示しています。"
     override val rangeClose = "範囲の編集を閉じる"
     override val awaitingInterpretation = "指示書を待機中…"

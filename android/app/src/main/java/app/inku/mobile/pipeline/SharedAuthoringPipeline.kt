@@ -22,6 +22,7 @@ data class SharedPipelineRunRequest(
     val sketch: PipelineSketchRequest = PipelineSketchRequest.Off,
     val parentHistoryId: String? = null,
     val inputProvenanceJson: String? = null,
+    val completionRangesJson: String? = null,
 )
 
 sealed interface PipelineRunOutcome {
@@ -65,7 +66,7 @@ class SharedAuthoringPipeline(
             PipelineStartRequest(
                 ownerId = request.ownerId,
                 configJson = request.config.configJson,
-                authoring = PipelineAuthoring.DirectDdl(request.text),
+                authoring = PipelineAuthoring.DirectDdl(request.text, request.completionRangesJson),
                 models = request.models,
                 context = request.context,
                 hostContextJson = durableHostContext(request),

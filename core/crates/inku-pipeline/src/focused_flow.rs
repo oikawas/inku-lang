@@ -1594,6 +1594,79 @@ fn a_range_whose_words_changed_is_completed_again_and_recorded() {
     );
 }
 
+/// A3 (T8): a completion may keep the numbers of a range whose words changed
+/// (the new words say the same place). The text does not change, so nothing
+/// is asked for approval: the record takes the new words and the run settles.
+#[test]
+fn a_renamed_range_that_keeps_its_numbers_settles_without_approval() {
+    let completed = "scatter ten small orange circles at the bottom right (horizontal 2/3 to 1, vertical 2/3 to 1).";
+    let compiled = inku_ddl::compile_typed_ddl(
+        inku_ddl::NormalizedDdlDocument::new(
+            completed,
+            inku_ddl::ResolvedInstructionLanguage::En,
+            Vec::new(),
+        )
+        .unwrap(),
+        &[],
+        None,
+        config().compiler.macro_limits().unwrap(),
+    );
+    let record = inku_ddl::CompletionRangeRecord {
+        ranges: inku_ddl::written_ranges(&compiled)
+            .iter()
+            .map(inku_ddl::RecordedRange::from)
+            .collect(),
+    };
+    let edited = completed.replace("the bottom right", "the bottom right area");
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "words-kept-numbers".into(),
+            authoring_nonce: "words-kept-numbers-1".into(),
+            config: Box::new(config()),
+            authority: VariationAuthorityState::new_direct_ddl(),
+            authoring: AuthoringInput::DirectDdl {
+                source: edited.clone(),
+                completion_ranges: Some(record),
+            },
+        },
+    );
+    let pending = run(None, &start).snapshot;
+    let state = run(Some(&pending), &envelope(Some(&pending), ack(&pending))).snapshot;
+    assert_eq!(
+        hole_source(&state, 0),
+        "the bottom right area (horizontal 2/3 to 1, vertical 2/3 to 1)"
+    );
+    let settled = run(
+        Some(&state),
+        &hole_response(
+            &state,
+            json!({"results":[{"id":"h1","status":"proposed",
+                "replacement":"the bottom right area (horizontal 2/3 to 1, vertical 2/3 to 1)"}]}),
+        ),
+    );
+    assert!(settled.snapshot.action.is_none());
+    assert!(
+        matches!(settled.snapshot.phase, PipelinePhase::ScoreReady),
+        "{:?}",
+        settled.snapshot.phase
+    );
+    assert!(
+        settled
+            .events
+            .iter()
+            .any(|event| event.tag == "score_finalized")
+    );
+    assert_eq!(settled.snapshot.document.as_ref().unwrap().source, edited);
+    let kept = settled
+        .snapshot
+        .completion_ranges
+        .as_ref()
+        .expect("a record");
+    assert_eq!(kept.ranges.len(), 1);
+    assert_eq!(kept.ranges[0].words, "the bottom right area");
+}
+
 /// The source of the `index`-th hole the running completion asks for.
 fn hole_source(state: &PipelineSnapshot, index: usize) -> String {
     let action = state.action.as_ref().unwrap();

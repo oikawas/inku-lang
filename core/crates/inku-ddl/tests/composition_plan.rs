@@ -1156,14 +1156,12 @@ fn spaced_edge_words_are_the_hyphenated_position_words() {
         assert_eq!(places(&spelled), [word], "{spelled}");
         let compiled = compile(&spelled, language, &[]);
         assert!(compiled.holes.is_empty(), "{spelled}: {:?}", compiled.holes);
-        let named_result = plan_verified_stage15(
-            stage(&named, language, &[]).verified_effective_view(),
-            context("golden"),
-        );
-        let spelled_result = plan_verified_stage15(
-            stage(&spelled, language, &[]).verified_effective_view(),
-            context("golden"),
-        );
+        let named_stage = stage(&named, language, &[]);
+        let named_result =
+            plan_verified_stage15(named_stage.verified_effective_view(), context("golden"));
+        let spelled_stage = stage(&spelled, language, &[]);
+        let spelled_result =
+            plan_verified_stage15(spelled_stage.verified_effective_view(), context("golden"));
         let named_object = &named_result
             .objects()
             .unwrap_or_else(|| panic!("{named}: {:?}", named_result.diagnostics()))[0];

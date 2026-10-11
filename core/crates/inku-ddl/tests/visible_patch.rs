@@ -799,6 +799,12 @@ fn a_range_whose_words_changed_takes_new_numbers_only() {
             "左の上（横0〜1/3、縦0〜1/3）",
             Some(RangeWordsNotKept),
         ),
+        // A particle added after the range: the replacement is not the range alone.
+        (
+            "左上",
+            "左上（横0〜1/3、縦0〜1/3）に",
+            Some(RangeWordsNotKept),
+        ),
         (
             "上",
             "上（横2/3〜1、縦2/3〜1）",

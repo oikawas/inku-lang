@@ -1336,8 +1336,13 @@ fn range_words_changed_failure(
             .into_iter()
             .find(|written| written.span == span)
     };
-    let (Some(before), Some(after)) = (written(base, hole.span), written(candidate, range)) else {
+    let Some(before) = written(base, hole.span) else {
         return Some(VisiblePatchDiagnostic::TargetUnresolved);
+    };
+    // A replacement that is not exactly one range with words (a preposition or
+    // particle added around it, or no parenthesis) did not keep the range.
+    let Some(after) = written(candidate, range) else {
+        return Some(VisiblePatchDiagnostic::RangeWordsNotKept);
     };
     if after.words != before.words {
         return Some(VisiblePatchDiagnostic::RangeWordsNotKept);

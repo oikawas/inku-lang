@@ -77,7 +77,8 @@ pub mod work_plan;
 pub use completion_record::{
     COMPLETION_RANGES_SCHEMA_ID, CompletionRangeMatch, CompletionRangeRecord, CompletionRangeState,
     RANGE_WORDS_CHANGED_HOLE_KIND, RecordedRange, WrittenRange, match_completion_ranges,
-    record_after_patch, settle_completion_record, with_completion_record, written_ranges,
+    record_after_patch, record_keeping_numbers, settle_completion_record, with_completion_record,
+    written_ranges,
 };
 pub use visible_patch::visible_ddl_patch_available;
 

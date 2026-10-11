@@ -7,9 +7,9 @@ use inku_ddl::{
     CompilerLockState, CompletionRangeRecord, MacroDefinition, MacroLock, NormalizedDdlDocument,
     RANGE_WORDS_CHANGED_HOLE_KIND, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID,
     SAIJIKI_V1_ASSET_ID, TypedDdlCompilation, compile_typed_ddl,
-    migrate_macro_definition_from_saijiki_v1, record_after_patch, settle_completion_record,
-    validate_visible_ddl_patch, validate_visible_ddl_patch_detailed, visible_ddl_patch_available,
-    with_completion_record,
+    migrate_macro_definition_from_saijiki_v1, record_after_patch, record_keeping_numbers,
+    settle_completion_record, validate_visible_ddl_patch, validate_visible_ddl_patch_detailed,
+    visible_ddl_patch_available, with_completion_record,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -2076,6 +2076,57 @@ impl PipelineSnapshot {
             && self.ask_holes_again(&prompt, &results, &proposals, hole_ids, spent_ms, events)?
         {
             return Ok(());
+        }
+        // A3: the completion may keep the numbers of a range whose words alone
+        // changed (the new words say the same place). Such an edit changes no
+        // text, so it is not asked for approval: the record takes the range's
+        // new words. It is kept only when nothing failed or other edits go on
+        // to approval, so a retry still finds the holes it asked for.
+        let source = base.document.source();
+        let unchanged = patch
+            .edits
+            .iter()
+            .filter(|edit| {
+                source.get(edit.allowed_span.start_byte..edit.allowed_span.end_byte)
+                    == Some(edit.replacement.as_str())
+            })
+            .map(|edit| inku_ddl::SourceSpan::from(edit.allowed_span))
+            .collect::<Vec<_>>();
+        patch.edits.retain(|edit| {
+            source.get(edit.allowed_span.start_byte..edit.allowed_span.end_byte)
+                != Some(edit.replacement.as_str())
+        });
+        let all_passed = results.iter().all(|result| result["status"] == "validated");
+        let settles = patch.edits.is_empty() && !unchanged.is_empty() && all_passed;
+        let proposes = candidate.is_some() && !patch.edits.is_empty();
+        if !unchanged.is_empty()
+            && (settles || proposes)
+            && let Some(record) = &self.completion_ranges
+        {
+            self.completion_ranges = Some(record_keeping_numbers(&base, record, &unchanged));
+        }
+        if settles {
+            self.action = None;
+            let has_score = self
+                .delivery
+                .as_ref()
+                .is_some_and(|delivery| delivery.score.is_some());
+            self.phase = if has_score {
+                PipelinePhase::ScoreReady
+            } else {
+                PipelinePhase::NeedsUserEdit {
+                    reason: "compiler_diagnostics".into(),
+                }
+            };
+            return self.event(
+                events,
+                if has_score {
+                    "score_finalized"
+                } else {
+                    "needs_user_edit"
+                },
+                json!({"has_score": has_score}),
+            );
         }
         let Some(candidate) = candidate.filter(|_| !patch.edits.is_empty()) else {
             let detail = results

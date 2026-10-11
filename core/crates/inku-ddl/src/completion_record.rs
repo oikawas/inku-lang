@@ -460,6 +460,24 @@ pub fn record_after_patch(
     CompletionRangeRecord { ranges }
 }
 
+/// The record after a completion kept the numbers of ranges whose words alone
+/// changed (the new words say the same place): the text does not change, and
+/// each such range's recorded range takes its words and sentence as they are
+/// now. `spans` are the ranges in `base`.
+pub fn record_keeping_numbers(
+    base: &TypedDdlCompilation,
+    record: &CompletionRangeRecord,
+    spans: &[SourceSpan],
+) -> CompletionRangeRecord {
+    let mut ranges = record.ranges.clone();
+    for found in match_completion_ranges(&written_ranges(base), record) {
+        if spans.contains(&found.range.span) {
+            ranges[found.recorded] = RecordedRange::from(&found.range);
+        }
+    }
+    CompletionRangeRecord { ranges }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

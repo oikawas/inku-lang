@@ -80,6 +80,23 @@ public final class SettingsModel {
         return model.isSelectable && model.purposes.contains("llm")
     }
 
+    /// Server `/api/models` lists the active ChatGPT profile's published models as the `chatgpt` drawing group.
+    /// The pickers read registered models, so the publication is copied into the reserved provider; none clears it.
+    public nonisolated static func mirroringPersonalPlan(_ settings: HostSettings, publication: ChatGPTPlanPublication?) -> HostSettings {
+        var next = settings
+        let models = (publication?.publishedModels ?? []).map { ProviderModelSettings(id: $0.id, label: $0.label, purposes: ["llm"]) }
+        if let index = next.providers.firstIndex(where: { $0.kind == .chatGPTPlan }) {
+            // A plan that never published anything keeps its settings file unchanged.
+            if !(models.isEmpty && next.providers[index].models == nil) { next.providers[index].models = models }
+            next.providers[index].enabledModels = nil
+        } else if !models.isEmpty {
+            var provider = ProviderSettings.personalPlan
+            provider.models = models
+            next.providers.append(provider)
+        }
+        return next
+    }
+
     /// Batch pickers offer only registered, enabled LLM entries; saved custom references are not candidates.
     public nonisolated static func batchModels(for provider: ProviderSettings) -> [ProviderModelSettings] {
         registeredModels(for: provider, purpose: "llm")

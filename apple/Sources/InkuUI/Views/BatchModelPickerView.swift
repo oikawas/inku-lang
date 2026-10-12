@@ -94,7 +94,7 @@ struct BatchModelPickerView: View {
                         sharedModelHint
                         ForEach(groups) { provider in
                             VStack(alignment: .leading, spacing: 7) {
-                                Text(provider.displayName).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
+                                Text(model.display.providerName(provider)).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
                                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 7)], spacing: 7) {
                                     ForEach(sortedModels(for: provider)) { entry in
                                         modelCard(entry, provider: provider)

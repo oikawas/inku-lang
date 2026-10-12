@@ -5,7 +5,6 @@ import Observation
 @MainActor @Observable
 public final class ChatGPTPlanSettingsModel {
     public private(set) var state: ChatGPTPlanState?
-    public private(set) var models: [ChatGPTPlanModel] = []
     public private(set) var busy = false
     public private(set) var authorizing = false
     public var errorText: String?
@@ -14,9 +13,18 @@ public final class ChatGPTPlanSettingsModel {
     @ObservationIgnored private var operation: Task<Void, Never>?
     public init() {}
 
+    /// ChatGPTSettings.svelte `connected`: the active profile is connected with the plan scope. Models are chosen
+    /// in model settings, which the tab then opens.
+    public var connected: Bool {
+        guard let state, state.enabled, let active = state.profiles.first(where: { $0.id == state.activeProfileID }) else { return false }
+        return active.state == "connected" && active.scopes.contains("chatgpt.tokens.use.direct")
+    }
+
+    /// Every connection change also refreshes the ChatGPT models the drawing pickers offer (Web `changed`).
     public func load(app: AppModel) async {
         do { state = try await app.personalPlanRuntime().state() }
         catch { report(error, language: app.display.preferences.language) }
+        await app.synchronizePersonalPlanModels()
     }
     public func setEnabled(_ enabled: Bool, app: AppModel) async {
         await perform(app: app) {
@@ -28,7 +36,6 @@ public final class ChatGPTPlanSettingsModel {
                     settings.providers.append(.personalPlan); try await app.updateHostSettings(settings)
                 }
             }
-            self.models = []
             self.status = enabled ? "ChatGPTプラン接続を有効にしました。接続は認証ボタンから開始します。" : "ChatGPTプラン接続を無効にしました。"
         }
     }
@@ -46,8 +53,8 @@ public final class ChatGPTPlanSettingsModel {
                 openURL(attempt.authorizationURL)
                 _ = try await runtime.finishAuthorization(attempt.id)
                 try Task.checkCancellation()
-                self.models = []
-                self.status = "本人確認済みのChatGPTプランを接続しました。提供モデルを取得して描画モデルを選択してください。"
+                // The connected guide that follows names the next step: model settings.
+                self.status = ""
             } catch { if !Task.isCancelled { self.report(error, language: app.display.preferences.language) } }
             if let id = self.attemptID { try? await app.personalPlanRuntime().cancelAuthorization(id) }
             self.attemptID = nil
@@ -63,39 +70,19 @@ public final class ChatGPTPlanSettingsModel {
     }
     public func selectProfile(_ id: String, app: AppModel) async {
         await perform(app: app) {
-            try await app.personalPlanRuntime().selectProfile(id); self.models = []
+            try await app.personalPlanRuntime().selectProfile(id)
             self.status = "次の描画で使う個人プロファイルを変更しました。実行中・待機中の要求は元の接続に固定されています。"
         }
     }
     public func signOut(_ id: String, app: AppModel) async {
         await perform(app: app) {
             let confirmed = try await app.personalPlanRuntime().signOut(id)
-            self.models = []
             self.status = confirmed ? "ローカル接続を解除し、提供元での失効を確認しました。"
                 : "ローカル接続を解除しました。提供元での失効は確認できていません。"
         }
     }
     public func retryQuota(_ id: String, app: AppModel) async {
         await perform(app: app) { try await app.personalPlanRuntime().retryQuota(id); self.status = "利用状況を確認した後の明示的な再試行を許可しました。" }
-    }
-    public func refreshModels(app: AppModel) async {
-        await perform(app: app) {
-            self.models = try await app.personalPlanRuntime().models(force: true)
-            self.status = "この個人プロファイルに提供されたモデルを取得しました。"
-        }
-    }
-    public func selectModel(_ id: String, app: AppModel) async {
-        await perform(app: app) {
-            let runtime = try app.personalPlanRuntime()
-            let offered = try await runtime.models()
-            guard offered.contains(where: { $0.id == id }) else { throw HostError("chatgpt_model_not_offered") }
-            var settings = await app.hostSettings()
-            if !settings.providers.contains(where: { $0.kind == .chatGPTPlan }) { settings.providers.append(.personalPlan) }
-            settings.models.stage1Model = "chatgpt:" + id
-            settings.models.stage2Model = "chatgpt:" + id
-            try await app.updateHostSettings(settings)
-            self.status = "描画モデルを選択しました。"
-        }
     }
     private func perform(app: AppModel, operation: @escaping @MainActor () async throws -> Void) async {
         guard !busy else { return }; busy = true; errorText = nil

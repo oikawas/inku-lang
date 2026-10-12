@@ -182,7 +182,9 @@ public actor ChatGPTPlanRuntime {
                     let profile = ChatGPTStoredProfile(id: attempt.profileID, issuer: identity.issuer, subject: identity.subject,
                         email: identity.email, clientID: issued, label: (identity.email ?? "ChatGPT") + " / " + issued.suffix(8),
                         state: "connected", generation: generation, accessToken: fields.access, refreshToken: fields.refresh,
-                        idToken: fields.identity, scopes: fields.scopes, expiresAt: fields.expiry, earliestRefreshAt: fields.earliest)
+                        idToken: fields.identity, scopes: fields.scopes, expiresAt: fields.expiry, earliestRefreshAt: fields.earliest,
+                        // Server chatgpt_store.save_profile: reauthorization keeps the profile's model choices.
+                        publishedModels: current?.publishedModels)
                     value.profiles[profile.id] = profile; value.activeProfileID = profile.id
                     value.pendingRegistrations.removeValue(forKey: profile.id)
                     return profile.publicValue
@@ -228,6 +230,40 @@ public actor ChatGPTPlanRuntime {
         defer { _ = lease }
         return try await offeredModels(session: session, force: force, deadline: deadline, operationEpoch: operationEpoch)
     }
+    /// Server chatgpt_models.saved_publication: opening model settings never starts a catalog or token refresh.
+    public func publication() throws -> ChatGPTPlanPublication {
+        let session = try pin()
+        return Self.publication(try checkedProfile(session))
+    }
+    /// Server POST /api/me/chatgpt/models/refresh.
+    public func refreshPublication() async throws -> ChatGPTPlanPublication {
+        let session = try pin()
+        _ = try await models(session: session, force: true)
+        let value = try checkedState()
+        guard value.activeProfileID == session.profileID else { throw HostError("chatgpt_session_changed") }
+        return Self.publication(try checkedProfile(session, value: value))
+    }
+    /// Server chatgpt_models.save_publication: only the active profile, only models in its saved catalog.
+    public func savePublication(profileID: String, generation: Int64, models selected: [String]) async throws -> ChatGPTPlanPublication {
+        try checkOpen()
+        guard selected.count <= 1024, selected.allSatisfy({ (1...256).contains($0.count) }) else { throw HostError("chatgpt_model_not_offered") }
+        let session = ChatGPTPlanSession(profileID: profileID, generation: generation)
+        return try await mutate { value in
+            var profile = try self.checkedProfile(session, value: value)
+            guard value.activeProfileID == profileID else { throw HostError("chatgpt_session_changed") }
+            let offered = Set((profile.models ?? []).map(\.id))
+            guard selected.allSatisfy(offered.contains) else { throw HostError("chatgpt_model_not_offered") }
+            var seen = Set<String>()
+            profile.publishedModels = selected.filter { seen.insert($0).inserted }
+            value.profiles[profileID] = profile
+            return Self.publication(profile)
+        }
+    }
+    private static func publication(_ profile: ChatGPTStoredProfile) -> ChatGPTPlanPublication {
+        let models = profile.models ?? []
+        let published = Set(profile.publishedModels ?? []).intersection(models.map(\.id))
+        return ChatGPTPlanPublication(profileID: profile.id, generation: profile.generation, models: models, published: published)
+    }
     public func perform(action: Data, session: ChatGPTPlanSession, model: String, argumentLimit: Int,
                         onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
         try await performAttempt(action: action, session: session, model: model, argumentLimit: argumentLimit,
@@ -268,7 +304,9 @@ public actor ChatGPTPlanRuntime {
                 body = prepared
             } else { body = nil }
             let offered = try await offeredModels(session: session, force: false, deadline: deadline, operationEpoch: operationEpoch)
-            guard offered.contains(where: { $0.id == model }) else { throw HostError("chatgpt_model_not_offered") }
+            // Server chatgpt_provider.request: offered and published by this profile.
+            guard offered.contains(where: { $0.id == model }),
+                  try checkedProfile(session).publishedModels?.contains(model) == true else { throw HostError("chatgpt_model_not_offered") }
             let token = try await accessToken(session, deadline: deadline, operationEpoch: operationEpoch)
             if let recorder {
                 let profile = try checkedProfile(session)

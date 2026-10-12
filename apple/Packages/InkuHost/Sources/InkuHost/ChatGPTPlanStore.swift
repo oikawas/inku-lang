@@ -34,6 +34,19 @@ public struct ChatGPTPlanModel: Identifiable, Codable, Sendable, Equatable {
     public init(id: String, label: String) { self.id = id; self.label = label }
 }
 
+/// Server chatgpt_models.publication: the active profile's saved catalog with its published marks.
+public struct ChatGPTPlanPublication: Sendable, Equatable {
+    public let profileID: String
+    public let generation: Int64
+    public let models: [ChatGPTPlanModel]
+    public let published: Set<String>
+    public init(profileID: String, generation: Int64, models: [ChatGPTPlanModel], published: Set<String>) {
+        self.profileID = profileID; self.generation = generation; self.models = models; self.published = published
+    }
+    /// In catalog order, as Server's drawing catalog lists them.
+    public var publishedModels: [ChatGPTPlanModel] { models.filter { published.contains($0.id) } }
+}
+
 struct ChatGPTStoredProfile: Codable, Sendable {
     var id: String
     var issuer: String
@@ -51,6 +64,8 @@ struct ChatGPTStoredProfile: Codable, Sendable {
     var earliestRefreshAt: Date
     var models: [ChatGPTPlanModel]?
     var modelsExpireAt: Date?
+    /// Server `published_models`: the models this profile publishes for drawing. Absent in a vault saved before it.
+    var publishedModels: [String]?
     var publicValue: ChatGPTPlanProfile {
         .init(id: id, label: label, email: email, clientID: clientID, state: state,
               generation: generation, scopes: scopes, expiresAt: expiresAt)

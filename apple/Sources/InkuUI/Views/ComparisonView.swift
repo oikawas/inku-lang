@@ -108,7 +108,7 @@ public struct ComparisonView: View {
                 Text(model.display.localized("使用中のLLMモデルを4件まで選択してください。"))
                     .inkuFont(12).foregroundStyle(.secondary)
                 ForEach(comparison.modelProviders) { provider in
-                    Text(provider.displayName).inkuFont(12, weight: .semibold)
+                    Text(model.display.providerName(provider)).inkuFont(12, weight: .semibold)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 190))], alignment: .leading) {
                         ForEach(SettingsModel.batchModels(for: provider)) { entry in
                             comparisonModelCard(entry, provider: provider)

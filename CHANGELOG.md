@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-12 — Match Server's ChatGPT plan settings flow in Swift
+
+At the author's instruction, the macOS ChatGPT plan settings now handle the connection only; the model list and "Use for drawing" are gone. Once connected they show a guide and "Open model settings". Models are chosen under the ChatGPT plan in the Models settings: refresh the list, check the models to publish and save. The publication is saved per connected profile and kept when the same identity reauthorizes. Only published models appear as "ChatGPT plan" in the drawing model picker, comparison and drawing defaults. As on Server, a drawing request is sent only for a model that is in the catalog and published. An existing connection also saves its publication once.
+
 ### 2026-10-12 — Match Server's Gemini thinking levels in Swift
 
 Swift drawing pipeline and Vision requests now choose Gemini thinking levels by model: `low` for `gemini-3.8-flash`, Pro models, and `gemini-2.5-flash`; no `thinkingConfig` for `gemini-2.5-flash-lite`; and `minimal` for other models. Both paths share the same matching, including Server's prefix and suffix handling, to prevent requests from being refused for an unsupported `minimal` level.

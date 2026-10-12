@@ -81,6 +81,59 @@ final class ChatGPTPlanRuntimeChecks: XCTestCase {
         XCTAssertEqual(try fixture.store.load().profiles[session.profileID]?.generation, session.generation)
     }
 
+    // Failure: model settings published a model the profile was not offered, or wrote another profile's choice.
+    func testPublicationSavesOnlyOfferedModelsOfTheActiveProfile() async throws {
+        let other = UUID().uuidString
+        let fixture = try RuntimeFixture(expired: false, published: nil, otherProfileID: other)
+        defer { fixture.remove() }
+        let client = RuntimeHTTP(blockRefresh: false)
+        let runtime = ChatGPTPlanRuntime(store: fixture.store, http: client)
+        let opened = try await runtime.publication()
+        XCTAssertEqual(opened.models.map(\.id), ["offered", "second"])
+        XCTAssertEqual(opened.published, [])
+        let saved = try await runtime.savePublication(profileID: opened.profileID, generation: opened.generation, models: ["second", "offered", "second"])
+        XCTAssertEqual(saved.publishedModels.map(\.id), ["offered", "second"])
+        XCTAssertEqual(try fixture.store.load().profiles[fixture.activeID]?.publishedModels, ["second", "offered"])
+        for (profileID, generation, models, code) in [(opened.profileID, opened.generation, ["missing"], "chatgpt_model_not_offered"),
+                                                      (other, Int64(1), ["offered"], "chatgpt_session_changed"),
+                                                      (opened.profileID, opened.generation + 1, ["offered"], "chatgpt_session_changed")] {
+            do { _ = try await runtime.savePublication(profileID: profileID, generation: generation, models: models); XCTFail("Saved \(models) for \(code)") }
+            catch { XCTAssertEqual((error as? HostError)?.code, code) }
+        }
+        XCTAssertNil(try fixture.store.load().profiles[other]?.publishedModels)
+        // Server refresh: the fetched catalog replaces the saved one, and the published marks follow it.
+        let refreshed = try await runtime.refreshPublication()
+        XCTAssertEqual(refreshed.models.map(\.id), ["offered"])
+        XCTAssertEqual(refreshed.publishedModels.map(\.id), ["offered"])
+        let responseCount = await client.responseCount()
+        XCTAssertEqual(responseCount, 0)
+    }
+    // Failure: a model the profile was offered but never published still reached the Responses endpoint.
+    func testUnpublishedModelIsRefusedBeforeTheRequest() async throws {
+        let fixture = try RuntimeFixture(expired: false, published: nil)
+        defer { fixture.remove() }
+        let client = RuntimeHTTP(blockRefresh: false)
+        let runtime = ChatGPTPlanRuntime(store: fixture.store, http: client)
+        let session = try await runtime.pin()
+        do {
+            _ = try await runtime.perform(action: Self.action, session: session, model: "offered", argumentLimit: 4096, onBytes: { _ in })
+            XCTFail("An unpublished model was sent")
+        } catch { XCTAssertEqual(ChatGPTPlanRuntime.diagnostic(error).code, "chatgpt_model_not_offered") }
+        let responseCount = await client.responseCount()
+        XCTAssertEqual(responseCount, 0)
+    }
+    // Failure: a vault saved before published models existed no longer opens.
+    func testProfileSavedWithoutPublishedModelsDecodes() throws {
+        let fixture = try RuntimeFixture(expired: false)
+        defer { fixture.remove() }
+        let profile = try XCTUnwrap(fixture.store.load().profiles[fixture.activeID])
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(profile)) as? [String: Any])
+        XCTAssertNotNil(object.removeValue(forKey: "publishedModels"))
+        let old = try JSONDecoder().decode(ChatGPTStoredProfile.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertNil(old.publishedModels)
+        XCTAssertEqual(old.models?.map(\.id), ["offered", "second"])
+    }
+
     private static var action: Data {
         ExactJSON.object(["tag": .string("generate_normalized_ddl"), "identity": .object(["action_id": .string("fixture")]),
             "timeout_ms": .string("2000"), "payload": .object(["prompt": .object(["system": .string("system"), "message": .string("message"),
@@ -91,16 +144,21 @@ final class ChatGPTPlanRuntimeChecks: XCTestCase {
 private struct RuntimeFixture {
     let folder: URL
     let store: ChatGPTPlanStore
-    init(expired: Bool) throws {
+    let activeID: String
+    init(expired: Bool, published: [String]? = ["offered"], otherProfileID: String? = nil) throws {
         folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-plan-runtime-" + UUID().uuidString, isDirectory: true)
         store = ChatGPTPlanStore(directory: folder, keys: RuntimeKeyStore())
         let id = UUID().uuidString
+        activeID = id
         var value = ChatGPTVaultState(); value.enabled = true; value.activeProfileID = id
-        value.profiles[id] = ChatGPTStoredProfile(id: id, issuer: "https://auth.openai.com", subject: "fixture-subject", email: nil,
-            clientID: "fixture-client", label: "fixture", state: "connected", generation: 1,
-            accessToken: "fixture-access-token", refreshToken: "fixture-refresh-token", idToken: nil,
-            scopes: ["chatgpt.tokens.use.direct"], expiresAt: Date().addingTimeInterval(expired ? -1 : 3600),
-            earliestRefreshAt: Date(timeIntervalSince1970: 0), models: [.init(id: "offered", label: "Offered")], modelsExpireAt: expired ? nil : Date().addingTimeInterval(300))
+        for profileID in [id] + (otherProfileID.map { [$0] } ?? []) {
+            value.profiles[profileID] = ChatGPTStoredProfile(id: profileID, issuer: "https://auth.openai.com", subject: "fixture-subject", email: nil,
+                clientID: "fixture-client", label: "fixture", state: "connected", generation: 1,
+                accessToken: "fixture-access-token", refreshToken: "fixture-refresh-token", idToken: nil,
+                scopes: ["chatgpt.tokens.use.direct"], expiresAt: Date().addingTimeInterval(expired ? -1 : 3600),
+                earliestRefreshAt: Date(timeIntervalSince1970: 0), models: [.init(id: "offered", label: "Offered"), .init(id: "second", label: "Second")],
+                modelsExpireAt: expired ? nil : Date().addingTimeInterval(300), publishedModels: published)
+        }
         try store.write(value)
     }
     func remove() { try? FileManager.default.removeItem(at: folder) }

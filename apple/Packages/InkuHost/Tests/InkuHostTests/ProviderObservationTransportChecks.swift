@@ -252,7 +252,7 @@ private struct ObservationPersonalFixture {
             clientID: "fixture-client", label: "fixture", state: "connected", generation: 1,
             accessToken: "fixture-access-token", refreshToken: "fixture-refresh-token", idToken: nil,
             scopes: ["chatgpt.tokens.use.direct"], expiresAt: Date().addingTimeInterval(3600), earliestRefreshAt: Date(timeIntervalSince1970: 0),
-            models: [.init(id: "offered", label: "Offered")], modelsExpireAt: Date().addingTimeInterval(300))
+            models: [.init(id: "offered", label: "Offered")], modelsExpireAt: Date().addingTimeInterval(300), publishedModels: ["offered"])
         try store.write(state)
     }
 }

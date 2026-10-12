@@ -13,13 +13,21 @@ struct ModelSettingsView: View {
     @State private var confirmation: Confirmation?
     @State private var saving = false
     @State private var rateHelp: String?
+    /// The active ChatGPT profile's saved publication; nil hides the ChatGPT plan service, as the Web does when
+    /// `/api/me/chatgpt/models/settings` fails (no connected, plan-scoped active profile).
+    @State private var chatGPT: ChatGPTPlanPublication?
 
     private var actionsDisabled: Bool { model.isBrowsingLocked || saving }
     private var credentialsLocked: Bool { model.isBusy || automation.isOccupied }
     private var credentialActionsDisabled: Bool { actionsDisabled || credentialsLocked }
     private var drawingModels: ModelSelection { drawingDraft ?? settings.host.models }
+    private var chatGPTSelected: Bool { chatGPT != nil && settings.selectedProviderID == ProviderSettings.personalPlan.id }
+    /// The reserved provider carries the mirrored publication (`SettingsModel.mirroringPersonalPlan`).
+    private var chatGPTProvider: ProviderSettings {
+        settings.host.providers.first { $0.kind == .chatGPTPlan } ?? .personalPlan
+    }
     private var drawingChoices: [DrawingChoice] {
-        settings.orderedProviders.flatMap { provider in
+        (settings.orderedProviders + settings.host.providers.filter { $0.kind == .chatGPTPlan }).flatMap { provider in
             SettingsModel.batchModels(for: provider).map {
                 DrawingChoice(provider: provider, model: ProviderModelInfo(id: provider.id + ":" + $0.id,
                     name: $0.label, contextLimit: nil, capabilities: []))
@@ -32,7 +40,9 @@ struct ModelSettingsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text(model.display.localized("AIサービス接続")).inkuFont(16, weight: .semibold)
                 serviceCards
-                if let provider = settings.selectedProvider {
+                if chatGPTSelected, let chatGPT {
+                    chatGPTEditor(chatGPT)
+                } else if let provider = settings.selectedProvider {
                     serviceEditor(provider)
                 } else {
                     Text(model.display.localized("サービスを追加してください。"))
@@ -58,6 +68,10 @@ struct ModelSettingsView: View {
                                            automation: automation)
             case .models(let providerID):
                 ProviderModelsSheet(providerID: providerID, model: model, settings: settings)
+            case .chatGPTModels:
+                if let chatGPT {
+                    ChatGPTModelsSheet(model: model, publication: chatGPT) { next in await acceptChatGPT(next) }
+                }
             }
         }
         .confirmationDialog(confirmationTitle, isPresented: Binding(
@@ -82,6 +96,9 @@ struct ModelSettingsView: View {
                 if serviceDrafts[provider.id] == nil { serviceDrafts[provider.id] = ServiceDraft(provider: provider) }
             }
             if drawingDraft == nil { drawingDraft = persisted.models }
+            // Opening model settings reads the saved publication only; it never fetches the catalog.
+            let publication = try? await model.personalPlanRuntime().publication()
+            await acceptChatGPT(publication)
         }
         .onChange(of: settings.host.providers) { _, providers in
             for provider in providers where provider.kind != .chatGPTPlan {
@@ -97,31 +114,66 @@ struct ModelSettingsView: View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10, alignment: .leading)],
                   alignment: .leading, spacing: 10) {
             ForEach(settings.orderedProviders) { provider in
-                let selected = settings.selectedProviderID == provider.id
-                Button {
-                    settings.selectedProviderID = provider.id
-                } label: {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(provider.displayName).inkuFont(13, weight: .semibold).lineLimit(2)
-                        Text(provider.id).inkuFont(12).foregroundStyle(.secondary).lineLimit(1)
-                        Text(model.display.localized(credentialStatus(provider.id)))
-                            .inkuFont(12).foregroundStyle(.secondary)
-                        Text(model.display.localizedFormat("使用モデル: %ld個", settings.publishedModels(for: provider).count))
-                            .inkuFont(12).foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 90, alignment: .topLeading)
-                    .padding(12)
-                    .background(selected ? Color.accentColor.opacity(0.10) : Color.primary.opacity(0.025),
-                                in: RoundedRectangle(cornerRadius: 10))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(selected ? Color.accentColor : Color.primary.opacity(0.15), lineWidth: selected ? 2 : 1)
-                    }
-                    .contentShape(RoundedRectangle(cornerRadius: 10))
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(selected ? [.isSelected] : [])
+                serviceCard(provider, status: model.display.localized(credentialStatus(provider.id)))
             }
+            // ModelAdministrationSettings.svelte: `chatgpt · 接続済み`, listed while the publication can be read.
+            if chatGPT != nil {
+                serviceCard(chatGPTProvider, status: ChatGPTStatusCopy.text("chatgpt_connected", language: model.display.preferences.language))
+            }
+        }
+    }
+
+    private func serviceCard(_ provider: ProviderSettings, status: String) -> some View {
+        let selected = settings.selectedProviderID == provider.id
+        return Button {
+            settings.selectedProviderID = provider.id
+        } label: {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(model.display.providerName(provider)).inkuFont(13, weight: .semibold).lineLimit(2)
+                Text(provider.id).inkuFont(12).foregroundStyle(.secondary).lineLimit(1)
+                Text(status)
+                    .inkuFont(12).foregroundStyle(.secondary)
+                Text(model.display.localizedFormat("使用モデル: %ld個", settings.publishedModels(for: provider).count))
+                    .inkuFont(12).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 90, alignment: .topLeading)
+            .padding(12)
+            .background(selected ? Color.accentColor.opacity(0.10) : Color.primary.opacity(0.025),
+                        in: RoundedRectangle(cornerRadius: 10))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(selected ? Color.accentColor : Color.primary.opacity(0.15), lineWidth: selected ? 2 : 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+
+    /// ModelAdministrationSettings.svelte for `chatgpt`: the personal-model note and the published models. It has no
+    /// name, rate limit, URL or API key.
+    private func chatGPTEditor(_ publication: ChatGPTPlanPublication) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(model.display.providerName(chatGPTProvider)).inkuFont(14, weight: .semibold)
+                Text(model.display.localizedFormat("サービスID: %@", chatGPTProvider.id))
+                    .inkuFont(12, design: .monospaced).foregroundStyle(.secondary).textSelection(.enabled)
+            }
+            Text(model.display.webCopy("chatgptPersonalModels", "この接続の本人用モデルです。「公開モデルを選択」で一覧を取得し、描画に使うモデルを選んで保存してください。他の利用者には公開されません。"))
+                .inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            modelSummary(chatGPTProvider) { sheetRoute = .chatGPTModels }
+        }
+        .padding(16)
+        .background(Color.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 12))
+        .overlay { RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.15)) }
+    }
+
+    private func acceptChatGPT(_ publication: ChatGPTPlanPublication?) async {
+        chatGPT = publication
+        await model.synchronizePersonalPlanModels(publication)
+        settings.host = await model.hostSettings()
+        if publication == nil, settings.selectedProviderID == ProviderSettings.personalPlan.id {
+            settings.selectedProviderID = settings.orderedProviders.first?.id
         }
     }
 
@@ -136,7 +188,7 @@ struct ModelSettingsView: View {
                 Spacer(minLength: 8)
                 Button(model.display.localized("名前変更")) { sheetRoute = .service(.rename(provider.id)) }
             }
-            modelSummary(provider)
+            modelSummary(provider) { sheetRoute = .models(provider.id) }
             Divider()
             DisclosureGroup(model.display.localized("レート制限")) {
                 rateSettings(provider).padding(.top, 10)
@@ -153,7 +205,7 @@ struct ModelSettingsView: View {
         .overlay { RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.15)) }
     }
 
-    private func modelSummary(_ provider: ProviderSettings) -> some View {
+    private func modelSummary(_ provider: ProviderSettings, select: @escaping () -> Void) -> some View {
         let selectedModels = settings.publishedModels(for: provider)
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 12) {
@@ -163,7 +215,7 @@ struct ModelSettingsView: View {
                         .inkuFont(13, weight: .semibold)
                 }
                 Spacer(minLength: 8)
-                Button(model.display.localized("モデル選択")) { sheetRoute = .models(provider.id) }
+                Button(model.display.localized("モデル選択"), action: select)
             }
             if selectedModels.isEmpty {
                 Text(model.display.localized("使用するモデルはありません。"))
@@ -305,7 +357,7 @@ struct ModelSettingsView: View {
                         set: { drawingBinding(\.stage1Model).wrappedValue = $0 })) {
                         Text(model.display.localized("選択してください")).tag("")
                         ForEach(drawingChoices) { choice in
-                            Text("\(choice.provider.displayName) / \(choice.model.name)").tag(choice.id)
+                            Text("\(model.display.providerName(choice.provider)) / \(choice.model.name)").tag(choice.id)
                                 .disabled(!settings.isModelAvailable(choice.id))
                         }
                     }
@@ -525,10 +577,12 @@ struct ModelSettingsView: View {
     private enum SheetRoute: Identifiable {
         case service(ProviderServiceEditorMode)
         case models(String)
+        case chatGPTModels
         var id: String {
             switch self {
             case .service(let mode): "service-" + mode.id
             case .models(let providerID): "models-" + providerID
+            case .chatGPTModels: "chatgpt-models"
             }
         }
     }

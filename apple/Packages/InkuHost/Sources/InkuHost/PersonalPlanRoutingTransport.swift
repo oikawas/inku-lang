@@ -118,7 +118,13 @@ public final class PersonalPlanRoutingTransport: ObservedProviderTransport, Obse
     }
     public func performAuxiliary(prompt: AuxiliaryPrompt, modelReference: String, settings: HostSettings, credentials: any CredentialStore,
                                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
-        if try Self.personalModel(modelReference, providers: settings.providers) != nil { throw HostError("chatgpt_operation_not_supported") }
+        if let model = try Self.personalModel(modelReference, providers: settings.providers) {
+            // Vision advice and colophons run on the plan; the demo description does not.
+            guard prompt.purpose == .vision else { throw HostError("chatgpt_operation_not_supported") }
+            let session = try await runtime.pin()
+            return try await runtime.visionText(session: session, model: model, system: prompt.system, message: prompt.message,
+                                                images: prompt.images, timeoutSeconds: prompt.timeoutSeconds, onBytes: onBytes)
+        }
         guard let auxiliary = ordinary as? any AuxiliaryTransport else { throw HostError("auxiliary_transport_unavailable") }
         return try await auxiliary.performAuxiliary(prompt: prompt, modelReference: modelReference, settings: settings, credentials: credentials, onBytes: onBytes)
     }

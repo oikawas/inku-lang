@@ -26,7 +26,9 @@ struct ChatGPTModelsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var publication: ChatGPTPlanPublication
     @State private var selected: Set<String>
+    @State private var purposes: [String: [String]]
     @State private var search = ""
+    @State private var filter: ProviderModelFilter = .all
     @State private var working = false
     @State private var statusMessage: String?
     @State private var errorMessage: String?
@@ -37,14 +39,27 @@ struct ChatGPTModelsSheet: View {
         self.onChange = onChange
         _publication = State(initialValue: publication)
         _selected = State(initialValue: publication.published)
+        _purposes = State(initialValue: publication.purposes)
     }
 
     private var display: DisplaySettings { model.display }
-    private var dirty: Bool { selected != publication.published }
+    private var dirty: Bool { selected != publication.published || purposes != publication.purposes }
+    private func purposes(of id: String) -> [String] { purposes[id] ?? ChatGPTPlanPublication.defaultPurposes }
+    /// A published model needs a purpose, as on the other services.
+    private var missingPurpose: Bool { selected.contains { purposes(of: $0).isEmpty } }
+    /// The same filter as the other services' picker; the catalog keeps ChatGPT's order.
     private var visibleModels: [ChatGPTPlanModel] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return publication.models }
-        return publication.models.filter { $0.label.localizedCaseInsensitiveContains(query) || $0.id.localizedCaseInsensitiveContains(query) }
+        return publication.models.filter { item in
+            guard query.isEmpty || item.label.localizedCaseInsensitiveContains(query) || item.id.localizedCaseInsensitiveContains(query) else { return false }
+            switch filter {
+            case .all: return true
+            case .enabled: return selected.contains(item.id)
+            case .disabled: return !selected.contains(item.id)
+            case .llm: return purposes(of: item.id).contains("llm")
+            case .vision: return purposes(of: item.id).contains("vision")
+            }
+        }
     }
 
     var body: some View {
@@ -86,13 +101,22 @@ struct ChatGPTModelsSheet: View {
 
     private var toolbar: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField(display.localized("モデルを検索"), text: $search).autocorrectionDisabled()
-                    .textFieldStyle(.plain)
-            }.padding(8)
-                .background(.background, in: RoundedRectangle(cornerRadius: 6))
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(.secondary.opacity(0.25)))
+            HStack(spacing: 12) {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                    TextField(display.localized("モデルを検索"), text: $search).autocorrectionDisabled()
+                        .textFieldStyle(.plain)
+                }.padding(8)
+                    .background(.background, in: RoundedRectangle(cornerRadius: 6))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(.secondary.opacity(0.25)))
+                Picker(display.localized("絞り込み"), selection: $filter) {
+                    Text(display.localized("すべて")).tag(ProviderModelFilter.all)
+                    Text(display.localized("使用中")).tag(ProviderModelFilter.enabled)
+                    Text(display.localized("不使用")).tag(ProviderModelFilter.disabled)
+                    Text(display.localized("LLM 用")).tag(ProviderModelFilter.llm)
+                    Text(display.localized("Vision 用")).tag(ProviderModelFilter.vision)
+                }.frame(width: 200)
+            }
             HStack(spacing: 10) {
                 Button(display.webCopy("chatgptRefreshModels", "モデル一覧を更新")) { Task { await refresh() } }
                     .disabled(working || dirty || model.isBrowsingLocked)
@@ -109,18 +133,46 @@ struct ChatGPTModelsSheet: View {
     }
 
     private func row(_ item: ChatGPTPlanModel) -> some View {
-        Toggle(isOn: Binding(get: { selected.contains(item.id) },
-                             set: { if $0 { selected.insert(item.id) } else { selected.remove(item.id) } })) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.label).inkuFont(14, weight: .semibold)
-                Text(item.id).inkuFont(12, design: .monospaced).foregroundStyle(.secondary).textSelection(.enabled)
+        HStack(alignment: .top, spacing: 12) {
+            Toggle(isOn: Binding(get: { selected.contains(item.id) },
+                                 set: { if $0 { selected.insert(item.id) } else { selected.remove(item.id) } })) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.label).inkuFont(14, weight: .semibold)
+                    Text(item.id).inkuFont(12, design: .monospaced).foregroundStyle(.secondary).textSelection(.enabled)
+                    if selected.contains(item.id), purposes(of: item.id).isEmpty {
+                        Text(display.localized("LLM か Vision の用途を選んでください。")).inkuFont(12).foregroundStyle(.orange)
+                    }
+                }
+            }
+            .toggleStyle(.checkbox)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 6) {
+                purposeButton("LLM", purpose: "llm", item: item)
+                purposeButton("Vision", purpose: "vision", item: item)
             }
         }
-        .toggleStyle(.checkbox)
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.background, in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(.secondary.opacity(0.18)))
+    }
+
+    /// The other services' purpose capsule (ProviderModelsSheet).
+    private func purposeButton(_ label: String, purpose: String, item: ChatGPTPlanModel) -> some View {
+        let on = purposes(of: item.id).contains(purpose)
+        return Button(label) {
+            var next = purposes(of: item.id)
+            if on { next.removeAll { $0 == purpose } } else { next.append(purpose) }
+            purposes[item.id] = ["llm", "vision"].filter(next.contains)
+        }
+            .buttonStyle(.plain)
+            .inkuFont(12, weight: .medium)
+            .padding(.horizontal, 10).padding(.vertical, 5)
+            .foregroundStyle(on ? Color.accentColor : Color.secondary)
+            .background(on ? Color.accentColor.opacity(0.14) : Color.secondary.opacity(0.08), in: Capsule())
+            .overlay(Capsule().stroke(on ? Color.accentColor.opacity(0.4) : Color.secondary.opacity(0.2)))
+            .accessibilityLabel(item.label + " " + label)
+            .accessibilityValue(display.localized(on ? "選択中" : "未選択"))
     }
 
     private var footer: some View {
@@ -140,7 +192,7 @@ struct ChatGPTModelsSheet: View {
                     .keyboardShortcut(.cancelAction).disabled(working)
                 Button(display.localized("保存")) { Task { await save() } }
                     .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-                    .disabled(working || !dirty || model.isBrowsingLocked)
+                    .disabled(working || !dirty || missingPurpose || model.isBrowsingLocked)
             }
         }.padding(16)
     }
@@ -150,7 +202,7 @@ struct ChatGPTModelsSheet: View {
         statusMessage = ChatGPTStatusCopy.text("chatgpt_models_loading", language: display.preferences.language)
         do {
             let next = try await model.personalPlanRuntime().refreshPublication()
-            publication = next; selected = next.published
+            publication = next; selected = next.published; purposes = next.purposes
             statusMessage = next.models.isEmpty
                 ? display.webCopy("chatgptModelsEmpty", "この登録で選択できるモデルはありません。接続とプラン利用の許可を確認してください。")
                 : display.webCopyFormat("chatgptModelsLoaded", "%@件のモデルを取得しました。公開するモデルを選んで保存してください。", next.models.count)
@@ -164,9 +216,10 @@ struct ChatGPTModelsSheet: View {
         do {
             // Web sends the catalog order, not the order the boxes were checked.
             let ids = publication.models.map(\.id).filter(selected.contains)
+            let changed = purposes.filter { publication.purposes[$0.key] != $0.value }
             let next = try await model.personalPlanRuntime().savePublication(
-                profileID: publication.profileID, generation: publication.generation, models: ids)
-            publication = next; selected = next.published
+                profileID: publication.profileID, generation: publication.generation, models: ids, purposes: changed)
+            publication = next; selected = next.published; purposes = next.purposes
             await onChange(next)
             working = false
             dismiss()

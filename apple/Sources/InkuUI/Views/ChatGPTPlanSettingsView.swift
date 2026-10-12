@@ -17,7 +17,7 @@ public struct ChatGPTPlanSettingsView: View {
                     get: { controller.state?.enabled ?? false },
                     set: { value in Task { await controller.setEnabled(value, app: app) } }))
                     .disabled(controller.busy)
-                Text(app.display.localized("記述の解釈・写生・自動配色選択・指示書の補完で利用できます。Vision推敲、奥書、デモ記述生成、モデル調査には対応していません。"))
+                Text(app.display.localized("記述の解釈・写生・自動配色選択・指示書の補完、Vision推敲と奥書で利用できます。デモ記述生成とモデル調査には対応していません。"))
                     .inkuFont(12).foregroundStyle(.secondary)
                 if controller.state?.enabled == true {
                     Button(app.display.localized("新しい個人プロファイルを接続")) {

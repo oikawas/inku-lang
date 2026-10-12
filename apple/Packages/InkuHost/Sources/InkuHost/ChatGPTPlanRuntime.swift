@@ -184,7 +184,7 @@ public actor ChatGPTPlanRuntime {
                         state: "connected", generation: generation, accessToken: fields.access, refreshToken: fields.refresh,
                         idToken: fields.identity, scopes: fields.scopes, expiresAt: fields.expiry, earliestRefreshAt: fields.earliest,
                         // Server chatgpt_store.save_profile: reauthorization keeps the profile's model choices.
-                        publishedModels: current?.publishedModels)
+                        publishedModels: current?.publishedModels, modelPurposes: current?.modelPurposes)
                     value.profiles[profile.id] = profile; value.activeProfileID = profile.id
                     value.pendingRegistrations.removeValue(forKey: profile.id)
                     return profile.publicValue
@@ -243,18 +243,27 @@ public actor ChatGPTPlanRuntime {
         guard value.activeProfileID == session.profileID else { throw HostError("chatgpt_session_changed") }
         return Self.publication(try checkedProfile(session, value: value))
     }
-    /// Server chatgpt_models.save_publication: only the active profile, only models in its saved catalog.
-    public func savePublication(profileID: String, generation: Int64, models selected: [String]) async throws -> ChatGPTPlanPublication {
+    /// Server chatgpt_models.save_publication: only the active profile, only models in its saved catalog. `purposes`
+    /// replaces the named models' purposes and keeps the others; a published model needs at least one purpose.
+    public func savePublication(profileID: String, generation: Int64, models selected: [String],
+                                purposes: [String: [String]] = [:]) async throws -> ChatGPTPlanPublication {
         try checkOpen()
         guard selected.count <= 1024, selected.allSatisfy({ (1...256).contains($0.count) }) else { throw HostError("chatgpt_model_not_offered") }
+        guard purposes.values.allSatisfy({ $0.allSatisfy(["llm", "vision"].contains) }) else { throw HostError("provider_model_settings_invalid") }
         let session = ChatGPTPlanSession(profileID: profileID, generation: generation)
         return try await mutate { value in
             var profile = try self.checkedProfile(session, value: value)
             guard value.activeProfileID == profileID else { throw HostError("chatgpt_session_changed") }
             let offered = Set((profile.models ?? []).map(\.id))
-            guard selected.allSatisfy(offered.contains) else { throw HostError("chatgpt_model_not_offered") }
+            guard selected.allSatisfy(offered.contains), purposes.keys.allSatisfy(offered.contains) else { throw HostError("chatgpt_model_not_offered") }
+            var chosen = profile.modelPurposes ?? [:]
+            for (id, value) in purposes { chosen[id] = ChatGPTPlanPublication.ordered(value) }
+            guard selected.allSatisfy({ !(chosen[$0] ?? ChatGPTPlanPublication.defaultPurposes).isEmpty }) else {
+                throw HostError("provider_model_settings_invalid")
+            }
             var seen = Set<String>()
             profile.publishedModels = selected.filter { seen.insert($0).inserted }
+            profile.modelPurposes = chosen.isEmpty ? nil : chosen
             value.profiles[profileID] = profile
             return Self.publication(profile)
         }
@@ -262,7 +271,17 @@ public actor ChatGPTPlanRuntime {
     private static func publication(_ profile: ChatGPTStoredProfile) -> ChatGPTPlanPublication {
         let models = profile.models ?? []
         let published = Set(profile.publishedModels ?? []).intersection(models.map(\.id))
-        return ChatGPTPlanPublication(profileID: profile.id, generation: profile.generation, models: models, published: published)
+        return ChatGPTPlanPublication(profileID: profile.id, generation: profile.generation, models: models, published: published,
+                                      purposes: profile.modelPurposes ?? [:])
+    }
+    /// Server chatgpt_provider.request: offered, published by this profile, and chosen for this purpose.
+    private func checkOffered(_ model: String, purpose: String, session: ChatGPTPlanSession, deadline: Date, operationEpoch: UInt64) async throws {
+        let offered = try await offeredModels(session: session, force: false, deadline: deadline, operationEpoch: operationEpoch)
+        let profile = try checkedProfile(session)
+        guard offered.contains(where: { $0.id == model }), profile.publishedModels?.contains(model) == true,
+              (profile.modelPurposes?[model] ?? ChatGPTPlanPublication.defaultPurposes).contains(purpose) else {
+            throw HostError("chatgpt_model_not_offered")
+        }
     }
     public func perform(action: Data, session: ChatGPTPlanSession, model: String, argumentLimit: Int,
                         onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
@@ -303,10 +322,7 @@ public actor ChatGPTPlanRuntime {
                 try await recorder.saveRequest(willSend)
                 body = prepared
             } else { body = nil }
-            let offered = try await offeredModels(session: session, force: false, deadline: deadline, operationEpoch: operationEpoch)
-            // Server chatgpt_provider.request: offered and published by this profile.
-            guard offered.contains(where: { $0.id == model }),
-                  try checkedProfile(session).publishedModels?.contains(model) == true else { throw HostError("chatgpt_model_not_offered") }
+            try await checkOffered(model, purpose: "llm", session: session, deadline: deadline, operationEpoch: operationEpoch)
             let token = try await accessToken(session, deadline: deadline, operationEpoch: operationEpoch)
             if let recorder {
                 let profile = try checkedProfile(session)
@@ -342,6 +358,50 @@ public actor ChatGPTPlanRuntime {
             if diagnostic.code == "subscription_sharing_usage_limit_exceeded" { try await pauseQuota(session) }
             throw error
         }
+    }
+
+    /// Vision advice and colophons on the plan: one text answer about images through the same Responses endpoint,
+    /// without tools, temperature or an output limit (the drawing body sends neither). The model must be offered,
+    /// published and chosen for Vision; otherwise nothing is sent.
+    public func visionText(session: ChatGPTPlanSession, model: String, system: String, message: String, images: [String],
+                           timeoutSeconds: Double, onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
+        guard timeoutSeconds.isFinite, timeoutSeconds > 0 else { throw HostError("chatgpt_transport_timeout") }
+        let body = try Self.visionBody(model: model, system: system, message: message, images: images)
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+        let operationEpoch = epoch
+        try validate(session)
+        let lease = try await store.lease("wire-" + session.profileID, deadline: deadline, check: { try await self.validate(session, operationEpoch: operationEpoch) })
+        defer { _ = lease }
+        do {
+            try await checkOffered(model, purpose: "vision", session: session, deadline: deadline, operationEpoch: operationEpoch)
+            let token = try await accessToken(session, deadline: deadline, operationEpoch: operationEpoch)
+            var request = URLRequest(url: ChatGPTEndpoints.responses); request.httpMethod = "POST"; request.httpBody = body.data
+            request.timeoutInterval = max(0.001, deadline.timeIntervalSinceNow)
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type"); request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+            request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
+            let boundedRequest = request
+            let result = try await guarded(deadline: deadline, check: { try await self.validate(session, operationEpoch: operationEpoch) }) {
+                try await self.http.send(boundedRequest, maximumBytes: max(1_048_576, Self.visionTextLimit * 6 + 524_288), onBytes: onBytes)
+            }
+            if !(200...299).contains(result.status) { throw Self.responseFailure(result) }
+            var decoder = ChatGPTResponseDecoder(textLimit: Self.visionTextLimit)
+            try decoder.feed(result.data)
+            let answer = try decoder.finish(); try validate(session, operationEpoch: operationEpoch); return answer
+        } catch {
+            if Self.diagnostic(error).code == "subscription_sharing_usage_limit_exceeded" { try await pauseQuota(session) }
+            throw error
+        }
+    }
+    static let visionTextLimit = 65_536
+
+    static func visionBody(model: String, system: String, message: String, images: [String]) throws -> ExactJSON {
+        var content: [ExactJSON] = [.object(["type": .string("input_text"), "text": .string(message)])]
+        for image in images {
+            guard image.hasPrefix("data:image/") else { throw HostError("pipeline_schema_violation") }
+            content.append(.object(["type": .string("input_image"), "image_url": .string(image)]))
+        }
+        return .object(["model": .string(model), "store": .bool(false), "stream": .bool(true), "instructions": .string(system),
+            "input": .array([.object(["role": .string("user"), "content": .array(content)])])])
     }
 
     static func requestBody(model: String, prompt: ExactJSON) throws -> ExactJSON {

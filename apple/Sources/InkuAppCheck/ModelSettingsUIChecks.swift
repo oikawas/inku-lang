@@ -136,19 +136,25 @@ func runModelSettingsUIChecks() async throws {
     // or copying them changed another connection. Server lists only the active profile's published models.
     let planCatalog = [ChatGPTPlanModel(id: "plan-a", label: "Plan A"), ChatGPTPlanModel(id: "plan-b", label: "Plan B"),
                    ChatGPTPlanModel(id: "plan-c", label: "Plan C")]
-    let publication = ChatGPTPlanPublication(profileID: UUID().uuidString, generation: 1, models: planCatalog, published: ["plan-c", "plan-a"])
+    let publication = ChatGPTPlanPublication(profileID: UUID().uuidString, generation: 1, models: planCatalog, published: ["plan-c", "plan-a"],
+                                             purposes: ["plan-a": ["vision"]])
     await app.synchronizePersonalPlanModels(publication)
     guard let planIndex = expected.providers.firstIndex(where: { $0.kind == .chatGPTPlan }) else {
         throw CheckFailure.message("Fixture lost the ChatGPT plan provider")
     }
-    expected.providers[planIndex].models = [.init(id: "plan-a", label: "Plan A"), .init(id: "plan-c", label: "Plan C")]
+    expected.providers[planIndex].models = [.init(id: "plan-a", label: "Plan A", purposes: ["vision"]),
+                                            .init(id: "plan-c", label: "Plan C", purposes: ["llm", "vision"])]
     try await expectSettings("Copying the ChatGPT publication changed another setting")
     var mirrored = await app.hostSettings()
-    guard SettingsModel.isBatchModelAvailable("chatgpt:plan-a", settings: mirrored),
+    // plan-a is published for Vision only, plan-c for both, plan-b not at all.
+    guard !SettingsModel.isBatchModelAvailable("chatgpt:plan-a", settings: mirrored),
           SettingsModel.isBatchModelAvailable("chatgpt:plan-c", settings: mirrored),
           !SettingsModel.isBatchModelAvailable("chatgpt:plan-b", settings: mirrored),
-          SettingsModel.isModelAvailable("chatgpt:plan-a", settings: mirrored) else {
-        throw CheckFailure.message("Drawing pickers did not offer exactly the published ChatGPT models")
+          SettingsModel.isModelAvailable("chatgpt:plan-c", settings: mirrored),
+          SettingsModel.isRegisteredModelAvailable("chatgpt:plan-a", purpose: "vision", settings: mirrored),
+          SettingsModel.isRegisteredModelAvailable("chatgpt:plan-c", purpose: "vision", settings: mirrored),
+          !SettingsModel.isRegisteredModelAvailable("chatgpt:plan-b", purpose: "vision", settings: mirrored) else {
+        throw CheckFailure.message("Drawing and Vision pickers did not offer exactly the published ChatGPT models for their purposes")
     }
     await editor.load(model: app)
     guard !editor.orderedProviders.contains(where: { $0.kind == .chatGPTPlan }) else {
@@ -158,7 +164,8 @@ func runModelSettingsUIChecks() async throws {
     expected.providers[planIndex].models = []
     try await expectSettings("A disconnected ChatGPT plan kept its models or changed another setting")
     mirrored = await app.hostSettings()
-    guard !SettingsModel.isBatchModelAvailable("chatgpt:plan-a", settings: mirrored) else {
+    guard !SettingsModel.isBatchModelAvailable("chatgpt:plan-c", settings: mirrored),
+          !SettingsModel.isRegisteredModelAvailable("chatgpt:plan-a", purpose: "vision", settings: mirrored) else {
         throw CheckFailure.message("A disconnected ChatGPT plan still offered a drawing model")
     }
 
@@ -176,7 +183,7 @@ func runModelSettingsUIChecks() async throws {
     guard await credentials.reads == 0, await credentials.writes == 0, await transport.calls == 0 else {
         throw CheckFailure.message("Settings-only checks touched a secret or called a provider")
     }
-    print("Model settings UI passed: scoped saves and rejected URL; legacy decode; draft discard, filter and bulk selection; persisted purposes/evaluation/usage; disabled/Vision/EOL/subscription drawing guards with saved references retained; keyless add/delete; ChatGPT plan published models 2 of 3 offered and cleared when disconnected; restart. Temporary settings/SQLite only, zero secret reads/writes and provider calls.")
+    print("Model settings UI passed: scoped saves and rejected URL; legacy decode; draft discard, filter and bulk selection; persisted purposes/evaluation/usage; disabled/Vision/EOL/subscription drawing guards with saved references retained; keyless add/delete; ChatGPT plan published models 2 of 3 offered by purpose (Vision-only kept out of drawing) and cleared when disconnected; restart. Temporary settings/SQLite only, zero secret reads/writes and provider calls.")
 }
 
 private actor ModelSettingsNoSecretStore: ProviderCredentialStore {

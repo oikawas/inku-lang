@@ -1,6 +1,7 @@
 import Foundation
 
-/// Bounded SSE bytes become one pipeline object only after matching completed inference and EOF.
+/// Bounded SSE bytes become one pipeline object only after matching completed inference and EOF. In text mode
+/// (Vision on the plan) the result is the completed answer's `output_text` instead, and any tool call is refused.
 public struct ChatGPTResponseDecoder: Sendable {
     public private(set) var terminalResponse: ExactJSON?
     private let argumentLimit: Int
@@ -15,6 +16,13 @@ public struct ChatGPTResponseDecoder: Sendable {
     private var completed: String?
     private var responseID: String?
     private var failure: HostError?
+    private var text = false
+    private var textDelta = ""
+
+    public init(textLimit: Int) {
+        self.init(argumentLimit: textLimit)
+        text = true
+    }
 
     public init(argumentLimit: Int) {
         self.argumentLimit = argumentLimit
@@ -87,6 +95,7 @@ public struct ChatGPTResponseDecoder: Sendable {
         if tag == "response.incomplete" { throw HostError("chatgpt_response_incomplete") }
         if tag.contains("refusal") { throw HostError("chatgpt_refused") }
         guard completed == nil else { throw HostError("chatgpt_response_invalid") }
+        if text { try textEvent(tag, event); return }
         switch tag {
         case "response.created", "response.in_progress":
             try matchResponse(event["response"])
@@ -140,6 +149,41 @@ public struct ChatGPTResponseDecoder: Sendable {
             completed = text; terminalResponse = response
         default:
             // Reasoning/lifecycle metadata cannot deliver a result; tools are checked at both item and completion boundaries.
+            break
+        }
+    }
+
+    private mutating func textEvent(_ tag: String, _ event: ExactJSON) throws {
+        switch tag {
+        case "response.created", "response.in_progress":
+            try matchResponse(event["response"])
+        case "response.output_item.added", "response.output_item.done":
+            try Self.auxiliary(event["item"])
+        case "response.output_text.delta":
+            guard let delta = event["delta"].string else { throw HostError("chatgpt_response_invalid") }
+            guard delta.utf8.count <= argumentLimit - textDelta.utf8.count else { throw HostError("chatgpt_response_too_large") }
+            textDelta += delta
+        case "response.completed":
+            let response = event["response"]
+            try matchResponse(response)
+            guard response["status"].string == "completed" else { throw HostError("chatgpt_response_incomplete") }
+            let output: [ExactJSON]
+            switch response["output"] {
+            case .null: output = []
+            case .array(let items): output = items
+            default: throw HostError("chatgpt_response_invalid")
+            }
+            var answer = ""
+            for item in output {
+                try Self.auxiliary(item)
+                for part in item["content"].array ?? [] { answer += part["text"].string ?? "" }
+            }
+            // A stream may finish with an empty summary; the deltas then carry the answer.
+            if answer.isEmpty { answer = textDelta }
+            guard answer.utf8.count <= argumentLimit else { throw HostError("chatgpt_response_too_large") }
+            guard !answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw HostError("chatgpt_response_incomplete") }
+            completed = answer; terminalResponse = response
+        default:
             break
         }
     }

@@ -84,7 +84,9 @@ public final class SettingsModel {
     /// The pickers read registered models, so the publication is copied into the reserved provider; none clears it.
     public nonisolated static func mirroringPersonalPlan(_ settings: HostSettings, publication: ChatGPTPlanPublication?) -> HostSettings {
         var next = settings
-        let models = (publication?.publishedModels ?? []).map { ProviderModelSettings(id: $0.id, label: $0.label, purposes: ["llm"]) }
+        let models = (publication?.publishedModels ?? []).map {
+            ProviderModelSettings(id: $0.id, label: $0.label, purposes: publication?.purposes(of: $0.id) ?? ChatGPTPlanPublication.defaultPurposes)
+        }
         if let index = next.providers.firstIndex(where: { $0.kind == .chatGPTPlan }) {
             // A plan that never published anything keeps its settings file unchanged.
             if !(models.isEmpty && next.providers[index].models == nil) { next.providers[index].models = models }

@@ -1446,3 +1446,5 @@
 "1〜32 MiBの整数。既定・推奨値は12 MiBです。実際に生成するときの保存設定を使います。" = "Whole numbers from 1 to 32 MiB. The default and recommended value is 12 MiB. Drawing uses the saved setting at the time it runs.";
 "SVGの上限には1〜32 MiBの整数を入力してください。" = "Enter a whole number from 1 to 32 MiB for the SVG limit.";
 "生成SVGが設定した容量の上限を超えました。設定→制限値で上限を変更できます。" = "The SVG exceeds the configured size limit. Change it in Settings → Limits.";
+"記述の解釈・写生・自動配色選択・指示書の補完、Vision推敲と奥書で利用できます。デモ記述生成とモデル調査には対応していません。" = "Available for reading descriptions, sketches, automatic palette choice, completing instructions, Vision refinement and colophons. Demo description generation and model research are not supported.";
+"LLM か Vision の用途を選んでください。" = "Choose LLM or Vision.";

@@ -37,12 +37,17 @@ export class CanvasViewportState implements CanvasViewport {
 	}
 
 	setZoom(nextZoom: number): void {
-		this.zoom = clampZoom(nextZoom);
-		// Panning only has meaning above the fitted size. Returning to fit also
-		// clears an old offset so a later zoom starts from the centered artwork.
-		if (this.zoom <= 1) {
-			this.panX = 0;
-			this.panY = 0;
+		const zoom = clampZoom(nextZoom);
+		const ratio = zoom / this.zoom;
+		const previousPanX = this.panX, previousPanY = this.panY;
+		// Keep the artwork point at the viewport center fixed, including when
+		// zooming through the fitted size. Only an explicit fit recenters it.
+		this.panX *= ratio;
+		this.panY *= ratio;
+		this.zoom = zoom;
+		if (this.dragging) {
+			this.dragStartPanX += this.panX - previousPanX;
+			this.dragStartPanY += this.panY - previousPanY;
 		}
 	}
 

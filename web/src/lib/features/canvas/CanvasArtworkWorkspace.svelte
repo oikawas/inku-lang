@@ -136,10 +136,10 @@
 	onpointerup={(event) => viewport.endDrag(event)}
 	onpointercancel={(event) => viewport.endDrag(event)}
 >
-				<div class="canvas-pan" style="transform: translate3d({viewport.panX}px, {viewport.panY}px, 0);">
+				<div class="canvas-pan" style="transform: translate3d({viewport.panX}px, {viewport.panY}px, 0) scale({viewport.actualZoom}); transform-origin: center center; transition: transform {viewport.dragging ? '0s' : '0.15s'};">
 					<div
 						class="canvas-box"
-						style="width: {canvasBaseWidth}px; height: {canvasBaseHeight}px; transform: scale({viewport.actualZoom}); transform-origin: center center; transition: transform 0.15s;"
+						style="width: {canvasBaseWidth}px; height: {canvasBaseHeight}px;"
 					>
 						{#if result}
 							{#if artworkUrl}

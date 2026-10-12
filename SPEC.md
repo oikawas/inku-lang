@@ -1168,7 +1168,10 @@ Major UI areas:
   word highlighting and `Draw from DDL`. Redraw is disabled for an absent body; editing happens
   in a DDL editor dialog with line numbers, inline Saijiki, and a short syntax guide
 - Canvas panel: SVG display, zoom, pan, output tabs, work-conditions header,
-  and work actions and export at the bottom
+  and work actions and export at the bottom. Web zoom controls (buttons, wheel,
+  and keyboard) keep the point on the work at the center of the visible area fixed,
+  including after panning and when crossing the fitted scale. An explicit fit
+  recenters the work.
 - History strip: recent works, hover metadata, star markers, pagination. **The reader chooses
   which information is printed under each thumbnail** — up to two of generation, model, engine version
   and file size, and **zero may also be selected** (choose nothing and only the pictures are shown)

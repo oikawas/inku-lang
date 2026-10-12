@@ -87,6 +87,15 @@ fn an_alpha_mask_that_is_not_white_is_left_to_resvg() {
     }
 }
 
+/// The two linear gradients the core writes (the ink-wash ground's bands and the
+/// computer fill, with `color-interpolation="sRGB"`) are inside the table.
+#[test]
+fn the_core_s_linear_gradients_are_inside_the_table() {
+    for name in ["linear-gradient-wash", "linear-gradient-field"] {
+        assert!(display_svg(&compat(name)).is_ok(), "{name}");
+    }
+}
+
 #[test]
 fn what_the_table_does_not_hold_is_left_to_resvg() {
     let head = r#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">"#;
@@ -101,7 +110,11 @@ fn what_the_table_does_not_hold_is_left_to_resvg() {
             r##"<defs><pattern id="p" width="1" height="1"/></defs>"##,
             "pattern_units",
         ),
-        (r##"<defs><linearGradient id="g"/></defs>"##, "element"),
+        (r##"<defs><symbol id="s"/></defs>"##, "element"),
+        (
+            r##"<defs><linearGradient id="g" color-interpolation="linearRGB"/></defs>"##,
+            "attribute",
+        ),
         (r##"<line x2="5" stroke="url(#g)"/>"##, "bounding_box"),
         (r##"<use href="#missing"/>"##, "reference"),
         (

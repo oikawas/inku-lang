@@ -2,7 +2,7 @@
 
 This directory contains the native SwiftUI client, developed for macOS first, and the shared Apple packages. [SWIFT_SPEC.ja.md](SWIFT_SPEC.ja.md) is the canonical specification for Swift host behavior; this document is its maintained English version. The [product specification](../SPEC.md) defines shared DDL, Score, prompts, authoring authority, pipeline transitions, seeds, and rendering semantics. Server remains the primary development host, and Swift follows the same Rust core without duplicating semantic processing.
 
-Last updated: 2026-10-11.
+Last updated: 2026-10-12.
 
 Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The macOS app has its own version, defined by `apple/VERSION` and `apple/BUILD_NUMBER` and allocated separately from the Server and Web versions (the first release is 1.0.0, Build 1). The corresponding Server version is shown in the app's About inku window and in the changelog. Matching shared layer versions does not establish that host features and the native UI port are complete.
 
@@ -13,6 +13,17 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Record confirmed implementation changes and remaining scope in dated sections of this specification. Maintain product history in the shared [CHANGELOG.ja.md](../CHANGELOG.ja.md) and [CHANGELOG.md](../CHANGELOG.md). Do not create a separate Swift changelog.
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
+
+## 2026-10-12 Add linearGradient to the support table
+
+During the author's visual check, a work with a linear gradient stopped as outside the support table. At the author's instruction (investigate and plan, then implement).
+
+- The support table (the shared core's [`inku-display` `check.rs`](../core/crates/inku-display/src/check.rs)) gains the element `linearGradient` and the attribute `color-interpolation`. `color-interpolation` is inside the table only with the value `sRGB`; other values stay outside as before (code `attribute`).
+- The core writes linear gradients for the ink-wash ground's bands and for the computer fill. Both use only `offset`, `stop-color` and `stop-opacity` on their stops and fit the painted `path`'s bounding box (the default units). Skia's `SkSVGLinearGradient` draws them as Chrome does. Skia's gradients do not read `color-interpolation`, and the value the core writes (`sRGB`) is the default.
+- Comparison (2026-10-12): 38 works with linear gradients were drawn by Skia and by Chrome, and all 37 inside the table matched by the author's yardstick. The ink wash is faint and the yardstick cannot see it inside the works, so a synthetic work with strongly drawn bands showed that it matches, and that it does not without the bands. Zoomed windows (Graphite) also matched the CPU.
+- The table is shared, so on Android too these works are drawn with Skia instead of resvg.
+- Remaining scope: `tableValues` on `feFuncA` in old works (render engine 41 and earlier) stays outside the table, and those works stop on macOS.
+- Checks: the shared core's `inku-display` Skia tests (C1, C2, C4, and a test that the two linear gradients match Chrome and do not once removed), the tests of what the table does not hold, and the `inku-display-gpu` tests (G2 with the two added).
 
 ## 2026-10-11 Draw zoomed windows with Graphite in a separate process on Apple silicon
 

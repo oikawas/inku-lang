@@ -1,8 +1,9 @@
 //! G2 (`--features graphite`, Apple silicon): a window Graphite draws stands where the
 //! CPU draws it. The works are the display's compatibility pictures without noise
 //! (feTurbulence draws its grain differently on the GPU, as the 2026-10-11 survey
-//! found; `alpha-mask-gray` is outside the support table), each whole at 1x and as a
-//! 4x window off the centre, compared with the CPU window by the author's yardstick.
+//! found; `alpha-mask-gray` is outside the support table), with the two linear gradients
+//! the core writes (2026-10-12), each whole at 1x and as a 4x window off the centre,
+//! compared with the CPU window by the author's yardstick.
 #![cfg(all(feature = "graphite", target_os = "macos"))]
 
 use inku_display::{RasterRegionOptions, prepare_scene};
@@ -12,11 +13,13 @@ use inku_display_gpu::GpuWindows;
 mod comparison;
 use comparison::{difference, over_white};
 
-const WORKS: [&str; 4] = [
+const WORKS: [&str; 6] = [
     "ellipse-gradient",
     "use-href",
     "pattern-href",
     "alpha-mask-white",
+    "linear-gradient-wash",
+    "linear-gradient-field",
 ];
 
 #[test]
@@ -65,5 +68,5 @@ fn gpu_windows_stand_where_the_cpu_draws_them() {
             compared += 1;
         }
     }
-    assert_eq!(compared, 8);
+    assert_eq!(compared, 12);
 }

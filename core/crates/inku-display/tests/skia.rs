@@ -162,6 +162,49 @@ fn a_grey_alpha_mask_would_not_match_chrome() {
     }
 }
 
+/// The two linear gradients the core writes, drawn large without noise (2026-10-12):
+/// the ink-wash ground's bands and the computer fill. Each matches Chrome (154.0.8037.99,
+/// drawn as for C1), and the control, the same SVG with its gradient fills removed, does
+/// not: the yardstick sees the gradients.
+#[test]
+fn linear_gradients_match_chrome() {
+    for (name, gradients) in [
+        (
+            "linear-gradient-wash",
+            ["ground_ink_wash_gradient_0", "ground_ink_wash_gradient_1"],
+        ),
+        (
+            "linear-gradient-field",
+            ["tool-fill-0-0-field", "tool-fill-0-1-field"],
+        ),
+    ] {
+        let svg = String::from_utf8(data(&format!("compat/{name}.svg"))).unwrap();
+        let (width, height, reference) = chrome(&format!("compat/{name}-chrome.png"));
+        let drawn = difference(
+            width,
+            height,
+            &over_white(&whole(&svg, width, height)),
+            &reference,
+        );
+        let without = gradients.iter().fold(svg.clone(), |svg, id| {
+            assert!(svg.contains(&format!("url(#{id})")), "{name}: {id}");
+            svg.replace(&format!("url(#{id})"), "none")
+        });
+        let control = difference(
+            width,
+            height,
+            &over_white(&whole(&without, width, height)),
+            &reference,
+        );
+        eprintln!("{name}: {drawn:?}, without the gradients {control:?}");
+        assert!(drawn.passes(), "{name}: {drawn:?}");
+        assert!(
+            !control.passes(),
+            "{name} matches Chrome without its gradients: {control:?}"
+        );
+    }
+}
+
 /// C4. 512px tiles drawn on eight threads from one scene, stitched, against one piece
 /// (stage 1: the window's position changes filter results slightly, so not identical).
 #[test]

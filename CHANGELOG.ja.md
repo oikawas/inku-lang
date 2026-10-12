@@ -6,6 +6,15 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+## macOS（未公開。版は統合時に確定）
+
+### 2026-10-12 — linearGradientを含む作品を表示する
+
+作者の目視の間に、地の墨のにじみの帯を持つ作品の表示が止まった。表示の照合表にlinearGradientが無かったためで、照合表に要素`linearGradient`と属性`color-interpolation`（値`sRGB`だけ）を足した。
+
+- 描画が書く2種（地の墨のにじみの帯、computerの塗り）を、SkiaはChromeと同じに描く。linearGradientを含む作品38件を描き比べ、照合表に入る37件が一致した。拡大の窓（Graphite）でも同じ。
+- 照合表はAndroidと共有なので、Androidでもこれらの作品がresvgではなくSkiaで描かれる。
+
 ## 未リリース
 
 ### 2026-10-12 — 英語の端の語を空白で書いても読む（DDL 17）

@@ -27,6 +27,12 @@ One small SVG per rewrite (`pattern-href`, `use-href`, `ellipse-gradient`, `seed
 the same way. The seed `253038826` is one of `p11`'s: Blink reads it as 253038816,
 Skia as 253038832. Seeds above 2^31 drew the same noise either way.
 
+`linear-gradient-wash` and `linear-gradient-field` are the two linear gradients the
+core writes (the ink-wash ground's bands, and the computer fill with
+`color-interpolation="sRGB"`), drawn large and without noise (2026-10-12). Chrome
+154.0.8037.99 made their pictures the same way. Without their gradient fills they do
+not match Chrome, so the test sees the gradients.
+
 ## `public-requests.json` (C6)
 
 The 17 public DDL texts of stage 1 (with where each was taken from) and the exact

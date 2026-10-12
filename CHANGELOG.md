@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-12 — Use the visible area's center for Swift canvas zoom too
+
+Swift canvas zoom buttons, wheel, and pinch keep the point on the work at the center of the visible area fixed. Panning and crossing scale 1 preserve that position; only an explicit fit resets position and scale. Pinch magnifications remain relative to the gesture's start, and zoom during a drag adjusts the drag's origin.
+
 ### 2026-10-12 — Zoom the Web canvas about the visible area's center
 
 After panning, zoom in or out while keeping the point on the work at the center of the visible area fixed. Buttons, wheel, and keyboard share this behavior, including when crossing the fitted scale. An explicit fit recenters the work. Translation and scaling use one transform to keep the same center during the zoom transition.

@@ -4,7 +4,7 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-10-12.
+Last updated: 2026-10-13.
 
 ## Generated-SVG ceiling (I-375)
 
@@ -48,6 +48,16 @@ When updating Android specifications:
    adaptation of the Japanese source.
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
+
+## 2026-10-13 ChatGPT plan stream errors
+
+Read the error code from the HTTP body's `error`, `response.failed`'s `response.error`,
+then the event itself when `type="error"`, in that order. Treat a non-object body or response
+as empty; do not adopt top-level codes from other events.
+A streamed `subscription_sharing_usage_limit_exceeded` also puts the connection in quota state,
+stops new plan requests, and shows the existing usage guidance.
+Treat `subscription_sharing_usage_unavailable` and `subscription_sharing_user_unavailable`
+as temporary transport failures, retaining the connection and credentials for a retry.
 
 ## 2026-10-12 Gemini thinking levels by model
 

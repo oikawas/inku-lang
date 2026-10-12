@@ -298,6 +298,63 @@ class ChatGptPlanBoundaryTest {
         assertEquals("provider_rejected", failureOf(generated({ completedStream() }, badUtf8)))
     }
 
+    @Test
+    fun topLevelStreamErrorsPauseQuotaAndKeepTemporaryFailuresRetryable() = runBlocking {
+        val limit = "subscription_sharing_usage_limit_exceeded"
+        for (code in listOf(limit, "subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable")) {
+            val errorEvent = JSONObject().put("type", "error").put("code", code).put("message", "Plan usage unavailable")
+                .put("param", JSONObject.NULL).put("sequence_number", 3)
+            withPlan({ "data: $errorEvent\n\n" }) { manager, ref, http ->
+                val error = runCatching { manager.generate(request(ref)) }.exceptionOrNull() as ChatGptException
+                assertEquals(code, error.code)
+                assertEquals(if (code == limit) "provider_rejected" else "transport_unavailable", failureOf(error))
+                assertEquals(code, manager.state.value.errorCode)
+                if (code == limit) {
+                    assertEquals("quota", manager.state.value.active?.status)
+                    assertFalse(manager.state.value.canUsePlan)
+                    val calls = http.calls.size
+                    assertTrue(runCatching { manager.generate(request(ref)) }.isFailure)
+                    assertEquals(calls, http.calls.size)
+                } else {
+                    assertEquals("connected", manager.state.value.active?.status)
+                    assertTrue(manager.state.value.canUsePlan)
+                    http.handler = { url, token, _ ->
+                        check(url.endsWith("/responses"))
+                        assertEquals("access-a", token)
+                        ChatGptHttpResponse(200, completedStream())
+                    }
+                    assertEquals("赤い円。", JSONObject(manager.generate(request(ref)).text).getString("ddl"))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun responseErrorsKeepNestedPrecedenceAndRequireAnErrorEventForTopLevelCodes() {
+        val limit = "subscription_sharing_usage_limit_exceeded"
+        val temporary = "subscription_sharing_usage_unavailable"
+        val nested = JSONObject().put("code", "subscription_sharing_user_not_eligible")
+        val top = JSONObject().put("type", "error").put("code", limit)
+            .put("error", nested).put("response", JSONObject().put("error", JSONObject().put("code", temporary)))
+        assertEquals("subscription_sharing_user_not_eligible", chatGptResponseError(top).code)
+        top.remove("error")
+        assertEquals(temporary, chatGptResponseError(top).code)
+        top.put("response", "not an object")
+        assertEquals(limit, chatGptResponseError(top).code)
+        top.remove("type")
+        assertEquals("chatgpt_response_failed", chatGptResponseError(top).code)
+        val http = chatGptResponseError(JSONObject().put("error", JSONObject().put("code", limit)), 429)
+        assertEquals(limit, http.code)
+        assertEquals("provider_rejected", http.failure)
+        val failed = chatGptResponseError(JSONObject().put("type", "response.failed")
+            .put("response", JSONObject().put("error", JSONObject().put("code", temporary))))
+        assertEquals(temporary, failed.code)
+        assertEquals("transport_unavailable", failed.failure)
+        for (value in listOf(null, "not an object", JSONArray())) {
+            assertEquals("chatgpt_response_failed", chatGptResponseError(value).code)
+        }
+    }
+
     private fun failureOf(error: Throwable): String = runBlocking {
         val provider = object : ModelProvider {
             override val providerId = "chatgpt"

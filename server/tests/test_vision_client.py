@@ -49,7 +49,22 @@ def test_gemini_sends_the_image_inline_and_reads_the_answer_parts():
     assert body["contents"][0]["parts"] == [
         {"text": "what changed?"}, {"inlineData": {"mimeType": "image/png", "data": "iVBORw0KGgo="}},
     ]
-    assert body["generationConfig"]["maxOutputTokens"] == 260
+    assert body["generationConfig"]["maxOutputTokens"] == 260 + 8192
+
+
+def test_gemini_vision_says_when_its_answer_ran_out(caplog):
+    # gemini-3.1-pro-preview thought 683 and wrote 337 of 1,024 (draw, 2026-10-12).
+    cut = {"candidates": [{"finishReason": "MAX_TOKENS", "content": {"parts": [{"text": '{"observation": "A ci'}]}}],
+           "usageMetadata": {"candidatesTokenCount": 337, "thoughtsTokenCount": 683}}
+    with caplog.at_level("WARNING", logger="inku_server.vision_client"):
+        text, _request, _body = _ask("gemini", cut, model="gemini-3.1-pro-preview")
+    assert text == '{"observation": "A ci'
+    line = next(r.getMessage() for r in caplog.records if r.getMessage().startswith("provider_output_limit "))
+    assert json.loads(line.split(" ", 1)[1]) == {
+        "action": "vision", "provider": "gemini", "model": "gemini-3.1-pro-preview", "max_tokens": 260 + 8192,
+        "finish_reason": "MAX_TOKENS", "output_tokens": 337, "thought_tokens": 683, "has_text": True,
+        "has_function_call": False,
+    }
 
 
 def test_anthropic_sends_a_base64_image_block():

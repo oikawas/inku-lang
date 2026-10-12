@@ -8,6 +8,23 @@
 
 ## 未リリース
 
+### 2026-10-13 — Geminiの思考レベルを既定でlowにし、思考の分の出力枠を足す
+
+作者の指示（Googleの資料とGeminiへの要求の照合）。描画セッションの2026-10-12の実測（Build 1178・1179）で、次が分かった。
+
+- 表に無いモデルへ`minimal`を送っていたため、`gemini-3.7-flash`と別名の`gemini-flash-latest`・`gemini-pro-latest`が「Thinking level MINIMAL is not supported」の400で断った。別名は最新のモデルへ移るので、名前の表では追いつけない。
+- `gemini-2.5-flash-image`は思考レベルの指定そのものを400で断った（Models APIの一覧に`thinking`が無い）。
+- 思考のトークンも`maxOutputTokens`に数えられる。`gemini-3.1-pro-preview`は1,024のうち683を思考に使って途中で切れ、`gemini-3-pro-image`は320のうち317を思考に使って本文が空だった。
+
+直したこと:
+
+- 思考レベルは、`minimal`を受け付けると分かっているモデル（Googleの表と実測で確かめたもの、Gemma）にだけ`minimal`を送り、ほかは`low`を送る。`low`は、Googleの表の思考モデルのうち`gemini-3.1-flash-lite-image`（`minimal`側に入れた）を除くすべてが受け付ける。`gemini-2.5-flash-lite`・`gemini-2.5-flash-image`・`antigravity-`には思考レベルを送らない。
+- 思考レベルを送るモデルでは、答えの枠に思考の分として8,192を足す（描画は2,048→10,240、Visionの助言は320→8,512）。
+- `finishReason`が`MAX_TOKENS`の描画の応答は答えとして使わず、Claudeと同じ`provider_output_limit`の行（思考と本文のトークン数を含む）を残す。Visionは応答を返し、同じ行を残す。
+- VisionはGeminiへtemperatureを送らない（描画と同じ）。Gemini 3は既定の1.0に合わせてあり、Googleの案内は温度などのサンプリング指定を外すよう求めている。
+- デモの指示文（`/api/demo/instruction`）も同じ思考レベル・出力枠・温度にし、Gemmaが返す思考の部分を指示文に混ぜない。同じ関数のClaudeへの要求も、temperatureを送らず（Sonnet 5は400で断る）、思考の分の枠を足す。
+- 当該アカウントで使えない2.5系（404）、Interactions API専用のモデル、画像を受け付けないモデルは、要求の形では直らないので変えていない。
+
 ### 2026-10-13 — Claudeの思考の分だけ出力枠を足し、上限で切れた応答を記録する
 
 描画セッションの実測（作者の指示による依頼）。Claude 5系のモデルは、思考の指定がなくても考え、その思考が出力上限（`max_tokens`）に数えられる。Sonnet 5は描画の2,048のうち2,047〜2,048を思考に使い、Haiku 5.5も上限に達して、描画6件に絵が出なかった。Visionの助言（320）も、JSONが途中で切れていた。

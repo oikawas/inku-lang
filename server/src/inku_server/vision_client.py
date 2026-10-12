@@ -21,7 +21,7 @@ from urllib.parse import quote
 import httpx
 
 from .anthropic_request import anthropic_max_tokens, output_limit_record
-from .gemini_request import gemini_thinking
+from .gemini_request import gemini_max_output_tokens, gemini_output_limit_record, gemini_thinking
 from .openai_request import openai_sampling
 from .provider_refusal import provider_error
 from .chatgpt_store import ChatGPTError
@@ -98,8 +98,10 @@ def _request(connection: dict[str, Any], model_id: str, *, system: str, text: st
         return base + "/v1beta/models/" + quote(model_id, safe="") + ":generateContent", headers, {
             "systemInstruction": {"parts": [{"text": system}]},
             "contents": [{"role": "user", "parts": parts}],
-            # The lowest thinking level, as the pipeline asks.
-            "generationConfig": {"temperature": temperature, "maxOutputTokens": max_tokens,
+            # The lowest thinking level and no temperature, as the pipeline asks:
+            # Gemini 3 is tuned for its default of 1.0 and below it can loop
+            # (Gemini 3 developer guide), and Gemma 4's model card samples at 1.0.
+            "generationConfig": {"maxOutputTokens": gemini_max_output_tokens(model_id, max_tokens),
                                  **gemini_thinking(model_id)},
         }
     raise ValueError(f"unsupported provider kind for Vision: {kind}")
@@ -152,12 +154,15 @@ def vision_text(connection: dict[str, Any], model_id: str, *, system: str, text:
         }, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
     response.raise_for_status()
     data = response.json()
-    cut = output_limit_record(data) if connection.get("kind") == "anthropic" else None
+    kind = connection.get("kind")
+    cut = (output_limit_record(data) if kind == "anthropic"
+           else gemini_output_limit_record(data) if kind == "gemini" else None)
     if cut is not None:
         # Returned as it is: a cut colophon is still prose, and cut advice JSON
         # fails where it is parsed. This line says the budget, not the image, ran out.
         _logger.warning("provider_output_limit %s", json.dumps({
             "action": "vision", "provider": connection.get("id"), "model": model_id,
-            "max_tokens": body["max_tokens"], **cut,
+            "max_tokens": body["max_tokens"] if kind == "anthropic" else body["generationConfig"]["maxOutputTokens"],
+            **cut,
         }, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
     return _answer(str(connection.get("kind")), data).strip()

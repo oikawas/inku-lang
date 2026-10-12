@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Send Gemini "low" thinking by default, with room for thinking
+
+Server sent `minimal` to every Gemini model it did not list, so `gemini-3.7-flash` and the `gemini-flash-latest` and `gemini-pro-latest` aliases refused with a 400; `gemini-2.5-flash-image` refused any thinking level; and thought tokens, which `maxOutputTokens` counts, cut `gemini-3.1-pro-preview` at 1,024 and left `gemini-3-pro-image` with no answer at 320 (draw session, 2026-10-12). Only the models known to take `minimal` (Google's thinking-levels table, the ids measured, and Gemma) are now sent it; every other model is sent `low`, and `gemini-2.5-flash-lite`, `gemini-2.5-flash-image`, and `antigravity-` models are sent no level. Models sent a level get 8,192 tokens of room beside the answer. A drawing response that stops at `MAX_TOKENS` is not used and logs `provider_output_limit`. Vision and the demo instruction no longer send Gemini a temperature, as Google's Gemini 3 guidance asks, and the demo no longer includes Gemma's thought parts. The demo's Claude request also drops its temperature, which Sonnet 5 refuses, and leaves room for thinking.
+
 ### 2026-10-13 — Leave Claude room to think, and record an answer cut off at the limit
 
 Claude 5 models think when no thinking setting is sent, and the thinking counts toward `max_tokens`. Sonnet 5 spent 2,047-2,048 of a 2,048 drawing budget thinking, so six drawings had no picture, and 320-token Vision advice JSON was cut. Requests to the Claude 5 models and Mythos Preview now add 8,192 tokens of room to the answer's budget; Claude 4.x, which does not think unasked, is unchanged. Thinking is not disabled: several models refuse it, and without it Haiku 5.5 and Opus 5 can drop the tool call. A drawing response stopped at `max_tokens` is never used as an answer and logs a `provider_output_limit` line; Vision returns the text and logs the same line. Other providers are unchanged.

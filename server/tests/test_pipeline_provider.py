@@ -467,6 +467,28 @@ def test_gemini_forces_one_schema_bound_function_call_with_lowest_thinking(monke
     }
 
 
+def test_gemini_drawing_leaves_room_for_thinking_and_a_cut_answer_is_not_an_answer(monkeypatch):
+    monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model",
+                        lambda *args, **kwargs: ("gemini", "gemini-3.1-pro-preview"))
+    monkeypatch.setattr("inku_server.pipeline_provider.connection_for", lambda *args: {
+        "id": "gemini", "kind": "gemini", "base_url": "https://generativelanguage.invalid",
+        "api_key": "test-only", "requires_api_key": True,
+    })
+    seen = []
+
+    async def request(value):
+        seen.append(value)
+        return httpx.Response(200, json={"candidates": [{"finishReason": "MAX_TOKENS", "content": {"parts": [
+            {"functionCall": {"name": "submit_pipeline_response", "args": {"normalized_ddl": "cut he"}}},
+        ]}}], "usageMetadata": {"candidatesTokenCount": 40, "thoughtsTokenCount": 8400}})
+
+    provider = SingleAttemptProvider(ProviderOptions({}, "m", "m", 256, 8192), transport=httpx.MockTransport(request))
+    result = provider(_action())
+    assert json.loads(seen[0].content)["generationConfig"]["maxOutputTokens"] == 256 + 8192
+    assert result["failure"] == "malformed_payload"
+    assert provider.failure_detail == "output_limit_reached"
+
+
 def _reading_action() -> dict:
     # Keys arrive in name order, as the core's JSON writes them; the order that
     # matters is named in propertyOrdering.

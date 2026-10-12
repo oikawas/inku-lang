@@ -20,7 +20,7 @@ from .api_core.common import _is_qualified_model_id
 from .model_settings import connection_for, provider_for_model
 from .provider_limits import provider_slot
 from .anthropic_request import anthropic_max_tokens, output_limit_record
-from .gemini_request import gemini_thinking
+from .gemini_request import gemini_max_output_tokens, gemini_output_limit_record, gemini_thinking
 from .openai_request import openai_sampling
 from .provider_refusal import provider_error as _provider_error
 from .provider_observation import ProviderObservationError, ProviderObservationStore
@@ -382,7 +382,7 @@ class SingleAttemptProvider:
             body = {"systemInstruction": {"parts": [{"text": prompt["system"]}]},
                     "contents": [{"role": "user", "parts": [{"text": prompt["message"]}]}],
                     "generationConfig": {
-                        "maxOutputTokens": self.options.max_tokens,
+                        "maxOutputTokens": gemini_max_output_tokens(model, self.options.max_tokens),
                         **gemini_thinking(model),
                     },
                     "tools": [{"functionDeclarations": [{
@@ -507,6 +507,18 @@ class SingleAttemptProvider:
             if budget is not None and reservation is not None:
                 budget.settle(str(connection["id"]), reservation, input_used if input_used is not None
                               else (None if limits["tpm"] else 0))
+        # A response stopped at the output limit is cut off whatever it holds:
+        # a tool input or JSON text that ends there is not the whole answer.
+        cut = (output_limit_record(data) if kind == "anthropic"
+               else gemini_output_limit_record(data) if kind == "gemini" else None)
+        if cut is not None:
+            self.failure_detail = "output_limit_reached"
+            _logger.warning("provider_output_limit %s", json.dumps({
+                "action": action["tag"], "provider": connection["id"], "model": model,
+                "max_tokens": body["max_tokens"] if kind == "anthropic" else body["generationConfig"]["maxOutputTokens"],
+                **cut,
+            }, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+            raise TypeError("provider output reached its token limit")
         if kind == "openai_compatible":
             message = data["choices"][0]["message"]
             calls = message.get("tool_calls") or []
@@ -517,16 +529,6 @@ class SingleAttemptProvider:
             else:
                 text = message.get("content")
         elif kind == "anthropic":
-            # A response stopped at max_tokens is cut off whatever it holds: a
-            # tool input or JSON text that ends there is not the whole answer.
-            cut = output_limit_record(data)
-            if cut is not None:
-                self.failure_detail = "output_limit_reached"
-                _logger.warning("provider_output_limit %s", json.dumps({
-                    "action": action["tag"], "provider": connection["id"], "model": model,
-                    "max_tokens": body["max_tokens"], **cut,
-                }, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
-                raise TypeError("provider output reached max_tokens")
             calls = [block for block in data["content"] if block.get("type") == "tool_use"]
             if calls:
                 if len(calls) != 1 or calls[0].get("name") != response_name:

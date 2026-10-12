@@ -17,6 +17,8 @@ from ...reference import build_reference, render_markdown
 from ...saijiki import display_categories
 from ...render_engines import current_render_engine
 from ...distribution_notices import NoticesResponse, notice_bytes, notice_catalog
+from ...anthropic_request import anthropic_max_tokens
+from ...gemini_request import gemini_max_output_tokens, gemini_thinking
 from ...model_settings import connection_for, model_provider_catalog, provider_for_model
 from ... import db as _db
 from ..common import MODEL_NOT_OFFERED_DETAIL, _APP_VERSION, _RELEASE_VERSION, _build_number, _env_flag, _model_offered_to, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _unexpected_http_error
@@ -280,10 +282,11 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
         if connection.get("base_url"):
             kwargs["base_url"] = connection["base_url"]
         client = anthropic.Anthropic(timeout=timeout, **kwargs)
+        # As vision_client asks Claude: no temperature, which claude-sonnet-5
+        # refuses with a 400, and room for the thinking Claude 5 does unasked.
         resp = client.messages.create(
             model=model_id,
-            max_tokens=180,
-            temperature=0.9,
+            max_tokens=anthropic_max_tokens(model_id, 180),
             system=_demo_instruction_system(lang),
             messages=[{"role": "user", "content": seed_phrase}],
         )
@@ -303,7 +306,11 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
         body = {
             "systemInstruction": {"parts": [{"text": _demo_instruction_system(lang)}]},
             "contents": [{"role": "user", "parts": [{"text": seed_phrase}]}],
-            "generationConfig": {"temperature": 0.9, "maxOutputTokens": 180},
+            # As vision_client asks Gemini: the lowest thinking level a model
+            # takes, room for thinking within maxOutputTokens, and the default
+            # temperature Gemini 3 is tuned for.
+            "generationConfig": {"maxOutputTokens": gemini_max_output_tokens(model_id, 180),
+                                 **gemini_thinking(model_id)},
         }
         request = urllib.request.Request(
             url,
@@ -314,7 +321,8 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
         with urllib.request.urlopen(request, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
         parts = payload.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-        text = "\n".join(str(part.get("text", "")) for part in parts).strip()
+        # Gemma returns its thoughts as parts beside the answer.
+        text = "\n".join(str(part["text"]) for part in parts if "text" in part and not part.get("thought")).strip()
     else:
         from openai import OpenAI
 

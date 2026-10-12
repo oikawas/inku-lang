@@ -31,6 +31,8 @@ class GeminiModelProvider(
         } finally {
             connection.disconnect()
         }
+        val outputTruncated = response.optJSONArray("candidates")?.optJSONObject(0)?.optString("finishReason") == "MAX_TOKENS"
+        if (request.pipelineAction != null && outputTruncated) throw ProviderOutputLimitException()
         val parts = response.optJSONArray("candidates")?.optJSONObject(0)
             ?.optJSONObject("content")?.optJSONArray("parts")
             ?: throw MalformedProviderResponseException("Gemini response did not contain content.")
@@ -40,21 +42,18 @@ class GeminiModelProvider(
             modelId = request.modelId,
             promptTokens = usage?.optInt("promptTokenCount")?.takeIf { it > 0 },
             completionTokens = usage?.optInt("candidatesTokenCount")?.takeIf { it > 0 },
-            outputTruncated = response.optJSONArray("candidates")?.optJSONObject(0)?.optString("finishReason") == "MAX_TOKENS",
+            outputTruncated = outputTruncated,
             elapsedMs = System.currentTimeMillis() - started,
         )
     }
 
     private fun payload(request: ModelRequest): JSONObject {
         val pipelineAction = request.pipelineAction
-        val generation = JSONObject().put("maxOutputTokens", request.maxTokens)
-        if (pipelineAction == null) {
-            generation.put("temperature", request.temperature)
-        }
-        // Pipeline, vision, and a request for minimal thinking use Server's model-specific minimum.
-        val thinkingLevel = if (pipelineAction != null || request.imageJpeg != null || request.thinkingLevel == "minimal") {
-            geminiThinkingLevel(request.modelId.removePrefix("$providerId:"))
-        } else request.thinkingLevel
+        val thinkingLevel = geminiThinkingLevel(request.modelId.removePrefix("$providerId:"))
+        // The wire budget includes thoughts; keep the caller's answer budget beside them.
+        val generation = JSONObject().put("maxOutputTokens", request.maxTokens.toLong() +
+            if (thinkingLevel == null) 0 else THINKING_ROOM_TOKENS)
+        // Sampling is model-default on every Gemini path, including vision and demo text.
         thinkingLevel?.let { generation.put("thinkingConfig", JSONObject().put("thinkingLevel", it)) }
         if (request.stopSequences.isNotEmpty()) generation.put("stopSequences", JSONArray(request.stopSequences))
         val user = textContent(request.prompt).put("role", "user")

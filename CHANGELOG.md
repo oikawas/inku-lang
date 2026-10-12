@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+## macOS (unreleased; the version is settled at integration)
+
+### 2026-10-12 — Always show the version and build at the bottom left
+
+At the author's instruction. The foot of the left rail, the window's bottom-left corner, always shows the app's version and build: `1.1.2` and `Build 4` on two lines in the collapsed rail, on one line when it is expanded. Its look and tooltip follow the build at the foot of the Web's rail. The Web shows it only in developer mode; the macOS app always does.
+
 ## Unreleased
 
 ### 2026-10-12 — English edges may also be written with a space (DDL 17)

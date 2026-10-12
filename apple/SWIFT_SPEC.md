@@ -14,6 +14,15 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-12 Always show the version and build at the bottom left
+
+At the author's instruction to always show the version number and build number at the app's bottom left.
+
+- At the foot of the left rail ([`AppRailView`](Sources/InkuUI/Views/AppRailView.swift)), the window's bottom-left corner, the app shows its version and build (`CFBundleShortVersionString` and `CFBundleVersion`, from `apple/VERSION` and `apple/BUILD_NUMBER`): `1.1.2` and `Build 4` on two lines in the collapsed rail, and `1.1.2 · Build 4` on one line in the expanded rail.
+- It looks like the build at the foot of the Web's rail (`.rail-build`): 10pt, faint, tabular digits. Its tooltip is `Build 4`.
+- The Web shows its build only in developer mode; the macOS app shows both always, whatever the UI mode or auxiliary display.
+- Check: AppCheck `--tooltips-leftovers-only` (the 173 Web tooltip sites; the build display moved from excluded to matched).
+
 ## 2026-10-12 Add linearGradient to the support table
 
 During the author's visual check, a work with a linear gradient stopped as outside the support table. At the author's instruction (investigate and plan, then implement).

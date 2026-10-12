@@ -3,7 +3,7 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-10-12。
+最終更新: 2026-10-13。
 
 ## SVG生成上限（I-375）
 
@@ -34,20 +34,30 @@ Androidはpremultiplied RGBAをNDK Bitmapへ直接転送する。Kotlin Engine 3
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
 
-## 2026-10-12 Geminiのモデル別思考レベル
+## 2026-10-13 Geminiのモデル別思考レベル
 
-Geminiの描画・写真分析・写真からの記述生成は、Serverの `gemini_thinking()` と同じ対応で
-最も低い思考レベルを送る。接続名を取り除いて `models/` を受け、版名・previewの境界もServerと揃える。
+Geminiの描画・写真分析・写真からの記述生成・デモは、Server ca0fb583の `gemini_thinking()` と
+同じ対応を使う。2026-10-12の表を更新した。接続名と `models/` を取り除いて照らす。
 
 | モデル | thinkingConfig |
 | --- | --- |
-| gemini-3.8-flash、gemini-\<版\>-pro全般、gemini-2.5-flash | thinkingLevel: low |
-| gemini-2.5-flash-lite（preview等の別名も同じ） | 送らない（既定で思考しない） |
-| ほか（gemini-3.5-flash-lite、gemini-3.6-flash、gemini-3-flash-preview、Gemma 4等） | thinkingLevel: minimal |
+| gemini-2.5-flash-lite／image（名前の後はハイフンか終端）、antigravity-で始まる名前 | 送らない |
+| 下の13名の完全一致、gemma-で始まる名前 | thinkingLevel: minimal |
+| ほか（latestのFlash／Pro、3.7 Flash、未知の名前も含む） | thinkingLevel: low |
 
-2.5-flash-liteを先に判定し、2.5-flashの規則へ入れない。画像・記述のtemperature、
-描画の既定sampling、出力上限、関数応答の形式は従来どおり。
-根拠はGoogleの[思考レベル表](https://ai.google.dev/gemini-api/docs/thinking)（2026-10-12確認）。
+minimalの完全一致はgemini-3.6-flash、gemini-3.5-flash、gemini-3.5-flash-lite、
+gemini-flash-lite-latest、gemini-3-flash-preview、gemini-3.1-flash-lite、
+gemini-3.1-flash-lite-preview、gemini-3.1-flash-image、gemini-3.1-flash-image-preview、
+gemini-3.1-flash-lite-image、gemini-robotics-er-2-preview、nano-banana-pro-preview、gemini-nano-banana-2.1。
+
+思考レベルを送る場合は本文の予算に8192を加えてmaxOutputTokensとし、送らない場合は加算しない。
+Geminiのすべての要求はtemperatureを送らず、既定samplingを使う。
+描画のMAX_TOKENSは、関数引数が揃って見えても答えにせず、malformed_payloadと
+output_limit_reachedとして共有coreへ失敗を返す。カメラの記述生成は従来どおり打切りを拒む。
+デモの指示文はthoughtを除いた本文だけを読む。デモのClaudeもtemperatureを送らず、
+ServerのClaude5系・Mythos Previewの規則に当たる場合はmax_tokensに8192を加える。
+根拠はGoogleの[思考資料](https://ai.google.dev/gemini-api/docs/thinking)、
+[Gemini3の案内](https://ai.google.dev/gemini-api/docs/gemini-3)とServerの実測に基づく要求規則。
 
 ## 2026-10-12 作品表示中の補完承認と停止理由
 
@@ -254,7 +264,7 @@ debug headlessの`image`入力も同じ二段の処理を使う。`skip_draw`は
 
 - Anthropic: モデルによらず`temperature`を省き、モデルの既定値を使う。写真の記述生成・デモ用記述も同じである。Sonnet 5.5が写真の記述生成の`temperature: 0.2`をHTTP 400で拒否していた不具合を修正した。回答ツールは`auto`で提示し、呼出しがあれば指定したツール1つの`input`を読む。テキストでの回答はJSONオブジェクトを読む。自由文のテキストブロックは改行で結び、thinkingは読まない。
 - OpenAI互換: `stream: false`を明示し、OpenAI自身のAPIでは既存の`openai_sampling()`相当の出力上限・sampling・思考指定を使う。回答ツールの呼出しがあれば指定したツール1つの引数だけを読む。呼出しが無い場合はメッセージのテキストを読む。
-- Gemini: 画像要求の思考は接続名によらず上の「Geminiのモデル別思考レベル」に従い、記述の後にJPEGの`inlineData`を置く。画像の自由文はtemperature 0.2、描画はtemperatureを省く。描画応答は指定した関数1つの`args`オブジェクトだけを読む。自由文のテキストは改行で結び、thoughtは読まない。
+- Gemini: 画像要求の思考は接続名によらず上の「Geminiのモデル別思考レベル」に従い、記述の後にJPEGの`inlineData`を置く。Geminiの画像・記述・デモ・描画ともtemperatureを省く。描画応答は指定した関数1つの`args`オブジェクトだけを読む。自由文のテキストは改行で結び、thoughtは読まない。
 
 外部モデルによる写真の記述生成でHTTPエラーが起きた場合も、描画と同じ秘匿処理済みの拒否理由を、共通の記述生成境界からLogcatの`InkuProvider`へ`vision`の操作名で残す。
 
@@ -348,7 +358,7 @@ Androidの固定色カタログ13件はServerと同じID、色map、paletteを�
 
 Gemini provider の生成要求は Gemini API の `models/{model}:generateContent` に送る。API key は `x-goog-api-key` で渡し（モデル一覧の取得も同じヘッダーで渡し、最後のページまで読む）、共有pipelineの構造化応答は native function declaration と `functionCall.args` を使う。モデル一覧の取得だけが成功しても、生成要求の到達確認とは扱わない。
 
-共有pipelineのprovider要求はServerの`pipeline_provider.py`と同じ条件で送る。Geminiではtemperatureを送らず、思考は上の「Geminiのモデル別思考レベル」に従い、`allowedFunctionNames`で応答関数を1つに固定し、core のresponse schemaをServerと同じGemini対応subsetへ変換する（`const`は1要素の`enum`へ、hole補完の`oneOf`は平坦化する。厳密な検証は共有Rustが行う）。OpenAI互換providerではStage 1（`generate_normalized_ddl`）と構図の読み（`read_composition`）をtemperature 0.3、他の要求を0.0とする。Stage 1と写生・カタログ選択の出力上限は2048、hole補完は2048とする。
+共有pipelineのprovider要求はServerの`pipeline_provider.py`と同じ条件で送る。Geminiではtemperatureを送らず、思考は上の「Geminiのモデル別思考レベル」に従い、`allowedFunctionNames`で応答関数を1つに固定し、core のresponse schemaをServerと同じGemini対応subsetへ変換する（`const`は1要素の`enum`へ、hole補完の`oneOf`は平坦化する。厳密な検証は共有Rustが行う）。OpenAI互換providerではStage 1（`generate_normalized_ddl`）と構図の読み（`read_composition`）をtemperature 0.3、他の要求を0.0とする。Stage 1と写生・カタログ選択の本文予算は2048、hole補完は2048とする。Geminiの思考を送る要求は上の規則で8192を足す。
 
 Room DBのhistory用cursor windowは160 MiBとする（生成SVG32＋Score/snapshot32＋metadata/protocol64＋他field余裕32 MiB）。この枠を超える旧行を無制限に読む保証ではない。実行状態のBLOBはcursorへ全量を載せず、固定digestを指定した1 MiBのchunkで読み、全量のSHA-256を検証する。最新実行・実行metadata queryもBLOBを含めない。新しいhost stateはrenderedをJSON objectで保持して二重escapeを避け、旧文字列形式も読み戻せる。
 

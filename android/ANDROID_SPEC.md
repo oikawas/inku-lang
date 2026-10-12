@@ -4,7 +4,7 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-10-12.
+Last updated: 2026-10-13.
 
 ## Generated-SVG ceiling (I-375)
 
@@ -49,21 +49,31 @@ When updating Android specifications:
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
 
-## 2026-10-12 Gemini thinking levels by model
+## 2026-10-13 Gemini thinking levels by model
 
-Gemini drawing, photo analysis, and writing a description from an observation use the same lowest-level
-mapping as Server's `gemini_thinking()`. Remove the connection name, accept `models/`, and keep the same
-version and preview name boundaries as Server.
+Gemini drawing, photo analysis, writing a description from an observation, and demo instructions use
+Server ca0fb583's `gemini_thinking()` mapping, updating the 2026-10-12 table.
+Remove the connection name and `models/` before matching.
 
 | Model | thinkingConfig |
 | --- | --- |
-| gemini-3.8-flash, all gemini-\<version\>-pro, gemini-2.5-flash | thinkingLevel: low |
-| gemini-2.5-flash-lite (including preview aliases) | Omitted; thinking is off by default |
-| Others (gemini-3.5-flash-lite, gemini-3.6-flash, gemini-3-flash-preview, Gemma 4, etc.) | thinkingLevel: minimal |
+| gemini-2.5-flash-lite/image (followed by a hyphen or end), names starting with antigravity- | Omitted |
+| The 13 exact names below and names starting with gemma- | thinkingLevel: minimal |
+| Others (including Flash/Pro latest aliases, 3.7 Flash, and unknown names) | thinkingLevel: low |
 
-Match 2.5-flash-lite before 2.5-flash. Image and description temperatures, drawing's default sampling,
-output limits, and function responses stay as before.
-Source: Google's [thinking-levels table](https://ai.google.dev/gemini-api/docs/thinking), checked 2026-10-12.
+The exact minimal names are gemini-3.6-flash, gemini-3.5-flash, gemini-3.5-flash-lite,
+gemini-flash-lite-latest, gemini-3-flash-preview, gemini-3.1-flash-lite,
+gemini-3.1-flash-lite-preview, gemini-3.1-flash-image, gemini-3.1-flash-image-preview,
+gemini-3.1-flash-lite-image, gemini-robotics-er-2-preview, nano-banana-pro-preview, and gemini-nano-banana-2.1.
+
+When a thinking level is sent, add 8192 to the answer budget for maxOutputTokens; otherwise add nothing.
+All Gemini requests omit temperature and use default sampling.
+A drawing response marked MAX_TOKENS is not an answer even if its function arguments look complete:
+return a malformed_payload failure with detail output_limit_reached to the shared core.
+Camera description writing still refuses truncated output. Demo instructions read only text without thought parts.
+Claude demos also omit temperature and add 8192 to max_tokens when Server's Claude 5/Mythos Preview rule matches.
+Sources: Google's [thinking guide](https://ai.google.dev/gemini-api/docs/thinking),
+[Gemini 3 guide](https://ai.google.dev/gemini-api/docs/gemini-3), and Server's request rules based on measured refusals.
 
 ## 2026-10-12 Completion approval and stop reasons while a work is displayed
 
@@ -281,7 +291,7 @@ Drawing follows the provider-kind request and response rules in Server's `pipeli
 
 - Anthropic: omit `temperature` for every model and use its default, including photo descriptions and demo descriptions. This fixes Sonnet 5.5 rejecting photo-description `temperature: 0.2` with HTTP 400. Offer the answer tool with `auto`; if called, read the `input` of exactly one requested tool. Read the JSON object when the answer is text. Join free-text blocks with newlines and ignore thinking.
 - OpenAI-compatible: explicitly set `stream: false`. OpenAI's own API retains the output-limit, sampling, and reasoning fields equivalent to `openai_sampling()`. If the answer tool is called, read the arguments of exactly one requested tool; without a call, read the message text.
-- Gemini: image thinking follows "Gemini thinking levels by model" above regardless of connection name, and the JPEG `inlineData` follows the description. Image free text uses temperature 0.2; drawing omits temperature. A drawing response must contain exactly one requested function with an `args` object. Join free-text blocks with newlines and ignore thought parts.
+- Gemini: image thinking follows "Gemini thinking levels by model" above regardless of connection name, and the JPEG `inlineData` follows the description. All Gemini image, description, demo, and drawing requests omit temperature. A drawing response must contain exactly one requested function with an `args` object. Join free-text blocks with newlines and ignore thought parts.
 
 Photo-description HTTP errors from remote models log the same redacted refusal used for drawing, from the common description boundary under Logcat tag `InkuProvider` with action `vision`.
 
@@ -375,7 +385,7 @@ This sketch pipeline's rendered output is produced by the packaged `core/crates/
 
 Gemini provider generation requests use the Gemini API `models/{model}:generateContent` endpoint. The API key is sent as `x-goog-api-key` (the model-list fetch sends it the same way and reads every page), and structured responses for the shared pipeline use native function declarations and `functionCall.args`. A successful model-list fetch does not establish that generation requests work.
 
-Shared-pipeline provider requests use the same conditions as Server's `pipeline_provider.py`. For Gemini, no temperature is sent, thinking follows "Gemini thinking levels by model" above, `allowedFunctionNames` restricts the response to one function, and the core response schema is projected into the same Gemini-supported subset as on Server (`const` becomes a one-element `enum`; hole-completion `oneOf` variants are flattened; shared Rust performs the exact validation). OpenAI-compatible providers use temperature 0.3 for Stage 1 (`generate_normalized_ddl`) and the composition reading (`read_composition`), and 0.0 for other requests. The output limit is 2048 for Stage 1, sketch, and catalog selection, and 2048 for hole completion.
+Shared-pipeline provider requests use the same conditions as Server's `pipeline_provider.py`. For Gemini, no temperature is sent, thinking follows "Gemini thinking levels by model" above, `allowedFunctionNames` restricts the response to one function, and the core response schema is projected into the same Gemini-supported subset as on Server (`const` becomes a one-element `enum`; hole-completion `oneOf` variants are flattened; shared Rust performs the exact validation). OpenAI-compatible providers use temperature 0.3 for Stage 1 (`generate_normalized_ddl`) and the composition reading (`read_composition`), and 0.0 for other requests. The answer budget is 2048 for Stage 1, sketch, and catalog selection, and 2048 for hole completion. Gemini requests with a thinking level add 8192 as specified above.
 
 The Room history cursor window is 160 MiB (32 MiB generated SVG + 32 MiB Score/snapshot + 64 MiB metadata/protocol + 32 MiB other-field headroom). Legacy rows above these bounds are not guaranteed unlimited reads. Execution BLOBs are read in 1 MiB chunks bound to one digest, then validated with SHA-256, without putting the complete BLOB into a cursor window. Latest-execution and execution-metadata queries omit the BLOB too. New host state keeps rendered data as a JSON object to avoid double escaping, while still reading legacy string encoding.
 

@@ -3,6 +3,7 @@ package app.inku.mobile.pipeline
 import android.util.Log
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.MalformedProviderResponseException
+import app.inku.mobile.llm.ProviderOutputLimitException
 import app.inku.mobile.llm.ModelProviderHttpException
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ModelTool
@@ -86,7 +87,11 @@ class SingleAttemptModelEffectProvider(
 
     private fun failed(identity: JSONObject, failure: String, cause: Throwable, elapsedMs: Long): String {
         val detail = (cause as? InkuFailure)?.detail
-            ?: if (cause is ProviderRateLimitWaitException) "rate_limit_wait" else null
+            ?: when (cause) {
+                is ProviderRateLimitWaitException -> "rate_limit_wait"
+                is ProviderOutputLimitException -> "output_limit_reached"
+                else -> null
+            }
         // An observer is told, never trusted: the core still gets its result.
         runCatching { onFailure(identity.optString("action_id"), failure, detail, cause) }
         return providerFailure(identity, failure, elapsedMs).toString()
@@ -113,6 +118,7 @@ class SingleAttemptModelEffectProvider(
     private fun failureCode(error: Throwable): String = when (error) {
         is InkuFailure -> "provider_rejected"
         is MalformedProviderResponseException -> "malformed_payload"
+        is ProviderOutputLimitException -> "malformed_payload"
         is ProviderRateLimitWaitException -> "rate_limited"
         is app.inku.mobile.llm.ChatGptException -> error.failure
         is ModelProviderHttpException -> when {

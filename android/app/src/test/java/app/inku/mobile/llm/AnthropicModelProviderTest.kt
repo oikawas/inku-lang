@@ -15,6 +15,23 @@ import org.junit.Test
 
 class AnthropicModelProviderTest {
     @Test
+    fun demoClaudeFiveAndMythosHaveThinkingRoomWithoutTemperature() = runBlocking {
+        for ((model, room) in listOf("claude-sonnet-5" to 8192, "claude-opus-5-5" to 8192,
+            "claude-mythos-preview" to 8192, "claude-fable-5-preview" to 8192, "claude-sonnet-4-6" to 0)) {
+            lateinit var connection: AnthropicConnection
+            val provider = AnthropicModelProvider("custom-claude", "https://provider.invalid", "test-only") { url ->
+                AnthropicConnection(url, """{"content":[{"type":"thinking","thinking":"internal"},
+                    {"type":"text","text":"a pond at dusk"}]}""").also { connection = it }
+            }
+            assertEquals("a pond at dusk", DemoInstructionWriter(provider).write("pond", "custom-claude:$model"))
+            val payload = JSONObject(connection.body.toString(Charsets.UTF_8.name()))
+            assertEquals(256 + room, payload.getInt("max_tokens"))
+            assertFalse(payload.has("temperature"))
+            assertFalse(payload.has("tools"))
+        }
+    }
+
+    @Test
     fun aPartialTextAnswerCarriesItsOutputLimitToTheWriter() = runBlocking {
         val provider = AnthropicModelProvider("anthropic", "https://api.anthropic.com", "test-key") { url ->
             AnthropicConnection(url, answer = """{"stop_reason":"max_tokens","content":[{"type":"text","text":"クリーム色のひろがりに、赤い"}]}""")

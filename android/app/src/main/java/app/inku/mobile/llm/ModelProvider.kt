@@ -29,10 +29,10 @@ data class ModelRequest(
     val pipelineAction: String? = null,
     /** One normalized JPEG sent with [prompt]; only camera analysis sets it. */
     val imageJpeg: ByteArray? = null,
-    /** Gemini non-pipeline level: minimal selects the model's minimum; null keeps its default. */
-    val thinkingLevel: String? = null,
     /** Non-secret registration pinned when this shared-pipeline run began. */
     val chatGptSession: ChatGptSessionRef? = null,
+    /** The demo's free-text instruction, whose Claude budget follows Server's demo route. */
+    val demoInstruction: Boolean = false,
 )
 
 class ModelProviderHttpException(
@@ -53,6 +53,9 @@ class ModelProviderHttpException(
  * check, whose KeyError/IndexError/TypeError it classifies `malformed_payload`.
  */
 class MalformedProviderResponseException(message: String) : IllegalStateException(message)
+
+/** A cut-off tool input cannot become a complete pipeline answer. */
+class ProviderOutputLimitException : IllegalStateException("Provider output reached its token limit.")
 
 /**
  * The builtin services that need a key, as the server's builtin definitions

@@ -44,6 +44,7 @@ import app.inku.mobile.llm.LocalModelDownloader
 import app.inku.mobile.llm.ModelDownloadSpec
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
+import app.inku.mobile.llm.DemoInstructionWriter
 import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionAnalysisResult
 import app.inku.mobile.llm.deleteWithdrawnModelFiles
@@ -859,25 +860,8 @@ class InkuRepository(
         )
     }
 
-    suspend fun generateDemoPrompt(seedPhrase: String, modelId: String): String {
-        val seed = seedPhrase.trim().ifBlank { "96文字以内の短い描画指示文を1つ作って。" }
-        val response = activeModelProvider.generate(
-            ModelRequest(
-                modelId = modelId,
-                prompt = seed,
-                temperature = 0.85,
-                maxTokens = 256,
-                systemInstruction = "あなたはinkuのデモ用短文を作る。回答は日本語の短文1つだけ。前置き、箇条書き、番号、引用符、説明、Markdownを出さない。",
-            ),
-        )
-        return response.text
-            .trim()
-            .trim('"', '“', '”', '\'', '「', '」')
-            .lineSequence()
-            .map { it.trim().removePrefix("-").trim() }
-            .firstOrNull { it.isNotBlank() }
-            ?: inkuError { it.demoPromptGenerationEmpty }
-    }
+    suspend fun generateDemoPrompt(seedPhrase: String, modelId: String): String =
+        DemoInstructionWriter(activeModelProvider).write(seedPhrase, modelId)
 
     suspend fun renderFromScore(description: String, scoreJson: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), sourceText: String? = null, parentHistoryId: String? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()

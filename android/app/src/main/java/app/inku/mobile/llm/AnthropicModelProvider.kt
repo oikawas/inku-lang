@@ -59,7 +59,8 @@ class AnthropicModelProvider(
         val model = request.modelId.removePrefix("$providerId:")
         val payload = JSONObject()
             .put("model", model)
-            .put("max_tokens", request.maxTokens)
+            .put("max_tokens", request.maxTokens.toLong() +
+                if (request.demoInstruction && DEMO_THINKS_BY_DEFAULT.containsMatchIn(model)) THINKING_ROOM_TOKENS else 0)
             .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", userContent(request))))
         // Both server transports (pipeline_provider.py and vision_client.py)
         // omit temperature for this kind. Sonnet 5.5 refuses it on photo
@@ -87,6 +88,8 @@ class AnthropicModelProvider(
 
     internal companion object {
         const val ANTHROPIC_VERSION = "2023-06-01"
+        private val DEMO_THINKS_BY_DEFAULT =
+            Regex("^claude-(?:(?:opus|sonnet|haiku|fable|mythos)-5(?:-|$)|mythos-preview(?:-|$))")
 
         /** Plain text, or one base64 JPEG ahead of the instruction, as the server sends Anthropic. */
         internal fun userContent(request: ModelRequest): Any {

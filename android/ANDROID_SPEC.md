@@ -49,6 +49,16 @@ When updating Android specifications:
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
 
+## 2026-10-13 ChatGPT plan stream errors
+
+Read the error code from the HTTP body's `error`, `response.failed`'s `response.error`,
+then the event itself when `type="error"`, in that order. Treat a non-object body or response
+as empty; do not adopt top-level codes from other events.
+A streamed `subscription_sharing_usage_limit_exceeded` also puts the connection in quota state,
+stops new plan requests, and shows the existing usage guidance.
+Treat `subscription_sharing_usage_unavailable` and `subscription_sharing_user_unavailable`
+as temporary transport failures, retaining the connection and credentials for a retry.
+
 ## 2026-10-13 Gemini thinking levels by model
 
 Gemini drawing, photo analysis, writing a description from an observation, and demo instructions use

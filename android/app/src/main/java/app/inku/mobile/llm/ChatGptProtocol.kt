@@ -147,8 +147,11 @@ private val PUBLIC_CHATGPT_CODES = setOf(
     "chatpass_v2_invalid_authorization_context", "subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable",
 )
 
-internal fun chatGptResponseError(value: JSONObject, status: Int? = null): ChatGptException {
-    val error = value.optJSONObject("error") ?: value.optJSONObject("response")?.optJSONObject("error")
+internal fun chatGptResponseError(value: Any?, status: Int? = null): ChatGptException {
+    val body = value as? JSONObject
+    // HTTP errors and response.failed are nested; a stream error carries its own code.
+    val error = body?.optJSONObject("error") ?: body?.optJSONObject("response")?.optJSONObject("error")
+        ?: body?.takeIf { it.optString("type") == "error" }
     val code = error?.optString("code")
     val public = if (code in PUBLIC_CHATGPT_CODES) code!! else when {
         status == 401 || status == 403 -> "chatgpt_admission_rejected"

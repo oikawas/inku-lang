@@ -34,6 +34,16 @@ Androidはpremultiplied RGBAをNDK Bitmapへ直接転送する。Kotlin Engine 3
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
 
+## 2026-10-13 ChatGPTプランのストリームエラー
+
+エラーのcodeはHTTP本文の `error`、`response.failed` の `response.error`、
+`type="error"` のイベント自身の順に読む。objectではない本文・responseは空として扱い、
+ほかのイベントの最上位codeはエラーとして採用しない。
+ストリームの `subscription_sharing_usage_limit_exceeded` も利用上限として接続をquotaにし、
+プランでの新しい要求を止め、既存の利用状況への案内を出す。
+`subscription_sharing_usage_unavailable` と `subscription_sharing_user_unavailable` は
+一時的な通信不能として扱い、接続と資格情報を保って再試行できる。
+
 ## 2026-10-13 Geminiのモデル別思考レベル
 
 Geminiの描画・写真分析・写真からの記述生成・デモは、Server ca0fb583の `gemini_thinking()` と

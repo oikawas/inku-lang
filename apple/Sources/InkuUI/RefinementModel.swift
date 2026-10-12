@@ -175,15 +175,17 @@ public final class RefinementModel {
                     guard plans.count == count else { throw HostError("invalid_adjustment_plan_count") }
                     self.capturedStage1Model = plans.first?.stage1Model
                     self.capturedStage2Model = plans.first?.stage2Model
-                    for (index, plan) in plans.enumerated() {
+                    // Web generateRefinementCandidates: the options are drawn at once, within the fan-out limit.
+                    try await RefinementFanout.run(count: plans.count, onStart: { index in self.slots[index].state = .running }) { index in
                         try Task.checkCancellation()
                         guard self.runID == run, !self.closed, !self.stopping else { throw CancellationError() }
-                        self.slots[index].state = .running
                         do {
-                            let candidate = try await app.prepareDrawingAdjustmentCandidate(plan: plan, token: token)
+                            let candidate = try await app.prepareDrawingAdjustmentCandidate(plan: plans[index], token: token)
                             try Task.checkCancellation()
                             guard self.runID == run, !self.closed, !self.stopping else { throw CancellationError() }
+                            // Options keep their requested order whichever lands first.
                             self.candidates.append(RefinementCandidate(prepared: candidate, kind: selectedKind, number: index + 1))
+                            self.candidates.sort { $0.number < $1.number }
                             self.slots[index].state = .ready
                         } catch {
                             try Task.checkCancellation()

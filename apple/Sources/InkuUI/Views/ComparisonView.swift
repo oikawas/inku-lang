@@ -13,11 +13,10 @@ public struct ComparisonView: View {
         _comparison = State(initialValue: ComparisonModel(work: work, kind: kind))
     }
 
-    /// Candidates are prepared one after another: landed ones (made or failed) are done, the next one runs.
+    /// One lane per requested candidate, in the state the fan-out reports for it.
     private var lanes: some View {
-        let landed = comparison.candidates.count + comparison.failures.count
-        return VariationLanesView(display: model.display, states: comparison.laneLabels.indices.map { index in
-            index < landed ? .done : index == landed ? .running : .waiting
+        VariationLanesView(display: model.display, states: comparison.laneStates.map { state in
+            switch state { case .waiting: .waiting; case .running: .running; case .done: .done }
         }, labels: comparison.laneLabels, named: comparison.kind == .model)
     }
 

@@ -14,7 +14,9 @@ func runRefinementChecks() async throws {
     let provider = RefinementProvider()
     let app = AppModel(databaseURL: databaseURL, transport: provider)
     await app.initialize()
-    let service = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false)
+    // Drawing takes only registered models.
+    let service = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
+                                   models: ["original", "layout", "reading", "ignored-stage2"].map { ProviderModelSettings(id: $0) })
     let settings = HostSettings(providers: [service], models: ModelSelection(stage1Model: "check:original", stage2Model: "check:original"))
     try await app.updateHostSettings(settings)
     app.inputMode = "description"; app.descriptionText = "a red circle"; app.seedText = "0"; app.wild = true
@@ -76,22 +78,18 @@ func runRefinementChecks() async throws {
         throw CheckFailure.message("Touch admitted empty core-trimmed words")
     } catch CoreFailure.emptySeedText { }
 
-    // Failure: variation claimed a Stage 2 operation and mutated a Score although current Stage 1.5 is a no-op.
-    let variationSucceeded = await app.performComparison(status: "variation check") { token in
-        let plans = try await app.makeDrawingAdjustmentPlans(work: parent, kind: "variation", count: 4, amplitude: "large",
-            modelReference: "unknown:unused")
-        guard plans.count == 4, plans.allSatisfy({ $0.stage1Model == parent.stage1Model && $0.stage2Model == parent.stage2Model }) else {
-            throw CheckFailure.message("Variation changed actual parent model facts")
-        }
-        let candidate = try await app.prepareDrawingAdjustmentCandidate(plan: plans[0], token: token)
-        guard candidate.work.score == parent.score, candidate.work.svg == parent.svg, candidate.work.ddl == parent.ddl,
-              candidate.work.renderColorMap == parent.renderColorMap, candidate.work.renderSeed == parent.renderSeed,
-              candidate.work.compositionSeed == parent.compositionSeed, candidate.work.variationAmplitude == "large",
-              candidate.work.variationSeed.flatMap(UInt64.init).map({ (1...((UInt64(1) << 31) - 1)).contains($0) }) == true,
-              await provider.calls == initialCalls, try await database.list().count == initialRows + 1,
-              app.selectedWork == touched else { throw CheckFailure.message("Current variation was not an unsaved, exact, provider-free replay") }
+    // Failure: the retired variation (8ca63a39, Server 1162; not an offered refinement kind) still drew a candidate.
+    let variationChecked = await app.performComparison(status: "variation check") { token in
+        do {
+            let plans = try await app.makeDrawingAdjustmentPlans(work: parent, kind: "variation", count: 4, amplitude: "large",
+                modelReference: "unknown:unused")
+            _ = try await app.prepareDrawingAdjustmentCandidate(plan: plans[0], token: token)
+            throw CheckFailure.message("Retired variation drew a candidate")
+        } catch let error as HostError where error.code == "variation_retired" {}
+        guard await provider.calls == initialCalls, try await database.list().count == initialRows + 1,
+              app.selectedWork == touched else { throw CheckFailure.message("Retired variation called a provider, saved or moved the display") }
     }
-    guard variationSucceeded else { throw CheckFailure.message("Variation failed: \(app.errorText ?? app.status)") }
+    guard variationChecked else { throw CheckFailure.message("Variation check failed: \(app.errorText ?? app.status)") }
 
     // Failure: there was no frozen four-layout round, and retained drawing borrowed next-work colors or model facts.
     var layouts: [PreparedCandidate] = []
@@ -119,7 +117,8 @@ func runRefinementChecks() async throws {
     guard layoutSucceeded else { throw CheckFailure.message("Layout failed: \(app.errorText ?? app.status)") }
 
     // Failure: a Stage 2 picker was incorrectly used for reading; promotion/reopening then left a preview writer attached.
-    app.selectNextDrawingModel("check:reading")
+    // Reading takes the saved Stage 1 (AppModel.makeDrawingAdjustmentPlans); the next-work picker alone is a draft.
+    try await app.selectSharedDrawingModel("check:reading")
     var reread: SavedWork?
     let readingSucceeded = await app.performComparison(status: "reading check") { token in
         let plans = try await app.makeDrawingAdjustmentPlans(work: parent, kind: "reinterpretation", count: 1, modelReference: "check:ignored-stage2")
@@ -157,7 +156,10 @@ func runRefinementChecks() async throws {
         let candidate = try await app.prepareDrawingAdjustmentCandidate(plan: plans[0], token: token)
         guard candidate.authority == "ddl_authoritative", candidate.work.ddl == held.ddl,
               await provider.calls == callsBeforeLocked else { throw CheckFailure.message("Held layout reread or discarded the committed DDL") }
-        _ = try await app.makeDrawingAdjustmentPlans(work: held, kind: "variation", count: 1)
+        do {
+            _ = try await app.makeDrawingAdjustmentPlans(work: held, kind: "variation", count: 1)
+            throw CheckFailure.message("Held work planned the retired variation")
+        } catch let error as HostError where error.code == "variation_retired" { }
         _ = try await app.makeDrawingAdjustmentPlans(work: held, kind: "touch_change", count: 1, words: words)
     }
     guard heldSucceeded else { throw CheckFailure.message("Held non-reading adjustment failed: \(app.errorText ?? app.status)") }
@@ -181,6 +183,20 @@ func runRefinementChecks() async throws {
           sketchMetadata["from_sketch_state"].string == parent.sketchState, sketchMetadata["to_sketch_mode"].string == "off" else {
         throw CheckFailure.message("Saved sketch edge lost exact Server operation metadata")
     }
+
+    // Failure: refinement drew its options one after another; Web draws them at once within the fan-out limit.
+    let fanout = RefinementModel(work: parent)
+    await fanout.initialize(app: app)
+    fanout.kind = .reading
+    let fanoutRows = try await database.list().count
+    await provider.measureConcurrency()
+    await fanout.generate(app: app, count: 4)
+    let fanoutPeak = await provider.finishMeasuring()
+    guard fanout.candidates.count == 4, fanout.candidates.map(\.number) == [1, 2, 3, 4], fanoutPeak == 4,
+          fanout.slots.allSatisfy({ $0.state == .ready }), try await database.list().count == fanoutRows else {
+        throw CheckFailure.message("Refinement options were not drawn at once: \(fanout.candidates.count) options, peak \(fanoutPeak) in flight, \(fanout.errorText ?? fanout.status)")
+    }
+    fanout.discardCandidates()
 
     // Failure: stopping an adjustment admitted a late response or released the busy gate before it drained.
     let beforeCancel = try await database.list().count
@@ -209,7 +225,7 @@ func runRefinementChecks() async throws {
           try await app.savedConfiguration(workID: parent.id).configuration == context.configuration else {
         throw CheckFailure.message("Late adjustment saved/adopted a child or mutated its parent")
     }
-    print(String(format: "Refinement passed in %.3fs: exact word-touch/provider0/zero placement; four frozen layout previews; no-op variation; Stage1 reading; explicit idempotent adoption/reopened DDL fork; held-source guard; Server edit metadata; cancellation drain. Mock transport + isolated SQLite + real Rust only.", Date().timeIntervalSince(began)))
+    print(String(format: "Refinement passed in %.3fs: exact word-touch/provider0/zero placement; four frozen layout previews; retired variation refused; Stage1 reading; explicit idempotent adoption/reopened DDL fork; held-source guard; Server edit metadata; cancellation drain; four reading options at once (peak \(fanoutPeak) in flight). Mock transport + isolated SQLite + real Rust only.", Date().timeIntervalSince(began)))
 }
 
 private actor RefinementSignal {
@@ -237,7 +253,13 @@ private actor RefinementProvider: ProviderTransport {
     private var blockNext = false
     private var action: ExactJSON?
     private var continuation: CheckedContinuation<Data, Never>?
+    private var measuring = false
+    private var inFlight = 0
+    private var peak = 0
     func blockNextCall() { blockNext = true }
+    /// Holds each call briefly and records how many overlap.
+    func measureConcurrency() { measuring = true; inFlight = 0; peak = 0 }
+    func finishMeasuring() -> Int { measuring = false; return peak }
     func perform(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
         calls += 1
@@ -250,6 +272,11 @@ private actor RefinementProvider: ProviderTransport {
                     Task { await started.fire() }
                 }
             } onCancel: { Task { await self.cancelled.fire() } }
+        }
+        if measuring {
+            inFlight += 1; peak = max(peak, inFlight)
+            defer { inFlight -= 1 }
+            try await Task.sleep(for: .milliseconds(300))
         }
         return response(input)
     }

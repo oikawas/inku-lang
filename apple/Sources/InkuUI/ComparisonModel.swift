@@ -7,9 +7,14 @@ public enum ComparisonKind: String, CaseIterable, Sendable {
     case catalog, model
 }
 
+/// A candidate lane of the running preparation (Web `VariationSlotState`).
+public enum ComparisonLaneState: Equatable, Sendable { case waiting, running, done }
+
 public struct ComparisonCandidate: Identifiable, Sendable {
     public let prepared: PreparedCandidate
     public let label: String
+    /// The position it was requested in; candidates land in any order but are listed in this one.
+    public var order = 0
     public var selected = false
     public var savedWork: SavedWork?
     public var id: String { prepared.id }
@@ -32,6 +37,7 @@ public final class ComparisonModel {
     public private(set) var failures: [String] = []
     /// The candidates of the running preparation in request order, one lane each (Web `gridSlotLabels`).
     public private(set) var laneLabels: [String] = []
+    public private(set) var laneStates: [ComparisonLaneState] = []
     public private(set) var running = false
     public private(set) var saving = false
     public private(set) var stopping = false
@@ -39,6 +45,7 @@ public final class ComparisonModel {
     public var errorText: String?
     @ObservationIgnored private var initialized = false
     @ObservationIgnored private var runID: UUID?
+    @ObservationIgnored private var failureOrder: [Int: String] = [:]
     @ObservationIgnored private var completionWaiters: [CheckedContinuation<Void, Never>] = []
     private let requestedWork: SavedWork?
 
@@ -140,8 +147,9 @@ public final class ComparisonModel {
         let run = UUID()
         runID = run
         running = true; saving = false; stopping = false
-        errorText = nil; failures = []; failedModelReferences = []; candidates = []
+        errorText = nil; failures = []; failureOrder = [:]; failedModelReferences = []; candidates = []
         laneLabels = labels.map(\.1)
+        laneStates = labels.map { _ in .waiting }
         let succeeded = await app.performComparison(status: "比較候補を生成中") { token in
             var requests: [GenerationRequest] = []
             if comparisonKind == .model {
@@ -150,26 +158,34 @@ public final class ComparisonModel {
                 }
                 requests = try await app.pinPersonalPlanRequests(requests)
             }
-            for (index, entry) in labels.enumerated() {
+            // Web generateModelCandidates / color catalog plans: the candidates are drawn at once, within the fan-out limit.
+            let pinned = requests
+            try await RefinementFanout.run(count: labels.count, onStart: { index in
+                self.laneStates[index] = .running
+                self.status = "候補 \(index + 1)/\(labels.count): \(labels[index].1)"
+            }) { index in
+                let entry = labels[index]
                 try Task.checkCancellation()
                 guard self.runID == run, !self.stopping else { throw CancellationError() }
-                self.status = "候補 \(index + 1)/\(labels.count): \(entry.1)"
                 do {
                     let candidate: PreparedCandidate
                     if comparisonKind == .catalog {
                         candidate = try await app.previewCatalogCandidate(work: work, catalogID: entry.0, token: token)
                     } else {
-                        candidate = try await app.generateCandidate(request: requests[index], token: token)
+                        candidate = try await app.generateCandidate(request: pinned[index], token: token)
                     }
                     try Task.checkCancellation()
                     guard self.runID == run, !self.stopping else { throw CancellationError() }
-                    self.candidates.append(ComparisonCandidate(prepared: candidate, label: entry.1))
+                    self.candidates.append(ComparisonCandidate(prepared: candidate, label: entry.1, order: index))
+                    self.candidates.sort { $0.order < $1.order }
                 } catch {
                     try Task.checkCancellation()
                     guard self.runID == run, !self.stopping else { throw CancellationError() }
-                    self.failures.append("\(entry.1): \(error.localizedDescription)")
+                    self.failureOrder[index] = "\(entry.1): \(error.localizedDescription)"
+                    self.failures = self.failureOrder.sorted { $0.key < $1.key }.map(\.value)
                     if comparisonKind == .model { self.failedModelReferences.insert(entry.0) }
                 }
+                self.laneStates[index] = .done
             }
         }
         if runID == run {
@@ -218,7 +234,7 @@ public final class ComparisonModel {
     }
 
     private func finish() {
-        running = false; saving = false; stopping = false; laneLabels = []
+        running = false; saving = false; stopping = false; laneLabels = []; laneStates = []
         let waiters = completionWaiters; completionWaiters = []
         waiters.forEach { $0.resume() }
     }

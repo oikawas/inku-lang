@@ -24,6 +24,8 @@ func runComparisonChecks() async throws {
     await comparison.initialize(app: model)
     let catalogs = Array(model.catalogs.filter { $0.id != original.catalogID }.prefix(2))
     guard catalogs.count == 2 else { throw CheckFailure.message("Comparison needs two bundled catalogs") }
+    // The comparison opens with every other catalog chosen; this check compares two.
+    comparison.selectedCatalogIDs = []
     catalogs.forEach { comparison.selectCatalog($0.id, selected: true) }
     await comparison.generate(app: model)
     guard comparison.candidates.count == 2, comparison.failures.isEmpty,
@@ -34,8 +36,9 @@ func runComparisonChecks() async throws {
     let chosen = comparison.candidates[0]
     comparison.selectCandidate(chosen.id, selected: true)
     await comparison.saveSelected(app: model)
-    guard comparison.candidates[0].savedWork?.id == chosen.work.id,
-          comparison.candidates[1].savedWork == nil, try await database.list().count == 2,
+    // Saving every chosen option discards the rest, as Web's "adopt and close" does.
+    guard comparison.candidates.count == 1, comparison.candidates[0].savedWork?.id == chosen.work.id,
+          try await database.list().count == 2,
           try await database.work(id: original.id) == original,
           let nodeID = comparison.candidates[0].savedWork?.lineageNodeID,
           try await database.edge(childNodeID: nodeID)?.derivationKind == "catalog_change" else {
@@ -49,22 +52,41 @@ func runComparisonChecks() async throws {
     model.newWork()
     model.inputMode = "description"
     model.descriptionText = "a red circle"
-    let provider = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false)
+    // Drawing and comparison take only registered models.
+    let provider = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
+                                    models: ["model", "m1", "m2", "m3", "m4"].map { ProviderModelSettings(id: $0) })
     try await model.updateHostSettings(HostSettings(providers: [provider], models: ModelSelection(stage1Model: "check:model", stage2Model: "check:model")))
     await model.generate()
     guard model.errorText == nil, let described = model.selectedWork, !model.sourceLocked else { throw CheckFailure.message("Description source failed") }
+    // Failure: the retired variation (8ca63a39, Server 1162) still drew a work from the selected one.
+    let beforeVariation = try await database.list().count
     model.variationSeedText = "17"
     await model.varySelectedWork()
-    guard model.errorText == nil, let variation = model.selectedWork,
-          variation.id != described.id, variation.ddl == described.ddl, variation.variationSeed == "17", !model.sourceLocked else {
-        throw CheckFailure.message("Retained source variation acquired DDL authority: \(model.errorText ?? model.status)")
+    guard model.selectedWork == described, try await database.list().count == beforeVariation, !model.sourceLocked else {
+        throw CheckFailure.message("Retired variation drew a work: \(model.errorText ?? model.status)")
+    }
+    model.errorText = nil
+    let variation = described
+
+    // Failure: model comparison drew its candidates one after another; Web draws them at once within the fan-out limit.
+    let fanout = ComparisonModel()
+    await fanout.initialize(app: model)
+    fanout.kind = .model
+    ["check:m1", "check:m2", "check:m3", "check:m4"].forEach { fanout.selectModel($0, selected: true) }
+    let fanoutRows = try await database.list().count
+    await transport.measureConcurrency()
+    await fanout.generate(app: model)
+    let fanoutPeak = await transport.finishMeasuring()
+    guard fanout.candidates.count == 4, fanout.failures.isEmpty, fanoutPeak == 4,
+          fanout.candidates.map(\.order) == [0, 1, 2, 3], try await database.list().count == fanoutRows else {
+        throw CheckFailure.message("Model comparison was not drawn at once: \(fanout.candidates.count) candidates, peak \(fanoutPeak) in flight, \(fanout.errorText ?? fanout.failures.joined(separator: "; "))")
     }
 
     // Failure: stopping an in-flight model comparison admitted late candidates or cleared busy before its request drained.
     let stoppedComparison = ComparisonModel()
     await stoppedComparison.initialize(app: model)
     stoppedComparison.kind = .model
-    stoppedComparison.modelReferencesText = "check:model"
+    stoppedComparison.selectModel("check:m1", selected: true)
     await transport.blockNextCall()
     let rowCount = try await database.list().count
     let pending = Task { @MainActor in await stoppedComparison.generate(app: model) }
@@ -85,13 +107,20 @@ func runComparisonChecks() async throws {
           try await database.list().count == rowCount + 1 else {
         throw CheckFailure.message("Editing a retained variation failed to create a source-authoritative child: \(model.errorText ?? model.status)")
     }
-    print("Comparison passed: two previews add no history; one explicit selection creates one immutable-parent child; save retry is idempotent; unchanged-source variation retains authority and remains editable; blocked model cancellation drains with no late candidate. No external provider calls.")
+    print("Comparison passed: two previews add no history; four model candidates drawn at once (peak \(fanoutPeak) in flight); one explicit selection creates one immutable-parent child; save retry is idempotent; retired variation draws nothing and the description source stays editable; blocked model cancellation drains with no late candidate. No external provider calls.")
 }
 
 private actor ComparisonProvider: ProviderTransport {
     private var blockNext = false
     private var blocked = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var measuring = false
+    private var inFlight = 0
+    private var peak = 0
+
+    /// Holds each call briefly and records how many overlap.
+    func measureConcurrency() { measuring = true; inFlight = 0; peak = 0 }
+    func finishMeasuring() -> Int { measuring = false; return peak }
 
     func blockNextCall() { blockNext = true; blocked = false }
     func waitForBlockedCall() async {
@@ -106,6 +135,11 @@ private actor ComparisonProvider: ProviderTransport {
             throw HostError("comparison_mock_stop_not_received")
         }
         let input = try ExactJSON(data: action)
+        if measuring {
+            inFlight += 1; peak = max(peak, inFlight)
+            defer { inFlight -= 1 }
+            try await Task.sleep(for: .milliseconds(300))
+        }
         return ExactJSON.object(["tag": .string("normalized_ddl_generated"), "identity": input["identity"],
             "response": .string(#"{"normalized_ddl":"place one red circle at center."}"#), "elapsed_ms": .string("1")]).data
     }

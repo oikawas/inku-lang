@@ -579,6 +579,7 @@
 			modelCatalogRequest++;
 			clearChatGPTModelCatalog();
 			availableModelCatalog = availableModelCatalog.filter((group) => group.id !== 'chatgpt');
+			availableVisionModelCatalog = availableVisionModelCatalog.filter((group) => group.id !== 'chatgpt');
 		},
 		apiFetch,
 		currentUser: () => session.currentUser,
@@ -602,6 +603,7 @@
 				if (modelCatalogOwner !== actor || !chatgptPlanAvailable) {
 					clearChatGPTModelCatalog();
 					availableModelCatalog = availableModelCatalog.filter((group) => group.id !== 'chatgpt');
+					availableVisionModelCatalog = availableVisionModelCatalog.filter((group) => group.id !== 'chatgpt');
 				}
 			});
 		}
@@ -1217,6 +1219,7 @@
 				settings.chatgpt.reset();
 				clearChatGPTModelCatalog();
 				availableModelCatalog = availableModelCatalog.filter((group) => group.id !== 'chatgpt');
+				availableVisionModelCatalog = availableVisionModelCatalog.filter((group) => group.id !== 'chatgpt');
 			}
 			setThumbnailHidpi(data.thumbnail_hidpi === true);
 			currentRenderEngineVersion = typeof data.render_engine_version === 'string'
@@ -1280,6 +1283,7 @@
 		modelCatalogRequest++;
 		clearChatGPTModelCatalog();
 		availableModelCatalog = availableModelCatalog.filter((group) => group.id !== 'chatgpt');
+		availableVisionModelCatalog = availableVisionModelCatalog.filter((group) => group.id !== 'chatgpt');
 		history.clear();
 		libraryMounted = false;
 		lineageState.reset();

@@ -146,6 +146,7 @@ class PublishedModelsBody(BaseModel):
     profile_id: str = Field(min_length=1, max_length=128)
     generation: int = Field(ge=1)
     published_models: list[Annotated[str, Field(min_length=1, max_length=256)]] = Field(max_length=1024)
+    model_purposes: dict[Annotated[str, Field(min_length=1, max_length=256)], list[Literal["llm", "vision"]]] | None = None
 
 
 @router.get("/models/settings")
@@ -160,6 +161,6 @@ def model_settings(actor: str = Depends(owner)) -> dict:
 @router.put("/models/settings")
 def publish_models(body: PublishedModelsBody, actor: str = Depends(owner)) -> dict:
     try:
-        return save_publication(actor, body.profile_id, body.generation, body.published_models)
+        return save_publication(actor, body.profile_id, body.generation, body.published_models, body.model_purposes)
     except ChatGPTError as error:
         raise _error(error) from None

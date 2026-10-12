@@ -22,8 +22,8 @@ from zoneinfo import ZoneInfo
 from inku_analysis.rasterizer import svg_to_png
 
 from .feature_analysis import composition_family
-from .model_settings import connection_for, provider_for_model
-from .vision_client import vision_text
+from .model_settings import provider_for_model
+from .vision_client import check_vision_access, vision_connection, vision_text
 
 DEFAULT_MODEL = os.getenv("INKU_OKUGAKI_MODEL", "meta/llama-3.2-90b-vision-instruct")
 _VISION_RESPONSE_CACHE: OrderedDict[str, tuple[float, str]] = OrderedDict()
@@ -246,7 +246,8 @@ def _cached_vision_response(cache_key: str, generate: Callable[[], str]) -> str:
 
 
 def _vision_cache_key(
-    *, provider: str, model_id: str, base_url: str, language: str, request: dict[str, Any], images: list[str]
+    *, provider: str, model_id: str, base_url: str, language: str, request: dict[str, Any], images: list[str],
+    session: dict[str, Any] | None = None,
 ) -> str:
     payload = {
         "version": 1,
@@ -258,6 +259,8 @@ def _vision_cache_key(
         "request": request,
         "images": [hashlib.sha256(image.encode("utf-8")).hexdigest() for image in images],
     }
+    if session is not None:
+        payload["chatgpt_session"] = session
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -271,7 +274,8 @@ def _vision_chat(
     settings: dict[str, Any],
 ) -> str:
     provider, model_id = provider_for_model(model, stage="stage1", settings=settings)
-    connection = connection_for(provider, settings)
+    connection = vision_connection(provider, settings)
+    check_vision_access(connection, model_id)
     if "invariant_prompt" in request:
         instruction = str(request["invariant_prompt"])
     elif language == "ja":
@@ -287,6 +291,8 @@ def _vision_chat(
         language=language,
         request=request,
         images=images,
+        session={key: connection[key] for key in ("owner_id", "profile_id", "generation")}
+        if provider == "chatgpt" else None,
     )
 
     def request_completion() -> str:

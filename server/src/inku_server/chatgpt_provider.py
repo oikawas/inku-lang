@@ -214,6 +214,74 @@ class SSEDecoder:
         return self.completed
 
 
+class TextSSEDecoder(SSEDecoder):
+    """Vision accepts completed assistant text, never partial text or tool calls."""
+
+    def _text(self, item: dict) -> str:
+        if item.get("type") == "reasoning":
+            return ""
+        if item.get("type") != "message" or item.get("role") != "assistant":
+            self._unexpected([item])
+        if item.get("status") not in {None, "completed"}:
+            raise ChatGPTError("chatgpt_response_incomplete")
+        parts = []
+        for part in item.get("content", []):
+            if part.get("type") == "refusal":
+                raise ChatGPTError("chatgpt_refused", action="edit")
+            if part.get("type") != "output_text" or not isinstance(part.get("text"), str):
+                raise ChatGPTError("chatgpt_response_invalid")
+            parts.append(part["text"])
+        text = "".join(parts)
+        if len(text.encode("utf-8")) > self.argument_limit:
+            raise ChatGPTError("chatgpt_response_too_large")
+        return text
+
+    def event(self, event: dict) -> None:
+        tag = event.get("type")
+        if tag in {"error", "response.failed", "response.incomplete"} or "refusal" in str(tag):
+            super().event(event)
+            return
+        if self.terminal is not None:
+            raise ChatGPTError("chatgpt_response_invalid")
+        if tag in {"response.output_item.added", "response.output_item.done"}:
+            item = event["item"]
+            if item.get("type") not in {"message", "reasoning"}:
+                self._unexpected([item])
+            if tag == "response.output_item.done":
+                self._text(item)
+                self.finalized_items[item["id"]] = item
+        elif tag == "response.completed":
+            response = event["response"]
+            if response.get("status") != "completed":
+                raise ChatGPTError("chatgpt_response_incomplete")
+            output = response.get("output")
+            if output is None or output == []:
+                output = list(self.finalized_items.values())
+            if not isinstance(output, list):
+                raise ChatGPTError("chatgpt_response_invalid")
+            text = "".join(self._text(item) for item in output)
+            if len(text.encode("utf-8")) > self.argument_limit:
+                raise ChatGPTError("chatgpt_response_too_large")
+            if not text:
+                raise ChatGPTError("chatgpt_response_invalid")
+            self.completed, self.terminal = text, response
+        elif str(tag).startswith("response.function_call"):
+            raise ChatGPTError("chatgpt_unexpected_tool", action="diagnose")
+        elif tag in {"response.output_text.delta", "response.output_text.done"}:
+            text = event.get("delta" if tag.endswith("delta") else "text")
+            if not isinstance(text, str):
+                raise ChatGPTError("chatgpt_response_invalid")
+            if len(text.encode("utf-8")) > self.argument_limit:
+                raise ChatGPTError("chatgpt_response_too_large")
+
+
+def vision_request_body(model: str, *, system: str, text: str, images: list[str]) -> dict:
+    content = [{"type": "input_text", "text": text}]
+    content.extend({"type": "input_image", "image_url": image} for image in images)
+    return {"model": model, "store": False, "stream": True, "instructions": system,
+            "input": [{"role": "user", "content": content}]}
+
+
 async def catalog(owner: str, profile_id: str, generation: int, deadline: float, cancel=None, *, force: bool = False, _wire_held: bool = False) -> list[dict]:
     def check():
         return check_session(owner, profile_id, generation, cancel)
@@ -239,7 +307,7 @@ async def catalog(owner: str, profile_id: str, generation: int, deadline: float,
         if error.code == "subscription_sharing_usage_limit_exceeded":
             pause_quota(owner, profile_id, generation, deadline)
         raise error
-    models = [{"id": entry["slug"], "label": entry["display_name"], "purposes": ["llm"]}
+    models = [{"id": entry["slug"], "label": entry["display_name"], "purposes": ["llm", "vision"]}
               for entry in value["models"] if entry.get("visibility") == "list"
               and isinstance(entry.get("slug"), str) and isinstance(entry.get("display_name"), str)]
     store = CredentialStore()
@@ -254,8 +322,9 @@ async def catalog(owner: str, profile_id: str, generation: int, deadline: float,
 
 
 async def request(owner: str, profile_id: str, generation: int, model: str, action: dict, deadline: float,
-                  limit: int, cancel=None, observation=None) -> str:
-    if action["tag"] not in EFFECTS:
+                  limit: int, cancel=None, observation=None, *, purpose: str = "llm",
+                  transport: httpx.AsyncBaseTransport | None = None) -> str:
+    if (purpose == "llm" and action["tag"] not in EFFECTS) or (purpose == "vision" and action["tag"] != "vision") or purpose not in {"llm", "vision"}:
         raise ChatGPTError("chatgpt_operation_not_supported")
     def check():
         return check_session(owner, profile_id, generation, cancel)
@@ -263,21 +332,25 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
     with store.lock("wire:" + owner + ":" + profile_id, deadline, check):
         try:
             models = await catalog(owner, profile_id, generation, deadline, cancel, _wire_held=True)
-            if not any(entry["id"] == model and entry["enabled"] for entry in models):
+            if not any(entry["id"] == model and entry["enabled"] and purpose in entry["purposes"] for entry in models):
                 raise ChatGPTError("chatgpt_model_not_offered", action="models")
             token = await access_token(owner, profile_id, generation, deadline, cancel)
-            body = request_body(model, action["payload"]["prompt"])
+            prompt = action["payload"]["prompt"]
+            body = vision_request_body(model, **prompt) if purpose == "vision" else request_body(model, prompt)
             if observation:
                 from .pipeline_provider import provider_stage_record
                 capture, execution = observation
                 truncated = capture.request(owner, execution, action, provider_stage_record(action["tag"]), "chatgpt", model, canonical(body))
                 if truncated:
                     raise ChatGPTError("chatgpt_observation_incomplete")
-            decoder = SSEDecoder(limit)
+            decoder = TextSSEDecoder(limit) if purpose == "vision" else SSEDecoder(limit)
             raw = bytearray()
             status = 0
             try:
-                async with httpx.AsyncClient(follow_redirects=False) as client:
+                client_options = {"follow_redirects": False}
+                if transport is not None:
+                    client_options["transport"] = transport
+                async with httpx.AsyncClient(**client_options) as client:
                     check()
                     stream = client.stream("POST", RESOURCE + "/responses", json=body, headers={"Authorization": "Bearer " + token},
                                            timeout=max(0.001, deadline - time.monotonic()))
@@ -310,6 +383,14 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
             raise
 
 
+async def request_vision(owner: str, profile_id: str, generation: int, model: str, *,
+                         system: str, text: str, images: list[str], deadline: float,
+                         transport: httpx.AsyncBaseTransport | None = None) -> str:
+    action = {"tag": "vision", "payload": {"prompt": {"system": system, "text": text, "images": images}}}
+    return await request(owner, profile_id, generation, model, action, deadline, 512 * 1024,
+                         purpose="vision", transport=transport)
+
+
 def pin(owner: str) -> tuple[str, int]:
     from .chatgpt_runtime import check_owner
     check_owner(owner)
@@ -318,11 +399,11 @@ def pin(owner: str) -> tuple[str, int]:
     return profile["id"], profile["generation"]
 
 
-def offered(owner: str, model: str, *, profile_id: str | None = None, generation: int | None = None) -> bool:
+def offered(owner: str, model: str, *, profile_id: str | None = None, generation: int | None = None, purpose: str = "llm") -> bool:
     try:
         if profile_id is None or generation is None:
             profile_id, generation = pin(owner)
         models = asyncio.run(catalog(owner, profile_id, generation, time.monotonic() + 15))
-        return any(entry["id"] == model and entry["enabled"] for entry in models)
+        return any(entry["id"] == model and entry["enabled"] and purpose in entry["purposes"] for entry in models)
     except (ChatGPTError, httpx.HTTPError, TimeoutError, ValueError, KeyError):
         return False

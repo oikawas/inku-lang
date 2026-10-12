@@ -8,8 +8,8 @@ from typing import Any, Callable
 
 from inku_analysis.rasterizer import svg_to_png
 
-from .model_settings import connection_for, provider_for_model
-from .vision_client import vision_text
+from .model_settings import provider_for_model
+from .vision_client import vision_connection, vision_text
 
 ALLOWED_KINDS = ("reinterpretation", "catalog_change", "layout_change", "touch_change")
 
@@ -44,7 +44,7 @@ def _vision_chat(
         + json.dumps(payload, ensure_ascii=False, sort_keys=True)
     )
     return vision_text(
-        connection_for(provider, settings), model_id, system=_system_prompt(language), text=instruction,
+        vision_connection(provider, settings), model_id, system=_system_prompt(language), text=instruction,
         images=[image], temperature=0.35, max_tokens=320,
     )
 

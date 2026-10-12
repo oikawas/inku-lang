@@ -74,6 +74,9 @@
 	.settings-feature-root .model-metadata-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 	.settings-feature-root .model-metadata-fields label { display: grid; gap: 4px; min-width: 0; color: var(--fg3); font-size: var(--ui-font-size-13); }
 	.settings-feature-root .model-metadata-fields label.wide { grid-column: 1 / -1; }
+	.settings-feature-root .model-metadata-fields > div { display: grid; gap: 4px; min-width: 0; color: var(--fg3); font-size: var(--ui-font-size-13); }
+	.settings-feature-root .model-metadata-fields > div.wide { grid-column: 1 / -1; }
+	.settings-feature-root .model-metadata-fields p { margin: 0; color: var(--fg); white-space: pre-wrap; overflow-wrap: anywhere; }
 	.settings-feature-root .model-picker-summary { display: inline-flex; align-items: center; gap: 9px; margin-right: auto; color: var(--fg2); font-size: var(--ui-font-size-13); }
 	.settings-feature-root .model-picker-summary strong { color: var(--accent); font-weight: 600; }
 	.settings-feature-root .model-picker-result { min-width: 0; color: var(--fg2); font-size: var(--ui-font-size-13); line-height: 1.35; overflow-wrap: anywhere; }

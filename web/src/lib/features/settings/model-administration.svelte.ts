@@ -103,12 +103,13 @@ export function createModelAdministration<TActor extends SettingsActor>(
 	}
 
 	function acceptChatGPT(data: ChatGPTPublication): void {
-		chatgptPublication = data;
+		const models = data.models.map((model) => ({ ...model, purposes: model.purposes ?? ['llm', 'vision'] as ('llm' | 'vision')[] }));
+		chatgptPublication = { ...data, models };
 		const provider: ProviderGroup = { id: 'chatgpt', label: t().chatgptPlanLabel,
-			kind: 'chatgpt_responses', requires_api_key: false, models: data.models };
+			kind: 'chatgpt_responses', requires_api_key: false, models };
 		modelCatalog = [...modelCatalog.filter((group) => group.id !== 'chatgpt'), provider];
 		modelSettings = { providers: { ...modelSettings?.providers, chatgpt: {
-			base_url: '', api_key_set: false, api_key_hint: null, models: data.models,
+			base_url: '', api_key_set: false, api_key_hint: null, models,
 			enabled_models: data.enabled_models
 		} } };
 	}
@@ -386,12 +387,16 @@ export function createModelAdministration<TActor extends SettingsActor>(
 			if (!personalModelsAllowed() || !chatgptPublication) return false;
 			const owner = deps.currentUser()?.id, version = revision;
 			const selected = patch.enabled_models ?? modelSettings?.providers.chatgpt?.enabled_models ?? {};
+			const draftModels = patch.models ?? modelSettings?.providers.chatgpt?.models ?? chatgptPublication.models;
+			const modelPurposes = Object.fromEntries(chatgptPublication.models.map((model) => [model.id,
+				draftModels.find((draft) => draft.id === model.id)?.purposes ?? model.purposes ?? ['llm', 'vision']]));
 			modelSettingsLoading = true;
 			try {
 				const data = await personalResponse(await deps.apiFetch('/api/me/chatgpt/models/settings', {
 					method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
 						profile_id: chatgptPublication.profile_id, generation: chatgptPublication.generation,
-						published_models: chatgptPublication.models.filter((model) => selected[model.id] === true).map((model) => model.id)
+						published_models: chatgptPublication.models.filter((model) => selected[model.id] === true).map((model) => model.id),
+						model_purposes: modelPurposes
 					})
 				}));
 				if (!sameOwner(owner, version) || !personalModelsAllowed()) return false;

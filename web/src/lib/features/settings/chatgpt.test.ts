@@ -153,8 +153,10 @@ test('connected guide leads to personal model settings with explicit publication
 			if (path.endsWith('/refresh')) return new Promise<Response>((resolve) => { deferred = resolve; });
 			if (init?.method === 'PUT') {
 				const body = JSON.parse(String(init.body));
-				assert.deepEqual(body, { profile_id: 'profile', generation: 1, published_models: ['second-slug'] });
-				saved = { ...saved, enabled_models: { 'second-slug': true, 'first-slug': false } };
+				assert.deepEqual(body, { profile_id: 'profile', generation: 1, published_models: ['second-slug'],
+					model_purposes: { 'second-slug': ['vision'], 'first-slug': [] } });
+				saved = { ...saved, models: [{ id: 'second-slug', label: 'First offered', purposes: ['vision'], enabled: true },
+					{ id: 'first-slug', label: 'Second offered', purposes: [], enabled: false }], enabled_models: { 'second-slug': true, 'first-slug': false } };
 			}
 			return response(saved);
 		}
@@ -168,9 +170,15 @@ test('connected guide leads to personal model settings with explicit publication
 	deferred!(response(saved));
 	await pending;
 	assert.deepEqual(administration.modelCatalog[0].models.map((model: any) => model.id), ['second-slug', 'first-slug']);
+	assert.deepEqual(administration.modelCatalog[0].models[0].purposes, ['llm', 'vision']);
 	assert.equal(administration.modelFetchResults.chatgpt.message, ja.chatgptModelsLoaded(2));
-	assert.equal(await administration.saveModelProvider('chatgpt', { enabled_models: { 'second-slug': true, 'first-slug': false } }), true);
+	assert.equal(await administration.saveModelProvider('chatgpt', { models: [
+		{ id: 'second-slug', label: 'First offered', purposes: ['vision'] },
+		{ id: 'first-slug', label: 'Second offered', purposes: [] }
+	], enabled_models: { 'second-slug': true, 'first-slug': false } }), true);
 	assert.equal(administration.modelSettings.providers.chatgpt.enabled_models['second-slug'], true);
+	assert.deepEqual(administration.modelCatalog[0].models[0].purposes, ['vision']);
+	assert.deepEqual(administration.modelSettings.providers.chatgpt.models[1].purposes, []);
 	assert.equal(changes, 2);
 	const failed = administration.fetchProviderModels('chatgpt');
 	deferred!(new Response(JSON.stringify({ detail: { code: 'chatgpt_transport_unavailable' } }), { status: 503 }));
@@ -200,4 +208,33 @@ test('connected guide leads to personal model settings with explicit publication
 	assert.deepEqual(administration.modelSettings.providers, {});
 	administration.resetForLoggedOut();
 	connection.reset();
+});
+
+test('personal publication picker exposes Vision use and read-only upstream details', async () => {
+	const source = readFileSync(new URL('./ModelAdministrationSettings.svelte', import.meta.url), 'utf8')
+		.replace("import { t } from '$lib/i18n/index.svelte';", `import { ja } from ${JSON.stringify(new URL('../../i18n/ja.ts', import.meta.url).href)}; const t = () => ja;`)
+		.replace("from '$lib/modelMeta'", `from ${JSON.stringify(new URL('../../modelMeta.ts', import.meta.url).href)}`)
+		.replace("import './model-administration-settings.css';", '')
+		// Open the existing dialog in the SSR fixture, without changing production props.
+		.replace('</script>', "openModelPicker('chatgpt');\n</script>");
+	const generated = compile(source, { filename: 'ModelAdministrationSettings.svelte', generate: 'server' }).js.code
+		.replace(/(['"])svelte\/internal\/server\1/g, JSON.stringify(import.meta.resolve('svelte/internal/server')))
+		.replace(/(['"])svelte\1/g, JSON.stringify(import.meta.resolve('svelte')));
+	const view = (await import('data:text/javascript;base64,' + Buffer.from(generated).toString('base64'))).default;
+	const models = [{ id: 'vision-model', label: 'Vision model', purposes: ['vision'], speed_label: 'Upstream speed', comment_ja: '接続元の評価' },
+		{ id: 'no-purpose', label: 'Unused model', purposes: [] }];
+	const { body } = render(view, { props: {
+		providerGroups: [{ id: 'chatgpt', label: ja.chatgptPlanLabel, models }], personalOnly: true,
+		administration: { modelSettings: { providers: { chatgpt: { enabled_models: { 'vision-model': true, 'no-purpose': false } } } },
+			modelFetchResults: {}, modelSettingsLoading: false }
+	} });
+	assert.match(body, /<option value="vision">/);
+	assert.match(body, /aria-label="Vision model LLM \/ Vision"/);
+	assert.match(body, /aria-pressed="true"[^>]*>Vision<\/button>/);
+	assert.match(body, /<details class="model-metadata-editor">/);
+	assert.match(body, /Upstream speed/);
+	assert.match(body, /接続元の評価/);
+	assert.doesNotMatch(body, /<textarea/);
+	const unused = body.slice(body.indexOf('Unused model') - 150, body.indexOf('Unused model'));
+	assert.match(unused, /disabled/);
 });

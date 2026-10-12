@@ -63,12 +63,14 @@ def test_personal_publication_routes_offer_only_saved_models_and_reject_stale_or
         fetched = client.post("/api/me/chatgpt/models/refresh").json()
         assert [model["id"] for model in fetched["models"]] == ["luna", "other"]
         assert fetched["enabled_models"] == {"luna": False, "other": False}
+        assert all(model["purposes"] == ["llm", "vision"] for model in fetched["models"])
         assert public.api_models(actor).drawing_catalog[-1]["models"] == []
         body = {"profile_id": profile["id"], "generation": 1, "published_models": ["luna"]}
         assert client.put("/api/me/chatgpt/models/settings", json=body).json()["enabled_models"] == {"luna": True, "other": False}
         drawing = public.api_models(actor)
         assert [entry["id"] for entry in drawing.drawing_catalog[-1]["models"]] == ["luna"]
-        assert all(provider["id"] != "chatgpt" for provider in drawing.llm_catalog + drawing.vision_catalog)
+        assert [entry["id"] for entry in drawing.vision_catalog[-1]["models"]] == ["luna"]
+        assert all(provider["id"] != "chatgpt" for provider in drawing.catalog + drawing.llm_catalog)
         assert "chatgpt" not in shared_settings["providers"]
         assert offered("owner", "luna") and not offered("owner", "other")
         action = {"tag": "generate_normalized_ddl", "payload": {"prompt": {}}}
@@ -76,6 +78,25 @@ def test_personal_publication_routes_offer_only_saved_models_and_reject_stale_or
             asyncio.run(request("owner", profile["id"], 1, "other", action, time.monotonic() + 5, 4096))
         assert len(calls) == 1
         assert client.put("/api/me/chatgpt/models/settings", json={**body, "published_models": ["hidden"]}).status_code == 403
+        invalid = client.put("/api/me/chatgpt/models/settings", json={**body, "model_purposes": {"luna": []}})
+        assert invalid.status_code == 403 and invalid.json()["detail"]["code"] == "chatgpt_model_not_offered"
+        assert client.put("/api/me/chatgpt/models/settings", json={**body, "model_purposes": {"hidden": ["vision"]}}).status_code == 403
+        assert client.put("/api/me/chatgpt/models/settings", json={**body, "model_purposes": {"luna": ["audio"]}}).status_code == 422
+        assert store.profile("owner").get("model_purposes", {}) == {}
+        vision_only = {**body, "model_purposes": {"luna": ["vision"], "other": []}}
+        published = client.put("/api/me/chatgpt/models/settings", json=vision_only).json()
+        assert [(model["id"], model["purposes"], model["enabled"]) for model in published["models"]] == [
+            ("luna", ["vision"], True), ("other", [], False),
+        ]
+        assert client.get("/api/me/chatgpt/models/settings").json() == published
+        drawing = public.api_models(actor)
+        assert drawing.drawing_catalog[-1]["models"] == []
+        assert [entry["id"] for entry in drawing.vision_catalog[-1]["models"]] == ["luna"]
+        assert drawing.vision_catalog[-1]["id"] == "chatgpt"
+        assert drawing.vision_catalog[-1]["kind"] == "chatgpt_responses"
+        assert not offered("owner", "luna") and offered("owner", "luna", purpose="vision")
+        assert not offered("owner", "other", purpose="vision")
+        assert client.put("/api/me/chatgpt/models/settings", json=body).json() == published
         actor = {"id": "other-owner"}
         assert client.get("/api/me/chatgpt/models/settings").status_code == 403
         assert client.put("/api/me/chatgpt/models/settings", json=body).status_code == 403
@@ -83,6 +104,7 @@ def test_personal_publication_routes_offer_only_saved_models_and_reject_stale_or
         # The refresh/reauthorization snapshot predates the later publication save.
         store.save_profile("owner", {**profile, "generation": 2}, expected_generation=1)
         assert store.profile("owner")["published_models"] == ["luna"]
+        assert store.profile("owner")["model_purposes"] == {"luna": ["vision"], "other": []}
         assert client.put("/api/me/chatgpt/models/settings", json=body).status_code == 403
         store.save_profile("owner", {**profile, "id": str(uuid.uuid4())})
         assert client.put("/api/me/chatgpt/models/settings", json={**body, "generation": 2}).status_code == 403
@@ -91,6 +113,36 @@ def test_personal_publication_routes_offer_only_saved_models_and_reject_stale_or
         late = client.post("/api/me/chatgpt/models/refresh")
         assert late.status_code == 403 and late.json()["detail"]["code"] == "chatgpt_session_changed"
         assert len(calls) == 2
+
+
+def test_old_catalog_purposes_do_not_override_unset_profile_choices():
+    from inku_server.chatgpt_models import publication
+
+    profile = {"id": "fixture-profile", "generation": 1, "published_models": ["fixture-model"],
+               "catalog": {"models": [{"id": "fixture-model", "label": "Fixture", "purposes": ["llm"]}]}}
+    assert publication(profile)["models"] == [
+        {"id": "fixture-model", "label": "Fixture", "purposes": ["llm", "vision"], "enabled": True},
+    ]
+
+
+def test_chatgpt_model_admission_limits_operations_and_passes_the_runtime_profile_pin(monkeypatch):
+    from inku_server import chatgpt_provider
+    from inku_server.api_core.common import _model_offered_to
+    from inku_server.model_settings import default_model_settings
+
+    calls = []
+    monkeypatch.setattr(chatgpt_provider, "offered", lambda *args, **kwargs: calls.append((args, kwargs)) or True)
+    settings = {**default_model_settings(), "chatgpt_profile_id": "fixture-profile", "chatgpt_generation": 7}
+    assert _model_offered_to({"id": "owner"}, "chatgpt:luna", stage="stage1", purpose="vision", settings=settings, operation="vision")
+    assert calls == [(("owner", "luna"), {"purpose": "vision", "profile_id": "fixture-profile", "generation": 7})]
+    assert _model_offered_to({"id": "owner"}, "chatgpt:luna", stage="stage1", purpose="llm", settings=settings, operation="pipeline")
+    assert calls[-1][1]["purpose"] == "llm"
+    for operation, purpose in ((None, "vision"), ("pipeline", "vision"), ("vision", "llm"), ("demo", "llm")):
+        assert not _model_offered_to({"id": "owner"}, "chatgpt:luna", stage="stage1", purpose=purpose, settings=settings, operation=operation)
+    assert not _model_offered_to(None, "chatgpt:luna", stage="stage1", purpose="vision", settings=settings, operation="vision")
+    assert len(calls) == 2
+    assert _model_offered_to({"id": "owner"}, "chatgpt:luna", stage="stage1", purpose="vision", settings=default_model_settings(), operation="vision")
+    assert calls[-1][1] == {"purpose": "vision", "profile_id": None, "generation": None}
 
 
 def test_completed_function_with_assistant_message_is_accepted_without_using_text():

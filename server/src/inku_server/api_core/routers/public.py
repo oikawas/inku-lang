@@ -126,6 +126,7 @@ def api_models(actor: dict = Depends(_current_user)) -> ModelSettingsResponse:
     settings = _db.get_model_settings()
     developer_mode = _env_flag("INKU_DEVELOPER_MODE")
     drawing = model_provider_catalog(settings, include_disabled=False, include_developer=developer_mode, purpose="llm")
+    vision = model_provider_catalog(settings, include_disabled=False, include_developer=developer_mode, purpose="vision")
     profile_id = generation = None
     chatgpt_available = False
     from ...chatgpt_runtime import check_owner
@@ -137,7 +138,9 @@ def api_models(actor: dict = Depends(_current_user)) -> ModelSettingsResponse:
         chatgpt_available = True
         profile_id, generation = pin(actor["id"])
         models = [model for model in saved_publication(actor["id"], profile_id, generation)["models"] if model["enabled"]]
-        drawing.append({"id": "chatgpt", "label": "ChatGPT plan", "kind": "chatgpt_responses", "requires_api_key": False, "models": models})
+        for purpose, target in (("llm", drawing), ("vision", vision)):
+            target.append({"id": "chatgpt", "label": "ChatGPT plan", "kind": "chatgpt_responses",
+                           "requires_api_key": False, "models": [model for model in models if purpose in model["purposes"]]})
     except (ChatGPTError, ValueError, KeyError):
         profile_id = generation = None
     return ModelSettingsResponse(
@@ -149,9 +152,7 @@ def api_models(actor: dict = Depends(_current_user)) -> ModelSettingsResponse:
         llm_catalog=model_provider_catalog(
             settings, include_disabled=False, include_developer=developer_mode, purpose="llm"
         ),
-        vision_catalog=model_provider_catalog(
-            settings, include_disabled=False, include_developer=developer_mode, purpose="vision"
-        ),
+        vision_catalog=vision,
         settings={"model_settings": actor.get("model_settings") or {}},
     )
 

@@ -10,9 +10,11 @@ the same header for the key, the model id as one quoted path segment.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
+import time
 from typing import Any
 from urllib.parse import quote
 
@@ -21,8 +23,33 @@ import httpx
 from .gemini_request import gemini_thinking
 from .openai_request import openai_sampling
 from .provider_refusal import provider_error
+from .chatgpt_store import ChatGPTError
+from .model_settings import connection_for
 
 _logger = logging.getLogger(__name__)
+
+
+def vision_connection(provider: str, settings: dict[str, Any]) -> dict[str, Any]:
+    if provider != "chatgpt":
+        return connection_for(provider, settings)
+    try:
+        return {"id": "chatgpt", "kind": "chatgpt_responses", "base_url": "https://api.openai.com/v1",
+                "owner_id": settings["chatgpt_owner_id"], "profile_id": settings["chatgpt_profile_id"],
+                "generation": settings["chatgpt_generation"]}
+    except KeyError:
+        raise ChatGPTError("chatgpt_not_connected") from None
+
+
+def check_vision_access(connection: dict[str, Any], model_id: str) -> None:
+    """Even a cached reading belongs to the pinned owner's currently offered model."""
+    if connection.get("kind") != "chatgpt_responses":
+        return
+    from .chatgpt_runtime import check_session
+    from .chatgpt_models import publication
+    profile = check_session(connection["owner_id"], connection["profile_id"], connection["generation"])
+    if not any(model["id"] == model_id and model["enabled"] and "vision" in model["purposes"]
+               for model in publication(profile)["models"]):
+        raise ChatGPTError("chatgpt_model_not_offered", action="models")
 
 
 def _image_parts(image: str) -> tuple[str, str]:
@@ -89,6 +116,23 @@ def _answer(kind: str, data: dict[str, Any]) -> str:
 def vision_text(connection: dict[str, Any], model_id: str, *, system: str, text: str, images: list[str],
                 temperature: float, max_tokens: int, transport: httpx.BaseTransport | None = None) -> str:
     """Ask once and return the answer's text, stripped. A timeout is a TimeoutError."""
+    if connection.get("kind") == "chatgpt_responses":
+        from .chatgpt_provider import request_vision
+        for image in images:
+            _image_parts(image)
+        try:
+            return asyncio.run(request_vision(
+                connection["owner_id"], connection["profile_id"], connection["generation"], model_id,
+                system=system, text=text, images=images,
+                deadline=time.monotonic() + float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "180")),
+                transport=transport,
+            )).strip()
+        except ChatGPTError:
+            raise
+        except (httpx.HTTPError, TimeoutError):
+            raise ChatGPTError("chatgpt_transport_unavailable", failure="transport_unavailable", action="retry") from None
+        except (ValueError, KeyError, TypeError):
+            raise ChatGPTError("chatgpt_response_invalid", action="diagnose") from None
     if connection.get("requires_api_key") and not connection.get("api_key"):
         raise ValueError(f"{connection.get('id')} API key is not configured")
     url, headers, body = _request(connection, model_id, system=system, text=text, images=images,

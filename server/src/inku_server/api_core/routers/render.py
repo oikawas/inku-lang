@@ -19,7 +19,9 @@ from ...autonomous_refine import ALLOWED_KINDS as AUTONOMOUS_REFINE_KINDS, visio
 from ...limits import limits_as_dict
 from ...saved_score_compat import coerce_saved_score
 from ...schema import Score
-from ..common import DESCRIPTION_LOCKED_DETAIL, MODEL_NOT_OFFERED_DETAIL, _model_offered_to, _resolve_instruction_lang, _resolved_vision_model, _unexpected_http_error
+from ..common import DESCRIPTION_LOCKED_DETAIL, _resolve_instruction_lang, _resolved_vision_model, _unexpected_http_error
+from ..vision import chatgpt_vision_error, prepare_vision_settings
+from ...chatgpt_store import ChatGPTError
 from ..deps import _current_user
 from ..models import CompositionRanges, JsonSeed, RecompositionResult
 from ..rendering import (
@@ -652,9 +654,7 @@ def api_vision_refine_advice(
     if not svg:
         raise HTTPException(status_code=422, detail="refinement source has no image")
     model = _resolved_vision_model(body.model, actor)
-    settings = _db.get_model_settings()
-    if not _model_offered_to(actor, model, stage="stage1", purpose="vision", settings=settings):
-        raise HTTPException(status_code=403, detail=MODEL_NOT_OFFERED_DETAIL)
+    settings = prepare_vision_settings(actor, model, _db.get_model_settings())
     try:
         advice = vision_refine_advice(
             svg=svg,
@@ -665,6 +665,8 @@ def api_vision_refine_advice(
             language=body.language,
             settings=settings,
         )
+    except ChatGPTError as exc:
+        raise chatgpt_vision_error(exc) from None
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001

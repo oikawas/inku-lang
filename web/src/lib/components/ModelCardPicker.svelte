@@ -92,7 +92,7 @@
 <div class="context-model-picker">
 	<span class="field-label">{label}</span>
 	<button class="picker-launch" type="button" {disabled} bind:this={launchButton} onclick={openPicker}>
-		<span><strong>{selected?.model.label ?? selectedModel}</strong>{#if selected}<small>{selected.group.label}</small>{:else if offer.notInList}<small class="not-in-list">{t().modelPickerNotInList}</small>{/if}</span>
+		<span><strong>{selected?.model.label ?? selectedModel}</strong>{#if selected}<small>{selected.group.id === 'chatgpt' ? t().chatgptPlanLabel : selected.group.label}</small>{:else if offer.notInList}<small class="not-in-list">{t().modelPickerNotInList}</small>{/if}</span>
 		<span class="change-label">{t().modelSelectButton}</span>
 	</button>
 </div>
@@ -104,7 +104,7 @@
 		{#if selectionError}<p class="selection-error" role="alert">{selectionError}</p>{/if}
 		<div class="picker-groups">
 			{#each configuredGroups as group (group.id)}
-				<section><h3>{group.label}</h3><div class="model-grid">
+				<section><h3>{group.id === 'chatgpt' ? t().chatgptPlanLabel : group.label}</h3><div class="model-grid">
 					{#each sortModels(group.models, purpose) as model (model.id)}
 						<button type="button" class:selected={selected?.group.id === group.id && selected?.model.id === model.id} class:eol={model.eol} class:unselectable={isModelUnselectable(model)} disabled={isModelUnselectable(model)} onpointerenter={positionMeta} onfocus={positionMeta} onclick={() => choose(group.id, model.id)}>
 							<strong>{model.label}</strong>{#if isModelUnselectable(model)}<small class="eol-mark">{modelStatusLabel(model, isJapanese)}</small>{/if}{#if model.notes}<small>{model.notes}</small>{/if}

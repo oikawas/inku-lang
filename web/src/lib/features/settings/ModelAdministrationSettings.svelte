@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
-	import { isModelUnselectable, modelStatusLabel, sortModels } from '$lib/modelMeta';
+	import { isModelUnselectable, modelStatusLabel, modelRecommendation, modelSpeed, sortModels } from '$lib/modelMeta';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
 	import type { ModelAdministration, ModelProviderSetting } from './model-administration.svelte';
 	import './model-administration-settings.css';
@@ -207,7 +207,8 @@
 		modelPickerEnabledDraft = {
 			...modelPickerEnabledDraft,
 			// A retired or plan-only model is never published; the Server refuses it too.
-			...Object.fromEntries(models.map((model) => [model.id, enabled && !isModelUnselectable(model)])),
+			...Object.fromEntries(models.map((model) => [model.id, enabled && !isModelUnselectable(model)
+				&& (modelPickerProviderId !== 'chatgpt' || (modelPickerPurposeDraft[model.id] ?? []).length > 0)])),
 		};
 	}
 
@@ -574,7 +575,7 @@
 					spellcheck="false"
 					data-dialog-focus
 				/>
-				<label class="model-picker-filter"><span>{t().settingsModelFilterLabel}</span><select bind:value={modelPickerFilter}><option value="all">{t().settingsModelFilterAll}</option><option value="published">{t().settingsModelFilterPublished}</option><option value="unpublished">{t().settingsModelFilterUnpublished}</option><option value="llm">{t().settingsModelFilterLlm}</option>{#if modelPickerProvider.id !== 'chatgpt'}<option value="vision">{t().settingsModelFilterVision}</option>{/if}</select></label>
+				<label class="model-picker-filter"><span>{t().settingsModelFilterLabel}</span><select bind:value={modelPickerFilter}><option value="all">{t().settingsModelFilterAll}</option><option value="published">{t().settingsModelFilterPublished}</option><option value="unpublished">{t().settingsModelFilterUnpublished}</option><option value="llm">{t().settingsModelFilterLlm}</option><option value="vision">{t().settingsModelFilterVision}</option></select></label>
 				<div class="model-picker-actions">
 					<button class="ghost-btn" title={modelPickerDirty ? t().settingsModelFetchDisabledWhileDirty : undefined} onclick={fetchModelPickerModels} disabled={modelSettingsLoading || modelPickerDirty}>{t().settingsModelFetchModels}</button>
 					<button class="ghost-btn" onclick={() => setAllPublishedModels(filteredModelPickerModels, true)} disabled={modelSettingsLoading}>{t().settingsModelSelectVisible}</button>
@@ -591,7 +592,7 @@
 								<input
 									type="checkbox"
 								checked={!isModelUnselectable(model) && modelPickerDraftEnabled(model.id)}
-								disabled={isModelUnselectable(model)}
+									disabled={isModelUnselectable(model) || (modelPickerProvider.id === 'chatgpt' && modelDraft(model).purposes?.length === 0)}
 								onchange={(e) => {
 									modelPickerEnabledDraft = {
 										...modelPickerEnabledDraft,
@@ -601,21 +602,29 @@
 								/>
 									<span><strong>{model.label}</strong><small>{model.id}</small>{#if modelStatusLabel(model, t().code === 'ja')}<em class="model-picker-status">{modelStatusLabel(model, t().code === 'ja')}</em>{/if}{#if model.notes}<em>{model.notes}</em>{/if}</span>
 								</label>
-								{#if modelPickerProvider.id !== 'chatgpt'}<div class="model-purpose-controls" aria-label={`${model.label} LLM / Vision`}>
+								<div class="model-purpose-controls" aria-label={`${model.label} LLM / Vision`}>
 									<button type="button" class:active={modelPurposeSelected(model.id, 'llm')} aria-pressed={modelPurposeSelected(model.id, 'llm')} onclick={() => toggleModelPurpose(model.id, 'llm')}>LLM</button>
 									<button type="button" class:active={modelPurposeSelected(model.id, 'vision')} aria-pressed={modelPurposeSelected(model.id, 'vision')} onclick={() => toggleModelPurpose(model.id, 'vision')}>Vision</button>
-								</div>{/if}
+								</div>
 							</div>
-							{#if modelPickerProvider.id !== 'chatgpt'}<details class="model-metadata-editor">
+							<details class="model-metadata-editor">
 								<summary>{t().settingsModelMetadataDetails}</summary>
 							<div class="model-metadata-fields">
+									{#if modelPickerProvider.id === 'chatgpt'}
+										<div><span>オススメ度 / Recommendation</span><p>{modelRecommendation(modelDraft(model))}</p></div>
+										<div><span>速度区分 / Speed class</span><p>{model.speed_class || '—'}</p></div>
+										<div class="wide"><span>実測値に基づく速度ラベル / Measured speed label</span><p>{modelSpeed(model)}</p></div>
+										<div class="wide"><span>評価コメント（日本語）</span><p>{model.comment_ja || '—'}</p></div>
+										<div class="wide"><span>Evaluation comment (English)</span><p>{model.comment_en || '—'}</p></div>
+									{:else}
 								<label><span>オススメ度 / Recommendation</span><select value={modelDraft(model).recommendation_level ?? 0} onchange={(event) => updateModelMetadata(model, { recommendation_level: Number(event.currentTarget.value) || undefined })}><option value="0">—</option>{#each [1, 2, 3, 4, 5] as level}<option value={level}>{level} / 5</option>{/each}</select></label>
 								<label><span>速度区分 / Speed class</span><select value={modelDraft(model).speed_class ?? ''} onchange={(event) => updateModelMetadata(model, { speed_class: event.currentTarget.value || undefined })}><option value="">—</option><option value="ultra-fast">ultra-fast</option><option value="fast">fast</option><option value="medium">medium</option><option value="slow">slow</option><option value="low-speed-outlier">low-speed-outlier</option></select></label>
 								<label class="wide"><span>実測値に基づく速度ラベル / Measured speed label</span><input value={modelDraft(model).speed_label ?? ''} oninput={(event) => updateModelMetadata(model, { speed_label: event.currentTarget.value })} /></label>
 								<label class="wide"><span>評価コメント（日本語）</span><textarea rows="2" value={modelDraft(model).comment_ja ?? ''} oninput={(event) => updateModelMetadata(model, { comment_ja: event.currentTarget.value })}></textarea></label>
 								<label class="wide"><span>Evaluation comment (English)</span><textarea rows="2" value={modelDraft(model).comment_en ?? ''} oninput={(event) => updateModelMetadata(model, { comment_en: event.currentTarget.value })}></textarea></label>
+									{/if}
 								</div>
-							</details>{/if}
+							</details>
 						</article>
 					{/each}
 			</div>

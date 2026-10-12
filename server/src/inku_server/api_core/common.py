@@ -142,10 +142,11 @@ def _model_offered_to(actor: dict | None, model_ref: str | None, *, stage: str, 
     """
     provider_id, model_id = provider_for_model(model_ref or None, stage=stage, settings=settings)
     if provider_id == "chatgpt":
-        if actor is None or operation != "pipeline" or purpose != "llm":
+        if actor is None or (operation, purpose) not in (("pipeline", "llm"), ("vision", "vision")):
             return False
         from ..chatgpt_provider import offered
-        return offered(actor["id"], model_id)
+        return offered(actor["id"], model_id, purpose=purpose,
+                       profile_id=settings.get("chatgpt_profile_id"), generation=settings.get("chatgpt_generation"))
     if actor is not None and _db.has_permission_group(actor, "admins"):
         return True
     return model_is_offered(provider_id, model_id, settings, purpose=purpose)

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-12 — Use ChatGPT plan for Vision refinement and colophons
+
+Server/Web stores LLM/Vision purposes per registration and offers only published models matching the purpose. Unset purposes default to both; models with no purpose cannot be published. Select models now shows Vision filtering, purpose buttons and catalog details. Vision refinement and colophons pin the starting registration, send images and text to Responses and read only completed text. Colophon caches separate registrations/generations and retain publication checks.
+
 ### 2026-10-12 — Match Server's Gemini thinking levels in Swift
 
 Swift drawing pipeline and Vision requests now choose Gemini thinking levels by model: `low` for `gemini-3.8-flash`, Pro models, and `gemini-2.5-flash`; no `thinkingConfig` for `gemini-2.5-flash-lite`; and `minimal` for other models. Both paths share the same matching, including Server's prefix and suffix handling, to prevent requests from being refused for an unsupported `minimal` level.

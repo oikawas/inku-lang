@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-12 — ChatGPTプランをVision推敲・奥書にも使う
+
+Server/WebのChatGPTプランに登録ごとのLLM／Vision用途を保存し、公開した用途に合うモデルだけを候補へ出す。未保存用途は両方、用途なしは公開不可。公開モデルの選択にVisionの絞り込み・用途ボタン・取得元の詳細を表示する。Vision推敲と奥書は開始時の登録を固定し、Responsesへ画像とテキストを送り、完了したテキストだけを読む。奥書cacheを登録・世代ごとに分離し、公開撤回の確認を省略しない。
+
 ### 2026-10-12 — SwiftのGemini思考レベルをServerに揃える
 
 Swiftの描画pipelineとVisionも、Geminiへの思考レベルをモデルごとに選ぶ。`gemini-3.8-flash`、Pro系、`gemini-2.5-flash`には`low`を送り、`gemini-2.5-flash-lite`では`thinkingConfig`を省く。ほかのモデルは従来どおり`minimal`。両経路で共通の判定を使い、Serverと同じ接頭辞・接尾辞の扱いで、不適切な`minimal`による要求の拒否を防ぐ。

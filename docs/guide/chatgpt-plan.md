@@ -6,7 +6,15 @@ Draw using the allowance granted when you sign in to ChatGPT. Its credentials an
 
 Explicitly set `INKU_CHATGPT_PLAN_ENABLED=1` and use developer mode, single-user mode, or explicit `INKU_CHATGPT_SELF_HOSTED=1` with verified self-hosted startup. The last option supports released containers with ordinary account sign-in and no developer mode. Administrators also need their own connection and `chatgpt.tokens.use.direct` permission. In single-user mode, only the fixed account owns it. A visible screen does not mean OAuth is complete.
 
-Initial local support covers source installations with the Web, API and browser on one PC. Android, local callbacks inside Docker, Vision, colophons, demo instruction generation and model inspection are outside scope.
+Initial local support covered source installations with the Web, API and browser on one PC. Server/Web also supports ChatGPT plan for Vision refinement and colophons. Local callbacks inside Docker, demo instruction generation and model inspection remain outside scope. See the [Android specification](../../android/ANDROID_SPEC.md) for current Android connection behavior.
+
+## Publish a Vision model
+
+In Settings → Models, open Select models for ChatGPT plan and save each model's LLM/Vision purposes and publication state. Models without saved purposes default to both; a model with no purpose cannot be published. The Vision filter shows the applicable models. Published Vision models appear as ChatGPT plan in Vision refinement and colophon pickers. Model details are reference information from the catalog.
+
+Purposes are stored in the registration's `model_purposes`. Responses from `GET/PUT /api/me/chatgpt/models/settings` include each model's `purposes` and existing `enabled`/`enabled_models` fields. PUT accepts `profile_id`, `generation`, `published_models` and an optional `model_purposes` map. Omitting the map preserves existing purposes; supplying it updates only the named models.
+
+Vision requests pin the owner, profile ID and generation at the start and send images and text to Responses. They send no tools, temperature or output-token limit and concatenate `output_text` from the completed response. Unpublished, unlisted or non-Vision models are refused before sending with `chatgpt_model_not_offered`. Disconnected, incomplete or refused output is not used as an answer. Colophon caches also separate registrations and are not reused for a model whose publication was withdrawn.
 
 ## Connect on the same PC
 

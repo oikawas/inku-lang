@@ -3082,8 +3082,12 @@ sequential resolution.
   chooses the crossing position along the shorter one; a shorter current fails.
   A failure records `missing_joint_reference`, `joint_reference_omitted`,
   `unsupported_joint_geometry` or `numeric_joint_position_conflict` and omits only
-  the relation. An instruction with a count above one is fitted per copy, and an
-  external group relation translates the whole group once, as for `not_touching`.
+  the relation. A group of copies (consecutive copies targeting the same preceding element)
+  moves as a whole by one translation from its combined bounds for `resting_on`,
+  `overlapping` and `crossing` (its arrangement or scatter is kept), and each copy
+  is moved inside on its own for `inside` (the author's decision, 2026-10-12). A
+  preceding group is taken by its combined bounds. An external group relation
+  translates the whole group once.
   Macro emits do not carry these four words yet
 
 Current typed Along / Cutting rendering covers count-one actual Scores. Macro repeated CompositionPlans retain shared relation intent; repeated-instance performance belongs to later materialization. Typed Along aligns

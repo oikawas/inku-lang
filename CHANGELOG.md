@@ -14,6 +14,7 @@ By the author's choice (all five of the first set). Many descriptions state join
 
 - Four words join the relations (あいだ) of Saijiki. Only the fixed phrases `前の形に載る` / `resting on the previous shape`, `前の形の中に` / `inside the previous shape`, `前の形に重なる` / `overlapping the previous shape` and `前の形を横切る` / `crossing the previous shape` make relations. The English short forms are `resting on`, `inside`, `overlaps` and `crossing` (`overlapping` is the group-layout word, so the short form is `overlaps`).
 - The performance fits the current shape from the performed bounds by translation only and never moves the previous shape. When a joint cannot hold, only the relation is omitted with a reason such as `unsupported_joint_geometry`.
+- For a group of copies, resting on, overlapping and crossing move the whole group as one shape (its scatter is kept), and inside moves each copy inside on its own (the author's decision). A preceding group is taken by its combined bounds.
 - `connected` starts from the nearest point of the outline when the previous shape is a closed square, circle, ellipse, triangle or polygon.
 - Only works with these relations use Score 0.20.0; other works keep their Score. DDL engine 58, render engine 74. The Server word table, the Score schema, the Web, Android and macOS word resources, and the Web word help and reason messages follow.
 

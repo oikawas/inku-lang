@@ -54,13 +54,14 @@ func runAuxiliaryProvenanceChecks() async throws {
         previousNodeID = nodeID
     }
 
-    // A later random run must not attach the advice still displayed from the previous Vision run.
+    // A later random run must not attach the advice still displayed from the previous Vision run. Like Web's
+    // AIRefineModal, every run starts again from the chosen source, not from the previous run's last child.
     auxiliary.visionMode = false; auxiliary.generations = 1; auxiliary.modelReference = "check:unused"
     await auxiliary.startRefinement(app: app)
     guard auxiliary.errorText == nil, auxiliary.completedGenerations == 1,
           auxiliary.generatedWorks.count == 1, let child = auxiliary.generatedWorks.first,
           let nodeID = child.lineageNodeID, let edge = try await database.edge(childNodeID: nodeID),
-          edge.parentNodeID == previousNodeID, edge.derivationKind == "reinterpretation",
+          edge.parentNodeID == parentNodeID, edge.derivationKind == "reinterpretation",
           try await database.work(id: child.id)?.historyVisibility == "normal" else {
         throw CheckFailure.message("Random provenance child failed: \(auxiliary.errorText ?? auxiliary.status)")
     }

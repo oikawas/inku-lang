@@ -2,6 +2,7 @@
 members = [
     "crates/inku-ddl",
     "crates/inku-display",
+    "crates/inku-display-gpu",
     "crates/inku-pipeline",
     "crates/inku-pipeline-uniffi",
     "crates/inku-score",

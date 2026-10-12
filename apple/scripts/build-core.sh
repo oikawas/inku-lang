@@ -45,11 +45,19 @@ if [[ "$PROFILE" == release ]]; then
 fi
 # Skia screen display (inku-display): skia-bindings reads the prebuilt binaries from
 # copies checked against core/crates/inku-display/skia-binaries.sha256 on every build.
-SKIA_BINARIES_URL="$("$ROOT/scripts/skia-binaries.sh" "${TARGETS[@]}")"
+# The GPU windows' Skia (Graphite) is the archive scripts/skia-graphite-binaries.sh built,
+# checked against core/crates/inku-display-gpu/skia-binaries.sha256.
+SKIA_BINARIES_URL="$("$ROOT/scripts/skia-binaries.sh" --with-local "${TARGETS[@]}")"
 export SKIA_BINARIES_URL
 for target in "${TARGETS[@]}"; do
     "$ROOT/scripts/rust-toolchain.sh" build --locked -p inku-pipeline-uniffi --features display --lib --target "$target" "${PROFILE_ARGS[@]}"
 done
+# The zoomed windows' program on Apple silicon (inku-display-gpu). no-compile: a missing or
+# different archive stops the build instead of compiling Skia here.
+"$ROOT/scripts/rust-toolchain.sh" build --locked -p inku-display-gpu --features graphite,skia-safe/no-compile \
+    --bin inku-display-gpu --target aarch64-apple-darwin "${PROFILE_ARGS[@]}"
+mkdir -p "$BUILD/display-gpu"
+cp "$RUST_TARGET/aarch64-apple-darwin/$PROFILE/inku-display-gpu" "$BUILD/display-gpu/inku-display-gpu"
 
 # The Cargo.lock-pinned 0.32.0 generator inspects this exact archive's metadata.
 "$ROOT/scripts/rust-toolchain.sh" run --locked -p inku-pipeline-uniffi --features cli --bin uniffi-bindgen -- \
@@ -133,6 +141,11 @@ identity = {
         for target in targets
     },
     "swift_binding_sha256": file_digest(package / "Sources/InkuCoreBindings/InkuCoreBindings.swift"),
+    "display_gpu": {
+        "target": "aarch64-apple-darwin",
+        "features": ["graphite"],
+        "sha256": file_digest(root / "apple/scripts/.build/core/display-gpu/inku-display-gpu"),
+    },
 }
 (package / "Artifacts/build-manifest.json").write_text(json.dumps(identity, indent=2, sort_keys=True) + "\n")
 __INKU_CORE_MANIFEST__

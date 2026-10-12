@@ -123,9 +123,12 @@ def rust_crates(notices: Notices, sysroot: Path) -> None:
     metadata = json.loads(cargo("metadata", "--format-version", "1", "--locked", "--offline", "--all-features"))
     packages = metadata["packages"]
     members: set[tuple[str, str, str]] = set()
-    for target in TARGETS:
-        tree = cargo("tree", "--locked", "--offline", "-p", "inku-pipeline-uniffi", "--features", "display",
-                     "--target", target, "-e", "normal", "--prefix", "none", "--format", "{p}")
+    trees = [cargo("tree", "--locked", "--offline", "-p", "inku-pipeline-uniffi", "--features", "display",
+                   "--target", target, "-e", "normal", "--prefix", "none", "--format", "{p}") for target in TARGETS]
+    # The zoomed windows' program, shipped next to the app for Apple silicon only.
+    trees.append(cargo("tree", "--locked", "--offline", "-p", "inku-display-gpu", "--features", "graphite",
+                       "--target", "aarch64-apple-darwin", "-e", "normal", "--prefix", "none", "--format", "{p}"))
+    for tree in trees:
         for line in tree.splitlines():
             match = TREE_LINE.match(line.strip().removesuffix(" (*)").removesuffix(" (proc-macro)"))
             if not match:

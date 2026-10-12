@@ -1,7 +1,7 @@
 {
  "schema": "inku.macos-third-party-notices.v1",
  "inputs": {
-  "core/Cargo.lock": "933d6dd4861c7711685132a18776766d435355d237d844ff6090fc0dcd300ad4",
+  "core/Cargo.lock": "a0a1b805ae18795ea20c37d033b22828681f90d5762a88ffa227772ac8e02f4a",
   "apple/Package.resolved": "23397c5afe667533ac1394c1e35f27136e80cb6a872ad93e6a789727d9162acb"
  },
  "components": [
@@ -784,6 +784,20 @@
    "license": "MIT",
    "source": "https://github.com/oikawas/inku-lang",
    "note": "From this repository, core/crates/inku-display.",
+   "texts": [
+    {
+     "label": "LICENSE",
+     "text": "e4eb0f25fa522c57"
+    }
+   ]
+  },
+  {
+   "group": "rust",
+   "name": "inku-display-gpu",
+   "version": "0.1.0",
+   "license": "MIT",
+   "source": "https://github.com/oikawas/inku-lang",
+   "note": "From this repository, core/crates/inku-display-gpu.",
    "texts": [
     {
      "label": "LICENSE",

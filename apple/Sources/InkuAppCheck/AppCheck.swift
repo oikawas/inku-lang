@@ -82,6 +82,7 @@ struct AppCheck {
             let fixture = URL(fileURLWithPath: CommandLine.arguments[index + 1])
             try runDisplayChecks(fixtureURL: fixture)
             try await runDisplayCanvasChecks(svg: String(contentsOf: fixture, encoding: .utf8))
+            try await runDisplayGPUChecks(svg: String(contentsOf: fixture, encoding: .utf8), helper: displayGPUHelper())
             return
         }
         if let index = CommandLine.arguments.firstIndex(of: "--thumbnails-only"), CommandLine.arguments.indices.contains(index + 1) {

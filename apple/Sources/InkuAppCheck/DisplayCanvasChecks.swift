@@ -5,7 +5,8 @@ import InkuUI
 
 private enum DisplayCanvasCheckFailure: Error { case failed(String) }
 
-/// The work area's painter and request flow, on `svg` (a supported work).
+/// The work area's painter and request flow, on `svg` (a supported work), with the windows drawn in tiles on the
+/// CPU as on Intel Macs (`runDisplayGPUChecks` covers Graphite's windows).
 /// Failure (C1): the work area silently draws with resvg, or joins its tiles wrongly; a work Skia cannot
 /// draw is drawn another way instead of stopping with its cause logged.
 /// Failure (C5): a new work waits behind the one the viewer left, or a cancelled request
@@ -17,7 +18,7 @@ func runDisplayCanvasChecks(svg: String) async throws {
     // C1: Skia draws the work area, coarse whole first; the tiles join into the one-piece whole.
     let logFolder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-display-failures-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: logFolder) }
-    let renderer = DisplayRenderer()
+    let renderer = DisplayRenderer(windows: .cpu)
     renderer.connectFailureLog(directory: logFolder)
     var frames: [DisplayRenderer.Frame] = []
     for try await frame in renderer.whole(svg: svg, width: 1500, height: 1500) { frames.append(frame) }
@@ -55,12 +56,12 @@ func runDisplayCanvasChecks(svg: String) async throws {
     let large: UInt32 = 4096
     let alone = CanvasPicture()
     let started = ContinuousClock.now
-    await alone.load(svg: svg, width: large, height: large, renderer: DisplayRenderer())
+    await alone.load(svg: svg, width: large, height: large, renderer: DisplayRenderer(windows: .cpu))
     let largeAlone = ContinuousClock.now - started
     guard alone.painter == .skia, !alone.loading else { throw fail("The large whole did not finish on its own") }
 
     let next = ##"<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><rect width="300" height="200" fill="#2e6b3f"/></svg>"##
-    let shared = DisplayRenderer()
+    let shared = DisplayRenderer(windows: .cpu)
     let picture = CanvasPicture()
     let first = Task { await picture.load(svg: svg, width: large, height: large, renderer: shared) }
     try await waitUntil("the coarse whole of the large request") { picture.image != nil }
@@ -123,10 +124,10 @@ func runDisplayCanvasChecks(svg: String) async throws {
     let deep = DisplayRegion(fullWidth: 12_000, fullHeight: 12_000, x: 4000, y: 4000, width: 4096, height: 4096)
     let deepPlan = CanvasDetailPlan(fullWidth: 12_000, fullHeight: 12_000, x: 4000, y: 4000, width: 4096, height: 4096)
     let windowStarted = ContinuousClock.now
-    for try await _ in DisplayRenderer().window(svg: svg, region: deep) {}
+    for try await _ in DisplayRenderer(windows: .cpu).window(svg: svg, region: deep) {}
     let windowAlone = ContinuousClock.now - windowStarted
     let zoomed = CanvasPicture()
-    let zoomRenderer = DisplayRenderer()
+    let zoomRenderer = DisplayRenderer(windows: .cpu)
     await zoomed.load(svg: svg, width: 1000, height: 1000, renderer: zoomRenderer)
     let deepTask = Task { await zoomed.loadWindow(svg: svg, plan: deepPlan, renderer: zoomRenderer) }
     try await waitUntil("the first tiles of the window") { zoomed.pendingWindow != nil }

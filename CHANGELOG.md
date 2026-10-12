@@ -20,6 +20,16 @@ An idle Web batch with drawing errors offers "Retry failed works". It keeps the 
 
 At the author's instruction (make A3). For each numeric range an approved completion wrote, the work keeps the words before the parenthesis, the numbers, and the sentence. When instructions from a saved work are drawn again, the shared core compares each range with the record and tells completed ranges, edited numbers, and edited words apart. A range whose words alone were edited goes to the completion when drawn, which asks for approval of new numbers for the new words (completion prompt v5; a proposal that changes the words is refused with `range_words_not_kept`). A range with edited numbers is drawn by its numbers as before. The record is only laid over the compilation: the result the instructions alone give, the saved formats, and the engine versions do not change. Instructions exported or imported alone carry no record and are drawn by their numbers as before. Edit screens read the states from the shared core's `completion_range_states`. Saving and screens on Server and Android follow separately.
 
+## macOS 1.1.2 (unreleased; Build 4)
+
+### 2026-10-11 — Draw zoomed windows with Graphite on Apple silicon
+
+Zooming comes closer to the Web's Chrome in speed (the author's instruction and decisions). On Apple silicon, the work area's zoomed windows are drawn with Skia's Graphite (GPU) by a separate process bundled with the app (`inku-display-gpu`). A 4x window of the author's largest work went from 0.52 s to 0.03 s. The 100% whole, and windows on Intel and under Rosetta, are drawn on the CPU as before.
+
+- When the drawing process ends (including a GPU driver ending it), the app goes on. That window is not drawn, the cause goes to the display failure log, and that work is not sent again in this run.
+- In a Graphite window, the grain feTurbulence makes sits slightly differently from Chrome. The 100% whole looks the same as before.
+- No published Skia prebuilt has Graphite with SVG, so `scripts/skia-graphite-binaries.sh` builds it and builds check it by SHA-256.
+
 ## v2.15.96 (2026-10-06 / Build 1172)
 
 ### 2026-10-06 — Show completion originals and reasons on Web

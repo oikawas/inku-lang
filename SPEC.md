@@ -2103,7 +2103,10 @@ separate `inku-svg-raster` boundary. The macOS work area, zoomed view included,
 is rasterized for display by the separate `core/crates/inku-display` (Skia): it
 rewrites compatibility points in memory just before display. A work outside
 its support table, or one Skia cannot draw, is not drawn another way: the
-display stops and records the cause (the author's ruling, 2026-10-06). Neither changes the Render
+display stops and records the cause (the author's ruling, 2026-10-06). On Apple
+silicon, only the zoomed windows are drawn by Skia's Graphite (GPU) in a separate
+process (`core/crates/inku-display-gpu`); when that process ends, the window is not
+drawn and the cause is recorded (the author's decision, 2026-10-11). Neither changes the Render
 Engine version, saved SVG, or the meaning of `rh3`.
 
 Shared Rust owns Score structure and meaning. Python retains saved-format read compatibility, including finite actions such as a warned drop of an invalid legacy relation. Hosts must not add a visual event, composition anchor, density floor, or accent shape.

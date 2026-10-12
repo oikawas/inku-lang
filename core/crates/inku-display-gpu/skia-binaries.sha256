@@ -1,0 +1,7 @@
+# Skia binaries for inku-display-gpu (skia-safe/skia-bindings =0.153.3 with svg, webp,
+# metal and graphite: Graphite on Metal for the macOS app's zoomed windows). No
+# release publishes this combination, so scripts/skia-graphite-binaries.sh builds it
+# from the skia-bindings crate's source (macOS 26.5 SDK, ninja v1.13.2) into the cache.
+# scripts/skia-binaries.sh checks the copy there and never fetches it. A rebuild
+# changes the digest: replace the line with the one the build script prints.
+8c708fef2de49b64f655bfab12dd7c4dd87cfa46021b93544ac47c3daaea6b78  0.153.3/skia-binaries-b7f043e0b1e2a850e702-aarch64-apple-darwin-graphite-jpegd-jpege-metal-pdf-svg-textlayout-webpd-webpe.tar.gz

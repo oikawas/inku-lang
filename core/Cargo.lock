@@ -561,6 +561,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "inku-display-gpu"
+version = "0.1.0"
+dependencies = [
+ "inku-display",
+ "skia-safe",
+]
+
+[[package]]
 name = "inku-pipeline"
 version = "0.1.0"
 dependencies = [

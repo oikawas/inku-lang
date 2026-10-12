@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-12 — Swift drawing mascots match Web
-
-Author's instruction. The macOS drawing mascot, a simple line drawing until now, is replaced by the same two 5x5 pixel mascots as Web (Incu, a turning cube, and Yuragi, a crab that greets with its claws and blows bubbles). The Web CSS motion is ported as values over time, and AppCheck `--mascot-only` checks them against the keyframes. As on Web, the drawing indicator (mascot, label, facts, stop) now appears for batch, work editing, DDL editing, refinement, color catalog and model comparison, and autonomous refinement as well as single drawing and demo. Refinement and comparison show a lane per candidate wearing the mascot not chosen.
-
 ### 2026-10-12 — Match Server's ChatGPT plan settings flow in Swift
 
 At the author's instruction, the macOS ChatGPT plan settings now handle the connection only; the model list and "Use for drawing" are gone. Once connected they show a guide and "Open model settings". Models are chosen under the ChatGPT plan in the Models settings: refresh the list, check the models to publish and save. The publication is saved per connected profile and kept when the same identity reauthorizes. Only published models appear as "ChatGPT plan" in the drawing model picker, comparison and drawing defaults. As on Server, a drawing request is sent only for a model that is in the catalog and published. An existing connection also saves its publication once.
@@ -64,7 +60,11 @@ An idle Web batch with drawing errors offers "Retry failed works". It keeps the 
 
 At the author's instruction (make A3). For each numeric range an approved completion wrote, the work keeps the words before the parenthesis, the numbers, and the sentence. When instructions from a saved work are drawn again, the shared core compares each range with the record and tells completed ranges, edited numbers, and edited words apart. A range whose words alone were edited goes to the completion when drawn, which asks for approval of new numbers for the new words (completion prompt v5; a proposal that changes the words is refused with `range_words_not_kept`). A range with edited numbers is drawn by its numbers as before. The record is only laid over the compilation: the result the instructions alone give, the saved formats, and the engine versions do not change. Instructions exported or imported alone carry no record and are drawn by their numbers as before. Edit screens read the states from the shared core's `completion_range_states`. Saving and screens on Server and Android follow separately.
 
-## macOS 1.1.2 (unreleased; Build 7)
+## macOS 1.1.2 (unreleased; Build 8)
+
+### 2026-10-12 — Swift drawing mascots match Web
+
+Author's instruction. The macOS drawing mascot, a simple line drawing until now, is replaced by the same two 5x5 pixel mascots as Web (Incu, a turning cube, and Yuragi, a crab that greets with its claws and blows bubbles). The Web CSS motion is ported as values over time, and AppCheck `--mascot-only` checks them against the keyframes. As on Web, the drawing indicator (mascot, label, facts, stop) now appears for batch, work editing, DDL editing, refinement, color catalog and model comparison, and autonomous refinement as well as single drawing and demo. Refinement and comparison show a lane per candidate wearing the mascot not chosen.
 
 ### 2026-10-12 — Always show the version and build at the bottom left
 

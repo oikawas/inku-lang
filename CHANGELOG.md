@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Send Ollama's gpt-oss "low" with room to reason, and give Vision and the demo Ollama's reasoning setting
+
+On Ollama Cloud, `gpt-oss:20b` reasoned through the whole 2,048-token budget in all six drawings despite `reasoning_effort: "none"` and answered nothing, as did `gpt-oss:120b` in two (draw session, 2026-10-12). Ollama resolves a reasoning effort a model does not list to that model's default, and gpt-oss lists only low, medium, and high. Ollama requests, local and cloud, now send gpt-oss `low` with 8,192 tokens of room, and every other model `none` as before. The setting moved into `openai_sampling()`, so Vision and the demo instruction now carry it too. An OpenAI-compatible drawing response that stops with `finish_reason: length` is not used as an answer and logs `provider_output_limit`; the core retries it as before.
+
 ### 2026-10-13 — Match Server's Gemini requests and Claude demo requests in Swift
 
 Swift Gemini drawing, Vision, and demo requests now send `minimal` only to the 13 known model names and Gemma, defaulting to `low` for others. Gemini 2.5 Flash Lite/Image and Antigravity receive no thinking level; models sent a level receive 8,192 extra output tokens. Gemini requests omit temperature, and demo instructions exclude thought text. Drawing responses ended at `MAX_TOKENS` are rejected even when their function call looks complete. Claude demos also omit temperature and receive 8,192 extra output tokens when Server's matching identifies a model that thinks by default.

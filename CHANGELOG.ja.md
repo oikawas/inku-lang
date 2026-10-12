@@ -8,6 +8,15 @@
 
 ## 未リリース
 
+### 2026-10-13 — Ollamaのgpt-ossにlowと推論の分の出力枠を送り、VisionとデモにもOllamaの推論の指定を付ける
+
+作者の指示（Ollamaの資料とOllama Cloudへの要求の照合）。描画セッションの2026-10-12の実測（run d3ab43b9、Build 1179）で、`gpt-oss:20b`は6件とも、`reasoning_effort: "none"`を送っても推論だけで出力枠2,048を使い切り（`finish_reason: length`）、本文も関数呼び出しも空だった。`gpt-oss:120b`も日本語の2件で同じだった。OllamaのOpenAI互換APIでは、`reasoning_effort`の値はモデルごとに決まり（`/api/show`の`thinking.values`）、モデルに無い値はそのモデルの既定に戻る。gpt-ossが受け付けるのは`low`・`medium`・`high`だけで、既定は`medium`である。
+
+- Ollama（ローカルとCloud）への要求では、gpt-ossに`reasoning_effort: "low"`を送り、出力枠に推論の分として8,192を足す（描画2,048→10,240）。ほかのモデルには従来どおり`none`を送る。
+- この指定は`openai_sampling()`に移し、描画だけでなくVision（推敲の助言・奥書）とデモの指示文にも付ける。これまでVisionとデモには推論の指定が無く、推論するモデルでは枠320・180を推論が使い切りうる。
+- OpenAI互換の応答で`finish_reason`が`length`のものは、描画では答えとして使わず、`provider_output_limit`の行（出力トークン数、推論の有無、本文・関数呼び出しの有無）を残す。Visionは応答を返して同じ行を残す。coreは「応答を読めない」も「形が違う」も再試行するので、再試行の扱いは変わらない。
+- 無料枠での利用拒否（HTTP 402・403）、画像を受け付けないモデルは、要求の形では直らないので変えていない。OllamaのOpenAI互換APIは`tool_choice`を未対応としている（無視される）が、送っても害はなく、本文で答えたモデルの答えも読むので変えていない。
+
 ### 2026-10-13 — SwiftのGemini要求とClaudeデモ要求をServerに揃える
 
 SwiftのGemini描画・Vision・デモも、対応が確かめられた13名とGemmaだけに`minimal`を送り、ほかは既定で`low`にする。2.5 Flash Lite／ImageとAntigravityには思考レベルを送らず、送るモデルだけ出力枠に8,192を足す。Geminiへの温度指定を外し、デモの指示文へ思考の部分を混ぜない。`MAX_TOKENS`の描画応答は、関数呼び出しが揃っていても答えとして使わない。Claudeデモも温度を送らず、Serverが思考するモデルと判定した場合は出力枠を8,192増やす。

@@ -489,6 +489,37 @@ def test_gemini_drawing_leaves_room_for_thinking_and_a_cut_answer_is_not_an_answ
     assert provider.failure_detail == "output_limit_reached"
 
 
+def test_ollama_cloud_gpt_oss_is_asked_for_low_and_a_reasoning_only_answer_is_cut(monkeypatch, caplog):
+    # gpt-oss:20b on Ollama Cloud reasoned through 2,048 tokens with "none" and
+    # returned no content and no tool call (draw, 2026-10-12, T000055).
+    monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model",
+                        lambda *args, **kwargs: ("ollama-cloud", "gpt-oss:20b"))
+    monkeypatch.setattr("inku_server.pipeline_provider.connection_for", lambda *args: {
+        "id": "ollama-cloud", "kind": "openai_compatible", "base_url": "https://ollama.invalid/v1",
+        "api_key": "test-only", "requires_api_key": True,
+    })
+    seen = []
+
+    async def request(value):
+        seen.append(json.loads(value.content))
+        return httpx.Response(200, json={"choices": [{"finish_reason": "length", "message": {
+            "role": "assistant", "content": "", "reasoning": "We need to produce...",
+        }}], "usage": {"prompt_tokens": 3932, "completion_tokens": 8448, "total_tokens": 12380}})
+
+    provider = SingleAttemptProvider(ProviderOptions({}, "m", "m", 256, 8192), transport=httpx.MockTransport(request))
+    with caplog.at_level("WARNING", logger="inku_server.pipeline_provider"):
+        result = provider(_action())
+    assert seen[0]["reasoning_effort"] == "low" and seen[0]["max_tokens"] == 256 + 8192
+    assert result["failure"] == "malformed_payload"
+    assert provider.failure_detail == "output_limit_reached"
+    line = next(r.getMessage() for r in caplog.records if r.getMessage().startswith("provider_output_limit "))
+    assert json.loads(line.split(" ", 1)[1]) == {
+        "action": "generate_normalized_ddl", "provider": "ollama-cloud", "model": "gpt-oss:20b",
+        "max_tokens": 256 + 8192, "finish_reason": "length", "output_tokens": 8448, "reasoning_tokens": None,
+        "has_reasoning": True, "has_text": False, "has_tool_call": False,
+    }
+
+
 def _reading_action() -> dict:
     # Keys arrive in name order, as the core's JSON writes them; the order that
     # matters is named in propertyOrdering.

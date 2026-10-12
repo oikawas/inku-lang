@@ -22,7 +22,7 @@ import httpx
 
 from .anthropic_request import anthropic_max_tokens, output_limit_record
 from .gemini_request import gemini_max_output_tokens, gemini_output_limit_record, gemini_thinking
-from .openai_request import openai_sampling
+from .openai_request import openai_output_limit_record, openai_sampling
 from .provider_refusal import provider_error
 from .chatgpt_store import ChatGPTError
 from .model_settings import connection_for
@@ -156,13 +156,15 @@ def vision_text(connection: dict[str, Any], model_id: str, *, system: str, text:
     data = response.json()
     kind = connection.get("kind")
     cut = (output_limit_record(data) if kind == "anthropic"
-           else gemini_output_limit_record(data) if kind == "gemini" else None)
+           else gemini_output_limit_record(data) if kind == "gemini"
+           else openai_output_limit_record(data) if kind == "openai_compatible" else None)
     if cut is not None:
         # Returned as it is: a cut colophon is still prose, and cut advice JSON
         # fails where it is parsed. This line says the budget, not the image, ran out.
         _logger.warning("provider_output_limit %s", json.dumps({
             "action": "vision", "provider": connection.get("id"), "model": model_id,
-            "max_tokens": body["max_tokens"] if kind == "anthropic" else body["generationConfig"]["maxOutputTokens"],
+            "max_tokens": (body["generationConfig"]["maxOutputTokens"] if kind == "gemini"
+                           else body.get("max_tokens", body.get("max_completion_tokens"))),
             **cut,
         }, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
     return _answer(str(connection.get("kind")), data).strip()

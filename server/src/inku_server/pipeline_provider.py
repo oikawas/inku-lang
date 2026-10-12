@@ -21,7 +21,7 @@ from .model_settings import connection_for, provider_for_model
 from .provider_limits import provider_slot
 from .anthropic_request import anthropic_max_tokens, output_limit_record
 from .gemini_request import gemini_max_output_tokens, gemini_output_limit_record, gemini_thinking
-from .openai_request import openai_sampling
+from .openai_request import openai_output_limit_record, openai_sampling
 from .provider_refusal import provider_error as _provider_error
 from .provider_observation import ProviderObservationError, ProviderObservationStore
 from .provider_rate_limits import ProviderRateBudget, RateAccountingUnavailable, RateLimitUnavailable, retry_after_seconds
@@ -358,8 +358,6 @@ class SingleAttemptProvider:
                     "parameters": prompt["response_schema"],
                 }}]
                 body["tool_choice"] = {"type": "function", "function": {"name": response_name}}
-            if connection["id"] in {"ollama", "ollama-cloud"}:
-                body["reasoning_effort"] = "none"
         elif kind == "anthropic":
             url = base + "/v1/messages"
             headers.update({"x-api-key": key, "anthropic-version": "2023-06-01"})
@@ -510,12 +508,14 @@ class SingleAttemptProvider:
         # A response stopped at the output limit is cut off whatever it holds:
         # a tool input or JSON text that ends there is not the whole answer.
         cut = (output_limit_record(data) if kind == "anthropic"
-               else gemini_output_limit_record(data) if kind == "gemini" else None)
+               else gemini_output_limit_record(data) if kind == "gemini"
+               else openai_output_limit_record(data) if kind == "openai_compatible" else None)
         if cut is not None:
             self.failure_detail = "output_limit_reached"
             _logger.warning("provider_output_limit %s", json.dumps({
                 "action": action["tag"], "provider": connection["id"], "model": model,
-                "max_tokens": body["max_tokens"] if kind == "anthropic" else body["generationConfig"]["maxOutputTokens"],
+                "max_tokens": (body["generationConfig"]["maxOutputTokens"] if kind == "gemini"
+                               else body.get("max_tokens", body.get("max_completion_tokens"))),
                 **cut,
             }, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
             raise TypeError("provider output reached its token limit")

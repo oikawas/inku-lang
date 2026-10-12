@@ -229,6 +229,19 @@ def stream_bytes(*, failed=False):
     return b"".join(b"data: " + canonical(event) + b"\r\n\r\n" for event in events), arguments
 
 
+@pytest.mark.parametrize(("code", "failure", "action"), [
+    ("subscription_sharing_usage_limit_exceeded", "provider_rejected", "usage"),
+    ("subscription_sharing_usage_unavailable", "transport_unavailable", "retry"),
+])
+def test_a_stream_error_event_is_read_by_its_own_code(code, failure, action):
+    # A stream's `error` event holds code and param at its top level, not under "error".
+    from inku_server.chatgpt_provider import SSEDecoder
+    event = {"type": "error", "code": code, "message": "plan usage", "param": None, "sequence_number": 3}
+    with pytest.raises(ChatGPTError, match=code) as raised:
+        SSEDecoder(1024).feed(b"data: " + canonical(event) + b"\r\n\r\n")
+    assert (raised.value.failure, raised.value.action) == (failure, action)
+
+
 def test_sse_split_utf8_requires_completed_and_rejects_late_quota():
     from inku_server.chatgpt_provider import SSEDecoder
     wire, arguments = stream_bytes()

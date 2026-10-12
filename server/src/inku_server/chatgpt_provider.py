@@ -42,7 +42,12 @@ def safe_identifier(value) -> str | None:
 
 
 def response_error(value: dict, status: int | None = None, request_id: str | None = None) -> ResponseFailure:
-    error = value.get("error") or value.get("response", {}).get("error") or {}
+    # An HTTP error body nests the error under "error" and response.failed
+    # under "response"; a stream's `error` event carries code and param itself
+    # (ResponseErrorEvent), so a usage limit sent that way still pauses the plan.
+    value = value if isinstance(value, dict) else {}
+    response = value.get("response") if isinstance(value.get("response"), dict) else {}
+    error = value.get("error") or response.get("error") or (value if value.get("type") == "error" else {})
     if not isinstance(error, dict):
         error = {}
     code = error.get("code")

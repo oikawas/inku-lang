@@ -8,6 +8,14 @@
 
 ## 未リリース
 
+### 2026-10-13 — ChatGPTプランのストリーム中のerrorイベントを、そのコードで読む
+
+作者の指示（OpenAIの資料とChatGPTプランへの要求の照合）。Sign in with ChatGPTの資料（models-and-inference・preview-limitations・errors-and-recovery）と照らすと、要求の形（`store: false`・`stream: true`、namespaceにまとめた関数、`instructions`、省くべき`max_output_tokens`・`temperature`などを送らないこと、画像の`input_image`）と、トークン更新のエラーの扱いは資料どおりだった。描画セッションの10-12の実測でも、84送信がすべて完了していた。
+
+食い違いは1か所だった。ストリームの途中の`error`イベントは、`code`と`param`をイベントの最上位に持つ（OpenAI SDKの`ResponseErrorEvent`）。Serverは`error`の入れ子と`response.error`しか見ていなかったため、利用上限（`subscription_sharing_usage_limit_exceeded`）がこのイベントで届くと、一般の失敗として扱い、資料が求める新しい要求の停止と利用状況への案内をしなかった。一時的な`subscription_sharing_usage_unavailable`なども、再試行でなく診断として扱っていた。
+
+- `error`イベントでは最上位の`code`・`param`を読む。HTTPのエラー本文と`response.failed`の読み方は変えない。
+
 ### 2026-10-13 — Geminiの思考レベルを既定でlowにし、思考の分の出力枠を足す
 
 作者の指示（Googleの資料とGeminiへの要求の照合）。描画セッションの2026-10-12の実測（Build 1178・1179）で、次が分かった。

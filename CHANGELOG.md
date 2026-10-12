@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Read a ChatGPT plan stream's error event by its own code
+
+Checked against OpenAI's Sign in with ChatGPT documentation, the ChatGPT plan requests (`store: false`, `stream: true`, function tools in a namespace, `instructions`, none of the omitted fields such as `max_output_tokens` or `temperature`, and `input_image` parts) and the token-refresh error handling already match it. One difference remained: a stream's `error` event carries `code` and `param` at its top level, but Server looked only under `error` and `response.error`, so a usage limit sent that way was treated as a generic failure instead of pausing plan requests and pointing to usage, and a temporary `subscription_sharing_usage_unavailable` was treated as needing diagnosis rather than a retry. The top-level code is now read.
+
 ### 2026-10-13 — Send Gemini "low" thinking by default, with room for thinking
 
 Server sent `minimal` to every Gemini model it did not list, so `gemini-3.7-flash` and the `gemini-flash-latest` and `gemini-pro-latest` aliases refused with a 400; `gemini-2.5-flash-image` refused any thinking level; and thought tokens, which `maxOutputTokens` counts, cut `gemini-3.1-pro-preview` at 1,024 and left `gemini-3-pro-image` with no answer at 320 (draw session, 2026-10-12). Only the models known to take `minimal` (Google's thinking-levels table, the ids measured, and Gemma) are now sent it; every other model is sent `low`, and `gemini-2.5-flash-lite`, `gemini-2.5-flash-image`, and `antigravity-` models are sent no level. Models sent a level get 8,192 tokens of room beside the answer. A drawing response that stops at `MAX_TOKENS` is not used and logs `provider_output_limit`. Vision and the demo instruction no longer send Gemini a temperature, as Google's Gemini 3 guidance asks, and the demo no longer includes Gemma's thought parts. The demo's Claude request also drops its temperature, which Sonnet 5 refuses, and leaves room for thinking.

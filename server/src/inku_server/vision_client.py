@@ -18,6 +18,7 @@ from urllib.parse import quote
 
 import httpx
 
+from .gemini_request import gemini_thinking
 from .openai_request import openai_sampling
 from .provider_refusal import provider_error
 
@@ -69,10 +70,9 @@ def _request(connection: dict[str, Any], model_id: str, *, system: str, text: st
         return base + "/v1beta/models/" + quote(model_id, safe="") + ":generateContent", headers, {
             "systemInstruction": {"parts": [{"text": system}]},
             "contents": [{"role": "user", "parts": parts}],
-            # Minimal thinking, as the pipeline asks: a thinking model otherwise
-            # spends the small output budget before it writes the answer.
+            # The lowest thinking level, as the pipeline asks.
             "generationConfig": {"temperature": temperature, "maxOutputTokens": max_tokens,
-                                 "thinkingConfig": {"thinkingLevel": "minimal"}},
+                                 **gemini_thinking(model_id)},
         }
     raise ValueError(f"unsupported provider kind for Vision: {kind}")
 

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-12 — Send each Gemini model its lowest thinking level
+
+Server sent `thinkingLevel: minimal` to every Gemini model for drawing and Vision requests. Per Google AI Studio's thinking-levels table, `gemini-3.8-flash`, the Pro models, `gemini-2.5-pro`, and `gemini-2.5-flash` do not take `minimal`; their lowest level is `low`, which they are now sent. `gemini-2.5-flash-lite`, which does not think by default, is sent no level. Other models, including `gemini-3.5-flash-lite` and Gemma 4, keep `minimal`. Android is unchanged.
+
 ### 2026-10-12 — Extend SVG limits to Android and Swift
 
 Android and Swift gain local generated-SVG settings: 12 MiB by default and recommendation, configurable from 1 to 32 MiB. Each actual draw reads its limit for the intermediate allowance and final UTF-8 byte check. Native transport separates SVG from JSON, and oversized works are not saved while their failure is retained. Shared display/raster and the Swift export parser use a separate 64 MiB envelope to accommodate descriptions and wrappers around a 32 MiB work. Existing native APIs and drawing identity remain unchanged.

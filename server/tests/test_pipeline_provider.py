@@ -4,6 +4,7 @@ import asyncio
 import json
 
 import httpx
+import pytest
 
 from inku_server.pipeline_provider import ProviderOptions, SingleAttemptProvider
 
@@ -304,10 +305,11 @@ def test_anthropic_answer_given_as_text_is_read_as_the_response_object(monkeypat
     assert provider(_action())["failure"] == "malformed_payload"
 
 
-def test_gemini_forces_one_schema_bound_function_call_with_minimal_thinking(monkeypatch):
+@pytest.mark.parametrize(("model", "level"), [("gemma-4-31b-it", "minimal"), ("gemini-3.8-flash", "low")])
+def test_gemini_forces_one_schema_bound_function_call_with_lowest_thinking(monkeypatch, model, level):
     monkeypatch.setattr(
         "inku_server.pipeline_provider.provider_for_model",
-        lambda *args, **kwargs: ("gemini", "gemma-4-31b-it"),
+        lambda *args, **kwargs: ("gemini", model),
     )
     monkeypatch.setattr(
         "inku_server.pipeline_provider.connection_for",
@@ -349,7 +351,7 @@ def test_gemini_forces_one_schema_bound_function_call_with_minimal_thinking(monk
         )
 
     provider = SingleAttemptProvider(
-        ProviderOptions({}, "gemini:gemma-4-31b-it", "fixture", 256, 8192),
+        ProviderOptions({}, "gemini:" + model, "fixture", 256, 8192),
         transport=httpx.MockTransport(request),
     )
     action = _action()
@@ -437,7 +439,7 @@ def test_gemini_forces_one_schema_bound_function_call_with_minimal_thinking(monk
         }
     }
     assert request_body["generationConfig"]["thinkingConfig"] == {
-        "thinkingLevel": "minimal"
+        "thinkingLevel": level
     }
 
 

@@ -19,6 +19,7 @@ import httpx
 from .api_core.common import _is_qualified_model_id
 from .model_settings import connection_for, provider_for_model
 from .provider_limits import provider_slot
+from .gemini_request import gemini_thinking
 from .openai_request import openai_sampling
 from .provider_refusal import provider_error as _provider_error
 from .provider_observation import ProviderObservationError, ProviderObservationStore
@@ -381,7 +382,7 @@ class SingleAttemptProvider:
                     "contents": [{"role": "user", "parts": [{"text": prompt["message"]}]}],
                     "generationConfig": {
                         "maxOutputTokens": self.options.max_tokens,
-                        "thinkingConfig": {"thinkingLevel": "minimal"},
+                        **gemini_thinking(model),
                     },
                     "tools": [{"functionDeclarations": [{
                         "name": response_name,

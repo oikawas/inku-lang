@@ -8,6 +8,13 @@
 
 ## 未リリース
 
+### 2026-10-12 — Geminiへ各モデルの最も低い思考レベルを送る
+
+作者の指示（Google AI Studioの資料「Thinking levels」）。ServerはGeminiへの描画とVisionの要求に、モデルを問わず`thinkingLevel: minimal`を送っていた。資料の表では、`gemini-3.8-flash`、Proのモデル（`gemini-3.1-pro-preview`・`gemini-3-pro-preview`）、`gemini-2.5-pro`・`gemini-2.5-flash`は`minimal`を受け付けず、最も低い段は`low`である。
+
+- これらのモデルへは`low`を送る。`gemini-2.5-flash-lite`は既定で思考しないため、思考レベルを送らない。ほかのモデル（`gemini-3.5-flash-lite`・`gemini-3.6-flash`・`gemini-3-flash-preview`・Gemma 4）へは従来どおり`minimal`を送る。
+- 表は`gemini_request.py`の1箇所に置き、描画のpipelineとVisionの両方が使う。Androidは変えていない。
+
 ### 2026-10-12 — SVG制限値をAndroid／Swiftへ拡張する
 
 Android／SwiftにもSVG生成上限のローカル設定を追加する。既定・推奨12 MiB、1〜32 MiBで、実際の描画時に取得した値を生成途中の予算と最終UTF-8 byte検査へ渡す。native通信ではSVGとJSONを分離し、超過した作品を保存せず失敗を保持する。共有表示・rasterとSwift書き出しparserは、32 MiB作品に説明・wrapperを追加できる別の64 MiB枠を使う。既存native APIと描画identityは保持する。

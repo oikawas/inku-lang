@@ -30,7 +30,7 @@ internal class CameraDescriptionWriter(private val provider: ModelProvider) {
                     temperature = 0.7,
                     maxTokens = 2048,
                     timeoutMs = 120_000L,
-                    thinkingLevel = "minimal",
+                    thinkingLevel = geminiThinkingLevel(request.modelId.removePrefix("${provider.providerId}:")),
                 ),
             )
         } catch (error: ModelProviderHttpException) {

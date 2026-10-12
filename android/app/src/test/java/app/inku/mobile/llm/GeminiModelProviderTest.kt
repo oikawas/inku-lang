@@ -15,6 +15,23 @@ import org.junit.Test
 
 class GeminiModelProviderTest {
     @Test
+    fun pipelineModelsSendTheServersLowestThinkingLevel() = runBlocking {
+        for ((model, expected) in THINKING_CASES) {
+            lateinit var connection: GeminiConnection
+            val provider = GeminiModelProvider("custom-google", "https://generativelanguage.invalid", "test-only") { url ->
+                GeminiConnection(url).also { connection = it }
+            }
+            provider.generate(ModelRequest("custom-google:$model", "draw", 0.0, 1024,
+                tool = ModelTool("submit_pipeline_response", "Submit", """{"type":"object"}"""),
+                pipelineAction = "generate_normalized_ddl"))
+            val payload = JSONObject(connection.body.toString(Charsets.UTF_8.name()))
+            assertThinking(model, expected, payload)
+            assertFalse(payload.getJSONObject("generationConfig").has("temperature"))
+            assertEquals("ANY", payload.getJSONObject("toolConfig").getJSONObject("functionCallingConfig").getString("mode"))
+        }
+    }
+
+    @Test
     fun compositionSchemaKeepsTheThesisFirstAndOrdersNestedObjectsWithoutDroppingProperties() {
         val projected = GeminiJsonSchema.project(JSONObject("""{
             "type":"object","propertyOrdering":["thesis","roles","missing"],
@@ -120,6 +137,38 @@ class GeminiModelProviderTest {
 
 class GeminiVisionRequestTest {
     @Test
+    fun imageModelsSendTheServersLowestThinkingLevel() = runBlocking {
+        for ((model, expected) in THINKING_CASES) {
+            lateinit var connection: GeminiConnection
+            val provider = GeminiModelProvider("custom-google", "https://generativelanguage.invalid", "test-only") { url ->
+                GeminiConnection(url, TEXT_ANSWER).also { connection = it }
+            }
+            RemoteVisionAnalyzer(provider).analyze(VisionAnalysisRequest(modelId = "custom-google:$model",
+                languageCode = "en", normalizedJpeg = byteArrayOf(1, 2, 3), width = 320, height = 240))
+            val payload = JSONObject(connection.body.toString(Charsets.UTF_8.name()))
+            assertThinking(model, expected, payload)
+            assertEquals(0.2, payload.getJSONObject("generationConfig").getDouble("temperature"), 0.0)
+            assertEquals("AQID", payload.getJSONArray("contents").getJSONObject(0).getJSONArray("parts")
+                .getJSONObject(1).getJSONObject("inlineData").getString("data"))
+        }
+    }
+
+    @Test
+    fun cameraDescriptionModelsSendTheServersLowestThinkingLevel() = runBlocking {
+        for ((model, expected) in THINKING_CASES) {
+            lateinit var connection: GeminiConnection
+            val provider = GeminiModelProvider("custom-google", "https://generativelanguage.invalid", "test-only") { url ->
+                GeminiConnection(url, TEXT_ANSWER).also { connection = it }
+            }
+            CameraDescriptionWriter(provider).write(CameraDescriptionRequest("a red circle", "custom-google:$model", "en"))
+            val payload = JSONObject(connection.body.toString(Charsets.UTF_8.name()))
+            assertThinking(model, expected, payload)
+            assertEquals(0.7, payload.getJSONObject("generationConfig").getDouble("temperature"), 0.0)
+            assertFalse(payload.has("tools"))
+        }
+    }
+
+    @Test
     fun cameraRequestFollowsTheGeminiKindEvenWithACustomConnectionId() = runBlocking {
         lateinit var connection: GeminiConnection
         val provider = GeminiModelProvider("photo-google", "https://generativelanguage.googleapis.com", "test-key") { url ->
@@ -143,6 +192,29 @@ class GeminiVisionRequestTest {
         assertEquals("AQID", inline.getString("data"))
         assertEquals("A red circle. A blue rectangle.", response.text)
     }
+}
+
+private val THINKING_CASES = listOf(
+    "gemini-3.8-flash" to "low",
+    "gemini-3.6-flash" to "minimal",
+    "gemini-3.5-flash-lite" to "minimal",
+    "gemini-3.1-pro-preview" to "low",
+    "gemini-3-flash-preview" to "minimal",
+    "gemini-3-pro-preview" to "low",
+    "gemini-2.5-pro" to "low",
+    "gemini-2.5-flash" to "low",
+    "gemini-2.5-flash-lite" to null,
+    "gemma-4-31b-it" to "minimal",
+    "models/gemini-4.1-pro-preview" to "low",
+    "gemini-2.5-flash-lite-preview" to null,
+    "gemini-2.5-flashlight" to "minimal",
+)
+private const val TEXT_ANSWER = """{"candidates":[{"content":{"parts":[{"text":"A red circle."}]}}]}"""
+
+private fun assertThinking(model: String, expected: String?, payload: JSONObject) {
+    val generation = payload.getJSONObject("generationConfig")
+    if (expected == null) assertFalse(model, generation.has("thinkingConfig"))
+    else assertEquals(model, expected, generation.getJSONObject("thinkingConfig").getString("thinkingLevel"))
 }
 
 private class GeminiConnection(

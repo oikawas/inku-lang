@@ -120,6 +120,7 @@ composition / color catalog と食い違って見える（→ §8）。
 | 説明（テンプレートの注記） | **Details** | 名詞。**`Description` は記述に予約** | ~~Description~~ |
 | 履歴の値／現在値を維持 | **The history's value** / **Keep the current value** | 履歴選択の 2 択 | — |
 | （推奨しない） | **(not recommended)** | 括弧付きの付記。**メニューの選択肢の隣にだけ** | ~~deprecated~~（廃止に読める）、~~legacy~~ |
+| オススメ度（モデル評価） | **recommendation** | LLM・Stage 1・Stage 2・Visionそれぞれの5段階の評価。既存モデル詳細の語に合わせる | ~~rating~~（別の尺度に読める） |
 | SVG オブジェクト数／SVG 点数 | **SVG objects** / **SVG points** | 生成情報の重さの行。数え方の正本は `$lib/svgWeight` | ~~elements~~・~~nodes~~（DOM の量に読める）、~~vertices~~ |
 | 揺らぎ | **sway** | 名詞 | ~~fluctuation~~（計測器）、~~jitter~~（信号） |
 | 添景 | **staffage** | 名詞。v2.11.0 で軸ごと畳んだ（記録の表示にのみ残る） | ~~decoration~~、~~props~~ |

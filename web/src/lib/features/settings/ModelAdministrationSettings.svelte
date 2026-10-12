@@ -611,18 +611,17 @@
 								<summary>{t().settingsModelMetadataDetails}</summary>
 							<div class="model-metadata-fields">
 									{#if modelPickerProvider.id === 'chatgpt'}
-										<div><span>オススメ度 / Recommendation</span><p>{modelRecommendation(modelDraft(model))}</p></div>
-										<div><span>速度区分 / Speed class</span><p>{model.speed_class || '—'}</p></div>
-										<div class="wide"><span>実測値に基づく速度ラベル / Measured speed label</span><p>{modelSpeed(model)}</p></div>
-										<div class="wide"><span>評価コメント（日本語）</span><p>{model.comment_ja || '—'}</p></div>
-										<div class="wide"><span>Evaluation comment (English)</span><p>{model.comment_en || '—'}</p></div>
+										{#each ['recommendation_llm', 'recommendation_stage1', 'recommendation_stage2', 'recommendation_vision'] as key}
+											{@const recommendationKey = key as 'recommendation_llm' | 'recommendation_stage1' | 'recommendation_stage2' | 'recommendation_vision'}
+											<label><span>{t().settingsModelRecommendationFields[recommendationKey]}</span><select value={modelDraft(model)[recommendationKey] ?? 0} onchange={(event) => updateModelMetadata(model, { [recommendationKey]: Number(event.currentTarget.value) || undefined })}><option value="0">—</option>{#each [1, 2, 3, 4, 5] as level}<option value={level}>{level} / 5</option>{/each}</select></label>
+										{/each}
 									{:else}
 								<label><span>オススメ度 / Recommendation</span><select value={modelDraft(model).recommendation_level ?? 0} onchange={(event) => updateModelMetadata(model, { recommendation_level: Number(event.currentTarget.value) || undefined })}><option value="0">—</option>{#each [1, 2, 3, 4, 5] as level}<option value={level}>{level} / 5</option>{/each}</select></label>
-								<label><span>速度区分 / Speed class</span><select value={modelDraft(model).speed_class ?? ''} onchange={(event) => updateModelMetadata(model, { speed_class: event.currentTarget.value || undefined })}><option value="">—</option><option value="ultra-fast">ultra-fast</option><option value="fast">fast</option><option value="medium">medium</option><option value="slow">slow</option><option value="low-speed-outlier">low-speed-outlier</option></select></label>
+									{/if}
+								<label><span>速度区分 / Speed class</span><select value={modelDraft(model).speed_class ?? ''} onchange={(event) => updateModelMetadata(model, { speed_class: event.currentTarget.value || undefined })}><option value="">—</option><option value="unknown">unknown</option><option value="ultra-fast">ultra-fast</option><option value="fast">fast</option><option value="medium">medium</option><option value="slow">slow</option><option value="low-speed-outlier">low-speed-outlier</option></select></label>
 								<label class="wide"><span>実測値に基づく速度ラベル / Measured speed label</span><input value={modelDraft(model).speed_label ?? ''} oninput={(event) => updateModelMetadata(model, { speed_label: event.currentTarget.value })} /></label>
 								<label class="wide"><span>評価コメント（日本語）</span><textarea rows="2" value={modelDraft(model).comment_ja ?? ''} oninput={(event) => updateModelMetadata(model, { comment_ja: event.currentTarget.value })}></textarea></label>
 								<label class="wide"><span>Evaluation comment (English)</span><textarea rows="2" value={modelDraft(model).comment_en ?? ''} oninput={(event) => updateModelMetadata(model, { comment_en: event.currentTarget.value })}></textarea></label>
-									{/if}
 								</div>
 							</details>
 						</article>

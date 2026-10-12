@@ -153,6 +153,8 @@ async def import_profile(envelope: dict) -> dict:
                 profile.update(state="connected", refresh_owner="runtime", generation=(old or {}).get("generation", 0) + 1)
                 # Publication is owned by the receiving installation, not the envelope.
                 profile["published_models"] = (old or {}).get("published_models", [])
+                profile["model_purposes"] = (old or {}).get("model_purposes", {})
+                profile["model_metadata"] = (old or {}).get("model_metadata", {})
                 profile.pop("catalog", None)
                 result = {"version": 1, "status": "imported", "owner_id": owner, "profile_id": profile["id"],
                           "host_id": host_id, "request_id": request_id, "replayed": False}

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-12 — Save ChatGPT plan model assessments per personal registration
+
+Server/Web model details can edit and save LLM, Stage 1, Stage 2 and Vision recommendations, speed class and measured label, and Japanese/English comments. Assessments are encrypted per owner and registration, preserving publication, purposes, upstream catalogs and credentials. Catalog refresh and reauthorization/import of the same identity retain them; active-registration and generation checks refuse saves from stale screens. The existing API also supports assessment-only partial patches: omission keeps a field and `null` removes its personal override.
+
 ### 2026-10-12 — Match Server's ChatGPT plan settings flow in Swift
 
 At the author's instruction, the macOS ChatGPT plan settings now handle the connection only; the model list and "Use for drawing" are gone. Once connected they show a guide and "Open model settings". Models are chosen under the ChatGPT plan in the Models settings: refresh the list, check the models to publish and save. The publication is saved per connected profile and kept when the same identity reauthorizes. Only published models appear as "ChatGPT plan" in the drawing model picker, comparison and drawing defaults. As on Server, a drawing request is sent only for a model that is in the catalog and published. An existing connection also saves its publication once.

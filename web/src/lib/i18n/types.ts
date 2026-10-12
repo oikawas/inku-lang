@@ -903,6 +903,7 @@ export interface LangPack {
 	settingsModelDraftChanges: string;
 	settingsModelFetchDisabledWhileDirty: string;
 	settingsModelMetadataDetails: string;
+	settingsModelRecommendationFields: Record<'recommendation_llm' | 'recommendation_stage1' | 'recommendation_stage2' | 'recommendation_vision', string>;
 	settingsModelConnectionDetails: string;
 	settingsModelRateLimits: string;
 	settingsModelRpm: string;

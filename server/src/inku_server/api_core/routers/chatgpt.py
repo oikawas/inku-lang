@@ -141,12 +141,25 @@ def refresh_models(actor: str = Depends(owner)) -> dict:
     return models(actor, force=True)
 
 
+class ModelMetadataPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    recommendation_llm: Annotated[int, Field(strict=True, ge=1, le=5)] | None = None
+    recommendation_stage1: Annotated[int, Field(strict=True, ge=1, le=5)] | None = None
+    recommendation_stage2: Annotated[int, Field(strict=True, ge=1, le=5)] | None = None
+    recommendation_vision: Annotated[int, Field(strict=True, ge=1, le=5)] | None = None
+    speed_class: Annotated[str, Field(strict=True, min_length=1, max_length=64, pattern=r"\S")] | None = None
+    speed_label: Annotated[str, Field(strict=True, min_length=1, max_length=256, pattern=r"\S")] | None = None
+    comment_ja: Annotated[str, Field(strict=True, min_length=1, max_length=8192, pattern=r"\S")] | None = None
+    comment_en: Annotated[str, Field(strict=True, min_length=1, max_length=8192, pattern=r"\S")] | None = None
+
+
 class PublishedModelsBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     profile_id: str = Field(min_length=1, max_length=128)
     generation: int = Field(ge=1)
-    published_models: list[Annotated[str, Field(min_length=1, max_length=256)]] = Field(max_length=1024)
+    published_models: list[Annotated[str, Field(min_length=1, max_length=256)]] | None = Field(default=None, max_length=1024)
     model_purposes: dict[Annotated[str, Field(min_length=1, max_length=256)], list[Literal["llm", "vision"]]] | None = None
+    model_metadata: dict[Annotated[str, Field(min_length=1, max_length=256)], ModelMetadataPatch | None] | None = Field(default=None, max_length=1024)
 
 
 @router.get("/models/settings")
@@ -161,6 +174,10 @@ def model_settings(actor: str = Depends(owner)) -> dict:
 @router.put("/models/settings")
 def publish_models(body: PublishedModelsBody, actor: str = Depends(owner)) -> dict:
     try:
-        return save_publication(actor, body.profile_id, body.generation, body.published_models, body.model_purposes)
+        metadata = None if body.model_metadata is None else {
+            model: patch.model_dump(exclude_unset=True) if patch is not None else None
+            for model, patch in body.model_metadata.items()
+        }
+        return save_publication(actor, body.profile_id, body.generation, body.published_models, body.model_purposes, metadata)
     except ChatGPTError as error:
         raise _error(error) from None

@@ -110,10 +110,16 @@ def test_sealed_handoff_rejects_changed_owner_and_is_one_time(isolated, tmp_path
     monkeypatch.setattr(transfer, "validate_identity", verified)
     with pytest.raises(ChatGPTError):
         asyncio.run(transfer.import_profile({**envelope, "owner_id": "other"}))
+    seed(isolated, {**value, "published_models": ["local-model"],
+                    "model_purposes": {"local-model": ["vision"]},
+                    "model_metadata": {"local-model": {"recommendation_stage1": 4, "comment_ja": "本人の評価"}}})
     result = asyncio.run(transfer.import_profile(envelope))
     assert result["host_id"] == remote_host != mac_host
     assert isolated.profile("owner")["refresh_owner"] == "runtime"
     assert isolated.profile("owner")["refresh_token"] == "fixture-refresh"
+    assert isolated.profile("owner")["published_models"] == ["local-model"]
+    assert isolated.profile("owner")["model_purposes"] == {"local-model": ["vision"]}
+    assert isolated.profile("owner")["model_metadata"] == {"local-model": {"recommendation_stage1": 4, "comment_ja": "本人の評価"}}
     assert asyncio.run(transfer.import_profile(envelope))["replayed"]
     with pytest.raises(ChatGPTError):
         asyncio.run(transfer.import_profile({**envelope, "ciphertext": envelope["ciphertext"] + "A"}))

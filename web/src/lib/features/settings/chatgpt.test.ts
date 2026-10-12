@@ -154,8 +154,10 @@ test('connected guide leads to personal model settings with explicit publication
 			if (init?.method === 'PUT') {
 				const body = JSON.parse(String(init.body));
 				assert.deepEqual(body, { profile_id: 'profile', generation: 1, published_models: ['second-slug'],
-					model_purposes: { 'second-slug': ['vision'], 'first-slug': [] } });
-				saved = { ...saved, models: [{ id: 'second-slug', label: 'First offered', purposes: ['vision'], enabled: true },
+					model_purposes: { 'second-slug': ['vision'], 'first-slug': [] },
+					model_metadata: { 'second-slug': { recommendation_stage1: 4, speed_label: null, comment_ja: '実測の評価' } } });
+				saved = { ...saved, models: [{ id: 'second-slug', label: 'First offered', purposes: ['vision'], enabled: true,
+					recommendation_stage1: 4, comment_ja: '実測の評価' },
 					{ id: 'first-slug', label: 'Second offered', purposes: [], enabled: false }], enabled_models: { 'second-slug': true, 'first-slug': false } };
 			}
 			return response(saved);
@@ -166,18 +168,21 @@ test('connected guide leads to personal model settings with explicit publication
 	const pending = administration.fetchProviderModels('chatgpt');
 	assert.equal(administration.modelSettingsLoading, true);
 	assert.equal(administration.modelFetchResults.chatgpt.message, ja.chatgptStatus('chatgpt_models_loading'));
-	saved = { ...saved, models: [{ id: 'second-slug', label: 'First offered' }, { id: 'first-slug', label: 'Second offered' }], enabled_models: { 'second-slug': false, 'first-slug': false } };
+	saved = { ...saved, models: [{ id: 'second-slug', label: 'First offered', speed_label: 'Old speed' }, { id: 'first-slug', label: 'Second offered' }], enabled_models: { 'second-slug': false, 'first-slug': false } };
 	deferred!(response(saved));
 	await pending;
 	assert.deepEqual(administration.modelCatalog[0].models.map((model: any) => model.id), ['second-slug', 'first-slug']);
 	assert.deepEqual(administration.modelCatalog[0].models[0].purposes, ['llm', 'vision']);
 	assert.equal(administration.modelFetchResults.chatgpt.message, ja.chatgptModelsLoaded(2));
 	assert.equal(await administration.saveModelProvider('chatgpt', { models: [
-		{ id: 'second-slug', label: 'First offered', purposes: ['vision'] },
+		{ id: 'second-slug', label: 'First offered', purposes: ['vision'], recommendation_stage1: 4, speed_label: '', comment_ja: '実測の評価' },
 		{ id: 'first-slug', label: 'Second offered', purposes: [] }
 	], enabled_models: { 'second-slug': true, 'first-slug': false } }), true);
 	assert.equal(administration.modelSettings.providers.chatgpt.enabled_models['second-slug'], true);
 	assert.deepEqual(administration.modelCatalog[0].models[0].purposes, ['vision']);
+	assert.equal(administration.modelCatalog[0].models[0].recommendation_stage1, 4);
+	assert.equal(administration.modelCatalog[0].models[0].comment_ja, '実測の評価');
+	assert.equal(administration.modelCatalog[0].models[0].speed_label, undefined);
 	assert.deepEqual(administration.modelSettings.providers.chatgpt.models[1].purposes, []);
 	assert.equal(changes, 2);
 	const failed = administration.fetchProviderModels('chatgpt');
@@ -210,7 +215,7 @@ test('connected guide leads to personal model settings with explicit publication
 	connection.reset();
 });
 
-test('personal publication picker exposes Vision use and read-only upstream details', async () => {
+test('personal publication picker exposes Vision use and editable evaluation fields', async () => {
 	const source = readFileSync(new URL('./ModelAdministrationSettings.svelte', import.meta.url), 'utf8')
 		.replace("import { t } from '$lib/i18n/index.svelte';", `import { ja } from ${JSON.stringify(new URL('../../i18n/ja.ts', import.meta.url).href)}; const t = () => ja;`)
 		.replace("from '$lib/modelMeta'", `from ${JSON.stringify(new URL('../../modelMeta.ts', import.meta.url).href)}`)
@@ -234,7 +239,8 @@ test('personal publication picker exposes Vision use and read-only upstream deta
 	assert.match(body, /<details class="model-metadata-editor">/);
 	assert.match(body, /Upstream speed/);
 	assert.match(body, /接続元の評価/);
-	assert.doesNotMatch(body, /<textarea/);
+	assert.match(body, /<textarea/);
+	for (const label of Object.values(ja.settingsModelRecommendationFields)) assert.ok(body.includes(label));
 	const unused = body.slice(body.indexOf('Unused model') - 150, body.indexOf('Unused model'));
 	assert.match(unused, /disabled/);
 });

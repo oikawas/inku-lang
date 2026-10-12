@@ -390,13 +390,23 @@ export function createModelAdministration<TActor extends SettingsActor>(
 			const draftModels = patch.models ?? modelSettings?.providers.chatgpt?.models ?? chatgptPublication.models;
 			const modelPurposes = Object.fromEntries(chatgptPublication.models.map((model) => [model.id,
 				draftModels.find((draft) => draft.id === model.id)?.purposes ?? model.purposes ?? ['llm', 'vision']]));
+			const metadataKeys = ['recommendation_llm', 'recommendation_stage1', 'recommendation_stage2',
+				'recommendation_vision', 'speed_class', 'speed_label', 'comment_ja', 'comment_en'] as const;
+			const modelMetadata = Object.fromEntries(chatgptPublication.models.flatMap((model) => {
+				const draft = draftModels.find((item) => item.id === model.id);
+				if (!draft) return [];
+				const changed = Object.fromEntries(metadataKeys.filter((key) => draft[key] !== model[key])
+					.map((key) => [key, draft[key] === '' || draft[key] === undefined ? null : draft[key]]));
+				return Object.keys(changed).length ? [[model.id, changed]] : [];
+			}));
 			modelSettingsLoading = true;
 			try {
 				const data = await personalResponse(await deps.apiFetch('/api/me/chatgpt/models/settings', {
 					method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
 						profile_id: chatgptPublication.profile_id, generation: chatgptPublication.generation,
 						published_models: chatgptPublication.models.filter((model) => selected[model.id] === true).map((model) => model.id),
-						model_purposes: modelPurposes
+						model_purposes: modelPurposes,
+						...(Object.keys(modelMetadata).length ? { model_metadata: modelMetadata } : {})
 					})
 				}));
 				if (!sameOwner(owner, version) || !personalModelsAllowed()) return false;

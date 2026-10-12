@@ -995,6 +995,8 @@ Stage 1、camera projection、hole補完は既存の共有grammar helperを使�
 
 Androidは端末内の本人single-user hostとして、設定「ChatGPTプラン」から端末のChromeとloopback callbackで直接認証する。Macからの移送やServerの資格情報を使わず、本人のscopeと登録ごとの公開catalogを検証してResponsesへ接続する。tokenと公開設定はKeystoreで暗号化したbackup対象外のアプリ領域へ保存する。独立した設定、初回の利用枠の案内、本人のモデル公開、固定した登録ID/generation、切断時の停止を同じ意味で扱う。Androidの詳細は[ANDROID_SPEC.ja.md](android/ANDROID_SPEC.ja.md)に記す。
 
+Server/WebではChatGPTプランのモデル詳細に本人の評価を保存できる。登録内の`model_metadata`へLLM・Stage 1・Stage 2・Visionのオススメ度（整数1〜5）、速度区分・実測速度ラベル・日英コメントを暗号化保存し、取得元catalogはそのまま保つ。本人の一覧とモデル選択へ評価を重ね、一覧更新・token更新・同一identityの再認証／再importでも保持する。`PUT /api/me/chatgpt/models/settings`は`profile_id`・`generation`と提供中モデルIDを検証する。`model_metadata`はモデルごとの部分更新で、省略項目は保持、各項目の`null`は本人の上書きを解除、モデル全体の`null`はそのモデルの上書きをすべて解除する。許可する鍵は`recommendation_llm`・`recommendation_stage1`・`recommendation_stage2`・`recommendation_vision`・`speed_class`・`speed_label`・`comment_ja`・`comment_en`だけである。公開・用途を省略した評価のみの保存でも既存の公開と用途は保ち、他owner・別の選択登録・古いgenerationからの保存を拒否する。この評価保存はServer/Webの機能であり、Android／Swiftの端末内設定とは同期しない。
+
 Responses/SSEは補助のassistant message・reasoningと、必要な一つの`inku` namespaceの`submit_pipeline_response`を区別する。描画には完了応答の関数引数だけを採用する。本文だけの応答、refusal、未知tool、複数関数・部分応答は拒否し、形式不一致では再接続を促さず診断を案内する。形式診断logはtype/name/namespaceだけで本文・引数を含めない。
 
 完了イベントのoutputが空・NULL・省略の場合は、先行する`response.output_item.done`で確定した一つの関数を使う。deltaだけでは採用せず、`response.completed`の成功状態と引数の一致・サイズ上限を要求する。形式診断にはstream中と確定済みの関数件数も含める。新しい描画の開始時は前の失敗表示を外し、現在の選択モデルで実行する。共有pipelineの親作品とauthorityは保持する。

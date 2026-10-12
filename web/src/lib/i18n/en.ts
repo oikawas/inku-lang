@@ -1066,6 +1066,12 @@ export const en: LangPack = {
 	settingsModelDraftChanges: 'Unsaved changes',
 	settingsModelFetchDisabledWhileDirty: 'Save or discard unsaved changes before fetching the model list.',
 	settingsModelMetadataDetails: 'Model details',
+	settingsModelRecommendationFields: {
+		recommendation_llm: 'LLM recommendation',
+		recommendation_stage1: 'Stage 1 recommendation',
+		recommendation_stage2: 'Stage 2 recommendation',
+		recommendation_vision: 'Vision recommendation',
+	},
 	settingsModelConnectionDetails: 'Connection settings',
 	settingsModelRateLimits: 'Rate limits',
 	settingsModelRpm: 'Requests per minute (RPM)',

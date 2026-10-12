@@ -97,22 +97,58 @@ def test_personal_publication_routes_offer_only_saved_models_and_reject_stale_or
         assert not offered("owner", "luna") and offered("owner", "luna", purpose="vision")
         assert not offered("owner", "other", purpose="vision")
         assert client.put("/api/me/chatgpt/models/settings", json=body).json() == published
+        metadata_body = {"profile_id": profile["id"], "generation": 1, "model_metadata": {"luna": {
+            "recommendation_stage1": 4, "speed_class": "fast", "speed_label": "12s",
+            "comment_ja": "実測の評価", "comment_en": "Measured assessment",
+        }}}
+        evaluated = client.put("/api/me/chatgpt/models/settings", json=metadata_body)
+        assert evaluated.status_code == 200
+        metadata = evaluated.json()["model_metadata"]
+        assert metadata == metadata_body["model_metadata"]
+        assert evaluated.json()["enabled_models"] == published["enabled_models"]
+        assert evaluated.json()["models"][0]["purposes"] == ["vision"]
+        assert public.api_models(actor).vision_catalog[-1]["models"][0]["recommendation_stage1"] == 4
+        assert store.profile("owner")["access_token"] == "fixture-access"
+        assert client.put("/api/me/chatgpt/models/settings", json=body).json()["model_metadata"] == metadata
+        for patch in ({"recommendation_stage1": True}, {"recommendation_stage1": 6},
+                      {"recommendation_stage1": "4"}, {"purposes": ["llm"]},
+                      {"access_token": "invalid"}, {"comment_ja": " "}):
+            assert client.put("/api/me/chatgpt/models/settings", json={**metadata_body, "model_metadata": {"luna": patch}}).status_code == 422
+        assert client.put("/api/me/chatgpt/models/settings", json={**metadata_body, "model_metadata": {"hidden": {"recommendation_stage1": 4}}}).status_code == 403
+        assert store.profile("owner")["model_metadata"] == metadata
+        assert client.post("/api/me/chatgpt/models/refresh").json()["model_metadata"] == metadata
+        assert store.profile("owner")["catalog"]["models"][0] == {"id": "luna", "label": "Luna", "purposes": ["llm", "vision"]}
+        cleared = client.put("/api/me/chatgpt/models/settings", json={**metadata_body,
+            "model_metadata": {"luna": {"comment_en": None}}}).json()
+        assert "comment_en" not in cleared["model_metadata"]["luna"]
+        assert cleared["model_metadata"]["luna"]["recommendation_stage1"] == 4
+        metadata = cleared["model_metadata"]
         actor = {"id": "other-owner"}
         assert client.get("/api/me/chatgpt/models/settings").status_code == 403
         assert client.put("/api/me/chatgpt/models/settings", json=body).status_code == 403
+        assert client.put("/api/me/chatgpt/models/settings", json=metadata_body).status_code == 403
         actor = {"id": "owner"}
         # The refresh/reauthorization snapshot predates the later publication save.
-        store.save_profile("owner", {**profile, "generation": 2}, expected_generation=1)
+        store.save_profile("owner", {**profile, "generation": 2, "catalog": store.profile("owner")["catalog"]}, expected_generation=1)
         assert store.profile("owner")["published_models"] == ["luna"]
         assert store.profile("owner")["model_purposes"] == {"luna": ["vision"], "other": []}
+        assert store.profile("owner")["model_metadata"] == metadata
         assert client.put("/api/me/chatgpt/models/settings", json=body).status_code == 403
-        store.save_profile("owner", {**profile, "id": str(uuid.uuid4())})
+        assert client.put("/api/me/chatgpt/models/settings", json=metadata_body).status_code == 403
+        assert store.profile("owner")["model_metadata"] == metadata
+        removed = client.put("/api/me/chatgpt/models/settings", json={**metadata_body, "generation": 2,
+            "model_metadata": {"luna": None}}).json()
+        assert removed["model_metadata"] == {} and "recommendation_stage1" not in removed["models"][0]
+        other_profile = {**profile, "id": str(uuid.uuid4())}
+        store.save_profile("owner", other_profile)
+        assert store.profile("owner").get("model_metadata", {}) == {}
         assert client.put("/api/me/chatgpt/models/settings", json={**body, "generation": 2}).status_code == 403
-        assert len(calls) == 1
+        assert client.put("/api/me/chatgpt/models/settings", json={**metadata_body, "generation": 2}).status_code == 403
+        assert len(calls) == 2
         switch_during_fetch = True
         late = client.post("/api/me/chatgpt/models/refresh")
         assert late.status_code == 403 and late.json()["detail"]["code"] == "chatgpt_session_changed"
-        assert len(calls) == 2
+        assert len(calls) == 3
 
 
 def test_old_catalog_purposes_do_not_override_unset_profile_choices():

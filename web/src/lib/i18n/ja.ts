@@ -1064,6 +1064,12 @@ export const ja: LangPack = {
 	settingsModelDraftChanges: '未保存の変更',
 	settingsModelFetchDisabledWhileDirty: '未保存の変更を保存または取り消してからモデルリストを取得してください。',
 	settingsModelMetadataDetails: 'モデル詳細',
+	settingsModelRecommendationFields: {
+		recommendation_llm: 'LLMのオススメ度',
+		recommendation_stage1: 'Stage 1のオススメ度',
+		recommendation_stage2: 'Stage 2のオススメ度',
+		recommendation_vision: 'Visionのオススメ度',
+	},
 	settingsModelConnectionDetails: '接続設定',
 	settingsModelRateLimits: 'レート制限',
 	settingsModelRpm: '毎分の要求数（RPM）',

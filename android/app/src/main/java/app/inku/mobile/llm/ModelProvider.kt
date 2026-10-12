@@ -29,7 +29,7 @@ data class ModelRequest(
     val pipelineAction: String? = null,
     /** One normalized JPEG sent with [prompt]; only camera analysis sets it. */
     val imageJpeg: ByteArray? = null,
-    /** Gemini `thinkingLevel` for a non-pipeline request; null keeps the model default. */
+    /** Gemini non-pipeline level: minimal selects the model's minimum; null keeps its default. */
     val thinkingLevel: String? = null,
     /** Non-secret registration pinned when this shared-pipeline run began. */
     val chatGptSession: ChatGptSessionRef? = null,

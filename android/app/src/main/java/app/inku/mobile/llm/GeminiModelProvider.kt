@@ -50,15 +50,12 @@ class GeminiModelProvider(
         val generation = JSONObject().put("maxOutputTokens", request.maxTokens)
         if (pipelineAction == null) {
             generation.put("temperature", request.temperature)
-            // Server Vision requests use minimal thinking for the Gemini kind,
-            // including a custom connection ID or an unfamiliar model name.
-            val thinkingLevel = if (request.imageJpeg != null) "minimal" else request.thinkingLevel
-            thinkingLevel?.let { generation.put("thinkingConfig", JSONObject().put("thinkingLevel", it)) }
-        } else {
-            // Shared-pipeline requests use the server's Gemini request shape:
-            // model-default sampling and minimal thinking.
-            generation.put("thinkingConfig", JSONObject().put("thinkingLevel", "minimal"))
         }
+        // Pipeline, vision, and a request for minimal thinking use Server's model-specific minimum.
+        val thinkingLevel = if (pipelineAction != null || request.imageJpeg != null || request.thinkingLevel == "minimal") {
+            geminiThinkingLevel(request.modelId.removePrefix("$providerId:"))
+        } else request.thinkingLevel
+        thinkingLevel?.let { generation.put("thinkingConfig", JSONObject().put("thinkingLevel", it)) }
         if (request.stopSequences.isNotEmpty()) generation.put("stopSequences", JSONArray(request.stopSequences))
         val user = textContent(request.prompt).put("role", "user")
         request.imageJpeg?.let { image ->

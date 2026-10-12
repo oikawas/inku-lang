@@ -34,6 +34,21 @@ Androidはpremultiplied RGBAをNDK Bitmapへ直接転送する。Kotlin Engine 3
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
 
+## 2026-10-12 Geminiのモデル別思考レベル
+
+Geminiの描画・写真分析・写真からの記述生成は、Serverの `gemini_thinking()` と同じ対応で
+最も低い思考レベルを送る。接続名を取り除いて `models/` を受け、版名・previewの境界もServerと揃える。
+
+| モデル | thinkingConfig |
+| --- | --- |
+| gemini-3.8-flash、gemini-\<版\>-pro全般、gemini-2.5-flash | thinkingLevel: low |
+| gemini-2.5-flash-lite（preview等の別名も同じ） | 送らない（既定で思考しない） |
+| ほか（gemini-3.5-flash-lite、gemini-3.6-flash、gemini-3-flash-preview、Gemma 4等） | thinkingLevel: minimal |
+
+2.5-flash-liteを先に判定し、2.5-flashの規則へ入れない。画像・記述のtemperature、
+描画の既定sampling、出力上限、関数応答の形式は従来どおり。
+根拠はGoogleの[思考レベル表](https://ai.google.dev/gemini-api/docs/thinking)（2026-10-12確認）。
+
 ## 2026-10-12 作品表示中の補完承認と停止理由
 
 制作画面の承認・停止の欄は記述編集欄から独立した共有位置に出す。
@@ -239,7 +254,7 @@ debug headlessの`image`入力も同じ二段の処理を使う。`skip_draw`は
 
 - Anthropic: モデルによらず`temperature`を省き、モデルの既定値を使う。写真の記述生成・デモ用記述も同じである。Sonnet 5.5が写真の記述生成の`temperature: 0.2`をHTTP 400で拒否していた不具合を修正した。回答ツールは`auto`で提示し、呼出しがあれば指定したツール1つの`input`を読む。テキストでの回答はJSONオブジェクトを読む。自由文のテキストブロックは改行で結び、thinkingは読まない。
 - OpenAI互換: `stream: false`を明示し、OpenAI自身のAPIでは既存の`openai_sampling()`相当の出力上限・sampling・思考指定を使う。回答ツールの呼出しがあれば指定したツール1つの引数だけを読む。呼出しが無い場合はメッセージのテキストを読む。
-- Gemini: 画像要求では接続名・モデル名によらず`thinkingConfig.thinkingLevel: minimal`とし、記述の後にJPEGの`inlineData`を置く。画像の自由文はtemperature 0.2、描画はtemperatureを省く。描画応答は指定した関数1つの`args`オブジェクトだけを読む。自由文のテキストは改行で結び、thoughtは読まない。
+- Gemini: 画像要求の思考は接続名によらず上の「Geminiのモデル別思考レベル」に従い、記述の後にJPEGの`inlineData`を置く。画像の自由文はtemperature 0.2、描画はtemperatureを省く。描画応答は指定した関数1つの`args`オブジェクトだけを読む。自由文のテキストは改行で結び、thoughtは読まない。
 
 外部モデルによる写真の記述生成でHTTPエラーが起きた場合も、描画と同じ秘匿処理済みの拒否理由を、共通の記述生成境界からLogcatの`InkuProvider`へ`vision`の操作名で残す。
 
@@ -309,7 +324,7 @@ DDL SpecとDDL engineの版はServerの`layer_versions.py`が名乗り、Android
 
 下部「カメラ」はアプリ内カメラ（CameraX、背面カメラのプレビューとシャッター）を開き、撮影した写真を`cacheDir/camera/`のアプリ専用一時ファイルへ直接書く。標準カメラアプリの起動と確認画面は通らない。初回は`CAMERA`権限を求め、拒否された場合やCameraXを開始できない場合は、従来の標準カメラ（`ActivityResultContracts.TakePicture`）へ切り替える。Photo Pickerの入口と、元写真の保持・削除の契約は変えない。
 
-写真から記述を作る「記述生成モデル」は、設定「その他」で選ぶ。既定は端末内の`local-litert-lm:gemma-4-e2b`で、有効な外部providerのモデルも選べる。値は`app_settings`の`camera_vision_model`に保存し、欠落・壊れた値と、サポート対象から外した端末内モデル（Gemma 4 E4B）は既定へ戻す。設定画面からは撮影中に変更できない（撮影画面の「モデル選択」からは変えられ、その撮影に使う）。端末内モデルでは写真は端末の外へ出ない。外部モデルを選んだ場合に限り、向き補正・長辺1280px・JPEG品質85で再エンコードした画像（元のEXIF・位置情報を含まない）を、そのproviderへ送る。Geminiは`inlineData`、OpenAI互換は`image_url`のdata URIで送り、元ファイル、URI、path、表示名は送らない。設定画面は外部モデルの選択中、送信先と送る内容を常に表示する。Gemini種別の画像要求には、Serverと同じく`thinkingLevel: minimal`を付ける（既定の思考は時間を倍以上にし、出力上限を使い切って空応答になることがあった）。記述プロンプトは`camera-description-v4`で、構図、主な対象とその単純な形・数、面積順の色と差し色、光・時刻・季節・天気、質感と繰り返しを3〜5文・180字程度で書かせる。端末内モデルは字数の指示を守らず時間が字数に比例して延びるため、日本語180字（英語450字）を超えた後の最後の文末で生成を止め、途中の文を残さない。
+写真から記述を作る「記述生成モデル」は、設定「その他」で選ぶ。既定は端末内の`local-litert-lm:gemma-4-e2b`で、有効な外部providerのモデルも選べる。値は`app_settings`の`camera_vision_model`に保存し、欠落・壊れた値と、サポート対象から外した端末内モデル（Gemma 4 E4B）は既定へ戻す。設定画面からは撮影中に変更できない（撮影画面の「モデル選択」からは変えられ、その撮影に使う）。端末内モデルでは写真は端末の外へ出ない。外部モデルを選んだ場合に限り、向き補正・長辺1280px・JPEG品質85で再エンコードした画像（元のEXIF・位置情報を含まない）を、そのproviderへ送る。Geminiは`inlineData`、OpenAI互換は`image_url`のdata URIで送り、元ファイル、URI、path、表示名は送らない。設定画面は外部モデルの選択中、送信先と送る内容を常に表示する。Gemini種別の画像要求は、Serverと同じく上の「Geminiのモデル別思考レベル」の最も低い段を使う（既定の思考は時間を倍以上にし、出力上限を使い切って空応答になることがあった）。記述プロンプトは`camera-description-v4`で、構図、主な対象とその単純な形・数、面積順の色と差し色、光・時刻・季節・天気、質感と繰り返しを3〜5文・180字程度で書かせる。端末内モデルは字数の指示を守らず時間が字数に比例して延びるため、日本語180字（英語450字）を超えた後の最後の文末で生成を止め、途中の文を残さない。
 
 記述からの描画は、NVIDIA NIM・`vivid_material`・写生なしの固定経路を廃止し、撮影開始時の描画設定（Stage 1／2モデル、色カタログ（自動を含む）、写生）を使う。設定はrun単位で固定し、再試行も同じ値を使う。撮影前に、記述生成モデルと描画モデルについて、端末内モデルは取得済みか、外部providerは有効でBase URLと必要なAPI keyがあるかを確かめ、不足時は撮影を始めない。端末内の記述生成モデルは、撮影画面を開いている間に読み込みを始める。新しい作品の`input_provenance.route`は`description_to_pipeline`、`vision_provider_id`は実際に使ったproviderである。旧値`local_description_to_nim`／`local_ddl_to_nim_stage2`／`ddl_to_pipeline_stage2`の作品は従来どおり表示する。
 
@@ -333,7 +348,7 @@ Androidの固定色カタログ13件はServerと同じID、色map、paletteを�
 
 Gemini provider の生成要求は Gemini API の `models/{model}:generateContent` に送る。API key は `x-goog-api-key` で渡し（モデル一覧の取得も同じヘッダーで渡し、最後のページまで読む）、共有pipelineの構造化応答は native function declaration と `functionCall.args` を使う。モデル一覧の取得だけが成功しても、生成要求の到達確認とは扱わない。
 
-共有pipelineのprovider要求はServerの`pipeline_provider.py`と同じ条件で送る。Geminiではtemperatureを送らず、`thinkingConfig.thinkingLevel`を`minimal`とし、`allowedFunctionNames`で応答関数を1つに固定し、core のresponse schemaをServerと同じGemini対応subsetへ変換する（`const`は1要素の`enum`へ、hole補完の`oneOf`は平坦化する。厳密な検証は共有Rustが行う）。OpenAI互換providerではStage 1（`generate_normalized_ddl`）と構図の読み（`read_composition`）をtemperature 0.3、他の要求を0.0とする。Stage 1と写生・カタログ選択の出力上限は2048、hole補完は2048とする。
+共有pipelineのprovider要求はServerの`pipeline_provider.py`と同じ条件で送る。Geminiではtemperatureを送らず、思考は上の「Geminiのモデル別思考レベル」に従い、`allowedFunctionNames`で応答関数を1つに固定し、core のresponse schemaをServerと同じGemini対応subsetへ変換する（`const`は1要素の`enum`へ、hole補完の`oneOf`は平坦化する。厳密な検証は共有Rustが行う）。OpenAI互換providerではStage 1（`generate_normalized_ddl`）と構図の読み（`read_composition`）をtemperature 0.3、他の要求を0.0とする。Stage 1と写生・カタログ選択の出力上限は2048、hole補完は2048とする。
 
 Room DBのhistory用cursor windowは160 MiBとする（生成SVG32＋Score/snapshot32＋metadata/protocol64＋他field余裕32 MiB）。この枠を超える旧行を無制限に読む保証ではない。実行状態のBLOBはcursorへ全量を載せず、固定digestを指定した1 MiBのchunkで読み、全量のSHA-256を検証する。最新実行・実行metadata queryもBLOBを含めない。新しいhost stateはrenderedをJSON objectで保持して二重escapeを避け、旧文字列形式も読み戻せる。
 

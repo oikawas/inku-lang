@@ -17,6 +17,10 @@ During the author's visual check, a work with the ink-wash ground's bands stoppe
 
 ## Unreleased
 
+### 2026-10-12 — Android displays linear gradients with Skia too
+
+The shared display support table now accepts linearGradient and sRGB color-interpolation, so Android displays the ink-wash ground and computer fills with Skia too. On Pixel 9, both synthetic fixtures drawn through the production display renderer matched Chrome references with no fallback. Exports and thumbnails still use resvg. Android's specification notes and focused device check follow the shared change.
+
 ### 2026-10-12 — English edges may also be written with a space (DDL 17)
 
 At the author's choice (read the spaced spelling too). English read the edges only as `left-edge`, `right-edge`, `top-edge`, and `bottom-edge`, so `the left edge` was not a position word. Words a completion kept before a range's parenthesis in the spaced spelling were therefore never matched against the edge, and in the A3 measurement a range renamed to `the left edge` kept its old numbers (horizontal 2/3 to 1). The four spaced spellings are now parser aliases of the same words, as `line up` is for `line-up`, and the completion check matches them against the edge's range. The Stage 1 prompt, the Saijiki display, the completion prompt, and the DDL engine are unchanged. None of the 711 typed saved works (656 Japanese, 55 English) uses a spaced spelling, so no saved work reads differently.

@@ -4,7 +4,7 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-10-11.
+Last updated: 2026-10-12.
 
 **Catch-up status**: Android sits at generation `2.1.4-android.80`. DDL conversion and Score → SVG
 rendering run in the shared Rust core (`core/crates/`) of the same commit, packaged with the app, so
@@ -44,6 +44,16 @@ When updating Android specifications:
    adaptation of the Japanese source.
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
+
+## 2026-10-12 Display linear gradients
+
+The shared display support table accepts `linearGradient` and `color-interpolation="sRGB"`.
+Android's normal display also uses Skia for the ink-wash ground's bands and computer fills.
+Other color-interpolation values stay outside the table with code `attribute` and use resvg as before.
+Exports and thumbnails still use resvg. This does not introduce Graphite on Android.
+The focused Pixel 9 check draws the shared core's two synthetic fixtures through the production
+AndroidDisplayRenderer and observes Skia use and comparison with Chrome references.
+Saved author works are not fixtures.
 
 ## 2026-10-11 Completion range records (A3)
 

@@ -3,7 +3,7 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-10-11。
+最終更新: 2026-10-12。
 
 **追随状況**: Android は `2.1.4-android.80` の世代にある。DDLの変換とScore → SVGの描画は、
 同じcommitの共有Rust core（`core/crates/`）を同梱してServerと同じ実装で行い、Android独自の版定数を持たない。
@@ -29,6 +29,15 @@ Androidはpremultiplied RGBAをNDK Bitmapへ直接転送する。Kotlin Engine 3
 - `ANDROID_SPEC.md` は英語版として、`ANDROID_SPEC.ja.md` の意図を保った翻訳・要約として更新する。
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
+
+## 2026-10-12 linearGradientの表示
+
+共有の表示の照合表は `linearGradient` と `color-interpolation="sRGB"` を受ける。
+地の墨のにじみの帯とcomputerの塗りも、Androidの通常表示でSkiaを使う。
+ほかのcolor-interpolation値は符号 `attribute` で照合表の外となり、従来どおりresvgへ回す。
+出力とthumbnailは引き続きresvgを使う。AndroidのGraphite導入ではない。
+Pixel 9の最小確認は、共有coreの合成2件を通常のAndroidDisplayRendererで描き、
+Skiaの使用とChrome基準との画像比較を観測する。作者の保存作品はfixtureにしない。
 
 ## 2026-10-11 補完が書いた範囲の控え（A3）
 

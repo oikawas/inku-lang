@@ -23,6 +23,7 @@ interface RenderBridge {
     fun renderEngineVersion(): String
     fun rendererReferenceJson(): String
     fun render(requestJson: String): NativeRenderOutput
+    fun renderWithSvgLimit(requestJson: String, maxSvgBytes: Long): NativeRenderOutput = render(requestJson)
     fun rasterize(svg: String, rasterOptionsJson: String): NativeRasterOutput
     fun rasterizeBitmap(svg: String, rasterOptionsJson: String): Bitmap =
         error("Bitmap rasterization is unavailable on this bridge")
@@ -43,6 +44,7 @@ object NativeRenderBridge : RenderBridge {
     external override fun renderEngineVersion(): String
     external override fun rendererReferenceJson(): String
     external override fun render(requestJson: String): NativeRenderOutput
+    external override fun renderWithSvgLimit(requestJson: String, maxSvgBytes: Long): NativeRenderOutput
     external override fun rasterize(svg: String, rasterOptionsJson: String): NativeRasterOutput
     external override fun rasterizeBitmap(svg: String, rasterOptionsJson: String): Bitmap
 

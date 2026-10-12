@@ -12,8 +12,8 @@ import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 /**
  * Gives every query cursor a window large enough for one saved work.
  *
- * The platform default window is about 2 MB, but a work may carry an SVG up to
- * the server's 12 MiB limit, and its execution state embeds that render. Rows
+ * The platform default window is about 2 MB, but a work may carry a 32 MiB SVG.
+ * Execution BLOBs use digest-bound chunks rather than this complete-row window. Rows
  * past the default window were written but could not be read back
  * (`SQLiteBlobTooBigException`), so large works failed only on Android.
  */
@@ -52,7 +52,9 @@ class LargeRowOpenHelperFactory(
     }
 
     companion object {
-        /** 12 MiB SVG plus its JSON-escaped copy inside the execution state. */
-        const val DEFAULT_WINDOW_BYTES: Long = 40L * 1024 * 1024
+        /** Raw SVG 32 + Score/snapshot 32 + metadata/protocol 64 + row headroom 32 MiB.
+         * Legacy rows outside those bounds may still be unreadable; this is not an unlimited allowance.
+         */
+        const val DEFAULT_WINDOW_BYTES: Long = 160L * 1024 * 1024
     }
 }

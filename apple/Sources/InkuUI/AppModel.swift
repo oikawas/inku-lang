@@ -255,7 +255,8 @@ public final class AppModel {
             let routed = PersonalPlanRoutingTransport(ordinary: ordinary, runtime: personalRuntime)
             self.personalRuntime = personalRuntime
             self.managedTransport = routed
-            self.host = PipelineHost(database: database, transport: routed, credentials: credentials)
+            self.host = PipelineHost(database: database, transport: routed, credentials: credentials,
+                                     svgLimitBytes: { try await store.svgLimitBytes() })
             self.settingsStore = store
             self.settings = settings
             synchronizeNextDrawingModel(previousSettings: nil)
@@ -606,9 +607,12 @@ public final class AppModel {
         return drawingLimitDefinition.normalized(settings.drawingLimits)
     }
 
-    public func updateDrawingLimits(_ limits: [String: UInt32]) async throws {
+    public var svgLimitMiB: Int { settings.svgLimitMiB ?? SVGGenerationLimit.recommendedMiB }
+
+    public func updateDrawingLimits(_ limits: [String: UInt32], svgLimitMiB: Int? = nil) async throws {
         var changed = settings
         changed.drawingLimits = limits
+        if let svgLimitMiB { changed.svgLimitMiB = svgLimitMiB }
         try await updateHostSettings(changed)
     }
 
@@ -1259,6 +1263,11 @@ public final class AppModel {
         if generationToken == token, !stopping, !Task.isCancelled { finishProviderStage(view) }
         await recordDescriptionFeedback(request: request, view: view)
         try Task.checkCancellation()
+        if view.phase == "failed", let events = try ExactJSON(data: view.eventsJSON).array,
+           let failure = events.last(where: { $0["tag"].string == "failed" })?["payload"],
+           failure["reason"].string == "svg_too_large" {
+            throw HostError("svg_too_large", svgLimitMiB: failure["svg_limit_mib"].number.flatMap(Int.init))
+        }
         guard generationToken == token, let work = view.candidateWork else { throw HostError("comparison_candidate_requires_edit") }
         return PreparedCandidate(executionID: view.executionID, work: work, authority: view.authority, providerMetrics: view.providerMetrics)
     }
@@ -1864,6 +1873,7 @@ public final class AppModel {
             unreadOutputs.insert("ddl")
         }
         if let svg = view.svg { currentSVG = svg }
+        else if view.phase == "failed" { currentSVG = "" }
         if let score = view.scoreJSON {
             let value = String(decoding: score, as: UTF8.self)
             if value != scoreJSON { scoreJSON = value; unreadOutputs.insert("score") }
@@ -1934,8 +1944,18 @@ public final class AppModel {
 
     private func report(_ error: Error) {
         if generationToken != nil, !stopping { providerProgress?.finish(.failed, at: Date()) }
-        errorText = error.localizedDescription
+        errorText = failureMessage(error)
         status = "処理を完了できませんでした"
+    }
+
+    public func failureMessage(_ error: Error) -> String {
+        if (error as? HostError)?.code == "svg_too_large" {
+            if let limit = (error as? HostError)?.svgLimitMiB {
+                return DrawingFailureMessage.svgLimitText(limit, language: display.preferences.language)
+            }
+            return display.localized("生成SVGが設定した容量の上限を超えました。設定→制限値で上限を変更できます。")
+        }
+        return error.localizedDescription
     }
     private static func pretty(_ bytes: Data) throws -> String {
         let value = try ExactJSON(data: bytes)

@@ -30,8 +30,8 @@ internal data class PipelineStatusPresentation(val attentionText: String?, val c
 internal fun pipelineStatusPresentation(state: InkuUiState, strings: InkuStrings): PipelineStatusPresentation {
     val view = state.pipelineView
     return PipelineStatusPresentation(
-        attentionText = view?.phaseReason?.let { pipelineAttentionText(it, view.providerFailure, strings) },
-        canResume = view?.patchProposal == null && (view?.phaseTag == "score_ready" ||
+        attentionText = view?.phaseReason?.let { pipelineAttentionText(it, view.providerFailure, strings, view.svgOutputLimitMiB) },
+        canResume = view?.patchProposal == null && (view?.phaseReason == "svg_output_too_large" || view?.phaseTag == "score_ready" ||
             (view?.phaseTag == "completed" && !savedPipelineRevision(state))),
     )
 }
@@ -53,7 +53,8 @@ private val STAGE_OF_REASON = mapOf(
  * model when the stage that stopped was its call. An earlier stage's retry
  * that later succeeded explains nothing and is left out.
  */
-fun pipelineAttentionText(reason: String, failure: PipelineProviderFailure?, strings: InkuStrings): String {
+fun pipelineAttentionText(reason: String, failure: PipelineProviderFailure?, strings: InkuStrings, svgOutputLimitMiB: Int? = null): String {
+    if (reason == "svg_output_too_large" && svgOutputLimitMiB != null) return strings.svgOutputTooLarge(svgOutputLimitMiB)
     val base = "${strings.pipelineNeedsAttention} ${strings.pipelineAttentionReason(reason)}"
     if (failure == null || failure.stage != STAGE_OF_REASON[reason]) return base
     return base + strings.pipelineFailureCause(failure.failure, failure.attempt, failure.detail)

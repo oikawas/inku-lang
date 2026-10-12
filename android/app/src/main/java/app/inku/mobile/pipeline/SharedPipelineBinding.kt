@@ -11,6 +11,10 @@ interface SharedPipelineBinding {
     fun resolvePalette(inputBytes: ByteArray): ByteArray
     fun resolveMacroCatalog(inputBytes: ByteArray): ByteArray
     fun renderSaved(inputBytes: ByteArray): ByteArray
+    fun stepSvgLimited(snapshotBytes: ByteArray, inputEnvelopeBytes: ByteArray, maxSvgBytes: Long): NativeSvgOutput =
+        NativeSvgOutput(step(snapshotBytes, inputEnvelopeBytes), null)
+    fun renderSavedSvgLimited(inputBytes: ByteArray, maxSvgBytes: Long): NativeSvgOutput =
+        NativeSvgOutput(renderSaved(inputBytes), null)
 
     /** Selects other composition ranges without a model; an older binding leaves them alone. */
     fun recompose(inputBytes: ByteArray): ByteArray =

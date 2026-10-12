@@ -158,14 +158,16 @@ public struct HostSettings: Codable, Sendable, Equatable {
     public var operationalLimits: [String: UInt32]?
     public var plugins: PluginPreferences?
     public var drawingLimits: [String: UInt32]?
+    public var svgLimitMiB: Int?
     public var providerDefaultsInstalled: Bool?
     public init(providers: [ProviderSettings] = [], models: ModelSelection = .init(), operationalLimits: [String: UInt32]? = nil,
                 plugins: PluginPreferences? = nil, drawingLimits: [String: UInt32]? = nil,
-                providerDefaultsInstalled: Bool? = nil) {
+                providerDefaultsInstalled: Bool? = nil, svgLimitMiB: Int? = nil) {
         self.providers = providers; self.models = models
         self.operationalLimits = operationalLimits
         self.plugins = plugins
         self.drawingLimits = drawingLimits
+        self.svgLimitMiB = svgLimitMiB
         self.providerDefaultsInstalled = providerDefaultsInstalled
     }
 }
@@ -177,6 +179,7 @@ public actor ProviderSettingsStore {
         guard FileManager.default.fileExists(atPath: url.path) else { return .init() }
         let settings = try JSONDecoder().decode(HostSettings.self, from: Data(contentsOf: url))
         try settings.providers.forEach { try $0.validate() }
+        _ = try SVGGenerationLimit.bytes(settings.svgLimitMiB)
         return settings
     }
     public func load(installingDefaults defaults: [ProviderSettings]) throws -> HostSettings {
@@ -192,8 +195,11 @@ public actor ProviderSettingsStore {
     }
     public func save(_ settings: HostSettings) throws {
         try settings.providers.forEach { try $0.validate() }
+        _ = try SVGGenerationLimit.bytes(settings.svgLimitMiB)
         guard Set(settings.providers.map(\.id)).count == settings.providers.count else { throw HostError("duplicate_provider") }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try JSONEncoder().encode(settings).write(to: url, options: .atomic)
     }
+
+    public func svgLimitBytes() throws -> UInt64 { try SVGGenerationLimit.bytes(load().svgLimitMiB) }
 }

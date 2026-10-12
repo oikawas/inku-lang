@@ -181,18 +181,22 @@ class RoomSharedPipelineStore(
 
     override suspend fun load(ownerId: String, executionId: String): ByteArray? {
         val stored = dao.getExecution(ownerId, executionId) ?: return null
-        if (sha256(stored.stateBytes) != stored.stateDigest) {
-            throw SharedPipelinePersistenceException("stored execution state bytes failed integrity validation")
-        }
-        return stored.stateBytes.copyOf()
+        return loadExecutionBlob(stored)
     }
 
     suspend fun loadLatestExecution(ownerId: String, variationId: String): ByteArray? {
         val stored = dao.getLatestExecution(ownerId, variationId) ?: return null
-        if (sha256(stored.stateBytes) != stored.stateDigest) {
+        return loadExecutionBlob(stored)
+    }
+
+    private suspend fun loadExecutionBlob(stored: PipelineExecutionEntity): ByteArray {
+        val bytes = readExecutionBlob { offset, length ->
+            dao.executionStateChunk(offset, length, stored.ownerId, stored.executionId, stored.stateDigest)
+        }
+        if (sha256(bytes) != stored.stateDigest) {
             throw SharedPipelinePersistenceException("stored execution state bytes failed integrity validation")
         }
-        return stored.stateBytes.copyOf()
+        return bytes
     }
 
     suspend fun readAuthority(ownerId: String, variationId: String): VariationAuthorityEntity? =

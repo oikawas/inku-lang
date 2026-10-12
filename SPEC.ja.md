@@ -1652,7 +1652,9 @@ Serverの「設定 → 制限値 → SVG出力」で、生成する1作品のSVG
 
 Server専用native入口は取得済み上限を生成途中の出力allowanceへ渡し、SVG本体をJSON通信枠から分離する。入力・snapshot・SVG以外の通信予算と、mark/extent/resource/clipの独立した保護は維持する。新しい入口がないnative wheelへは黙ってfallbackせず、503の`svg_limit_binding_unavailable`で停止する。生成後のbyte検査はrenderer内ですでに消費したCPU・一時メモリを防ぐものではない。
 
-この設定はServer/Webの生成・保存・表示に適用する。Android/Swiftのローカル生成・設定UIへは伝播せず、native raster/displayとSwift export parserの既存12 MiB上限は別のconsumer制約として残る。そのため12 MiBを超えるServer作品のnative表示・書き出し互換はこの変更の保証範囲に含めない。
+Android／Swiftにも「設定 → 制限値」のSVG生成上限があり、各アプリのローカル設定を実際の描画時に読む。既定・推奨12 MiB、範囲1〜32 MiBとUTF-8 byte検査はServerと共通で、Server設定を端末へ自動同期しない。上限を超えた新しいSVGを作品として保存せず、失敗状態を保持して以前の成功を今回の成功として表示しない。SVGはnative APIでJSONとは別に受け取り、JSONのescapeによる通信枠の先行拒否を避ける。
+
+保存済み作品の表示・書き出しには生成設定を遡及適用しない。共有native raster/display、GPU transportとSwift export parserの絶対上限は64 MiBである。これは最大32 MiBの生成本体に最大32 MiBの説明・書き出しwrapper用余裕を足したconsumer用の枠で、生成上限とは別である。派生SVGが64 MiBを超えた場合は拒否し、pixel数・寸法・geometry等の独立した保護も維持する。
 
 #### 明示された個数の扱い（v2.7.6）
 

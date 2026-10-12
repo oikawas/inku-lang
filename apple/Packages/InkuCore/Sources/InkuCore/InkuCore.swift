@@ -151,6 +151,7 @@ extension CoreFailure {
 
 /// A synchronous owned-byte facade. Hosts schedule heavy calls off MainActor.
 public enum InkuCore {
+    public static let svgConsumerMaximumBytes: UInt64 = 64 * 1_024 * 1_024
     public static var versionReport: String { InkuCoreBindings.versionReport() }
     public static var rasterAPIVersion: String { InkuCoreBindings.rasterApiVersion() }
     public static var canvasRegistry: Data { Data(InkuCoreBindings.canvasRegistry().utf8) }
@@ -193,6 +194,11 @@ public enum InkuCore {
         InkuCoreBindings.step(snapshotBytes: snapshot, inputEnvelopeBytes: input)
     }
 
+    public static func stepSvgLimited(snapshot: Data, input: Data, maxSvgBytes: UInt64) -> (json: Data, svg: String?) {
+        let output = InkuCoreBindings.stepSvgLimited(snapshotBytes: snapshot, inputEnvelopeBytes: input, maxSvgBytes: maxSvgBytes)
+        return (output.jsonBytes, output.svg)
+    }
+
     public static func providerAttempt(snapshot: Data) -> Data {
         InkuCoreBindings.providerAttempt(snapshotBytes: snapshot)
     }
@@ -207,6 +213,16 @@ public enum InkuCore {
 
     public static func renderSaved(_ input: Data) -> Data {
         InkuCoreBindings.renderSaved(inputBytes: input)
+    }
+
+    public static func renderCompiledSvgLimited(_ input: Data, maxSvgBytes: UInt64) -> (json: Data, svg: String?) {
+        let output = InkuCoreBindings.renderCompiledSvgLimited(inputBytes: input, maxSvgBytes: maxSvgBytes)
+        return (output.jsonBytes, output.svg)
+    }
+
+    public static func renderSavedSvgLimited(_ input: Data, maxSvgBytes: UInt64) -> (json: Data, svg: String?) {
+        let output = InkuCoreBindings.renderSavedSvgLimited(inputBytes: input, maxSvgBytes: maxSvgBytes)
+        return (output.jsonBytes, output.svg)
     }
 
     public static func resolvePalette(_ input: Data) -> Data {

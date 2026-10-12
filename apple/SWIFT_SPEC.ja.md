@@ -87,7 +87,7 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 「作品を表示中」の印は、今の作品の全体か窓を実際に描いている間だけ出す。要求ごとに世代番号を付け、古い結果は捨てる。
 - 照合表に無い要素・属性・style内の性質を含む作品と、Skiaで読めない作品は、resvg（共通raster）で描き、理由の符号を数える。数は画面には出さない。その作品は、拡大しても全体を引き伸ばす。（2026-10-06の後の節で、resvgへ戻さず止める扱いに変えた。）
 - サムネイル、歳時記のプレビュー、PNGの書き出し、vision用の画像は、resvgのまま。
-- SVGの上限は12MiB（`inku-svg-raster`の`MAX_SVG_BYTES`。Skiaの表示とSwiftの書き出しの検査も同じ値）。
+- SVGのconsumer上限は64 MiB（`inku-svg-raster`の`MAX_SVG_BYTES`。Skiaの表示とSwiftの書き出しの検査も同じ値）。最大32 MiBの生成本体に、説明・書き出しwrapper用の最大32 MiBを加えた枠で、pixel・寸法等の独立上限は保持する。
 - Skiaの事前ビルドは、SHA-256で固定した写しを`~/Library/Application Support/inku/build-cache/skia-binaries/`に置き、`build-core.sh`がbuildのたびに照合する。Skiaとその中の8部品を、通知の「ネイティブライブラリ」に載せる。アプリはstrip後で、各アーキテクチャ約14MB大きくなる。
 - 版は1.1.0（Build 2）。対応するServerはv2.15.86（Build 1162）のまま。
 - 確認：AppCheck `--display-only <SVG>`（描き手、タイルのつなぎ、resvgへの戻し、作品の切り替えと印、窓）と`--canvas-detail-only`（窓の計画）。共有coreの`inku-display`の試験（Chromeとの一致、互換変換、タイルの継ぎ目、現行coreの出力と照合表の突き合わせ）。
@@ -316,6 +316,8 @@ macOSのキャンバス上の縦ホイールは1回0.15の倍率変更を行い�
 対象画面の主要操作へTipsを補い、設定の`showTooltips`とtoolbarの表示切替に従う。「inkuについて」は同じcheckoutのWebの概念説明、5項目の用語表、作者情報とrepositoryリンクを取り込む。製品版・build・build日時とDDL／render層の版を生成resourceから、binding protocolは同梱coreのreportから表示する。
 
 描画の制限値はServerの9項目、3分類、既定値と相互上限ルールをbuild resourceとして使用する。1–100000の整数を独立draftで編集し、保存・取消・再読込を分ける。既定値への復帰も保存するまで適用しない。新作品の要求ではServerと同じ4項目をhard／operational両budgetへ写し、適用値からbudget identityを作る。保存作品のconfigurationと既存の構造資源設定は保持する。DDLの意味・展開・描画は共有Rustのままとし、DB schemaを変えない。
+
+同じ設定画面でSVG生成上限も編集する。既定・推奨12 MiB、1〜32 MiBの整数で、`providers.json`へ保存する。実際の描画時に現在の設定を読み、共有rendererの出力予算と最終SVG本文のUTF-8 byte検査へ渡す。SVGはJSONとは別にnative APIから受け取り、超過したSVGを保存・成功結果へ取り込まない。拒否時の上限値と失敗を永続化し、再起動後に旧成功を今回の成功として表示しない。この設定はcompiler budgetや作品identityに混ぜず、保存済み作品の表示・書き出しは別の64 MiB consumer枠を使う。
 
 表示resourceは`export-server-resources.py`と`export-web-reference.mjs`で明示したServer／Web正本から更新し、通常buildとSwift packageはcommit済みsnapshotを使う。限定確認selectorは`--library-browsing-only`、`--lineage-presentation-only`、`--ddl-editor-cancel-only`、`--drawing-limits-editing-only`、`--canvas-wheel-only`で、具体差分に必要なものだけを選ぶ。nativeの配置・操作感・実ホイールイベント、Intel／最低OS実機、実provider、iOSの受入は別に確認する。
 

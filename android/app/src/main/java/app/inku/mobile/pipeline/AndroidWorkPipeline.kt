@@ -13,6 +13,7 @@ import app.inku.mobile.data.refinement.SeedFactory
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.render.AndroidRenderHost
 import app.inku.mobile.render.SvgRenderer
+import app.inku.mobile.render.SvgOutputLimit
 import app.inku.mobile.render.srgbColorProfile
 import app.inku.mobile.ui.i18n.InkuFailure
 import java.math.BigInteger
@@ -44,6 +45,7 @@ class AndroidWorkPipeline(
      * one [PaintResult.pipelineView] names; saving it again finds that work.
      */
     private val saveSafePerformance: suspend (PaintResult) -> Unit = {},
+    private val readSvgLimitBytes: suspend () -> Long = { SvgOutputLimit.DEFAULT_BYTES },
 ) {
     private val configBuilder = SharedPipelineConfigBuilder(binding)
     /** Why the last attempt of each action failed, until the host records it. */
@@ -58,6 +60,7 @@ class AndroidWorkPipeline(
         executionStore = executionStore,
         maxEffectSteps = configBuilder.policy.maximumEffectSteps,
         onProviderAttempt = onProviderAttempt,
+        readSvgLimitBytes = readSvgLimitBytes,
         safePerformance = object : SafePerformancePort {
             override fun renderCommand(view: PipelineView): PipelineCommand.Render? {
                 val context = JSONObject(view.hostContextJson)
@@ -195,6 +198,12 @@ class AndroidWorkPipeline(
             }
         }
         if (next.phaseTag != "score_ready" && next.phaseTag != "completed") {
+            if (next.phaseReason == "svg_output_too_large" && next.scoreJson != null) {
+                val retried = host.command(OWNER_ID, existingId,
+                    configBuilder.renderCommand(stored.config, next, stored.renderSeed, stored.wild))
+                if (retried.phaseTag != "completed") throw PipelineInteractionRequired(retried)
+                return project(retried)
+            }
             throw PipelineInteractionRequired(next)
         }
         val rendered = authoring.renderReady(
@@ -259,6 +268,13 @@ class AndroidWorkPipeline(
 
     suspend fun resume(executionId: String): PaintResult {
         val restored = host.restore(OWNER_ID, executionId)
+        if (restored.phaseReason == "svg_output_too_large" && restored.scoreJson != null) {
+            val run = restoredRun(executionId)
+            val retried = host.command(OWNER_ID, executionId,
+                configBuilder.renderCommand(run.config, restored, run.renderSeed, run.wild))
+            if (retried.phaseTag != "completed") throw PipelineInteractionRequired(retried)
+            return project(retried)
+        }
         if (restored.phaseTag != "score_ready" && restored.phaseTag != "completed") {
             throw PipelineInteractionRequired(restored)
         }
@@ -281,6 +297,7 @@ class AndroidWorkPipeline(
                     compositionSeed = request.compositionSeed,
                     workColorSnapshot = request.workColorSnapshot,
                     wild = request.renderWild,
+                    maxSvgBytes = readSvgLimitBytes(),
                 ),
             )
             val metadata = JSONObject(rendered.metadataJson)
@@ -361,10 +378,11 @@ class AndroidWorkPipeline(
                     compositionSeed = request.compositionSeed,
                     workColorSnapshot = request.workColorSnapshot,
                     wild = request.renderWild,
+                    maxSvgBytes = SvgOutputLimit.CONSUMER_BYTES,
                 ),
             ).svg
         }
-        return renderSaved(scoreJson, request, svgProfile).output.requiredString("svg")
+        return renderSaved(scoreJson, request, svgProfile, generatedWork = false).output.requiredString("svg")
     }
 
     private class SavedRender(
@@ -379,7 +397,7 @@ class AndroidWorkPipeline(
     )
 
     /** A saved Score through `renderSaved`, with the policy the work was compiled under. */
-    private suspend fun renderSaved(scoreJson: String, request: PaintRequest, svgProfile: String): SavedRender {
+    private suspend fun renderSaved(scoreJson: String, request: PaintRequest, svgProfile: String, generatedWork: Boolean = true): SavedRender {
         // A saved color snapshot is the render authority even if its catalog ID
         // has since been retired. Older work without one uses today's default.
         val useDefaultPolicy = request.workColorSnapshot != null ||
@@ -418,15 +436,23 @@ class AndroidWorkPipeline(
             .put("hard_policy", hardPolicy)
             .put("operational_budget", operationalBudget)
             .put("clip", clipPolicy())
-        val output = JSONObject(binding.renderSaved(input.toString().encodeToByteArray()).toString(Charsets.UTF_8))
+        val maxSvgBytes = if (generatedWork) readSvgLimitBytes() else SvgOutputLimit.CONSUMER_BYTES
+        val native = binding.renderSavedSvgLimited(input.toString().encodeToByteArray(), maxSvgBytes)
+        val output = JSONObject(native.jsonBytes.toString(Charsets.UTF_8))
         if (output.has("error")) {
             // A code per reason, worded where it is shown; the core's own
             // reason goes to the log only, as the server logs it.
             val code = output.requiredString("error")
             output.optString("message").takeIf { it.isNotEmpty() }
                 ?.let { Log.w(RENDER_LOG_TAG, "saved replay refused ($code): $it") }
+            if (generatedWork && (code == "output_too_large" || code == "svg_output_too_large")) {
+                throw InkuFailure("svg_output_too_large") { it.svgOutputTooLarge((maxSvgBytes / SvgOutputLimit.BYTES_PER_MIB).toInt()) }
+            }
             throw InkuFailure { it.savedRenderRefused(code) }
         }
+        val svg = native.svg ?: output.requiredString("svg")
+        SvgOutputLimit.requireSvg(svg, maxSvgBytes, generatedWork)
+        output.put("svg", svg)
         loggedRenderWarnings(output.requiredObject("metadata"), "saved replay ($svgProfile)")
         return SavedRender(
             output,

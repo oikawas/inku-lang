@@ -26,6 +26,99 @@ import org.junit.Test
 
 class SharedPipelineHostTest {
     @Test
+    fun svgLimitRefusalPersistsWithoutStaleSuccessAndRerenderReadsCurrentAllowance() = runBlocking {
+        val scripted = ScriptedBinding()
+        var limit = app.inku.mobile.render.SvgOutputLimit.BYTES_PER_MIB
+        val boundarySvg = "<svg>" + "あ".repeat(349521) + "ab</svg>"
+        assertEquals(limit, boundarySvg.toByteArray(Charsets.UTF_8).size.toLong())
+        var svg = boundarySvg
+        val allowances = mutableListOf<Long>()
+        val binding = object : SharedPipelineBinding by scripted {
+            override fun stepSvgLimited(snapshotBytes: ByteArray, inputEnvelopeBytes: ByteArray, maxSvgBytes: Long): NativeSvgOutput {
+                allowances += maxSvgBytes
+                val output = JSONObject(scripted.step(snapshotBytes, inputEnvelopeBytes).toString(Charsets.UTF_8))
+                val rendered = output.getJSONObject("payload").getJSONObject("result").optJSONObject("rendered")
+                rendered?.put("svg", "")
+                return NativeSvgOutput(output.toString().encodeToByteArray(), if (rendered != null) svg else null)
+            }
+        }
+        val executions = MemoryExecutionStore()
+        val commits = RecordingCommitStore()
+        val provider = RecordingEffectProvider()
+        val render = PipelineCommand.Render("{}", "{}")
+        var safeSaves = 0
+        fun newHost() = SharedPipelineHost(binding, provider, commits, executions, readSvgLimitBytes = { limit },
+            safePerformance = object : SafePerformancePort {
+                override fun renderCommand(view: PipelineView) = render
+                override suspend fun save(view: PipelineView) { safeSaves += 1 }
+            })
+        val host = newHost()
+        val ready = host.start(startRequest(PipelineAuthoring.DirectDdl("place one circle.")))
+        val success = host.command(OWNER, ready.executionId, render)
+        assertEquals(boundarySvg, JSONObject(success.renderedJson!!).getString("svg"))
+        svg += "!"
+        val refused = host.command(OWNER, ready.executionId, render)
+        assertEquals("failed", refused.phaseTag)
+        assertEquals("svg_output_too_large", refused.phaseReason)
+        assertTrue(refused.terminal)
+        assertFalse(refused.busy)
+        assertNull(refused.renderedJson)
+        assertEquals(1, refused.svgOutputLimitMiB)
+        assertEquals(0, safeSaves)
+        val stored = JSONObject(executions.load(OWNER, ready.executionId)!!.toString(Charsets.UTF_8))
+        assertTrue(stored.getBoolean("svg_output_failure"))
+        assertFalse(stored.has("rendered_json"))
+        val calls = allowances.size
+        val restored = newHost().restore(OWNER, ready.executionId)
+        assertEquals("failed", restored.phaseTag)
+        assertEquals(1, restored.svgOutputLimitMiB)
+        assertNull(restored.renderedJson)
+        assertEquals(calls, allowances.size)
+        limit *= 2
+        assertEquals(1, newHost().restore(OWNER, ready.executionId).svgOutputLimitMiB)
+        assertTrue(app.inku.mobile.ui.pipelineAttentionText("svg_output_too_large", null,
+            app.inku.mobile.ui.i18n.InkuStringsEn, 1).contains("1 MiB"))
+        val retried = newHost().command(OWNER, ready.executionId, render)
+        assertEquals("completed", retried.phaseTag)
+        assertEquals(svg, JSONObject(retried.renderedJson!!).getString("svg"))
+        assertEquals(limit, allowances.last())
+        assertEquals(0, safeSaves)
+        assertEquals(CONFIG.toString(), JSONObject(newHost().snapshotJson(OWNER, ready.executionId)).getJSONObject("config").toString())
+        assertFalse(JSONObject(executions.load(OWNER, ready.executionId)!!.toString(Charsets.UTF_8)).getBoolean("svg_output_failure"))
+
+        val exportAllowances = mutableListOf<Long>()
+        val exportBinding = object : SharedPipelineBinding by ScriptedBinding() {
+            override fun renderSavedSvgLimited(inputBytes: ByteArray, maxSvgBytes: Long): NativeSvgOutput {
+                exportAllowances += maxSvgBytes
+                return NativeSvgOutput("""{"svg":"","metadata":{}}""".encodeToByteArray(), svg)
+            }
+        }
+        val pipeline = androidPipeline(exportBinding, readSvgLimitBytes = { app.inku.mobile.render.SvgOutputLimit.BYTES_PER_MIB })
+        val work = pipeline.composeFromDdl("place one circle.", describe(""))
+        assertEquals(svg, pipeline.renderExportSvg(work.scoreJson, describe(""), "editable"))
+        assertEquals(app.inku.mobile.render.SvgOutputLimit.CONSUMER_BYTES, exportAllowances.last())
+        try {
+            pipeline.renderFromScore(work.scoreJson, describe(""))
+            fail("a fresh replay still uses the current generation allowance")
+        } catch (failure: app.inku.mobile.ui.i18n.InkuFailure) {
+            assertEquals("svg_output_too_large", failure.detail)
+        }
+        assertEquals(app.inku.mobile.render.SvgOutputLimit.BYTES_PER_MIB, exportAllowances.last())
+    }
+
+    @Test
+    fun svgLimitSettingsAcceptOnlyIntegerMiBAndDefaultSafely() {
+        val policy = app.inku.mobile.render.SvgOutputLimit
+        assertEquals(12, policy.storedMiB(null))
+        assertEquals(1, policy.parseMiB("1"))
+        assertEquals(32, policy.parseMiB("32"))
+        listOf("0", "33", "12.0", "", "-1", "NaN").forEach { assertNull(policy.parseMiB(it)) }
+        assertEquals(32, policy.storedMiB("""{"value":33554432}"""))
+        listOf("{}", "broken", """{"value":33554433}""", """{"value":12582912.0}""", """{"value":"12582912"}""")
+            .forEach { assertEquals(12, policy.storedMiB(it)) }
+    }
+
+    @Test
     fun completionRecordSurvivesSavedWorkForkAndExecutionForkButNotANewImportedRun() = runBlocking {
         val record = JSONObject("""{"schema":"inku.completion-ranges.v1","ranges":[{"words":"右下","horizontal":["2/3","1"],"vertical":["2/3","1"],"sentence":"\uFFFCに、赤い円。"}],"future":{"keep":"opaque"}}""")
         val binding = ScriptedBinding(uniqueExecutions = true).apply { completionRecord = record }
@@ -436,7 +529,9 @@ class SharedPipelineHostTest {
         compositionSeed = seed, recomposeMode = mode, instructionLang = "en",
     )
 
-    private fun androidPipeline(binding: SharedPipelineBinding, readHistory: suspend (String) -> ManagedHistoryRead? = { null }) = AndroidWorkPipeline(
+    private fun androidPipeline(binding: SharedPipelineBinding,
+        readSvgLimitBytes: suspend () -> Long = { app.inku.mobile.render.SvgOutputLimit.DEFAULT_BYTES },
+        readHistory: suspend (String) -> ManagedHistoryRead? = { null }) = AndroidWorkPipeline(
         binding = binding,
         modelProvider = object : ModelProvider {
             override val providerId = "test"
@@ -447,6 +542,7 @@ class SharedPipelineHostTest {
             override fun render(request: RenderRequest): RenderResult = error("the shared pipeline renders this run")
         },
         bundledPluginsEnabled = { false },
+        readSvgLimitBytes = readSvgLimitBytes,
     )
 
     @Test

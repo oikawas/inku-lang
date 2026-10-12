@@ -5,6 +5,10 @@
 
 最終更新: 2026-10-12。
 
+## SVG生成上限（I-375）
+
+「設定 → 制限値」でSVG生成上限を1〜32 MiBの整数として端末内へ保存する。既定・推奨は12 MiBで、取消と既定値の入力は保存まで適用しない。実際の描画時に現在値を読み、共有rendererの出力予算とSVG本文のUTF-8 byte検査へ渡す。SVGをJSONから分離した追加JNI入口を使い、通信JSONのescape量を作品のサイズと混同しない。超過作品を保存せず、当該試行の上限値と失敗を実行状態へ記録し、再起動後に旧成功を今回の成功として扱わない。設定はcompiler budget・Score・作品identityへ混ぜず、Serverから端末へ自動同期しない。保存済み作品の表示・書き出しには生成設定を遡及適用せず、独立した64 MiBのconsumer枠を使う。
+
 **追随状況**: Android は `2.1.4-android.80` の世代にある。DDLの変換とScore → SVGの描画は、
 同じcommitの共有Rust core（`core/crates/`）を同梱してServerと同じ実装で行い、Android独自の版定数を持たない。
 render engineの版は同梱した`core/crates/inku-render/`の`RENDER_ENGINE_VERSION`をJNI経由で名乗り、
@@ -94,7 +98,7 @@ sceneのcache退避は使用中の参照を閉じず、最後の要求が終わ�
 
 共通APIの`Unsupported`だけ一度resvgへ戻し、理由を診断へ数える。`Refused`、捕捉panic、
 JNI／Bitmap作成失敗は戻さず表示エラーにする。macOSの既存の広い戻し方とはhost方針が異なる。
-入力上限は両表示経路とも12MiB。履歴・系譜の保存thumbnail、歳時記の小さな画像、PNG出力、
+入力のconsumer上限は両表示経路とも64 MiB。最大32 MiBの生成本体に説明・書き出しwrapper用の最大32 MiBを加えた枠で、pixel・寸法等の独立上限は保持する。履歴・系譜の保存thumbnail、歳時記の小さな画像、PNG出力、
 LLM画像とheadless画像化は既存resvgを使う。表示のrollbackは`AndroidDisplayRenderer.drawsWithSkia`で選ぶ。
 
 Androidの固定Skia配布物は共通SHA一覧と`scripts/skia-binaries.sh`で毎build照合する。
@@ -331,7 +335,7 @@ Gemini provider の生成要求は Gemini API の `models/{model}:generateConten
 
 共有pipelineのprovider要求はServerの`pipeline_provider.py`と同じ条件で送る。Geminiではtemperatureを送らず、`thinkingConfig.thinkingLevel`を`minimal`とし、`allowedFunctionNames`で応答関数を1つに固定し、core のresponse schemaをServerと同じGemini対応subsetへ変換する（`const`は1要素の`enum`へ、hole補完の`oneOf`は平坦化する。厳密な検証は共有Rustが行う）。OpenAI互換providerではStage 1（`generate_normalized_ddl`）と構図の読み（`read_composition`）をtemperature 0.3、他の要求を0.0とする。Stage 1と写生・カタログ選択の出力上限は2048、hole補完は2048とする。
 
-Room DBのcursor windowは40 MiBとする。SVGはServerと同じく12 MiBまで許され、実行状態はその描画結果を含むため、標準の約2 MBでは保存済みの行を読み戻せない。
+Room DBのhistory用cursor windowは160 MiBとする（生成SVG32＋Score/snapshot32＋metadata/protocol64＋他field余裕32 MiB）。この枠を超える旧行を無制限に読む保証ではない。実行状態のBLOBはcursorへ全量を載せず、固定digestを指定した1 MiBのchunkで読み、全量のSHA-256を検証する。最新実行・実行metadata queryもBLOBを含めない。新しいhost stateはrenderedをJSON objectで保持して二重escapeを避け、旧文字列形式も読み戻せる。
 
 ## 2026-09-24 現行の下部操作・写真入力・作品一覧
 

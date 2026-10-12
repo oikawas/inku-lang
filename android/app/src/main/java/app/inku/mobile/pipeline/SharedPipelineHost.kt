@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import app.inku.mobile.render.SvgOutputLimit
 
 /** Serialized Android host for the shared Rust authoring state machine. */
 class SharedPipelineHost(
@@ -30,6 +31,7 @@ class SharedPipelineHost(
     private val safePerformance: SafePerformancePort? = null,
     /** Why a model attempt failed beyond its class (`credentials_unavailable`), by action id. */
     private val failureDetail: (actionId: String) -> String? = { null },
+    private val readSvgLimitBytes: suspend () -> Long = { SvgOutputLimit.DEFAULT_BYTES },
 ) {
     private val sessions = mutableMapOf<String, Session>()
     private val sessionsMutex = Mutex()
@@ -88,7 +90,9 @@ class SharedPipelineHost(
         val envelope = envelope("new", "0", messageId, payload)
         val inputBytes = envelope.toString().encodeToByteArray()
         requireWithin(inputBytes, limits.maxInputBytes)
-        val output = parseOutput(binding.step(ByteArray(0), inputBytes), messageId, limits)
+        val maxSvgBytes = readSvgLimitBytes()
+        val native = binding.stepSvgLimited(ByteArray(0), inputBytes, maxSvgBytes)
+        val output = parseOutput(native.jsonBytes, messageId, limits, native.svg, maxSvgBytes)
         val session = Session(
             ownerId = request.ownerId,
             snapshotBytes = output.snapshotBytes,
@@ -98,6 +102,8 @@ class SharedPipelineHost(
             fresh = true,
             renderedJson = output.renderedJson,
             eventsJson = output.eventsJson,
+            svgOutputFailure = output.svgOutputFailure,
+            svgOutputFailureLimitBytes = output.svgOutputFailureLimitBytes,
         )
         val snapshot = session.snapshot()
         executionStore.create(
@@ -142,7 +148,7 @@ class SharedPipelineHost(
                     throw error
                 }
             }
-            if (command is PipelineCommand.Cancel) view(session) else driveWithCancellation(session)
+            if (command is PipelineCommand.Cancel) view(session) else driveWithCancellation(session, allowRefusedDrive = true)
         }
     }
 
@@ -200,8 +206,14 @@ class SharedPipelineHost(
             ),
             hostContextJson = state.requiredObject("host_context").toString(),
             fresh = state.getBoolean("fresh"),
-            renderedJson = state.optionalString("rendered_json"),
+            renderedJson = when (val rendered = state.opt("rendered_json")) {
+                is JSONObject -> rendered.toString()
+                is String -> rendered.takeIf(String::isNotEmpty)
+                else -> null
+            },
             eventsJson = state.optString("events_json", "[]"),
+            svgOutputFailure = state.optBoolean("svg_output_failure", false),
+            svgOutputFailureLimitBytes = state.optLong("svg_output_failure_limit_bytes", SvgOutputLimit.DEFAULT_BYTES),
             metrics = state.optJSONObject("metrics")?.let { metrics ->
                 metrics.keys().asSequence().associateWith { metrics.getLong(it) }
             } ?: emptyMap(),
@@ -244,10 +256,11 @@ class SharedPipelineHost(
     }
 
     /** A drive whose caller is cancelled cancels the execution too, so it is not left busy. */
-    private suspend fun driveWithCancellation(session: Session): PipelineView {
+    private suspend fun driveWithCancellation(session: Session, allowRefusedDrive: Boolean = false): PipelineView {
+        if (!allowRefusedDrive && session.mutex.withLock { session.svgOutputFailure }) return view(session)
         session.mutex.withLock { session.drivers += 1 }
         return try {
-            drive(session).let { view -> if (view.phaseTag in STOPPED_PHASES) performSafely(session) ?: view else view }
+            drive(session, allowRefusedDrive).let { view -> if (view.phaseTag in STOPPED_PHASES) performSafely(session) ?: view else view }
         } catch (cancelled: CancellationException) {
             withContext(NonCancellable) {
                 runCatching { cancel(session.ownerId, session.snapshot().requiredString("execution_id")) }
@@ -263,8 +276,9 @@ class SharedPipelineHost(
      * call -- until it asks for none, at most [maxEffectSteps] of them. A
      * model call another drive has already taken ends this drive with a view.
      */
-    private suspend fun drive(session: Session): PipelineView {
+    private suspend fun drive(session: Session, allowRefusedDrive: Boolean = false): PipelineView {
         repeat(maxEffectSteps) {
+            if (!allowRefusedDrive && session.mutex.withLock { session.svgOutputFailure }) return view(session)
             val action = session.mutex.withLock {
                 session.snapshot().optJSONObject("action")?.let { JSONObject(it.toString()) }
             } ?: return view(session)
@@ -272,6 +286,7 @@ class SharedPipelineHost(
                 "commit_visible_normalized_ddl" -> runCommitEffect(session, action)
                 "complete_visible_ddl_holes" -> {
                     performSafely(session, action)
+                    if (session.mutex.withLock { session.svgOutputFailure }) return view(session)
                     if (!runProviderEffect(session, action)) return view(session)
                 }
                 "select_description_catalog",
@@ -380,6 +395,7 @@ class SharedPipelineHost(
     private suspend fun performSafely(session: Session, action: JSONObject? = null): PipelineView? {
         val port = safePerformance ?: return null
         val pending = view(session)
+        if (pending.phaseReason == "svg_output_too_large") return null
         if (pending.scoreJson == null) return null
         if (pending.renderedJson == null) {
             val render = port.renderCommand(pending) ?: return null
@@ -428,7 +444,9 @@ class SharedPipelineHost(
         ).toString().encodeToByteArray()
         requireWithin(session.snapshotBytes, limits.maxSnapshotBytes)
         requireWithin(input, limits.maxInputBytes)
-        val output = parseOutput(binding.step(session.snapshotBytes, input), messageId, limits)
+        val maxSvgBytes = readSvgLimitBytes()
+        val native = binding.stepSvgLimited(session.snapshotBytes, input, maxSvgBytes)
+        val output = parseOutput(native.jsonBytes, messageId, limits, native.svg, maxSvgBytes)
         val next = JSONObject(output.snapshotBytes.toString(Charsets.UTF_8))
         if (next.requiredString("execution_id") != previous.requiredString("execution_id")) {
             throw PipelineHostException("pipeline_execution_identity_changed")
@@ -437,14 +455,20 @@ class SharedPipelineHost(
         // document it drew is unchanged and still delivered.
         val oldDocument = previous.optJSONObject("document")?.toString()
         val nextDocument = next.optJSONObject("document")?.toString()
-        val rendered = output.renderedJson ?: session.renderedJson
-            ?.takeIf { oldDocument == nextDocument && next.optJSONObject("delivery") != null }
+        val svgOutputFailure = output.svgOutputFailure || (session.svgOutputFailure && output.renderedJson == null)
+        val rendered = if (svgOutputFailure) null else output.renderedJson ?: session.renderedJson
+            ?.takeIf { oldDocument == nextDocument && next.optJSONObject("delivery") != null &&
+                next.requiredObject("phase").requiredString("tag") != "failed" }
         val priorSnapshot = session.snapshotBytes
         val priorRendered = session.renderedJson
         val priorEvents = session.eventsJson
+        val priorSvgOutputFailure = session.svgOutputFailure
+        val priorSvgOutputFailureLimitBytes = session.svgOutputFailureLimitBytes
         session.snapshotBytes = output.snapshotBytes
         session.renderedJson = rendered
         session.eventsJson = output.eventsJson
+        session.svgOutputFailure = svgOutputFailure
+        if (output.svgOutputFailure) session.svgOutputFailureLimitBytes = output.svgOutputFailureLimitBytes
         val saved = executionStore.compareAndSet(
             ownerId = session.ownerId,
             executionId = next.requiredString("execution_id"),
@@ -456,11 +480,13 @@ class SharedPipelineHost(
             session.snapshotBytes = priorSnapshot
             session.renderedJson = priorRendered
             session.eventsJson = priorEvents
+            session.svgOutputFailure = priorSvgOutputFailure
+            session.svgOutputFailureLimitBytes = priorSvgOutputFailureLimitBytes
             throw PipelineHostException("execution_snapshot_conflict")
         }
     }
 
-    private fun parseOutput(bytes: ByteArray, messageId: String, limits: Limits): StepResult {
+    private fun parseOutput(bytes: ByteArray, messageId: String, limits: Limits, detachedSvg: String?, maxSvgBytes: Long): StepResult {
         requireWithin(bytes, limits.maxOutputBytes)
         val output = runCatching { JSONObject(bytes.toString(Charsets.UTF_8)) }
             .getOrElse { throw PipelineHostException("pipeline_malformed_output", it) }
@@ -479,6 +505,18 @@ class SharedPipelineHost(
             throw PipelineHostException("pipeline_protocol_mismatch")
         }
         val result = payload.requiredObject("result")
+        var svgOutputFailure = false
+        result.optJSONObject("rendered")?.let { rendered ->
+            val svg = detachedSvg ?: rendered.requiredString("svg")
+            try {
+                SvgOutputLimit.requireSvg(svg, maxSvgBytes)
+                rendered.put("svg", svg)
+            } catch (failure: app.inku.mobile.ui.i18n.InkuFailure) {
+                if (failure.detail != "svg_output_too_large") throw failure
+                svgOutputFailure = true
+                result.remove("rendered")
+            }
+        }
         val snapshot = result.requiredObject("snapshot")
         val snapshotBytes = snapshot.toString().encodeToByteArray()
         requireWithin(snapshotBytes, limits.maxSnapshotBytes)
@@ -487,6 +525,8 @@ class SharedPipelineHost(
             renderedJson = result.optJSONObject("rendered")?.toString(),
             eventsJson = result.optJSONArray("events")?.toString()
                 ?: throw PipelineHostException("pipeline_schema_violation"),
+            svgOutputFailure = svgOutputFailure,
+            svgOutputFailureLimitBytes = maxSvgBytes,
         )
     }
 
@@ -494,7 +534,7 @@ class SharedPipelineHost(
         val snapshot = session.snapshot()
         val authority = snapshot.requiredObject("authority")
         val phase = snapshot.requiredObject("phase")
-        val phaseTag = phase.requiredString("tag")
+        val phaseTag = if (session.svgOutputFailure) "failed" else phase.requiredString("tag")
         val document = snapshot.optJSONObject("document")
         val delivery = snapshot.optJSONObject("delivery")
         val patch = if (phaseTag == "awaiting_patch_approval") {
@@ -520,14 +560,15 @@ class SharedPipelineHost(
             deliveryJson = delivery?.toString(),
             renderedJson = session.renderedJson,
             patchProposal = patch,
-            busy = snapshot.optJSONObject("action") != null || session.providerActionInFlight != null,
+            busy = !session.svgOutputFailure && (snapshot.optJSONObject("action") != null || session.providerActionInFlight != null),
             terminal = phaseTag in TERMINAL_PHASES,
             eventsJson = session.eventsJson,
             description = session.context.description.takeIf(String::isNotEmpty),
             hostContextJson = session.hostContextJson,
             models = session.models,
             sketch = PipelineSketchResult.from(snapshot.optJSONObject("sketch")),
-            phaseReason = phase.optionalString("reason")?.takeIf { phaseTag in STOPPED_PHASES },
+            phaseReason = if (session.svgOutputFailure) "svg_output_too_large" else phase.optionalString("reason")?.takeIf { phaseTag in STOPPED_PHASES },
+            svgOutputLimitMiB = if (session.svgOutputFailure) (session.svgOutputFailureLimitBytes / SvgOutputLimit.BYTES_PER_MIB).toInt() else null,
             providerFailure = session.providerFailure,
             holeCompletionResults = HoleCompletionResult.fromCheck(snapshot.optJSONObject("hole_completion_check")),
             completionRangesJson = snapshot.optJSONObject("completion_ranges")?.toString(),
@@ -559,8 +600,10 @@ class SharedPipelineHost(
         )
         .put("host_context", JSONObject(session.hostContextJson))
         .put("fresh", session.fresh)
-        .put("rendered_json", session.renderedJson)
+        .put("rendered_json", session.renderedJson?.let(::JSONObject))
         .put("events_json", session.eventsJson)
+        .put("svg_output_failure", session.svgOutputFailure)
+        .put("svg_output_failure_limit_bytes", session.svgOutputFailureLimitBytes)
         .put("metrics", JSONObject(session.metrics))
         .put(
             "provider_failure",
@@ -694,6 +737,8 @@ class SharedPipelineHost(
         /** Model time per stage, as the server's `metrics`. */
         var metrics: Map<String, Long> = emptyMap(),
         var providerFailure: PipelineProviderFailure? = null,
+        var svgOutputFailure: Boolean = false,
+        var svgOutputFailureLimitBytes: Long = SvgOutputLimit.DEFAULT_BYTES,
         /** Drives running on this session; guarded by [mutex]. */
         var drivers: Int = 0,
         val mutex: Mutex = Mutex(),
@@ -715,6 +760,8 @@ class SharedPipelineHost(
         val snapshotBytes: ByteArray,
         val renderedJson: String?,
         val eventsJson: String,
+        val svgOutputFailure: Boolean = false,
+        val svgOutputFailureLimitBytes: Long = SvgOutputLimit.DEFAULT_BYTES,
     )
 
     private companion object {

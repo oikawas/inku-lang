@@ -72,12 +72,12 @@ interface SharedPipelineDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertExecution(entity: PipelineExecutionEntity)
 
-    @Query("SELECT * FROM pipeline_candidate_executions WHERE owner_id = :ownerId AND execution_id = :executionId")
+    @Query("SELECT owner_id, execution_id, variation_id, sequence, X'' AS state_bytes, state_digest, created_at, updated_at FROM pipeline_candidate_executions WHERE owner_id = :ownerId AND execution_id = :executionId")
     suspend fun getExecution(ownerId: String, executionId: String): PipelineExecutionEntity?
 
     @Query(
         """
-        SELECT * FROM pipeline_candidate_executions
+        SELECT owner_id, execution_id, variation_id, sequence, X'' AS state_bytes, state_digest, created_at, updated_at FROM pipeline_candidate_executions
         WHERE owner_id = :ownerId AND variation_id = :variationId
         ORDER BY updated_at DESC, execution_id DESC
         LIMIT 1
@@ -87,13 +87,16 @@ interface SharedPipelineDao {
 
     @Query(
         """
-        SELECT * FROM pipeline_candidate_executions
+        SELECT owner_id, execution_id, variation_id, sequence, X'' AS state_bytes, state_digest, created_at, updated_at FROM pipeline_candidate_executions
         WHERE owner_id = :ownerId
         ORDER BY updated_at DESC, created_at DESC
         LIMIT 1
         """,
     )
     suspend fun latestExecution(ownerId: String): PipelineExecutionEntity?
+
+    @Query(EXECUTION_STATE_CHUNK_SQL)
+    suspend fun executionStateChunk(offset: Int, length: Int, ownerId: String, executionId: String, digest: String): ByteArray?
 
     @Query(
         """

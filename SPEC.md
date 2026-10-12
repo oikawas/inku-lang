@@ -2655,7 +2655,9 @@ This Server output safety setting is independent of mark limits and is absent fr
 
 Server-specific native entries pass the captured ceiling to the intermediate output allowance and carry SVG outside the JSON transport envelope. Independent input, snapshot, non-SVG transport, mark, extent, resource, and clip budgets remain enforced. A native wheel missing these entries fails with 503 `svg_limit_binding_unavailable`, rather than silently falling back. The post-render byte check does not prevent CPU or temporary memory already consumed inside the renderer.
 
-This setting covers Server/Web generation, saving, and display. It does not propagate to Android/Swift local generation or settings. Their existing native raster/display and Swift export parser ceiling of 12 MiB remains a separate consumer restriction; native display/export compatibility for larger Server works is outside this change's guarantee.
+Android and Swift also provide a generated-SVG ceiling under Settings → Limits and read their local setting when drawing. They share the 12 MiB default and recommendation, the 1–32 MiB range, and the UTF-8 byte check; Server settings are not automatically synchronized to devices. An oversized new SVG is not saved as a work. Its failure remains visible without presenting an earlier success as the current attempt's success. Native APIs return SVG separately from JSON so JSON escaping does not exhaust the transport envelope first.
+
+Stored-work display and export do not retroactively apply the generation setting. Shared native raster/display, GPU transport, and the Swift export parser have an absolute 64 MiB ceiling: at most 32 MiB of a generated work plus up to 32 MiB of description/export wrapper allowance. This consumer envelope is separate from the generation ceiling. Derived SVG above 64 MiB is refused, and independent pixel-count, dimension, and geometry protections remain in force.
 
 #### How a stated count is treated (v2.7.6)
 

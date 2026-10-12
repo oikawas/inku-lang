@@ -6,6 +6,10 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-10-12.
 
+## Generated-SVG ceiling (I-375)
+
+Settings → Limits stores an integer ceiling from 1 to 32 MiB on the device, with 12 MiB as the default and recommendation. Cancel and restoring draft defaults do not apply changes until saved. Each actual draw reads the current value for the shared renderer's output allowance and SVG-body UTF-8 check. Added JNI entries return SVG separately from JSON, so transport escaping is not mistaken for a work's size. Oversized works are not saved. The attempted limit and failure remain in execution state, preventing restart from presenting an earlier success as the current attempt's success. The setting is not part of compiler budgets, Score, or work identity and is not automatically synchronized from Server. Stored-work display and export use a separate 64 MiB consumer envelope without retroactively applying the generation setting.
+
 **Catch-up status**: Android sits at generation `2.1.4-android.80`. DDL conversion and Score → SVG
 rendering run in the shared Rust core (`core/crates/`) of the same commit, packaged with the app, so
 Android implements them exactly as the server does and declares no version constants of its own.
@@ -118,7 +122,7 @@ pixel limit; the virtual whole is limited to a 120,000px side. Density-limited r
 
 Only shared `Unsupported` failures return to resvg once, with diagnostic reason counts. `Refused`,
 caught panics and JNI/Bitmap failures show an error. This host policy differs from macOS's existing
-broader fallback. Both paths accept at most 12MiB of SVG. Saved history/lineage thumbnails, small
+broader fallback. Both paths have a 64 MiB SVG consumer ceiling: at most 32 MiB of a generated work plus up to 32 MiB of description/export wrappers, retaining independent pixel and dimension protections. Saved history/lineage thumbnails, small
 saijiki previews, PNG output, model images and headless rasterization use existing resvg.
 `AndroidDisplayRenderer.drawsWithSkia` selects display rollback.
 
@@ -357,7 +361,7 @@ Gemini provider generation requests use the Gemini API `models/{model}:generateC
 
 Shared-pipeline provider requests use the same conditions as Server's `pipeline_provider.py`. For Gemini, no temperature is sent, `thinkingConfig.thinkingLevel` is `minimal`, `allowedFunctionNames` restricts the response to one function, and the core response schema is projected into the same Gemini-supported subset as on Server (`const` becomes a one-element `enum`; hole-completion `oneOf` variants are flattened; shared Rust performs the exact validation). OpenAI-compatible providers use temperature 0.3 for Stage 1 (`generate_normalized_ddl`) and the composition reading (`read_composition`), and 0.0 for other requests. The output limit is 2048 for Stage 1, sketch, and catalog selection, and 2048 for hole completion.
 
-The Room database cursor window is 40 MiB. SVGs may reach Server's 12 MiB limit, and the execution state embeds that render, so the default window of about 2 MB cannot read such saved rows back.
+The Room history cursor window is 160 MiB (32 MiB generated SVG + 32 MiB Score/snapshot + 64 MiB metadata/protocol + 32 MiB other-field headroom). Legacy rows above these bounds are not guaranteed unlimited reads. Execution BLOBs are read in 1 MiB chunks bound to one digest, then validated with SHA-256, without putting the complete BLOB into a cursor window. Latest-execution and execution-metadata queries omit the BLOB too. New host state keeps rendered data as a JSON object to avoid double escaping, while still reading legacy string encoding.
 
 ## 2026-09-24 Current bottom actions, photo entry, and Works scrolling
 

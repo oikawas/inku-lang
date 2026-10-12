@@ -64,6 +64,7 @@ import app.inku.mobile.pipeline.PipelineExecutionStore
 import app.inku.mobile.pipeline.SketchInput
 import app.inku.mobile.pipeline.ProviderAttempt
 import app.inku.mobile.render.RustArtworkRasterizer
+import app.inku.mobile.render.SvgOutputLimit
 import java.io.File
 import java.io.FileOutputStream
 import kotlinx.coroutines.CoroutineScope
@@ -134,6 +135,7 @@ class InkuRepository(
             executionStore = sharedPipelineStore,
             readHistory = { id -> sharedPipelineStore.readHistory(AndroidWorkPipeline.OWNER_ID, id) },
             bundledPluginsEnabled = { isBundledPluginPackageEnabled() },
+            readSvgLimitBytes = { SvgOutputLimit.storedMiB(getSetting(SvgOutputLimit.SETTING_KEY)) * SvgOutputLimit.BYTES_PER_MIB },
             pinModelSession = { models ->
                 if ((models.stage1ModelId.startsWith("chatgpt:") || models.stage2ModelId.startsWith("chatgpt:")) && modelProviderOverride == null) {
                     // A DDL with no holes can render without credentials. The provider
@@ -238,6 +240,7 @@ class InkuRepository(
     suspend fun restoreActivePipeline(): PipelineView? {
         val execution = database.sharedPipelineDao().latestExecution(AndroidWorkPipeline.OWNER_ID) ?: return null
         val view = pipeline.restore(execution.executionId)
+        if (view.phaseReason == "svg_output_too_large") return view
         if (view.phaseTag == "completed") {
             return view.takeIf { database.historyDao().getById(pipelineHistoryId(view)) == null }
         }

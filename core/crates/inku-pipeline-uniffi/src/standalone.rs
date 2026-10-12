@@ -82,3 +82,38 @@ pub fn render_compiled(input_bytes: Vec<u8>) -> Vec<u8> {
             .map_err(|error| refusal("invalid_render_output", &error.to_string()))
     })
 }
+
+/// Native replay keeps raw SVG outside the bounded metadata envelope.
+#[uniffi::export]
+pub fn render_compiled_svg_limited(
+    input_bytes: Vec<u8>,
+    max_svg_bytes: u64,
+) -> super::NativeSvgOutput {
+    let limit = match super::native_svg_limit(max_svg_bytes) {
+        Ok(limit) => limit,
+        Err(refusal) => return refusal,
+    };
+    catch_unwind(AssertUnwindSafe(|| {
+        let input: RenderInput = match parse(&input_bytes, "invalid_render_input") {
+            Ok(input) => input,
+            Err(bytes) => return (bytes, None).into(),
+        };
+        match inku_pipeline::core_boundary::render_delivery_with_svg_limit(
+            &input.delivery,
+            input.options.into(),
+            &input.compiler,
+            input.clip,
+            limit,
+        ) {
+            Ok(output) => {
+                super::separated_saved_output(output, super::MAX_SAVED_RENDER_METADATA_BYTES).into()
+            }
+            Err(error) => (
+                refusal(super::saved_render_error_code(&error), &error.to_string()),
+                None,
+            )
+                .into(),
+        }
+    }))
+    .unwrap_or_else(|_| (refusal("internal_invariant", "the core panicked"), None).into())
+}

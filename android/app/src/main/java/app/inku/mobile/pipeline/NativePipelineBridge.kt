@@ -1,5 +1,8 @@
 package app.inku.mobile.pipeline
 
+/** SVG is detached so JSON escaping cannot consume the protocol's byte allowance. */
+data class NativeSvgOutput(val jsonBytes: ByteArray, val svg: String?)
+
 /** Synchronous owned-byte transport; the host owns scheduling and all effects. */
 object NativePipelineBridge : SharedPipelineBinding {
     init {
@@ -13,6 +16,8 @@ object NativePipelineBridge : SharedPipelineBinding {
     external override fun resolvePalette(inputBytes: ByteArray): ByteArray
     external override fun resolveMacroCatalog(inputBytes: ByteArray): ByteArray
     external override fun renderSaved(inputBytes: ByteArray): ByteArray
+    external override fun stepSvgLimited(snapshotBytes: ByteArray, inputEnvelopeBytes: ByteArray, maxSvgBytes: Long): NativeSvgOutput
+    external override fun renderSavedSvgLimited(inputBytes: ByteArray, maxSvgBytes: Long): NativeSvgOutput
     external override fun explainPluginDiagnostics(inputBytes: ByteArray): ByteArray
     external override fun recompose(inputBytes: ByteArray): ByteArray
     external override fun completionRangeStates(inputBytes: ByteArray): ByteArray

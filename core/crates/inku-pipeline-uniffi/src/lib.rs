@@ -31,7 +31,7 @@ pub use raster::{
     rasterize_svg, rasterize_svg_region,
 };
 pub use saijiki_migration::migrate_saijiki_v1;
-pub use standalone::{compile_document, render_compiled};
+pub use standalone::{compile_document, render_compiled, render_compiled_svg_limited};
 
 const BINDING_VERSION: &str = "1.1.0";
 const PROTOCOL_VERSION: &str = "1.0.0";
@@ -61,6 +61,45 @@ pub fn step_with_svg_limit(
         )
     }))
     .unwrap_or_else(|_| (error_bytes(ProtocolError::InternalInvariant), None))
+}
+
+/// Native hosts receive raw SVG independently of bounded metadata JSON.
+/// Validate its UTF-8 size before adopting the returned snapshot or result.
+#[derive(uniffi::Record)]
+pub struct NativeSvgOutput {
+    pub json_bytes: Vec<u8>,
+    pub svg: Option<String>,
+}
+
+impl From<(Vec<u8>, Option<String>)> for NativeSvgOutput {
+    fn from((json_bytes, svg): (Vec<u8>, Option<String>)) -> Self {
+        Self { json_bytes, svg }
+    }
+}
+
+pub(crate) fn native_svg_limit(max_svg_bytes: u64) -> Result<usize, NativeSvgOutput> {
+    // A host uses its 1–32 MiB generation setting, or the separate consumer
+    // envelope when recreating a stored work's export profile.
+    if max_svg_bytes == 0 || max_svg_bytes > inku_svg_raster::MAX_SVG_BYTES as u64 {
+        return Err(NativeSvgOutput {
+            json_bytes: saved_render_refusal("invalid_svg_limit", "invalid SVG byte allowance"),
+            svg: None,
+        });
+    }
+    Ok(max_svg_bytes as usize)
+}
+
+/// Advance without escaping the SVG into the output JSON envelope.
+#[uniffi::export]
+pub fn step_svg_limited(
+    snapshot_bytes: Vec<u8>,
+    input_envelope_bytes: Vec<u8>,
+    max_svg_bytes: u64,
+) -> NativeSvgOutput {
+    match native_svg_limit(max_svg_bytes) {
+        Ok(limit) => step_with_svg_limit(snapshot_bytes, input_envelope_bytes, limit).into(),
+        Err(refusal) => refusal,
+    }
 }
 
 /// Report the provider attempt in flight for a stored snapshot, so a host can
@@ -349,6 +388,15 @@ pub fn render_saved_with_svg_limit(
     })
 }
 
+/// Replay through the same separated transport used by native pipeline steps.
+#[uniffi::export]
+pub fn render_saved_svg_limited(input_bytes: Vec<u8>, max_svg_bytes: u64) -> NativeSvgOutput {
+    match native_svg_limit(max_svg_bytes) {
+        Ok(limit) => render_saved_with_svg_limit(input_bytes, limit).into(),
+        Err(refusal) => refusal,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -384,12 +432,35 @@ mod tests {
         let old = render_saved(input.clone());
         let old_value: serde_json::Value = serde_json::from_slice(&old).unwrap();
         assert!(old_value.get("error").is_none(), "{old_value}");
-        let (bytes, svg) = render_saved_with_svg_limit(input, 32 << 20);
+        let NativeSvgOutput {
+            json_bytes: bytes,
+            svg,
+        } = render_saved_svg_limited(input, 32 << 20);
         let mut separated: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(separated["svg"], "");
         assert_eq!(svg.as_deref(), old_value["svg"].as_str());
         separated["svg"] = serde_json::json!(svg.unwrap());
         assert_eq!(separated, old_value);
+    }
+
+    #[test]
+    fn svg_limit_native_entries_reject_unbounded_allowances_without_svg() {
+        for limit in [0, inku_svg_raster::MAX_SVG_BYTES as u64 + 1, u64::MAX] {
+            let outputs = [
+                step_svg_limited(vec![], vec![], limit),
+                render_saved_svg_limited(vec![], limit),
+                render_compiled_svg_limited(vec![], limit),
+            ];
+            for output in outputs {
+                assert!(output.svg.is_none());
+                let value: serde_json::Value = serde_json::from_slice(&output.json_bytes).unwrap();
+                assert_eq!(value["error"], "invalid_svg_limit");
+            }
+        }
+        let output = render_compiled_svg_limited(b"{".to_vec(), 32 << 20);
+        assert!(output.svg.is_none());
+        let value: serde_json::Value = serde_json::from_slice(&output.json_bytes).unwrap();
+        assert_eq!(value["error"], "invalid_render_input");
     }
 
     #[test]

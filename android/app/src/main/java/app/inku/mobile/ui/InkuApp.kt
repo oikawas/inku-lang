@@ -4397,6 +4397,7 @@ private fun SettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier
         SettingsPane.ChatGpt -> ChatGptSettingsPanel(state, viewModel, modifier)
         SettingsPane.Demo -> DemoSettingsPanel(state, viewModel, modifier)
         SettingsPane.Export -> ExportSettingsPanel(state, viewModel, modifier)
+        SettingsPane.Limits -> LimitsSettingsPanel(state, viewModel, modifier)
         SettingsPane.Misc -> MiscSettingsPanel(state, viewModel, modifier)
         SettingsPane.Version -> VersionInfoPanel(viewModel, modifier)
     }
@@ -4422,6 +4423,7 @@ private fun SettingsHomePanel(state: InkuUiState, viewModel: InkuViewModel, modi
         SettingsListItem(mark = "◎", title = S.chatGptPlan, sub = S.chatGptConnectionSubtitle, onClick = { viewModel.setSettingsPane(SettingsPane.ChatGpt) })
         SettingsListItem(mark = "◉", title = S.demo, sub = S.demoRunAndSeed, onClick = { viewModel.setSettingsPane(SettingsPane.Demo) })
         SettingsListItem(mark = "⬚", title = S.export, sub = "PNG 1080 / 2160", onClick = { viewModel.setSettingsPane(SettingsPane.Export) })
+        SettingsListItem(mark = "◇", title = S.settingsLimitsTitle, sub = S.settingsLimitsSubtitle, onClick = { viewModel.setSettingsPane(SettingsPane.Limits) })
         SettingsListItem(mark = "◐", title = S.settingsMisc, sub = S.miscSubtitle, onClick = { viewModel.setSettingsPane(SettingsPane.Misc) })
         SettingsListItem(
             mark = "#",
@@ -4514,6 +4516,24 @@ private fun ExportSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mo
                 }
                 SecondarySmallButton(text = S.templateAdd, onClick = viewModel::addExportTemplate)
             }
+        }
+    }
+}
+
+@Composable
+private fun LimitsSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
+    var value by remember(state.maxSvgMiB) { mutableStateOf(state.maxSvgMiB.toString()) }
+    val valid = app.inku.mobile.render.SvgOutputLimit.parseMiB(value) != null
+    Column(modifier = modifier.verticalScroll(rememberScrollState()).padding(horizontal = Dimens.spaceXs),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
+        SettingsHeader(state.settingsPane, viewModel)
+        SettingsCard(S.svgOutputLimitTitle, S.svgOutputLimitDescription, "${state.maxSvgMiB} MiB") {
+            ImeAwareOutlinedTextField(value, { value = it }, label = S.svgOutputLimitTitle,
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, autoCorrectEnabled = false))
+            if (!valid) Text(S.svgOutputLimitInvalid, color = MaterialTheme.colorScheme.error)
+            SecondarySmallButton(text = S.save, enabled = valid && value.trim() != state.maxSvgMiB.toString(),
+                onClick = { viewModel.setMaxSvgMiB(value) })
         }
     }
 }
@@ -5412,6 +5432,7 @@ private fun settingsPaneTitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.ChatGpt -> S.chatGptPlan
     SettingsPane.Demo -> S.demo
     SettingsPane.Export -> S.export
+    SettingsPane.Limits -> S.settingsLimitsTitle
     SettingsPane.Misc -> S.settingsMisc
     SettingsPane.Version -> S.versionInfo
 }
@@ -5423,6 +5444,7 @@ private fun settingsPaneSubtitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.ChatGpt -> S.chatGptConnectionSubtitle
     SettingsPane.Demo -> S.demoSubtitle
     SettingsPane.Export -> "PNG / SVG templates"
+    SettingsPane.Limits -> S.settingsLimitsSubtitle
     SettingsPane.Misc -> S.miscSubtitle
     SettingsPane.Version -> "version / build"
 }

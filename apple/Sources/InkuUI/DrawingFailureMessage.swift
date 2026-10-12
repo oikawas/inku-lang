@@ -14,6 +14,9 @@ enum DrawingFailureMessage {
         let failure = events.last { $0["tag"].string == "failed" }?["payload"]
         let action = failure?["stage"].string
         let reason = failure?["reason"].string
+        if reason == "svg_too_large", let limit = failure?["svg_limit_mib"].number.flatMap(Int.init) {
+            return svgLimitText(limit, language: language)
+        }
         // Metrics belong to this view's execution. A sketch/catalog failure must not explain a later DDL failure.
         let finalMetric = action.flatMap { action in view.providerMetrics.last { $0.action == action } }
         // A completed final response can fail core validation; never borrow an earlier retry's network error.
@@ -64,6 +67,11 @@ enum DrawingFailureMessage {
         return web + (english ? " Details: " + supplement + "." : " 詳細: " + supplement + "。")
     }
 
+    static func svgLimitText(_ limit: Int, language: String) -> String {
+        language == "en" ? "The SVG exceeded the \(limit) MiB limit. The work was not saved. Change the limit in Settings → Limits."
+            : "生成SVGが\(limit) MiBの上限を超えました。作品を保存していません。設定→制限値で上限を変更できます。"
+    }
+
     private static func diagnosticReason(_ diagnostic: ProviderAttemptDiagnostic, english: Bool) -> String? {
         if diagnostic.kind == .host, let code = diagnostic.hostCode, let text = hostReasons[code] {
             return english ? text.1 : text.0
@@ -86,6 +94,7 @@ enum DrawingFailureMessage {
     }
 
     private static let stages: [String: (String, String)] = [
+        "render": ("SVG生成処理", "SVG drawing processing"),
         "generate_sketch": ("写生生成処理", "Sketch generation processing"),
         "select_description_catalog": ("配色選択処理", "Catalog selection processing"),
         "generate_normalized_ddl": ("指示書生成処理", "DDL generation processing"),
@@ -94,6 +103,7 @@ enum DrawingFailureMessage {
     ]
     /// Web ja.ts/en.ts pipelineAttentionReason for the phase a failed action stops.
     private static let phaseReasons: [String: (String, String)] = [
+        "render": ("SVGを生成できませんでした", "the SVG could not be drawn"),
         "generate_sketch": ("記述の解釈を完了できませんでした", "the description could not be interpreted"),
         "select_description_catalog": ("記述の解釈を完了できませんでした", "the description could not be interpreted"),
         "generate_normalized_ddl": ("記述の解釈を完了できませんでした", "the description could not be interpreted"),
@@ -101,6 +111,7 @@ enum DrawingFailureMessage {
     ]
     /// Web ja.ts/en.ts pipelineFailureCause.
     private static let causes: [String: (String, String)] = [
+        "svg_too_large": ("生成SVGが設定した容量の上限を超えました。設定→制限値で上限を変更できます", "The SVG exceeds the configured size limit. Change it in Settings → Limits"),
         "transport_timeout": ("モデルの応答が制限時間内に返りませんでした", "the model did not answer within the time limit"),
         "transport_unavailable": ("モデルに接続できませんでした", "the model could not be reached"),
         "rate_limited": ("モデルの提供元が要求を制限しました", "the model provider rate-limited the request"),

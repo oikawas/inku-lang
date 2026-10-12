@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-12 — Show the export menu in library previews
+
+The export menu in a work preview was clipped by its pane. The preview menu now floats over the page so its options remain visible.
+
 ### 2026-10-12 — Fix PNG export from the creation screen
 
 Choosing PNG from a saved work's export menu now downloads the file even when there is no callback to report the save.

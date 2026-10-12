@@ -288,4 +288,3 @@ def test_missing_native_safety_capability_does_not_fall_back(monkeypatch):
     assert refused.value.detail["code"] == "svg_limit_binding_unavailable"
     assert run.transcript == []
     assert saved == []
-

@@ -45,6 +45,18 @@ fn overlap_share(own: Bounds, prior: Bounds) -> f64 {
     w * h / area
 }
 
+/// Whether crossing goes across the height of the previous shape: across its
+/// thinner direction, or along the current shape's longer direction when the
+/// previous shape is as wide as tall.
+fn crosses_vertically(own: Bounds, prior: Bounds) -> bool {
+    let (wide, tall) = (width(prior), height(prior));
+    if (wide - tall).abs() <= EPSILON {
+        height(own) > width(own)
+    } else {
+        wide > tall
+    }
+}
+
 /// The rectangle a shape inside the previous one must stay in: the bounds of
 /// a square, and the bounds shrunk about their center by 1/√2 for the other
 /// closed shapes (the largest rectangle inside an ellipse). Open shapes and
@@ -96,7 +108,7 @@ pub(crate) fn accepts(
             share >= OVERLAP_ACCEPTED.0 - 1e-6 && share <= OVERLAP_ACCEPTED.1 + 1e-6
         }
         RelationType::Crossing => {
-            if width(own) >= height(own) {
+            if !crosses_vertically(own, prior) {
                 own.min.x < prior.min.x
                     && own.max.x > prior.max.x
                     && center.y >= prior.min.y - EPSILON
@@ -193,7 +205,7 @@ pub(crate) fn preferred(
         RelationType::Crossing => {
             let across = draw("crossing-across");
             let along = draw("crossing-along") - 0.5;
-            if width(own) >= height(own) {
+            if !crosses_vertically(own, prior) {
                 if width(own) <= width(prior) + EPSILON {
                     return None;
                 }
@@ -257,13 +269,13 @@ mod tests {
     fn every_joint_accepts_its_preferred_translation_for_several_seeds() {
         let prior = bounds(0.3, 0.4, 0.7, 0.6);
         let own = bounds(0.05, 0.05, 0.15, 0.1);
-        let long = bounds(0.0, 0.0, 0.6, 0.05);
+        let tall = bounds(0.0, 0.0, 0.05, 0.6);
         for seed in [1_i128, 7, 42] {
             for (kind, own) in [
                 (RelationType::RestingOn, own),
                 (RelationType::Inside, own),
                 (RelationType::Overlapping, own),
-                (RelationType::Crossing, long),
+                (RelationType::Crossing, tall),
             ] {
                 let primitive = Primitive::Ellipse;
                 let delta = preferred(kind, own, prior, primitive, seed, 0)
@@ -305,6 +317,48 @@ mod tests {
             )
             .is_none()
         );
+    }
+
+    #[test]
+    fn crossing_goes_across_the_thinner_direction_of_the_previous_shape() {
+        // A wide shape crosses a horizontal line from above to below, and a
+        // tall shape crosses a vertical line from left to right.
+        let wide = bounds(0.0, 0.0, 0.3, 0.1);
+        let horizontal = bounds(0.1, 0.5, 0.9, 0.5);
+        let tall = bounds(0.0, 0.0, 0.1, 0.3);
+        let vertical = bounds(0.5, 0.1, 0.5, 0.9);
+        for seed in [1_i128, 7, 42] {
+            let delta = preferred(
+                RelationType::Crossing,
+                wide,
+                horizontal,
+                Primitive::Line,
+                seed,
+                0,
+            )
+            .unwrap_or_else(|| panic!("horizontal seed {seed}"));
+            assert!(accepts(
+                RelationType::Crossing,
+                wide,
+                horizontal,
+                None,
+                delta
+            ));
+            let placed = moved(wide, delta);
+            assert!(placed.min.y < 0.5 && placed.max.y > 0.5, "{placed:?}");
+            let delta = preferred(
+                RelationType::Crossing,
+                tall,
+                vertical,
+                Primitive::Line,
+                seed,
+                0,
+            )
+            .unwrap_or_else(|| panic!("vertical seed {seed}"));
+            assert!(accepts(RelationType::Crossing, tall, vertical, None, delta));
+            let placed = moved(tall, delta);
+            assert!(placed.min.x < 0.5 && placed.max.x > 0.5, "{placed:?}");
+        }
     }
 
     #[test]

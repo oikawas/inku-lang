@@ -3078,8 +3078,12 @@ sequential resolution.
   shapes, points, or a current that does not fit. `overlapping` chooses the share
   of the current bounds that overlaps the preceding element from 1/3 to 2/3
   (accepted 1/4 to 3/4) and shifts in a seeded direction. `crossing` extends the
-  current past both sides of the preceding element along its longer direction and
-  chooses the crossing position along the shorter one; a shorter current fails.
+  current past both sides of the preceding element across the element's thinner
+  direction (vertically past a wide element, horizontally past a tall one) and
+  chooses the crossing position along the other direction; when the element is as
+  wide as tall, the current crosses along its own longer direction. A current no
+  longer than the element in that direction fails (the author's decision,
+  2026-10-12).
   A failure records `missing_joint_reference`, `joint_reference_omitted`,
   `unsupported_joint_geometry` or `numeric_joint_position_conflict` and omits only
   the relation. A group of copies (consecutive copies targeting the same preceding element)

@@ -15,6 +15,7 @@
 - 歳時記の「あいだ」に4語を足す。固定句 `前の形に載る` / `resting on the previous shape`、`前の形の中に` / `inside the previous shape`、`前の形に重なる` / `overlapping the previous shape`、`前の形を横切る` / `crossing the previous shape` だけが関係になる。英語の短い形は `resting on` / `inside` / `overlaps` / `crossing`（`overlapping` は組の並べ方の語なので、重なるの短い形は `overlaps`）。
 - 演奏は、付ける形を演奏後の外接矩形から平行移動だけで合わせ、直前の形は動かさない。成り立たないときは関係だけを外し、理由（`unsupported_joint_geometry` など）を残す。
 - 付ける側が群れのとき、載る・重なる・横切るは群れ全体を一つの形として動かし（散らばりは保つ）、中には個ごとに相手の内側へ動かす（作者の判断）。相手が群れなら、その全体の外接矩形を使う。
+- 横切るは、相手の細い向きに越える（走路を横切る足跡のように、横長の相手なら上下に越える）。相手の縦横が同じなら、付ける側の長い向きで越える（作者の判断）。
 - 「つながる」は、直前の形が閉じた四角・円・楕円・三角・多角形のとき、その輪郭の最も近い点から始まる。
 - これらを持つ作品だけ Score 0.20.0。ほかの作品の Score は変わらない。DDL engine 58、描画 engine 74。Server の語の写し、Score の型、Web・Android・macOS の語の資源、Web の語の説明と理由の文言を合わせた。
 

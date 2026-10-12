@@ -62,7 +62,7 @@ fn every_joint_holds_after_performance_for_three_seeds() {
     let circle = json!({"primitive": "circle", "center": [0.5, 0.5], "radius": 0.2});
     let ellipse = json!({"primitive": "ellipse", "center": [0.5, 0.5], "size": [0.4, 0.2]});
     let small = json!({"primitive": "circle", "center": [0.1, 0.1], "radius": 0.03});
-    let long = json!({"primitive": "line", "from": [0.05, 0.9], "to": [0.75, 0.9]});
+    let tall = json!({"primitive": "line", "from": [0.9, 0.05], "to": [0.9, 0.75]});
     for seed in SEEDS {
         for prior in [&square, &circle, &ellipse] {
             let resting = plan(&joint(prior.clone(), small.clone(), "resting_on"), seed);
@@ -109,19 +109,43 @@ fn every_joint_holds_after_performance_for_three_seeds() {
                 "overlap {share}"
             );
 
-            let crossing = plan(&joint(prior.clone(), long.clone(), "crossing"), seed);
+            // Every prior here is wider than tall or round, so the tall line
+            // crosses it from above to below.
+            let crossing = plan(&joint(prior.clone(), tall.clone(), "crossing"), seed);
             assert!(crossing.execution.is_none(), "{:?}", crossing.execution);
             let (own, base) = (bounds(&crossing, 1, seed), bounds(&crossing, 0, seed));
             assert!(
-                own.min.x < base.min.x && own.max.x > base.max.x,
-                "crossing x"
-            );
-            let center = own.center().y;
-            assert!(
-                base.min.y - 1e-9 <= center && center <= base.max.y + 1e-9,
+                own.min.y < base.min.y && own.max.y > base.max.y,
                 "crossing y"
             );
+            let center = own.center().x;
+            assert!(
+                base.min.x - 1e-9 <= center && center <= base.max.x + 1e-9,
+                "crossing x"
+            );
         }
+    }
+}
+
+#[test]
+fn a_wide_shape_crosses_a_horizontal_line_from_above_to_below() {
+    // Footprints crossing a running track: the shape is wider than tall but
+    // crosses the line's thinner direction.
+    let track = json!({"primitive": "line", "from": [0.1, 0.5], "to": [0.9, 0.5]});
+    let footprint = json!({"primitive": "ellipse", "center": [0.2, 0.2], "size": [0.3, 0.1]});
+    for seed in SEEDS {
+        let crossing = plan(&joint(track.clone(), footprint.clone(), "crossing"), seed);
+        assert!(crossing.execution.is_none(), "{:?}", crossing.execution);
+        let (own, base) = (bounds(&crossing, 1, seed), bounds(&crossing, 0, seed));
+        assert!(
+            own.min.y < base.min.y && own.max.y > base.max.y,
+            "{own:?} {base:?}"
+        );
+        let center = own.center().x;
+        assert!(
+            base.min.x <= center && center <= base.max.x,
+            "{own:?} {base:?}"
+        );
     }
 }
 

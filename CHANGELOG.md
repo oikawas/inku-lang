@@ -6,15 +6,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
-## macOS (unreleased; the version is settled at integration)
-
-### 2026-10-12 — Show works with linear gradients
-
-During the author's visual check, a work with the ink-wash ground's bands stopped: the display's support table had no linearGradient. The table now holds the element `linearGradient` and the attribute `color-interpolation` (only `sRGB`).
-
-- Skia draws the two kinds the core writes (the ink-wash ground's bands and the computer fill) as Chrome does: of 38 works with linear gradients, the 37 inside the table matched. Zoomed windows (Graphite) agree too.
-- The table is shared with Android, so there too these works are drawn with Skia instead of resvg.
-
 ## Unreleased
 
 ### 2026-10-12 — English edges may also be written with a space (DDL 17)
@@ -30,6 +21,13 @@ An idle Web batch with drawing errors offers "Retry failed works". It keeps the 
 At the author's instruction (make A3). For each numeric range an approved completion wrote, the work keeps the words before the parenthesis, the numbers, and the sentence. When instructions from a saved work are drawn again, the shared core compares each range with the record and tells completed ranges, edited numbers, and edited words apart. A range whose words alone were edited goes to the completion when drawn, which asks for approval of new numbers for the new words (completion prompt v5; a proposal that changes the words is refused with `range_words_not_kept`). A range with edited numbers is drawn by its numbers as before. The record is only laid over the compilation: the result the instructions alone give, the saved formats, and the engine versions do not change. Instructions exported or imported alone carry no record and are drawn by their numbers as before. Edit screens read the states from the shared core's `completion_range_states`. Saving and screens on Server and Android follow separately.
 
 ## macOS 1.1.2 (unreleased; Build 4)
+
+### 2026-10-12 — Show works with linear gradients
+
+During the author's visual check, a work with the ink-wash ground's bands stopped: the display's support table had no linearGradient. The table now holds the element `linearGradient` and the attribute `color-interpolation` (only `sRGB`).
+
+- Skia draws the two kinds the core writes (the ink-wash ground's bands and the computer fill) as Chrome does: of 38 works with linear gradients, the 37 inside the table matched. Zoomed windows (Graphite) agree too.
+- The table is shared with Android, so there too these works are drawn with Skia instead of resvg.
 
 ### 2026-10-11 — Draw zoomed windows with Graphite on Apple silicon
 

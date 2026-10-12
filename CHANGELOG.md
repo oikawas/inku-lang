@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-12 — Swift draws refinement candidates at once
-
-Author's report (the refinement "change model" ran one candidate after another instead of in parallel). Web draws every refinement candidate at once (`runRefinementFanout`, capped at 4 by Server's default). Swift drew layout, reading and touch, and color catalog and model comparison, one at a time; it now draws them at once with the same cap of 4. Candidates are listed in the requested order and the lanes show each one's state. The comparison and refinement AppChecks had failed on expectations older than the 2026-10-05 alignment with Server (the retired variation, adopt-and-close, registered drawing models); they were fixed and now also count the requests in flight (at most 4).
-
 ### 2026-10-12 — Match Server's ChatGPT plan settings flow in Swift
 
 At the author's instruction, the macOS ChatGPT plan settings now handle the connection only; the model list and "Use for drawing" are gone. Once connected they show a guide and "Open model settings". Models are chosen under the ChatGPT plan in the Models settings: refresh the list, check the models to publish and save. The publication is saved per connected profile and kept when the same identity reauthorizes. Only published models appear as "ChatGPT plan" in the drawing model picker, comparison and drawing defaults. As on Server, a drawing request is sent only for a model that is in the catalog and published. An existing connection also saves its publication once.
@@ -64,7 +60,11 @@ An idle Web batch with drawing errors offers "Retry failed works". It keeps the 
 
 At the author's instruction (make A3). For each numeric range an approved completion wrote, the work keeps the words before the parenthesis, the numbers, and the sentence. When instructions from a saved work are drawn again, the shared core compares each range with the record and tells completed ranges, edited numbers, and edited words apart. A range whose words alone were edited goes to the completion when drawn, which asks for approval of new numbers for the new words (completion prompt v5; a proposal that changes the words is refused with `range_words_not_kept`). A range with edited numbers is drawn by its numbers as before. The record is only laid over the compilation: the result the instructions alone give, the saved formats, and the engine versions do not change. Instructions exported or imported alone carry no record and are drawn by their numbers as before. Edit screens read the states from the shared core's `completion_range_states`. Saving and screens on Server and Android follow separately.
 
-## macOS 1.1.2 (unreleased; Build 8)
+## macOS 1.1.2 (unreleased; Build 9)
+
+### 2026-10-12 — Swift draws refinement candidates at once
+
+Author's report (the refinement "change model" ran one candidate after another instead of in parallel). Web draws every refinement candidate at once (`runRefinementFanout`, capped at 4 by Server's default). Swift drew layout, reading and touch, and color catalog and model comparison, one at a time; it now draws them at once with the same cap of 4. Candidates are listed in the requested order and the lanes show each one's state. The comparison and refinement AppChecks had failed on expectations older than the 2026-10-05 alignment with Server (the retired variation, adopt-and-close, registered drawing models); they were fixed and now also count the requests in flight (at most 4).
 
 ### 2026-10-12 — Swift drawing mascots match Web
 

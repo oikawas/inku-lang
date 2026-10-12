@@ -54,6 +54,7 @@ struct AppRailView: View {
                 }
             }
             Spacer(minLength: 0)
+            versionFoot
         }
         .padding(.vertical, 10).padding(.horizontal, 6)
         .frame(width: expanded ? 164 : 44, alignment: .leading)
@@ -106,6 +107,33 @@ struct AppRailView: View {
         #if !os(macOS)
         .frame(minHeight: 78, alignment: .topLeading)
         #endif
+    }
+
+    /// AppRail.svelte:198 (`.rail-build`): the rail's foot, the window's bottom-left corner. The Web shows its build
+    /// there in developer mode; the app always shows its own version and build (apple/VERSION, apple/BUILD_NUMBER),
+    /// at the author's instruction (2026-10-12).
+    private var versionFoot: some View {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
+        return Group {
+            if expanded {
+                Text("\(version) · Build \(build)")
+            } else {
+                VStack(spacing: 1) {
+                    Text(version)
+                    Text("Build \(build)")
+                }
+            }
+        }
+        .inkuFont(10)
+        .monospacedDigit()
+        .foregroundStyle(.tertiary)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        .padding(.vertical, 4).padding(.horizontal, 2)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .inkuTooltip(display.tooltipValue("Build \(build)"), placement: .right)
     }
 
     private var uiModeLabel: String {

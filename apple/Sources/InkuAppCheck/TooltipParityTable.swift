@@ -36,7 +36,7 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "AppRail.svelte:170", swift: "Views/AppRailView.swift", marker: "serverKey: \"tooltipAppRailSettings\""),
     .init(web: "AppRail.svelte:178", swift: "Views/AppRailView.swift", marker: "serverKey: \"tooltipAppRailTheme\""),
     .init(web: "AppRail.svelte:187", swift: "Views/AppRailView.swift", marker: "serverKey: \"tooltipAppRailLang\") + \": \" + name"),
-    .init(web: "AppRail.svelte:199", excluded: "開発者モードの Build 表示は Swift に無い（版は About に出る）"),
+    .init(web: "AppRail.svelte:199", swift: "Views/AppRailView.swift", marker: "tooltipValue(\"Build \\(build)\")"),
     .init(web: "AuthPanel.svelte:44", excluded: "ログイン画面（AuthPanel）は単一利用者アプリに無い"),
     .init(web: "AuthPanel.svelte:77", excluded: "ログイン画面（AuthPanel）は単一利用者アプリに無い"),
     .init(web: "CanvasArtworkWorkspace.svelte:174", swift: "Views/CreationControls.swift", marker: "FallbackCopy.interpretHint(interpret"),

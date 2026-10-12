@@ -14,6 +14,15 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-12 左下に版とBuildを常に出す
+
+作者の指示「アプリの左下に、バージョン番号とビルド番号を常時表示する」による。
+
+- 左端の操作列（[`AppRailView`](Sources/InkuUI/Views/AppRailView.swift)）の一番下、窓の左下に、アプリの版とBuild（`apple/VERSION`・`apple/BUILD_NUMBER`から入る`CFBundleShortVersionString`・`CFBundleVersion`）を出す。畳んだ列では`1.1.2`と`Build 4`の2行、広げた列では`1.1.2 · Build 4`の1行。
+- 見た目はWebの操作列の一番下のBuildの表示（`.rail-build`）に合わせる：10pt、淡い文字、等幅の数字。ツールチップは`Build 4`。
+- Webは開発者モードのときだけBuildを出すが、macOSはUIモードや補助表示に関わらず常に出す。
+- 確認：AppCheck `--tooltips-leftovers-only`（Webのツールチップ173か所との照合。Buildの表示を除外から対応へ替えた）。
+
 ## 2026-10-12 照合表にlinearGradientを足す
 
 作者の目視の間に、linearGradientを含む作品の表示が照合表の外として止まった。作者の指示（調べて計画を出す、実装する）による。

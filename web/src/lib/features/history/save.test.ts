@@ -66,10 +66,13 @@ test('T-292/T-293: save owns the payload and selects the saved identity after re
 	});
 
 	assert.equal(result?.id, 'saved-2');
+	assert.equal(result?.svg, '<svg>saved</svg>');
 	assert.deepEqual(order, ['svg', 'post', 'user', 'fetch:0:saved-2']);
 	assert.equal(calls[0]?.path, '/api/history');
 	const body = JSON.parse(String(calls[0]?.init?.body)) as Record<string, unknown>;
-	assert.equal(body.svg, '<svg>full</svg>');
+	assert.equal('svg' in body, false);
+	assert.equal(String(calls[0]?.init?.body).includes('<svg>full</svg>'), false);
+	assert.deepEqual(body.score, { instructions: [] });
 	assert.equal(body.ddl, '\u3000saved ddl\r\n');
 	assert.equal(body.ddl_source_origin, 'legacy_expanded');
 	assert.equal('expanded_ddl' in body, false);

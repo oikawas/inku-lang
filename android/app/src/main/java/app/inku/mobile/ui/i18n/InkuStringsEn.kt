@@ -58,6 +58,12 @@ object InkuStringsEn : InkuStrings {
     override val settingsLanguageTitle = "Language"
     override val settingsLanguageSubtitle = "Interface wording, Saijiki, and the language of a work"
     override val settingsDisplayTitle = "Display"
+    override val settingsLimitsTitle = "Limits"
+    override val settingsLimitsSubtitle = "SVG output size limit"
+    override val svgOutputLimitTitle = "SVG size limit (MiB)"
+    override val svgOutputLimitDescription = "An integer from 1 to 32. The default and recommended limit is 12 MiB. A drawing that exceeds the limit fails without saving the work automatically. Raising the limit may increase memory use."
+    override val svgOutputLimitInvalid = "Enter an integer from 1 to 32."
+    override fun svgOutputTooLarge(limitMiB: Int) = "The SVG exceeds the $limitMiB MiB size limit. Check Limits in Settings. The work is not saved automatically."
     override val settingsTextSizeTitle = "Text size"
     override val settingsTextSizeSubtitle = "Adjusts text in addition to your device setting"
     override val settingsTextSizeSample = "From words to a work."
@@ -116,6 +122,7 @@ object InkuStringsEn : InkuStrings {
         "compiler_diagnostics" -> "some parts need review or editing"
         "host_commit_failed" -> "the work could not be saved"
         "compiler_boundary_failed" -> "the DDL could not be converted into a score"
+        "svg_output_too_large" -> "the SVG exceeds the size limit; the work is not saved automatically"
         else -> reason
     }
     override fun pipelineFailureCause(failure: String, attempts: Int, detail: String?): String {
@@ -156,6 +163,7 @@ object InkuStringsEn : InkuStrings {
         "invalid_score" -> "the Score is not in a drawable form"
         "mark_too_large" -> "a mark is too large"
         "output_too_large" -> "the drawn SVG is too large"
+        "svg_output_too_large" -> "the SVG exceeds the size limit; the work is not saved automatically"
         "non_finite_value" -> "a value is not a finite number"
         "invalid_saved_performance" -> "the saved content cannot be read"
         "internal_invariant" -> "something went wrong inside the drawing core"

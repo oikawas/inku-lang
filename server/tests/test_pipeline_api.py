@@ -49,12 +49,24 @@ def _wait_for(
     raise AssertionError(f"pipeline did not reach {phase}: {last}")
 
 
-def test_hole_provider_runs_after_current_safe_render_is_persisted() -> None:
+def test_hole_provider_runs_after_current_safe_render_is_persisted(monkeypatch) -> None:
+    from inku_server.api_core import rendering
+
+    monkeypatch.setattr(rendering, "_generated_svg_limit_bytes", lambda: 12 * 1024 * 1024)
     order: list[str] = []
     record = {"schema": "inku.completion-ranges.v1", "ranges": [{"opaque": "kept"}]}
 
     class Binding:
         canvas_registry = {"registry": {"formats": []}}
+
+        @classmethod
+        def step_with_svg_limit(cls, snapshot_bytes, input_bytes, _limit):
+            result = json.loads(cls.step(snapshot_bytes, input_bytes))
+            rendered = result["payload"]["result"]["rendered"]
+            svg = rendered["svg"] if rendered is not None else None
+            if rendered is not None:
+                rendered["svg"] = ""
+            return json.dumps(result).encode(), svg
 
         @staticmethod
         def step(snapshot_bytes: bytes, input_bytes: bytes) -> bytes:

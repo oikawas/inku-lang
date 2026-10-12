@@ -62,7 +62,8 @@ class AndroidRenderHost(
             .put("options", options)
             .toString()
 
-        val native = bridge.render(requestJson)
+        val native = bridge.renderWithSvgLimit(requestJson, request.maxSvgBytes)
+        SvgOutputLimit.requireSvg(native.svg, request.maxSvgBytes, request.maxSvgBytes != SvgOutputLimit.CONSUMER_BYTES)
         require(native.svg.startsWith("<svg")) { "Rust renderer returned a non-SVG payload" }
         val metadata = JSONObject(native.metadataJson)
         val engineId = bridge.renderEngineId()

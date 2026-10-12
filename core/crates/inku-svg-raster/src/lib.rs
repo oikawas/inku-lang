@@ -13,8 +13,9 @@ pub const RASTER_API_VERSION: &str = "0.1.0";
 /// Byte layout returned by [`rasterize`].
 pub const PIXEL_FORMAT_RGBA8_PREMULTIPLIED: &str = "rgba8-premultiplied";
 
-/// Maximum accepted UTF-8 SVG payload size.
-pub const MAX_SVG_BYTES: usize = 12 * 1024 * 1024;
+/// Consumer envelope, independent of the host's generated-SVG setting.
+/// Accept a 32 MiB artwork plus up to 32 MiB of export descriptions/wrappers.
+pub const MAX_SVG_BYTES: usize = 64 * 1024 * 1024;
 /// Maximum accepted or derived output dimension.
 pub const MAX_RASTER_DIMENSION: u32 = 8_192;
 /// Maximum accepted output pixel allocation.
@@ -657,7 +658,19 @@ mod tests {
     }
 
     #[test]
-    fn svg_input_size_is_bounded() {
+    fn svg_limit_consumer_accepts_maximum_artwork_with_export_wrapper() {
+        let mut svg =
+            String::from("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1\" height=\"1\"><!--");
+        svg.push_str(&" ".repeat(32 * 1024 * 1024 - svg.len()));
+        svg.push_str("--><desc>export description</desc></svg>");
+        assert!(svg.len() > 32 * 1024 * 1024);
+        assert_eq!(MAX_SVG_BYTES, 64 * 1024 * 1024);
+        let scene = prepare_scene(&svg).expect("maximum artwork with export wrapper");
+        assert_eq!(scene.source_bytes, svg.len() as u64);
+    }
+
+    #[test]
+    fn svg_limit_consumer_refuses_oversized_input() {
         let oversized = " ".repeat(MAX_SVG_BYTES + 1);
         assert!(matches!(
             rasterize(

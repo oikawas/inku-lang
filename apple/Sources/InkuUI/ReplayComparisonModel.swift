@@ -64,7 +64,7 @@ public final class ReplayComparisonModel {
                         try Task.checkCancellation()
                         if error is CancellationError { throw error }
                         // Preparation errors belong to this sheet, not the main canvas's alert.
-                        preparationError = error.localizedDescription
+                        preparationError = app.failureMessage(error)
                     }
                 }
                 try Task.checkCancellation()
@@ -80,7 +80,7 @@ public final class ReplayComparisonModel {
                 self.status = "再現の比較を停止しました。"
             } catch {
                 self.status = "再現の比較を用意できませんでした。"
-                self.errorText = error.localizedDescription
+                self.errorText = app.failureMessage(error)
             }
         }
         operation = pending

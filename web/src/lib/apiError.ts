@@ -84,6 +84,10 @@ export function describeApiErrorDetail(detail: unknown, status: number, strings:
 	if (typeof detail === 'string' && detail) return detail;
 
 	const structured = object(detail);
+	if (structured?.code === 'generated_svg_too_large' && typeof structured.limit_mib === 'number' && Number.isFinite(structured.limit_mib)) {
+		return strings.errorGeneratedSvgTooLarge(structured.limit_mib);
+	}
+	if (structured?.code === 'svg_limit_binding_unavailable') return strings.errorSvgLimitBindingUnavailable;
 	if (typeof structured?.code === 'string' && (structured.code.startsWith('chatgpt_') || structured.code.startsWith('subscription_sharing_') || structured.code.startsWith('chatpass_'))) return strings.chatgptStatus(structured.code);
 	if (structured?.code === 'model_not_offered') return strings.errorModelNotOffered;
 	// A redraw from the description of a work its edited DDL holds.

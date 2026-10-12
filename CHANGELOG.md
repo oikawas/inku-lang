@@ -8,6 +8,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-12 — Extend SVG limits to Android and Swift
+
+Android and Swift gain local generated-SVG settings: 12 MiB by default and recommendation, configurable from 1 to 32 MiB. Each actual draw reads its limit for the intermediate allowance and final UTF-8 byte check. Native transport separates SVG from JSON, and oversized works are not saved while their failure is retained. Shared display/raster and the Swift export parser use a separate 64 MiB envelope to accommodate descriptions and wrappers around a 32 MiB work. Existing native APIs and drawing identity remain unchanged.
+
+### 2026-10-12 — Set the generated SVG ceiling in Limits
+
+Settings → Limits now stores an SVG output ceiling from 1 to 32 MiB, with 12 MiB as the default and recommendation. A new SVG exceeding the selected UTF-8 byte count is refused before that render attempt is saved or returned; the error names the actual ceiling. Normal drawing, redraws, and streaming share the rule, while stored SVG display remains available. Server-specific native entries align intermediate output budgets and transport with the configured range without changing drawing identity or native client entries. Existing Android/Swift 12 MiB display and export limits remain outside this setting's scope.
+
 ### 2026-10-12 — Show the export menu in library previews
 
 The export menu in a work preview was clipped by its pane. The preview menu now floats over the page so its options remain visible.

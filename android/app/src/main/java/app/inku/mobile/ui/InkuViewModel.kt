@@ -238,6 +238,7 @@ data class InkuUiState(
     val workNotice: String? = null,
     val displaySafeMarginsEnabled: Boolean = false,
     val pngAlphaWhite: Boolean = false,
+    val maxSvgMiB: Int = app.inku.mobile.render.SvgOutputLimit.DEFAULT_MIB,
     val saijikiOpen: Boolean = false,
     // Whether the description is being written. The bottom bar reads it: while
     // the keyboard is up, the four destinations give their place to the one
@@ -417,6 +418,7 @@ enum class SettingsPane {
     ChatGpt,
     Demo,
     Export,
+    Limits,
     Misc,
     Version,
 }
@@ -622,12 +624,12 @@ class InkuViewModel @JvmOverloads constructor(
         val parentId = context.optJSONObject("result_options")?.optString("parent_history_id")
         // A drawing the run saved before it stopped for the author is the work
         // on screen while the proposal or the stop is answered, as on web.
-        val selected = repository.safePerformance(view.executionId)
+        val selected = (repository.safePerformance(view.executionId)
             ?: localState.value.selectedHistory?.takeIf { item ->
                 item.id == parentId || runCatching {
                     JSONObject(item.renderMetadataJson).optString("pipeline_execution_id") == view.executionId
                 }.getOrDefault(false)
-            }
+            }).takeUnless { view.phaseReason == "svg_output_too_large" }
         localState.value = localState.value.copy(
             tab = AppTab.Compose,
             composeMode = ComposeMode.Write,
@@ -654,7 +656,7 @@ class InkuViewModel @JvmOverloads constructor(
             cameraCaptureState = CameraCaptureState.Idle,
             message = when {
                 view.patchProposal != null -> strings().pipelineProposal
-                view.phaseReason != null -> pipelineAttentionText(view.phaseReason, view.providerFailure, strings())
+                view.phaseReason != null -> pipelineAttentionText(view.phaseReason, view.providerFailure, strings(), view.svgOutputLimitMiB)
                 else -> strings().pipelineCheckDdl
             },
         )
@@ -1994,6 +1996,17 @@ class InkuViewModel @JvmOverloads constructor(
     fun setPngAlphaWhite(enabled: Boolean) {
         localState.value = localState.value.copy(pngAlphaWhite = enabled)
         persistSetting("png_alpha_white", JSONObject().put("enabled", enabled).toString())
+    }
+
+    fun setMaxSvgMiB(text: String) {
+        val value = app.inku.mobile.render.SvgOutputLimit.parseMiB(text) ?: return
+        viewModelScope.launch {
+            runCatching {
+                repository.saveSetting(app.inku.mobile.render.SvgOutputLimit.SETTING_KEY,
+                    JSONObject().put("value", value * app.inku.mobile.render.SvgOutputLimit.BYTES_PER_MIB).toString())
+            }.onSuccess { localState.value = localState.value.copy(maxSvgMiB = value) }
+                .onFailure { error -> localState.value = localState.value.copy(message = messageFor(error, strings(), strings().statusSaveFailed)) }
+        }
     }
 
     fun setRenderWild(wild: Boolean) {
@@ -3684,6 +3697,7 @@ class InkuViewModel @JvmOverloads constructor(
             ?.let { JSONObject(it).optBoolean("enabled", current.displaySafeMarginsEnabled) }
             ?: if (legacyPixel9Paper) true else current.displaySafeMarginsEnabled
         val pngAlpha = settings["png_alpha_white"]?.let { JSONObject(it).optBoolean("enabled", current.pngAlphaWhite) } ?: current.pngAlphaWhite
+        val maxSvgMiB = app.inku.mobile.render.SvgOutputLimit.storedMiB(settings[app.inku.mobile.render.SvgOutputLimit.SETTING_KEY])
         val renderWild = settings[SETTING_KEY_RENDER_WILD]?.let { JSONObject(it).optBoolean("enabled", current.renderWild) } ?: current.renderWild
         val uiMode = settings["ui_mode"]?.let { JSONObject(it).optString("value", current.uiMode) } ?: current.uiMode
         // A stored code that is not one of the two falls back to Japanese
@@ -3722,6 +3736,7 @@ class InkuViewModel @JvmOverloads constructor(
             selectedCanvasAspect = if (picked) current.selectedCanvasAspect else CanvasAspects.newSelectionOrDefault(canvas),
             displaySafeMarginsEnabled = displaySafeMargins,
             pngAlphaWhite = pngAlpha,
+            maxSvgMiB = maxSvgMiB,
             renderWild = renderWild,
             bundledPluginsEnabled = bundledPluginsEnabled,
             bundledPluginWordsJa = bundledPluginWords.first,

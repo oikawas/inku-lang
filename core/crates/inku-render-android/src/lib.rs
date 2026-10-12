@@ -15,7 +15,7 @@ use inku_render::types::RenderRequest;
 use inku_svg_raster::RasterOptions;
 use jni::JNIEnv;
 use jni::objects::{JObject, JString, JValue};
-use jni::sys::{jobject, jstring};
+use jni::sys::{jlong, jobject, jstring};
 
 const RENDER_OUTPUT_CLASS: &str = "app/inku/mobile/render/NativeRenderOutput";
 const RENDER_OUTPUT_SIGNATURE: &str = "(Ljava/lang/String;Ljava/lang/String;)V";
@@ -160,11 +160,38 @@ pub extern "system" fn Java_app_inku_mobile_render_NativeRenderBridge_render(
     _receiver: JObject<'_>,
     request_json: JString<'_>,
 ) -> jobject {
+    render_java_request(env, request_json, None)
+}
+
+/// Render with the current host setting as an intermediate output allowance.
+/// The host validates final UTF-8 bytes before taking ownership of the result.
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_render_NativeRenderBridge_renderWithSvgLimit(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    request_json: JString<'_>,
+    max_svg_bytes: jlong,
+) -> jobject {
+    render_java_request(env, request_json, Some(max_svg_bytes))
+}
+
+fn render_java_request(
+    env: JNIEnv<'_>,
+    request_json: JString<'_>,
+    max_svg_bytes: Option<jlong>,
+) -> jobject {
     jni_boundary(env, null_mut(), |env| {
         let request_json = java_string(env, request_json)?;
         let request = parse_render_request(&request_json)?;
-        let output = inku_render::render::render(request)
-            .map_err(|error| BindingError::state(format!("render failed: {error}")))?;
+        let output = match max_svg_bytes {
+            Some(limit) if limit > 0 && limit as u64 <= inku_svg_raster::MAX_SVG_BYTES as u64 => {
+                inku_render::render::render_with_svg_limit(request, limit as usize)
+            }
+            Some(_) => return Err(BindingError::invalid("invalid SVG byte allowance")),
+            None => inku_render::render::render(request),
+        }
+        .map_err(|error| BindingError::state(format!("render failed: {error}")))?;
         let metadata_json = serde_json::to_string(&output.metadata).map_err(|error| {
             BindingError::state(format!("metadata serialization failed: {error}"))
         })?;

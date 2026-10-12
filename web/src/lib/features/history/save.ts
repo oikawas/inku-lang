@@ -55,9 +55,9 @@ export async function saveHistoryItem(
 ): Promise<HistoryItem | null> {
 	if (!deps.signedIn()) return null;
 
-	// A listing item carries a thumbnail, not necessarily the drawing. Saving it
-	// again must fetch the one full SVG before the copy is written.
-	const svg = await deps.ensureSvg(item);
+	// Keep the full drawing available to callers. The server redraws the Score
+	// on save, so submitting the SVG would only duplicate the request payload.
+	await deps.ensureSvg(item);
 	// An absent compose record means “predates the field”, while an explicit
 	// value records what the stage did. Never turn the former into `none`.
 	const composeFallback = deps.composeFallbackFor(item);
@@ -71,7 +71,6 @@ export async function saveHistoryItem(
 				ddl: item.ddl,
 				ddl_source_origin: item.ddl_source_origin ?? null,
 				score: item.score,
-				svg,
 				at: item.at,
 				elapsed_ms: item.elapsed_ms ?? 0,
 				stage1_model: item.stage1_model ?? null,

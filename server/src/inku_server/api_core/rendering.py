@@ -15,6 +15,9 @@ from ..limits import (
     Limits,
     limits_from_settings,
     normalize_limits,
+    SVG_LIMIT_FIELD,
+    SVG_MIB,
+    normalize_svg_limit_mib,
 )
 from ..plugins import canvas_aspect_ids, canvas_aspect_ratio_for_aspect, normalize_canvas_aspect_id
 from ..render_engines import SVG_PROFILES, current_render_engine, new_render_seed
@@ -33,6 +36,25 @@ _SRGB_COLOR_PROFILE = {
     "name": "sRGB IEC61966-2.1",
     "standard": "IEC 61966-2-1:1999",
 }
+
+
+def _generated_svg_limit_bytes() -> int:
+    """Read current installation safety policy for this render, never its work."""
+    settings = _db.get_render_limit_settings()
+    return normalize_svg_limit_mib(settings.get(SVG_LIMIT_FIELD)) * SVG_MIB
+
+
+def _validate_generated_svg(svg: str, limit_bytes: int) -> None:
+    if len(svg.encode("utf-8")) > limit_bytes:
+        raise HTTPException(status_code=422, detail={
+            "code": "generated_svg_too_large",
+            "limit_mib": limit_bytes / SVG_MIB,
+            "limit_bytes": limit_bytes,
+        })
+
+
+def _svg_limit_binding_unavailable() -> HTTPException:
+    return HTTPException(status_code=503, detail={"code": "svg_limit_binding_unavailable"})
 
 
 def _effective_limits() -> Limits:
@@ -261,6 +283,7 @@ def _render_score_svg(
         work=work, catalog_id=catalog_id
     )
     with _render_capacity(owner), _render_refusals_as_422():
+        svg_limit = _generated_svg_limit_bytes()
         svg = current_render_engine().render(
             score,
             color_map=render_metadata["render_color_map"],
@@ -270,7 +293,9 @@ def _render_score_svg(
             render_seed=render_seed,
             composition_seed=_composition_seed(composition_seed),
             wild=wild,
+            max_svg_bytes=svg_limit,
         ).svg
+        _validate_generated_svg(svg, svg_limit)
     return svg, resolved_catalog_id, color_source, limits_source
 
 
@@ -431,6 +456,7 @@ def _render_with_metadata(
     wild = bool(render_metadata.get("render_wild"))
     render_metadata = {**render_metadata, "render_seed": effective_seed, "render_wild": wild}
     with _render_capacity(owner), _render_refusals_as_422():
+        svg_limit = _generated_svg_limit_bytes()
         result = current_render_engine().render(
             score,
             color_map=render_metadata["render_color_map"],
@@ -442,7 +468,9 @@ def _render_with_metadata(
             render_seed=effective_seed,
             composition_seed=composition_seed,
             wild=wild,
+            max_svg_bytes=svg_limit,
         )
+        _validate_generated_svg(result.svg, svg_limit)
     _render_warnings(result.metadata, "render")
     return result.svg, {**render_metadata, **result.metadata}
 

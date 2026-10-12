@@ -3,8 +3,8 @@
 use std::ptr::null_mut;
 
 use jni::JNIEnv;
-use jni::objects::{JByteArray, JObject, JString};
-use jni::sys::{jbyteArray, jstring};
+use jni::objects::{JByteArray, JObject, JString, JValue};
+use jni::sys::{jbyteArray, jlong, jobject, jstring};
 
 use super::{BindingError, java_string, jni_boundary, new_java_string};
 
@@ -17,6 +17,64 @@ fn write_bytes(env: &JNIEnv<'_>, value: &[u8]) -> Result<jbyteArray, BindingErro
     env.byte_array_from_slice(value)
         .map(JByteArray::into_raw)
         .map_err(|error| BindingError::state(format!("pipeline byte allocation failed: {error}")))
+}
+
+fn native_svg_output(
+    env: &mut JNIEnv<'_>,
+    output: inku_pipeline_uniffi::NativeSvgOutput,
+) -> Result<jobject, BindingError> {
+    let json = env
+        .byte_array_from_slice(&output.json_bytes)
+        .map_err(|error| {
+            BindingError::state(format!("pipeline byte allocation failed: {error}"))
+        })?;
+    let json_object = JObject::from(json);
+    let svg_object = match output.svg {
+        Some(svg) => JObject::from(
+            env.new_string(svg)
+                .map_err(|error| BindingError::state(format!("SVG allocation failed: {error}")))?,
+        ),
+        None => JObject::null(),
+    };
+    env.new_object(
+        "app/inku/mobile/pipeline/NativeSvgOutput",
+        "([BLjava/lang/String;)V",
+        &[JValue::Object(&json_object), JValue::Object(&svg_object)],
+    )
+    .map(JObject::into_raw)
+    .map_err(|error| BindingError::state(format!("NativeSvgOutput construction failed: {error}")))
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_stepSvgLimited(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    snapshot: JByteArray<'_>,
+    input: JByteArray<'_>,
+    max_svg_bytes: jlong,
+) -> jobject {
+    jni_boundary(env, null_mut(), |env| {
+        let snapshot = read_bytes(env, snapshot)?;
+        let input = read_bytes(env, input)?;
+        let output = inku_pipeline_uniffi::step_svg_limited(snapshot, input, max_svg_bytes as u64);
+        native_svg_output(env, output)
+    })
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_renderSavedSvgLimited(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    input: JByteArray<'_>,
+    max_svg_bytes: jlong,
+) -> jobject {
+    jni_boundary(env, null_mut(), |env| {
+        let input = read_bytes(env, input)?;
+        let output = inku_pipeline_uniffi::render_saved_svg_limited(input, max_svg_bytes as u64);
+        native_svg_output(env, output)
+    })
 }
 
 #[unsafe(no_mangle)]

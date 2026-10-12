@@ -11,13 +11,15 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from ...limits import (
     BYTES_PER_MARK,
-    DEFAULT_LIMITS,
     LIMIT_ABSOLUTE_MAX,
     LIMIT_GROUPS,
-    limits_as_dict,
+    SVG_LIMIT_FIELD,
+    SVG_LIMIT_MIN_MIB,
+    SVG_LIMIT_MAX_MIB,
+    normalize_render_limit_settings,
 )
 from ...persistence.backup import SQLiteSnapshotError
 from ...plugins import plugin_status_items
@@ -268,6 +270,7 @@ class RenderLimitsStatus(BaseModel):
     defaults: dict[str, int]
     groups: dict[str, list[str]]
     absolute_max: int
+    field_bounds: dict[str, dict[str, int]] = Field(default_factory=dict)
     # Bytes of SVG one mark costs, by drawing tool. The panel turns the count on
     # the stepper into the weight a reader will actually open.
     bytes_per_mark: dict[str, int]
@@ -760,14 +763,16 @@ def _render_concurrency_status() -> RenderConcurrencyStatus:
 def _render_limits_status() -> RenderLimitsStatus:
     return RenderLimitsStatus(
         limits=_db.get_render_limit_settings(),
-        defaults=limits_as_dict(DEFAULT_LIMITS),
-        groups={name: list(fields) for name, fields in LIMIT_GROUPS},
+        defaults=normalize_render_limit_settings(None),
+        groups={**{name: list(fields) for name, fields in LIMIT_GROUPS},
+                "svg_output": [SVG_LIMIT_FIELD]},
         absolute_max=LIMIT_ABSOLUTE_MAX,
+        field_bounds={SVG_LIMIT_FIELD: {"min": SVG_LIMIT_MIN_MIB, "max": SVG_LIMIT_MAX_MIB, "step": 1}},
         bytes_per_mark=dict(BYTES_PER_MARK),
         note=(
-            "These govern how many marks a work may carry. They are stored per install and "
-            "recorded on every work drawn under them (history.render_limits), so a work made "
-            "here can still be told apart from the same description drawn elsewhere. "
+            "Mark limits are recorded on each work (history.render_limits). The SVG output "
+            "ceiling is separate installation safety policy applied to fresh renders, not "
+            "stored-display retrieval or the work's identity. "
             "Values that contradict each other are rounded down, not rejected; the stored set "
             "is what comes back."
         ),
@@ -788,6 +793,7 @@ class RenderLimitsBody(BaseModel):
     ddl_count_max: int | None = None
     ddl_count_max_grid: int | None = None
     schema_count_max: int | None = None
+    max_generated_svg_mib: StrictInt | None = None
     reset_to_defaults: bool = False
 
 
@@ -796,7 +802,7 @@ def api_settings_update_limits(
     body: RenderLimitsBody,
 ) -> RenderLimitsStatus:
     if body.reset_to_defaults:
-        requested = limits_as_dict(DEFAULT_LIMITS)
+        requested = normalize_render_limit_settings(None)
     else:
         requested = {
             key: value

@@ -20,6 +20,47 @@ function view(overrides: Partial<PipelineView> = {}): PipelineView {
 	};
 }
 
+test('a persisted SVG refusal stops automatic performance and preserves its exact detail', async () => {
+	const detail = { code: 'generated_svg_too_large', limit_mib: 3, limit_bytes: 3 * 1024 * 1024 };
+	const refused = view({
+		phase: { tag: 'ready' },
+		delivery: { score: {}, upstream_diagnostics: [], downstream_diagnostics: [], resource_omissions: [], relation_omissions: [] },
+		current_render_refusal: detail,
+	});
+	let commands = 0;
+	const api = {
+		load: async () => refused,
+		command: async () => { commands += 1; return view(); },
+	};
+	const controller = new PipelineController(api as never, () => ({}), () => {});
+	await assert.rejects(controller.loadVariation('variation-1'), (cause: unknown) => {
+		assert.ok(cause instanceof PipelineApiError);
+		assert.equal(cause.status, 422);
+		assert.deepEqual(cause.detail, detail);
+		return true;
+	});
+	assert.equal(commands, 0);
+	assert.equal(controller.current?.result, null);
+	assert.equal(controller.current?.current_render_refusal, detail);
+});
+
+test('a poll returning HTTP 422 cannot return the preceding successful result', async () => {
+	const detail = { code: 'generated_svg_too_large', limit_mib: 2, limit_bytes: 2097152 };
+	const transport = new PipelineApi(async () => Response.json({ detail }, { status: 422 }));
+	const api = {
+		authorDdl: async () => view({ busy: true }),
+		load: (variationId: string) => transport.load(variationId),
+	};
+	const controller = new PipelineController(api as never, () => ({}), () => {}, async () => {});
+	controller.adopt(view({ result: { svg: '<svg>previous</svg>' } as PipelineView['result'] }));
+	await assert.rejects(controller.fromDdl('circle'), (cause: unknown) => {
+		assert.ok(cause instanceof PipelineApiError);
+		assert.deepEqual(cause.detail, detail);
+		return true;
+	});
+	assert.equal(controller.current?.result, null);
+});
+
 test('new authoring clears a failed view while retaining its parent and the newly selected model', async () => {
 	let model = 'chatgpt:luna';
 	const failed = view({ phase: { tag: 'failed', reason: 'stage1_failed' },

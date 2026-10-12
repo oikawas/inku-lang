@@ -190,4 +190,5 @@ data class RenderRequest(
     val workColorSnapshot: WorkColorSnapshot? = null,
     /** Explicit host render option. `null` keeps historical Score fallback semantics. */
     val wild: Boolean? = null,
+    val maxSvgBytes: Long = app.inku.mobile.render.SvgOutputLimit.DEFAULT_BYTES,
 )

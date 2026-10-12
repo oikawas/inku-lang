@@ -199,6 +199,7 @@ DB 列 `history.tenkei`、`tenkei_for_node()` 等の内部識別子、web の `t
 `web/scripts/i18n-lint.mjs`（error は 1 件でも exit 1）:
 
 1. `en.ts` と `ja.ts` の**鍵集合が完全一致**すること
+   表示文言の検査では、入れ子の対応表にあるAPIフィールド名も鍵として除外します。
 2. §3 の固定ラベル（四操作・配置の選び `By principle` / `By chance`・古い作品の強度・`Paint`・`Wild`）が**一字一句その語**であること
 3. §5-1 の禁止語が**どこにも無い**こと
 4. §5-2 の制限語が**許容キー以外に無い**こと

@@ -3,7 +3,8 @@ import InkuPersistence
 
 public struct HostError: Error, LocalizedError, Sendable, Equatable {
     public let code: String
-    public init(_ code: String) { self.code = code }
+    public let svgLimitMiB: Int?
+    public init(_ code: String, svgLimitMiB: Int? = nil) { self.code = code; self.svgLimitMiB = svgLimitMiB }
     public var errorDescription: String? { code }
 }
 

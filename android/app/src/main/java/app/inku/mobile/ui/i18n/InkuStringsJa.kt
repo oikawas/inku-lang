@@ -51,6 +51,12 @@ object InkuStringsJa : InkuStrings {
     override val settingsLanguageTitle = "言語"
     override val settingsLanguageSubtitle = "画面の文言・歳時記・作品の言葉"
     override val settingsDisplayTitle = "表示"
+    override val settingsLimitsTitle = "制限"
+    override val settingsLimitsSubtitle = "描画するSVGのサイズ上限"
+    override val svgOutputLimitTitle = "SVGサイズ上限（MiB）"
+    override val svgOutputLimitDescription = "1〜32の整数。既定・推奨は12 MiBです。生成したSVGが上限を超えた場合は失敗し、作品を自動保存しません。上限を上げるとメモリ使用量が増えることがあります。"
+    override val svgOutputLimitInvalid = "1〜32の整数を入力してください。"
+    override fun svgOutputTooLarge(limitMiB: Int) = "生成したSVGが${limitMiB} MiBのサイズ上限を超えました。設定の「制限」を確認してください。作品は自動保存されません。"
     override val settingsTextSizeTitle = "文字の大きさ"
     override val settingsTextSizeSubtitle = "端末の文字設定に加えて調整します"
     override val settingsTextSizeSample = "言葉から、ひとつの作品へ。"
@@ -110,6 +116,7 @@ object InkuStringsJa : InkuStrings {
         "compiler_diagnostics" -> "確認または修正が必要な箇所があります"
         "host_commit_failed" -> "作品の保存を完了できませんでした"
         "compiler_boundary_failed" -> "DDLを楽譜へ変換できませんでした"
+        "svg_output_too_large" -> "生成したSVGがサイズ上限を超えたため、作品は自動保存されません"
         else -> reason
     }
     override fun pipelineFailureCause(failure: String, attempts: Int, detail: String?): String {
@@ -150,6 +157,7 @@ object InkuStringsJa : InkuStrings {
         "invalid_score" -> "Scoreが描ける形ではありません"
         "mark_too_large" -> "大きすぎる印があります"
         "output_too_large" -> "描いたSVGが大きすぎます"
+        "svg_output_too_large" -> "生成したSVGがサイズ上限を超えたため、作品は自動保存されません"
         "non_finite_value" -> "数でない値（無限大など）があります"
         "invalid_saved_performance" -> "保存された内容を読めません"
         "internal_invariant" -> "描画coreの内部で問題が起きました"

@@ -86,7 +86,11 @@ struct DrawingLogView: View {
             Text(model.display.localizedFormat("補完モデル: %@", record.stage2Model))
             if let reason = record.failureReason {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(model.display.localized(failure(reason))).fontWeight(.semibold)
+                    if reason == "svg_too_large", let limit = record.failureSVGLimitMiB {
+                        Text(DrawingFailureMessage.svgLimitText(limit, language: model.display.preferences.language)).fontWeight(.semibold)
+                    } else {
+                        Text(model.display.localized(failure(reason))).fontWeight(.semibold)
+                    }
                     Text(reason).inkuFont(12, design: .monospaced).foregroundStyle(.secondary)
                     if let stage = record.failureStage { Text(model.display.localized(action(stage))) }
                     if record.providerMetrics.contains(where: { $0.failure != nil && $0.diagnostic == nil }) {

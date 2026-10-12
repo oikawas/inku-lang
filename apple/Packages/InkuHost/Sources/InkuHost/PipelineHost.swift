@@ -8,13 +8,16 @@ public actor PipelineHost {
     public nonisolated let database: InkuDatabase
     private let transport: any ProviderTransport
     private let credentials: any CredentialStore
+    private let svgLimitBytes: @Sendable () async throws -> UInt64
     private var executions: [String: ExecutionDriver] = [:]
     public init(database: InkuDatabase, transport: (any ProviderTransport)? = nil,
-                credentials: any CredentialStore = KeychainCredentialStore()) {
+                credentials: any CredentialStore = KeychainCredentialStore(),
+                svgLimitBytes: @escaping @Sendable () async throws -> UInt64 = { try SVGGenerationLimit.bytes(nil) }) {
         self.database = database
         if let native = transport as? URLSessionProviderTransport { self.transport = native.withRateDatabase(database) }
         else { self.transport = transport ?? URLSessionProviderTransport(database: database) }
         self.credentials = credentials
+        self.svgLimitBytes = svgLimitBytes
     }
 
     public func generate(_ request: GenerationRequest, progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {
@@ -37,7 +40,7 @@ public actor PipelineHost {
         }
         let report = try ExactJSON(data: Data(InkuCore.versionReport.utf8))
         guard report["binding_version"].string == "1.1.0", report["protocol_version"].string == "1.0.0" else { throw HostError("binding_protocol_mismatch") }
-        let driver = try ExecutionDriver(request: request, database: database, transport: transport, credentials: credentials)
+        let driver = try ExecutionDriver(request: request, database: database, transport: transport, credentials: credentials, svgLimitBytes: svgLimitBytes)
         let started = try await driver.start(progress: progress)
         executions[started.executionID] = driver
         return try await withTaskCancellationHandler {
@@ -163,7 +166,12 @@ public actor PipelineHost {
         var request = try SavedPerformance.renderRequest(work: work, context: context, renderSeed: nil, wild: nil)
         request["request"]["options"]["svg_profile"] = .string(profile)
         try Task.checkCancellation()
-        let rendered = try ExactJSON(data: InkuCore.renderSaved(request.data))
+        let output = InkuCore.renderSavedSvgLimited(request.data, maxSvgBytes: InkuCore.svgConsumerMaximumBytes)
+        var rendered = try ExactJSON(data: output.json)
+        if let svg = output.svg {
+            guard UInt64(svg.utf8.count) <= InkuCore.svgConsumerMaximumBytes else { throw HostError("svg_consumer_too_large") }
+            rendered["svg"] = .string(svg)
+        }
         if let code = rendered["error"].string { throw HostError(code) }
         return try rendered.requiredString("svg")
     }
@@ -185,7 +193,7 @@ public actor PipelineHost {
         let context = try await savedPerformanceContext(workID: work.id)
         let comparison = try SavedPerformance.replayComparisonRequest(work: work, context: context)
         try Task.checkCancellation()
-        let rendered = try ExactJSON(data: InkuCore.renderSaved(comparison.request.data))
+        let rendered = try await renderSavedLimited(comparison.request.data, description: work.effectiveSourceText)
         if let code = rendered["error"].string { throw HostError(code) }
         let snapshot = ReplayComparisonSnapshot(workID: work.id, originalSVG: work.svg,
             replayedSVG: try rendered.requiredString("svg"), recordedVersion: work.renderEngineVersion,
@@ -260,7 +268,7 @@ public actor PipelineHost {
         let context = try ExactJSON(data: plan.context)
         let request = try ExactJSON(data: plan.renderRequest)
         try Task.checkCancellation()
-        let rendered = try ExactJSON(data: InkuCore.renderSaved(request.data))
+        let rendered = try await renderSavedLimited(request.data, description: source.effectiveSourceText)
         if let code = rendered["error"].string { throw HostError(code) }
         let svg = try rendered.requiredString("svg")
         try Task.checkCancellation()
@@ -372,7 +380,9 @@ public actor PipelineHost {
         let clip = try ExactJSON(data: request.clipPolicy)
         let renderInput: ExactJSON = .object(["delivery": delivery, "options": options, "compiler": compiler, "clip": clip])
         try Task.checkCancellation()
-        let rendered = try ExactJSON(data: InkuCore.renderCompiled(renderInput.data))
+        let maximum = try await svgLimitBytes()
+        let output = InkuCore.renderCompiledSvgLimited(renderInput.data, maxSvgBytes: maximum)
+        let rendered = try await renderedLimited(output, maximum: maximum, description: request.description, models: request.models)
         if let code = rendered["error"].string { throw HostError(code) }
         let executionID = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
         let nodeID = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
@@ -426,12 +436,34 @@ public actor PipelineHost {
         for driver in executions.values { _ = try await driver.cancel(progress: { _ in }) }
     }
 
+    private func renderSavedLimited(_ input: Data, description: String) async throws -> ExactJSON {
+        let maximum = try await svgLimitBytes()
+        let output = InkuCore.renderSavedSvgLimited(input, maxSvgBytes: maximum)
+        return try await renderedLimited(output, maximum: maximum, description: description, models: .init())
+    }
+
+    private func renderedLimited(_ output: (json: Data, svg: String?), maximum: UInt64,
+                                 description: String, models: ModelSelection) async throws -> ExactJSON {
+        var rendered = try ExactJSON(data: output.json)
+        if let svg = output.svg {
+            do { try SVGGenerationLimit.validate(svg, maximumBytes: maximum) }
+            catch {
+                let failure = StoredSVGFailure(description: description, models: models, limitMiB: Int(maximum / (1_024 * 1_024)))
+                _ = try await database.compareAndSwapExecution(id: UUID().uuidString, expectedRevision: nil,
+                                                               snapshot: JSONEncoder().encode(failure))
+                throw error
+            }
+            rendered["svg"] = .string(svg)
+        }
+        return rendered
+    }
+
     private func execution(_ id: String) async throws -> ExecutionDriver {
         if let current = executions[id] { return current }
         guard let record = try await database.loadExecution(id: id) else { throw HostError("execution_not_found") }
         // Another reentrant load may already have installed the current actor.
         if let current = executions[id] { return current }
-        let driver = try ExecutionDriver(record: record, database: database, transport: transport, credentials: credentials)
+        let driver = try ExecutionDriver(record: record, database: database, transport: transport, credentials: credentials, svgLimitBytes: svgLimitBytes)
         executions[id] = driver; return driver
     }
 }
@@ -440,6 +472,8 @@ private struct StoredExecution: Codable, Sendable {
     var schema = "inku.swift-pipeline-execution.v1"
     var snapshot: Data
     var rendered: Data?
+    var svgFailure: String? = nil
+    var svgFailureLimitMiB: Int? = nil
     var events: Data = Data("[]".utf8)
     var models: ModelSelection
     var providers: [ProviderSettings]
@@ -501,6 +535,7 @@ private actor ExecutionDriver {
     let database: InkuDatabase
     let transport: any ProviderTransport
     let credentials: any CredentialStore
+    let svgLimitBytes: @Sendable () async throws -> UInt64
     let gate = AsyncGate()
     var state: StoredExecution
     var databaseRevision: Int64?
@@ -513,11 +548,13 @@ private actor ExecutionDriver {
     // A native private-capture lifetime budget; normal metrics do not consume this budget.
     let maximumExecutionRawBodyBytes = 64 * 1_024 * 1_024
 
-    init(request: GenerationRequest, database: InkuDatabase, transport: any ProviderTransport, credentials: any CredentialStore) throws {
+    init(request: GenerationRequest, database: InkuDatabase, transport: any ProviderTransport, credentials: any CredentialStore,
+         svgLimitBytes: @escaping @Sendable () async throws -> UInt64) throws {
         guard try ExactJSON(data: request.configuration).object != nil,
               try ExactJSON(data: request.renderOptions).object != nil,
               try ExactJSON(data: request.clipPolicy).object != nil else { throw HostError("invalid_pipeline_configuration") }
         self.database = database; self.transport = transport; self.credentials = credentials
+        self.svgLimitBytes = svgLimitBytes
         self.state = StoredExecution(snapshot: Data(), models: request.models, providers: request.providers,
                                      renderOptions: request.renderOptions, clipPolicy: request.clipPolicy,
                                      renderColorMaps: request.renderColorMaps,
@@ -537,12 +574,14 @@ private actor ExecutionDriver {
         self.state.derivationMetadata = request.derivationMetadata
         self.state.interpretationSeed = request.interpretationSeed
     }
-    init(record: ExecutionSnapshot, database: InkuDatabase, transport: any ProviderTransport, credentials: any CredentialStore) throws {
+    init(record: ExecutionSnapshot, database: InkuDatabase, transport: any ProviderTransport, credentials: any CredentialStore,
+         svgLimitBytes: @escaping @Sendable () async throws -> UInt64) throws {
         let stored = try JSONDecoder().decode(StoredExecution.self, from: record.snapshot)
         guard stored.schema == "inku.swift-pipeline-execution.v1" else { throw HostError("stored_execution_invalid") }
         let snapshot = try ExactJSON(data: stored.snapshot)
         guard snapshot["execution_id"].string == record.id else { throw HostError("stored_execution_invalid") }
         self.database = database; self.transport = transport; self.credentials = credentials
+        self.svgLimitBytes = svgLimitBytes
         self.state = stored; self.snapshot = snapshot; self.databaseRevision = record.revision; self.restored = true
     }
 
@@ -555,7 +594,7 @@ private actor ExecutionDriver {
                                                                 "origin": .string(request.authoring.isDirect ? "user_authored_ddl" : "stage1_generated"),
                                                                 "authority": .string(request.authoring.isDirect ? "ddl_authoritative" : "description_authoritative")]),
                                          "authoring": request.authoring.json])
-        let next = try coreStep(payload)
+        let next = try await coreStep(payload)
         let id = try next.snapshot.requiredString("execution_id")
         let saved = try await database.compareAndSwapExecution(id: id, expectedRevision: nil, snapshot: encoded(next.state))
         adopt(next, revision: saved.revision)
@@ -625,7 +664,7 @@ private actor ExecutionDriver {
 
     func drive(progress: @escaping PipelineProgressHandler, allowProvider: Bool = true) async throws -> PipelineView {
         await gate.lock()
-        if driving || restored {
+        if driving || restored || state.svgFailure != nil {
             let result = try makeView(); await gate.unlock(); return result
         }
         driving = true; await gate.unlock()
@@ -829,7 +868,7 @@ private actor ExecutionDriver {
     }
 
     private struct NextState { let state: StoredExecution; let snapshot: ExactJSON }
-    private func coreStep(_ payload: ExactJSON, clearProvider: Bool = false) throws -> NextState {
+    private func coreStep(_ payload: ExactJSON, clearProvider: Bool = false) async throws -> NextState {
         var payload = payload; payload["version"] = .integer(1)
         let messageID = newID()
         let current = snapshot.object == nil ? nil : snapshot
@@ -841,30 +880,48 @@ private actor ExecutionDriver {
         let limits = try config.requiredObject("envelope_limits")
         try within(state.snapshot.count, limit: limits["max_snapshot_bytes"])
         try within(envelope.data.count, limit: limits["max_input_bytes"])
-        let bytes = InkuCore.step(snapshot: state.snapshot, input: envelope.data)
+        let maximum = payload["tag"].string == "render" ? try await svgLimitBytes() : try SVGGenerationLimit.bytes(32)
+        let native = InkuCore.stepSvgLimited(snapshot: state.snapshot, input: envelope.data, maxSvgBytes: maximum)
+        let bytes = native.json
         try within(bytes.count, limit: limits["max_output_bytes"])
         let output = try ExactJSON(data: bytes)
         guard output["protocol"].string == "inku.pipeline", output["version"].string == "1.0.0" else { throw HostError("pipeline_protocol_mismatch") }
         if output["kind"].string == "error" { throw HostError(output["payload"]["code"].string ?? "pipeline_error") }
         guard output["kind"].string == "output", output["message_id"].string == messageID,
               output["payload"]["tag"].string == "step_result", output["payload"]["version"].number == "1" else { throw HostError("pipeline_schema_violation") }
-        let result = try output.requiredObject("payload").requiredObject("result")
+        var result = try output.requiredObject("payload").requiredObject("result")
+        if let svg = native.svg {
+            do { try SVGGenerationLimit.validate(svg, maximumBytes: maximum) }
+            catch {
+                guard let current else { throw error }
+                var failed = state
+                failed.svgFailure = "svg_too_large"
+                failed.svgFailureLimitMiB = Int(maximum / (1_024 * 1_024))
+                failed.rendered = nil; failed.savedWorkID = nil; failed.candidate = nil
+                let prior = try ExactJSON(data: state.events).array ?? []
+                failed.events = ExactJSON.array(prior + [.object(["tag": .string("failed"),
+                    "sequence": current["sequence"], "payload": .object(["stage": .string("render"), "reason": .string("svg_too_large"),
+                        "svg_limit_mib": .integer(failed.svgFailureLimitMiB!)])])]).data
+                return NextState(state: failed, snapshot: current)
+            }
+            result["rendered"]["svg"] = .string(svg)
+        }
         let nextSnapshot = try result.requiredObject("snapshot")
         if let current { guard nextSnapshot["execution_id"] == current["execution_id"] else { throw HostError("pipeline_execution_identity_changed") } }
         try within(nextSnapshot.data.count, limit: limits["max_snapshot_bytes"])
         guard result["events"].array != nil else { throw HostError("pipeline_schema_violation") }
-        var next = state; next.snapshot = nextSnapshot.data
+        var next = state; next.snapshot = nextSnapshot.data; next.svgFailure = nil; next.svgFailureLimitMiB = nil
         let priorEvents = try ExactJSON(data: state.events).array ?? []
         next.events = ExactJSON.array(priorEvents + (result["events"].array ?? [])).data
         if result["rendered"].object != nil { next.rendered = result["rendered"].data; next.savedWorkID = nil; next.candidate = nil }
-        else if current?["document"] != nextSnapshot["document"] || nextSnapshot["delivery"].object == nil {
+        else if current?["document"] != nextSnapshot["document"] || nextSnapshot["delivery"].object == nil || nextSnapshot["phase"]["tag"].string == "failed" {
             next.rendered = nil; next.savedWorkID = nil; next.candidate = nil
         }
         if clearProvider { next.pendingProviderAction = nil }
         return NextState(state: next, snapshot: nextSnapshot)
     }
     private func advance(_ payload: ExactJSON, clearProvider: Bool = false) async throws {
-        let next = try coreStep(payload, clearProvider: clearProvider)
+        let next = try await coreStep(payload, clearProvider: clearProvider)
         let record = try await database.compareAndSwapExecution(id: executionID(), expectedRevision: databaseRevision, snapshot: encoded(next.state))
         adopt(next, revision: record.revision)
     }
@@ -878,7 +935,7 @@ private actor ExecutionDriver {
               payload["variation_id"] == snapshot["variation_id"] else { throw HostError("authority_conflict") }
         let acknowledgement: ExactJSON = .object(["tag": .string("visible_normalized_ddl_committed"), "identity": action["identity"],
                                                   "ddl_digest": payload["ddl_digest"], "revision": authority["next_state"]["revision"], "authority_digest": payload["authority_digest"]])
-        let next = try coreStep(.object(["tag": .string("effect_result"), "result": acknowledgement]))
+        let next = try await coreStep(.object(["tag": .string("effect_result"), "result": acknowledgement]))
         guard let revision = databaseRevision else { throw HostError("execution_not_started") }
         let committed = try await database.commitEffect(id: executionID(), expectedRevision: revision,
                                                        effectID: action["identity"].requiredString("action_id"), snapshot: encoded(next.state), acknowledgement: acknowledgement.data)
@@ -1027,7 +1084,7 @@ private actor ExecutionDriver {
 
     private func makeView() throws -> PipelineView {
         let rendered = try state.rendered.map { try ExactJSON(data: $0) }
-        let phase = try snapshot.requiredObject("phase").requiredString("tag")
+        let phase = state.svgFailure == nil ? try snapshot.requiredObject("phase").requiredString("tag") : "failed"
         return PipelineView(executionID: try executionID(), variationID: try snapshot.requiredString("variation_id"),
                             sequence: try snapshot.requiredString("sequence"), revision: try snapshot["authority"].requiredString("revision"), phase: phase,
                             authority: try snapshot["authority"].requiredString("authority"), origin: try snapshot["authority"].requiredString("origin"),

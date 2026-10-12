@@ -165,6 +165,7 @@ data class PipelineView(
     val sketch: PipelineSketchResult = PipelineSketchResult(),
     /** Why a stopped run stopped (`needs_user_edit` / `failed` only), as web's `pipelineAttentionReason`. */
     val phaseReason: String? = null,
+    val svgOutputLimitMiB: Int? = null,
     val providerFailure: PipelineProviderFailure? = null,
     val holeCompletionResults: List<HoleCompletionResult> = emptyList(),
     /** Opaque core record; a host never invents records for an older work. */

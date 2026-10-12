@@ -351,6 +351,8 @@ export const en: LangPack = {
 	errorSaijikiMigrationRequired: 'This work was saved in the words of the retired Saijiki (v1) and cannot be opened until it is migrated. Ask the administrator.',
 	errorScoreInvalid: (reason) => `The Score is invalid: ${reason}`,
 	errorScoreNotRenderable: (reason) => `This Score cannot be drawn: ${reason}`,
+	errorGeneratedSvgTooLarge: (limitMib) => `The SVG exceeded the configured limit (${limitMib} MiB), so this work was not saved.`,
+	errorSvgLimitBindingUnavailable: 'The server’s drawing engine does not support the SVG limit setting, so this work was not saved.',
 	renderRefusalReason: (code) => ({
 		resource_authority: "the work's resource policy could not be confirmed",
 		performance_stopped: 'drawing stopped at a limit',
@@ -786,8 +788,10 @@ export const en: LangPack = {
 	userNoSearchResults: 'No users match the current filters.',
 	settingsRenderLimitsCurrent: 'Saved',
 	settingsRenderLimitsDefault: 'Default',
+	settingsRenderLimitsRecommended: (limitMib) => `Recommended: ${limitMib} MiB`,
 	settingsRenderLimitsUnit: (unit) => `Unit: ${unit}`,
 	settingsRenderLimitUnits: {
+		max_generated_svg_mib: 'MiB',
 		max_expanded_primitives: 'marks',
 		max_expanded_per_instruction: 'marks',
 		max_instructions: 'instructions',
@@ -804,6 +808,7 @@ export const en: LangPack = {
 	settingsRenderLimitsSaving: 'Saving…',
 	settingsRenderLimitsNormalized: (fields) => `The server normalized these values: ${fields}`,
 	settingsRenderLimitGroupSummaries: {
+		svg_output: 'Limit the size of new SVG output.',
 		capability: 'The total marks a work may carry. Only this family follows the hardware.',
 		legibility: 'The boundary between drawing a stated count and showing it as a band.',
 		safety: 'Guards against a typo or runaway. Usually leave the defaults.',
@@ -879,7 +884,7 @@ export const en: LangPack = {
 	settingsDetailHint: 'The detailed mode adds the Plugins, Other (server), Limits and Unread-word ledger tabs.',
 	settingsRenderLimitsTitle: 'Limits',
 	settingsRenderLimitsIntro:
-		'Limits on marks per work and counts read from descriptions. Changing them affects how many lines get drawn. Saved values guide what Stage 1 and Stage 2 tell the model and are recorded with each work.',
+		'Limits on marks and counts read from descriptions affect how many lines get drawn. These values guide what Stage 1 and Stage 2 tell the model and are recorded with each work. The SVG limit is a safety ceiling applied when saving new SVG output.',
 	settingsRenderLimitsRounding:
 		'Choose Save changes to apply your edits. The server normalizes conflicting values on save; for example, marks per instruction cannot exceed the work total.',
 	settingsRenderLimitsWeight: (low: number, high: number) =>
@@ -887,11 +892,13 @@ export const en: LangPack = {
 	settingsRenderLimitsReset: 'Restore defaults',
 	settingsRenderLimitsSaved: 'Limits saved',
 	settingsRenderLimitGroups: {
+		svg_output: 'SVG output',
 		capability: 'Drawing volume',
 		legibility: 'Count representation',
 		safety: 'Safety limits'
 	},
 	settingsRenderLimitGroupTooltips: {
+		svg_output: 'The SVG limit uses the server setting at the start of drawing. It does not apply when viewing saved works.',
 		capability:
 			'How much this installation can afford to put on one work. A faster machine may raise it, and this is the only family that should follow the hardware.\n\nMeasured on the development machine at engine 35: one grid mark costs about 13 KB of SVG with a pen and about 16 KB with a thick brush. Even at the default of 400, one work reaches 5-6.5 MB and takes several seconds to draw. The higher it goes, the heavier the work is to open.\n\nThe cost per mark moves by 25% with the brush, so a count is an estimate of weight, not the weight itself.',
 		legibility:
@@ -900,6 +907,7 @@ export const en: LangPack = {
 			'Numbers that only stop a typing mistake or a runaway. Nothing here makes a drawing better.\n\nThe largest work in production carries 27 instructions (median 4), so the defaults have never bound a real one. Leave the family alone unless something is wrong.'
 	},
 	settingsRenderLimitLabels: {
+		max_generated_svg_mib: 'SVG limit',
 		max_expanded_primitives: 'Marks per work',
 		max_expanded_per_instruction: 'Marks per instruction',
 		max_instructions: 'Instructions per work',
@@ -911,6 +919,7 @@ export const en: LangPack = {
 		schema_count_max: "Ceiling checked on Stage 2's output"
 	},
 	settingsRenderLimitHints: {
+		max_generated_svg_mib: 'Safety ceiling for SVG output. Works above it are not saved. Viewing saved works is unaffected.',
 		max_expanded_primitives: 'Past this the whole work is scaled down to fit.',
 		max_expanded_per_instruction: 'An instruction asking for more than this is thinned. A value above the per-work total is lowered to it',
 		max_instructions: 'Instructions past this are dropped.',

@@ -279,6 +279,11 @@ impl OutputAllowance {
         }
     }
 
+    fn with_minimum_base(mut self, minimum: usize) -> Self {
+        self.allowed = self.allowed.max(minimum);
+        self
+    }
+
     fn add_mark(&mut self) {
         self.allowed = self.allowed.saturating_add(self.per_mark);
     }
@@ -369,6 +374,27 @@ fn absolute_render_policy() -> inku_score::HardResourcePolicy {
 /// arrangement count of 4.3 billion kept it computing positions for more than
 /// 20 minutes). Untrusted Scores go through [`render_with_resources`].
 pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
+    render_with_allowance(request, OutputAllowance::default())
+}
+
+/// Render with a host's minimum intermediate output allowance.
+///
+/// The host checks the final SVG's UTF-8 bytes separately. This runtime value
+/// never changes the Score, render options, metadata or the default entry.
+pub fn render_with_svg_limit(
+    request: RenderRequest,
+    max_svg_bytes: usize,
+) -> Result<RenderOutput, RenderError> {
+    render_with_allowance(
+        request,
+        OutputAllowance::default().with_minimum_base(max_svg_bytes),
+    )
+}
+
+fn render_with_allowance(
+    request: RenderRequest,
+    allowance: OutputAllowance,
+) -> Result<RenderOutput, RenderError> {
     validate_request(&request)?;
     let absolute = absolute_render_policy();
     inku_score::check_legacy_resource_demand(
@@ -377,7 +403,7 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         inku_score::OperationalResourceBudget(absolute.budget),
     )
     .map_err(RenderError::ResourceAuthority)?;
-    render_impl(request, None, &[], OutputAllowance::default())
+    render_impl(request, None, &[], allowance)
 }
 
 /// Render a typed Score with independently authorized resource policies.
@@ -388,6 +414,40 @@ pub fn render_with_resources(
     operational_budget: inku_score::OperationalResourceBudget,
     clip_policy: CompatFillClipPolicy,
 ) -> Result<RenderOutput, RenderError> {
+    render_with_resources_and_allowance(
+        request,
+        hard_policy,
+        operational_budget,
+        clip_policy,
+        OutputAllowance::default(),
+    )
+}
+
+/// Keep resource authority while allowing a host's final SVG ceiling to fit.
+/// The minimum allowance is local to this call and is not a render identity.
+pub fn render_with_resources_and_svg_limit(
+    request: RenderRequest,
+    hard_policy: &inku_score::HardResourcePolicy,
+    operational_budget: inku_score::OperationalResourceBudget,
+    clip_policy: CompatFillClipPolicy,
+    max_svg_bytes: usize,
+) -> Result<RenderOutput, RenderError> {
+    render_with_resources_and_allowance(
+        request,
+        hard_policy,
+        operational_budget,
+        clip_policy,
+        OutputAllowance::default().with_minimum_base(max_svg_bytes),
+    )
+}
+
+fn render_with_resources_and_allowance(
+    request: RenderRequest,
+    hard_policy: &inku_score::HardResourcePolicy,
+    operational_budget: inku_score::OperationalResourceBudget,
+    clip_policy: CompatFillClipPolicy,
+    allowance: OutputAllowance,
+) -> Result<RenderOutput, RenderError> {
     validate_request(&request)?;
     let mut omitted = std::collections::BTreeMap::new();
     loop {
@@ -396,7 +456,7 @@ pub fn render_with_resources(
             request.clone(),
             Some((hard_policy, operational_budget, clip_policy)),
             &excluded,
-            OutputAllowance::default(),
+            allowance,
         )?;
         let mut changed = false;
         if let Some(execution) = &mut output.metadata.execution {
@@ -905,6 +965,57 @@ fn render_impl(
 mod tests {
     use super::*;
     use crate::types::{CanvasSize, RenderOptions};
+
+    #[test]
+    fn svg_limit_runtime_base_admits_bytes_a_lower_fixed_base_refuses() {
+        let mark = Element::new("path").attr("d", "x".repeat(1_200));
+        let mut old = OutputAllowance::new(1_000, 10);
+        old.add_mark();
+        assert!(matches!(
+            old.spend([&mark]),
+            Err(RenderError::OutputTooLarge { .. })
+        ));
+
+        let mut raised = OutputAllowance::new(1_000, 10).with_minimum_base(2_000);
+        raised.add_mark();
+        raised.spend([&mark]).unwrap();
+        assert_eq!(raised.allowed, 2_010);
+        assert_eq!(raised.per_mark, old.per_mark);
+        assert_eq!(
+            OutputAllowance::default()
+                .with_minimum_base(32 << 20)
+                .allowed,
+            32 << 20
+        );
+    }
+
+    #[test]
+    fn svg_limit_runtime_base_never_lowers_the_default_allowance() {
+        let normal = OutputAllowance::default();
+        let mut lower = normal.with_minimum_base(1 << 20);
+        assert_eq!(lower.allowed, normal.allowed);
+        lower.add_mark();
+        assert_eq!(lower.allowed, normal.allowed + normal.per_mark);
+    }
+
+    #[test]
+    fn svg_limit_keeps_accepted_render_bytes_and_metadata() {
+        let request: RenderRequest = serde_json::from_value(serde_json::json!({
+            "score": {"version": "0.9.0", "instructions": []},
+            "options": {"resolved_color_map": {}, "catalog_id": null,
+                "canvas": {"width": 1000.0, "height": 1000.0},
+                "canvas_aspect_id": "square", "svg_profile": "display",
+                "render_seed": 7, "composition_seed": null, "wild": false},
+        }))
+        .unwrap();
+        let normal = render(request.clone()).unwrap();
+        let raised = render_with_svg_limit(request.clone(), 32 << 20).unwrap();
+        let lower = render_with_svg_limit(request, 1).unwrap();
+        assert_eq!(normal, raised);
+        assert_eq!(normal, lower);
+        // The final host ceiling is not an early-render truncation rule.
+        assert!(lower.svg.len() > 1);
+    }
 
     #[test]
     fn marks_past_the_output_allowance_are_refused() {

@@ -1,4 +1,5 @@
 import Foundation
+import InkuCore
 
 /// XMLParser is available on both macOS and iOS and never resolves resources.
 struct SVGDocument {
@@ -7,7 +8,8 @@ struct SVGDocument {
     let height: Double
 
     init(_ svg: String) throws {
-        guard !svg.isEmpty, svg.utf8.count <= 12 * 1024 * 1024,
+        // Stored generation bodies can be 32 MiB; description/card wrappers have separate headroom.
+        guard !svg.isEmpty, UInt64(svg.utf8.count) <= InkuCore.svgConsumerMaximumBytes,
               !svg.localizedCaseInsensitiveContains("<!DOCTYPE"), !svg.localizedCaseInsensitiveContains("<!ENTITY") else {
             throw ExportFailure("保存SVGが空・大きすぎる・外部定義を含むため書き出せません。")
         }

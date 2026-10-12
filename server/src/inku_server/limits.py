@@ -59,6 +59,33 @@ class Limits:
 
 DEFAULT_LIMITS = Limits()
 
+# Output safety is installation policy, not a mark budget recorded on a work.
+SVG_MIB = 1024 * 1024
+SVG_LIMIT_FIELD = "max_generated_svg_mib"
+SVG_LIMIT_DEFAULT_MIB = 12
+SVG_LIMIT_MIN_MIB = 1
+SVG_LIMIT_MAX_MIB = 32
+
+
+def normalize_svg_limit_mib(value: object) -> int:
+    if isinstance(value, bool):
+        return SVG_LIMIT_DEFAULT_MIB
+    try:
+        number = int(value)  # type: ignore[arg-type]
+        if isinstance(value, float) and value != number:
+            return SVG_LIMIT_DEFAULT_MIB
+    except (TypeError, ValueError, OverflowError):
+        return SVG_LIMIT_DEFAULT_MIB
+    return min(SVG_LIMIT_MAX_MIB, max(SVG_LIMIT_MIN_MIB, number))
+
+
+def normalize_render_limit_settings(settings: object) -> dict[str, int]:
+    """Persist output safety alongside, but outside, the recorded mark limits."""
+    clean = normalize_limits(settings)
+    value = settings.get(SVG_LIMIT_FIELD) if isinstance(settings, dict) else None
+    clean[SVG_LIMIT_FIELD] = normalize_svg_limit_mib(value)
+    return clean
+
 LIMIT_FIELD_NAMES: tuple[str, ...] = tuple(
     field.name for field in dataclasses.fields(Limits)
 )

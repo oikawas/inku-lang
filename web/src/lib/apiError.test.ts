@@ -3,6 +3,20 @@ import test from 'node:test';
 
 import { describeApiErrorDetail } from './apiError.ts';
 import { ja } from './i18n/ja.ts';
+import { en } from './i18n/en.ts';
+
+test('SVG save refusal names the actual configured ceiling in both languages', () => {
+	const detail = { code: 'generated_svg_too_large', limit_mib: 7, limit_bytes: 7 * 1024 * 1024 };
+	assert.equal(describeApiErrorDetail(detail, 422, ja), 'SVGが設定上限（7 MiB）を超えたため、この作品は保存されませんでした。');
+	assert.equal(describeApiErrorDetail(detail, 422, en), 'The SVG exceeded the configured limit (7 MiB), so this work was not saved.');
+	assert.equal(describeApiErrorDetail({ ...detail, limit_mib: 32 }, 422, ja), ja.errorGeneratedSvgTooLarge(32));
+	for (const strings of [ja, en]) {
+		assert.equal(describeApiErrorDetail({ code: 'svg_limit_binding_unavailable' }, 503, strings), strings.errorSvgLimitBindingUnavailable);
+		assert.equal(describeApiErrorDetail({ code: 'output_too_large' }, 422, strings), strings.errorScoreNotRenderable(strings.renderRefusalReason('output_too_large')));
+		assert.equal(describeApiErrorDetail('score is invalid: bad', 422, strings), strings.errorScoreInvalid('bad'));
+		assert.equal(describeApiErrorDetail({ code: 'generated_svg_too_large' }, 422, strings), 'HTTP 422');
+	}
+});
 
 test('a failed pipeline action uses its saved phase instead of inventing a provider error', () => {
 	const actual = describeApiErrorDetail({

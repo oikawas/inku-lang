@@ -9,6 +9,7 @@ public struct DrawingLogRecord: Codable, Sendable, Equatable, Identifiable {
     public let description: String
     public let phase: String
     public let failureReason: String?
+    public let failureSVGLimitMiB: Int?
     public let failureStage: String?
     public let stage1Model: String
     public let stage2Model: String
@@ -51,19 +52,27 @@ extension PipelineHost {
 
     private static func drawingLog(_ record: ExecutionSnapshot) throws -> DrawingLogRecord? {
         let decoder = JSONDecoder()
-        guard try decoder.decode(StoredDrawingLogSchema.self, from: record.snapshot).schema == "inku.swift-pipeline-execution.v1" else {
+        let schema = try decoder.decode(StoredDrawingLogSchema.self, from: record.snapshot).schema
+        if schema == "inku.swift-svg-failure.v1" {
+            let failure = try decoder.decode(StoredSVGFailure.self, from: record.snapshot)
+            return DrawingLogRecord(id: record.id, databaseRevision: record.revision, startedAt: failure.startedAt,
+                description: failure.description, phase: "failed", failureReason: "svg_too_large", failureSVGLimitMiB: failure.limitMiB, failureStage: "render",
+                stage1Model: failure.models.stage1Model, stage2Model: failure.models.stage2Model,
+                savedWorkID: nil, providerMetrics: [], events: [])
+        }
+        guard schema == "inku.swift-pipeline-execution.v1" else {
             return nil
         }
         // Decode only public fields; even developer-captured raw bodies are never decoded here.
         let stored = try decoder.decode(StoredDrawingLog.self, from: record.snapshot)
         let core = try ExactJSON(data: stored.snapshot)
         let events = try ExactJSON(data: stored.events).array ?? []
-        let phase = core["phase"]["tag"].string ?? core["phase"].string ?? "unknown"
+        let phase = stored.svgFailure == nil ? core["phase"]["tag"].string ?? core["phase"].string ?? "unknown" : "failed"
         let failure = phase == "failed" ? events.last { $0["tag"].string == "failed" }?["payload"] ?? .null : .null
         return DrawingLogRecord(id: record.id, databaseRevision: record.revision,
             startedAt: stored.startedAt, description: stored.description,
             phase: phase,
-            failureReason: failure["reason"].string, failureStage: failure["stage"].string,
+            failureReason: failure["reason"].string, failureSVGLimitMiB: stored.svgFailureLimitMiB, failureStage: failure["stage"].string,
             stage1Model: stored.models.stage1Model, stage2Model: stored.models.stage2Model,
             savedWorkID: stored.savedWorkID, providerMetrics: stored.providerObservations?.map(\.metric) ?? [],
             events: events.map { event in
@@ -86,5 +95,16 @@ private struct StoredDrawingLog: Decodable {
     let models: ModelSelection
     let startedAt: Date
     let savedWorkID: String?
+    let svgFailure: String?
+    let svgFailureLimitMiB: Int?
     let providerObservations: [Observation]?
+}
+
+/// A refused standalone performance has no successful candidate or core sequence.
+struct StoredSVGFailure: Codable {
+    var schema = "inku.swift-svg-failure.v1"
+    var startedAt = Date()
+    let description: String
+    let models: ModelSelection
+    let limitMiB: Int
 }

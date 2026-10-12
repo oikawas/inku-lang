@@ -349,6 +349,8 @@ export const ja: LangPack = {
 	errorSaijikiMigrationRequired: 'この作品は旧い歳時記（v1）の語で保存されていて、移行が済むまで開けません。管理者に連絡してください。',
 	errorScoreInvalid: (reason) => `Scoreが不正です: ${reason}`,
 	errorScoreNotRenderable: (reason) => `このScoreは描けません: ${reason}`,
+	errorGeneratedSvgTooLarge: (limitMib) => `SVGが設定上限（${limitMib} MiB）を超えたため、この作品は保存されませんでした。`,
+	errorSvgLimitBindingUnavailable: 'サーバーの描画エンジンがSVG上限設定に対応していないため、この作品は保存されませんでした。',
 	renderRefusalReason: (code) => ({
 		resource_authority: '作品の資源の方針を確かめられませんでした',
 		performance_stopped: '描画が上限に達して止まりました',
@@ -784,8 +786,10 @@ export const ja: LangPack = {
 	userNoSearchResults: '条件に合うユーザーはいません。',
 	settingsRenderLimitsCurrent: '保存値',
 	settingsRenderLimitsDefault: '既定値',
+	settingsRenderLimitsRecommended: (limitMib) => `推奨値: ${limitMib} MiB`,
 	settingsRenderLimitsUnit: (unit) => `単位: ${unit}`,
 	settingsRenderLimitUnits: {
+		max_generated_svg_mib: 'MiB',
 		max_expanded_primitives: '墨',
 		max_expanded_per_instruction: '墨',
 		max_instructions: '指示',
@@ -802,6 +806,7 @@ export const ja: LangPack = {
 	settingsRenderLimitsSaving: '保存中…',
 	settingsRenderLimitsNormalized: (fields) => `サーバーが整合する値へ丸めました: ${fields}`,
 	settingsRenderLimitGroupSummaries: {
+		svg_output: '新しく生成するSVGの容量を制限します。',
 		capability: '作品に載せる墨の総量。機材に合わせるのはここだけです。',
 		legibility: '述べた数のまま描く帯と、群として見せる帯の境目です。',
 		safety: '誤入力や暴走を止める上限。通常は既定値のままにします。',
@@ -877,7 +882,7 @@ export const ja: LangPack = {
 	settingsDetailHint: '詳細モードでは、プラグイン・その他（サーバー）・制限値・未読語台帳のタブが出ます。',
 	settingsRenderLimitsTitle: '制限値',
 	settingsRenderLimitsIntro:
-		'作品の墨の数や記述から読む数の上限です。変更すると描かれる線の数も変わります。保存した値は Stage 1 / Stage 2 のプロンプトに使われ、作品ごとに記録されます。',
+		'墨の数や記述から読む数の上限は、描かれる線の数に影響します。これらの値は Stage 1 / Stage 2 のプロンプトに使われ、作品ごとに記録されます。SVG上限は、新しく生成するSVGを保存する際の安全上限です。',
 	settingsRenderLimitsRounding:
 		'変更は「変更を保存」で適用します。保存時に互いに矛盾する値を調整します（例: 一つの指示の墨の数は、一枚の総量を超えない値にします）。',
 	settingsRenderLimitsWeight: (low: number, high: number) =>
@@ -885,11 +890,13 @@ export const ja: LangPack = {
 	settingsRenderLimitsReset: '既定値へ戻す',
 	settingsRenderLimitsSaved: '制限値を保存しました',
 	settingsRenderLimitGroups: {
+		svg_output: 'SVG出力',
 		capability: '描画量',
 		legibility: '数の表現',
 		safety: '安全上限'
 	},
 	settingsRenderLimitGroupTooltips: {
+		svg_output: 'SVG上限は描画開始時のサーバー設定を使います。保存済み作品の表示には適用しません。',
 		capability:
 			'この設置の機材が、一枚にどれだけ描けるかを決めます。速い機械なら上げられる、ここだけが機材に合わせて動かす族です。\n\n実測（エンジン 35・開発機）: 格子の墨 1 本が SVG のおよそ 13 KB（ペン）〜16 KB（太筆）にあたります。既定の 400 本でも、一枚が 5〜6.5 MB・描画に数秒かかります。上げるほど閲覧側が重くなります。\n\n一本あたりの費用は筆致で 25% 変わるので、本数は重さの目安であって重さそのものではありません。',
 		legibility:
@@ -898,6 +905,7 @@ export const ja: LangPack = {
 			'誤入力と暴走を止めるためだけの数です。ここを動かしても絵は良くなりません。\n\n本番の実績は指示 27 個が最大（中央値 4）なので、既定値は実在の作品に一度も当たっていません。ふつうは既定のままにしてください。'
 	},
 	settingsRenderLimitLabels: {
+		max_generated_svg_mib: 'SVG上限',
 		max_expanded_primitives: '一枚あたりの墨の数',
 		max_expanded_per_instruction: '一つの指示あたりの墨の数',
 		max_instructions: '一枚あたりの指示の数',
@@ -909,6 +917,7 @@ export const ja: LangPack = {
 		schema_count_max: 'Stage 2 の出力を検証する天井'
 	},
 	settingsRenderLimitHints: {
+		max_generated_svg_mib: '生成するSVGの安全上限。超過した作品は保存しません。保存済み作品の表示は対象外',
 		max_expanded_primitives: 'これを超えると作品全体を縮めて収めます。',
 		max_expanded_per_instruction: '一つの指示がこれより多くを求めたら間引きます。一枚の総量より大きい値は総量まで下げます',
 		max_instructions: 'これを超えた指示は切り捨てます。',

@@ -1,14 +1,18 @@
 import SwiftUI
+import InkuHost
 
 @MainActor struct OperationalLimitsView: View {
     @Bindable var model: AppModel
     @State private var draft: [String: String] = [:]
     @State private var saved: [String: UInt32] = [:]
+    @State private var svgDraft = "12"
+    @State private var savedSVG = 12
     @State private var saving = false
     @State private var message = ""
     @State private var helpGroup: String?
 
-    private var changed: Bool { draft != saved.mapValues(String.init) }
+    private var changed: Bool { draft != saved.mapValues(String.init) || svgDraft != String(savedSVG) }
+    private var validSVG: Bool { (try? SVGGenerationLimit.parse(svgDraft)) != nil }
 
     var body: some View {
         Group {
@@ -40,22 +44,39 @@ import SwiftUI
                         }
                     }
                 }
+                Section(model.display.localized("生成SVGの上限")) {
+                    Text(model.display.localized("生成したSVG本文のUTF-8バイト数を確認します。超過時は生成を失敗として記録し、作品を保存しません。処理量の上限や保存作品の表示・書き出しとは別の設定です。"))
+                        .inkuFont(13).foregroundStyle(.secondary)
+                    HStack {
+                        Text(model.display.localized("上限（MiB）"))
+                        Spacer()
+                        TextField(model.display.localized("上限（MiB）"), text: $svgDraft)
+                            .textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing).frame(width: 100)
+                            .onChange(of: svgDraft) { _, _ in message = "" }
+                    }.disabled(saving || model.isBrowsingLocked)
+                    Text(model.display.localized("1〜32 MiBの整数。既定・推奨値は12 MiBです。実際に生成するときの保存設定を使います。"))
+                        .inkuFont(12).foregroundStyle(.secondary)
+                }
                 Section {
                     Text(copy.text("settingsRenderLimitsRounding")).inkuFont(13).foregroundStyle(.secondary)
                     HStack {
                         Button(model.display.localized("再読込")) { load() }.disabled(changed)
-                        Button(copy.text("settingsRenderLimitsReset")) { draft = definition.defaults.mapValues(String.init); message = "" }
+                        Button(copy.text("settingsRenderLimitsReset")) { draft = definition.defaults.mapValues(String.init); svgDraft = String(SVGGenerationLimit.recommendedMiB); message = "" }
                             .inkuTooltip(model.display.preferences.showTooltips ? model.display.localized("既定値を入力欄に戻します。変更を保存するまで適用しません。") : "")
                         Spacer()
                         if changed {
-                            Button(model.display.localized("取消")) { draft = saved.mapValues(String.init); message = "" }
+                            Button(model.display.localized("取消")) { draft = saved.mapValues(String.init); svgDraft = String(savedSVG); message = "" }
                             Button(model.display.localized("変更を保存")) { Task { await save(definition: definition) } }
                                 .buttonStyle(.borderedProminent)
-                                .disabled((try? definition.parsedDraft(draft)) == nil)
+                                .disabled((try? definition.parsedDraft(draft)) == nil || !validSVG)
                         }
                     }.disabled(saving || model.isBrowsingLocked)
                     if changed, (try? definition.parsedDraft(draft)) == nil {
                         Text(model.display.localized("制限値には整数を入力してください。"))
+                            .inkuFont(12).foregroundStyle(.red)
+                    }
+                    if changed && !validSVG {
+                        Text(model.display.localized("SVGの上限には1〜32 MiBの整数を入力してください。"))
                             .inkuFont(12).foregroundStyle(.red)
                     }
                     if !message.isEmpty { Text(model.display.message(message)).inkuFont(12).textSelection(.enabled) }
@@ -99,7 +120,7 @@ import SwiftUI
     }
 
     private func load() {
-        do { saved = try model.drawingLimits(); draft = saved.mapValues(String.init); message = "" }
+        do { saved = try model.drawingLimits(); draft = saved.mapValues(String.init); savedSVG = model.svgLimitMiB; svgDraft = String(savedSVG); message = "" }
         catch { message = error.localizedDescription }
     }
 
@@ -114,8 +135,9 @@ import SwiftUI
         saving = true
         defer { saving = false }
         do {
-            try await model.updateDrawingLimits(definition.parsedDraft(draft))
+            try await model.updateDrawingLimits(definition.parsedDraft(draft), svgLimitMiB: SVGGenerationLimit.parse(svgDraft))
             saved = try model.drawingLimits(); draft = saved.mapValues(String.init)
+            savedSVG = model.svgLimitMiB; svgDraft = String(savedSVG)
             message = model.productReference?.localized(language: model.display.preferences.language)?.text("settingsRenderLimitsSaved") ?? "制限値を保存しました"
         } catch { message = (try? definition.parsedDraft(draft)) == nil ? "制限値には整数を入力してください。" : error.localizedDescription }
     }

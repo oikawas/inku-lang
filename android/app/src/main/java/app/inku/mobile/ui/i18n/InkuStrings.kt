@@ -60,6 +60,12 @@ interface InkuStrings {
     val settingsLanguageTitle: String
     val settingsLanguageSubtitle: String
     val settingsDisplayTitle: String
+    val settingsLimitsTitle: String
+    val settingsLimitsSubtitle: String
+    val svgOutputLimitTitle: String
+    val svgOutputLimitDescription: String
+    val svgOutputLimitInvalid: String
+    fun svgOutputTooLarge(limitMiB: Int): String
     val settingsTextSizeTitle: String
     val settingsTextSizeSubtitle: String
     val settingsTextSizeSample: String

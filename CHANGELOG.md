@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-12 — Fix PNG export from the creation screen
+
+Choosing PNG from a saved work's export menu now downloads the file even when there is no callback to report the save.
+
 ### 2026-10-12 — Zoom the Web canvas about the visible area's center
 
 After panning, zoom in or out while keeping the point on the work at the center of the visible area fixed. Buttons, wheel, and keyboard share this behavior, including when crossing the fitted scale. An explicit fit recenters the work. Translation and scaling use one transform to keep the same center during the zoom transition.

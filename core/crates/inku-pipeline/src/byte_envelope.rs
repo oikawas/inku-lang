@@ -201,8 +201,7 @@ mod tests {
 
     fn start_input() -> Vec<u8> {
         let mut config = crate::focused_flow::config();
-        config.definitions =
-            vec![inku_ddl::MacroDefinition::from_json(&json!({
+        let definition = json!({
             "schema": "inku.macro-definition.v1", "namespace": "Example", "heading": "Circle",
             "version": "1.0.0", "parameters": {}, "components": {}, "body": [{
                 "op": "emit", "binding": null, "fields": {
@@ -214,7 +213,9 @@ mod tests {
                     "count": {"expr": "integer", "value": 1}
                 }
             }]
-        })).unwrap()];
+        });
+        config.definitions =
+            vec![inku_ddl::MacroDefinition::from_json(&definition.to_string()).unwrap()];
         config.macro_summaries = vec!["One black circle at the center".into()];
         serde_json::to_vec(&json!({
             "protocol": PROTOCOL_NAME, "version": PROTOCOL_VERSION, "kind": "input",

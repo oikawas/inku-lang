@@ -2,7 +2,7 @@
 
 This directory contains the native SwiftUI client, developed for macOS first, and the shared Apple packages. [SWIFT_SPEC.ja.md](SWIFT_SPEC.ja.md) is the canonical specification for Swift host behavior; this document is its maintained English version. The [product specification](../SPEC.md) defines shared DDL, Score, prompts, authoring authority, pipeline transitions, seeds, and rendering semantics. Server remains the primary development host, and Swift follows the same Rust core without duplicating semantic processing.
 
-Last updated: 2026-10-12.
+Last updated: 2026-10-13.
 
 Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The macOS app has its own version, defined by `apple/VERSION` and `apple/BUILD_NUMBER` and allocated separately from the Server and Web versions (the first release is 1.0.0, Build 1). The corresponding Server version is shown in the app's About inku window and in the changelog. Matching shared layer versions does not establish that host features and the native UI port are complete.
 
@@ -14,14 +14,16 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
-## 2026-10-12 Match Server's Gemini thinking levels
+## 2026-10-13 Match Server's Gemini requests and Claude demo requests
 
-Gemini drawing pipeline and Vision requests set `generationConfig.thinkingConfig` using the same model matching as Server's `gemini_request.py`.
+Gemini drawing pipeline, Vision, and demo instruction requests use the model matching and output budgets in Server's [`gemini_request.py`](../server/src/inku_server/gemini_request.py). This updates the matching introduced on 2026-10-12.
 
-- `gemini-3.8-flash`, `gemini-<numeric and dotted version>-pro`, and `gemini-2.5-flash` receive `thinkingLevel: low`.
-- `gemini-2.5-flash-lite` receives no `thinkingConfig`. Other models, including `gemini-3.5-flash-lite`, `gemini-3.6-flash`, `gemini-3-flash-preview`, and Gemma 4, retain `minimal`.
-- Matching strips the leading `models/` and requires the end of the model name or a suffix starting with `-`. The pipeline and Vision share this matching. Demo requests are unchanged.
-- Check: InkuHost's `GeminiThinkingLevelTests.testPipelineAndVisionSendServerThinkingLevels` verifies both paths' outgoing JSON, omitted configuration, prefixes, suffixes, and model-name boundaries.
+- Matching strips the leading `models/`. Names matching `^gemini-2\.5-flash-(lite|image)(-|$)` or `^antigravity-` receive no `thinkingConfig`.
+- `minimal` is sent only to names starting with `gemma-` and these 13 exact names: `gemini-3.6-flash`, `gemini-3.5-flash`, `gemini-3.5-flash-lite`, `gemini-flash-lite-latest`, `gemini-3-flash-preview`, `gemini-3.1-flash-lite`, `gemini-3.1-flash-lite-preview`, `gemini-3.1-flash-image`, `gemini-3.1-flash-image-preview`, `gemini-3.1-flash-lite-image`, `gemini-robotics-er-2-preview`, `nano-banana-pro-preview`, and `gemini-nano-banana-2.1`. Others receive `low`, including new models and the latest Flash/Pro aliases.
+- Models sent a thinking level receive 8,192 extra `maxOutputTokens`; models sent none keep the answer's budget. Drawing, Vision, and demo requests omit Gemini's `temperature` and use the provider's default ([Google's Gemini 3 guide](https://ai.google.dev/gemini-api/docs/gemini-3#temperature)).
+- If the first drawing candidate has `finishReason: MAX_TOKENS`, reject it with `provider_output_limit` even if its function call looks complete. Vision and demo text excludes parts marked `thought: true`.
+- Claude demo requests omit `temperature`. Only models matching Server's [`anthropic_request.py`](../server/src/inku_server/anthropic_request.py) rule (`^claude-((opus|sonnet|haiku|fable|mythos)-5(-|$)|mythos-preview(-|$))`) receive 8,192 extra `max_tokens`. This change does not adjust Claude's drawing or Vision budgets.
+- Checks: InkuHost's `GeminiThinkingLevelTests` verifies outgoing JSON for all three Gemini paths, omitted configuration and output budgets, rejection of cut-off drawing responses, and Claude demo sampling and budgets. `AuxiliaryServerParityChecks.testAnswerTextFollowsServerReaders` prevents thought text from leaking into demo instructions.
 
 ## 2026-10-12 Always show the version and build at the bottom left
 

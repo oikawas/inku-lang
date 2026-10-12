@@ -61,8 +61,8 @@ final class AuxiliaryServerParityChecks: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(URLSessionProviderTransport.sdkRetryDelay(URLError(.networkConnectionLost), retry: 0, kind: .anthropic, random: 0), 0.5)
     }
 
-    // Failure: a null or absent answer fails as malformed where Server reads empty text, or the demo drops
-    // Gemini thought text that Server's demo keeps.
+    // Failure: a null or absent answer fails as malformed where Server reads empty text,
+    // or Gemini thought text leaks into the demo instruction.
     func testAnswerTextFollowsServerReaders() throws {
         func text(_ raw: String, _ kind: ProviderKind, _ purpose: AuxiliaryPrompt.Purpose = .vision) throws -> String {
             try AuxiliaryWire.responseText(Data(raw.utf8), kind: kind, purpose: purpose)
@@ -72,7 +72,7 @@ final class AuxiliaryServerParityChecks: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(try text(#"{"promptFeedback":{}}"#, .gemini), "")
         let thought = #"{"candidates":[{"content":{"parts":[{"text":"plan","thought":true},{"text":"pond"}]}}]}"#
         XCTAssertEqual(try text(thought, .gemini), "pond")
-        XCTAssertEqual(try text(thought, .gemini, .demo), "plan\npond")
+        XCTAssertEqual(try text(thought, .gemini, .demo), "pond")
         XCTAssertThrowsError(try text(#"{"choices":[]}"#, .openAICompatible))
     }
 

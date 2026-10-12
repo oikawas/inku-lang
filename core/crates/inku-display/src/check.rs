@@ -4,6 +4,10 @@
 //! 17 public works and 3 heavy works; Skia display stage 1, 2026-10-06), and each entry
 //! was checked against Skia's SVG source. A work outside it is shown with resvg, as
 //! before, and the host counts the reason.
+//!
+//! `linearGradient` and `color-interpolation` were added on 2026-10-12, from 38 works
+//! with linear gradients (the ink-wash ground's bands, and the computer fill, which also
+//! writes `color-interpolation="sRGB"`): Skia drew each one inside the table as Chrome did.
 
 use std::collections::HashMap;
 
@@ -31,6 +35,7 @@ const ELEMENTS: &[&str] = &[
     "mask",
     "pattern",
     "radialGradient",
+    "linearGradient",
     "stop",
     "use",
     "filter",
@@ -55,6 +60,7 @@ const ATTRIBUTES: &[&str] = &[
     "class",
     "clip-path",
     "clipPathUnits",
+    "color-interpolation",
     "color-interpolation-filters",
     "cx",
     "cy",
@@ -203,6 +209,11 @@ fn check_attribute(
         "href" if !matches!(element, "pattern" | "use") => {
             Err(Unsupported::new("attribute", format!("{element}@href")))
         }
+        // Skia's gradients do not read it; the core writes only the default, sRGB.
+        "color-interpolation" if attribute.value() != "sRGB" => Err(Unsupported::new(
+            "attribute",
+            format!("{element}@color-interpolation={}", attribute.value()),
+        )),
         // Skia has no CSS; the one declaration the core writes is `mask-type:alpha`,
         // which Skia ignores (always luminance). That is the same for white content.
         "style" => {

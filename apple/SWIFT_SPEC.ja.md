@@ -2,7 +2,7 @@
 
 このディレクトリは、macOS先行のnative SwiftUIクライアントとApple向け共通packageのworkspaceである。本書をSwift host固有の仕様正本とし、[SWIFT_SPEC.md](SWIFT_SPEC.md)を対応英語版とする。共有DDL、Score、prompt、authoring authority、pipeline状態遷移、seed、描画の意味は[製品仕様](../SPEC.ja.md)を正本とし、Serverを開発上のprimaryとして同じRust coreへ追随する。Swift側に意味処理を複製しない。
 
-最終更新: 2026-10-11。
+最終更新: 2026-10-12。
 
 binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。macOSアプリの版は`apple/VERSION`と`apple/BUILD_NUMBER`を正本とする独自の版で、Server／Webの版とは別に採番する（初回は1.0.0／Build 1）。対応するServerの版はアプリの「inkuについて」と変更履歴に併記する。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
 
@@ -13,6 +13,17 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 確定した実装変更と残る範囲は本書の日付付き節へ記し、製品の変更履歴は共通の[CHANGELOG.ja.md](../CHANGELOG.ja.md)／[CHANGELOG.md](../CHANGELOG.md)へ同期して記す。Swift専用CHANGELOGを分けない。
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
+
+## 2026-10-12 照合表にlinearGradientを足す
+
+作者の目視の間に、linearGradientを含む作品の表示が照合表の外として止まった。作者の指示（調べて計画を出す、実装する）による。
+
+- 照合表（共有coreの[`inku-display`の`check.rs`](../core/crates/inku-display/src/check.rs)）に、要素`linearGradient`と属性`color-interpolation`を足した。`color-interpolation`は値が`sRGB`のときだけ照合表の中で、ほかの値は今までどおり外（符号`attribute`）。
+- 描画はlinearGradientを、地の墨のにじみの帯と、computerの塗りで書く。どちらも止まりの`offset`・`stop-color`・`stop-opacity`だけを使い、塗る`path`の外接矩形に合わせる（既定の単位）。Skiaの`SkSVGLinearGradient`はこれをChromeと同じに描く。`color-interpolation`はSkiaのグラデーションでは読まれず、描画が書く値（`sRGB`）は既定と同じ。
+- 描き比べ（2026-10-12）：linearGradientを含む作品38件をSkiaとChromeで描き、照合表に入る37件すべてが作者の物差しで一致した。墨のにじみは薄く、作品の中では物差しに見えないので、帯を濃く描いた合成の作品で、一致することと、帯を抜くと一致しないことを確かめた。拡大の窓（Graphite）もCPUと一致した。
+- 照合表は共有なので、Androidでもこれらの作品はresvgではなくSkiaで描かれる。
+- 残る範囲：古い作品（描画エンジン41まで）の`feFuncA`の`tableValues`は照合表の外のままで、macOSでは表示が止まる。
+- 確認：共有coreの`inku-display`のSkiaの試験（C1・C2・C4と、2種のlinearGradientがChromeと一致し、抜くと一致しない試験）、照合表の外の判定の試験、`inku-display-gpu`の試験（G2に2件を足した）。
 
 ## 2026-10-11 拡大の窓をApple SiliconではGraphiteで別のプロセスに描かせる
 

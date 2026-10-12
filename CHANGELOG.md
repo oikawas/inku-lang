@@ -6,6 +6,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+## macOS (unreleased; the version is settled at integration)
+
+### 2026-10-12 — Show works with linear gradients
+
+During the author's visual check, a work with the ink-wash ground's bands stopped: the display's support table had no linearGradient. The table now holds the element `linearGradient` and the attribute `color-interpolation` (only `sRGB`).
+
+- Skia draws the two kinds the core writes (the ink-wash ground's bands and the computer fill) as Chrome does: of 38 works with linear gradients, the 37 inside the table matched. Zoomed windows (Graphite) agree too.
+- The table is shared with Android, so there too these works are drawn with Skia instead of resvg.
+
 ## Unreleased
 
 ### 2026-10-12 — English edges may also be written with a space (DDL 17)

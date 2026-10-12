@@ -94,6 +94,7 @@ export type SettingsStatus = {
 		defaults: Record<string, number>;
 		groups: Record<string, string[]>;
 		absolute_max: number;
+		field_bounds?: Record<string, { min: number; max: number; step: number }>;
 		bytes_per_mark: Record<string, number>;
 		note: string;
 	};

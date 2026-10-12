@@ -132,7 +132,8 @@ function pack(file) {
 			cur = { key: m[1], text: m[2] };
 		} else if (cur) {
 			if (/^};?$/.test(line)) { out.push(cur); cur = null; }
-			else cur.text += ' ' + line.trim();
+			// Nested mapping keys are API identifiers, not English UI text.
+			else cur.text += ' ' + line.replace(/^\t{2}[A-Za-z0-9_]+:/, '').trim();
 		}
 	}
 	if (cur) out.push(cur);

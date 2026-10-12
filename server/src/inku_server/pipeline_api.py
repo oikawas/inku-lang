@@ -195,6 +195,9 @@ class PipelineService:
             provider=provider,
             allow_render=self.render_for is not None or self.render_with_context is not None,
             context=context, save_snapshot=save,
+            on_render_refusal=lambda snapshot, detail: self.store.record_render_refusal(
+                owner, snapshot["execution_id"], expected_sequence=snapshot["sequence"], detail=detail,
+            ),
         )
         return run
 
@@ -444,8 +447,13 @@ class PipelineService:
             raise HTTPException(404, "variation_not_found")
         execution_id = record.execution_id
         run = self.execution(owner, execution_id)
+        if run.context.get("svg_refusal") is not None:
+            raise HTTPException(422, run.context["svg_refusal"])
         job = self._jobs.get((owner, execution_id))
         if job is not None and job.done() and job.exception() is not None:
+            error = job.exception()
+            if isinstance(error, HTTPException) and isinstance(error.detail, dict) and error.detail.get("code") == "svg_limit_binding_unavailable":
+                raise error
             raise HTTPException(503, {"code": "pipeline_effect_failed", "message": "The authoring operation could not finish."})
         return run.view()
 

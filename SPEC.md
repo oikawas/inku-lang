@@ -2645,6 +2645,18 @@ A Score 0.10 `arrangement.resolved` recipe, anchor, and domain fix where a group
 
 Every choice is bound to `render_seed` and the original owner and reads only Score fields; nothing branches on words, subjects, or source text. `density: none`, `jitter: 0`, `rhythm_spacing: none`, and `fade: none` leave recipe centers unchanged. The compiler writes these explicit defaults when no performance vocabulary is present, so stored Score meaning is unchanged and only its replayed appearance follows this engine.
 
+#### Generated SVG safety ceiling
+
+Server Settings → Limits → SVG output accepts an integer ceiling from 1 to 32 MiB for a newly drawn work. The default and recommendation is 12 MiB. One MiB is 1,048,576 bytes: the default is 12,582,912 bytes and the maximum is 33,554,432 bytes. Administrators save the setting; installations without it use 12 MiB. Out-of-range integers are bounded to 1 or 32, and restoring defaults returns to 12. Fractional, nonnumeric, and boolean updates are not accepted.
+
+Read the current setting once after acquiring render capacity, immediately before SVG generation, and use that value throughout the attempt. Accept an SVG whose UTF-8 byte count equals the ceiling; refuse only a greater count with HTTP 422 and `generated_svg_too_large`. The detail's `limit_mib` and `limit_bytes` name the applied ceiling. Paint streams use the existing error event with the same status and detail. Refused SVGs enter neither success bodies nor done events, transcripts, persisted execution SVGs, or history. That attempt schedules no artifacts or thumbnails and increments no completed-generation count. Keep only safe refusal detail and never present an earlier legal drawing as this attempt's success. Earlier legal history and intermediate drawings remain intact.
+
+This Server output safety setting is independent of mark limits and is absent from a work's `render_limits`, Score, resource policy, and render identity. Request limits and stored works cannot raise it. Normal drawing, batches, legacy/compact Score redraws, and freshly rendered editable/compat/live profiles share the rule. Stored display SVGs and idempotent retrievals are exempt and return their existing bytes. Accepted SVGs, metadata, seeds, and hashes remain unchanged. Do not truncate, compress, split, automatically retry, or silently reduce mark counts.
+
+Server-specific native entries pass the captured ceiling to the intermediate output allowance and carry SVG outside the JSON transport envelope. Independent input, snapshot, non-SVG transport, mark, extent, resource, and clip budgets remain enforced. A native wheel missing these entries fails with 503 `svg_limit_binding_unavailable`, rather than silently falling back. The post-render byte check does not prevent CPU or temporary memory already consumed inside the renderer.
+
+This setting covers Server/Web generation, saving, and display. It does not propagate to Android/Swift local generation or settings. Their existing native raster/display and Swift export parser ceiling of 12 MiB remains a separate consumer restriction; native display/export compatibility for larger Server works is outside this change's guarantee.
+
 #### How a stated count is treated (v2.7.6)
 
 In canonical meaning, a stated count remains lossless symbolic intent. The Step

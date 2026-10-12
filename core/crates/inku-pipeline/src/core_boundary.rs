@@ -12,7 +12,10 @@ use inku_render::{
     compat_clip::ClipLimits,
     ground::shown_background,
     palette::work_palette_context,
-    render::{CompatFillClipPolicy, RenderError, render_with_resources},
+    render::{
+        CompatFillClipPolicy, RenderError, render_with_resources,
+        render_with_resources_and_svg_limit,
+    },
     types::{RenderOptions, RenderOutput, RenderRequest},
 };
 use inku_score::{
@@ -613,8 +616,45 @@ pub fn render_saved_score(
     operational_budget: OperationalResourceBudget,
     clip: ClipPolicy,
 ) -> Result<RenderOutput, BoundaryError> {
-    render_with_resources(request, hard_policy, operational_budget, clip.resolved()?)
-        .map_err(BoundaryError::Render)
+    render_saved_score_impl(request, hard_policy, operational_budget, clip, None)
+}
+
+/// Replay with a host-only runtime allowance, outside the saved Score policy.
+pub fn render_saved_score_with_svg_limit(
+    request: RenderRequest,
+    hard_policy: &HardResourcePolicy,
+    operational_budget: OperationalResourceBudget,
+    clip: ClipPolicy,
+    max_svg_bytes: usize,
+) -> Result<RenderOutput, BoundaryError> {
+    render_saved_score_impl(
+        request,
+        hard_policy,
+        operational_budget,
+        clip,
+        Some(max_svg_bytes),
+    )
+}
+
+fn render_saved_score_impl(
+    request: RenderRequest,
+    hard_policy: &HardResourcePolicy,
+    operational_budget: OperationalResourceBudget,
+    clip: ClipPolicy,
+    max_svg_bytes: Option<usize>,
+) -> Result<RenderOutput, BoundaryError> {
+    let clip = clip.resolved()?;
+    match max_svg_bytes {
+        Some(maximum) => render_with_resources_and_svg_limit(
+            request,
+            hard_policy,
+            operational_budget,
+            clip,
+            maximum,
+        ),
+        None => render_with_resources(request, hard_policy, operational_budget, clip),
+    }
+    .map_err(BoundaryError::Render)
 }
 
 /// Render only the Score and identities produced by the matching compiler options.
@@ -623,6 +663,27 @@ pub fn render_delivery(
     options: RenderOptions,
     compiler: &CompilerOptions,
     clip: ClipPolicy,
+) -> Result<RenderOutput, BoundaryError> {
+    render_delivery_impl(delivery, options, compiler, clip, None)
+}
+
+/// Preserve delivery identity while applying a host-only output allowance.
+pub fn render_delivery_with_svg_limit(
+    delivery: &CompiledDelivery,
+    options: RenderOptions,
+    compiler: &CompilerOptions,
+    clip: ClipPolicy,
+    max_svg_bytes: usize,
+) -> Result<RenderOutput, BoundaryError> {
+    render_delivery_impl(delivery, options, compiler, clip, Some(max_svg_bytes))
+}
+
+fn render_delivery_impl(
+    delivery: &CompiledDelivery,
+    options: RenderOptions,
+    compiler: &CompilerOptions,
+    clip: ClipPolicy,
+    max_svg_bytes: Option<usize>,
 ) -> Result<RenderOutput, BoundaryError> {
     compiler.validate()?;
     delivery.validate()?;
@@ -677,13 +738,13 @@ pub fn render_delivery(
         return Err(BoundaryError::ScoreIdentityMismatch);
     }
 
-    render_with_resources(
+    render_saved_score_impl(
         RenderRequest { score, options },
         &compiler.hard_resource_policy,
         compiler.operational_resource_budget,
-        clip.resolved()?,
+        clip,
+        max_svg_bytes,
     )
-    .map_err(BoundaryError::Render)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

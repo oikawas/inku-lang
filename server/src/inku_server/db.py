@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from .color_catalogs import RENAMED_COLOR_CATALOG_IDS
 from .identity import description_hash
-from .limits import normalize_limits
+from .limits import normalize_render_limit_settings
 from .plugins import canvas_aspect_ratio_for_aspect, normalize_canvas_aspect_id
 from .persistence import accounts as _accounts
 from .persistence.backup import (
@@ -835,7 +835,7 @@ def get_render_limit_settings() -> dict:
 
 
 def _render_limit_settings_store() -> _settings.RenderLimitSettingsStore:
-    return _settings.RenderLimitSettingsStore(_app_settings_store(), normalize_limits)
+    return _settings.RenderLimitSettingsStore(_app_settings_store(), normalize_render_limit_settings)
 
 
 def update_render_limit_settings(settings: dict) -> dict:

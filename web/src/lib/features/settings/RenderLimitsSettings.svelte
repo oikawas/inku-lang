@@ -42,7 +42,7 @@
 		draft = { ...status.limits };
 	});
 
-	// The nine limits are addressed by their server-side field names. The label,
+	// The limits are addressed by their server-side field names. The label,
 	// the hint and the group heading all come from i18n by that name, so the
 	// panel does not carry a second, drifting copy of the vocabulary.
 	function renderLimitLabel(field: string): string {
@@ -53,6 +53,10 @@
 	function renderLimitHint(field: string): string {
 		const hints = t().settingsRenderLimitHints as Record<string, string>;
 		return hints[field] ?? '';
+	}
+
+	function renderLimitBounds(field: string): { min: number; max: number; step: number } {
+		return status?.field_bounds?.[field] ?? { min: 1, max: status?.absolute_max ?? 1, step: 1 };
 	}
 
 	function renderLimitGroupLabel(group: string): string {
@@ -154,8 +158,9 @@
 								<div class="limits-field-control">
 									<NumberStepper
 										label={renderLimitLabel(field)}
-										min={1}
-										max={status.absolute_max}
+										min={renderLimitBounds(field).min}
+										max={renderLimitBounds(field).max}
+										step={renderLimitBounds(field).step}
 										value={draft[field] ?? status.limits[field]}
 										disabled={!isAdmin || saving}
 										onChange={(value) => {
@@ -166,6 +171,9 @@
 									<div class="limits-field-facts">
 										<span>{t().settingsRenderLimitsCurrent}: {formatGroupedNumber(saved[field] ?? status.limits[field], 1)}</span>
 										<span>{t().settingsRenderLimitsDefault}: {formatGroupedNumber(status.defaults[field], 1)}</span>
+										{#if field === 'max_generated_svg_mib'}
+											<span>{t().settingsRenderLimitsRecommended(status.defaults[field])}</span>
+										{/if}
 										<span>{renderLimitUnit(field)}</span>
 									</div>
 								</div>

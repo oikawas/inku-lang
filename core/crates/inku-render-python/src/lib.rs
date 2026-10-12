@@ -103,6 +103,25 @@ fn render(py: Python<'_>, request_json: &str) -> PyResult<(String, String)> {
     })
 }
 
+/// Server-only allowance; final SVG byte acceptance belongs to the host validator.
+#[pyfunction]
+fn render_with_svg_limit(
+    py: Python<'_>,
+    request_json: &str,
+    max_svg_bytes: usize,
+) -> PyResult<(String, String)> {
+    py.detach(|| {
+        let request = serde_json::from_str(request_json)
+            .map_err(|error| PyValueError::new_err(format!("invalid render request: {error}")))?;
+        let output = inku_render::render::render_with_svg_limit(request, max_svg_bytes)
+            .map_err(|error| PyValueError::new_err(format!("render failed: {error}")))?;
+        let metadata = serde_json::to_string(&output.metadata).map_err(|error| {
+            PyValueError::new_err(format!("metadata serialization failed: {error}"))
+        })?;
+        Ok((output.svg, metadata))
+    })
+}
+
 /// Render one canonical coarse request under independent caller-owned resource authority.
 #[pyfunction]
 fn render_with_resources(
@@ -161,6 +180,21 @@ fn pipeline_step<'py>(
     PyBytes::new(py, &output)
 }
 
+/// Return bounded envelope JSON and any newly rendered SVG as separate values.
+#[pyfunction]
+fn pipeline_step_with_svg_limit<'py>(
+    py: Python<'py>,
+    snapshot_bytes: &Bound<'py, PyBytes>,
+    input_bytes: &Bound<'py, PyBytes>,
+    max_svg_bytes: usize,
+) -> (Bound<'py, PyBytes>, Option<String>) {
+    let snapshot = snapshot_bytes.as_bytes().to_vec();
+    let input = input_bytes.as_bytes().to_vec();
+    let (output, svg) =
+        py.detach(|| inku_pipeline_uniffi::step_with_svg_limit(snapshot, input, max_svg_bytes));
+    (PyBytes::new(py, &output), svg)
+}
+
 /// Report the provider attempt in flight for a stored pipeline snapshot.
 #[pyfunction]
 fn pipeline_provider_attempt<'py>(
@@ -212,6 +246,18 @@ fn pipeline_render_saved<'py>(
     PyBytes::new(py, &output)
 }
 
+#[pyfunction]
+fn pipeline_render_saved_with_svg_limit<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+    max_svg_bytes: usize,
+) -> (Bound<'py, PyBytes>, Option<String>) {
+    let input = input_bytes.as_bytes().to_vec();
+    let (output, svg) =
+        py.detach(|| inku_pipeline_uniffi::render_saved_with_svg_limit(input, max_svg_bytes));
+    (PyBytes::new(py, &output), svg)
+}
+
 /// Migrate one saved Saijiki v1 unit (a document and its definitions) for a one-time host migration.
 #[pyfunction]
 fn pipeline_migrate_saijiki_v1<'py>(
@@ -260,11 +306,13 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(renderer_reference_json, module)?)?;
     module.add_function(wrap_pyfunction!(render_seed_from_text, module)?)?;
     module.add_function(wrap_pyfunction!(render, module)?)?;
+    module.add_function(wrap_pyfunction!(render_with_svg_limit, module)?)?;
     module.add_function(wrap_pyfunction!(render_with_resources, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_version_report, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_canvas_registry, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_stage1_system_projection, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_step, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_step_with_svg_limit, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_provider_attempt, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_resolve_palette, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_resolve_macro_catalog, module)?)?;
@@ -273,6 +321,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     module.add_function(wrap_pyfunction!(pipeline_render_saved, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        pipeline_render_saved_with_svg_limit,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(pipeline_migrate_saijiki_v1, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_recompose, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_composition_ranges, module)?)?;

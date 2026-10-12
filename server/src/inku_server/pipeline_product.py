@@ -546,7 +546,10 @@ class ProductPipelineEffects:
         """Perform raw compact Score; the route has already authorized work access."""
         from . import db
         from .api_core.common import _build_number
-        from .api_core.rendering import _limits_for_render, _render_seed_from_text, _render_warnings, _SRGB_COLOR_PROFILE
+        from .api_core.rendering import (
+            _limits_for_render, _render_seed_from_text, _render_warnings, _SRGB_COLOR_PROFILE,
+            _generated_svg_limit_bytes, _validate_generated_svg, _svg_limit_binding_unavailable,
+        )
         from .render_engines import new_render_seed
         from .api_core.state import _render_capacity
         from .layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
@@ -598,7 +601,17 @@ class ProductPipelineEffects:
         payload = {"request": {"score": score, "options": options}, "hard_policy": policy["hard_policy"],
                    "operational_budget": policy["operational_budget"], "clip": self.manifest["render"]["clip"]}
         with _render_capacity(owner):
-            rendered = json.loads(self.binding.render_saved(_bytes(payload)))
+            render_saved = getattr(self.binding, "render_saved_with_svg_limit", None)
+            if not callable(render_saved):
+                raise _svg_limit_binding_unavailable()
+            svg_limit = _generated_svg_limit_bytes()
+            output_bytes, svg = render_saved(_bytes(payload), svg_limit)
+            rendered = json.loads(output_bytes)
+            if "error" not in rendered:
+                if not isinstance(svg, str) or rendered.get("svg") != "":
+                    raise CandidateHostError("invalid_render_boundary")
+                _validate_generated_svg(svg, svg_limit)
+                rendered["svg"] = svg
         if "error" in rendered:
             # The code is the answer; the core's reason is for the log only.
             _logger.warning("saved replay refused: %s: %s", rendered["error"], rendered.get("message"))

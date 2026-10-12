@@ -32,5 +32,6 @@ class RenderEngine(Protocol):
         composition_seed: int | None = None,
         wild: bool = False,
         error_policy: str = "omit_and_continue",
+        max_svg_bytes: int | None = None,
     ) -> RenderEngineResult:
         ...

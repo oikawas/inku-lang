@@ -1642,6 +1642,18 @@ Score 0.10の`arrangement.resolved`（recipe・anchor・domain）は群れの置
 
 すべて`render_seed`と元ownerに束縛し、Score fieldだけを読む。語・題材・原文による分岐は持たない。`density: none`・`jitter: 0`・`rhythm_spacing: none`・`fade: none`はrecipeの中心点を変えない。compilerは演奏語彙が無ければこれらを明示の既定値で書くので、保存済みScoreの意味は変わらず、再演の見え方だけが本版の演奏に従う。
 
+#### 生成SVGの安全上限
+
+Serverの「設定 → 制限値 → SVG出力」で、生成する1作品のSVG上限を1〜32 MiBの整数で設定する。既定・推奨は12 MiB。1 MiBは1,048,576 bytes、既定値は12,582,912 bytes、最大値は33,554,432 bytesである。設定は管理者が保存し、未設定の環境は12 MiBを使う。範囲外の整数は1または32へ補正され、既定値への復元は12へ戻る。小数・非数値・真偽値の更新は受け付けない。
+
+描画capacityを取得してSVG生成を始める直前に現在値を一度読み、同じ描画ではその値を使う。SVG文字列のUTF-8 byte数が上限と同じなら許可し、大きい場合だけHTTP 422の`generated_svg_too_large`で拒否する。応答の`limit_mib`と`limit_bytes`は実際に適用した値を示す。paint streamは既存のerror eventで同じstatusとdetailを返す。超過結果を成功本文・done・transcript・実行状態のSVG・履歴へ渡さず、その描画試行のartifact・thumbnail・生成数の副作用を止める。拒否の安全なdetailだけを残し、以前の合法な描画を今回の成功として返さない。以前の合法な履歴・中間描画は保持する。
+
+墨の数の上限と独立したServerの出力安全設定であり、作品の`render_limits`・Score・resource policy・render identityには含めない。requestや保存作品の値で現在のSVG上限を上げられない。通常描画、バッチ、legacy/compact Scoreの再描画、editable/compat/liveの新規描画に同じ規則を適用する。保存済みdisplay SVGとidempotencyによる保存済み取得には遡及適用せず、既存のbyteをそのまま返す。許可されたSVG・metadata・seed・hashは変えない。切り詰め・圧縮・分割・自動再試行・墨数の自動削減は行わない。
+
+Server専用native入口は取得済み上限を生成途中の出力allowanceへ渡し、SVG本体をJSON通信枠から分離する。入力・snapshot・SVG以外の通信予算と、mark/extent/resource/clipの独立した保護は維持する。新しい入口がないnative wheelへは黙ってfallbackせず、503の`svg_limit_binding_unavailable`で停止する。生成後のbyte検査はrenderer内ですでに消費したCPU・一時メモリを防ぐものではない。
+
+この設定はServer/Webの生成・保存・表示に適用する。Android/Swiftのローカル生成・設定UIへは伝播せず、native raster/displayとSwift export parserの既存12 MiB上限は別のconsumer制約として残る。そのため12 MiBを超えるServer作品のnative表示・書き出し互換はこの変更の保証範囲に含めない。
+
 #### 明示された個数の扱い（v2.7.6）
 
 Canonical meaningでは、記述に明示された個数をlosslessなsymbolic intentとして保持する。Step 11のpure ceiling preflightを、展開、配列確保、またはその他のO(count) materializationより前に適用する。`u32::MAX`等の巨大な要求値もclampや代表数へsilent rewriteしない。単独primitiveは予算内のsource順prefixだけをmaterializeして残りを診断し、構造上部分実行できない単位の拒否時だけallocation / materializationを0にする。

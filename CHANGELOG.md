@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-12 — Set the generated SVG ceiling in Limits
+
+Settings → Limits now stores an SVG output ceiling from 1 to 32 MiB, with 12 MiB as the default and recommendation. A new SVG exceeding the selected UTF-8 byte count is refused before that render attempt is saved or returned; the error names the actual ceiling. Normal drawing, redraws, and streaming share the rule, while stored SVG display remains available. Server-specific native entries align intermediate output budgets and transport with the configured range without changing drawing identity or native client entries. Existing Android/Swift 12 MiB display and export limits remain outside this setting's scope.
+
 ### 2026-10-12 — Zoom the Web canvas about the visible area's center
 
 After panning, zoom in or out while keeping the point on the work at the center of the visible area fixed. Buttons, wheel, and keyboard share this behavior, including when crossing the fitted scale. An explicit fit recenters the work. Translation and scaling use one transform to keep the same center during the zoom transition.

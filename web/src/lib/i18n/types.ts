@@ -236,6 +236,8 @@ export interface LangPack {
 	errorSaijikiMigrationRequired: string;
 	errorScoreInvalid: (reason: string) => string;
 	errorScoreNotRenderable: (reason: string) => string;
+	errorGeneratedSvgTooLarge: (limitMib: number) => string;
+	errorSvgLimitBindingUnavailable: string;
 	/** Why the render core would not draw a Score again, by its stable code. */
 	renderRefusalReason: (code: string) => string;
 	runStatusElapsed: (seconds: string) => string;
@@ -677,6 +679,7 @@ export interface LangPack {
 	userNoSearchResults: string;
 	settingsRenderLimitsCurrent: string;
 	settingsRenderLimitsDefault: string;
+	settingsRenderLimitsRecommended: (limitMib: number) => string;
 	settingsRenderLimitsUnit: (unit: string) => string;
 	settingsRenderLimitUnits: Record<string, string>;
 	settingsRenderLimitsChanges: (count: number) => string;

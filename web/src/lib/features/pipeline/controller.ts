@@ -224,6 +224,17 @@ export class PipelineController {
 		this.observe(view);
 	}
 
+	private setRunView(view: PipelineView): void {
+		this.setView(view);
+		// A persisted refusal must not become another automatic perform request.
+		if (view.current_render_refusal) {
+			throw new PipelineApiError(
+				view.current_render_refusal.code === 'svg_limit_binding_unavailable' ? 503 : 422,
+				view.current_render_refusal,
+			);
+		}
+	}
+
 	private async run(start: () => Promise<PipelineView>, autoPerform = true): Promise<PipelineView> {
 		const ordinal = ++this.requestOrdinal;
 		let next = await start();
@@ -231,13 +242,13 @@ export class PipelineController {
 		this.historySelection = null;
 		this.legacyHistoryId = null;
 		this.linkedHistoryId = null;
-		this.setView(next);
+		this.setRunView(next);
 		while (next.busy) {
 			await this.pause(250);
 			if (ordinal !== this.requestOrdinal) return next;
 			next = await this.api.load(next.variation_id);
 			if (ordinal !== this.requestOrdinal) return next;
-			this.setView(next);
+			this.setRunView(next);
 		}
 		if (
 			autoPerform
@@ -247,13 +258,13 @@ export class PipelineController {
 		) {
 			next = await this.api.command(next, { tag: 'perform' });
 			if (ordinal !== this.requestOrdinal) return next;
-			this.setView(next);
+			this.setRunView(next);
 			while (next.busy) {
 				await this.pause(250);
 				if (ordinal !== this.requestOrdinal) return next;
 				next = await this.api.load(next.variation_id);
 				if (ordinal !== this.requestOrdinal) return next;
-				this.setView(next);
+				this.setRunView(next);
 			}
 		}
 		return next;

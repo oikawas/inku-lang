@@ -2339,6 +2339,23 @@ pub fn advance(
     snapshot: Option<PipelineSnapshot>,
     input: Envelope<PipelineInput>,
 ) -> Result<StepOutput, ProtocolError> {
+    advance_impl(snapshot, input, None)
+}
+
+/// A Server's allowance travels with this call, never with the sealed snapshot.
+pub fn advance_with_svg_limit(
+    snapshot: Option<PipelineSnapshot>,
+    input: Envelope<PipelineInput>,
+    max_svg_bytes: usize,
+) -> Result<StepOutput, ProtocolError> {
+    advance_impl(snapshot, input, Some(max_svg_bytes))
+}
+
+fn advance_impl(
+    snapshot: Option<PipelineSnapshot>,
+    input: Envelope<PipelineInput>,
+    max_svg_bytes: Option<usize>,
+) -> Result<StepOutput, ProtocolError> {
     input.validate("input")?;
     let mut events = Vec::new();
     let mut rendered = None;
@@ -2512,15 +2529,22 @@ pub fn advance(
                     return Err(ProtocolError::InvalidState);
                 }
                 let delivery = state.delivery.as_ref().ok_or(ProtocolError::InvalidState)?;
-                rendered = Some(
-                    crate::core_boundary::render_delivery(
+                let output = match max_svg_bytes {
+                    Some(maximum) => crate::core_boundary::render_delivery_with_svg_limit(
                         delivery,
                         options.into(),
                         &state.config.compiler,
                         clip,
-                    )
-                    .map_err(|_| ProtocolError::SemanticViolation)?,
-                );
+                        maximum,
+                    ),
+                    None => crate::core_boundary::render_delivery(
+                        delivery,
+                        options.into(),
+                        &state.config.compiler,
+                        clip,
+                    ),
+                };
+                rendered = Some(output.map_err(|_| ProtocolError::SemanticViolation)?);
                 if final_render {
                     state.phase = PipelinePhase::Completed;
                     state.event(

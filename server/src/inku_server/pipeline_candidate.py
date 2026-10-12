@@ -155,9 +155,11 @@ class PipelineBinding:
             module = importlib.import_module("inku_render")
             version_report = module.pipeline_version_report
             self.step = module.pipeline_step
+            self.step_with_svg_limit = getattr(module, "pipeline_step_with_svg_limit", None)
             self.canvas_registry = json.loads(module.pipeline_canvas_registry())
             self.resolve_palette = module.pipeline_resolve_palette
             self.render_saved = module.pipeline_render_saved
+            self.render_saved_with_svg_limit = getattr(module, "pipeline_render_saved_with_svg_limit", None)
             self.resolve_macro_catalog = module.pipeline_resolve_macro_catalog
             # Optional so an older native wheel keeps working without the explanations.
             self.explain_plugin_diagnostics = getattr(module, "pipeline_explain_plugin_diagnostics", None)
@@ -189,6 +191,7 @@ class CandidateExecution:
         allow_render: bool = False,
         context: dict | None = None,
         save_snapshot: Callable[[dict | None, dict, dict, dict | None], None] | None = None,
+        on_render_refusal: Callable[[dict, dict], None] | None = None,
     ):
         self.binding, self.store, self.owner_id = binding, store, owner_id
         self.config = json.loads(_bytes(config))
@@ -196,6 +199,7 @@ class CandidateExecution:
         self.allow_render = allow_render
         self.context = json.loads(_bytes(context or {}))
         self.save_snapshot = save_snapshot
+        self.on_render_refusal = on_render_refusal
         self._rendered: dict | None = None
         self._snapshot: dict | None = None
         self._lock = threading.RLock()
@@ -324,6 +328,11 @@ class CandidateExecution:
                            "catalog_diagnostics": self.context.get("macro_catalog", {}).get("diagnostics", []),
                            "rendered": self._rendered,
                            "result": json_seeds(self.context.get("result"))})
+            if self.context.get("svg_refusal") is not None:
+                # Keep the earlier legal performance internally, but never
+                # present it as the refused attempt's successful result.
+                result.update(current_render_refusal=self.context["svg_refusal"],
+                              busy=False, rendered=None, result=None)
             if self.context.get("provider_failure") is not None:
                 result["provider_failure"] = self.context["provider_failure"]
             attempt = self._provider_attempt(state)
@@ -372,16 +381,49 @@ class CandidateExecution:
         snapshot_bytes, input_bytes = (_bytes(state) if state else b""), _bytes(envelope)
         if len(snapshot_bytes) > limits["max_snapshot_bytes"] or len(input_bytes) > limits["max_input_bytes"]:
             raise CandidateHostError("transport_size_limit")
-        output_bytes = self.binding.step(snapshot_bytes, input_bytes)
+        svg = None
+        svg_limit = None
+        if payload.get("tag") == "render":
+            from .api_core.rendering import (
+                _generated_svg_limit_bytes, _render_capacity,
+                _svg_limit_binding_unavailable, _validate_generated_svg,
+            )
+            render_step = getattr(self.binding, "step_with_svg_limit", None)
+            if not callable(render_step):
+                raise _svg_limit_binding_unavailable()
+            with _render_capacity(self.owner_id):
+                svg_limit = _generated_svg_limit_bytes()
+                output_bytes, svg = render_step(snapshot_bytes, input_bytes, svg_limit)
+                if svg is not None:
+                    from fastapi import HTTPException
+                    try:
+                        _validate_generated_svg(svg, svg_limit)
+                    except HTTPException as error:
+                        self.context["svg_refusal"] = error.detail
+                        if self.on_render_refusal is not None:
+                            self.on_render_refusal(state, error.detail)
+                        raise
+        else:
+            output_bytes = self.binding.step(snapshot_bytes, input_bytes)
         if len(output_bytes) > limits["max_output_bytes"]:
             raise CandidateHostError("transport_size_limit")
         output = json.loads(output_bytes)
-        self.transcript.append({"input": envelope, "output": output})
         if output["kind"] == "error":
             raise CandidateHostError(output["payload"]["code"])
         result = output["payload"]["result"]
         next_snapshot = result["snapshot"]
         rendered = result["rendered"]
+        if svg is not None:
+            if not isinstance(rendered, dict) or rendered.get("svg") != "":
+                raise CandidateHostError("invalid_render_boundary")
+            rendered["svg"] = svg
+            self.context.pop("svg_refusal", None)
+        elif svg_limit is not None and rendered is not None:
+            raise CandidateHostError("invalid_render_boundary")
+        if state and (next_snapshot["document"] != state["document"]
+                      or next_snapshot["delivery"] != state["delivery"]):
+            self.context.pop("svg_refusal", None)
+        self.transcript.append({"input": envelope, "output": output})
         # A committed edit invalidates the previous performance. Keep it only
         # when the same acknowledged source and Score remain active.
         if rendered is None and state and next_snapshot["document"] == state["document"] and next_snapshot["delivery"] is not None:

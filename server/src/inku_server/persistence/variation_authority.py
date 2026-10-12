@@ -1207,6 +1207,44 @@ class VariationAuthorityStore:
             )
         return None if row is None else _execution_record(row)
 
+    def record_render_refusal(
+        self, owner_id: str, execution_id: str, *, expected_sequence: str, detail: dict,
+    ) -> None:
+        """Record host refusal only; retain the exact core state and legal SVG.
+
+        The digest CAS also protects host-only updates at the same core sequence.
+        No refused rendering or forged core transition enters this wrapper.
+        """
+        from ..limits import SVG_MIB, SVG_LIMIT_MIN_MIB, SVG_LIMIT_MAX_MIB
+
+        size = detail.get("limit_bytes")
+        if (detail.get("code") != "generated_svg_too_large" or type(size) is not int
+                or not SVG_LIMIT_MIN_MIB * SVG_MIB <= size <= SVG_LIMIT_MAX_MIB * SVG_MIB
+                or size % SVG_MIB or detail.get("limit_mib") != size / SVG_MIB):
+            raise VariationAuthorityAdapterError("invalid SVG refusal detail")
+        safe = {"code": "generated_svg_too_large", "limit_bytes": size, "limit_mib": size // SVG_MIB}
+        expected_sequence, _ = _decimal_u64(expected_sequence, "expected execution sequence")
+        with self.engine.begin() as connection:
+            row = connection.execute(select(pipeline_candidate_executions).where(
+                pipeline_candidate_executions.c.owner_id == owner_id,
+                pipeline_candidate_executions.c.execution_id == execution_id,
+            )).mappings().one_or_none()
+            if row is None or row["sequence"] != expected_sequence:
+                raise ExecutionSnapshotConflict(None if row is None else row["sequence"])
+            wrapper = json.loads(row["state_bytes"])
+            wrapper["context"]["svg_refusal"] = safe
+            state_bytes, digest = _validated_state_bytes(json.dumps(
+                wrapper, ensure_ascii=False, allow_nan=False, separators=(",", ":"),
+            ).encode())
+            changed = connection.execute(update(pipeline_candidate_executions).where(
+                pipeline_candidate_executions.c.owner_id == owner_id,
+                pipeline_candidate_executions.c.execution_id == execution_id,
+                pipeline_candidate_executions.c.sequence == expected_sequence,
+                pipeline_candidate_executions.c.state_digest == row["state_digest"],
+            ).values(state_bytes=state_bytes, state_digest=digest, updated_at=self.now_ms()))
+            if changed.rowcount != 1:
+                raise ExecutionSnapshotConflict(expected_sequence)
+
     def compare_and_set_execution(
         self,
         owner_id: str,

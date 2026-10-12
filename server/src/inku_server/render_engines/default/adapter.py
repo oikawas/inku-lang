@@ -59,6 +59,7 @@ class DefaultRenderEngine:
         composition_seed: int | None = None,
         wild: bool = False,
         error_policy: str = "omit_and_continue",
+        max_svg_bytes: int | None = None,
     ) -> RenderEngineResult:
         native = _native_binding()
         aspect, canvas = resolved_canvas(score, canvas_aspect)
@@ -77,9 +78,15 @@ class DefaultRenderEngine:
             "score": canonical_score_payload(score),
             "options": options,
         }
-        svg, metadata_json = native.render(
-            json.dumps(request, ensure_ascii=False, separators=(",", ":"))
-        )
+        request_json = json.dumps(request, ensure_ascii=False, separators=(",", ":"))
+        if max_svg_bytes is None:
+            svg, metadata_json = native.render(request_json)
+        else:
+            from ...api_core.rendering import _svg_limit_binding_unavailable
+            render = getattr(native, "render_with_svg_limit", None)
+            if not callable(render):
+                raise _svg_limit_binding_unavailable()
+            svg, metadata_json = render(request_json, max_svg_bytes)
         metadata = json.loads(metadata_json)
         if not isinstance(svg, str) or not isinstance(metadata, dict):
             raise RuntimeError("Rust render binding returned an invalid output boundary")

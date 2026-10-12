@@ -47,6 +47,22 @@ pub fn step(snapshot_bytes: Vec<u8>, input_envelope_bytes: Vec<u8>) -> Vec<u8> {
     .unwrap_or_else(|_| error_bytes(ProtocolError::InternalInvariant))
 }
 
+/// Rust helper for the Server's CPython binding; existing UniFFI/JNI calls stay unchanged.
+pub fn step_with_svg_limit(
+    snapshot_bytes: Vec<u8>,
+    input_envelope_bytes: Vec<u8>,
+    max_svg_bytes: usize,
+) -> (Vec<u8>, Option<String>) {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::byte_envelope::step_owned_with_svg_limit(
+            &snapshot_bytes,
+            &input_envelope_bytes,
+            max_svg_bytes,
+        )
+    }))
+    .unwrap_or_else(|_| (error_bytes(ProtocolError::InternalInvariant), None))
+}
+
 /// Report the provider attempt in flight for a stored snapshot, so a host can
 /// show retry progress. The binding version is unchanged: this only adds a call.
 #[uniffi::export]
@@ -203,6 +219,10 @@ struct SavedRenderInput {
     clip: inku_pipeline::core_boundary::ClipPolicy,
 }
 
+const MAX_SAVED_RENDER_INPUT_BYTES: usize = 16 * 1024 * 1024;
+// Only the added Server transport caps metadata JSON; the old ABI is unchanged.
+const MAX_SAVED_RENDER_METADATA_BYTES: usize = 64 * 1024 * 1024;
+
 /// The stable code a host receives when the core does not draw a saved Score.
 ///
 /// `invalid_saved_performance` stays the code for input the core cannot read
@@ -237,7 +257,7 @@ pub fn render_saved(input_bytes: Vec<u8>) -> Vec<u8> {
             .expect("two strings serialize")
     }
     fn render(input_bytes: &[u8]) -> Vec<u8> {
-        if input_bytes.len() > 16 * 1024 * 1024 {
+        if input_bytes.len() > MAX_SAVED_RENDER_INPUT_BYTES {
             return refusal("invalid_saved_performance", "input is larger than 16 MiB");
         }
         let input: SavedRenderInput = match serde_json::from_slice(input_bytes) {
@@ -259,9 +279,145 @@ pub fn render_saved(input_bytes: Vec<u8>) -> Vec<u8> {
         .unwrap_or_else(|_| refusal("internal_invariant", "the core panicked"))
 }
 
+fn saved_render_refusal(code: &str, message: &str) -> Vec<u8> {
+    serde_json::to_vec(&serde_json::json!({ "error": code, "message": message }))
+        .expect("two strings serialize")
+}
+
+fn separated_saved_output(
+    mut output: inku_render::types::RenderOutput,
+    max_metadata_bytes: usize,
+) -> (Vec<u8>, Option<String>) {
+    let svg = std::mem::take(&mut output.svg);
+    match serde_json::to_vec(&output) {
+        Ok(bytes) if bytes.len() <= max_metadata_bytes => (bytes, Some(svg)),
+        Ok(_) => (
+            saved_render_refusal(
+                "invalid_saved_performance",
+                "render metadata exceeds its byte limit",
+            ),
+            None,
+        ),
+        Err(error) => (
+            saved_render_refusal("invalid_saved_performance", &error.to_string()),
+            None,
+        ),
+    }
+}
+
+/// Server replay transport keeps raw SVG outside bounded non-SVG JSON.
+/// The runtime value raises only intermediate allowance; the host checks final bytes.
+pub fn render_saved_with_svg_limit(
+    input_bytes: Vec<u8>,
+    max_svg_bytes: usize,
+) -> (Vec<u8>, Option<String>) {
+    catch_unwind(AssertUnwindSafe(|| {
+        if input_bytes.len() > MAX_SAVED_RENDER_INPUT_BYTES {
+            return (
+                saved_render_refusal("invalid_saved_performance", "input is larger than 16 MiB"),
+                None,
+            );
+        }
+        let input: SavedRenderInput = match serde_json::from_slice(&input_bytes) {
+            Ok(input) => input,
+            Err(error) => {
+                return (
+                    saved_render_refusal("invalid_saved_performance", &error.to_string()),
+                    None,
+                );
+            }
+        };
+        match inku_pipeline::core_boundary::render_saved_score_with_svg_limit(
+            input.request,
+            &input.hard_policy,
+            input.operational_budget,
+            input.clip,
+            max_svg_bytes,
+        ) {
+            Ok(output) => separated_saved_output(output, MAX_SAVED_RENDER_METADATA_BYTES),
+            Err(error) => (
+                saved_render_refusal(saved_render_error_code(&error), &error.to_string()),
+                None,
+            ),
+        }
+    }))
+    .unwrap_or_else(|_| {
+        (
+            saved_render_refusal("internal_invariant", "the core panicked"),
+            None,
+        )
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn small_saved_input() -> Vec<u8> {
+        let budget = inku_score::ResourceBudget {
+            maximum: inku_score::ResourceDemand {
+                primitive_marks: 400,
+                object_templates: 64,
+                ..inku_score::ResourceDemand::default()
+            },
+        };
+        serde_json::to_vec(&serde_json::json!({
+            "request": {
+                "score": {"version": "0.12.0", "instructions": [{"primitive": "circle",
+                    "center": [0.5, 0.5], "radius": 0.05}]},
+                "options": {"resolved_color_map": {}, "catalog_id": null,
+                    "canvas": {"width": 1000.0, "height": 1000.0},
+                    "canvas_aspect_id": "square", "svg_profile": "display",
+                    "render_seed": 7, "composition_seed": null, "wild": false},
+            },
+            "hard_policy": inku_score::HardResourcePolicy { identity: "test".to_owned(), budget },
+            "operational_budget": inku_score::OperationalResourceBudget(budget),
+            "clip": {"tolerance_pixels": 0.1, "max_nodes": "1000", "max_path_elements": "1000",
+                "max_flattened_points": "1000", "max_work": "1000", "max_output_vertices": "1000"},
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn svg_limit_saved_transport_keeps_old_svg_and_metadata() {
+        let input = small_saved_input();
+        let old = render_saved(input.clone());
+        let old_value: serde_json::Value = serde_json::from_slice(&old).unwrap();
+        assert!(old_value.get("error").is_none(), "{old_value}");
+        let (bytes, svg) = render_saved_with_svg_limit(input, 32 << 20);
+        let mut separated: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(separated["svg"], "");
+        assert_eq!(svg.as_deref(), old_value["svg"].as_str());
+        separated["svg"] = serde_json::json!(svg.unwrap());
+        assert_eq!(separated, old_value);
+    }
+
+    #[test]
+    fn svg_limit_saved_metadata_cap_excludes_svg_and_still_refuses_metadata() {
+        let old = render_saved(small_saved_input());
+        let mut output: inku_render::types::RenderOutput = serde_json::from_slice(&old).unwrap();
+        let raw = "<svg data-x=\"\\\">\n墨\u{0000}</svg>".repeat(32);
+        output.svg = raw.clone();
+        let (bytes, svg) = separated_saved_output(output.clone(), MAX_SAVED_RENDER_METADATA_BYTES);
+        assert_eq!(svg.as_deref(), Some(raw.as_str()));
+        assert!(serde_json::to_vec(&output).unwrap().len() > bytes.len() + raw.len());
+        assert_eq!(
+            separated_saved_output(output.clone(), bytes.len()).1,
+            Some(raw)
+        );
+        let (error, svg) = separated_saved_output(output, bytes.len() - 1);
+        assert_eq!(svg, None);
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&error).unwrap()["error"],
+            "invalid_saved_performance"
+        );
+        let (error, svg) = render_saved_with_svg_limit(b"{".to_vec(), 32 << 20);
+        assert_eq!(svg, None);
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&error).unwrap()["error"],
+            "invalid_saved_performance"
+        );
+    }
 
     #[test]
     fn a_saved_render_refusal_names_its_reason() {

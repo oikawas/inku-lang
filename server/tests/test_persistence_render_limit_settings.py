@@ -60,7 +60,7 @@ def test_settings_owns_render_limit_storage_and_db_delegates(
 
     monkeypatch.setattr(db._settings, "RenderLimitSettingsStore", RecordingStore)
     monkeypatch.setattr(db, "_app_settings_store", lambda: dependency)
-    monkeypatch.setattr(db, "normalize_limits", normalizer)
+    monkeypatch.setattr(db, "normalize_render_limit_settings", normalizer)
     assert db.get_render_limit_settings() == "get-sentinel"
     assert db.update_render_limit_settings({"known": 7}) == "update-sentinel"
     assert calls == [

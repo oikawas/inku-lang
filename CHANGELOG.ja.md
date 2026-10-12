@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-12 — SwiftのGemini思考レベルをServerに揃える
+
+Swiftの描画pipelineとVisionも、Geminiへの思考レベルをモデルごとに選ぶ。`gemini-3.8-flash`、Pro系、`gemini-2.5-flash`には`low`を送り、`gemini-2.5-flash-lite`では`thinkingConfig`を省く。ほかのモデルは従来どおり`minimal`。両経路で共通の判定を使い、Serverと同じ接頭辞・接尾辞の扱いで、不適切な`minimal`による要求の拒否を防ぐ。
+
 ### 2026-10-12 — Geminiへ各モデルの最も低い思考レベルを送る
 
 作者の指示（Google AI Studioの資料「Thinking levels」）。ServerはGeminiへの描画とVisionの要求に、モデルを問わず`thinkingLevel: minimal`を送っていた。資料の表では、`gemini-3.8-flash`、Proのモデル（`gemini-3.1-pro-preview`・`gemini-3-pro-preview`）、`gemini-2.5-pro`・`gemini-2.5-flash`は`minimal`を受け付けず、最も低い段は`low`である。

@@ -432,7 +432,7 @@ public enum AuxiliaryWire {
                 parts.append(.object(["inlineData": .object(["mimeType": .string(type), "data": .string(data)])]))
             }
             var configuration: ExactJSON = .object(["temperature": .number(String(prompt.temperature)), "maxOutputTokens": .integer(prompt.maximumTokens)])
-            if prompt.purpose == .vision { configuration["thinkingConfig"] = .object(["thinkingLevel": .string("minimal")]) }
+            if prompt.purpose == .vision, let thinking = ProviderWire.geminiThinkingConfig(model) { configuration["thinkingConfig"] = thinking }
             body = .object(["systemInstruction": .object(["parts": .array([.object(["text": .string(prompt.system)])])]),
                 "contents": .array([.object(["role": .string("user"), "parts": .array(parts)])]), "generationConfig": configuration])
         }

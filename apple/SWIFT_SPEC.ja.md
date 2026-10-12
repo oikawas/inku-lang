@@ -14,6 +14,15 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-12 Geminiの思考レベルをServerに揃える
+
+Geminiへの描画pipelineとVisionの要求は、Serverの`gemini_request.py`と同じモデル判定で、`generationConfig.thinkingConfig`を設定する。
+
+- `gemini-3.8-flash`、`gemini-<数字と点の版>-pro`、`gemini-2.5-flash`は`thinkingLevel: low`を送る。
+- `gemini-2.5-flash-lite`は`thinkingConfig`を送らない。ほかのモデル（`gemini-3.5-flash-lite`、`gemini-3.6-flash`、`gemini-3-flash-preview`、Gemma 4を含む）は`minimal`のまま。
+- 判定は先頭の`models/`を除き、モデル名の末尾または`-`で始まる接尾辞を境界にする。共通の判定をpipelineとVisionが使う。demo要求の扱いは変更しない。
+- 確認：InkuHostの`GeminiThinkingLevelTests.testPipelineAndVisionSendServerThinkingLevels`で、両経路の送信JSON、設定の省略、接頭辞・接尾辞・モデル名の境界を確認する。
+
 ## 2026-10-12 左下に版とBuildを常に出す
 
 作者の指示「アプリの左下に、バージョン番号とビルド番号を常時表示する」による。

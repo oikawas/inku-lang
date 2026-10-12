@@ -14,6 +14,15 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-12 Match Server's Gemini thinking levels
+
+Gemini drawing pipeline and Vision requests set `generationConfig.thinkingConfig` using the same model matching as Server's `gemini_request.py`.
+
+- `gemini-3.8-flash`, `gemini-<numeric and dotted version>-pro`, and `gemini-2.5-flash` receive `thinkingLevel: low`.
+- `gemini-2.5-flash-lite` receives no `thinkingConfig`. Other models, including `gemini-3.5-flash-lite`, `gemini-3.6-flash`, `gemini-3-flash-preview`, and Gemma 4, retain `minimal`.
+- Matching strips the leading `models/` and requires the end of the model name or a suffix starting with `-`. The pipeline and Vision share this matching. Demo requests are unchanged.
+- Check: InkuHost's `GeminiThinkingLevelTests.testPipelineAndVisionSendServerThinkingLevels` verifies both paths' outgoing JSON, omitted configuration, prefixes, suffixes, and model-name boundaries.
+
 ## 2026-10-12 Always show the version and build at the bottom left
 
 At the author's instruction to always show the version number and build number at the app's bottom left.

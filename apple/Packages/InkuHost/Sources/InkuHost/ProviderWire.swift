@@ -60,9 +60,11 @@ public enum ProviderWire {
             let encoded = model.addingPercentEncoding(withAllowedCharacters: CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~"))!
             endpoint = base + "/v1beta/models/" + encoded + ":generateContent"
             headers["x-goog-api-key"] = key ?? ""
+            var configuration: ExactJSON = .object(["maxOutputTokens": .integer(maxTokens)])
+            if let thinking = geminiThinkingConfig(model) { configuration["thinkingConfig"] = thinking }
             body = .object(["systemInstruction": .object(["parts": .array([.object(["text": .string(system)])])]),
                             "contents": .array([.object(["role": .string("user"), "parts": .array([.object(["text": .string(message)])])])]),
-                            "generationConfig": .object(["maxOutputTokens": .integer(maxTokens), "thinkingConfig": .object(["thinkingLevel": .string("minimal")])]),
+                            "generationConfig": configuration,
                             "tools": .array([.object(["functionDeclarations": .array([.object(["name": .string(responseName), "description": function["description"], "parametersJsonSchema": try geminiSchema(schema, compactHoleEdits: actionName == "complete_visible_ddl_holes")])])])]),
                             "toolConfig": .object(["functionCallingConfig": .object(["mode": .string("ANY"), "allowedFunctionNames": .array([.string(responseName)])])])])
         }
@@ -72,6 +74,15 @@ public enum ProviderWire {
         request.httpMethod = "POST"; request.httpBody = provider.kind == .gemini ? Data(body.orderedText.utf8) : body.data
         request.allHTTPHeaderFields = headers
         return request
+    }
+
+    // Mirrors Server gemini_request.gemini_thinking, including model-name boundaries.
+    static func geminiThinkingConfig(_ model: String) -> ExactJSON? {
+        let name = model.hasPrefix("models/") ? String(model.dropFirst("models/".count)) : model
+        if name.range(of: "^gemini-2\\.5-flash-lite(?:-|$)", options: .regularExpression) != nil { return nil }
+        let low = ["^gemini-2\\.5-flash(?:-|$)", "^gemini-[\\d.]+-pro(?:-|$)", "^gemini-3\\.8-flash(?:-|$)"]
+            .contains { name.range(of: $0, options: .regularExpression) != nil }
+        return .object(["thinkingLevel": .string(low ? "low" : "minimal")])
     }
 
     public static func responseText(_ data: Data, kind: ProviderKind) throws -> String {

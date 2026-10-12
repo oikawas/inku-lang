@@ -4,19 +4,43 @@ import InkuUI
 
 @MainActor
 func runCanvasWheelChecks() throws {
-    // Failure: no wheel interaction; fitting a panned work retained its old offset.
+    // Failure: zooming a panned work changes the point at the viewport center,
+    // or crossing the fitted scale resets the offset.
     let enlarged = CanvasInteraction.wheelScale(from: 1, deltaY: 3)
     let reduced = CanvasInteraction.wheelScale(from: 1, deltaY: -3)
     let displaced = CGSize(width: 60, height: -25)
     guard abs(enlarged - 1.15) < 0.000001, abs(reduced - 0.85) < 0.000001,
           CanvasInteraction.wheelScale(from: 9.95, deltaY: 1) == 10,
           CanvasInteraction.wheelScale(from: 0.3, deltaY: -1) == 0.25,
-          CanvasInteraction.wheelScale(from: 2, deltaY: 0) == 2,
-          CanvasInteraction.offset(for: enlarged, current: displaced) == displaced,
-          CanvasInteraction.offset(for: reduced, current: displaced) == .zero else {
-        throw CheckFailure.message("Canvas wheel directions, fixed Web scale bounds or fit recentering changed")
+          CanvasInteraction.wheelScale(from: 2, deltaY: 0) == 2 else {
+        throw CheckFailure.message("Canvas wheel directions or fixed Web scale bounds changed")
     }
-    print("Canvas wheel scale passed: ±15 points, 25–1000% bounds, horizontal-only input ignored, fit recenters a panned work. Native event delivery remains a UI check.")
+    let area = CGSize(width: 818, height: 597)
+    let fitted = CGRect(x: 159, y: 48.5, width: 500, height: 500)
+    func pointAtCenter(scale: CGFloat, offset: CGSize) -> CGPoint {
+        let frame = CanvasInteraction.zoomedPicture(fitted, area: area, scale: scale, offset: offset)
+        return CGPoint(x: (area.width / 2 - frame.minX) / frame.width,
+                       y: (area.height / 2 - frame.minY) / frame.height)
+    }
+    var scale: CGFloat = 2
+    var offset = displaced
+    let expected = pointAtCenter(scale: scale, offset: offset)
+    func zoom(_ requested: CGFloat) throws {
+        offset = CanvasInteraction.offset(from: scale, to: requested, current: offset)
+        scale = CanvasInteraction.boundedScale(requested)
+        let point = pointAtCenter(scale: scale, offset: offset)
+        guard abs(point.x - expected.x) < 0.000001, abs(point.y - expected.y) < 0.000001 else {
+            throw CheckFailure.message("Zoom moved the point at the viewport center: \(point), expected \(expected)")
+        }
+    }
+    // Buttons, crossing 100%, bounds, and wheel use the same offset conversion.
+    for requested in [scale * 1.25, 1.0, 0.8, 0.01, 99, 99] { try zoom(requested) }
+    try zoom(CanvasInteraction.wheelScale(from: scale, deltaY: -3))
+    try zoom(CanvasInteraction.wheelScale(from: scale, deltaY: 3))
+    // Pinch supplies cumulative magnifications from a fixed gesture origin.
+    let gestureScale = scale
+    for magnification in [CGFloat(0.9), 0.75, 0.5, 0.4, 1.1] { try zoom(gestureScale * magnification) }
+    print("Canvas zoom center passed: buttons, wheel, cumulative pinch, 25–1000% bounds, and crossing fit retain the point at the visible center. Native event delivery remains a UI check.")
 }
 
 @MainActor

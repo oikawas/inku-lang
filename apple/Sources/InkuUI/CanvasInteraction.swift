@@ -12,7 +12,11 @@ public enum CanvasInteraction {
         return boundedScale(scale + (deltaY > 0 ? 0.15 : -0.15))
     }
 
-    public static func offset(for scale: CGFloat, current: CGSize) -> CGSize { scale <= 1 ? .zero : current }
+    /// Keep the same point on the work at the center of the visible area when changing scale.
+    public static func offset(from scale: CGFloat, to nextScale: CGFloat, current: CGSize) -> CGSize {
+        let ratio = boundedScale(nextScale) / scale
+        return CGSize(width: current.width * ratio, height: current.height * ratio)
+    }
 
     /// Web CanvasPanel.svelte:567-569,587-598: a 400px base in the canvas proportion (width / height), fitted with
     /// `min((W − 120) / base W, (H − 96) / base H)` within 0.25–10 and rounded to hundredths. The area has no outer margin.

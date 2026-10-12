@@ -177,13 +177,12 @@ struct ArtworkCanvas: View {
                         .scaleEffect(scale).offset(offset)
                         .gesture(MagnificationGesture()
                             .onChanged { value in
-                                scale = bounded(gestureScale * value)
-                                clearPanWhenFitted()
+                                setScale(gestureScale * value, updatingGestureScale: false)
                             }
                             .onEnded { _ in gestureScale = scale })
                         .simultaneousGesture(DragGesture()
                             .onChanged { value in
-                                guard scale > 1 else { clearPanWhenFitted(); return }
+                                guard scale > 1 else { return }
                                 offset = CGSize(width: dragOrigin.width + value.translation.width,
                                                 height: dragOrigin.height + value.translation.height)
                             }
@@ -305,11 +304,18 @@ struct ArtworkCanvas: View {
     }
 
     private func bounded(_ value: CGFloat) -> CGFloat { CanvasInteraction.boundedScale(value) }
-    private func clearPanWhenFitted() {
-        offset = CanvasInteraction.offset(for: scale, current: offset)
-        if scale <= 1 { dragOrigin = .zero }
+    private func setScale(_ value: CGFloat, updatingGestureScale: Bool = true) {
+        let next = bounded(value)
+        let previousOffset = offset
+        let nextOffset = CanvasInteraction.offset(from: scale, to: next, current: previousOffset)
+        offset = nextOffset
+        // A simultaneous drag keeps its translation; its next event must not
+        // restore the offset from before the scale change.
+        dragOrigin = CGSize(width: dragOrigin.width + nextOffset.width - previousOffset.width,
+                            height: dragOrigin.height + nextOffset.height - previousOffset.height)
+        scale = next
+        if updatingGestureScale { gestureScale = next }
     }
-    private func setScale(_ value: CGFloat) { scale = bounded(value); gestureScale = scale; clearPanWhenFitted() }
     private func reset() {
         scale = 1; gestureScale = 1; offset = .zero; dragOrigin = .zero
         viewport?.wrappedValue.svgKey = svg.hashValue

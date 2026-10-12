@@ -60,8 +60,7 @@ public enum ProviderWire {
             let encoded = model.addingPercentEncoding(withAllowedCharacters: CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~"))!
             endpoint = base + "/v1beta/models/" + encoded + ":generateContent"
             headers["x-goog-api-key"] = key ?? ""
-            var configuration: ExactJSON = .object(["maxOutputTokens": .integer(maxTokens)])
-            if let thinking = geminiThinkingConfig(model) { configuration["thinkingConfig"] = thinking }
+            let configuration = geminiGenerationConfig(model, answerTokens: maxTokens)
             body = .object(["systemInstruction": .object(["parts": .array([.object(["text": .string(system)])])]),
                             "contents": .array([.object(["role": .string("user"), "parts": .array([.object(["text": .string(message)])])])]),
                             "generationConfig": configuration,
@@ -76,13 +75,28 @@ public enum ProviderWire {
         return request
     }
 
-    // Mirrors Server gemini_request.gemini_thinking, including model-name boundaries.
+    private static let geminiMinimalModels: Set<String> = [
+        "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest",
+        "gemini-3-flash-preview", "gemini-3.1-flash-lite", "gemini-3.1-flash-lite-preview",
+        "gemini-3.1-flash-image", "gemini-3.1-flash-image-preview", "gemini-3.1-flash-lite-image",
+        "gemini-robotics-er-2-preview", "nano-banana-pro-preview", "gemini-nano-banana-2.1",
+    ]
+
+    // Mirrors Server gemini_request: only known models get minimal; moving
+    // aliases and unknown models get low, and models without thinking get no level.
     static func geminiThinkingConfig(_ model: String) -> ExactJSON? {
         let name = model.hasPrefix("models/") ? String(model.dropFirst("models/".count)) : model
-        if name.range(of: "^gemini-2\\.5-flash-lite(?:-|$)", options: .regularExpression) != nil { return nil }
-        let low = ["^gemini-2\\.5-flash(?:-|$)", "^gemini-[\\d.]+-pro(?:-|$)", "^gemini-3\\.8-flash(?:-|$)"]
-            .contains { name.range(of: $0, options: .regularExpression) != nil }
-        return .object(["thinkingLevel": .string(low ? "low" : "minimal")])
+        if name.range(of: "^(?:gemini-2\\.5-flash-(?:lite|image)(?:-|$)|antigravity-)", options: .regularExpression) != nil { return nil }
+        let minimal = geminiMinimalModels.contains(name) || name.hasPrefix("gemma-")
+        return .object(["thinkingLevel": .string(minimal ? "minimal" : "low")])
+    }
+
+    static func geminiGenerationConfig(_ model: String, answerTokens: Int) -> ExactJSON {
+        let thinking = geminiThinkingConfig(model)
+        // Gemini's maxOutputTokens includes thoughts as well as the answer.
+        var configuration: ExactJSON = .object(["maxOutputTokens": .integer(answerTokens + (thinking == nil ? 0 : 8192))])
+        if let thinking { configuration["thinkingConfig"] = thinking }
+        return configuration
     }
 
     public static func responseText(_ data: Data, kind: ProviderKind) throws -> String {
@@ -112,6 +126,7 @@ public enum ProviderWire {
                 text = parsed.text
             }
         case .gemini:
+            if value["candidates"].array?.first?["finishReason"].string == "MAX_TOKENS" { throw HostError("provider_output_limit") }
             guard let parts = value["candidates"].array?.first?["content"]["parts"].array else { throw HostError("malformed_payload") }
             let calls = parts.map { $0["functionCall"] }.filter { $0.object != nil }
             guard calls.count == 1, calls[0]["name"].string == responseName, calls[0]["args"].object != nil else { throw HostError("malformed_payload") }

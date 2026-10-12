@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-13 — SwiftのGemini要求とClaudeデモ要求をServerに揃える
+
+SwiftのGemini描画・Vision・デモも、対応が確かめられた13名とGemmaだけに`minimal`を送り、ほかは既定で`low`にする。2.5 Flash Lite／ImageとAntigravityには思考レベルを送らず、送るモデルだけ出力枠に8,192を足す。Geminiへの温度指定を外し、デモの指示文へ思考の部分を混ぜない。`MAX_TOKENS`の描画応答は、関数呼び出しが揃っていても答えとして使わない。Claudeデモも温度を送らず、Serverが思考するモデルと判定した場合は出力枠を8,192増やす。
+
 ### 2026-10-13 — ChatGPTプランのストリーム中のerrorイベントを、そのコードで読む
 
 作者の指示（OpenAIの資料とChatGPTプランへの要求の照合）。Sign in with ChatGPTの資料（models-and-inference・preview-limitations・errors-and-recovery）と照らすと、要求の形（`store: false`・`stream: true`、namespaceにまとめた関数、`instructions`、省くべき`max_output_tokens`・`temperature`などを送らないこと、画像の`input_image`）と、トークン更新のエラーの扱いは資料どおりだった。描画セッションの10-12の実測でも、84送信がすべて完了していた。

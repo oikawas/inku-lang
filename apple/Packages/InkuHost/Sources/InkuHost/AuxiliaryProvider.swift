@@ -452,9 +452,10 @@ public enum AuxiliaryWire {
                     "type": .string("base64"), "media_type": .string(type), "data": .string(data)])])
             }
             blocks.append(.object(["type": .string("text"), "text": .string(prompt.message)]))
-            body = .object(["model": .string(model), "max_tokens": .integer(prompt.maximumTokens), "system": .string(prompt.system),
+            // Server's demo reserves room for the models that think by default.
+            let thinks = prompt.purpose == .demo && model.range(of: "^claude-(?:(?:opus|sonnet|haiku|fable|mythos)-5(?:-|$)|mythos-preview(?:-|$))", options: .regularExpression) != nil
+            body = .object(["model": .string(model), "max_tokens": .integer(prompt.maximumTokens + (thinks ? 8192 : 0)), "system": .string(prompt.system),
                 "messages": .array([.object(["role": .string("user"), "content": .array(blocks)])])])
-            if prompt.purpose == .demo { body["temperature"] = .number(String(prompt.temperature)) }
         case .gemini:
             let segment = model.addingPercentEncoding(withAllowedCharacters: CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~"))!
             endpoint = base + "/v1beta/models/" + segment + ":generateContent"
@@ -464,8 +465,8 @@ public enum AuxiliaryWire {
                 let (type, data) = try imageParts(image)
                 parts.append(.object(["inlineData": .object(["mimeType": .string(type), "data": .string(data)])]))
             }
-            var configuration: ExactJSON = .object(["temperature": .number(String(prompt.temperature)), "maxOutputTokens": .integer(prompt.maximumTokens)])
-            if prompt.purpose == .vision, let thinking = ProviderWire.geminiThinkingConfig(model) { configuration["thinkingConfig"] = thinking }
+            // Keep Gemini's default sampling for both Vision and demo instructions.
+            let configuration = ProviderWire.geminiGenerationConfig(model, answerTokens: prompt.maximumTokens)
             body = .object(["systemInstruction": .object(["parts": .array([.object(["text": .string(prompt.system)])])]),
                 "contents": .array([.object(["role": .string("user"), "parts": .array(parts)])]), "generationConfig": configuration])
         }
@@ -501,9 +502,8 @@ public enum AuxiliaryWire {
             let candidates = value["candidates"] == .null ? [.object([:])] : value["candidates"].array
             guard let candidate = candidates?.first else { throw HostError("malformed_payload") }
             guard let parts = candidate["content"]["parts"] == .null ? [] : candidate["content"]["parts"].array else { throw HostError("malformed_payload") }
-            // The demo joins every part as Server's demo does; Vision drops thought parts as vision_client does.
-            text = purpose == .demo ? parts.map { $0["text"].string ?? "" }.joined(separator: "\n")
-                : parts.filter { $0["thought"].bool != true }.compactMap { $0["text"].string }.joined(separator: "\n")
+            // Neither Vision nor a demo instruction includes the provider's thoughts.
+            text = parts.filter { $0["thought"].bool != true }.compactMap { $0["text"].string }.joined(separator: "\n")
         }
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }

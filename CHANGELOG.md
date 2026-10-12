@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Match Server's Gemini requests and Claude demo requests in Swift
+
+Swift Gemini drawing, Vision, and demo requests now send `minimal` only to the 13 known model names and Gemma, defaulting to `low` for others. Gemini 2.5 Flash Lite/Image and Antigravity receive no thinking level; models sent a level receive 8,192 extra output tokens. Gemini requests omit temperature, and demo instructions exclude thought text. Drawing responses ended at `MAX_TOKENS` are rejected even when their function call looks complete. Claude demos also omit temperature and receive 8,192 extra output tokens when Server's matching identifies a model that thinks by default.
+
 ### 2026-10-13 — Read a ChatGPT plan stream's error event by its own code
 
 Checked against OpenAI's Sign in with ChatGPT documentation, the ChatGPT plan requests (`store: false`, `stream: true`, function tools in a namespace, `instructions`, none of the omitted fields such as `max_output_tokens` or `temperature`, and `input_image` parts) and the token-refresh error handling already match it. One difference remained: a stream's `error` event carries `code` and `param` at its top level, but Server looked only under `error` and `response.error`, so a usage limit sent that way was treated as a generic failure instead of pausing plan requests and pointing to usage, and a temporary `subscription_sharing_usage_unavailable` was treated as needing diagnosis rather than a retry. The top-level code is now read.

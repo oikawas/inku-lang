@@ -8,6 +8,15 @@
 
 ## 未リリース
 
+### 2026-10-12 — 継ぎ目の語「載る・中に・重なる・横切る」を足す（DDL 18、Score 0.20.0）
+
+作者の選択（第一陣の5つすべて）による。記述の多くは物どうしの継ぎ目（屋上の巣、氷の上のトナカイ、ガラスの中の種、走路を横切る足跡など）を言うが、今の関係の語で書けるのは線や弧どうしのつながりだけだった。
+
+- 歳時記の「あいだ」に4語を足す。固定句 `前の形に載る` / `resting on the previous shape`、`前の形の中に` / `inside the previous shape`、`前の形に重なる` / `overlapping the previous shape`、`前の形を横切る` / `crossing the previous shape` だけが関係になる。英語の短い形は `resting on` / `inside` / `overlaps` / `crossing`（`overlapping` は組の並べ方の語なので、重なるの短い形は `overlaps`）。
+- 演奏は、付ける形を演奏後の外接矩形から平行移動だけで合わせ、直前の形は動かさない。成り立たないときは関係だけを外し、理由（`unsupported_joint_geometry` など）を残す。
+- 「つながる」は、直前の形が閉じた四角・円・楕円・三角・多角形のとき、その輪郭の最も近い点から始まる。
+- これらを持つ作品だけ Score 0.20.0。ほかの作品の Score は変わらない。DDL engine 58、描画 engine 74。Server の語の写し、Score の型、Web・Android・macOS の語の資源、Web の語の説明と理由の文言を合わせた。
+
 ### 2026-10-12 — SwiftのGemini思考レベルをServerに揃える
 
 Swiftの描画pipelineとVisionも、Geminiへの思考レベルをモデルごとに選ぶ。`gemini-3.8-flash`、Pro系、`gemini-2.5-flash`には`low`を送り、`gemini-2.5-flash-lite`では`thinkingConfig`を省く。ほかのモデルは従来どおり`minimal`。両経路で共通の判定を使い、Serverと同じ接頭辞・接尾辞の扱いで、不適切な`minimal`による要求の拒否を防ぐ。

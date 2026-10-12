@@ -84,7 +84,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		key: 'aida',
 		label: 'あいだ',
 		en: 'relations',
-		words: ['沿う', '触れない', '切る', '間に', '触れる', 'つながる', '鏡写し']
+		words: ['沿う', '触れない', '切る', '間に', '触れる', 'つながる', '載る', '中に', '重なる', '横切る', '鏡写し']
 	},
 ];
 
@@ -171,6 +171,6 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		key: 'aida',
 		label: 'あいだ',
 		en: 'relations',
-		words: ['along', 'not touching', 'cutting', 'between', 'touching', 'connected', 'mirrored']
+		words: ['along', 'not touching', 'cutting', 'between', 'touching', 'connected', 'resting on', 'inside', 'overlaps', 'crossing', 'mirrored']
 	},
 ];

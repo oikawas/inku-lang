@@ -26,6 +26,75 @@ pub(crate) fn endpoints(
     })
 }
 
+/// The undistorted outline of a closed connection target (square, circle,
+/// ellipse, triangle or polygon) on the canvas, in short-side units, after the
+/// instruction's rotation and `transform`. The drawn wobble is not part of it.
+pub(crate) fn closed_outline(
+    instruction: &Instruction,
+    canvas: Option<CanvasSize>,
+    transform: AffineTransform,
+) -> Option<Vec<Point>> {
+    if !instruction.is_closed_connection_target() {
+        return None;
+    }
+    let anchor =
+        point_to_short_side_units(instruction_anchor_on_canvas(instruction, canvas), canvas);
+    let transform = transform.compose(AffineTransform::around(
+        anchor,
+        1.0,
+        1.0,
+        instruction.rotation.unwrap_or(0.0),
+        Point::new(0.0, 0.0),
+    ));
+    let center = || {
+        instruction
+            .center
+            .map(|p| point_to_short_side_units(p, canvas))
+    };
+    let ellipse =
+        |center: Point, rx: f64, ry: f64| crate::geometry::circle_points(center, rx, ry, 720);
+    let points = match instruction.primitive {
+        Primitive::Circle => ellipse(center()?, instruction.radius?, instruction.radius?),
+        Primitive::Ellipse => {
+            let size = instruction.size?;
+            ellipse(center()?, size.x / 2.0, size.y / 2.0)
+        }
+        Primitive::Polygon => polygon_points(
+            center()?,
+            instruction.radius?,
+            usize::from(instruction.sides.unwrap_or(5)),
+            0.0,
+        ),
+        Primitive::Square | Primitive::Triangle => {
+            let position = point_to_short_side_units(instruction.position?, canvas);
+            let size = instruction.size?;
+            if instruction.primitive == Primitive::Triangle {
+                vec![
+                    Point::new(position.x, position.y + size.y),
+                    Point::new(position.x + size.x, position.y + size.y),
+                    Point::new(position.x + size.x / 2.0, position.y),
+                ]
+            } else {
+                vec![
+                    position,
+                    Point::new(position.x + size.x, position.y),
+                    Point::new(position.x + size.x, position.y + size.y),
+                    Point::new(position.x, position.y + size.y),
+                ]
+            }
+        }
+        _ => return None,
+    };
+    let points = points
+        .into_iter()
+        .map(|point| transform.apply(point))
+        .collect::<Vec<_>>();
+    points
+        .iter()
+        .all(|point| point.x.is_finite() && point.y.is_finite())
+        .then_some(points)
+}
+
 fn point_bounds(points: impl IntoIterator<Item = Point>) -> Option<Bounds> {
     let mut points = points.into_iter();
     let first = points.next()?;

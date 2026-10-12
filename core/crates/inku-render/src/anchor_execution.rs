@@ -114,6 +114,12 @@ enum TranslationPredicate {
         target_start: Point,
         target_end: Point,
     },
+    Joint {
+        kind: RelationType,
+        own: Bounds,
+        prior: Bounds,
+        inside: Option<Bounds>,
+    },
 }
 
 struct ExternalConstraint {
@@ -171,6 +177,12 @@ impl ExternalConstraint {
                 target_start,
                 target_end,
             } => segments_properly_cross(moved(start), moved(end), target_start, target_end),
+            TranslationPredicate::Joint {
+                kind,
+                own,
+                prior,
+                inside,
+            } => crate::joint_relation::accepts(kind, own, prior, inside, delta),
         }
     }
 }
@@ -968,6 +980,7 @@ impl Execution<'_> {
         &self,
         source: usize,
         relation: &inku_score::Relation,
+        start: Point,
     ) -> Result<Point, ScoreExecutionReason> {
         if let Some(anchor) = relation.target_anchor_index {
             if relation.target_instruction_index.is_some() || anchor >= self.anchors.len() {
@@ -1057,6 +1070,23 @@ impl Execution<'_> {
             ));
         }
         let prior = &prior.instruction;
+        if prior.is_closed_connection_target()
+            && self
+                .request
+                .score
+                .edition_at_least(inku_score::ScoreEdition::V0_20)
+        {
+            // A closed shape has no end: the start meets the nearest point of
+            // its outline (Score 0.20.0).
+            let outline = crate::affine_geometry::closed_outline(
+                prior,
+                self.request.canvas,
+                self.sources[target].transform,
+            )
+            .ok_or(ScoreExecutionReason::UnsupportedConnectedPrimitive)?;
+            return crate::joint_relation::nearest_on_outline(&outline, start)
+                .ok_or(ScoreExecutionReason::UnsupportedConnectedPrimitive);
+        }
         if !supports_connected(prior) {
             return Err(ScoreExecutionReason::UnsupportedConnectedPrimitive);
         }
@@ -1104,10 +1134,10 @@ impl Execution<'_> {
             // checks its final position and applies one common correction.
             return Ok(instruction);
         }
-        let target = self.connected_target(index, relation)?;
         let start = endpoint_geometry(&instruction, self.request.canvas)
             .ok_or(ScoreExecutionReason::UnsupportedConnectedPrimitive)?
             .0;
+        let target = self.connected_target(index, relation, start)?;
         let delta = finite_point(Point::new(target.x - start.x, target.y - start.y))?;
         if relation.position_authority == Some(ConnectedPositionAuthority::NumericFixed)
             && distance(delta) > GEOMETRY_EPSILON
@@ -1328,7 +1358,15 @@ impl Execution<'_> {
     ) -> Result<ExternalConstraint, ScoreExecutionReason> {
         let relation = instruction.relation.as_ref().expect("bounds relation");
         let between = relation.kind == RelationType::Between;
-        let (missing, omitted, geometry, numeric_reason) = if between {
+        let joint = relation.kind.is_joint();
+        let (missing, omitted, geometry, numeric_reason) = if joint {
+            (
+                ScoreExecutionReason::MissingJointReference,
+                ScoreExecutionReason::JointReferenceOmitted,
+                ScoreExecutionReason::UnsupportedJointGeometry,
+                ScoreExecutionReason::NumericJointPositionConflict,
+            )
+        } else if between {
             (
                 ScoreExecutionReason::MissingBetweenReference,
                 ScoreExecutionReason::BetweenReferenceOmitted,
@@ -1389,6 +1427,34 @@ impl Execution<'_> {
         let prior = target(source - 1)?;
         let center = own.center();
         let seed = self.request.performance_seed.unwrap_or_default();
+        if joint {
+            let prior_primitive = self.sources[source - 1]
+                .performed
+                .last()
+                .ok_or(omitted)?
+                .instruction
+                .primitive;
+            let preferred = crate::joint_relation::preferred(
+                relation.kind,
+                own,
+                prior,
+                prior_primitive,
+                seed,
+                ordinal,
+            )
+            .ok_or(geometry)?;
+            return Ok(ExternalConstraint {
+                source,
+                preferred,
+                predicate: TranslationPredicate::Joint {
+                    kind: relation.kind,
+                    own,
+                    prior,
+                    inside: crate::joint_relation::inside_region(prior_primitive, prior),
+                },
+                numeric_reason,
+            });
+        }
         if !between {
             let radius = own.radius() + prior.radius();
             let gap = relation_gap_amount(relation.gap, seed, ordinal);
@@ -1532,7 +1598,7 @@ impl Execution<'_> {
             numeric_reason,
         };
         if relation.kind == RelationType::Connected {
-            return Ok(exact(self.connected_target(source, relation)?));
+            return Ok(exact(self.connected_target(source, relation, start)?));
         }
         let target = relation
             .target_instruction_index

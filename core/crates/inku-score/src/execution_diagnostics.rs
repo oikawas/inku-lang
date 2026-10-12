@@ -59,6 +59,10 @@ pub enum ScoreExecutionReason {
     MirrorBodyMismatch,
     MirrorCoincidentAnchors,
     MirrorExplicitConflict,
+    MissingJointReference,
+    JointReferenceOmitted,
+    UnsupportedJointGeometry,
+    NumericJointPositionConflict,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]

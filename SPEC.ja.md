@@ -1784,7 +1784,7 @@ LeWitt の Wall Drawing も同様である。語彙は線と少数の色とい�
 
 §13.3 の感情語彙/運動語彙の区別を、関係に延長する。物理的・外部観察可能な関係のみをコアに許す。
 
-**関係語彙は次の7語に限定する:**
+**関係語彙は次の11語に限定する:**
 
 | 語彙（日） | 語彙（英） | 意味 | Scoreの表現 |
 |---|---|---|---|
@@ -1793,14 +1793,20 @@ LeWitt の Wall Drawing も同様である。語彙は線と少数の色とい�
 | 切る | cutting | 直前要素を横切り、視覚的な断絶を作る（短歌の「切れ」に相当） | `cutting` |
 | 間に | between | 直前の2要素の間の領域に置く | `between` |
 | 触れる | touching | 直前要素に接触する。両端点を一致させて閉形を構成する | `touching` |
-| つながる | connected | current始端を、明示時は先行Line / Arcの始点・終点・途中へ、未指定時は直前要素の終端へ合わせる | `connected` |
+| つながる | connected | current始端を、明示時は先行Line / Arcの始点・終点・途中へ、未指定時は直前要素の終端（閉じた形なら輪郭の最も近い点）へ合わせる | `connected` |
+| 載る | resting on | 直前要素の上の縁に、当該要素の下端を接して載せる | `resting_on` |
+| 中に | inside | 直前の閉じた要素の内側に置く | `inside` |
+| 重なる | overlaps | 直前要素に一部を重ねて置く | `overlapping` |
+| 横切る | crossing | 直前要素を、片方の縁から反対の縁まで越えて置く | `crossing` |
 | 鏡写し | mirrored | 二つの形・まとまりの間の軸を挟んで位置と向きを鏡像にする | `mirror_relations` |
 
 **排除する語**: 寄り添う、応える、対話する、呼応する——意図・擬人の語であり、外部から観察できない。
 
 `relation` は正規化DDL中に明示的な previous-object 句がある場合に限る。`connected` は既存の `前の形につながる` に加え、`[前の]線/弧の始点/終点につながる` を受ける。後者は対象側端点だけを選び、currentはcanonical始点のままである。通常DDLの無回転の線・通常弧では左が始点、右が終点であり、回転・鏡映後も同じ端を指す。途中を指定した接続はLine / Arcの両端以外へつなぎ、具体位置を演奏で決める。端点も途中も指定しない接続はprior終端からcurrent始端へつながる。自然文由来の「周囲」「同じ拍子」「先行/遅れ」「近く/遠く」は relation ではなく、position / path / rotation / spacingで表す。
 
-**第二段候補（実測後に判断）**: 重なる、離す、同じ向きに、逆向きに、〜より細く。現行語で表現の不足が実測で示されてから追加する。片端接続の`つながる (connected)`は独立した表現価値と有限なLine / Arc / Point endpoint familyを確定してから導入した。
+載る・中に・重なる・横切るは、`前の形に載る` / `resting on the previous shape`、`前の形の中に` / `inside the previous shape`、`前の形に重なる` / `overlapping the previous shape`、`前の形を横切る` / `crossing the previous shape` の固定句だけで関係になる（DDL 18、Score 0.20.0）。英語の短い形は `resting on` / `inside` / `overlaps` / `crossing` である。重なるの短い形を `overlaps` とするのは、`overlapping` が組の並べ方の語（重ねて）だからである。横切るは視覚の断絶を作る「切る」とは別の語である。記述49作品のうち22作品が物どうしの継ぎ目を言い、強い読み手が継ぎ目を参照どおりに読めることを測ってから足した。
+
+**第二段候補（実測後に判断）**: 離す、同じ向きに、逆向きに、〜より細く、貫く、渡る、囲む、吊る。現行語で表現の不足が実測で示されてから追加する。片端接続の`つながる (connected)`は独立した表現価値と有限なLine / Arc / Point endpoint familyを確定してから導入した。
 
 ### 14.3 JSON Score スキーマ
 
@@ -1819,7 +1825,7 @@ instruction に任意フィールド `relation` を追加する。
 
 | フィールド | 値 | 説明 |
 |---|---|---|
-| `type` | `along` / `not_touching` / `cutting` / `between` / `touching` / `connected` | 関係の種類 |
+| `type` | `along` / `not_touching` / `cutting` / `between` / `touching` / `connected` / `resting_on` / `inside` / `overlapping` / `crossing` | 関係の種類。後の4つと、閉じた形を相手にする`connected`はScore 0.20.0 |
 | `gap` | `narrow` / `medium` / `wide` | 距離の目安。具体値は演奏が解決する |
 | `target_instruction_index` | 0以上のScore index | checked `connected` / `touching` / `along` / `cutting`が参照する正確な先行Score instruction。旧relationでは省略 |
 | `target_path_position` | 有限な0〜1 / `"interior"` | 数値はScore 0.11のLine中心線位置。文字列はScore 0.13でLine / Arcの両端以外を演奏時に選ぶ。サンプル順の補間を使い、明示した先行targetを保持する |
@@ -1844,7 +1850,8 @@ id 参照が必要になった場合も、その必要が実測で示されて�
 - `cutting` → 直前要素と交差する角度・交点を、レンジ内で演奏ごとに決める
 - `between` → 直前2要素の間の領域内で決める
 - `touching` → line / arc だけに適用し、直前の line / arc の演奏実現後の両端点へ当該要素の両端点を一致させる
-- `connected` → Line / Arc / Pointに適用する。`target_endpoint`があればcurrentのcanonical始端（Pointはcenter）を指定したprior Line / Arc端点へ、なければpriorのcanonical終端（Pointはcenter）へ平行移動する。prior、寸法、曲率、rotationは変えない
+- `connected` → Line / Arc / Pointに適用する。`target_endpoint`があればcurrentのcanonical始端（Pointはcenter）を指定したprior Line / Arc端点へ、なければpriorのcanonical終端（Pointはcenter）へ平行移動する。priorが閉じた四角・円・楕円・三角・多角形なら、揺らぎの前の輪郭（rotationと変形の後）の上で、currentの始端に最も近い点へ平行移動する（Score 0.20.0。雲形と三日月は相手にしない）。prior、寸法、曲率、rotationは変えない
+- `resting_on` / `inside` / `overlapping` / `crossing` → どの図形にも適用し、currentと直前要素の演奏後の外接矩形から、currentを平行移動だけで合わせる。直前要素は動かさず、currentの形・寸法・向きは変えない。残る自由は演奏seedで選ぶ。`resting_on`はcurrentの下端を直前要素の上端に合わせ、横の中心をcurrentが直前要素の横幅に収まる範囲から選ぶ（currentが広ければ中心）。`inside`は直前の閉じた要素の内側の矩形（四角は外接矩形、ほかの閉じた形は中心を同じにして1/√2に縮めた矩形）に収まる位置を選び、開いた形・点・入りきらないcurrentでは成り立たない。`overlapping`はcurrentの外接矩形の面積のうち直前要素と重なる割合を1/3〜2/3から選び（判定は1/4〜3/4）、seedの向きへずらす。`crossing`はcurrentの長い向きで直前要素の両側へはみ出させ、短い向きの中心を直前要素の範囲から選ぶ。currentが短ければ成り立たない。成り立たないときは`missing_joint_reference` / `joint_reference_omitted` / `unsupported_joint_geometry` / `numeric_joint_position_conflict`を記録して関係だけを外す。個数が2以上のinstructionは個体ごとに合わせ、組の外部関係では組の全体を一つの平行移動で合わせる（`not_touching`と同じ）。Macroのemitはこの4語をまだ運ばない
 
 現行のtyped Along / Cutting描画はCount1のactual Scoreを対象とする。Macroの反復CompositionPlanは共通のrelation intentを保持するが、反復個体の演奏は後続materializationで扱う。Typed Alongではcurrentと直前要素がともに線で、currentの方向が未指定なら、その方向を直前の線と平行に揃える。明示された方向・寸法・数値位置は保持する。Typed Cuttingも、共通resolverが決めた通常寸法または明示寸法を保持し、専用のランダム長に置き換えない。明示方向は交差角の演奏より優先する。通常DDLとMacroは同じ意味を使う。旧metadata-free Scoreの関係処理は保存形式の互換用に保持する。
 
@@ -1879,7 +1886,7 @@ relation は記述者が Stage 1 または direct typed DDL で明示した場�
 
 ### 14.7 歳時記への表示
 
-歳時記の「あいだ」カテゴリは、関係の語彙が単なる幾何指定ではなく、余白と緊張を書くための語であることを示す。表示例: 「沿う」「触れない」「切る」「間に」「触れる」「つながる」。
+歳時記の「あいだ」カテゴリは、関係の語彙が単なる幾何指定ではなく、余白と緊張を書くための語であることを示す。表示例: 「沿う」「触れない」「切る」「間に」「触れる」「つながる」「載る」「中に」「重なる」「横切る」「鏡写し」。
 
 ---
 

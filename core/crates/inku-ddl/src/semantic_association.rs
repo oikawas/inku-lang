@@ -91,6 +91,10 @@ pub enum SemanticRelationKind {
     Between,
     Touching,
     Connected,
+    RestingOn,
+    Inside,
+    Overlapping,
+    Crossing,
     Mirrored,
 }
 
@@ -103,6 +107,10 @@ impl SemanticRelationKind {
             Self::Between => "between",
             Self::Touching => "touching",
             Self::Connected => "connected",
+            Self::RestingOn => "resting_on",
+            Self::Inside => "inside",
+            Self::Overlapping => "overlapping",
+            Self::Crossing => "crossing",
             Self::Mirrored => "mirrored",
         }
     }
@@ -3031,6 +3039,10 @@ fn explicit_previous_reference_occurrence(
         CanonicalRelationKind::Between => SemanticRelationKind::Between,
         CanonicalRelationKind::Touching => SemanticRelationKind::Touching,
         CanonicalRelationKind::Connected => SemanticRelationKind::Connected,
+        CanonicalRelationKind::RestingOn => SemanticRelationKind::RestingOn,
+        CanonicalRelationKind::Inside => SemanticRelationKind::Inside,
+        CanonicalRelationKind::Overlapping => SemanticRelationKind::Overlapping,
+        CanonicalRelationKind::Crossing => SemanticRelationKind::Crossing,
         CanonicalRelationKind::Mirrored => SemanticRelationKind::Mirrored,
     };
     let reference = match reference {

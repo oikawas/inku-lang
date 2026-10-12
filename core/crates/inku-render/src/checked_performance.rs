@@ -136,7 +136,7 @@ fn is_bounds_relation(relation: &inku_score::Relation) -> bool {
     matches!(
         relation.kind,
         RelationType::NotTouching | RelationType::Between
-    )
+    ) || relation.kind.is_joint()
 }
 
 fn is_checked_bounds_relation(relation: &inku_score::Relation) -> bool {

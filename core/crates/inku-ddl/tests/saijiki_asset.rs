@@ -79,7 +79,7 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             .sum::<usize>(),
         95
     );
-    assert_eq!(asset.relations.len(), 7);
+    assert_eq!(asset.relations.len(), 11);
     assert_eq!(
         asset
             .categories
@@ -115,6 +115,10 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             "cutting",
             "between",
             "connected",
+            "resting_on",
+            "inside",
+            "overlapping",
+            "crossing",
             "mirrored"
         ]
     );
@@ -124,9 +128,13 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             "触れる",
             "つながる",
             "沿う",
+            "横切る",
             "切る",
             "触れない",
             "間に",
+            "載る",
+            "中に",
+            "重なる",
             "鏡写し"
         ]
     );
@@ -136,9 +144,13 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             "touching",
             "connected",
             "along",
+            "crossing",
             "cutting",
             "not touching",
             "between",
+            "resting on",
+            "inside",
+            "overlaps",
             "mirrored"
         ]
     );
@@ -151,6 +163,10 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             "between",
             "touching",
             "connected",
+            "resting_on",
+            "inside",
+            "overlapping",
+            "crossing",
             "mirrored"
         ]
     );
@@ -170,7 +186,7 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
         .map(|relation| relation.relation_type.as_str())
         .collect::<HashSet<_>>();
     assert_eq!(category_keys.len(), 13);
-    assert_eq!(relation_types.len(), 7);
+    assert_eq!(relation_types.len(), 11);
 
     let aliases = asset
         .categories

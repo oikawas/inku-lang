@@ -1363,6 +1363,10 @@
     "between",
     "touching",
     "connected",
+    "resting_on",
+    "inside",
+    "overlapping",
+    "crossing",
     "mirrored"
   ],
   "relation_marker_order": {
@@ -1370,18 +1374,26 @@
       "touching",
       "connected",
       "along",
+      "crossing",
       "cutting",
       "not touching",
       "between",
+      "resting on",
+      "inside",
+      "overlaps",
       "mirrored"
     ],
     "ja": [
       "触れる",
       "つながる",
       "沿う",
+      "横切る",
       "切る",
       "触れない",
       "間に",
+      "載る",
+      "中に",
+      "重なる",
       "鏡写し"
     ]
   },
@@ -1459,6 +1471,50 @@
       "relation_type": "connected",
       "surface_en": "connected",
       "surface_ja": "つながる"
+    },
+    {
+      "literals_en": [
+        "resting on the previous shape"
+      ],
+      "literals_ja": [
+        "前の形に載る"
+      ],
+      "relation_type": "resting_on",
+      "surface_en": "resting on",
+      "surface_ja": "載る"
+    },
+    {
+      "literals_en": [
+        "inside the previous shape"
+      ],
+      "literals_ja": [
+        "前の形の中に"
+      ],
+      "relation_type": "inside",
+      "surface_en": "inside",
+      "surface_ja": "中に"
+    },
+    {
+      "literals_en": [
+        "overlapping the previous shape"
+      ],
+      "literals_ja": [
+        "前の形に重なる"
+      ],
+      "relation_type": "overlapping",
+      "surface_en": "overlaps",
+      "surface_ja": "重なる"
+    },
+    {
+      "literals_en": [
+        "crossing the previous shape"
+      ],
+      "literals_ja": [
+        "前の形を横切る"
+      ],
+      "relation_type": "crossing",
+      "surface_en": "crossing",
+      "surface_ja": "横切る"
     },
     {
       "literals_en": [

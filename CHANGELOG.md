@@ -8,6 +8,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-12 — Joint words: resting on, inside, overlaps, crossing (DDL 18, Score 0.20.0)
+
+By the author's choice (all five of the first set). Many descriptions state joints between things (a nest on a roof, reindeer on the ice, a seed inside glass, footprints crossing a track), but the relation words could write only connections between lines and arcs.
+
+- Four words join the relations (あいだ) of Saijiki. Only the fixed phrases `前の形に載る` / `resting on the previous shape`, `前の形の中に` / `inside the previous shape`, `前の形に重なる` / `overlapping the previous shape` and `前の形を横切る` / `crossing the previous shape` make relations. The English short forms are `resting on`, `inside`, `overlaps` and `crossing` (`overlapping` is the group-layout word, so the short form is `overlaps`).
+- The performance fits the current shape from the performed bounds by translation only and never moves the previous shape. When a joint cannot hold, only the relation is omitted with a reason such as `unsupported_joint_geometry`.
+- `connected` starts from the nearest point of the outline when the previous shape is a closed square, circle, ellipse, triangle or polygon.
+- Only works with these relations use Score 0.20.0; other works keep their Score. DDL engine 58, render engine 74. The Server word table, the Score schema, the Web, Android and macOS word resources, and the Web word help and reason messages follow.
+
 ### 2026-10-12 — Match Server's Gemini thinking levels in Swift
 
 Swift drawing pipeline and Vision requests now choose Gemini thinking levels by model: `low` for `gemini-3.8-flash`, Pro models, and `gemini-2.5-flash`; no `thinkingConfig` for `gemini-2.5-flash-lite`; and `minimal` for other models. Both paths share the same matching, including Server's prefix and suffix handling, to prevent requests from being refused for an unsupported `minimal` level.

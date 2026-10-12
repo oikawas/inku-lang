@@ -423,7 +423,9 @@ pub fn materialize_selected_composition(
         }
     }
     let score = Score {
-        version: if placement_groups
+        version: if inku_score::instructions_use_joint_relations(&instructions) {
+            inku_score::ScoreEdition::V0_20
+        } else if placement_groups
             .iter()
             .any(|group| group.layout == inku_score::GroupLayout::Cells)
         {

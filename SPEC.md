@@ -2950,7 +2950,7 @@ The distinction §13.3 draws between emotion words and motion words extends to
 relation.  Only physical, externally observable relations are allowed into the
 core.
 
-**The set is limited to these seven words:**
+**The set is limited to these eleven words:**
 
 | Word (ja) | Word (en) | Meaning | Score representation |
 |---|---|---|---|
@@ -2959,7 +2959,11 @@ core.
 | 切る | cutting | crosses the preceding element and makes a visual break (the *kire*, the cut, of tanka) | `cutting` |
 | 間に | between | placed in the region between the preceding two elements | `between` |
 | 触れる | touching | contacts the preceding element; coinciding endpoints compose a closed form | `touching` |
-| つながる | connected | joins the current start to a selected start, end, or interior point of a prior Line or Arc, or to the prior endpoint when omitted | `connected` |
+| つながる | connected | joins the current start to a selected start, end, or interior point of a prior Line or Arc, or to the prior endpoint when omitted (the nearest outline point of a closed prior) | `connected` |
+| 載る | resting on | rests the lower edge of the current element on the top of the preceding element | `resting_on` |
+| 中に | inside | placed inside the preceding closed element | `inside` |
+| 重なる | overlaps | placed overlapping part of the preceding element | `overlapping` |
+| 横切る | crossing | placed across the preceding element, from one edge past the other | `crossing` |
 | 鏡写し | mirrored | mirrors the positions and orientations of two complete shapes or groups across the axis between them | `mirror_relations` |
 
 **Words excluded**: nestle up to, answer, converse with, resonate with — words of
@@ -2983,8 +2987,18 @@ or partway selector, the connection uses prior end to current start. Notions tha
 language — around, on the same beat, leading or lagging, near or far — are not
 relations, and are expressed through position, path, rotation, and spacing.
 
-**Second-round candidates (judged after measurement)**: overlapping, set apart,
-same direction, opposite direction, thinner than.  They are added
+Resting on, inside, overlaps and crossing become relations only through the fixed
+phrases `前の形に載る` / `resting on the previous shape`, `前の形の中に` / `inside
+the previous shape`, `前の形に重なる` / `overlapping the previous shape` and
+`前の形を横切る` / `crossing the previous shape` (DDL 18, Score 0.20.0). The
+English short forms are `resting on`, `inside`, `overlaps` and `crossing`; the
+short form of overlapping is `overlaps` because `overlapping` is the group-layout
+word. Crossing is a word apart from cutting, which makes a visual break. They were
+added after measuring that 22 of 49 descriptions state joints between things and
+that strong readers read those joints as stated.
+
+**Second-round candidates (judged after measurement)**: set apart,
+same direction, opposite direction, thinner than, piercing, spanning, surrounding, hanging.  They are added
 only once measurement shows the current words to be expressively insufficient.
 The one-endpoint `connected` relation entered only after its independent visual
 value and finite Line / Arc / Point endpoint family were fixed.
@@ -3006,7 +3020,7 @@ An optional `relation` field is added to an instruction.
 
 | Field | Values | Meaning |
 |---|---|---|
-| `type` | `along` / `not_touching` / `cutting` / `between` / `touching` / `connected` | the kind of relation |
+| `type` | `along` / `not_touching` / `cutting` / `between` / `touching` / `connected` / `resting_on` / `inside` / `overlapping` / `crossing` | the kind of relation; the last four, and `connected` to a closed shape, need Score 0.20.0 |
 | `gap` | `narrow` / `medium` / `wide` | a guide distance; the concrete value is resolved by the performance |
 | `target_instruction_index` | non-negative Score index | the exact preceding Score instruction for checked `connected` / `touching` / `along` / `cutting`; omitted for older relations |
 | `target_path_position` | finite 0–1 / `"interior"` | numbers retain the Score 0.11 Line centerline position; the Score 0.13 string selects an interior Line / Arc position during performance, interpolated by sample order and preserving the explicit prior target |
@@ -3047,7 +3061,30 @@ sequential resolution.
 - `connected` -> applies to Line, Arc, and Point; with `target_endpoint`, the
   current canonical start (Point center) is translated to the selected endpoint
   of a prior Line or Arc; without it, it is translated to the prior canonical
-  end (Point center). The prior, dimensions, curvature, and rotation remain unchanged
+  end (Point center). When the prior is a closed square, circle, ellipse,
+  triangle or polygon, the start is translated to the nearest point of its
+  outline before any wobble, after rotation and transforms (Score 0.20.0;
+  cloudforms and crescents are not targets). The prior, dimensions, curvature,
+  and rotation remain unchanged
+- `resting_on` / `inside` / `overlapping` / `crossing` -> apply to every shape and
+  translate the current element only, from the performed bounds of the current
+  and preceding elements. The preceding element never moves, and the current
+  keeps its shape, dimensions and direction; free coordinates come from the
+  performance seed. `resting_on` sets the current lower edge on the preceding
+  top and chooses the horizontal center where the current fits the preceding
+  width (the center when it is wider). `inside` chooses a position inside the
+  preceding closed element's inner rectangle (the bounds of a square; the bounds
+  shrunk by 1/√2 about their center for other closed shapes) and fails for open
+  shapes, points, or a current that does not fit. `overlapping` chooses the share
+  of the current bounds that overlaps the preceding element from 1/3 to 2/3
+  (accepted 1/4 to 3/4) and shifts in a seeded direction. `crossing` extends the
+  current past both sides of the preceding element along its longer direction and
+  chooses the crossing position along the shorter one; a shorter current fails.
+  A failure records `missing_joint_reference`, `joint_reference_omitted`,
+  `unsupported_joint_geometry` or `numeric_joint_position_conflict` and omits only
+  the relation. An instruction with a count above one is fitted per copy, and an
+  external group relation translates the whole group once, as for `not_touching`.
+  Macro emits do not carry these four words yet
 
 Current typed Along / Cutting rendering covers count-one actual Scores. Macro repeated CompositionPlans retain shared relation intent; repeated-instance performance belongs to later materialization. Typed Along aligns
 the current line parallel to the preceding line when both
@@ -3139,7 +3176,8 @@ nor changes a relation; coerce may only drop an invalid relation with a warning.
 A relations (あいだ) category is added to Saijiki.  Laid over the notion of *ma*,
 the interval, it shows that the vocabulary of relation is not mere geometric
 specification but words for writing negative space and tension.  Displayed as:
-along, not touching, cutting, between, touching.
+along, not touching, cutting, between, touching, connected, resting on, inside,
+overlaps, crossing, mirrored.
 
 ---
 

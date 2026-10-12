@@ -475,7 +475,10 @@ fn checked_object_relation(
     prior: Option<(Primitive, Option<inku_score::ArcForm>)>,
 ) -> Option<Relation> {
     let touching = kind == RelationType::Touching;
-    let bounds_relation = matches!(kind, RelationType::NotTouching | RelationType::Between);
+    // The joint relations are placed from performed bounds; the performer
+    // decides whether the shapes admit them, as for not touching.
+    let bounds_relation =
+        matches!(kind, RelationType::NotTouching | RelationType::Between) || kind.is_joint();
     if !bounds_relation {
         let line_relation = matches!(kind, RelationType::Along | RelationType::Cutting);
         let supported = |primitive, arc_form: Option<inku_score::ArcForm>| {
@@ -486,13 +489,28 @@ fn checked_object_relation(
                     || (!touching && primitive == Primitive::Point)
             }
         };
+        // A connection may also start from a closed shape's outline (Score 0.20.0).
+        let closed_target = |primitive, arc_form: Option<inku_score::ArcForm>| {
+            kind == RelationType::Connected
+                && arc_form.is_none()
+                && matches!(
+                    primitive,
+                    Primitive::Circle
+                        | Primitive::Ellipse
+                        | Primitive::Square
+                        | Primitive::Triangle
+                        | Primitive::Polygon
+                )
+        };
         let primitive = score_primitive_from_identity(input.primitive).ok()?;
         let arc_form = input
             .proportion_arc_form
             .filter(|form| form.id == "crescent")
             .map(|_| inku_score::ArcForm::Crescent);
         if !supported(primitive, arc_form)
-            || !prior.is_some_and(|(primitive, arc_form)| supported(primitive, arc_form))
+            || !prior.is_some_and(|(primitive, arc_form)| {
+                supported(primitive, arc_form) || closed_target(primitive, arc_form)
+            })
         {
             return None;
         }
@@ -3462,7 +3480,9 @@ fn lower_verified_stage15_shared<'a>(
         ScoreLoweringOutcome::Complete
     };
     let score = (objects.is_none() && outcome != ScoreLoweringOutcome::Stopped).then(|| Score {
-        version: if instructions
+        version: if inku_score::instructions_use_joint_relations(&instructions) {
+            inku_score::ScoreEdition::V0_20.as_str().to_owned()
+        } else if instructions
             .iter()
             .any(inku_score::Instruction::requires_edition_0_17)
         {
@@ -3986,6 +4006,10 @@ fn direct_score_relation<'a>(
         SemanticRelationKind::Touching => RelationType::Touching,
         SemanticRelationKind::Along => RelationType::Along,
         SemanticRelationKind::Cutting => RelationType::Cutting,
+        SemanticRelationKind::RestingOn => RelationType::RestingOn,
+        SemanticRelationKind::Inside => RelationType::Inside,
+        SemanticRelationKind::Overlapping => RelationType::Overlapping,
+        SemanticRelationKind::Crossing => RelationType::Crossing,
         SemanticRelationKind::Mirrored => {
             return Err(unsupported_relation_reason(instruction_index, relation));
         }

@@ -19,10 +19,35 @@ public struct AuxiliaryPrompt: Sendable, Equatable {
     }
 }
 
+/// What one Vision operation (one piece of advice, one colophon) reads with, fixed before its first request. Ordinary
+/// providers fix nothing; the ChatGPT plan fixes the profile and generation (Server api_core/vision.prepare_vision_settings).
+public struct AuxiliaryRun: Sendable, Equatable {
+    public let chatGPTSession: ChatGPTPlanSession?
+    public init(chatGPTSession: ChatGPTPlanSession? = nil) { self.chatGPTSession = chatGPTSession }
+    public static let unpinned = AuxiliaryRun()
+}
+
 public protocol AuxiliaryTransport: Sendable {
     func performAuxiliary(prompt: AuxiliaryPrompt, modelReference: String, settings: HostSettings,
                           credentials: any CredentialStore,
                           onBytes: @escaping @Sendable (Int) -> Void) async throws -> String
+    func beginAuxiliaryRun(modelReference: String, settings: HostSettings) async throws -> AuxiliaryRun
+    func performAuxiliary(prompt: AuxiliaryPrompt, modelReference: String, settings: HostSettings,
+                          credentials: any CredentialStore, run: AuxiliaryRun,
+                          onBytes: @escaping @Sendable (Int) -> Void) async throws -> String
+    /// Before a cached reading is reused: the run may still read with this model.
+    func checkAuxiliaryRun(_ run: AuxiliaryRun, modelReference: String, settings: HostSettings) async throws
+}
+
+extension AuxiliaryTransport {
+    public func beginAuxiliaryRun(modelReference: String, settings: HostSettings) async throws -> AuxiliaryRun { .unpinned }
+    public func performAuxiliary(prompt: AuxiliaryPrompt, modelReference: String, settings: HostSettings,
+                                 credentials: any CredentialStore, run: AuxiliaryRun,
+                                 onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
+        try await performAuxiliary(prompt: prompt, modelReference: modelReference, settings: settings,
+                                   credentials: credentials, onBytes: onBytes)
+    }
+    public func checkAuxiliaryRun(_ run: AuxiliaryRun, modelReference: String, settings: HostSettings) async throws {}
 }
 
 extension URLSessionProviderTransport: AuxiliaryTransport {}
@@ -81,8 +106,9 @@ public actor AuxiliaryProvider {
                        : "この世代を観察し、限定された推敲助言を返してください。文脈:\n") + payload.pythonText
         let prompt = AuxiliaryPrompt(system: Self.adviceSystem(language), message: message,
                                      images: [Self.imageURL(png)], temperature: 0.35, maximumTokens: 320)
+        let run = try await transport.beginAuxiliaryRun(modelReference: model, settings: settings)
         let raw = try await transport.performAuxiliary(prompt: prompt, modelReference: model,
-                                                      settings: settings, credentials: credentials, onBytes: { _ in })
+                                                      settings: settings, credentials: credentials, run: run, onBytes: { _ in })
         try Task.checkCancellation()
         return try Self.parseAdvice(raw, kinds: kinds, model: model)
     }
@@ -94,6 +120,7 @@ public actor AuxiliaryProvider {
         guard branch.pathOnly, let target = branch.nodes.last, target.id == branch.focusNodeID,
               !branch.nodes.isEmpty else { throw HostError("colophon_requires_root_path") }
         let model = try Self.model(modelReference, settings: settings)
+        let run = try await transport.beginAuxiliaryRun(modelReference: model, settings: settings)
         let at = Int64(Date().timeIntervalSince1970 * 1000)
         let facts = try Self.factSheet(branch)
         let generations = facts["generations"].array!
@@ -112,14 +139,14 @@ public actor AuxiliaryProvider {
             let message = Self.generationMessage(request, language: language, hasImage: !images.isEmpty)
             let observation = try await cachedRead(prompt: AuxiliaryPrompt(system: Self.colophonSystem(language),
                 message: message, images: images, temperature: 0.35, maximumTokens: 260),
-                model: model, language: language, settings: settings)
+                model: model, language: language, settings: settings, run: run)
             try Task.checkCancellation()
             observations.append(Self.firstPerson(observation, language: language))
         }
         let invariantPrompt = Self.invariantMessage(facts["invariants"], language: language)
         let conclusion = try await cachedRead(prompt: AuxiliaryPrompt(system: Self.colophonSystem(language),
             message: invariantPrompt, temperature: 0.35, maximumTokens: 260), model: model,
-            language: language, settings: settings)
+            language: language, settings: settings, run: run)
         try Task.checkCancellation()
         let formatter = DateFormatter(); formatter.dateFormat = "yyyy-MM-dd"
         formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
@@ -131,14 +158,20 @@ public actor AuxiliaryProvider {
             signature: signature, warnings: Self.evaluationWarnings(body, language: language), factSheetJSON: facts.text)
     }
 
-    private func cachedRead(prompt: AuxiliaryPrompt, model: String, language: String, settings: HostSettings) async throws -> String {
-        // Requests include only public configuration, never a key or another branch's future.
+    private func cachedRead(prompt: AuxiliaryPrompt, model: String, language: String, settings: HostSettings,
+                            run: AuxiliaryRun) async throws -> String {
+        // Requests include only public configuration, never a key or another branch's future. A pinned ChatGPT
+        // profile keeps its readings apart (Server okugaki._vision_cache_key).
         let key = model + "\n" + language + "\n" + prompt.system + "\n" + prompt.message + "\n" + prompt.images.joined(separator: "\n")
             + "\n" + settings.providers.map { $0.id + ":" + $0.baseURL.absoluteString }.joined(separator: "\n")
+            + (run.chatGPTSession.map { "\nchatgpt:" + $0.profileID + ":" + String($0.generation) } ?? "")
         observationsCache.removeAll { Date().timeIntervalSince($0.at) > 1800 }
-        if let cached = observationsCache.first(where: { $0.key == key }) { return cached.response }
+        if let cached = observationsCache.first(where: { $0.key == key }) {
+            try await transport.checkAuxiliaryRun(run, modelReference: model, settings: settings)
+            return cached.response
+        }
         let response = try await transport.performAuxiliary(prompt: prompt, modelReference: model,
-            settings: settings, credentials: credentials, onBytes: { _ in })
+            settings: settings, credentials: credentials, run: run, onBytes: { _ in })
         try Task.checkCancellation()
         if !response.isEmpty {
             observationsCache.append((key, Date(), response))

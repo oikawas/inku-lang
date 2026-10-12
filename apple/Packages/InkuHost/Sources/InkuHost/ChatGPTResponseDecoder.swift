@@ -17,7 +17,7 @@ public struct ChatGPTResponseDecoder: Sendable {
     private var responseID: String?
     private var failure: HostError?
     private var text = false
-    private var textDelta = ""
+    private var finalizedText: [(id: ExactJSON, item: ExactJSON)] = []
 
     public init(textLimit: Int) {
         self.init(argumentLimit: textLimit)
@@ -153,39 +153,53 @@ public struct ChatGPTResponseDecoder: Sendable {
         }
     }
 
+    /// Server chatgpt_provider.TextSSEDecoder: only completed assistant items answer; deltas are bounded, never adopted.
     private mutating func textEvent(_ tag: String, _ event: ExactJSON) throws {
+        if tag.hasPrefix("response.function_call") { throw HostError("chatgpt_unexpected_tool") }
         switch tag {
         case "response.created", "response.in_progress":
             try matchResponse(event["response"])
         case "response.output_item.added", "response.output_item.done":
-            try Self.auxiliary(event["item"])
-        case "response.output_text.delta":
-            guard let delta = event["delta"].string else { throw HostError("chatgpt_response_invalid") }
-            guard delta.utf8.count <= argumentLimit - textDelta.utf8.count else { throw HostError("chatgpt_response_too_large") }
-            textDelta += delta
+            let item = event["item"]
+            guard ["message", "reasoning"].contains(item["type"].string ?? "") else { throw HostError("chatgpt_unexpected_tool") }
+            if tag == "response.output_item.done" {
+                _ = try textOf(item)
+                if let index = finalizedText.firstIndex(where: { $0.id == item["id"] }) { finalizedText[index].item = item }
+                else { finalizedText.append((item["id"], item)) }
+            }
+        case "response.output_text.delta", "response.output_text.done":
+            guard let piece = event[tag.hasSuffix("delta") ? "delta" : "text"].string else { throw HostError("chatgpt_response_invalid") }
+            guard piece.utf8.count <= argumentLimit else { throw HostError("chatgpt_response_too_large") }
         case "response.completed":
             let response = event["response"]
             try matchResponse(response)
             guard response["status"].string == "completed" else { throw HostError("chatgpt_response_incomplete") }
             let output: [ExactJSON]
             switch response["output"] {
-            case .null: output = []
-            case .array(let items): output = items
+            case .null: output = finalizedText.map(\.item)
+            case .array(let items): output = items.isEmpty ? finalizedText.map(\.item) : items
             default: throw HostError("chatgpt_response_invalid")
             }
-            var answer = ""
-            for item in output {
-                try Self.auxiliary(item)
-                for part in item["content"].array ?? [] { answer += part["text"].string ?? "" }
-            }
-            // A stream may finish with an empty summary; the deltas then carry the answer.
-            if answer.isEmpty { answer = textDelta }
+            let answer = try output.map(textOf).joined()
             guard answer.utf8.count <= argumentLimit else { throw HostError("chatgpt_response_too_large") }
-            guard !answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw HostError("chatgpt_response_incomplete") }
+            guard !answer.isEmpty else { throw HostError("chatgpt_response_invalid") }
             completed = answer; terminalResponse = response
         default:
             break
         }
+    }
+    private func textOf(_ item: ExactJSON) throws -> String {
+        if item["type"].string == "reasoning" { return "" }
+        guard item["type"].string == "message", item["role"].string == "assistant" else { throw HostError("chatgpt_unexpected_tool") }
+        guard item["status"] == .null || item["status"].string == "completed" else { throw HostError("chatgpt_response_incomplete") }
+        var answer = ""
+        for part in item["content"].array ?? [] {
+            if part["type"].string == "refusal" { throw HostError("chatgpt_refused") }
+            guard part["type"].string == "output_text", let piece = part["text"].string else { throw HostError("chatgpt_response_invalid") }
+            answer += piece
+        }
+        guard answer.utf8.count <= argumentLimit else { throw HostError("chatgpt_response_too_large") }
+        return answer
     }
 
     private mutating func matchResponse(_ response: ExactJSON) throws {

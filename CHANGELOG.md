@@ -14,6 +14,8 @@ At the author's instruction, the macOS ChatGPT plan settings now handle the conn
 
 After the author's review, the picker gained the other services' filter and each model's LLM and Vision purposes, and ChatGPT plan models now also serve Vision refinement and colophons (author's ruling; Serverセッション-codex was asked to fix Server, and Swift implemented the proposed contract first). Purposes are saved per profile; a model without a saved choice serves both. Vision requests send the images to the Responses endpoint, only for a model published for Vision.
 
+Serverセッション-codex adopted this contract for Server and Web (product `0c488c98`). Checked against Server, Swift now allows a Vision answer of up to 512 KiB of UTF-8, rejects partial-only answers, and refuses invalid saves with `chatgpt_model_not_offered`. A colophon pins its profile when it starts, caches readings per profile, and checks the Vision publication before reusing one.
+
 ### 2026-10-12 — Match Server's Gemini thinking levels in Swift
 
 Swift drawing pipeline and Vision requests now choose Gemini thinking levels by model: `low` for `gemini-3.8-flash`, Pro models, and `gemini-2.5-flash`; no `thinkingConfig` for `gemini-2.5-flash-lite`; and `minimal` for other models. Both paths share the same matching, including Server's prefix and suffix handling, to prevent requests from being refused for an unsupported `minimal` level.

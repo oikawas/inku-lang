@@ -14,6 +14,8 @@
 
 作者の目視の指摘で、選択画面に他のサービスと同じ絞り込みと各モデルのLLM／Visionの用途を足した。ChatGPTプランのモデルをVision推敲と奥書にも使えるようにした（作者裁定。ServerはServerセッション-codexへ修正を依頼し、Swiftは依頼に添えた形で先に実装した）。用途は登録ごとに保存し、保存の無いモデルはLLMとVisionの両方とする。Visionの要求は画像付きでResponsesへ送り、その用途で公開したモデルでなければ送らない。
 
+Serverセッション-codexがこの形を採り、Server／Webへ実装した（product `0c488c98`）。Serverの判定と照らして、SwiftはVisionの答えの上限をUTF-8で512 KiBにし、断片だけの答えを採らず、保存の拒否を`chatgpt_model_not_offered`に揃えた。奥書は開始時に登録を固定し、キャッシュを登録ごとに分け、使う前にもVisionの公開を確かめる。
+
 ### 2026-10-12 — SwiftのGemini思考レベルをServerに揃える
 
 Swiftの描画pipelineとVisionも、Geminiへの思考レベルをモデルごとに選ぶ。`gemini-3.8-flash`、Pro系、`gemini-2.5-flash`には`low`を送り、`gemini-2.5-flash-lite`では`thinkingConfig`を省く。ほかのモデルは従来どおり`minimal`。両経路で共通の判定を使い、Serverと同じ接頭辞・接尾辞の扱いで、不適切な`minimal`による要求の拒否を防ぐ。

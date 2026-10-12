@@ -118,14 +118,40 @@ public final class PersonalPlanRoutingTransport: ObservedProviderTransport, Obse
     }
     public func performAuxiliary(prompt: AuxiliaryPrompt, modelReference: String, settings: HostSettings, credentials: any CredentialStore,
                                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
+        try await performAuxiliary(prompt: prompt, modelReference: modelReference, settings: settings, credentials: credentials,
+                                   run: .unpinned, onBytes: onBytes)
+    }
+    /// A Vision operation on the plan fixes the active profile once and checks that it publishes the model for Vision
+    /// before any image is read (Server prepare_vision_settings); a later profile switch does not move the operation.
+    public func beginAuxiliaryRun(modelReference: String, settings: HostSettings) async throws -> AuxiliaryRun {
+        guard let model = try Self.personalModel(modelReference, providers: settings.providers) else {
+            guard let auxiliary = ordinary as? any AuxiliaryTransport else { return .unpinned }
+            return try await auxiliary.beginAuxiliaryRun(modelReference: modelReference, settings: settings)
+        }
+        let session = try await runtime.pin()
+        try await runtime.checkVisionAccess(session: session, model: model)
+        return AuxiliaryRun(chatGPTSession: session)
+    }
+    public func performAuxiliary(prompt: AuxiliaryPrompt, modelReference: String, settings: HostSettings, credentials: any CredentialStore,
+                                 run: AuxiliaryRun, onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
         if let model = try Self.personalModel(modelReference, providers: settings.providers) {
             // Vision advice and colophons run on the plan; the demo description does not.
             guard prompt.purpose == .vision else { throw HostError("chatgpt_operation_not_supported") }
-            let session = try await runtime.pin()
-            return try await runtime.visionText(session: session, model: model, system: prompt.system, message: prompt.message,
+            let pinned: ChatGPTPlanSession
+            if let fixed = run.chatGPTSession { pinned = fixed } else { pinned = try await runtime.pin() }
+            return try await runtime.visionText(session: pinned, model: model, system: prompt.system, message: prompt.message,
                                                 images: prompt.images, timeoutSeconds: prompt.timeoutSeconds, onBytes: onBytes)
         }
         guard let auxiliary = ordinary as? any AuxiliaryTransport else { throw HostError("auxiliary_transport_unavailable") }
-        return try await auxiliary.performAuxiliary(prompt: prompt, modelReference: modelReference, settings: settings, credentials: credentials, onBytes: onBytes)
+        return try await auxiliary.performAuxiliary(prompt: prompt, modelReference: modelReference, settings: settings,
+                                                    credentials: credentials, run: run, onBytes: onBytes)
+    }
+    public func checkAuxiliaryRun(_ run: AuxiliaryRun, modelReference: String, settings: HostSettings) async throws {
+        guard let model = try Self.personalModel(modelReference, providers: settings.providers) else {
+            try await (ordinary as? any AuxiliaryTransport)?.checkAuxiliaryRun(run, modelReference: modelReference, settings: settings)
+            return
+        }
+        guard let session = run.chatGPTSession else { throw HostError("chatgpt_session_pin_required") }
+        try await runtime.checkVisionAccess(session: session, model: model)
     }
 }

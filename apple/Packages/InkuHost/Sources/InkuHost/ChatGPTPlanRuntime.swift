@@ -249,7 +249,7 @@ public actor ChatGPTPlanRuntime {
                                 purposes: [String: [String]] = [:]) async throws -> ChatGPTPlanPublication {
         try checkOpen()
         guard selected.count <= 1024, selected.allSatisfy({ (1...256).contains($0.count) }) else { throw HostError("chatgpt_model_not_offered") }
-        guard purposes.values.allSatisfy({ $0.allSatisfy(["llm", "vision"].contains) }) else { throw HostError("provider_model_settings_invalid") }
+        guard purposes.values.allSatisfy({ $0.allSatisfy(["llm", "vision"].contains) }) else { throw HostError("chatgpt_model_not_offered") }
         let session = ChatGPTPlanSession(profileID: profileID, generation: generation)
         return try await mutate { value in
             var profile = try self.checkedProfile(session, value: value)
@@ -259,7 +259,7 @@ public actor ChatGPTPlanRuntime {
             var chosen = profile.modelPurposes ?? [:]
             for (id, value) in purposes { chosen[id] = ChatGPTPlanPublication.ordered(value) }
             guard selected.allSatisfy({ !(chosen[$0] ?? ChatGPTPlanPublication.defaultPurposes).isEmpty }) else {
-                throw HostError("provider_model_settings_invalid")
+                throw HostError("chatgpt_model_not_offered")
             }
             var seen = Set<String>()
             profile.publishedModels = selected.filter { seen.insert($0).inserted }
@@ -280,6 +280,15 @@ public actor ChatGPTPlanRuntime {
         let profile = try checkedProfile(session)
         guard offered.contains(where: { $0.id == model }), profile.publishedModels?.contains(model) == true,
               (profile.modelPurposes?[model] ?? ChatGPTPlanPublication.defaultPurposes).contains(purpose) else {
+            throw HostError("chatgpt_model_not_offered")
+        }
+    }
+    /// Server vision_client.check_vision_access: the pinned profile still publishes the model for Vision. It reads the
+    /// saved profile only, so a cached colophon reading is checked without a request.
+    public func checkVisionAccess(session: ChatGPTPlanSession, model: String) throws {
+        let profile = try checkedProfile(session)
+        guard (profile.models ?? []).contains(where: { $0.id == model }), profile.publishedModels?.contains(model) == true,
+              (profile.modelPurposes?[model] ?? ChatGPTPlanPublication.defaultPurposes).contains("vision") else {
             throw HostError("chatgpt_model_not_offered")
         }
     }
@@ -392,7 +401,8 @@ public actor ChatGPTPlanRuntime {
             throw error
         }
     }
-    static let visionTextLimit = 65_536
+    /// Server request_vision: the answer may be up to 512 KiB of UTF-8.
+    static let visionTextLimit = 512 * 1024
 
     static func visionBody(model: String, system: String, message: String, images: [String]) throws -> ExactJSON {
         var content: [ExactJSON] = [.object(["type": .string("input_text"), "text": .string(message)])]

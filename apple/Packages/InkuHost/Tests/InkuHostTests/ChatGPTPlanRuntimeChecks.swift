@@ -1,4 +1,5 @@
 import Foundation
+import InkuPersistence
 import XCTest
 @testable import InkuHost
 
@@ -151,7 +152,12 @@ final class ChatGPTPlanRuntimeChecks: XCTestCase {
             _ = try await runtime.savePublication(profileID: opened.profileID, generation: opened.generation,
                                                   models: ["offered", "second"], purposes: ["second": []])
             XCTFail("A model without a purpose was published")
-        } catch { XCTAssertEqual((error as? HostError)?.code, "provider_model_settings_invalid") }
+        } catch { XCTAssertEqual((error as? HostError)?.code, "chatgpt_model_not_offered") }
+        do {
+            _ = try await runtime.savePublication(profileID: opened.profileID, generation: opened.generation,
+                                                  models: ["offered"], purposes: ["offered": ["draw"]])
+            XCTFail("A purpose other than LLM or Vision was saved")
+        } catch { XCTAssertEqual((error as? HostError)?.code, "chatgpt_model_not_offered") }
         XCTAssertEqual(try fixture.store.load().profiles[fixture.activeID]?.publishedModels, ["offered"])
         do {
             _ = try await runtime.perform(action: Self.action, session: session, model: "offered", argumentLimit: 4096, onBytes: { _ in })
@@ -215,6 +221,90 @@ final class ChatGPTPlanRuntimeChecks: XCTestCase {
             XCTFail("A usage-limit failure returned an answer")
         } catch { XCTAssertEqual(ChatGPTPlanRuntime.diagnostic(error).code, "subscription_sharing_usage_limit_exceeded") }
         XCTAssertEqual(try fixture.store.load().profiles[session.profileID]?.state, "quota")
+    }
+
+    // Failure: a Vision answer was taken from deltas alone, read an unfinished item, ignored a function call event,
+    // or kept a limit other than Server's 512 KiB (chatgpt_provider.TextSSEDecoder, request_vision).
+    func testVisionAnswerIsOnlyCompletedText() throws {
+        func frame(_ value: ExactJSON) -> String { "data: " + value.text + "\n\n" }
+        func message(_ text: String, status: String? = nil) -> ExactJSON {
+            var item: [String: ExactJSON] = ["type": .string("message"), "id": .string("m"), "role": .string("assistant"),
+                "content": .array([.object(["type": .string("output_text"), "text": .string(text)])])]
+            if let status { item["status"] = .string(status) }
+            return .object(item)
+        }
+        func completed(_ output: [ExactJSON]) -> String {
+            frame(.object(["type": .string("response.completed"), "response": .object(["status": .string("completed"), "output": .array(output)])]))
+        }
+        func read(_ wire: String, limit: Int = 4096) throws -> String {
+            var decoder = ChatGPTResponseDecoder(textLimit: limit)
+            try decoder.feed(Data(wire.utf8)); return try decoder.finish()
+        }
+        func code(_ wire: String, limit: Int = 4096) -> String? {
+            do { _ = try read(wire, limit: limit); return nil } catch { return (error as? HostError)?.code }
+        }
+        let delta = frame(.object(["type": .string("response.output_text.delta"), "delta": .string("断片")]))
+        XCTAssertEqual(code(delta + completed([])), "chatgpt_response_invalid")
+        let done = frame(.object(["type": .string("response.output_item.done"), "item": message("確定")]))
+        XCTAssertEqual(try read(delta + done + completed([])), "確定")
+        XCTAssertEqual(code(completed([message("途中", status: "in_progress")])), "chatgpt_response_incomplete")
+        XCTAssertEqual(code(completed([message("")])), "chatgpt_response_invalid")
+        let image: ExactJSON = .object(["type": .string("message"), "role": .string("assistant"),
+            "content": .array([.object(["type": .string("output_image")])])])
+        XCTAssertEqual(code(completed([image])), "chatgpt_response_invalid")
+        let call = frame(.object(["type": .string("response.function_call_arguments.delta"), "delta": .string("{")]))
+        XCTAssertEqual(code(call + completed([message("x")])), "chatgpt_unexpected_tool")
+        XCTAssertEqual(ChatGPTPlanRuntime.visionTextLimit, 512 * 1024)
+        XCTAssertEqual(try read(completed([message("12345678")]), limit: 8), "12345678")
+        XCTAssertEqual(code(completed([message("123456789")]), limit: 8), "chatgpt_response_too_large")
+    }
+
+    // Failure: a colophon on the plan was not pinned to one profile, reused a reading across a reconnection,
+    // or reused one after the model stopped being published for Vision (Server okugaki / check_vision_access).
+    func testColophonOnThePlanPinsAndKeepsReadingsPerProfile() async throws {
+        let fixture = try RuntimeFixture(expired: false)
+        defer { fixture.remove() }
+        let client = VisionHTTP(answer: "円がある")
+        let runtime = ChatGPTPlanRuntime(store: fixture.store, http: client)
+        let routed = PersonalPlanRoutingTransport(ordinary: NoOrdinaryTransport(), runtime: runtime)
+        let settings = HostSettings(providers: [.personalPlan])
+        let provider = AuxiliaryProvider(transport: routed, credentials: NoCredentials())
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("inku-plan-colophon-\(UUID().uuidString)").appendingPathComponent("test.sqlite")
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        let database = try InkuDatabase(url: file)
+        let root = SavedWork(id: "root", at: 1, input: "円", score: "{\"instructions\":[{\"primitive\":\"circle\",\"color\":\"red\",\"center\":[0.5,0.5]}]}", svg: "first", lineageNodeID: "node-root")
+        try await database.save(root, node: LineageNode(id: "node-root", historyID: root.id, at: 1, rootNodeID: "node-root"))
+        let lineage = try await database.lineage(focusNodeID: "node-root", pathOnly: true)
+        let branch = try XCTUnwrap(lineage)
+        let png: @Sendable ([String]) async throws -> Data? = { _ in Data([137, 80, 78, 71, 13, 10, 26, 10]) }
+        func colophon() async throws {
+            _ = try await provider.colophon(branch: branch, modelReference: "chatgpt:offered", language: "ja", settings: settings, png: png)
+        }
+        try await colophon()
+        let first = await client.requests().count
+        XCTAssertEqual(first, 2)
+        try await colophon()
+        let cached = await client.requests().count
+        XCTAssertEqual(cached, first)
+        var value = try fixture.store.load()
+        value.profiles[fixture.activeID]?.generation = 2
+        try fixture.store.write(value)
+        try await colophon()
+        let reconnected = await client.requests().count
+        XCTAssertEqual(reconnected, first * 2)
+        let run = try await routed.beginAuxiliaryRun(modelReference: "chatgpt:offered", settings: settings)
+        XCTAssertEqual(run.chatGPTSession, ChatGPTPlanSession(profileID: fixture.activeID, generation: 2))
+        _ = try await runtime.savePublication(profileID: fixture.activeID, generation: 2, models: ["offered"], purposes: ["offered": ["llm"]])
+        do {
+            try await routed.checkAuxiliaryRun(run, modelReference: "chatgpt:offered", settings: settings)
+            XCTFail("A reading was reusable after the model stopped serving Vision")
+        } catch { XCTAssertEqual(ChatGPTPlanRuntime.diagnostic(error).code, "chatgpt_model_not_offered") }
+        do {
+            try await colophon()
+            XCTFail("A colophon ran on a model not published for Vision")
+        } catch { XCTAssertEqual(ChatGPTPlanRuntime.diagnostic(error).code, "chatgpt_model_not_offered") }
+        let refused = await client.requests().count
+        XCTAssertEqual(refused, reconnected)
     }
 
     private static var action: Data {

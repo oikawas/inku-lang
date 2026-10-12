@@ -4,7 +4,7 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-10-11.
+Last updated: 2026-10-12.
 
 **Catch-up status**: Android sits at generation `2.1.4-android.80`. DDL conversion and Score → SVG
 rendering run in the shared Rust core (`core/crates/`) of the same commit, packaged with the app, so
@@ -44,6 +44,18 @@ When updating Android specifications:
    adaptation of the Japanese source.
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
+
+## 2026-10-12 Completion approval and stop reasons while a work is displayed
+
+The Compose screen keeps its approval and stop section outside the description editor.
+While a safe performance saved before completion is displayed, show the current instructions,
+proposal, incomplete-hole reasons, and approval and decline actions too. A run awaiting an answer
+also keeps this section visible when the work-only fullscreen presentation was selected.
+Read stop reasons from the run. Show the existing resume action for score_ready and an unsaved
+completed revision; keep the core's transitions for stops requiring source edits unchanged.
+Approval uses the existing execution, revision, and proposal digest, with A3's existing saving,
+record, and completion tags. Displaying the section does not approve or decline anything.
+Installation and acceptance of proposals waiting on the device remain separate checks.
 
 ## 2026-10-11 Completion range records (A3)
 

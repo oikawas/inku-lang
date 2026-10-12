@@ -1660,7 +1660,8 @@ private fun shortCanvasLabel(state: InkuUiState): String {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
-    if (state.canvasPresentationMode) {
+    val layout = composeScreenLayout(state)
+    if (layout.presentationOnly) {
         CanvasHeroCard(state, viewModel, modifier = Modifier.fillMaxSize())
         return
     }
@@ -1675,7 +1676,7 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
     var batchEditorFocused by remember { mutableStateOf(false) }
     val imeVisible = WindowInsets.isImeVisible
     val hasWork = state.selectedHistory != null
-    val showEditor = !hasWork || editingWork || state.composeMode == ComposeMode.Batch
+    val showEditor = layout.showEditor
     // Back from 「この作品を推敲」 returns to the work's result, one level up,
     // instead of leaving the app: the screen-wide handler in InkuApp cannot see
     // this local state. Whatever that handler does own -- the camera, the DDL
@@ -1737,6 +1738,8 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
             )
             ChatGptDrawingStatus(state, viewModel)
             RunStatusRow(state, viewModel)
+            // The author answers the run while its safe performance stays visible.
+            if (layout.showPipelineStatus) PipelineStatusSection(state, viewModel)
             if (editingWork) {
                 state.selectedHistory?.let { item ->
                     Text(S.editingWorkLabel(item.renderHashShort), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -3093,10 +3096,6 @@ private fun DrawPanel(
                 onStop = viewModel::stopDrawing,
             )
         }
-        state.message?.takeIf { it.isNotBlank() }?.let { message ->
-            Text(message, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
-        }
-        PipelineStatusPanel(state, viewModel)
         // 解釈 is the half of this screen one reaches for after the drawing, so
         // it is what the simple display mode leaves out. Before this stage the
         // mode's only effect was hiding the mascot and a duplicated chip row,
@@ -6738,16 +6737,24 @@ private fun DdlActionRow(state: InkuUiState, viewModel: InkuViewModel) {
 }
 
 @Composable
+private fun PipelineStatusSection(state: InkuUiState, viewModel: InkuViewModel) {
+    val status = pipelineStatusPresentation(state, S)
+    state.message?.takeIf { it.isNotBlank() && it != status.attentionText &&
+        !(state.pipelineView?.patchProposal != null && it == S.pipelineProposal) }?.let { message ->
+        Text(message, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
+    }
+    PipelineStatusPanel(state, viewModel)
+}
+
+@Composable
 private fun PipelineStatusPanel(state: InkuUiState, viewModel: InkuViewModel) {
     val view = state.pipelineView
     val proposal = view?.patchProposal
     val completionDetails = holeCompletionDetails(view)
-    val savedCurrentRevision = remember(view?.executionId, view?.revision, state.selectedHistory?.renderMetadataJson) {
-        runCatching {
-            val metadata = JSONObject(state.selectedHistory?.renderMetadataJson ?: "{}")
-            metadata.optString("pipeline_execution_id") == view?.executionId &&
-                metadata.optString("pipeline_revision") == view?.revision
-        }.getOrDefault(false)
+    val savedCurrentRevision = savedPipelineRevision(state)
+    val status = pipelineStatusPresentation(state, S)
+    status.attentionText?.let { attention ->
+        Text(attention, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
     }
     if (proposal != null) {
         Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(Dimens.radiusCard)) {
@@ -6768,7 +6775,7 @@ private fun PipelineStatusPanel(state: InkuUiState, viewModel: InkuViewModel) {
                 }
             }
         }
-    } else if (view?.phaseTag == "score_ready" || (view?.phaseTag == "completed" && !savedCurrentRevision)) {
+    } else if (status.canResume) {
         TextButton(onClick = viewModel::resumePipeline, enabled = !state.isDrawing) { Text(S.pipelineResume) }
     }
     if (proposal == null) HoleCompletionReasons(completionDetails)

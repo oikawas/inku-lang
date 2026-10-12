@@ -18,7 +18,7 @@ from inku_server.vision_client import vision_text
 IMAGE = "data:image/png;base64,iVBORw0KGgo="
 
 
-def _ask(kind: str, answer: dict, base_url: str = "https://provider.example"):
+def _ask(kind: str, answer: dict, base_url: str = "https://provider.example", model: str = "gemma-4-31b-it"):
     sent: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -27,7 +27,7 @@ def _ask(kind: str, answer: dict, base_url: str = "https://provider.example"):
 
     text = vision_text(
         {"id": kind, "kind": kind, "base_url": base_url, "api_key": "k", "requires_api_key": True},
-        "gemma-4-31b-it",
+        model,
         system="observe",
         text="what changed?",
         images=[IMAGE],
@@ -62,6 +62,21 @@ def test_anthropic_sends_a_base64_image_block():
     assert "temperature" not in body
     assert body["messages"][0]["content"][0] == {
         "type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "iVBORw0KGgo="},
+    }
+
+
+def test_anthropic_vision_leaves_room_for_thinking_and_says_when_it_ran_out(caplog):
+    # Haiku 5.5 thinks unasked; 320 tokens of advice JSON were cut (draw, 2026-10-12).
+    cut = {"stop_reason": "max_tokens", "usage": {"output_tokens": 8452},
+           "content": [{"type": "thinking", "thinking": "..."}, {"type": "text", "text": '{"observation": "A ci'}]}
+    with caplog.at_level("WARNING", logger="inku_server.vision_client"):
+        text, _request, body = _ask("anthropic", cut, model="claude-haiku-5-5")
+    assert body["max_tokens"] == 260 + 8192
+    assert text == '{"observation": "A ci'
+    line = next(r.getMessage() for r in caplog.records if r.getMessage().startswith("provider_output_limit "))
+    assert json.loads(line.split(" ", 1)[1]) == {
+        "action": "vision", "provider": "anthropic", "model": "claude-haiku-5-5", "max_tokens": 8452,
+        "stop_reason": "max_tokens", "output_tokens": 8452, "thinking_blocks": 1, "has_text": True, "has_tool_use": False,
     }
 
 

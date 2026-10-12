@@ -20,6 +20,7 @@ from urllib.parse import quote
 
 import httpx
 
+from .anthropic_request import anthropic_max_tokens, output_limit_record
 from .gemini_request import gemini_thinking
 from .openai_request import openai_sampling
 from .provider_refusal import provider_error
@@ -85,7 +86,7 @@ def _request(connection: dict[str, Any], model_id: str, *, system: str, text: st
         # No temperature, as the pipeline sends Anthropic: the colophon with
         # claude-sonnet-5 was refused 400 while one was sent (2026-09-28).
         return base + "/v1/messages", headers, {
-            "model": model_id, "max_tokens": max_tokens, "system": system,
+            "model": model_id, "max_tokens": anthropic_max_tokens(model_id, max_tokens), "system": system,
             "messages": [{"role": "user", "content": blocks}],
         }
     if kind == "gemini":
@@ -150,4 +151,13 @@ def vision_text(connection: dict[str, Any], model_id: str, *, system: str, text:
             "status": response.status_code, **provider_error(response.content[:16384]),
         }, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
     response.raise_for_status()
-    return _answer(str(connection.get("kind")), response.json()).strip()
+    data = response.json()
+    cut = output_limit_record(data) if connection.get("kind") == "anthropic" else None
+    if cut is not None:
+        # Returned as it is: a cut colophon is still prose, and cut advice JSON
+        # fails where it is parsed. This line says the budget, not the image, ran out.
+        _logger.warning("provider_output_limit %s", json.dumps({
+            "action": "vision", "provider": connection.get("id"), "model": model_id,
+            "max_tokens": body["max_tokens"], **cut,
+        }, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+    return _answer(str(connection.get("kind")), data).strip()

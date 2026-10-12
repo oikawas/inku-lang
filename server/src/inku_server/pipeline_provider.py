@@ -19,6 +19,7 @@ import httpx
 from .api_core.common import _is_qualified_model_id
 from .model_settings import connection_for, provider_for_model
 from .provider_limits import provider_slot
+from .anthropic_request import anthropic_max_tokens, output_limit_record
 from .gemini_request import gemini_thinking
 from .openai_request import openai_sampling
 from .provider_refusal import provider_error as _provider_error
@@ -362,7 +363,7 @@ class SingleAttemptProvider:
         elif kind == "anthropic":
             url = base + "/v1/messages"
             headers.update({"x-api-key": key, "anthropic-version": "2023-06-01"})
-            body = {"model": model, "max_tokens": self.options.max_tokens,
+            body = {"model": model, "max_tokens": anthropic_max_tokens(model, self.options.max_tokens),
                     "system": prompt["system"],
                     "messages": [{"role": "user", "content": prompt["message"]}],
                     "tools": [{
@@ -516,6 +517,16 @@ class SingleAttemptProvider:
             else:
                 text = message.get("content")
         elif kind == "anthropic":
+            # A response stopped at max_tokens is cut off whatever it holds: a
+            # tool input or JSON text that ends there is not the whole answer.
+            cut = output_limit_record(data)
+            if cut is not None:
+                self.failure_detail = "output_limit_reached"
+                _logger.warning("provider_output_limit %s", json.dumps({
+                    "action": action["tag"], "provider": connection["id"], "model": model,
+                    "max_tokens": body["max_tokens"], **cut,
+                }, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+                raise TypeError("provider output reached max_tokens")
             calls = [block for block in data["content"] if block.get("type") == "tool_use"]
             if calls:
                 if len(calls) != 1 or calls[0].get("name") != response_name:

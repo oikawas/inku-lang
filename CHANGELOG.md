@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Leave Claude room to think, and record an answer cut off at the limit
+
+Claude 5 models think when no thinking setting is sent, and the thinking counts toward `max_tokens`. Sonnet 5 spent 2,047-2,048 of a 2,048 drawing budget thinking, so six drawings had no picture, and 320-token Vision advice JSON was cut. Requests to the Claude 5 models and Mythos Preview now add 8,192 tokens of room to the answer's budget; Claude 4.x, which does not think unasked, is unchanged. Thinking is not disabled: several models refuse it, and without it Haiku 5.5 and Opus 5 can drop the tool call. A drawing response stopped at `max_tokens` is never used as an answer and logs a `provider_output_limit` line; Vision returns the text and logs the same line. Other providers are unchanged.
+
 ### 2026-10-12 — Save ChatGPT plan model assessments per personal registration
 
 Server/Web model details can edit and save LLM, Stage 1, Stage 2 and Vision recommendations, speed class and measured label, and Japanese/English comments. Assessments are encrypted per owner and registration, preserving publication, purposes, upstream catalogs and credentials. Catalog refresh and reauthorization/import of the same identity retain them; active-registration and generation checks refuse saves from stale screens. The existing API also supports assessment-only partial patches: omission keeps a field and `null` removes its personal override.

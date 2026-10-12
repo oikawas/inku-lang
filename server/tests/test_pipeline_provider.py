@@ -284,6 +284,30 @@ def test_anthropic_offers_the_core_schema_tool_and_extracts_its_input(monkeypatc
     assert request_body["tool_choice"] == {"type": "auto"}
 
 
+def test_anthropic_drawing_leaves_room_for_thinking_and_a_cut_tool_input_is_not_an_answer(monkeypatch):
+    # Sonnet 5 thought 2,047-2,048 of a 2,048 drawing budget (draw, 2026-10-12).
+    monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model",
+                        lambda *args, **kwargs: ("anthropic", "claude-sonnet-5"))
+    monkeypatch.setattr("inku_server.pipeline_provider.connection_for", lambda *args: {
+        "id": "anthropic", "kind": "anthropic", "base_url": "https://api.anthropic.invalid",
+        "api_key": "test-only", "requires_api_key": True,
+    })
+    seen = []
+
+    async def request(value):
+        seen.append(value)
+        return httpx.Response(200, json={"stop_reason": "max_tokens", "usage": {"output_tokens": 8448}, "content": [
+            {"type": "thinking", "thinking": "..."},
+            {"type": "tool_use", "name": "submit_pipeline_response", "input": {"normalized_ddl": "cut he"}},
+        ]})
+
+    provider = SingleAttemptProvider(ProviderOptions({}, "m", "m", 256, 8192), transport=httpx.MockTransport(request))
+    result = provider(_action())
+    assert json.loads(seen[0].content)["max_tokens"] == 256 + 8192
+    assert result["failure"] == "malformed_payload"
+    assert provider.failure_detail == "output_limit_reached"
+
+
 def test_anthropic_answer_given_as_text_is_read_as_the_response_object(monkeypatch):
     monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model",
                         lambda *args, **kwargs: ("anthropic", "claude-opus-5-5"))

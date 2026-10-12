@@ -103,7 +103,11 @@ export function createExportActions(deps: ExportDeps) {
 		// through the getters after the rasterisation, which is asynchronous.
 		const generatedAt = deps.displayedHistoryItem()?.at ?? deps.result()?.history_at ?? Date.now();
 		const stamped = await withPngCaptureDate(png, new Date(generatedAt));
-		deps.onSaved?.(await triggerDownload(stamped, deps.exportFilename('png', size)));
+		// Saved before the report, not inside its argument list: an optional call
+		// skips its arguments when there is no reporter, and the saved-work menu
+		// passes none, so the file never left the page.
+		const outcome = await triggerDownload(stamped, deps.exportFilename('png', size));
+		deps.onSaved?.(outcome);
 	}
 
 	return { downloadSVG, downloadPNG };

@@ -1488,11 +1488,19 @@ impl Execution<'_> {
         }
         let prior = prior.ok_or(ScoreExecutionReason::JointReferenceOmitted)?;
         let prior_primitive = self.request.score.instructions[target].primitive;
+        let paper = Bounds {
+            min: Point::new(0.0, 0.0),
+            max: crate::geometry::point_to_short_side_units(
+                Point::new(1.0, 1.0),
+                self.request.canvas,
+            ),
+        };
         let preferred = crate::joint_relation::preferred(
             relation.kind,
             own,
             prior,
             prior_primitive,
+            paper,
             self.request.performance_seed.unwrap_or_default(),
             ordinal,
         )

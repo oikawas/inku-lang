@@ -150,6 +150,29 @@ fn a_wide_shape_crosses_a_horizontal_line_from_above_to_below() {
 }
 
 #[test]
+fn a_joint_takes_its_free_position_on_the_part_of_the_previous_shape_on_the_paper() {
+    // A track running off the right edge, and a square running off it.
+    let track = json!({"primitive": "line", "from": [0.3, 0.65], "to": [1.45, 0.65]});
+    let footprints = json!({"primitive": "ellipse", "center": [0.2, 0.2], "size": [0.6, 0.3]});
+    let square = json!({"primitive": "square", "position": [0.6, 0.5], "size": [1.0, 0.2]});
+    let circle = json!({"primitive": "circle", "center": [0.1, 0.1], "radius": 0.05});
+    for seed in SEEDS {
+        let crossing = plan(&joint(track.clone(), footprints.clone(), "crossing"), seed);
+        assert!(crossing.execution.is_none(), "{:?}", crossing.execution);
+        let own = bounds(&crossing, 1, seed);
+        let x = own.center().x;
+        assert!((0.3..=1.0).contains(&x), "{own:?}");
+        let resting = plan(&joint(square.clone(), circle.clone(), "resting_on"), seed);
+        assert!(resting.execution.is_none(), "{:?}", resting.execution);
+        let own = bounds(&resting, 1, seed);
+        assert!(
+            own.min.x >= 0.6 - 1e-9 && own.max.x <= 1.0 + 1e-9,
+            "{own:?}"
+        );
+    }
+}
+
+#[test]
 fn a_joint_the_shapes_cannot_hold_omits_only_its_relation() {
     let small_square = json!({"primitive": "square", "position": [0.45, 0.45], "size": [0.1, 0.1]});
     let large = json!({"primitive": "circle", "center": [0.2, 0.2], "radius": 0.2});

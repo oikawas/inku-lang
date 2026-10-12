@@ -3070,7 +3070,12 @@ sequential resolution.
   translate the current element only, from the performed bounds of the current
   and preceding elements. The preceding element never moves, and the current
   keeps its shape, dimensions and direction; free coordinates come from the
-  performance seed. `resting_on` sets the current lower edge on the preceding
+  performance seed. The resting, crossing and inside positions are drawn from
+  the part of the preceding element (its inner rectangle for `inside`) on the
+  paper when the current fits there, and from the whole element otherwise;
+  overlapping tries other directions in turn only when the seed's direction
+  leaves the current's center off the paper (the author's decision,
+  2026-10-12). `resting_on` sets the current lower edge on the preceding
   top and chooses the horizontal center where the current fits the preceding
   width (the center when it is wider). `inside` chooses a position inside the
   preceding closed element's inner rectangle (the bounds of a square; the bounds

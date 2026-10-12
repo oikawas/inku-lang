@@ -4,8 +4,9 @@
 //! Each is placed from the performed bounds of the current and the previous
 //! shape by translation only. The previous shape never moves and the current
 //! keeps its shape, size and direction; free coordinates come from the
-//! performance seed. A joint that the shapes cannot satisfy is reported and
-//! only the relation is omitted.
+//! performance seed, from the part of the previous shape on the paper when the
+//! current shape fits there. A joint that the shapes cannot satisfy is reported
+//! and only the relation is omitted.
 
 use crate::planning::Bounds;
 use crate::types::{Point, Seed};
@@ -15,6 +16,10 @@ use inku_score::{Primitive, RelationType};
 const OVERLAP_ACCEPTED: (f64, f64) = (0.25, 0.75);
 /// The share the performance chooses from, inside the accepted range.
 const OVERLAP_CHOSEN: (f64, f64) = (1.0 / 3.0, 2.0 / 3.0);
+/// The directions overlapping tries, in equal steps of a full turn from the
+/// seed's direction, when that direction leaves the current shape's center
+/// off the paper.
+const OVERLAP_TURNS: usize = 16;
 const EPSILON: f64 = 1e-9;
 
 fn width(bounds: Bounds) -> f64 {
@@ -43,6 +48,22 @@ fn overlap_share(own: Bounds, prior: Bounds) -> f64 {
         return 0.0;
     }
     w * h / area
+}
+
+/// The part of `bounds` on the paper, when there is one.
+fn on_paper(bounds: Bounds, paper: Bounds) -> Option<Bounds> {
+    let part = Bounds {
+        min: Point::new(bounds.min.x.max(paper.min.x), bounds.min.y.max(paper.min.y)),
+        max: Point::new(bounds.max.x.min(paper.max.x), bounds.max.y.min(paper.max.y)),
+    };
+    (part.min.x <= part.max.x && part.min.y <= part.max.y).then_some(part)
+}
+
+fn on_the_paper(point: Point, paper: Bounds) -> bool {
+    point.x >= paper.min.x
+        && point.x <= paper.max.x
+        && point.y >= paper.min.y
+        && point.y <= paper.max.y
 }
 
 /// Whether crossing goes across the height of the previous shape: across its
@@ -126,12 +147,20 @@ pub(crate) fn accepts(
 
 /// The translation the performance prefers for the joint, or `None` when the
 /// shapes cannot satisfy it.
+///
+/// The free coordinates (where along the previous shape the current one rests
+/// or crosses, where inside it the current one goes) are drawn from the part
+/// of the previous shape on the paper when the current shape fits there, and
+/// from the whole previous shape otherwise. Overlapping keeps the seed's
+/// direction unless it leaves the current shape's center off the paper; then
+/// it takes the first other direction that does not.
 #[must_use]
 pub(crate) fn preferred(
     kind: RelationType,
     own: Bounds,
     prior: Bounds,
     prior_primitive: Primitive,
+    paper: Bounds,
     seed: Seed,
     ordinal: usize,
 ) -> Option<Point> {
@@ -142,10 +171,13 @@ pub(crate) fn preferred(
             if prior_primitive == Primitive::Point {
                 return None;
             }
-            let x = if width(own) <= width(prior) {
-                prior.min.x
+            let room = on_paper(prior, paper)
+                .filter(|room| width(own) <= width(*room))
+                .unwrap_or(prior);
+            let x = if width(own) <= width(room) {
+                room.min.x
                     + width(own) / 2.0
-                    + draw("resting-on-position") * (width(prior) - width(own))
+                    + draw("resting-on-position") * (width(room) - width(own))
             } else {
                 prior.center().x
             };
@@ -156,13 +188,18 @@ pub(crate) fn preferred(
             if width(own) > width(region) + EPSILON || height(own) > height(region) + EPSILON {
                 return None;
             }
+            let room = on_paper(region, paper)
+                .filter(|room| {
+                    width(own) <= width(*room) + EPSILON && height(own) <= height(*room) + EPSILON
+                })
+                .unwrap_or(region);
             let free = Point::new(
-                (width(region) - width(own)).max(0.0),
-                (height(region) - height(own)).max(0.0),
+                (width(room) - width(own)).max(0.0),
+                (height(room) - height(own)).max(0.0),
             );
             Point::new(
-                region.min.x + width(own) / 2.0 + draw("inside-x") * free.x,
-                region.min.y + height(own) / 2.0 + draw("inside-y") * free.y,
+                room.min.x + width(own) / 2.0 + draw("inside-x") * free.x,
+                room.min.y + height(own) / 2.0 + draw("inside-y") * free.y,
             )
         }
         RelationType::Overlapping => {
@@ -171,54 +208,70 @@ pub(crate) fn preferred(
             }
             let share =
                 OVERLAP_CHOSEN.0 + draw("overlap-share") * (OVERLAP_CHOSEN.1 - OVERLAP_CHOSEN.0);
-            let angle = std::f64::consts::TAU * draw("overlap-angle");
-            let direction = Point::new(angle.cos(), angle.sin());
-            let at = |distance: f64| {
-                let point = Point::new(
-                    prior.center().x + direction.x * distance,
-                    prior.center().y + direction.y * distance,
-                );
-                overlap_share(
-                    moved(own, Point::new(point.x - center.x, point.y - center.y)),
-                    prior,
+            let toward = |turn: f64| {
+                let angle = std::f64::consts::TAU * (draw("overlap-angle") + turn);
+                let direction = Point::new(angle.cos(), angle.sin());
+                let at = |distance: f64| {
+                    let point = Point::new(
+                        prior.center().x + direction.x * distance,
+                        prior.center().y + direction.y * distance,
+                    );
+                    overlap_share(
+                        moved(own, Point::new(point.x - center.x, point.y - center.y)),
+                        prior,
+                    )
+                };
+                // The share never grows as the center moves away along one ray.
+                let (mut near, mut far) =
+                    (0.0, width(own) + height(own) + width(prior) + height(prior));
+                for _ in 0..64 {
+                    let middle = (near + far) / 2.0;
+                    if at(middle) >= share {
+                        near = middle;
+                    } else {
+                        far = middle;
+                    }
+                }
+                Point::new(
+                    prior.center().x + direction.x * near,
+                    prior.center().y + direction.y * near,
                 )
             };
-            if at(0.0) < share {
+            let centered = moved(
+                own,
+                Point::new(prior.center().x - center.x, prior.center().y - center.y),
+            );
+            if overlap_share(centered, prior) < share {
                 return None;
             }
-            // The share never grows as the center moves away along one ray.
-            let (mut near, mut far) =
-                (0.0, width(own) + height(own) + width(prior) + height(prior));
-            for _ in 0..64 {
-                let middle = (near + far) / 2.0;
-                if at(middle) >= share {
-                    near = middle;
-                } else {
-                    far = middle;
-                }
+            let seeded = toward(0.0);
+            if on_the_paper(seeded, paper) {
+                seeded
+            } else {
+                (1..OVERLAP_TURNS)
+                    .map(|turn| toward(turn as f64 / OVERLAP_TURNS as f64))
+                    .find(|point| on_the_paper(*point, paper))
+                    .unwrap_or(seeded)
             }
-            Point::new(
-                prior.center().x + direction.x * near,
-                prior.center().y + direction.y * near,
-            )
         }
         RelationType::Crossing => {
             let across = draw("crossing-across");
             let along = draw("crossing-along") - 0.5;
+            let room = on_paper(prior, paper).unwrap_or(prior);
             if !crosses_vertically(own, prior) {
                 if width(own) <= width(prior) + EPSILON {
                     return None;
                 }
                 Point::new(
                     prior.center().x + along * (width(own) - width(prior)) / 2.0,
-                    prior.min.y + across * height(prior),
+                    room.min.y + across * height(room),
                 )
             } else {
                 if height(own) <= height(prior) + EPSILON {
                     return None;
                 }
                 Point::new(
-                    prior.min.x + across * width(prior),
+                    room.min.x + across * width(room),
                     prior.center().y + along * (height(own) - height(prior)) / 2.0,
                 )
             }
@@ -265,6 +318,10 @@ mod tests {
         }
     }
 
+    fn paper() -> Bounds {
+        bounds(0.0, 0.0, 1.0, 1.0)
+    }
+
     #[test]
     fn every_joint_accepts_its_preferred_translation_for_several_seeds() {
         let prior = bounds(0.3, 0.4, 0.7, 0.6);
@@ -278,7 +335,7 @@ mod tests {
                 (RelationType::Crossing, tall),
             ] {
                 let primitive = Primitive::Ellipse;
-                let delta = preferred(kind, own, prior, primitive, seed, 0)
+                let delta = preferred(kind, own, prior, primitive, paper(), seed, 0)
                     .unwrap_or_else(|| panic!("{kind:?} seed {seed}"));
                 assert!(
                     accepts(kind, own, prior, inside_region(primitive, prior), delta),
@@ -293,14 +350,37 @@ mod tests {
         let prior = bounds(0.4, 0.4, 0.6, 0.6);
         let large = bounds(0.0, 0.0, 0.5, 0.5);
         let short = bounds(0.0, 0.0, 0.1, 0.02);
-        assert!(preferred(RelationType::Inside, large, prior, Primitive::Square, 1, 0).is_none());
-        assert!(preferred(RelationType::Inside, short, prior, Primitive::Line, 1, 0).is_none());
+        assert!(
+            preferred(
+                RelationType::Inside,
+                large,
+                prior,
+                Primitive::Square,
+                paper(),
+                1,
+                0
+            )
+            .is_none()
+        );
+        assert!(
+            preferred(
+                RelationType::Inside,
+                short,
+                prior,
+                Primitive::Line,
+                paper(),
+                1,
+                0
+            )
+            .is_none()
+        );
         assert!(
             preferred(
                 RelationType::Crossing,
                 short,
                 prior,
                 Primitive::Square,
+                paper(),
                 1,
                 0
             )
@@ -312,6 +392,7 @@ mod tests {
                 short,
                 prior,
                 Primitive::Point,
+                paper(),
                 1,
                 0
             )
@@ -333,6 +414,7 @@ mod tests {
                 wide,
                 horizontal,
                 Primitive::Line,
+                paper(),
                 seed,
                 0,
             )
@@ -351,6 +433,7 @@ mod tests {
                 tall,
                 vertical,
                 Primitive::Line,
+                paper(),
                 seed,
                 0,
             )
@@ -358,6 +441,94 @@ mod tests {
             assert!(accepts(RelationType::Crossing, tall, vertical, None, delta));
             let placed = moved(tall, delta);
             assert!(placed.min.x < 0.5 && placed.max.x > 0.5, "{placed:?}");
+        }
+    }
+
+    #[test]
+    fn a_previous_shape_on_the_paper_keeps_every_translation() {
+        // The paper only narrows where the previous shape runs off it.
+        let prior = bounds(0.3, 0.4, 0.7, 0.6);
+        let small = bounds(0.05, 0.05, 0.15, 0.1);
+        let tall = bounds(0.0, 0.0, 0.05, 0.6);
+        let everywhere = bounds(-10.0, -10.0, 10.0, 10.0);
+        for seed in 1_i128..=8 {
+            for (kind, own) in [
+                (RelationType::RestingOn, small),
+                (RelationType::Inside, small),
+                (RelationType::Overlapping, small),
+                (RelationType::Crossing, tall),
+            ] {
+                let primitive = Primitive::Ellipse;
+                assert_eq!(
+                    preferred(kind, own, prior, primitive, paper(), seed, 0),
+                    preferred(kind, own, prior, primitive, everywhere, seed, 0),
+                    "{kind:?} seed {seed}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn free_positions_come_from_the_part_of_the_previous_shape_on_the_paper() {
+        let small = bounds(0.0, 0.0, 0.1, 0.1);
+        // A square running off the right edge, and a track line running off it.
+        let off_right = bounds(0.6, 0.4, 1.6, 0.8);
+        let track = bounds(0.3, 0.65, 1.45, 0.65);
+        let footprints = bounds(0.0, 0.0, 0.6, 0.5);
+        let corner = bounds(0.85, 0.85, 1.2, 1.2);
+        for seed in 1_i128..=8 {
+            for kind in [RelationType::RestingOn, RelationType::Inside] {
+                let delta = preferred(kind, small, off_right, Primitive::Square, paper(), seed, 0)
+                    .unwrap_or_else(|| panic!("{kind:?} seed {seed}"));
+                let placed = moved(small, delta);
+                assert!(
+                    placed.min.x >= 0.6 - 1e-9 && placed.max.x <= 1.0 + 1e-9,
+                    "{kind:?} seed {seed} {placed:?}"
+                );
+                assert!(accepts(
+                    kind,
+                    small,
+                    off_right,
+                    inside_region(Primitive::Square, off_right),
+                    delta
+                ));
+            }
+            let delta = preferred(
+                RelationType::Crossing,
+                footprints,
+                track,
+                Primitive::Line,
+                paper(),
+                seed,
+                0,
+            )
+            .unwrap_or_else(|| panic!("crossing seed {seed}"));
+            let placed = moved(footprints, delta);
+            let x = placed.center().x;
+            assert!((0.3..=1.0).contains(&x), "crossing seed {seed} {placed:?}");
+            assert!(placed.min.y < 0.65 && placed.max.y > 0.65);
+            let delta = preferred(
+                RelationType::Overlapping,
+                small,
+                corner,
+                Primitive::Square,
+                paper(),
+                seed,
+                0,
+            )
+            .unwrap_or_else(|| panic!("overlapping seed {seed}"));
+            let center = moved(small, delta).center();
+            assert!(
+                center.x <= 1.0 && center.y <= 1.0,
+                "overlapping seed {seed} {center:?}"
+            );
+            assert!(accepts(
+                RelationType::Overlapping,
+                small,
+                corner,
+                None,
+                delta
+            ));
         }
     }
 

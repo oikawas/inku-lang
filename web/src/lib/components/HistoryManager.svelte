@@ -934,6 +934,7 @@
 						{#if onShareItem && previewItem && !previewItem.shared}<button class="ghost-btn" type="button" onclick={() => previewItem && onShareItem?.(previewItem)}>{isJapanese ? '共有設定' : 'Share settings'}</button>{/if}
 						<SavedWorkExportMenu
 							scope={previewExportScope}
+							floating
 							animationSettings={animationExportSettings}
 							{pngTemplates}
 							onDownloadSVG={onDownloadSavedWorkSVG}

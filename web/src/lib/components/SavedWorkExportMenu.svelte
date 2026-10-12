@@ -18,6 +18,8 @@
 		animationSettings: AnimationExportSettings;
 		pngTemplates?: ExportTemplate[];
 		variant?: 'canvas' | 'panel';
+		/** Open over the page, for a trigger inside a pane that scrolls and so clips. */
+		floating?: boolean;
 		onDownloadSVG?: (profile: SvgProfile, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
 		onDownloadPNG?: (height: number, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
 		onDownloadCard?: (historyId: string, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
@@ -32,6 +34,7 @@
 		animationSettings,
 		pngTemplates = [],
 		variant = 'panel',
+		floating = false,
 		onDownloadSVG,
 		onDownloadPNG,
 		onDownloadCard,
@@ -55,6 +58,39 @@
 	let cardRunning = $state(false);
 	const single = $derived((snapshot?.ids.length ?? 0) === 1);
 	const transition = $derived((snapshot?.ids.length ?? 0) > 1);
+	let floatingStyle = $state<string | null>(null);
+
+	// The library's preview pane scrolls, so an absolute menu is cut at its
+	// edge. A floating menu is placed from the trigger in viewport pixels, the
+	// way ModelCardPicker places its card: below when it fits, else above, and
+	// kept inside the window.
+	function placeFloatingMenu(): void {
+		if (!triggerEl || !menuEl) return;
+		const b = triggerEl.getBoundingClientRect();
+		const margin = 16;
+		const gap = 6;
+		const left = Math.max(margin, Math.min(b.left, window.innerWidth - menuEl.offsetWidth - margin));
+		const below = window.innerHeight - b.bottom - gap - margin;
+		const above = b.top - gap - margin;
+		const openUp = below < Math.min(menuEl.scrollHeight, 240) && above > below;
+		const vertical = openUp
+			? `top: auto; bottom: ${window.innerHeight - b.top + gap}px;`
+			: `top: ${b.bottom + gap}px; bottom: auto;`;
+		floatingStyle = `left: ${left}px; right: auto; ${vertical} max-height: min(520px, ${Math.max(0, openUp ? above : below)}px);`;
+	}
+
+	$effect(() => {
+		if (!floating || !open || !menuEl) return;
+		void svgHelpOpen; // the help table widens the menu
+		placeFloatingMenu();
+		// The pane scrolls under a fixed menu, so the menu follows its trigger.
+		window.addEventListener('resize', placeFloatingMenu);
+		window.addEventListener('scroll', placeFloatingMenu, true);
+		return () => {
+			window.removeEventListener('resize', placeFloatingMenu);
+			window.removeEventListener('scroll', placeFloatingMenu, true);
+		};
+	});
 
 	function scopeLabel(target: SavedWorkExportSnapshot): string {
 		if (target.description) return target.description;
@@ -177,7 +213,7 @@
 		{#if variant === 'panel'}<span>{t().exportLabel} ▾</span>{/if}
 	</button>
 	{#if open && snapshot}
-		<div bind:this={menuEl} class="saved-work-export-menu" class:wide={svgHelpOpen} role="menu" tabindex="-1" onkeydown={onMenuKeydown}>
+		<div bind:this={menuEl} class="saved-work-export-menu" class:wide={svgHelpOpen} class:floating style={floating ? floatingStyle : null} role="menu" tabindex="-1" onkeydown={onMenuKeydown}>
 			<div class="saved-work-export-scope">
 				<strong>{scopeLabel(snapshot)}</strong>
 				{#if transition && snapshot.kind !== 'lineage-path'}<span>{t().savedWorkExportOldestFirst}</span>{/if}
@@ -292,6 +328,7 @@
 	.saved-work-export-group button:hover:not(:disabled) { background: var(--bg); }
 	.saved-work-export-group button:disabled { opacity: .55; cursor: default; }
 	.saved-work-export-menu.wide { width: min(480px, calc(100vw - 32px)); }
+	.saved-work-export-menu.floating { position: fixed; }
 	.saved-work-export-group button { display: grid; gap: 1px; }
 	.saved-work-export-name { font-weight: 500; }
 	.saved-work-export-sub { color: var(--fg3); font-size: var(--ui-font-size-11); }

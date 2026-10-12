@@ -13,7 +13,9 @@ func runAuxiliaryProvenanceChecks() async throws {
     let transport = AuxiliaryProvenanceProvider()
     let app = AppModel(databaseURL: databaseURL, transport: transport)
     await app.initialize()
-    let service = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false)
+    // Drawing takes only a registered LLM model (Swift's drawing guard); the Vision model also draws its children.
+    let service = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
+                                   models: [.init(id: "generation"), .init(id: "vision", purposes: ["llm", "vision"])])
     try await app.updateHostSettings(HostSettings(providers: [service],
         models: ModelSelection(stage1Model: "check:generation", stage2Model: "check:generation")))
     app.inputMode = "description"; app.descriptionText = "a red circle"; app.seedText = "42"

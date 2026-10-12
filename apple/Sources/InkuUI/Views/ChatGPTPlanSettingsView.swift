@@ -1,21 +1,23 @@
 import InkuHost
 import SwiftUI
 
+/// ChatGPTSettings.svelte: the tab connects the account only. Models are published in model settings.
 public struct ChatGPTPlanSettingsView: View {
     @Bindable private var app: AppModel
+    private let onOpenModelSettings: () -> Void
     @State private var controller = ChatGPTPlanSettingsModel()
     @Environment(\.openURL) private var openURL
-    public init(model: AppModel) { app = model }
+    public init(model: AppModel, onOpenModelSettings: @escaping () -> Void) { app = model; self.onOpenModelSettings = onOpenModelSettings }
     public var body: some View {
         Group {
             Section(app.display.localized("個人ChatGPTプラン")) {
-                Text(app.display.localized("本人のChatGPTプランで描画できます。APIキー接続とは別に、使うアカウントと提供モデルを選びます。保存作品はこのMacの同じライブラリに残ります。"))
+                Text(app.display.localized("本人のChatGPTプランで描画できます。APIキー接続とは別に、使うアカウントを接続します。描画に使うモデルはモデル設定で選びます。保存作品はこのMacの同じライブラリに残ります。"))
                     .foregroundStyle(.secondary)
                 Toggle(app.display.localized("個人ChatGPTプラン接続を有効にする"), isOn: Binding(
                     get: { controller.state?.enabled ?? false },
                     set: { value in Task { await controller.setEnabled(value, app: app) } }))
                     .disabled(controller.busy)
-                Text(app.display.localized("記述の解釈・写生・自動配色選択・指示書の補完で利用できます。Vision推敲、奥書、デモ記述生成、モデル調査には対応していません。"))
+                Text(app.display.localized("記述の解釈・写生・自動配色選択・指示書の補完、Vision推敲と奥書で利用できます。デモ記述生成とモデル調査には対応していません。"))
                     .inkuFont(12).foregroundStyle(.secondary)
                 if controller.state?.enabled == true {
                     Button(app.display.localized("新しい個人プロファイルを接続")) {
@@ -53,16 +55,11 @@ public struct ChatGPTPlanSettingsView: View {
                     Link(app.display.localized("ChatGPTの利用状況を確認"), destination: URL(string: "https://chatgpt.com/settings/usage")!)
                 }
             }
-            if controller.state?.enabled == true {
-                Section(app.display.localized("本人に提供された描画モデル")) {
-                    Button(app.display.localized("モデル一覧を更新")) { Task { await controller.refreshModels(app: app) } }.disabled(controller.busy)
-                    ForEach(controller.models) { model in
-                        HStack {
-                            VStack(alignment: .leading) { Text(model.label); Text(model.id).inkuFont(12).foregroundStyle(.secondary) }
-                            Spacer()
-                            Button(app.display.localized("描画に使用")) { Task { await controller.selectModel(model.id, app: app) } }
-                        }.disabled(controller.busy)
-                    }
+            if controller.connected {
+                Section {
+                    Text(app.display.webCopy("chatgptModelSettingsGuide", "接続が完了しました。モデル設定で「ChatGPTプラン」のモデル一覧を取得し、公開するモデルを選んで保存してください。その後、描画モデルを選択できます。"))
+                        .foregroundStyle(.secondary)
+                    Button(app.display.webCopy("chatgptOpenModelSettings", "モデル設定を開く"), action: onOpenModelSettings)
                 }
             }
             if controller.busy { ProgressView() }

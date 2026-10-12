@@ -34,6 +34,27 @@ public struct ChatGPTPlanModel: Identifiable, Codable, Sendable, Equatable {
     public init(id: String, label: String) { self.id = id; self.label = label }
 }
 
+/// Server chatgpt_models.publication: the active profile's saved catalog with its published marks.
+public struct ChatGPTPlanPublication: Sendable, Equatable {
+    /// A ChatGPT plan model takes images, so a model without a saved choice serves both purposes.
+    public static let defaultPurposes = ["llm", "vision"]
+    public let profileID: String
+    public let generation: Int64
+    public let models: [ChatGPTPlanModel]
+    public let published: Set<String>
+    /// Every catalog model's purposes, in `llm`, `vision` order.
+    public let purposes: [String: [String]]
+    public init(profileID: String, generation: Int64, models: [ChatGPTPlanModel], published: Set<String>,
+                purposes: [String: [String]] = [:]) {
+        self.profileID = profileID; self.generation = generation; self.models = models; self.published = published
+        self.purposes = Dictionary(uniqueKeysWithValues: models.map { ($0.id, Self.ordered(purposes[$0.id] ?? Self.defaultPurposes)) })
+    }
+    /// In catalog order, as Server's drawing and Vision catalogs list them.
+    public var publishedModels: [ChatGPTPlanModel] { models.filter { published.contains($0.id) } }
+    public func purposes(of id: String) -> [String] { purposes[id] ?? Self.defaultPurposes }
+    static func ordered(_ purposes: [String]) -> [String] { ["llm", "vision"].filter(purposes.contains) }
+}
+
 struct ChatGPTStoredProfile: Codable, Sendable {
     var id: String
     var issuer: String
@@ -51,6 +72,10 @@ struct ChatGPTStoredProfile: Codable, Sendable {
     var earliestRefreshAt: Date
     var models: [ChatGPTPlanModel]?
     var modelsExpireAt: Date?
+    /// Server `published_models`: the models this profile publishes for drawing. Absent in a vault saved before it.
+    var publishedModels: [String]?
+    /// The purposes chosen per model (`llm`, `vision`); a model without an entry serves both.
+    var modelPurposes: [String: [String]]?
     var publicValue: ChatGPTPlanProfile {
         .init(id: id, label: label, email: email, clientID: clientID, state: state,
               generation: generation, scopes: scopes, expiresAt: expiresAt)

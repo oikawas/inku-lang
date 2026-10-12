@@ -28,6 +28,31 @@ private actor AuxiliaryProbe: AuxiliaryTransport {
     func finish(_ text: String) { pending?.resume(returning: text); pending = nil }
 }
 
+/// Fixes a run like the ChatGPT plan does, and can refuse a cached reading afterwards.
+private actor PinningProbe: AuxiliaryTransport {
+    var begun = 0
+    var runs: [AuxiliaryRun] = []
+    var checks = 0
+    var refuseCached = false
+    let session = ChatGPTPlanSession(profileID: UUID().uuidString, generation: 1)
+    func beginAuxiliaryRun(modelReference: String, settings: HostSettings) async throws -> AuxiliaryRun {
+        begun += 1; return AuxiliaryRun(chatGPTSession: session)
+    }
+    func performAuxiliary(prompt: AuxiliaryPrompt, modelReference: String, settings: HostSettings,
+                          credentials: any CredentialStore, onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
+        throw HostError("unpinned_auxiliary_request")
+    }
+    func performAuxiliary(prompt: AuxiliaryPrompt, modelReference: String, settings: HostSettings, credentials: any CredentialStore,
+                          run: AuxiliaryRun, onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
+        runs.append(run); return "reading"
+    }
+    func checkAuxiliaryRun(_ run: AuxiliaryRun, modelReference: String, settings: HostSettings) async throws {
+        checks += 1
+        if refuseCached { throw HostError("chatgpt_model_not_offered") }
+    }
+    func refuse() { refuseCached = true }
+}
+
 struct AuxiliaryBoundaryTests {
     @Test func cancelledDemoRejectsLateUncooperativeAnswer() async throws {
         let transport = AuxiliaryProbe(delayed: true)
@@ -60,6 +85,34 @@ struct AuxiliaryBoundaryTests {
         #expect(body["messages"].array?.first?["content"].array?.first?["source"]["media_type"].string == "image/png")
         let raw = Data("{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"hidden thought\",\"thought\":true},{\"text\":\" actual answer \"}]}}]}".utf8)
         #expect(try AuxiliaryWire.responseText(raw, kind: .gemini) == "actual answer")
+    }
+
+    // Failure: a colophon pinned a run per request, or a cached reading skipped the run's check.
+    @Test func colophonPinsOneRunAndChecksItBeforeACachedReading() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("inku-auxiliary-\(UUID().uuidString)").appendingPathComponent("test.sqlite")
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        let database = try InkuDatabase(url: file)
+        let root = SavedWork(id: "root", at: 1, input: "CAPTION", score: "{\"instructions\":[{\"primitive\":\"circle\",\"color\":\"red\",\"center\":[0.5,0.5]}]}", svg: "first", lineageNodeID: "node-root")
+        let child = SavedWork(id: "child", at: 2, input: "LATER", score: "{\"instructions\":[{\"primitive\":\"circle\",\"color\":\"blue\",\"center\":[0.5,0.5]}]}", svg: "second", lineageNodeID: "node-child")
+        try await database.save(root, node: LineageNode(id: "node-root", historyID: root.id, at: 1, rootNodeID: "node-root"))
+        try await database.save(child, node: LineageNode(id: "node-child", historyID: child.id, at: 2, rootNodeID: "node-root"),
+            edge: LineageEdge(id: "edge", parentNodeID: "node-root", childNodeID: "node-child", derivationKind: "catalog_change", at: 2))
+        let optionalBranch = try await database.lineage(focusNodeID: "node-child", pathOnly: true)
+        let branch = try #require(optionalBranch)
+        let probe = PinningProbe()
+        let provider = AuxiliaryProvider(transport: probe, credentials: AuxiliaryCredentials())
+        let settings = HostSettings(models: ModelSelection(stage1Model: "service:vision"))
+        let png: @Sendable ([String]) async throws -> Data? = { _ in Data([137, 80, 78, 71, 13, 10, 26, 10]) }
+        _ = try await provider.colophon(branch: branch, language: "en", settings: settings, png: png)
+        let runs = await probe.runs
+        #expect(await probe.begun == 1)
+        #expect(runs.count == 3 && Set(runs.map { $0.chatGPTSession?.profileID }).count == 1)
+        #expect(await probe.checks == 0)
+        await probe.refuse()
+        await #expect(throws: HostError.self) { try await provider.colophon(branch: branch, language: "en", settings: settings, png: png) }
+        #expect(await probe.begun == 2)
+        #expect(await probe.checks == 1)
+        #expect(await probe.runs.count == 3)
     }
 
     @Test func colophonReadsOnlyKnownPrefixAndMechanicalInvariants() async throws {

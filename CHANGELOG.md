@@ -8,6 +8,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-12 — Match Server's ChatGPT plan settings flow in Swift
+
+At the author's instruction, the macOS ChatGPT plan settings now handle the connection only; the model list and "Use for drawing" are gone. Once connected they show a guide and "Open model settings". Models are chosen under the ChatGPT plan in the Models settings: refresh the list, check the models to publish and save. The publication is saved per connected profile and kept when the same identity reauthorizes. Only published models appear as "ChatGPT plan" in the drawing model picker, comparison and drawing defaults. As on Server, a drawing request is sent only for a model that is in the catalog and published. An existing connection also saves its publication once.
+
+After the author's review, the picker gained the other services' filter and each model's LLM and Vision purposes, and ChatGPT plan models now also serve Vision refinement and colophons (author's ruling; Serverセッション-codex was asked to fix Server, and Swift implemented the proposed contract first). Purposes are saved per profile; a model without a saved choice serves both. Vision requests send the images to the Responses endpoint, only for a model published for Vision.
+
+Serverセッション-codex adopted this contract for Server and Web (product `0c488c98`). Checked against Server, Swift now allows a Vision answer of up to 512 KiB of UTF-8, rejects partial-only answers, and refuses invalid saves with `chatgpt_model_not_offered`. A colophon pins its profile when it starts, caches readings per profile, and checks the Vision publication before reusing one.
+
 ### 2026-10-12 — Use ChatGPT plan for Vision refinement and colophons
 
 Server/Web stores LLM/Vision purposes per registration and offers only published models matching the purpose. Unset purposes default to both; models with no purpose cannot be published. Select models now shows Vision filtering, purpose buttons and catalog details. Vision refinement and colophons pin the starting registration, send images and text to Responses and read only completed text. Colophon caches separate registrations/generations and retain publication checks.

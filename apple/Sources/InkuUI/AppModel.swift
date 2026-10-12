@@ -637,6 +637,18 @@ public final class AppModel {
     }
     public func shutdownPersonalPlan() async { await personalRuntime?.shutdown() }
 
+    /// Copies the active ChatGPT profile's published models into the settings the model pickers read. It reads the
+    /// saved publication only (no catalog or token refresh); a profile that cannot be pinned leaves no ChatGPT model.
+    public func synchronizePersonalPlanModels() async {
+        guard let personalRuntime else { return }
+        await synchronizePersonalPlanModels(try? await personalRuntime.publication())
+    }
+    public func synchronizePersonalPlanModels(_ publication: ChatGPTPlanPublication?) async {
+        let next = SettingsModel.mirroringPersonalPlan(settings, publication: publication)
+        guard next != settings else { return }
+        try? await updateHostSettings(next)
+    }
+
     /// New runs pin once before journaling. A supplied pin is checked and is never replaced.
     public func pinPersonalPlanRequests(_ requests: [GenerationRequest]) async throws -> [GenerationRequest] {
         guard let personalRuntime else { throw HostError("pipeline_unavailable") }

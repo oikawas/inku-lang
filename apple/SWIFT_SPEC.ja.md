@@ -428,11 +428,15 @@ RPM／入力TPMは62秒windowで設定値の90%を使用し、正の小さい設
 
 ### Personal ChatGPT
 
-Personal ChatGPTは通常のAPI key接続と別に扱い、既定は無効とする。利用者が明示して有効化・接続し、提供されたmodelを描画modelとして選ぶ。Stage1／Stage2は同じ描画modelを使用する。本人の接続を複数保存しても、作品DBは一つのローカルlibraryであり、multi-user機能を追加しない。
+Personal ChatGPTは通常のAPI key接続と別に扱い、既定は無効とする。利用者が明示して有効化・接続し、公開したmodelを描画modelとして選ぶ。Stage1／Stage2は同じ描画modelを使用する。本人の接続を複数保存しても、作品DBは一つのローカルlibraryであり、multi-user機能を追加しない。
+
+設定の導線はServer／Webに合わせる（2026-10-12）。ChatGPTプランの設定は接続だけを扱い（有効化、接続・再認証・同意の更新・選択・接続解除・利用枠の後の再試行、利用状況）、選択中の登録が接続済みでプラン利用の許可があれば、案内と「モデル設定を開く」を出す。modelは「モデル」設定の「ChatGPTプラン」で選ぶ。開くだけでは外部取得せず保存済みの一覧を読み、「モデル一覧を更新」で取得し、チェックしたmodelを登録ごとの公開として保存する。一覧にないmodelと選択中でない登録への保存は拒否し、同じ本人の再認証は公開を保つ。公開したmodelだけが、描画のモデル選択・比較・描画の既定値の候補に「ChatGPTプラン」として出る（予約provider `chatgpt`のmodelsへ写す。名前・rate・URL・API keyの設定は無い）。描画の要求は、一覧にあって公開したmodelだけを送り、ほかは要求を送らず`chatgpt_model_not_offered`で止める。既存の接続でも公開を一度保存する。
+
+ChatGPTプランのmodelはVisionにも使う（作者裁定、2026-10-12。契約はswiftが提案し、Serverが採った形。Serverの`chatgpt_models.py`・`chatgpt_provider.py`・`vision_client.py`と同じ判定にする）。選択画面は他のサービスと同じ絞り込み（すべて／使用中／不使用／LLM 用／Vision 用）と各modelのLLM／Visionの用途を持ち、用途は登録ごと・modelごとに保存する。保存の無いmodelはLLMとVisionの両方とし、用途が空のmodelの公開と、LLM／Vision以外の用途の保存は`chatgpt_model_not_offered`で拒む。LLMの用途を持つ公開modelが描画の候補、Visionの用途を持つ公開modelがVision推敲と奥書の候補になる。Vision推敲は1回の助言ごと、奥書は1回の奥書ごとに、開始時の選択中の登録（profile ID／generation）を固定し、途中で選択を変えても付け替えない。要求は同じResponsesへ`input_text`と`input_image`（data URL）を送り、toolsと温度・出力の上限は送らない。答えは完了したassistantのitemの`output_text`をつないだもの（UTF-8で512 KiBまで）で、断片だけの答え・未完了・拒否・toolは採らない。奥書のキャッシュは固定した登録ごとに分け、キャッシュを使う前にも、そのmodelがその登録でVisionに公開されているかを確かめる。要求の前に、一覧にあり・公開し・その用途を持つmodelかを確かめ（描画もLLMの用途を確かめる）、違えば要求を送らず`chatgpt_model_not_offered`で止める。デモの記述とmodel調査は対応しない。
 
 本人認証は127.0.0.1の一時listenerと`/auth/callback`、state／nonce／PKCE、発行済みclient ID、検証したidentityと許可scopeを使用する。資格情報は最大1MiBのAES-GCM暗号化vaultへ原子的に保存し、device-localの32byte keyをKeychainへ置く。平文token fallbackを持たず、SQLite backupに資格情報を含めない。初期無効状態で認証や推論を開始しない。
 
-開始時にprofile ID／generationを固定し、queued要求やbatch／demoの再開で接続を付け替えない。接続解除・切替・quota後は古いrefreshや遅延応答を採用せず、別providerへ暗黙に切り替えない。共有Rustの記述解釈、写生、自動配色、構図の読み、DDL補完だけをResponses／SSEへ接続する。Vision推敲、奥書、demo用記述、model検査はこの接続では未対応として表示する。実本人OAuth、model取得、推論の受入はoffline確認と分ける。
+開始時にprofile ID／generationを固定し、queued要求やbatch／demoの再開で接続を付け替えない。接続解除・切替・quota後は古いrefreshや遅延応答を採用せず、別providerへ暗黙に切り替えない。共有Rustの記述解釈、写生、自動配色、構図の読み、DDL補完と、Vision推敲・奥書をResponses／SSEへ接続する。demo用記述とmodel検査はこの接続では未対応として表示する。実本人OAuth、model取得、推論の受入はoffline確認と分ける。
 
 ### 保存作品の書出しとnative raster
 

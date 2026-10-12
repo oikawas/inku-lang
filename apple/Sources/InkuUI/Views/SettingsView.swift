@@ -213,7 +213,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 case .demo: EmptyView()
                 case .models: EmptyView()
                 case .personalPlan:
-                    ChatGPTPlanSettingsView(model: model).disabled(model.isBusy || automation.isOccupied)
+                    ChatGPTPlanSettingsView(model: model) { section = .models }.disabled(model.isBusy || automation.isOccupied)
                 case .database: database
                 case .export: ExportSettingsView(model: model)
                 case .clipboard: clipboard

@@ -413,23 +413,8 @@ struct CreationView: View {
 
     /// Web RunStatus.svelte: mascot, the stage and its provider facts, and the stop button, in one bordered box.
     private func runStatus(label: String, onStop: @escaping () -> Void, stopping: Bool) -> some View {
-        HStack(alignment: .center, spacing: 10) {
-            NativeMascot(kind: display.preferences.mascot).frame(width: 28, height: 28)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(display.message(label)).inkuFont(12, weight: .medium).lineLimit(2)
-                ProviderProgressView(model: model)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            Button(display.localized(stopping ? "停止中" : "停止"), action: onStop)
-                .buttonStyle(InkuGhostButtonStyle())
-                .keyboardShortcut(.escape, modifiers: [])
-                .disabled(stopping)
-                .inkuTooltip(tip("実行中の描画を停止します。"))
-        }
-        .padding(.vertical, 6).padding(.horizontal, 8)
-        .frame(minHeight: 46)
-        .background(RoundedRectangle(cornerRadius: 4).fill(InkuColor.panel))
-        .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
+        RunStatusView(display: display, label: label, stopping: stopping, stopTooltip: tip("実行中の描画を停止します。"),
+                      stopsWithEscape: true, onStop: onStop) { ProviderProgressView(model: model) }
     }
 
     /// The native status line and the backup and result-log reports, which the Web has no place for.

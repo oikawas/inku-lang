@@ -227,26 +227,15 @@ public struct RefinementView: View {
 
     private var progressCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                ProgressView().controlSize(.small)
-                Text(model.display.localized(refinement.saving ? "選択した候補を保存中" : "候補の準備中")).inkuFont(14, weight: .semibold)
-                Spacer()
-                Button(model.display.localized(refinement.stopping ? "停止中" : "停止"), role: .destructive) {
-                    Task { await refinement.stop(app: model) }
-                }.disabled(refinement.stopping || closing)
-            }
+            // RefinementAdjustView.svelte:189-203: the drawing indicator, and a lane per candidate under it.
+            RunStatusView(display: model.display, label: refinement.saving ? "選択した候補を保存中" : "候補の準備中",
+                          stopping: refinement.stopping || closing,
+                          onStop: { Task { await refinement.stop(app: model) } }) { ProviderProgressView(model: model) }
             if !refinement.saving {
-                ProgressView(value: Double(refinement.completedCount), total: Double(max(1, refinement.slots.count)))
-                    .accessibilityLabel(model.display.localized("候補の進捗"))
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140))], alignment: .leading, spacing: 8) {
-                    ForEach(refinement.slots) { slot in
-                        // VariationLanes.svelte:85: each lane names its task on hover.
-                        Label(model.display.localizedFormat("候補 %ld: %@", slot.id, model.display.localized(slotLabel(slot))), systemImage: slotSymbol(slot))
-                            .inkuFont(12).foregroundStyle(slot.state == .failed ? Color.red : Color.secondary)
-                            .inkuTooltip(model.display.tooltipValue(model.display.localizedFormat("候補 %ld", slot.id) + " · "
-                                                                    + model.display.localized(refinement.kind.titleKey)))
-                    }
-                }
+                // VariationLanes.svelte: a failed candidate has landed too (refinement-session finishSlot).
+                VariationLanesView(display: model.display, states: refinement.slots.map { slot in
+                    switch slot.state { case .waiting: .waiting; case .running: .running; case .ready, .failed: .done }
+                }, labels: refinement.slots.map { _ in model.display.localized(refinement.kind.titleKey) })
             }
             if model.isBusy { Text(model.display.message(model.status)).inkuFont(12).foregroundStyle(.secondary) }
             if let stage1 = refinement.capturedStage1Model, !stage1.isEmpty {
@@ -256,14 +245,6 @@ public struct RefinementView: View {
                 Text(model.display.localizedFormat("構造化モデル: %@", stage2)).inkuFont(12).foregroundStyle(.secondary).textSelection(.enabled)
             }
         }.refinementPanel()
-    }
-
-    private func slotLabel(_ slot: RefinementSlot) -> String {
-        switch slot.state { case .waiting: "待機中"; case .running: "描画中"; case .ready: "準備完了"; case .failed: "失敗" }
-    }
-
-    private func slotSymbol(_ slot: RefinementSlot) -> String {
-        switch slot.state { case .waiting: "clock"; case .running: "paintbrush"; case .ready: "checkmark.circle"; case .failed: "exclamationmark.triangle" }
     }
 
     private var candidateSection: some View {

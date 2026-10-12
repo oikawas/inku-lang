@@ -107,11 +107,10 @@ public struct WorkEditView: View {
     private var footer: some View {
         HStack {
             if editor.running {
-                ProgressView().controlSize(.small)
-                Text(model.display.message(model.isBusy ? model.status : "生成の準備中"))
+                // WorkEditDialog.svelte:118: the drawing indicator at the end of the footer row.
                 Spacer()
-                Button(model.display.localized(editor.stopping ? "停止中" : "停止")) { Task { await editor.stop(app: model) } }
-                    .disabled(editor.stopping)
+                RunStatusView(display: model.display, label: model.isBusy ? model.status : "生成の準備中", variant: .inline,
+                              stopping: editor.stopping, onStop: { Task { await editor.stop(app: model) } })
             } else {
                 Spacer()
                 Button(model.display.localized("描く")) {

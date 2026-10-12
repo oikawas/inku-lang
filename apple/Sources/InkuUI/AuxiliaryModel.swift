@@ -35,6 +35,8 @@ public final class AuxiliaryModel {
     public private(set) var colophonDraft: ColophonDraft?
     public private(set) var storedColophons: [ColophonDraft] = []
     public private(set) var running = false
+    /// The running operation draws generations (autonomous refinement), rather than reading advice or a colophon.
+    public private(set) var refining = false
     public private(set) var stopping = false
     public private(set) var completedGenerations = 0
     public private(set) var generatedWorks: [SavedWork] = []
@@ -236,7 +238,7 @@ public final class AuxiliaryModel {
         let amplitude = amplitude
         let wild = inheritWild ? nil : wildOverride
         let runToken = UUID()
-        token = runToken; running = true; stopping = false; errorText = nil
+        token = runToken; running = true; refining = true; stopping = false; errorText = nil
         completedGenerations = 0; generatedWorks = []
         let operation = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -316,7 +318,7 @@ public final class AuxiliaryModel {
         }
         task = operation
         await operation.value
-        if token == runToken { token = nil; running = false; stopping = false; task = nil }
+        if token == runToken { token = nil; running = false; refining = false; stopping = false; task = nil }
     }
 
     /// Explicitly choose a saved generation as the next parent without changing the main canvas.

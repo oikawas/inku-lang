@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-12 — Swift drawing mascots match Web
+
+Author's instruction. The macOS drawing mascot, a simple line drawing until now, is replaced by the same two 5x5 pixel mascots as Web (Incu, a turning cube, and Yuragi, a crab that greets with its claws and blows bubbles). The Web CSS motion is ported as values over time, and AppCheck `--mascot-only` checks them against the keyframes. As on Web, the drawing indicator (mascot, label, facts, stop) now appears for batch, work editing, DDL editing, refinement, color catalog and model comparison, and autonomous refinement as well as single drawing and demo. Refinement and comparison show a lane per candidate wearing the mascot not chosen.
+
 ### 2026-10-12 — Match Server's ChatGPT plan settings flow in Swift
 
 At the author's instruction, the macOS ChatGPT plan settings now handle the connection only; the model list and "Use for drawing" are gone. Once connected they show a guide and "Open model settings". Models are chosen under the ChatGPT plan in the Models settings: refresh the list, check the models to publish and save. The publication is saved per connected profile and kept when the same identity reauthorizes. Only published models appear as "ChatGPT plan" in the drawing model picker, comparison and drawing defaults. As on Server, a drawing request is sent only for a model that is in the catalog and published. An existing connection also saves its publication once.

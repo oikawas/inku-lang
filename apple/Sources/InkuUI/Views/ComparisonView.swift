@@ -13,6 +13,14 @@ public struct ComparisonView: View {
         _comparison = State(initialValue: ComparisonModel(work: work, kind: kind))
     }
 
+    /// Candidates are prepared one after another: landed ones (made or failed) are done, the next one runs.
+    private var lanes: some View {
+        let landed = comparison.candidates.count + comparison.failures.count
+        return VariationLanesView(display: model.display, states: comparison.laneLabels.indices.map { index in
+            index < landed ? .done : index == landed ? .running : .waiting
+        }, labels: comparison.laneLabels, named: comparison.kind == .model)
+    }
+
     public var body: some View {
         @Bindable var comparison = comparison
         ScrollView {
@@ -39,12 +47,15 @@ public struct ComparisonView: View {
                     }
                     if comparison.kind == .catalog { catalogChoices }
                     else { modelChoices }
+                    if comparison.running {
+                        // RefinementColorCatalogView.svelte:77 / RefinementModelCompareView.svelte:100: the drawing
+                        // indicator, and a lane per candidate (named by model when comparing models).
+                        RunStatusView(display: model.display, label: comparison.status, stopping: comparison.stopping,
+                                      onStop: { Task { await comparison.stop(app: model) } }) { ProviderProgressView(model: model) }
+                        if !comparison.saving { lanes }
+                    }
                     HStack {
-                        if comparison.running {
-                            ProgressView().controlSize(.small)
-                            Button(model.display.localized(comparison.stopping ? "停止中" : "停止"), role: .destructive) { Task { await comparison.stop(app: model) } }
-                                .disabled(comparison.stopping)
-                        } else {
+                        if !comparison.running {
                             Button(model.display.localizedFormat("%ld件の候補を生成", comparison.requestedCount), systemImage: "square.grid.2x2") {
                                 Task { await comparison.generate(app: model) }
                             }.buttonStyle(.borderedProminent).disabled(!comparison.canGenerate || model.isBusy)
@@ -67,7 +78,7 @@ public struct ComparisonView: View {
                 } else {
                     ContentUnavailableView(model.display.localized("保存作品を選択"), systemImage: "photo", description: Text(model.display.localized("ライブラリか制作画面で元の作品を選択してください。")))
                 }
-                Text(model.display.message(comparison.status)).inkuFont(13).foregroundStyle(.secondary)
+                if !comparison.running { Text(model.display.message(comparison.status)).inkuFont(13).foregroundStyle(.secondary) }
                 if let error = comparison.errorText { Text(error).foregroundStyle(.red).textSelection(.enabled) }
                 ForEach(Array(comparison.failures.enumerated()), id: \.offset) { _, failure in
                     Text(failure).inkuFont(13).foregroundStyle(.red).textSelection(.enabled)

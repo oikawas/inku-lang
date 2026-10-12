@@ -182,7 +182,7 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "UnreadWordsPanel.svelte:48", swift: "Views/UnreadWordsView.swift", marker: "serverKey: \"settingsUnreadWordsPurposeTooltip\""),
     .init(web: "UnreadWordsPanel.svelte:88", swift: "Views/UnreadWordsView.swift", marker: "\"settingsUnreadWordsFirstSeen\""),
     .init(web: "UnreadWordsPanel.svelte:90", swift: "Views/UnreadWordsView.swift", marker: "tooltipValue(context)"),
-    .init(web: "VariationLanes.svelte:85", swift: "Views/RefinementView.swift", marker: "\"候補 %ld\", slot.id) + \" · \""),
+    .init(web: "VariationLanes.svelte:85", swift: "Views/RunStatusView.swift", marker: ".inkuTooltip(display.tooltipValue(label))"),
     .init(web: "WorkActionMenu.svelte:107", swift: "Views/CreationView.swift", marker: "serverKey: \"workActionGenerationLocked\""),
     .init(web: "WorkActionMenu.svelte:126", swift: "SavedWorkActionState.swift", marker: "tooltip(\"記述を変える\") : reason"),
     .init(web: "WorkActionMenu.svelte:130", swift: "SavedWorkActionState.swift", marker: "tooltip(\"写生なし／ありで描き直す\") : reason"),

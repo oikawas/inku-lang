@@ -30,6 +30,8 @@ public final class ComparisonModel {
     public private(set) var contextAvailable = false
     public private(set) var candidates: [ComparisonCandidate] = []
     public private(set) var failures: [String] = []
+    /// The candidates of the running preparation in request order, one lane each (Web `gridSlotLabels`).
+    public private(set) var laneLabels: [String] = []
     public private(set) var running = false
     public private(set) var saving = false
     public private(set) var stopping = false
@@ -139,6 +141,7 @@ public final class ComparisonModel {
         runID = run
         running = true; saving = false; stopping = false
         errorText = nil; failures = []; failedModelReferences = []; candidates = []
+        laneLabels = labels.map(\.1)
         let succeeded = await app.performComparison(status: "比較候補を生成中") { token in
             var requests: [GenerationRequest] = []
             if comparisonKind == .model {
@@ -215,7 +218,7 @@ public final class ComparisonModel {
     }
 
     private func finish() {
-        running = false; saving = false; stopping = false
+        running = false; saving = false; stopping = false; laneLabels = []
         let waiters = completionWaiters; completionWaiters = []
         waiters.forEach { $0.resume() }
     }

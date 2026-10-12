@@ -48,8 +48,9 @@ struct DdlAuthoringEditorSheet: View {
                 }
                 Spacer()
                 if model.isBusy {
-                    ProgressView().controlSize(.small)
-                    Button(model.display.localized("停止")) { Task { await model.cancel() } }
+                    // DdlEditorDialog.svelte:219: the drawing indicator replaces the footer actions.
+                    RunStatusView(display: model.display, label: model.status, variant: .inline,
+                                  onStop: { Task { await model.cancel() } })
                 } else {
                     Button(model.display.localized("取消")) { session.cancel(); dismiss() }
                         .keyboardShortcut(.cancelAction)
@@ -147,8 +148,9 @@ struct NewDdlAuthoringSheet: View {
                     ProgressView().controlSize(.small)
                     Button(model.display.localized("停止")) { importTask?.cancel() }
                 } else if model.isBusy {
-                    ProgressView().controlSize(.small)
-                    Button(model.display.localized("停止")) { Task { await model.cancel() } }
+                    Spacer()
+                    RunStatusView(display: model.display, label: model.status, variant: .inline,
+                                  onStop: { Task { await model.cancel() } })
                 } else {
                     Spacer()
                     Button(model.display.localized("取消")) { dismiss() }.keyboardShortcut(.cancelAction)

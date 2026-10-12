@@ -53,7 +53,11 @@ public struct AuxiliaryView: View {
                 }.disabled(auxiliary.running || auxiliary.selectingSource || model.isBusy)
                 if mode == .colophon { colophonControls }
                 else { adviceControls; refinementControls }
-                if auxiliary.running {
+                if auxiliary.running && auxiliary.refining {
+                    // AIRefineModal.svelte:252: autonomous refinement draws, so it shows the drawing indicator.
+                    RunStatusView(display: model.display, label: auxiliary.status, stopping: auxiliary.stopping,
+                                  onStop: { Task { await auxiliary.stop(app: model) } }) { ProviderProgressView(model: model) }
+                } else if auxiliary.running {
                     HStack {
                         ProgressView().controlSize(.small)
                         Text(model.display.message(auxiliary.status))

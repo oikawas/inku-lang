@@ -660,33 +660,3 @@ public struct ContentView: View {
         presentation = false
     }
 }
-
-/// RunStatus mascot (Web `RunStatus.svelte` run-mascot).
-struct NativeMascot: View {
-    @Environment(\.locale) private var locale
-    let kind: String
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 0.1)) { timeline in
-            let wave = sin(timeline.date.timeIntervalSinceReferenceDate * 4)
-            Canvas { context, size in
-                var path = Path()
-                if kind == "yuragi" {
-                    path.addEllipse(in: CGRect(x: 7, y: 10, width: 14, height: 11))
-                    for side in [CGFloat(-1), 1] {
-                        for leg in 0..<3 {
-                            path.move(to: CGPoint(x: 14 + side * 6, y: 13 + CGFloat(leg) * 3))
-                            path.addLine(to: CGPoint(x: 14 + side * 11, y: 12 + CGFloat(leg) * 5 + wave * side))
-                        }
-                        path.move(to: CGPoint(x: 14 + side * 5, y: 11)); path.addLine(to: CGPoint(x: 14 + side * 9, y: 5))
-                        path.addLines([CGPoint(x: 14 + side * 6, y: 2), CGPoint(x: 14 + side * 9, y: 5), CGPoint(x: 14 + side * 12, y: 2)])
-                    }
-                } else {
-                    path.addLines([CGPoint(x: 14, y: 3), CGPoint(x: 24, y: 9), CGPoint(x: 24, y: 20), CGPoint(x: 14, y: 26), CGPoint(x: 4, y: 20), CGPoint(x: 4, y: 9), CGPoint(x: 14, y: 3)])
-                    path.move(to: CGPoint(x: 4, y: 9)); path.addLines([CGPoint(x: 14, y: 15), CGPoint(x: 24, y: 9)])
-                    path.move(to: CGPoint(x: 14, y: 15)); path.addLine(to: CGPoint(x: 14, y: 26))
-                }
-                context.stroke(path, with: .color(.accentColor), lineWidth: 1.4)
-            }.rotationEffect(.degrees(wave * 5))
-        }.accessibilityLabel(InkuLocalization.string(kind == "yuragi" ? "Yuragiが描画中" : "Incuが描画中", locale: locale))
-    }
-}

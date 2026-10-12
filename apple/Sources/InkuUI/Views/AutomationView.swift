@@ -27,15 +27,15 @@ private enum DemoModelPicker: String, Identifiable {
                 BatchPanelView(model: model, automation: automation)
             } else {
                 ScrollView { demo }
-                if automation.isOccupied {
+                if automation.running {
+                    // DemoPanel.svelte:196: the running demo shows the drawing indicator.
+                    RunStatusView(display: model.display, label: automation.status, stopping: automation.stopping,
+                                  onStop: { Task { await automation.stop(app: model) } }) { ProviderProgressView(model: model) }
+                } else if automation.isOccupied {
                     HStack {
                         ProgressView().controlSize(.small)
-                        Text(model.display.message(automation.preparing ? "生成の準備中" : automation.status))
+                        Text(model.display.message("生成の準備中"))
                         Spacer()
-                        if automation.running {
-                            Button(model.display.localized(automation.stopping ? "停止中" : "停止"), systemImage: "stop.fill") { Task { await automation.stop(app: model) } }
-                                .disabled(automation.stopping)
-                        }
                     }
                 } else { Text(model.display.message(automation.status)).inkuFont(13).foregroundStyle(.secondary) }
                 if let error = automation.errorText { Text(error).foregroundStyle(.red).textSelection(.enabled) }

@@ -254,11 +254,10 @@ struct BatchPanelView: View {
                     Text(model.display.localized("バッチを準備中…")).inkuFont(13)
                 }
             } else if automation.running {
-                Button(model.display.localized(automation.stopping ? "停止中" : "停止"), systemImage: "stop.fill") {
-                    Task { await automation.stop(app: model) }
-                }
-                .buttonStyle(.bordered).disabled(automation.stopping)
-                .inkuTooltip(tip("実行中のバッチを停止します。未処理の行は後で再開できます。"))
+                // BatchPanel.svelte:280: the running batch shows the drawing indicator with its progress.
+                RunStatusView(display: model.display, label: automation.status, stopping: automation.stopping,
+                              stopTooltip: tip("実行中のバッチを停止します。未処理の行は後で再開できます。"),
+                              onStop: { Task { await automation.stop(app: model) } }) { ProviderProgressView(model: model) }
             } else {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 8) { newBatchLabel; newBatchButton }
@@ -269,7 +268,7 @@ struct BatchPanelView: View {
                         .inkuFont(12).foregroundStyle(.secondary)
                 }
             }
-            if !automation.status.isEmpty && !automation.preparing {
+            if !automation.status.isEmpty && !automation.preparing && !automation.running {
                 Text(model.display.message(automation.status)).inkuFont(12).foregroundStyle(.secondary)
                     .lineLimit(3).textSelection(.enabled)
             }

@@ -258,7 +258,16 @@ class UserAccountItem(BaseModel):
     at: int
 
 
+def _model_label_table() -> list[dict]:
+    from ..model_catalog import MODEL_LABELS
+    return [dict(label) for label in MODEL_LABELS]
+
+
 class ModelSettingsResponse(BaseModel):
+    # The label table of the model catalog (model_catalog.json), in fold order: what each label
+    # of a model is called and whether it lets the model be published. Every model in the lists
+    # carries its `labels` and the `fold` it is filed in.
+    model_labels: list[dict] = Field(default_factory=_model_label_table)
     catalog: list[dict] = Field(default_factory=list)
     llm_catalog: list[dict] = Field(default_factory=list)
     vision_catalog: list[dict] = Field(default_factory=list)

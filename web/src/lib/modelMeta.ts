@@ -2,7 +2,7 @@
 // recommendation, cost, speed, comment). All model-picker surfaces read from here so
 // the values and formatting stay consistent. The underlying data lives on
 // ModelOption (server model catalog, editable via settings).
-import type { ModelOption } from './models';
+import type { ModelLabel, ModelOption } from './models';
 
 export type ModelPurpose = 'llm' | 'vision';
 
@@ -161,55 +161,55 @@ export function modelComment(model: ModelOption, isJapanese: boolean): string {
 	return isJapanese ? (model.comment_ja || model.comment_en || '—') : (model.comment_en || model.comment_ja || '—');
 }
 
-export function modelEolLabel(model: ModelOption, isJapanese: boolean): string | null {
-	if (!model.eol) return null;
-	const date = model.eol_date ? ` (${model.eol_date})` : '';
-	return isJapanese ? `提供終了${date}` : `End of life${date}`;
+// The label table of the model catalog (the Server's model_catalog.json; the author,
+// 2026-10-13), in fold order: what each label is called and whether a model carrying it
+// can be published. It arrives with every model list as `model_labels`, and every listed
+// model carries its `labels` and the `fold` it is filed in, worked out by the Server. The
+// Web only reads them, so a new label or fold needs no change here.
+let labelTable: ModelLabel[] = [];
+
+export function setModelLabelTable(labels: ModelLabel[] | undefined): void {
+	if (Array.isArray(labels) && labels.length > 0) labelTable = labels;
 }
 
-// Four conditions make a listed model unselectable: retirement (EOL), a paid
-// tier requirement, being a kind inku does not support, and a measurement in
-// which it answered neither purpose. Disabling and sorting share this predicate.
+export function modelLabelTable(): ModelLabel[] {
+	return labelTable;
+}
+
+function labelText(id: string, isJapanese: boolean): string {
+	const label = labelTable.find((entry) => entry.id === id);
+	return label ? (isJapanese ? label.ja : label.en) : id;
+}
+
+// A model can be published, and chosen, only when every one of its labels allows it.
+// Disabling and sorting share this predicate. The list in models.ts that shows before
+// the Server answers carries the stored marks rather than labels.
 export function isModelUnselectable(model: ModelOption): boolean {
+	if (model.labels) return model.labels.some((id) => labelTable.find((entry) => entry.id === id)?.publishable === false);
 	return !!model.eol || !!model.requires_subscription || !!model.not_supported || answersNothing(model);
 }
 
+// Every label of the model, in the table's order; the end of life carries its date.
 export function modelStatusLabel(model: ModelOption, isJapanese: boolean): string | null {
-	const eol = modelEolLabel(model, isJapanese);
-	if (eol) return eol;
-	if (model.not_supported) return isJapanese ? 'ノンサポート' : 'Not supported';
-	if (model.requires_subscription) return isJapanese ? '有料プラン限定' : 'Paid plan only';
-	if (answersNothing(model)) return isJapanese ? '計測で応答なし' : 'No response when measured';
-	return null;
+	const labels = model.labels ?? [];
+	if (labels.length === 0) return null;
+	return labels
+		.map((id) => (id === 'eol' && model.eol_date ? `${labelText(id, isJapanese)} (${model.eol_date})` : labelText(id, isJapanese)))
+		.join(' · ');
 }
 
-// Where model administration files a model that cannot be published (the
-// author, 2026-10-13): each kind is folded away at the bottom of the list,
-// closed at first. Paid-plan models stayed in the list until a measurement
-// found twelve Ollama Cloud models this account cannot call; they now have the
-// first fold (the author, 2026-10-13), and a plan that reaches one clears its
-// mark on the next fetch. Older models can still be published; they are folded
-// above the others (the author, 2026-10-13: the OpenAI API up to GPT-5.4), and
-// only when nothing else keeps them from publication.
-export type ModelFold = 'legacy' | 'subscription' | 'no_response' | 'not_supported' | 'eol';
-export const MODEL_FOLDS: ModelFold[] = ['legacy', 'subscription', 'no_response', 'not_supported', 'eol'];
+// Model administration files each model into the fold of its last label, below the
+// list and closed at first; a model with no label stays in the list.
+export type ModelFold = string;
+
+export function modelFolds(): ModelFold[] {
+	return labelTable.map((label) => label.id);
+}
 
 export function modelFold(model: ModelOption): ModelFold | null {
-	if (model.eol) return 'eol';
-	if (model.not_supported) return 'not_supported';
-	if (model.requires_subscription) return 'subscription';
-	if (answersNothing(model)) return 'no_response';
-	if (model.legacy) return 'legacy';
-	return null;
+	return model.fold ?? null;
 }
 
 export function modelFoldTitle(fold: ModelFold, count: number, isJapanese: boolean): string {
-	const [ja, en] = {
-		legacy: ['旧モデル', 'Older models'],
-		subscription: ['有料プラン限定', 'Paid plan only'],
-		no_response: ['計測で応答なし', 'No response when measured'],
-		not_supported: ['ノンサポート', 'Not supported'],
-		eol: ['提供終了', 'End of life']
-	}[fold];
-	return isJapanese ? `${ja}（${count}）` : `${en} (${count})`;
+	return isJapanese ? `${labelText(fold, true)}（${count}）` : `${labelText(fold, false)} (${count})`;
 }

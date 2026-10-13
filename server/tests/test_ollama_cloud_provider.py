@@ -58,9 +58,10 @@ def test_catalog_reaches_the_settings_the_ui_reads() -> None:
     assert "gemma4:31b" in ids
     assert len(ids) == len(VERIFIED_OLLAMA_CLOUD_MODELS)
     # The tooltip reads these four; normalisation drops keys it does not know, so a
-    # renamed field would show as an em dash rather than fail anywhere.
+    # renamed field would show as an em dash rather than fail anywhere. Since the
+    # 2026-10-13 measurement the speed is the measured mean, not a label.
     measured = next(model for model in models if model["id"] == "gemma4:31b")
-    for key in ("purposes", "speed_label", "comment_ja", "comment_en"):
+    for key in ("purposes", "speed_llm_seconds", "comment_ja", "comment_en"):
         assert key in measured
 
 

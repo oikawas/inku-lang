@@ -1,5 +1,6 @@
 import { t } from '$lib/i18n/index.svelte';
-import { PROVIDER_GROUPS, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
+import { setModelLabelTable } from '$lib/modelMeta';
+import { PROVIDER_GROUPS, type ModelLabel, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
 import type { ApiFetch } from '$lib/transport/api-fetch';
 import type { SettingsActor } from './navigation-state.svelte';
 
@@ -69,6 +70,7 @@ type ChatGPTPublication = {
 	generation: number;
 	models: ModelOption[];
 	enabled_models: Record<string, boolean>;
+	model_labels?: ModelLabel[];
 };
 
 // What a ChatGPT plan model is assessed to be: the shared keys every provider's
@@ -109,6 +111,7 @@ export function createModelAdministration<TActor extends SettingsActor>(
 	}
 
 	function acceptChatGPT(data: ChatGPTPublication): void {
+		setModelLabelTable(data.model_labels);
 		const models = data.models.map((model) => ({ ...model, purposes: model.purposes ?? ['llm', 'vision'] as ('llm' | 'vision')[] }));
 		chatgptPublication = { ...data, models };
 		const provider: ProviderGroup = { id: 'chatgpt', label: t().chatgptPlanLabel,
@@ -136,7 +139,8 @@ export function createModelAdministration<TActor extends SettingsActor>(
 
 	// The Server response is authoritative for both catalog metadata and stored
 	// provider settings; never retain a locally assembled approximation after a save.
-	function acceptModelResponse(data: { catalog: ProviderGroup[]; settings: ModelSettings }, status: string): void {
+	function acceptModelResponse(data: { catalog: ProviderGroup[]; settings: ModelSettings; model_labels?: ModelLabel[] }, status: string): void {
+		setModelLabelTable(data.model_labels);
 		modelCatalog = data.catalog;
 		modelSettings = data.settings;
 		if (personalModelsAllowed() && chatgptPublication) acceptChatGPT(chatgptPublication);
@@ -410,7 +414,8 @@ export function createModelAdministration<TActor extends SettingsActor>(
 				if (assessments.length) {
 					const shared = await deps.apiFetch('/api/settings/models', {
 						method: 'PUT', headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({ chatgpt_models: assessments })
+						// The shared assessments go in like any provider's models (the common format).
+						body: JSON.stringify({ providers: { chatgpt: { models: assessments } } })
 					});
 					if (!shared.ok) throw new Error(`HTTP ${shared.status}`);
 				}

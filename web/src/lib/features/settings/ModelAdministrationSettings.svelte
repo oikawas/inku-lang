@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
-	import { isModelUnselectable, MODEL_FOLDS, modelFold, modelFoldTitle, modelStatusLabel, modelRecommendation, modelSpeed, purposeUnsupported, recommendationTier, sortModels, type ModelFold } from '$lib/modelMeta';
+	import { isModelUnselectable, modelFold, modelFolds, modelFoldTitle, modelStatusLabel, modelRecommendation, modelSpeed, purposeUnsupported, recommendationTier, sortModels, type ModelFold } from '$lib/modelMeta';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
 	import type { ModelAdministration, ModelProviderSetting } from './model-administration.svelte';
 	import './model-administration-settings.css';
@@ -390,18 +390,19 @@
 			});
 		return provider.id === 'chatgpt' ? models : sortModels(models);
 	});
-	// Models that cannot be published -- paid-plan only, measured to answer
-	// nothing, not supported, or retired -- are folded at the bottom, closed at
-	// first (the author, 2026-10-13). Older models, which can still be published,
-	// take the first fold. The search and the filter still count them.
+	// Each model is filed into the fold of its last label -- not measured, older,
+	// paid-plan only, measured to answer nothing, not supported, retired -- below the
+	// list and closed at first (the author, 2026-10-13). The folds and their order are
+	// the catalog's label table. The search and the filter still count them.
 	const modelPickerSections = $derived.by(() => {
-		const sections: Record<'main' | ModelFold, ModelOption[]> = { main: [], legacy: [], subscription: [], no_response: [], not_supported: [], eol: [] };
-		for (const model of filteredModelPickerModels) sections[modelFold(model) ?? 'main'].push(model);
+		const sections: Record<'main' | ModelFold, ModelOption[]> = { main: [] };
+		for (const fold of modelFolds()) sections[fold] = [];
+		for (const model of filteredModelPickerModels) (sections[modelFold(model) ?? 'main'] ??= []).push(model);
 		return sections;
 	});
 	const modelPickerShownModels = $derived([
 		...modelPickerSections.main,
-		...MODEL_FOLDS.flatMap((fold) => (modelPickerOpenFolds[fold] ? modelPickerSections[fold] : []))
+		...modelFolds().flatMap((fold) => (modelPickerOpenFolds[fold] ? modelPickerSections[fold] ?? [] : []))
 	]);
 
 </script>
@@ -677,8 +678,8 @@
 					{#each modelPickerSections.main as model, modelIndex (`${model.id}:${modelIndex}`)}
 						{@render modelPickerEntry(model)}
 					{/each}
-					{#each MODEL_FOLDS as fold (fold)}
-						{#if modelPickerSections[fold].length > 0}
+					{#each modelFolds() as fold (fold)}
+						{#if modelPickerSections[fold]?.length}
 							<details class="model-picker-fold" bind:open={modelPickerOpenFolds[fold]}>
 								<summary>{modelFoldTitle(fold, modelPickerSections[fold].length, t().code === 'ja')}</summary>
 								<div class="model-picker-list">

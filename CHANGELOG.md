@@ -8,6 +8,18 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — One catalog of model information, with labels and folds as data
+
+At the author's instruction (reorganize how model information is kept: the ChatGPT plan's too, in a common format; the most efficient way, minding how it reaches Swift and Android; the folds for older, not supported, end of life and not measured, and the labelling of models, built into the common format) and choices (the catalog is a JSON file in the repository, six folds, administrators may still edit). Model information was split between the Server's code, 5173's database, a separate ChatGPT key, the copy macOS bundles and the Web's startup list, and the 2026-10-13 measurements were on 5173 only.
+
+- Every provider's and the ChatGPT plan's model information is in `server/src/inku_server/model_catalog.json` (`inku.model-catalog.v2`), built from what 5173 served and checked against it provider by provider. The local Ollama models and NVIDIA take the code's values, which 5173 had kept older copies of.
+- The Ollama Cloud comments again begin "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model.", which the 2026-10-13 save had dropped, and the paid models' comments name the paid plan.
+- The catalog holds the label table (Not measured, Older model, Paid plan only, No response when measured, Not supported, End of life). The Server works out each model's labels and fold, and the model lists gain `labels`, `fold` and the table as `model_labels`. A new fold, Not measured, holds models with no measurement.
+- When the catalog changes, its information is laid whole over the matching ids an installation stored; the version follows the content's hash, so `MODEL_CONFIG_VERSION` is no longer raised by hand. A model that first appears in a refetched list takes what the catalog knows about it.
+- The ChatGPT plan's assessments are under `chatgpt` in the catalog; administrators save their edits through `providers.chatgpt.models` (`chatgpt_models` is still accepted).
+- The Web draws the folds and labels from the table, and a model's row and hover card show every label it carries, only those keeping it from publication in the warning colour.
+- `verified_model_catalog.py` now only reads the catalog, so the macOS export (`apple/scripts/export-server-resources.py`) runs unchanged. The labelling rules are listed in `server/tests/data/model-catalog-cases.json`.
+
 ## v2.15.116 (2026-10-13 / Build 1192)
 
 ### 2026-10-13 — Swift copies its Web text again from Build 1190

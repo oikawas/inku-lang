@@ -90,7 +90,7 @@
 									onclick={() => selectGenerationModel(provider.id, model.id)}
 								>
 									<strong>{model.label}</strong>
-									{#if isModelUnselectable(model)}<span class="eol-mark">{modelStatusLabel(model, isJapanese)}</span>{/if}
+									{#if modelStatusLabel(model, isJapanese)}<span class={isModelUnselectable(model) ? 'eol-mark' : 'model-label-mark'}>{modelStatusLabel(model, isJapanese)}</span>{/if}
 									{#if model.notes}<span>{model.notes}</span>{/if}
 									<ModelMetaCard {model} {isJapanese} purpose={recommendationPurpose} />
 								</button>

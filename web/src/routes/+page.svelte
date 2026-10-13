@@ -63,8 +63,10 @@
 		splitModelRef,
 		type Provider,
 		type ProviderGroup,
+		type ModelLabel,
 		type ModelOption
 	} from '$lib/models';
+	import { setModelLabelTable } from '$lib/modelMeta';
 	import { t, getLang, initLang } from '$lib/i18n/index.svelte';
 	import { initMascot } from '$lib/mascot.svelte';
 	import { FALLBACK_CATALOG, catalogById, catalogNameplate, type ColorCatalog, type ColorCatalogsResponse } from '$lib/colors';
@@ -1122,9 +1124,10 @@
 		try {
 			const r = await apiFetch('/api/models', { cache: 'no-store' });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { catalog: ProviderGroup[]; llm_catalog?: ProviderGroup[]; drawing_catalog?: ProviderGroup[]; vision_catalog?: ProviderGroup[]; chatgpt_plan_available?: boolean; settings: { model_settings?: UserModelSettings } };
+			const data = await r.json() as { catalog: ProviderGroup[]; llm_catalog?: ProviderGroup[]; drawing_catalog?: ProviderGroup[]; vision_catalog?: ProviderGroup[]; chatgpt_plan_available?: boolean; model_labels?: ModelLabel[]; settings: { model_settings?: UserModelSettings } };
 			if (session.currentUser?.id !== userId || request !== modelCatalogRequest) return;
 			chatgptPlanAvailable = data.chatgpt_plan_available === true;
+			setModelLabelTable(data.model_labels);
 			modelCatalogOwner = userId;
 			clearChatGPTModelCatalog();
 			availableModelCatalog = data.drawing_catalog ?? data.llm_catalog ?? data.catalog;

@@ -45,7 +45,16 @@ for (const c of EXPECTATIONS.display.cases) {
 {
 	const model = { id: 'x', label: 'x', recommendation_stage1: 1 };
 	check('unmeasured stage renders as an em dash', modelRecommendation(model, 'llm', 'stage2'), '—');
-	check('a measured 1 renders as one star', modelRecommendation(model, 'llm', 'stage1'), '★☆☆☆☆ (1/5)');
+	check('a measured 1 renders as one star', modelRecommendation(model, 'llm', 'stage1'), '★☆☆ (1/3)');
+}
+
+// ── the card prints three tiers of the five stored levels ─────────────────
+for (const c of EXPECTATIONS.tiers.cases) {
+	check(
+		`level ${c.level} prints as its tier`,
+		modelRecommendation({ id: 'x', label: 'x', recommendation_llm: c.level }, 'llm'),
+		c.text
+	);
 }
 
 // ── omitting the stage keeps the old answer ───────────────────────────────

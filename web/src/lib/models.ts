@@ -17,6 +17,12 @@ export type ModelOption = {
 	recommendation_stage2?: number;
 	speed_class?: string;
 	speed_label?: string;
+	// Measured reference numbers (2026-10-13): approximate USD for one drawing and
+	// for one Vision image, and the mean seconds each took. Absent means not measured.
+	cost_usd_llm?: number;
+	cost_usd_vision?: number;
+	speed_llm_seconds?: number;
+	speed_vision_seconds?: number;
 	comment_ja?: string;
 	comment_en?: string;
 	// v1.98: A provider-retired model remains listed but cannot start a new drawing.

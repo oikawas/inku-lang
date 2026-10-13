@@ -6,6 +6,7 @@ browser. The UI receives masked status fields.
 
 from __future__ import annotations
 
+import math
 import os
 from copy import deepcopy
 from typing import Any
@@ -37,11 +38,22 @@ MODEL_RECOMMENDATION_KEYS = (
     "recommendation_stage2",
     "recommendation_level",
 )
+# Measured reference numbers the picker prints beside the levels (the author's
+# tooltip request, 2026-10-13): approximate USD for one drawing and for one
+# Vision image, and the mean seconds the provider took for each. Numbers rather
+# than labels, so the card can word them in either language.
+MODEL_MEASUREMENT_KEYS = (
+    "cost_usd_llm",
+    "cost_usd_vision",
+    "speed_llm_seconds",
+    "speed_vision_seconds",
+)
 MODEL_METADATA_KEYS = (
     "purposes",
     *MODEL_RECOMMENDATION_KEYS,
     "speed_class",
     "speed_label",
+    *MODEL_MEASUREMENT_KEYS,
     "comment_ja",
     "comment_en",
 )
@@ -239,6 +251,13 @@ def _normalize_models(models: Any) -> list[dict[str, Any]]:
                 value = model.get(key)
                 if isinstance(value, str) and value.strip():
                     item[key] = value.strip()
+            # Absent means not measured, as with the levels. A free model costs 0,
+            # which is a measurement; no request takes 0 seconds, so that is not.
+            for key in MODEL_MEASUREMENT_KEYS:
+                value = model.get(key)
+                if (isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+                        and (value > 0 if key.startswith("speed_") else value >= 0)):
+                    item[key] = float(value)
             # v1.98: 提供終了 (EOL) の印。新規描画では選べないが一覧には残す。
             if model.get("eol") is True:
                 item["eol"] = True
@@ -578,8 +597,8 @@ def model_provider_catalog(
             if include_disabled or enabled:
                 shown = {**model, "enabled": enabled}
                 if hide_speed:
-                    shown.pop("speed_class", None)
-                    shown.pop("speed_label", None)
+                    for key in ("speed_class", "speed_label", "speed_llm_seconds", "speed_vision_seconds"):
+                        shown.pop(key, None)
                 models.append(shown)
         catalog.append({
             "id": provider["id"],

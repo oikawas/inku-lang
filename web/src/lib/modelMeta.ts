@@ -1,14 +1,24 @@
 // Single source for formatting model evaluation metadata (purposes,
-// recommendation, speed, comment). All model-picker surfaces read from here so
+// recommendation, cost, speed, comment). All model-picker surfaces read from here so
 // the values and formatting stay consistent. The underlying data lives on
 // ModelOption (server model catalog, editable via settings).
 import type { ModelOption } from './models';
 
-export function modelPurposes(model: ModelOption): string {
-	return (model.purposes ?? ['llm']).map((purpose) => (purpose === 'vision' ? 'Vision' : 'LLM')).join(' / ');
-}
-
 export type ModelPurpose = 'llm' | 'vision';
+
+// Both purposes are always listed, so the card says what a model cannot be chosen
+// for as well as what it can (the author, 2026-10-13). Whether it can is the
+// model's purposes, which the measurements set: a model whose drawings failed is
+// not offered as an LLM, and one whose Vision answers could not be confirmed is
+// not offered for Vision.
+export function modelPurposeBadges(model: ModelOption): { purpose: ModelPurpose; label: string; selectable: boolean }[] {
+	const purposes = model.purposes ?? ['llm'];
+	return (['llm', 'vision'] as const).map((purpose) => ({
+		purpose,
+		label: purpose === 'vision' ? 'Vision' : 'LLM',
+		selectable: purposes.includes(purpose)
+	}));
+}
 
 // Which stage is choosing the model. 'both' assigns one model to both stages.
 export type ModelStage = 'stage1' | 'stage2' | 'both';
@@ -50,13 +60,20 @@ export function modelRecommendationLevel(
 	return Math.max(0, Math.min(5, Number.isFinite(raw) ? raw : 0));
 }
 
+// The card prints three tiers (the author, 2026-10-13). The stored levels keep
+// their five steps -- the measurements were scored on them and they still order
+// the cards -- and read as 4-5 recommended, 3 standard, 1-2 modest.
+export function recommendationTier(level: number): number {
+	return level >= 4 ? 3 : level >= 3 ? 2 : level >= 1 ? 1 : 0;
+}
+
 export function modelRecommendation(
 	model: ModelOption,
 	purpose?: ModelPurpose,
 	stage?: ModelStage
 ): string {
-	const level = modelRecommendationLevel(model, purpose, stage);
-	return level > 0 ? `${'★'.repeat(level)}${'☆'.repeat(5 - level)} (${level}/5)` : '—';
+	const tier = recommendationTier(modelRecommendationLevel(model, purpose, stage));
+	return tier > 0 ? `${'★'.repeat(tier)}${'☆'.repeat(3 - tier)} (${tier}/3)` : '—';
 }
 
 /**
@@ -96,8 +113,37 @@ export function sortModels(models: ModelOption[], purpose?: ModelPurpose, stage?
 	});
 }
 
-export function modelSpeed(model: ModelOption): string {
+// "LLM … / Vision …" for whichever of the two was measured, or null for neither.
+function perPurpose(
+	llm: number | undefined,
+	vision: number | undefined,
+	format: (value: number, purpose: ModelPurpose) => string
+): string | null {
+	const parts = [
+		...(typeof llm === 'number' ? [`LLM ${format(llm, 'llm')}`] : []),
+		...(typeof vision === 'number' ? [`Vision ${format(vision, 'vision')}`] : [])
+	];
+	return parts.length > 0 ? parts.join(' / ') : null;
+}
+
+// The measured means are a reference, not a promise: one sample of six
+// descriptions and two images, on one day. A model measured only the old way
+// keeps its label.
+export function modelSpeed(model: ModelOption, isJapanese: boolean): string {
+	const seconds = (value: number) => (value < 100 ? value.toFixed(1) : String(Math.round(value)));
+	const means = perPurpose(model.speed_llm_seconds, model.speed_vision_seconds, (value) =>
+		isJapanese ? `平均 ${seconds(value)}秒` : `mean ${seconds(value)} s`);
+	if (means) return isJapanese ? `${means}（参考値）` : `${means} (reference)`;
 	return model.speed_label || '—';
+}
+
+// Approximate USD for one drawing (every generation request it made) and for one
+// Vision image. A free model costs $0, which is shown rather than left out.
+export function modelCost(model: ModelOption, isJapanese: boolean): string {
+	const usd = (value: number) => (value === 0 ? '$0' : value < 0.0001 ? '<$0.0001' : `$${Number(value.toPrecision(2))}`);
+	const unit = (purpose: ModelPurpose) =>
+		purpose === 'llm' ? (isJapanese ? '（描画1回）' : ' per drawing') : (isJapanese ? '（画像1枚）' : ' per picture');
+	return perPurpose(model.cost_usd_llm, model.cost_usd_vision, (value, purpose) => `${usd(value)}${unit(purpose)}`) ?? '—';
 }
 
 export function modelComment(model: ModelOption, isJapanese: boolean): string {

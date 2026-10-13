@@ -8,6 +8,14 @@
 
 ## 未リリース
 
+### 2026-10-13 — NVIDIA NIMのGemma 4の思考を切り、デモの指示文で標準外の項目を本文で送る
+
+作者の指示（NVIDIAの資料とNIMへの要求の照合）。NIMでホストされる`google/gemma-4-31b-it`のAPI仕様では、`chat_template_kwargs`の既定が`{"enable_thinking": true}`で、思考が既定で有効になる。Serverはこれを切っていなかったため、既定の描画モデルが毎回思考し、思考が出力枠（2,048）と時間を使っていた（7月の実測では応答の中央値が114〜221秒）。同じGemma 4でも、MLXでは思考を切り、Gemini APIでは`minimal`にしている。作者の選択により、NIMでも切る。
+
+- NIM（接続の`id`が`nvidia`）のGemma 4には`chat_template_kwargs: {"enable_thinking": false}`を送る。指定は`openai_sampling()`に置き、描画・Vision・デモの指示文で共通にする。ほかのNIMのモデルには送らない（仕様に無いモデルがある）。
+- デモの指示文はOpenAIのSDKの`create()`を使うが、`create()`はOpenAIの項目しか受け付けない。そのため、NIMの`chat_template_kwargs`やMLXの`top_k`・`enable_thinking`は`extra_body`で送る。これまでMLXでデモの指示文を作ると、この引数で失敗していた。
+- 仕様との食い違いのうち、次は実測で失敗が確かめられていないので変えていない：Gemma 4のモデルカードが勧めるtemperature 1.0（描画は0.3／0.0）、仕様の役割に`system`が無いこと（7月は動いていた）、結果待ちの202応答（起きた記録が無い）。
+
 ### 2026-10-13 — SwiftのOllama要求をServerに揃える
 
 SwiftのOllamaローカル・Cloudも、描画・Vision・デモで`gpt-oss`に`reasoning_effort: low`と8,192の追加出力枠を送り、ほかのモデルには`none`を送る。OpenAI互換の描画応答が`finish_reason: length`で終わったら、本文やtool callが揃っていても答えに使わず`malformed_payload`で拒否し、`provider_output_limit`とトークン数をシステムログに残す。既存の再試行の分類は変えない。

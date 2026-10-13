@@ -11,7 +11,7 @@ import httpx
 _OPENAI_FIXED_TEMPERATURE = re.compile(r"^(gpt-5|o\d)")
 # gpt-5.1 and later take reasoning_effort "none"; gpt-5 itself and the o-series do not.
 _OPENAI_REASONING_OFF = re.compile(r"^gpt-5\.\d")
-_MLX_GEMMA4 = re.compile(r"^gemma[-_]?4(?:[-_]|$)", re.IGNORECASE)
+_GEMMA4 = re.compile(r"^gemma[-_]?4(?:[-_]|$)", re.IGNORECASE)
 # Ollama turns reasoning_effort into its think setting: "none" turns thinking
 # off where a model allows it, and a name a model does not list falls back to
 # that model's default (OpenAI compatibility, docs.ollama.com). gpt-oss lists
@@ -39,14 +39,20 @@ def openai_sampling(connection: dict, model: str, *, max_tokens: int, temperatur
     Gemma 4 on MLX uses its model card's sampling settings: the generic low
     temperature made a constrained work plan repeat layers until truncation.
     Ollama, local and cloud, is asked for no thinking, or for gpt-oss, which
-    cannot stop, the lowest level and room for it.
+    cannot stop, the lowest level and room for it. Gemma 4 on NVIDIA NIM thinks
+    unless its chat template is told not to: the hosted API's
+    chat_template_kwargs defaults to {"enable_thinking": true}
+    (docs.api.nvidia.com, google-gemma-4-31b-it, read 2026-10-13), so it is
+    turned off there as it is on MLX.
     """
     if httpx.URL(str(connection["base_url"])).host != "api.openai.com":
         fields = {"max_tokens": max_tokens, "temperature": temperature}
         if connection.get("api_profile") == "mlx":
             fields["enable_thinking"] = False
-            if _MLX_GEMMA4.match(model.rsplit("/", 1)[-1]):
+            if _GEMMA4.match(model.rsplit("/", 1)[-1]):
                 fields.update(temperature=1.0, top_p=0.95, top_k=64)
+        if connection.get("id") == "nvidia" and _GEMMA4.match(model.rsplit("/", 1)[-1]):
+            fields["chat_template_kwargs"] = {"enable_thinking": False}
         if connection.get("id") in {"ollama", "ollama-cloud"}:
             if _OLLAMA_LEVELS_ONLY.match(model):
                 fields.update(max_tokens=max_tokens + OLLAMA_THINKING_ROOM_TOKENS, reasoning_effort="low")

@@ -330,13 +330,19 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
 
         connection = connection_for(provider, settings)
         client = OpenAI(base_url=connection["base_url"], api_key=connection.get("api_key") or "none", timeout=timeout)
+        # The SDK names only OpenAI's own fields; a server's own (NIM's
+        # chat_template_kwargs, MLX's top_k and enable_thinking) travel in the body.
+        sampling = openai_sampling(connection, model_id, max_tokens=180, temperature=0.9)
+        named = {key: sampling.pop(key) for key in ("max_tokens", "max_completion_tokens", "temperature", "top_p",
+                                                      "reasoning_effort") if key in sampling}
         resp = client.chat.completions.create(
             model=model_id,
             messages=[
                 {"role": "system", "content": _demo_instruction_system(lang)},
                 {"role": "user", "content": seed_phrase},
             ],
-            **openai_sampling(connection, model_id, max_tokens=180, temperature=0.9),
+            **named,
+            extra_body=sampling or None,
         )
         text = (resp.choices[0].message.content or "").strip()
     text = text.strip().strip("\"'“”‘’")

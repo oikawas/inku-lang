@@ -75,6 +75,7 @@ COPY --from=native-builder /wheelhouse/ /tmp/wheelhouse/
 RUN cd /app/server \
     && uv sync --frozen --no-dev \
     && uv pip install --python /app/server/.venv/bin/python --no-deps /tmp/wheelhouse/*.whl \
+    && /app/server/.venv/bin/python -c 'import inku_render; print("native_import_ok", inku_render.render_engine_version())' \
     && /app/server/.venv/bin/python /opt/inku-sqlite/check_runtime.py \
     && rm -rf /tmp/wheelhouse \
     && test -s /app/LICENSE \

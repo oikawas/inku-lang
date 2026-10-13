@@ -21,7 +21,7 @@ At the author's instruction (bringing in the differences from Server Build 1190,
 - The instruction box and the editor hide, without changing the text (no glyphs), the numbers of each range whose name and numbers match the shared core's table (`InkuCore.compositionRanges`, `inku.composition-ranges.v1`, 32 ranges), and an old [composition] mark. The name gets a dotted underline. The range opens when the caret enters it, and its numbers can be retyped in place. Leaving a range after editing its numbers makes the name follow the table (a valid number outside the table becomes "chosen place"; the author's own words stay). Editing the name stops the follow. Nothing is rewritten while the IME composes. Copying, saving and drawing use the whole text with its numbers.
 - The frame of the range under the caret, or of the name under the pointer, is drawn over the work (following zoom and pan). An invalid number keeps the last valid frame, dashed. While a range is invalid, a hint with examples appears and "Draw from instructions", confirm and draw are disabled. Japanese reads "-" and "－", and English reads "-" and "–" besides `to`, as range joins.
 - The range reading copies Web `composition-ranges.ts` (numbers are integer fractions with denominators up to one million).
-- Checks: AppCheck `--composition-ranges-only` (the Web test examples, plus folding, opening, frame, follow and the last valid frame; 38).
+- Checks: AppCheck `--composition-ranges-only` (the Web test examples, plus folding, opening, frame, follow, the last valid frame, and the real editor off screen folding exactly the numbers; 40).
 
 ## 2026-10-13 Edit the whole text in the instruction box, the "Instruction editor" and "Discard edits"
 

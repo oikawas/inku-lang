@@ -20,7 +20,8 @@ CUT = "ひさかたの光のどけき春の日に"
 class _Recorder:
     runs: list["_Recorder"] = []
 
-    def __init__(self, binding, store, *, owner_id, config, provider, allow_render, context, save_snapshot):
+    def __init__(self, binding, store, *, owner_id, config, provider, allow_render, context, save_snapshot,
+                 on_render_refusal=None):
         self.context = context
         self.config = config
         self.authoring: dict | None = None

@@ -78,7 +78,7 @@ PUBLIC = {  # every entry needs a reason
 #   -1 for retiring POST /api/variation/seeds (2026-10-04).
 #   +1 for GET /api/composition/ranges, the core's display table (2026-10-05).
 #   +2 for the public distribution notice index and text (2026-10-05).
-EXPECTED_ROUTE_COUNT = 121
+EXPECTED_ROUTE_COUNT = 122
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

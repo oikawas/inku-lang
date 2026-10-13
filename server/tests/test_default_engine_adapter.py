@@ -111,6 +111,7 @@ def test_default_package_exports_the_thin_adapter_contract():
         "composition_seed",
         "wild",
         "error_policy",
+        "max_svg_bytes",
     ]
 
 

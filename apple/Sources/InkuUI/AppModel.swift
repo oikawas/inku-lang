@@ -113,6 +113,17 @@ public final class AppModel {
     public private(set) var patchProposalJSON = ""
     public private(set) var patchCandidate = ""
     public private(set) var completionIssues: [HoleCompletionIssue] = []
+    /// Web DdlViewer: the displayed work's instructions as the author is editing them in the box. Typing never
+    /// draws; "Draw from instructions" draws this text once. Another work starts from its own instructions.
+    public private(set) var ddlBoxDraftWorkID: String?
+    public private(set) var ddlBoxDraft = ""
+    /// A word or a discard waiting for the box editor.
+    var ddlBoxInsertion: InkuEditorInsertion?
+    public func ddlBoxText(for work: SavedWork) -> String { ddlBoxDraftWorkID == work.id ? ddlBoxDraft : work.ddl ?? "" }
+    public func setDdlBoxText(_ text: String, for work: SavedWork) {
+        guard ddlBoxDraftWorkID == work.id || text != (work.ddl ?? "") else { return }
+        ddlBoxDraftWorkID = work.id; ddlBoxDraft = text
+    }
     public private(set) var unreadOutputs: Set<String> = []
     private var workActionStates: [String: SavedWorkActionState] = [:]
     public let library = LibraryModel()
@@ -422,6 +433,8 @@ public final class AppModel {
         let selectionToken = displayToken
         importedDDL = nil; importedMacroNames = []
         previewWork = nil
+        // The box draft belongs to the work it was typed for.
+        if ddlBoxDraftWorkID != work.id { ddlBoxDraftWorkID = nil; ddlBoxDraft = "" }
         selectedWorkID = work.id
         selectedWork = work
         // Web `adoptSketch`: another work on screen brings its own prose; an edit belongs to the work it was made on.

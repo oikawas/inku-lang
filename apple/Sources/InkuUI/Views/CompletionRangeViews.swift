@@ -63,28 +63,3 @@ struct CompletionRangeSummary: View {
     }
 }
 
-/// The read-only DDL box with its completion ranges, asked once per work and text rather than on every redraw.
-@MainActor
-struct CompletionRangeDDLBox: View {
-    let model: AppModel
-    let workID: String
-    let ddl: String
-    @State private var states: [CompletionRangeState] = []
-    @State private var source = ""
-
-    var body: some View {
-        let shown = source == ddl ? states : []
-        VStack(alignment: .leading, spacing: 6) {
-            ScrollView {
-                Text(CompletionRangeStyle.attributed(ddl, shown)).inkuFont(12.5, design: .monospaced).lineSpacing(4).textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 10)
-            }.frame(minHeight: 100, maxHeight: 220)
-                .overlay(alignment: .leading) { Rectangle().fill(.quaternary).frame(width: 2) }
-            CompletionRangeSummary(display: model.display, states: shown)
-        }
-        .task(id: [workID, ddl, model.completionRecordKey]) {
-            states = model.completionRangeStates(source: ddl)
-            source = ddl
-        }
-    }
-}

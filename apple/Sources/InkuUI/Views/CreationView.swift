@@ -51,6 +51,9 @@ struct CreationView: View {
     private var workspaceWork: SavedWork? { usesBatchWork ? batchWork : model.displayedWork }
     private var workspaceIsPreview: Bool { !usesBatchWork && model.isPreview }
     private var hasSavedWorkspaceWork: Bool { workspaceWork?.trashed == false && !workspaceIsPreview }
+    private var canInsertIntoBox: Bool {
+        !isBatch && hasSavedWorkspaceWork && !controlsDisabled && !model.isBusy && workspaceWork?.ddl != nil && display.visible("ddl_tools")
+    }
     private var display: DisplaySettings { model.display }
     #if os(macOS)
     @Environment(DDLImportController.self) private var importer
@@ -723,7 +726,9 @@ struct CreationView: View {
                     .accessibilityLabel(display.localized("閉じる"))
                     .inkuTooltip(display.tooltip("閉じる"))
             }.padding(.horizontal, 8).padding(.top, 6)
-            SaijikiView(model: model)
+            // SaijikiDrawer: a chosen word goes into the instruction box when it can be edited; otherwise only the sample.
+            SaijikiView(model: model, onInsertWord: canInsertIntoBox
+                        ? { model.ddlBoxInsertion = InkuEditorInsertion(text: $0, atEndUnlessUsed: true) } : nil)
         }
         .frame(width: 460)
         .frame(maxHeight: .infinity)

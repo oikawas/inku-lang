@@ -13,12 +13,13 @@ struct DdlAuthoringEditorSheet: View {
     @State private var inheritedWild = false
     @State private var wildOverride: Bool?
     @State private var insertion: InkuEditorInsertion?
+    @State private var confirmingDiscard = false
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(model.display.localized("DDLを編集")).inkuFont(16, weight: .semibold)
+                    Text(model.display.localized(session.work == nil ? "DDLを編集" : "指示書エディタ")).inkuFont(16, weight: .semibold)
                     Text(model.display.localized("取消すると、表示中の作品と指示書は変わりません。"))
                         .inkuFont(12).foregroundStyle(.secondary)
                 }
@@ -52,6 +53,19 @@ struct DdlAuthoringEditorSheet: View {
                     RunStatusView(display: model.display, label: model.status, variant: .inline,
                                   onStop: { Task { await model.cancel() } })
                 } else {
+                    if let target = session.discardTarget {
+                        // DdlEditorDialog: back to the work's saved instructions as one undoable step; the box keeps its draft.
+                        Button(model.display.localized("編集を破棄")) { confirmingDiscard = true }
+                            .disabled(session.draft == target)
+                            .confirmationDialog(model.display.localized("この作品を描いたときの指示書に戻します。編集した内容は失われます。"),
+                                                isPresented: $confirmingDiscard, titleVisibility: .visible) {
+                                Button(model.display.localized("破棄する"), role: .destructive) {
+                                    guard !model.isBusy, session.draft != target else { return }
+                                    insertion = InkuEditorInsertion(text: target, replacesAll: true)
+                                }
+                                Button(model.display.localized("キャンセル"), role: .cancel) {}
+                            }
+                    }
                     Button(model.display.localized("取消")) { session.cancel(); dismiss() }
                         .keyboardShortcut(.cancelAction)
                         .inkuTooltip(tip("編集中の変更を破棄して閉じます。"))

@@ -521,9 +521,12 @@ public struct ContentView: View {
         case "copy-hash": model.library.copyHash(work.renderHash)
         case "export-card": dialog = .export(ExportSession(works: [work], preserveOrder: false, directCard: true))
         case "draw-ddl":
-            guard let source = work.ddl, DDLSource.hasBody(source) else { return }
+            // Web DdlViewer: the box's draft is what is drawn, once.
+            let source = model.ddlBoxText(for: work)
+            guard DDLSource.hasBody(source) else { return }
             Task { await model.drawEditedDDL(work: work, source: source) }
-        case "ddl": dialog = .ddl(DdlEditingSession(work: work))
+        // The editor opens on the box's draft; its discard returns to the work's saved instructions.
+        case "ddl": dialog = .ddl(DdlEditingSession(work: work, draft: model.ddlBoxText(for: work)))
         case "color": dialog = .comparison(ComparisonSession(work: work, kind: .catalog))
         case "model": dialog = .comparison(ComparisonSession(work: work, kind: .model))
         case "ai": dialog = .advice(RefinementSession(work: work))

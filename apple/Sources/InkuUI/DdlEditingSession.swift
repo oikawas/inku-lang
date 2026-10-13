@@ -21,9 +21,9 @@ public final class DdlEditingSession: Identifiable {
         sourceWork = nil
     }
 
-    public init(work: SavedWork) {
+    public init(work: SavedWork, draft: String? = nil) {
         initialText = work.ddl ?? ""
-        draft = initialText
+        self.draft = draft ?? initialText
         sourceWorkID = work.id
         sourceRevision = "0"
         sourceWork = work
@@ -45,6 +45,9 @@ public final class DdlEditingSession: Identifiable {
     }
 
     public func cancel() { draft = initialText }
+
+    /// Web DdlEditorDialog: discard returns to the work's saved instructions; a new DDL has none.
+    public var discardTarget: String? { sourceWork == nil ? nil : initialText }
 
     public func commit(to model: AppModel, wildOverride: Bool? = nil) async -> Bool {
         guard canSubmit(to: model) else { return false }

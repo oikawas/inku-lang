@@ -24,6 +24,9 @@ struct InkuEditorStyle: Equatable {
                                              lineNumbers: false, inset: CGSize(width: 10, height: 9), drawsBackground: false)
     static let ddl = InkuEditorStyle(fontSize: 14, monospaced: false, lineHeightMultiple: 1.7, wraps: true,
                                      lineNumbers: true, inset: CGSize(width: 11, height: 10), drawsBackground: false)
+    /// Web DdlViewer's `compact` editor: the same DDL editing without line numbers.
+    static let ddlCompact = InkuEditorStyle(fontSize: 14, monospaced: false, lineHeightMultiple: 1.78, wraps: true,
+                                            lineNumbers: false, inset: CGSize(width: 4, height: 4), drawsBackground: false)
 }
 
 /// A range an editor paints without changing its text: the grey band of a number or comment (Web LabelHighlight),
@@ -42,6 +45,10 @@ struct InkuEditorMark: Equatable {
 struct InkuEditorInsertion: Equatable {
     let id = UUID()
     let text: String
+    /// Web DdlViewer `insertWord`: an editor the author has not used yet takes the word at its end.
+    var atEndUnlessUsed = false
+    /// Web `replaceValueWithHistory`: the whole text is replaced as one undoable step.
+    var replacesAll = false
 }
 
 @MainActor
@@ -276,7 +283,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
                 let binding = settings.insertion
                 // Editing the text changes SwiftUI state, so it waits until this update has finished.
                 DispatchQueue.main.async { [weak self] in
-                    self?.insert(request.text)
+                    self?.insert(request)
                     if binding?.wrappedValue?.id == request.id { binding?.wrappedValue = nil }
                 }
             }
@@ -284,10 +291,12 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
 
         /// Web DdlEditor `insertWord`: the word replaces the selection, which the editor keeps while another control
         /// has focus, and the caret follows it.
-        private func insert(_ word: String) {
-            guard let editor, editor.isEditable, !editor.hasMarkedText(), !word.isEmpty else { return }
+        private func insert(_ request: InkuEditorInsertion) {
+            let word = request.text
+            guard let editor, editor.isEditable, !editor.hasMarkedText(), !word.isEmpty || request.replacesAll else { return }
             let length = (editor.string as NSString).length
-            let selected = editor.selectedRange()
+            let selected = request.replacesAll ? NSRange(location: 0, length: length)
+                : request.atEndUnlessUsed && !editor.used ? NSRange(location: length, length: 0) : editor.selectedRange()
             let range = NSRange(location: min(selected.location, length), length: min(selected.length, max(0, length - selected.location)))
             guard editor.shouldChangeText(in: range, replacementString: word) else { return }
             editor.textStorage?.replaceCharacters(in: range, with: NSAttributedString(string: word, attributes: editor.typingAttributes))
@@ -389,6 +398,13 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
 @MainActor
 private final class BatchEditorTextView: NSTextView {
     var onCompositionEnded: (() -> Void)?
+    /// Set once the author focuses the editor; until then a chosen word goes at the end.
+    private(set) var used = false
+    override func becomeFirstResponder() -> Bool {
+        let became = super.becomeFirstResponder()
+        if became { used = true }
+        return became
+    }
     override func unmarkText() {
         super.unmarkText()
         onCompositionEnded?()

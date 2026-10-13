@@ -14,6 +14,16 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-13 Edit the whole text in the instruction box, the "Instruction editor" and "Discard edits"
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage C-1). The sources are Web `DdlViewer.svelte` and `DdlEditorDialog.svelte`.
+
+- The work's instruction box is an editor without line numbers (with the editor's token colours and completion range marks). The whole text can be edited as a draft for the displayed work; typing never draws, and "Draw from instructions" draws the draft once. It is read-only while drawing, for an unsaved work and in the trash. Displaying another work starts from that work's instructions.
+- The box's button, the work edit menu and the work editor's title read "Instruction editor". The editor opens on the box's draft.
+- A word chosen in the Creation view's Saijiki goes into the box at its caret when the box can be edited, or at its end if the box has not been used yet; otherwise only the sample shows.
+- "Discard edits" sits in the box and in the work editor. After confirmation it returns the whole text to the instructions the work was drawn from, as one undoable step. It is disabled for the same text, read-only text and while drawing, and absent from a new DDL's editor. Discarding in the editor leaves the box's draft as it is.
+- Checks: AppCheck `--ddl-box-only`.
+
 ## 2026-10-13 Choose the composition again (by principle or by chance) and move "Change the layout"
 
 At the author's instruction (bringing in the differences from Server Build 1190, stage B). The sources are Server `_recompose` and `compose` and Web `recomposition.ts`, `RefinementAdjustView.svelte` and `WorkActionMenu.svelte`.

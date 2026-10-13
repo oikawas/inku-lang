@@ -111,7 +111,7 @@ public enum ServerTips {
 
     // Short words can name different controls; only established shared labels opt in.
     private static let sharedLabels: Set<String> = [
-        "指示書を編集", "色カタログを変える", "モデルを変える",
+        "指示書を編集", "指示書エディタ", "色カタログを変える", "モデルを変える",
         "キャンバス", "思考を表示", "合計",
     ]
 

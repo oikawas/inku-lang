@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Swift edits the whole text in the instruction box, with "Instruction editor" and "Discard edits"
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage C-1). Swift's instruction box was read-only. As on the Web, it is now an editor without line numbers where the whole text can be edited as a draft of the displayed work; typing never draws, and "Draw from instructions" draws it once. The button, menu and editor title read "Instruction editor", and a Saijiki word goes in at the box's caret (or its end if unused). "Discard edits" returns to the work's instructions and can be undone with ⌘Z.
+
 ### 2026-10-13 — Swift "Change the layout" chooses the composition again by principle or by chance
 
 At the author's instruction (bringing in the differences from Server Build 1190, stage B). Swift's "Change the layout" drew a new seed and redrew the saved instructions as they were, so numeric ranges never moved. As on the Web, "Change the layout" in the work edit menu now opens a layout-only dialog that asks the shared core to choose the ranges again "By principle" or "By chance" and draws the chosen instructions. Each option shows the moved layers and ranges, or why they stayed, and the adopted child records the mode in its lineage. "Edit drawing parameters" now offers reading and touch. The AI process's layout also recomposes by principle.

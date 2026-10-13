@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
-	import { isModelUnselectable, modelFold, modelFolds, modelFoldTitle, modelStatusLabel, modelRecommendation, modelSpeed, purposeUnsupported, recommendationTier, sortModels, type ModelFold } from '$lib/modelMeta';
+	import { isModelUnselectable, modelFold, modelFolds, modelFoldTitle, modelStatusLabel, modelStatusParts, modelRecommendation, modelSpeed, purposeUnsupported, recommendationTier, sortModels, type ModelFold } from '$lib/modelMeta';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
 	import type { ModelAdministration, ModelProviderSetting } from './model-administration.svelte';
 	import './model-administration-settings.css';
@@ -621,7 +621,7 @@
 										};
 									}}
 								/>
-									<span><strong>{model.label}</strong><small>{model.id}</small>{#if modelStatusLabel(model, t().code === 'ja')}<em class="model-picker-status" class:unselectable={isModelUnselectable(model)}>{modelStatusLabel(model, t().code === 'ja')}</em>{/if}{#if model.notes}<em>{model.notes}</em>{/if}</span>
+									<span><strong>{model.label}</strong><small>{model.id}</small>{#if modelStatusLabel(model, t().code === 'ja')}<em class="model-picker-status">{#each modelStatusParts(model, t().code === 'ja') as part, partIndex (partIndex)}{#if partIndex > 0}{' · '}{/if}<span class:unselectable={part.blocking}>{part.text}</span>{/each}</em>{/if}{#if model.notes}<em>{model.notes}</em>{/if}</span>
 								</label>
 								<div class="model-purpose-controls" aria-label={`${model.label} LLM / Vision`}>
 									<button type="button" class:active={modelPurposeSelected(model.id, 'llm')} aria-pressed={modelPurposeSelected(model.id, 'llm')} disabled={purposeUnsupported(model, 'llm')} title={purposeUnsupported(model, 'llm') ? noResponseTitle() : undefined} onclick={() => toggleModelPurpose(model.id, 'llm')}>LLM</button>

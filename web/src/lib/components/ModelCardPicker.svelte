@@ -2,7 +2,7 @@
 	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { pickerSelection, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
-	import { modelRecommendation, modelSpeed, modelCost, modelComment, modelStatusLabel, isModelUnselectable, sortModels, type ModelPurpose } from '$lib/modelMeta';
+	import { modelRecommendation, modelSpeed, modelCost, modelComment, modelStatusLabel, modelStatusParts, isModelUnselectable, sortModels, type ModelPurpose } from '$lib/modelMeta';
 	import { openFloatingCard } from '$lib/floatingCard';
 	import ModelPurposeBadges from './ModelPurposeBadges.svelte';
 
@@ -99,9 +99,9 @@
 				<section><h3>{group.id === 'chatgpt' ? t().chatgptPlanLabel : group.label}</h3><div class="model-grid">
 					{#each sortModels(group.models, purpose) as model (model.id)}
 						<button type="button" class:selected={selected?.group.id === group.id && selected?.model.id === model.id} class:eol={model.eol} class:unselectable={isModelUnselectable(model)} disabled={isModelUnselectable(model)} onpointerenter={positionMeta} onfocus={positionMeta} onclick={() => choose(group.id, model.id)}>
-							<strong>{model.label}</strong>{#if modelStatusLabel(model, isJapanese)}<small class={isModelUnselectable(model) ? 'eol-mark' : 'model-label-mark'}>{modelStatusLabel(model, isJapanese)}</small>{/if}{#if model.notes}<small>{model.notes}</small>{/if}
+							<strong>{model.label}</strong>{#if modelStatusLabel(model, isJapanese)}<small class="model-label-mark">{#each modelStatusParts(model, isJapanese) as part, partIndex (partIndex)}{#if partIndex > 0}{' · '}{/if}<span class:eol-mark={part.blocking}>{part.text}</span>{/each}</small>{/if}{#if model.notes}<small>{model.notes}</small>{/if}
 							<span class="metadata" role="tooltip">
-								{#if modelStatusLabel(model, isJapanese)}<span><b>状態 / Status</b><span class={isModelUnselectable(model) ? 'status-warning' : 'status-muted'}>{modelStatusLabel(model, isJapanese)}</span></span>{/if}
+								{#if modelStatusLabel(model, isJapanese)}<span><b>状態 / Status</b><span class="status-muted">{#each modelStatusParts(model, isJapanese) as part, partIndex (partIndex)}{#if partIndex > 0}{' · '}{/if}<span class:status-warning={part.blocking}>{part.text}</span>{/each}</span></span>{/if}
 								<span><b>用途 / Use</b><ModelPurposeBadges {model} {isJapanese} /></span>
 								<span><b>オススメ度 / Recommendation</b>{modelRecommendation(model, purpose)}</span>
 								<span><b>概算コスト / Est. cost</b>{modelCost(model, isJapanese)}</span>
@@ -122,9 +122,9 @@
 	.model-grid button.unselectable { opacity: 0.55; cursor: not-allowed; }
 	/* Strike through retired models only; a paid-tier model has not disappeared. */
 	.model-grid button.eol strong { text-decoration: line-through; }
-	/* The card's small text is muted (.model-grid > button > small below); a label that keeps
-	   the model from publication has to outrank that rule to show in the warning colour. */
-	.model-grid > button > small.eol-mark { color: var(--danger); font-weight: 600; }
+	/* Each label is its own span inside the card's muted small text (.model-grid > button > small
+	   below); a label that keeps the model from publication outranks that rule in the warning colour. */
+	.model-grid > button > small .eol-mark { color: var(--danger); font-weight: 600; }
 	/* A label that leaves the model selectable (older model, not measured) is not a warning. */
 	.model-label-mark { color: var(--fg3); }
 	/* The hover card colours the labels the same way, in the tooltip's own palette. */

@@ -1488,6 +1488,17 @@ impl Execution<'_> {
         }
         let prior = prior.ok_or(ScoreExecutionReason::JointReferenceOmitted)?;
         let prior_primitive = self.request.score.instructions[target].primitive;
+        // A fill is drawn clipped to its target, so the joint holds to the
+        // part that is seen; a shape inside it stays in the part of its inner
+        // rectangle that is seen.
+        let fill_target = self.fill_target_bounds(target);
+        let clip = |bounds: Bounds| {
+            fill_target
+                .and_then(|area| crate::joint_relation::part_within(bounds, area))
+                .unwrap_or(bounds)
+        };
+        let inside = crate::joint_relation::inside_region(prior_primitive, prior).map(clip);
+        let prior = clip(prior);
         let paper = Bounds {
             min: Point::new(0.0, 0.0),
             max: crate::geometry::point_to_short_side_units(
@@ -1499,6 +1510,7 @@ impl Execution<'_> {
             relation.kind,
             own,
             prior,
+            inside,
             prior_primitive,
             paper,
             self.request.performance_seed.unwrap_or_default(),
@@ -1512,10 +1524,33 @@ impl Execution<'_> {
                 kind: relation.kind,
                 own,
                 prior,
-                inside: crate::joint_relation::inside_region(prior_primitive, prior),
+                inside,
             },
             numeric_reason: ScoreExecutionReason::NumericJointPositionConflict,
         })
+    }
+
+    /// The bounds of the target a source instruction's fill is clipped to, in
+    /// canvas-short-edge units, when the instruction belongs to a fill that is
+    /// drawn.
+    fn fill_target_bounds(&self, source: usize) -> Option<Bounds> {
+        let typed = self.typed.as_ref()?;
+        let scope = typed.instructions.get(source)?.fill_scope_index?;
+        if self.omitted_fill_scopes.get(scope).copied().unwrap_or(true) {
+            return None;
+        }
+        let contour = typed.fill_scopes.get(scope)?.prepared_region.contour();
+        let first = *contour.first()?;
+        Some(contour.iter().fold(
+            Bounds {
+                min: first,
+                max: first,
+            },
+            |bounds, point| Bounds {
+                min: Point::new(bounds.min.x.min(point.x), bounds.min.y.min(point.y)),
+                max: Point::new(bounds.max.x.max(point.x), bounds.max.y.max(point.y)),
+            },
+        ))
     }
 
     fn bounds_constraint(

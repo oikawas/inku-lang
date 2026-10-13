@@ -3071,12 +3071,20 @@ sequential resolution.
   translate the current element only, from the performed bounds of the current
   and preceding elements. The preceding element never moves, and the current
   keeps its shape, dimensions and direction; free coordinates come from the
-  performance seed. The resting, crossing and inside positions are drawn from
-  the part of the preceding element (its inner rectangle for `inside`) on the
-  paper when the current fits there, and from the whole element otherwise;
-  overlapping tries other directions in turn only when the seed's direction
-  leaves the current's center off the paper (the author's decision,
-  2026-10-12). `resting_on` sets the current lower edge on the preceding
+  performance seed. When the preceding element belongs to a fill
+  (`fill_groups`), its bounds are the part seen inside the fill target, and the
+  inner rectangle for `inside` is cut by the target as well (unchanged when they
+  do not meet). The resting, crossing and inside positions are drawn from the
+  part of the preceding element (its inner rectangle for `inside`) on the paper
+  when the current fits there, and from the whole element otherwise. When the
+  chosen resting or crossing position leaves the current (a group as a whole)
+  off the paper, it moves the least that puts the current on the paper within
+  the range that keeps the joint, or to the position in that range nearest the
+  paper when none does. Overlapping tries other directions in turn only when
+  the seed's direction leaves the current off the paper, and takes the first
+  that keeps the current on the paper, or else the first that keeps its center
+  on it (the author's decisions, 2026-10-12 and 2026-10-13). `resting_on` sets
+  the current lower edge on the preceding
   top and chooses the horizontal center where the current fits the preceding
   width (the center when it is wider). `inside` chooses a position inside the
   preceding closed element's inner rectangle (the bounds of a square; the bounds

@@ -198,6 +198,7 @@ class OpenAiCompatibleProvider(
          * asked not to (gpt-5 itself and the o-series do not take "none"). Other
          * OpenAI-compatible servers keep their fields, except Ollama's gpt-oss
          * gets its lowest thinking level and 8,192 extra tokens for reasoning.
+         * NIM's Gemma 4 gets its chat-template thinking switch turned off.
          */
         internal fun putOpenAiSampling(
             payload: JSONObject,
@@ -210,6 +211,9 @@ class OpenAiCompatibleProvider(
             val host = runCatching { URL(baseUrl).host }.getOrNull()?.lowercase()
             if (host != OPENAI_HOST) {
                 payload.put("temperature", temperature).put("max_tokens", maxTokens)
+                if (providerId == "nvidia" && GEMMA4.containsMatchIn(model.substringAfterLast('/'))) {
+                    payload.put("chat_template_kwargs", JSONObject().put("enable_thinking", false))
+                }
                 if (providerId in OLLAMA_PROVIDER_IDS) {
                     if (OLLAMA_LEVELS_ONLY.containsMatchIn(model)) {
                         payload.put("reasoning_effort", "low").put("max_tokens", maxTokens + OLLAMA_THINKING_ROOM_TOKENS)
@@ -258,6 +262,7 @@ class OpenAiCompatibleProvider(
         private const val OPENAI_HOST = "api.openai.com"
         private val OPENAI_FIXED_TEMPERATURE = Regex("^(gpt-5|o\\d)")
         private val OPENAI_REASONING_OFF = Regex("^gpt-5\\.\\d")
+        private val GEMMA4 = Regex("^gemma[-_]?4(?:[-_]|$)", RegexOption.IGNORE_CASE)
         private val OLLAMA_PROVIDER_IDS = setOf("ollama", "ollama-cloud")
         private val OLLAMA_LEVELS_ONLY = Regex("^gpt-oss(?:[:-]|$)")
         private const val OLLAMA_THINKING_ROOM_TOKENS = 8192

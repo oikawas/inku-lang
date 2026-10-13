@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-13 — AndroidのNIM Gemma 4でも思考を切る
+
+NVIDIA NIMのGemma 4にはchat_template_kwargsのenable_thinkingをfalseで送り、描画・Vision・写真の記述・デモで思考を切る。ほかのモデルには付けず、出力枠とtemperatureは保つ。
+
 ### 2026-10-13 — SwiftでもNVIDIA NIMのGemma 4の思考を切る
 
 SwiftのNVIDIA NIMへの描画・Vision・デモも、Gemma 4だけに`chat_template_kwargs: {"enable_thinking": false}`を送り、Serverと同じく思考を切る。他モデルと他providerには指定を足さず、出力枠と温度は既存の値を保持する。

@@ -94,6 +94,54 @@ class OpenAiCompatibleRequestBodyTest {
     }
 
     @Test
+    fun nimTurnsOffThinkingOnlyForGemmaFourWithoutChangingItsBudgetOrSampling() {
+        for (model in listOf("google/gemma-4-31b-it", "gemma4", "org/nested/GEMMA_4_IT")) {
+            val body = OpenAiCompatibleProvider.requestBody("nvidia", pipelineRequest("nvidia:$model"), NVIDIA_URL)
+            assertEquals(model, body.getString("model"))
+            val kwargs = body.getJSONObject("chat_template_kwargs")
+            assertEquals(1, kwargs.length())
+            assertFalse(kwargs.getBoolean("enable_thinking"))
+            assertEquals(2048, body.getInt("max_tokens"))
+            assertEquals(0.3, body.getDouble("temperature"), 0.0)
+            assertEquals("submit_pipeline_response", body.getJSONObject("tool_choice").getJSONObject("function").getString("name"))
+            assertFalse(body.has("reasoning_effort"))
+        }
+        for (model in listOf("meta/llama-3.2-90b-vision-instruct", "google/gemma-3n-e4b-it", "google/gemma42")) {
+            val body = OpenAiCompatibleProvider.requestBody("nvidia", pipelineRequest("nvidia:$model"), NVIDIA_URL)
+            assertFalse(body.has("chat_template_kwargs"))
+            assertEquals(2048, body.getInt("max_tokens"))
+            assertEquals(0.3, body.getDouble("temperature"), 0.0)
+        }
+        val elsewhere = OpenAiCompatibleProvider.requestBody("custom", pipelineRequest("custom:google/gemma-4-31b-it"), NVIDIA_URL)
+        assertFalse(elsewhere.has("chat_template_kwargs"))
+    }
+
+    @Test
+    fun nimVisionPhotoDescriptionAndDemoSendTheSwitchInTheirActualJsonBodies() = runBlocking {
+        val sent = mutableListOf<RecordingConnection>()
+        val provider = OpenAiCompatibleProvider("nvidia", NVIDIA_URL, "test-only") { url ->
+            RecordingConnection(url, """{"choices":[{"finish_reason":"stop","message":{"content":"A red circle."}}]}""")
+                .also { sent += it }
+        }
+        val model = "nvidia:google/gemma-4-31b-it"
+        RemoteVisionAnalyzer(provider).analyze(VisionAnalysisRequest(byteArrayOf(1, 2, 3), 1, 1, "en", model))
+        CameraDescriptionWriter(provider).write(CameraDescriptionRequest("A red circle", model, "en"))
+        assertEquals("A red circle.", DemoInstructionWriter(provider).write("circle", model))
+        val bodies = sent.map { JSONObject(it.sent.toString(Charsets.UTF_8.name())) }
+        assertEquals(listOf(2048, 2048, 256), bodies.map { it.getInt("max_tokens") })
+        assertEquals(listOf(0.2, 0.7, 0.85), bodies.map { it.getDouble("temperature") })
+        for (body in bodies) {
+            assertEquals("google/gemma-4-31b-it", body.getString("model"))
+            assertFalse(body.getJSONObject("chat_template_kwargs").getBoolean("enable_thinking"))
+            assertFalse(body.has("extra_body"))
+            assertFalse(body.has("reasoning_effort"))
+        }
+        val image = bodies.first().getJSONArray("messages").getJSONObject(0).getJSONArray("content")
+        assertEquals("data:image/jpeg;base64,AQID", image.getJSONObject(1).getJSONObject("image_url").getString("url"))
+        assertFalse(bodies.last().has("tools"))
+    }
+
+    @Test
     fun ollamaAuxiliaryRequestsUseTheSameReasoningAndTokenRoom() = runBlocking {
         for (id in listOf("ollama", "ollama-cloud")) {
             val sent = mutableListOf<RecordingConnection>()

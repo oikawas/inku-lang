@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Turn off NIM Gemma 4 thinking on Android too
+
+NVIDIA NIM's Gemma 4 gets chat_template_kwargs with enable_thinking false for drawing, Vision, photo descriptions and demo instructions. Other models do not get it; output budgets and temperature stay unchanged.
+
 ### 2026-10-13 — Disable NVIDIA NIM Gemma 4 thinking in Swift
 
 Swift drawing, Vision, and demo requests to NVIDIA NIM now send `chat_template_kwargs: {"enable_thinking": false}` only for Gemma 4, matching Server's choice to disable thinking. Other models and providers receive no additional field, and existing output budgets and temperatures are preserved.

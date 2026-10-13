@@ -442,6 +442,7 @@ public enum AuxiliaryWire {
                         body["temperature"] = .number("1.0"); body["top_p"] = .number("0.95"); body["top_k"] = .integer(64)
                     }
                 }
+                ProviderWire.applyNIMSampling(to: &body, providerID: provider.id, model: model)
                 ProviderWire.applyOllamaSampling(to: &body, providerID: provider.id, model: model, maxTokens: prompt.maximumTokens)
             }
         case .anthropic:

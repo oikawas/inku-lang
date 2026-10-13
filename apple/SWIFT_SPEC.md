@@ -14,6 +14,15 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-13 Disable NVIDIA NIM Gemma 4 thinking
+
+Drawing, Vision (refinement advice and colophons), and demo instruction requests to NVIDIA NIM disable Gemma 4 thinking, following Server's [`openai_request.py`](../server/src/inku_server/openai_request.py) and the [NIM API specification](https://docs.api.nvidia.com/nim/reference/google-gemma-4-31b-it-infer).
+
+- Only OpenAI-compatible connection ID `nvidia` with a model's final `/` segment matching `^gemma[-_]?4([-_]|$)`, case-insensitively, receives `chat_template_kwargs: {"enable_thinking": false}`. All three paths share this matching.
+- Other NIM models and providers receive no such field. Existing `max_tokens` and `temperature` values are preserved. Official OpenAI URLs retain the existing official API settings.
+- Swift builds raw JSON, so `chat_template_kwargs` is placed directly in the request body, without an SDK `extra_body` wrapper.
+- Check: InkuHost's `NIMGemmaThinkingTests` verifies outgoing JSON for all three paths, token budgets and temperature, other-model and other-provider controls, case-insensitivity, and model-name boundaries.
+
 ## 2026-10-13 Match Server's Ollama reasoning controls and output budgets
 
 Drawing, Vision (refinement advice and colophons), and demo instruction requests to local and Cloud Ollama use the reasoning controls in Server's [`openai_request.py`](../server/src/inku_server/openai_request.py).

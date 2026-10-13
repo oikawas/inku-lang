@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Disable NVIDIA NIM Gemma 4 thinking in Swift
+
+Swift drawing, Vision, and demo requests to NVIDIA NIM now send `chat_template_kwargs: {"enable_thinking": false}` only for Gemma 4, matching Server's choice to disable thinking. Other models and providers receive no additional field, and existing output budgets and temperatures are preserved.
+
 ### 2026-10-13 — Match Server's Ollama requests and output limits on Android
 
 Android also asks local/Cloud gpt-oss for low with 8,192 extra output tokens, and other models for none, across Vision, photo descriptions and demo instructions too. An OpenAI-compatible drawing response ending at length is refused even if its call or text looks complete, with retryable malformed_payload and output-limit diagnostics.

@@ -43,6 +43,7 @@ public enum ProviderWire {
                         body["temperature"] = .number("1.0"); body["top_p"] = .number("0.95"); body["top_k"] = .integer(64)
                     }
                 }
+                applyNIMSampling(to: &body, providerID: provider.id, model: model)
                 applyOllamaSampling(to: &body, providerID: provider.id, model: model, maxTokens: maxTokens)
             }
             if provider.id == "ollama" || provider.apiProfile == "mlx" {
@@ -75,6 +76,13 @@ public enum ProviderWire {
         request.httpMethod = "POST"; request.httpBody = provider.kind == .gemini ? Data(body.orderedText.utf8) : body.data
         request.allHTTPHeaderFields = headers
         return request
+    }
+
+    // NIM's hosted Gemma 4 must have thinking disabled in its chat template.
+    static func applyNIMSampling(to body: inout ExactJSON, providerID: String, model: String) {
+        let name = model.components(separatedBy: "/").last ?? model
+        guard providerID == "nvidia", name.range(of: "^gemma[-_]?4(?:[-_]|$)", options: [.regularExpression, .caseInsensitive]) != nil else { return }
+        body["chat_template_kwargs"] = .object(["enable_thinking": .bool(false)])
     }
 
     // Mirrors Server openai_sampling for both local and Cloud Ollama.

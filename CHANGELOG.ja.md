@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-13 — SwiftでもNVIDIA NIMのGemma 4の思考を切る
+
+SwiftのNVIDIA NIMへの描画・Vision・デモも、Gemma 4だけに`chat_template_kwargs: {"enable_thinking": false}`を送り、Serverと同じく思考を切る。他モデルと他providerには指定を足さず、出力枠と温度は既存の値を保持する。
+
 ### 2026-10-13 — AndroidのOllama要求と出力上限をServerに揃える
 
 Androidもローカル／Cloudのgpt-ossにlowと8,192追加の出力枠を送り、ほかのモデルにはnoneを送る。Vision・写真の記述・デモにも同じ規則を適用する。lengthで切れたOpenAI互換の描画応答は、関数や本文が揃って見えても答えにせず、再試行可能なmalformed_payloadと上限到達の診断を残す。

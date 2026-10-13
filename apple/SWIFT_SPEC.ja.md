@@ -14,6 +14,15 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-13 NVIDIA NIMのGemma 4の思考を切る
+
+NVIDIA NIMへの描画・Vision（推敲の助言・奥書）・デモの指示文は、Serverの[`openai_request.py`](../server/src/inku_server/openai_request.py)と同じくGemma 4の思考を切る（[NIM API仕様](https://docs.api.nvidia.com/nim/reference/google-gemma-4-31b-it-infer)）。
+
+- OpenAI互換の接続IDが`nvidia`で、モデル名の最後の`/`より後ろが`^gemma[-_]?4([-_]|$)`に一致するときだけ、大文字小文字を問わず`chat_template_kwargs: {"enable_thinking": false}`を送る。3経路で同じ判定を使う。
+- 他のNIMモデルや他providerにはこの指定を付けない。`max_tokens`と`temperature`は既存の値を保持する。公式OpenAIのURLでは既存の公式API指定を使う。
+- Swiftは生のJSONを組むため、`chat_template_kwargs`を要求本文へ直接入れる。SDK用の`extra_body`へは包まない。
+- 確認：InkuHostの`NIMGemmaThinkingTests`で、3経路の送信JSON、出力枠・温度、他モデル・他providerの対照、大文字小文字とモデル名の境界を確認する。
+
 ## 2026-10-13 Ollamaの推論指定と出力枠をServerに揃える
 
 Ollamaローカル・Cloudへの描画・Vision（推敲の助言・奥書）・デモの指示文は、Serverの[`openai_request.py`](../server/src/inku_server/openai_request.py)と同じ推論指定を使う。

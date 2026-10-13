@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import { ja } from './i18n/ja.ts';
 import { en } from './i18n/en.ts';
 import type { LangPack } from './i18n/types.ts';
-import { paintStageHandlers, paintStageLabel, providerAttemptText, readPaintStream } from './paintStream.ts';
+import { paintStageHandlers, paintStageLabel, providerAttemptText, readPaintStream, runningStageLabel } from './paintStream.ts';
 
 const DONE = { event: 'done', ddl: '黒い円を中心に置く。', svg: '<svg/>' };
 
@@ -164,4 +164,32 @@ test('completion asked again is shown separately from a communication retry', as
 			? ['断られた案を理由を添えて問い直し中（2/4回目）', '再試行中（3/4回目）']
 			: ['Asking again with the reasons the proposal was refused (2/4)', 'Retrying (try 3/4)']);
 	}
+});
+
+// ---------------------------------------------------------------- composition reading
+
+test('the composition reading names itself while it runs', () => {
+	// The core and the Server already report the running call's action; the
+	// reading used to wait under the label of the layer before it (2026-10-13).
+	for (const strings of [ja, en] as LangPack[]) {
+		const reading = { action: 'read_composition', attempt: 1, max_attempts: 2 };
+		assert.equal(runningStageLabel(strings.stageInterpreting, reading, strings), strings.stageReadingComposition);
+		assert.equal(runningStageLabel(strings.stageDdlGenerating, reading, strings), strings.stageReadingComposition);
+		const drafting = { action: 'generate_normalized_ddl', attempt: 1, max_attempts: 4 };
+		assert.equal(runningStageLabel(strings.stageDdlGenerating, drafting, strings), strings.stageDdlGenerating);
+		assert.equal(runningStageLabel(strings.stageInterpreting, null, strings), strings.stageInterpreting);
+		const others = [
+			strings.stageSketching,
+			strings.stageInterpreting,
+			strings.stageStructuring(''),
+			strings.stagePerforming,
+			strings.stageDdlGenerating
+		];
+		assert.ok(
+			!others.includes(strings.stageReadingComposition),
+			`${strings.code}: the reading shares another stage's words`
+		);
+	}
+	assert.equal(ja.stageReadingComposition, '構図の読み中…');
+	assert.equal(en.stageReadingComposition, 'Reading the composition…');
 });

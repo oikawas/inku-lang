@@ -55,8 +55,13 @@ export type PaintAttemptEvent = {
 	elapsed_ms: number;
 };
 
-/** What the running indicator counts: this attempt of at most so many. */
-export type ProviderAttemptCount = Pick<PipelineProviderAttempt, 'attempt' | 'max_attempts' | 'asked_again'>;
+/**
+ * What the running indicator counts: this attempt of at most so many. The
+ * call's action, when the run reports it, lets the indicator name the
+ * composition reading (`runningStageLabel`).
+ */
+export type ProviderAttemptCount = Pick<PipelineProviderAttempt, 'attempt' | 'max_attempts' | 'asked_again'> &
+	Partial<Pick<PipelineProviderAttempt, 'action'>>;
 
 export type PaintStreamHandlers = {
 	/** Stage 0.5 settled. Absent from a run where the layer did not contribute. */
@@ -159,6 +164,22 @@ export function paintStageLabel(
 	if (moment === 'sketch') return strings.stageInterpreting;
 	if (moment === 'stage1') return strings.stageStructuring('');
 	return strings.stagePerforming;
+}
+
+/**
+ * The stage name while a model call runs. The composition reading has no
+ * layer event of its own -- it runs after Stage 1 and before the DDL is
+ * committed -- so it used to wait under the label of the layer before it
+ * (`解釈中…` in the stream, `DDL生成` for a single draw). The running call's
+ * action names it; every other call keeps the label the run already shows
+ * (2026-10-13).
+ */
+export function runningStageLabel(
+	label: string,
+	attempt: ProviderAttemptCount | null | undefined,
+	strings: LangPack
+): string {
+	return attempt?.action === 'read_composition' ? strings.stageReadingComposition : label;
 }
 
 /**

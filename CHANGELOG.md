@@ -8,6 +8,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — The composition reading in the running indicator
+
+At the author's instruction (the next task, the composition reading in the progress display) and choices (only while the reading runs, worded "Reading the composition…"). The composition reading runs after Stage 1 and before the instructions are settled and has no layer event of its own, so the Web waited under the previous stage's name (`Interpreting your words…` for a single drawing, `interpreting your words…` for refinement candidates, the demo, and batches).
+
+- While the running model call is the composition reading (`read_composition`), the Web names the stage "Reading the composition…" (Japanese 「構図の読み中…」), both for a single drawing and for the candidates, demo, and batches that use the drawing stream. The other stage names and the attempt count are unchanged.
+- The core and the Server are unchanged: the reading's attempt already arrived as the `action` of `provider_attempt`.
+- The paragraph on the wait in Creating Images is corrected to match the screen today (a single drawing shows `Interpreting your words…` until it is done).
+
 ## v2.15.115 (2026-10-13 / Build 1191)
 
 ### 2026-10-13 — A completion no longer repeats the sentence end

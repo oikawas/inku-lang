@@ -28,7 +28,7 @@ import { CanvasViewportState } from '$lib/features/canvas/viewport-state.svelte'
 import type { SaveHistoryOptions } from '$lib/features/history/save';
 import { PipelineApi, PipelineApiError, pipelineDiagnostics, pipelinePatch, pipelineViewFromErrorDetail, type PipelineOptions, type PipelineView } from '$lib/features/pipeline/api';
 import { PipelineController } from '$lib/features/pipeline/controller';
-import type { ProviderAttemptCount } from '$lib/paintStream';
+import { runningStageLabel, type ProviderAttemptCount } from '$lib/paintStream';
 
 type Iteration = HistoryItem;
 type BatchPaintResult = PaintResult & { ddl: string; thinking: string | null; };
@@ -1009,7 +1009,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		set loading(value) { loading = value; },
 		get activeRunMode() { return activeRunMode; },
 		set activeRunMode(value) { activeRunMode = value; },
-		get stageLabel() { return stageLabel; },
+		// The composition reading names itself while it runs, on both drawing paths.
+		get stageLabel() { return runningStageLabel(stageLabel, activeRunAttempt, t()); },
 		set stageLabel(value) { stageLabel = value; },
 		get error() { return error; },
 		set error(value) { error = value; },

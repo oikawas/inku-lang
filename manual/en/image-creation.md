@@ -62,7 +62,7 @@ The new password must be at least eight characters. **It does not change unless 
 4. Press `Paint`.
 5. Confirm that the performance appears in the `Work` tab and is saved to history.
 
-While you wait, the indicator next to `Paint` names the layer that is working (`sketching from life…`, `interpreting your words…`, `writing the score…`, `performing…`). **It is not a guess: each name is switched by a signal the server sends when that layer finishes** (v2.13.39). With `Sketch from life` set to `Off`, the wait does not open on `sketching from life…`.
+While you wait, the indicator names the stage that is working. When `Paint` draws a single work, it reads `Interpreting your words…` until the drawing is done, and beside it `Awaiting reply (try 1/4)` and the like count the attempts at the model's reply. For the candidates refinement makes, the demo, and batches, the layer names (`sketching from life…`, `interpreting your words…`, `writing the score…`, `performing…`) **are switched by a signal the server sends when each layer finishes** (v2.13.39). With `Sketch from life` set to `Off`, the wait does not open on `sketching from life…`. Either way, while the composition is being read (after Stage 1, before the instructions are settled), it reads `Reading the composition…`.
 
 The first work is the source work. The refinement action `Another performance` is never applied to this first painting.
 

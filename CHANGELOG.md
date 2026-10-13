@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Swift reads the shared v2 model catalog
+
+Swift bundles the canonical model JSON unchanged and reads assessments, mean seconds and estimated costs for every provider, including the ChatGPT plan. Rows and details show every label from its table. Six kinds of fold follow the table order, show counts and start closed. New selection requires every label to permit publication. Saved names, purposes and account access checks remain local while catalog updates replace stale assessments and labels. Canonical assessments are read-only; custom models absent from the catalog retain local assessment editing.
+
 ## v2.15.120 (2026-10-13 / Build 1196)
 
 ### 2026-10-13 — Each model label takes its own colour

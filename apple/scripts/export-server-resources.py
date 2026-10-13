@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import ast
 import argparse
+import ast
 import json
 import runpy
 import shutil
@@ -65,34 +65,34 @@ def provider_defaults() -> dict:
             "baseURL": provider["default_base_url"],
             "requiresAPIKey": provider["requires_api_key"],
             "credentialID": provider["id"],
+            "speedHidden": bool(provider.get("speed_developer_only")),
         } for provider in definitions],
     }
 
 
-def model_guidance() -> dict:
-    catalog, definitions = provider_catalog()
-    model_keys = {
-        "id", "label", "purposes", "recommendation_llm", "recommendation_vision",
-        "recommendation_stage1", "recommendation_stage2", "recommendation_level",
-        "speed_class", "speed_label", "comment_ja", "comment_en", "eol", "eol_date",
-        "requires_subscription",
-    }
-    providers = []
-    for provider in definitions:
-        hide_speed = bool(provider.get("speed_developer_only"))
-        models = []
-        for model in provider["models"]:
-            shown = {key: value for key, value in model.items() if key in model_keys}
-            # Match the release Server catalog's speed visibility. The evaluation
-            # comments remain verbatim, including their measurement caveats.
-            if hide_speed:
-                shown.pop("speed_class", None)
-                shown.pop("speed_label", None)
-            models.append(shown)
-        providers.append({"id": provider["id"], "label": provider["label"],
-                          "kind": provider["kind"], "speed_hidden": hide_speed, "models": models})
-    return {"schema": "inku.model-guidance.v1", "version": catalog["MODEL_CONFIG_VERSION"],
-            "updated": catalog["MODEL_CONFIG_LAST_UPDATED"], "providers": providers}
+def model_catalog() -> dict:
+    catalog = json.loads((SERVER / "model_catalog.json").read_text(encoding="utf-8"))
+    if catalog.get("schema") != "inku.model-catalog.v2":
+        raise ValueError("Model catalog schema unavailable")
+    return catalog
+
+
+def write_json(path: Path, value: object) -> None:
+    content = json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+    if path.exists() and path.read_text(encoding="utf-8") == content:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    print(f"Generated changed resource: {path.relative_to(DESTINATION_ROOT)}")
+
+
+def export_model_catalog(manifest: dict) -> None:
+    catalog = model_catalog()
+    manifest.pop("model_guidance", None)
+    manifest["model_catalog"] = catalog
+    manifest["provider_defaults"] = provider_defaults()
+    write_json(DESTINATION_ROOT / "apple/Packages/InkuHost/Sources/InkuHost/Resources/model-labels.json",
+               {"schema": catalog["schema"], "labels": catalog["labels"]})
 
 
 class BindingPlaceholder:
@@ -109,9 +109,16 @@ def main() -> None:
     global ROOT, SERVER
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, default=ROOT, help="Product checkout containing the canonical Server/Web resources")
+    parser.add_argument("--model-catalog-only", action="store_true", help="Refresh only the model catalog and label resources")
     arguments = parser.parse_args()
     ROOT = arguments.source_root.resolve()
     SERVER = ROOT / "server/src/inku_server"
+    if arguments.model_catalog_only:
+        manifest_path = OUTPUT / "server-defaults.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        export_model_catalog(manifest)
+        write_json(manifest_path, manifest)
+        return
     catalogs = literal_assignment(SERVER / "color_catalogs.py", "_CATALOG_DEFINITIONS")
     source = ast.parse((SERVER / "pipeline_defaults.py").read_text())
     constants = {"ADDITIONAL_RESOURCE_LIMITS", "HOST_LIMITS"}
@@ -151,8 +158,7 @@ def main() -> None:
     module = ast.fix_missing_locations(ast.Module(body=selected, type_ignores=[]))
     exec(compile(module, "server/pipeline_defaults.py", "exec"), environment)  # noqa: S102
     manifest = environment["default_manifest"](BindingPlaceholder())
-    manifest["model_guidance"] = model_guidance()
-    manifest["provider_defaults"] = provider_defaults()
+    export_model_catalog(manifest)
     rules = []
     normalization = next(node for node in limit_source.body if isinstance(node, ast.FunctionDef)
                          and node.name == "normalize_limits")
@@ -215,7 +221,7 @@ def main() -> None:
     for name, value in [("server-defaults.json", manifest), ("color-catalogs.json", catalogs),
                         ("macro-sources.json", macro_sources), ("plugin-words.json", plugin_words),
                         ("saijiki.json", saijiki)]:
-        (OUTPUT / name).write_text(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+        write_json(OUTPUT / name, value)
     subprocess.run(["node", str(DESTINATION_ROOT / "apple/scripts/export-web-reference.mjs"), "--source-root", str(ROOT)], check=True)
     print(f"Generated Server defaults, {len(catalogs)} catalogs, {len(plugin_words)} plugin words and canonical Saijiki.")
 

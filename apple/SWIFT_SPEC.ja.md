@@ -467,7 +467,9 @@ DB指定は`--database`、任意のbundle設定`InkuDatabasePath`、従来のApp
 
 制作画面で登録済みのserviceと描画modelを選択する。設定したmodelと明示取得したmodel一覧を表示し、一覧取得は利用者のbutton操作だけで始める。選択した次のmodelは記述解釈と構造化の両段へ渡し、設定画面の保存defaultや親作品のmodelを書き換えない。新しい生成要求・推敲・比較の初期選択は次のmodelを使い、開始済みbatch／demoのmodelはそのsnapshotへ固定する。未接続時はモデル設定へ案内する。
 
-制作とモデル設定の「モデルの適性・用途」はreview済みServer登録資料snapshotを同梱し、用途、解釈／構造化と両段の評価、Visionの評価、日英comment、更新日時と提供状態を表示する。両段の評価は弱い段階の値、段階別評価がない場合はLLM評価を使う。正確なcatalog service ID・接続方式・model IDで照合し、Ollama tagの`:`を保持する。custom serviceや未登録modelを名前やURLから推測で評価しない。Serverのdeveloper専用速度情報は公開環境と同じく表示しない。登録資料と接続先から明示取得した入力上限・対応機能は別欄にし、案内を読むだけで選択・保存default・開始時snapshotを変更しない。
+制作とモデル設定の「モデルの適性・用途」は`server/src/inku_server/model_catalog.json`（`inku.model-catalog.v2`）を`server-defaults.json`の`model_catalog`としてそのまま同梱し、ChatGPTプランも同じ正本から読む。用途、解釈／構造化と両段の評価、Visionの評価、日英comment、平均秒数・概算USD費用、更新日時と提供状態を表示する。両段の評価は弱い段階の値、段階別評価がない場合はLLM評価を使う。正確なcatalog service ID・接続方式・model IDで照合し、Ollama tagの`:`を保持する。custom serviceや未登録modelを名前やURLから推測で評価しない。Serverのdeveloper専用速度情報は公開環境と同じく表示しない。登録資料と接続先から明示取得した入力上限・対応機能は別欄にし、案内を読むだけで選択・保存default・開始時snapshotを変更しない。
+
+札の名前・順序・公開可否は正本の`labels`表だけから読む（Host用の小さい札の表もexportで生成する）。記録の札に端末の確かめによるsubscription・eolを重ね、用途が無ければno_responseを足す。計測欄を1つも持たず他の札がすべて公開可能ならunmeasuredを足す。空配列・nullでも計測欄の存在として数える。折りたたみは最後の札、札が無ければ通常一覧、選べるかはすべての札の`publishable`で決まる。モデル設定・ChatGPTプランの公開選択・描画選択・比較は非空の折りたたみを表の順に件数付きで初期は閉じて表示し、行と詳細にすべての札を出す。公開できない札は警告色、ほかは控えめな色にする。保存済みの名前・用途・明示的な利用可否補正を保ち、正本にあるモデルの評価と非アクセス札は最新正本で置き換える。正本評価は読取表示、カスタムモデルは端末で編集できる。ChatGPTプランの公開と用途は本人の保存値を使い、正本defaultsから自動公開しない。`InkuAppCheck --model-catalog-only <server/tests/data/model-catalog-cases.json>`で共通15件の札・折りたたみ・公開可否と正本の同梱、保存値との重ね合わせを確かめる。
 
 状態欄は共通coreの試行回数とhostの開始時刻を用い、providerの段階、固定要求の呼出しmodel、試行／再試行、段階全体と今回の経過時間を表示する。同じ段階の再試行は段階の時計を保持し、今回の時計を開始し直す。完了・失敗・確認待ち・停止で時計を確定し、停止は遅い応答の終了を待つ。入力／出力token数はproviderが返した実usageを使い、未取得は「記録なし」、明示0は0と表示する。文字数や予算用の推定tokenを実usageへ置き換えない。通常生成と比較候補は同じ表示を使い、古いtokenの応答を除外する。新規・新しい処理開始は古い表示を消す。保存作品の選択とprovider不要の再現比較は、当該作品の保存時recordを読む。
 

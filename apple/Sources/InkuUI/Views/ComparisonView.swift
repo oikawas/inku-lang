@@ -119,10 +119,9 @@ public struct ComparisonView: View {
                     .inkuFont(12).foregroundStyle(.secondary)
                 ForEach(comparison.modelProviders) { provider in
                     Text(model.display.providerName(provider)).inkuFont(12, weight: .semibold)
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 190))], alignment: .leading) {
-                        ForEach(SettingsModel.batchModels(for: provider)) { entry in
-                            comparisonModelCard(entry, provider: provider)
-                        }
+                    ModelCatalogGroupsView(models: SettingsModel.batchModels(for: provider), display: model.display,
+                                           columns: [GridItem(.adaptive(minimum: 190))]) { entry in
+                        comparisonModelCard(entry, provider: provider)
                     }
                 }
                 Text(model.display.localizedFormat("選択中: %ld / 4", comparison.modelReferences.count)).inkuFont(12).monospacedDigit()
@@ -150,13 +149,9 @@ public struct ComparisonView: View {
                     model.display.preferences.comparisonModels = Array(comparison.modelReferences.prefix(4))
                 }))
                 .disabled(comparison.running || model.isBusy || comparison.hasUnsaved || comparison.sourceIsLocked || target || full || !entry.isSelectable)
-                .strikethrough(entry.eol == true)
+                .strikethrough(entry.modelFold == "eol")
             if target { Text(model.display.localized("元の作品のモデル")).inkuFont(12).foregroundStyle(.secondary) }
-            if entry.eol == true {
-                Text(model.display.localized("提供終了") + (entry.eolDate.map { " (\($0))" } ?? "")).inkuFont(12).foregroundStyle(.secondary)
-            } else if entry.requiresSubscription == true {
-                Text(model.display.localized("有料プラン限定")).inkuFont(12).foregroundStyle(.secondary)
-            }
+            ModelLabelsView(labels: entry.resolvedLabels, display: model.display)
             if comparison.failedModelReferences.contains(reference) { Text(model.display.localized("このモデルの候補を用意できませんでした。")).inkuFont(12).foregroundStyle(.red) }
             DisclosureGroup(model.display.localized("モデルの適性・用途")) {
                 RegisteredModelMetadataView(entry: entry, provider: provider, display: model.display)

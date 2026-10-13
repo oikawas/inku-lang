@@ -104,14 +104,15 @@ public enum ProviderModelCatalog {
                 return ProviderModelSettings(id: row.id, label: row.label, purposes: row.id.lowercased().contains("vision") ? ["vision"] : ["llm"])
             }
             if !(row.label == row.id && !model.label.isEmpty && model.label != model.id) { model.label = row.label }
-            model.eol = nil; model.eolDate = nil
+            model.eol = false; model.eolDate = nil
+            model.labels.removeAll { $0 == "eol" }
             return model
         }
         for index in models.indices {
             switch access[models[index].id] {
             case .retired(let date): models[index].eol = true; models[index].eolDate = date
             case .subscription(true): models[index].requiresSubscription = true
-            case .subscription(false): models[index].requiresSubscription = nil
+            case .subscription(false): models[index].requiresSubscription = false
             case nil: break
             }
         }

@@ -6,6 +6,28 @@ import InkuUI
     // The missing native guidance must map the generated Server evaluations to
     // the actual selected ID, without turning unknown services into rated ones.
     let catalog = try ModelGuidanceCatalog.loadBundled()
+    guard let manifest = try JSONSerialization.jsonObject(with: ModelGuidanceCatalog.bundledManifestData()) as? [String: Any],
+          let canonical = manifest["model_catalog"] as? [String: Any],
+          canonical["schema"] as? String == "inku.model-catalog.v2",
+          let records = canonical["providers"] as? [String: [String: Any]] else {
+        throw CheckFailure.message("Native guidance canonical v2 records unavailable")
+    }
+    func sourceRecord(provider: String, model: String) throws -> ProviderModelSettings {
+        guard let models = records[provider]?["models"] as? [[String: Any]],
+              let record = models.first(where: { $0["id"] as? String == model }) else {
+            throw CheckFailure.message("Native guidance canonical record unavailable: \(provider):\(model)")
+        }
+        return try ModelGuidanceCatalog.modelSettings(recordData: JSONSerialization.data(withJSONObject: record))
+    }
+    func sourceBothLevel(_ model: ProviderModelSettings) -> Int? {
+        [model.recommendationStage1, model.recommendationStage2].compactMap { $0 }.min()
+            ?? model.recommendationLLM ?? model.recommendationLevel
+    }
+    let qwenRecord = try sourceRecord(provider: "ollama", model: "qwen3.5:4b-q4_K_M")
+    let ministralRecord = try sourceRecord(provider: "ollama", model: "ministral-3:8b-instruct-2512-q4_K_M")
+    let gemmaRecord = try sourceRecord(provider: "nvidia", model: "google/gemma-4-31b-it")
+    let cloudRecord = try sourceRecord(provider: "ollama-cloud", model: "gemma4:31b")
+    let openAIRecord = try sourceRecord(provider: "openai", model: "gpt-5.1")
     let endpoint = URL(string: "http://127.0.0.1:1/v1")!
     let local = ProviderSettings(id: "ollama", baseURL: endpoint, requiresAPIKey: false,
                                  credentialID: "guidance-check-\(UUID().uuidString)")
@@ -16,22 +38,45 @@ import InkuUI
     let configured = [local, nvidia, cloud, openAI, custom]
     let selected = "ollama:qwen3.5:4b-q4_K_M"
     guard let qwen = catalog.guidance(for: selected, providers: configured),
-          qwen.modelID == "qwen3.5:4b-q4_K_M", qwen.purposes == ["llm"],
-          qwen.hasStageRecommendations, qwen.stage1Level == 5, qwen.stage2Level == 2, qwen.bothStagesLevel == 2,
+          qwen.modelID == qwenRecord.id, qwen.purposes == qwenRecord.purposes,
+          qwen.hasStageRecommendations == (qwenRecord.recommendationStage1 != nil || qwenRecord.recommendationStage2 != nil),
+          qwen.stage1Level == (qwenRecord.recommendationStage1 ?? qwenRecord.recommendationLLM ?? qwenRecord.recommendationLevel),
+          qwen.stage2Level == (qwenRecord.recommendationStage2 ?? qwenRecord.recommendationLLM ?? qwenRecord.recommendationLevel),
+          qwen.bothStagesLevel == sourceBothLevel(qwenRecord),
           qwen.speedHidden, qwen.speedLabel == nil, qwen.speedClass == nil,
-          qwen.comment(language: "ja")?.contains("第二段階では被覆 9/28") == true,
-          qwen.comment(language: "en")?.contains("Stage 2 coverage is 9 of 28") == true,
-          qwen.comment(language: "en") != qwen.comment(language: "ja") else {
+          qwen.comment(language: "ja") == qwenRecord.commentJA,
+          qwen.comment(language: "en") == qwenRecord.commentEN else {
         throw CheckFailure.message("Native guidance lost the Server's stage-specific/localized Qwen evaluation or exposed developer-only speed")
     }
     guard let gemma = catalog.guidance(for: "nvidia:google/gemma-4-31b-it", providers: configured),
-          !gemma.hasStageRecommendations, gemma.bothStagesLevel == 4, gemma.visionLevel == 5,
-          gemma.purposes == ["llm", "vision"], !gemma.speedHidden, gemma.speedLabel != nil,
+          gemma.hasStageRecommendations == (gemmaRecord.recommendationStage1 != nil || gemmaRecord.recommendationStage2 != nil),
+          gemma.bothStagesLevel == sourceBothLevel(gemmaRecord),
+          gemma.visionLevel == (gemmaRecord.recommendationVision ?? gemmaRecord.recommendationLevel),
+          gemma.purposes == gemmaRecord.purposes, !gemma.speedHidden,
+          gemma.speedLabel == gemmaRecord.speedLabel, gemma.speedClass == gemmaRecord.speedClass,
+          gemma.comment(language: "ja") == gemmaRecord.commentJA,
+          gemma.comment(language: "en") == gemmaRecord.commentEN,
           let cloudModel = catalog.guidance(for: "ollama-cloud:gemma4:31b", providers: configured),
-          cloudModel.speedHidden, cloudModel.speedLabel == nil,
-          let unscored = catalog.guidance(for: "openai:gpt-5.1", providers: configured),
-          !unscored.hasEvaluation, unscored.bothStagesLevel == nil, unscored.visionLevel == nil else {
-        throw CheckFailure.message("Native guidance confused LLM and Vision ratings, release speed visibility, or unrated registered models")
+          cloudModel.speedHidden, cloudModel.speedLabel == nil, cloudModel.purposes == cloudRecord.purposes,
+          cloudModel.bothStagesLevel == sourceBothLevel(cloudRecord),
+          cloudModel.visionLevel == (cloudRecord.recommendationVision ?? cloudRecord.recommendationLevel),
+          cloudModel.speedLLMSeconds == cloudRecord.speedLLMSeconds,
+          cloudModel.speedVisionSeconds == cloudRecord.speedVisionSeconds,
+          cloudModel.comment(language: "ja") == cloudRecord.commentJA,
+          cloudModel.comment(language: "en") == cloudRecord.commentEN,
+          let openAIModel = catalog.guidance(for: "openai:gpt-5.1", providers: configured),
+          openAIModel.hasEvaluation == openAIRecord.hasCatalogMeasurement,
+          openAIModel.bothStagesLevel == sourceBothLevel(openAIRecord),
+          openAIModel.visionLevel == (openAIRecord.recommendationVision ?? openAIRecord.recommendationLevel),
+          openAIModel.purposes == openAIRecord.purposes,
+          openAIModel.speedLLMSeconds == openAIRecord.speedLLMSeconds,
+          openAIModel.speedVisionSeconds == openAIRecord.speedVisionSeconds,
+          openAIModel.costUSDLLM == openAIRecord.costUSDLLM,
+          openAIModel.costUSDVision == openAIRecord.costUSDVision,
+          openAIModel.resolvedLabels == openAIRecord.resolvedLabels,
+          openAIModel.comment(language: "ja") == openAIRecord.commentJA,
+          openAIModel.comment(language: "en") == openAIRecord.commentEN else {
+        throw CheckFailure.message("Native guidance differs from canonical v2 ratings, measurements, costs, labels or localized comments")
     }
     let wrongKind = ProviderSettings(id: "ollama", kind: .anthropic, baseURL: endpoint, requiresAPIKey: false)
     guard catalog.guidance(for: "guidance-custom:qwen3.5:4b-q4_K_M", providers: configured) == nil,
@@ -65,8 +110,9 @@ import InkuUI
     let savedBytes = try Data(contentsOf: defaultsURL)
     let settings = SettingsModel()
     await settings.load(model: app)
-    guard catalog.guidance(for: app.nextDrawingModelReference, providers: settings.host.providers)?.bothStagesLevel == 2,
-          catalog.guidance(for: settings.host.models.stage1Model, providers: settings.host.providers)?.stage2Level == 5 else {
+    guard catalog.guidance(for: app.nextDrawingModelReference, providers: settings.host.providers)?.bothStagesLevel == sourceBothLevel(qwenRecord),
+          catalog.guidance(for: settings.host.models.stage1Model, providers: settings.host.providers)?.stage2Level
+            == (ministralRecord.recommendationStage2 ?? ministralRecord.recommendationLLM ?? ministralRecord.recommendationLevel) else {
         throw CheckFailure.message("Creation and Settings selected IDs did not resolve to their respective Server evaluations")
     }
     app.selectNextDrawingModel(savedDefault)
@@ -81,7 +127,7 @@ import InkuUI
           app.works.isEmpty, await transport.calls == 0 else {
         throw CheckFailure.message("Reading model guidance changed selection, saved defaults, an earlier request snapshot, or invoked a provider")
     }
-    print("Model guidance passed: bundled Server stage 5/2/both 2 and JA/EN comments; LLM/Vision separate; release speed visibility; unknown boundaries; Creation/Settings IDs map independently; selected models, saved defaults and earlier request snapshot preserved; zero provider calls. Temporary DB only.")
+    print("Model guidance passed: canonical v2 stage/LLM/Vision ratings, measurements, costs, labels and JA/EN comments; release speed visibility; unknown boundaries; Creation/Settings IDs map independently; selected models, saved defaults and earlier request snapshot preserved; zero provider calls. Temporary DB only.")
 }
 
 private actor ModelGuidanceNoCallProvider: ProviderTransport {

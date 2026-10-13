@@ -48,9 +48,15 @@ struct ChatGPTModelsSheet: View {
     /// A published model needs a purpose, as on the other services.
     private var missingPurpose: Bool { selected.contains { purposes(of: $0).isEmpty } }
     /// The same filter as the other services' picker; the catalog keeps ChatGPT's order.
-    private var visibleModels: [ChatGPTPlanModel] {
+    private var catalogModels: [ProviderModelSettings] {
+        publication.models.map { item in
+            let saved = ProviderModelSettings(id: item.id, label: item.label, purposes: purposes(of: item.id))
+            return ModelGuidanceCatalog.bundled?.applyingCatalog(to: saved, providerID: "chatgpt", kind: .chatGPTPlan) ?? saved
+        }
+    }
+    private var visibleModels: [ProviderModelSettings] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
-        return publication.models.filter { item in
+        return catalogModels.filter { item in
             guard query.isEmpty || item.label.localizedCaseInsensitiveContains(query) || item.id.localizedCaseInsensitiveContains(query) else { return false }
             switch filter {
             case .all: return true
@@ -74,7 +80,7 @@ struct ChatGPTModelsSheet: View {
                         Text(display.localized("該当するモデルがありません。"))
                             .foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(32)
                     }
-                    ForEach(visibleModels) { item in row(item) }
+                    ModelCatalogGroupsView(models: visibleModels, display: display) { item in row(item) }
                 }.padding(16)
             }
             .disabled(working)
@@ -121,7 +127,7 @@ struct ChatGPTModelsSheet: View {
                 Button(display.webCopy("chatgptRefreshModels", "モデル一覧を更新")) { Task { await refresh() } }
                     .disabled(working || dirty || model.isBrowsingLocked)
                     .inkuTooltip(dirty ? display.tooltip("未保存の変更を保存または取り消してからモデルリストを取得してください。", serverKey: "settingsModelFetchDisabledWhileDirty") : "")
-                Button(display.webCopy("settingsModelSelectVisible", "表示中を全て選択")) { selected.formUnion(visibleModels.map(\.id)) }
+                Button(display.webCopy("settingsModelSelectVisible", "表示中を全て選択")) { selected.formUnion(visibleModels.filter(\.isSelectable).map(\.id)) }
                     .disabled(working || visibleModels.isEmpty)
                 Button(display.webCopy("settingsModelClearVisible", "表示中を全て解除")) { selected.subtract(visibleModels.map(\.id)) }
                     .disabled(working || visibleModels.isEmpty)
@@ -132,25 +138,32 @@ struct ChatGPTModelsSheet: View {
         }.padding(16)
     }
 
-    private func row(_ item: ChatGPTPlanModel) -> some View {
+    private func row(_ item: ProviderModelSettings) -> some View {
+      VStack(alignment: .leading, spacing: 10) {
         HStack(alignment: .top, spacing: 12) {
             Toggle(isOn: Binding(get: { selected.contains(item.id) },
-                                 set: { if $0 { selected.insert(item.id) } else { selected.remove(item.id) } })) {
+                                 set: { if $0 && item.isSelectable { selected.insert(item.id) } else { selected.remove(item.id) } })) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.label).inkuFont(14, weight: .semibold)
                     Text(item.id).inkuFont(12, design: .monospaced).foregroundStyle(.secondary).textSelection(.enabled)
+                    ModelLabelsView(labels: item.resolvedLabels, display: display)
                     if selected.contains(item.id), purposes(of: item.id).isEmpty {
                         Text(display.localized("LLM か Vision の用途を選んでください。")).inkuFont(12).foregroundStyle(.orange)
                     }
                 }
             }
             .toggleStyle(.checkbox)
+            .disabled(!item.isSelectable && !selected.contains(item.id))
             .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 6) {
                 purposeButton("LLM", purpose: "llm", item: item)
                 purposeButton("Vision", purpose: "vision", item: item)
             }
         }
+        DisclosureGroup(display.localized("モデル詳細")) {
+            RegisteredModelMetadataView(entry: item, provider: metadataProvider, display: display)
+        }.inkuFont(13)
+      }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.background, in: RoundedRectangle(cornerRadius: 10))
@@ -158,7 +171,13 @@ struct ChatGPTModelsSheet: View {
     }
 
     /// The other services' purpose capsule (ProviderModelsSheet).
-    private func purposeButton(_ label: String, purpose: String, item: ChatGPTPlanModel) -> some View {
+    private var metadataProvider: ProviderSettings {
+        var provider = ProviderSettings.personalPlan
+        provider.models = catalogModels
+        return provider
+    }
+
+    private func purposeButton(_ label: String, purpose: String, item: ProviderModelSettings) -> some View {
         let on = purposes(of: item.id).contains(purpose)
         return Button(label) {
             var next = purposes(of: item.id)
@@ -166,6 +185,7 @@ struct ChatGPTModelsSheet: View {
             purposes[item.id] = ["llm", "vision"].filter(next.contains)
         }
             .buttonStyle(.plain)
+            .disabled(!ProviderModelsDraft.canEditPurposes(item) || (item.unsupportedPurposes ?? []).contains(purpose))
             .inkuFont(12, weight: .medium)
             .padding(.horizontal, 10).padding(.vertical, 5)
             .foregroundStyle(on ? Color.accentColor : Color.secondary)
@@ -192,7 +212,7 @@ struct ChatGPTModelsSheet: View {
                     .keyboardShortcut(.cancelAction).disabled(working)
                 Button(display.localized("保存")) { Task { await save() } }
                     .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-                    .disabled(working || !dirty || missingPurpose || model.isBrowsingLocked)
+                    .disabled(working || !dirty || missingPurpose || catalogModels.contains { selected.contains($0.id) && !$0.isSelectable } || model.isBrowsingLocked)
             }
         }.padding(16)
     }

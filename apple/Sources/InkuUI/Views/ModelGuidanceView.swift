@@ -31,12 +31,10 @@ struct ModelGuidanceView: View {
                     } else {
                         row("速度", guidance.speedLabel == "未計測" ? display.localized("未計測") : guidance.speedLabel ?? "—")
                     }
-                    if guidance.endOfLife {
-                        Text(display.localized("提供終了") + (guidance.endOfLifeDate.map { " (\($0))" } ?? ""))
-                            .foregroundStyle(.secondary)
-                    } else if guidance.requiresSubscription {
-                        Text(display.localized("有料プラン限定")).foregroundStyle(.secondary)
-                    }
+                    ModelLabelsView(labels: guidance.resolvedLabels, display: display)
+                    ModelMeasurementView(llmSeconds: guidance.speedHidden ? nil : guidance.speedLLMSeconds,
+                                         visionSeconds: guidance.speedHidden ? nil : guidance.speedVisionSeconds,
+                                         llmCost: guidance.costUSDLLM, visionCost: guidance.costUSDVision)
                     if let comment = guidance.comment(language: display.preferences.language) {
                         row("評価コメント", comment)
                     }

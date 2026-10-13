@@ -1,0 +1,41 @@
+{
+  "labels": [
+    {
+      "en": "Not measured",
+      "id": "unmeasured",
+      "ja": "未計測",
+      "publishable": true
+    },
+    {
+      "en": "Older model",
+      "id": "legacy",
+      "ja": "旧モデル",
+      "publishable": true
+    },
+    {
+      "en": "Paid plan only",
+      "id": "subscription",
+      "ja": "有料プラン限定",
+      "publishable": false
+    },
+    {
+      "en": "No response when measured",
+      "id": "no_response",
+      "ja": "計測で応答なし",
+      "publishable": false
+    },
+    {
+      "en": "Not supported",
+      "id": "not_supported",
+      "ja": "ノンサポート",
+      "publishable": false
+    },
+    {
+      "en": "End of life",
+      "id": "eol",
+      "ja": "提供終了",
+      "publishable": false
+    }
+  ],
+  "schema": "inku.model-catalog.v2"
+}

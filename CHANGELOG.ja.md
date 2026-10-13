@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-13 — AndroidのOllama要求と出力上限をServerに揃える
+
+Androidもローカル／Cloudのgpt-ossにlowと8,192追加の出力枠を送り、ほかのモデルにはnoneを送る。Vision・写真の記述・デモにも同じ規則を適用する。lengthで切れたOpenAI互換の描画応答は、関数や本文が揃って見えても答えにせず、再試行可能なmalformed_payloadと上限到達の診断を残す。
+
 ### 2026-10-13 — NVIDIA NIMのGemma 4の思考を切り、デモの指示文で標準外の項目を本文で送る
 
 作者の指示（NVIDIAの資料とNIMへの要求の照合）。NIMでホストされる`google/gemma-4-31b-it`のAPI仕様では、`chat_template_kwargs`の既定が`{"enable_thinking": true}`で、思考が既定で有効になる。Serverはこれを切っていなかったため、既定の描画モデルが毎回思考し、思考が出力枠（2,048）と時間を使っていた（7月の実測では応答の中央値が114〜221秒）。同じGemma 4でも、MLXでは思考を切り、Gemini APIでは`minimal`にしている。作者の選択により、NIMでも切る。

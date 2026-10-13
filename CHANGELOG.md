@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Match Server's Ollama requests and output limits on Android
+
+Android also asks local/Cloud gpt-oss for low with 8,192 extra output tokens, and other models for none, across Vision, photo descriptions and demo instructions too. An OpenAI-compatible drawing response ending at length is refused even if its call or text looks complete, with retryable malformed_payload and output-limit diagnostics.
+
 ### 2026-10-13 — Turn off NVIDIA NIM's Gemma 4 thinking, and send the demo's non-OpenAI fields in the body
 
 NIM's hosted `google/gemma-4-31b-it` defaults `chat_template_kwargs` to `{"enable_thinking": true}`, and Server never turned it off, so the default drawing model thought on every request, spending the 2,048-token budget and time (median responses of 114-221 s in July). Gemma 4 already runs without thinking on MLX and at `minimal` on the Gemini API; at the author's choice NIM's Gemma 4 is now sent `chat_template_kwargs: {"enable_thinking": false}` through `openai_sampling()`, for drawing, Vision, and the demo instruction. Other NIM models are sent nothing new. The demo instruction calls the OpenAI SDK, whose `create()` takes only OpenAI's own fields, so a server's own fields (NIM's `chat_template_kwargs`, MLX's `top_k` and `enable_thinking`) now go in `extra_body`; an MLX demo instruction used to fail on them.

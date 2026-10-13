@@ -155,7 +155,8 @@ public enum ProviderModelCatalog {
             guard let key, !key.isEmpty, let chat = post(base + "/chat/completions", .object(["model": .string(id),
                 "messages": .array([.object(["role": .string("user"), "content": .string(".")])]), "max_tokens": .integer(1)]), bearer: key) else { return nil }
             switch await send(chat).status {
-            case 403: return .subscription(true)
+            // A model outside the Free plan answers 402, one the account cannot reach yet 403 (Server settings.py).
+            case 402, 403: return .subscription(true)
             case 200: return .subscription(false)
             default: return nil
             }

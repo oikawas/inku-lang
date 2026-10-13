@@ -14,6 +14,17 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-13 Claudeの思考の出力枠と、上限で切れた応答の記録をServerに揃える
+
+作者の指示（Server Build 1190との差の取り込み、段A）。正本はServerの`anthropic_request.py`・`gemini_request.py`・`openai_request.py`・`pipeline_provider.py`・`vision_client.py`。
+
+- Claude 5（opus・sonnet・haiku・fable・mythosの5）とMythos Previewは、描画・Vision・デモのどれでも`max_tokens`へ8,192を足す（`ProviderOutputLimit.anthropicMaxTokens`）。Claude 4系は足さない。
+- 描画で上限に当たって切れた応答（Claudeの`stop_reason: max_tokens`、Geminiの`finishReason: MAX_TOKENS`、OpenAI互換の`finish_reason: length`、Responsesの`incomplete`／`max_output_tokens`）は、どの社でも答えにせず`malformed_payload`で拒む（Geminiは前は`provider_output_limit`でprovider_rejectedに分かれていた）。
+- 切れた応答は、システムログ（subsystem `app.inku`、category `provider`）にServerと同じ1行`provider_output_limit {…}`を残す。JSONは鍵を名前の順に詰めて書き、`action`・`provider`・`model`・送った本文の上限`max_tokens`と、社ごとの項目（出力・思考／推論のトークン数、本文・関数呼び出しの有無など、無い値は`null`）を持つ。本文・推論文は含めない。Visionは切れた応答をそのまま返し、同じ行（`action: vision`）を残す。デモは残さない。この節より前の節の書き方（`unknown`、Geminiの`provider_output_limit`）はこれに改めた。
+- 有料プラン限定の確かめ（Ollama Cloudの1トークンの要求）は、402も403も有料プラン限定と読む。
+- 見送り：ChatGPTプランのストリームのerrorイベントの`param`は残さない。Swiftはこの値を画面にも記録にも出さない。
+- 確認：InkuHostの`ProviderOutputLimitTests`（Claudeの出力枠、Claudeの切れた応答の拒否、4つの記録の項目と記録の行）、`ProviderModelCatalogChecks`（402）、`GeminiThinkingLevelTests`ほか。
+
 ## 2026-10-13 OpenAI APIの描画をResponsesへ移し、推論設定をServerに揃える
 
 OpenAI互換の接続先ホストが`api.openai.com`のときだけ、Serverの[`openai_request.py`](../server/src/inku_server/openai_request.py)と同じ要求・応答処理を使う。公式仕様は[推論モデル](https://developers.openai.com/api/docs/guides/reasoning)と[GPT-6案内](https://developers.openai.com/api/docs/guides/latest-model)を参照する。

@@ -4,7 +4,6 @@ import OSLog
 /// This adapter changes HTTP shape only. The core owns prompt, schema and response validation.
 public enum ProviderWire {
     public static let responseName = "submit_pipeline_response"
-    private static let logger = Logger(subsystem: "app.inku", category: "provider")
 
     public static func request(action: Data, provider: ProviderSettings, model: String, maxTokens: Int, key: String?) throws -> URLRequest {
         try provider.validate()
@@ -62,7 +61,7 @@ public enum ProviderWire {
         case .anthropic:
             endpoint = base + "/v1/messages"
             headers["x-api-key"] = key ?? ""; headers["anthropic-version"] = "2023-06-01"
-            body = .object(["model": .string(model), "max_tokens": .integer(maxTokens), "system": .string(system),
+            body = .object(["model": .string(model), "max_tokens": .integer(ProviderOutputLimit.anthropicMaxTokens(model, answerTokens: maxTokens)), "system": .string(system),
                             "messages": .array([.object(["role": .string("user"), "content": .string(message)])]),
                             "tools": .array([.object(["name": .string(responseName), "description": function["description"], "input_schema": schema])]),
                             "tool_choice": .object(["type": .string("auto")])])
@@ -146,13 +145,7 @@ public enum ProviderWire {
         guard isOpenAIAPI(provider) else { return try responseText(data, kind: provider.kind) }
         let value = try ExactJSON(data: data)
         let output = value["output"].array ?? []
-        if value["status"].string == "incomplete", value["incomplete_details"]["reason"].string == "max_output_tokens" {
-            let tokens = value["usage"]["output_tokens"].number ?? "unknown"
-            let reasoning = value["usage"]["output_tokens_details"]["reasoning_tokens"].number ?? "unknown"
-            let hasText = output.contains { $0["type"].string == "message" }
-            let hasFunction = output.contains { $0["type"].string == "function_call" }
-            logger.error("provider_output_limit incomplete_reason=max_output_tokens output_tokens=\(tokens, privacy: .public) reasoning_tokens=\(reasoning, privacy: .public) has_text=\(hasText, privacy: .public) has_function_call=\(hasFunction, privacy: .public)")
-        }
+        // A cut-off answer is not completed; the transport logs what it spent.
         guard value["status"].string == "completed", value["output"].array != nil else { throw HostError("malformed_payload") }
         let calls = output.filter { $0["type"].string == "function_call" }
         let text: String
@@ -172,16 +165,13 @@ public enum ProviderWire {
 
     public static func responseText(_ data: Data, kind: ProviderKind) throws -> String {
         let value = try ExactJSON(data: data)
+        // Server pipeline_provider: an answer stopped at its output limit is cut off whatever it holds,
+        // so a tool input or JSON text that ends there is not the whole answer (malformed_payload).
+        if ProviderOutputLimit.record(value, kind: kind, responses: false) != nil { throw HostError("malformed_payload") }
         var text: String?
         switch kind {
         case .chatGPTPlan: throw HostError("chatgpt_operation_not_supported")
         case .openAICompatible:
-            if value["choices"].array?.first?["finish_reason"].string == "length" {
-                let output = value["usage"]["completion_tokens"].number ?? "unknown"
-                let reasoning = value["usage"]["completion_tokens_details"]["reasoning_tokens"].number ?? "unknown"
-                logger.error("provider_output_limit finish_reason=length output_tokens=\(output, privacy: .public) reasoning_tokens=\(reasoning, privacy: .public)")
-                throw HostError("malformed_payload")
-            }
             guard let message = value["choices"].array?.first?["message"] else { throw HostError("malformed_payload") }
             let calls = message["tool_calls"].array ?? []
             if calls.isEmpty { text = message["content"].string }
@@ -203,7 +193,6 @@ public enum ProviderWire {
                 text = parsed.text
             }
         case .gemini:
-            if value["candidates"].array?.first?["finishReason"].string == "MAX_TOKENS" { throw HostError("provider_output_limit") }
             guard let parts = value["candidates"].array?.first?["content"]["parts"].array else { throw HostError("malformed_payload") }
             let calls = parts.map { $0["functionCall"] }.filter { $0.object != nil }
             guard calls.count == 1, calls[0]["name"].string == responseName, calls[0]["args"].object != nil else { throw HostError("malformed_payload") }

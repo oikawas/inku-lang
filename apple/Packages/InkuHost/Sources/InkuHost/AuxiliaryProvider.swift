@@ -451,9 +451,8 @@ public enum AuxiliaryWire {
                     "type": .string("base64"), "media_type": .string(type), "data": .string(data)])])
             }
             blocks.append(.object(["type": .string("text"), "text": .string(prompt.message)]))
-            // Server's demo reserves room for the models that think by default.
-            let thinks = prompt.purpose == .demo && model.range(of: "^claude-(?:(?:opus|sonnet|haiku|fable|mythos)-5(?:-|$)|mythos-preview(?:-|$))", options: .regularExpression) != nil
-            body = .object(["model": .string(model), "max_tokens": .integer(prompt.maximumTokens + (thinks ? 8192 : 0)), "system": .string(prompt.system),
+            // Server's Vision and demo reserve room for the models that think by default.
+            body = .object(["model": .string(model), "max_tokens": .integer(ProviderOutputLimit.anthropicMaxTokens(model, answerTokens: prompt.maximumTokens)), "system": .string(prompt.system),
                 "messages": .array([.object(["role": .string("user"), "content": .array(blocks)])])])
         case .gemini:
             let segment = model.addingPercentEncoding(withAllowedCharacters: CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~"))!

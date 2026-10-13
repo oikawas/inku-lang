@@ -14,6 +14,17 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-13 Match Server's Claude thinking budget and cut-off answer records
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage A). The sources are Server's `anthropic_request.py`, `gemini_request.py`, `openai_request.py`, `pipeline_provider.py` and `vision_client.py`.
+
+- Claude 5 (opus, sonnet, haiku, fable and mythos 5) and Mythos Preview receive 8,192 extra `max_tokens` for drawing, Vision and demo alike (`ProviderOutputLimit.anthropicMaxTokens`). Claude 4 models do not.
+- A drawing answer cut off at its output limit (Claude `stop_reason: max_tokens`, Gemini `finishReason: MAX_TOKENS`, OpenAI-compatible `finish_reason: length`, Responses `incomplete`/`max_output_tokens`) is never taken as the answer and is refused as `malformed_payload` for every provider (Gemini used to fail as `provider_output_limit`, classed as provider_rejected).
+- A cut-off answer leaves Server's one line `provider_output_limit {…}` in the system log (subsystem `app.inku`, category `provider`). The JSON has keys in name order with compact separators, and holds `action`, `provider`, `model`, the sent body's limit `max_tokens`, and each provider's fields (output and thinking or reasoning token counts, whether text or a function call is present; missing values are `null`). It holds no answer or reasoning text. Vision returns a cut-off answer as it is and leaves the same line (`action: vision`); the demo leaves none. This replaces what earlier sections said (`unknown`, Gemini's `provider_output_limit`).
+- The paid-plan check (Ollama Cloud's one-token request) reads both 402 and 403 as paid-plan only.
+- Not taken: the `param` of a ChatGPT plan stream `error` event is not kept. Swift shows it neither on screen nor in a record.
+- Checks: InkuHost `ProviderOutputLimitTests` (Claude budgets, refusing a cut-off Claude answer, the four records and the log line), `ProviderModelCatalogChecks` (402), `GeminiThinkingLevelTests` and others.
+
 ## 2026-10-13 Move OpenAI API drawing to Responses and match Server reasoning settings
 
 Only OpenAI-compatible connections whose host is `api.openai.com` use the request and response handling in Server's [`openai_request.py`](../server/src/inku_server/openai_request.py). See the official [reasoning model guide](https://developers.openai.com/api/docs/guides/reasoning) and [GPT-6 guide](https://developers.openai.com/api/docs/guides/latest-model).

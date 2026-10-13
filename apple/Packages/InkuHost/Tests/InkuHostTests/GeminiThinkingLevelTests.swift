@@ -82,7 +82,7 @@ final class GeminiThinkingLevelTests: XCTestCase {
             ])])])]),
         ])])])
         XCTAssertThrowsError(try ProviderWire.responseText(response.data, kind: .gemini)) {
-            XCTAssertEqual(($0 as? HostError)?.code, "provider_output_limit")
+            XCTAssertEqual(($0 as? HostError)?.code, "malformed_payload")
         }
         var candidate = try XCTUnwrap(response["candidates"].array?.first)
         candidate["finishReason"] = .string("STOP")

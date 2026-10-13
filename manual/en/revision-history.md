@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-13 — The composition reading in the running indicator
+
+The running indicator now reads `Reading the composition…` while the composition is being read, so the paragraph on the wait in section 2 of Creating Images in both languages is corrected. It now also says, as the screen behaves today, that a single drawing with `Paint` shows `Interpreting your words…` until it is done, and that the layer names switch for the candidates refinement makes, the demo, and batches.
+
 ## 2026-10-13 — Older models in publication selection
 
 Publication selection now files models of an older generation the provider has superseded into the first fold, Older models, where they can still be published. Section 5.0 of Server Configuration says so, and that the bulk selection takes a fold only while it is open.

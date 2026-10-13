@@ -48,6 +48,14 @@ At the author's instruction (bringing in the differences from Server Build 1190,
 
 At the author's instruction, matching the Web. The Prompts tab of macOS generation information showed only Stage 1 and Stage 2. It now also shows the sketch (Stage 0.5) and the composition reading, in the order a work calls them (sketch, Stage 1, composition reading, Stage 2), each with the input it was sent (with a copy button) and its system prompt (collapsible). Swift had left the composition reading out of its send record and saved only Stage 1 and Stage 2 with a work. A work now keeps the last send of all four stages and the list of stages it recorded. The catalog choice is not shown. For works saved earlier, the sketch and the composition reading read as not recorded.
 
+### 2026-10-13 — The composition reading in the running indicator
+
+At the author's instruction (the next task, the composition reading in the progress display) and choices (only while the reading runs, worded "Reading the composition…"). The composition reading runs after Stage 1 and before the instructions are settled and has no layer event of its own, so the Web waited under the previous stage's name (`Interpreting your words…` for a single drawing, `interpreting your words…` for refinement candidates, the demo, and batches).
+
+- While the running model call is the composition reading (`read_composition`), the Web names the stage "Reading the composition…" (Japanese 「構図の読み中…」), both for a single drawing and for the candidates, demo, and batches that use the drawing stream. The other stage names and the attempt count are unchanged.
+- The core and the Server are unchanged: the reading's attempt already arrived as the `action` of `provider_attempt`.
+- The paragraph on the wait in Creating Images is corrected to match the screen today (a single drawing shows `Interpreting your words…` until it is done).
+
 ## v2.15.115 (2026-10-13 / Build 1191)
 
 ### 2026-10-13 — A completion no longer repeats the sentence end

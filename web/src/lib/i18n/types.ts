@@ -254,6 +254,8 @@ export interface LangPack {
 	stageInterpreting: string;
 	stageStructuring: (tokLabel: string) => string;
 	stagePerforming: string;
+	/** While the composition reading's model call runs (2026-10-13). */
+	stageReadingComposition: string;
 	batchProgress: (current: number, total: number) => string;
 	batchRetryProgress: (current: number, total: number, round: number) => string;
 	settingsBatchRetryLabel: string;

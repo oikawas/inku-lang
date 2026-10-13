@@ -382,6 +382,7 @@ export const en: LangPack = {
 	stageInterpreting: 'interpreting your words…',
 	stageStructuring: (tok) => `writing the score…${tok}`,
 	stagePerforming: 'performing…',
+	stageReadingComposition: 'Reading the composition…',
 	batchProgress: (cur, tot) => `performing ${cur} / ${tot}…`,
 	batchRetryProgress: (cur, tot, round) => `retry ${round}: performing ${cur} / ${tot}…`,
 	settingsBatchRetryLabel: 'Batch retry',

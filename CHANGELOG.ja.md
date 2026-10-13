@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-13 — SwiftはGemini以外の送り手にも型の欄をpropertyOrderingの順に送る
+
+作者の選択（送り手を直す）による。coreの型のJSONは欄を名前の順に書く。Swiftはこれまで`propertyOrdering`の順に並べ直すのをGeminiだけで行い、OpenAI API・OpenAI互換・Ollama・mlx・Anthropic・Personal ChatGPTには名前の順のまま送っていた。構図の読みの型は`relations`が先頭、`thesis`が最後で届いていた。これらの道も`propertyOrdering`の順に書くようにした。Personal ChatGPTは記録する本文と送る本文が同じバイトになる。`propertyOrdering`の無い要求（Stage 1・Stage 2など）は同じバイトのまま。
+
 ### 2026-10-13 — 有料プラン限定のモデルも折りたたみにまとめ、402も有料プラン限定と読む
 
 作者の指示による（描画セッション-codexのOllama Cloudの計測を元に、モデル設定と公開モデル選択パネルを更新）。計測では、Ollama Cloudの提供中18モデルのうち11モデルがFreeプランの外として402を、1モデルが提供の準備中として403を返した。
@@ -18,6 +22,7 @@
 ### 2026-10-13 — Gemini以外の送り手でも、型の欄をpropertyOrderingの順に送る
 
 描画セッション-claudeの依頼（作者の選択「送り手を直す」）による。coreのJSONは鍵の順を保たないので、型の`properties`は名前の順で届く（構図の読みならthesisが最後）。並べ直していたのはGeminiの道だけで、OpenAIのResponsesとChat Completions、Ollama・mlxのresponse_format、Anthropicのinput_schema、ChatGPTプランの関数には名前の順のまま送っていた。これらでも、型が`propertyOrdering`を持つとき、入れ子を含め`properties`をその順に書いて送る（新しい`schema_order.ordered_schema`）。名の無い欄は後に今の順で続き、ほかの鍵と`propertyOrdering`は残す。今のcoreで順を名指す型は構図の読みだけで、Stage 1などの順を名指さない型は今と同じバイトで送る。
+
 ### 2026-10-13 — 構図の読みが、記述が言う継ぎ目を返す
 
 作者の選択（I-711 段C の C5。測ってから作る、全部の読み手に入れる）による。構図は読みの継ぎ目を受け取れたが、読みが継ぎ目を返さなかったので、構図は継ぎ目を書かなかった。

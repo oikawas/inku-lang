@@ -307,6 +307,25 @@ final class ChatGPTPlanRuntimeChecks: XCTestCase {
         XCTAssertEqual(refused, reconnected)
     }
 
+    // Failure: the plan sent the reading schema's properties in name order, or changed the bytes of other schemas.
+    func testSchemaPropertyOrderOnThePlan() async throws {
+        for (schema, ordered) in [(SchemaOrderFixture.ordered, true), (SchemaOrderFixture.unordered, false)] {
+            let fixture = try RuntimeFixture(expired: false)
+            defer { fixture.remove() }
+            let client = RuntimeHTTP(blockRefresh: false)
+            let runtime = ChatGPTPlanRuntime(store: fixture.store, http: client)
+            let session = try await runtime.pin()
+            // The fixture's first answer ends in a quota error; only the sent body matters here.
+            _ = try? await runtime.perform(action: SchemaOrderFixture.action(schema), session: session, model: "offered", argumentLimit: 4096, onBytes: { _ in })
+            let sent = await client.lastResponseRequest()
+            let body = try XCTUnwrap(sent?.httpBody)
+            let text = String(decoding: body, as: UTF8.self)
+            if ordered {
+                XCTAssertTrue(text.contains(SchemaOrderFixture.top)); XCTAssertTrue(text.contains(SchemaOrderFixture.nested))
+            } else { XCTAssertEqual(body, try ExactJSON(data: body).data) }
+        }
+    }
+
     private static var action: Data {
         ExactJSON.object(["tag": .string("generate_normalized_ddl"), "identity": .object(["action_id": .string("fixture")]),
             "timeout_ms": .string("2000"), "payload": .object(["prompt": .object(["system": .string("system"), "message": .string("message"),

@@ -172,6 +172,7 @@ macOS版を初めて配布するにあたり、画面・操作・保存した選
 - 非正方形の用紙は、Serverと同じく既定の高さ1000を保ち、幅を偶数丸めで出す（16:9は1778×1000）。新規の生成と再演奏の両方に適用する。
 - 指示書の言語はWebと同じく常に自動で、記述またはDDLの文字（日本語→英字→UI言語）で決める。言語の選択肢は置かない。
 - Personal ChatGPTの応答解析、HTTP sessionの寿命（要求ごと）、失敗の分類（応答過大、期限0）、rateの待ち方とGeminiのtoken計数の順序、Ollama Cloudの同時2本、model一覧の取得（ページ送り、新しいmodelは無効で登録、消えたmodelはEOLとして残す）、model参照の解決、Gemini schemaの`propertyOrdering`、自動配色の`catalog_mode`、デモの再試行と「暴れる」切、推敲助言と奥書の文脈JSON、失敗文言、PNGの撮影日時、DDL書出しの`exported_from`、描画警告の保存をServer／Webに合わせた。
+- 型の欄の並び：coreの型のJSONは欄を名前の順に書くので、hostは`propertyOrdering`を持つオブジェクトの`properties`をその順に書き直して送る（名の無い欄は後ろに名前の順、ほかの鍵と値は変えない）。Geminiだけでなく、OpenAI API（Responses）、OpenAI互換のtools、Ollama・mlxのresponse_format、Anthropicのinput_schema、Personal ChatGPTも同じに送る（描画セッションの依頼、作者の選択、2026-10-13）。今の`propertyOrdering`は構図の読みの型だけにあり、ほかの要求のバイトは変わらない。
 - Geminiのrate設定で欄が欠けた場合は、旧版が0（無制限）を欄の省略で保存していたため、無制限として読む扱いを残す。独自のproviderでkindがanthropic／geminiのものは、kindに合わせて送る。
 
 ### 版・署名・配布

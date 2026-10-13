@@ -322,11 +322,11 @@ public actor ChatGPTPlanRuntime {
         do {
             // The body does not depend on authentication. Durably save it before any
             // model-discovery or token-refresh HTTP, as well as before the paid request.
-            let body: ExactJSON?
+            let body: Data?
             if let recorder {
                 let profile = try checkedProfile(session)
-                let prepared = try Self.requestBody(model: model, prompt: effect.requiredObject("payload").requiredObject("prompt"))
-                recorder.prepare(body: prepared.data, providerID: providerID, model: model,
+                let prepared = try Self.requestData(model: model, prompt: effect.requiredObject("payload").requiredObject("prompt"))
+                recorder.prepare(body: prepared, providerID: providerID, model: model,
                     secrets: [profile.accessToken, profile.refreshToken, profile.idToken].compactMap { $0 })
                 try await recorder.saveRequest(willSend)
                 body = prepared
@@ -337,8 +337,8 @@ public actor ChatGPTPlanRuntime {
                 let profile = try checkedProfile(session)
                 recorder.addSecrets([token, profile.refreshToken, profile.idToken].compactMap { $0 })
             }
-            let sentBody = try body ?? Self.requestBody(model: model, prompt: effect.requiredObject("payload").requiredObject("prompt"))
-            var request = URLRequest(url: ChatGPTEndpoints.responses); request.httpMethod = "POST"; request.httpBody = sentBody.data
+            let sentBody = try body ?? Self.requestData(model: model, prompt: effect.requiredObject("payload").requiredObject("prompt"))
+            var request = URLRequest(url: ChatGPTEndpoints.responses); request.httpMethod = "POST"; request.httpBody = sentBody
             request.timeoutInterval = max(0.001, deadline.timeIntervalSinceNow)
             request.setValue("application/json", forHTTPHeaderField: "Content-Type"); request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
             request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
@@ -412,6 +412,11 @@ public actor ChatGPTPlanRuntime {
         }
         return .object(["model": .string(model), "store": .bool(false), "stream": .bool(true), "instructions": .string(system),
             "input": .array([.object(["role": .string("user"), "content": .array(content)])])])
+    }
+
+    /// The bytes recorded and sent: schema properties in their propertyOrdering, as every dialect writes them.
+    static func requestData(model: String, prompt: ExactJSON) throws -> Data {
+        Data(try requestBody(model: model, prompt: prompt).orderedText.utf8)
     }
 
     static func requestBody(model: String, prompt: ExactJSON) throws -> ExactJSON {

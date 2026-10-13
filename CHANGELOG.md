@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Swift sends schema properties in propertyOrdering to every provider
+
+By the author's choice (fix the senders). The core writes schema JSON keys in name order. Swift reordered them by `propertyOrdering` only for Gemini and sent the OpenAI API, OpenAI-compatible providers, Ollama, mlx, Anthropic and Personal ChatGPT the name order, so the composition reading schema arrived with `relations` first and `thesis` last. These paths now write `propertyOrdering` order too. Personal ChatGPT records and sends the same bytes. Requests without `propertyOrdering` (Stage 1, Stage 2 and the others) keep their bytes.
+
 ### 2026-10-13 — Paid-plan models get their own fold, and a 402 also reads as plan-only
 
 At the author's instruction (update model settings and publication selection from the draw session's measurement of Ollama Cloud). Of the 18 Ollama Cloud models on offer, 11 answered 402 as outside the Free plan and one answered 403 as still rolling out.
@@ -18,6 +22,7 @@ At the author's instruction (update model settings and publication selection fro
 ### 2026-10-13 — Every sender writes a schema's properties in its propertyOrdering
 
 At the draw session's request (the author's choice to fix the senders). The core's JSON keeps no key order, so a schema's `properties` arrive in name order (thesis last, for the composition reading). Only the Gemini path reordered them; OpenAI Responses and Chat Completions, Ollama and mlx `response_format`, Anthropic `input_schema` and the ChatGPT plan's function sent the name order. They now write `properties` in the schema's `propertyOrdering`, nested ones too (the new `schema_order.ordered_schema`); unnamed properties follow in their present order, and every other key and `propertyOrdering` stay. Today only the composition reading names an order; Stage 1 and other schemas go out byte for byte as before.
+
 ### 2026-10-13 — The composition reading returns the joints the description states
 
 By the author's choice (I-711 stage C, C5: measure before building, and give it to every reader). The composition could take a reading's joints, but the reading returned none, so the composition wrote no joints.

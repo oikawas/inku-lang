@@ -12,7 +12,9 @@ import InkuUI
     guard app.errorText == nil, !app.catalogs.isEmpty, !app.canvases.isEmpty else {
         throw CheckFailure.message("Composition host fixture could not load bundled defaults: \(app.errorText ?? app.status)")
     }
-    let service = ProviderSettings(id: "composition-check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false)
+    // Drawing takes only registered models.
+    let service = ProviderSettings(id: "composition-check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false,
+                                   models: ["pinned", "unused-stage2"].map { ProviderModelSettings(id: $0) })
     try await app.updateHostSettings(HostSettings(providers: [service],
         models: ModelSelection(stage1Model: "composition-check:pinned", stage2Model: "composition-check:pinned")))
     app.inputMode = "description"; app.descriptionText = compositionCheckDescription
@@ -33,7 +35,8 @@ import InkuUI
     // result, so native creation could not reach a committed/saved composition.
     let composed = try await host.generate(request)
     guard composed.phase == "completed", let composedID = composed.savedWorkID,
-          composed.svg?.contains("<svg") == true, composed.visibleDDL?.contains("[composition]") == true,
+          // Ranges print without the [composition] mark (core 79f18448); Stage 1 here names places only in words.
+          composed.svg?.contains("<svg") == true, composed.visibleDDL?.contains("(horizontal ") == true,
           compositionEventTags(composed).contains("composition_read"),
           await provider.actions.map({ $0["tag"].string ?? "" }) == ["generate_normalized_ddl", "read_composition"],
           await provider.selectedModels == ["composition-check:pinned", "composition-check:pinned"] else {
@@ -85,8 +88,8 @@ import InkuUI
     let noReadRun = try await compatibilityHost.generate(noReadRequest)
     guard oldRun.phase == "completed", let oldID = oldRun.savedWorkID,
           noReadRun.phase == "completed", let noReadID = noReadRun.savedWorkID,
-          oldRun.visibleDDL?.contains("[composition]") == false,
-          noReadRun.visibleDDL?.contains("[composition]") == true,
+          oldRun.visibleDDL?.contains("(horizontal ") == false,
+          noReadRun.visibleDDL?.contains("(horizontal ") == true,
           await compatibility.actions.map({ $0["tag"].string ?? "" }) == ["generate_normalized_ddl", "generate_normalized_ddl"] else {
         throw CheckFailure.message("Absent/read:false composition configs acquired a reading request or changed their composition semantics")
     }
@@ -119,7 +122,7 @@ private func compositionWireCheck(_ action: ExactJSON, service: ProviderSettings
     let request = try ProviderWire.request(action: action.data, provider: service, model: "pinned", maxTokens: models.stage1MaxTokens, key: nil)
     let body = try ExactJSON(data: request.httpBody ?? Data())
     let transported = body["tools"].array?.first?["function"]["parameters"] ?? .null
-    let ordering = ExactJSON.array(["thesis", "roles", "relations", "tension", "stated_places"].map(ExactJSON.string))
+    let ordering = ExactJSON.array(["thesis", "roles", "relations", "tension", "stated_places", "joints"].map(ExactJSON.string))
     guard body["model"].string == "pinned", body["max_tokens"].number == "3072", body["temperature"].number == "0.3",
           transported == schema, transported["propertyOrdering"] == ordering,
           body["messages"].array?.first?["content"] == prompt["system"],
@@ -130,10 +133,12 @@ private func compositionWireCheck(_ action: ExactJSON, service: ProviderSettings
     let geminiRequest = try ProviderWire.request(action: action.data, provider: gemini, model: "pinned", maxTokens: models.stage1MaxTokens, key: nil)
     let geminiBody = try ExactJSON(data: geminiRequest.httpBody ?? Data())
     let geminiSchema = geminiBody["tools"].array?.first?["functionDeclarations"].array?.first?["parametersJsonSchema"] ?? .null
-    for path in [schema, schema["properties"]["relations"]["items"], schema["properties"]["tension"], schema["properties"]["stated_places"]["items"]] {
+    for path in [schema, schema["properties"]["relations"]["items"], schema["properties"]["tension"], schema["properties"]["stated_places"]["items"],
+                 schema["properties"]["joints"]["items"]] {
         guard path["propertyOrdering"].array?.isEmpty == false else { throw CheckFailure.message("Core composition schema is missing an object property order") }
     }
-    guard geminiSchema == schema, geminiBody["generationConfig"]["maxOutputTokens"].number == "3072" else {
+    // Gemini counts thoughts in maxOutputTokens: the Stage 1 cap 3072 plus 8192 for an unlisted model's low thinking.
+    guard geminiSchema == schema, geminiBody["generationConfig"]["maxOutputTokens"].number == "11264" else {
         throw CheckFailure.message("Gemini projection dropped composition propertyOrdering or used the Stage2 cap")
     }
 }

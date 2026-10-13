@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Swift completes saijiki words and macro names in the instructions
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage C-3). Swift's instruction fields offered no completions. As on the Web, typing the start of a word in the instruction box or the editor lists the saijiki words and macro names of the instruction language. Nothing is offered while read-only, composing, or inside an open range's numbers.
+
 ### 2026-10-13 — Swift folds numeric ranges in the instructions, frames them over the work and retypes them
 
 At the author's instruction (bringing in the differences from Server Build 1190, stage C-2). Swift showed numeric ranges in full. As on the Web, the numbers of a range whose name and numbers match the shared core's table are folded under a dotted name, open at the caret and can be retyped in place. Its frame shows over the work, and the name follows the numbers when the caret leaves. An invalid number keeps the last valid frame, shows a hint and holds drawing back. Hyphens also join ranges.

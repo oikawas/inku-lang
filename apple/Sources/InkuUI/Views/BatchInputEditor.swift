@@ -80,6 +80,8 @@ struct InkuTextEditor: View {
     /// Web `numericRangeEditing`: the core's range table folds matching numeric places; nil leaves the text open.
     var rangeTable: [CompositionRanges.Entry]? = nil
     var onRangeStatus: ((RangeEditorStatus) -> Void)? = nil
+    /// Web `ddlCompletions`: saijiki words and macro names offered while typing; nil offers nothing.
+    var completions: DdlCompletions? = nil
     @Environment(DisplaySettings.self) private var display
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.colorScheme) private var colorScheme
@@ -89,7 +91,7 @@ struct InkuTextEditor: View {
                                accessibilityLabel: accessibilityLabel,
                                textScale: display.preferences.textScale, colorScheme: colorScheme,
                                style: style, marks: marks, insertion: insertion,
-                               rangeTable: rangeTable, onRangeStatus: onRangeStatus)
+                               rangeTable: rangeTable, onRangeStatus: onRangeStatus, completions: completions)
             .clipped()
     }
 }
@@ -162,6 +164,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
     let insertion: Binding<InkuEditorInsertion?>?
     var rangeTable: [CompositionRanges.Entry]? = nil
     var onRangeStatus: ((RangeEditorStatus) -> Void)? = nil
+    var completions: DdlCompletions? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
 
@@ -251,6 +254,9 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         private var pendingExternalText: String?
         private var replacingText = false
         private var lastInsertionID: UUID?
+        /// Set by the author's own typing; a chosen word, a followed name or a restored text offers nothing.
+        private var typedInsertion = false
+        private var programmaticEdit = false
 
         init(text: Binding<String>) { self.text = text }
 
@@ -280,6 +286,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             editor?.onCompositionEnded = nil
             editor?.onFocusChanged = nil
             editor?.onHover = nil
+            editor?.completionRange = nil
             editor = nil
             scroll = nil
             ruler = nil
@@ -292,6 +299,9 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             guard let editor, let scroll else { return }
             let source = text.wrappedValue
             editor.setAccessibilityLabel(settings.accessibilityLabel)
+            if (settings.completions == nil) != (editor.completionRange == nil) {
+                editor.completionRange = settings.completions == nil ? nil : { [weak self] in self?.completionMatch()?.range }
+            }
             scroll.appearance = NSAppearance(named: settings.colorScheme == .dark ? .darkAqua : .aqua)
             if editor.hasMarkedText() {
                 pendingExternalText = source == editor.string ? nil : source
@@ -321,6 +331,8 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             let selected = request.replacesAll ? NSRange(location: 0, length: length)
                 : request.atEndUnlessUsed && !editor.used ? NSRange(location: length, length: 0) : editor.selectedRange()
             let range = NSRange(location: min(selected.location, length), length: min(selected.length, max(0, length - selected.location)))
+            programmaticEdit = true
+            defer { programmaticEdit = false }
             guard editor.shouldChangeText(in: range, replacementString: word) else { return }
             editor.textStorage?.replaceCharacters(in: range, with: NSAttributedString(string: word, attributes: editor.typingAttributes))
             editor.didChangeText()
@@ -370,6 +382,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         }
 
         func textView(_ textView: NSTextView, shouldChangeTextIn affectedCharRange: NSRange, replacementString: String?) -> Bool {
+            typedInsertion = !programmaticEdit && !(replacementString ?? "").isEmpty
             if settings?.rangeTable != nil, !textView.hasMarkedText(), let replacementString {
                 rangeState.pendingName = rangeState.pendingName(afterEditing: affectedCharRange)
                 rangeEdit = (affectedCharRange, (replacementString as NSString).length)
@@ -380,6 +393,8 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         func textViewDidChangeSelection(_ notification: Notification) {
             guard let editor, let settings, let table = settings.rangeTable, !replacingText, !editor.hasMarkedText() else { return }
             let focused = editor.window?.firstResponder === editor
+            programmaticEdit = true
+            defer { programmaticEdit = false }
             if editor.isEditable, let follow = rangeState.followedName(text: editor.string, selection: editor.selectedRange(), focused: focused, table: table),
                editor.shouldChangeText(in: follow.range, replacementString: follow.name) {
                 // Web followNameOnLeaving: the name follows the numbers the author edited, once the caret leaves.
@@ -440,6 +455,36 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
                 if text.wrappedValue != editor.string { text.wrappedValue = editor.string }
             }
             if !editor.hasMarkedText() { applyDeferredUpdates() }
+            offerCompletions()
+        }
+
+        /// Web `ddlCompletions`: nothing while read-only, composing, or with the caret in an open range's numbers.
+        private func completionMatch() -> DdlCompletions.Match? {
+            guard let editor, let completions = settings?.completions, editor.isEditable, !editor.hasMarkedText() else { return nil }
+            let selection = editor.selectedRange()
+            guard selection.length == 0 else { return nil }
+            let body = rangeState.active.map { NSRange(location: $0.bodyStart, length: $0.bodyEnd - $0.bodyStart) }
+            return DdlCompletions.match(text: editor.string, caret: selection.location, words: completions.words(for: editor.string), excluded: body)
+        }
+
+        /// Web `activateOnTyping`: the list opens as the author types a word some candidate starts with. No item is
+        /// chosen until the author picks one, so typing on is never replaced.
+        private func offerCompletions() {
+            guard typedInsertion, let editor, !editor.completing else { return }
+            typedInsertion = false
+            guard completionMatch() != nil else { return }
+            DispatchQueue.main.async { [weak editor] in
+                guard let editor, editor.window?.firstResponder === editor, !editor.hasMarkedText() else { return }
+                editor.complete(nil)
+            }
+        }
+
+        func textView(_ textView: NSTextView, completions words: [String], forPartialWordRange charRange: NSRange,
+                      indexOfSelectedItem index: UnsafeMutablePointer<Int>?) -> [String] {
+            guard settings?.completions != nil else { return words }
+            guard let match = completionMatch(), match.range == charRange else { return [] }
+            index?.pointee = -1
+            return match.items
         }
 
         func textDidEndEditing(_ notification: Notification) { applyDeferredUpdates() }
@@ -519,6 +564,19 @@ private final class BatchEditorTextView: NSTextView {
     /// The character under the pointer, for the range frame on hover (Web `hoveredRange`).
     var onHover: ((Int?) -> Void)?
     private var hoverArea: NSTrackingArea?
+    /// The word the completion list replaces; nil leaves completion off (the system's word range is not used).
+    var completionRange: (() -> NSRange?)?
+    /// True while the completion list writes its candidate into the text.
+    private(set) var completing = false
+    override var rangeForUserCompletion: NSRange {
+        guard let completionRange else { return super.rangeForUserCompletion }
+        return completionRange() ?? NSRange(location: NSNotFound, length: 0)
+    }
+    override func insertCompletion(_ word: String, forPartialWordRange charRange: NSRange, movement: Int, isFinal flag: Bool) {
+        completing = true
+        defer { completing = false }
+        super.insertCompletion(word, forPartialWordRange: charRange, movement: movement, isFinal: flag)
+    }
     override func becomeFirstResponder() -> Bool {
         let became = super.becomeFirstResponder()
         if became { used = true; DispatchQueue.main.async { [weak self] in self?.onFocusChanged?() } }
@@ -674,6 +732,7 @@ private struct BatchNativeInputEditor: UIViewRepresentable {
     let insertion: Binding<InkuEditorInsertion?>?
     var rangeTable: [CompositionRanges.Entry]? = nil
     var onRangeStatus: ((RangeEditorStatus) -> Void)? = nil
+    var completions: DdlCompletions? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
     func makeUIView(context: Context) -> BatchIOSTextView {

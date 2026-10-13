@@ -38,7 +38,8 @@ struct DdlBoxEditor: View {
                            onRangeStatus: { status in
                                rangeStatus = status
                                model.rangePreview = status.preview
-                           })
+                           },
+                           completions: model.ddlCompletions)
                 .frame(minHeight: 100, maxHeight: 220)
                 .overlay(alignment: .leading) { Rectangle().fill(.quaternary).frame(width: 2) }
             if completionSource == text { CompletionRangeSummary(display: model.display, states: completionStates) }

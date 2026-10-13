@@ -86,7 +86,8 @@ struct DdlEditorPane: View {
                            onRangeStatus: { status in
                                rangeStatus = status
                                model.rangePreview = status.preview
-                           })
+                           },
+                           completions: model.ddlCompletions)
             if text.isEmpty {
                 Text(display.webCopy("ddlEditPlaceholder", "背景を白で埋める。青い細い線を左下から右上へ三本引く。赤い小さな円を余白を残して配置する。"))
                     .inkuFont(14).foregroundStyle(.tertiary).lineSpacing(14 * 0.7)

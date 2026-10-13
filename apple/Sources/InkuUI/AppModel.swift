@@ -2057,4 +2057,9 @@ extension AppModel {
     }
 
     var currentInputText: String { inputMode == "ddl" ? ddlText : descriptionText }
+
+    /// Web `ddlCompletions`: the enabled saijiki words and macro names, in the language the instructions read in.
+    public var ddlCompletions: DdlCompletions {
+        DdlCompletions(saijiki: saijiki, plugins: pluginWords) { [weak self] text in self?.instructionLanguage(for: text) ?? "ja" }
+    }
 }

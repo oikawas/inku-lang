@@ -1492,3 +1492,4 @@
 "編集を破棄" = "Discard edits";
 "この作品を描いたときの指示書に戻します。編集した内容は失われます。" = "This returns to the instructions this work was drawn from. Your edits will be lost.";
 "破棄する" = "Discard";
+"横1/3〜2/3、縦2/3〜1 の形で、0〜1の数を、始まりを終わりより小さく書いてください。「-」「－」も使えます。枠は最後の有効な範囲です" = "Use horizontal 1/3 to 2/3, vertical 2/3 to 1, with numbers from 0 to 1 and each start below its end. You may also join numbers with - or –. The frame shows the last valid range";

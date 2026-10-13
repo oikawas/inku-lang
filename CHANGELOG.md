@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Swift folds numeric ranges in the instructions, frames them over the work and retypes them
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage C-2). Swift showed numeric ranges in full. As on the Web, the numbers of a range whose name and numbers match the shared core's table are folded under a dotted name, open at the caret and can be retyped in place. Its frame shows over the work, and the name follows the numbers when the caret leaves. An invalid number keeps the last valid frame, shows a hint and holds drawing back. Hyphens also join ranges.
+
 ### 2026-10-13 — Swift edits the whole text in the instruction box, with "Instruction editor" and "Discard edits"
 
 At the author's instruction (bringing in the differences from Server Build 1190, stage C-1). Swift's instruction box was read-only. As on the Web, it is now an editor without line numbers where the whole text can be edited as a draft of the displayed work; typing never draws, and "Draw from instructions" draws it once. The button, menu and editor title read "Instruction editor", and a Saijiki word goes in at the box's caret (or its end if unused). "Discard edits" returns to the work's instructions and can be undone with ⌘Z.

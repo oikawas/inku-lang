@@ -41,6 +41,13 @@ struct InkuEditorMark: Equatable {
     }
 }
 
+/// Web `RangeEditorStatus`: the frame to show, whether a range is invalid, and whether the IME is composing.
+struct RangeEditorStatus: Equatable {
+    var preview: CompositionRanges.Preview?
+    var invalid = false
+    var composing = false
+}
+
 /// A word to put at the caret (Web DdlEditor `insertWord`), replacing the selection.
 struct InkuEditorInsertion: Equatable {
     let id = UUID()
@@ -70,6 +77,9 @@ struct InkuTextEditor: View {
     var style = InkuEditorStyle.batch
     var marks: (String) -> [InkuEditorMark] = InkuEditorMark.descriptionLabels
     var insertion: Binding<InkuEditorInsertion?>? = nil
+    /// Web `numericRangeEditing`: the core's range table folds matching numeric places; nil leaves the text open.
+    var rangeTable: [CompositionRanges.Entry]? = nil
+    var onRangeStatus: ((RangeEditorStatus) -> Void)? = nil
     @Environment(DisplaySettings.self) private var display
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.colorScheme) private var colorScheme
@@ -78,7 +88,8 @@ struct InkuTextEditor: View {
         BatchNativeInputEditor(text: $text, isEditable: isEditable && isEnabled,
                                accessibilityLabel: accessibilityLabel,
                                textScale: display.preferences.textScale, colorScheme: colorScheme,
-                               style: style, marks: marks, insertion: insertion)
+                               style: style, marks: marks, insertion: insertion,
+                               rangeTable: rangeTable, onRangeStatus: onRangeStatus)
             .clipped()
     }
 }
@@ -149,6 +160,8 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
     let style: InkuEditorStyle
     let marks: (String) -> [InkuEditorMark]
     let insertion: Binding<InkuEditorInsertion?>?
+    var rangeTable: [CompositionRanges.Entry]? = nil
+    var onRangeStatus: ((RangeEditorStatus) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
 
@@ -223,8 +236,12 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
     }
 
     @MainActor
-    final class Coordinator: NSObject, NSTextViewDelegate {
+    final class Coordinator: NSObject, NSTextViewDelegate, @preconcurrency NSLayoutManagerDelegate {
         private var text: Binding<String>
+        private var rangeState = RangeEditorState()
+        private var rangeHover: Int?
+        private var rangeEdit: (range: NSRange, length: Int)?
+        private var lastRangeStatus: RangeEditorStatus?
         private weak var scroll: BatchEditorScrollView?
         private weak var editor: BatchEditorTextView?
         private weak var ruler: BatchEditorRuler?
@@ -242,9 +259,12 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             self.editor = editor
             self.ruler = ruler
             editor.delegate = self
+            editor.layoutManager?.delegate = self
             editor.onCompositionEnded = { [weak self] in
                 DispatchQueue.main.async { [weak self] in self?.applyDeferredUpdates() }
             }
+            editor.onFocusChanged = { [weak self] in self?.refreshRanges() }
+            editor.onHover = { [weak self] index in self?.hover(at: index) }
             scroll.contentView.postsBoundsChangedNotifications = true
             boundsObservation = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification,
                 object: scroll.contentView, queue: .main) { [weak ruler] _ in
@@ -256,7 +276,10 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             if let boundsObservation { NotificationCenter.default.removeObserver(boundsObservation) }
             boundsObservation = nil
             editor?.delegate = nil
+            editor?.layoutManager?.delegate = nil
             editor?.onCompositionEnded = nil
+            editor?.onFocusChanged = nil
+            editor?.onHover = nil
             editor = nil
             scroll = nil
             ruler = nil
@@ -317,11 +340,102 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             for mark in settings.marks(editor.string) where mark.range.location >= 0 && NSMaxRange(mark.range) <= full.length {
                 layout.addTemporaryAttributes(mark.style.attributes, forCharacterRange: mark.range)
             }
+            // `.cm-ddl-range-name`: the place word of a folded range, with a dotted underline.
+            guard settings.rangeTable != nil else { return }
+            for name in rangeState.names where NSMaxRange(name) <= full.length {
+                layout.addTemporaryAttributes([.underlineStyle: NSUnderlineStyle.single.rawValue | NSUnderlineStyle.patternDot.rawValue,
+                                               .underlineColor: NSColor.secondaryLabelColor], forCharacterRange: name)
+            }
+        }
+
+        // MARK: Numeric ranges (Web codemirror-ranges.ts)
+
+        /// Folded characters generate no glyphs: the text itself never changes.
+        func layoutManager(_ layoutManager: NSLayoutManager, shouldGenerateGlyphs glyphs: UnsafePointer<CGGlyph>,
+                           properties props: UnsafePointer<NSLayoutManager.GlyphProperty>, characterIndexes charIndexes: UnsafePointer<Int>,
+                           font aFont: NSFont, forGlyphRange glyphRange: NSRange) -> Int {
+            let hidden = rangeState.hidden
+            guard !hidden.isEmpty else { return 0 }
+            var changed = false
+            var properties = (0..<glyphRange.length).map { index -> NSLayoutManager.GlyphProperty in
+                let character = charIndexes[index]
+                if hidden.contains(where: { NSLocationInRange(character, $0) }) { changed = true; return .null }
+                return props[index]
+            }
+            guard changed else { return 0 }
+            properties.withUnsafeMutableBufferPointer { buffer in
+                layoutManager.setGlyphs(glyphs, properties: buffer.baseAddress!, characterIndexes: charIndexes, font: aFont, forGlyphRange: glyphRange)
+            }
+            return glyphRange.length
+        }
+
+        func textView(_ textView: NSTextView, shouldChangeTextIn affectedCharRange: NSRange, replacementString: String?) -> Bool {
+            if settings?.rangeTable != nil, !textView.hasMarkedText(), let replacementString {
+                rangeState.pendingName = rangeState.pendingName(afterEditing: affectedCharRange)
+                rangeEdit = (affectedCharRange, (replacementString as NSString).length)
+            }
+            return true
+        }
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let editor, let settings, let table = settings.rangeTable, !replacingText, !editor.hasMarkedText() else { return }
+            let focused = editor.window?.firstResponder === editor
+            if editor.isEditable, let follow = rangeState.followedName(text: editor.string, selection: editor.selectedRange(), focused: focused, table: table),
+               editor.shouldChangeText(in: follow.range, replacementString: follow.name) {
+                // Web followNameOnLeaving: the name follows the numbers the author edited, once the caret leaves.
+                let selection = editor.selectedRange()
+                rangeState.pendingName = false
+                editor.textStorage?.replaceCharacters(in: follow.range, with: NSAttributedString(string: follow.name, attributes: editor.typingAttributes))
+                editor.didChangeText()
+                let shift = (follow.name as NSString).length - follow.range.length
+                editor.setSelectedRange(NSRange(location: selection.location >= NSMaxRange(follow.range) ? selection.location + shift : selection.location,
+                                                length: selection.length))
+                return
+            }
+            refreshRanges()
+        }
+
+        private func hover(at index: Int?) {
+            let start = index.flatMap { index in
+                rangeState.ranges.first { range in rangeState.names.contains { NSLocationInRange(index, $0) && $0.location >= range.nameStart && NSMaxRange($0) <= range.nameEnd } }?.start
+            }
+            guard start != rangeHover else { return }
+            rangeHover = start
+            refreshRanges()
+        }
+
+        /// Re-reads the ranges for the current text, caret and focus; refolds only when the folded set changes.
+        func refreshRanges(reset: Bool = false) {
+            guard let editor, let settings, let table = settings.rangeTable else { return }
+            if editor.hasMarkedText() { report(RangeEditorStatus(preview: lastRangeStatus?.preview, invalid: lastRangeStatus?.invalid ?? false, composing: true)); return }
+            var previous: RangeEditorState? = reset ? nil : rangeState
+            if let edit = rangeEdit, let current = previous { previous = current.mapped(edit: edit.range, replacementLength: edit.length) }
+            rangeEdit = nil
+            let focused = editor.window?.firstResponder === editor
+            let next = RangeEditorState.derive(text: editor.string, selection: editor.selectedRange(), focused: focused,
+                                               hover: reset ? nil : rangeHover, previous: previous, table: table)
+            let refold = next.hidden != rangeState.hidden
+            rangeState = next
+            if refold, let layout = editor.layoutManager {
+                let full = NSRange(location: 0, length: (editor.string as NSString).length)
+                layout.invalidateGlyphs(forCharacterRange: full, changeInLength: 0, actualCharacterRange: nil)
+                layout.invalidateLayout(forCharacterRange: full, actualCharacterRange: nil)
+                refreshLayout()
+            }
+            applyMarks()
+            report(RangeEditorStatus(preview: next.preview, invalid: next.invalid, composing: false))
+        }
+
+        private func report(_ status: RangeEditorStatus) {
+            guard status != lastRangeStatus, let callback = settings?.onRangeStatus else { return }
+            lastRangeStatus = status
+            DispatchQueue.main.async { callback(status) }
         }
 
         func textDidChange(_ notification: Notification) {
             guard !replacingText, let editor else { return }
             refreshLayout()
+            refreshRanges()
             if pendingExternalText == nil {
                 if text.wrappedValue != editor.string { text.wrappedValue = editor.string }
             }
@@ -384,6 +498,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
             refreshLayout()
             scroll.restore(origin: origin)
             replacingText = false
+            refreshRanges(reset: true)
         }
 
         private func refreshLayout() {
@@ -400,10 +515,35 @@ private final class BatchEditorTextView: NSTextView {
     var onCompositionEnded: (() -> Void)?
     /// Set once the author focuses the editor; until then a chosen word goes at the end.
     private(set) var used = false
+    var onFocusChanged: (() -> Void)?
+    /// The character under the pointer, for the range frame on hover (Web `hoveredRange`).
+    var onHover: ((Int?) -> Void)?
+    private var hoverArea: NSTrackingArea?
     override func becomeFirstResponder() -> Bool {
         let became = super.becomeFirstResponder()
-        if became { used = true }
+        if became { used = true; DispatchQueue.main.async { [weak self] in self?.onFocusChanged?() } }
         return became
+    }
+    override func resignFirstResponder() -> Bool {
+        let resigned = super.resignFirstResponder()
+        if resigned { DispatchQueue.main.async { [weak self] in self?.onFocusChanged?() } }
+        return resigned
+    }
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverArea { removeTrackingArea(hoverArea) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
+        addTrackingArea(area); hoverArea = area
+    }
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        guard onHover != nil else { return }
+        let point = convert(event.locationInWindow, from: nil)
+        onHover?(characterIndexForInsertion(at: point))
+    }
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        onHover?(nil)
     }
     override func unmarkText() {
         super.unmarkText()
@@ -532,6 +672,8 @@ private struct BatchNativeInputEditor: UIViewRepresentable {
     let style: InkuEditorStyle
     let marks: (String) -> [InkuEditorMark]
     let insertion: Binding<InkuEditorInsertion?>?
+    var rangeTable: [CompositionRanges.Entry]? = nil
+    var onRangeStatus: ((RangeEditorStatus) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
     func makeUIView(context: Context) -> BatchIOSTextView {

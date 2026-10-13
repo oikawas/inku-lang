@@ -478,7 +478,7 @@ struct CreationDisplayedProcess: View {
                     }
                     Button(model.display.localized("指示書から描画"), systemImage: "arrow.clockwise") { onWorkAction(work, "draw-ddl") }
                         .buttonStyle(InkuGhostButtonStyle())
-                        .disabled(!saved || !DDLSource.hasBody(boxText) || disabled)
+                        .disabled(!saved || !DDLSource.hasBody(boxText) || disabled || model.ddlBoxRangeBlocked)
                         .inkuTooltip(model.display.tooltip("表示中の指示書（正規化DDL）をそのままStage 2へ渡して描き直します。Stage 1は走らないので解釈は変わりません。", serverKey: "tooltipDdlPaint"))
                 }
             }

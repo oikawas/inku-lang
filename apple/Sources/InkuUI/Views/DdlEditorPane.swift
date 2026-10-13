@@ -14,11 +14,16 @@ struct DdlEditorPane: View {
     @State private var showGuide = false
     @State private var completionStates: [CompletionRangeState] = []
     @State private var completionSource = ""
+    @State private var rangeStatus = RangeEditorStatus()
+    /// Web DdlEditorDialog: an invalid range or an IME composition holds the draw back.
+    var onRangeBlocked: ((Bool) -> Void)?
+    private var invalidSource: Bool { rangeStatus.invalid || CompositionRanges.scan(text).contains { $0.bounds == nil } }
     @State private var highlighter: DdlHighlighter
     private let plugins: PluginNameIndex
 
     init(model: AppModel, text: Binding<String>, disabled: Bool = false, insertion: Binding<InkuEditorInsertion?>,
-         onShowSaijiki: (() -> Void)? = nil) {
+         onShowSaijiki: (() -> Void)? = nil, onRangeBlocked: ((Bool) -> Void)? = nil) {
+        self.onRangeBlocked = onRangeBlocked
         self.model = model
         _text = text
         self.disabled = disabled
@@ -38,8 +43,14 @@ struct DdlEditorPane: View {
             toolbar
             editor.frame(maxHeight: .infinity)
             if completionSource == text { CompletionRangeSummary(display: display, states: completionStates) }
+            if invalidSource {
+                Text(display.localized("横1/3〜2/3、縦2/3〜1 の形で、0〜1の数を、始まりを終わりより小さく書いてください。「-」「－」も使えます。枠は最後の有効な範囲です"))
+                    .inkuFont(12).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+            }
             if !unknownNames.isEmpty || showGuide { support }
         }
+        .onChange(of: invalidSource || rangeStatus.composing, initial: true) { _, blocked in onRangeBlocked?(blocked) }
+        .onDisappear { model.rangePreview = nil }
     }
 
     /// `.ddl-editor-toolbar`: the language label with its tooltip, the switches, and the status at the right.
@@ -70,7 +81,12 @@ struct DdlEditorPane: View {
                            style: .ddl, marks: { [highlighter, completionStates, completionSource] source in
                                // Tags describe the text they were read for and vanish once it changes (Web).
                                highlighter.marks(source) + (source == completionSource ? CompletionRangeStyle.marks(completionStates) : [])
-                           }, insertion: $insertion)
+                           }, insertion: $insertion,
+                           rangeTable: CompositionRanges.table,
+                           onRangeStatus: { status in
+                               rangeStatus = status
+                               model.rangePreview = status.preview
+                           })
             if text.isEmpty {
                 Text(display.webCopy("ddlEditPlaceholder", "背景を白で埋める。青い細い線を左下から右上へ三本引く。赤い小さな円を余白を残して配置する。"))
                     .inkuFont(14).foregroundStyle(.tertiary).lineSpacing(14 * 0.7)

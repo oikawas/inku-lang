@@ -112,6 +112,9 @@ struct AppCheck {
             try await runComparisonChecks()
             return
         }
+        if CommandLine.arguments.contains("--composition-ranges-only") {
+            try runCompositionRangeReadChecks(); return
+        }
         if CommandLine.arguments.contains("--ddl-box-only") {
             try await runDdlBoxChecks(); return
         }

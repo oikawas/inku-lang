@@ -630,7 +630,8 @@ struct CreationView: View {
                           showsZoomControls: display.visible("work_tools"),
                           // Below about 740pt the capsule would sit on the right corner row (seven 34pt buttons).
                           zoomControlsAtTop: rightPanelWidth < 740 * display.preferences.textScale,
-                          aspectRatio: workspaceWork?.renderCanvasAspectRatio, viewport: $ui.canvasViewport)
+                          aspectRatio: workspaceWork?.renderCanvasAspectRatio, viewport: $ui.canvasViewport,
+                          rangePreview: usesBatchWork ? nil : model.rangePreview)
             CreationCanvasControls(model: model, corner: .left, work: workspaceWork, saved: hasSavedWorkspaceWork,
                                    disabled: controlsDisabled, browsingDisabled: browsingDisabled,
                                    generationInfoOpen: ui.generationInfoOpen,

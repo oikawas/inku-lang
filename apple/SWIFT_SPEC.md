@@ -14,6 +14,15 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-13 Fold numeric ranges in the instructions, frame them over the work and retype them
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage C-2). The sources are Web `composition-ranges.ts`, `codemirror-ranges.ts`, `DdlViewer.svelte` and `DdlRangePreview.svelte`.
+
+- The instruction box and the editor hide, without changing the text (no glyphs), the numbers of each range whose name and numbers match the shared core's table (`InkuCore.compositionRanges`, `inku.composition-ranges.v1`, 32 ranges), and an old [composition] mark. The name gets a dotted underline. The range opens when the caret enters it, and its numbers can be retyped in place. Leaving a range after editing its numbers makes the name follow the table (a valid number outside the table becomes "chosen place"; the author's own words stay). Editing the name stops the follow. Nothing is rewritten while the IME composes. Copying, saving and drawing use the whole text with its numbers.
+- The frame of the range under the caret, or of the name under the pointer, is drawn over the work (following zoom and pan). An invalid number keeps the last valid frame, dashed. While a range is invalid, a hint with examples appears and "Draw from instructions", confirm and draw are disabled. Japanese reads "-" and "－", and English reads "-" and "–" besides `to`, as range joins.
+- The range reading copies Web `composition-ranges.ts` (numbers are integer fractions with denominators up to one million).
+- Checks: AppCheck `--composition-ranges-only` (the Web test examples, plus folding, opening, frame, follow and the last valid frame; 38).
+
 ## 2026-10-13 Edit the whole text in the instruction box, the "Instruction editor" and "Discard edits"
 
 At the author's instruction (bringing in the differences from Server Build 1190, stage C-1). The sources are Web `DdlViewer.svelte` and `DdlEditorDialog.svelte`.

@@ -119,6 +119,10 @@ public final class AppModel {
     public private(set) var ddlBoxDraft = ""
     /// A word or a discard waiting for the box editor.
     var ddlBoxInsertion: InkuEditorInsertion?
+    /// The numeric range an instruction editor's caret or pointer is on, framed over the displayed work.
+    public var rangePreview: CompositionRanges.Preview?
+    /// The box holds an invalid range or an IME composition, so drawing from it waits.
+    public var ddlBoxRangeBlocked = false
     public func ddlBoxText(for work: SavedWork) -> String { ddlBoxDraftWorkID == work.id ? ddlBoxDraft : work.ddl ?? "" }
     public func setDdlBoxText(_ text: String, for work: SavedWork) {
         guard ddlBoxDraftWorkID == work.id || text != (work.ddl ?? "") else { return }

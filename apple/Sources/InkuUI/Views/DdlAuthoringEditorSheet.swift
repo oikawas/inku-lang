@@ -13,6 +13,7 @@ struct DdlAuthoringEditorSheet: View {
     @State private var inheritedWild = false
     @State private var wildOverride: Bool?
     @State private var insertion: InkuEditorInsertion?
+    @State private var rangeBlocked = false
     @State private var confirmingDiscard = false
 
     var body: some View {
@@ -40,7 +41,7 @@ struct DdlAuthoringEditorSheet: View {
                 if wildOverride == nil { Text(model.display.localized("元の作品から継承")).inkuFont(12).foregroundStyle(.secondary) }
             }.padding(.horizontal, 16).padding(.vertical, 10).disabled(model.isBusy)
             DdlEditorPane(model: model, text: $session.draft, disabled: model.isBusy, insertion: $insertion,
-                          onShowSaijiki: { showSaijiki = true })
+                          onShowSaijiki: { showSaijiki = true }, onRangeBlocked: { rangeBlocked = $0 })
                 .padding(.horizontal, 18).padding(.vertical, 14)
             Divider()
             HStack {
@@ -73,7 +74,7 @@ struct DdlAuthoringEditorSheet: View {
                         Task { if await session.commit(to: model, wildOverride: wildOverride) { dismiss() } }
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(!session.canSubmit(to: model))
+                    .disabled(!session.canSubmit(to: model) || rangeBlocked)
                     .keyboardShortcut(.defaultAction)
                     .inkuTooltip(tip("このDDLを確定して、新しい作品として描画します。"))
                 }
@@ -122,6 +123,7 @@ struct NewDdlAuthoringSheet: View {
     @State private var importing = false
     @State private var importError: String?
     @State private var insertion: InkuEditorInsertion?
+    @State private var rangeBlocked = false
     @State private var showSaijiki = false
 
     init(model: AppModel, initialImport: DDLPackageImport? = nil) {
@@ -147,7 +149,7 @@ struct NewDdlAuthoringSheet: View {
                 Button(model.display.localized("DDLファイルを読み込む…"), systemImage: "doc.badge.arrow.up") { showImport = true }
             }.padding(16).disabled(model.isBusy || importing)
             DdlEditorPane(model: model, text: $draft, disabled: model.isBusy || importing, insertion: $insertion,
-                          onShowSaijiki: { showSaijiki = true })
+                          onShowSaijiki: { showSaijiki = true }, onRangeBlocked: { rangeBlocked = $0 })
                 .padding(.horizontal, 18).padding(.vertical, 14)
             if let importedDocument, !importedDocument.names.isEmpty {
                 Text(model.display.localized("この新しい作品に定義を持ち込みます: ") + importedDocument.names.joined(separator: ", "))
@@ -171,7 +173,7 @@ struct NewDdlAuthoringSheet: View {
                     Button(model.display.localized("描く")) {
                         Task { if await model.drawNewDDL(draft, imported: importedDocument) { dismiss() } }
                     }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-                        .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || rangeBlocked)
                 }
             }.padding(16)
         }

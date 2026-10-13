@@ -1,4 +1,5 @@
 import Foundation
+import InkuHost
 #if os(macOS)
 import AppKit
 #endif
@@ -192,6 +193,9 @@ extension InkuEditorMark.Style {
         switch self {
         case .muted:
             return [.backgroundColor: NSColor.systemGray.withAlphaComponent(0.22)]
+        case .completion(let state):
+            let color: NSColor = switch state { case .completed: .systemBlue; case .numbersChanged: .systemGreen; case .wordsChanged: .systemOrange }
+            return [.underlineStyle: NSUnderlineStyle.thick.rawValue | NSUnderlineStyle.patternDot.rawValue, .underlineColor: color]
         case .unknownName:
             return [.foregroundColor: Self.dynamic(0x8a5a12, 0xf0c368),
                     .backgroundColor: Self.dynamic(0xbf8820, 0xbf8820, lightAlpha: 0.12, darkAlpha: 0.26),

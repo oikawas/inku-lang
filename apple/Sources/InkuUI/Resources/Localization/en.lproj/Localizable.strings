@@ -1469,3 +1469,8 @@
 "文脈が長すぎて補えなかった" = "The context was too long to complete.";
 "検査で断られた（%@）" = "Refused by the check (%@).";
 "断られた案を理由を添えて問い直し中 %d/%d" = "Asking again with the reasons the proposal was refused %d/%d";
+"補完" = "completion";
+"数を直した" = "numbers edited";
+"言葉を直した" = "words edited";
+"言葉を直した範囲が 1 つあります。描くと補完がその範囲の数を書き直し、承認を求めます。" = "One range has edited words. Drawing asks the completion to rewrite its numbers and asks for your approval.";
+"言葉を直した範囲が %ld つあります。描くと補完がその範囲の数を書き直し、承認を求めます。" = "%ld ranges have edited words. Drawing asks the completion to rewrite their numbers and asks for your approval.";

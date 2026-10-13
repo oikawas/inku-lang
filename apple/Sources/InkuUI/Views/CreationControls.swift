@@ -455,11 +455,7 @@ struct CreationDisplayedProcess: View {
                         .disabled(!saved || !hasDDL || disabled)
                         .inkuTooltip(model.display.tooltip("表示中の作品の指示書を編集して、その子として描き直します", serverKey: "tooltipDdlEdit"))
                 }
-                ScrollView {
-                    Text(ddl).inkuFont(12.5, design: .monospaced).lineSpacing(4).textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 10)
-                }.frame(minHeight: 100, maxHeight: 220)
-                    .overlay(alignment: .leading) { Rectangle().fill(.quaternary).frame(width: 2) }
+                CompletionRangeDDLBox(model: model, workID: work.id, ddl: ddl)
                 HStack {
                     Spacer(minLength: 0)
                     Button(model.display.localized("指示書から描画"), systemImage: "arrow.clockwise") { onWorkAction(work, "draw-ddl") }

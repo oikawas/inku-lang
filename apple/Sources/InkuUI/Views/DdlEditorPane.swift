@@ -1,4 +1,5 @@
 import SwiftUI
+import InkuHost
 
 /// Web `DdlEditor.svelte`: the language the DDL is read in, the quick-guide switch and 「N 行・N 文字」 above a
 /// numbered, highlighted editor, then the names this installation does not hold and the guide.
@@ -11,6 +12,8 @@ struct DdlEditorPane: View {
     @Binding var insertion: InkuEditorInsertion?
     var onShowSaijiki: (() -> Void)?
     @State private var showGuide = false
+    @State private var completionStates: [CompletionRangeState] = []
+    @State private var completionSource = ""
     @State private var highlighter: DdlHighlighter
     private let plugins: PluginNameIndex
 
@@ -34,6 +37,7 @@ struct DdlEditorPane: View {
         VStack(alignment: .leading, spacing: 8) {
             toolbar
             editor.frame(maxHeight: .infinity)
+            if completionSource == text { CompletionRangeSummary(display: display, states: completionStates) }
             if !unknownNames.isEmpty || showGuide { support }
         }
     }
@@ -63,7 +67,10 @@ struct DdlEditorPane: View {
     private var editor: some View {
         ZStack(alignment: .topLeading) {
             InkuTextEditor(text: $text, isEditable: !disabled, accessibilityLabel: display.webCopy("ddlEditorInstructions", "指示書"),
-                           style: .ddl, marks: { [highlighter] in highlighter.marks($0) }, insertion: $insertion)
+                           style: .ddl, marks: { [highlighter, completionStates, completionSource] source in
+                               // Tags describe the text they were read for and vanish once it changes (Web).
+                               highlighter.marks(source) + (source == completionSource ? CompletionRangeStyle.marks(completionStates) : [])
+                           }, insertion: $insertion)
             if text.isEmpty {
                 Text(display.webCopy("ddlEditPlaceholder", "背景を白で埋める。青い細い線を左下から右上へ三本引く。赤い小さな円を余白を残して配置する。"))
                     .inkuFont(14).foregroundStyle(.tertiary).lineSpacing(14 * 0.7)
@@ -74,6 +81,13 @@ struct DdlEditorPane: View {
         .background(InkuColor.panel, in: RoundedRectangle(cornerRadius: 4))
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.accentColor.opacity(0.7)))
+        // Web DdlEditor: the states are asked 180 ms after the text settles.
+        .task(id: [text, model.completionRecordKey]) {
+            try? await Task.sleep(for: .milliseconds(180))
+            guard !Task.isCancelled else { return }
+            completionStates = model.completionRangeStates(source: text)
+            completionSource = text
+        }
     }
 
     /// `.ddl-editor-support`: unknown names in amber with what each would fire as, then the guide.

@@ -14,6 +14,14 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-13 Completion range records and their three states
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage D2). The sources are CHANGELOG "2026-10-11 — Completion range records and three states (A3)" and Server/Web `70d47cab`.
+
+- The record of numeric ranges an approved completion wrote (the shared core's `completion_ranges`, `inku.completion-ranges.v1`) is kept with the work's context when it is saved. A direct DDL drawn from a saved work (editing its instructions, or drawing its saved instructions under other conditions) passes that record to the shared core. A range whose words were edited goes to the completion, which asks for approval of rewritten numbers.
+- The DDL editor and the DDL box ask the shared core's `completion_range_states` for each range's state (completion, numbers edited, words edited), mark each with a dotted underline in its state's colour, and name the states with counts below the text. When a range has edited words, "N ranges have edited words. Drawing asks the completion to rewrite their numbers and asks for your approval." appears. The states are asked 0.18 seconds after the text settles and vanish when it changes. They are read from the current execution when it is the displayed work's, otherwise from the saved work. The Web places a tag at each range's end; a native editor cannot place one without editing the text, so Swift uses the colours and the list below.
+- Checks: AppCheck `--completion-ranges-only` (with the real core: approving a completion and saving, the three states, and a renamed range drawn from the reopened work asks the completion again).
+
 ## 2026-10-13 Show the author's text and the reason for gaps that could not be completed, and asking again
 
 At the author's instruction (bringing in the differences from Server Build 1190, stage D1). The sources are Web `holeCompletionIssues`, `PipelineStatus.svelte` and `providerAttemptText`.

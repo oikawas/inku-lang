@@ -1,5 +1,6 @@
 import Foundation
 import InkuPersistence
+import InkuCore
 
 public struct HostError: Error, LocalizedError, Sendable, Equatable {
     public let code: String
@@ -96,6 +97,8 @@ public struct GenerationRequest: Codable, Sendable {
     public var captureProviderIO: Bool?
     public var disabledPluginNames: [String]?
     public var provenance: GenerationProvenance?
+    /// The parent work's completion range record (`inku.completion-ranges.v1`), carried into a child drawn from it.
+    public var completionRanges: Data?
     public init(authoring: GenerationAuthoring, configuration: Data, renderOptions: Data, clipPolicy: Data,
                 models: ModelSelection = .init(), providers: [ProviderSettings] = [],
                 renderColorMaps: [String: Data] = [:],
@@ -170,8 +173,33 @@ public struct PipelineView: Sendable {
     public let holeIDs: [String]
     public let candidateWork: SavedWork?
     public let providerMetrics: [ProviderAttemptMetric]
+    /// The execution's completion range record, when a completion it approved wrote ranges.
+    public var completionRangesJSON: Data?
     /// Holes the completion left uncompleted, shown when the author must decide or edit (Web holeCompletionIssues).
     public var completionIssues: [HoleCompletionIssue] = []
+}
+
+/// One range a completion wrote, as the author has since left it (core `completion_range_states`).
+public struct CompletionRangeState: Sendable, Equatable {
+    public enum State: String, Sendable { case completed, numbersChanged = "numbers_changed", wordsChanged = "words_changed" }
+    public let utf16Start: Int
+    public let utf16End: Int
+    public let state: State
+    public init(utf16Start: Int, utf16End: Int, state: State) { self.utf16Start = utf16Start; self.utf16End = utf16End; self.state = state }
+
+    /// Empty without a record, and for a response that is not `inku.completion-range-states.v1`.
+    public static func states(configuration: Data, source: String, record: Data?) -> [CompletionRangeState] {
+        guard let record, let config = try? ExactJSON(data: configuration), let ranges = try? ExactJSON(data: record) else { return [] }
+        let input: ExactJSON = .object(["config": config, "source": .string(source), "completion_ranges": ranges])
+        guard let output = try? ExactJSON(data: InkuCore.completionRangeStates(input.data)),
+              output["schema"].string == "inku.completion-range-states.v1" else { return [] }
+        let length = source.utf16.count
+        return (output["ranges"].array ?? []).compactMap { range in
+            guard let start = range["utf16_start"].number.flatMap(Int.init), let end = range["utf16_end"].number.flatMap(Int.init),
+                  let state = range["state"].string.flatMap(State.init), start >= 0, start < end, end <= length else { return nil }
+            return CompletionRangeState(utf16Start: start, utf16End: end, state: state)
+        }
+    }
 }
 
 /// One hole the completion check refused or left unresolved: the author's sentence and the check's reason code.
@@ -253,6 +281,8 @@ public struct SavedAuthoringContext: Sendable {
     public let origin: String
     public let revision: String
     public let authorityJSON: Data
+    /// The completion range record saved with the work (absent for works without one or saved earlier).
+    public var completionRanges: Data?
     public var originKind: AuthoringOrigin? { AuthoringOrigin(rawValue: origin) }
 }
 

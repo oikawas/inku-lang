@@ -156,7 +156,8 @@ public actor PipelineHost {
             renderOptions: context["options"].data, clipPolicy: context["clip"].data,
             document: context["document"].object == nil ? nil : context["document"].data,
             authority: try context["authority"].requiredString("authority"),
-            origin: try context["authority"].requiredString("origin"), revision: try context["authority"].requiredString("revision"), authorityJSON: context["authority"].data)
+            origin: try context["authority"].requiredString("origin"), revision: try context["authority"].requiredString("revision"), authorityJSON: context["authority"].data,
+            completionRanges: context["completion_ranges"].object == nil ? nil : context["completion_ranges"].data)
     }
 
     public func exportSVG(workID: String, profile: String) async throws -> String {
@@ -412,6 +413,8 @@ public actor PipelineHost {
             derivationKind: request.derivationKind, metadataJSON: try metadataText(request.derivationMetadata), at: now)
         var context = SavedPerformance.context(score: score, options: options, compiler: compiler, clip: clip)
         context["configuration"] = config; context["document"] = document; context["authority"] = authority
+        // Server fork: a changed performance of a saved work keeps the parent's completion range record.
+        if let record = request.completionRanges { context["completion_ranges"] = try ExactJSON(data: record) }
         context["presentation"] = try SavedPresentation.capture(delivery: delivery, rendered: rendered,
             prompts: nil, events: Data("[]".utf8), configuration: config, document: document,
             disabledPluginNames: request.disabledPluginNames ?? [], provenance: request.provenance)
@@ -585,6 +588,13 @@ private actor ExecutionDriver {
         self.state = stored; self.snapshot = snapshot; self.databaseRevision = record.revision; self.restored = true
     }
 
+    /// Server `start`: a direct DDL drawn from a saved work carries that work's completion range record.
+    private func authoring(_ request: GenerationRequest) throws -> ExactJSON {
+        var authoring = request.authoring.json
+        if request.authoring.isDirect, let record = request.completionRanges { authoring["completion_ranges"] = try ExactJSON(data: record) }
+        return authoring
+    }
+
     func start(progress: PipelineProgressHandler) async throws -> PipelineView {
         await gate.lock(); defer { Task { await gate.unlock() } }
         guard let request = initialRequest else { throw HostError("execution_already_started") }
@@ -593,7 +603,7 @@ private actor ExecutionDriver {
                                          "authority": .object(["protocol_version": .string("inku.variation-authority.v1"), "revision": .string("0"),
                                                                 "origin": .string(request.authoring.isDirect ? "user_authored_ddl" : "stage1_generated"),
                                                                 "authority": .string(request.authoring.isDirect ? "ddl_authoritative" : "description_authoritative")]),
-                                         "authoring": request.authoring.json])
+                                         "authoring": try authoring(request)])
         let next = try await coreStep(payload)
         let id = try next.snapshot.requiredString("execution_id")
         let saved = try await database.compareAndSwapExecution(id: id, expectedRevision: nil, snapshot: encoded(next.state))
@@ -1016,6 +1026,7 @@ private actor ExecutionDriver {
         performance["configuration"] = snapshot["config"]
         performance["document"] = snapshot["document"]
         performance["authority"] = snapshot["authority"]
+        if snapshot["completion_ranges"].object != nil { performance["completion_ranges"] = snapshot["completion_ranges"] }
         performance["presentation"] = try SavedPresentation.capture(delivery: delivery, rendered: rendered,
             prompts: state.prompts, events: state.events, configuration: snapshot["config"], document: snapshot["document"],
             disabledPluginNames: state.disabledPluginNames ?? [], provenance: state.provenance)
@@ -1096,6 +1107,7 @@ private actor ExecutionDriver {
                             promptJSON: state.prompts,
                             holeIDs: snapshot["delivery"]["compiler_lock"]["hole_identities"].array?.compactMap(\.string) ?? [], candidateWork: state.candidate?.work,
                             providerMetrics: state.providerObservations?.map(\.metric) ?? [],
+                            completionRangesJSON: snapshot["completion_ranges"].object == nil ? nil : snapshot["completion_ranges"].data,
                             completionIssues: state.svgFailure == nil ? HoleCompletionIssue.issues(snapshot: snapshot) : [])
     }
     private func executionID() throws -> String { try snapshot.requiredString("execution_id") }

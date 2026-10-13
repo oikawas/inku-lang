@@ -29,7 +29,7 @@ struct InkuEditorStyle: Equatable {
 /// A range an editor paints without changing its text: the grey band of a number or comment (Web LabelHighlight),
 /// or a DDL token colour (Web `highlight.ts`). Painted as layout-manager temporary attributes, never while the IME composes.
 struct InkuEditorMark: Equatable {
-    enum Style: Equatable { case muted, token(DdlTokenClass), unknownName }
+    enum Style: Equatable { case muted, token(DdlTokenClass), unknownName, completion(CompletionRangeState.State) }
     let range: NSRange
     let style: Style
 

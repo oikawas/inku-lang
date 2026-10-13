@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Swift keeps completion range records and shows their three states
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage D2). Swift did not keep the record of ranges a completion wrote with the work, so it was lost when the work was selected again and its instructions edited. The record is now kept with the work and passed to the shared core when drawing from the saved work, so a range with edited words goes to the completion. The DDL views mark completion, numbers edited and words edited with coloured dotted underlines, with their names, counts and the hint about edited words (the Web places a tag at each range's end).
+
 ### 2026-10-13 — Swift shows the author's text and reason for gaps completion could not fill, and asking again
 
 At the author's instruction (bringing in the differences from Server Build 1190, stage D1). Swift's DDL completion view showed only the committed text and the proposal. As on the Web, when completion stops and while a proposal awaits approval, each gap it could not fill shows the author's text and a plain reason. An attempt after the check refused a proposal reads "Asking again with the reasons the proposal was refused", apart from a communication retry.

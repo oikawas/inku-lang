@@ -147,8 +147,15 @@ public final class AppModel {
     @ObservationIgnored private var activeOperation: Task<Void, Never>?
     @ObservationIgnored private var stopping = false
     @ObservationIgnored private var initialized = false
-    @ObservationIgnored private var selectedContext: SavedAuthoringContext?
-    @ObservationIgnored private var currentView: PipelineView?
+    @ObservationIgnored private var selectedContext: SavedAuthoringContext? { didSet { refreshCompletionRecordKey() } }
+    @ObservationIgnored private var currentView: PipelineView? { didSet { refreshCompletionRecordKey() } }
+    /// Changes whenever the record `completionRangeStates` reads may have changed, so views ask again.
+    public private(set) var completionRecordKey = ""
+    private func refreshCompletionRecordKey() {
+        let key = [currentView?.executionID ?? "", String(currentView?.completionRangesJSON?.hashValue ?? 0),
+                   selectedWorkID ?? "", String(selectedContext?.completionRanges?.hashValue ?? 0)].joined(separator: "|")
+        if key != completionRecordKey { completionRecordKey = key }
+    }
     @ObservationIgnored private var importedDDL: DDLPackageImport?
     @ObservationIgnored private var providerModelsByExecution: [String: ModelSelection] = [:]
     /// Set once the saved next-work conditions have been read, so the defaults never overwrite them.
@@ -776,6 +783,16 @@ public final class AppModel {
         status = "DDLを読み込みました。生成して保存できます。"
     }
 
+    /// Web `CompletionRangeStatesQuery`: the displayed work's own execution when it is current, else its saved record.
+    public func completionRangeStates(source: String) -> [CompletionRangeState] {
+        guard let work = displayedWork else { return [] }
+        if let view = currentView, view.savedWorkID == work.id {
+            return CompletionRangeState.states(configuration: view.configurationJSON, source: source, record: view.completionRangesJSON)
+        }
+        guard let context = selectedContext, selectedWorkID == work.id else { return [] }
+        return CompletionRangeState.states(configuration: context.configuration, source: source, record: context.completionRanges)
+    }
+
     public func requestForCurrentInput(inputMode: String? = nil, source: String? = nil, description: String? = nil,
                                       parentWorkID: String? = nil, derivationKind: String = "new",
                                       catalogModeOverride: String? = nil, sketchOverride: SketchRequest? = nil,
@@ -803,6 +820,8 @@ public final class AppModel {
             sketch: sketch, savedConfiguration: savedConfig,
             importedPlugins: mode == "ddl" && parentWorkID == nil ? importedDDL?.plugins ?? [] : [])
         request.captureProviderIO = developerModeEnabled && display.preferences.captureProviderIO == true
+        // Server `start`: a direct DDL drawn from the selected saved work carries its completion range record.
+        if mode == "ddl", parentWorkID != nil, parentWorkID == selectedWorkID { request.completionRanges = selectedContext?.completionRanges }
         return request
     }
 
@@ -865,6 +884,7 @@ public final class AppModel {
                 renderOptions: options.data, clipPolicy: saved.clipPolicy, models: models, providers: settings.providers,
                 renderColorMaps: [catalog: options["resolved_color_map"].data], description: work.effectiveSourceText,
                 parentWorkID: work.id, derivationKind: "ddl_edit")
+            request.completionRanges = saved.completionRanges
             request = try await pinPersonalPlanRequests([request])[0]
             return await runAutomation(request: request) != nil
         } catch { report(error); return false }
@@ -1002,6 +1022,8 @@ public final class AppModel {
                 parentWorkID: source.id, derivationKind: kind, saveHistory: false,
                 retainedDocument: reading ? nil : document, retainedAuthority: reading ? nil : saved.authorityJSON,
                 derivationMetadata: metadata.data, interpretationSeed: interpretation))
+            // A redraw of the saved DDL keeps the parent's completion range record (Server fork).
+            if !reading { requests[requests.count - 1].completionRanges = saved.completionRanges }
         }
         requests = try await pinPersonalPlanRequests(requests)
         try Task.checkCancellation()
@@ -1111,6 +1133,7 @@ public final class AppModel {
         if !reading {
             guard let document = saved.document else { throw HostError("saved_document_unavailable") }
             request.retainedDocument = document; request.retainedAuthority = saved.authorityJSON
+            request.completionRanges = saved.completionRanges
         }
         return request
     }

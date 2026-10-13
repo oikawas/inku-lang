@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.116 (2026-10-13 / Build 1192)
+
 ### 2026-10-13 — Swift copies its Web text again from Build 1190
 
 At the author's instruction (bringing in the differences from Server Build 1190, stage G). The Web text Swift's screens use, and its versions, had been copied from the Build 1162 Web. They are now copied from the Build 1190 (v2.15.114) Web, and "About Inku" names Server v2.15.114 (Build 1190). The model settings display (use badges, three-step recommendation, estimated cost, mean seconds, uses with no measured response, the fold for models that cannot be published, and shared ChatGPT plan ratings) was deferred and is not in Swift yet.

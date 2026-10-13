@@ -618,15 +618,11 @@
 									<button type="button" class:active={modelPurposeSelected(model.id, 'vision')} aria-pressed={modelPurposeSelected(model.id, 'vision')} disabled={purposeUnsupported(model, 'vision')} title={purposeUnsupported(model, 'vision') ? noResponseTitle() : undefined} onclick={() => toggleModelPurpose(model.id, 'vision')}>Vision</button>
 								</div>
 							</div>
+							<!-- Assessments are shared model settings (2026-10-13): an administrator edits them. -->
+							{#if !personalOnly}
 							<details class="model-metadata-editor">
 								<summary>{t().settingsModelMetadataDetails}</summary>
 							<div class="model-metadata-fields">
-									{#if modelPickerProvider?.id === 'chatgpt'}
-										{#each ['recommendation_llm', 'recommendation_stage1', 'recommendation_stage2', 'recommendation_vision'] as key}
-											{@const recommendationKey = key as RecommendationKey}
-											<label><span>{t().settingsModelRecommendationFields[recommendationKey]}</span><select value={recommendationTier(Number(modelDraft(model)[recommendationKey] ?? 0))} onchange={(event) => setRecommendationTier(model, recommendationKey, Number(event.currentTarget.value))}><option value={0}>—</option>{#each [3, 2, 1] as tier}<option value={tier}>{tierStars(tier)}</option>{/each}</select></label>
-										{/each}
-									{:else}
 										{#each ['recommendation_llm', 'recommendation_vision'] as key}
 											{@const recommendationKey = key as RecommendationKey}
 											<label><span>{t().settingsModelRecommendationFields[recommendationKey]}</span><select value={recommendationTier(Number(modelDraft(model)[recommendationKey] ?? 0))} onchange={(event) => setRecommendationTier(model, recommendationKey, Number(event.currentTarget.value))}><option value={0}>—</option>{#each [3, 2, 1] as tier}<option value={tier}>{tierStars(tier)}</option>{/each}</select></label>
@@ -634,12 +630,12 @@
 										{#each MEASURED_FIELDS as field (field.key)}
 											<label><span>{field.label}</span><input type="number" min="0" step="any" value={modelDraft(model)[field.key] ?? ''} oninput={(event) => setMeasured(model, field.key, event.currentTarget.value)} /></label>
 										{/each}
-									{/if}
 								<label class="wide"><span>速度ラベル（平均秒数が無いときに表示）/ Speed label (shown without mean seconds)</span><input value={modelDraft(model).speed_label ?? ''} oninput={(event) => updateModelMetadata(model, { speed_label: event.currentTarget.value })} /></label>
 								<label class="wide"><span>評価コメント（日本語）</span><textarea rows="2" value={modelDraft(model).comment_ja ?? ''} oninput={(event) => updateModelMetadata(model, { comment_ja: event.currentTarget.value })}></textarea></label>
 								<label class="wide"><span>Evaluation comment (English)</span><textarea rows="2" value={modelDraft(model).comment_en ?? ''} oninput={(event) => updateModelMetadata(model, { comment_en: event.currentTarget.value })}></textarea></label>
 								</div>
 							</details>
+							{/if}
 						</article>
 		{/snippet}
 		<div class="modal-backdrop model-picker-backdrop" onclick={closeModelPicker} aria-hidden="true"></div>

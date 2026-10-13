@@ -255,6 +255,9 @@ class ModelSettingsPatch(BaseModel):
     stage2_provider: str | None = None
     stage2_model: str | None = None
     providers: dict[str, ModelProviderPatch] = Field(default_factory=dict)
+    # Shared assessments of ChatGPT plan models, by model id; each entry replaces
+    # that model's stored assessment. Publication stays personal (/api/me/chatgpt).
+    chatgpt_models: list[dict] | None = None
 
 
 class RenderConcurrencyStatus(BaseModel):

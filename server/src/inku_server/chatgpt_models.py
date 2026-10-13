@@ -1,4 +1,11 @@
-"""Personal publication preferences, separate from the shared API-key registry."""
+"""Personal publication preferences, separate from the shared API-key registry.
+
+What a ChatGPT plan model is -- its recommendation, cost, speed, comments and
+the purposes it was measured not to answer -- is shared model settings, the same
+for every subscriber and kept in the same keys as every other provider's (the
+author, 2026-10-13). Which of the offered models a person publishes, and for
+what, stays in that person's registration.
+"""
 
 from __future__ import annotations
 
@@ -13,16 +20,33 @@ def purposes_for_model(profile: dict, model: str) -> list[str]:
     return list(profile.get("model_purposes", {}).get(model, ["llm", "vision"]))
 
 
+def shared_assessments() -> dict[str, dict]:
+    """The administration's assessments of ChatGPT plan models, read at each use."""
+    from . import db
+    from .model_settings import chatgpt_assessments
+    return chatgpt_assessments(db.get_model_settings())
+
+
+def usable_purposes(profile: dict, model: str, assessment: dict) -> list[str]:
+    # A purpose the model was measured not to answer is not offered, whatever was ticked.
+    unsupported = assessment.get("unsupported_purposes", [])
+    return [purpose for purpose in purposes_for_model(profile, model) if purpose not in unsupported]
+
+
 def publication(profile: dict, models: list[dict] | None = None) -> dict:
     if models is None:
         models = profile.get("catalog", {}).get("models", [])
     selected = set(profile.get("published_models", []))
-    metadata = profile.get("model_metadata", {})
-    annotated = [{**model, **metadata.get(model["id"], {}), "purposes": purposes_for_model(profile, model["id"]),
-                  "enabled": model["id"] in selected} for model in models]
+    assessments = shared_assessments()
+    annotated = []
+    for model in models:
+        assessment = assessments.get(model["id"], {})
+        purposes = usable_purposes(profile, model["id"], assessment)
+        annotated.append({**model, **{key: value for key, value in assessment.items() if key not in ("id", "label")},
+                          "purposes": purposes,
+                          "enabled": model["id"] in selected and bool(purposes) and not assessment.get("not_supported")})
     return {"profile_id": profile["id"], "generation": profile["generation"], "models": annotated,
-            "enabled_models": {model["id"]: model["enabled"] for model in annotated},
-            "model_metadata": {model["id"]: dict(metadata[model["id"]]) for model in models if model["id"] in metadata}}
+            "enabled_models": {model["id"]: model["enabled"] for model in annotated}}
 
 
 def saved_publication(owner: str, profile_id: str, generation: int) -> dict:
@@ -36,8 +60,7 @@ def saved_publication(owner: str, profile_id: str, generation: int) -> dict:
 
 
 def save_publication(owner: str, profile_id: str, generation: int, selected: list[str] | None,
-                     model_purposes: dict[str, list[str]] | None = None,
-                     model_metadata: dict[str, dict | None] | None = None) -> dict:
+                     model_purposes: dict[str, list[str]] | None = None) -> dict:
     store = CredentialStore()
     with store.lock("edit:" + owner, time.monotonic() + 5):
         profile = check_session(owner, profile_id, generation)
@@ -47,23 +70,6 @@ def save_publication(owner: str, profile_id: str, generation: int, selected: lis
         offered = {model["id"] for model in profile.get("catalog", {}).get("models", [])}
         if selected is not None and any(model not in offered for model in selected):
             raise ChatGPTError("chatgpt_model_not_offered", action="models")
-        if model_metadata is not None:
-            if any(model not in offered for model in model_metadata):
-                raise ChatGPTError("chatgpt_model_not_offered", action="models")
-            metadata = {model: dict(fields) for model, fields in profile.get("model_metadata", {}).items()}
-            for model, patch in model_metadata.items():
-                if patch is None:
-                    metadata.pop(model, None)
-                    continue
-                fields = metadata.setdefault(model, {})
-                for key, value in patch.items():
-                    if value is None:
-                        fields.pop(key, None)
-                    else:
-                        fields[key] = value.strip() if isinstance(value, str) else value
-                if not fields:
-                    metadata.pop(model, None)
-            profile["model_metadata"] = metadata
         if model_purposes is not None:
             if not isinstance(model_purposes, dict) or any(
                 model not in offered or not isinstance(purposes, list)
@@ -80,6 +86,13 @@ def save_publication(owner: str, profile_id: str, generation: int, selected: lis
         if any(model in offered and not purposes_for_model(profile, model) for model in selected_models):
             raise ChatGPTError("chatgpt_model_not_offered", action="models")
         if selected is not None:
+            # A newly published model must have a purpose left after the shared
+            # assessment; an older choice it has since emptied is simply not offered.
+            assessments = shared_assessments()
+            if any(model in offered and (not usable_purposes(profile, model, assessments.get(model, {}))
+                                         or assessments.get(model, {}).get("not_supported"))
+                   for model in selected):
+                raise ChatGPTError("chatgpt_model_not_offered", action="models")
             profile["published_models"] = list(dict.fromkeys(selected))
         saved["profiles"][profile_id] = profile
         store.write(owner, saved)

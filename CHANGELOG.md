@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — ChatGPT plan model assessments are shared data, like every other provider's
+
+At the author's instruction (update model settings and publication selection from the draw session's measurement of the seven ChatGPT models, and hold the two as common data). The assessments used to live in each person's encrypted registration under eight keys, so they could hold no purposes measured without a response, no not-supported mark, no cost and no mean seconds, and the publication panel edited them differently from every other provider. They now live in the shared model settings' `chatgpt_models`, per model ID and in the same keys; an administrator saves them through `chatgpt_models` in `PUT /api/settings/models`, each entry replacing that model's assessment, and no purposes are kept there. Publication and purposes stay in the person's registration; `PUT /api/me/chatgpt/models/settings` no longer takes `model_metadata` (422), and an older stored `model_metadata` is not read. Personal catalogs and pickers overlay the shared assessments: a purpose measured without a response leaves the purposes, and a model with no purpose left, or not supported, cannot be published. The ChatGPT panel uses the same assessment fields as every other provider (LLM and Vision tiers, cost, mean seconds, speed label, comments), shown to administrators only; the Stage 1 and Stage 2 recommendation fields are gone.
+
 ### 2026-10-13 — Publication selection folds the models that cannot be published
 
 At the author's instruction. Publication selection files the models that cannot be published into three folds below the list, closed at first, each heading showing its count: No response when measured, Not supported, and End of life. Search and filtering still count the folded models. A paid-plan model stays in the list, since a plan can change. Model metadata gains `not_supported`, marking a kind left out of the benchmark (speech, music, video, embeddings and the like); such a model cannot be published.

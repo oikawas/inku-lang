@@ -286,6 +286,23 @@ def _normalize_models(models: Any) -> list[dict[str, Any]]:
     return normalized
 
 
+def normalize_chatgpt_models(entries: Any) -> list[dict[str, Any]]:
+    """The shared assessments of ChatGPT plan models (the author, 2026-10-13).
+
+    A model's measurements are the same for every subscriber, so they are kept
+    with the other providers' instead of in each person's registration, in the
+    same keys. Which models a person publishes, and for what, stays personal, so
+    the purposes are not kept here; the purposes it was measured not to answer are.
+    """
+    return [{key: value for key, value in model.items() if key != "purposes"} for model in _normalize_models(entries)]
+
+
+def chatgpt_assessments(settings: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    """The shared assessment of each ChatGPT plan model, by model id."""
+    entries = settings.get("chatgpt_models") if isinstance(settings, dict) else None
+    return {model["id"]: model for model in normalize_chatgpt_models(entries)}
+
+
 def default_model_settings() -> dict[str, Any]:
     return {
         "model_catalog_version": MODEL_CONFIG_VERSION,
@@ -350,6 +367,9 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
         return default
     clean = deepcopy(default)
     incoming_catalog_version = str(settings.get("model_catalog_version") or "")
+    chatgpt_models = normalize_chatgpt_models(settings.get("chatgpt_models"))
+    if chatgpt_models:
+        clean["chatgpt_models"] = chatgpt_models
     providers = settings.get("providers")
     if isinstance(providers, dict):
         for raw_provider_id, incoming in providers.items():
@@ -761,6 +781,12 @@ def update_model_settings(current: dict[str, Any], patch: dict[str, Any]) -> dic
                             known_models[model_id].get("eol") or known_models[model_id].get("requires_subscription")
                         )
                         clean["providers"][provider_id]["enabled_models"][model_id] = bool(enabled) and callable_model
+    # An entry replaces the stored assessment of the same model and leaves the others.
+    incoming_chatgpt = patch.get("chatgpt_models")
+    if isinstance(incoming_chatgpt, list):
+        merged = {str(model["id"]): model for model in clean.get("chatgpt_models", [])}
+        merged.update({model["id"]: model for model in normalize_chatgpt_models(incoming_chatgpt)})
+        clean["chatgpt_models"] = list(merged.values())
     return normalize_model_settings(clean)
 
 

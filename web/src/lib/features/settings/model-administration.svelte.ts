@@ -71,6 +71,12 @@ type ChatGPTPublication = {
 	enabled_models: Record<string, boolean>;
 };
 
+// What a ChatGPT plan model is assessed to be: the shared keys every provider's
+// models carry, apart from the purposes a person ticks.
+const ASSESSMENT_KEYS = ['unsupported_purposes', 'not_supported', 'recommendation_llm', 'recommendation_stage1',
+	'recommendation_stage2', 'recommendation_vision', 'speed_class', 'speed_label', 'cost_usd_llm', 'cost_usd_vision',
+	'speed_llm_seconds', 'speed_vision_seconds', 'comment_ja', 'comment_en'] as const;
+
 export function createModelAdministration<TActor extends SettingsActor>(
 	deps: ModelAdministrationDeps<TActor>
 ): ModelAdministration {
@@ -390,23 +396,29 @@ export function createModelAdministration<TActor extends SettingsActor>(
 			const draftModels = patch.models ?? modelSettings?.providers.chatgpt?.models ?? chatgptPublication.models;
 			const modelPurposes = Object.fromEntries(chatgptPublication.models.map((model) => [model.id,
 				draftModels.find((draft) => draft.id === model.id)?.purposes ?? model.purposes ?? ['llm', 'vision']]));
-			const metadataKeys = ['recommendation_llm', 'recommendation_stage1', 'recommendation_stage2',
-				'recommendation_vision', 'speed_class', 'speed_label', 'comment_ja', 'comment_en'] as const;
-			const modelMetadata = Object.fromEntries(chatgptPublication.models.flatMap((model) => {
+			// The assessments are shared model settings (the author, 2026-10-13): an
+			// administrator saves a changed model's whole assessment there, before the
+			// person's publication, whose answer then carries it.
+			const assessments = isAdministrator() ? chatgptPublication.models.flatMap((model) => {
 				const draft = draftModels.find((item) => item.id === model.id);
-				if (!draft) return [];
-				const changed = Object.fromEntries(metadataKeys.filter((key) => draft[key] !== model[key])
-					.map((key) => [key, draft[key] === '' || draft[key] === undefined ? null : draft[key]]));
-				return Object.keys(changed).length ? [[model.id, changed]] : [];
-			}));
+				if (!draft || ASSESSMENT_KEYS.every((key) => JSON.stringify(draft[key] ?? null) === JSON.stringify(model[key] ?? null))) return [];
+				return [{ id: model.id, label: model.label, ...Object.fromEntries(ASSESSMENT_KEYS
+					.filter((key) => draft[key] !== undefined && draft[key] !== '').map((key) => [key, draft[key]])) }];
+			}) : [];
 			modelSettingsLoading = true;
 			try {
+				if (assessments.length) {
+					const shared = await deps.apiFetch('/api/settings/models', {
+						method: 'PUT', headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ chatgpt_models: assessments })
+					});
+					if (!shared.ok) throw new Error(`HTTP ${shared.status}`);
+				}
 				const data = await personalResponse(await deps.apiFetch('/api/me/chatgpt/models/settings', {
 					method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
 						profile_id: chatgptPublication.profile_id, generation: chatgptPublication.generation,
 						published_models: chatgptPublication.models.filter((model) => selected[model.id] === true).map((model) => model.id),
-						model_purposes: modelPurposes,
-						...(Object.keys(modelMetadata).length ? { model_metadata: modelMetadata } : {})
+						model_purposes: modelPurposes
 					})
 				}));
 				if (!sameOwner(owner, version) || !personalModelsAllowed()) return false;

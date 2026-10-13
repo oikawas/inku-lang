@@ -144,7 +144,15 @@ test('connected guide leads to personal model settings with explicit publication
 			requests.push({ path, body: init?.body ? JSON.parse(String(init.body)) : undefined });
 			if (path === '/api/settings/models') {
 				assert.equal(admin, true);
-				if (init?.method === 'PUT') assert.deepEqual(Object.keys(JSON.parse(String(init.body)).providers), ['openai']);
+				if (init?.method === 'PUT') {
+					const body = JSON.parse(String(init.body));
+					// A ChatGPT assessment is shared model settings, saved whole for the model that changed.
+					if (body.chatgpt_models) {
+						assert.deepEqual(body, { chatgpt_models: [{ id: 'second-slug', label: 'First offered', recommendation_vision: 3, comment_ja: '共通の評価' }] });
+						return response({ catalog: [], settings: { providers: {} } });
+					}
+					assert.deepEqual(Object.keys(body.providers), ['openai']);
+				}
 				return response({ catalog: [{ id: 'openai', label: 'OpenAI', models: [] }], settings: {
 					providers: { openai: { base_url: '', api_key_set: false, api_key_hint: null, enabled_models: {} } }
 				} });
@@ -154,8 +162,7 @@ test('connected guide leads to personal model settings with explicit publication
 			if (init?.method === 'PUT') {
 				const body = JSON.parse(String(init.body));
 				assert.deepEqual(body, { profile_id: 'profile', generation: 1, published_models: ['second-slug'],
-					model_purposes: { 'second-slug': ['vision'], 'first-slug': [] },
-					model_metadata: { 'second-slug': { recommendation_stage1: 4, speed_label: null, comment_ja: '実測の評価' } } });
+					model_purposes: { 'second-slug': ['vision'], 'first-slug': [] } });
 				saved = { ...saved, models: [{ id: 'second-slug', label: 'First offered', purposes: ['vision'], enabled: true,
 					recommendation_stage1: 4, comment_ja: '実測の評価' },
 					{ id: 'first-slug', label: 'Second offered', purposes: [], enabled: false }], enabled_models: { 'second-slug': true, 'first-slug': false } };
@@ -202,9 +209,15 @@ test('connected guide leads to personal model settings with explicit publication
 	owner = 'owner'; admin = true;
 	await administration.loadModelSettings();
 	assert.deepEqual(administration.modelCatalog.map((provider: any) => provider.id), ['openai', 'chatgpt']);
+	const before = requests.length;
+	assert.equal(await administration.saveModelProvider('chatgpt', { models: [
+		{ id: 'second-slug', label: 'First offered', purposes: ['vision'], recommendation_vision: 3, comment_ja: '共通の評価' },
+		{ id: 'first-slug', label: 'Second offered', purposes: [] }
+	], enabled_models: { 'second-slug': true, 'first-slug': false } }), true);
+	assert.deepEqual(requests.slice(before).map((request) => request.path), ['/api/settings/models', '/api/me/chatgpt/models/settings']);
 	await administration.saveModelSettings();
 	assert.equal(administration.modelSettings.providers.chatgpt.enabled_models['second-slug'], true);
-	assert.equal(changes, 3);
+	assert.equal(changes, 4);
 	admin = false;
 	assert.deepEqual(administration.modelCatalog.map((provider: any) => provider.id), ['chatgpt']);
 	assert.deepEqual(Object.keys(administration.modelSettings.providers), ['chatgpt']);
@@ -215,7 +228,7 @@ test('connected guide leads to personal model settings with explicit publication
 	connection.reset();
 });
 
-test('personal publication picker exposes Vision use and editable evaluation fields', async () => {
+test('personal publication picker exposes Vision use; the shared assessments are an administrator\'s to edit', async () => {
 	const source = readFileSync(new URL('./ModelAdministrationSettings.svelte', import.meta.url), 'utf8')
 		.replace("import { t } from '$lib/i18n/index.svelte';", `import { ja } from ${JSON.stringify(new URL('../../i18n/ja.ts', import.meta.url).href)}; const t = () => ja;`)
 		.replace("from '$lib/modelMeta'", `from ${JSON.stringify(new URL('../../modelMeta.ts', import.meta.url).href)}`)
@@ -228,19 +241,24 @@ test('personal publication picker exposes Vision use and editable evaluation fie
 	const view = (await import('data:text/javascript;base64,' + Buffer.from(generated).toString('base64'))).default;
 	const models = [{ id: 'vision-model', label: 'Vision model', purposes: ['vision'], speed_label: 'Upstream speed', comment_ja: '接続元の評価' },
 		{ id: 'no-purpose', label: 'Unused model', purposes: [] }];
-	const { body } = render(view, { props: {
-		providerGroups: [{ id: 'chatgpt', label: ja.chatgptPlanLabel, models }], personalOnly: true,
+	const picker = (personalOnly: boolean) => render(view, { props: {
+		providerGroups: [{ id: 'chatgpt', label: ja.chatgptPlanLabel, models }], personalOnly,
 		administration: { modelSettings: { providers: { chatgpt: { enabled_models: { 'vision-model': true, 'no-purpose': false } } } },
 			modelFetchResults: {}, modelSettingsLoading: false }
-	} });
+	} }).body;
+	const body = picker(true);
 	assert.match(body, /<option value="vision">/);
 	assert.match(body, /aria-label="Vision model LLM \/ Vision"/);
 	assert.match(body, /aria-pressed="true"[^>]*>Vision<\/button>/);
-	assert.match(body, /<details class="model-metadata-editor">/);
-	assert.match(body, /Upstream speed/);
-	assert.match(body, /接続元の評価/);
-	assert.match(body, /<textarea/);
-	for (const label of Object.values(ja.settingsModelRecommendationFields)) assert.ok(body.includes(label));
 	const unused = body.slice(body.indexOf('Unused model') - 150, body.indexOf('Unused model'));
 	assert.match(unused, /disabled/);
+	// Assessments are shared model settings (2026-10-13): a person publishes, an administrator assesses.
+	assert.doesNotMatch(body, /<details class="model-metadata-editor">/);
+	const administrator = picker(false);
+	assert.match(administrator, /<details class="model-metadata-editor">/);
+	assert.match(administrator, /Upstream speed/);
+	assert.match(administrator, /接続元の評価/);
+	for (const key of ['recommendation_llm', 'recommendation_vision'] as const) assert.ok(administrator.includes(ja.settingsModelRecommendationFields[key]));
+	assert.ok(!administrator.includes(ja.settingsModelRecommendationFields.recommendation_stage1));
+	assert.match(administrator, /平均秒数 Vision/);
 });

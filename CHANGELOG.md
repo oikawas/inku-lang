@@ -8,6 +8,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — The composition reading returns the joints the description states
+
+By the author's choice (I-711 stage C, C5: measure before building, and give it to every reader). The composition could take a reading's joints, but the reading returned none, so the composition wrote no joints.
+
+- The composition reading prompt is now `inku.composition-reading-prompt.v3`. Its values end with the joints (`joints`: one of five values, resting on, inside, overlapping, crossing or connected; two layers; and the words quoted from the description), written only when the description says in words how things meet. The prompt and the schema are byte for byte the ones measured before building, sending 49 works to three readers (Gemma 4 31B, Gemini 3.6 Flash, GPT-6.1-Sol).
+- The check reads the joints in the reply's order once the stated places are fixed. A joint whose value or layers do not fit (finding `joint_layer`), whose quoted words are not in the description (finding `joint_unquoted`), or that the composition cannot write (`joint_stated` and the like) is dropped and named in the findings. The joints left are placed and printed by the composition.
+- A reply without joints, or whose joints are not a list, is read as having none. A reading without joints leaves the composition as before. The DDL, Score and Saijiki editions do not change.
+
 ### 2026-10-13 — ChatGPT plan model assessments are shared data, like every other provider's
 
 At the author's instruction (update model settings and publication selection from the draw session's measurement of the seven ChatGPT models, and hold the two as common data). The assessments used to live in each person's encrypted registration under eight keys, so they could hold no purposes measured without a response, no not-supported mark, no cost and no mean seconds, and the publication panel edited them differently from every other provider. They now live in the shared model settings' `chatgpt_models`, per model ID and in the same keys; an administrator saves them through `chatgpt_models` in `PUT /api/settings/models`, each entry replacing that model's assessment, and no purposes are kept there. Publication and purposes stay in the person's registration; `PUT /api/me/chatgpt/models/settings` no longer takes `model_metadata` (422), and an older stored `model_metadata` is not read. Personal catalogs and pickers overlay the shared assessments: a purpose measured without a response leaves the purposes, and a model with no purpose left, or not supported, cannot be published. The ChatGPT panel uses the same assessment fields as every other provider (LLM and Vision tiers, cost, mean seconds, speed label, comments), shown to administrators only; the Stage 1 and Stage 2 recommendation fields are gone.

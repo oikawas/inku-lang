@@ -123,6 +123,7 @@ fn checked_reading(case: &Case) -> Result<(CheckedReading, Vec<String>), String>
                 )
             })
             .collect(),
+        joints: Vec::new(),
     };
     let quoted: Vec<bool> = reading
         .stated_places

@@ -3,8 +3,10 @@
 //!
 //! The system text is the composition prototype's own (the compressed theory, the
 //! kinds of layer, the values and their meanings, the rules), kept byte for byte so
-//! the product asks what the prototype measured. No description or reading example
-//! is put in the prompt.
+//! the product asks what the prototype measured. The joints paragraph and its two
+//! rules are the ones I-711 stage C measured with each reader before they were
+//! built in, kept byte for byte too. No description or reading example is put in
+//! the prompt.
 
 use inku_ddl::ResolvedInstructionLanguage;
 use inku_ddl::work_plan::{WorkPlan, WorkPlanPlugin, WorkPlanSlot, print_work_plan_with_plugins};
@@ -14,7 +16,7 @@ use crate::composition::{self, LayerKind, PLACES, RawReading, RawRelation, RawSt
 use crate::prompts::{LlmPrompt, LlmStage, PromptError, PromptLimits};
 
 /// Distinct composition reading prompt edition.
-pub const COMPOSITION_READING_PROMPT_ID: &str = "inku.composition-reading-prompt.v2";
+pub const COMPOSITION_READING_PROMPT_ID: &str = "inku.composition-reading-prompt.v3";
 
 const UNSPECIFIED: &str = "unspecified";
 
@@ -71,6 +73,12 @@ tension（全体の張り）。言わなくてよいものはunspecified:
 - symmetry（symmetric / asymmetric）: 左右対称（symmetric、静かな均衡のときだけ）か、非対称か。言わなくてよい。
 - void（strong / medium / weak）: 描かない場所の強さ。strong（広く空ける）、medium、weak（画面全体を使ってよい）。
 stated_places: 記述が、ある層を画面のどこに置くかを、位置の言葉で言うときだけ。位置の言葉は、画面の部分を指す言葉（上・下・中央・左・右・隅・端など）。描く物や情景の名前は、位置の言葉ではない。layer（層の番号）と、位置の言葉を含む記述の部分をそのまま短く引いたwordsと、その言葉が言う場所を場所の値から1つ選んだplace（top＝上、bottom＝下、center＝中心、left_edge＝左端、right_edge＝右端、top_edge＝上端、bottom_edge＝下端、corner＝隅、top_left_corner＝左上の隅、top_right_corner＝右上の隅、bottom_left_corner＝左下の隅、bottom_right_corner＝右下の隅）。記述がどの隅かを言うときはその隅を、どの隅かを言わないときはcornerを選ぶ。下絵に場所が無い層でも、記述が言うなら書く。無ければ空にする。
+joints（層どうしの継ぎ目）: 記述が、描く物どうしが接する・つながる・中に入る・重なる・横切ることを言葉で言うときだけ書く。typeと、layers（層の番号を、a・bの順に）と、その継ぎ目を言う記述の部分をそのまま短く引いたwords。
+- rests_on（載る） [a, b]: aがbの上に接して載る。
+- inside（中に） [a, b]: aがbの形の中にある。
+- overlaps（重なる） [a, b]: aがbに一部重なる。
+- crosses（横切る） [a, b]: aがbの上を横切る。
+- continues_from（つながる） [a, b]: aがbの端から続く（aの始まりがbに接する）。
 
 # 決まり
 - 記述全体を読んで決める。記述の語から、関係・張り・場所を決まった対応で引かない。
@@ -78,7 +86,9 @@ stated_places: 記述が、ある層を画面のどこに置くかを、位置�
 - 記述から読めない関係は書かない。関係は0個でもよい。
 - 記述から読めない張りは unspecified にする（作者が決めた既定が使われる）。
 - rolesは、層の数と同じ数だけ、層の番号の順に書く。
-- 下絵の層の〔下絵が付けた場所〕は、下絵を作ったときの推測で、記述の言葉とは限らない。記述がその場所をはっきり言うときだけ、stated_placesに書く。"#;
+- 下絵の層の〔下絵が付けた場所〕は、下絵を作ったときの推測で、記述の言葉とは限らない。記述がその場所をはっきり言うときだけ、stated_placesに書く。
+- jointsは、記述が物どうしの接し方を言葉で言うときだけ書く。接しない近さ・離れ・上下はrelationsに書き、jointsには書かない。継ぎ目は0個でもよい。
+- 1つの層をaとする継ぎ目は1つまで。"#;
 
 const SYSTEM_EN: &str = r#"You are the composition reader of inku, an app that makes pictures from words. Read a description and the layers of the work plan made from it, and return a composition reading using fixed values only. Do not write coordinates or numbers; another part of the app computes the placement from your reading.
 
@@ -133,6 +143,12 @@ tension (the whole picture). Use unspecified where you have nothing to say:
 - symmetry (symmetric / asymmetric): left-right symmetric (only with static balance) or asymmetric. May be left out.
 - void (strong / medium / weak): how strongly empty space works: strong (wide empty space), medium, or weak (the whole canvas may be used).
 stated_places: only when the description says, in words of position, where on the canvas a layer is. Words of position name a part of the picture (top, bottom, center, left, right, corner, edge and the like); the names of things or of the scene are not words of position. layer (its number); words, a short verbatim quote of the part of the description that contains the words of position; and place, the place those words name, chosen from the place values (top, bottom, center, left_edge, right_edge, top_edge, bottom_edge, corner, top_left_corner, top_right_corner, bottom_left_corner, bottom_right_corner). When the description says which corner, choose that corner; when it does not say which, choose corner. Write it even when the plan has no place for that layer, if the description states one. Leave it empty when there are none.
+joints (how layers are joined): only when the description says in words that the drawn things touch, connect, lie inside, overlap or cross one another. A type, layers (the layer numbers, as a, b in order), and words: the part of the description that says the joint, quoted short and verbatim.
+- rests_on [a, b]: a rests on top of b, touching it.
+- inside [a, b]: a lies inside the shape of b.
+- overlaps [a, b]: a partly overlaps b.
+- crosses [a, b]: a crosses over b.
+- continues_from [a, b]: a continues from an end of b (a starts where it touches b).
 
 # Rules
 - Decide from the whole description. Do not look up relations, tension or places from words of the description by a fixed correspondence.
@@ -140,7 +156,9 @@ stated_places: only when the description says, in words of position, where on th
 - Do not write relations the description does not let you read. Zero relations is fine.
 - Use unspecified for any tension the description does not let you read (the author's defaults apply).
 - Write exactly one role per layer, in layer order.
-- A layer's [place set by the work plan] was guessed when the plan was made; it is not necessarily the description's words. Only when the description clearly states that place, write it in stated_places."#;
+- A layer's [place set by the work plan] was guessed when the plan was made; it is not necessarily the description's words. Only when the description clearly states that place, write it in stated_places.
+- Write joints only when the description says in words how the things meet. Closeness, distance, and above or below without touching go in relations, not in joints. There may be no joints.
+- A layer is a in at most one joint."#;
 
 fn kind_name(kind: LayerKind, language: ResolvedInstructionLanguage) -> &'static str {
     match (kind, language) {
@@ -238,8 +256,10 @@ fn message(
 /// The response schema for a plan of `layer_count` layers: fixed values only.
 ///
 /// Each object names its property order (`propertyOrdering`), the order the
-/// prototype wrote and measured: the thesis is written first. JSON values here
-/// keep no key order, so a transport that orders properties reads it from there.
+/// prototype wrote and measured: the thesis is written first, and the joints
+/// last, once the other fields are written (the order I-711 stage C measured).
+/// JSON values here keep no key order, so a transport that orders properties
+/// reads it from there.
 fn response_schema(layer_count: usize) -> Value {
     let optional = |values: &[&str]| {
         let mut values: Vec<&str> = values.to_vec();
@@ -253,7 +273,7 @@ fn response_schema(layer_count: usize) -> Value {
     let axes: Vec<&str> = composition::TENSION.iter().map(|(axis, _)| *axis).collect();
     json!({
         "type": "object",
-        "propertyOrdering": ["thesis", "roles", "relations", "tension", "stated_places"],
+        "propertyOrdering": ["thesis", "roles", "relations", "tension", "stated_places", "joints"],
         "properties": {
             "thesis": {"type": "string"},
             "roles": {
@@ -283,9 +303,19 @@ fn response_schema(layer_count: usize) -> Value {
                     "place": {"type": "string", "enum": PLACES}
                 },
                 "required": ["layer", "words", "place"]
+            }},
+            "joints": {"type": "array", "items": {
+                "type": "object",
+                "propertyOrdering": ["type", "layers", "words"],
+                "properties": {
+                    "type": {"type": "string", "enum": composition::JOINT_NAMES},
+                    "layers": {"type": "array", "items": {"type": "integer", "minimum": 0}, "minItems": 2, "maxItems": 2},
+                    "words": {"type": "string"}
+                },
+                "required": ["type", "layers", "words"]
             }}
         },
-        "required": ["thesis", "roles", "relations", "tension", "stated_places"]
+        "required": ["thesis", "roles", "relations", "tension", "stated_places", "joints"]
     })
 }
 
@@ -346,7 +376,8 @@ fn layer_key(value: Option<&Value>) -> String {
 
 /// Read a composition reply. It fails when the reply is not the requested shape:
 /// not JSON, no role list of the plan's length, a relation or tension that is not an
-/// object, or layer numbers that are not a list.
+/// object, or layer numbers that are not a list. Joints are kept as the reply wrote
+/// them, for the check; a reply without a list of joints has none.
 pub fn parse_composition_reading_response(
     response_text: &str,
     layer_count: usize,
@@ -441,6 +472,10 @@ pub fn parse_composition_reading_response(
             None => stated_places.push((key, stated)),
         }
     }
+    let joints = match value.get("joints") {
+        Some(Value::Array(joints)) => joints.clone(),
+        _ => Vec::new(),
+    };
     let thesis = value
         .get("thesis")
         .and_then(Value::as_str)
@@ -452,6 +487,7 @@ pub fn parse_composition_reading_response(
             relations,
             tension,
             stated_places,
+            joints,
         },
         thesis,
     })
@@ -497,6 +533,28 @@ mod tests {
         assert_eq!(reading.stated_places[0].1.place.as_deref(), Some("bottom"));
         assert_eq!(reading.stated_places[1].1.place, None);
         assert_eq!(parsed.thesis, "t");
+    }
+
+    #[test]
+    fn joints_are_read_as_the_reply_wrote_them_and_a_reply_without_a_list_has_none() {
+        let head = r#""thesis":"t","roles":["field","focal"],"relations":[],"tension":{},"stated_places":[]"#;
+        let reply = format!(
+            r#"{{{head},"joints":[{{"type":"rests_on","layers":[1,0],"words":"on the hill"}},"x",{{"type":"touches"}}]}}"#
+        );
+        let parsed = parse_composition_reading_response(&reply, 2, limits()).expect("readable");
+        assert_eq!(
+            parsed.reading.joints,
+            [
+                json!({"type": "rests_on", "layers": [1, 0], "words": "on the hill"}),
+                json!("x"),
+                json!({"type": "touches"}),
+            ]
+        );
+        for joints in ["", r#","joints":null"#, r#","joints":{"type":"rests_on"}"#] {
+            let reply = format!("{{{head}{joints}}}");
+            let parsed = parse_composition_reading_response(&reply, 2, limits()).expect("readable");
+            assert!(parsed.reading.joints.is_empty(), "{reply}");
+        }
     }
 
     #[test]

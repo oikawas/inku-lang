@@ -1,7 +1,7 @@
 {
  "schema": "inku.model-catalog.v2",
  "version": "3.0.0",
- "updated": "2026-10-13T13:30:00Z",
+ "updated": "2026-10-13T14:19:00Z",
  "labels": [
   {
    "id": "unmeasured",
@@ -43,10 +43,9 @@
  "providers": {
   "openai": {
    "defaults": [
-    "gpt-5.1",
-    "gpt-5.1-mini",
-    "gpt-4.1",
-    "gpt-4.1-mini"
+    "gpt-5.6-luna",
+    "gpt-5.6-terra",
+    "gpt-6-luna"
    ],
    "models": [
     {

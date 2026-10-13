@@ -8,7 +8,7 @@
 -->
 <script lang="ts">
 	import type { ModelOption } from '$lib/models';
-	import { modelRecommendation, modelStageRecommendations, modelSpeed, modelCost, modelComment, modelStatusLabel, type ModelPurpose } from '$lib/modelMeta';
+	import { isModelUnselectable, modelRecommendation, modelStageRecommendations, modelSpeed, modelCost, modelComment, modelStatusLabel, type ModelPurpose } from '$lib/modelMeta';
 	import { openFloatingCard } from '$lib/floatingCard';
 	import ModelPurposeBadges from './ModelPurposeBadges.svelte';
 
@@ -43,7 +43,7 @@
 </script>
 
 <span class="model-hover-card" role="tooltip" bind:this={card}>
-	{#if modelStatusLabel(model, isJapanese)}<span><strong>状態 / Status</strong>{modelStatusLabel(model, isJapanese)}</span>{/if}
+	{#if modelStatusLabel(model, isJapanese)}<span><strong>状態 / Status</strong><span class={isModelUnselectable(model) ? 'status-warning' : 'status-muted'}>{modelStatusLabel(model, isJapanese)}</span></span>{/if}
 	<span><strong>用途 / Use</strong><ModelPurposeBadges {model} {isJapanese} /></span>
 	{#if stages}
 		<span><strong>オススメ度 / Stage 1</strong>{stages.stage1}</span>
@@ -79,4 +79,7 @@
 	.model-hover-card > span { display: grid; gap: 2px; color: var(--tooltip-fg); font-size: var(--ui-font-size-11); line-height: 1.45; }
 	.model-hover-card > span + span { margin-top: 6px; }
 	.model-hover-card strong { color: var(--tooltip-muted); font-size: var(--ui-font-size-9); font-weight: 500; letter-spacing: .05em; text-transform: uppercase; }
+	/* A label that keeps the model from publication is a warning; older and not measured stay muted. */
+	.model-hover-card .status-warning { color: var(--danger); font-weight: 600; }
+	.model-hover-card .status-muted { color: var(--tooltip-muted); }
 </style>

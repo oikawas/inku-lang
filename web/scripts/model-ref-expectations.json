@@ -9,10 +9,9 @@
   ],
   "catalog": {
     "openai": [
-      "gpt-5.1",
-      "gpt-5.1-mini",
-      "gpt-4.1",
-      "gpt-4.1-mini"
+      "gpt-5.6-luna",
+      "gpt-5.6-terra",
+      "gpt-6-luna"
     ],
     "anthropic": [
       "claude-opus-4-7",

@@ -14,6 +14,7 @@ from .chatgpt_auth import RESOURCE, access_token, read_limited
 from .chatgpt_runtime import check_session, guarded
 from .chatgpt_store import ChatGPTError, CredentialStore, canonical
 from .chatgpt_models import publication
+from .schema_order import ordered_schema
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ def request_body(model: str, prompt: dict) -> dict:
             "input": [{"role": "user", "content": prompt["message"]}],
             "tools": [{"type": "namespace", "name": "inku", "description": "Return data for the inku drawing pipeline.",
                        "tools": [{"type": "function", "name": "submit_pipeline_response", "description": "Return the requested drawing data.",
-                                  "parameters": prompt["response_schema"], "strict": False}]}],
+                                  "parameters": ordered_schema(prompt["response_schema"]), "strict": False}]}],
             "tool_choice": "required", "parallel_tool_calls": False}
 
 

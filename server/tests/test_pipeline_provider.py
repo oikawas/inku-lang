@@ -649,6 +649,53 @@ def test_the_composition_reading_is_sent_as_stage1_with_the_schema_order(monkeyp
     assert json.loads(sent[0].content)["temperature"] == 0.3
 
 
+@pytest.mark.parametrize(("connection", "sent_schema"), [
+    ({"id": "fixture", "kind": "openai_compatible", "base_url": "https://provider.invalid/v1"},
+     lambda body: body["tools"][0]["function"]["parameters"]),
+    ({"id": "ollama", "kind": "openai_compatible", "base_url": "http://ollama.invalid/v1"},
+     lambda body: body["response_format"]["json_schema"]["schema"]),
+    ({"id": "anthropic", "kind": "anthropic", "base_url": "https://api.anthropic.invalid"},
+     lambda body: body["tools"][0]["input_schema"]),
+    ({"id": "openai", "kind": "openai_compatible", "base_url": "https://api.openai.com/v1"},
+     lambda body: body["tools"][0]["parameters"]),
+], ids=["chat-completions-tool", "response-format", "anthropic-input-schema", "openai-responses"])
+def test_every_sender_but_gemini_writes_the_reading_in_its_property_order(monkeypatch, connection, sent_schema):
+    """The core's JSON arrives in name order (thesis last); a sender that is not
+    Gemini now writes the properties in propertyOrdering, nested ones too, as the
+    prototype and the C5 measurement sent them (the draw session's request, the
+    author's choice of 2026-10-13). Every key and word stays."""
+    monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model", lambda *args, **kwargs: (connection["id"], "fixture-model"))
+    monkeypatch.setattr("inku_server.pipeline_provider.connection_for", lambda *args: {
+        **connection, "api_key": "test-only", "requires_api_key": True})
+    sent = []
+
+    async def request(value):
+        sent.append(json.loads(value.content))
+        return httpx.Response(500, json={})
+
+    action = _reading_action()
+    original = action["payload"]["prompt"]["response_schema"]
+    SingleAttemptProvider(ProviderOptions({}, "m", "m", 256, 8192), transport=httpx.MockTransport(request))(action)
+    schema = sent_schema(sent[0])
+    assert list(schema["properties"]) == ["thesis", "roles", "relations"]
+    assert list(schema["properties"]["relations"]["items"]["properties"]) == ["type", "layers"]
+    assert schema == original and schema["propertyOrdering"] == ["thesis", "roles", "relations"]
+
+
+def test_the_chatgpt_plan_writes_the_reading_in_its_property_order_and_other_schemas_as_they_came():
+    from inku_server.chatgpt_provider import request_body
+    from inku_server.schema_order import ordered_schema
+
+    prompt = _reading_action()["payload"]["prompt"]
+    parameters = request_body("gpt-6.1-sol", prompt)["tools"][0]["tools"][0]["parameters"]
+    assert list(parameters["properties"]) == ["thesis", "roles", "relations"]
+    assert list(parameters["properties"]["relations"]["items"]["properties"]) == ["type", "layers"]
+    # A schema that names no order -- Stage 1's and the rest -- goes out byte for byte as it came.
+    for schema in (_action()["payload"]["prompt"]["response_schema"],
+                   {"type": "object", "properties": {"b": {"type": "object", "properties": {"z": {}, "a": {}}}, "a": {}}}):
+        assert json.dumps(ordered_schema(schema)) == json.dumps(schema)
+
+
 def test_each_provider_action_is_recorded_under_its_stage():
     from inku_server.pipeline_provider import provider_stage_record
 

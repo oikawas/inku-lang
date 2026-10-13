@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-13 — Gemini以外の送り手でも、型の欄をpropertyOrderingの順に送る
+
+描画セッション-claudeの依頼（作者の選択「送り手を直す」）による。coreのJSONは鍵の順を保たないので、型の`properties`は名前の順で届く（構図の読みならthesisが最後）。並べ直していたのはGeminiの道だけで、OpenAIのResponsesとChat Completions、Ollama・mlxのresponse_format、Anthropicのinput_schema、ChatGPTプランの関数には名前の順のまま送っていた。これらでも、型が`propertyOrdering`を持つとき、入れ子を含め`properties`をその順に書いて送る（新しい`schema_order.ordered_schema`）。名の無い欄は後に今の順で続き、ほかの鍵と`propertyOrdering`は残す。今のcoreで順を名指す型は構図の読みだけで、Stage 1などの順を名指さない型は今と同じバイトで送る。
+
 ### 2026-10-13 — ChatGPTプランのモデルの評価を、ほかの提供元と共通の共有データにする
 
 作者の指示による（描画セッション-codexのChatGPT 7モデルの計測を元に、モデル設定と公開モデル選択パネルを更新し、二つを共通のデータとして持つ）。ChatGPTプランのモデルの評価は、これまで本人ごとの登録（暗号化）に8つの鍵だけで保存していたため、応答の無い用途・ノンサポート・概算コスト・平均秒数を持てず、公開モデル選択パネルの編集欄もほかの提供元と違った。

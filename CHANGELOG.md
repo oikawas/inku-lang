@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.119 (2026-10-13 / Build 1195)
+
 ### 2026-10-13 — Drawing again from a stopped run
 
 At the author's report ("The authoring operation could not finish." on 5173) and choice (draw again from the stopped run's parent). A description fork from a run stopped before its first save spent a Stage 1 call and then stopped at its own first save, refused because the parent had no saved record (since 2026-09-13).

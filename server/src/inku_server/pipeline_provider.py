@@ -26,6 +26,7 @@ from .openai_request import (
     openai_responses_output_limit_record, openai_sampling,
 )
 from .provider_refusal import provider_error as _provider_error
+from .schema_order import ordered_schema
 from .provider_observation import ProviderObservationError, ProviderObservationStore
 from .provider_rate_limits import ProviderRateBudget, RateAccountingUnavailable, RateLimitUnavailable, retry_after_seconds
 from .chatgpt_store import ChatGPTError
@@ -361,12 +362,12 @@ class SingleAttemptProvider:
             if connection["id"] == "ollama" or connection.get("api_profile") == "mlx":
                 body["response_format"] = {
                     "type": "json_schema",
-                    "json_schema": {"name": response_name, "schema": prompt["response_schema"], "strict": True},
+                    "json_schema": {"name": response_name, "schema": ordered_schema(prompt["response_schema"]), "strict": True},
                 }
             else:
                 body["tools"] = [{"type": "function", "function": {
                     "name": response_name, "description": "Submit the requested pipeline response.",
-                    "parameters": prompt["response_schema"],
+                    "parameters": ordered_schema(prompt["response_schema"]),
                 }}]
                 body["tool_choice"] = {"type": "function", "function": {"name": response_name}}
         elif kind == "anthropic":
@@ -378,7 +379,7 @@ class SingleAttemptProvider:
                     "tools": [{
                         "name": response_name,
                         "description": "Submit the requested pipeline response.",
-                        "input_schema": prompt["response_schema"],
+                        "input_schema": ordered_schema(prompt["response_schema"]),
                     }],
                     # Left to the model: claude-opus-5-5 refuses a forced tool
                     # ("tool_choice: type \"tool\" and \"any\" are not supported

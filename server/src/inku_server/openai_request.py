@@ -7,6 +7,8 @@ from typing import Any
 
 import httpx
 
+from .schema_order import ordered_schema
+
 # OpenAI's reasoning families answer 400 to any temperature but the default;
 # the GPT-6 guide removes temperature and top_p whenever reasoning is not none.
 _OPENAI_REASONING = re.compile(r"^(gpt-5|gpt-6|o\d)")
@@ -98,7 +100,7 @@ def openai_responses_body(connection: dict, model: str, prompt: dict, *, respons
         "model": model, "store": False, "instructions": prompt["system"],
         "input": [{"role": "user", "content": prompt["message"]}],
         "tools": [{"type": "function", "name": response_name, "description": "Submit the requested pipeline response.",
-                   "parameters": prompt["response_schema"], "strict": False}],
+                   "parameters": ordered_schema(prompt["response_schema"]), "strict": False}],
         "tool_choice": "required", "parallel_tool_calls": False,
         "max_output_tokens": sampling["max_completion_tokens"],
     }

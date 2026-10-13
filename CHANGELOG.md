@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.118 (2026-10-13 / Build 1194)
+
 ### 2026-10-13 — The OpenAI defaults are the three published models, and every screen shows blocking labels in the warning colour
 
 At the author's choice (the rest of the model catalog work). The models a fresh installation lists and publishes for the OpenAI API were `gpt-5.1`, `gpt-5.1-mini`, `gpt-4.1` and `gpt-4.1-mini`, all four older models. The rows of the administrator's "Visible models" picker also showed the labels that keep a model from publication in the muted colour. While fixing that, it turned out that "Model selection" and the model card picker did not show the warning colour either: the rule that mutes the grid's small text was more specific, so only the bold weight applied (this predates the catalog).

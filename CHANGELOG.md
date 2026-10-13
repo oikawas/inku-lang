@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.112 (2026-10-13 / Build 1188)
+
 ### 2026-10-13 — Swift sends schema properties in propertyOrdering to every provider
 
 By the author's choice (fix the senders). The core writes schema JSON keys in name order. Swift reordered them by `propertyOrdering` only for Gemini and sent the OpenAI API, OpenAI-compatible providers, Ollama, mlx, Anthropic and Personal ChatGPT the name order, so the composition reading schema arrived with `relations` first and `thesis` last. These paths now write `propertyOrdering` order too. Personal ChatGPT records and sends the same bytes. Requests without `propertyOrdering` (Stage 1, Stage 2 and the others) keep their bytes.
@@ -177,7 +179,7 @@ An idle Web batch with drawing errors offers "Retry failed works". It keeps the 
 
 At the author's instruction (make A3). For each numeric range an approved completion wrote, the work keeps the words before the parenthesis, the numbers, and the sentence. When instructions from a saved work are drawn again, the shared core compares each range with the record and tells completed ranges, edited numbers, and edited words apart. A range whose words alone were edited goes to the completion when drawn, which asks for approval of new numbers for the new words (completion prompt v5; a proposal that changes the words is refused with `range_words_not_kept`). A range with edited numbers is drawn by its numbers as before. The record is only laid over the compilation: the result the instructions alone give, the saved formats, and the engine versions do not change. Instructions exported or imported alone carry no record and are drawn by their numbers as before. Edit screens read the states from the shared core's `completion_range_states`. Saving and screens on Server and Android follow separately.
 
-## macOS 1.1.2 (unreleased; Build 9)
+## macOS 1.1.2 (2026-10-13 / Build 10; Server v2.15.112)
 
 ### 2026-10-12 — Swift draws refinement candidates at once
 

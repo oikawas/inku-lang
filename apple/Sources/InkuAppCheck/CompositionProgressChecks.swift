@@ -14,7 +14,9 @@ func runCompositionProgressChecks() async throws {
     let databaseURL = folder.appendingPathComponent("works.sqlite")
     let app = AppModel(databaseURL: databaseURL, transport: provider)
     await app.initialize()
-    let service = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false)
+    // Drawing takes only registered models.
+    let service = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
+                                   models: ["pinned", "comparison-stage1", "holes-only", "later"].map { ProviderModelSettings(id: $0) })
     try await app.updateHostSettings(HostSettings(providers: [service],
         models: ModelSelection(stage1Model: "check:pinned", stage2Model: "check:pinned")))
     app.inputMode = "description"; app.descriptionText = compositionProgressDescription; app.seedText = "0"
@@ -48,7 +50,7 @@ func runCompositionProgressChecks() async throws {
     await retry.release()
     await generation.value
     guard firstFacts, retryFacts, app.errorText == nil, let work = app.selectedWork,
-          work.ddl?.contains("[composition]") == true, let finished = app.providerProgress,
+          work.ddl?.contains("(horizontal ") == true, let finished = app.providerProgress,
           finished.stage == .composition, finished.outcome == .succeeded, !finished.clockRunning,
           let endedAt = finished.stageEndedAt,
           finished.stageElapsed(at: endedAt) == finished.stageElapsed(at: endedAt.addingTimeInterval(60)),
@@ -59,7 +61,7 @@ func runCompositionProgressChecks() async throws {
     let prompts = try ExactJSON(data: Data(app.promptJSON.utf8))
     guard let entries = prompts.array, entries.count == 1,
           entries[0]["action"].string == "generate_normalized_ddl",
-          !app.promptJSON.contains("inku.composition-reading-prompt.v1") else {
+          !app.promptJSON.contains("inku.composition-reading-prompt.v3") else {
         throw CheckFailure.message("Composition prompt leaked into the Stage 1/2 prompt presentation")
     }
     let context = try await app.savedConfiguration(workID: work.id)

@@ -20,9 +20,16 @@
 //! - chance (automatism): each moving layer takes one of the ranges its kind
 //!   allows, by a hash of the seed, the work and the layer.
 //!
+//! A sentence that ends with a joint the composition writes (`前の形に載る`,
+//! `overlapping the previous shape`; I-711 C6) is read as its layer joined to the
+//! layer before. It keeps its range, which sets how far it spreads, and the other
+//! layers are placed again as the composition places a work with joints.
+//!
 //! Only the text of the moving ranges changes; every other byte stays. A work the
 //! instructions cannot recompose (no range to move, a sentence a plan does not
 //! write) is left as it is, with the reason.
+
+use std::collections::BTreeMap;
 
 use inku_ddl::work_plan::{
     COMPOSITION_MARK_EN, COMPOSITION_MARK_JA, WorkPlanLayer, WorkPlanSlot, composition_background,
@@ -30,13 +37,15 @@ use inku_ddl::work_plan::{
 };
 use inku_ddl::{
     CompilerLockState, MacroDefinition, MacroExpansionLimits, MacroLock, NormalizedDdlDocument,
-    ResolvedInstructionLanguage, SemanticHead, compile_typed_ddl,
+    ResolvedInstructionLanguage, SemanticHead, SemanticInstruction, SemanticPreviousReference,
+    SemanticRelation, SemanticRelationKind, compile_typed_ddl,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::composition::{
-    self, OtherAnswer, chance_answer, corner_place, default_reading, fixed_region,
-    is_composition_range, other_answer, region_key, region_of_bounds, written_range,
+    self, Joint, JointKind, OtherAnswer, chance_answer, chance_joined_answer, check_joints,
+    corner_place, default_reading, fixed_region, is_composition_range, other_answer,
+    other_joined_answer, region_key, region_of_bounds, written_range,
 };
 
 pub const RECOMPOSITION_SCHEMA_ID: &str = "inku.composition-recompose.v1";
@@ -88,6 +97,8 @@ struct ReadLayer {
     moving: Option<std::ops::Range<usize>>,
     /// The range it has now, when the instructions name one of the solver's.
     current: Option<usize>,
+    /// The bounds its range writes (left, top, right, bottom), when it has one.
+    bounds: Option<[(u64, u64); 4]>,
 }
 
 /// The visible source as a document, with the locks of the definitions the
@@ -153,11 +164,33 @@ fn shown(text: &str, language: ResolvedInstructionLanguage) -> String {
         .to_owned()
 }
 
-/// Read every sentence back as a layer, or say why the work cannot be recomposed.
+/// The joint a sentence's relation is, when it is one the composition writes: one
+/// of the five relations that join a shape to the previous one, to the previous
+/// shape itself (no end or path of it).
+fn written_joint(relation: &SemanticRelation) -> Option<JointKind> {
+    if relation.reference != SemanticPreviousReference::PreviousOne
+        || relation.target_endpoint.is_some()
+        || relation.target_path_selection.is_some()
+    {
+        return None;
+    }
+    Some(match relation.kind {
+        SemanticRelationKind::RestingOn => JointKind::RestsOn,
+        SemanticRelationKind::Inside => JointKind::Inside,
+        SemanticRelationKind::Overlapping => JointKind::Overlaps,
+        SemanticRelationKind::Crossing => JointKind::Crosses,
+        SemanticRelationKind::Connected => JointKind::ContinuesFrom,
+        _ => return None,
+    })
+}
+
+/// Read every sentence back as a layer, with the joints the composition writes
+/// (each one joins a sentence to the layer before), or say why the work cannot be
+/// recomposed.
 fn read_layers(
     source: &str,
     ast: &inku_ddl::SemanticDocumentAst,
-) -> Result<Vec<ReadLayer>, &'static str> {
+) -> Result<(Vec<ReadLayer>, Vec<Joint>), &'static str> {
     if !ast.coordinated_head_groups.is_empty()
         || !ast.group_predicates.is_empty()
         || !ast.continuations.is_empty()
@@ -165,6 +198,9 @@ fn read_layers(
         return Err("unsupported_sentence");
     }
     let mut read = Vec::new();
+    let mut joints = Vec::new();
+    // Whether the sentence before was read as a layer, the partner a joint needs.
+    let mut after_layer = false;
     for instruction in &ast.instructions {
         let range = instruction.entity.numeric_range.as_ref();
         if matches!(instruction.entity.head, SemanticHead::MacroInvocation(_)) {
@@ -172,15 +208,41 @@ fn read_layers(
             if range.is_some() || instruction.position.is_some() {
                 return Err("unsupported_sentence");
             }
+            after_layer = false;
             continue;
         }
-        let mut layer = composition_layer(instruction).ok_or("unsupported_sentence")?;
+        let joint = match &instruction.relation {
+            None => None,
+            Some(relation) => Some(
+                written_joint(relation)
+                    .filter(|_| after_layer)
+                    .ok_or("unsupported_sentence")?,
+            ),
+        };
+        let layer = if joint.is_some() {
+            composition_layer(&SemanticInstruction {
+                relation: None,
+                ..instruction.clone()
+            })
+        } else {
+            composition_layer(instruction)
+        };
+        let mut layer = layer.ok_or("unsupported_sentence")?;
+        after_layer = true;
+        if let Some(kind) = joint {
+            joints.push(Joint {
+                kind,
+                a: read.len(),
+                b: read.len() - 1,
+            });
+        }
         let Some(range) = range else {
             if layer.attributes.contains_key(&WorkPlanSlot::Position) {
                 read.push(ReadLayer {
                     layer,
                     moving: None,
                     current: None,
+                    bounds: None,
                 });
                 continue;
             }
@@ -203,22 +265,27 @@ fn read_layers(
                 layer,
                 moving: None,
                 current: region,
+                bounds: Some(bounds),
             });
             continue;
         }
         read.push(ReadLayer {
             layer,
-            moving: Some(span.start_byte..span.end_byte),
+            // A joined sentence keeps its range: the range sets how far the layer
+            // spreads, and the joint sets where it goes.
+            moving: joint.is_none().then_some(span.start_byte..span.end_byte),
             current: region.filter(|index| is_composition_range(*index)),
+            bounds: Some(bounds),
         });
     }
-    Ok(read)
+    Ok((read, joints))
 }
 
 /// The layers and the background a composition reads from the visible
-/// instructions: one layer per sentence a plan writes, with the place the
-/// instructions keep (a stated place, or a corner as a named corner); moving
-/// ranges have no place. `Err` names why the work cannot be recomposed.
+/// instructions: one layer per sentence a plan writes (a sentence with a joint
+/// the composition writes is its layer), with the place the instructions keep (a
+/// stated place, or a corner as a named corner); moving ranges have no place.
+/// `Err` names why the work cannot be recomposed.
 pub fn composition_layers(
     source: &str,
     language: ResolvedInstructionLanguage,
@@ -230,7 +297,7 @@ pub fn composition_layers(
         .semantic_document
         .as_ref()
         .ok_or("not_canonical")?;
-    let read = read_layers(source, &semantic.ast)?;
+    let (read, _) = read_layers(source, &semantic.ast)?;
     let background = semantic
         .ast
         .background
@@ -261,71 +328,108 @@ pub fn recompose(
     let Some(semantic) = compilation.semantic_document.as_ref() else {
         return unchanged("not_canonical");
     };
-    let read = match read_layers(source, &semantic.ast) {
+    let (read, joints) = match read_layers(source, &semantic.ast) {
         Ok(read) => read,
         Err(reason) => return unchanged(reason),
     };
+    let layers: Vec<WorkPlanLayer> = read.iter().map(|layer| layer.layer.clone()).collect();
+    let mut reading = default_reading(&layers);
+    if !joints.is_empty() {
+        // A joint the composition would not write (on a stated place, a
+        // connection a shape cannot start) is a sentence it cannot recompose.
+        if !check_joints(&joints, &layers, &reading.fixed).1.is_empty() {
+            return unchanged("unsupported_sentence");
+        }
+        reading.joints = joints;
+    }
     if !read.iter().any(|layer| layer.moving.is_some()) {
         return unchanged("nothing_to_move");
     }
-    let layers: Vec<WorkPlanLayer> = read.iter().map(|layer| layer.layer.clone()).collect();
     let background = semantic
         .ast
         .background
         .as_ref()
         .and_then(composition_background)
         .unwrap_or_else(|| "white".to_owned());
-    let reading = default_reading(&layers);
+    // The layers placed again, in their order: a joined layer keeps its range.
+    let keep: Vec<usize> = (0..read.len())
+        .filter(|index| reading.joints.iter().all(|joint| joint.a != *index))
+        .collect();
+    let bounds: Vec<Option<[(u64, u64); 4]>> = read.iter().map(|layer| layer.bounds).collect();
     let (answer, kind) = match mode {
         RecomposeMode::Principled => {
-            let Ok(searched) = composition::search(&layers, &reading, &background) else {
-                return unchanged("unsolved");
-            };
             // The current answer, when every range is one the solver knows.
-            let current: Option<Vec<usize>> = read
+            let current: Option<Vec<usize>> = keep
                 .iter()
-                .enumerate()
-                .map(|(index, layer)| {
+                .map(|index| {
+                    let layer = &read[*index];
                     if layer.moving.is_some() {
                         layer.current
                     } else {
                         reading
                             .fixed
-                            .get(&index)
+                            .get(index)
                             .and_then(|place| fixed_region(place))
                     }
                 })
                 .collect();
-            match other_answer(
-                &layers,
-                &reading,
-                &background,
-                &searched,
-                current.as_deref(),
-                seed,
-                work_id,
-            ) {
+            let other = if reading.joints.is_empty() {
+                composition::search(&layers, &reading, &background).and_then(|searched| {
+                    other_answer(
+                        &layers,
+                        &reading,
+                        &background,
+                        &searched,
+                        current.as_deref(),
+                        seed,
+                        work_id,
+                    )
+                })
+            } else {
+                other_joined_answer(
+                    &layers,
+                    &reading,
+                    &background,
+                    &bounds,
+                    current.as_deref(),
+                    seed,
+                    work_id,
+                )
+            };
+            match other {
                 Ok((_, OtherAnswer::None)) => return unchanged("no_other_answer"),
                 Ok((answer, OtherAnswer::Near)) => (answer, "near"),
                 Ok((answer, OtherAnswer::Next)) => (answer, "next"),
                 Err(_) => return unchanged("unsolved"),
             }
         }
-        RecomposeMode::Chance => match chance_answer(&layers, &reading.fixed, seed, work_id) {
-            Ok(answer) => (answer, "chance"),
-            Err(_) => return unchanged("unsolved"),
-        },
+        RecomposeMode::Chance => {
+            let chosen = if reading.joints.is_empty() {
+                chance_answer(&layers, &reading.fixed, seed, work_id)
+            } else {
+                chance_joined_answer(&layers, &reading, &background, &bounds, seed, work_id)
+            };
+            match chosen {
+                Ok(answer) => (answer, "chance"),
+                Err(_) => return unchanged("unsolved"),
+            }
+        }
     };
+    // The answer is the range of each layer placed again.
+    let placed: BTreeMap<usize, usize> = keep.into_iter().zip(answer).collect();
     let mut rewritten = source.to_owned();
     let mut moves = Vec::new();
     for (index, layer) in read.iter().enumerate().rev() {
         let Some(span) = &layer.moving else {
             continue;
         };
-        if layer.current == Some(answer[index]) {
+        let Some(&chosen) = placed.get(&index) else {
+            return unchanged("unsolved");
+        };
+        if layer.current == Some(chosen) {
             continue;
         }
-        let Some(range) = written_range(answer[index]) else {
+        let Some(range) = written_range(chosen) else {
             return unchanged("unsolved");
         };
         let to = range.written(language);
@@ -340,7 +444,7 @@ pub fn recompose(
             layer: index,
             from_key: layer.current.map(|current| region_key(current).to_owned()),
             from,
-            to_key: region_key(answer[index]).to_owned(),
+            to_key: region_key(chosen).to_owned(),
             to,
         });
     }

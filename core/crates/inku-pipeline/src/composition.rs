@@ -1603,6 +1603,12 @@ pub fn region_key(index: usize) -> &'static str {
 /// one of the 28 composition ranges, a named place or a corner.
 #[must_use]
 pub fn region_of_bounds(bounds: [(u64, u64); 4]) -> Option<usize> {
+    let rect = rect_of_bounds(bounds)?;
+    regions().all.iter().position(|region| region.rect == rect)
+}
+
+/// A written range's exact bounds (left, top, right, bottom) as a range.
+fn rect_of_bounds(bounds: [(u64, u64); 4]) -> Option<Rect> {
     let mut rect = [Frac::ZERO; 4];
     for (slot, (numerator, denominator)) in rect.iter_mut().zip(bounds) {
         let (numerator, denominator) = (
@@ -1614,7 +1620,7 @@ pub fn region_of_bounds(bounds: [(u64, u64); 4]) -> Option<usize> {
         }
         *slot = Frac::new(numerator, denominator);
     }
-    regions().all.iter().position(|region| region.rect == rect)
+    Some(rect)
 }
 
 /// Whether a range is one of the 28 a composition chooses from.
@@ -1719,6 +1725,20 @@ pub fn other_answer(
     seed: u64,
     work_id: &str,
 ) -> Result<(Vec<usize>, OtherAnswer), Unsolved> {
+    other_of(searched, current, seed, work_id, || {
+        Work::new(layers, reading, background)
+    })
+}
+
+/// [`other_answer`] for the solver's work, which `work` gives only when the
+/// near-best hold no other answer.
+fn other_of<'a>(
+    searched: &Searched,
+    current: Option<&[usize]>,
+    seed: u64,
+    work_id: &str,
+    work: impl FnOnce() -> Result<Work<'a>, Unsolved>,
+) -> Result<(Vec<usize>, OtherAnswer), Unsolved> {
     let near: Vec<&Vec<usize>> = searched
         .near
         .iter()
@@ -1733,7 +1753,7 @@ pub fn other_answer(
     let Some(current) = current else {
         return Err(Unsolved::NoRanges);
     };
-    let work = Work::new(layers, reading, background)?;
+    let work = work()?;
     let sizes: Vec<usize> = work.options.iter().map(Vec::len).collect();
     let table = regions();
     let keys = |choice: &[usize]| -> Vec<&str> {
@@ -1785,21 +1805,85 @@ pub fn chance_answer(
         .iter()
         .enumerate()
         .map(|(index, layer)| {
-            let options = candidates(
-                layer,
-                Role::Secondary,
-                fixed.get(&index).map(String::as_str),
-            )
-            .filter(|options| !options.is_empty())
-            .ok_or(Unsolved::NoRanges)?;
-            let digest = Sha256::digest(format!("{seed}:{work_id}:{index}").as_bytes());
-            let value = u64::from_be_bytes(
-                digest[..8]
-                    .try_into()
-                    .expect("a SHA-256 digest has eight bytes"),
-            );
-            let count = u64::try_from(options.len()).expect("a range count fits u64");
-            Ok(options[usize::try_from(value % count).expect("an index below the count")])
+            let options = chance_options(layer, fixed, index)?;
+            Ok(chance_pick(&options, seed, work_id, index))
+        })
+        .collect()
+}
+
+/// The ranges chance chooses from for layer `index`.
+fn chance_options(
+    layer: &WorkPlanLayer,
+    fixed: &BTreeMap<usize, String>,
+    index: usize,
+) -> Result<Vec<usize>, Unsolved> {
+    candidates(
+        layer,
+        Role::Secondary,
+        fixed.get(&index).map(String::as_str),
+    )
+    .filter(|options| !options.is_empty())
+    .ok_or(Unsolved::NoRanges)
+}
+
+/// The range chance takes among `options` for layer `index`, by a hash of the
+/// seed, the work and the layer.
+fn chance_pick(options: &[usize], seed: u64, work_id: &str, index: usize) -> usize {
+    let digest = Sha256::digest(format!("{seed}:{work_id}:{index}").as_bytes());
+    let value = u64::from_be_bytes(
+        digest[..8]
+            .try_into()
+            .expect("a SHA-256 digest has eight bytes"),
+    );
+    let count = u64::try_from(options.len()).expect("a range count fits u64");
+    options[usize::try_from(value % count).expect("an index below the count")]
+}
+
+/// [`other_answer`] for instructions whose sentences carry joints (I-711 C6),
+/// placed as [`join`] places a work: each joined layer keeps the range its
+/// sentence writes (`bounds`, by layer), which sets how far it spreads, and the
+/// other layers are placed again, a partner weighing with the layers joined to
+/// it, keeping the ranges where its group lies on the canvas when there is one,
+/// and scored as the group. The answer, like `current`, is the ranges of the
+/// layers that are not joined, in their order.
+pub fn other_joined_answer(
+    layers: &[WorkPlanLayer],
+    reading: &CheckedReading,
+    background: &str,
+    bounds: &[Option<[(u64, u64); 4]>],
+    current: Option<&[usize]>,
+    seed: u64,
+    work_id: &str,
+) -> Result<(Vec<usize>, OtherAnswer), Unsolved> {
+    let group = grouped_by_bounds(layers, reading, background, bounds)?;
+    let work = Work::new(&group.layers, &group.reading, background)?.with_joined(group.joined);
+    let searched = search_work(&work)?;
+    other_of(&searched, current, seed, work_id, || Ok(work))
+}
+
+/// [`chance_answer`] for instructions whose sentences carry joints (I-711 C6):
+/// each joined layer keeps the range its sentence writes (`bounds`, by layer);
+/// every other layer takes one of the ranges [`chance_answer`] gives it, by the
+/// same hash (the seed, the work and the layer's own number), a partner only
+/// among those where its group lies on the canvas when there is one. The
+/// answer is the ranges of the layers that are not joined, in their order.
+pub fn chance_joined_answer(
+    layers: &[WorkPlanLayer],
+    reading: &CheckedReading,
+    background: &str,
+    bounds: &[Option<[(u64, u64); 4]>],
+    seed: u64,
+    work_id: &str,
+) -> Result<Vec<usize>, Unsolved> {
+    let group = grouped_by_bounds(layers, reading, background, bounds)?;
+    group
+        .keep
+        .iter()
+        .zip(&group.joined)
+        .map(|(index, joined)| {
+            let options = chance_options(&layers[*index], &reading.fixed, *index)?;
+            let options = fitting(&layers[*index], options, joined);
+            Ok(chance_pick(&options, seed, work_id, *index))
         })
         .collect()
 }
@@ -2172,6 +2256,24 @@ fn joint_group(own: &Rect, joined: &[Joined]) -> Rect {
     })
 }
 
+/// The ranges among `options` where a layer and the layers joined to it lie on
+/// the canvas; all of them when the layer has none joined or none of them fits.
+fn fitting(layer: &WorkPlanLayer, options: Vec<usize>, joined: &[Joined]) -> Vec<usize> {
+    if joined.is_empty() {
+        return options;
+    }
+    let table = regions();
+    let fits: Vec<usize> = options
+        .iter()
+        .copied()
+        .filter(|index| {
+            let own = effective(layer, &table.all[*index].rect);
+            inside(&joint_group(&own, joined), &WHOLE)
+        })
+        .collect();
+    if fits.is_empty() { options } else { fits }
+}
+
 /// What a layer's weight is made of: its tone against the background, its
 /// surface, and its weight when that does not depend on the range.
 fn weight_parts(layer: &WorkPlanLayer, background_lightness: f64) -> (f64, f64, Option<f64>) {
@@ -2268,22 +2370,9 @@ impl<'a> Work<'a> {
     /// Keep the layers joined to each layer: a layer with joined layers keeps
     /// only the ranges where its group lies on the canvas, when there is one.
     fn with_joined(mut self, joined: Vec<Vec<Joined>>) -> Self {
-        let table = regions();
         for (i, group) in joined.iter().enumerate() {
-            if group.is_empty() {
-                continue;
-            }
-            let fitting: Vec<usize> = self.options[i]
-                .iter()
-                .copied()
-                .filter(|index| {
-                    let own = effective(&self.layers[i], &table.all[*index].rect);
-                    inside(&joint_group(&own, group), &WHOLE)
-                })
-                .collect();
-            if !fitting.is_empty() {
-                self.options[i] = fitting;
-            }
+            let options = std::mem::take(&mut self.options[i]);
+            self.options[i] = fitting(&self.layers[i], options, group);
         }
         self.joined = joined;
         self
@@ -2949,23 +3038,70 @@ pub fn join(
         return plain;
     }
     let attached: BTreeMap<usize, Joint> = joints.iter().map(|joint| (joint.a, *joint)).collect();
-    let keep: Vec<usize> = (0..count).filter(|i| !attached.contains_key(i)).collect();
+    let table = regions();
+    let Some(group) = grouped(layers, reading, &attached, background, |a| {
+        Some(table.all[solution.regions[a]].rect)
+    }) else {
+        return plain;
+    };
+    let Ok(work) = Work::new(&group.layers, &group.reading, background) else {
+        return plain;
+    };
+    let work = work.with_joined(group.joined);
+    let Ok(searched) = search_work(&work) else {
+        return plain;
+    };
+    let Ok(placed) = solve_work(&work, &searched, seed, work_id) else {
+        return plain;
+    };
+    let mut regions = solution.regions.clone();
+    for (new, old) in group.keep.iter().enumerate() {
+        regions[*old] = placed.regions[new];
+    }
+    Jointed {
+        regions,
+        order: print_order(count, &attached),
+        joints: (0..count)
+            .map(|i| attached.get(&i).map(|joint| joint.kind))
+            .collect(),
+    }
+}
+
+/// A work taken apart at its joints: the layers placed again (`keep`, in their
+/// order) with their reading, and the layers joined to each of them.
+struct Grouped {
+    keep: Vec<usize>,
+    layers: Vec<WorkPlanLayer>,
+    reading: CheckedReading,
+    joined: Vec<Vec<Joined>>,
+}
+
+/// Take a work apart at its joints (`attached`, by joined layer): a joined layer
+/// joins the group of the layer its partners lead to, with the size of its
+/// extent in the range `range` gives it. `None` when a joined layer has no range.
+fn grouped(
+    layers: &[WorkPlanLayer],
+    reading: &CheckedReading,
+    attached: &BTreeMap<usize, Joint>,
+    background: &str,
+    range: impl Fn(usize) -> Option<Rect>,
+) -> Option<Grouped> {
+    let keep: Vec<usize> = (0..layers.len())
+        .filter(|i| !attached.contains_key(i))
+        .collect();
     let position: BTreeMap<usize, usize> = keep
         .iter()
         .enumerate()
         .map(|(new, old)| (*old, new))
         .collect();
-    let kept: Vec<WorkPlanLayer> = keep.iter().map(|i| layers[*i].clone()).collect();
-    let reduced = reduce_reading(reading, &keep);
     let background_lightness = lightness(Some(background), 0.99);
-    let table = regions();
     let mut joined = vec![Vec::new(); keep.len()];
-    for (a, joint) in &attached {
+    for (a, joint) in attached {
         let mut root = joint.b;
         while let Some(next) = attached.get(&root) {
             root = next.b;
         }
-        let extent = effective(&layers[*a], &table.all[solution.regions[*a]].rect);
+        let extent = effective(&layers[*a], &range(*a)?);
         let (tone, surface, fixed_weight) = weight_parts(&layers[*a], background_lightness);
         joined[position[&root]].push(Joined {
             kind: joint.kind,
@@ -2977,27 +3113,28 @@ pub fn join(
             surface,
         });
     }
-    let Ok(work) = Work::new(&kept, &reduced, background) else {
-        return plain;
-    };
-    let work = work.with_joined(joined);
-    let Ok(searched) = search_work(&work) else {
-        return plain;
-    };
-    let Ok(placed) = solve_work(&work, &searched, seed, work_id) else {
-        return plain;
-    };
-    let mut regions = solution.regions.clone();
-    for (new, old) in keep.iter().enumerate() {
-        regions[*old] = placed.regions[new];
-    }
-    Jointed {
-        regions,
-        order: print_order(count, &attached),
-        joints: (0..count)
-            .map(|i| attached.get(&i).map(|joint| joint.kind))
-            .collect(),
-    }
+    Some(Grouped {
+        layers: keep.iter().map(|i| layers[*i].clone()).collect(),
+        reading: reduce_reading(reading, &keep),
+        keep,
+        joined,
+    })
+}
+
+/// [`grouped`] for instructions read back (I-711 C6): the reading's joints the
+/// composition can write, each joined layer with the range its sentence writes.
+fn grouped_by_bounds(
+    layers: &[WorkPlanLayer],
+    reading: &CheckedReading,
+    background: &str,
+    bounds: &[Option<[(u64, u64); 4]>],
+) -> Result<Grouped, Unsolved> {
+    let (joints, _) = check_joints(&reading.joints, layers, &reading.fixed);
+    let attached: BTreeMap<usize, Joint> = joints.iter().map(|joint| (joint.a, *joint)).collect();
+    grouped(layers, reading, &attached, background, |a| {
+        rect_of_bounds(bounds.get(a).copied().flatten()?)
+    })
+    .ok_or(Unsolved::NoRanges)
 }
 
 /// The reading of the layers in `keep`, renumbered: a relation that names a
@@ -3292,6 +3429,39 @@ mod tests {
         );
         let codes: Vec<&str> = findings.iter().map(|finding| finding.code).collect();
         assert_eq!(codes, ["joint_layer"]);
+    }
+
+    /// I-711 C6: by chance, a partner that a layer a third of the canvas tall
+    /// rests on takes only ranges where that layer, sitting on its top edge,
+    /// stays on the canvas, so never a range at the top; without the joint the
+    /// same partner takes one for some seeds.
+    #[test]
+    fn by_chance_a_partner_with_a_layer_resting_on_it_keeps_off_the_top() {
+        let layers = [
+            plan_layer("place", "square", None),
+            plan_layer("place", "circle", None),
+        ];
+        let mut reading = default_reading(&layers);
+        reading.joints = vec![Joint {
+            kind: JointKind::RestsOn,
+            a: 1,
+            b: 0,
+        }];
+        // The circle keeps the top center its sentence writes.
+        let bounds = [None, Some([(1, 3), (0, 1), (2, 3), (1, 3)])];
+        let at_top = |index: usize| regions().all[index].rect[1] == Frac::ZERO;
+        let mut alone_at_top = 0;
+        for seed in 1..=20 {
+            let joined = chance_joined_answer(&layers, &reading, "white", &bounds, seed, "work")
+                .expect("chosen");
+            assert_eq!(joined.len(), 1, "seed {seed}");
+            assert!(!at_top(joined[0]), "seed {seed}: {}", region_key(joined[0]));
+            let alone = chance_answer(&layers, &reading.fixed, seed, "work").expect("chosen");
+            if at_top(alone[0]) {
+                alone_at_top += 1;
+            }
+        }
+        assert!(alone_at_top > 0, "{alone_at_top}");
     }
 
     #[test]

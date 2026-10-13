@@ -8,6 +8,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Another composition recomposes instructions with joint phrases
+
+By the author's choice (I-711 stage C, C6: recomposition treats joints as the composition does). Since C5 the composition writes joint phrases (`resting on the previous shape` and so on), but recomposition (the refinement `Another composition` and the composition generations of autonomous refinement) did not read a sentence with a relation phrase, and refused a work with a joint as `unsupported_sentence`.
+
+- A joint phrase in the form the composition writes (one of the five, resting on, inside, overlapping, crossing and connected, to the previous shape itself, after a sentence of an underdrawing layer) is read as its layer without the phrase, joined to the layer before.
+- The joined sentence keeps the text of its range and its phrase. The other layers are chosen again without the joined layer, as the composition places them. By principle, a partner weighs with the joined layers, takes only the ranges where its group lies on the canvas, and is scored as the group. By chance, a partner takes one of the ranges where its group lies on the canvas, by the same hash as without joints.
+- A joint the composition does not write (a joined layer on a place the description states or in a corner, a connection from a layer that is not a line, an arc or a point, or to a cloudform) and the other relation phrases are refused as before. Instructions without a joint phrase get the same answer as before.
+- The relations row of SPEC §3.1 and of the README's Saijiki table now lists the eleven words the Saijiki shows (mirrored included). Creating Images in the manual gains an item on joint phrases.
+
 ## v2.15.112 (2026-10-13 / Build 1188)
 
 ### 2026-10-13 — Swift sends schema properties in propertyOrdering to every provider

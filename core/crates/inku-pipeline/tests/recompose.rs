@@ -356,3 +356,50 @@ fn a_range_joined_with_a_hyphen_moves() {
     assert_eq!(moves[0].from, "下中央（横1/3-2/3、縦2/3〜1）");
     assert_eq!(moves[0].from_key.as_deref(), Some("cell-12"));
 }
+
+/// I-711 C6: instructions a composition printed with a joint (a measured reading,
+/// Gemma 4 on ja-01) recompose in both modes. The joined sentence keeps every
+/// byte, its joint phrase too, since its range sets how far it spreads and the
+/// joint sets where it goes; the other ranges move, and the result compiles (a
+/// recomposition that does not is left as it is).
+#[test]
+fn a_work_with_a_joint_recomposes_and_the_joined_sentence_stays() {
+    let source = "紙。\n背景を白で埋める。\n\
+        右上の四半分（横1/2〜1、縦0〜1/2）に、灰の鉛筆の薄い空の横長の大きな四角を1個置く。\n\
+        左中央（横0〜1/3、縦1/3〜2/3）に、細かく小刻みに揺れる黒の細い細筆の実線の濃い粒の垂直の普通の大きさの線を1個引く、前の形に重なる。\n\
+        左（横0〜1/3、縦0〜1）に、緑のペンの程よいとても小さな点を5個散らす。";
+    let joined = source.lines().nth(3).expect("the joined sentence");
+    assert!(joined.ends_with("、前の形に重なる。"), "{joined}");
+    for mode in [RecomposeMode::Principled, RecomposeMode::Chance] {
+        let mut reasons = Vec::new();
+        let (after, moves) = (1..=8)
+            .find_map(|seed| {
+                match recompose(
+                    source,
+                    ResolvedInstructionLanguage::Ja,
+                    &[],
+                    LIMITS,
+                    mode,
+                    seed,
+                    "w",
+                ) {
+                    Recomposition::Recomposed { source, moves, .. } => Some((source, moves)),
+                    Recomposition::Unchanged { reason } => {
+                        reasons.push(reason);
+                        None
+                    }
+                }
+            })
+            .unwrap_or_else(|| panic!("{mode:?}: {reasons:?}"));
+        assert_eq!(after.lines().nth(3), Some(joined), "{mode:?}: {after}");
+        assert!(!moves.is_empty(), "{mode:?}");
+        // The joined layer is the second one; the square and the dots move.
+        assert!(
+            moves.iter().all(|step| step.layer != 1),
+            "{mode:?}: {moves:?}"
+        );
+        for step in &moves {
+            assert!(after.contains(&step.to), "{mode:?}: {}", step.to);
+        }
+    }
+}

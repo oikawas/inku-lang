@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-13 — Joint phrases
+
+The composition now writes how the description says things meet as a joint phrase in the instructions (`resting on the previous shape` and so on), and `Another composition` reads the sentences that carry one. Section 6 of Creating Images in both languages gains the item "Joint phrases", and the paragraph on `Another composition` in section 8 says that a sentence with a joint phrase keeps its range and its phrase.
+
 ## 2026-10-04 — Variation retired
 
 Variation is retired (the author's decision), so its row leaves the refinement table of Creating Images in both languages and 8.1 now tells of the retirement. Variation is also gone from the refinement elements, autonomous refinement, held works, provenance, lineage, and the troubleshooting table, and the held work's button reads `Start a new work from this description`. Works made by an earlier variation keep a "Variation (retired)" edge and the variation seed and amplitude of that time.

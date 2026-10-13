@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.117 (2026-10-13 / Build 1193)
+
 ### 2026-10-13 — One catalog of model information, with labels and folds as data
 
 At the author's instruction (reorganize how model information is kept: the ChatGPT plan's too, in a common format; the most efficient way, minding how it reaches Swift and Android; the folds for older, not supported, end of life and not measured, and the labelling of models, built into the common format) and choices (the catalog is a JSON file in the repository, six folds, administrators may still edit). Model information was split between the Server's code, 5173's database, a separate ChatGPT key, the copy macOS bundles and the Web's startup list, and the 2026-10-13 measurements were on 5173 only.

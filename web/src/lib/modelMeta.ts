@@ -188,20 +188,24 @@ export function modelStatusLabel(model: ModelOption, isJapanese: boolean): strin
 // closed at first. Paid-plan models stayed in the list until a measurement
 // found twelve Ollama Cloud models this account cannot call; they now have the
 // first fold (the author, 2026-10-13), and a plan that reaches one clears its
-// mark on the next fetch.
-export type ModelFold = 'subscription' | 'no_response' | 'not_supported' | 'eol';
-export const MODEL_FOLDS: ModelFold[] = ['subscription', 'no_response', 'not_supported', 'eol'];
+// mark on the next fetch. Older models can still be published; they are folded
+// above the others (the author, 2026-10-13: the OpenAI API up to GPT-5.4), and
+// only when nothing else keeps them from publication.
+export type ModelFold = 'legacy' | 'subscription' | 'no_response' | 'not_supported' | 'eol';
+export const MODEL_FOLDS: ModelFold[] = ['legacy', 'subscription', 'no_response', 'not_supported', 'eol'];
 
 export function modelFold(model: ModelOption): ModelFold | null {
 	if (model.eol) return 'eol';
 	if (model.not_supported) return 'not_supported';
 	if (model.requires_subscription) return 'subscription';
 	if (answersNothing(model)) return 'no_response';
+	if (model.legacy) return 'legacy';
 	return null;
 }
 
 export function modelFoldTitle(fold: ModelFold, count: number, isJapanese: boolean): string {
 	const [ja, en] = {
+		legacy: ['旧モデル', 'Older models'],
 		subscription: ['有料プラン限定', 'Paid plan only'],
 		no_response: ['計測で応答なし', 'No response when measured'],
 		not_supported: ['ノンサポート', 'Not supported'],

@@ -32,12 +32,16 @@ test('models that cannot be published are filed into their folds; a usable one s
 		{ id: 'tts', label: 'x', not_supported: true },
 		{ id: 'silent', label: 'x', purposes: [], unsupported_purposes: both },
 		{ id: 'vision-only', label: 'x', purposes: ['vision'] as ('llm' | 'vision')[], unsupported_purposes: ['llm'] as ('llm' | 'vision')[] },
-		{ id: 'paid', label: 'x', requires_subscription: true }
+		{ id: 'paid', label: 'x', requires_subscription: true },
+		{ id: 'older', label: 'x', legacy: true },
+		{ id: 'older-silent', label: 'x', legacy: true, purposes: [], unsupported_purposes: both }
 	].map((model) => [model.id, modelFold(model), isModelUnselectable(model)]);
 	assert.deepEqual(folds, [
 		['retired', 'eol', true], ['tts', 'not_supported', true], ['silent', 'no_response', true],
-		['vision-only', null, false], ['paid', 'subscription', true]
+		['vision-only', null, false], ['paid', 'subscription', true],
+		['older', 'legacy', false], ['older-silent', 'no_response', true]
 	]);
+	assert.equal(modelStatusLabel({ id: 'older', label: 'x', legacy: true }, true), null);
 	assert.equal(modelStatusLabel({ id: 'tts', label: 'x', not_supported: true }, true), 'ノンサポート');
 });
 

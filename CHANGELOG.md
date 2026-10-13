@@ -8,6 +8,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Publication selection folds older models away
+
+At the author's instruction (fold the models up to GPT-5.4 as older models). The OpenAI API list holds 148 models, and the newer generations sat in one list with the older ones back to GPT-3.5.
+
+- Model information gains the `legacy` (older model) mark. The Server keeps it through saving and model-list fetches. The mark does not stop publication.
+- Web publication selection files older models into the first fold below the list, Older models (n), closed at first. An older model that also carries Paid plan only, No response when measured, Not supported or End of life still goes into that mark's fold.
+- Selecting or clearing the shown models acts only on the list and the folds that are open; models inside a closed Older models fold are not selected.
+- Members' model choice does not change: a published older model can be chosen as before.
+
 ## v2.15.114 (2026-10-13 / Build 1190)
 
 ### 2026-10-13 — The Prompts tab shows the sketch and the composition reading

@@ -12,6 +12,7 @@ class RoutingModelProvider(
     private val localProvider: LocalLiteRtLmProvider,
     private val chatGptPlan: (() -> ChatGptPlanManager)? = null,
     private val admission: ProviderAdmission = ProviderAdmission.shared,
+    private val observeAccess: suspend (ProviderSettingEntity, String, Boolean) -> Unit = { _, _, _ -> },
 ) : ModelProvider {
     override val providerId: String = "routing"
 
@@ -27,10 +28,15 @@ class RoutingModelProvider(
             return localProvider.generate(request)
         }
         val remote = remoteProvider(provider)
-        if (request.pipelineAction == null) return remote.generate(request)
-        // Only shared-pipeline requests are paced, as only they pass the
-        // server's provider slot and rate budget.
-        return admission.admit(provider.providerId, request.timeoutMs) { remote.generate(request) }
+        try {
+            val result = if (request.pipelineAction == null) remote.generate(request) else
+                admission.admit(provider.providerId, request.timeoutMs) { remote.generate(request) }
+            observeAccess(provider, request.modelId, true)
+            return result
+        } catch (error: ModelProviderHttpException) {
+            if (error.statusCode == 402 || error.statusCode == 403) observeAccess(provider, request.modelId, false)
+            throw error
+        }
     }
 
     suspend fun fetchModels(providerId: String): List<String> {

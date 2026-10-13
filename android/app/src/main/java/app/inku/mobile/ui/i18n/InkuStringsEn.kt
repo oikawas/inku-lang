@@ -14,6 +14,14 @@ package app.inku.mobile.ui.i18n
  * ellipsis, no exclamation marks.
  */
 object InkuStringsEn : InkuStrings {
+    override val modelRecommendation = "Recommendation"
+    override val modelAverageSeconds = "Average seconds"
+    override val modelEstimatedCost = "Estimated cost"
+    override val modelAccessCheck = "Check with this key"
+    override val modelAccessChecking = "Checking access with this key"
+    override val modelAccessAvailable = "This key can use the model."
+    override val modelAccessUnavailable = "This key cannot use the model. Check your plan."
+    override val modelAccessUnknown = "Access could not be confirmed. Labels have not changed."
     override val chatGptPlan = "ChatGPT plan"
     override val chatGptConnectionSubtitle = "Connect your ChatGPT account to this device"
     override val chatGptPlanDescription = "Eligible drawing requests use your ChatGPT plan allowance or configured credits. Manage usage and limits in ChatGPT settings."

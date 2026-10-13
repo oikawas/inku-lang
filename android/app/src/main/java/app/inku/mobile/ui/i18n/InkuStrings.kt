@@ -34,6 +34,14 @@ import androidx.compose.runtime.compositionLocalOf
 interface InkuStrings {
     val code: String
     val label: String
+    val modelRecommendation: String
+    val modelAverageSeconds: String
+    val modelEstimatedCost: String
+    val modelAccessCheck: String
+    val modelAccessChecking: String
+    val modelAccessAvailable: String
+    val modelAccessUnavailable: String
+    val modelAccessUnknown: String
 
     // Personal ChatGPT-plan connection; never provider API-key settings.
     val chatGptPlan: String

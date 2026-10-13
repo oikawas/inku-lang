@@ -107,6 +107,8 @@ class InkuRepository(
         RustArtworkRasterizer()
     }
     private val providerModelCandidatePrefix = "provider_model_candidates:"
+    private val modelObservationPrefix = "model_catalog_observations:"
+    val modelCatalog: ModelCatalog by lazy { ModelCatalog.load(context) }
     private val localLiteRtProvider = LocalLiteRtLmProvider(context.applicationContext, database.modelAssetDao())
     val chatGptPlan: app.inku.mobile.llm.ChatGptPlanManager
         get() = (context.applicationContext as app.inku.mobile.InkuApplication).chatGptPlan
@@ -114,6 +116,7 @@ class InkuRepository(
         database = database,
         localProvider = localLiteRtProvider,
         chatGptPlan = { chatGptPlan },
+        observeAccess = { provider, model, accessible -> recordModelAccess(provider, model, accessible) },
     )
     // Every model call in this class goes through this one, so an override
     // reaches Stage 1, Stage 2 and the demo prompt alike.
@@ -186,10 +189,36 @@ class InkuRepository(
 
     fun providerModelCandidates(): Flow<Map<String, List<String>>> =
         database.settingsDao().observeLike("$providerModelCandidatePrefix%").map { rows ->
-            rows.associate { row ->
+            rows.filter { it.valueJson != "null" }.associate { row ->
                 row.key.removePrefix(providerModelCandidatePrefix) to parseModelIds(row.valueJson)
             }
         }
+
+    fun modelCatalogObservations(): Flow<Map<String, ModelCatalogObservation>> =
+        database.settingsDao().observeLike("$modelObservationPrefix%").map { rows ->
+            rows.associate { it.key.removePrefix(modelObservationPrefix) to ModelCatalogObservation.read(it.valueJson) }
+        }
+
+    private suspend fun recordModelAccess(provider: ProviderSettingEntity, modelId: String, accessible: Boolean) {
+        database.withTransaction {
+            val current = database.providerSettingDao().get(provider.providerId) ?: return@withTransaction
+            if (current.encryptedApiKey != provider.encryptedApiKey || current.baseUrl != provider.baseUrl || current.kind != provider.kind) return@withTransaction
+            val key = "$modelObservationPrefix${provider.providerId}"
+            val old = ModelCatalogObservation.read(database.settingsDao().get(key)?.valueJson)
+            val id = ModelCatalog.rawId(provider.providerId, modelId)
+            saveSetting(key, old.copy(access = old.access + (id to accessible)).json())
+        }
+    }
+
+    suspend fun checkModelAccess(providerId: String, modelId: String): Boolean? {
+        require(providerId == "ollama-cloud")
+        val provider = database.providerSettingDao().get(providerId) ?: inkuError { it.errorServiceNotFound(providerId) }
+        val key = provider.encryptedApiKey?.let(AndroidSecretBox::decryptOrPlain)
+        if (key.isNullOrBlank()) inkuError { it.errorProviderApiKeyMissing(provider.displayName) }
+        val result = app.inku.mobile.llm.ModelAccessProbe.check(requireNotNull(provider.baseUrl), key, ModelCatalog.rawId(providerId, modelId))
+        result?.let { recordModelAccess(provider, modelId, it) }
+        return result
+    }
 
     fun exportTemplates(): Flow<List<ExportTemplateEntity>> = database.exportTemplateDao().observeAll()
 
@@ -617,34 +646,36 @@ class InkuRepository(
             updatedAt = System.currentTimeMillis(),
         )
         database.providerSettingDao().upsert(next)
+        if (!apiKey.isNullOrBlank() || existing?.baseUrl != next.baseUrl || existing?.kind != next.kind) {
+            saveSetting("$modelObservationPrefix$cleanId", ModelCatalogObservation().json())
+            saveSetting("$providerModelCandidatePrefix$cleanId", "null")
+        }
     }
 
     suspend fun clearProviderApiKey(providerId: String) {
         if (providerId == "chatgpt") throw app.inku.mobile.llm.ChatGptException("chatgpt_reserved_provider")
         val existing = database.providerSettingDao().get(providerId) ?: return
         database.providerSettingDao().upsert(existing.copy(encryptedApiKey = null, updatedAt = System.currentTimeMillis()))
+        saveSetting("$modelObservationPrefix$providerId", ModelCatalogObservation().json())
+        saveSetting("$providerModelCandidatePrefix$providerId", "null")
     }
 
     suspend fun fetchProviderModels(providerId: String): List<String> {
         if (providerId == "chatgpt") return chatGptPlan.refreshModels()
         ensureDefaultProviderSettings()
+        val before = database.providerSettingDao().get(providerId) ?: inkuError { it.errorServiceNotFound(providerId) }
         val models = modelRouter.fetchModels(providerId)
-        val existing = database.providerSettingDao().get(providerId) ?: inkuError { it.errorServiceNotFound(providerId) }
-        val fetchedIds = models.toSet()
-        val selected = parseModelIds(existing.publishedModelsJson).filter { it in fetchedIds }
-        database.settingsDao().upsert(
-            AppSettingEntity(
-                key = "$providerModelCandidatePrefix$providerId",
-                valueJson = JSONArray(models).toString(),
-                updatedAt = System.currentTimeMillis(),
-            ),
-        )
-        database.providerSettingDao().upsert(
-            existing.copy(
-                publishedModelsJson = JSONArray(selected).toString(),
-                updatedAt = System.currentTimeMillis(),
-            ),
-        )
+        database.withTransaction {
+            val existing = database.providerSettingDao().get(providerId) ?: inkuError { it.errorServiceNotFound(providerId) }
+            check(existing.encryptedApiKey == before.encryptedApiKey && existing.baseUrl == before.baseUrl && existing.kind == before.kind) { "Connection changed while fetching models." }
+            val selected = parseModelIds(existing.publishedModelsJson).filter { ModelCatalog.rawId(providerId, it) in models }
+            val observationKey = "$modelObservationPrefix$providerId"
+            val old = ModelCatalogObservation.read(database.settingsDao().get(observationKey)?.valueJson)
+            val previous = database.settingsDao().get("$providerModelCandidatePrefix$providerId")?.valueJson?.takeUnless { it == "null" }?.let(::parseModelIds).orEmpty()
+            saveSetting(observationKey, old.copy(seen = (old.seen + previous + models + parseModelIds(existing.publishedModelsJson).map { ModelCatalog.rawId(providerId, it) }).distinct()).json())
+            saveSetting("$providerModelCandidatePrefix$providerId", JSONArray(models).toString())
+            database.providerSettingDao().upsert(existing.copy(publishedModelsJson = JSONArray(selected).toString(), updatedAt = System.currentTimeMillis()))
+        }
         return models
     }
 
@@ -1233,7 +1264,7 @@ class InkuRepository(
                 kind = "openai-compatible",
                 baseUrl = "https://integrate.api.nvidia.com/v1",
                 encryptedApiKey = null,
-                publishedModelsJson = models("google/gemma-4-31b-it"),
+                publishedModelsJson = models(),
                 isEnabled = true,
                 isDefaultLocal = false,
                 updatedAt = System.currentTimeMillis(),
@@ -1274,7 +1305,9 @@ class InkuRepository(
                 isDefaultLocal = false,
                 updatedAt = System.currentTimeMillis(),
             ),
-        )
+        ).map { setting ->
+            if (setting.isDefaultLocal) setting else setting.copy(publishedModelsJson = JSONArray(modelCatalog.defaults(setting.providerId)).toString())
+        }
     }
 
     /**
@@ -1307,20 +1340,7 @@ class InkuRepository(
             val offered = parseModelIds(defaultSetting.publishedModelsJson)
             return JSONArray(currentIds.filter { it in offered }.ifEmpty { offered }).toString()
         }
-        val legacyIds = legacyDefaultPublishedModels(defaultSetting.providerId)
-        return if (legacyIds.isNotEmpty() && currentIds.toSet() == legacyIds.toSet()) {
-            defaultSetting.publishedModelsJson
-        } else {
-            current
-        }
-    }
-
-    private fun legacyDefaultPublishedModels(providerId: String): List<String> = when (providerId) {
-        "openai" -> listOf("openai:gpt-5.1", "openai:gpt-5.1-mini", "openai:gpt-4.1", "openai:gpt-4.1-mini")
-        "nvidia" -> listOf("google/gemma-4-31b-it", "meta/llama-3.3-70b-instruct", "mistralai/mistral-large-2-instruct")
-        "anthropic" -> listOf("anthropic:claude-opus-4-7", "anthropic:claude-sonnet-4-6", "anthropic:claude-haiku-4-5-20251001")
-        "gemini" -> listOf("gemini:gemini-2.5-pro", "gemini:gemini-2.5-flash", "gemini:gemini-2.5-flash-lite")
-        else -> emptyList()
+        return current
     }
 
     private fun parseModelIds(value: String): List<String> {

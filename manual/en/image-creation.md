@@ -183,6 +183,8 @@ There are two entrances to the instruction dialog. Both use the same dialog and 
 
 On Web and Android, when instruction completion stops, `Gaps that could not be completed` shows the author's original text and a plain reason for each gap. The approval screen also shows these when a proposal leaves some gaps uncompleted. Gaps that passed are not listed. A context that is too long gets an explanation; an unknown reason reads `Refused by the check (code).` While the model is asked again with the reasons its proposal was refused, the running line reads, for example, `Asking again with the reasons the proposal was refused (2/4)`. A communication retry continues to read `Retrying`.
 
+For a place the existing position words cannot say, the completion keeps the author's words exactly and writes a horizontal and vertical range in parentheses after them (for example `at the bottom right (horizontal 2/3 to 1, vertical 2/3 to 1)`). The check refuses a proposal whose range falls outside the range of the words before the parenthesis. When the check refuses a proposal, the same gap is asked once more, with the reasons.
+
 ### See and edit a place's range
 
 When a range's name and numbers match the range table, for example `at the bottom right (horizontal 2/3 to 1, vertical 2/3 to 1)`, the display folds the numbers and gives `bottom right` a dotted underline. Hover over or press the name to show its rectangle on the work. Press it to open the muted numbers for editing. The rectangle follows valid numbers, and a match to another table entry changes the name too. Setting both axes to `0 to 1/3`, for example, changes the name to `top left`.
@@ -191,6 +193,8 @@ Numbers outside the table or a name that disagrees with its numbers stay unfolde
 
 Changing the numbers edits the instructions. Typing does not draw; press `Draw from instructions` to redraw once. Saving, copying, and the text editor use the complete source with its numbers. Only the display folds them. An older drawing engine without a range table keeps the complete display.
 
+For each range the completion wrote, the work keeps the words and numbers as approved, and the instructions of a saved work mark each such range `completion`, `numbers edited` or `words edited`. A range whose numbers you edited is drawn at those numbers, as before. A range whose words alone you edited goes back to the completion when you draw, which asks you to approve a proposal with numbers rewritten to fit the new words (a note reads, for example, "One range has edited words. Drawing asks the completion to rewrite its numbers and asks for your approval."). Instructions exported or imported on their own carry no such record and are drawn at their numbers, as before.
+
 ### Joint phrases
 
 When the description says how things meet (resting on, inside, overlapping, crossing, connected), the composition joins that layer to its partner. In the instructions the layer's sentence comes right after its partner's and ends with a phrase such as `resting on the previous shape`. The other phrases are `inside the previous shape`, `overlapping the previous shape`, `crossing the previous shape` and `connected to the previous shape`. Japanese instructions write `前の形に載る` and so on.
@@ -198,6 +202,8 @@ When the description says how things meet (resting on, inside, overlapping, cros
 The range in a joined sentence sets how far the layer spreads. The phrase sets where it goes: the layer is drawn against its partner.
 
 A joint that cannot hold is not written. A layer whose place the description states, for example, is drawn at that place, not joined to another.
+
+You can also write joint phrases in the instructions yourself (they are words of "between" in the Saijiki). Only the fixed phrases `resting on the previous shape`, `inside the previous shape`, `overlapping the previous shape`, `crossing the previous shape` and `connected to the previous shape` make a relation, and English also reads the short forms `resting on`, `inside`, `overlaps` and `crossing`. Japanese writes `前の形に載る` and so on. The joined shape only moves, without resizing, to meet the previous shape, which stays where it is. When the joined layer is a crowd, resting on, overlapping and crossing move the whole crowd as one shape, while inside moves each member inside its partner. Crossing goes across the partner's narrow direction. A filled partner is joined where it is visible. When the relation cannot hold, because of the shapes' sizes or kinds for example, only the relation is dropped, and the reason is shown (for example "The relation was omitted because the shapes cannot hold it (too large to fit inside, too short to cross, or a point as the other shape).").
 
 ### A plugin name that does not exist shows up while you type
 
@@ -483,6 +489,8 @@ Descriptions used before can be restored from `Batch description history`. The l
 
 A batch stopped with `Stop` can continue through `Resume the interrupted batch` and `Resume where it stopped`. It checks the unfinished lines of the original batch, skips completed works, and restores the original text and drawing conditions. After a browser reload, the same signed-in account can also resume when its newest saved batch text and saved batch works establish that the batch stopped part-way. If the unfinished lines cannot be established from the saved history and text, no resume card appears.
 
+When a stopped batch still has lines that failed to draw, `Retry failed works` appears. It redraws only the failed lines, with their original text, line numbers and drawing conditions, leaving out lines that succeeded, were interrupted or never ran. Lines that succeed leave the error list, and the remaining errors can be tried again. When the previous batch's full text cannot be confirmed, the button is unavailable and says so.
+
 Set `Batch retry` in the settings to one or more and the failed lines alone are painted again after the first pass. Zero means no retry. A run that was stopped is not retried.
 
 ## 17. Demo
@@ -505,7 +513,7 @@ Open it from `Settings` in the app rail. Settings are grouped as `Display and op
 | Connections and administration (administrators) | `Models`, `User management`, `DB settings`, and `Log retention`. `Detailed` also shows `Other (server)` and `Limits` |
 | Extensions and details | `Detailed` shows `Plugins` and `Unread-word ledger` |
 
-To choose the drawing model, open `Model selection` from the making screen's conditions and select it in `Stage 1/2`. Choose the image-reading model separately in `Vision` when needed. The administrator's `Models` page manages connections and which models are published to members. Where no model is visible for a use, `Model selection` says there are no models to choose from and that an administrator can make them visible. A chosen model that has left the list is shown by its id, marked `Not in the list`.
+To choose the drawing model, open `Model selection` from the making screen's conditions and select it in `Stage 1/2`. Choose the image-reading model separately in `Vision` when needed. The administrator's `Models` page manages connections and which models are published to members. Where no model is visible for a use, `Model selection` says there are no models to choose from and that an administrator can make them visible. A chosen model that has left the list is shown by its id, marked `Not in the list`. Hovering over a model shows `LLM` and `Vision` badges for its purposes (greyed where it cannot be chosen), the recommendation in three tiers (★★★, ★★☆, ★☆☆), the approximate cost (per drawing for LLM, per picture for Vision; $0 for a free model) and its speed (the measured mean seconds as a reference value when present, the speed label otherwise). Where a member's own ChatGPT plan can be connected, models published under `ChatGPT plan` in `Models` appear as "ChatGPT plan" candidates: for drawing when published for LLM, and for Vision refinement and colophons when published for Vision.
 
 The settings dialog has `Standard` and `Detailed` modes, switched through `Display mode` at upper right. `Standard` shows everyday settings; **`Plugins`, `Limits`, `Unread-word ledger`, and `Other (server)` appear only in `Detailed`.** The choice remains in this browser.
 
@@ -513,7 +521,7 @@ The settings dialog has `Standard` and `Detailed` modes, switched through `Displ
 
 `User management` provides search, permission and no-group filters, then selection and editing of users. `Add user` opens the add form explicitly. Edit only the selected member, set permissions and groups, then use `Save changes`. While edits are unsaved, it does not refresh the list or select another user; a failed save keeps both input and error. It is available to administrators in the Web UI.
 
-`Limits` is not a speed control: it changes the number of lines actually drawn. The values chosen there are written into the Stage 1 and Stage 2 prompts and recorded on every work painted. See `Server Configuration` for the details.
+`Limits` is not a speed control: it changes the number of lines actually drawn. The mark and count values are written into the Stage 1 and Stage 2 prompts and recorded on every work painted. The `SVG limit` in the `SVG output` group is a safety ceiling for saving newly generated SVG: a work above it is not saved (it is not recorded on works and does not affect viewing saved works). See `Server Configuration` for the details.
 
 **When a work is redrawn, the limits it was drawn under are the ones that apply** (v2.13.31). Today's settings are used only for an older work whose row recorded no limits. **When a limit actually takes effect and drops marks, it says so under the picture, named** (the same place as the plugin warnings). The same rule holds here as in the settings: a limit can be lowered for one drawing, never raised.
 

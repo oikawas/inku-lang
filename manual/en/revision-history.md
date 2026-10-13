@@ -2,6 +2,14 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-13 — Model assessments, SVG limit, completion ranges, retrying failed batch works
+
+Brought in line with the work since 10-06. Section 5.0 of Server Configuration gains the four folds of models that cannot be published (Paid plan only, No response when measured, Not supported, End of life) and the handling of 402, assessment editing (three-tier recommendations, cost, mean seconds, purposes without a response), the hover card, and ChatGPT plan publication and assessments (`chatgpt_models`; `model_metadata` is refused with 422). Section 5.1 gains the `SVG limit` of `SVG output` (`max_generated_svg_mib`, 12 MiB by default, 1–32 MiB), and the group names follow the screen: `Drawing volume`, `Count representation`, `Safety limits`. In Creating Images in both languages, section 6 gains the numeric ranges the completion writes and its single re-ask, the three states of completion ranges (`completion`, `numbers edited`, `words edited`), and writing joint phrases yourself with the fixed phrases and the notice when a relation is dropped; section 16 gains `Retry failed works`; section 18 gains the hover card, ChatGPT plan candidates and the `SVG limit`.
+
+## 2026-10-06 — Full instruction editing, discarding edits, range names that follow, completion originals and reasons
+
+This day's revision went unrecorded and is added here. Section 6 of Creating Images in both languages describes editing the full instructions in the Describe box, `Discard edits`, a range name following to `the chosen place` when its numbers leave the table, and showing the original text and reason for each gap that could not be completed on Web and Android.
+
 ## 2026-10-13 — Joint phrases
 
 The composition now writes how the description says things meet as a joint phrase in the instructions (`resting on the previous shape` and so on), and `Another composition` reads the sentences that carry one. Section 6 of Creating Images in both languages gains the item "Joint phrases", and the paragraph on `Another composition` in section 8 says that a sentence with a joint phrase keeps its range and its phrase.

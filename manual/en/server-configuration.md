@@ -240,9 +240,15 @@ To change the published models as an administrator:
 2. Find models with search and filters, and check those to publish. The bulk selection action applies only to the currently filtered results.
 3. Use `Save` to apply the selection, or `Cancel` to close without saving it. Fetching the model list is unavailable while there are unsaved changes; save or discard them first.
 
-A model marked `End of life` or `Paid plan only` cannot be checked and cannot be offered. Ollama Cloud (ollama.com) returns its list whatever the key's plan, so each `Fetch model list` makes one short call to every listed model with the configured API key. A retired model is marked `End of life`, one the plan does not reach is marked `Paid plan only`, and one the key can call loses the `Paid plan only` mark. A model that could not be checked, because the service was busy or the call timed out, keeps its earlier mark. With one call per model the fetch can take a minute or two, and it spends a little of the Ollama Cloud allowance.
+A model marked `Paid plan only`, `No response when measured`, `Not supported` or `End of life` cannot be checked and cannot be offered. These models are filed into folds below the list, each headed with its count (`Paid plan only (n)`), closed at first; search and filters count the models inside the folds too. `No response when measured` marks a model that answered neither purpose when measured; `Not supported` marks a kind left out of the benchmark (speech, music, video, embeddings and the like). Ollama Cloud (ollama.com) returns its list whatever the key's plan, so each `Fetch model list` makes one short call to every listed model with the configured API key. A retired model is marked `End of life`, one the plan does not reach (HTTP 402 or 403) is marked `Paid plan only`, and one the key can call loses the `Paid plan only` mark. A model that could not be checked, because the service was busy or the call timed out, keeps its earlier mark. With one call per model the fetch can take a minute or two, and it spends a little of the Ollama Cloud allowance.
 
 A model left unpublished, or one the connection service does not list, is not called when a member outside `admins` names it through the API or the CLI; the request is refused with 403 (`model_not_offered` for drawing). Models are called with the server's API keys, so what you publish is also what members may spend. Models of a connection service that developer mode hides (the built-in Stage defaults among them) stay callable unless you unpublish them. `admins` may call any configured model, to try one before publishing it.
+
+An administrator opens a model in the list to edit its assessment. The recommendation is chosen for `LLM` and for `Vision` in three tiers, ★★★, ★★☆ and ★☆☆, stored as 5, 3 and 2. The approximate cost (USD, per drawing for LLM and per picture for Vision) and the measured mean seconds can be entered too; the speed label stays for models without measured means. The `LLM` or `Vision` button of a purpose measured without a response is greyed and cannot be pressed, and that purpose does not come back when an administrator chooses again.
+
+When a member hovers over a model in `Model selection`, the card shows `LLM` and `Vision` badges for its purposes (greyed where it cannot be chosen), the recommendation in three tiers, the approximate cost ($0 for a free model) and its speed: the measured mean seconds as a reference value when present, the speed label otherwise. The stored five-level recommendation reads 4–5 as ★★★, 3 as ★★☆ and 1–2 as ★☆☆.
+
+**ChatGPT plan.** Where a member's own ChatGPT plan can be connected, the member fetches their model list under `ChatGPT plan` in `Models`, chooses the models to publish and their `LLM` / `Vision` purposes, and saves. Published LLM models appear as "ChatGPT plan" candidates for drawing, and published Vision models for Vision refinement and colophons. Model assessments (recommendation, purposes measured without a response, not supported, cost, mean seconds, speed label and comments) live in the shared model settings like every other provider's; administrators save them through `chatgpt_models` in `PUT /api/settings/models`, each entry replacing that model's assessment. The assessment fields are shown to administrators only. Saving a member's publications and purposes (`PUT /api/me/chatgpt/models/settings`) takes no assessment, and sending `model_metadata` is refused with 422. A purpose measured without a response leaves the purposes, and a model with no purpose left, or not supported, cannot be published. For connection, transfer and recovery see `docs/guide/chatgpt-plan.md`.
 
 | Stage | Role |
 |---|---|
@@ -262,29 +268,32 @@ Resolved values are recorded as `instruction_lang_requested`, `instruction_lang_
 
 ### 5.1 Limits
 
-Nine numbers decide how many marks one work may hold. They are not a speed control: the number of lines actually drawn changes. Switch Settings to `Detailed` and open `Limits`, or use `inku-cli config update`. **They are written into the Stage 1 and Stage 2 prompts and recorded on every work painted.**
+Nine numbers decide how many marks one work may hold, and one more caps the size of generated SVG. The nine are not a speed control: the number of lines actually drawn changes. Switch Settings to `Detailed` and open `Limits`, or use `inku-cli config update`. **The nine numbers are written into the Stage 1 and Stage 2 prompts and recorded on every work painted.**
 
 | Group | Value | Default | Contents |
 |---|---|---|---|
-| Marks actually drawn | `max_expanded_primitives` | 400 | Marks per work. Beyond this the whole work is shrunk to fit |
+| Drawing volume | `max_expanded_primitives` | 400 | Marks per work. Beyond this the whole work is shrunk to fit |
 | | `max_expanded_per_instruction` | 240 | Marks per instruction. An instruction asking for more is thinned |
 | | `max_instructions` | 64 | Instructions per work. Any beyond this are dropped |
-| Stated counts | `literal_count_threshold` | 240 | Below this a stated count is drawn as stated; at or above it the work is shown as a crowd |
+| Count representation | `literal_count_threshold` | 240 | Below this a stated count is drawn as stated; at or above it the work is shown as a crowd |
 | | `represented_count_min` | 80 | Lower end when shown as a crowd |
 | | `represented_count_max` | 120 | Upper end |
-| Reading and validation ceilings | `ddl_count_max` | 1000 | Numbers in the description are rounded down to this. It is also the top of the density band taught to Stage 1 |
+| Safety limits | `ddl_count_max` | 1000 | Numbers in the description are rounded down to this. It is also the top of the density band taught to Stage 1 |
 | | `ddl_count_max_grid` | 2000 | A literal grid alone is allowed higher than ordinary composition |
 | | `schema_count_max` | 2000 | A count returned by Stage 2 above this is trimmed |
+| SVG output | `max_generated_svg_mib` | 12 | Size ceiling for newly generated SVG (MiB, 1–32). A work above it is not saved |
 
 Mutually inconsistent values are rounded rather than rejected — if the representation ceiling exceeds the literal threshold, it is lowered to that threshold. What the admin UI shows is the rounded, effective value.
 
 **A raised value reaches the page** (v2.13.32). A description that names no count — "fine lines tiled across the whole sheet", say — expands as far as `max_expanded_primitives` allows, and the boundaries that decide how dense a group reads and how many clusters it is split into are held as ratios of `represented_count_max`. The cap on how many clusters a group may be split into moves by the same ratio, so raising the ceiling keeps roughly the same amount of ink in one cluster. **At the default settings all of these land on the values they had before.**
 
-**The `Marks actually drawn` row also says roughly how many megabytes that count is** (v2.13.32). The per-mark cost is measured on the server and sent to the panel, shown as a range from a fine stroke to a thick one (about 5.2–6.5 MB at the default of 400 marks). The other eight rows carry no such figure: they are per-instruction bounds, legibility thresholds and typo guards, and none of them decides the size of the file.
+**The marks-per-work row of `Drawing volume` also says roughly how many megabytes that count is** (v2.13.32). The per-mark cost is measured on the server and sent to the panel, shown as a range from a fine stroke to a thick one (about 5.2–6.5 MB at the default of 400 marks). The other rows carry no such figure: they are per-instruction bounds, legibility thresholds and typo guards, and none of them decides the size of the file.
 
 **When a work is redrawn, the values recorded on its own row are the ones that apply** (v2.13.31). Lowering the settings does not change a work already painted: it comes out at the numbers it was painted under. Today's settings are used only for an older work that recorded none, and **the answer names which of the two drew it** (`render_limits_source` = `work` / `settings` / `work_unrecorded`). **A caller may lower a value for one drawing but never raise one** — each element is taken as the smaller of the two.
 
 **When a limit takes effect and drops marks, the record says which limit did it, by name** (`render_limit_notes`, one line per limit).
+
+**The `SVG limit` (`max_generated_svg_mib`) is a safety ceiling applied when newly generated SVG is saved** (2026-10-12). The default and recommended value is 12 MiB, and 1–32 MiB can be saved. Normal drawing, redrawing and streaming share it, using the server setting at the start of drawing. A work above it is neither saved nor returned, and the message reads "The SVG exceeded the configured limit (n MiB), so this work was not saved." It is not part of any prompt, is not recorded on works, and does not affect viewing saved works. `inku-cli config update` has no flag for it; change it in the admin UI.
 
 **The limits are constant guards for stability, data size, and device performance.** They exist neither to add what the description does not ask for nor to remove what it does.
 

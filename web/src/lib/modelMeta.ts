@@ -16,8 +16,19 @@ export function modelPurposeBadges(model: ModelOption): { purpose: ModelPurpose;
 	return (['llm', 'vision'] as const).map((purpose) => ({
 		purpose,
 		label: purpose === 'vision' ? 'Vision' : 'LLM',
-		selectable: purposes.includes(purpose)
+		selectable: purposes.includes(purpose) && !purposeUnsupported(model, purpose)
 	}));
+}
+
+// A purpose the benchmark found the model does not answer (no drawing, or no
+// Vision answer). Model administration cannot switch it on.
+export function purposeUnsupported(model: ModelOption, purpose: ModelPurpose): boolean {
+	return (model.unsupported_purposes ?? []).includes(purpose);
+}
+
+// Measured to answer neither purpose: there is nothing to choose it for.
+function answersNothing(model: ModelOption): boolean {
+	return purposeUnsupported(model, 'llm') && purposeUnsupported(model, 'vision');
 }
 
 // Which stage is choosing the model. 'both' assigns one model to both stages.
@@ -156,15 +167,17 @@ export function modelEolLabel(model: ModelOption, isJapanese: boolean): string |
 	return isJapanese ? `提供終了${date}` : `End of life${date}`;
 }
 
-// Two conditions make a listed model unselectable: retirement (EOL) and a paid
-// tier requirement. Disabling and sorting share this predicate.
+// Three conditions make a listed model unselectable: retirement (EOL), a paid
+// tier requirement, and a measurement in which it answered neither purpose.
+// Disabling and sorting share this predicate.
 export function isModelUnselectable(model: ModelOption): boolean {
-	return !!model.eol || !!model.requires_subscription;
+	return !!model.eol || !!model.requires_subscription || answersNothing(model);
 }
 
 export function modelStatusLabel(model: ModelOption, isJapanese: boolean): string | null {
 	const eol = modelEolLabel(model, isJapanese);
 	if (eol) return eol;
 	if (model.requires_subscription) return isJapanese ? '有料プラン限定' : 'Paid plan only';
+	if (answersNothing(model)) return isJapanese ? '計測で応答なし' : 'No response when measured';
 	return null;
 }

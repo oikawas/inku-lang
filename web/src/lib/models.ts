@@ -5,6 +5,9 @@ export type ModelOption = {
 	label: string;
 	notes?: string;
 	purposes?: ('llm' | 'vision')[];
+	// Purposes the model was measured not to answer (2026-10-13). The server keeps
+	// them out of purposes; an operator cannot tick them back.
+	unsupported_purposes?: ('llm' | 'vision')[];
 	enabled?: boolean;
 	// v1.98: Recommendations are per purpose; recommendation_level reads the legacy format.
 	recommendation_llm?: number;

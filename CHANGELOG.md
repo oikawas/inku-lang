@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Purposes measured without a response cannot be chosen; model administration matches the cards
+
+At the author's instruction (Settings → Model settings → Model selection). Model metadata gains `unsupported_purposes`, the purposes a model was measured not to answer; the server takes them out of the purposes, so an administrator cannot tick them back, and a model that answered neither purpose is offered nowhere and cannot be published. In model administration the LLM or Vision button of such a purpose is greyed and cannot be pressed, and a model that answered neither cannot be ticked for publication (status "No response when measured"). Model details now match the cards: the recommendation is chosen per purpose (Stage 1 and Stage 2 too for the ChatGPT plan) in three tiers stored as 5, 3 and 2; the old single recommendation field (`recommendation_level`, which the server never returns, so it always looked blank, and which per-purpose values outranked) and the speed-class field are gone, and cost and mean-seconds fields are added (except for ChatGPT plan personal assessments). The speed label stays for models without mean seconds.
+
 ### 2026-10-13 — Model hover cards are no longer cut off at the edge of a picker
 
 At the author's instruction. In model selection (settings and model comparison) the hover card sat directly under its model, so a model low in the list had its card cut off at the bottom of the scrolling area, more often once the card gained a row. The card is now placed against the window: below the model when it fits, above when there is more room there, and inside the window either way. The other picker (`ModelCardPicker`) uses the same placement and measures the shown card instead of assuming its height.

@@ -50,6 +50,7 @@ MODEL_MEASUREMENT_KEYS = (
 )
 MODEL_METADATA_KEYS = (
     "purposes",
+    "unsupported_purposes",
     *MODEL_RECOMMENDATION_KEYS,
     "speed_class",
     "speed_label",
@@ -224,9 +225,18 @@ def _normalize_models(models: Any) -> list[dict[str, Any]]:
             else:
                 marker = f"{model_id} {item.get('notes', '')}".lower()
                 clean_purposes = ["vision"] if "vision" in marker else ["llm"]
-            if not clean_purposes:
+            # A purpose the model was measured not to answer cannot be chosen for it
+            # (the author, 2026-10-13), whatever the operator ticked. A model left
+            # with no purpose is offered for nothing, rather than defaulted to LLM.
+            unsupported = model.get("unsupported_purposes")
+            clean_unsupported = ([purpose for purpose in ("llm", "vision") if purpose in unsupported]
+                                 if isinstance(unsupported, list) else [])
+            clean_purposes = [purpose for purpose in clean_purposes if purpose not in clean_unsupported]
+            if not clean_purposes and not clean_unsupported:
                 clean_purposes = ["llm"]
             item["purposes"] = clean_purposes
+            if clean_unsupported:
+                item["unsupported_purposes"] = clean_unsupported
             # v1.98: 推奨度は用途ごとに持つ。LLM は「3 回成功したか・スキーマを壊さないか・
             # 補正発火が少ないか」、Vision は画像特徴の再現率で決まり、尺度が異なるため。
             # 旧 recommendation_level は用途別の値が無いときだけ読む (書き出しはしない)。
@@ -433,6 +443,10 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
                 for model_id, enabled in enabled_models.items():
                     if model_id in known_model_ids:
                         provider["enabled_models"][model_id] = bool(enabled)
+            # Measured to answer neither purpose: there is nothing to publish it for.
+            for model in provider["models"]:
+                if not model.get("purposes", ["llm"]):
+                    provider["enabled_models"][str(model["id"])] = False
             clean["providers"][provider_id] = provider
     return clean
 

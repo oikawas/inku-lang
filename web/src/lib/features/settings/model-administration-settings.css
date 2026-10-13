@@ -69,6 +69,8 @@
 	.settings-feature-root .model-purpose-controls { display: inline-flex; gap: 5px; }
 	.settings-feature-root .model-purpose-controls button { min-height: 32px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--fg3); font: inherit; font-size: var(--ui-font-size-13); cursor: pointer; }
 	.settings-feature-root .model-purpose-controls button.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--fg); }
+	/* Measured not to answer this purpose: greyed and not pressable. */
+	.settings-feature-root .model-purpose-controls button:disabled { border-style: dashed; opacity: .4; cursor: not-allowed; }
 	.settings-feature-root .model-metadata-editor { border-top: 1px solid var(--border); padding: 0 12px 12px; }
 	.settings-feature-root .model-metadata-editor summary { padding: 10px 0; color: var(--fg2); font-size: var(--ui-font-size-13); cursor: pointer; }
 	.settings-feature-root .model-metadata-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }

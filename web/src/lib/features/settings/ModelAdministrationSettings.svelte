@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
-	import { isModelUnselectable, modelStatusLabel, modelRecommendation, modelSpeed, sortModels } from '$lib/modelMeta';
+	import { isModelUnselectable, modelStatusLabel, modelRecommendation, modelSpeed, purposeUnsupported, recommendationTier, sortModels } from '$lib/modelMeta';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
 	import type { ModelAdministration, ModelProviderSetting } from './model-administration.svelte';
 	import './model-administration-settings.css';
@@ -276,6 +276,35 @@
 			...modelPickerMetadataDraft,
 			[model.id]: { ...modelDraft(model), ...patch },
 		};
+	}
+
+	// The editor offers the three tiers the cards print (the author, 2026-10-13). A
+	// tier is stored as a level the cards read back as that tier: 5, 3 or 2.
+	type RecommendationKey = 'recommendation_llm' | 'recommendation_stage1' | 'recommendation_stage2' | 'recommendation_vision';
+	const TIER_LEVEL: Record<number, number> = { 3: 5, 2: 3, 1: 2 };
+	function tierStars(tier: number): string {
+		return `${'★'.repeat(tier)}${'☆'.repeat(3 - tier)}`;
+	}
+	function setRecommendationTier(model: ModelOption, key: RecommendationKey, tier: number): void {
+		updateModelMetadata(model, { [key]: TIER_LEVEL[tier] });
+	}
+
+	// The measured reference numbers the cards print. Shared settings only: the
+	// ChatGPT plan's personal assessments take the eight older keys.
+	type MeasuredKey = 'cost_usd_llm' | 'cost_usd_vision' | 'speed_llm_seconds' | 'speed_vision_seconds';
+	const MEASURED_FIELDS: { key: MeasuredKey; label: string }[] = [
+		{ key: 'cost_usd_llm', label: '概算コスト LLM（USD・描画1回）/ LLM est. cost (USD per drawing)' },
+		{ key: 'cost_usd_vision', label: '概算コスト Vision（USD・画像1枚）/ Vision est. cost (USD per picture)' },
+		{ key: 'speed_llm_seconds', label: '平均秒数 LLM（参考値）/ LLM mean seconds (reference)' },
+		{ key: 'speed_vision_seconds', label: '平均秒数 Vision（参考値）/ Vision mean seconds (reference)' }
+	];
+	function setMeasured(model: ModelOption, key: MeasuredKey, text: string): void {
+		const value = Number(text);
+		updateModelMetadata(model, { [key]: text.trim() === '' || !Number.isFinite(value) ? undefined : value });
+	}
+
+	function noResponseTitle(): string {
+		return t().code === 'ja' ? '計測で応答が無かったため選べません' : 'Not selectable: no response when measured';
 	}
 
 	function serviceIdLabel(provider: Provider): string {
@@ -603,8 +632,8 @@
 									<span><strong>{model.label}</strong><small>{model.id}</small>{#if modelStatusLabel(model, t().code === 'ja')}<em class="model-picker-status">{modelStatusLabel(model, t().code === 'ja')}</em>{/if}{#if model.notes}<em>{model.notes}</em>{/if}</span>
 								</label>
 								<div class="model-purpose-controls" aria-label={`${model.label} LLM / Vision`}>
-									<button type="button" class:active={modelPurposeSelected(model.id, 'llm')} aria-pressed={modelPurposeSelected(model.id, 'llm')} onclick={() => toggleModelPurpose(model.id, 'llm')}>LLM</button>
-									<button type="button" class:active={modelPurposeSelected(model.id, 'vision')} aria-pressed={modelPurposeSelected(model.id, 'vision')} onclick={() => toggleModelPurpose(model.id, 'vision')}>Vision</button>
+									<button type="button" class:active={modelPurposeSelected(model.id, 'llm')} aria-pressed={modelPurposeSelected(model.id, 'llm')} disabled={purposeUnsupported(model, 'llm')} title={purposeUnsupported(model, 'llm') ? noResponseTitle() : undefined} onclick={() => toggleModelPurpose(model.id, 'llm')}>LLM</button>
+									<button type="button" class:active={modelPurposeSelected(model.id, 'vision')} aria-pressed={modelPurposeSelected(model.id, 'vision')} disabled={purposeUnsupported(model, 'vision')} title={purposeUnsupported(model, 'vision') ? noResponseTitle() : undefined} onclick={() => toggleModelPurpose(model.id, 'vision')}>Vision</button>
 								</div>
 							</div>
 							<details class="model-metadata-editor">
@@ -612,14 +641,19 @@
 							<div class="model-metadata-fields">
 									{#if modelPickerProvider.id === 'chatgpt'}
 										{#each ['recommendation_llm', 'recommendation_stage1', 'recommendation_stage2', 'recommendation_vision'] as key}
-											{@const recommendationKey = key as 'recommendation_llm' | 'recommendation_stage1' | 'recommendation_stage2' | 'recommendation_vision'}
-											<label><span>{t().settingsModelRecommendationFields[recommendationKey]}</span><select value={modelDraft(model)[recommendationKey] ?? 0} onchange={(event) => updateModelMetadata(model, { [recommendationKey]: Number(event.currentTarget.value) || undefined })}><option value="0">—</option>{#each [1, 2, 3, 4, 5] as level}<option value={level}>{level} / 5</option>{/each}</select></label>
+											{@const recommendationKey = key as RecommendationKey}
+											<label><span>{t().settingsModelRecommendationFields[recommendationKey]}</span><select value={recommendationTier(Number(modelDraft(model)[recommendationKey] ?? 0))} onchange={(event) => setRecommendationTier(model, recommendationKey, Number(event.currentTarget.value))}><option value={0}>—</option>{#each [3, 2, 1] as tier}<option value={tier}>{tierStars(tier)}</option>{/each}</select></label>
 										{/each}
 									{:else}
-								<label><span>オススメ度 / Recommendation</span><select value={modelDraft(model).recommendation_level ?? 0} onchange={(event) => updateModelMetadata(model, { recommendation_level: Number(event.currentTarget.value) || undefined })}><option value="0">—</option>{#each [1, 2, 3, 4, 5] as level}<option value={level}>{level} / 5</option>{/each}</select></label>
+										{#each ['recommendation_llm', 'recommendation_vision'] as key}
+											{@const recommendationKey = key as RecommendationKey}
+											<label><span>{t().settingsModelRecommendationFields[recommendationKey]}</span><select value={recommendationTier(Number(modelDraft(model)[recommendationKey] ?? 0))} onchange={(event) => setRecommendationTier(model, recommendationKey, Number(event.currentTarget.value))}><option value={0}>—</option>{#each [3, 2, 1] as tier}<option value={tier}>{tierStars(tier)}</option>{/each}</select></label>
+										{/each}
+										{#each MEASURED_FIELDS as field (field.key)}
+											<label><span>{field.label}</span><input type="number" min="0" step="any" value={modelDraft(model)[field.key] ?? ''} oninput={(event) => setMeasured(model, field.key, event.currentTarget.value)} /></label>
+										{/each}
 									{/if}
-								<label><span>速度区分 / Speed class</span><select value={modelDraft(model).speed_class ?? ''} onchange={(event) => updateModelMetadata(model, { speed_class: event.currentTarget.value || undefined })}><option value="">—</option><option value="unknown">unknown</option><option value="ultra-fast">ultra-fast</option><option value="fast">fast</option><option value="medium">medium</option><option value="slow">slow</option><option value="low-speed-outlier">low-speed-outlier</option></select></label>
-								<label class="wide"><span>実測値に基づく速度ラベル / Measured speed label</span><input value={modelDraft(model).speed_label ?? ''} oninput={(event) => updateModelMetadata(model, { speed_label: event.currentTarget.value })} /></label>
+								<label class="wide"><span>速度ラベル（平均秒数が無いときに表示）/ Speed label (shown without mean seconds)</span><input value={modelDraft(model).speed_label ?? ''} oninput={(event) => updateModelMetadata(model, { speed_label: event.currentTarget.value })} /></label>
 								<label class="wide"><span>評価コメント（日本語）</span><textarea rows="2" value={modelDraft(model).comment_ja ?? ''} oninput={(event) => updateModelMetadata(model, { comment_ja: event.currentTarget.value })}></textarea></label>
 								<label class="wide"><span>Evaluation comment (English)</span><textarea rows="2" value={modelDraft(model).comment_en ?? ''} oninput={(event) => updateModelMetadata(model, { comment_en: event.currentTarget.value })}></textarea></label>
 								</div>

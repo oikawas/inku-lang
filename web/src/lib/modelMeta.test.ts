@@ -5,7 +5,7 @@
 // check in scripts/model-recommendation-check.mjs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { modelCost, modelPurposeBadges, modelSpeed } from './modelMeta';
+import { isModelUnselectable, modelCost, modelPurposeBadges, modelSpeed, modelStatusLabel } from './modelMeta';
 
 test('both purposes are listed, and the one a model cannot be chosen for is marked', () => {
 	assert.deepEqual(
@@ -14,6 +14,15 @@ test('both purposes are listed, and the one a model cannot be chosen for is mark
 	);
 	// A model whose purposes are not stated is an LLM, as everywhere else.
 	assert.deepEqual(modelPurposeBadges({ id: 'x', label: 'x' }).map((badge) => badge.selectable), [true, false]);
+});
+
+test('a purpose measured without a response is greyed, and a model with neither cannot be chosen', () => {
+	const drawsNothing = { id: 'x', label: 'x', purposes: ['llm', 'vision'] as ('llm' | 'vision')[], unsupported_purposes: ['llm'] as ('llm' | 'vision')[] };
+	assert.deepEqual(modelPurposeBadges(drawsNothing).map((badge) => badge.selectable), [false, true]);
+	assert.equal(isModelUnselectable(drawsNothing), false);
+	const answersNothing = { id: 'x', label: 'x', purposes: [], unsupported_purposes: ['llm', 'vision'] as ('llm' | 'vision')[] };
+	assert.equal(isModelUnselectable(answersNothing), true);
+	assert.equal(modelStatusLabel(answersNothing, true), '計測で応答なし');
 });
 
 test('cost prints per drawing and per image, and a free model costs $0 rather than nothing', () => {

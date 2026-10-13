@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Move Android OpenAI drawing to Responses
+
+OpenAI API drawing now requests its function answer through Responses, accepting only a completed single call or text. GPT-6 Sol/Luna and 5.x turn reasoning off; reasoning models that cannot stop get low and 25,000 extra output tokens. Vision, photo descriptions and demos keep Chat Completions with the same reasoning policy. Cut-off drawing responses are refused, with output and reasoning counts recorded in diagnostics.
+
 ### 2026-10-13 — Move Swift OpenAI API drawing to Responses
 
 Swift drawing on the official OpenAI API now uses nonstreaming Responses with one function tool required. GPT-5, GPT-6, and o-series models omit temperature: models that can stop reasoning use `none`, while others use `low` with 25,000 extra output tokens. Only completed responses are accepted; output cut off at the limit fails as `malformed_payload` and logs token counts. Rate accounting reads `usage.input_tokens`. Vision, colophons, and demos retain Chat Completions with the same reasoning settings; other providers retain their request formats.

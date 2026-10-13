@@ -34,6 +34,25 @@ Androidはpremultiplied RGBAをNDK Bitmapへ直接転送する。Kotlin Engine 3
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
 
+## 2026-10-13 OpenAI APIの描画と推論指定
+
+接続先のhostが `api.openai.com` のときだけ、描画pipelineを `POST /v1/responses` に送る。
+store=false、instructionsとuserのinput、coreのschemaをそのまま持つ平坦なfunction tool
+（strict=false）、tool_choice=required、parallel_tool_calls=falseを使う。ストリームは使わない。
+推論系 `^(gpt-5|gpt-6|o\d)` はtemperatureを送らない。
+`^(gpt-5\.\d|gpt-6-(sol|luna)(-|$))` はeffort=noneと元の出力枠を使う。
+ほかの推論系（GPT-6 Astra、GPT-6.1 Sol、GPT-5無印、o系）はeffort=lowで枠に25,000を足す。
+非推論系（GPT-4.1等）はtemperatureを送り、推論を指定しない。
+描画ではmax_output_tokensとreasoning.effort、Vision・写真の記述・奥書・デモは
+Chat Completionsのmax_completion_tokensとreasoning_effortを使う。
+
+Responsesはstatus=completedだけを答えにする。function_callが1つで要求したnameと一致し、
+argumentsが文字列ならそれを読む。関数が無ければmessageのoutput_textだけを連結する。
+reasoningやrefusalを本文へ混ぜない。incomplete/max_output_tokensはmalformed_payloadと
+output_limit_reachedにし、provider_output_limitへ要求枠・output_tokens・reasoning_tokensと
+本文／関数の有無を記録する。ほかの未完了も答えにしない。usageのinput_tokensとoutput_tokensを読む。
+他のOpenAI互換providerとChatGPTプランのSSEは、この切替の対象にしない。
+
 ## 2026-10-13 NVIDIA NIMのGemma 4の思考指定
 
 接続idが `nvidia` で、接続名を除いたモデル名の最後の `/` より後ろが
@@ -324,7 +343,7 @@ Androidへの転送は、Rustのpremultiplied RGBAをNDKの`RGBA_8888` Bitmapへ
 
 ## 2026-09-26 現行の接続先・描画設定・書き出し
 
-接続形式ごとに、Serverの`pipeline_provider.py`と同じ形で送る。`openai-compatible`は`/chat/completions`、`gemini`は`/v1beta/models/{model}:generateContent`、`anthropic`（Claude API）は`/v1/messages`で、`x-api-key`と`anthropic-version: 2023-06-01`を付け、描画の応答は強制したtool呼び出しの`input`（ただし`anthropic`はServerと同じく、どのClaudeのモデルにも答えのtoolを`tool_choice` `auto`で渡し、その呼び出しを答えとし、本文で答えたときは最初の`{`から最後の`}`までを読む。thinkingのブロックは読まず、対象が無ければ`malformed_payload`。Claude Opus 5.5は強制したtoolを断るため）、写真はbase64の画像ブロックで送る。既定の接続先はServerの一覧と同じで、ovmsを持たず、Ollama Cloud（`ollama-cloud`、`https://ollama.com/v1`、キー必須）を持つ。ただしローカルのOllama（`ollama`、`http://127.0.0.1:11434/v1`）はAndroidでは持たない（作者の裁定、2026-09-27）。端末自身にOllamaは動かず、LANのOllamaへの平文のhttpは断るためである。接続先のモデル選択で一覧を取得する前に出す候補も、Serverの組み込みの一覧と同じにする（Geminiは`gemini-3.5-flash-lite`と`gemma-4-31b-it`。2.5系は提供終了の後に作ったAPIアカウントでは呼べない）。一覧から外したovmsとローカルのOllamaの行は、キー・名前・Base URL・モデル一覧のどれかを作者が設定していれば作者の接続先として残し、既定のままなら起動時に消す。`openai-compatible`の描画の答えは強制した関数呼び出しで求めるが、`ollama`だけはJSON schemaの`response_format`で求める。`ollama`と`ollama-cloud`の推論指定と出力枠は上の2026-10-13の規則に従う。接続先のhostが`api.openai.com`なら、Serverの`openai_sampling()`と同じく、`max_tokens`の代わりに`max_completion_tokens`を送り、モデルidが`gpt-5`か`o`＋数字で始まればtemperatureを送らず、`gpt-5.`＋数字で始まれば`reasoning_effort: none`を送る。提供元がpipelineの呼び出しをHTTPで断ったとき、pipelineが残すのは失敗の分類だけなので、Serverと同じく提供元の理由をLogcat（tag `InkuProvider`）に`provider_http_error`の1行で残す。行には、操作・モデルid・状態と、提供元のエラーの`code`・`type`・`param`・`status`、鍵に見える文字列を伏せた短いmessageを入れる。既定の接続先は起動時に不足分を補うだけで、作者が変えたサービス名とBase URLを保持する（接続形式は既定のまま、端末内の接続先のBase URLは目印なので変えない）。既定の接続先の「サービス削除」は行を消さず、Serverと同じく無効にして一覧から隠し、APIキーを消す。同じIDで追加すれば戻る。作者が追加した接続先は行ごと消す。端末内の接続先は消せない。APIキーは伏せ字とパスワード用キーボード（予測・学習なし）で入力し、「AIサービスを追加」は閉じると入力値を消す。「ローカルLLMはキー無しで使える場合がある」の注記は、キーが必須でない接続先にだけ出す。
+接続形式ごとに、Serverの`pipeline_provider.py`と同じ形で送る。`openai-compatible`はOpenAI APIの描画を除き`/chat/completions`、`gemini`は`/v1beta/models/{model}:generateContent`、`anthropic`（Claude API）は`/v1/messages`で、`x-api-key`と`anthropic-version: 2023-06-01`を付け、描画の応答は強制したtool呼び出しの`input`（ただし`anthropic`はServerと同じく、どのClaudeのモデルにも答えのtoolを`tool_choice` `auto`で渡し、その呼び出しを答えとし、本文で答えたときは最初の`{`から最後の`}`までを読む。thinkingのブロックは読まず、対象が無ければ`malformed_payload`。Claude Opus 5.5は強制したtoolを断るため）、写真はbase64の画像ブロックで送る。既定の接続先はServerの一覧と同じで、ovmsを持たず、Ollama Cloud（`ollama-cloud`、`https://ollama.com/v1`、キー必須）を持つ。ただしローカルのOllama（`ollama`、`http://127.0.0.1:11434/v1`）はAndroidでは持たない（作者の裁定、2026-09-27）。端末自身にOllamaは動かず、LANのOllamaへの平文のhttpは断るためである。接続先のモデル選択で一覧を取得する前に出す候補も、Serverの組み込みの一覧と同じにする（Geminiは`gemini-3.5-flash-lite`と`gemma-4-31b-it`。2.5系は提供終了の後に作ったAPIアカウントでは呼べない）。一覧から外したovmsとローカルのOllamaの行は、キー・名前・Base URL・モデル一覧のどれかを作者が設定していれば作者の接続先として残し、既定のままなら起動時に消す。`openai-compatible`の描画の答えは強制した関数呼び出しで求めるが、`ollama`だけはJSON schemaの`response_format`で求める。Ollamaの推論指定と出力枠は上の「Ollamaの推論指定と出力枠」に従う。hostが`api.openai.com`の描画はResponses APIを使い、推論と補助機能の要求も上の「OpenAI APIの描画と推論指定」に従う。提供元がpipelineの呼び出しをHTTPで断ったとき、pipelineが残すのは失敗の分類だけなので、Serverと同じく提供元の理由をLogcat（tag `InkuProvider`）に`provider_http_error`の1行で残す。行には、操作・モデルid・状態と、提供元のエラーの`code`・`type`・`param`・`status`、鍵に見える文字列を伏せた短いmessageを入れる。既定の接続先は起動時に不足分を補うだけで、作者が変えたサービス名とBase URLを保持する（接続形式は既定のまま、端末内の接続先のBase URLは目印なので変えない）。既定の接続先の「サービス削除」は行を消さず、Serverと同じく無効にして一覧から隠し、APIキーを消す。同じIDで追加すれば戻る。作者が追加した接続先は行ごと消す。端末内の接続先は消せない。APIキーは伏せ字とパスワード用キーボード（予測・学習なし）で入力し、「AIサービスを追加」は閉じると入力値を消す。「ローカルLLMはキー無しで使える場合がある」の注記は、キーが必須でない接続先にだけ出す。
 
 描画表現「暴れる（Wild）」は`app_settings`の`render_wild`（`{"enabled":bool}`）に保存し、記述からの新しい描画（単発・バッチ・デモ・カメラ）に載せる。作品からのDDL描画は作品のWild（`render_metadata.render_wild`）を、推敲の候補は親作品のWildを継ぐ（Webの`targetWild`・`effectiveRefineWild`と同じ）。作品を選ぶと、その作品の色カタログ（自動で描いた作品は自動）とキャンバスを次の描画に使う。起動時に作品が表示されていれば、保存済みの色カタログ・キャンバスより作品の値を優先する。「履歴選択時のキャンバス・色カタログ」「DDL再描画を新しい履歴として保存」は処理を持たなかったため削除した。色カタログ選択ダイアログの戻る・外側タップはキャンセルで、キャンセルは保存値も元に戻す。作品画面・全画面の送り・検索は全作品を対象にする（以前は新しい100件だけ）。
 

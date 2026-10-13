@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-13 — AndroidのOpenAI描画をResponsesへ移す
+
+OpenAI APIの描画はResponsesで関数の答えを求め、completedの1つの関数か本文だけを読む。GPT-6 Sol／Lunaと5.xは推論を切り、切れない推論系はlowと25,000追加の出力枠を使う。Vision・写真の記述・デモはChat Completionsのまま同じ推論規則に従う。上限で切れた描画は答えにせず、出力量・推論量を診断に残す。
+
 ### 2026-10-13 — SwiftのOpenAI API描画をResponsesへ移す
 
 Swiftも公式OpenAI APIの描画を非streamのResponsesへ移し、function toolを1件要求する。GPT-5・GPT-6・o系は温度を送らず、推論を切れるモデルは`none`、ほかは`low`と25,000の追加出力枠を使う。完了した応答だけを採用し、上限で切れた応答は`malformed_payload`で拒否してトークン数を記録する。入力使用量は`usage.input_tokens`をレート管理へ渡す。Vision・奥書・デモはChat Completionsのまま同じ推論判定を使い、他providerの要求形式は維持する。

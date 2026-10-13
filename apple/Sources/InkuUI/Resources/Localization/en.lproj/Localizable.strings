@@ -1381,6 +1381,10 @@
 "UI 言語" = "UI language";
 "Stage 1 ユーザー入力" = "Stage 1 user input";
 "Stage 1 システムプロンプト" = "Stage 1 system prompt";
+"写生（Stage 0.5） 送った入力" = "Sketch (Stage 0.5) input as sent";
+"写生（Stage 0.5） システムプロンプト" = "Sketch (Stage 0.5) system prompt";
+"構図の読み 送った入力" = "Composition reading input as sent";
+"構図の読み システムプロンプト" = "Composition reading system prompt";
 "Stage 2 ユーザー入力 (正規化DDL)" = "Stage 2 user input (normalized DDL)";
 "Stage 2 システムプロンプト" = "Stage 2 system prompt";
 "色の対応" = "Color map";

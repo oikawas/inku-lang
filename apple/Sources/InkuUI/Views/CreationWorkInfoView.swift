@@ -160,10 +160,15 @@ struct CreationWorkInfoView: View {
     private func prompts(_ work: SavedWork) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                // OutputTabsContent.svelte: the stages in the order a work calls them.
+                sentStage("generate_sketch", stage: "sketch", input: copy("promptSketchInput", "写生（Stage 0.5） 送った入力"),
+                          system: copy("promptSketchSystem", "写生（Stage 0.5） システムプロンプト"))
                 promptText(copy("promptStage1Input", "Stage 1 ユーザー入力"), work.effectiveSourceText, id: "stage1-input")
-                systemPrompt("generate_normalized_ddl", title: copy("promptStage1System", "Stage 1 システムプロンプト"))
+                systemPrompt("generate_normalized_ddl", stage: "stage1", title: copy("promptStage1System", "Stage 1 システムプロンプト"))
+                sentStage("read_composition", stage: "composition", input: copy("promptCompositionInput", "構図の読み 送った入力"),
+                          system: copy("promptCompositionSystem", "構図の読み システムプロンプト"))
                 if let ddl = work.ddl, !ddl.isEmpty { promptText(copy("promptStage2Input", "Stage 2 ユーザー入力 (正規化DDL)"), ddl, id: "stage2-input") }
-                systemPrompt("complete_visible_ddl_holes", title: copy("promptStage2System", "Stage 2 システムプロンプト"))
+                systemPrompt("complete_visible_ddl_holes", stage: "stage2", title: copy("promptStage2System", "Stage 2 システムプロンプト"))
             }.padding(14)
         }
     }
@@ -252,14 +257,24 @@ struct CreationWorkInfoView: View {
         }
     }
 
-    @ViewBuilder private func systemPrompt(_ action: String, title: String) -> some View {
+    /// The sketch and the composition reading: what each was given, then its system prompt.
+    @ViewBuilder private func sentStage(_ action: String, stage: String, input: String, system: String) -> some View {
+        if let message = information?.prompt(action)?["message"].string, !message.isEmpty {
+            promptText(input, message, id: action + "-input")
+        }
+        systemPrompt(action, stage: stage, title: system)
+    }
+
+    @ViewBuilder private func systemPrompt(_ action: String, stage: String, title: String) -> some View {
         if let system = information?.prompt(action)?["system"].string {
             promptText(title, system, id: action, collapsible: true)
         } else {
             VStack(alignment: .leading, spacing: 6) {
                 Text(title).inkuFont(12, weight: .semibold).foregroundStyle(.secondary)
                 Text(loading ? copy("promptLoading", "読み込み中…") : loadError != nil ? copy("promptSystemUnavailable", "読み込めませんでした。")
-                    : information?.prompts == nil ? copy("promptSystemNotRecorded", "この作品は、送った内容を記録する前に描かれたため、記録がありません。")
+                    // A stage the work kept called no model; one it did not keep was drawn before its record began.
+                    : information?.prompts == nil || information?.presentation?.promptStages.contains(stage) != true
+                        ? copy("promptSystemNotRecorded", "この作品は、送った内容を記録する前に描かれたため、記録がありません。")
                     : copy("promptSystemNotSent", "この作品では、このStageはモデルを呼んでいません。"))
                     .inkuFont(13).foregroundStyle(.secondary)
             }

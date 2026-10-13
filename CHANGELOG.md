@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Swift prompt tab shows the sketch and the composition reading
+
+At the author's instruction, matching the Web. The Prompts tab of macOS generation information showed only Stage 1 and Stage 2. It now also shows the sketch (Stage 0.5) and the composition reading, in the order a work calls them (sketch, Stage 1, composition reading, Stage 2), each with the input it was sent (with a copy button) and its system prompt (collapsible). Swift had left the composition reading out of its send record and saved only Stage 1 and Stage 2 with a work. A work now keeps the last send of all four stages and the list of stages it recorded. The catalog choice is not shown. For works saved earlier, the sketch and the composition reading read as not recorded.
+
 ## v2.15.114 (2026-10-13 / Build 1190)
 
 ### 2026-10-13 — The Prompts tab shows the sketch and the composition reading

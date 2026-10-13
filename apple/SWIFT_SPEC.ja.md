@@ -244,7 +244,7 @@ Serverの追加変更に合わせ、描画capability matrixの再導出をshape�
 
 新作品の送信prompt、compile delivery、render metadata、diagnostics、eventsを保存effectのACKへimmutableなpresentationとして入れる。作品の再選択はその作品のACKを読み、同じexecutionに後から保存したchildの情報や現在の設定で置き換えない。空配列は当該段を送っていない新記録、欠落は旧記録の未記録として区別する。構図・写生・自動配色のprivate requestをStage 1／穴補完のauthor向けpromptへ混ぜない。保存前の取消しを確認し、commit後の取消し通知で保存済み作品とACKを消さない。
 
-生成情報は開いた保存作品を固定し、「詳細」「プロンプト」「Score (JSON)」のtabで読む。詳細は写生、両段のmodel／言語、seed、色の対応、canvas、SVGのbyte／object／point数、hash、版、由来、batch ID／元行、保存comment、日時／時間と実usageを表示する。送信記録の欠落と空配列、読込中と取得失敗を区別し、promptの開閉・コピーとScoreの行番号・コピーを提供する。読込みやtab変更で制作の選択、現在設定、provider送信を変えない。
+生成情報は開いた保存作品を固定し、「詳細」「プロンプト」「Score (JSON)」のtabで読む。詳細は写生、両段のmodel／言語、seed、色の対応、canvas、SVGのbyte／object／point数、hash、版、由来、batch ID／元行、保存comment、日時／時間と実usageを表示する。送信記録の欠落と空配列、読込中と取得失敗を区別し、promptの開閉・コピーとScoreの行番号・コピーを提供する。プロンプトのtabは、写生（Stage 0.5）、Stage 1、構図の読み、Stage 2を処理の順に出し、写生と構図の読みは送った入力も出す（2026-10-13 作者の指示、SPEC §12.7.1）。保存作品は各段の最後の送信と記録した段の一覧を持ち、一覧にある段でmodelを呼ばなかったものは「呼んでいません」、一覧に無い段（それより前に保存した作品の写生と構図の読み）は記録なしと示す。色カタログの選択は出さない。読込みやtab変更で制作の選択、現在設定、provider送信を変えない。
 
 新規requestのoptional `GenerationProvenance` はDDL／DDL engine、native Bundle build、参照資料build、UI言語とbatch ID／行番号をsave ACKへ保持する。旧作品の欠落を現在値で補わず、再演は元のprovenanceを保つ。Stage 1 promptの基底digestはnativeでは未記録として示す。意味が異なる `base_source_digest` を代用しない。usageの部分記録から完全な総tokenを作らない。この生成情報UIの最終追加はsource実装であり、以下の途中の型検査や過去画面確認を最終build／実画面受入と読み替えない。
 

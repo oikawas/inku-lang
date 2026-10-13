@@ -8,6 +8,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — A completion no longer repeats the sentence end
+
+At the author's choice (drop it on receipt). A hole that a completion rewrites stops before the sentence end, but a proposal that also closed the sentence left the saved instructions ending twice, as in 「…散らす。。」 (found on the Pixel 9 approval card). Almost every Japanese proposal that reached approval closed its sentence.
+
+- When the source has a sentence end (`。` `.` `！` `!` `？` `?`) right after the hole, the shared core drops the proposal's own trailing sentence end before applying it. The approval card's proposed DDL shows one end too.
+- With no sentence end after the hole (instructions without a final period, or before a line break), the proposal keeps its end.
+- The prompt, the requests to the model, the hole ranges, the checks, and the drawing are unchanged. A proposal made before this change and still awaiting approval, and the instructions of saved works, stay as they are.
+
 ## v2.15.114 (2026-10-13 / Build 1190)
 
 ### 2026-10-13 — The Prompts tab shows the sketch and the composition reading

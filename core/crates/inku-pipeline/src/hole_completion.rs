@@ -12,6 +12,32 @@ fn contains(outer: SourceSpan, inner: SourceSpan) -> bool {
     outer.start_byte <= inner.start_byte && inner.end_byte <= outer.end_byte
 }
 
+/// The clause separators that end a sentence (`inku_ddl`'s clause stream); a
+/// hole's span stops before them.
+fn ends_sentence(character: char) -> bool {
+    matches!(character, '。' | '.' | '！' | '!' | '？' | '?')
+}
+
+/// A hole stops before its sentence end, so a completion that ends the
+/// sentence itself would leave the end twice (「…散らす。。」, 2026-10-13).
+/// Where the source ends the sentence right after the hole, the completion's
+/// own end is dropped; an answer that would be left blank stays as it is.
+pub(crate) fn without_repeated_sentence_end(
+    source: &str,
+    span: SourceSpan,
+    replacement: String,
+) -> String {
+    let source_ends = source
+        .get(span.end_byte..)
+        .and_then(|rest| rest.chars().next())
+        .is_some_and(ends_sentence);
+    let kept = replacement.trim_end_matches(ends_sentence);
+    if !source_ends || kept.len() == replacement.len() || kept.trim().is_empty() {
+        return replacement;
+    }
+    kept.to_owned()
+}
+
 /// The words the compiler could not read inside `span`, in source order (A1
 /// stage 3, 2026-10-06): a completion told which words were unread can rewrite
 /// them instead of copying them.

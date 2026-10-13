@@ -1140,7 +1140,7 @@ Hole補完の要求には、対象の原文、確定済みtyped fact、有限Sai
 
 単独primitiveのhead・actionが同一clause内で確定し、countが明示結合済み、または認識済み数値・未解決診断を持たず未指定のままで、group・sequence・continuation・fill targetを持たない単純な参照namespaceでは、その句の言い換えも個別に検証できる。候補を再compileし、全instructionのsource順head identity・count（未指定状態も含む）・actionが不変で、修正対象が外向きの参照依存を持たないことを追加確認する。未結合の数値や質的数量の診断を数量省略とみなさず、既定countを推測して補完しない。後続の未解決参照だけを理由に先行ownerの修復を拒否しない。依存構造が不明な単位はまとめたままにし、確定fact／owner／範囲外診断の既存検証と採用候補全体の再compileを省略しない。
 
-新しい応答は、要求内で有効な短い対象IDごとに修正候補または未解決理由を一件返す。共有RustはIDの完全一致・重複・欠落を検査し、保存済み要求とcompiler lockから実hole ID、許可span、range digest、base source digestを復元する。Providerにhashやbyte位置を再生成させず、Python／Kotlin hostに意味の補修を置かない。非同期応答のaction identity、revision、compiler lockとCASの検証は維持する。
+新しい応答は、要求内で有効な短い対象IDごとに修正候補または未解決理由を一件返す。共有RustはIDの完全一致・重複・欠落を検査し、保存済み要求とcompiler lockから実hole ID、許可span、range digest、base source digestを復元する。許可spanは文末の区切り（`。` `.` `！` `!` `？` `?`）の前で終わるので、原文でspanの直後が区切りのとき、候補の末尾の区切りは共有Rustが落としてから当てる（2026-10-13。候補も文を閉じると「…散らす。。」のように区切りが重なっていた）。落とすと空白だけになる候補は、そのまま検証する。Providerにhashやbyte位置を再生成させず、Python／Kotlin hostに意味の補修を置かない。非同期応答のaction identity、revision、compiler lockとCASの検証は維持する。
 
 Providerのpatchは候補にすぎない。共有compilerは再compile時に確定済みfactと、そのfactが結び付いていた対象を保つかを検査し、対象の解決を確認する。原文に含まれる未認識表現の同義性すべてを機械的に証明するものではなく、解釈結果は可視DDLとして作者へ提示する。独立性を証明できた単位だけを部分採用の候補にでき、同じ総数・group・参照関係等に依存する単位や独立性不明の単位を推測で分割しない。採用候補の組合せも全体を再compileして範囲外の意味と診断を照合する。作者の明示承認時にbaseへ再検証し、sourceと次authorityを1個のCAS save actionとしてhostへ渡す。一致するsave acknowledgmentの後だけ保存されたvisible bytesを再parseし、残ったholeの自動再送は行わない。未解決・不採用の対象と安全な理由コードを保持し、現在の安全なScore／SVGを失わず、部分採用を全hole解決と扱わない。
 

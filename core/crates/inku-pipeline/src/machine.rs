@@ -1879,6 +1879,12 @@ impl PipelineSnapshot {
                         };
                         match result {
                             HoleCompletionResult::Proposed { replacement, .. } => {
+                                let replacement =
+                                    crate::hole_completion::without_repeated_sentence_end(
+                                        base.document.source(),
+                                        hole.allowed_span,
+                                        replacement,
+                                    );
                                 proposals[index] = Some(replacement.clone());
                                 patch.edits.push(HolePatchEditResponse {
                                     hole_id: hole.id.clone(),

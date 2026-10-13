@@ -64,6 +64,9 @@ struct Execution<'a> {
     typed: Option<TypedExecutionPlan>,
     /// Mirror relations already applied.
     mirror_done: Vec<bool>,
+    /// Every expanded copy of each source instruction, by ordinal; a joint
+    /// relation of a group of copies is fitted from all of them.
+    copies: Vec<Vec<(usize, Instruction)>>,
 }
 
 fn relation_inside_member(
@@ -113,6 +116,12 @@ enum TranslationPredicate {
         end: Point,
         target_start: Point,
         target_end: Point,
+    },
+    Joint {
+        kind: RelationType,
+        own: Bounds,
+        prior: Bounds,
+        inside: Option<Bounds>,
     },
 }
 
@@ -171,8 +180,21 @@ impl ExternalConstraint {
                 target_start,
                 target_end,
             } => segments_properly_cross(moved(start), moved(end), target_start, target_end),
+            TranslationPredicate::Joint {
+                kind,
+                own,
+                prior,
+                inside,
+            } => crate::joint_relation::accepts(kind, own, prior, inside, delta),
         }
     }
+}
+
+fn union_bounds(union: Option<Bounds>, bounds: Bounds) -> Bounds {
+    union.map_or(bounds, |union| Bounds {
+        min: Point::new(union.min.x.min(bounds.min.x), union.min.y.min(bounds.min.y)),
+        max: Point::new(union.max.x.max(bounds.max.x), union.max.y.max(bounds.max.y)),
+    })
 }
 
 fn distance(point: Point) -> f64 {
@@ -968,6 +990,7 @@ impl Execution<'_> {
         &self,
         source: usize,
         relation: &inku_score::Relation,
+        start: Point,
     ) -> Result<Point, ScoreExecutionReason> {
         if let Some(anchor) = relation.target_anchor_index {
             if relation.target_instruction_index.is_some() || anchor >= self.anchors.len() {
@@ -1057,6 +1080,23 @@ impl Execution<'_> {
             ));
         }
         let prior = &prior.instruction;
+        if prior.is_closed_connection_target()
+            && self
+                .request
+                .score
+                .edition_at_least(inku_score::ScoreEdition::V0_20)
+        {
+            // A closed shape has no end: the start meets the nearest point of
+            // its outline (Score 0.20.0).
+            let outline = crate::affine_geometry::closed_outline(
+                prior,
+                self.request.canvas,
+                self.sources[target].transform,
+            )
+            .ok_or(ScoreExecutionReason::UnsupportedConnectedPrimitive)?;
+            return crate::joint_relation::nearest_on_outline(&outline, start)
+                .ok_or(ScoreExecutionReason::UnsupportedConnectedPrimitive);
+        }
         if !supports_connected(prior) {
             return Err(ScoreExecutionReason::UnsupportedConnectedPrimitive);
         }
@@ -1104,10 +1144,10 @@ impl Execution<'_> {
             // checks its final position and applies one common correction.
             return Ok(instruction);
         }
-        let target = self.connected_target(index, relation)?;
         let start = endpoint_geometry(&instruction, self.request.canvas)
             .ok_or(ScoreExecutionReason::UnsupportedConnectedPrimitive)?
             .0;
+        let target = self.connected_target(index, relation, start)?;
         let delta = finite_point(Point::new(target.x - start.x, target.y - start.y))?;
         if relation.position_authority == Some(ConnectedPositionAuthority::NumericFixed)
             && distance(delta) > GEOMETRY_EPSILON
@@ -1165,6 +1205,9 @@ impl Execution<'_> {
             // Preserve the member geometry until the scope's own transform has
             // completed. Only a common translation can satisfy this relation.
             return Ok(instruction);
+        }
+        if relation.kind.is_joint() && is_checked_bounds_relation(relation) {
+            return self.prepare_joint(index, ordinal, instruction);
         }
         if is_bounds_relation(relation)
             && (is_checked_bounds_relation(relation)
@@ -1319,6 +1362,197 @@ impl Execution<'_> {
         Ok(instruction)
     }
 
+    /// A joint relation of one source (Score 0.20.0). A compact arrangement
+    /// performs its copies as consecutive sources that all target the same
+    /// previous instruction; together they are one group. Resting on,
+    /// overlapping and crossing fit the whole group with one translation when
+    /// its first source is prepared; inside fits each copy alone.
+    fn prepare_joint(
+        &mut self,
+        index: usize,
+        ordinal: usize,
+        mut instruction: Instruction,
+    ) -> Result<Instruction, ScoreExecutionReason> {
+        let relation = self.request.score.instructions[index]
+            .relation
+            .clone()
+            .ok_or(ScoreExecutionReason::MissingJointReference)?;
+        let target = relation
+            .target_instruction_index
+            .filter(|&target| target < index)
+            .ok_or(ScoreExecutionReason::MissingJointReference)?;
+        let instructions = &self.request.score.instructions;
+        let run = (target + 1..instructions.len())
+            .take_while(|&member| {
+                instructions[member].relation.as_ref().is_some_and(|other| {
+                    other.kind == relation.kind && other.target_instruction_index == Some(target)
+                })
+            })
+            .collect::<Vec<_>>();
+        if !run.contains(&index) {
+            return Err(ScoreExecutionReason::MissingJointReference);
+        }
+        let per_copy = relation.kind == RelationType::Inside;
+        if !per_copy && (index != run[0] || !self.sources[index].performed.is_empty()) {
+            // The first copy already moved (or failed for) the whole group.
+            instruction.relation = None;
+            return Ok(instruction);
+        }
+        let bounds = |value: &Instruction, source: usize, ordinal: usize| {
+            crate::affine_geometry::bounds(
+                value,
+                self.request.performance_seed,
+                ordinal,
+                self.request.canvas,
+                None,
+                self.sources[source].transform,
+            )
+            .ok_or(ScoreExecutionReason::UnsupportedJointGeometry)
+        };
+        let own = if per_copy {
+            bounds(&instruction, index, ordinal)?
+        } else {
+            let mut union: Option<Bounds> = None;
+            for &member in &run {
+                for (copy, original) in &self.copies[member] {
+                    let placed = self.placed_instruction(*copy, original);
+                    union = Some(union_bounds(union, bounds(&placed, member, *copy)?));
+                }
+            }
+            union.ok_or(ScoreExecutionReason::UnsupportedJointGeometry)?
+        };
+        let constraint = self.joint_constraint(index, target, ordinal, &relation, own)?;
+        let zero = Point::new(0.0, 0.0);
+        let delta = if constraint.accepts(zero) {
+            zero
+        } else {
+            if relation.position_authority == Some(ConnectedPositionAuthority::NumericFixed) {
+                return Err(constraint.numeric_reason);
+            }
+            if !constraint.accepts(constraint.preferred) {
+                return Err(ScoreExecutionReason::ConflictingRelationConstraints);
+            }
+            constraint.preferred
+        };
+        if per_copy {
+            let canvas = self.request.canvas;
+            let anchor = crate::geometry::point_to_short_side_units(
+                crate::planning::instruction_anchor_on_canvas(&instruction, canvas),
+                canvas,
+            );
+            let moved = crate::geometry::point_from_short_side_units(
+                Point::new(anchor.x + delta.x, anchor.y + delta.y),
+                canvas,
+            );
+            instruction =
+                crate::planning::move_anchor_to_on_canvas(&instruction, moved, false, canvas);
+        } else {
+            let translation = AffineTransform::translation(delta);
+            for &member in &run {
+                self.apply_instruction_transform(member, translation)?;
+                self.transform_mirror_anchors(member, member + 1, translation, false);
+            }
+        }
+        instruction.relation = None;
+        Ok(instruction)
+    }
+
+    /// The constraint of a joint relation from the current bounds and the
+    /// bounds of every performed copy of the target source.
+    fn joint_constraint(
+        &self,
+        source: usize,
+        target: usize,
+        ordinal: usize,
+        relation: &inku_score::Relation,
+        own: Bounds,
+    ) -> Result<ExternalConstraint, ScoreExecutionReason> {
+        if relation.target_anchor_index.is_some() || target >= source {
+            return Err(ScoreExecutionReason::MissingJointReference);
+        }
+        if self.sources[source].structural || self.sources[target].structural {
+            return Err(ScoreExecutionReason::UnsupportedJointGeometry);
+        }
+        let mut prior: Option<Bounds> = None;
+        for value in &self.sources[target].performed {
+            let bounds = crate::affine_geometry::bounds(
+                &value.instruction,
+                self.request.performance_seed,
+                value.ordinal,
+                self.request.canvas,
+                value.seed_override,
+                self.sources[target].transform,
+            )
+            .ok_or(ScoreExecutionReason::UnsupportedJointGeometry)?;
+            prior = Some(union_bounds(prior, bounds));
+        }
+        let prior = prior.ok_or(ScoreExecutionReason::JointReferenceOmitted)?;
+        let prior_primitive = self.request.score.instructions[target].primitive;
+        // A fill is drawn clipped to its target, so the joint holds to the
+        // part that is seen; a shape inside it stays in the part of its inner
+        // rectangle that is seen.
+        let fill_target = self.fill_target_bounds(target);
+        let clip = |bounds: Bounds| {
+            fill_target
+                .and_then(|area| crate::joint_relation::part_within(bounds, area))
+                .unwrap_or(bounds)
+        };
+        let inside = crate::joint_relation::inside_region(prior_primitive, prior).map(clip);
+        let prior = clip(prior);
+        let paper = Bounds {
+            min: Point::new(0.0, 0.0),
+            max: crate::geometry::point_to_short_side_units(
+                Point::new(1.0, 1.0),
+                self.request.canvas,
+            ),
+        };
+        let preferred = crate::joint_relation::preferred(
+            relation.kind,
+            own,
+            prior,
+            inside,
+            prior_primitive,
+            paper,
+            self.request.performance_seed.unwrap_or_default(),
+            ordinal,
+        )
+        .ok_or(ScoreExecutionReason::UnsupportedJointGeometry)?;
+        Ok(ExternalConstraint {
+            source,
+            preferred,
+            predicate: TranslationPredicate::Joint {
+                kind: relation.kind,
+                own,
+                prior,
+                inside,
+            },
+            numeric_reason: ScoreExecutionReason::NumericJointPositionConflict,
+        })
+    }
+
+    /// The bounds of the target a source instruction's fill is clipped to, in
+    /// canvas-short-edge units, when the instruction belongs to a fill that is
+    /// drawn.
+    fn fill_target_bounds(&self, source: usize) -> Option<Bounds> {
+        let typed = self.typed.as_ref()?;
+        let scope = typed.instructions.get(source)?.fill_scope_index?;
+        if self.omitted_fill_scopes.get(scope).copied().unwrap_or(true) {
+            return None;
+        }
+        let contour = typed.fill_scopes.get(scope)?.prepared_region.contour();
+        let first = *contour.first()?;
+        Some(contour.iter().fold(
+            Bounds {
+                min: first,
+                max: first,
+            },
+            |bounds, point| Bounds {
+                min: Point::new(bounds.min.x.min(point.x), bounds.min.y.min(point.y)),
+                max: Point::new(bounds.max.x.max(point.x), bounds.max.y.max(point.y)),
+            },
+        ))
+    }
+
     fn bounds_constraint(
         &self,
         source: usize,
@@ -1328,7 +1562,15 @@ impl Execution<'_> {
     ) -> Result<ExternalConstraint, ScoreExecutionReason> {
         let relation = instruction.relation.as_ref().expect("bounds relation");
         let between = relation.kind == RelationType::Between;
-        let (missing, omitted, geometry, numeric_reason) = if between {
+        let joint = relation.kind.is_joint();
+        let (missing, omitted, geometry, numeric_reason) = if joint {
+            (
+                ScoreExecutionReason::MissingJointReference,
+                ScoreExecutionReason::JointReferenceOmitted,
+                ScoreExecutionReason::UnsupportedJointGeometry,
+                ScoreExecutionReason::NumericJointPositionConflict,
+            )
+        } else if between {
             (
                 ScoreExecutionReason::MissingBetweenReference,
                 ScoreExecutionReason::BetweenReferenceOmitted,
@@ -1377,6 +1619,9 @@ impl Execution<'_> {
                 .last()
                 .and_then(|value| value.seed_override),
         )?;
+        if joint {
+            return self.joint_constraint(source, source - 1, ordinal, relation, own);
+        }
         let target = |index: usize| {
             let value = self.sources[index].performed.last().ok_or(omitted)?;
             bounds(
@@ -1532,7 +1777,7 @@ impl Execution<'_> {
             numeric_reason,
         };
         if relation.kind == RelationType::Connected {
-            return Ok(exact(self.connected_target(source, relation)?));
+            return Ok(exact(self.connected_target(source, relation, start)?));
         }
         let target = relation
             .target_instruction_index
@@ -2395,6 +2640,15 @@ fn resolve_impl(
                 .map_or(0, |typed| typed.mirror_relations.len())
         ],
         typed,
+        copies: ordinals
+            .iter()
+            .map(|ordinals| {
+                ordinals
+                    .iter()
+                    .map(|&ordinal| (ordinal, expanded.instructions[ordinal].clone()))
+                    .collect()
+            })
+            .collect(),
     };
     for node in execution.schedule.order.clone() {
         if let ScheduleNode::Group(index) = node {

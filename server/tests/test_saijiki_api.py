@@ -147,6 +147,7 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
     "aida": (
         ("沿う", "along"), ("触れない", "not touching"), ("切る", "cutting"),
         ("間に", "between"), ("触れる", "touching"), ("つながる", "connected"),
+        ("載る", "resting on"), ("中に", "inside"), ("重なる", "overlaps"), ("横切る", "crossing"),
         ("鏡写し", "mirrored"),
     ),
 }

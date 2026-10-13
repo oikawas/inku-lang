@@ -25,6 +25,7 @@ pub mod ground;
 mod ground_patterns;
 pub mod group;
 mod ink_spread;
+mod joint_relation;
 pub mod layers;
 mod mark_geometry;
 mod mark_paths;
@@ -50,7 +51,7 @@ pub const CORE_API_VERSION: &str = "0.1.0";
 
 /// Canonical engine identity owned by the portable core and exposed by every host binding.
 pub const RENDER_ENGINE_ID: &str = "default";
-pub const RENDER_ENGINE_VERSION: &str = "73";
+pub const RENDER_ENGINE_VERSION: &str = "74";
 
 /// Report the host-boundary version for binding and packaging smoke tests.
 #[must_use]
@@ -75,6 +76,6 @@ mod tests {
 
     #[test]
     fn engine_identity_is_owned_by_the_core() {
-        assert_eq!(render_engine_identity(), ("default", "73"));
+        assert_eq!(render_engine_identity(), ("default", "74"));
     }
 }

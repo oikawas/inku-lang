@@ -121,7 +121,7 @@ def test_checked_in_score_schema_matches_the_live_pydantic_model() -> None:
     assert {"version", "canvas", "background", "presence", "instructions", "anchors", "transform_groups", "placement_groups", "repetition_groups", "fill_groups", "mirror_relations", "resource_policy"} <= properties.keys()
 
     assert properties["version"]["default"] == "0.9.0"
-    assert properties["version"]["enum"] == ["0.19.0", "0.18.0", "0.17.0", "0.16.0", "0.15.0", "0.14.0", "0.13.0", "0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
+    assert properties["version"]["enum"] == ["0.20.0", "0.19.0", "0.18.0", "0.17.0", "0.16.0", "0.15.0", "0.14.0", "0.13.0", "0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
     transform_group = schema["$defs"]["TransformGroup"]["properties"]
     assert {"start", "end", "rotation_degrees", "scale_x", "scale_y", "translate_x", "translate_y", "fixed_position_indices", "anchor_indices"} <= transform_group.keys()
     placement_group = schema["$defs"]["PlacementGroup"]["properties"]
@@ -299,3 +299,20 @@ def test_score010_compact_recipe_reads_without_changing_the_default_edition() ->
     assert score.version == "0.10.0"
     assert score.instructions[0].arrangement.resolved.recipe.kind == "place"
     assert Score.model_fields["version"].default == "0.9.0"
+
+
+def test_score20_requires_its_edition_for_joint_relations_only() -> None:
+    relation = {"type": "resting_on", "target_instruction_index": 0, "position_authority": "named_movable"}
+    data = {"version": "0.20.0", "instructions": [
+        {"primitive": "square"}, {"primitive": "circle", "relation": relation},
+    ]}
+    assert Score.model_validate(data).model_dump()["instructions"][1]["relation"]["type"] == "resting_on"
+    with pytest.raises(ValueError, match="require Score version 0.20.0"):
+        Score.model_validate({**data, "version": "0.19.0"})
+    # A saved connection to a closed shape before 0.20.0 stays readable.
+    older = {"version": "0.19.0", "instructions": [
+        {"primitive": "circle"},
+        {"primitive": "line", "relation": {
+            "type": "connected", "target_instruction_index": 0, "position_authority": "named_movable"}},
+    ]}
+    assert Score.model_validate(older).version == "0.19.0"

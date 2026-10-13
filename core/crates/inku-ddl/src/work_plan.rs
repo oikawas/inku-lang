@@ -1056,6 +1056,21 @@ pub fn print_work_plan_composed(
     plugins: &[WorkPlanPlugin],
     ranges: &[Option<ComposedRange>],
 ) -> String {
+    print_work_plan_composed_with_joints(plan, language, plugins, ranges, &[])
+}
+
+/// [`print_work_plan_composed`] with the joint relation each layer is joined to
+/// the previous one by (a Score relation type such as `resting_on`): its
+/// sentence ends with the relation's Saijiki phrase. Layers past the end of
+/// `joints`, or with `None`, have no joint.
+#[must_use]
+pub fn print_work_plan_composed_with_joints(
+    plan: &WorkPlan,
+    language: ResolvedInstructionLanguage,
+    plugins: &[WorkPlanPlugin],
+    ranges: &[Option<ComposedRange>],
+    joints: &[Option<&str>],
+) -> String {
     let mut lines = Vec::new();
     if let Some(ground) = &plan.ground {
         let text = surface(WorkPlanSlot::Ground, ground, language);
@@ -1098,12 +1113,53 @@ pub fn print_work_plan_composed(
     }
     for (index, layer) in plan.layers.iter().enumerate() {
         let range = ranges.get(index).and_then(Option::as_ref);
-        lines.push(match language {
+        let sentence = match language {
             ResolvedInstructionLanguage::Ja => print_layer_ja(layer, range),
             ResolvedInstructionLanguage::En => print_layer_en(layer, range),
+        };
+        let relation = joints
+            .get(index)
+            .copied()
+            .flatten()
+            .and_then(|relation| joint_phrase(relation, language));
+        lines.push(match relation {
+            Some(phrase) => with_joint_phrase(&sentence, phrase, language),
+            None => sentence,
         });
     }
     lines.join("\n")
+}
+
+/// The Saijiki phrase of a joint relation (its first literal in the language).
+fn joint_phrase(relation: &str, language: ResolvedInstructionLanguage) -> Option<&'static str> {
+    let entry = crate::saijiki::saijiki_asset()
+        .relations
+        .iter()
+        .find(|entry| entry.relation_type == relation)?;
+    match language {
+        ResolvedInstructionLanguage::Ja => entry.literals_ja.first(),
+        ResolvedInstructionLanguage::En => entry.literals_en.first(),
+    }
+    .map(String::as_str)
+}
+
+/// A printed sentence that ends with a joint phrase: `…を置く、前の形に載る。`,
+/// `… resting on the previous shape.`.
+fn with_joint_phrase(
+    sentence: &str,
+    phrase: &str,
+    language: ResolvedInstructionLanguage,
+) -> String {
+    match language {
+        ResolvedInstructionLanguage::Ja => {
+            let body = sentence.strip_suffix('。').unwrap_or(sentence);
+            format!("{body}、{phrase}。")
+        }
+        ResolvedInstructionLanguage::En => {
+            let body = sentence.strip_suffix('.').unwrap_or(sentence);
+            format!("{body} {phrase}.")
+        }
+    }
 }
 
 fn fixed_palette() -> inku_score::ResolvedPaletteContext {

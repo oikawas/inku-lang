@@ -1056,6 +1056,7 @@ Stage 1のfallback候補はStage 1の応答待ちにだけ属する。Stage 1が
 - 検査: 読みを下絵に照らし、画面で示せない値を落として所見を記録する（出来事`composition_read`は所見のcodeだけを持つ）。記述が言う場所は、引いた言葉が記述にあり、位置の言葉（日本語は上・下・中央・中心・真ん中・左・右・隅・端を部分一致、英語はtop・bottom・center・centre・middle・left・right・corner(s)・edge(s)・above・below・upper・lowerを単語として）を含むときだけ残す。
 - 解き: 各層の範囲の組み合わせを総当たりで探し（上限3,000,000）、読みと作者の既定（動的な均衡、多めの余白、左右は同等）に照らした点で比べる。最良の点の1.03倍＋0.02以内の答えから、作品の`composition_seed`（無ければ1）と、構図を入れる前の文書のdigestで一つを選ぶ。記述が「隅」とだけ言う層は四隅の範囲から選ぶ。記述が名指す隅（右下の隅など）は、読みが場所の値`top_left_corner`・`top_right_corner`・`bottom_left_corner`・`bottom_right_corner`で返し、引いた言葉が記述にあって位置の言葉を含み、下絵の場所が無いか、「隅」か、その隅がある側の場所（左上の隅なら上・上端・左端）のときは、下絵の場所より優先してその隅の範囲に置く（下絵の語彙では、どの隅かを言えないため。所見`stated_corner_from_reading`、I-712）。下絵の場所がほかの場所（中心など）のときは、読み手が言葉を別の層に結ぶことがあるので、下絵の場所を残す（所見`stated_corner_conflict`）。
 - 印字: 構図が置いた層は数値の範囲（§18）で、範囲の名前と数を書く（`右下（横2/3〜1、縦2/3〜1）に、…`、`… at the bottom right (horizontal 2/3 to 1, vertical 2/3 to 1)`）。記述が場所を言う層は、その場所の語のまま書く。Build 1155〜1163は範囲の前に印「［構図］」（英語は`[composition]`）を置いていたが、2026-10-05の作者の判断で書かなくなった（§18）。構図を入れた文書が診断なしで組めることを確かめてから、Stage 1の理由のままcommitする。
+- 継ぎ目（I-711 段C、2026-10-12 作者の判断）: 読みの継ぎ目（付ける層・相手・語。載る・中に・重なる・横切る・つながる、§14.4）は、検査で、層の番号が無いもの、記述が場所を言う付ける層、相手1つに2つ目の付ける層、2つ目の継ぎ目を持つ付ける層、輪になるもの、線・弧・点でない層のつながると雲形へのつながるを落とす。付ける層には継ぎ目の無い解きの範囲を書く（範囲で広がりを決め、位置は継ぎ目が決める）。ほかの層は付ける層を外して解き直し、相手は付ける層の重さを足し、付ける層の範囲の大きさの箱を語ごとに置いたまとまり（載るは相手の箱の上の辺の上に中央で、中には相手の箱の中、ほかは相手の箱の中心に）が紙に収まる範囲だけを候補にし（無ければ全部）、まとまりの箱で採点する。印字では付ける層を相手の直後へ移し、文の末に歳時記の句（`前の形に載る`・`resting on the previous shape`など）を付ける。解き直しが解けないときは継ぎ目なしで印字する。読みが継ぎ目を返すのは後の段で、今の読みでは構図は変わらない。
 - 読みが使えないとき: 読みの要求が予算を使い切ったとき、読めない応答の再試行が尽きたとき、要求を組めないときは、既定の読み（関係なし、作者の既定、下絵の場所はすべて残す）で解く（出来事`composition_fallback`）。組み合わせが上限を超える、置ける範囲が無い、構図を入れた文書が組めないときは、構図を入れずにStage 1が印字したままcommitする（出来事`composition_skipped`）。残りを描く道（`stage1_residual_execution`）と、`normalized_ddl`を持つ保存済み応答の再生には構図を入れない。
 - 設定: `PipelineConfig.composition`（`{read}`）。無ければ構図を行わない。`read: false`は読みを送らず、既定の読みで解く。Serverの既定のmanifestは`{read: true}`で、保存した設定で描き直す作品はその設定のままである。Androidの新規設定は雲のモデルで`read: true`、端末のLiteRT Gemma 4 E2Bで`read: false`とする。
 - Serverは読みの時間をStage 1と分けて`metrics.composition`に数え（履歴の列は増やさず、合計にだけ入る）、読みの失敗の段を`composition`と記録する。読みのsystem promptはプロンプトのタブに出さない。
@@ -1786,7 +1787,7 @@ LeWitt の Wall Drawing も同様である。語彙は線と少数の色とい�
 
 §13.3 の感情語彙/運動語彙の区別を、関係に延長する。物理的・外部観察可能な関係のみをコアに許す。
 
-**関係語彙は次の7語に限定する:**
+**関係語彙は次の11語に限定する:**
 
 | 語彙（日） | 語彙（英） | 意味 | Scoreの表現 |
 |---|---|---|---|
@@ -1795,14 +1796,20 @@ LeWitt の Wall Drawing も同様である。語彙は線と少数の色とい�
 | 切る | cutting | 直前要素を横切り、視覚的な断絶を作る（短歌の「切れ」に相当） | `cutting` |
 | 間に | between | 直前の2要素の間の領域に置く | `between` |
 | 触れる | touching | 直前要素に接触する。両端点を一致させて閉形を構成する | `touching` |
-| つながる | connected | current始端を、明示時は先行Line / Arcの始点・終点・途中へ、未指定時は直前要素の終端へ合わせる | `connected` |
+| つながる | connected | current始端を、明示時は先行Line / Arcの始点・終点・途中へ、未指定時は直前要素の終端（閉じた形なら輪郭の最も近い点）へ合わせる | `connected` |
+| 載る | resting on | 直前要素の上の縁に、当該要素の下端を接して載せる | `resting_on` |
+| 中に | inside | 直前の閉じた要素の内側に置く | `inside` |
+| 重なる | overlaps | 直前要素に一部を重ねて置く | `overlapping` |
+| 横切る | crossing | 直前要素を、片方の縁から反対の縁まで越えて置く | `crossing` |
 | 鏡写し | mirrored | 二つの形・まとまりの間の軸を挟んで位置と向きを鏡像にする | `mirror_relations` |
 
 **排除する語**: 寄り添う、応える、対話する、呼応する——意図・擬人の語であり、外部から観察できない。
 
 `relation` は正規化DDL中に明示的な previous-object 句がある場合に限る。`connected` は既存の `前の形につながる` に加え、`[前の]線/弧の始点/終点につながる` を受ける。後者は対象側端点だけを選び、currentはcanonical始点のままである。通常DDLの無回転の線・通常弧では左が始点、右が終点であり、回転・鏡映後も同じ端を指す。途中を指定した接続はLine / Arcの両端以外へつなぎ、具体位置を演奏で決める。端点も途中も指定しない接続はprior終端からcurrent始端へつながる。自然文由来の「周囲」「同じ拍子」「先行/遅れ」「近く/遠く」は relation ではなく、position / path / rotation / spacingで表す。
 
-**第二段候補（実測後に判断）**: 重なる、離す、同じ向きに、逆向きに、〜より細く。現行語で表現の不足が実測で示されてから追加する。片端接続の`つながる (connected)`は独立した表現価値と有限なLine / Arc / Point endpoint familyを確定してから導入した。
+載る・中に・重なる・横切るは、`前の形に載る` / `resting on the previous shape`、`前の形の中に` / `inside the previous shape`、`前の形に重なる` / `overlapping the previous shape`、`前の形を横切る` / `crossing the previous shape` の固定句だけで関係になる（DDL 18、Score 0.20.0）。英語の短い形は `resting on` / `inside` / `overlaps` / `crossing` である。重なるの短い形を `overlaps` とするのは、`overlapping` が組の並べ方の語（重ねて）だからである。横切るは視覚の断絶を作る「切る」とは別の語である。記述49作品のうち22作品が物どうしの継ぎ目を言い、強い読み手が継ぎ目を参照どおりに読めることを測ってから足した。
+
+**第二段候補（実測後に判断）**: 離す、同じ向きに、逆向きに、〜より細く、貫く、渡る、囲む、吊る。現行語で表現の不足が実測で示されてから追加する。片端接続の`つながる (connected)`は独立した表現価値と有限なLine / Arc / Point endpoint familyを確定してから導入した。
 
 ### 14.3 JSON Score スキーマ
 
@@ -1821,7 +1828,7 @@ instruction に任意フィールド `relation` を追加する。
 
 | フィールド | 値 | 説明 |
 |---|---|---|
-| `type` | `along` / `not_touching` / `cutting` / `between` / `touching` / `connected` | 関係の種類 |
+| `type` | `along` / `not_touching` / `cutting` / `between` / `touching` / `connected` / `resting_on` / `inside` / `overlapping` / `crossing` | 関係の種類。後の4つと、閉じた形を相手にする`connected`はScore 0.20.0 |
 | `gap` | `narrow` / `medium` / `wide` | 距離の目安。具体値は演奏が解決する |
 | `target_instruction_index` | 0以上のScore index | checked `connected` / `touching` / `along` / `cutting`が参照する正確な先行Score instruction。旧relationでは省略 |
 | `target_path_position` | 有限な0〜1 / `"interior"` | 数値はScore 0.11のLine中心線位置。文字列はScore 0.13でLine / Arcの両端以外を演奏時に選ぶ。サンプル順の補間を使い、明示した先行targetを保持する |
@@ -1846,7 +1853,8 @@ id 参照が必要になった場合も、その必要が実測で示されて�
 - `cutting` → 直前要素と交差する角度・交点を、レンジ内で演奏ごとに決める
 - `between` → 直前2要素の間の領域内で決める
 - `touching` → line / arc だけに適用し、直前の line / arc の演奏実現後の両端点へ当該要素の両端点を一致させる
-- `connected` → Line / Arc / Pointに適用する。`target_endpoint`があればcurrentのcanonical始端（Pointはcenter）を指定したprior Line / Arc端点へ、なければpriorのcanonical終端（Pointはcenter）へ平行移動する。prior、寸法、曲率、rotationは変えない
+- `connected` → Line / Arc / Pointに適用する。`target_endpoint`があればcurrentのcanonical始端（Pointはcenter）を指定したprior Line / Arc端点へ、なければpriorのcanonical終端（Pointはcenter）へ平行移動する。priorが閉じた四角・円・楕円・三角・多角形なら、揺らぎの前の輪郭（rotationと変形の後）の上で、currentの始端に最も近い点へ平行移動する（Score 0.20.0。雲形と三日月は相手にしない）。prior、寸法、曲率、rotationは変えない
+- `resting_on` / `inside` / `overlapping` / `crossing` → どの図形にも適用し、currentと直前要素の演奏後の外接矩形から、currentを平行移動だけで合わせる。直前要素は動かさず、currentの形・寸法・向きは変えない。残る自由は演奏seedで選ぶ。直前要素が塗り（`fill_groups`の構成員）なら、塗りの区画（target）で切り抜いた見える部分を直前要素の外接矩形とし、`inside`の内側の矩形も区画と重ねた部分にする（区画と重ならなければ切り抜く前のまま）。載せる横の位置・横切る位置・中に入れる位置は、直前要素（中にでは内側の矩形）の紙の上の部分にcurrentが収まるならその部分から選び、収まらなければ直前要素全体から選ぶ。選んだ載る・横切るの位置でcurrent（群れなら全体）が紙からはみ出すときは、関係が成り立つ範囲の中で紙に収まる最も近い位置へ動かし、収まる位置が無ければ範囲の中で紙に最も近い位置にする。重なるは、seedの向きでcurrentが紙からはみ出すときだけ、ほかの向きを順に試し、currentが紙に収まる最初の向き、無ければ中心が紙の上に来る最初の向きにする（作者の判断 2026-10-12・2026-10-13）。`resting_on`はcurrentの下端を直前要素の上端に合わせ、横の中心をcurrentが直前要素の横幅に収まる範囲から選ぶ（currentが広ければ中心）。`inside`は直前の閉じた要素の内側の矩形（四角は外接矩形、ほかの閉じた形は中心を同じにして1/√2に縮めた矩形）に収まる位置を選び、開いた形・点・入りきらないcurrentでは成り立たない。`overlapping`はcurrentの外接矩形の面積のうち直前要素と重なる割合を1/3〜2/3から選び（判定は1/4〜3/4）、seedの向きへずらす。`crossing`は直前要素の細い向き（横長なら縦、縦長なら横）でcurrentを直前要素の両側へはみ出させ、もう一方の向きの中心を直前要素の範囲から選ぶ。直前要素の縦横が同じなら、currentの長い向きで越える。currentがその向きで直前要素より短ければ成り立たない（作者の判断 2026-10-12）。成り立たないときは`missing_joint_reference` / `joint_reference_omitted` / `unsupported_joint_geometry` / `numeric_joint_position_conflict`を記録して関係だけを外す。個数が2以上の群れ（同じ直前要素を指す連続した個）は、`resting_on` / `overlapping` / `crossing`では群れ全体の外接矩形から一つの平行移動を求めて全体を動かし（並びや散らばりは保つ）、`inside`では個ごとに直前要素の内側へ動かす（作者の判断 2026-10-12）。群れの相手が群れなら、相手の全体の外接矩形を使う。組の外部関係では組の全体を一つの平行移動で合わせる。Macroのemitはこの4語をまだ運ばない
 
 現行のtyped Along / Cutting描画はCount1のactual Scoreを対象とする。Macroの反復CompositionPlanは共通のrelation intentを保持するが、反復個体の演奏は後続materializationで扱う。Typed Alongではcurrentと直前要素がともに線で、currentの方向が未指定なら、その方向を直前の線と平行に揃える。明示された方向・寸法・数値位置は保持する。Typed Cuttingも、共通resolverが決めた通常寸法または明示寸法を保持し、専用のランダム長に置き換えない。明示方向は交差角の演奏より優先する。通常DDLとMacroは同じ意味を使う。旧metadata-free Scoreの関係処理は保存形式の互換用に保持する。
 
@@ -1881,7 +1889,7 @@ relation は記述者が Stage 1 または direct typed DDL で明示した場�
 
 ### 14.7 歳時記への表示
 
-歳時記の「あいだ」カテゴリは、関係の語彙が単なる幾何指定ではなく、余白と緊張を書くための語であることを示す。表示例: 「沿う」「触れない」「切る」「間に」「触れる」「つながる」。
+歳時記の「あいだ」カテゴリは、関係の語彙が単なる幾何指定ではなく、余白と緊張を書くための語であることを示す。表示例: 「沿う」「触れない」「切る」「間に」「触れる」「つながる」「載る」「中に」「重なる」「横切る」「鏡写し」。
 
 ---
 

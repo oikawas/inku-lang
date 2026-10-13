@@ -562,6 +562,55 @@ pub struct Relation {
     pub toward: Option<String>,
 }
 
+/// The words a reading joins two layers with: the DDL relations that join a
+/// shape to the previous one (resting on, inside, overlapping, crossing and
+/// connected).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum JointKind {
+    RestsOn,
+    Inside,
+    Overlaps,
+    Crosses,
+    ContinuesFrom,
+}
+
+impl JointKind {
+    #[must_use]
+    pub fn parse(value: &str) -> Option<Self> {
+        Some(match value {
+            "rests_on" => Self::RestsOn,
+            "inside" => Self::Inside,
+            "overlaps" => Self::Overlaps,
+            "crosses" => Self::Crosses,
+            "continues_from" => Self::ContinuesFrom,
+            _ => return None,
+        })
+    }
+
+    /// The Score relation the printed phrase makes.
+    #[must_use]
+    pub fn relation_type(self) -> &'static str {
+        match self {
+            Self::RestsOn => "resting_on",
+            Self::Inside => "inside",
+            Self::Overlaps => "overlapping",
+            Self::Crosses => "crossing",
+            Self::ContinuesFrom => "connected",
+        }
+    }
+}
+
+/// A joint the composition writes: layer `a` is printed right after layer `b`
+/// and joined to it by the relation of `kind`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Joint {
+    #[serde(rename = "type")]
+    pub kind: JointKind,
+    pub a: usize,
+    pub b: usize,
+}
+
 /// The roles a reading gives its layers, in the order the response schema lists them.
 pub const ROLE_NAMES: [&str; 5] = ["field", "focal", "secondary", "scattered", "accent"];
 
@@ -743,6 +792,10 @@ pub struct CheckedReading {
     pub tension: BTreeMap<String, String>,
     /// Places the description states, by layer: kept as they are.
     pub fixed: BTreeMap<usize, String>,
+    /// Joints the composition writes as DDL relations (I-711 stage C). A
+    /// reading without joints keeps its stored form.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub joints: Vec<Joint>,
 }
 
 /// What the check dropped, changed or kept, and why (by code).
@@ -1162,9 +1215,59 @@ pub fn check(
             relations,
             tension,
             fixed,
+            joints: Vec::new(),
         },
         findings,
     ))
+}
+
+/// The joints a composition can write, in the given order, and a finding for
+/// each one it drops: a layer number out of range, a layer whose place the
+/// description states, a partner or a layer already joined, a joint that would
+/// close a loop, or a connection the joined shape cannot start (only a line, an
+/// arc or a point connects, and not to a cloudform).
+#[must_use]
+pub fn check_joints(
+    joints: &[Joint],
+    layers: &[WorkPlanLayer],
+    fixed: &BTreeMap<usize, String>,
+) -> (Vec<Joint>, Vec<Finding>) {
+    let mut kept: Vec<Joint> = Vec::new();
+    let mut findings = Vec::new();
+    for joint in joints {
+        let item = format!("{} {}->{}", joint.kind.relation_type(), joint.a, joint.b);
+        let code = if joint.a >= layers.len() || joint.b >= layers.len() || joint.a == joint.b {
+            Some("joint_layer")
+        } else if fixed.contains_key(&joint.a) {
+            Some("joint_stated")
+        } else if joint.kind == JointKind::ContinuesFrom
+            && (!matches!(layers[joint.a].shape.as_str(), "line" | "arc" | "point")
+                || layers[joint.b].shape == "cloudform")
+        {
+            Some("joint_not_writable")
+        } else if kept.iter().any(|other| other.b == joint.b) {
+            Some("joint_partner_taken")
+        } else if kept.iter().any(|other| other.a == joint.a) {
+            Some("joint_layer_taken")
+        } else {
+            // Following the partners from b must not come back to a.
+            let mut step = joint.b;
+            let mut closes = false;
+            while let Some(next) = kept.iter().find(|other| other.a == step) {
+                step = next.b;
+                if step == joint.a {
+                    closes = true;
+                    break;
+                }
+            }
+            closes.then_some("joint_cycle")
+        };
+        match code {
+            Some(code) => findings.push(finding(code, item, "dropped")),
+            None => kept.push(*joint),
+        }
+    }
+    (kept, findings)
 }
 
 /// The reading to solve when no reading can be used.
@@ -1213,6 +1316,7 @@ pub fn default_reading(layers: &[WorkPlanLayer]) -> CheckedReading {
         relations: Vec::new(),
         tension: BTreeMap::new(),
         fixed,
+        joints: Vec::new(),
     }
 }
 
@@ -1959,6 +2063,93 @@ struct Work<'a> {
     balance: String,
     tension: BTreeMap<String, String>,
     options: Vec<Vec<usize>>,
+    /// The layers joined to each layer (I-711 stage C); empty without joints.
+    joined: Vec<Vec<Joined>>,
+}
+
+/// A layer joined to a composed layer: the joint, the size of the range the
+/// joined layer keeps, and what its weight is made of.
+#[derive(Clone, Debug)]
+struct Joined {
+    kind: JointKind,
+    width: Frac,
+    height: Frac,
+    fixed_weight: Option<f64>,
+    fill: bool,
+    tone: f64,
+    surface: f64,
+}
+
+impl Joined {
+    fn weight(&self, r: &Rect) -> f64 {
+        match self.fixed_weight {
+            Some(weight) => weight,
+            None => {
+                let scale = if self.fill { 4.0 } else { 2.0 };
+                area(r) * scale * self.tone * self.surface
+            }
+        }
+    }
+}
+
+const WHOLE: Rect = [Frac::ZERO, Frac::ZERO, Frac::ONE, Frac::ONE];
+
+/// The box of a composed layer and the layers joined to it, each placed where
+/// its joint moves it, with the size of its range: resting on sits centred on
+/// the top edge, inside stays within the box, and the other joints centre on
+/// the box.
+fn joint_group(own: &Rect, joined: &[Joined]) -> Rect {
+    let (cx, cy) = exact_center(own);
+    joined.iter().fold(*own, |group, joint| {
+        let (half_width, half_height) = (joint.width.half(), joint.height.half());
+        let placed = match joint.kind {
+            JointKind::Inside => return group,
+            JointKind::RestsOn => [
+                cx - half_width,
+                own[1] - joint.height,
+                cx + half_width,
+                own[1],
+            ],
+            _ => [
+                cx - half_width,
+                cy - half_height,
+                cx + half_width,
+                cy + half_height,
+            ],
+        };
+        [
+            group[0].min(placed[0]),
+            group[1].min(placed[1]),
+            group[2].max(placed[2]),
+            group[3].max(placed[3]),
+        ]
+    })
+}
+
+/// What a layer's weight is made of: its tone against the background, its
+/// surface, and its weight when that does not depend on the range.
+fn weight_parts(layer: &WorkPlanLayer, background_lightness: f64) -> (f64, f64, Option<f64>) {
+    let tone =
+        0.3 + (lightness(attribute(layer, WorkPlanSlot::Color), 0.5) - background_lightness).abs();
+    let surface = surface_weight(attribute(layer, WorkPlanSlot::Surface));
+    let fixed = if matches!(layer.action.as_str(), "fill" | "tile") {
+        None
+    } else {
+        let shape = match layer.shape.as_str() {
+            "line" | "arc" => 0.5,
+            "point" => 0.3,
+            _ => 1.0,
+        };
+        Some(
+            size_area(attribute(layer, WorkPlanSlot::Size))
+                * count_weight(layer.count)
+                * 10.0
+                * tone
+                * surface
+                * shape,
+        )
+    };
+    (tone, surface, fixed)
 }
 
 /// Why a work is not solved.
@@ -2006,29 +2197,10 @@ impl<'a> Work<'a> {
             balance,
             tension,
             options: Vec::with_capacity(layers.len()),
+            joined: vec![Vec::new(); layers.len()],
         };
         for (i, layer) in layers.iter().enumerate() {
-            let tone = 0.3
-                + (lightness(attribute(layer, WorkPlanSlot::Color), 0.5) - background_lightness)
-                    .abs();
-            let surface = surface_weight(attribute(layer, WorkPlanSlot::Surface));
-            let fixed = if matches!(layer.action.as_str(), "fill" | "tile") {
-                None
-            } else {
-                let shape = match layer.shape.as_str() {
-                    "line" | "arc" => 0.5,
-                    "point" => 0.3,
-                    _ => 1.0,
-                };
-                Some(
-                    size_area(attribute(layer, WorkPlanSlot::Size))
-                        * count_weight(layer.count)
-                        * 10.0
-                        * tone
-                        * surface
-                        * shape,
-                )
-            };
+            let (tone, surface, fixed) = weight_parts(layer, background_lightness);
             work.tone.push(tone);
             work.surface.push(surface);
             work.fixed_weight.push(fixed);
@@ -2047,7 +2219,53 @@ impl<'a> Work<'a> {
         self.options.iter().map(|o| o.len() as u64).product()
     }
 
+    /// Keep the layers joined to each layer: a layer with joined layers keeps
+    /// only the ranges where its group lies on the canvas, when there is one.
+    fn with_joined(mut self, joined: Vec<Vec<Joined>>) -> Self {
+        let table = regions();
+        for (i, group) in joined.iter().enumerate() {
+            if group.is_empty() {
+                continue;
+            }
+            let fitting: Vec<usize> = self.options[i]
+                .iter()
+                .copied()
+                .filter(|index| {
+                    let own = effective(&self.layers[i], &table.all[*index].rect);
+                    inside(&joint_group(&own, group), &WHOLE)
+                })
+                .collect();
+            if !fitting.is_empty() {
+                self.options[i] = fitting;
+            }
+        }
+        self.joined = joined;
+        self
+    }
+
+    /// The box a layer is scored with: its extent, grown by the layers joined to it.
+    fn boxed(&self, i: usize, rect: &Rect) -> Rect {
+        let own = effective(&self.layers[i], rect);
+        if self.joined[i].is_empty() {
+            own
+        } else {
+            joint_group(&own, &self.joined[i])
+        }
+    }
+
     fn weight(&self, i: usize, r: &Rect) -> f64 {
+        let own = self.own_weight(i, r);
+        if self.joined[i].is_empty() {
+            return own;
+        }
+        let mut total = own;
+        for joined in &self.joined[i] {
+            total += joined.weight(r);
+        }
+        total
+    }
+
+    fn own_weight(&self, i: usize, r: &Rect) -> f64 {
         match self.fixed_weight[i] {
             Some(weight) => weight,
             None => {
@@ -2282,7 +2500,7 @@ impl<'a> Work<'a> {
         let roles = &self.reading.roles;
         let n = self.layers.len();
         let boxes: Vec<Rect> = (0..n)
-            .map(|i| effective(&self.layers[i], &table.all[choice[i]].rect))
+            .map(|i| self.boxed(i, &table.all[choice[i]].rect))
             .collect();
         terms.0.clear();
         let weights: Vec<f64> = (0..n).map(|i| self.weight(i, &boxes[i])).collect();
@@ -2543,7 +2761,10 @@ pub fn search(
     reading: &CheckedReading,
     background: &str,
 ) -> Result<Searched, Unsolved> {
-    let work = Work::new(layers, reading, background)?;
+    search_work(&Work::new(layers, reading, background)?)
+}
+
+fn search_work(work: &Work<'_>) -> Result<Searched, Unsolved> {
     let combinations = work.combinations();
     if combinations == 0 {
         return Err(Unsolved::NoRanges);
@@ -2614,20 +2835,203 @@ pub fn solve(
     seed: u64,
     work_id: &str,
 ) -> Result<Solution, Unsolved> {
-    let work = Work::new(layers, reading, background)?;
+    solve_work(
+        &Work::new(layers, reading, background)?,
+        searched,
+        seed,
+        work_id,
+    )
+}
+
+fn solve_work(
+    work: &Work<'_>,
+    searched: &Searched,
+    seed: u64,
+    work_id: &str,
+) -> Result<Solution, Unsolved> {
     let regions = searched.near[pick_index(seed, work_id, searched.near.len())].clone();
     let mut terms = Terms::default();
     let score = work.score(&regions, &mut terms);
     let terms = terms
         .0
         .iter()
-        .map(|(term, value)| (term_name(*term, reading), *value))
+        .map(|(term, value)| (term_name(*term, work.reading), *value))
         .collect();
     Ok(Solution {
         regions,
         score,
         terms,
     })
+}
+
+/// A placement with joints: every layer's range, the order to print the layers
+/// in, and the joint each joined layer is printed with.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Jointed {
+    pub regions: Vec<usize>,
+    /// Each joined layer right after its partner; the other layers keep their order.
+    pub order: Vec<usize>,
+    /// The joint of each joined layer, by layer.
+    pub joints: Vec<Option<JointKind>>,
+}
+
+/// Place a work's joints (I-711 stage C). A joined layer keeps its range in
+/// `solution`, the placement without joints: the range sets how far the layer
+/// spreads, and the joint moves it to its partner when the work is drawn. The
+/// other layers are placed again without the joined layers: a partner weighs
+/// with the layers joined to it, keeps only the ranges where its group (its
+/// range and the joined ranges placed by their joints) lies on the canvas when
+/// there is one, and is scored as the group. Without joints, or when that
+/// placement cannot be solved, `solution` is kept as it is.
+#[must_use]
+pub fn join(
+    layers: &[WorkPlanLayer],
+    reading: &CheckedReading,
+    background: &str,
+    solution: &Solution,
+    seed: u64,
+    work_id: &str,
+) -> Jointed {
+    let count = layers.len();
+    let plain = Jointed {
+        regions: solution.regions.clone(),
+        order: (0..count).collect(),
+        joints: vec![None; count],
+    };
+    let (joints, _) = check_joints(&reading.joints, layers, &reading.fixed);
+    if joints.is_empty() || solution.regions.len() != count {
+        return plain;
+    }
+    let attached: BTreeMap<usize, Joint> = joints.iter().map(|joint| (joint.a, *joint)).collect();
+    let keep: Vec<usize> = (0..count).filter(|i| !attached.contains_key(i)).collect();
+    let position: BTreeMap<usize, usize> = keep
+        .iter()
+        .enumerate()
+        .map(|(new, old)| (*old, new))
+        .collect();
+    let kept: Vec<WorkPlanLayer> = keep.iter().map(|i| layers[*i].clone()).collect();
+    let reduced = reduce_reading(reading, &keep);
+    let background_lightness = lightness(Some(background), 0.99);
+    let table = regions();
+    let mut joined = vec![Vec::new(); keep.len()];
+    for (a, joint) in &attached {
+        let mut root = joint.b;
+        while let Some(next) = attached.get(&root) {
+            root = next.b;
+        }
+        let extent = effective(&layers[*a], &table.all[solution.regions[*a]].rect);
+        let (tone, surface, fixed_weight) = weight_parts(&layers[*a], background_lightness);
+        joined[position[&root]].push(Joined {
+            kind: joint.kind,
+            width: extent[2] - extent[0],
+            height: extent[3] - extent[1],
+            fixed_weight,
+            fill: layers[*a].action == "fill",
+            tone,
+            surface,
+        });
+    }
+    let Ok(work) = Work::new(&kept, &reduced, background) else {
+        return plain;
+    };
+    let work = work.with_joined(joined);
+    let Ok(searched) = search_work(&work) else {
+        return plain;
+    };
+    let Ok(placed) = solve_work(&work, &searched, seed, work_id) else {
+        return plain;
+    };
+    let mut regions = solution.regions.clone();
+    for (new, old) in keep.iter().enumerate() {
+        regions[*old] = placed.regions[new];
+    }
+    Jointed {
+        regions,
+        order: print_order(count, &attached),
+        joints: (0..count)
+            .map(|i| attached.get(&i).map(|joint| joint.kind))
+            .collect(),
+    }
+}
+
+/// The reading of the layers in `keep`, renumbered: a relation that names a
+/// layer outside `keep` is left out.
+fn reduce_reading(reading: &CheckedReading, keep: &[usize]) -> CheckedReading {
+    let position: BTreeMap<usize, usize> = keep
+        .iter()
+        .enumerate()
+        .map(|(new, old)| (*old, new))
+        .collect();
+    let renumber = |index: Option<usize>| match index {
+        None => Some(None),
+        Some(index) => position.get(&index).map(|new| Some(*new)),
+    };
+    let relations = reading
+        .relations
+        .iter()
+        .filter_map(|relation| {
+            Some(Relation {
+                a: *position.get(&relation.a)?,
+                b: renumber(relation.b)?,
+                c: renumber(relation.c)?,
+                ..relation.clone()
+            })
+        })
+        .collect();
+    CheckedReading {
+        roles: keep.iter().map(|i| reading.roles[*i]).collect(),
+        relations,
+        tension: reading.tension.clone(),
+        fixed: reading
+            .fixed
+            .iter()
+            .filter_map(|(index, place)| Some((*position.get(index)?, place.clone())))
+            .collect(),
+        joints: Vec::new(),
+    }
+}
+
+/// Each joined layer right after its partner, in the order of the layers.
+fn print_order(count: usize, attached: &BTreeMap<usize, Joint>) -> Vec<usize> {
+    let mut children: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    for (a, joint) in attached {
+        children.entry(joint.b).or_default().push(*a);
+    }
+    let mut order = Vec::with_capacity(count);
+    let mut stack: Vec<usize> = (0..count)
+        .rev()
+        .filter(|i| !attached.contains_key(i))
+        .collect();
+    while let Some(index) = stack.pop() {
+        order.push(index);
+        if let Some(joined) = children.get(&index) {
+            stack.extend(joined.iter().rev());
+        }
+    }
+    order
+}
+
+/// [`composed_plan`] for a placement with joints: the layers and their ranges
+/// in print order, with the Score relation each joined layer is printed with.
+#[must_use]
+pub fn composed_plan_with_joints(
+    plan: &WorkPlan,
+    jointed: &Jointed,
+) -> (
+    WorkPlan,
+    Vec<Option<ComposedRange>>,
+    Vec<Option<&'static str>>,
+) {
+    let (mut composed, ranges) = composed_plan(plan, &jointed.regions);
+    let layers = std::mem::take(&mut composed.layers);
+    composed.layers = jointed.order.iter().map(|i| layers[*i].clone()).collect();
+    let ranges = jointed.order.iter().map(|i| ranges[*i].clone()).collect();
+    let relations = jointed
+        .order
+        .iter()
+        .map(|i| jointed.joints[*i].map(JointKind::relation_type))
+        .collect();
+    (composed, ranges, relations)
 }
 
 #[cfg(test)]

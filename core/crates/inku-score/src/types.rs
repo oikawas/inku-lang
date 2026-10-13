@@ -503,7 +503,23 @@ string_enum!(RelationType {
     Between,
     Touching,
     Connected,
+    RestingOn,
+    Inside,
+    Overlapping,
+    Crossing,
 });
+
+impl RelationType {
+    /// The joint relations of Score 0.20.0, placed from the bounds of the
+    /// performed previous shape by translation only.
+    #[must_use]
+    pub const fn is_joint(self) -> bool {
+        matches!(
+            self,
+            Self::RestingOn | Self::Inside | Self::Overlapping | Self::Crossing
+        )
+    }
+}
 string_enum!(RelationGap {
     Narrow,
     Medium,
@@ -599,6 +615,22 @@ const fn default_relation_gap() -> RelationGap {
     RelationGap::Medium
 }
 
+/// Whether any relation of these instructions needs Score 0.20.0: a joint
+/// relation, or a connection whose instruction target is a closed shape.
+#[must_use]
+pub fn instructions_use_joint_relations(instructions: &[Instruction]) -> bool {
+    instructions.iter().any(|instruction| {
+        instruction.relation.as_ref().is_some_and(|relation| {
+            relation.kind.is_joint()
+                || (relation.kind == RelationType::Connected
+                    && relation
+                        .target_instruction_index
+                        .and_then(|index| instructions.get(index))
+                        .is_some_and(Instruction::is_closed_connection_target))
+        })
+    })
+}
+
 /// A Score edition, named by `Score::version`.
 ///
 /// Editions accumulate: each keeps every field of the editions before it, so
@@ -625,10 +657,11 @@ pub enum ScoreEdition {
     V0_17,
     V0_18,
     V0_19,
+    V0_20,
 }
 
 impl ScoreEdition {
-    pub const ALL: [Self; 19] = [
+    pub const ALL: [Self; 20] = [
         Self::V0_1,
         Self::V0_2,
         Self::V0_3,
@@ -648,6 +681,7 @@ impl ScoreEdition {
         Self::V0_17,
         Self::V0_18,
         Self::V0_19,
+        Self::V0_20,
     ];
 
     /// The edition a version string names.
@@ -680,6 +714,7 @@ impl ScoreEdition {
             Self::V0_17 => "0.17.0",
             Self::V0_18 => "0.18.0",
             Self::V0_19 => "0.19.0",
+            Self::V0_20 => "0.20.0",
         }
     }
 }
@@ -1111,6 +1146,22 @@ pub struct Instruction {
 }
 
 impl Instruction {
+    /// Whether a connection may attach to this instruction's outline: a
+    /// closed square, circle, ellipse, triangle or polygon (Score 0.20.0).
+    /// A cloudform's outline exists only in performance and a crescent keeps
+    /// its own endpoint rule, so neither is a target.
+    #[must_use]
+    pub fn is_closed_connection_target(&self) -> bool {
+        matches!(
+            self.primitive,
+            Primitive::Circle
+                | Primitive::Ellipse
+                | Primitive::Square
+                | Primitive::Triangle
+                | Primitive::Polygon
+        ) && self.arc_form.is_none()
+    }
+
     /// Whether the mark fills a closed shape flat. Before Score 0.17.0 a
     /// stated intensity could reach no other mark.
     #[must_use]
@@ -2412,6 +2463,13 @@ impl Score {
 
     /// Reject descriptors introduced after the declared Score edition or with
     /// geometry that belongs to an open arc.
+    /// Whether a relation needs Score 0.20.0: a joint relation, or a
+    /// connection whose instruction target is a closed shape.
+    #[must_use]
+    pub fn uses_joint_relations(&self) -> bool {
+        instructions_use_joint_relations(&self.instructions)
+    }
+
     pub fn validate_schema_edition(&self) -> Result<(), &'static str> {
         self.validate_compact_score_0_10()?;
         self.validate_mirror_relations()?;
@@ -2438,6 +2496,18 @@ impl Score {
             }
         }
         self.validate_transform_groups()?;
+        // A saved Score before 0.20.0 may hold a connection to a closed shape:
+        // it stays valid and keeps its older performance (the relation is
+        // omitted). Only the new relation types need the edition.
+        if self.instructions.iter().any(|instruction| {
+            instruction
+                .relation
+                .as_ref()
+                .is_some_and(|relation| relation.kind.is_joint())
+        }) && !self.edition_at_least(ScoreEdition::V0_20)
+        {
+            return Err("joint relations require Score version 0.20.0");
+        }
         for instruction in &self.instructions {
             if let Some(relation) = &instruction.relation {
                 if relation.target_instruction_index.is_some()

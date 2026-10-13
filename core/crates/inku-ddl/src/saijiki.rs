@@ -198,6 +198,10 @@ pub enum CanonicalRelationKind {
     Cutting,
     Between,
     Connected,
+    RestingOn,
+    Inside,
+    Overlapping,
+    Crossing,
     Mirrored,
 }
 
@@ -210,6 +214,10 @@ impl CanonicalRelationKind {
             Self::Cutting => "cutting",
             Self::Between => "between",
             Self::Connected => "connected",
+            Self::RestingOn => "resting_on",
+            Self::Inside => "inside",
+            Self::Overlapping => "overlapping",
+            Self::Crossing => "crossing",
             Self::Mirrored => "mirrored",
         }
     }
@@ -269,6 +277,10 @@ pub(crate) fn canonical_relation_identity(
         "cutting" => CanonicalRelationKind::Cutting,
         "between" => CanonicalRelationKind::Between,
         "connected" => CanonicalRelationKind::Connected,
+        "resting_on" => CanonicalRelationKind::RestingOn,
+        "inside" => CanonicalRelationKind::Inside,
+        "overlapping" => CanonicalRelationKind::Overlapping,
+        "crossing" => CanonicalRelationKind::Crossing,
         "mirrored" => CanonicalRelationKind::Mirrored,
         _ => return None,
     };
@@ -281,6 +293,10 @@ pub(crate) fn canonical_relation_identity(
             | CanonicalRelationKind::Touching
             | CanonicalRelationKind::Cutting
             | CanonicalRelationKind::Connected
+            | CanonicalRelationKind::RestingOn
+            | CanonicalRelationKind::Inside
+            | CanonicalRelationKind::Overlapping
+            | CanonicalRelationKind::Crossing
             | CanonicalRelationKind::Mirrored => CanonicalPreviousReference::PreviousOne,
         }),
     };

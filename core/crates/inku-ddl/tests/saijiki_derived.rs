@@ -82,9 +82,13 @@ fn full_language_projections_preserve_python_prompt_and_marker_behavior() {
             "touching",
             "connected",
             "along",
+            "crossing",
             "cutting",
             "not touching",
             "between",
+            "resting on",
+            "inside",
+            "overlaps",
             "mirrored",
         ]
     );
@@ -136,6 +140,10 @@ fn ordered_marker_relation_reference_and_display_projections_match_asset_semanti
             "cutting",
             "between",
             "connected",
+            "resting_on",
+            "inside",
+            "overlapping",
+            "crossing",
             "mirrored"
         ]
     );
@@ -182,6 +190,10 @@ fn ordered_marker_relation_reference_and_display_projections_match_asset_semanti
             "between",
             "touching",
             "connected",
+            "resting on",
+            "inside",
+            "overlaps",
+            "crossing",
             "mirrored"
         ]
     );

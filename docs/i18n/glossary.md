@@ -127,6 +127,10 @@ composition / color catalog と食い違って見える（→ §8）。
 | 銀筆 | **silverpoint** | 名詞。Score の `weight` 値と同綴り・小文字 | ~~hair~~（画材として存在しない語だった）、~~metalpoint~~ |
 | 歳時記 | **Saijiki** | 固有名詞・大文字。カテゴリ鍵のローマ字（`katachi` ほか）は正しい英語表記 | ~~almanac~~ 単独 |
 | 鏡写し | **mirrored** | 歳時記のあいだ。二つの形・まとまりの間の軸に対する位置と向きの鏡像 | 色・画材の複製とはしない |
+| 載る | **resting on** | 歳時記のあいだ。直前の形の上の縁に下端を接して載せる | 短い形は resting on |
+| 中に | **inside** | 歳時記のあいだ。直前の閉じた形の内側に置く | 位置の語の「中心」とは別 |
+| 重なる | **overlaps** | 歳時記のあいだ。直前の形に一部を重ねる。句は overlapping the previous shape | 組の並べ方の overlapping（重ねて）とは別の語 |
+| 横切る | **crossing** | 歳時記のあいだ。直前の形を片方の縁から反対の縁まで越える | 「切る」（cutting、視覚の断絶）とは別 |
 
 ## 5. 文書・調査の語
 

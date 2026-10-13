@@ -329,7 +329,11 @@
 # in one place. The copies become one member of a placement group: `cells`
 # for no action, placing, scattering or drawing (Score 0.19.0), the line-up
 # or tile layout for those actions.
-DDL_ENGINE_VERSION = "57"
+# 58: Four joint relations (resting on, inside, overlapping, crossing the
+# previous shape) are placed from the performed bounds by translation only, and
+# a connection may start from the nearest point of a closed shape's outline
+# (Score 0.20.0). A joint the shapes cannot satisfy omits only the relation.
+DDL_ENGINE_VERSION = "58"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -367,4 +371,8 @@ DDL_ENGINE_VERSION = "57"
 # 17 (2026-10-12): The English edges may also be written with a space (`left
 # edge`, `right edge`, `top edge`, `bottom edge`) and are the same position
 # words as `left-edge` and the others.
-DDL_VERSION = "17"
+# 18 (2026-10-12): 載る / resting on, 中に / inside, 重なる / overlaps and
+# 横切る / crossing join the relation vocabulary through the fixed
+# previous-shape phrases (`前の形に載る`, `resting on the previous shape`, ...),
+# and つながる / connected may follow a closed shape.
+DDL_VERSION = "18"

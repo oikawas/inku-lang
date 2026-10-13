@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use inku_ddl::work_plan::{WorkPlan, print_work_plan_composed};
+use inku_ddl::work_plan::{WorkPlan, print_work_plan_composed_with_joints};
 use inku_ddl::{
     CompilerLockState, CompletionRangeRecord, MacroDefinition, MacroLock, NormalizedDdlDocument,
     RANGE_WORDS_CHANGED_HOLE_KIND, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID,
@@ -1312,18 +1312,33 @@ impl PipelineSnapshot {
             .compiler
             .composition_seed()
             .map_err(|_| "policy")?;
+        let work_id = candidate.source_digest();
         let solution = composition::solve(
             &plan.layers,
             reading,
             background,
             &searched,
             composition_seed.unwrap_or(1),
-            &candidate.source_digest(),
+            &work_id,
         )
         .map_err(|_| "unsolved")?;
-        let (composed, ranges) = composition::composed_plan(plan, &solution.regions);
+        let jointed = composition::join(
+            &plan.layers,
+            reading,
+            background,
+            &solution,
+            composition_seed.unwrap_or(1),
+            &work_id,
+        );
+        let (composed, ranges, joints) = composition::composed_plan_with_joints(plan, &jointed);
         let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
-        let source = print_work_plan_composed(&composed, self.config.language, &plugins, &ranges);
+        let source = print_work_plan_composed_with_joints(
+            &composed,
+            self.config.language,
+            &plugins,
+            &ranges,
+            &joints,
+        );
         let document = self.new_document(source).map_err(|_| "document")?;
         let compiled = compile_typed_ddl(
             document.document().map_err(|_| "document")?,

@@ -1801,6 +1801,7 @@ survives into the following composition-reading wait.
 - Check: the reading is checked against the underdrawing; values the canvas cannot show are dropped and findings recorded (the `composition_read` event carries only the finding codes). A stated place is kept only when the quoted words occur in the description and hold a word of position (in Japanese 上・下・中央・中心・真ん中・左・右・隅・端 as substrings; in English top, bottom, center, centre, middle, left, right, corner(s), edge(s), above, below, upper, lower as words).
 - Solving: every combination of the layers' ranges is searched (up to 3,000,000) and scored against the reading and the author's defaults (dynamic balance, generous empty space, left and right alike). Among the answers within 1.03 times the best score plus 0.02, the work's `composition_seed` (1 when absent) and the digest of the document before composition pick one. A layer the description puts in a "corner" without saying which is placed on one of the four corner ranges. A corner the description names (the bottom right corner and so on) is returned by the reading as the place value `top_left_corner`, `top_right_corner`, `bottom_left_corner` or `bottom_right_corner`; when the quoted words occur in the description and hold a word of position, and the underdrawing has no place for the layer, says "corner", or names a side the corner lies on (top, top edge or left edge for the top left corner), it is placed on that corner's range instead of the underdrawing's place, which cannot say which corner (finding `stated_corner_from_reading`, I-712). When the underdrawing names another place (the center and so on), that place stays, since a reader may tie the words to the wrong layer (finding `stated_corner_conflict`).
 - Printing: a layer the composition places is written as a numeric range (§18), with the range's name and numbers (`右下（横2/3〜1、縦2/3〜1）に、…`, `… at the bottom right (horizontal 2/3 to 1, vertical 2/3 to 1)`). A layer whose place the description states keeps that place word. Builds 1155 to 1163 wrote the mark `［構図］` (`[composition]` in English) before the range; by the author's decision of 2026-10-05 it is no longer written (§18). The composed document is committed with Stage 1's reason once it compiles with no diagnostic.
+- Joints (I-711 stage C, the author's decision of 2026-10-12): the check drops a reading's joint (a joined layer, its partner and the word: resting on, inside, overlapping, crossing or connected, §14.4) whose layer numbers are missing, whose joined layer has a place the description states, whose partner already has a joined layer, whose joined layer already has a joint, that would close a loop, or that connects a layer other than a line, an arc or a point, or connects to a cloudform. A joined layer is written with its range from the solving without joints (the range sets how far it spreads; the joint sets where it is). The other layers are solved again without the joined layers: a partner weighs with the layers joined to it, keeps only the ranges where its group lies on the canvas (the joined layers' ranges, at their own size, placed by their words: resting on centred on the partner's top edge, inside within the partner, the others centred on the partner), or every range when none does, and is scored as the group. The printing moves a joined layer right after its partner and ends its sentence with the Saijiki phrase (`前の形に載る`, `resting on the previous shape`, and so on). When the second solving fails, the work is printed without joints. Readings return joints in a later stage; today's readings leave the composition unchanged.
 - When the reading is unavailable: when the reading request uses up its budget, when unreadable replies exhaust the retries, or when the request cannot be built, the default reading (no relations, the author's defaults, every underdrawing place kept) is used (event `composition_fallback`). When the combinations exceed the limit, no range fits, or the composed document does not compile, Stage 1's printed document is committed without composition (event `composition_skipped`). The residual path (`stage1_residual_execution`) and the replay of a saved response that carries `normalized_ddl` are not composed.
 - Setting: `PipelineConfig.composition` (`{read}`). Without it there is no composition. `read: false` sends no reading and uses the default reading. The Server's default manifest sets `{read: true}`; a work redrawn under its saved settings keeps them. New Android configurations set `read: true` for cloud models and `read: false` for on-device LiteRT Gemma 4 E2B.
 - The Server times the reading apart from Stage 1 in `metrics.composition` (no new history column; it enters only the total) and records the reading's failures under the stage `composition`. The prompt tab does not show the reading's system prompt.
@@ -2952,7 +2953,7 @@ The distinction §13.3 draws between emotion words and motion words extends to
 relation.  Only physical, externally observable relations are allowed into the
 core.
 
-**The set is limited to these seven words:**
+**The set is limited to these eleven words:**
 
 | Word (ja) | Word (en) | Meaning | Score representation |
 |---|---|---|---|
@@ -2961,7 +2962,11 @@ core.
 | 切る | cutting | crosses the preceding element and makes a visual break (the *kire*, the cut, of tanka) | `cutting` |
 | 間に | between | placed in the region between the preceding two elements | `between` |
 | 触れる | touching | contacts the preceding element; coinciding endpoints compose a closed form | `touching` |
-| つながる | connected | joins the current start to a selected start, end, or interior point of a prior Line or Arc, or to the prior endpoint when omitted | `connected` |
+| つながる | connected | joins the current start to a selected start, end, or interior point of a prior Line or Arc, or to the prior endpoint when omitted (the nearest outline point of a closed prior) | `connected` |
+| 載る | resting on | rests the lower edge of the current element on the top of the preceding element | `resting_on` |
+| 中に | inside | placed inside the preceding closed element | `inside` |
+| 重なる | overlaps | placed overlapping part of the preceding element | `overlapping` |
+| 横切る | crossing | placed across the preceding element, from one edge past the other | `crossing` |
 | 鏡写し | mirrored | mirrors the positions and orientations of two complete shapes or groups across the axis between them | `mirror_relations` |
 
 **Words excluded**: nestle up to, answer, converse with, resonate with — words of
@@ -2985,8 +2990,18 @@ or partway selector, the connection uses prior end to current start. Notions tha
 language — around, on the same beat, leading or lagging, near or far — are not
 relations, and are expressed through position, path, rotation, and spacing.
 
-**Second-round candidates (judged after measurement)**: overlapping, set apart,
-same direction, opposite direction, thinner than.  They are added
+Resting on, inside, overlaps and crossing become relations only through the fixed
+phrases `前の形に載る` / `resting on the previous shape`, `前の形の中に` / `inside
+the previous shape`, `前の形に重なる` / `overlapping the previous shape` and
+`前の形を横切る` / `crossing the previous shape` (DDL 18, Score 0.20.0). The
+English short forms are `resting on`, `inside`, `overlaps` and `crossing`; the
+short form of overlapping is `overlaps` because `overlapping` is the group-layout
+word. Crossing is a word apart from cutting, which makes a visual break. They were
+added after measuring that 22 of 49 descriptions state joints between things and
+that strong readers read those joints as stated.
+
+**Second-round candidates (judged after measurement)**: set apart,
+same direction, opposite direction, thinner than, piercing, spanning, surrounding, hanging.  They are added
 only once measurement shows the current words to be expressively insufficient.
 The one-endpoint `connected` relation entered only after its independent visual
 value and finite Line / Arc / Point endpoint family were fixed.
@@ -3008,7 +3023,7 @@ An optional `relation` field is added to an instruction.
 
 | Field | Values | Meaning |
 |---|---|---|
-| `type` | `along` / `not_touching` / `cutting` / `between` / `touching` / `connected` | the kind of relation |
+| `type` | `along` / `not_touching` / `cutting` / `between` / `touching` / `connected` / `resting_on` / `inside` / `overlapping` / `crossing` | the kind of relation; the last four, and `connected` to a closed shape, need Score 0.20.0 |
 | `gap` | `narrow` / `medium` / `wide` | a guide distance; the concrete value is resolved by the performance |
 | `target_instruction_index` | non-negative Score index | the exact preceding Score instruction for checked `connected` / `touching` / `along` / `cutting`; omitted for older relations |
 | `target_path_position` | finite 0–1 / `"interior"` | numbers retain the Score 0.11 Line centerline position; the Score 0.13 string selects an interior Line / Arc position during performance, interpolated by sample order and preserving the explicit prior target |
@@ -3049,7 +3064,51 @@ sequential resolution.
 - `connected` -> applies to Line, Arc, and Point; with `target_endpoint`, the
   current canonical start (Point center) is translated to the selected endpoint
   of a prior Line or Arc; without it, it is translated to the prior canonical
-  end (Point center). The prior, dimensions, curvature, and rotation remain unchanged
+  end (Point center). When the prior is a closed square, circle, ellipse,
+  triangle or polygon, the start is translated to the nearest point of its
+  outline before any wobble, after rotation and transforms (Score 0.20.0;
+  cloudforms and crescents are not targets). The prior, dimensions, curvature,
+  and rotation remain unchanged
+- `resting_on` / `inside` / `overlapping` / `crossing` -> apply to every shape and
+  translate the current element only, from the performed bounds of the current
+  and preceding elements. The preceding element never moves, and the current
+  keeps its shape, dimensions and direction; free coordinates come from the
+  performance seed. When the preceding element belongs to a fill
+  (`fill_groups`), its bounds are the part seen inside the fill target, and the
+  inner rectangle for `inside` is cut by the target as well (unchanged when they
+  do not meet). The resting, crossing and inside positions are drawn from the
+  part of the preceding element (its inner rectangle for `inside`) on the paper
+  when the current fits there, and from the whole element otherwise. When the
+  chosen resting or crossing position leaves the current (a group as a whole)
+  off the paper, it moves the least that puts the current on the paper within
+  the range that keeps the joint, or to the position in that range nearest the
+  paper when none does. Overlapping tries other directions in turn only when
+  the seed's direction leaves the current off the paper, and takes the first
+  that keeps the current on the paper, or else the first that keeps its center
+  on it (the author's decisions, 2026-10-12 and 2026-10-13). `resting_on` sets
+  the current lower edge on the preceding
+  top and chooses the horizontal center where the current fits the preceding
+  width (the center when it is wider). `inside` chooses a position inside the
+  preceding closed element's inner rectangle (the bounds of a square; the bounds
+  shrunk by 1/√2 about their center for other closed shapes) and fails for open
+  shapes, points, or a current that does not fit. `overlapping` chooses the share
+  of the current bounds that overlaps the preceding element from 1/3 to 2/3
+  (accepted 1/4 to 3/4) and shifts in a seeded direction. `crossing` extends the
+  current past both sides of the preceding element across the element's thinner
+  direction (vertically past a wide element, horizontally past a tall one) and
+  chooses the crossing position along the other direction; when the element is as
+  wide as tall, the current crosses along its own longer direction. A current no
+  longer than the element in that direction fails (the author's decision,
+  2026-10-12).
+  A failure records `missing_joint_reference`, `joint_reference_omitted`,
+  `unsupported_joint_geometry` or `numeric_joint_position_conflict` and omits only
+  the relation. A group of copies (consecutive copies targeting the same preceding element)
+  moves as a whole by one translation from its combined bounds for `resting_on`,
+  `overlapping` and `crossing` (its arrangement or scatter is kept), and each copy
+  is moved inside on its own for `inside` (the author's decision, 2026-10-12). A
+  preceding group is taken by its combined bounds. An external group relation
+  translates the whole group once.
+  Macro emits do not carry these four words yet
 
 Current typed Along / Cutting rendering covers count-one actual Scores. Macro repeated CompositionPlans retain shared relation intent; repeated-instance performance belongs to later materialization. Typed Along aligns
 the current line parallel to the preceding line when both
@@ -3141,7 +3200,8 @@ nor changes a relation; coerce may only drop an invalid relation with a warning.
 A relations (あいだ) category is added to Saijiki.  Laid over the notion of *ma*,
 the interval, it shows that the vocabulary of relation is not mere geometric
 specification but words for writing negative space and tension.  Displayed as:
-along, not touching, cutting, between, touching.
+along, not touching, cutting, between, touching, connected, resting on, inside,
+overlaps, crossing, mirrored.
 
 ---
 

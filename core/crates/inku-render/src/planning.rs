@@ -788,6 +788,13 @@ pub fn resolve_relation_on_canvas(
         return dropped(instruction, index, "prior has no performed bounds");
     };
     let prior_center = prior_bounds.center();
+    if relation.kind.is_joint() {
+        return dropped(
+            instruction,
+            index,
+            "joint relations require a checked instruction target",
+        );
+    }
     let gap = relation_gap(seed, index, relation.gap);
     let target = match relation.kind {
         RelationType::Between => {
@@ -930,6 +937,10 @@ pub fn resolve_relation_on_canvas(
         }
         RelationType::Touching => unreachable!("touching handled above"),
         RelationType::Connected => unreachable!("connected handled by checked performance"),
+        RelationType::RestingOn
+        | RelationType::Inside
+        | RelationType::Overlapping
+        | RelationType::Crossing => unreachable!("joint relations dropped above"),
     };
     RelationResolution {
         instruction: move_anchor_to_on_canvas(

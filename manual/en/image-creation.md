@@ -191,6 +191,14 @@ Numbers outside the table or a name that disagrees with its numbers stay unfolde
 
 Changing the numbers edits the instructions. Typing does not draw; press `Draw from instructions` to redraw once. Saving, copying, and the text editor use the complete source with its numbers. Only the display folds them. An older drawing engine without a range table keeps the complete display.
 
+### Joint phrases
+
+When the description says how things meet (resting on, inside, overlapping, crossing, connected), the composition joins that layer to its partner. In the instructions the layer's sentence comes right after its partner's and ends with a phrase such as `resting on the previous shape`. The other phrases are `inside the previous shape`, `overlapping the previous shape`, `crossing the previous shape` and `connected to the previous shape`. Japanese instructions write `前の形に載る` and so on.
+
+The range in a joined sentence sets how far the layer spreads. The phrase sets where it goes: the layer is drawn against its partner.
+
+A joint that cannot hold is not written. A layer whose place the description states, for example, is drawn at that place, not joined to another.
+
 ### A plugin name that does not exist shows up while you type
 
 A `namespace.word` such as `Nature.青葉` is marked in the plugin color only when that qualified name is registered on this server. **A name that is not registered takes a different color, and the reason is listed under the editor.**
@@ -265,7 +273,7 @@ You may choose `Make one option` or `Make four options`. `Another performance` i
 
 The color catalog is changed from the work-editing menu instead (8.3).
 
-Under `Another composition`, choose `By principle` or `By chance`. The default, `By principle`, solves another composition from what the instructions alone tell; `By chance` chooses among the ranges each layer's kind permits. Options use the saved instructions, so a work without a description can make them too. Numeric ranges are chosen again whoever wrote them. Corners, place words, characters outside the moving ranges, and the original work stay as they are.
+Under `Another composition`, choose `By principle` or `By chance`. The default, `By principle`, solves another composition from what the instructions alone tell; `By chance` chooses among the ranges each layer's kind permits. Options use the saved instructions, so a work without a description can make them too. Numeric ranges are chosen again whoever wrote them. Corners, place words, characters outside the moving ranges, and the original work stay as they are. A sentence with a joint phrase (6) keeps its range and its phrase, and the layer is drawn joined to its partner.
 
 Each option shows its layer number and move, such as `1: bottom right → top left`. When the ranges cannot be chosen again, it gives a reason, such as no composition ranges in this work or too many combinations to find another composition, and rebuilds the saved instructions as they are. A work without numeric ranges, explicit tilts or corners may give the same picture. Saving an option records the composition seed and chosen mode on its Layout lineage edge.
 

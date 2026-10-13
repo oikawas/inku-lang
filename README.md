@@ -281,7 +281,7 @@ The reference dictionary is called **Saijiki**（歳時記）— a word borrowed
 | motions | うごき | place, line-up, draw, scatter, fill, tile |
 | order | じゅん | alternating, in order |
 | proportions | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
-| relations | あいだ | along, not touching, cutting, between, touching, connected, mirrored (used as "along the previous line" or "mirrored with the previous shape") |
+| relations | あいだ | along, not touching, cutting, between, touching, connected, resting on, inside, overlaps, crossing, mirrored (used as "along the previous line," "resting on the previous shape" or "mirrored with the previous shape") |
 
 Surfaces name the inside of a closed shape or the way a mark sits; handling names how the ink is laid on any mark; grounds name the canvas itself, the support. A ground is written as a sentence of its own, such as "Washi." Words from registered plugins (for the bundled `Nature.leaves`, words such as "YoungLeaves" and "FallenLeaves") appear in the Saijiki in the same way as the core words.
 
@@ -323,7 +323,7 @@ During development, we always move forward while comparing with saved reference 
 - **Multi-stage pipeline** — Sketch from life and automatic color catalog selection, both optional; Stage 1 (underdrawing); the Typed Compiler; Stage 1.5 (meaning verification); and the Renderer. Non-deterministic AI layers and deterministic algorithmic layers alternate
 - **Shared core** — the flow of the processing, the Typed Compiler, the score, and the Renderer are gathered in a shared Rust core that the server (Python) and Android (Kotlin) both call
 - **Primitives and arrangement** — point, line, circle, ellipse, arc, square, triangle, cloudform; placing, lining up, drawing, scattering, filling, and tiling, with paths such as waves and diagonal bands, and "alternating" or "in order" sequences
-- **Regions and relations** — scores can state seven kinds of relation between elements ("along the previous line," "not touching the previous shape," "mirrored with the previous shape") that the performance resolves
+- **Regions and relations** — scores can state eleven kinds of relation between elements ("along the previous line," "not touching the previous shape," "mirrored with the previous shape") that the performance resolves
 - **Material rendering** — silverpoint, pencil, pen, rotring, crayon, chalk, brushes, oil paint, burin, and drypoint, differentiated through the shared stroke engine's width, tracking, and sparse events plus tool-specific edges. Surface qualities (flat, sweep, stipple, hatch, crosshatch, aquatint, and more) and grounds (washi, charcoal ground, canvas, mezzotint, and more) can be chosen too
 - **Plugins** — namespaced vocabulary macros such as `Nature.YoungLeaves` (alias `Nature.若葉`); they may expand only into core vocabulary and cannot modify the core. When a description names one of their words, the underdrawing can choose it. Instructions that use an unregistered plugin draw everything else and give the reason on that sentence alone. Instructions can be exported together with their plugin definitions and imported elsewhere
 - **History and editions** — DB-backed history with stars, search, thumbnails, and exact reproduction via seeds and edition IDs

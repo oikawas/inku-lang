@@ -189,13 +189,21 @@ export function isModelUnselectable(model: ModelOption): boolean {
 	return !!model.eol || !!model.requires_subscription || !!model.not_supported || answersNothing(model);
 }
 
-// Every label of the model, in the table's order; the end of life carries its date.
+// Every label of the model, in the table's order, each with whether it keeps the model
+// from publication: a row paints those in the warning colour and leaves the others
+// (older model, not measured) muted. The end of life carries its date.
+export type ModelStatusPart = { text: string; blocking: boolean };
+
+export function modelStatusParts(model: ModelOption, isJapanese: boolean): ModelStatusPart[] {
+	return (model.labels ?? []).map((id) => ({
+		text: id === 'eol' && model.eol_date ? `${labelText(id, isJapanese)} (${model.eol_date})` : labelText(id, isJapanese),
+		blocking: labelTable.find((entry) => entry.id === id)?.publishable === false
+	}));
+}
+
 export function modelStatusLabel(model: ModelOption, isJapanese: boolean): string | null {
-	const labels = model.labels ?? [];
-	if (labels.length === 0) return null;
-	return labels
-		.map((id) => (id === 'eol' && model.eol_date ? `${labelText(id, isJapanese)} (${model.eol_date})` : labelText(id, isJapanese)))
-		.join(' · ');
+	const parts = modelStatusParts(model, isJapanese);
+	return parts.length === 0 ? null : parts.map((part) => part.text).join(' · ');
 }
 
 // Model administration files each model into the fold of its last label, below the

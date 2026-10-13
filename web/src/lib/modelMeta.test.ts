@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
-import { isModelUnselectable, modelCost, modelFold, modelFoldTitle, modelFolds, modelPurposeBadges, modelSpeed, modelStatusLabel, setModelLabelTable } from './modelMeta';
+import { isModelUnselectable, modelCost, modelFold, modelFoldTitle, modelFolds, modelPurposeBadges, modelSpeed, modelStatusLabel, modelStatusParts, setModelLabelTable } from './modelMeta';
 import type { ModelLabel, ModelOption } from './models';
 
 // The Server's model catalog and the cases every client checks itself against (2026-10-13).
@@ -50,6 +50,18 @@ test('a model shows every label it carries, and a fold is titled from the table'
 	assert.equal(modelStatusLabel({ id: 'x', label: 'x', labels: [], fold: null }, true), null);
 	assert.equal(modelFoldTitle('unmeasured', 5, true), '未計測（5）');
 	assert.equal(modelFoldTitle('legacy', 46, false), 'Older model (46)');
+});
+
+test('each label keeps its own colour: only one that keeps the model from publication warns', () => {
+	const retired = { id: 'x', label: 'x', labels: ['legacy', 'eol'], fold: 'eol', eol_date: '2026-10-13' };
+	assert.deepEqual(modelStatusParts(retired, true), [
+		{ text: '旧モデル', blocking: false },
+		{ text: '提供終了 (2026-10-13)', blocking: true }
+	]);
+	assert.deepEqual(modelStatusParts({ id: 'x', label: 'x', labels: ['unmeasured'], fold: 'unmeasured' }, false), [
+		{ text: 'Not measured', blocking: false }
+	]);
+	assert.deepEqual(modelStatusParts({ id: 'x', label: 'x', labels: [], fold: null }, true), []);
 });
 
 test('the startup list, which has no labels yet, keeps to its stored marks', () => {

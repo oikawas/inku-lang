@@ -8,6 +8,13 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Each model label takes its own colour
+
+Following the author's choice to align the Web's administrator screen. v2.15.118 painted a row's joined labels in one colour, so in an "Older model · End of life" row even "Older model", which does not keep the model from publication, showed in the warning colour. Android colours each label by whether that label keeps the model from publication, which is the rule handed to Swift and Android.
+
+- The administrator rows, the marks of "Model selection" and the model card picker, and the Status line of the hover card draw the labels one by one, and only those that keep the model from publication take the warning colour; Older model and Not measured stay muted.
+- `modelStatusParts` returns each label's text and whether it keeps the model from publication; the joined text (`modelStatusLabel`) is built from it.
+
 ## Android 2.1.4-android.98 (2026-10-13 / Build 148395)
 
 ### 2026-10-13 — Android uses the shared model catalog, with labels and six folds

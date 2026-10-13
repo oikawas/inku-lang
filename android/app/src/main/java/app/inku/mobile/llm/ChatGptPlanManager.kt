@@ -316,7 +316,7 @@ class ChatGptPlanManager internal constructor(
 
     override suspend fun generate(request: ModelRequest): ModelResponse {
         // Validate the operation before opening any connection, including catalog retrieval.
-        val body = chatGptRequestBody(request)
+        val body = chatGptRequestText(request)
         val ref = request.chatGptSession ?: throw ChatGptException("chatgpt_session_required")
         val started = System.nanoTime()
         try {
@@ -331,7 +331,7 @@ class ChatGptPlanManager internal constructor(
                 val token = accessToken(ref)
                 // The server decodes with the pipeline's response bound as its argument limit.
                 val decoder = ChatGptSseDecoder(argumentLimit = MAX_PROVIDER_RESPONSE_BYTES)
-                val response = http.request("$CHATGPT_RESOURCE/responses", "POST", token, body.toString(), timeoutMs = request.timeoutMs ?: 60_000,
+                val response = http.request("$CHATGPT_RESOURCE/responses", "POST", token, body, timeoutMs = request.timeoutMs ?: 60_000,
                     check = ::check, onChunk = decoder::feed)
                 if (response.status !in 200..299) throw chatGptResponseError(runCatching { JSONObject(response.body) }.getOrDefault(JSONObject()), response.status)
                 val text = decoder.finish(); check()

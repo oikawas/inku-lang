@@ -355,6 +355,29 @@ class ChatGptPlanBoundaryTest {
         }
     }
 
+    @Test
+    fun planWritesSchemaPropertiesInDeclaredOrderAndKeepsOtherRequestsByteForByte() = runBlocking {
+        withPlan({ completedStream() }) { manager, ref, http ->
+            var wire = ""
+            http.handler = { url, _, body ->
+                check(url.endsWith("/responses"))
+                wire = body!!
+                ChatGptHttpResponse(200, completedStream())
+            }
+            val cases = listOf("read_composition" to SchemaOrderFixtures.reading) + SchemaOrderFixtures.plain
+            for ((action, schema) in cases) {
+                val request = SchemaOrderFixtures.request("chatgpt:personal-model", action, schema).copy(chatGptSession = ref)
+                val before = chatGptRequestBody(request).toString()
+                manager.generate(request)
+                if (action == "read_composition") {
+                    val sentSchema = JSONObject(wire).getJSONArray("tools").getJSONObject(0)
+                        .getJSONArray("tools").getJSONObject(0).getJSONObject("parameters")
+                    SchemaOrderFixtures.assertOrdered(wire, sentSchema)
+                } else SchemaOrderFixtures.assertBytes(before, wire)
+            }
+        }
+    }
+
     private fun failureOf(error: Throwable): String = runBlocking {
         val provider = object : ModelProvider {
             override val providerId = "chatgpt"

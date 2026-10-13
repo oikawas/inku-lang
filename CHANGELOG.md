@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Model hover cards show purpose badges, three-tier recommendations, estimated cost and mean speed
+
+At the author's instruction, based on the draw session's Gemini measurement (run `provider-20261013-run-70f64bd9`). Purposes appear as LLM and Vision badges, greying the purpose a model cannot be chosen for; pickers still omit a model for a purpose it lacks. Recommendations print in three tiers while the stored five levels stay the measurement scale and the sort order: 4–5 read ★★★, 3 ★★☆, 1–2 ★☆☆. Model metadata gains an approximate USD cost (`cost_usd_llm` per drawing, `cost_usd_vision` per Vision picture) and measured mean seconds (`speed_llm_seconds`, `speed_vision_seconds`); saves and model-list fetches keep them, and non-numbers, negatives and zero seconds are dropped. Providers whose speed a release shows only in developer mode hide the means too. The hover card adds a cost row, $0 for a free model, and shows the means as reference values in place of the speed label when present.
+
 ### 2026-10-13 — Swift drawing stop button looks like Web
 
 At the author's instruction. The stop button in Swift's drawing indicator was a plain gray button. Like Web `StopButton.svelte`, it now has a red frame, a pale red background and a ringed dot, and pulses every 2.2 seconds as its background deepens and an outer ring spreads to 5px. Each theme uses the Web colors. The pulse stops when reduced motion is on. Stop buttons outside the drawing indicator are unchanged.

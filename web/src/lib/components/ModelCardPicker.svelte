@@ -2,7 +2,8 @@
 	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { pickerSelection, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
-	import { modelPurposes, modelRecommendation, modelSpeed, modelComment, modelStatusLabel, isModelUnselectable, sortModels, type ModelPurpose } from '$lib/modelMeta';
+	import { modelRecommendation, modelSpeed, modelCost, modelComment, modelStatusLabel, isModelUnselectable, sortModels, type ModelPurpose } from '$lib/modelMeta';
+	import ModelPurposeBadges from './ModelPurposeBadges.svelte';
 
 	type Props = {
 		label: string;
@@ -75,7 +76,7 @@
 		const meta = btn.querySelector('.metadata') as HTMLElement | null;
 		if (!meta) return;
 		const b = btn.getBoundingClientRect();
-		const mh = meta.offsetHeight || 170;
+		const mh = meta.offsetHeight || 210;
 		const mw = meta.offsetWidth || Math.min(340, window.innerWidth * 0.75);
 		const margin = 8;
 		const spaceBelow = window.innerHeight - b.bottom;
@@ -110,9 +111,10 @@
 							<strong>{model.label}</strong>{#if isModelUnselectable(model)}<small class="eol-mark">{modelStatusLabel(model, isJapanese)}</small>{/if}{#if model.notes}<small>{model.notes}</small>{/if}
 							<span class="metadata" role="tooltip">
 								{#if isModelUnselectable(model)}<span><b>状態 / Status</b>{modelStatusLabel(model, isJapanese)}</span>{/if}
-								<span><b>用途 / Use</b>{modelPurposes(model)}</span>
+								<span><b>用途 / Use</b><ModelPurposeBadges {model} {isJapanese} /></span>
 								<span><b>オススメ度 / Recommendation</b>{modelRecommendation(model, purpose)}</span>
-								<span><b>速度 / Speed</b>{modelSpeed(model)}</span>
+								<span><b>概算コスト / Est. cost</b>{modelCost(model, isJapanese)}</span>
+								<span><b>速度 / Speed</b>{modelSpeed(model, isJapanese)}</span>
 								<span><b>評価 / Comment</b>{modelComment(model, isJapanese)}</span>
 							</span>
 						</button>

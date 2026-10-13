@@ -75,12 +75,12 @@
     "cases": [
       {
         "model": { "recommendation_stage1": 5, "recommendation_stage2": 2 },
-        "split": { "stage1": "★★★★★ (5/5)", "stage2": "★★☆☆☆ (2/5)" },
+        "split": { "stage1": "★★★ (3/3)", "stage2": "★☆☆ (1/3)" },
         "why": "qwen3.5:4b -- both numbers visible without changing tab"
       },
       {
         "model": { "recommendation_stage1": 1 },
-        "split": { "stage1": "★☆☆☆☆ (1/5)", "stage2": "—" },
+        "split": { "stage1": "★☆☆ (1/3)", "stage2": "—" },
         "why": "an unmeasured stage stays an em dash inside the split"
       },
       { "model": { "recommendation_llm": 4 }, "split": null, "why": "measured end to end: one row" },
@@ -92,6 +92,19 @@
         "split": null,
         "why": "vision is never split even when stage keys are present"
       }
+    ]
+  },
+  "tiers": {
+    "note": [
+      "The card prints three tiers (the author, 2026-10-13). The stored levels keep their five",
+      "steps: the measurements were scored on them, and they still order the cards."
+    ],
+    "cases": [
+      { "level": 1, "text": "★☆☆ (1/3)" },
+      { "level": 2, "text": "★☆☆ (1/3)" },
+      { "level": 3, "text": "★★☆ (2/3)" },
+      { "level": 4, "text": "★★★ (3/3)" },
+      { "level": 5, "text": "★★★ (3/3)" }
     ]
   }
 }

@@ -1,5 +1,5 @@
 <!--
-	Shared model evaluation card (purposes / recommendation / speed / comment).
+	Shared model evaluation card (purposes / recommendation / cost / speed / comment).
 	This is the design used by the description-tab model selection; reused by the
 	settings model picker and the model comparison dialog so all surfaces match.
 	Display-only: the reveal (display:block on hover) is provided by the parent,
@@ -7,7 +7,8 @@
 -->
 <script lang="ts">
 	import type { ModelOption } from '$lib/models';
-	import { modelPurposes, modelRecommendation, modelStageRecommendations, modelSpeed, modelComment, modelStatusLabel, type ModelPurpose } from '$lib/modelMeta';
+	import { modelRecommendation, modelStageRecommendations, modelSpeed, modelCost, modelComment, modelStatusLabel, type ModelPurpose } from '$lib/modelMeta';
+	import ModelPurposeBadges from './ModelPurposeBadges.svelte';
 
 	type Props = {
 		model: ModelOption;
@@ -27,14 +28,15 @@
 
 <span class="model-hover-card" role="tooltip">
 	{#if modelStatusLabel(model, isJapanese)}<span><strong>状態 / Status</strong>{modelStatusLabel(model, isJapanese)}</span>{/if}
-	<span><strong>用途 / Use</strong>{modelPurposes(model)}</span>
+	<span><strong>用途 / Use</strong><ModelPurposeBadges {model} {isJapanese} /></span>
 	{#if stages}
 		<span><strong>オススメ度 / Stage 1</strong>{stages.stage1}</span>
 		<span><strong>オススメ度 / Stage 2</strong>{stages.stage2}</span>
 	{:else}
 		<span><strong>オススメ度 / Recommendation</strong>{modelRecommendation(model, purpose)}</span>
 	{/if}
-	<span><strong>速度 / Speed</strong>{modelSpeed(model)}</span>
+	<span><strong>概算コスト / Est. cost</strong>{modelCost(model, isJapanese)}</span>
+	<span><strong>速度 / Speed</strong>{modelSpeed(model, isJapanese)}</span>
 	<span><strong>評価 / Comment</strong>{modelComment(model, isJapanese)}</span>
 	{#if extra}<span><strong>状態 / Status</strong>{extra}</span>{/if}
 </span>

@@ -35,6 +35,7 @@ function actualMethod(path: string, name: string): string {
 test('box and modal settings choose line numbers and commit complete drafts', async () => {
 	const { setup } = await harness(`export function setup(compact, value, onChange, onRanges) {
 		const isJapanese = true, disabled = false, pluginEntries = [], pluginNameIndex = {}, ranges = [];
+		const completionSource = value, completionStates = [], completionLabels = {};
 		const previewForWord = () => {}, previewForPlugin = () => {};
 		let activeSaijikiPreview = null;
 		const t = () => ({ ddlEditorInstructions: 'instructions', ddlEditPlaceholder: 'placeholder' });
@@ -48,6 +49,7 @@ test('box and modal settings choose line numbers and commit complete drafts', as
 		const editor = setup(compact, source, (next: string) => changed.push(next), (status: unknown) => statuses.push(status));
 		assert.equal(editor.options.lineNumbers, !compact);
 		assert.equal(editor.options.cursorAtEnd, compact);
+		assert.equal(editor.options.completionSource, source);
 		const next = source + '\r\n青い線。';
 		editor.options.onChange(next);
 		assert.equal(editor.value(), next);

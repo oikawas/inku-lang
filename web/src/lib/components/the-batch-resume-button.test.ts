@@ -41,7 +41,7 @@ test('T-64  it comes before the button that starts a new run', () => {
 });
 
 test('T-65  a resumed run paints the plan, not the box', () => {
-	assert.match(OWNER, /const paintLines = options\.resumeLines \?\? lines;/, 'the resume plan is not what gets painted');
+	assert.match(OWNER, /const paintLines = options\.retryFailedLines \?\? options\.resumeLines \?\? lines;/, 'the resume plan is not what gets painted');
 	// Every quantity the run reads has to come from the plan, or the progress
 	// readout counts one thing while the loop paints another.
 	assert.match(OWNER, /const lineTotal = paintLines\.length;/);

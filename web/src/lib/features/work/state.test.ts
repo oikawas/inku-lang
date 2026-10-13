@@ -94,10 +94,16 @@ test('a batch drops the old single-work failure and retains its own line failure
 	await work.submitBatch({});
 	assert.equal(work.pipelineView, null);
 	assert.equal(batch.success, 1);
-	assert.deepEqual(reports.at(-1), {
+	const report = reports.at(-1);
+	assert.ok(report);
+	assert.deepEqual({ success: report.success, total: report.total, failures: report.failures }, {
 		success: 1, total: 2,
 		failures: [{ line: 2, input: 'failed line', message: 'schema_violation: 4 attempts' }]
 	});
+	assert.equal(report.retry?.prompt, 'drawn line\nfailed line');
+	assert.equal(report.retry?.runId, 'batch-test');
+	assert.deepEqual(report.retry?.failedLines, [2]);
+	assert.deepEqual(report.retry?.pendingLines, [2]);
 	assert.deepEqual(paints, ['drawn line', 'failed line']);
 
 	work.inputMode = 'single';

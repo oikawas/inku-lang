@@ -86,6 +86,7 @@ test('the actual viewer SSR uses the common editor and keeps its full-source dra
 		'$lib/plugin-names': new URL('./plugin-names.ts', import.meta.url).href,
 		'$lib/saijiki': new URL('./saijiki.ts', import.meta.url).href,
 		'$lib/features/ddl-editor/codemirror': new URL('./features/ddl-editor/codemirror.ts', import.meta.url).href,
+		'$lib/features/ddl-editor/completion-range-states': new URL('./features/ddl-editor/completion-range-states.ts', import.meta.url).href,
 		'$lib/i18n/index.svelte': runeModule('./i18n/index.svelte.ts', 'server')
 	};
 	function component(path: string): string {

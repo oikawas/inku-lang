@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Turn off NIM Gemma 4 thinking on Android too
+
+NVIDIA NIM's Gemma 4 gets chat_template_kwargs with enable_thinking false for drawing, Vision, photo descriptions and demo instructions. Other models do not get it; output budgets and temperature stay unchanged.
+
 ### 2026-10-13 — Match Server's Ollama requests and output limits on Android
 
 Android also asks local/Cloud gpt-oss for low with 8,192 extra output tokens, and other models for none, across Vision, photo descriptions and demo instructions too. An OpenAI-compatible drawing response ending at length is refused even if its call or text looks complete, with retryable malformed_payload and output-limit diagnostics.

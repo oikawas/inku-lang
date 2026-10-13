@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-13 — AndroidのNIM Gemma 4でも思考を切る
+
+NVIDIA NIMのGemma 4にはchat_template_kwargsのenable_thinkingをfalseで送り、描画・Vision・写真の記述・デモで思考を切る。ほかのモデルには付けず、出力枠とtemperatureは保つ。
+
 ### 2026-10-13 — AndroidのOllama要求と出力上限をServerに揃える
 
 Androidもローカル／Cloudのgpt-ossにlowと8,192追加の出力枠を送り、ほかのモデルにはnoneを送る。Vision・写真の記述・デモにも同じ規則を適用する。lengthで切れたOpenAI互換の描画応答は、関数や本文が揃って見えても答えにせず、再試行可能なmalformed_payloadと上限到達の診断を残す。

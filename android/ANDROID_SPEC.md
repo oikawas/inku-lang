@@ -49,6 +49,15 @@ When updating Android specifications:
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
 
+## 2026-10-13 NVIDIA NIM Gemma 4 thinking control
+
+Only connection id `nvidia` gets `chat_template_kwargs: {"enable_thinking": false}` when
+the model name, after removing the connection prefix and taking the part after the last `/`,
+matches `^gemma[-_]?4([-_]|$)` without regard to case. This turns off NIM Gemma 4's thinking
+through the common request path for drawing, Vision, photo descriptions and demo instructions.
+Other NIM models and connections do not get this field; max_tokens and temperature stay unchanged.
+Android sends raw JSON, so the field is at the top level rather than an SDK's extra_body.
+
 ## 2026-10-13 Ollama reasoning and output budgets
 
 Requests on connection ids `ollama` and `ollama-cloud` use Server's `openai_sampling()` rule

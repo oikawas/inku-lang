@@ -34,6 +34,15 @@ Androidはpremultiplied RGBAをNDK Bitmapへ直接転送する。Kotlin Engine 3
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
 
+## 2026-10-13 NVIDIA NIMのGemma 4の思考指定
+
+接続idが `nvidia` で、接続名を除いたモデル名の最後の `/` より後ろが
+`^gemma[-_]?4([-_]|$)` に合う場合（大文字小文字を問わない）だけ、
+`chat_template_kwargs: {"enable_thinking": false}` を送り、NIMのGemma 4の思考を切る。
+描画・Vision・写真の記述・デモは共通の要求処理を使う。
+ほかのNIMモデルや他の接続にはこの指定を付けず、max_tokensとtemperatureは変更しない。
+Androidは生のJSONで要求するので、指定は最上位へ置き、SDK用のextra_bodyは使わない。
+
 ## 2026-10-13 Ollamaの推論指定と出力枠
 
 接続idが `ollama` または `ollama-cloud` の要求は、描画・Vision・写真の記述・デモで

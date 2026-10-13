@@ -130,7 +130,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                         let value = try ExactJSON(data: bytes!)
                         recorder?.report(value)
                         let usage = provider.kind == .gemini ? value["usageMetadata"] : value["usage"]
-                        let tokenKey = provider.kind == .gemini ? "promptTokenCount" : (provider.kind == .anthropic ? "input_tokens" : "prompt_tokens")
+                        let tokenKey = provider.kind == .gemini ? "promptTokenCount" : (provider.kind == .anthropic || ProviderWire.isOpenAIAPI(provider) ? "input_tokens" : "prompt_tokens")
                         used = usage[tokenKey].number.flatMap(Int.init).flatMap { $0 >= 0 ? $0 : nil }
                     } catch { attemptError = error }
                     recorder?.setOperation(.admission)
@@ -152,7 +152,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                 guard let result = try await group.next() else { throw HostError("transport_unavailable") }
                 return result
             }
-            response = try ProviderWire.responseText(raw, kind: provider.kind)
+            response = try ProviderWire.responseText(raw, provider: provider)
         } catch let error as ProviderObservationFailure { throw error }
         catch is CancellationError {
             try await recorder?.finish(failure: nil, cancelled: true, callback: didFinish)

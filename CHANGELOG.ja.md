@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-13 — SwiftのOpenAI API描画をResponsesへ移す
+
+Swiftも公式OpenAI APIの描画を非streamのResponsesへ移し、function toolを1件要求する。GPT-5・GPT-6・o系は温度を送らず、推論を切れるモデルは`none`、ほかは`low`と25,000の追加出力枠を使う。完了した応答だけを採用し、上限で切れた応答は`malformed_payload`で拒否してトークン数を記録する。入力使用量は`usage.input_tokens`をレート管理へ渡す。Vision・奥書・デモはChat Completionsのまま同じ推論判定を使い、他providerの要求形式は維持する。
+
 ### 2026-10-13 — OpenAI APIの描画をResponses APIへ移し、GPT-6系の推論と温度の指定を直す
 
 作者の指示（OpenAIの資料とOpenAI APIへの要求の照合）と選択による。OpenAIのモデルは提供元の一覧から取り込めるが、Serverの判定はGPT-5系までしか見ていなかった。OpenAIの案内（reasoning・latest-model、2026-10-13）と照らすと、GPT-6系では次のとおり要求が通らない、または答えが切れる。

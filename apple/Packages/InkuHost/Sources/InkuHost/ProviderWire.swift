@@ -24,17 +24,24 @@ public enum ProviderWire {
         switch provider.kind {
         case .chatGPTPlan: throw HostError("chatgpt_session_pin_required")
         case .openAICompatible:
-            endpoint = base + "/chat/completions"
             headers["Authorization"] = "Bearer " + ((key ?? "").isEmpty ? "none" : key!)
-            body = .object(["model": .string(model), "stream": .bool(false),
-                            "messages": .array([.object(["role": .string("system"), "content": .string(system)]),
-                                                 .object(["role": .string("user"), "content": .string(message)])])])
             let temperature = ["generate_normalized_ddl", "read_composition"].contains(actionName) ? "0.3" : "0.0"
-            if provider.baseURL.host?.lowercased() == "api.openai.com" {
-                body["max_completion_tokens"] = .integer(maxTokens)
-                if !(model.hasPrefix("gpt-5") || model.range(of: "^o[0-9]", options: .regularExpression) != nil) { body["temperature"] = .number(temperature) }
-                if model.range(of: "^gpt-5\\.[0-9]", options: .regularExpression) != nil { body["reasoning_effort"] = .string("none") }
+            if isOpenAIAPI(provider) {
+                endpoint = base + "/responses"
+                let sampling = openAISampling(model, maxTokens: maxTokens, temperature: temperature)
+                body = .object(["model": .string(model), "store": .bool(false), "instructions": .string(system),
+                    "input": .array([.object(["role": .string("user"), "content": .string(message)])]),
+                    "tools": .array([.object(["type": .string("function"), "name": .string(responseName),
+                        "description": function["description"], "parameters": schema, "strict": .bool(false)])]),
+                    "tool_choice": .string("required"), "parallel_tool_calls": .bool(false),
+                    "max_output_tokens": sampling["max_completion_tokens"]])
+                if sampling["temperature"] != .null { body["temperature"] = sampling["temperature"] }
+                if let effort = sampling["reasoning_effort"].string { body["reasoning"] = .object(["effort": .string(effort)]) }
             } else {
+                endpoint = base + "/chat/completions"
+                body = .object(["model": .string(model), "stream": .bool(false),
+                    "messages": .array([.object(["role": .string("system"), "content": .string(system)]),
+                                         .object(["role": .string("user"), "content": .string(message)])])])
                 body["max_tokens"] = .integer(maxTokens); body["temperature"] = .number(temperature)
                 if provider.apiProfile == "mlx" {
                     body["enable_thinking"] = .bool(false)
@@ -45,12 +52,12 @@ public enum ProviderWire {
                 }
                 applyNIMSampling(to: &body, providerID: provider.id, model: model)
                 applyOllamaSampling(to: &body, providerID: provider.id, model: model, maxTokens: maxTokens)
-            }
-            if provider.id == "ollama" || provider.apiProfile == "mlx" {
-                body["response_format"] = .object(["type": .string("json_schema"), "json_schema": .object(["name": .string(responseName), "schema": schema, "strict": .bool(true)])])
-            } else {
-                body["tools"] = .array([.object(["type": .string("function"), "function": function])])
-                body["tool_choice"] = .object(["type": .string("function"), "function": .object(["name": .string(responseName)])])
+                if provider.id == "ollama" || provider.apiProfile == "mlx" {
+                    body["response_format"] = .object(["type": .string("json_schema"), "json_schema": .object(["name": .string(responseName), "schema": schema, "strict": .bool(true)])])
+                } else {
+                    body["tools"] = .array([.object(["type": .string("function"), "function": function])])
+                    body["tool_choice"] = .object(["type": .string("function"), "function": .object(["name": .string(responseName)])])
+                }
             }
         case .anthropic:
             endpoint = base + "/v1/messages"
@@ -76,6 +83,24 @@ public enum ProviderWire {
         request.httpMethod = "POST"; request.httpBody = provider.kind == .gemini ? Data(body.orderedText.utf8) : body.data
         request.allHTTPHeaderFields = headers
         return request
+    }
+
+    static func isOpenAIAPI(_ provider: ProviderSettings) -> Bool {
+        provider.kind == .openAICompatible && provider.baseURL.host?.lowercased() == "api.openai.com"
+    }
+
+    // Shared by Responses drawing and Chat Completions auxiliary requests.
+    static func openAISampling(_ model: String, maxTokens: Int, temperature: String) -> ExactJSON {
+        var sampling: ExactJSON = .object(["max_completion_tokens": .integer(maxTokens)])
+        if model.range(of: "^(gpt-5|gpt-6|o\\d)", options: .regularExpression) == nil {
+            sampling["temperature"] = .number(temperature)
+        } else if model.range(of: "^(gpt-5\\.\\d|gpt-6-(?:sol|luna)(?:-|$))", options: .regularExpression) != nil {
+            sampling["reasoning_effort"] = .string("none")
+        } else {
+            sampling["reasoning_effort"] = .string("low")
+            sampling["max_completion_tokens"] = .integer(maxTokens + 25000)
+        }
+        return sampling
     }
 
     // NIM's hosted Gemma 4 must have thinking disabled in its chat template.
@@ -115,6 +140,34 @@ public enum ProviderWire {
         var configuration: ExactJSON = .object(["maxOutputTokens": .integer(answerTokens + (thinking == nil ? 0 : 8192))])
         if let thinking { configuration["thinkingConfig"] = thinking }
         return configuration
+    }
+
+    public static func responseText(_ data: Data, provider: ProviderSettings) throws -> String {
+        guard isOpenAIAPI(provider) else { return try responseText(data, kind: provider.kind) }
+        let value = try ExactJSON(data: data)
+        let output = value["output"].array ?? []
+        if value["status"].string == "incomplete", value["incomplete_details"]["reason"].string == "max_output_tokens" {
+            let tokens = value["usage"]["output_tokens"].number ?? "unknown"
+            let reasoning = value["usage"]["output_tokens_details"]["reasoning_tokens"].number ?? "unknown"
+            let hasText = output.contains { $0["type"].string == "message" }
+            let hasFunction = output.contains { $0["type"].string == "function_call" }
+            logger.error("provider_output_limit incomplete_reason=max_output_tokens output_tokens=\(tokens, privacy: .public) reasoning_tokens=\(reasoning, privacy: .public) has_text=\(hasText, privacy: .public) has_function_call=\(hasFunction, privacy: .public)")
+        }
+        guard value["status"].string == "completed", value["output"].array != nil else { throw HostError("malformed_payload") }
+        let calls = output.filter { $0["type"].string == "function_call" }
+        let text: String
+        if !calls.isEmpty {
+            guard calls.count == 1, calls[0]["name"].string == responseName,
+                  let arguments = calls[0]["arguments"].string else { throw HostError("malformed_payload") }
+            text = arguments
+        } else {
+            text = output.filter { $0["type"].string == "message" }
+                .flatMap { $0["content"].array ?? [] }
+                .filter { $0["type"].string == "output_text" }
+                .compactMap { $0["text"].string }.joined()
+        }
+        guard !text.isEmpty else { throw HostError("malformed_payload") }
+        return text
     }
 
     public static func responseText(_ data: Data, kind: ProviderKind) throws -> String {

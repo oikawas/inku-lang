@@ -14,6 +14,17 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-13 OpenAI APIの描画をResponsesへ移し、推論設定をServerに揃える
+
+OpenAI互換の接続先ホストが`api.openai.com`のときだけ、Serverの[`openai_request.py`](../server/src/inku_server/openai_request.py)と同じ要求・応答処理を使う。公式仕様は[推論モデル](https://developers.openai.com/api/docs/guides/reasoning)と[GPT-6案内](https://developers.openai.com/api/docs/guides/latest-model)を参照する。
+
+- 描画pipelineは非streamの`POST /v1/responses`を使う。本文は`model`、`store: false`、システムプロンプトの`instructions`、ユーザー本文の`input`、`submit_pipeline_response`のfunction tool（coreのschemaをそのまま`parameters`へ、`strict: false`）、`tool_choice: required`、`parallel_tool_calls: false`、`max_output_tokens`。推論指定があるときは`reasoning: {effort}`、温度を送るときは`temperature`を加える。
+- 推論系`^(gpt-5|gpt-6|o\d)`には温度を送らない。そのうち`^(gpt-5\.\d|gpt-6-(sol|luna)(-|$))`は推論を`none`、それ以外（GPT-6 Astra・GPT-6.1 Sol・GPT-5無印・o系など）は`low`とし、答えの上限に25,000を足す。推論系でないモデルには従来の温度を送り、推論指定を付けない。
+- `status: completed`だけを採用する。`output`のfunction callがちょうど1件で、nameが一致し、argumentsが文字列なら、その文字列を返す。function callが無いときはmessageの`output_text`をつなぐ。未完了・不正なcall・空の答えは`malformed_payload`で拒否する。
+- `status: incomplete`かつ`incomplete_details.reason: max_output_tokens`では、`provider_output_limit`、出力・推論トークン数、messageとfunction callの有無をシステムログへ記録する。本文・推論文は記録しない。入力使用量は`usage.input_tokens`から取り、既存のレート管理と使用量報告へ渡す。
+- Vision・奥書・デモはChat Completionsのまま、同じモデル判定を`max_completion_tokens`と`reasoning_effort`へ反映する。他のOpenAI互換providerのChat形式と、ChatGPTプランのSSEは変更しない。
+- 確認：InkuHostの`OpenAIResponsesTests`で、両APIの要求、modelごとの指定、公式ホスト以外の対照、HTTPを注入した実transportの応答採用・拒否、SQLiteの入力トークン記録と報告使用量を確認する。
+
 ## 2026-10-13 NVIDIA NIMのGemma 4の思考を切る
 
 NVIDIA NIMへの描画・Vision（推敲の助言・奥書）・デモの指示文は、Serverの[`openai_request.py`](../server/src/inku_server/openai_request.py)と同じくGemma 4の思考を切る（[NIM API仕様](https://docs.api.nvidia.com/nim/reference/google-gemma-4-31b-it-infer)）。

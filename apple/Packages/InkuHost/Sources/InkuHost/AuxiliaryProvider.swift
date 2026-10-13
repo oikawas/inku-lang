@@ -427,12 +427,9 @@ public enum AuxiliaryWire {
             body = .object(["model": .string(model), "stream": .bool(false),
                 "messages": .array([.object(["role": .string("system"), "content": .string(prompt.system)]),
                                      .object(["role": .string("user"), "content": content])])])
-            if provider.baseURL.host?.lowercased() == "api.openai.com" {
-                body["max_completion_tokens"] = .integer(prompt.maximumTokens)
-                if !(model.hasPrefix("gpt-5") || model.range(of: "^o[0-9]", options: .regularExpression) != nil) {
-                    body["temperature"] = .number(String(prompt.temperature))
-                }
-                if model.range(of: "^gpt-5\\.[0-9]", options: .regularExpression) != nil { body["reasoning_effort"] = .string("none") }
+            if ProviderWire.isOpenAIAPI(provider) {
+                let sampling = ProviderWire.openAISampling(model, maxTokens: prompt.maximumTokens, temperature: String(prompt.temperature))
+                for (key, value) in sampling.object! { body[key] = value }
             } else {
                 body["max_tokens"] = .integer(prompt.maximumTokens); body["temperature"] = .number(String(prompt.temperature))
                 if provider.apiProfile == "mlx" {

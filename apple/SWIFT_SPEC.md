@@ -14,6 +14,17 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-13 Move OpenAI API drawing to Responses and match Server reasoning settings
+
+Only OpenAI-compatible connections whose host is `api.openai.com` use the request and response handling in Server's [`openai_request.py`](../server/src/inku_server/openai_request.py). See the official [reasoning model guide](https://developers.openai.com/api/docs/guides/reasoning) and [GPT-6 guide](https://developers.openai.com/api/docs/guides/latest-model).
+
+- Drawing uses nonstreaming `POST /v1/responses`. The body carries `model`, `store: false`, the system prompt as `instructions`, the user's message as `input`, the `submit_pipeline_response` function tool (the unchanged core schema as `parameters`, `strict: false`), `tool_choice: required`, `parallel_tool_calls: false`, and `max_output_tokens`. When applicable, it adds `reasoning: {effort}` or `temperature`.
+- Reasoning families `^(gpt-5|gpt-6|o\d)` receive no temperature. Within them, `^(gpt-5\.\d|gpt-6-(sol|luna)(-|$))` receives `none`; others, including GPT-6 Astra, GPT-6.1 Sol, GPT-5 without a suffix, and o-series models, receive `low` and 25,000 extra output tokens. Nonreasoning models retain the existing temperature without a reasoning field.
+- Only `status: completed` is accepted. Exactly one function call with the expected name and string arguments returns those arguments. With no function call, message `output_text` parts are concatenated. Unfinished output, invalid calls, and empty answers fail as `malformed_payload`.
+- `status: incomplete` with `incomplete_details.reason: max_output_tokens` logs `provider_output_limit`, output and reasoning token counts, and whether messages or function calls are present. No answer or reasoning text is logged. Input usage comes from `usage.input_tokens` for rate accounting and reported usage.
+- Vision, colophons, and demos retain Chat Completions, applying the same matching to `max_completion_tokens` and `reasoning_effort`. Other OpenAI-compatible providers retain their Chat format; ChatGPT plan SSE is unchanged.
+- Check: InkuHost's `OpenAIResponsesTests` verifies both API request formats, per-model settings, a nonofficial-host control, accepted and rejected responses through the real transport with injected HTTP, SQLite input-token accounting, and reported usage.
+
 ## 2026-10-13 Disable NVIDIA NIM Gemma 4 thinking
 
 Drawing, Vision (refinement advice and colophons), and demo instruction requests to NVIDIA NIM disable Gemma 4 thinking, following Server's [`openai_request.py`](../server/src/inku_server/openai_request.py) and the [NIM API specification](https://docs.api.nvidia.com/nim/reference/google-gemma-4-31b-it-infer).

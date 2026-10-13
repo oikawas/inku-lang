@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Move Swift OpenAI API drawing to Responses
+
+Swift drawing on the official OpenAI API now uses nonstreaming Responses with one function tool required. GPT-5, GPT-6, and o-series models omit temperature: models that can stop reasoning use `none`, while others use `low` with 25,000 extra output tokens. Only completed responses are accepted; output cut off at the limit fails as `malformed_payload` and logs token counts. Rate accounting reads `usage.input_tokens`. Vision, colophons, and demos retain Chat Completions with the same reasoning settings; other providers retain their request formats.
+
 ### 2026-10-13 — Draw through OpenAI's Responses API, and send GPT-6 models the reasoning and temperature they take
 
 OpenAI models can be imported from the provider's list, but Server's checks stopped at GPT-5. Per OpenAI's reasoning and latest-model guides, Chat Completions takes no function tools from GPT-6 Astra or GPT-6.1 Sol, and from GPT-6 Sol and Luna only with `reasoning_effort: "none"`, which Server sent only to gpt-5.x; temperature must be removed whenever reasoning is not none; and the models that cannot stop reasoning spend the output limit on it. Drawing on OpenAI's own API now goes through `/v1/responses` with the one function tool required, `store: false`, `max_output_tokens`, and `reasoning.effort`; an incomplete answer is not used and logs `provider_output_limit`. Every GPT-5, GPT-6, and o-series request omits temperature; models that can stop reasoning (gpt-5.1 and later, GPT-6 Sol and Luna) are sent `none`, and the rest `low` with 25,000 tokens of room, as OpenAI recommends. Vision, the colophon, and the demo instruction stay on Chat Completions, which they can use without tools. Other OpenAI-compatible providers are unchanged.

@@ -8,6 +8,13 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — The OpenAI defaults are the three published models, and every screen shows blocking labels in the warning colour
+
+At the author's choice (the rest of the model catalog work). The models a fresh installation lists and publishes for the OpenAI API were `gpt-5.1`, `gpt-5.1-mini`, `gpt-4.1` and `gpt-4.1-mini`, all four older models. The rows of the administrator's "Visible models" picker also showed the labels that keep a model from publication in the muted colour. While fixing that, it turned out that "Model selection" and the model card picker did not show the warning colour either: the rule that mutes the grid's small text was more specific, so only the bold weight applied (this predates the catalog).
+
+- The catalog's OpenAI defaults (`providers.openai.defaults`) are now `gpt-5.6-luna`, `gpt-5.6-terra` and `gpt-6-luna`, the models 5173 publishes. An installation that has stored its list keeps it unchanged. The Web's provisional list before the Server answers, and the model-reference expectation table (`web/scripts/model-ref-expectations.json`), list the same three.
+- The labels that keep a model from publication (Paid plan only, No response when measured, Not supported, End of life) show in the warning colour in the administrator rows, in the marks of "Model selection" and the model card picker, and in the Status line of the hover card, as the specification says; Older model and Not measured stay muted.
+
 ## v2.15.117 (2026-10-13 / Build 1193)
 
 ### 2026-10-13 — One catalog of model information, with labels and folds as data

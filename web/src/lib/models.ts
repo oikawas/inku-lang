@@ -74,10 +74,9 @@ export const PROVIDER_GROUPS: ProviderGroup[] = [
 		id: 'openai',
 		label: 'OpenAI API Platform',
 		models: [
-			{ id: 'gpt-5.1', label: 'GPT-5.1' },
-			{ id: 'gpt-5.1-mini', label: 'GPT-5.1 mini' },
-			{ id: 'gpt-4.1', label: 'GPT-4.1' },
-			{ id: 'gpt-4.1-mini', label: 'GPT-4.1 mini' }
+			{ id: 'gpt-5.6-luna', label: 'gpt-5.6-luna' },
+			{ id: 'gpt-5.6-terra', label: 'gpt-5.6-terra' },
+			{ id: 'gpt-6-luna', label: 'gpt-6-luna' }
 		]
 	},
 	{

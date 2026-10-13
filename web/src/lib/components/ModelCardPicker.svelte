@@ -101,7 +101,7 @@
 						<button type="button" class:selected={selected?.group.id === group.id && selected?.model.id === model.id} class:eol={model.eol} class:unselectable={isModelUnselectable(model)} disabled={isModelUnselectable(model)} onpointerenter={positionMeta} onfocus={positionMeta} onclick={() => choose(group.id, model.id)}>
 							<strong>{model.label}</strong>{#if modelStatusLabel(model, isJapanese)}<small class={isModelUnselectable(model) ? 'eol-mark' : 'model-label-mark'}>{modelStatusLabel(model, isJapanese)}</small>{/if}{#if model.notes}<small>{model.notes}</small>{/if}
 							<span class="metadata" role="tooltip">
-								{#if modelStatusLabel(model, isJapanese)}<span><b>状態 / Status</b>{modelStatusLabel(model, isJapanese)}</span>{/if}
+								{#if modelStatusLabel(model, isJapanese)}<span><b>状態 / Status</b><span class={isModelUnselectable(model) ? 'status-warning' : 'status-muted'}>{modelStatusLabel(model, isJapanese)}</span></span>{/if}
 								<span><b>用途 / Use</b><ModelPurposeBadges {model} {isJapanese} /></span>
 								<span><b>オススメ度 / Recommendation</b>{modelRecommendation(model, purpose)}</span>
 								<span><b>概算コスト / Est. cost</b>{modelCost(model, isJapanese)}</span>
@@ -122,9 +122,14 @@
 	.model-grid button.unselectable { opacity: 0.55; cursor: not-allowed; }
 	/* Strike through retired models only; a paid-tier model has not disappeared. */
 	.model-grid button.eol strong { text-decoration: line-through; }
-	.eol-mark { color: var(--danger); font-weight: 600; }
+	/* The card's small text is muted (.model-grid > button > small below); a label that keeps
+	   the model from publication has to outrank that rule to show in the warning colour. */
+	.model-grid > button > small.eol-mark { color: var(--danger); font-weight: 600; }
 	/* A label that leaves the model selectable (older model, not measured) is not a warning. */
 	.model-label-mark { color: var(--fg3); }
+	/* The hover card colours the labels the same way, in the tooltip's own palette. */
+	.metadata .status-warning { color: var(--danger); font-weight: 600; }
+	.metadata .status-muted { color: var(--tooltip-muted); }
 	.context-model-picker { display: grid; gap: 4px; min-width: 0; }
 	.field-label { color: var(--fg2); font-size: var(--ui-font-size-11); }
 	.picker-launch { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--fg); text-align: left; cursor: pointer; font: inherit; }

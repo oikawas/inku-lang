@@ -2516,7 +2516,7 @@ def test_model_settings_store_keys_server_side(monkeypatch):
                     "base_url": "https://api.openai.com/v1",
                     "api_key": "sk-test-secret",
                     "memo": "Team contract renews in April.",
-                    "enabled_models": {"gpt-5.1": False},
+                    "enabled_models": {"gpt-5.6-luna": False},
                 },
                 "gemini": {"base_url": "https://generativelanguage.googleapis.com", "api_key": "gemini-secret"},
             },
@@ -2526,7 +2526,7 @@ def test_model_settings_store_keys_server_side(monkeypatch):
     settings = r.json()["settings"]
     assert settings["providers"]["openai"]["api_key_set"] is True
     assert settings["providers"]["openai"]["api_key_hint"] == "sk-t...cret"
-    assert settings["providers"]["openai"]["enabled_models"]["gpt-5.1"] is False
+    assert settings["providers"]["openai"]["enabled_models"]["gpt-5.6-luna"] is False
     assert "sk-test-secret" not in json.dumps(settings)
     assert next(provider for provider in r.json()["catalog"] if provider["id"] == "openai")["memo"] == "Team contract renews in April."
 
@@ -2535,7 +2535,7 @@ def test_model_settings_store_keys_server_side(monkeypatch):
     assert "sk-test-secret" not in json.dumps(saved)
     assert connection_for("openai", saved)["api_key"] == "sk-test-secret"
     assert saved["providers"]["openai"]["memo"] == "Team contract renews in April."
-    assert saved["providers"]["openai"]["enabled_models"]["gpt-5.1"] is False
+    assert saved["providers"]["openai"]["enabled_models"]["gpt-5.6-luna"] is False
 
     r = client.put(
         "/api/settings/models",
@@ -2549,7 +2549,7 @@ def test_model_settings_store_keys_server_side(monkeypatch):
     assert public_models.status_code == 200
     openai_catalog = next(provider for provider in public_models.json()["catalog"] if provider["id"] == "openai")
     assert "memo" not in openai_catalog
-    assert all(model["id"] != "gpt-5.1" for model in openai_catalog["models"])
+    assert all(model["id"] != "gpt-5.6-luna" for model in openai_catalog["models"])
     nvidia_llm = next(provider for provider in public_models.json()["llm_catalog"] if provider["id"] == "nvidia")
     nvidia_vision = next(provider for provider in public_models.json()["vision_catalog"] if provider["id"] == "nvidia")
     assert len(nvidia_llm["models"]) == 40

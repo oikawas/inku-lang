@@ -621,7 +621,7 @@
 										};
 									}}
 								/>
-									<span><strong>{model.label}</strong><small>{model.id}</small>{#if modelStatusLabel(model, t().code === 'ja')}<em class="model-picker-status">{modelStatusLabel(model, t().code === 'ja')}</em>{/if}{#if model.notes}<em>{model.notes}</em>{/if}</span>
+									<span><strong>{model.label}</strong><small>{model.id}</small>{#if modelStatusLabel(model, t().code === 'ja')}<em class="model-picker-status" class:unselectable={isModelUnselectable(model)}>{modelStatusLabel(model, t().code === 'ja')}</em>{/if}{#if model.notes}<em>{model.notes}</em>{/if}</span>
 								</label>
 								<div class="model-purpose-controls" aria-label={`${model.label} LLM / Vision`}>
 									<button type="button" class:active={modelPurposeSelected(model.id, 'llm')} aria-pressed={modelPurposeSelected(model.id, 'llm')} disabled={purposeUnsupported(model, 'llm')} title={purposeUnsupported(model, 'llm') ? noResponseTitle() : undefined} onclick={() => toggleModelPurpose(model.id, 'llm')}>LLM</button>

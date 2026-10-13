@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-13 — AndroidのOllama要求と出力上限をServerに揃える
+
+Androidもローカル／Cloudのgpt-ossにlowと8,192追加の出力枠を送り、ほかのモデルにはnoneを送る。Vision・写真の記述・デモにも同じ規則を適用する。lengthで切れたOpenAI互換の描画応答は、関数や本文が揃って見えても答えにせず、再試行可能なmalformed_payloadと上限到達の診断を残す。
+
 ### 2026-10-13 — Ollamaのgpt-ossにlowと推論の分の出力枠を送り、VisionとデモにもOllamaの推論の指定を付ける
 
 作者の指示（Ollamaの資料とOllama Cloudへの要求の照合）。描画セッションの2026-10-12の実測（run d3ab43b9、Build 1179）で、`gpt-oss:20b`は6件とも、`reasoning_effort: "none"`を送っても推論だけで出力枠2,048を使い切り（`finish_reason: length`）、本文も関数呼び出しも空だった。`gpt-oss:120b`も日本語の2件で同じだった。OllamaのOpenAI互換APIでは、`reasoning_effort`の値はモデルごとに決まり（`/api/show`の`thinking.values`）、モデルに無い値はそのモデルの既定に戻る。gpt-ossが受け付けるのは`low`・`medium`・`high`だけで、既定は`medium`である。

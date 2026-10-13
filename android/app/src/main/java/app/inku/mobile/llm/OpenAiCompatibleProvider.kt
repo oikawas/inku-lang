@@ -1,5 +1,6 @@
 package app.inku.mobile.llm
 
+import android.util.Log
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
@@ -17,7 +18,13 @@ class OpenAiCompatibleProvider(
 ) : ModelProvider {
     override suspend fun generate(request: ModelRequest): ModelResponse = withContext(Dispatchers.IO) {
         val started = System.currentTimeMillis()
-        val response = postJson(endpoint("/chat/completions"), requestBody(providerId, request, baseUrl), request.timeoutMs)
+        val payload = requestBody(providerId, request, baseUrl)
+        val response = postJson(endpoint("/chat/completions"), payload, request.timeoutMs)
+        val outputTruncated = response.optJSONArray("choices")?.optJSONObject(0)?.optString("finish_reason") == "length"
+        if (request.pipelineAction != null && outputTruncated) {
+            Log.w("InkuProvider", outputLimitLine(providerId, request, payload, response))
+            throw ProviderOutputLimitException()
+        }
         val content = answerText(response, request.tool?.name)
         val usage = response.optJSONObject("usage")
         ModelResponse(
@@ -25,7 +32,7 @@ class OpenAiCompatibleProvider(
             modelId = request.modelId,
             promptTokens = usage?.optInt("prompt_tokens")?.takeIf { it > 0 },
             completionTokens = usage?.optInt("completion_tokens")?.takeIf { it > 0 },
-            outputTruncated = response.optJSONArray("choices")?.optJSONObject(0)?.optString("finish_reason") == "length",
+            outputTruncated = outputTruncated,
             elapsedMs = System.currentTimeMillis() - started,
         )
     }
@@ -61,6 +68,24 @@ class OpenAiCompatibleProvider(
     }
 
     internal companion object {
+        /** Bounded output-limit diagnostics, with no answer or reasoning text. */
+        internal fun outputLimitLine(providerId: String, request: ModelRequest, payload: JSONObject, response: JSONObject): String {
+            val message = response.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")
+            val usage = response.optJSONObject("usage")
+            val fields = JSONObject()
+                .put("action", request.pipelineAction).put("provider", providerId)
+                .put("model", modelForRequest(providerId, request.modelId))
+                .put("max_tokens", payload.opt("max_tokens") ?: payload.opt("max_completion_tokens") ?: JSONObject.NULL)
+                .put("finish_reason", "length")
+                .put("output_tokens", usage?.opt("completion_tokens") ?: JSONObject.NULL)
+                .put("reasoning_tokens", usage?.optJSONObject("completion_tokens_details")?.opt("reasoning_tokens") ?: JSONObject.NULL)
+                .put("has_reasoning", !(message?.opt("reasoning") as? String).isNullOrEmpty() ||
+                    !(message?.opt("reasoning_content") as? String).isNullOrEmpty())
+                .put("has_text", !(message?.opt("content") as? String).isNullOrEmpty())
+                .put("has_tool_call", (message?.optJSONArray("tool_calls")?.length() ?: 0) > 0)
+            return "provider_output_limit $fields"
+        }
+
         /**
          * The answer in a Chat Completions response, read as the server reads
          * `data["choices"][0]["message"]`: the offered tool's arguments, else
@@ -101,8 +126,8 @@ class OpenAiCompatibleProvider(
          * (`pipeline_provider.py`). A requested answer is a forced function
          * call, except on `ollama`, whose structured output goes as a strict
          * JSON-schema `response_format` -- the answer then comes back as the
-         * message text, which [generate] already reads. A pipeline request to
-         * either Ollama connection also turns reasoning off. OpenAI's own API
+         * message text, which [generate] already reads. Every Ollama request
+         * uses no reasoning, or gpt-oss's lowest level with room for it. OpenAI's own API
          * takes its length, temperature and reasoning fields differently; see
          * [putOpenAiSampling].
          */
@@ -124,6 +149,7 @@ class OpenAiCompatibleProvider(
                 payload,
                 baseUrl,
                 model,
+                providerId,
                 maxTokens = request.maxTokens,
                 temperature = pipelineTemperature(request.pipelineAction) ?: request.temperature,
             )
@@ -156,9 +182,6 @@ class OpenAiCompatibleProvider(
                         )
                 }
             }
-            if (request.pipelineAction != null && providerId in REASONING_OFF_PROVIDER_IDS) {
-                payload.put("reasoning_effort", "none")
-            }
             if (request.stopSequences.isNotEmpty()) {
                 payload.put("stop", JSONArray(request.stopSequences))
             }
@@ -173,19 +196,27 @@ class OpenAiCompatibleProvider(
          * temperature other than the default; and gpt-5.1 and later refuse
          * function tools in /v1/chat/completions while they reason, so they are
          * asked not to (gpt-5 itself and the o-series do not take "none"). Other
-         * OpenAI-compatible servers (NVIDIA, Ollama Cloud and the like) keep the
-         * fields they have always been sent.
+         * OpenAI-compatible servers keep their fields, except Ollama's gpt-oss
+         * gets its lowest thinking level and 8,192 extra tokens for reasoning.
          */
         internal fun putOpenAiSampling(
             payload: JSONObject,
             baseUrl: String,
             model: String,
+            providerId: String,
             maxTokens: Int,
             temperature: Double,
         ) {
             val host = runCatching { URL(baseUrl).host }.getOrNull()?.lowercase()
             if (host != OPENAI_HOST) {
                 payload.put("temperature", temperature).put("max_tokens", maxTokens)
+                if (providerId in OLLAMA_PROVIDER_IDS) {
+                    if (OLLAMA_LEVELS_ONLY.containsMatchIn(model)) {
+                        payload.put("reasoning_effort", "low").put("max_tokens", maxTokens + OLLAMA_THINKING_ROOM_TOKENS)
+                    } else {
+                        payload.put("reasoning_effort", "none")
+                    }
+                }
                 return
             }
             payload.put("max_completion_tokens", maxTokens)
@@ -227,7 +258,9 @@ class OpenAiCompatibleProvider(
         private const val OPENAI_HOST = "api.openai.com"
         private val OPENAI_FIXED_TEMPERATURE = Regex("^(gpt-5|o\\d)")
         private val OPENAI_REASONING_OFF = Regex("^gpt-5\\.\\d")
-        private val REASONING_OFF_PROVIDER_IDS = setOf("ollama", "ollama-cloud")
+        private val OLLAMA_PROVIDER_IDS = setOf("ollama", "ollama-cloud")
+        private val OLLAMA_LEVELS_ONLY = Regex("^gpt-oss(?:[:-]|$)")
+        private const val OLLAMA_THINKING_ROOM_TOKENS = 8192
     }
 }
 

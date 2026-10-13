@@ -2652,13 +2652,17 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
     # v1.98: 提供元から消えたモデルは削除せず EOL として末尾に残す。
     today = datetime.now(timezone.utc).date().isoformat()
     assert openai_catalog["models"] == [
-        {"id": "fetched-model", "label": "Fetched Model", "purposes": ["llm"], "enabled": True},
-        {"id": "new-fetched-model", "label": "New Fetched Model", "purposes": ["llm"], "enabled": False},
+        {"id": "fetched-model", "label": "Fetched Model", "purposes": ["llm"], "enabled": True,
+         "labels": ["unmeasured"], "fold": "unmeasured"},
+        {"id": "new-fetched-model", "label": "New Fetched Model", "purposes": ["llm"], "enabled": False,
+         "labels": ["unmeasured"], "fold": "unmeasured"},
         {
             "id": "removed-model",
             "label": "Removed Model",
             "purposes": ["llm"],
             "enabled": False,
+            "labels": ["eol"],
+            "fold": "eol",
             "eol": True,
             "eol_date": today,
         },
@@ -2676,10 +2680,14 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
     assert r.status_code == 200
     openai_catalog = next(provider for provider in r.json()["catalog"] if provider["id"] == "openai")
     assert openai_catalog["models"] == [
-        {"id": "new-model", "label": "New Model", "purposes": ["llm"], "enabled": False},
-        {"id": "fetched-model", "label": "Fetched Model", "purposes": ["llm"], "enabled": False, "eol": True, "eol_date": today},
-        {"id": "new-fetched-model", "label": "New Fetched Model", "purposes": ["llm"], "enabled": False, "eol": True, "eol_date": today},
-        {"id": "removed-model", "label": "Removed Model", "purposes": ["llm"], "enabled": False, "eol": True, "eol_date": today},
+        {"id": "new-model", "label": "New Model", "purposes": ["llm"], "enabled": False,
+         "labels": ["unmeasured"], "fold": "unmeasured"},
+        {"id": "fetched-model", "label": "Fetched Model", "purposes": ["llm"], "enabled": False,
+         "eol": True, "eol_date": today, "labels": ["eol"], "fold": "eol"},
+        {"id": "new-fetched-model", "label": "New Fetched Model", "purposes": ["llm"], "enabled": False,
+         "eol": True, "eol_date": today, "labels": ["eol"], "fold": "eol"},
+        {"id": "removed-model", "label": "Removed Model", "purposes": ["llm"], "enabled": False,
+         "eol": True, "eol_date": today, "labels": ["eol"], "fold": "eol"},
     ]
 
     db.update_model_settings(default_model_settings())

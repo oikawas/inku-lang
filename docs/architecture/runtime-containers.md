@@ -76,7 +76,7 @@ Explicitly enabling ChatGPT plan with `INKU_CHATGPT_PLAN_ENABLED=1` and `INKU_CH
 | Pipeline configuration | `pipeline_defaults.py` assembles the default manifest. `INKU_PIPELINE_CONFIG` replaces it with an explicit JSON manifest | Same | `pipeline_runtime.py`; `pipeline_defaults.py` |
 | DB | `INKU_DB_URL` accepts only a SQLite URL; non-SQLite URLs are rejected before engine creation | SQLite on the volume is explicit | `persistence/config.py`; `server/Dockerfile` |
 | Persistence | Environment-specific DB and output locations | Under one persistent volume | Dockerfiles and `compose.yaml` |
-| Deployment | Environment-specific and outside this document | Image build/publish on release tags | `.github/workflows/release.yml` |
+| Deployment | Environment-specific and outside this document | The maintainer builds and publishes images for each release tag; the release workflow is a manual build check that publishes nothing | `.github/workflows/release.yml` |
 
 The Server's physical owner is SQLAlchemy/SQLite and Android's is Room/SQLite; a future iOS adapter would own its own physical schema too. What they share is not file or table names but the language-neutral logical contract in [`persistence/README.md`](../../persistence/README.md) and [`persistence/contract.json`](../../persistence/contract.json). Server-only authentication/administration tables and device-only provider/model/cache tables are host extensions, not parity gaps.
 

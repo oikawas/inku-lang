@@ -69,7 +69,7 @@
 | TEST-CORPUS | 凍結コーパス | 明示的な全更新checkpointだけで新しい版のdirectoryを作る。最新の凍結はRender Engine 66の620件とDDL engine 45の3件（共有Rust pipeline）。DDL engine 1–26は退役した展開・coerce・plugin層の履歴記録 | `server/reference/render-engine-66/manifest.json`; `ddl-engine-45/manifest.json`; `server/reference/README.md`; `reference-corpus.yml` | §11, §22 | 確認済み | 公開可 |
 | TEST-ANDROID | Android受入 | 共有pipelineのhost JVM testと端末受入。同梱libraryのSVG・engine identity・renderer referenceを、build時に同じcommitのhost coreが作る期待値と照合し、raw pixelも照合する（凍結corpusはScore入力とraster入力だけに使う） | `SharedPipelineHostTest`; `AndroidSharedPipelineTest`; `SharedPipelineDeviceAcceptanceTest`; `NativeRenderDeviceTest`; `generateRustParityExpected`; `prepareRustParityAssets`; `inku-render-android/examples/render-parity-expected.rs` | Android仕様 | 確認済み | 公開可 |
 | TEST-WEBCLI | Web/CLI検査 | Svelte check/unit/lint、CLI pytest | `web/package.json`; `web/src/**/*.test.ts`; `cli/tests/test_cli.py` | Project Context「検査面」 | 確認済み | 公開可 |
-| CI-GATES | 現在のCI | server/cli lint+pytest（Rust toolchain guardを含む）、web check+unit+lint:i18n、bilingual docsとportable persistence verifier、共有Rust / raster / JNI / Android hostのpath-scoped native gate、手動dispatchだけのcorpus比較、tag時image build | `.github/workflows/checks.yml`; `android-native.yml`; `reference-corpus.yml`; `release.yml` | §11, §22; Android仕様 | 確認済み | 公開可 |
+| CI-GATES | 現在のCI | server/cli lint+pytest（Rust toolchain guardを含む）、web check+unit+lint:i18n、bilingual docsとportable persistence verifier、共有Rust / raster / JNI / Android hostのpath-scoped native gate、手動dispatchだけのcorpus比較とimage build確認 | `.github/workflows/checks.yml`; `android-native.yml`; `reference-corpus.yml`; `release.yml` | §11, §22; Android仕様 | 確認済み | 公開可 |
 
 ## 退役したID
 

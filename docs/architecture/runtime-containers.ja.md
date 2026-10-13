@@ -76,7 +76,7 @@ ChatGPTプランを`INKU_CHATGPT_PLAN_ENABLED=1`と`INKU_CHATGPT_SELF_HOSTED=1`�
 | pipeline設定 | 既定manifestは`pipeline_defaults.py`が組み立てる。`INKU_PIPELINE_CONFIG`で明示のJSON manifestへ置き換えられる | 同じ | `pipeline_runtime.py`; `pipeline_defaults.py` |
 | DB | `INKU_DB_URL`はSQLite URLだけを受理。非SQLiteはengine作成前に拒否 | volume上のSQLiteを明示 | `persistence/config.py`; `server/Dockerfile` |
 | 永続化 | 環境ごとのDB・出力先 | 1 persistent volume配下 | Dockerfileと`compose.yaml` |
-| 配備 | 環境固有のため本書の対象外 | release tagでimage build/publish | `.github/workflows/release.yml` |
+| 配備 | 環境固有のため本書の対象外 | release tagごとに保守者がimageをbuild/publishする。release workflowは公開しない手動のbuild確認 | `.github/workflows/release.yml` |
 
 Serverの物理ownerはSQLAlchemy/SQLite、Androidの物理ownerはRoom/SQLiteであり、将来iOS adapterを作る場合も自身の物理schemaを持つ。共通なのはfile名やtable名ではなく、[`persistence/README.md`](../../persistence/README.md)と[`persistence/contract.json`](../../persistence/contract.json)が定める言語非依存の論理契約である。Server専用の認証・管理tableと端末専用のprovider・model・cache tableはhost extensionであり、parity gapではない。
 

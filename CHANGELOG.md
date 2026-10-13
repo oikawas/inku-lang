@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.121 (2026-10-14 / Build 1197)
+
 ### 2026-10-14 — Reflect the NVIDIA NIM measurement in the model information
 
 At the author's request, the catalog `model_catalog.json` now carries the measurement of every model NIM lists today (80), with an 800-second response limit: six descriptions and Vision A/B sent once each, plus image C for the three models whose A/B held (run `provider-20261014-run-a93fb5ed`, drawing session). The rules are the ones applied to the other providers on 2026-10-13.

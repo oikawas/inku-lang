@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Move Android OpenAI drawing to Responses
+
+OpenAI API drawing now requests its function answer through Responses, accepting only a completed single call or text. GPT-6 Sol/Luna and 5.x turn reasoning off; reasoning models that cannot stop get low and 25,000 extra output tokens. Vision, photo descriptions and demos keep Chat Completions with the same reasoning policy. Cut-off drawing responses are refused, with output and reasoning counts recorded in diagnostics.
+
 ### 2026-10-13 — Draw through OpenAI's Responses API, and send GPT-6 models the reasoning and temperature they take
 
 OpenAI models can be imported from the provider's list, but Server's checks stopped at GPT-5. Per OpenAI's reasoning and latest-model guides, Chat Completions takes no function tools from GPT-6 Astra or GPT-6.1 Sol, and from GPT-6 Sol and Luna only with `reasoning_effort: "none"`, which Server sent only to gpt-5.x; temperature must be removed whenever reasoning is not none; and the models that cannot stop reasoning spend the output limit on it. Drawing on OpenAI's own API now goes through `/v1/responses` with the one function tool required, `store: false`, `max_output_tokens`, and `reasoning.effort`; an incomplete answer is not used and logs `provider_output_limit`. Every GPT-5, GPT-6, and o-series request omits temperature; models that can stop reasoning (gpt-5.1 and later, GPT-6 Sol and Luna) are sent `none`, and the rest `low` with 25,000 tokens of room, as OpenAI recommends. Vision, the colophon, and the demo instruction stay on Chat Completions, which they can use without tools. Other OpenAI-compatible providers are unchanged.

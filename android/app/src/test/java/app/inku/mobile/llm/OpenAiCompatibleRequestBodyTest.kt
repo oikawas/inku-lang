@@ -37,7 +37,7 @@ class OpenAiCompatibleRequestBodyTest {
             OpenAiCompatibleProvider.extractToolArguments(message, toolName)
         }
         val payload = OpenAiCompatibleProvider.requestBody("openai", pipelineRequest("openai:gpt-5.6-luna"), OPENAI_URL)
-        assertFalse(payload.getBoolean("stream"))
+        assertFalse(payload.has("stream"))
     }
 
     /** The server's `pipeline_provider.py` shapes: Ollama answers through `response_format`. */
@@ -219,34 +219,43 @@ class OpenAiCompatibleRequestBodyTest {
         }
     }
 
-    /**
-     * The server's `openai_sampling()`: OpenAI's own API takes the length as
-     * `max_completion_tokens`, refuses a temperature on the reasoning families,
-     * and refuses a forced call from gpt-5.1 and later unless they do not reason.
-     */
+    /** Server's model table, with sampling fields translated for Responses drawing requests. */
     @Test
     fun openAiItselfGetsItsOwnLengthTemperatureAndReasoningFields() {
-        fun body(model: String) = OpenAiCompatibleProvider.requestBody("openai", pipelineRequest("openai:$model"), OPENAI_URL)
-
-        val luna = body("gpt-5.6-luna")
-        assertEquals(2048, luna.getInt("max_completion_tokens"))
-        assertFalse(luna.has("max_tokens"))
-        assertFalse(luna.has("temperature"))
-        assertEquals("none", luna.getString("reasoning_effort"))
-        assertEquals(1, luna.getJSONArray("tools").length())
-
-        val gpt5 = body("gpt-5")
-        assertFalse(gpt5.has("temperature"))
-        assertFalse(gpt5.has("reasoning_effort"))
-
-        val o4 = body("o4-mini")
-        assertFalse(o4.has("temperature"))
-        assertFalse(o4.has("reasoning_effort"))
-
-        val gpt41 = body("gpt-4.1")
-        assertEquals(2048, gpt41.getInt("max_completion_tokens"))
-        assertEquals(0.3, gpt41.getDouble("temperature"), 0.0)
-        assertFalse(gpt41.has("reasoning_effort"))
+        val cases = listOf("gpt-4.1" to null, "gpt-5.1" to "none", "gpt-5.6-luna" to "none",
+            "gpt-6-luna" to "none", "gpt-6-sol" to "none", "gpt-6.1-sol" to "low",
+            "gpt-6-astra" to "low", "gpt-5" to "low", "o3" to "low")
+        for ((model, effort) in cases) {
+            val request = pipelineRequest("openai:$model")
+            val body = OpenAiCompatibleProvider.requestBody("openai", request, OPENAI_URL)
+            val limit = 2048 + if (effort == "low") 25000 else 0
+            assertEquals(limit, body.getInt("max_output_tokens"))
+            assertFalse(body.has("max_completion_tokens")); assertFalse(body.has("max_tokens"))
+            assertFalse(body.has("reasoning_effort")); assertFalse(body.has("messages")); assertFalse(body.has("stream"))
+            assertFalse(body.getBoolean("store")); assertFalse(body.getBoolean("parallel_tool_calls"))
+            assertEquals("required", body.getString("tool_choice"))
+            assertEquals("Submit JSON", body.getString("instructions"))
+            val input = body.getJSONArray("input").getJSONObject(0)
+            assertEquals("user", input.getString("role")); assertEquals("Draw a circle", input.getString("content"))
+            val tool = body.getJSONArray("tools").getJSONObject(0)
+            assertEquals(1, body.getJSONArray("tools").length())
+            assertEquals("function", tool.getString("type")); assertEquals("submit_pipeline_response", tool.getString("name"))
+            assertEquals("Submit", tool.getString("description")); assertFalse(tool.getBoolean("strict"))
+            assertEquals(JSONObject(schema).toString(), tool.getJSONObject("parameters").toString())
+            if (effort == null) {
+                assertFalse(body.has("reasoning")); assertEquals(0.3, body.getDouble("temperature"), 0.0)
+            } else {
+                assertEquals(effort, body.getJSONObject("reasoning").getString("effort")); assertFalse(body.has("temperature"))
+            }
+            val plain = OpenAiCompatibleProvider.requestBody("openai", request.copy(pipelineAction = null, tool = null), OPENAI_URL)
+            assertEquals(limit, plain.getInt("max_completion_tokens")); assertFalse(plain.has("max_output_tokens"))
+            assertTrue(plain.has("messages")); assertFalse(plain.has("tools"))
+            if (effort == null) {
+                assertFalse(plain.has("reasoning_effort")); assertEquals(0.7, plain.getDouble("temperature"), 0.0)
+            } else {
+                assertEquals(effort, plain.getString("reasoning_effort")); assertFalse(plain.has("temperature"))
+            }
+        }
 
         // The rule follows the host, not the connection's name.
         val elsewhere = OpenAiCompatibleProvider.requestBody("openai", pipelineRequest("openai:gpt-5.6-luna"), NVIDIA_URL)
@@ -254,6 +263,134 @@ class OpenAiCompatibleRequestBodyTest {
         assertFalse(elsewhere.has("max_completion_tokens"))
         assertEquals(0.3, elsewhere.getDouble("temperature"), 0.0)
         assertFalse(elsewhere.has("reasoning_effort"))
+        assertTrue(elsewhere.has("messages")); assertFalse(elsewhere.has("input"))
+        val renamed = OpenAiCompatibleProvider.requestBody("custom", pipelineRequest("custom:gpt-6-sol-fast"), OPENAI_URL)
+        assertEquals("none", renamed.getJSONObject("reasoning").getString("effort"))
+    }
+
+    @Test
+    fun openAiAuxiliaryCallsKeepChatCompletionsWithLowReasoningAndRoom() = runBlocking {
+        val sent = mutableListOf<RecordingConnection>()
+        val provider = OpenAiCompatibleProvider("openai", OPENAI_URL, "test-only") { url ->
+            RecordingConnection(url, """{"choices":[{"finish_reason":"stop","message":{"content":"A red circle."}}]}""")
+                .also { sent += it }
+        }
+        val model = "openai:gpt-6.1-sol"
+        RemoteVisionAnalyzer(provider).analyze(VisionAnalysisRequest(byteArrayOf(1, 2, 3), 1, 1, "en", model))
+        CameraDescriptionWriter(provider).write(CameraDescriptionRequest("A red circle", model, "en"))
+        assertEquals("A red circle.", DemoInstructionWriter(provider).write("circle", model))
+        assertTrue(sent.all { it.url.path == "/v1/chat/completions" })
+        val bodies = sent.map { JSONObject(it.sent.toString(Charsets.UTF_8.name())) }
+        assertEquals(listOf(27048, 27048, 25256), bodies.map { it.getInt("max_completion_tokens") })
+        for (body in bodies) {
+            assertEquals("low", body.getString("reasoning_effort"))
+            assertFalse(body.has("temperature")); assertFalse(body.has("top_p"))
+            assertFalse(body.has("tools")); assertFalse(body.has("max_output_tokens"))
+        }
+        val image = bodies.first().getJSONArray("messages").getJSONObject(0).getJSONArray("content")
+        assertEquals("data:image/jpeg;base64,AQID", image.getJSONObject(1).getJSONObject("image_url").getString("url"))
+    }
+
+    @Test
+    fun responsesNeedCompletionAndExactlyTheOfferedFunctionOrOnlyOutputText() {
+        fun call() = JSONObject().put("type", "function_call").put("name", "submit_pipeline_response").put("arguments", "{\"normalized_ddl\":\"circle\"}")
+        fun response(output: JSONArray) = JSONObject().put("status", "completed").put("output", output)
+        fun answer(value: JSONObject) = OpenAiCompatibleProvider.responsesAnswerText(value, "submit_pipeline_response")
+        assertEquals("circle", JSONObject(answer(response(JSONArray().put(JSONObject().put("type", "reasoning")).put(call())))).getString("normalized_ddl"))
+        for (status in listOf("incomplete", "failed", "in_progress")) {
+            assertThrows(MalformedProviderResponseException::class.java) { answer(response(JSONArray().put(call())).put("status", status)) }
+        }
+        for (calls in listOf(JSONArray().put(call()).put(call()), JSONArray().put(call().put("name", "other")),
+            JSONArray().put(call().put("arguments", JSONObject())), JSONArray().put(call().put("arguments", JSONObject.NULL)))) {
+            assertThrows(MalformedProviderResponseException::class.java) { answer(response(calls)) }
+        }
+        val message = JSONObject().put("type", "message").put("content", JSONArray()
+            .put(JSONObject().put("type", "refusal").put("refusal", "Do not use"))
+            .put(JSONObject().put("type", "output_text").put("text", "{\"normalized_ddl\":")))
+        val tail = JSONObject().put("type", "message").put("content", JSONArray().put(JSONObject().put("type", "output_text").put("text", "\"circle\"}")))
+        assertEquals("circle", JSONObject(answer(response(JSONArray().put("ignore").put(message).put(tail)))).getString("normalized_ddl"))
+        assertThrows(MalformedProviderResponseException::class.java) { answer(response(JSONArray().put(JSONObject().put("type", "reasoning")))) }
+        assertThrows(MalformedProviderResponseException::class.java) { answer(JSONObject().put("status", "completed")) }
+    }
+
+    @Test
+    fun openAiPipelineUsesResponsesAndKeepsUsageAndHttpRefusalDetails() = runBlocking {
+        val action = """{"tag":"generate_normalized_ddl","identity":{"action_id":"draw"},"timeout_ms":"1000",
+            "payload":{"prompt":{"action_name":"generate_normalized_ddl","message":"draw","system":"submit",
+            "response_schema":{"type":"object"}}}}"""
+        val sent = mutableListOf<RecordingConnection>()
+        val provider = OpenAiCompatibleProvider("custom-openai", OPENAI_URL, "test-only") { url ->
+            val success = sent.isEmpty()
+            RecordingConnection(url, if (success) """{"status":"completed","output":[{"type":"function_call",
+                "name":"submit_pipeline_response","arguments":"{\"normalized_ddl\":\"circle\"}"}],
+                "usage":{"input_tokens":12,"output_tokens":7}}""" else """{"error":{"code":"unsupported_parameter","param":"max_output_tokens","type":"invalid_request_error"}}""",
+                if (success) 200 else 400).also { sent += it }
+        }
+        val received = mutableListOf<ModelResponse>()
+        val observing = object : ModelProvider {
+            override val providerId = provider.providerId
+            override suspend fun generate(request: ModelRequest) = provider.generate(request).also { received += it }
+        }
+        val failures = mutableListOf<Throwable>()
+        val effect = SingleAttemptModelEffectProvider(observing) { _, _, _, cause -> failures += cause }
+        val models = PipelineModelSelection("custom-openai:gpt-6-sol", "custom-openai:gpt-6-sol")
+        val result = JSONObject(effect.perform(action, models))
+        assertEquals("normalized_ddl_generated", result.getString("tag"))
+        assertEquals("circle", JSONObject(result.getString("response")).getString("normalized_ddl"))
+        assertEquals(12, received.single().promptTokens); assertEquals(7, received.single().completionTokens)
+        assertFalse(received.single().outputTruncated)
+        val rejected = JSONObject(effect.perform(action, models))
+        assertEquals("provider_rejected", rejected.getString("failure"))
+        val cause = failures.single() as ModelProviderHttpException
+        assertEquals(400, cause.statusCode); assertEquals("unsupported_parameter", cause.refusal.getString("code"))
+        assertEquals("max_output_tokens", cause.refusal.getString("param"))
+        for (connection in sent) {
+            assertEquals("/v1/responses", connection.url.path); assertEquals("POST", connection.requestMethod)
+            assertEquals("Bearer test-only", connection.getRequestProperty("Authorization"))
+            assertEquals(1000, connection.readTimeout); assertFalse(connection.instanceFollowRedirects)
+            val body = JSONObject(connection.sent.toString(Charsets.UTF_8.name()))
+            assertFalse(body.getBoolean("store")); assertEquals(2048, body.getInt("max_output_tokens"))
+            assertEquals("none", body.getJSONObject("reasoning").getString("effort"))
+        }
+    }
+
+    @Test
+    fun incompleteResponsesNeverBecomeAnswersAndOutputLimitsKeepTheirDetail() = runBlocking {
+        val action = """{"tag":"generate_normalized_ddl","identity":{"action_id":"draw"},"timeout_ms":"1000",
+            "payload":{"prompt":{"action_name":"generate_normalized_ddl","message":"draw","system":"submit",
+            "response_schema":{"type":"object"}}}}"""
+        val function = JSONObject().put("type", "function_call").put("name", "submit_pipeline_response").put("arguments", "{}")
+        val cases = listOf("max_output_tokens" to JSONArray().put(JSONObject().put("type", "reasoning")),
+            "max_output_tokens" to JSONArray().put(function).put(JSONObject().put("type", "message")),
+            "content_filter" to JSONArray().put(function))
+        for ((reason, output) in cases) {
+            val response = JSONObject().put("status", "incomplete").put("incomplete_details", JSONObject().put("reason", reason))
+                .put("output", output).put("usage", JSONObject().put("input_tokens", 12).put("output_tokens", 27048)
+                    .put("output_tokens_details", JSONObject().put("reasoning_tokens", 26000)))
+            lateinit var connection: RecordingConnection
+            val provider = OpenAiCompatibleProvider("openai", OPENAI_URL, "test-only") { url ->
+                RecordingConnection(url, response.toString()).also { connection = it }
+            }
+            val details = mutableListOf<String?>()
+            val effect = SingleAttemptModelEffectProvider(provider) { _, _, detail, _ -> details += detail }
+            val model = "openai:gpt-6.1-sol"
+            val result = JSONObject(effect.perform(action, PipelineModelSelection(model, model)))
+            assertEquals("malformed_payload", result.getString("failure")); assertFalse(result.has("response"))
+            assertEquals(listOf(if (reason == "max_output_tokens") "output_limit_reached" else null), details)
+            if (reason == "max_output_tokens") {
+                val payload = JSONObject(connection.sent.toString(Charsets.UTF_8.name()))
+                val line = OpenAiCompatibleProvider.outputLimitLine("openai", pipelineRequest(model), payload, response)
+                assertTrue(line.startsWith("provider_output_limit "))
+                val record = JSONObject(line.substringAfter(' '))
+                assertEquals("generate_normalized_ddl", record.getString("action")); assertEquals("openai", record.getString("provider"))
+                assertEquals("gpt-6.1-sol", record.getString("model")); assertEquals(27048, record.getInt("max_tokens"))
+                assertEquals("max_output_tokens", record.getString("incomplete_reason"))
+                assertEquals(27048, record.getInt("output_tokens")); assertEquals(26000, record.getInt("reasoning_tokens"))
+                assertEquals(output.length() == 2, record.getBoolean("has_text"))
+                assertEquals(output.length() == 2, record.getBoolean("has_function_call"))
+                assertFalse(record.has("finish_reason")); assertFalse(record.has("has_reasoning"))
+            }
+        }
     }
 
     /** Server `_STAGE1_SAMPLED_ACTIONS`: the composition reading is sampled as Stage 1 is. */
@@ -295,11 +432,13 @@ class OpenAiCompatibleRequestBodyTest {
 
 private class RecordingConnection(url: java.net.URL,
     private val response: String = """{"choices":[{"message":{"content":"{\"normalized_ddl\":\"circle\"}"}}]}""",
+    private val status: Int = 200,
 ) : java.net.HttpURLConnection(url) {
     val sent = java.io.ByteArrayOutputStream()
     override fun getOutputStream() = sent
-    override fun getResponseCode() = 200
+    override fun getResponseCode() = status
     override fun getInputStream() = response.byteInputStream()
+    override fun getErrorStream() = response.byteInputStream()
     override fun connect() = Unit
     override fun disconnect() = Unit
     override fun usingProxy() = false

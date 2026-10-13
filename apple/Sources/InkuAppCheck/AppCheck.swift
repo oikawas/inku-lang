@@ -112,6 +112,9 @@ struct AppCheck {
             try await runComparisonChecks()
             return
         }
+        if CommandLine.arguments.contains("--recompose-only") {
+            try await runRecomposeChecks(); return
+        }
         if CommandLine.arguments.contains("--completion-ranges-only") {
             try await runCompletionRangeChecks(); return
         }

@@ -14,6 +14,15 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-13 Choose the composition again (by principle or by chance) and move "Change the layout"
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage B). The sources are Server `_recompose` and `compose` and Web `recomposition.ts`, `RefinementAdjustView.svelte` and `WorkActionMenu.svelte`.
+
+- "Change the layout" is an item of the work edit menu, after "Edit drawing parameters", and opens a layout-only dialog. "Edit drawing parameters" offers "Another reading" and "Change the touch with words". The layout dialog chooses "By principle" (default) or "By chance".
+- Each option draws a new composition seed and asks the shared core's `recompose` (with that option's configuration, the saved instructions, the mode, the seed, and the work ID `sha256:` plus the instructions' SHA-256) to choose the numeric ranges again. An option whose instructions changed is drawn as a direct DDL child of the saved work from the chosen instructions (passing the completion range record); an unchanged option draws the saved document as before. An unreadable answer or a failed call keeps the ranges (with Server's reason values). Instructions with joint phrases are recomposed by the core's `recompose`.
+- Each option's card lists the moved layers and ranges (`layer: before → after`, layers from 1), or the reason and "Redrawn with the same composition ranges." The adopted child's lineage edge records `composition_seed` and `recompose_mode`. The AI process's layout also recomposes by principle.
+- Checks: AppCheck `--recompose-only` (real core) and `--refinement-only`.
+
 ## 2026-10-13 Completion range records and their three states
 
 At the author's instruction (bringing in the differences from Server Build 1190, stage D2). The sources are CHANGELOG "2026-10-11 — Completion range records and three states (A3)" and Server/Web `70d47cab`.

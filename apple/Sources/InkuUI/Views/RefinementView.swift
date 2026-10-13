@@ -15,14 +15,14 @@ public struct RefinementView: View {
 
     public init(model: AppModel, work: SavedWork, onCommitted: @escaping @MainActor () -> Void = {},
                 onConfigureModels: @escaping @MainActor (String) -> Void = { _ in },
-                onClose: (@MainActor () -> Void)? = nil) {
+                onClose: (@MainActor () -> Void)? = nil, layoutOnly: Bool = false) {
         self.model = model
         self.onCommitted = onCommitted
         self.onConfigureModels = onConfigureModels
         self.onClose = onClose
         // Web `inku-refine-kind`: the last dimension chosen comes back (initialize drops a locked reading).
-        let refinement = RefinementModel(work: work)
-        if let saved = model.display.preferences.refineKind.flatMap(RefinementKind.init(rawValue:)),
+        let refinement = RefinementModel(work: work, layoutOnly: layoutOnly)
+        if !layoutOnly, let saved = model.display.preferences.refineKind.flatMap(RefinementKind.init(rawValue:)),
            RefinementKind.availableKinds.contains(saved) { refinement.kind = saved }
         _refinement = State(initialValue: refinement)
     }
@@ -105,10 +105,20 @@ public struct RefinementView: View {
     private var adjustmentControls: some View {
         @Bindable var refinement = refinement
         return VStack(alignment: .leading, spacing: 14) {
-            Text(model.display.localized("変更する要素を1つ選択")).inkuFont(14, weight: .semibold)
-            LazyVGrid(columns: [GridItem(.flexible(minimum: 120)), GridItem(.flexible(minimum: 120))], alignment: .leading, spacing: 10) {
-                ForEach(RefinementKind.availableKinds.filter { !self.refinement.sourceIsDDLOrigin || $0 != .reading }, id: \.self) { kind in
-                    kindButton(kind)
+            if self.refinement.layoutOnly {
+                // RefinementAdjustView.svelte layoutOnly: the title with its tooltip, then by principle or by chance.
+                Text(model.display.localized("配置を変える")).inkuFont(14, weight: .semibold)
+                    .inkuTooltip(kindTooltip(.layout, locked: false))
+                Picker(model.display.localized("配置を変える"), selection: $refinement.recomposeMode) {
+                    Text(model.display.localized("原理に沿う")).tag(Recomposition.Mode.principled)
+                    Text(model.display.localized("偶然に委ねる")).tag(Recomposition.Mode.chance)
+                }.pickerStyle(.radioGroup).labelsHidden().disabled(controlsDisabled)
+            } else {
+                Text(model.display.localized("変更する要素を1つ選択")).inkuFont(14, weight: .semibold)
+                LazyVGrid(columns: [GridItem(.flexible(minimum: 120)), GridItem(.flexible(minimum: 120))], alignment: .leading, spacing: 10) {
+                    ForEach(RefinementKind.availableKinds.filter { !self.refinement.sourceIsDDLOrigin || $0 != .reading }, id: \.self) { kind in
+                        kindButton(kind)
+                    }
                 }
             }
             if self.refinement.sourceIsLocked {
@@ -187,7 +197,7 @@ public struct RefinementView: View {
             return model.display.tooltip("編集した指示書で確定した作品です。記述を読み直す操作は使えません。", serverKey: "descriptionLockedReason")
         }
         switch kind {
-        case .layout: return model.display.tooltip("指示書で明示したかたむきの角度と「隅」の位置を選び直します。「中心」だけの作品では、どの候補も同じ絵になります", serverKey: "tooltipCanvasVaryComposition")
+        case .layout: return model.display.tooltip("保存した指示書の数で書いた範囲を、原理に沿うか偶然に委ねるかで選び直します。明示したかたむきと「隅」も候補のseedで選び直します。動かせないときは理由を示し、元の指示書で描き直します", serverKey: "tooltipCanvasVaryComposition")
         case .reading: return model.display.tooltip("AIによる言葉の読み取りからやり直し、新しい正規化DDLを生成します。配置とタッチは下流工程として再生成されます", serverKey: "tooltipCanvasVaryInterpretation")
         case .touch: return model.display.tooltip("入力した言葉から、線の質感、太さの揺らぎ、インクの滲みなどのタッチだけを決めます。同じ言葉は同じタッチになり、読み取りとJSON Scoreは保たれ、LLMを呼びません", serverKey: "tooltipCanvasVaryPerformance")
         case .variation: return ""
@@ -276,6 +286,12 @@ public struct RefinementView: View {
             workFacts(candidate.work)
             if candidate.kind == .variation {
                 Text(model.display.localized("動いたもの: なし")).inkuFont(12, weight: .semibold)
+            }
+            // RefinementCandidateGrid.svelte: what moved, or why the ranges stayed.
+            if let recomposition = candidate.recomposition {
+                ForEach(recomposition.lines(display: model.display), id: \.self) { line in
+                    Text(line).inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
             }
             if candidate.savedWork != nil {
                 // RefinementCandidateGrid.svelte:63: the saved mark says so.

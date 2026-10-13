@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Swift "Change the layout" chooses the composition again by principle or by chance
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage B). Swift's "Change the layout" drew a new seed and redrew the saved instructions as they were, so numeric ranges never moved. As on the Web, "Change the layout" in the work edit menu now opens a layout-only dialog that asks the shared core to choose the ranges again "By principle" or "By chance" and draws the chosen instructions. Each option shows the moved layers and ranges, or why they stayed, and the adopted child records the mode in its lineage. "Edit drawing parameters" now offers reading and touch. The AI process's layout also recomposes by principle.
+
 ### 2026-10-13 — Swift keeps completion range records and shows their three states
 
 At the author's instruction (bringing in the differences from Server Build 1190, stage D2). Swift did not keep the record of ranges a completion wrote with the work, so it was lost when the work was selected again and its instructions edited. The record is now kept with the work and passed to the shared core when drawing from the saved work, so a range with edited words goes to the completion. The DDL views mark completion, numbers edited and words edited with coloured dotted underlines, with their names, counts and the hint about edited words (the Web places a tag at each range's end).

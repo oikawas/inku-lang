@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-13 — The sketch and the composition reading in the Prompts tab
+
+The provenance drawer's Prompts tab now shows the system prompts of the sketch (Stage 0.5) and the composition reading, with the input actually sent, in the order a work calls them. Section 11 of Creating Images in both languages is corrected.
+
 ## 2026-10-13 — Joint phrases
 
 The composition now writes how the description says things meet as a joint phrase in the instructions (`resting on the previous shape` and so on), and `Another composition` reads the sentences that carry one. Section 6 of Creating Images in both languages gains the item "Joint phrases", and the paragraph on `Another composition` in section 8 says that a sentence with a joint phrase keeps its range and its phrase.

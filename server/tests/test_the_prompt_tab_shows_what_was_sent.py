@@ -5,6 +5,9 @@ one sent; it left with those layers. The shared pipeline builds each system
 prompt per work -- installed plugins, the sketch note and compiler feedback
 join Stage 1, and relation grammar joins Stage 2 only when the DDL needs it --
 so the host keeps the one it sent, on the execution, for its owner to read.
+The sketch and the composition reading joined the tab on 2026-10-13, with what
+they were given; `stages` tells a stage that called no model from one drawn
+before its record began.
 """
 
 from __future__ import annotations
@@ -17,7 +20,7 @@ from fastapi.testclient import TestClient
 
 from inku_server import db, pipeline_product
 from inku_server.api import app
-from inku_server.pipeline_product import record_system_prompt
+from inku_server.pipeline_product import record_system_prompt, system_prompts_view
 
 client = TestClient(app)
 
@@ -83,8 +86,11 @@ def test_a_drawing_shows_the_stage_1_system_prompt_it_sent(author, sent):
         "instruction_language": prompt["instruction_language"],
         "attempt": 1,
     }
-    # No hole was left, so Stage 2 never called a model.
+    # No hole was left, so Stage 2 never called a model; nor did a sketch or a
+    # reading. The execution kept every stage, so each reads as not sent.
     assert body["stage2"] is None
+    assert body["sketch"] is None and body["composition"] is None
+    assert body["stages"] == ["sketch", "stage1", "composition", "stage2"]
 
 
 def _action(tag: str, attempt: int, system: str) -> dict:
@@ -97,6 +103,7 @@ def _action(tag: str, attempt: int, system: str) -> dict:
                 "prompt_id": f"{tag}-prompt",
                 "prompt_digest": f"digest-{attempt}",
                 "instruction_language": "ja",
+                "message": f"{tag} message",
             }
         },
     }
@@ -104,12 +111,49 @@ def _action(tag: str, attempt: int, system: str) -> dict:
 
 def test_the_last_attempt_of_each_stage_is_kept_and_other_actions_are_not():
     context: dict = {"system_prompts": {}}
+    record_system_prompt(context, _action("generate_sketch", 1, "sketch"))
+    record_system_prompt(context, _action("select_description_catalog", 1, "catalog"))
     record_system_prompt(context, _action("generate_normalized_ddl", 1, "first"))
     record_system_prompt(context, _action("generate_normalized_ddl", 2, "with feedback"))
+    record_system_prompt(context, _action("read_composition", 1, "reading"))
     record_system_prompt(context, _action("complete_visible_ddl_holes", 1, "holes"))
-    record_system_prompt(context, _action("generate_sketch", 1, "sketch"))
 
-    assert context["system_prompts"]["stage1"]["system"] == "with feedback"
-    assert context["system_prompts"]["stage1"]["attempt"] == 2
-    assert context["system_prompts"]["stage2"]["system"] == "holes"
-    assert set(context["system_prompts"]) == {"stage1", "stage2"}
+    prompts = context["system_prompts"]
+    assert prompts["stage1"]["system"] == "with feedback"
+    assert prompts["stage1"]["attempt"] == 2
+    assert prompts["stage2"]["system"] == "holes"
+    assert prompts["sketch"]["system"] == "sketch"
+    assert prompts["composition"]["system"] == "reading"
+    # The catalog choice is not shown.
+    assert set(prompts) == {"sketch", "stage1", "composition", "stage2"}
+    # The sketch and the reading keep what they were given; Stage 1 and Stage 2 as before.
+    assert prompts["sketch"]["message"] == "generate_sketch message"
+    assert prompts["composition"]["message"] == "read_composition message"
+    assert set(prompts["stage1"]) == set(prompts["stage2"]) == {
+        "system", "prompt_id", "prompt_digest", "instruction_language", "attempt"
+    }
+
+
+def test_a_prompt_without_a_message_is_kept_without_one():
+    action = _action("read_composition", 1, "reading")
+    del action["payload"]["prompt"]["message"]
+    context: dict = {"system_prompts": {}}
+    record_system_prompt(context, action)
+    assert context["system_prompts"]["composition"]["system"] == "reading"
+    assert "message" not in context["system_prompts"]["composition"]
+
+
+def test_an_execution_from_before_the_sketch_and_the_reading_kept_stage_1_and_stage_2():
+    kept = {"stage1": {"system": "planner"}, "stage2": None}
+    # Saved before 2026-10-13: no list of stages.
+    assert system_prompts_view({"system_prompts": kept}) == {
+        "recorded": True,
+        "stages": ["stage1", "stage2"],
+        "sketch": None,
+        "stage1": {"system": "planner"},
+        "composition": None,
+        "stage2": None,
+    }
+    # Saved before the record began at all.
+    assert system_prompts_view({})["recorded"] is False
+    assert system_prompts_view({})["stages"] == []

@@ -80,14 +80,14 @@
 		statusHashCopied: boolean;
 		stage1PromptText: string;
 		ddl: string | null;
-		copiedPrompt: 'stage1' | 'stage2' | 'score' | null;
+		copiedPrompt: 'sketch' | 'stage1' | 'composition' | 'stage2' | 'score' | null;
 		scoreJsonText: string;
 		scoreJsonLines: string[];
 		scoreJsonHighlighted: string;
 		scoreJsonSeparatorLine: number | null;
 		onClose: () => void;
 		onCopyStatusHash: () => void | Promise<void>;
-		onCopyPromptText: (kind: 'stage1' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
+		onCopyPromptText: (kind: 'sketch' | 'stage1' | 'composition' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
 	};
 
 	let {

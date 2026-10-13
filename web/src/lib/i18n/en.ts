@@ -637,7 +637,11 @@ export const en: LangPack = {
 	shareTargetOn: 'Stop group sharing',
 	shareTargetOff: 'Share with group',
 
+	promptSketchInput: 'Sketch (Stage 0.5) input as sent',
+	promptSketchSystem: 'Sketch (Stage 0.5) system prompt',
 	promptStage1Input: 'Stage 1 user input',
+	promptCompositionInput: 'Composition reading input as sent',
+	promptCompositionSystem: 'Composition reading system prompt',
 	promptStage2Input: 'Stage 2 user input (normalized DDL)',
 	promptStage1System: 'Stage 1 system prompt',
 	promptStage2System: 'Stage 2 system prompt',

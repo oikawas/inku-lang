@@ -2,12 +2,14 @@
 	Shared model evaluation card (purposes / recommendation / cost / speed / comment).
 	This is the design used by the description-tab model selection; reused by the
 	settings model picker and the model comparison dialog so all surfaces match.
-	Display-only: the reveal (display:block on hover) is provided by the parent,
-	which must be position:relative and target `:global(.model-hover-card)`.
+	Display-only: the parent decides when it shows (display:block on hover or
+	focus, targeting `:global(.model-hover-card)`); the card places itself, fixed
+	to the window beside the parent, so no scrolling list or dialog edge cuts it.
 -->
 <script lang="ts">
 	import type { ModelOption } from '$lib/models';
 	import { modelRecommendation, modelStageRecommendations, modelSpeed, modelCost, modelComment, modelStatusLabel, type ModelPurpose } from '$lib/modelMeta';
+	import { openFloatingCard } from '$lib/floatingCard';
 	import ModelPurposeBadges from './ModelPurposeBadges.svelte';
 
 	type Props = {
@@ -24,9 +26,23 @@
 	// tabs to find the other. The stage a surface is choosing for still decides the
 	// order of the cards (sortModels) and what a click sets.
 	const stages = $derived(modelStageRecommendations(model, purpose));
+
+	let card = $state<HTMLSpanElement>();
+	$effect(() => {
+		const anchor = card?.parentElement;
+		if (!card || !anchor) return;
+		const shown = card;
+		const open = () => openFloatingCard(shown, anchor);
+		anchor.addEventListener('pointerenter', open);
+		anchor.addEventListener('focusin', open);
+		return () => {
+			anchor.removeEventListener('pointerenter', open);
+			anchor.removeEventListener('focusin', open);
+		};
+	});
 </script>
 
-<span class="model-hover-card" role="tooltip">
+<span class="model-hover-card" role="tooltip" bind:this={card}>
 	{#if modelStatusLabel(model, isJapanese)}<span><strong>状態 / Status</strong>{modelStatusLabel(model, isJapanese)}</span>{/if}
 	<span><strong>用途 / Use</strong><ModelPurposeBadges {model} {isJapanese} /></span>
 	{#if stages}
@@ -44,9 +60,9 @@
 <style>
 	.model-hover-card {
 		display: none;
-		position: absolute;
+		position: fixed;
 		left: 0;
-		top: calc(100% + 6px);
+		top: 0;
 		z-index: 520;
 		width: min(340px, 75vw);
 		box-sizing: border-box;

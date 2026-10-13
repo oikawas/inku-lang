@@ -3,6 +3,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { pickerSelection, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
 	import { modelRecommendation, modelSpeed, modelCost, modelComment, modelStatusLabel, isModelUnselectable, sortModels, type ModelPurpose } from '$lib/modelMeta';
+	import { openFloatingCard } from '$lib/floatingCard';
 	import ModelPurposeBadges from './ModelPurposeBadges.svelte';
 
 	type Props = {
@@ -71,22 +72,12 @@
 		}
 	}
 
+	// Measured once shown rather than guessed: a guessed height let a taller card
+	// run past the bottom of the window.
 	function positionMeta(event: Event) {
 		const btn = event.currentTarget as HTMLElement;
 		const meta = btn.querySelector('.metadata') as HTMLElement | null;
-		if (!meta) return;
-		const b = btn.getBoundingClientRect();
-		const mh = meta.offsetHeight || 210;
-		const mw = meta.offsetWidth || Math.min(340, window.innerWidth * 0.75);
-		const margin = 8;
-		const spaceBelow = window.innerHeight - b.bottom;
-		const openUp = spaceBelow < mh + margin && b.top > spaceBelow;
-		let top = openUp ? b.top - mh - 5 : b.bottom + 5;
-		top = Math.min(Math.max(margin, top), window.innerHeight - mh - margin);
-		let left = Math.min(b.left, window.innerWidth - mw - margin);
-		left = Math.max(margin, left);
-		meta.style.top = `${top}px`;
-		meta.style.left = `${left}px`;
+		if (meta) openFloatingCard(meta, btn);
 	}
 </script>
 

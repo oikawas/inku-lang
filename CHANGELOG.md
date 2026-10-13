@@ -8,9 +8,20 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## Android 2.1.4-android.98 (2026-10-13 / Build 148395)
+
 ### 2026-10-13 — Android uses the shared model catalog, with labels and six folds
 
 Android bundles the shared `model_catalog.json` during the build. Model management and drawing model selection show recommendations, average seconds, estimated costs, comments and every label, including for the ChatGPT plan. Management uses six initially closed folds in canonical table order; models blocked from publication cannot be newly selected. Startup preserves existing publication choices, while refetched offerings and this device's access results supplement the catalog. Ollama Cloud offers “Check with this key” for one chosen model. Android unit tests also compare labels, folds and publishability against the 15 shared cases.
+
+## v2.15.119 (2026-10-13 / Build 1195)
+
+### 2026-10-13 — Drawing again from a stopped run
+
+At the author's report ("The authoring operation could not finish." on 5173) and choice (draw again from the stopped run's parent). A description fork from a run stopped before its first save spent a Stage 1 call and then stopped at its own first save, refused because the parent had no saved record (since 2026-09-13).
+
+- When a description fork starts from a run stopped before its first save, the Server names that run's own parent (the saved work, or that one's parent while each is unsaved) instead, and with no parent it starts a new run without one. The lineage joins the work drawn before the stop.
+- The save checks, the Web, and the core are unchanged. A fork from a saved run is as before.
 
 ## v2.15.118 (2026-10-13 / Build 1194)
 

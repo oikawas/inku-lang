@@ -14,6 +14,16 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-13 Copy the Web text again from Build 1190
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage G).
+
+- `ui-reference.json` was regenerated with `export-web-reference.mjs --source-root` from main `d5659751` (Web/Server v2.15.114, Build 1190). "About Inku" names Server v2.15.114 (Build 1190).
+- Swift names 206 Web text keys literally, and all are in the copy in Japanese and English. Since 1162, the text changed for two ChatGPT plan guides and the "Change the layout" tooltip.
+- Stage E (the model settings display: use badges, three-step recommendation, estimated cost, mean seconds, uses with no measured response, the fold for models that cannot be published, and shared ChatGPT plan ratings) was deferred by the author. Although the corresponding Server is Build 1190, Swift lacks these. Their values are not in the Server code defaults, only in the Server's saved settings.
+- The Web-identical text added to `Localizable.strings` in stages A to C stays in use.
+- Checks: the copy's version (1190, v2.15.114, `d5659751`), the presence of the named keys, AppCheck `--tooltips-leftovers-only`.
+
 ## 2026-10-13 Complete saijiki words and macro names in the instructions
 
 At the author's instruction (bringing in the differences from Server Build 1190, stage C-3). The source is `ddlCompletions` in Web `features/ddl-editor/codemirror.ts`.

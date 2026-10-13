@@ -14,6 +14,16 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-13 文言の写しをBuild 1190のWebから作り直す
+
+作者の指示（Server Build 1190との差の取り込み、段G）。
+
+- `ui-reference.json`を`export-web-reference.mjs --source-root`でmain `d5659751`（Web/Server v2.15.114、Build 1190）から作り直した。「Inku について」の対応するServerはv2.15.114（Build 1190）。
+- Swiftが直書きの鍵で名指すWebの文言は206で、日英とも写しに全部ある。1162から文が変わったのは、ChatGPTプランの案内2つと「配置を変える」のツールチップ。
+- 段E（モデル設定の表示：用途のバッジ、3段階の推奨度、概算コスト、平均秒数、計測で応答の無い用途、公開できないモデルの折りたたみ、ChatGPTプランの共有の評価）は作者の決定で後回し。対応するServerの表示がBuild 1190でも、これらはSwiftに無い。新しい表示の値はServerのコードの既定値に無く、Serverの設定の保存にだけある。
+- 段A〜Cで`Localizable.strings`に足したWebと同じ文はそのまま使う。
+- 確認：写しの版（1190・v2.15.114・`d5659751`）、名指す鍵の有無、AppCheck `--tooltips-leftovers-only`。
+
 ## 2026-10-13 指示書で歳時記の語とマクロの名を補完する
 
 作者の指示（Server Build 1190との差の取り込み、段C-3）。正本はWebの`features/ddl-editor/codemirror.ts`の`ddlCompletions`。

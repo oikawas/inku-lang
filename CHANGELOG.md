@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Swift sends schema properties in propertyOrdering to every provider
+
+By the author's choice (fix the senders). The core writes schema JSON keys in name order. Swift reordered them by `propertyOrdering` only for Gemini and sent the OpenAI API, OpenAI-compatible providers, Ollama, mlx, Anthropic and Personal ChatGPT the name order, so the composition reading schema arrived with `relations` first and `thesis` last. These paths now write `propertyOrdering` order too. Personal ChatGPT records and sends the same bytes. Requests without `propertyOrdering` (Stage 1, Stage 2 and the others) keep their bytes.
+
 ### 2026-10-13 — Publication selection folds the models that cannot be published
 
 At the author's instruction. Publication selection files the models that cannot be published into three folds below the list, closed at first, each heading showing its count: No response when measured, Not supported, and End of life. Search and filtering still count the folded models. A paid-plan model stays in the list, since a plan can change. Model metadata gains `not_supported`, marking a kind left out of the benchmark (speech, music, video, embeddings and the like); such a model cannot be published.

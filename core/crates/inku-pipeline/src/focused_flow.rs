@@ -1508,6 +1508,58 @@ fn an_approved_completion_records_the_ranges_it_wrote() {
     );
 }
 
+/// A hole stops before its sentence end, so a completion that ends the
+/// sentence itself keeps one end (2026-10-13, 「…散らす。。」 on Pixel 9). Where
+/// the source has no end right after the hole, the completion's end stays.
+#[test]
+fn a_completion_that_ends_the_sentence_leaves_one_end() {
+    use inku_ddl::ResolvedInstructionLanguage::{En, Ja};
+    let scattered = "右上（横2/3〜1、縦0〜1/3）に橙の程よい塗りの小さな円を30個散らす。";
+    for (language, source, replacement, saved) in [
+        (
+            Ja,
+            "右上に、橙の程よい塗りの小さな円を30個散らす。",
+            scattered,
+            scattered,
+        ),
+        (
+            Ja,
+            "右上に、橙の程よい塗りの小さな円を30個散らす！",
+            scattered,
+            "右上（横2/3〜1、縦0〜1/3）に橙の程よい塗りの小さな円を30個散らす！",
+        ),
+        (
+            Ja,
+            "右上に、橙の程よい塗りの小さな円を30個散らす",
+            scattered,
+            scattered,
+        ),
+        (
+            Ja,
+            "右上に、橙の程よい塗りの小さな円を30個散らす\n背景を白で埋める。",
+            scattered,
+            "右上（横2/3〜1、縦0〜1/3）に橙の程よい塗りの小さな円を30個散らす。\n背景を白で埋める。",
+        ),
+        (
+            En,
+            "scatter ten small orange circles randomly at the bottom right.",
+            "scatter ten small orange circles at the bottom right (horizontal 2/3 to 1, vertical 2/3 to 1).",
+            "scatter ten small orange circles at the bottom right (horizontal 2/3 to 1, vertical 2/3 to 1).",
+        ),
+    ] {
+        let state = started_direct_ddl_in(language, source);
+        let proposed = run(
+            Some(&state),
+            &hole_response(
+                &state,
+                json!({"results":[{"id":"h1","status":"proposed","replacement":replacement}]}),
+            ),
+        )
+        .snapshot;
+        assert_eq!(committed_source(&approve(&proposed)), saved, "{source:?}");
+    }
+}
+
 /// A3 (T4): a direct DDL from a work whose completion range the author renamed
 /// asks the completion for that range's numbers again, while the text is drawn
 /// as written; once approved, the record takes the new numbers and the run
@@ -1700,12 +1752,21 @@ fn approve(state: &PipelineSnapshot) -> PipelineSnapshot {
 }
 
 fn started_direct_ddl(source: &str) -> PipelineSnapshot {
+    started_direct_ddl_in(inku_ddl::ResolvedInstructionLanguage::En, source)
+}
+
+fn started_direct_ddl_in(
+    language: inku_ddl::ResolvedInstructionLanguage,
+    source: &str,
+) -> PipelineSnapshot {
+    let mut pipeline_config = config();
+    pipeline_config.language = language;
     let start = envelope(
         None,
         PipelineInput::Start {
             variation_id: "asked-again".into(),
             authoring_nonce: "asked-again-1".into(),
-            config: Box::new(config()),
+            config: Box::new(pipeline_config),
             authority: VariationAuthorityState::new_direct_ddl(),
             authoring: AuthoringInput::DirectDdl {
                 source: source.into(),

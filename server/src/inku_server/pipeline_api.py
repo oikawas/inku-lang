@@ -428,18 +428,20 @@ class PipelineService:
         return {"capture_enabled": requested, "observations": observations}
 
     def system_prompts(self, owner: str, variation_id: str) -> dict:
-        """The Stage 1 and Stage 2 system prompts this variation actually sent.
+        """The system prompts this variation actually sent: the sketch, Stage 1,
+        the composition reading and Stage 2, with what the sketch and the
+        reading were given.
 
         Read from saved state only. `recorded` is false for an execution saved
-        before the record existed; a stage that never called a model is null.
+        before the record existed, `stages` names the stages it kept, and a kept
+        stage that never called a model is null.
         """
+        from .pipeline_product import system_prompts_view
+
         record = self.store.read_latest_execution_for_variation(owner, variation_id)
         if record is None:
             raise HTTPException(404, "variation_not_found")
-        prompts = json.loads(record.state_bytes).get("context", {}).get("system_prompts")
-        if not isinstance(prompts, dict):
-            return {"recorded": False, "stage1": None, "stage2": None}
-        return {"recorded": True, "stage1": prompts.get("stage1"), "stage2": prompts.get("stage2")}
+        return system_prompts_view(json.loads(record.state_bytes).get("context", {}))
 
     def get(self, owner: str, variation_id: str) -> dict:
         record = self.store.read_latest_execution_for_variation(owner, variation_id)

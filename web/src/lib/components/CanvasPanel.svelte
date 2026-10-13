@@ -67,7 +67,7 @@
 		stage1PromptText: string;
 		instructionText: string;
 		ddl: string | null;
-		copiedPrompt: 'stage1' | 'stage2' | 'score' | null;
+		copiedPrompt: 'sketch' | 'stage1' | 'composition' | 'stage2' | 'score' | null;
 		scoreJsonText: string;
 		scoreJsonLines: string[];
 		scoreJsonHighlighted: string;
@@ -106,7 +106,7 @@
 		onGotoPrev: () => void | Promise<void>;
 		onGotoLatest: () => void | Promise<void>;
 		onGotoOldest: () => void | Promise<void>;
-		onCopyPromptText: (kind: 'stage1' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
+		onCopyPromptText: (kind: 'sketch' | 'stage1' | 'composition' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
 		onCopyStatusHash: () => void | Promise<void>;
 		onToggleStar: (item: HistoryItem | null | undefined, event?: Event) => void | Promise<void>;
 		/** The revision mark of the work on screen, the same flag the history

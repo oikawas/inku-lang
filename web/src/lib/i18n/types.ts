@@ -531,7 +531,11 @@ export interface LangPack {
 	historyModelDetails: string;
 
 	// Prompts tab
+	promptSketchInput: string;
+	promptSketchSystem: string;
 	promptStage1Input: string;
+	promptCompositionInput: string;
+	promptCompositionSystem: string;
 	promptStage2Input: string;
 	promptStage1System: string;
 	promptStage2System: string;

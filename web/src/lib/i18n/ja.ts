@@ -635,7 +635,11 @@ export const ja: LangPack = {
 	shareTargetOn: 'グループ共有を解除',
 	shareTargetOff: 'グループ共有する',
 
+	promptSketchInput: '写生（Stage 0.5） 送った入力',
+	promptSketchSystem: '写生（Stage 0.5） システムプロンプト',
 	promptStage1Input: 'Stage 1 ユーザー入力',
+	promptCompositionInput: '構図の読み 送った入力',
+	promptCompositionSystem: '構図の読み システムプロンプト',
 	promptStage2Input: 'Stage 2 ユーザー入力 (正規化DDL)',
 	promptStage1System: 'Stage 1 システムプロンプト',
 	promptStage2System: 'Stage 2 システムプロンプト',

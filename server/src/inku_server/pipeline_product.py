@@ -165,28 +165,60 @@ def sketch_result(record: dict | None) -> dict:
 
 
 # The provider actions whose system prompt the prompt tab shows, by the name
-# the tab gives each stage.
-_SYSTEM_PROMPT_STAGES = {"generate_normalized_ddl": "stage1", "complete_visible_ddl_holes": "stage2"}
+# the tab gives each stage, in the order a work calls them.
+_SYSTEM_PROMPT_STAGES = {
+    "generate_sketch": "sketch",
+    "generate_normalized_ddl": "stage1",
+    "read_composition": "composition",
+    "complete_visible_ddl_holes": "stage2",
+}
+# The stages whose message the tab shows as sent too (2026-10-13): no other
+# view shows what the sketch and the composition reading were given.
+_MESSAGE_STAGES = {"sketch", "composition"}
+# The stages an execution saved before 2026-10-13 kept.
+_EARLIER_STAGES = ["stage1", "stage2"]
 
 
 def record_system_prompt(context: dict, action: dict) -> None:
     """Keep the system prompt this action sends, as it is sent.
 
     The last attempt of a stage replaces an earlier one, so a retry that
-    carried compiler feedback is what the work shows. The record lives in the
-    execution's saved context and is read only by its owner.
+    carried compiler feedback is what the work shows. The sketch and the
+    composition reading keep the message they sent as well. The record lives
+    in the execution's saved context and is read only by its owner.
     """
     stage = _SYSTEM_PROMPT_STAGES.get(action["tag"])
     prompt = (action.get("payload") or {}).get("prompt")
     # A record for the reader: an action without a prompt draws as before.
     if stage is None or not isinstance(prompt, dict):
         return
-    context.setdefault("system_prompts", {})[stage] = {
+    record = {
         "system": prompt["system"],
         "prompt_id": prompt["prompt_id"],
         "prompt_digest": prompt["prompt_digest"],
         "instruction_language": prompt["instruction_language"],
         "attempt": int(action["identity"]["attempt"]),
+    }
+    # The record never stops a send: a prompt without a message keeps none.
+    message = prompt.get("message")
+    if stage in _MESSAGE_STAGES and isinstance(message, str):
+        record["message"] = message
+    context.setdefault("system_prompts", {})[stage] = record
+
+
+def system_prompts_view(context: dict) -> dict:
+    """What the prompt tab reads from an execution's saved context.
+
+    `stages` names the stages the execution kept, so the tab tells a stage
+    that called no model (null) from one drawn before its record began.
+    """
+    prompts = context.get("system_prompts")
+    if not isinstance(prompts, dict):
+        return {"recorded": False, "stages": [], "sketch": None, "stage1": None, "composition": None, "stage2": None}
+    return {
+        "recorded": True,
+        "stages": list(context.get("system_prompt_stages", _EARLIER_STAGES)),
+        **{stage: prompts.get(stage) for stage in _SYSTEM_PROMPT_STAGES.values()},
     }
 
 
@@ -316,7 +348,7 @@ class ProductPipelineEffects:
         # Present from the start, so a work whose stage never called a model
         # reads as "not sent" and one drawn before the record as "not recorded".
         return config, {"host_options": selected, "color_maps": color_maps, "macro_catalog": catalog_context,
-                        "system_prompts": {},
+                        "system_prompts": {}, "system_prompt_stages": list(_SYSTEM_PROMPT_STAGES.values()),
                         "render_limits_source": self.settings.limits_source(work, requested_limits),
                         "auto_catalog": kind == "description" and mode == "auto",
                         "sketch_request": sketch_request_for(kind, options), "metrics": {}}

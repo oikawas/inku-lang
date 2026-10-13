@@ -178,7 +178,7 @@
 		preview_url?: string;
 		preview_url_2x?: string;
 	};
-	type CopyKind = 'stage1' | 'stage2' | 'score';
+	type CopyKind = 'sketch' | 'stage1' | 'composition' | 'stage2' | 'score';
 	let copiedPrompt = $state<CopyKind | null>(null);
 	let statusHashCopied = $state(false);
 	let previousInputMode = $state<'single' | 'batch'>('single');

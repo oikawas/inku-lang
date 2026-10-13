@@ -8,6 +8,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — The Prompts tab shows the sketch and the composition reading
+
+At the author's instruction (show the composition reading (v3) and the sketch (Stage 0.5)) and choices (with the messages sent, in the order a work calls them, macOS after the Web). The provenance drawer's Prompts tab showed only two of the prompts sent to an LLM, Stage 1 and hole completion (Stage 2).
+
+- The Server keeps the system prompts the sketch (`generate_sketch`) and the composition reading (`read_composition`) sent as well, the last send of each stage as for Stage 1 and completion, and keeps the messages these two sent. The catalog choice is still not kept.
+- `/api/pipeline/variations/{variation_id}/system-prompts` also returns `sketch`, `composition` and `stages`, the stages the execution kept. An execution without the list (from before this change) reads as keeping Stage 1 and Stage 2 only.
+- The Web Prompts tab shows, in the order sketch, Stage 1, composition reading, Stage 2, the input sent (with a copy button) and the system prompt (collapsible) of the sketch and the composition reading. A stage that called no model, and a stage of a work drawn before its record began, say so.
+- What is sent to models, retries, and drawing do not change. The macOS work info follows separately.
+
 ### 2026-10-13 — Another composition recomposes instructions with joint phrases
 
 By the author's choice (I-711 stage C, C6: recomposition treats joints as the composition does). Since C5 the composition writes joint phrases (`resting on the previous shape` and so on), but recomposition (the refinement `Another composition` and the composition generations of autonomous refinement) did not read a sentence with a relation phrase, and refused a work with a joint as `unsupported_sentence`.

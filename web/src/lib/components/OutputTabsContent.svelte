@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
-	import type { SystemPromptsState } from '$lib/features/canvas/system-prompts';
+	import type { PromptStage, SentSystemPrompt, SystemPromptsState } from '$lib/features/canvas/system-prompts';
 
+	type CopyKind = 'sketch' | 'stage1' | 'composition' | 'stage2' | 'score';
 	type Props = {
 		outputTab: 'prompts' | 'score';
 		/** The pane that scrolls in whichever tab is showing. The drawer that
@@ -11,12 +12,12 @@
 		/** The system prompts this work sent, as its execution kept them. */
 		systemPrompts?: SystemPromptsState;
 		ddl: string | null;
-		copiedPrompt: 'stage1' | 'stage2' | 'score' | null;
+		copiedPrompt: CopyKind | null;
 		scoreJsonText: string;
 		scoreJsonLines: string[];
 		scoreJsonHighlighted: string;
 		scoreJsonSeparatorLine: number | null;
-		onCopyPromptText: (kind: 'stage1' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
+		onCopyPromptText: (kind: CopyKind, text: string | null | undefined) => void | Promise<void>;
 	};
 
 	let {
@@ -35,24 +36,76 @@
 
 	const scoreJsonHighlightedLines = $derived(scoreJsonHighlighted ? scoreJsonHighlighted.split('\n') : []);
 
+	let sketchSystemExpanded = $state(false);
 	let stage1SystemExpanded = $state(false);
+	let compositionSystemExpanded = $state(false);
 	let stage2SystemExpanded = $state(false);
+	const sketchSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.sketch : null);
 	const stage1System = $derived(systemPrompts.state === 'recorded' ? systemPrompts.stage1 : null);
+	const compositionSystem = $derived(systemPrompts.state === 'recorded' ? systemPrompts.composition : null);
 	const stage2System = $derived(systemPrompts.state === 'recorded' ? systemPrompts.stage2 : null);
-	// Said in place of a stage's system prompt when there is none to show.
-	const systemPromptNote = $derived(
+	// Said in place of a stage's system prompt when there is none to show: a
+	// stage the execution kept called no model; one it did not keep was drawn
+	// before its record began.
+	const systemPromptNote = (stage: PromptStage) =>
 		systemPrompts.state === 'loading'
 			? t().promptLoading
 			: systemPrompts.state === 'recorded'
-				? t().promptSystemNotSent
+				? systemPrompts.stages.includes(stage)
+					? t().promptSystemNotSent
+					: t().promptSystemNotRecorded
 				: systemPrompts.state === 'not_recorded'
 					? t().promptSystemNotRecorded
-					: t().promptSystemUnavailable
-	);
+					: t().promptSystemUnavailable;
 </script>
+
+<!-- The sketch and the composition reading: what each was given, then its system prompt. -->
+{#snippet sentStage(
+	kind: 'sketch' | 'composition',
+	inputLabel: string,
+	systemLabel: string,
+	sent: SentSystemPrompt | null,
+	expanded: boolean,
+	toggle: () => void
+)}
+	{#if sent?.message}
+		<div class="prompt-head">
+			<p class="prompt-label">{inputLabel}</p>
+			<button
+				class="prompt-copy-btn"
+				class:copied={copiedPrompt === kind}
+				type="button"
+				title={copiedPrompt === kind ? t().promptCopied : t().promptCopy}
+				aria-label={copiedPrompt === kind ? t().promptCopied : t().promptCopy}
+				onclick={() => onCopyPromptText(kind, sent.message)}
+			>
+				<svg viewBox="0 0 24 24" aria-hidden="true">
+					<rect x="9" y="9" width="10" height="10" rx="2"></rect>
+					<path d="M5 15V7a2 2 0 0 1 2-2h8"></path>
+				</svg>
+			</button>
+		</div>
+		<textarea class="prompt-textarea prompt-user" class:sketch-user={kind === 'sketch'} readonly value={sent.message}></textarea>
+	{/if}
+	<div class="prompt-collapsible-head">
+		<p class="prompt-label">{systemLabel}</p>
+		{#if sent}
+			<button class="ghost-btn" type="button" onclick={toggle}>{expanded ? t().promptCollapse : t().promptExpand}</button>
+		{/if}
+	</div>
+	{#if sent}
+		<div class="prompt-collapse" class:expanded>
+			<textarea class="prompt-textarea prompt-system" readonly value={sent.system}></textarea>
+			{#if !expanded}<div class="prompt-fade"></div>{/if}
+		</div>
+	{:else}
+		<p class="prompt-note">{systemPromptNote(kind)}</p>
+	{/if}
+{/snippet}
 
 {#if outputTab === 'prompts'}
 	<div class="prompt-section" bind:this={scrollEl}>
+		{@render sentStage('sketch', t().promptSketchInput, t().promptSketchSystem, sketchSystem, sketchSystemExpanded, () => (sketchSystemExpanded = !sketchSystemExpanded))}
 		<div class="prompt-head">
 			<p class="prompt-label">{t().promptStage1Input}</p>
 			<button
@@ -82,8 +135,9 @@
 				{#if !stage1SystemExpanded}<div class="prompt-fade"></div>{/if}
 			</div>
 		{:else}
-			<p class="prompt-note">{systemPromptNote}</p>
+			<p class="prompt-note">{systemPromptNote('stage1')}</p>
 		{/if}
+		{@render sentStage('composition', t().promptCompositionInput, t().promptCompositionSystem, compositionSystem, compositionSystemExpanded, () => (compositionSystemExpanded = !compositionSystemExpanded))}
 		{#if ddl}
 			<div class="prompt-head">
 				<p class="prompt-label">{t().promptStage2Input}</p>
@@ -115,7 +169,7 @@
 				{#if !stage2SystemExpanded}<div class="prompt-fade"></div>{/if}
 			</div>
 		{:else}
-			<p class="prompt-note">{systemPromptNote}</p>
+			<p class="prompt-note">{systemPromptNote('stage2')}</p>
 		{/if}
 	</div>
 {/if}
@@ -225,7 +279,8 @@
 		resize: vertical;
 	}
 	.prompt-user { min-height: 120px; }
-	.stage1-user { min-height: 60px; height: 60px; }
+	.stage1-user,
+	.sketch-user { min-height: 60px; height: 60px; }
 	.prompt-collapsible-head {
 		display: flex;
 		align-items: center;

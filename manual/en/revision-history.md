@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-13 — Older models in publication selection
+
+Publication selection now files models of an older generation the provider has superseded into the first fold, Older models, where they can still be published. Section 5.0 of Server Configuration says so, and that the bulk selection takes a fold only while it is open.
+
 ## 2026-10-13 — The sketch and the composition reading in the Prompts tab
 
 The provenance drawer's Prompts tab now shows the system prompts of the sketch (Stage 0.5) and the composition reading, with the input actually sent, in the order a work calls them. Section 11 of Creating Images in both languages is corrected.

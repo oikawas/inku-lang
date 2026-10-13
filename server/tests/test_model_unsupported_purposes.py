@@ -56,6 +56,15 @@ def test_a_model_left_out_of_the_benchmark_is_not_supported_and_cannot_be_publis
     assert "not_supported" in MODEL_METADATA_KEYS
 
 
+def test_an_older_model_keeps_its_mark_and_can_still_be_published():
+    # The OpenAI API models up to GPT-5.4 are folded away, not withdrawn.
+    settings = _settings({"purposes": ["llm"], "legacy": True})
+    provider = normalize_model_settings(settings)["providers"]["gemini"]
+    assert (provider["models"][0]["legacy"], provider["enabled_models"]["measured-model"]) == (True, True)
+    assert (_offered(settings, "llm"), _offered(settings, "vision")) == (True, False)
+    assert "legacy" in MODEL_METADATA_KEYS
+
+
 def test_an_unmeasured_model_with_no_purpose_still_reads_as_an_llm():
     model = normalize_model_settings(_settings({"purposes": []}))["providers"]["gemini"]["models"][0]
     assert model["purposes"] == ["llm"] and "unsupported_purposes" not in model

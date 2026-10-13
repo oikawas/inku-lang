@@ -52,6 +52,7 @@ MODEL_METADATA_KEYS = (
     "purposes",
     "unsupported_purposes",
     "not_supported",
+    "legacy",
     *MODEL_RECOMMENDATION_KEYS,
     "speed_class",
     "speed_label",
@@ -282,6 +283,11 @@ def _normalize_models(models: Any) -> list[dict[str, Any]]:
             # published, and folded away in model administration.
             if model.get("not_supported") is True:
                 item["not_supported"] = True
+            # An older generation the provider has superseded (the OpenAI API up to
+            # GPT-5.4; the author, 2026-10-13). It can still be published; model
+            # administration only folds it away below the list.
+            if model.get("legacy") is True:
+                item["legacy"] = True
             normalized.append(item)
     return normalized
 

@@ -11,6 +11,9 @@ export type ModelOption = {
 	// Left out of the benchmark as a kind inku does not draw with (2026-10-13).
 	// Not published; model administration folds it away.
 	not_supported?: boolean;
+	// An older generation the provider has superseded (2026-10-13). It can still be
+	// published; model administration folds it away as an older model.
+	legacy?: boolean;
 	enabled?: boolean;
 	// v1.98: Recommendations are per purpose; recommendation_level reads the legacy format.
 	recommendation_llm?: number;

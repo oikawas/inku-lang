@@ -39,6 +39,9 @@
 	let modelPickerMetadataDraft = $state<Record<string, ModelOption>>({});
 	let modelPickerInitialDraft = $state('');
 	let modelPickerError = $state<string | null>(null);
+	// The folds the administrator has opened. Selecting or clearing what is shown
+	// takes the older models only while their fold is open.
+	let modelPickerOpenFolds = $state<Partial<Record<ModelFold, boolean>>>({});
 	let serviceDialogError = $state<string | null>(null);
 	let activeProviderId = $state<Provider | null>(null);
 	let editProviderId = $state<Provider | null>(null);
@@ -221,6 +224,7 @@
 		modelPickerPurposeDraft = Object.fromEntries((catalogProvider?.models ?? []).map((model) => [model.id, model.purposes ?? ['llm']]));
 		modelPickerMetadataDraft = Object.fromEntries((catalogProvider?.models ?? []).map((model) => [model.id, { ...model }]));
 		modelPickerError = null;
+		modelPickerOpenFolds = {};
 		modelPickerInitialDraft = pickerDraftSignature(catalogProvider?.models ?? []);
 		modelPickerProviderId = provider;
 	}
@@ -388,12 +392,17 @@
 	});
 	// Models that cannot be published -- paid-plan only, measured to answer
 	// nothing, not supported, or retired -- are folded at the bottom, closed at
-	// first (the author, 2026-10-13). The search and the filter still count them.
+	// first (the author, 2026-10-13). Older models, which can still be published,
+	// take the first fold. The search and the filter still count them.
 	const modelPickerSections = $derived.by(() => {
-		const sections: Record<'main' | ModelFold, ModelOption[]> = { main: [], subscription: [], no_response: [], not_supported: [], eol: [] };
+		const sections: Record<'main' | ModelFold, ModelOption[]> = { main: [], legacy: [], subscription: [], no_response: [], not_supported: [], eol: [] };
 		for (const model of filteredModelPickerModels) sections[modelFold(model) ?? 'main'].push(model);
 		return sections;
 	});
+	const modelPickerShownModels = $derived([
+		...modelPickerSections.main,
+		...MODEL_FOLDS.flatMap((fold) => (modelPickerOpenFolds[fold] ? modelPickerSections[fold] : []))
+	]);
 
 </script>
 
@@ -658,8 +667,8 @@
 				<label class="model-picker-filter"><span>{t().settingsModelFilterLabel}</span><select bind:value={modelPickerFilter}><option value="all">{t().settingsModelFilterAll}</option><option value="published">{t().settingsModelFilterPublished}</option><option value="unpublished">{t().settingsModelFilterUnpublished}</option><option value="llm">{t().settingsModelFilterLlm}</option><option value="vision">{t().settingsModelFilterVision}</option></select></label>
 				<div class="model-picker-actions">
 					<button class="ghost-btn" title={modelPickerDirty ? t().settingsModelFetchDisabledWhileDirty : undefined} onclick={fetchModelPickerModels} disabled={modelSettingsLoading || modelPickerDirty}>{t().settingsModelFetchModels}</button>
-					<button class="ghost-btn" onclick={() => setAllPublishedModels(filteredModelPickerModels, true)} disabled={modelSettingsLoading}>{t().settingsModelSelectVisible}</button>
-					<button class="ghost-btn" onclick={() => setAllPublishedModels(filteredModelPickerModels, false)} disabled={modelSettingsLoading}>{t().settingsModelClearVisible}</button>
+					<button class="ghost-btn" onclick={() => setAllPublishedModels(modelPickerShownModels, true)} disabled={modelSettingsLoading}>{t().settingsModelSelectVisible}</button>
+					<button class="ghost-btn" onclick={() => setAllPublishedModels(modelPickerShownModels, false)} disabled={modelSettingsLoading}>{t().settingsModelClearVisible}</button>
 				</div>
 				<div class="model-picker-count">{t().settingsModelPickerCount(filteredModelPickerModels.length, modelPickerProvider.models.length)}</div>
 			</div>
@@ -670,7 +679,7 @@
 					{/each}
 					{#each MODEL_FOLDS as fold (fold)}
 						{#if modelPickerSections[fold].length > 0}
-							<details class="model-picker-fold">
+							<details class="model-picker-fold" bind:open={modelPickerOpenFolds[fold]}>
 								<summary>{modelFoldTitle(fold, modelPickerSections[fold].length, t().code === 'ja')}</summary>
 								<div class="model-picker-list">
 									{#each modelPickerSections[fold] as model, modelIndex (`${model.id}:${modelIndex}`)}

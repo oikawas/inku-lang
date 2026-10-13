@@ -2,6 +2,10 @@ package app.inku.mobile.ui
 
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.platform.testTag
@@ -20,6 +24,29 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ModelCatalogDeviceTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
+
+    @Test fun eachLabelUsesItsOwnPublishabilityColor() {
+        val catalog = ModelCatalog.load(rule.activity)
+        val models = listOf(
+            catalog.classify(JSONObject().put("id", "mixed").put("labels", JSONArray(listOf("legacy", "eol")))),
+            catalog.classify(JSONObject().put("id", "muted").put("labels", JSONArray(listOf("legacy")))),
+        )
+        val scheme = lightColorScheme()
+        val expectedByLabel = mapOf("legacy" to scheme.onSurfaceVariant, "eol" to scheme.error, "unmeasured" to scheme.onSurfaceVariant)
+        rule.setContent { MaterialTheme(colorScheme = scheme) { Column {
+            models.forEach { ModelCatalogDetails(it, InkuStringsJa) }
+        } } }
+        assertEquals(listOf("legacy", "eol"), models[0].labels.map { it.id })
+        assertEquals(listOf("unmeasured", "legacy"), models[1].labels.map { it.id })
+        models.forEach { model ->
+            model.labels.forEach { label ->
+                val results = mutableListOf<TextLayoutResult>()
+                rule.onNode(hasText(label.ja) and hasAnyAncestor(hasTestTag("CatalogDetails:${model.id}")), useUnmergedTree = true)
+                    .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action -> assertTrue(action(results)) }
+                assertEquals("${model.id}/${label.id}", expectedByLabel.getValue(label.id), results.single().layoutInput.style.color)
+            }
+        }
+    }
 
     @Test fun sixClosedFoldsShowCanonicalLabelsAndBlockUnpublishableModels() {
         val catalog = ModelCatalog.load(rule.activity)

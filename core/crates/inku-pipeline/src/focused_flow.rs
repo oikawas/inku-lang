@@ -2206,6 +2206,63 @@ fn a_composing_run_reads_the_settled_plan_and_commits_marked_ranges() {
     );
 }
 
+/// I-711 C5: the joints a reading returns reach the committed DDL. The joint
+/// the check keeps is printed with its phrase; the one it drops is named in the
+/// reading's event.
+#[test]
+fn a_composing_run_writes_the_joints_the_reading_returns() {
+    let pending = composition_start(Some(CompositionConfig { read: true }));
+    let state = plan_answer(&pending).snapshot;
+    let action = state.action.as_ref().unwrap();
+    assert_eq!(action.tag, "read_composition");
+    let reading = json!({
+        "thesis": "a lone circle above a floor of dots",
+        "roles": ["field", "focal", "scattered"],
+        "relations": [{"type": "above", "layers": [1, 2], "side": "unspecified", "toward": "unspecified"}],
+        "tension": {"motion": "still", "focus": "unspecified", "vertical": "unspecified",
+                    "balance": "unspecified", "symmetry": "unspecified", "void": "unspecified"},
+        "stated_places": [{"layer": 2, "words": "at the bottom", "place": "bottom"}],
+        "joints": [
+            {"type": "overlaps", "layers": [1, 0], "words": "A red circle"},
+            {"type": "rests_on", "layers": [2, 0], "words": "black dots scattered at the bottom"}
+        ]
+    });
+    let result = PipelineInput::EffectResult {
+        result: EffectResult::CompositionRead {
+            identity: action.identity.clone(),
+            response: reading.to_string(),
+            elapsed_ms: DecimalU64::new(30),
+        },
+    };
+    let read = run(Some(&state), &envelope(Some(&state), result));
+    let findings = read
+        .events
+        .iter()
+        .find(|event| event.tag == "composition_read")
+        .map(|event| event.payload["findings"].clone());
+    // The dots keep the place the description states, so they are not joined.
+    assert_eq!(findings, Some(json!(["joint_stated"])));
+    let source = committed_source(&read.snapshot);
+    let lines: Vec<&str> = source.lines().collect();
+    // The circle keeps its range and is printed after the field with its joint.
+    assert!(lines[3].contains(" (horizontal "), "{source}");
+    assert!(
+        lines[3].ends_with(" overlapping the previous shape."),
+        "{source}"
+    );
+    assert!(lines[4].ends_with(" at the bottom."), "{source}");
+    let committed = run(
+        Some(&read.snapshot),
+        &envelope(Some(&read.snapshot), ack(&read.snapshot)),
+    )
+    .snapshot;
+    assert!(
+        matches!(committed.phase, PipelinePhase::ScoreReady),
+        "{:?}",
+        committed.phase
+    );
+}
+
 #[test]
 fn a_run_that_does_not_read_composes_from_the_default_reading() {
     let pending = composition_start(Some(CompositionConfig { read: false }));

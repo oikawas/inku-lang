@@ -18,6 +18,13 @@ At the author's instruction (update model settings and publication selection fro
 ### 2026-10-13 — Every sender writes a schema's properties in its propertyOrdering
 
 At the draw session's request (the author's choice to fix the senders). The core's JSON keeps no key order, so a schema's `properties` arrive in name order (thesis last, for the composition reading). Only the Gemini path reordered them; OpenAI Responses and Chat Completions, Ollama and mlx `response_format`, Anthropic `input_schema` and the ChatGPT plan's function sent the name order. They now write `properties` in the schema's `propertyOrdering`, nested ones too (the new `schema_order.ordered_schema`); unnamed properties follow in their present order, and every other key and `propertyOrdering` stay. Today only the composition reading names an order; Stage 1 and other schemas go out byte for byte as before.
+### 2026-10-13 — The composition reading returns the joints the description states
+
+By the author's choice (I-711 stage C, C5: measure before building, and give it to every reader). The composition could take a reading's joints, but the reading returned none, so the composition wrote no joints.
+
+- The composition reading prompt is now `inku.composition-reading-prompt.v3`. Its values end with the joints (`joints`: one of five values, resting on, inside, overlapping, crossing or connected; two layers; and the words quoted from the description), written only when the description says in words how things meet. The prompt and the schema are byte for byte the ones measured before building, sending 49 works to three readers (Gemma 4 31B, Gemini 3.6 Flash, GPT-6.1-Sol).
+- The check reads the joints in the reply's order once the stated places are fixed. A joint whose value or layers do not fit (finding `joint_layer`), whose quoted words are not in the description (finding `joint_unquoted`), or that the composition cannot write (`joint_stated` and the like) is dropped and named in the findings. The joints left are placed and printed by the composition.
+- A reply without joints, or whose joints are not a list, is read as having none. A reading without joints leaves the composition as before. The DDL, Score and Saijiki editions do not change.
 
 ### 2026-10-13 — ChatGPT plan model assessments are shared data, like every other provider's
 

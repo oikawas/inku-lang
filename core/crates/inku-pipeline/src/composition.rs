@@ -637,6 +637,15 @@ pub const RELATION_NAMES: [&str; 19] = [
     "dividing",
 ];
 
+/// The joints a reading may name, in the order the response schema lists them.
+pub const JOINT_NAMES: [&str; 5] = [
+    "rests_on",
+    "inside",
+    "overlaps",
+    "crosses",
+    "continues_from",
+];
+
 pub const SIDES: [&str; 2] = ["above", "below"];
 pub const TOWARD: [&str; 2] = ["left", "right"];
 
@@ -771,8 +780,8 @@ pub struct RawStatedPlace {
     pub place: Option<String>,
 }
 
-/// A reading as returned, before the check. Tension and stated places keep the
-/// reading's own order, which is the order of the findings.
+/// A reading as returned, before the check. Tension, stated places and joints
+/// keep the reading's own order, which is the order of the findings.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct RawReading {
     pub roles: Vec<String>,
@@ -782,6 +791,10 @@ pub struct RawReading {
     pub tension: Vec<(String, Value)>,
     #[serde(default)]
     pub stated_places: Vec<(String, RawStatedPlace)>,
+    /// Joints as the reply wrote them (type, layers and words); the check reads
+    /// their shape.
+    #[serde(default)]
+    pub joints: Vec<Value>,
 }
 
 /// The reading the solver uses.
@@ -792,8 +805,9 @@ pub struct CheckedReading {
     pub tension: BTreeMap<String, String>,
     /// Places the description states, by layer: kept as they are.
     pub fixed: BTreeMap<usize, String>,
-    /// Joints the composition writes as DDL relations (I-711 stage C). A
-    /// reading without joints keeps its stored form.
+    /// Joints the composition writes as DDL relations (I-711 stage C): the
+    /// reading's joints the check kept. A reading without joints keeps its
+    /// stored form.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub joints: Vec<Joint>,
 }
@@ -971,14 +985,28 @@ fn conflicts(first: &Relation, second: &Relation, exempt: impl Fn(usize) -> bool
     false
 }
 
-/// Whether the description holds the words of the i-th stated place.
+/// Whether the description holds the words of the i-th quote: the stated places
+/// in order, then the joints (with n stated places, the k-th joint is n + k).
 pub type Quoted<'a> = &'a dyn Fn(usize, &str) -> bool;
+
+/// A returned joint whose type is one of the five and whose two layers are two
+/// different layers of the plan, or `None`.
+fn read_joint(value: &Value, count: usize) -> Option<Joint> {
+    let kind = JointKind::parse(value.get("type")?.as_str()?)?;
+    let [a, b] = value.get("layers")?.as_array()?.as_slice() else {
+        return None;
+    };
+    let (a, b) = (layer_index(a, count)?, layer_index(b, count)?);
+    (a != b).then_some(Joint { kind, a, b })
+}
 
 /// Check a reading against the plan before the solver uses it.
 ///
 /// `quoted(i, words)` says whether the description holds the words of the i-th
-/// stated place; `None` skips that test. Values the canvas cannot show are dropped
-/// or changed, with a finding.
+/// quote, a stated place or a joint; `None` skips that test. Values the canvas
+/// cannot show are dropped or changed, with a finding. The joints are checked in
+/// the reply's order once the stated places are fixed, and the ones a
+/// composition cannot write are dropped as [`check_joints`] drops them.
 pub fn check(
     reading: &RawReading,
     layers: &[WorkPlanLayer],
@@ -1209,13 +1237,31 @@ pub fn check(
             fixed.insert(index, place.to_owned());
         }
     }
+
+    let mut joints = Vec::new();
+    for (k, raw) in reading.joints.iter().enumerate() {
+        let item = format!("joints.{k}");
+        let Some(joint) = read_joint(raw, count) else {
+            findings.push(finding("joint_layer", item, "dropped"));
+            continue;
+        };
+        let words = raw.get("words").and_then(Value::as_str).unwrap_or_default();
+        let at = reading.stated_places.len() + k;
+        if quoted.is_some_and(|quoted| words.is_empty() || !quoted(at, words)) {
+            findings.push(finding("joint_unquoted", item, "dropped"));
+            continue;
+        }
+        joints.push(joint);
+    }
+    let (joints, dropped) = check_joints(&joints, layers, &fixed);
+    findings.extend(dropped);
     Ok((
         CheckedReading {
             roles,
             relations,
             tension,
             fixed,
-            joints: Vec::new(),
+            joints,
         },
         findings,
     ))
@@ -3159,6 +3205,93 @@ mod tests {
             let codes: Vec<&str> = findings.iter().map(|finding| finding.code).collect();
             assert!(codes.contains(&code), "{plan}: {codes:?}");
         }
+    }
+
+    /// I-711 C5: the reading's joints are checked in the reply's order once the
+    /// stated places are fixed, and each one dropped leaves a finding.
+    #[test]
+    fn the_joints_a_composition_cannot_write_are_dropped_with_a_finding() {
+        let layers = [
+            plan_layer("fill", "square", None),
+            plan_layer("place", "circle", None),
+            plan_layer("place", "ellipse", Some("bottom")),
+        ];
+        let joint = |kind: &str, layers: &[u64], words: &str| {
+            let layers = Value::from(layers.to_vec());
+            serde_json::json!({"type": kind, "layers": layers, "words": words})
+        };
+        let reading = RawReading {
+            roles: vec!["field".into(), "focal".into(), "secondary".into()],
+            stated_places: vec![(
+                "2".into(),
+                RawStatedPlace {
+                    words: Some("at the bottom".into()),
+                    place: Some("bottom".into()),
+                },
+            )],
+            joints: vec![
+                joint("rests_on", &[1, 0], "on the hill"),
+                joint("touches", &[1, 0], "on the hill"),
+                joint("inside", &[1], "on the hill"),
+                joint("inside", &[1, 3], "on the hill"),
+                joint("inside", &[1, 1], "on the hill"),
+                Value::from("rests_on"),
+                joint("overlaps", &[2, 0], ""),
+                joint("overlaps", &[2, 0], "in the sky"),
+                joint("overlaps", &[2, 0], "on the hill"),
+            ],
+            ..RawReading::default()
+        };
+        let description = "a circle on the hill and a stone at the bottom";
+        let asked = std::cell::RefCell::new(Vec::new());
+        let quoted = |i: usize, words: &str| {
+            asked.borrow_mut().push(i);
+            description.contains(words)
+        };
+        let (checked, findings) = check(&reading, &layers, Some(&quoted)).expect("checked");
+        let rests_on = Joint {
+            kind: JointKind::RestsOn,
+            a: 1,
+            b: 0,
+        };
+        assert_eq!(checked.joints, [rests_on]);
+        let found: Vec<(&str, &str)> = findings
+            .iter()
+            .map(|finding| (finding.code, finding.item.as_str()))
+            .collect();
+        assert_eq!(
+            found,
+            [
+                ("joint_layer", "joints.1"),
+                ("joint_layer", "joints.2"),
+                ("joint_layer", "joints.3"),
+                ("joint_layer", "joints.4"),
+                ("joint_layer", "joints.5"),
+                ("joint_unquoted", "joints.6"),
+                ("joint_unquoted", "joints.7"),
+                ("joint_stated", "overlapping 2->0"),
+            ]
+        );
+        // The stated place is quote 0; the k-th joint is quote 1 + k.
+        assert_eq!(*asked.borrow(), [0, 1, 8, 9]);
+        // Without a quote test the words are not looked at; the layers still are.
+        let unquoted = RawReading {
+            joints: vec![
+                joint("crosses", &[1, 0], "in the sky"),
+                joint("crosses", &[1, 9], "on the hill"),
+            ],
+            ..reading
+        };
+        let (checked, findings) = check(&unquoted, &layers, None).expect("checked");
+        assert_eq!(
+            checked.joints,
+            [Joint {
+                kind: JointKind::Crosses,
+                ..rests_on
+            }]
+        );
+        let codes: Vec<&str> = findings.iter().map(|finding| finding.code).collect();
+        assert_eq!(codes, ["joint_layer"]);
     }
 
     #[test]

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## macOS 1.1.3 (2026-10-14 / Build 11; Server reference v2.15.114 / Build 1190)
+
+Publish the macOS changes integrated after 1.1.2 from the current main. The Server Build 1190 catch-up brings whole-text instruction editing, discarding edits, folded numeric ranges and frames, saijiki completion, completion records and states, the author's original words and completion reasons, retrying only failed batch works, choosing the composition again, and prompt display. It also includes model information, labels and six folds from the shared v2 catalog. The copied screen text refers to Server v2.15.114 / Build 1190; that value does not claim parity with every Server feature. Existing works, names, purposes and publication choices are preserved.
+
 ### 2026-10-13 — Swift reads the shared v2 model catalog
 
 Swift bundles the canonical model JSON unchanged and reads assessments, mean seconds and estimated costs for every provider, including the ChatGPT plan. Rows and details show every label from its table. Six kinds of fold follow the table order, show counts and start closed. New selection requires every label to permit publication. Saved names, purposes and account access checks remain local while catalog updates replace stale assessments and labels. Canonical assessments are read-only; custom models absent from the catalog retain local assessment editing.

@@ -59,10 +59,10 @@ func runCompositionProgressChecks() async throws {
         throw CheckFailure.message("Composition progress lost native stage/model/retry/time facts or did not complete: \(app.errorText ?? app.status)")
     }
     let prompts = try ExactJSON(data: Data(app.promptJSON.utf8))
-    guard let entries = prompts.array, entries.count == 1,
-          entries[0]["action"].string == "generate_normalized_ddl",
-          !app.promptJSON.contains("inku.composition-reading-prompt.v3") else {
-        throw CheckFailure.message("Composition prompt leaked into the Stage 1/2 prompt presentation")
+    guard let entries = prompts.array,
+          Set(entries.compactMap { $0["action"].string }) == ["generate_normalized_ddl", "read_composition"],
+          app.promptJSON.contains("inku.composition-reading-prompt.v3") else {
+        throw CheckFailure.message("The prompt presentation lost the composition reading")
     }
     let context = try await app.savedConfiguration(workID: work.id)
     let database = try InkuDatabase(url: databaseURL)
@@ -114,7 +114,7 @@ func runCompositionProgressChecks() async throws {
     }
     app.newWork()
     guard app.providerProgress == nil else { throw CheckFailure.message("Next work retained composition progress") }
-    print("Composition progress passed: Server default; real Rust interpretation→composition stage reset; one composition retry with pinned Stage1 model; JA/EN presentation; composition prompt absent; completion/Stop freeze and late-event refusal; saved Score replay/New keep provider-free/reset boundaries. Offline mock only.")
+    print("Composition progress passed: Server default; real Rust interpretation→composition stage reset; one composition retry with pinned Stage1 model; JA/EN presentation; composition prompt shown; completion/Stop freeze and late-event refusal; saved Score replay/New keep provider-free/reset boundaries. Offline mock only.")
 }
 
 @MainActor

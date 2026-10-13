@@ -203,6 +203,23 @@ public enum InkuCore {
         InkuCoreBindings.providerAttempt(snapshotBytes: snapshot)
     }
 
+    /// `inku.composition-ranges.v1`: the named composition ranges and corners the hosts fold in their display.
+    public static func compositionRanges() -> Data {
+        Data(InkuCoreBindings.compositionRanges().utf8)
+    }
+
+    /// `inku.composition-recompose.v1` for `{config, source, mode, seed, work_id}`: the source with its numeric ranges
+    /// chosen again by principle or by chance, or why they stay.
+    public static func recompose(_ input: Data) -> Data {
+        InkuCoreBindings.recompose(inputBytes: input)
+    }
+
+    /// `inku.completion-range-states.v1` for `{config, source, completion_ranges}`: each range a completion wrote,
+    /// as completed, numbers changed or words changed, with UTF-16 positions in the source.
+    public static func completionRangeStates(_ input: Data) -> Data {
+        InkuCoreBindings.completionRangeStates(inputBytes: input)
+    }
+
     public static func compile(_ input: Data) -> Data {
         InkuCoreBindings.compileDocument(inputBytes: input)
     }

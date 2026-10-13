@@ -152,6 +152,9 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                 guard let result = try await group.next() else { throw HostError("transport_unavailable") }
                 return result
             }
+            // Server pipeline_provider logs what a cut-off answer spent before refusing it.
+            ProviderOutputLimit.log(raw, request: boundedRequest, provider: provider, model: model, action: tag,
+                                    responses: ProviderWire.isOpenAIAPI(provider))
             response = try ProviderWire.responseText(raw, provider: provider)
         } catch let error as ProviderObservationFailure { throw error }
         catch is CancellationError {
@@ -271,6 +274,10 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                 do {
                     let raw = try await auxiliaryAttempt(request, timeout: prompt.timeoutSeconds, onBytes: onBytes)
                     try Task.checkCancellation()
+                    // Server vision_client returns a cut-off answer as it is and logs that the budget ran out.
+                    if prompt.purpose == .vision {
+                        ProviderOutputLimit.log(raw, request: request, provider: provider, model: model, action: "vision", responses: false)
+                    }
                     return try AuxiliaryWire.responseText(raw, kind: provider.kind, purpose: prompt.purpose)
                 } catch {
                     guard attempt < retries, let delay = Self.sdkRetryDelay(error, retry: attempt, kind: provider.kind) else { throw error }

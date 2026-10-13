@@ -38,12 +38,14 @@ struct SavedWorkRefinementActions: View {
     var body: some View {
         Group {
             Button(model.display.localized("描画パラメータの編集"), systemImage: "slider.horizontal.3") { onAction(work, "parameters") }
+            // WorkActionMenu.svelte: layout opens its own dialog, after the parameters.
+            Button(model.display.localized("配置を変える"), systemImage: "square.grid.2x2") { onAction(work, "layout") }
             Button(model.display.localized("色カタログを変える"), systemImage: "paintpalette") { onAction(work, "color") }
             if state?.showsDescriptionActions != false {
                 Button(model.display.localized("記述を変える"), systemImage: "text.cursor") { onAction(work, "description") }
                     .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? model.display.tooltip("記述を変える") : reason)
             }
-            Button(model.display.localized("指示書を編集"), systemImage: "doc.text") { onAction(work, "ddl") }
+            Button(model.display.localized("指示書エディタ"), systemImage: "doc.text") { onAction(work, "ddl") }
                 .disabled(work.ddl?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false)
             if state?.showsDescriptionActions != false {
                 Button(model.display.localized("写生なし／ありで描き直す"), systemImage: "pencil.and.outline") { onAction(work, "sketch") }

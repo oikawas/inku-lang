@@ -117,6 +117,7 @@ struct BatchPanelView: View {
             }
             actions
             if !automation.rows.isEmpty { resultSummary }
+            if automation.canRetryFailures { retryFailuresButton }
             if !issueRows.isEmpty { issueResults }
             if !automation.rows.isEmpty { allResults }
         }
@@ -308,6 +309,16 @@ struct BatchPanelView: View {
         Text(model.display.localizedFormat("成功 %ld・失敗 %ld・全 %ld件",
             automation.successfulCount, automation.failedCount, automation.rows.count))
             .inkuFont(13).monospacedDigit()
+    }
+
+    /// BatchPanel.svelte: the failure summary offers to draw the failed rows alone again.
+    private var retryFailuresButton: some View {
+        Button(model.display.localized("エラー作品を再描画"), systemImage: "arrow.clockwise") {
+            Task { await automation.retryFailures(app: model) }
+        }
+        .buttonStyle(InkuGhostButtonStyle())
+        .disabled(controlsDisabled)
+        .inkuTooltip(tip("失敗した行だけを、元の本文・行番号・描画条件で描き直します。"))
     }
 
     private var issueResults: some View {

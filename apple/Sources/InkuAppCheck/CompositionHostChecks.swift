@@ -42,9 +42,15 @@ import InkuUI
           await provider.selectedModels == ["composition-check:pinned", "composition-check:pinned"] else {
         throw CheckFailure.message("Structured Stage1 -> composition -> commit/save did not complete with the pinned Stage1 model")
     }
+    // The prompt tab shows the composition reading with what it was sent (2026-10-13), and the saved work keeps it.
     let prompts = try composed.promptJSON.map { try ExactJSON(data: $0).array ?? [] } ?? []
-    guard prompts.map({ $0["action"].string ?? "" }) == ["generate_normalized_ddl"] else {
-        throw CheckFailure.message("Composition reading leaked into the author-facing prompt journal")
+    let presentation = try await host.savedWorkPresentation(workID: composedID)
+    let savedPrompts = try presentation.promptJSON.map { try ExactJSON(data: $0).array ?? [] } ?? []
+    guard prompts.map({ $0["action"].string ?? "" }) == ["generate_normalized_ddl", "read_composition"],
+          savedPrompts.map({ $0["action"].string ?? "" }) == ["generate_normalized_ddl", "read_composition"],
+          savedPrompts.last?["prompt"]["message"].string?.isEmpty == false,
+          presentation.promptStages == ["sketch", "stage1", "composition", "stage2"] else {
+        throw CheckFailure.message("The prompt journal or the saved work lost the composition reading or its stages")
     }
     let saved = try await host.restoreSavedWork(workID: composedID)
     let context = try await host.savedAuthoringContext(workID: composedID)
@@ -109,7 +115,7 @@ import InkuUI
         throw CheckFailure.message("Composition integration retroactively changed saved SVG/Score/DDL or sent a reading during saved-Score replay")
     }
     try await compositionTransportGates(reading, models: request.models, folder: folder, credentials: credentials)
-    print("Composition host passed: real Rust Stage1 -> read -> commit/save; Stage1 model/cap and sampling; schema propertyOrdering preserved; prompt journal excludes composition; finite shared retry/fallback; saved absent/read:false settings retained; saved Score replay unchanged; ordinary/personal gates accept the action without network/OAuth/Keychain. Temporary DB only.")
+    print("Composition host passed: real Rust Stage1 -> read -> commit/save; Stage1 model/cap and sampling; schema propertyOrdering preserved; prompt journal and saved work keep the composition reading; finite shared retry/fallback; saved absent/read:false settings retained; saved Score replay unchanged; ordinary/personal gates accept the action without network/OAuth/Keychain. Temporary DB only.")
 }
 
 private func compositionEventTags(_ view: PipelineView) -> [String] {

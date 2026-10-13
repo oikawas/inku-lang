@@ -8,6 +8,46 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Swift copies its Web text again from Build 1190
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage G). The Web text Swift's screens use, and its versions, had been copied from the Build 1162 Web. They are now copied from the Build 1190 (v2.15.114) Web, and "About Inku" names Server v2.15.114 (Build 1190). The model settings display (use badges, three-step recommendation, estimated cost, mean seconds, uses with no measured response, the fold for models that cannot be published, and shared ChatGPT plan ratings) was deferred and is not in Swift yet.
+
+### 2026-10-13 — Swift completes saijiki words and macro names in the instructions
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage C-3). Swift's instruction fields offered no completions. As on the Web, typing the start of a word in the instruction box or the editor lists the saijiki words and macro names of the instruction language. Nothing is offered while read-only, composing, or inside an open range's numbers.
+
+### 2026-10-13 — Swift folds numeric ranges in the instructions, frames them over the work and retypes them
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage C-2). Swift showed numeric ranges in full. As on the Web, the numbers of a range whose name and numbers match the shared core's table are folded under a dotted name, open at the caret and can be retyped in place. Its frame shows over the work, and the name follows the numbers when the caret leaves. An invalid number keeps the last valid frame, shows a hint and holds drawing back. Hyphens also join ranges.
+
+### 2026-10-13 — Swift edits the whole text in the instruction box, with "Instruction editor" and "Discard edits"
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage C-1). Swift's instruction box was read-only. As on the Web, it is now an editor without line numbers where the whole text can be edited as a draft of the displayed work; typing never draws, and "Draw from instructions" draws it once. The button, menu and editor title read "Instruction editor", and a Saijiki word goes in at the box's caret (or its end if unused). "Discard edits" returns to the work's instructions and can be undone with ⌘Z.
+
+### 2026-10-13 — Swift "Change the layout" chooses the composition again by principle or by chance
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage B). Swift's "Change the layout" drew a new seed and redrew the saved instructions as they were, so numeric ranges never moved. As on the Web, "Change the layout" in the work edit menu now opens a layout-only dialog that asks the shared core to choose the ranges again "By principle" or "By chance" and draws the chosen instructions. Each option shows the moved layers and ranges, or why they stayed, and the adopted child records the mode in its lineage. "Edit drawing parameters" now offers reading and touch. The AI process's layout also recomposes by principle.
+
+### 2026-10-13 — Swift keeps completion range records and shows their three states
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage D2). Swift did not keep the record of ranges a completion wrote with the work, so it was lost when the work was selected again and its instructions edited. The record is now kept with the work and passed to the shared core when drawing from the saved work, so a range with edited words goes to the completion. The DDL views mark completion, numbers edited and words edited with coloured dotted underlines, with their names, counts and the hint about edited words (the Web places a tag at each range's end).
+
+### 2026-10-13 — Swift shows the author's text and reason for gaps completion could not fill, and asking again
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage D1). Swift's DDL completion view showed only the committed text and the proposal. As on the Web, when completion stops and while a proposal awaits approval, each gap it could not fill shows the author's text and a plain reason. An attempt after the check refused a proposal reads "Asking again with the reasons the proposal was refused", apart from a communication retry.
+
+### 2026-10-13 — Swift retries only the failed works of the last batch
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage F). Swift batches could only "Resume the last batch", which draws waiting, failed and uncertain rows together. As on the Web, "Retry failed works" now draws only the failed rows again with their original text, line numbers and the drawing conditions pinned at the start. Waiting, uncertain and successful rows are left alone.
+
+### 2026-10-13 — Swift Claude output budget and cut-off answer records match Server
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage A). Swift added room for Claude 5 thinking only to the demo; drawing and Vision now get it too. A Claude drawing answer cut off at its limit was taken as the answer; it is now refused as on Server. A cut-off answer is refused as `malformed_payload` for every provider (Gemini failed as another class) and leaves Server's one-line record in the system log. Vision returns a cut-off answer as it is and only logs it. The paid-plan check reads 402 as paid-plan only too.
+
+### 2026-10-13 — Swift prompt tab shows the sketch and the composition reading
+
+At the author's instruction, matching the Web. The Prompts tab of macOS generation information showed only Stage 1 and Stage 2. It now also shows the sketch (Stage 0.5) and the composition reading, in the order a work calls them (sketch, Stage 1, composition reading, Stage 2), each with the input it was sent (with a copy button) and its system prompt (collapsible). Swift had left the composition reading out of its send record and saved only Stage 1 and Stage 2 with a work. A work now keeps the last send of all four stages and the list of stages it recorded. The catalog choice is not shown. For works saved earlier, the sketch and the composition reading read as not recorded.
+
 ## v2.15.115 (2026-10-13 / Build 1191)
 
 ### 2026-10-13 — A completion no longer repeats the sentence end

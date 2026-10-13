@@ -1,4 +1,5 @@
 import SwiftUI
+import InkuHost
 
 /// Web `DdlEditor.svelte`: the language the DDL is read in, the quick-guide switch and 「N 行・N 文字」 above a
 /// numbered, highlighted editor, then the names this installation does not hold and the guide.
@@ -11,11 +12,18 @@ struct DdlEditorPane: View {
     @Binding var insertion: InkuEditorInsertion?
     var onShowSaijiki: (() -> Void)?
     @State private var showGuide = false
+    @State private var completionStates: [CompletionRangeState] = []
+    @State private var completionSource = ""
+    @State private var rangeStatus = RangeEditorStatus()
+    /// Web DdlEditorDialog: an invalid range or an IME composition holds the draw back.
+    var onRangeBlocked: ((Bool) -> Void)?
+    private var invalidSource: Bool { rangeStatus.invalid || CompositionRanges.scan(text).contains { $0.bounds == nil } }
     @State private var highlighter: DdlHighlighter
     private let plugins: PluginNameIndex
 
     init(model: AppModel, text: Binding<String>, disabled: Bool = false, insertion: Binding<InkuEditorInsertion?>,
-         onShowSaijiki: (() -> Void)? = nil) {
+         onShowSaijiki: (() -> Void)? = nil, onRangeBlocked: ((Bool) -> Void)? = nil) {
+        self.onRangeBlocked = onRangeBlocked
         self.model = model
         _text = text
         self.disabled = disabled
@@ -34,8 +42,15 @@ struct DdlEditorPane: View {
         VStack(alignment: .leading, spacing: 8) {
             toolbar
             editor.frame(maxHeight: .infinity)
+            if completionSource == text { CompletionRangeSummary(display: display, states: completionStates) }
+            if invalidSource {
+                Text(display.localized("横1/3〜2/3、縦2/3〜1 の形で、0〜1の数を、始まりを終わりより小さく書いてください。「-」「－」も使えます。枠は最後の有効な範囲です"))
+                    .inkuFont(12).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+            }
             if !unknownNames.isEmpty || showGuide { support }
         }
+        .onChange(of: invalidSource || rangeStatus.composing, initial: true) { _, blocked in onRangeBlocked?(blocked) }
+        .onDisappear { model.rangePreview = nil }
     }
 
     /// `.ddl-editor-toolbar`: the language label with its tooltip, the switches, and the status at the right.
@@ -63,7 +78,16 @@ struct DdlEditorPane: View {
     private var editor: some View {
         ZStack(alignment: .topLeading) {
             InkuTextEditor(text: $text, isEditable: !disabled, accessibilityLabel: display.webCopy("ddlEditorInstructions", "指示書"),
-                           style: .ddl, marks: { [highlighter] in highlighter.marks($0) }, insertion: $insertion)
+                           style: .ddl, marks: { [highlighter, completionStates, completionSource] source in
+                               // Tags describe the text they were read for and vanish once it changes (Web).
+                               highlighter.marks(source) + (source == completionSource ? CompletionRangeStyle.marks(completionStates) : [])
+                           }, insertion: $insertion,
+                           rangeTable: CompositionRanges.table,
+                           onRangeStatus: { status in
+                               rangeStatus = status
+                               model.rangePreview = status.preview
+                           },
+                           completions: model.ddlCompletions)
             if text.isEmpty {
                 Text(display.webCopy("ddlEditPlaceholder", "背景を白で埋める。青い細い線を左下から右上へ三本引く。赤い小さな円を余白を残して配置する。"))
                     .inkuFont(14).foregroundStyle(.tertiary).lineSpacing(14 * 0.7)
@@ -74,6 +98,13 @@ struct DdlEditorPane: View {
         .background(InkuColor.panel, in: RoundedRectangle(cornerRadius: 4))
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.accentColor.opacity(0.7)))
+        // Web DdlEditor: the states are asked 180 ms after the text settles.
+        .task(id: [text, model.completionRecordKey]) {
+            try? await Task.sleep(for: .milliseconds(180))
+            guard !Task.isCancelled else { return }
+            completionStates = model.completionRangeStates(source: text)
+            completionSource = text
+        }
     }
 
     /// `.ddl-editor-support`: unknown names in amber with what each would fire as, then the guide.

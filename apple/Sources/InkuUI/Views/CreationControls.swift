@@ -377,6 +377,10 @@ struct CreationDisplayedProcess: View {
     private var draft: SketchDraft? { model.sketchDraft?.workID == work.id ? model.sketchDraft : nil }
     private var ddl: String { work.ddl ?? "" }
     private var hasDDL: Bool { !ddl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    /// The box's draft: what "Draw from instructions" draws.
+    private var boxText: String { model.ddlBoxText(for: work) }
+    private var boxEditable: Bool { saved && !disabled && !work.trashed && !model.isBusy }
+    @State private var confirmingDiscard = false
     private var canEditSketch: Bool { saved && model.workActionState(for: work)?.canReadDescription == true }
     private var ddlHeading: String {
         let language: String
@@ -450,21 +454,31 @@ struct CreationDisplayedProcess: View {
                     Text(model.display.localized(ddlHeading)).inkuFont(12, weight: .semibold)
                         .inkuTooltip(model.display.tooltip("指示書はこの言語の文法で読みます。", serverKey: "tooltipDdlLang"))
                     Spacer(minLength: 4)
-                    Button(model.display.localized("指示書を編集")) { onWorkAction(work, "ddl") }
+                    Button(model.display.localized("指示書エディタ")) { onWorkAction(work, "ddl") }
                         .buttonStyle(InkuGhostButtonStyle())
                         .disabled(!saved || !hasDDL || disabled)
                         .inkuTooltip(model.display.tooltip("表示中の作品の指示書を編集して、その子として描き直します", serverKey: "tooltipDdlEdit"))
                 }
-                ScrollView {
-                    Text(ddl).inkuFont(12.5, design: .monospaced).lineSpacing(4).textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 10)
-                }.frame(minHeight: 100, maxHeight: 220)
-                    .overlay(alignment: .leading) { Rectangle().fill(.quaternary).frame(width: 2) }
+                DdlBoxEditor(model: model, work: work, editable: boxEditable)
                 HStack {
                     Spacer(minLength: 0)
+                    if saved {
+                        // DdlViewer `requestDiscardEdits`: back to the work's saved instructions, as one undoable step.
+                        Button(model.display.localized("編集を破棄")) { confirmingDiscard = true }
+                            .buttonStyle(InkuGhostButtonStyle())
+                            .disabled(!boxEditable || boxText == ddl)
+                            .confirmationDialog(model.display.localized("この作品を描いたときの指示書に戻します。編集した内容は失われます。"),
+                                                isPresented: $confirmingDiscard, titleVisibility: .visible) {
+                                Button(model.display.localized("破棄する"), role: .destructive) {
+                                    guard boxEditable, boxText != ddl else { return }
+                                    model.ddlBoxInsertion = InkuEditorInsertion(text: ddl, replacesAll: true)
+                                }
+                                Button(model.display.localized("キャンセル"), role: .cancel) {}
+                            }
+                    }
                     Button(model.display.localized("指示書から描画"), systemImage: "arrow.clockwise") { onWorkAction(work, "draw-ddl") }
                         .buttonStyle(InkuGhostButtonStyle())
-                        .disabled(!saved || !hasDDL || disabled)
+                        .disabled(!saved || !DDLSource.hasBody(boxText) || disabled || model.ddlBoxRangeBlocked)
                         .inkuTooltip(model.display.tooltip("表示中の指示書（正規化DDL）をそのままStage 2へ渡して描き直します。Stage 1は走らないので解釈は変わりません。", serverKey: "tooltipDdlPaint"))
                 }
             }

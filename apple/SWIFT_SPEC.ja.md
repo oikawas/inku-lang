@@ -14,6 +14,87 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-13 文言の写しをBuild 1190のWebから作り直す
+
+作者の指示（Server Build 1190との差の取り込み、段G）。
+
+- `ui-reference.json`を`export-web-reference.mjs --source-root`でmain `d5659751`（Web/Server v2.15.114、Build 1190）から作り直した。「Inku について」の対応するServerはv2.15.114（Build 1190）。
+- Swiftが直書きの鍵で名指すWebの文言は206で、日英とも写しに全部ある。1162から文が変わったのは、ChatGPTプランの案内2つと「配置を変える」のツールチップ。
+- 段E（モデル設定の表示：用途のバッジ、3段階の推奨度、概算コスト、平均秒数、計測で応答の無い用途、公開できないモデルの折りたたみ、ChatGPTプランの共有の評価）は作者の決定で後回し。対応するServerの表示がBuild 1190でも、これらはSwiftに無い。新しい表示の値はServerのコードの既定値に無く、Serverの設定の保存にだけある。
+- 段A〜Cで`Localizable.strings`に足したWebと同じ文はそのまま使う。
+- 確認：写しの版（1190・v2.15.114・`d5659751`）、名指す鍵の有無、AppCheck `--tooltips-leftovers-only`。
+
+## 2026-10-13 指示書で歳時記の語とマクロの名を補完する
+
+作者の指示（Server Build 1190との差の取り込み、段C-3）。正本はWebの`features/ddl-editor/codemirror.ts`の`ddlCompletions`。
+
+- 指示書の箱とエディタで、カーソルの前の語の始まり（大文字小文字は問わない）に合う候補を、macOSの補完の一覧で出す。候補は指示書の言語（`AppModel.instructionLanguage(for:)`）の歳時記の語と、マクロの名（日本語は別名の1つ目、ほかは修飾名、Webの`pluginDisplayName`）。有効なプラグインの語だけ。
+- 一覧は作者が打った時だけ開き、選ぶまで文を変えない（初めは何も選ばない）。語を選んで入れた時・名前の追従・外から文を戻した時は開かない。読み取り専用・変換中・開いた範囲の数の中では出さない。
+- 語の始まりは、カーソルの前の空白・句読点・記号の無い並びのうち、候補の始まりに合う最も長いもの。英字の語の途中からは始めない（`.`と`_`は語の中に含める）。日本語は区切りが無いので、候補に合う最も長い末尾を取る。Webは曖昧な一致で並べるが、Swiftは始まりの一致だけ。
+- 確認：AppCheck `--ddl-box-only`（本物の歳時記とマクロで、日本語・英語・別名・修飾名が出ること、英字の語の途中・空白の後・開いた範囲では出ないこと）。
+
+## 2026-10-13 指示書の数の範囲を畳み、絵の上で確かめ、打ち直す
+
+作者の指示（Server Build 1190との差の取り込み、段C-2）。正本はWebの`composition-ranges.ts`・`codemirror-ranges.ts`・`DdlViewer.svelte`・`DdlRangePreview.svelte`。
+
+- 指示書の箱とエディタは、共有coreの範囲の表（`InkuCore.compositionRanges`、`inku.composition-ranges.v1`、32の範囲）と名前と数が一致する範囲の数（と古い［構図］の印）を、文を変えずに隠す（glyphを出さない）。名前には点線の下線。カーソルが範囲に入ると開き、その場で数を打ち直せる。数を直した後に範囲を離れると、名前が表の数に追従する（表に無い有効な数は「指定の範囲」、自分で書いた語は保つ）。名前を直したら追従しない。変換中は書き換えない。コピー・保存・描画は数を含む全文。
+- カーソルが入っている範囲、または名前に乗せている範囲の枠を、作品の絵の上（拡大・移動に従う）に出す。無効な数は最後の有効な枠を破線で保つ。無効な範囲があれば書き方の例の案内を出し、「指示書から描画」・確定・描くを押せない。日本語は「-」「－」、英語は`to`に加え`-`と`–`を範囲のつなぎに読む。
+- 範囲の読みはWebの`composition-ranges.ts`を写した（数は分母100万までの整数の分数）。
+- 確認：AppCheck `--composition-ranges-only`（Webの試験の例と、畳み・開き・枠・追従・最後の有効な枠、画面に出さない実際の編集欄で数だけが隠れること、40）。
+
+## 2026-10-13 指示書の箱で全文を編集し、「指示書エディタ」と「編集を破棄」を入れる
+
+作者の指示（Server Build 1190との差の取り込み、段C-1）。正本はWebの`DdlViewer.svelte`・`DdlEditorDialog.svelte`。
+
+- 作品の指示書の箱は、行番号の無い編集欄（語の色分けと補完の範囲の印はエディタと同じ）。表示中の作品ごとの下書きとして全文を直せ、打つだけでは描かず、「指示書から描画」で下書きを一度描く。描画中・保存していない作品・ゴミ箱では読み取り専用。表示する作品が変われば、その作品の指示書から始まる。
+- 箱のボタン・作品編集メニュー・作品のエディタの題は「指示書エディタ」。エディタは箱の下書きで開く。
+- 作品画面の歳時記で選んだ語は、箱が編集できるとき箱のカーソル位置へ、箱をまだ触っていなければ末尾へ入る。そうでなければ見本だけ。
+- 「編集を破棄」を箱と作品のエディタに置く。確認の後、作品を描いたときの指示書へ全文を戻す（1回の取り消し単位）。同じ文・読み取り専用・描画中は押せず、新規のDDLのエディタには出さない。エディタで戻しても箱の下書きは変わらない。
+- 確認：AppCheck `--ddl-box-only`。
+
+## 2026-10-13 構図の選び直し（原理に沿う／偶然に委ねる）と「配置を変える」の移動
+
+作者の指示（Server Build 1190との差の取り込み、段B）。正本はServerの`_recompose`・`compose`とWebの`recomposition.ts`・`RefinementAdjustView.svelte`・`WorkActionMenu.svelte`。
+
+- 「配置を変える」は作品編集メニューの「描画パラメータの編集」の次の項目で、配置だけの画面を開く。描画パラメータの編集は「読み取りを変える」「言葉でタッチを変える」の2つ。配置の画面は「原理に沿う」（既定）か「偶然に委ねる」を選ぶ。
+- 候補ごとに新しい構図の種を引き、共有coreの`recompose`（その候補の設定、保存した指示書、選び方、種、作品のIDは`sha256:`と指示書のSHA-256）で、数で書いた範囲を選び直す。指示書が変わった候補は、選び直した指示書を保存した作品の子として直接のDDLで描く（補完の範囲の控えは渡す）。変わらない候補は保存した指示書の文書のまま描く。読めない答え・呼べないときは範囲を保つ（Serverと同じ理由の値）。継ぎ目の句のある指示書はcoreの`recompose`が組み直す。
+- 候補の札には動いた層と範囲（`層: 前 → 後`、層は1から）を出し、動かせないときは理由と「構図の範囲を保って描き直しました。」を出す。採用した子の系譜の辺の付記に`composition_seed`と`recompose_mode`を残す。AIプロセスの配置も「原理に沿う」で選び直す。
+- 確認：AppCheck `--recompose-only`（本物のcore）、`--refinement-only`。
+
+## 2026-10-13 補完が書いた範囲の控えと3つの状態
+
+作者の指示（Server Build 1190との差の取り込み、段D2）。正本はCHANGELOG「2026-10-11 — 補完が書いた範囲の控えと3つの状態（A3）」とServer・Webの`70d47cab`。
+
+- 承認した補完が書いた数の範囲の控え（共有coreの`completion_ranges`、`inku.completion-ranges.v1`）を、作品を保存するときに作品の文脈へ残す。保存した作品から直接のDDLを描くとき（指示書を直して描き直す、保存した指示書のまま条件を変えて描く）は、その控えを共有coreへ渡す。言葉を直した範囲は補完へ回り、数を書き直した案の承認を求める。
+- 指示書の編集欄と本文の欄は、共有coreの`completion_range_states`で範囲ごとに「補完」「数を直した」「言葉を直した」を求め、状態ごとの色の点線の下線で示し、欄の下に状態の名前と数を出す。言葉を直した範囲があれば「言葉を直した範囲が n つあります。描くと補完がその範囲の数を書き直し、承認を求めます。」を出す。求めるのは文が変わって0.18秒後で、文が変われば消す。表示中の作品が今の実行のものなら実行の控え、そうでなければ保存した作品の控えを読む。Webは範囲の終わりに札を挟むが、Swiftの編集欄は文を変えずに札を挟めないので、色と下の一覧で示す。
+- 確認：AppCheck `--completion-ranges-only`（本物のcoreで、補完の承認から保存、3つの状態、作品を選び直した後に言葉を直して描くと補完が求められる）。
+
+## 2026-10-13 補えなかった箇所の原文と理由、問い直し中を表示する
+
+作者の指示（Server Build 1190との差の取り込み、段D1）。正本はWebの`holeCompletionIssues`・`PipelineStatus.svelte`・`providerAttemptText`。
+
+- 補完が止まったとき（段が`needs_user_edit`か`failed`で、理由が`hole_completion_failed`か`hole_completion_context_limit`）と、変更案の承認を待つときに、指示書の補完の画面へ「補えなかった箇所」を出す。共有coreの`hole_completion_check`のうち断られた（`rejected`）・解けなかった（`unresolved`）穴ごとに、作者の原文と平易な理由を出し、通った穴は出さない。理由の文はWebと同じ（文脈が長すぎた場合も含む）で、知らない理由は「検査で断られた（符号）」と出す。
+- 案が検査で断られた後の試行（試行の報告の`asked_again`）は「断られた案を理由を添えて問い直し中 n/m」と出し、通信の再試行と分ける。
+- 確認：InkuHostの`HoleCompletionIssueTests`（出す条件と出す穴）、AppCheck `--completion-issues-only`（理由の文と`asked_again`）。
+
+## 2026-10-13 前回のバッチのエラー作品だけを再描画する
+
+作者の指示（Server Build 1190との差の取り込み、段F）。正本はWebの`BatchState.retryFailed`と`BatchPanel.svelte`。
+
+- バッチが止まっていて失敗の行が残っていれば、結果の数の下に「エラー作品を再描画」を出す。押すと、失敗の行だけを、元の本文・行番号と開始時に固定した要求（描画条件・モデル）のまま描き直す。描き直しの中でも再試行の回数の設定は効く。待ち・要確認・省略・成功の行には触れない。成功した行は失敗・要確認の一覧から外れ、残った失敗はまた試せる。
+- 確認：AppCheck `--automation-only`（成功1・失敗1・待ち1の記録で、送るのは失敗の行だけ、開始時のモデル、待ちの行は待ちのまま）。この確かめは「登録したモデルだけで描く」の後に材料がモデルを登録しておらず落ちていたので、モデルを登録した。
+
+## 2026-10-13 Claudeの思考の出力枠と、上限で切れた応答の記録をServerに揃える
+
+作者の指示（Server Build 1190との差の取り込み、段A）。正本はServerの`anthropic_request.py`・`gemini_request.py`・`openai_request.py`・`pipeline_provider.py`・`vision_client.py`。
+
+- Claude 5（opus・sonnet・haiku・fable・mythosの5）とMythos Previewは、描画・Vision・デモのどれでも`max_tokens`へ8,192を足す（`ProviderOutputLimit.anthropicMaxTokens`）。Claude 4系は足さない。
+- 描画で上限に当たって切れた応答（Claudeの`stop_reason: max_tokens`、Geminiの`finishReason: MAX_TOKENS`、OpenAI互換の`finish_reason: length`、Responsesの`incomplete`／`max_output_tokens`）は、どの社でも答えにせず`malformed_payload`で拒む（Geminiは前は`provider_output_limit`でprovider_rejectedに分かれていた）。
+- 切れた応答は、システムログ（subsystem `app.inku`、category `provider`）にServerと同じ1行`provider_output_limit {…}`を残す。JSONは鍵を名前の順に詰めて書き、`action`・`provider`・`model`・送った本文の上限`max_tokens`と、社ごとの項目（出力・思考／推論のトークン数、本文・関数呼び出しの有無など、無い値は`null`）を持つ。本文・推論文は含めない。Visionは切れた応答をそのまま返し、同じ行（`action: vision`）を残す。デモは残さない。この節より前の節の書き方（`unknown`、Geminiの`provider_output_limit`）はこれに改めた。
+- 有料プラン限定の確かめ（Ollama Cloudの1トークンの要求）は、402も403も有料プラン限定と読む。
+- 見送り：ChatGPTプランのストリームのerrorイベントの`param`は残さない。Swiftはこの値を画面にも記録にも出さない。
+- 確認：InkuHostの`ProviderOutputLimitTests`（Claudeの出力枠、Claudeの切れた応答の拒否、4つの記録の項目と記録の行）、`ProviderModelCatalogChecks`（402）、`GeminiThinkingLevelTests`ほか。
+
 ## 2026-10-13 OpenAI APIの描画をResponsesへ移し、推論設定をServerに揃える
 
 OpenAI互換の接続先ホストが`api.openai.com`のときだけ、Serverの[`openai_request.py`](../server/src/inku_server/openai_request.py)と同じ要求・応答処理を使う。公式仕様は[推論モデル](https://developers.openai.com/api/docs/guides/reasoning)と[GPT-6案内](https://developers.openai.com/api/docs/guides/latest-model)を参照する。
@@ -244,7 +325,7 @@ Serverの追加変更に合わせ、描画capability matrixの再導出をshape�
 
 新作品の送信prompt、compile delivery、render metadata、diagnostics、eventsを保存effectのACKへimmutableなpresentationとして入れる。作品の再選択はその作品のACKを読み、同じexecutionに後から保存したchildの情報や現在の設定で置き換えない。空配列は当該段を送っていない新記録、欠落は旧記録の未記録として区別する。構図・写生・自動配色のprivate requestをStage 1／穴補完のauthor向けpromptへ混ぜない。保存前の取消しを確認し、commit後の取消し通知で保存済み作品とACKを消さない。
 
-生成情報は開いた保存作品を固定し、「詳細」「プロンプト」「Score (JSON)」のtabで読む。詳細は写生、両段のmodel／言語、seed、色の対応、canvas、SVGのbyte／object／point数、hash、版、由来、batch ID／元行、保存comment、日時／時間と実usageを表示する。送信記録の欠落と空配列、読込中と取得失敗を区別し、promptの開閉・コピーとScoreの行番号・コピーを提供する。読込みやtab変更で制作の選択、現在設定、provider送信を変えない。
+生成情報は開いた保存作品を固定し、「詳細」「プロンプト」「Score (JSON)」のtabで読む。詳細は写生、両段のmodel／言語、seed、色の対応、canvas、SVGのbyte／object／point数、hash、版、由来、batch ID／元行、保存comment、日時／時間と実usageを表示する。送信記録の欠落と空配列、読込中と取得失敗を区別し、promptの開閉・コピーとScoreの行番号・コピーを提供する。プロンプトのtabは、写生（Stage 0.5）、Stage 1、構図の読み、Stage 2を処理の順に出し、写生と構図の読みは送った入力も出す（2026-10-13 作者の指示、SPEC §12.7.1）。保存作品は各段の最後の送信と記録した段の一覧を持ち、一覧にある段でmodelを呼ばなかったものは「呼んでいません」、一覧に無い段（それより前に保存した作品の写生と構図の読み）は記録なしと示す。色カタログの選択は出さない。読込みやtab変更で制作の選択、現在設定、provider送信を変えない。
 
 新規requestのoptional `GenerationProvenance` はDDL／DDL engine、native Bundle build、参照資料build、UI言語とbatch ID／行番号をsave ACKへ保持する。旧作品の欠落を現在値で補わず、再演は元のprovenanceを保つ。Stage 1 promptの基底digestはnativeでは未記録として示す。意味が異なる `base_source_digest` を代用しない。usageの部分記録から完全な総tokenを作らない。この生成情報UIの最終追加はsource実装であり、以下の途中の型検査や過去画面確認を最終build／実画面受入と読み替えない。
 

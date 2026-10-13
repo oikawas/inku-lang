@@ -14,6 +14,87 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-13 Copy the Web text again from Build 1190
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage G).
+
+- `ui-reference.json` was regenerated with `export-web-reference.mjs --source-root` from main `d5659751` (Web/Server v2.15.114, Build 1190). "About Inku" names Server v2.15.114 (Build 1190).
+- Swift names 206 Web text keys literally, and all are in the copy in Japanese and English. Since 1162, the text changed for two ChatGPT plan guides and the "Change the layout" tooltip.
+- Stage E (the model settings display: use badges, three-step recommendation, estimated cost, mean seconds, uses with no measured response, the fold for models that cannot be published, and shared ChatGPT plan ratings) was deferred by the author. Although the corresponding Server is Build 1190, Swift lacks these. Their values are not in the Server code defaults, only in the Server's saved settings.
+- The Web-identical text added to `Localizable.strings` in stages A to C stays in use.
+- Checks: the copy's version (1190, v2.15.114, `d5659751`), the presence of the named keys, AppCheck `--tooltips-leftovers-only`.
+
+## 2026-10-13 Complete saijiki words and macro names in the instructions
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage C-3). The source is `ddlCompletions` in Web `features/ddl-editor/codemirror.ts`.
+
+- The instruction box and the editor list, in the macOS completion list, the candidates that start with the word before the caret (ignoring case). The candidates are the saijiki words of the instruction language (`AppModel.instructionLanguage(for:)`) and the macro names (the first alias for Japanese, the qualified name otherwise, as Web `pluginDisplayName`), for enabled plugins only.
+- The list opens only as the author types, and changes nothing until an item is picked (none is chosen at first). Inserting a chosen word, a followed name or text restored from outside opens nothing. Nothing is offered while read-only, composing, or inside an open range's numbers.
+- The word is the longest run before the caret, with no space, punctuation or symbol, that starts some candidate; it never starts inside a Latin word (`.` and `_` belong to the word). Japanese has no word breaks, so the longest matching tail is taken. The Web ranks by fuzzy match; Swift matches word starts only.
+- Checks: AppCheck `--ddl-box-only` (with the real saijiki and macros: Japanese, English, alias and qualified names are offered; nothing inside a Latin word, after a space or in an open range).
+
+## 2026-10-13 Fold numeric ranges in the instructions, frame them over the work and retype them
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage C-2). The sources are Web `composition-ranges.ts`, `codemirror-ranges.ts`, `DdlViewer.svelte` and `DdlRangePreview.svelte`.
+
+- The instruction box and the editor hide, without changing the text (no glyphs), the numbers of each range whose name and numbers match the shared core's table (`InkuCore.compositionRanges`, `inku.composition-ranges.v1`, 32 ranges), and an old [composition] mark. The name gets a dotted underline. The range opens when the caret enters it, and its numbers can be retyped in place. Leaving a range after editing its numbers makes the name follow the table (a valid number outside the table becomes "chosen place"; the author's own words stay). Editing the name stops the follow. Nothing is rewritten while the IME composes. Copying, saving and drawing use the whole text with its numbers.
+- The frame of the range under the caret, or of the name under the pointer, is drawn over the work (following zoom and pan). An invalid number keeps the last valid frame, dashed. While a range is invalid, a hint with examples appears and "Draw from instructions", confirm and draw are disabled. Japanese reads "-" and "－", and English reads "-" and "–" besides `to`, as range joins.
+- The range reading copies Web `composition-ranges.ts` (numbers are integer fractions with denominators up to one million).
+- Checks: AppCheck `--composition-ranges-only` (the Web test examples, plus folding, opening, frame, follow, the last valid frame, and the real editor off screen folding exactly the numbers; 40).
+
+## 2026-10-13 Edit the whole text in the instruction box, the "Instruction editor" and "Discard edits"
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage C-1). The sources are Web `DdlViewer.svelte` and `DdlEditorDialog.svelte`.
+
+- The work's instruction box is an editor without line numbers (with the editor's token colours and completion range marks). The whole text can be edited as a draft for the displayed work; typing never draws, and "Draw from instructions" draws the draft once. It is read-only while drawing, for an unsaved work and in the trash. Displaying another work starts from that work's instructions.
+- The box's button, the work edit menu and the work editor's title read "Instruction editor". The editor opens on the box's draft.
+- A word chosen in the Creation view's Saijiki goes into the box at its caret when the box can be edited, or at its end if the box has not been used yet; otherwise only the sample shows.
+- "Discard edits" sits in the box and in the work editor. After confirmation it returns the whole text to the instructions the work was drawn from, as one undoable step. It is disabled for the same text, read-only text and while drawing, and absent from a new DDL's editor. Discarding in the editor leaves the box's draft as it is.
+- Checks: AppCheck `--ddl-box-only`.
+
+## 2026-10-13 Choose the composition again (by principle or by chance) and move "Change the layout"
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage B). The sources are Server `_recompose` and `compose` and Web `recomposition.ts`, `RefinementAdjustView.svelte` and `WorkActionMenu.svelte`.
+
+- "Change the layout" is an item of the work edit menu, after "Edit drawing parameters", and opens a layout-only dialog. "Edit drawing parameters" offers "Another reading" and "Change the touch with words". The layout dialog chooses "By principle" (default) or "By chance".
+- Each option draws a new composition seed and asks the shared core's `recompose` (with that option's configuration, the saved instructions, the mode, the seed, and the work ID `sha256:` plus the instructions' SHA-256) to choose the numeric ranges again. An option whose instructions changed is drawn as a direct DDL child of the saved work from the chosen instructions (passing the completion range record); an unchanged option draws the saved document as before. An unreadable answer or a failed call keeps the ranges (with Server's reason values). Instructions with joint phrases are recomposed by the core's `recompose`.
+- Each option's card lists the moved layers and ranges (`layer: before → after`, layers from 1), or the reason and "Redrawn with the same composition ranges." The adopted child's lineage edge records `composition_seed` and `recompose_mode`. The AI process's layout also recomposes by principle.
+- Checks: AppCheck `--recompose-only` (real core) and `--refinement-only`.
+
+## 2026-10-13 Completion range records and their three states
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage D2). The sources are CHANGELOG "2026-10-11 — Completion range records and three states (A3)" and Server/Web `70d47cab`.
+
+- The record of numeric ranges an approved completion wrote (the shared core's `completion_ranges`, `inku.completion-ranges.v1`) is kept with the work's context when it is saved. A direct DDL drawn from a saved work (editing its instructions, or drawing its saved instructions under other conditions) passes that record to the shared core. A range whose words were edited goes to the completion, which asks for approval of rewritten numbers.
+- The DDL editor and the DDL box ask the shared core's `completion_range_states` for each range's state (completion, numbers edited, words edited), mark each with a dotted underline in its state's colour, and name the states with counts below the text. When a range has edited words, "N ranges have edited words. Drawing asks the completion to rewrite their numbers and asks for your approval." appears. The states are asked 0.18 seconds after the text settles and vanish when it changes. They are read from the current execution when it is the displayed work's, otherwise from the saved work. The Web places a tag at each range's end; a native editor cannot place one without editing the text, so Swift uses the colours and the list below.
+- Checks: AppCheck `--completion-ranges-only` (with the real core: approving a completion and saving, the three states, and a renamed range drawn from the reopened work asks the completion again).
+
+## 2026-10-13 Show the author's text and the reason for gaps that could not be completed, and asking again
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage D1). The sources are Web `holeCompletionIssues`, `PipelineStatus.svelte` and `providerAttemptText`.
+
+- When completion stops (phase `needs_user_edit` or `failed` for `hole_completion_failed` or `hole_completion_context_limit`) and while a proposal awaits approval, the DDL completion view shows "Gaps that could not be completed". For each hole the shared core's `hole_completion_check` refused (`rejected`) or left `unresolved` it shows the author's text and a plain reason; holes that passed are not listed. The reasons are the Web's (including a context that was too long), and an unknown reason reads "Refused by the check (code)".
+- An attempt after the check refused a proposal (the attempt report's `asked_again`) reads "Asking again with the reasons the proposal was refused n/m", apart from a communication retry.
+- Checks: InkuHost `HoleCompletionIssueTests` (when issues show and which holes), AppCheck `--completion-issues-only` (reason texts and `asked_again`).
+
+## 2026-10-13 Retry only the failed works of the last batch
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage F). The sources are Web `BatchState.retryFailed` and `BatchPanel.svelte`.
+
+- When a batch has stopped with failed rows left, "Retry failed works" appears below the result counts. It draws only the failed rows again, with their original text and line numbers and the request pinned when the batch began (drawing conditions and models). The retry count setting still applies within it. Waiting, uncertain, skipped and successful rows are left as they are. A row that succeeds leaves the failed and uncertain list, and failures that remain can be retried again.
+- Checks: AppCheck `--automation-only` (with one success, one failure and one waiting row, only the failed row is sent, with the pinned model, and the waiting row stays waiting). This check had been failing since drawing began to take only registered models, because its fixture registered none; it now registers its models.
+
+## 2026-10-13 Match Server's Claude thinking budget and cut-off answer records
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage A). The sources are Server's `anthropic_request.py`, `gemini_request.py`, `openai_request.py`, `pipeline_provider.py` and `vision_client.py`.
+
+- Claude 5 (opus, sonnet, haiku, fable and mythos 5) and Mythos Preview receive 8,192 extra `max_tokens` for drawing, Vision and demo alike (`ProviderOutputLimit.anthropicMaxTokens`). Claude 4 models do not.
+- A drawing answer cut off at its output limit (Claude `stop_reason: max_tokens`, Gemini `finishReason: MAX_TOKENS`, OpenAI-compatible `finish_reason: length`, Responses `incomplete`/`max_output_tokens`) is never taken as the answer and is refused as `malformed_payload` for every provider (Gemini used to fail as `provider_output_limit`, classed as provider_rejected).
+- A cut-off answer leaves Server's one line `provider_output_limit {…}` in the system log (subsystem `app.inku`, category `provider`). The JSON has keys in name order with compact separators, and holds `action`, `provider`, `model`, the sent body's limit `max_tokens`, and each provider's fields (output and thinking or reasoning token counts, whether text or a function call is present; missing values are `null`). It holds no answer or reasoning text. Vision returns a cut-off answer as it is and leaves the same line (`action: vision`); the demo leaves none. This replaces what earlier sections said (`unknown`, Gemini's `provider_output_limit`).
+- The paid-plan check (Ollama Cloud's one-token request) reads both 402 and 403 as paid-plan only.
+- Not taken: the `param` of a ChatGPT plan stream `error` event is not kept. Swift shows it neither on screen nor in a record.
+- Checks: InkuHost `ProviderOutputLimitTests` (Claude budgets, refusing a cut-off Claude answer, the four records and the log line), `ProviderModelCatalogChecks` (402), `GeminiThinkingLevelTests` and others.
+
 ## 2026-10-13 Move OpenAI API drawing to Responses and match Server reasoning settings
 
 Only OpenAI-compatible connections whose host is `api.openai.com` use the request and response handling in Server's [`openai_request.py`](../server/src/inku_server/openai_request.py). See the official [reasoning model guide](https://developers.openai.com/api/docs/guides/reasoning) and [GPT-6 guide](https://developers.openai.com/api/docs/guides/latest-model).
@@ -244,7 +325,7 @@ Show thinking belongs to the model dialog's draft and local display preferences.
 
 New works keep prompts, compile delivery, render metadata, diagnostics, and events in an immutable presentation inside their save-effect ACK. Reopening reads that work's ACK rather than a later child's mutable execution state or current settings. An empty array records that a stage was not sent; missing data identifies an older unrecorded value. Private composition/sketch/automatic-catalog requests are not mixed into author-facing Stage 1/hole-completion prompts. Cancellation is checked before saving; a notification after commit does not remove the committed work or ACK.
 
-Generation information pins the saved work captured when opened and provides Details, Prompts, and Score (JSON) tabs. Details show sketch records, both stages’ models/languages, seeds, color mapping, canvas, SVG bytes/objects/points, hashes, versions, origin, batch ID/source line, saved comment, dates/timing, and actual usage. Missing sent records, empty arrays, loading, and failed reads remain distinct. Prompts expand/collapse and copy; Score has line numbers and copy. Reading or changing tabs changes neither Creation selection nor current settings and sends no provider request.
+Generation information pins the saved work captured when opened and provides Details, Prompts, and Score (JSON) tabs. Details show sketch records, both stages’ models/languages, seeds, color mapping, canvas, SVG bytes/objects/points, hashes, versions, origin, batch ID/source line, saved comment, dates/timing, and actual usage. Missing sent records, empty arrays, loading, and failed reads remain distinct. Prompts expand/collapse and copy; Score has line numbers and copy. The Prompts tab shows the sketch (Stage 0.5), Stage 1, the composition reading and Stage 2 in the order a work calls them, with the input the sketch and the composition reading were sent (author's instruction, 2026-10-13, SPEC §12.7.1). A saved work keeps the last send of each stage and the list of stages it recorded; a listed stage that called no model reads as not sent, and an unlisted one (the sketch and the reading of a work saved before then) as not recorded. The catalog choice is not shown. Reading or changing tabs changes neither Creation selection nor current settings and sends no provider request.
 
 Optional `GenerationProvenance` on new requests retains DDL/DDL-engine versions, native Bundle build, reference build, UI language, and batch ID/line in the save ACK. Older missing fields are not filled from current values; replay retains original provenance. The native app reports the Stage 1 prompt base digest as Not recorded rather than substituting the semantically different `base_source_digest`. Partial usage does not become an invented complete token total. This final generation-information UI addition is source implementation: interim typechecks and older screen checks do not establish its final build or runtime acceptance.
 

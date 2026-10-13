@@ -10,7 +10,8 @@ public enum RefinementKind: String, CaseIterable, Hashable, Sendable {
     case variation
     case touch = "touch_change"
 
-    public static var availableKinds: [Self] { [.layout, .reading, .touch] }
+    /// The parameters dialog (Web RefinementAdjustView): layout has its own dialog from the work menu.
+    public static var availableKinds: [Self] { [.reading, .touch] }
 
     public var titleKey: String {
         switch self {
@@ -37,6 +38,8 @@ public struct RefinementCandidate: Identifiable, Sendable {
     public let number: Int
     public var selected = false
     public var savedWork: SavedWork?
+    /// What a layout option moved, or why it kept the ranges.
+    public var recomposition: Recomposition?
     public var id: String { prepared.id }
     public var work: SavedWork { savedWork ?? prepared.work }
 }
@@ -78,9 +81,15 @@ public final class RefinementModel {
     @ObservationIgnored private var runID: UUID?
     @ObservationIgnored private var ownsAppOperation = false
 
-    public init(work: SavedWork) {
+    /// Web `layoutOnly`: the layout dialog always draws layout options, regardless of remembered parameters.
+    public let layoutOnly: Bool
+    public var recomposeMode = Recomposition.Mode.principled
+
+    public init(work: SavedWork, layoutOnly: Bool = false) {
         self.work = work
+        self.layoutOnly = layoutOnly
         wildOverride = work.renderWild ?? false
+        if layoutOnly { kind = .layout }
     }
 
     public var selectedCount: Int { candidates.filter { $0.selected && $0.savedWork == nil }.count }
@@ -91,11 +100,11 @@ public final class RefinementModel {
 
     public func canGenerate(count: Int) -> Bool {
         initialized && !running && !closed && !work.trashed && !hasUnsaved
-            && Self.isAvailable(kind) && [1, 4].contains(count) && !(kind == .reading && sourceIsLocked)
+            && isAvailable(kind) && [1, 4].contains(count) && !(kind == .reading && sourceIsLocked)
             && !(kind == .touch && (count != 1 || !hasTouchWords))
     }
 
-    private static func isAvailable(_ kind: RefinementKind) -> Bool { RefinementKind.availableKinds.contains(kind) }
+    private func isAvailable(_ kind: RefinementKind) -> Bool { layoutOnly ? kind == .layout : RefinementKind.availableKinds.contains(kind) }
 
     public func initialize(app: AppModel) async {
         guard !initialized, !initializing, !closed else { return }
@@ -148,6 +157,7 @@ public final class RefinementModel {
         let selectedKind = kind
         let selectedWords = words
         let selectedAmplitude = amplitude
+        let selectedMode = recomposeMode
         let selectedWild: Bool? = selectedKind == .touch || inheritWild ? nil : wildOverride
         let selectedModel: String? = [.layout, .reading].contains(selectedKind) && !modelReference.isEmpty ? modelReference : nil
         let run = UUID()
@@ -169,7 +179,7 @@ public final class RefinementModel {
                     try Task.checkCancellation()
                     let plans = try await app.makeDrawingAdjustmentPlans(work: self.work, kind: selectedKind.rawValue,
                         count: count, words: selectedWords, amplitude: selectedAmplitude,
-                        wildOverride: selectedWild, modelReference: selectedModel)
+                        wildOverride: selectedWild, modelReference: selectedModel, recomposeMode: selectedMode)
                     try Task.checkCancellation()
                     guard self.runID == run, !self.closed, !self.stopping else { throw CancellationError() }
                     guard plans.count == count else { throw HostError("invalid_adjustment_plan_count") }
@@ -184,7 +194,8 @@ public final class RefinementModel {
                             try Task.checkCancellation()
                             guard self.runID == run, !self.closed, !self.stopping else { throw CancellationError() }
                             // Options keep their requested order whichever lands first.
-                            self.candidates.append(RefinementCandidate(prepared: candidate, kind: selectedKind, number: index + 1))
+                            self.candidates.append(RefinementCandidate(prepared: candidate, kind: selectedKind, number: index + 1,
+                                                                       recomposition: plans[index].recomposition))
                             self.candidates.sort { $0.number < $1.number }
                             self.slots[index].state = .ready
                         } catch {

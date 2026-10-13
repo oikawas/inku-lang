@@ -78,17 +78,17 @@ final class ProviderModelCatalogChecks: XCTestCase, @unchecked Sendable {
     }
 
     // Failure (D8): Ollama Cloud models the plan cannot call stay selectable; Server asks /api/show (410) and a
-    // one-token chat (403) two at a time.
+    // one-token chat (402 outside the Free plan, 403 not reachable yet) two at a time.
     func testOllamaCloudAccessProbe() async {
         let cloud = ProviderSettings(id: "ollama-cloud", baseURL: URL(string: "https://ollama.com/v1")!, requiresAPIKey: true)
-        let answers = await ProviderModelCatalog.probeAccess(provider: cloud, key: "k", modelIDs: ["old", "paid", "free", "busy"], today: "2026-10-05") { request in
+        let answers = await ProviderModelCatalog.probeAccess(provider: cloud, key: "k", modelIDs: ["old", "paid", "plan", "free", "busy"], today: "2026-10-05") { request in
             let body = (try? ExactJSON(data: request.httpBody ?? Data())) ?? .null
             let model = body["model"].string ?? ""
             if request.url!.path == "/api/show" { return model == "old" ? (410, "model retired at 2026-09-28") : (200, "") }
             XCTAssertEqual(request.url!.absoluteString, "https://ollama.com/v1/chat/completions")
-            return model == "paid" ? (403, "") : model == "free" ? (200, "") : (nil, "")
+            return model == "paid" ? (403, "") : model == "plan" ? (402, "") : model == "free" ? (200, "") : (nil, "")
         }
-        XCTAssertEqual(answers, ["old": .retired("2026-09-28"), "paid": .subscription(true), "free": .subscription(false)])
+        XCTAssertEqual(answers, ["old": .retired("2026-09-28"), "paid": .subscription(true), "plan": .subscription(true), "free": .subscription(false)])
         let other = ProviderSettings(id: "ollama", baseURL: URL(string: "http://localhost:11434/v1")!, requiresAPIKey: false)
         let skipped = await ProviderModelCatalog.probeAccess(provider: other, key: nil, modelIDs: ["x"], today: "2026-10-05") { _ in (403, "") }
         XCTAssertTrue(skipped.isEmpty)

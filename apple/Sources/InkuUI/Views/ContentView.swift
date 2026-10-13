@@ -31,6 +31,7 @@ private struct WorkEditSession {
 private struct RefinementSession {
     let id = UUID()
     let work: SavedWork
+    var layoutOnly = false
 }
 
 private struct ReplaySession {
@@ -219,7 +220,7 @@ public struct ContentView: View {
                 .disabled(!canNavigateSections && !ui.settingsOpen)
             CreationView(model: model, history: history, automation: automation, maintenance: maintenance, ui: ui,
                          batchWorkspace: $batchWorkspace, inlinePanel: inlineRefinement,
-                         onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay,
+                         onEditWork: openWorkEdit, onAdjustWork: { openRefinement($0) }, onReplayWork: openReplay,
                          onWorkAction: openWorkAction, onLineageExport: openLineageExport,
                          onPresentWork: { Task { await preparePresentation() } },
                          onWorkspaceWorkChange: { work in
@@ -237,7 +238,7 @@ public struct ContentView: View {
 
     /// Web HistoryManager.svelte:1311 covers the window (`position: fixed; inset: 0`).
     private var libraryOverlay: some View {
-        LibraryView(model: model, preview: libraryPreview, onEditWork: openWorkEdit, onAdjustWork: openRefinement,
+        LibraryView(model: model, preview: libraryPreview, onEditWork: openWorkEdit, onAdjustWork: { openRefinement($0) },
                     onReplayWork: openReplay, onWorkAction: openWorkAction,
                     writingLocked: model.isBusy || automation.isOccupied, onClose: closeLibrary)
             .disabled(importing)
@@ -299,7 +300,7 @@ public struct ContentView: View {
             RefinementView(model: model, work: session.work, onCommitted: { closeLibrary() }, onConfigureModels: { destination in
                 dialog = nil
                 openSettings(SettingsSection(rawValue: destination) ?? .models)
-            }, onClose: { dialog = nil })
+            }, onClose: { dialog = nil }, layoutOnly: session.layoutOnly)
                 .id(session.id)
                 .environment(model.display)
         )
@@ -494,13 +495,13 @@ public struct ContentView: View {
         dialog = .edit(WorkEditSession(work: work, mode: mode))
     }
 
-    private func openRefinement(_ work: SavedWork) {
+    private func openRefinement(_ work: SavedWork, layoutOnly: Bool = false) {
         guard canUseWork, !work.trashed else { return }
         // The refine workspace replaces the canvas, so the library and settings step aside.
         ui.libraryOpen = false
         ui.settingsOpen = false
         ui.generationInfoOpen = false
-        dialog = .refinement(RefinementSession(work: work))
+        dialog = .refinement(RefinementSession(work: work, layoutOnly: layoutOnly))
     }
 
     private func openReplay(_ work: SavedWork) {
@@ -520,15 +521,19 @@ public struct ContentView: View {
         case "copy-hash": model.library.copyHash(work.renderHash)
         case "export-card": dialog = .export(ExportSession(works: [work], preserveOrder: false, directCard: true))
         case "draw-ddl":
-            guard let source = work.ddl, DDLSource.hasBody(source) else { return }
+            // Web DdlViewer: the box's draft is what is drawn, once.
+            let source = model.ddlBoxText(for: work)
+            guard DDLSource.hasBody(source) else { return }
             Task { await model.drawEditedDDL(work: work, source: source) }
-        case "ddl": dialog = .ddl(DdlEditingSession(work: work))
+        // The editor opens on the box's draft; its discard returns to the work's saved instructions.
+        case "ddl": dialog = .ddl(DdlEditingSession(work: work, draft: model.ddlBoxText(for: work)))
         case "color": dialog = .comparison(ComparisonSession(work: work, kind: .catalog))
         case "model": dialog = .comparison(ComparisonSession(work: work, kind: .model))
         case "ai": dialog = .advice(RefinementSession(work: work))
         case "colophon": dialog = .colophon(RefinementSession(work: work))
         case "export": dialog = .export(ExportSession(works: [work], preserveOrder: false))
         case "parameters": openRefinement(work)
+        case "layout": openRefinement(work, layoutOnly: true)
         case "description": openWorkEdit(work, .description)
         case "sketch": openWorkEdit(work, .sketch)
         case "create":

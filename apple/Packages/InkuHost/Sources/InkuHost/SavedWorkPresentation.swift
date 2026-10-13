@@ -5,6 +5,8 @@ import InkuCore
 /// reconstructed from the latest execution or the current prompt edition.
 public struct SavedWorkPresentation: Sendable {
     public let promptJSON: Data?
+    /// The prompt-tab stages this work kept; a kept stage without a prompt called no model.
+    public let promptStages: [String]
     public let deliveryJSON: Data?
     public let renderedJSON: Data?
     public let diagnosticsJSON: Data?
@@ -14,7 +16,7 @@ public struct SavedWorkPresentation: Sendable {
     init(context: ExactJSON) throws {
         let record = context["presentation"]
         guard record != .null else {
-            promptJSON = nil; deliveryJSON = nil; renderedJSON = nil
+            promptJSON = nil; promptStages = []; deliveryJSON = nil; renderedJSON = nil
             diagnosticsJSON = nil; eventsJSON = nil
             provenance = nil
             return
@@ -26,6 +28,7 @@ public struct SavedWorkPresentation: Sendable {
               record["diagnostics"].object != nil, record["events"].array != nil,
               record.object != nil else { throw HostError("saved_presentation_invalid") }
         promptJSON = record["prompts"] == .null ? nil : record["prompts"].data
+        promptStages = record["prompt_stages"].array?.compactMap(\.string) ?? SavedPresentation.earlierPromptStages
         deliveryJSON = record["delivery"] == .null ? nil : record["delivery"].data
         renderedJSON = record["rendered"].data
         diagnosticsJSON = record["diagnostics"].data
@@ -35,6 +38,13 @@ public struct SavedWorkPresentation: Sendable {
 }
 
 enum SavedPresentation {
+    /// Server `_SYSTEM_PROMPT_STAGES`: the actions the prompt tab shows, in the order a work calls them.
+    /// The catalog choice is not shown.
+    static let promptStages = [("generate_sketch", "sketch"), ("generate_normalized_ddl", "stage1"),
+                               ("read_composition", "composition"), ("complete_visible_ddl_holes", "stage2")]
+    /// A work saved before 2026-10-13 kept Stage 1 and Stage 2 only.
+    static let earlierPromptStages = ["stage1", "stage2"]
+
     static func replay(context: ExactJSON, rendered: ExactJSON) throws -> ExactJSON {
         _ = try SavedWorkPresentation(context: context)
         var record = context["presentation"]
@@ -65,9 +75,7 @@ enum SavedPresentation {
                         provenance: GenerationProvenance? = nil) throws -> ExactJSON {
         let records = try prompts.map { try ExactJSON(data: $0).array ?? [] } ?? []
         // Server records only the last actually requested prompt of each stage.
-        let latest = ["generate_normalized_ddl", "complete_visible_ddl_holes"].compactMap { tag in
-            records.last { $0["action"].string == tag }
-        }
+        let latest = promptStages.compactMap { tag, _ in records.last { $0["action"].string == tag } }
         let metadata = rendered["metadata"]
         var diagnostics: ExactJSON = .object([
             "upstream_diagnostics": delivery["upstream_diagnostics"],
@@ -88,7 +96,7 @@ enum SavedPresentation {
             "disabled": .array(disabledPluginNames.map(ExactJSON.string))])
         diagnostics["plugin_diagnostics"] = try ExactJSON(data: InkuCore.explainPluginDiagnostics(pluginInput.data))
         return .object(["schema": .string("inku.swift-saved-presentation.v1"),
-            "prompts": .array(latest), "delivery": delivery,
+            "prompts": .array(latest), "prompt_stages": .array(promptStages.map { .string($0.1) }), "delivery": delivery,
             // The work owns its saved SVG; presentation keeps render diagnostics only.
             "rendered": .object(["metadata": metadata]), "diagnostics": diagnostics,
             "events": try ExactJSON(data: events),

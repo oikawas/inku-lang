@@ -34,6 +34,8 @@ public struct DrawingAdjustmentPlan: Sendable {
     public let stage2Model: String?
     fileprivate let parent: SavedWork
     fileprivate let operation: Operation
+    /// The ranges a layout option chose again (Server `recomposition`); nil for other adjustments.
+    public var recomposition: Recomposition?
     fileprivate enum Operation: Sendable {
         case replay(SavedScoreReplayPlan)
         case author(GenerationRequest)
@@ -110,6 +112,22 @@ public final class AppModel {
     public private(set) var holeIDs: [String] = []
     public private(set) var patchProposalJSON = ""
     public private(set) var patchCandidate = ""
+    public private(set) var completionIssues: [HoleCompletionIssue] = []
+    /// Web DdlViewer: the displayed work's instructions as the author is editing them in the box. Typing never
+    /// draws; "Draw from instructions" draws this text once. Another work starts from its own instructions.
+    public private(set) var ddlBoxDraftWorkID: String?
+    public private(set) var ddlBoxDraft = ""
+    /// A word or a discard waiting for the box editor.
+    var ddlBoxInsertion: InkuEditorInsertion?
+    /// The numeric range an instruction editor's caret or pointer is on, framed over the displayed work.
+    public var rangePreview: CompositionRanges.Preview?
+    /// The box holds an invalid range or an IME composition, so drawing from it waits.
+    public var ddlBoxRangeBlocked = false
+    public func ddlBoxText(for work: SavedWork) -> String { ddlBoxDraftWorkID == work.id ? ddlBoxDraft : work.ddl ?? "" }
+    public func setDdlBoxText(_ text: String, for work: SavedWork) {
+        guard ddlBoxDraftWorkID == work.id || text != (work.ddl ?? "") else { return }
+        ddlBoxDraftWorkID = work.id; ddlBoxDraft = text
+    }
     public private(set) var unreadOutputs: Set<String> = []
     private var workActionStates: [String: SavedWorkActionState] = [:]
     public let library = LibraryModel()
@@ -146,8 +164,15 @@ public final class AppModel {
     @ObservationIgnored private var activeOperation: Task<Void, Never>?
     @ObservationIgnored private var stopping = false
     @ObservationIgnored private var initialized = false
-    @ObservationIgnored private var selectedContext: SavedAuthoringContext?
-    @ObservationIgnored private var currentView: PipelineView?
+    @ObservationIgnored private var selectedContext: SavedAuthoringContext? { didSet { refreshCompletionRecordKey() } }
+    @ObservationIgnored private var currentView: PipelineView? { didSet { refreshCompletionRecordKey() } }
+    /// Changes whenever the record `completionRangeStates` reads may have changed, so views ask again.
+    public private(set) var completionRecordKey = ""
+    private func refreshCompletionRecordKey() {
+        let key = [currentView?.executionID ?? "", String(currentView?.completionRangesJSON?.hashValue ?? 0),
+                   selectedWorkID ?? "", String(selectedContext?.completionRanges?.hashValue ?? 0)].joined(separator: "|")
+        if key != completionRecordKey { completionRecordKey = key }
+    }
     @ObservationIgnored private var importedDDL: DDLPackageImport?
     @ObservationIgnored private var providerModelsByExecution: [String: ModelSelection] = [:]
     /// Set once the saved next-work conditions have been read, so the defaults never overwrite them.
@@ -370,6 +395,7 @@ public final class AppModel {
         selectedHoleIDs = []
         patchProposalJSON = ""
         patchCandidate = ""
+        completionIssues = []
         diagnosticsJSON = ""
         promptJSON = ""
         promptAvailability = .loading
@@ -411,6 +437,8 @@ public final class AppModel {
         let selectionToken = displayToken
         importedDDL = nil; importedMacroNames = []
         previewWork = nil
+        // The box draft belongs to the work it was typed for.
+        if ddlBoxDraftWorkID != work.id { ddlBoxDraftWorkID = nil; ddlBoxDraft = "" }
         selectedWorkID = work.id
         selectedWork = work
         // Web `adoptSketch`: another work on screen brings its own prose; an edit belongs to the work it was made on.
@@ -774,6 +802,16 @@ public final class AppModel {
         status = "DDLを読み込みました。生成して保存できます。"
     }
 
+    /// Web `CompletionRangeStatesQuery`: the displayed work's own execution when it is current, else its saved record.
+    public func completionRangeStates(source: String) -> [CompletionRangeState] {
+        guard let work = displayedWork else { return [] }
+        if let view = currentView, view.savedWorkID == work.id {
+            return CompletionRangeState.states(configuration: view.configurationJSON, source: source, record: view.completionRangesJSON)
+        }
+        guard let context = selectedContext, selectedWorkID == work.id else { return [] }
+        return CompletionRangeState.states(configuration: context.configuration, source: source, record: context.completionRanges)
+    }
+
     public func requestForCurrentInput(inputMode: String? = nil, source: String? = nil, description: String? = nil,
                                       parentWorkID: String? = nil, derivationKind: String = "new",
                                       catalogModeOverride: String? = nil, sketchOverride: SketchRequest? = nil,
@@ -801,6 +839,8 @@ public final class AppModel {
             sketch: sketch, savedConfiguration: savedConfig,
             importedPlugins: mode == "ddl" && parentWorkID == nil ? importedDDL?.plugins ?? [] : [])
         request.captureProviderIO = developerModeEnabled && display.preferences.captureProviderIO == true
+        // Server `start`: a direct DDL drawn from the selected saved work carries its completion range record.
+        if mode == "ddl", parentWorkID != nil, parentWorkID == selectedWorkID { request.completionRanges = selectedContext?.completionRanges }
         return request
     }
 
@@ -863,6 +903,7 @@ public final class AppModel {
                 renderOptions: options.data, clipPolicy: saved.clipPolicy, models: models, providers: settings.providers,
                 renderColorMaps: [catalog: options["resolved_color_map"].data], description: work.effectiveSourceText,
                 parentWorkID: work.id, derivationKind: "ddl_edit")
+            request.completionRanges = saved.completionRanges
             request = try await pinPersonalPlanRequests([request])[0]
             return await runAutomation(request: request) != nil
         } catch { report(error); return false }
@@ -905,7 +946,8 @@ public final class AppModel {
     /// Allocate the entire round before any drawing, keeping saved colors, locks, policies and source authority.
     public func makeDrawingAdjustmentPlans(work: SavedWork, kind: String, count: Int, words: String = "",
                                            amplitude: String = "medium", wildOverride: Bool? = nil,
-                                           modelReference: String? = nil) async throws -> [DrawingAdjustmentPlan] {
+                                           modelReference: String? = nil,
+                                           recomposeMode: Recomposition.Mode = .principled) async throws -> [DrawingAdjustmentPlan] {
         guard !isPreview, !stopping, let host else { throw HostError("authoring_busy_or_unavailable") }
         guard ["layout_change", "reinterpretation", "variation", "touch_change"].contains(kind) else { throw HostError("unknown_refinement_kind") }
         guard [1, 4].contains(count), kind != "touch_change" || count == 1 else { throw HostError("invalid_adjustment_count") }
@@ -971,6 +1013,7 @@ public final class AppModel {
         }
         var usedSeeds = Set([source.compositionSeed].compactMap { $0 }.compactMap(UInt64.init))
         var requests: [GenerationRequest] = []
+        var recompositions: [Recomposition?] = []
         for _ in 0..<count {
             var configuration = baseConfiguration
             var options = baseOptions
@@ -980,31 +1023,43 @@ public final class AppModel {
             options["svg_profile"] = .string("display")
             var metadata: ExactJSON = .object([:])
             var interpretation: String?
+            var recomposition: Recomposition?
             if kind == "layout_change" {
                 var seed: UInt64
                 repeat { seed = UInt64.random(in: 0...((UInt64(1) << 53) - 1)) } while usedSeeds.contains(seed)
                 usedSeeds.insert(seed)
                 configuration["compiler"]["composition_seed"] = .string(String(seed))
                 options["composition_seed"] = .string(String(seed))
-                metadata = .object(["composition_seed": .number(String(seed))])
+                // Server compose: the numeric ranges are chosen again with this option's exact configuration.
+                recomposition = Recomposition.choose(configuration: configuration, source: ddl, mode: recomposeMode, seed: String(seed))
+                metadata = .object(["composition_seed": .number(String(seed)), "recompose_mode": .string(recomposeMode.rawValue)])
             } else {
                 interpretation = UUID().uuidString.lowercased()
                 metadata = .object(["interpretation_seed": .string(interpretation!)])
             }
+            // A recomposed option is a new direct DDL from the saved work; unchanged ranges keep its document.
+            let chosen = recomposition?.source
             let authoring: GenerationAuthoring = reading
                 ? .description(description, autoCatalog: false, sketch: source.sketchText.map(SketchRequest.supplied) ?? .off)
-                : .directDDL(ddl)
+                : .directDDL(chosen ?? ddl)
+            let retains = !reading && chosen == nil
             requests.append(GenerationRequest(authoring: authoring, configuration: configuration.data, renderOptions: options.data,
                 clipPolicy: saved.clipPolicy, models: models, providers: drawing.providers,
                 renderColorMaps: [catalog: baseOptions["resolved_color_map"].data], description: description,
                 parentWorkID: source.id, derivationKind: kind, saveHistory: false,
-                retainedDocument: reading ? nil : document, retainedAuthority: reading ? nil : saved.authorityJSON,
+                retainedDocument: retains ? document : nil, retainedAuthority: retains ? saved.authorityJSON : nil,
                 derivationMetadata: metadata.data, interpretationSeed: interpretation))
+            recompositions.append(recomposition)
+            // A redraw of the saved DDL keeps the parent's completion range record (Server fork).
+            if !reading { requests[requests.count - 1].completionRanges = saved.completionRanges }
         }
         requests = try await pinPersonalPlanRequests(requests)
         try Task.checkCancellation()
-        return requests.map { request in DrawingAdjustmentPlan(stage1Model: reading ? request.models.stage1Model : source.stage1Model,
-            stage2Model: request.models.stage2Model.isEmpty ? nil : request.models.stage2Model, parent: source, operation: .author(request)) }
+        return zip(requests, recompositions).map { request, recomposition in
+            DrawingAdjustmentPlan(stage1Model: reading ? request.models.stage1Model : source.stage1Model,
+                stage2Model: request.models.stage2Model.isEmpty ? nil : request.models.stage2Model, parent: source, operation: .author(request),
+                recomposition: recomposition)
+        }
     }
 
     public func prepareDrawingAdjustmentCandidate(plan: DrawingAdjustmentPlan, token: UUID) async throws -> PreparedCandidate {
@@ -1042,7 +1097,7 @@ public final class AppModel {
             authoringAuthority = context.authority; authoringOrigin = context.origin; authoringRevision = context.revision
             authoringPhase = "completed"
             currentExecutionID = nil; currentView = nil
-            holeIDs = []; selectedHoleIDs = []; patchProposalJSON = ""; patchCandidate = ""
+            holeIDs = []; selectedHoleIDs = []; patchProposalJSON = ""; patchCandidate = ""; completionIssues = []
             status = "選択した候補を保存しました"
         } catch { report(error) }
         return saved
@@ -1102,13 +1157,25 @@ public final class AppModel {
         nextConfig["compiler"]["composition_seed"] = composition
         nextOptions["composition_seed"] = composition
         request.configuration = nextConfig.data; request.renderOptions = nextOptions.data
+        // Web composeLayoutGeneration: the AI process chooses the ranges again by principle.
+        var recomposed: String?
+        if kind == "layout_change", !reading, let ddl = work.ddl {
+            let recomposition = Recomposition.choose(configuration: nextConfig, source: ddl, mode: .principled, seed: fresh)
+            recomposed = recomposition.source
+            if let chosen = recomposed { request.authoring = .directDDL(chosen) }
+            var metadata = (try? request.derivationMetadata.map { try ExactJSON(data: $0) } ?? nil) ?? .object([:])
+            if metadata.object == nil { metadata = .object([:]) }
+            metadata["composition_seed"] = .number(fresh); metadata["recompose_mode"] = .string("principled")
+            request.derivationMetadata = metadata.data
+        }
         if let modelReference {
             guard !modelReference.isEmpty else { throw HostError("model_reference_missing") }
             request.models.stage1Model = modelReference; request.models.stage2Model = modelReference
         }
         if !reading {
             guard let document = saved.document else { throw HostError("saved_document_unavailable") }
-            request.retainedDocument = document; request.retainedAuthority = saved.authorityJSON
+            if recomposed == nil { request.retainedDocument = document; request.retainedAuthority = saved.authorityJSON }
+            request.completionRanges = saved.completionRanges
         }
         return request
     }
@@ -1424,6 +1491,7 @@ public final class AppModel {
         authoringPhase = ""
         patchProposalJSON = ""
         patchCandidate = ""
+        completionIssues = []
         holeIDs = []
         selectedHoleIDs = []
         diagnosticsJSON = ""
@@ -1895,6 +1963,7 @@ public final class AppModel {
         authoringOrigin = view.origin
         authoringPhase = view.phase
         holeIDs = view.holeIDs
+        completionIssues = view.completionIssues
         selectedHoleIDs.formIntersection(Set(holeIDs))
         patchProposalJSON = view.patchProposalJSON.map { (try? Self.pretty($0)) ?? String(decoding: $0, as: UTF8.self) } ?? ""
         if let bytes = view.patchProposalJSON, let proposal = try? ExactJSON(data: bytes) {
@@ -1988,4 +2057,9 @@ extension AppModel {
     }
 
     var currentInputText: String { inputMode == "ddl" ? ddlText : descriptionText }
+
+    /// Web `ddlCompletions`: the enabled saijiki words and macro names, in the language the instructions read in.
+    public var ddlCompletions: DdlCompletions {
+        DdlCompletions(saijiki: saijiki, plugins: pluginWords) { [weak self] text in self?.instructionLanguage(for: text) ?? "ja" }
+    }
 }

@@ -26,6 +26,8 @@ struct ArtworkCanvas: View {
     var aspectRatio: Double? = nil
     /// The workspace keeps its zoom and pan here while the canvas view is rebuilt (tab switch, refine panel).
     var viewport: Binding<CanvasViewport>? = nil
+    /// Web DdlRangePreview: the numeric range the instructions' caret or pointer is on, over the work.
+    var rangePreview: CompositionRanges.Preview? = nil
     @Environment(DisplaySettings.self) private var display
     @Environment(\.displayScale) private var displayScale
     @State private var picture = CanvasPicture()
@@ -189,6 +191,7 @@ struct ArtworkCanvas: View {
                             .onEnded { _ in dragOrigin = offset })
                         .accessibilityLabel(display.localized("作品"))
                     detailLayer(size: size, box: box)
+                    rangeFrame(size: size, box: box)
                 } else if picture.loading {
                     ProgressView(display.localized("作品を表示中"))
                 } else if let error = picture.error {
@@ -213,6 +216,23 @@ struct ArtworkCanvas: View {
         let container = box.map { CGRect(x: (size.width - $0.width) / 2, y: (size.height - $0.height) / 2, width: $0.width, height: $0.height) }
             ?? CGRect(origin: .zero, size: size).insetBy(dx: 18, dy: 18)
         return CanvasInteraction.fittedPicture(aspect: CGFloat(image.width) / CGFloat(image.height), in: container)
+    }
+
+    /// The range's frame at its place in the picture, following zoom and pan; an invalid edit keeps the last frame dashed.
+    @ViewBuilder private func rangeFrame(size: CGSize, box: CGSize?) -> some View {
+        if let preview = rangePreview, preview.bounds.count == 4, let fitted = fittedRect(in: size, box: box) {
+            let picture = CanvasInteraction.zoomedPicture(fitted, area: size, scale: scale, offset: offset)
+            let rect = CGRect(x: picture.minX + preview.bounds[0] * picture.width, y: picture.minY + preview.bounds[1] * picture.height,
+                              width: (preview.bounds[2] - preview.bounds[0]) * picture.width, height: (preview.bounds[3] - preview.bounds[1]) * picture.height)
+            Rectangle()
+                .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: preview.invalid ? [6, 4] : []))
+                .background(Color.accentColor.opacity(0.08))
+                .frame(width: max(rect.width, 1), height: max(rect.height, 1))
+                .position(x: rect.midX, y: rect.midY)
+                .frame(width: size.width, height: size.height, alignment: .topLeading)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
     }
 
     /// The last complete window, and over it the one being drawn. Each keeps its place under later zoom and pan

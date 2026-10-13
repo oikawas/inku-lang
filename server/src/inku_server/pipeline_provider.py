@@ -21,7 +21,10 @@ from .model_settings import connection_for, provider_for_model
 from .provider_limits import provider_slot
 from .anthropic_request import anthropic_max_tokens, output_limit_record
 from .gemini_request import gemini_max_output_tokens, gemini_output_limit_record, gemini_thinking
-from .openai_request import openai_output_limit_record, openai_sampling
+from .openai_request import (
+    is_openai_api, openai_output_limit_record, openai_responses_answer, openai_responses_body,
+    openai_responses_output_limit_record, openai_sampling,
+)
 from .provider_refusal import provider_error as _provider_error
 from .provider_observation import ProviderObservationError, ProviderObservationStore
 from .provider_rate_limits import ProviderRateBudget, RateAccountingUnavailable, RateLimitUnavailable, retry_after_seconds
@@ -334,12 +337,20 @@ class SingleAttemptProvider:
         headers = {"Content-Type": "application/json"}
         kind = connection["kind"]
         response_name = "submit_pipeline_response"
-        if kind == "openai_compatible":
+        # OpenAI's own API draws through Responses, the only route that takes
+        # function tools from every current model (openai_responses_body).
+        responses = kind == "openai_compatible" and is_openai_api(connection)
+        temperature = 0.3 if prompt["action_name"] in _STAGE1_SAMPLED_ACTIONS else 0.0
+        if responses:
+            url = base + "/responses"
+            headers["Authorization"] = "Bearer " + (key or "none")
+            body = openai_responses_body(connection, model, prompt, response_name=response_name,
+                                         max_tokens=self.options.max_tokens, temperature=temperature)
+        elif kind == "openai_compatible":
             url = base + "/chat/completions"
             headers["Authorization"] = "Bearer " + (key or "none")
             body = {"model": model, "stream": False,
-                    **openai_sampling(connection, model, max_tokens=self.options.max_tokens,
-                                      temperature=0.3 if prompt["action_name"] in _STAGE1_SAMPLED_ACTIONS else 0.0),
+                    **openai_sampling(connection, model, max_tokens=self.options.max_tokens, temperature=temperature),
                     "messages": [{"role": "system", "content": prompt["system"]},
                                  {"role": "user", "content": prompt["message"]}]}
             # Preserve the established provider-specific structured-output
@@ -486,7 +497,7 @@ class SingleAttemptProvider:
             if not isinstance(usage, dict):
                 usage = {}
             used = usage.get("promptTokenCount") if kind == "gemini" else usage.get(
-                "input_tokens" if kind == "anthropic" else "prompt_tokens")
+                "input_tokens" if kind == "anthropic" or responses else "prompt_tokens")
             if isinstance(used, int) and not isinstance(used, bool) and used >= 0:
                 input_used = used
         except httpx.HTTPStatusError as error:
@@ -509,17 +520,20 @@ class SingleAttemptProvider:
         # a tool input or JSON text that ends there is not the whole answer.
         cut = (output_limit_record(data) if kind == "anthropic"
                else gemini_output_limit_record(data) if kind == "gemini"
+               else openai_responses_output_limit_record(data) if responses
                else openai_output_limit_record(data) if kind == "openai_compatible" else None)
         if cut is not None:
             self.failure_detail = "output_limit_reached"
             _logger.warning("provider_output_limit %s", json.dumps({
                 "action": action["tag"], "provider": connection["id"], "model": model,
                 "max_tokens": (body["generationConfig"]["maxOutputTokens"] if kind == "gemini"
-                               else body.get("max_tokens", body.get("max_completion_tokens"))),
+                               else body.get("max_tokens", body.get("max_completion_tokens", body.get("max_output_tokens")))),
                 **cut,
             }, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
             raise TypeError("provider output reached its token limit")
-        if kind == "openai_compatible":
+        if responses:
+            text = openai_responses_answer(data, response_name)
+        elif kind == "openai_compatible":
             message = data["choices"][0]["message"]
             calls = message.get("tool_calls") or []
             if calls:

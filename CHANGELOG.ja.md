@@ -8,6 +8,20 @@
 
 ## 未リリース
 
+### 2026-10-13 — OpenAI APIの描画をResponses APIへ移し、GPT-6系の推論と温度の指定を直す
+
+作者の指示（OpenAIの資料とOpenAI APIへの要求の照合）と選択による。OpenAIのモデルは提供元の一覧から取り込めるが、Serverの判定はGPT-5系までしか見ていなかった。OpenAIの案内（reasoning・latest-model、2026-10-13）と照らすと、GPT-6系では次のとおり要求が通らない、または答えが切れる。
+
+- Chat Completionsは、GPT-6 AstraとGPT-6.1 Solの関数呼び出しを受け付けない（Responses APIが要る）。GPT-6 SolとLunaは、`reasoning_effort: "none"`のときだけ受け付ける。Serverは`none`をgpt-5.xにしか送っていなかった。
+- 推論が`none`でないときは、`temperature`・`top_p`を外す。Serverは温度をGPT-6系に送っていた。
+- AstraとGPT-6.1 Sol、gpt-5（無印）、o系は推論を切れず、推論も出力の上限に数えられる。OpenAIは推論と出力に25,000以上を確保するよう勧めている。
+
+直したこと:
+
+- 描画（pipeline）は、OpenAI API（`api.openai.com`）に限り、Chat CompletionsからResponses API（`/v1/responses`）へ移す。関数1つを`tool_choice: "required"`で求め、`store: false`、`max_output_tokens`、`reasoning.effort`で送る。応答は`function_call`の`arguments`を読み、`status: "incomplete"`（`max_output_tokens`）は答えとして使わずに`provider_output_limit`を記録する。ほかのOpenAI互換の提供元は今までどおりChat Completions。
+- 推論の指定（描画・Vision・奥書・デモで共通）：GPT-5系・GPT-6系・o系には温度を送らない。推論を切れるモデル（gpt-5.1以降、GPT-6 Sol・Luna）には`none`、切れないモデル（GPT-6 Astra・6.1 Sol、gpt-5、o系）には`low`と、出力枠に25,000を足す。gpt-4.1などは変えない。
+- Vision・奥書・デモの指示文は、関数を使わないのでChat Completionsのまま。
+
 ### 2026-10-13 — AndroidのNIM Gemma 4でも思考を切る
 
 NVIDIA NIMのGemma 4にはchat_template_kwargsのenable_thinkingをfalseで送り、描画・Vision・写真の記述・デモで思考を切る。ほかのモデルには付けず、出力枠とtemperatureは保つ。

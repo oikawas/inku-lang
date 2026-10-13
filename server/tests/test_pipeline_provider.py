@@ -71,10 +71,12 @@ def test_single_attempt_preserves_core_prompt_and_reports_rate_limit_and_deadlin
     assert len(seen) == 3
 
 
-def test_openai_gets_its_own_length_field_and_a_refusal_says_why(monkeypatch, caplog):
-    """gpt-5.6 on api.openai.com was refused before any answer: it takes
-    max_completion_tokens and only the default temperature. The refusal's own
-    reason now reaches the log, with anything shaped like a key masked."""
+def test_openai_draws_through_responses_and_a_refusal_says_why(monkeypatch, caplog):
+    """Chat Completions takes no function tools from GPT-6 Astra and GPT-6.1 Sol,
+    so OpenAI's own API draws through Responses. gpt-5.6 is still asked not to
+    reason and sent only the default temperature (it refused function tools while
+    reasoning, Pentala 2026-09-28). A refusal's own reason reaches the log, with
+    anything shaped like a key masked."""
     target = {"model": "gpt-5.6-luna"}
     monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model",
                         lambda *args, **kwargs: ("openai", target["model"]))
@@ -83,32 +85,76 @@ def test_openai_gets_its_own_length_field_and_a_refusal_says_why(monkeypatch, ca
         "api_key": "test-only", "requires_api_key": True,
     })
     seen = []
+    paths = []
 
     async def request(value):
+        paths.append(value.url.path)
         seen.append(json.loads(value.content))
         if len(seen) == 1:
-            return httpx.Response(200, json={"choices": [{"message": {"content": '{"normalized_ddl":"x"}'}}]})
+            return httpx.Response(200, json={"status": "completed", "output": [
+                {"type": "reasoning", "id": "rs_1", "summary": []},
+                {"type": "function_call", "id": "fc_1", "call_id": "call_1", "name": "submit_pipeline_response",
+                 "arguments": '{"normalized_ddl":"x"}', "status": "completed"},
+            ], "usage": {"input_tokens": 12, "output_tokens": 7}})
         return httpx.Response(400, json={"error": {
             "message": "Incorrect API key provided: sk-proj-abcdef123456.", "type": "invalid_request_error",
-            "param": "max_tokens", "code": "unsupported_parameter",
+            "param": "max_output_tokens", "code": "unsupported_parameter",
         }})
 
     provider = SingleAttemptProvider(ProviderOptions({}, "m", "m", 256, 8192), transport=httpx.MockTransport(request))
-    assert provider(_action())["tag"] == "normalized_ddl_generated"
-    assert seen[0]["max_completion_tokens"] == 256
-    assert "max_tokens" not in seen[0] and "temperature" not in seen[0]
-    # Function tools are refused while gpt-5.6 reasons (Pentala, 2026-09-28).
-    assert seen[0]["reasoning_effort"] == "none"
+    action = _action()
+    result = provider(action)
+    assert result["tag"] == "normalized_ddl_generated"
+    assert json.loads(result["response"]) == {"normalized_ddl": "x"}
+    assert paths[0] == "/v1/responses"
+    assert seen[0]["max_output_tokens"] == 256 and "temperature" not in seen[0]
+    assert seen[0]["reasoning"] == {"effort": "none"}
+    assert seen[0]["tools"] == [{
+        "type": "function", "name": "submit_pipeline_response", "description": "Submit the requested pipeline response.",
+        "parameters": action["payload"]["prompt"]["response_schema"], "strict": False,
+    }]
+    assert seen[0]["tool_choice"] == "required" and seen[0]["store"] is False
 
     target["model"] = "gpt-4.1"
     with caplog.at_level("WARNING", logger="inku_server.pipeline_provider"):
         assert provider(_action())["failure"] == "provider_rejected"
-    assert seen[1]["temperature"] == 0.3 and seen[1]["max_completion_tokens"] == 256
-    assert "reasoning_effort" not in seen[1]
+    assert seen[1]["temperature"] == 0.3 and seen[1]["max_output_tokens"] == 256
+    assert "reasoning" not in seen[1]
     logged = json.loads(caplog.records[-1].getMessage().split(" ", 1)[1])
-    assert logged["status"] == 400 and logged["param"] == "max_tokens" and logged["code"] == "unsupported_parameter"
+    assert logged["status"] == 400 and logged["param"] == "max_output_tokens" and logged["code"] == "unsupported_parameter"
     assert logged["provider"] == "openai" and logged["model"] == "gpt-4.1"
-    assert "sk-proj" not in logged["message"]
+
+
+def test_openai_gpt_6_1_sol_reasons_low_with_room_and_a_cut_answer_is_not_used(monkeypatch, caplog):
+    # GPT-6.1 Sol takes no "none" reasoning; reasoning counts toward
+    # max_output_tokens, and OpenAI recommends reserving 25,000 for it.
+    monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model",
+                        lambda *args, **kwargs: ("openai", "gpt-6.1-sol"))
+    monkeypatch.setattr("inku_server.pipeline_provider.connection_for", lambda *args: {
+        "id": "openai", "kind": "openai_compatible", "base_url": "https://api.openai.com/v1",
+        "api_key": "test-only", "requires_api_key": True,
+    })
+    seen = []
+
+    async def request(value):
+        seen.append(json.loads(value.content))
+        return httpx.Response(200, json={"status": "incomplete", "incomplete_details": {"reason": "max_output_tokens"},
+                                         "output": [{"type": "reasoning", "id": "rs_1", "summary": []}],
+                                         "usage": {"input_tokens": 12, "output_tokens": 25256,
+                                                   "output_tokens_details": {"reasoning_tokens": 25256}}})
+
+    provider = SingleAttemptProvider(ProviderOptions({}, "m", "m", 256, 8192), transport=httpx.MockTransport(request))
+    with caplog.at_level("WARNING", logger="inku_server.pipeline_provider"):
+        result = provider(_action())
+    assert seen[0]["reasoning"] == {"effort": "low"} and seen[0]["max_output_tokens"] == 256 + 25000
+    assert "temperature" not in seen[0]
+    assert result["failure"] == "malformed_payload" and provider.failure_detail == "output_limit_reached"
+    line = next(r.getMessage() for r in caplog.records if r.getMessage().startswith("provider_output_limit "))
+    assert json.loads(line.split(" ", 1)[1]) == {
+        "action": "generate_normalized_ddl", "provider": "openai", "model": "gpt-6.1-sol",
+        "max_tokens": 256 + 25000, "incomplete_reason": "max_output_tokens", "output_tokens": 25256,
+        "reasoning_tokens": 25256, "has_text": False, "has_function_call": False,
+    }
 
 
 def test_mlx_profile_survives_settings_and_requests_core_schema_without_tools(monkeypatch):

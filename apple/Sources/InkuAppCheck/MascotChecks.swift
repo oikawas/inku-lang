@@ -50,9 +50,22 @@ func runMascotChecks() throws {
     try expect("yuragi left eye open at 67%", YuragiMascotFrames.eyeColor(left: true, at: 0.67 * 7), rgb(0xffffff), tolerance: 0.001)
     try expect("yuragi left eye blinks at 97%", YuragiMascotFrames.eyeColor(left: true, at: 0.97 * 7), rgb(0x111111), tolerance: 0.001)
 
+    // StopButton.svelte stopPulse, 2.2 s ease-in-out: background, outer ring, its spread, saturation.
+    func pulse(_ time: Double, dark: Bool) -> [Double] {
+        let frame = StopPulse.frame(at: time, dark: dark); return frame.background + frame.ring + [frame.spread, frame.saturation]
+    }
+    try expect("stop pulse light 0%", pulse(0, dark: false), [154, 61, 61, 0.16, 154, 61, 61, 0.088, 0, 1], tolerance: 0.001)
+    try expect("stop pulse light 25%", pulse(0.55, dark: false), [154, 61, 61, 0.23, 154, 61, 61, 0.154, 2.5, 1.14], tolerance: 0.001)
+    try expect("stop pulse light 50%", pulse(1.1, dark: false), [154, 61, 61, 0.30, 154, 61, 61, 0.22, 5, 1.28], tolerance: 0.001)
+    try expect("stop pulse light 100%", pulse(2.2, dark: false), [154, 61, 61, 0.16, 154, 61, 61, 0.088, 0, 1], tolerance: 0.001)
+    try expect("stop pulse dark 25% premultiplied", pulse(0.55, dark: true), [255, 121.48, 98.84, 0.31, 255, 126, 104, 0.196, 2.5, 1.14], tolerance: 0.01)
+    try expect("stop pulse dark 50%", pulse(1.1, dark: true), [255, 126, 104, 0.42, 255, 126, 104, 0.28, 5, 1.28], tolerance: 0.001)
+
     var sheet = "not written"
     if let path = ProcessInfo.processInfo.environment["INKU_MASCOT_SHEET"] { sheet = try writeMascotSheet(to: URL(fileURLWithPath: path)) }
-    print("Mascot frames passed: \(compared) keyframe values compared with the Web CSS (Incu breathe/spin/incubators, Yuragi claws/step/bubbles/eyes). Sheet: \(sheet).")
+    var stopSheet = "not written"
+    if let path = ProcessInfo.processInfo.environment["INKU_STOP_SHEET"] { stopSheet = try writeStopSheet(to: URL(fileURLWithPath: path)) }
+    print("Mascot frames passed: \(compared) keyframe values compared with the Web CSS (Incu breathe/spin/incubators, Yuragi claws/step/bubbles/eyes, stop button pulse). Sheet: \(sheet). Stop sheet: \(stopSheet).")
 }
 
 /// A row per mascot of stills at chosen times, so the pixels' overlap, overflow and size can be looked at.
@@ -83,4 +96,28 @@ private func writeMascotSheet(to url: URL) throws -> String {
     CGImageDestinationAddImage(destination, image, nil)
     guard CGImageDestinationFinalize(destination) else { throw CheckFailure.message("Mascot sheet write failed") }
     return url.path + " (rows incu, yuragi; times " + times.map { $0.0 + " " + $0.1.map { String($0) }.joined(separator: "/") }.joined(separator: "; ") + " s)"
+}
+
+/// Light and dark rows of the stop button at 0 %, 25 % and 50 % of its pulse.
+@MainActor
+private func writeStopSheet(to url: URL) throws -> String {
+    let times = [0, 0.55, 1.1]
+    let width = 480, height = 192
+    guard let context = CGContext(data: nil, width: width * times.count, height: height * 2, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+        throw CheckFailure.message("Stop sheet context failed")
+    }
+    for (row, dark) in [false, true].enumerated() {
+        for (column, time) in times.enumerated() {
+            guard let image = StopButtonSnapshot.image(dark: dark, at: time) else { throw CheckFailure.message("Stop snapshot failed") }
+            context.draw(image, in: CGRect(x: column * width, y: (1 - row) * height, width: width, height: height))
+        }
+    }
+    guard let image = context.makeImage(),
+          let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else {
+        throw CheckFailure.message("Stop sheet image failed")
+    }
+    CGImageDestinationAddImage(destination, image, nil)
+    guard CGImageDestinationFinalize(destination) else { throw CheckFailure.message("Stop sheet write failed") }
+    return url.path + " (rows light, dark; times " + times.map { String($0) }.joined(separator: "/") + " s)"
 }

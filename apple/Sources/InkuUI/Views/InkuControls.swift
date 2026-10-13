@@ -119,6 +119,102 @@ struct InkuGhostButtonStyle: ButtonStyle {
     }
 }
 
+/// Web `StopButton.svelte`'s `stopPulse` (2.2 s, ease-in-out) with its light and dark `--stop-*` colors. Colors
+/// are sRGB `[r, g, b, a]`.
+public enum StopPulse {
+    public struct Frame: Equatable {
+        public let background: [Double]
+        public let ring: [Double]
+        public let spread: Double
+        public let saturation: Double
+    }
+    struct Palette { let border, background, pulse, foreground, ring: [Double] }
+    static let light = Palette(border: [154, 61, 61, 0.78], background: [154, 61, 61, 0.16], pulse: [154, 61, 61, 0.30],
+                               foreground: [0x7f, 0x24, 0x1d, 1], ring: [154, 61, 61, 0.22])
+    static let dark = Palette(border: [255, 130, 110, 0.88], background: [255, 112, 88, 0.20], pulse: [255, 126, 104, 0.42],
+                              foreground: [0xff, 0xd6, 0xcc, 1], ring: [255, 126, 104, 0.28])
+    static let track = MascotTrack(duration: 2.2, stops: [(0, [0], .easeInOut), (0.5, [1], .easeInOut), (1, [0], .easeInOut)])
+
+    /// At 0 % the outer ring is `--stop-ring` at 40 % with no spread; at 50 % it is the full ring spread 5px.
+    public static func frame(at time: Double, dark: Bool) -> Frame {
+        let palette = dark ? Self.dark : Self.light
+        let amount = track.sample(time)[0]
+        // CSS interpolates colors premultiplied by alpha.
+        let alpha = palette.background[3] + (palette.pulse[3] - palette.background[3]) * amount
+        let background = (0..<3).map { index -> Double in
+            let from = palette.background[index] * palette.background[3], to = palette.pulse[index] * palette.pulse[3]
+            return alpha > 0 ? (from + (to - from) * amount) / alpha : 0
+        } + [alpha]
+        let ring = Array(palette.ring[0..<3]) + [palette.ring[3] * (0.4 + 0.6 * amount)]
+        return Frame(background: background, ring: ring, spread: 5 * amount, saturation: 1 + 0.28 * amount)
+    }
+
+    static func color(_ value: [Double]) -> Color {
+        Color(.sRGB, red: value[0] / 255, green: value[1] / 255, blue: value[2] / 255, opacity: value[3])
+    }
+}
+
+/// Web `StopButton.svelte` as `RunStatus.svelte` sizes it: 13px weight 500, padding 7×14, a dot with a 3px ring,
+/// a red frame that pulses. Reduced motion holds the 0 % frame, as the mascots stop.
+struct InkuStopButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View { InkuStopButtonFace(label: configuration.label) }
+}
+
+private struct InkuStopButtonFace<Label: View>: View {
+    let label: Label
+    /// A still at this time, for snapshots.
+    var still: Double?
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var start = Date()
+
+    var body: some View {
+        if let still { face(at: still) }
+        else if reduceMotion { face(at: 0) }
+        else { TimelineView(.animation) { timeline in face(at: timeline.date.timeIntervalSince(start)) } }
+    }
+
+    private func face(at time: Double) -> some View {
+        let dark = colorScheme == .dark
+        let palette = dark ? StopPulse.dark : StopPulse.light
+        let frame = StopPulse.frame(at: time, dark: dark)
+        let foreground = StopPulse.color(palette.foreground)
+        return HStack(spacing: 8) {
+            Circle().fill(foreground).frame(width: 8, height: 8)
+                .background(Circle().strokeBorder(StopPulse.color(palette.ring), lineWidth: 3).padding(-3))
+            label.inkuFont(13, weight: .medium).tracking(13 * 0.06).lineLimit(1)
+        }
+        .foregroundStyle(foreground)
+        // The 1px border sits outside CSS padding.
+        .padding(.horizontal, 15).padding(.vertical, 8)
+        .background(RoundedRectangle(cornerRadius: 4).fill(StopPulse.color(frame.background)))
+        .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(StopPulse.color(palette.border), lineWidth: 1))
+        // An outer box-shadow: only outside the border box.
+        .background {
+            if frame.spread > 0 {
+                RoundedRectangle(cornerRadius: 4 + frame.spread)
+                    .strokeBorder(StopPulse.color(frame.ring), lineWidth: frame.spread).padding(-frame.spread)
+            }
+        }
+        .saturation(frame.saturation)
+        .opacity(isEnabled ? 1 : 0.55)
+        .contentShape(Rectangle())
+    }
+}
+
+/// The stop button still at one time and theme, on a fixed panel color, so its pulse can be looked at.
+public enum StopButtonSnapshot {
+    @MainActor public static func image(dark: Bool, at time: Double, scale: Double = 4) -> CGImage? {
+        let renderer = ImageRenderer(content: InkuStopButtonFace(label: Text("停止"), still: time)
+            .environment(\.colorScheme, dark ? .dark : .light)
+            .frame(width: 120, height: 48)
+            .background(dark ? Color(white: 0.16) : Color.white))
+        renderer.scale = scale
+        return renderer.cgImage
+    }
+}
+
 /// Web `.paint-btn.block`: full width, 14px weight 500, padding 9, radius 4, action colors.
 struct InkuPaintButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled

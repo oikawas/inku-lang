@@ -36,7 +36,7 @@ struct RunStatusView<Info: View>: View {
 
     @ViewBuilder private func stopButton(_ onStop: @escaping () -> Void) -> some View {
         let button = Button(display.localized(stopping ? "停止中" : "停止"), action: onStop)
-            .buttonStyle(InkuGhostButtonStyle())
+            .buttonStyle(InkuStopButtonStyle())
             .disabled(stopping)
             .inkuTooltip(stopTooltip)
         if stopsWithEscape { button.keyboardShortcut(.escape, modifiers: []) } else { button }

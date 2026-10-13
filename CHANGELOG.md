@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Swift drawing stop button looks like Web
+
+At the author's instruction. The stop button in Swift's drawing indicator was a plain gray button. Like Web `StopButton.svelte`, it now has a red frame, a pale red background and a ringed dot, and pulses every 2.2 seconds as its background deepens and an outer ring spreads to 5px. Each theme uses the Web colors. The pulse stops when reduced motion is on. Stop buttons outside the drawing indicator are unchanged.
+
 ### 2026-10-13 — Move Android OpenAI drawing to Responses
 
 OpenAI API drawing now requests its function answer through Responses, accepting only a completed single call or text. GPT-6 Sol/Luna and 5.x turn reasoning off; reasoning models that cannot stop get low and 25,000 extra output tokens. Vision, photo descriptions and demos keep Chat Completions with the same reasoning policy. Cut-off drawing responses are refused, with output and reasoning counts recorded in diagnostics.

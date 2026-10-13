@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.120 (2026-10-13 / Build 1196)
+
 ### 2026-10-13 — Each model label takes its own colour
 
 Following the author's choice to align the Web's administrator screen. v2.15.118 painted a row's joined labels in one colour, so in an "Older model · End of life" row even "Older model", which does not keep the model from publication, showed in the warning colour. Android colours each label by whether that label keeps the model from publication, which is the rule handed to Swift and Android.

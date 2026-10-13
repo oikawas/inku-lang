@@ -15,8 +15,9 @@ Startup preserves existing publication choices. ChatGPT-plan evaluations also co
 `providers.chatgpt`; personal offerings and publication choices remain within their registration.
 
 Model management shows six folds in label-table order, with counts, initially closed. Every
-label appears in rows and descriptions: blocking labels use the warning color and publishable
-labels use subdued color. The last label determines the fold; only models whose labels are
+label appears in rows and descriptions. If any label blocks publication, every label in that
+row uses the warning color; otherwise all labels use subdued color. Fold labels also follow
+their publishability. The last label determines the fold; only models whose labels are
 all `publishable` can be newly published or selected. No remaining purpose adds `no_response`;
 no measurement and only publishable other labels adds `unmeasured`. Management and drawing
 model selection show the available recommendations (LLM, Stage 1, Stage 2, Vision), average

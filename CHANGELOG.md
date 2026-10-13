@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Android colors every label as a warning when any label blocks publication
+
+Model management and drawing model selection show every label of a model in the warning color when any of its labels blocks publication. This fixes Older model staying muted beside End of life. Initial OpenAI publication reads the catalog's defaults, so the newly chosen three models arrive without adding model names to Android code. Stored publication choices remain unchanged.
+
 ### 2026-10-13 — Android uses the shared model catalog, with labels and six folds
 
 Android bundles the shared `model_catalog.json` during the build. Model management and drawing model selection show recommendations, average seconds, estimated costs, comments and every label, including for the ChatGPT plan. Management uses six initially closed folds in canonical table order; models blocked from publication cannot be newly selected. Startup preserves existing publication choices, while refetched offerings and this device's access results supplement the catalog. Ollama Cloud offers “Check with this key” for one chosen model. Android unit tests also compare labels, folds and publishability against the 15 shared cases.

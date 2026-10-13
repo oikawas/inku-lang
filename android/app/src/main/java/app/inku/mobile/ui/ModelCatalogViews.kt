@@ -32,7 +32,7 @@ internal fun ModelCatalogDetails(model: CatalogModel, strings: InkuStrings) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.testTag("CatalogDetails:${model.id}")) {
         model.labels.forEach { label ->
             Text(label.name(strings.code == "en"), style = MaterialTheme.typography.labelSmall,
-                color = if (label.publishable) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error)
+                color = if (model.publishable) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error)
         }
         val record = model.record
         listOf("llm" to "LLM", "stage1" to "Stage 1", "stage2" to "Stage 2", "vision" to "Vision").forEach { (key, name) ->
@@ -93,7 +93,8 @@ internal fun ModelCatalogRows(
             item(key = "fold:${label.id}") {
                 TextButton(onClick = { expanded = if (label.id in expanded) expanded - label.id else expanded + label.id },
                     modifier = Modifier.fillMaxWidth().testTag("CatalogFold:${label.id}")) {
-                    Text("${if (label.id in expanded) "▼" else "▶"} ${label.name(strings.code == "en")} (${rows.size})")
+                    Text("${if (label.id in expanded) "▼" else "▶"} ${label.name(strings.code == "en")} (${rows.size})",
+                        color = if (label.publishable) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error)
                 }
             }
             if (label.id in expanded) rows(rows)

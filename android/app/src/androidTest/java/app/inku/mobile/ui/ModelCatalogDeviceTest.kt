@@ -2,6 +2,10 @@ package app.inku.mobile.ui
 
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.platform.testTag
@@ -20,6 +24,27 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ModelCatalogDeviceTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
+
+    @Test fun blockingLabelColorsEveryLabelInTheRow() {
+        val catalog = ModelCatalog.load(rule.activity)
+        val models = listOf(
+            catalog.classify(JSONObject().put("id", "mixed").put("labels", JSONArray(listOf("legacy", "eol")))),
+            catalog.classify(JSONObject().put("id", "muted").put("labels", JSONArray(listOf("legacy")))),
+        )
+        val scheme = lightColorScheme()
+        rule.setContent { MaterialTheme(colorScheme = scheme) { Column {
+            models.forEach { ModelCatalogDetails(it, InkuStringsJa) }
+        } } }
+        models.forEach { model ->
+            val expected = if (model.id == "mixed") scheme.error else scheme.onSurfaceVariant
+            model.labels.forEach { label ->
+                val results = mutableListOf<TextLayoutResult>()
+                rule.onNode(hasText(label.ja) and hasAnyAncestor(hasTestTag("CatalogDetails:${model.id}")), useUnmergedTree = true)
+                    .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action -> assertTrue(action(results)) }
+                assertEquals("${model.id}/${label.id}", expected, results.single().layoutInput.style.color)
+            }
+        }
+    }
 
     @Test fun sixClosedFoldsShowCanonicalLabelsAndBlockUnpublishableModels() {
         val catalog = ModelCatalog.load(rule.activity)

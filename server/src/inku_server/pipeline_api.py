@@ -32,6 +32,9 @@ _RECORD_OPTIONS = frozenset({
 })
 
 _LABEL_ONLY_DESCRIPTION = "description is only labels"
+# How far a description fork walks up past variations stopped before their
+# first save to find the parent it names (2026-10-13).
+_UNSAVED_PARENT_STEPS = 8
 
 
 _logger = logging.getLogger(__name__)
@@ -542,7 +545,24 @@ class PipelineService:
                        "host_options": source_run.context.get("host_options", {}),
                        "macro_catalog": source_run.context.get("macro_catalog", {})}
         return self.start(owner, "description", body.description,
-                          parent={"kind": "variation", "id": variation_id}, source_work=source_work, options=body.options)
+                          parent=self._fork_parent(owner, variation_id), source_work=source_work, options=body.options)
+
+    def _fork_parent(self, owner: str, variation_id: str) -> dict | None:
+        """The parent a description fork from `variation_id` names (2026-10-13).
+
+        A variation stopped before its first save has no saved authority, so
+        naming it failed the fork's own first save after its Stage 1 call. Its
+        own parent stands in, and that one's, until a saved variation, a legacy
+        history, or none."""
+        parent: dict | None = {"kind": "variation", "id": variation_id}
+        for _ in range(_UNSAVED_PARENT_STEPS):
+            if parent is None or parent.get("kind") != "variation" or self.store.read(owner, parent["id"]) is not None:
+                return parent
+            record = self.store.read_latest_execution_for_variation(owner, parent["id"])
+            if record is None:
+                return None
+            parent = json.loads(record.state_bytes).get("context", {}).get("parent")
+        return None
 
     def fork_linked_history(
         self, owner: str, history_id: str, body: LinkedHistoryForkBody

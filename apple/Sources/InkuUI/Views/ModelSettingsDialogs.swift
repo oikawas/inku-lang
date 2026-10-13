@@ -286,7 +286,7 @@ struct ProviderModelsSheet: View {
                         Text(model.display.localized("該当するモデルがありません。"))
                             .foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(32)
                     }
-                    ForEach(visibleModels) { item in modelRow(item) }
+                    ModelCatalogGroupsView(models: visibleModels, display: model.display) { item in modelRow(item) }
                 }.padding(16)
             }
             .disabled(isWorking)
@@ -356,7 +356,7 @@ struct ProviderModelsSheet: View {
                     Text(item.label).inkuFont(14, weight: .semibold)
                     Text(item.id).inkuFont(12, design: .monospaced).foregroundStyle(.secondary)
                         .textSelection(.enabled)
-                    if let status = statusLabel(item) { Text(status).inkuFont(12).foregroundStyle(.orange) }
+                    ModelLabelsView(labels: item.resolvedLabels, display: model.display)
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 6) {
                     purposeButton("LLM", purpose: "llm", item: item)
@@ -394,11 +394,15 @@ struct ProviderModelsSheet: View {
             .overlay(Capsule().stroke(selected ? Color.accentColor.opacity(0.4) : Color.secondary.opacity(0.2)))
             .accessibilityLabel(item.label + " " + label)
             .accessibilityValue(model.display.localized(selected ? "選択中" : "未選択"))
-            .disabled(!item.isSelectable)
+            .disabled(!ProviderModelsDraft.canEditPurposes(item) || (item.unsupportedPurposes ?? []).contains(purpose))
     }
 
+    @ViewBuilder
     private func metadataFields(_ item: ProviderModelSettings) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        if let provider, ModelGuidanceCatalog.bundled?.contains(modelID: item.id, providerID: provider.id, kind: provider.kind) == true {
+            RegisteredModelMetadataView(entry: item, provider: provider, display: model.display)
+        } else {
+          VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 16) {
                 metadataField("オススメ度") {
                     Picker(model.display.localized("オススメ度"), selection: recommendationBinding(item.id)) {
@@ -421,7 +425,8 @@ struct ProviderModelsSheet: View {
             }
             metadataField("評価コメント（日本語）") { commentEditor(item.id, key: \.commentJA, label: "評価コメント（日本語）") }
             metadataField("評価コメント（英語）") { commentEditor(item.id, key: \.commentEN, label: "評価コメント（英語）") }
-        }.padding(.top, 10)
+          }.padding(.top, 10)
+        }
     }
 
     private func metadataField<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
@@ -453,13 +458,6 @@ struct ProviderModelsSheet: View {
             item[keyPath: key] = value.isEmpty ? nil : value
             draft.updateModel(item)
         })
-    }
-
-    private func statusLabel(_ item: ProviderModelSettings) -> String? {
-        if item.eol == true {
-            return model.display.localized("提供終了") + (item.eolDate.map { " (\($0))" } ?? "")
-        }
-        return item.requiresSubscription == true ? model.display.localized("有料プラン限定") : nil
     }
 
     private var footer: some View {

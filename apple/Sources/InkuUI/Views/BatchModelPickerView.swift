@@ -95,10 +95,9 @@ struct BatchModelPickerView: View {
                         ForEach(groups) { provider in
                             VStack(alignment: .leading, spacing: 7) {
                                 Text(model.display.providerName(provider)).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
-                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 7)], spacing: 7) {
-                                    ForEach(sortedModels(for: provider)) { entry in
-                                        modelCard(entry, provider: provider)
-                                    }
+                                ModelCatalogGroupsView(models: sortedModels(for: provider), display: model.display,
+                                    columns: [GridItem(.adaptive(minimum: 190), spacing: 7)]) { entry in
+                                    modelCard(entry, provider: provider)
                                 }
                             }
                         }
@@ -236,14 +235,12 @@ struct BatchModelPickerView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .top, spacing: 8) {
                     Text(entry.label.isEmpty ? entry.id : entry.label)
-                        .inkuFont(13, weight: .medium).strikethrough(entry.eol == true)
+                        .inkuFont(13, weight: .medium).strikethrough(entry.modelFold == "eol")
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
                     if selected { Image(systemName: "checkmark").foregroundStyle(Color.accentColor) }
                 }
-                if let status = statusLabel(entry) {
-                    Text(status).inkuFont(12).foregroundStyle(.red)
-                }
+                ModelLabelsView(labels: entry.resolvedLabels, display: model.display)
             }
             .frame(maxWidth: .infinity, minHeight: 20, alignment: .topLeading)
             .padding(10)
@@ -293,7 +290,11 @@ struct BatchModelPickerView: View {
 
     private func metadata(_ entry: ProviderModelSettings, provider: ProviderSettings) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let status = statusLabel(entry) { metadataRow("状態", status) }
+            ModelLabelsView(labels: entry.resolvedLabels, display: model.display)
+            let guidance = ModelGuidanceCatalog.bundled?.guidance(for: provider.id + ":" + entry.id, providers: [provider])
+            ModelMeasurementView(llmSeconds: guidance?.speedHidden == true ? nil : entry.speedLLMSeconds,
+                                 visionSeconds: guidance?.speedHidden == true ? nil : entry.speedVisionSeconds,
+                                 llmCost: entry.costUSDLLM, visionCost: entry.costUSDVision)
             metadataRow("用途", purposes(entry))
             ForEach(recommendationRows(entry), id: \.0) { row in metadataRow(row.0, row.1) }
             metadataRow("速度", speed(entry, provider: provider))
@@ -346,17 +347,11 @@ struct BatchModelPickerView: View {
         return candidates.compactMap { $0 }.first { !$0.isEmpty } ?? "—"
     }
 
-    private func statusLabel(_ entry: ProviderModelSettings) -> String? {
-        if entry.eol == true {
-            return model.display.localized("提供終了") + (entry.eolDate.map { " (\($0))" } ?? "")
-        }
-        return entry.requiresSubscription == true ? model.display.localized("有料プラン限定") : nil
-    }
-
     private func metadataText(_ entry: ProviderModelSettings, provider: ProviderSettings) -> String {
         let rows = [("用途", purposes(entry))] + recommendationRows(entry)
             + [("速度", speed(entry, provider: provider)), ("評価コメント", comment(entry))]
-        return rows.map { model.display.localized($0.0) + ": " + $0.1 }.joined(separator: ". ")
+        return (entry.resolvedLabels.map { $0.name(language: model.display.preferences.language) }
+                + rows.map { model.display.localized($0.0) + ": " + $0.1 }).joined(separator: ". ")
     }
 }
 

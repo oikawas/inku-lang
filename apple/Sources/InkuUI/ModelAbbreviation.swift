@@ -36,7 +36,7 @@ public struct ModelNaming: Sendable {
 
     private func modelLabel(provider: String, model: String) -> String? {
         if let connection = connections.first(where: { $0.id == provider }) {
-            let models = connection.models ?? ModelGuidanceCatalog.bundled?.registeredModelSettings(for: connection) ?? []
+            let models = ModelGuidanceCatalog.bundled?.registeredModelSettings(for: connection) ?? connection.models ?? []
             if let label = models.first(where: { $0.id == model })?.label, !label.isEmpty { return label }
         }
         return Self.retiredModels[provider]?[model]
@@ -47,7 +47,7 @@ public struct ModelNaming: Sendable {
     private func owners(of model: String) -> Set<String> {
         Set(connections.filter { connection in
             connection.id != "chatgpt"
-                && (connection.models ?? ModelGuidanceCatalog.bundled?.registeredModelSettings(for: connection) ?? []).contains { $0.id == model }
+                && (ModelGuidanceCatalog.bundled?.registeredModelSettings(for: connection) ?? connection.models ?? []).contains { $0.id == model }
         }.map(\.id))
     }
 

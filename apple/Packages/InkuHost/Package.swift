@@ -8,7 +8,7 @@ let package = Package(
     dependencies: [.package(path: "../InkuCore"), .package(path: "../InkuPersistence")],
     targets: [
         .target(name: "InkuHost", dependencies: ["InkuCore", "InkuPersistence"],
-                resources: [.copy("Resources/description-meter")]),
+                resources: [.copy("Resources/description-meter"), .copy("Resources/model-labels.json")]),
         .testTarget(name: "InkuHostTests", dependencies: ["InkuHost"]),
     ]
 )

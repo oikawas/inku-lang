@@ -8,6 +8,10 @@ import InkuHost
 struct AppCheck {
     @MainActor
     static func main() async throws {
+        if let index = CommandLine.arguments.firstIndex(of: "--model-catalog-only") {
+            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Missing shared model catalog cases") }
+            try await runModelCatalogChecks(casesURL: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
+        }
         if CommandLine.arguments.contains("--palette-alias-parity-only") {
             func path(_ argument: String) throws -> URL? {
                 guard let index = CommandLine.arguments.firstIndex(of: argument) else { return nil }

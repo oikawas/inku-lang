@@ -57,7 +57,7 @@ public final class SettingsModel {
     }
 
     public func catalogModels(for provider: ProviderSettings) -> [ProviderModelSettings] {
-        provider.models ?? ModelGuidanceCatalog.bundled?.registeredModelSettings(for: provider) ?? []
+        ModelGuidanceCatalog.bundled?.registeredModelSettings(for: provider) ?? provider.models ?? []
     }
 
     public func publishedModels(for provider: ProviderSettings, purpose: String? = nil) -> [ProviderModelSettings] {
@@ -75,7 +75,7 @@ public final class SettingsModel {
         let (providerID, modelID) = ProviderModelReference.resolve(reference, providers: settings.providers)
         guard !modelID.isEmpty, let provider = settings.providers.first(where: { $0.id == providerID }) else { return false }
         guard provider.enabledModels?[modelID] != false else { return false }
-        let models = provider.models ?? ModelGuidanceCatalog.bundled?.registeredModelSettings(for: provider) ?? []
+        let models = ModelGuidanceCatalog.bundled?.registeredModelSettings(for: provider) ?? provider.models ?? []
         guard let model = models.first(where: { $0.id == modelID }) else { return false }
         return model.isSelectable && model.purposes.contains("llm")
     }
@@ -85,7 +85,8 @@ public final class SettingsModel {
     public nonisolated static func mirroringPersonalPlan(_ settings: HostSettings, publication: ChatGPTPlanPublication?) -> HostSettings {
         var next = settings
         let models = (publication?.publishedModels ?? []).map {
-            ProviderModelSettings(id: $0.id, label: $0.label, purposes: publication?.purposes(of: $0.id) ?? ChatGPTPlanPublication.defaultPurposes)
+            let model = ProviderModelSettings(id: $0.id, label: $0.label, purposes: publication?.purposes(of: $0.id) ?? ChatGPTPlanPublication.defaultPurposes)
+            return ModelGuidanceCatalog.bundled?.applyingCatalog(to: model, providerID: "chatgpt", kind: .chatGPTPlan) ?? model
         }
         if let index = next.providers.firstIndex(where: { $0.kind == .chatGPTPlan }) {
             // A plan that never published anything keeps its settings file unchanged.
@@ -105,7 +106,7 @@ public final class SettingsModel {
     }
 
     public nonisolated static func registeredModels(for provider: ProviderSettings, purpose: String) -> [ProviderModelSettings] {
-        let models = provider.models ?? ModelGuidanceCatalog.bundled?.registeredModelSettings(for: provider) ?? []
+        let models = ModelGuidanceCatalog.bundled?.registeredModelSettings(for: provider) ?? provider.models ?? []
         return models.filter { $0.purposes.contains(purpose) && provider.enabledModels?[$0.id] != false }
     }
 

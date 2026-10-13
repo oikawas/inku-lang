@@ -63,13 +63,19 @@ public struct ProviderModelsDraft: Sendable, Equatable {
     public mutating func togglePurpose(modelID: String, purpose: String) {
         guard ["llm", "vision"].contains(purpose),
               let index = models.firstIndex(where: { $0.id == modelID }),
-              models[index].isSelectable else { return }
+              Self.canEditPurposes(models[index]),
+              !(models[index].unsupportedPurposes ?? []).contains(purpose) else { return }
         if models[index].purposes.contains(purpose) {
             models[index].purposes.removeAll { $0 == purpose }
         } else {
             models[index].purposes.append(purpose)
         }
         enabled[modelID] = !models[index].purposes.isEmpty
+    }
+
+    /// An author can restore a locally cleared purpose without publishing a blocked model.
+    public static func canEditPurposes(_ model: ProviderModelSettings) -> Bool {
+        model.resolvedLabels.allSatisfy { $0.publishable || ($0.id == "no_response" && !model.labels.contains("no_response")) }
     }
 
     public mutating func setVisible(models visible: [ProviderModelSettings], enabled value: Bool) {

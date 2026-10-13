@@ -14,6 +14,13 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-13 前回のバッチのエラー作品だけを再描画する
+
+作者の指示（Server Build 1190との差の取り込み、段F）。正本はWebの`BatchState.retryFailed`と`BatchPanel.svelte`。
+
+- バッチが止まっていて失敗の行が残っていれば、結果の数の下に「エラー作品を再描画」を出す。押すと、失敗の行だけを、元の本文・行番号と開始時に固定した要求（描画条件・モデル）のまま描き直す。描き直しの中でも再試行の回数の設定は効く。待ち・要確認・省略・成功の行には触れない。成功した行は失敗・要確認の一覧から外れ、残った失敗はまた試せる。
+- 確認：AppCheck `--automation-only`（成功1・失敗1・待ち1の記録で、送るのは失敗の行だけ、開始時のモデル、待ちの行は待ちのまま）。この確かめは「登録したモデルだけで描く」の後に材料がモデルを登録しておらず落ちていたので、モデルを登録した。
+
 ## 2026-10-13 Claudeの思考の出力枠と、上限で切れた応答の記録をServerに揃える
 
 作者の指示（Server Build 1190との差の取り込み、段A）。正本はServerの`anthropic_request.py`・`gemini_request.py`・`openai_request.py`・`pipeline_provider.py`・`vision_client.py`。

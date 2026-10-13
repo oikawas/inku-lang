@@ -14,6 +14,13 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-13 Retry only the failed works of the last batch
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage F). The sources are Web `BatchState.retryFailed` and `BatchPanel.svelte`.
+
+- When a batch has stopped with failed rows left, "Retry failed works" appears below the result counts. It draws only the failed rows again, with their original text and line numbers and the request pinned when the batch began (drawing conditions and models). The retry count setting still applies within it. Waiting, uncertain, skipped and successful rows are left as they are. A row that succeeds leaves the failed and uncertain list, and failures that remain can be retried again.
+- Checks: AppCheck `--automation-only` (with one success, one failure and one waiting row, only the failed row is sent, with the pinned model, and the waiting row stays waiting). This check had been failing since drawing began to take only registered models, because its fixture registered none; it now registers its models.
+
 ## 2026-10-13 Match Server's Claude thinking budget and cut-off answer records
 
 At the author's instruction (bringing in the differences from Server Build 1190, stage A). The sources are Server's `anthropic_request.py`, `gemini_request.py`, `openai_request.py`, `pipeline_provider.py` and `vision_client.py`.

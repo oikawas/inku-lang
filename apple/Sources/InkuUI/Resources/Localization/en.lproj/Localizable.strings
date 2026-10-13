@@ -1452,3 +1452,5 @@
 "生成SVGが設定した容量の上限を超えました。設定→制限値で上限を変更できます。" = "The SVG exceeds the configured size limit. Change it in Settings → Limits.";
 "記述の解釈・写生・自動配色選択・指示書の補完、Vision推敲と奥書で利用できます。デモ記述生成とモデル調査には対応していません。" = "Available for reading descriptions, sketches, automatic palette choice, completing instructions, Vision refinement and colophons. Demo description generation and model research are not supported.";
 "LLM か Vision の用途を選んでください。" = "Choose LLM or Vision.";
+"エラー作品を再描画" = "Retry failed works";
+"失敗した行だけを、元の本文・行番号・描画条件で描き直します。" = "Draws only the failed rows again, with their original text, line numbers and drawing conditions.";

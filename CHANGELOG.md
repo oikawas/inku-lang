@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Swift retries only the failed works of the last batch
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage F). Swift batches could only "Resume the last batch", which draws waiting, failed and uncertain rows together. As on the Web, "Retry failed works" now draws only the failed rows again with their original text, line numbers and the drawing conditions pinned at the start. Waiting, uncertain and successful rows are left alone.
+
 ### 2026-10-13 — Swift Claude output budget and cut-off answer records match Server
 
 At the author's instruction (bringing in the differences from Server Build 1190, stage A). Swift added room for Claude 5 thinking only to the demo; drawing and Vision now get it too. A Claude drawing answer cut off at its limit was taken as the answer; it is now refused as on Server. A cut-off answer is refused as `malformed_payload` for every provider (Gemini failed as another class) and leaves Server's one-line record in the system log. Vision returns a cut-off answer as it is and only logs it. The paid-plan check reads 402 as paid-plan only too.

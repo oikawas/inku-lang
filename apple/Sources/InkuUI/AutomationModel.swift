@@ -164,6 +164,8 @@ public final class AutomationModel {
     public var observedRow: BatchRow? { rows.first { $0.id == observedRowID } }
     public var uncertainCount: Int { rows.filter { $0.state == .uncertain }.count }
     public var canResume: Bool { rows.contains { [.waiting, .failed, .uncertain].contains($0.state) } }
+    /// Web `canRetryFailures`: a stopped batch with failed rows can draw those rows alone again.
+    public var canRetryFailures: Bool { !running && !preparing && failedCount > 0 }
     public var canSaveDemoCurrent: Bool { demoWork != nil && !demoCurrentSaved && !savingDemo && !preparing }
     public func canStartDemo(app: AppModel) -> Bool {
         !isOccupied && !savingDemo && !app.isBusy && !demoSeedPhrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -335,7 +337,23 @@ public final class AutomationModel {
         await runBatch(app: app)
     }
 
-    private func runBatch(app: AppModel) async {
+    /// Web `retryFailed`: draws only the failed rows again with their original text, line numbers and the
+    /// conditions pinned when the batch began. Waiting, uncertain, skipped and successful rows stay as they are.
+    public func retryFailures(app: AppModel) async {
+        guard canRetryFailures, !app.isBusy else { return }
+        preparing = true
+        batchObservationToken = UUID()
+        defer { preparing = false }
+        if let originalText = journal?.originalText { batchText = BatchInputLines.normalizedText(originalText) }
+        let failed = Set(rows.filter { $0.state == .failed }.map(\.id))
+        for index in rows.indices where failed.contains(rows[index].id) { rows[index].state = .waiting }
+        journal?.round = 0
+        do { try await saveJournal() } catch { errorText = error.localizedDescription; return }
+        preparing = false
+        await runBatch(app: app, only: failed)
+    }
+
+    private func runBatch(app: AppModel, only scope: Set<String>? = nil) async {
         guard let initial = journal else { return }
         let runToken = UUID()
         token = runToken; running = true; stopping = false; mode = "batch"; errorText = nil
@@ -346,7 +364,10 @@ public final class AutomationModel {
                 var round = initial.round
                 while round <= initial.retries {
                     self.currentRetryRound = round
-                    let indices = self.rows.indices.filter { self.rows[$0].state == .waiting || (round > 0 && self.rows[$0].state == .failed) }
+                    let indices = self.rows.indices.filter {
+                        (scope?.contains(self.rows[$0].id) ?? true)
+                            && (self.rows[$0].state == .waiting || (round > 0 && self.rows[$0].state == .failed))
+                    }
                     for index in indices {
                         try Task.checkCancellation()
                         guard self.token == runToken else { return }
@@ -370,7 +391,7 @@ public final class AutomationModel {
                         try await self.saveJournal()
                         try Task.checkCancellation()
                     }
-                    if !self.rows.contains(where: { $0.state == .failed }) { break }
+                    if !self.rows.contains(where: { $0.state == .failed && (scope?.contains($0.id) ?? true) }) { break }
                     round += 1
                     self.journal?.round = round
                     try await self.saveJournal()

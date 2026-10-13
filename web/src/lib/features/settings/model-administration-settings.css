@@ -57,6 +57,10 @@
 	.settings-feature-root .model-picker-body { min-height: 0; overflow: auto; padding: 12px 16px; }
 	.settings-feature-root .model-picker-list { display: grid; gap: 8px; }
 	.settings-feature-root .model-picker-entry { min-width: 0; border: 1px solid var(--border); border-radius: var(--r); background: var(--bg); overflow: hidden; }
+	/* Models that cannot be published, folded at the bottom and closed at first. */
+	.settings-feature-root .model-picker-fold { border-top: 1px dashed var(--border); }
+	.settings-feature-root .model-picker-fold > summary { padding: 9px 2px; color: var(--fg2); font-size: var(--ui-font-size-13); cursor: pointer; }
+	.settings-feature-root .model-picker-fold > .model-picker-list { padding-bottom: 4px; }
 	.settings-feature-root .model-picker-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 12px; }
 	.settings-feature-root .model-picker-publish { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 9px; min-width: 0; color: var(--fg); cursor: pointer; }
 	.settings-feature-root .model-picker-publish input { width: 16px; height: 16px; margin-top: 2px; }

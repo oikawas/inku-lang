@@ -8,6 +8,9 @@ export type ModelOption = {
 	// Purposes the model was measured not to answer (2026-10-13). The server keeps
 	// them out of purposes; an operator cannot tick them back.
 	unsupported_purposes?: ('llm' | 'vision')[];
+	// Left out of the benchmark as a kind inku does not draw with (2026-10-13).
+	// Not published; model administration folds it away.
+	not_supported?: boolean;
 	enabled?: boolean;
 	// v1.98: Recommendations are per purpose; recommendation_level reads the legacy format.
 	recommendation_llm?: number;

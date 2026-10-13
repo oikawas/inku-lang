@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
-	import { isModelUnselectable, modelStatusLabel, modelRecommendation, modelSpeed, purposeUnsupported, recommendationTier, sortModels } from '$lib/modelMeta';
+	import { isModelUnselectable, MODEL_FOLDS, modelFold, modelFoldTitle, modelStatusLabel, modelRecommendation, modelSpeed, purposeUnsupported, recommendationTier, sortModels, type ModelFold } from '$lib/modelMeta';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
 	import type { ModelAdministration, ModelProviderSetting } from './model-administration.svelte';
 	import './model-administration-settings.css';
@@ -386,6 +386,14 @@
 			});
 		return provider.id === 'chatgpt' ? models : sortModels(models);
 	});
+	// Models that cannot be published -- measured to answer nothing, not
+	// supported, or retired -- are folded at the bottom, closed at first (the
+	// author, 2026-10-13). The search and the filter still count them.
+	const modelPickerSections = $derived.by(() => {
+		const sections: Record<'main' | ModelFold, ModelOption[]> = { main: [], no_response: [], not_supported: [], eol: [] };
+		for (const model of filteredModelPickerModels) sections[modelFold(model) ?? 'main'].push(model);
+		return sections;
+	});
 
 </script>
 
@@ -587,6 +595,53 @@
 {/if}
 
 	{#if modelPickerProvider && modelPickerSetting}
+		<!-- One model's row, in the list or in a fold below it. -->
+		{#snippet modelPickerEntry(model: ModelOption)}
+						<article class="model-picker-entry">
+							<div class="model-picker-row">
+								<label class="model-picker-publish">
+								<input
+									type="checkbox"
+								checked={!isModelUnselectable(model) && modelPickerDraftEnabled(model.id)}
+									disabled={isModelUnselectable(model) || (modelPickerProvider?.id === 'chatgpt' && modelDraft(model).purposes?.length === 0)}
+								onchange={(e) => {
+									modelPickerEnabledDraft = {
+										...modelPickerEnabledDraft,
+										[model.id]: (e.currentTarget as HTMLInputElement).checked,
+										};
+									}}
+								/>
+									<span><strong>{model.label}</strong><small>{model.id}</small>{#if modelStatusLabel(model, t().code === 'ja')}<em class="model-picker-status">{modelStatusLabel(model, t().code === 'ja')}</em>{/if}{#if model.notes}<em>{model.notes}</em>{/if}</span>
+								</label>
+								<div class="model-purpose-controls" aria-label={`${model.label} LLM / Vision`}>
+									<button type="button" class:active={modelPurposeSelected(model.id, 'llm')} aria-pressed={modelPurposeSelected(model.id, 'llm')} disabled={purposeUnsupported(model, 'llm')} title={purposeUnsupported(model, 'llm') ? noResponseTitle() : undefined} onclick={() => toggleModelPurpose(model.id, 'llm')}>LLM</button>
+									<button type="button" class:active={modelPurposeSelected(model.id, 'vision')} aria-pressed={modelPurposeSelected(model.id, 'vision')} disabled={purposeUnsupported(model, 'vision')} title={purposeUnsupported(model, 'vision') ? noResponseTitle() : undefined} onclick={() => toggleModelPurpose(model.id, 'vision')}>Vision</button>
+								</div>
+							</div>
+							<details class="model-metadata-editor">
+								<summary>{t().settingsModelMetadataDetails}</summary>
+							<div class="model-metadata-fields">
+									{#if modelPickerProvider?.id === 'chatgpt'}
+										{#each ['recommendation_llm', 'recommendation_stage1', 'recommendation_stage2', 'recommendation_vision'] as key}
+											{@const recommendationKey = key as RecommendationKey}
+											<label><span>{t().settingsModelRecommendationFields[recommendationKey]}</span><select value={recommendationTier(Number(modelDraft(model)[recommendationKey] ?? 0))} onchange={(event) => setRecommendationTier(model, recommendationKey, Number(event.currentTarget.value))}><option value={0}>—</option>{#each [3, 2, 1] as tier}<option value={tier}>{tierStars(tier)}</option>{/each}</select></label>
+										{/each}
+									{:else}
+										{#each ['recommendation_llm', 'recommendation_vision'] as key}
+											{@const recommendationKey = key as RecommendationKey}
+											<label><span>{t().settingsModelRecommendationFields[recommendationKey]}</span><select value={recommendationTier(Number(modelDraft(model)[recommendationKey] ?? 0))} onchange={(event) => setRecommendationTier(model, recommendationKey, Number(event.currentTarget.value))}><option value={0}>—</option>{#each [3, 2, 1] as tier}<option value={tier}>{tierStars(tier)}</option>{/each}</select></label>
+										{/each}
+										{#each MEASURED_FIELDS as field (field.key)}
+											<label><span>{field.label}</span><input type="number" min="0" step="any" value={modelDraft(model)[field.key] ?? ''} oninput={(event) => setMeasured(model, field.key, event.currentTarget.value)} /></label>
+										{/each}
+									{/if}
+								<label class="wide"><span>速度ラベル（平均秒数が無いときに表示）/ Speed label (shown without mean seconds)</span><input value={modelDraft(model).speed_label ?? ''} oninput={(event) => updateModelMetadata(model, { speed_label: event.currentTarget.value })} /></label>
+								<label class="wide"><span>評価コメント（日本語）</span><textarea rows="2" value={modelDraft(model).comment_ja ?? ''} oninput={(event) => updateModelMetadata(model, { comment_ja: event.currentTarget.value })}></textarea></label>
+								<label class="wide"><span>Evaluation comment (English)</span><textarea rows="2" value={modelDraft(model).comment_en ?? ''} oninput={(event) => updateModelMetadata(model, { comment_en: event.currentTarget.value })}></textarea></label>
+								</div>
+							</details>
+						</article>
+		{/snippet}
 		<div class="modal-backdrop model-picker-backdrop" onclick={closeModelPicker} aria-hidden="true"></div>
 		<div class="model-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="model-picker-title" tabindex="-1" data-settings-nested-dialog use:trapDialogFocus={closeModelPicker}>
 			<div class="modal-head">
@@ -614,51 +669,20 @@
 			</div>
 			<div class="model-picker-body">
 				<div class="model-picker-list" aria-label={t().settingsModelPublishedModels}>
-					{#each filteredModelPickerModels as model, modelIndex (`${model.id}:${modelIndex}`)}
-						<article class="model-picker-entry">
-							<div class="model-picker-row">
-								<label class="model-picker-publish">
-								<input
-									type="checkbox"
-								checked={!isModelUnselectable(model) && modelPickerDraftEnabled(model.id)}
-									disabled={isModelUnselectable(model) || (modelPickerProvider.id === 'chatgpt' && modelDraft(model).purposes?.length === 0)}
-								onchange={(e) => {
-									modelPickerEnabledDraft = {
-										...modelPickerEnabledDraft,
-										[model.id]: (e.currentTarget as HTMLInputElement).checked,
-										};
-									}}
-								/>
-									<span><strong>{model.label}</strong><small>{model.id}</small>{#if modelStatusLabel(model, t().code === 'ja')}<em class="model-picker-status">{modelStatusLabel(model, t().code === 'ja')}</em>{/if}{#if model.notes}<em>{model.notes}</em>{/if}</span>
-								</label>
-								<div class="model-purpose-controls" aria-label={`${model.label} LLM / Vision`}>
-									<button type="button" class:active={modelPurposeSelected(model.id, 'llm')} aria-pressed={modelPurposeSelected(model.id, 'llm')} disabled={purposeUnsupported(model, 'llm')} title={purposeUnsupported(model, 'llm') ? noResponseTitle() : undefined} onclick={() => toggleModelPurpose(model.id, 'llm')}>LLM</button>
-									<button type="button" class:active={modelPurposeSelected(model.id, 'vision')} aria-pressed={modelPurposeSelected(model.id, 'vision')} disabled={purposeUnsupported(model, 'vision')} title={purposeUnsupported(model, 'vision') ? noResponseTitle() : undefined} onclick={() => toggleModelPurpose(model.id, 'vision')}>Vision</button>
-								</div>
-							</div>
-							<details class="model-metadata-editor">
-								<summary>{t().settingsModelMetadataDetails}</summary>
-							<div class="model-metadata-fields">
-									{#if modelPickerProvider.id === 'chatgpt'}
-										{#each ['recommendation_llm', 'recommendation_stage1', 'recommendation_stage2', 'recommendation_vision'] as key}
-											{@const recommendationKey = key as RecommendationKey}
-											<label><span>{t().settingsModelRecommendationFields[recommendationKey]}</span><select value={recommendationTier(Number(modelDraft(model)[recommendationKey] ?? 0))} onchange={(event) => setRecommendationTier(model, recommendationKey, Number(event.currentTarget.value))}><option value={0}>—</option>{#each [3, 2, 1] as tier}<option value={tier}>{tierStars(tier)}</option>{/each}</select></label>
-										{/each}
-									{:else}
-										{#each ['recommendation_llm', 'recommendation_vision'] as key}
-											{@const recommendationKey = key as RecommendationKey}
-											<label><span>{t().settingsModelRecommendationFields[recommendationKey]}</span><select value={recommendationTier(Number(modelDraft(model)[recommendationKey] ?? 0))} onchange={(event) => setRecommendationTier(model, recommendationKey, Number(event.currentTarget.value))}><option value={0}>—</option>{#each [3, 2, 1] as tier}<option value={tier}>{tierStars(tier)}</option>{/each}</select></label>
-										{/each}
-										{#each MEASURED_FIELDS as field (field.key)}
-											<label><span>{field.label}</span><input type="number" min="0" step="any" value={modelDraft(model)[field.key] ?? ''} oninput={(event) => setMeasured(model, field.key, event.currentTarget.value)} /></label>
-										{/each}
-									{/if}
-								<label class="wide"><span>速度ラベル（平均秒数が無いときに表示）/ Speed label (shown without mean seconds)</span><input value={modelDraft(model).speed_label ?? ''} oninput={(event) => updateModelMetadata(model, { speed_label: event.currentTarget.value })} /></label>
-								<label class="wide"><span>評価コメント（日本語）</span><textarea rows="2" value={modelDraft(model).comment_ja ?? ''} oninput={(event) => updateModelMetadata(model, { comment_ja: event.currentTarget.value })}></textarea></label>
-								<label class="wide"><span>Evaluation comment (English)</span><textarea rows="2" value={modelDraft(model).comment_en ?? ''} oninput={(event) => updateModelMetadata(model, { comment_en: event.currentTarget.value })}></textarea></label>
+					{#each modelPickerSections.main as model, modelIndex (`${model.id}:${modelIndex}`)}
+						{@render modelPickerEntry(model)}
+					{/each}
+					{#each MODEL_FOLDS as fold (fold)}
+						{#if modelPickerSections[fold].length > 0}
+							<details class="model-picker-fold">
+								<summary>{modelFoldTitle(fold, modelPickerSections[fold].length, t().code === 'ja')}</summary>
+								<div class="model-picker-list">
+									{#each modelPickerSections[fold] as model, modelIndex (`${model.id}:${modelIndex}`)}
+										{@render modelPickerEntry(model)}
+									{/each}
 								</div>
 							</details>
-						</article>
+						{/if}
 					{/each}
 			</div>
 		</div>

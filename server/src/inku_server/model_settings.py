@@ -51,6 +51,7 @@ MODEL_MEASUREMENT_KEYS = (
 MODEL_METADATA_KEYS = (
     "purposes",
     "unsupported_purposes",
+    "not_supported",
     *MODEL_RECOMMENDATION_KEYS,
     "speed_class",
     "speed_label",
@@ -276,6 +277,11 @@ def _normalize_models(models: Any) -> list[dict[str, Any]]:
             # 契約を変えたときに戻す作業が要るうえ、存在自体が見えなくなる。
             if model.get("requires_subscription") is True:
                 item["requires_subscription"] = True
+            # Left out of the benchmark as a kind inku does not draw with (speech,
+            # music, video, embeddings and the like; the author, 2026-10-13). Not
+            # published, and folded away in model administration.
+            if model.get("not_supported") is True:
+                item["not_supported"] = True
             normalized.append(item)
     return normalized
 
@@ -443,9 +449,10 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
                 for model_id, enabled in enabled_models.items():
                     if model_id in known_model_ids:
                         provider["enabled_models"][model_id] = bool(enabled)
-            # Measured to answer neither purpose: there is nothing to publish it for.
+            # Measured to answer neither purpose, or not supported: there is nothing
+            # to publish it for.
             for model in provider["models"]:
-                if not model.get("purposes", ["llm"]):
+                if not model.get("purposes", ["llm"]) or model.get("not_supported") is True:
                     provider["enabled_models"][str(model["id"])] = False
             clean["providers"][provider_id] = provider
     return clean

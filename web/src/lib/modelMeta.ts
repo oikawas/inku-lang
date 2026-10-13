@@ -167,17 +167,40 @@ export function modelEolLabel(model: ModelOption, isJapanese: boolean): string |
 	return isJapanese ? `提供終了${date}` : `End of life${date}`;
 }
 
-// Three conditions make a listed model unselectable: retirement (EOL), a paid
-// tier requirement, and a measurement in which it answered neither purpose.
-// Disabling and sorting share this predicate.
+// Four conditions make a listed model unselectable: retirement (EOL), a paid
+// tier requirement, being a kind inku does not support, and a measurement in
+// which it answered neither purpose. Disabling and sorting share this predicate.
 export function isModelUnselectable(model: ModelOption): boolean {
-	return !!model.eol || !!model.requires_subscription || answersNothing(model);
+	return !!model.eol || !!model.requires_subscription || !!model.not_supported || answersNothing(model);
 }
 
 export function modelStatusLabel(model: ModelOption, isJapanese: boolean): string | null {
 	const eol = modelEolLabel(model, isJapanese);
 	if (eol) return eol;
+	if (model.not_supported) return isJapanese ? 'ノンサポート' : 'Not supported';
 	if (model.requires_subscription) return isJapanese ? '有料プラン限定' : 'Paid plan only';
 	if (answersNothing(model)) return isJapanese ? '計測で応答なし' : 'No response when measured';
 	return null;
+}
+
+// Where model administration files a model that cannot be published (the
+// author, 2026-10-13): each kind is folded away at the bottom of the list,
+// closed at first. A paid-plan model stays in the list; a plan can change.
+export type ModelFold = 'no_response' | 'not_supported' | 'eol';
+export const MODEL_FOLDS: ModelFold[] = ['no_response', 'not_supported', 'eol'];
+
+export function modelFold(model: ModelOption): ModelFold | null {
+	if (model.eol) return 'eol';
+	if (model.not_supported) return 'not_supported';
+	if (answersNothing(model)) return 'no_response';
+	return null;
+}
+
+export function modelFoldTitle(fold: ModelFold, count: number, isJapanese: boolean): string {
+	const [ja, en] = {
+		no_response: ['計測で応答なし', 'No response when measured'],
+		not_supported: ['ノンサポート', 'Not supported'],
+		eol: ['提供終了', 'End of life']
+	}[fold];
+	return isJapanese ? `${ja}（${count}）` : `${en} (${count})`;
 }

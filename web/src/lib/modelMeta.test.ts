@@ -5,7 +5,7 @@
 // check in scripts/model-recommendation-check.mjs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { isModelUnselectable, modelCost, modelPurposeBadges, modelSpeed, modelStatusLabel } from './modelMeta';
+import { isModelUnselectable, modelCost, modelFold, modelPurposeBadges, modelSpeed, modelStatusLabel } from './modelMeta';
 
 test('both purposes are listed, and the one a model cannot be chosen for is marked', () => {
 	assert.deepEqual(
@@ -23,6 +23,22 @@ test('a purpose measured without a response is greyed, and a model with neither 
 	const answersNothing = { id: 'x', label: 'x', purposes: [], unsupported_purposes: ['llm', 'vision'] as ('llm' | 'vision')[] };
 	assert.equal(isModelUnselectable(answersNothing), true);
 	assert.equal(modelStatusLabel(answersNothing, true), '計測で応答なし');
+});
+
+test('models that cannot be published are filed into their folds; a usable one stays in the list', () => {
+	const both = ['llm', 'vision'] as ('llm' | 'vision')[];
+	const folds = [
+		{ id: 'retired', label: 'x', eol: true, not_supported: true },
+		{ id: 'tts', label: 'x', not_supported: true },
+		{ id: 'silent', label: 'x', purposes: [], unsupported_purposes: both },
+		{ id: 'vision-only', label: 'x', purposes: ['vision'] as ('llm' | 'vision')[], unsupported_purposes: ['llm'] as ('llm' | 'vision')[] },
+		{ id: 'paid', label: 'x', requires_subscription: true }
+	].map((model) => [model.id, modelFold(model), isModelUnselectable(model)]);
+	assert.deepEqual(folds, [
+		['retired', 'eol', true], ['tts', 'not_supported', true], ['silent', 'no_response', true],
+		['vision-only', null, false], ['paid', null, true]
+	]);
+	assert.equal(modelStatusLabel({ id: 'tts', label: 'x', not_supported: true }, true), 'ノンサポート');
 });
 
 test('cost prints per drawing and per image, and a free model costs $0 rather than nothing', () => {

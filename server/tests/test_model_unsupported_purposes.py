@@ -47,6 +47,15 @@ def test_a_model_answering_neither_purpose_is_offered_for_nothing_and_cannot_be_
     assert (_offered(settings, "llm"), _offered(settings, "vision")) == (False, False)
 
 
+def test_a_model_left_out_of_the_benchmark_is_not_supported_and_cannot_be_published():
+    # gemini-2.5-flash-preview-tts and the other kinds inku does not draw with.
+    settings = _settings({"purposes": ["llm"], "not_supported": True})
+    provider = normalize_model_settings(settings)["providers"]["gemini"]
+    assert (provider["models"][0]["not_supported"], provider["enabled_models"]["measured-model"]) == (True, False)
+    assert (_offered(settings, "llm"), _offered(settings, "vision")) == (False, False)
+    assert "not_supported" in MODEL_METADATA_KEYS
+
+
 def test_an_unmeasured_model_with_no_purpose_still_reads_as_an_llm():
     model = normalize_model_settings(_settings({"purposes": []}))["providers"]["gemini"]["models"][0]
     assert model["purposes"] == ["llm"] and "unsupported_purposes" not in model

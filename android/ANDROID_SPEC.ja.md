@@ -34,6 +34,18 @@ Androidはpremultiplied RGBAをNDK Bitmapへ直接転送する。Kotlin Engine 3
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
 
+## 2026-10-13 Gemini以外へ送る型の欄の順序
+
+OpenAI Responses・OpenAI互換Chatの関数parameters、ollamaのresponse_formatのschema、
+Anthropicのinput_schema、ChatGPTプランのnamespace関数parametersも、送信時に
+propertyOrderingの順でpropertiesを書き出す。items・配列・入れ子も同じ規則を使い、
+指定に無い欄は元の順で後に続ける。他の鍵と値、propertyOrderingそのものは保持し、語を選別しない。
+構図の読みはthesisが先になり、全欄が指定されたC5の型ではjointsが最後になる。
+順の計算はGeminiJsonSchemaと共通にし、Geminiの投影・圧縮と送り方は変更しない。
+JSONObjectへ入れ直すだけで済ませず、送信文字列の順を指定して書く。
+順序の変更が無いJSONは従来のtoStringをそのまま使うため、propertyOrderingの無い
+Stage 1・Stage 2等の本文は同じバイトになる。
+
 ## 2026-10-13 OpenAI APIの描画と推論指定
 
 接続先のhostが `api.openai.com` のときだけ、描画pipelineを `POST /v1/responses` に送る。

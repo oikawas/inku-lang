@@ -47,7 +47,7 @@ class OpenAiCompatibleProvider(
             connection.setRequestProperty("Content-Type", "application/json")
             connection.doOutput = true
             OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { writer ->
-                writer.write(payload.toString())
+                writer.write(OrderedSchemaJson.encode(payload))
             }
             return JSONObject(readProviderBody(connection))
         } finally {

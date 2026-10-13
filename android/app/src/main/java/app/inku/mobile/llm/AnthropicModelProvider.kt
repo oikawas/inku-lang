@@ -37,7 +37,7 @@ class AnthropicModelProvider(
             connection.setRequestProperty("anthropic-version", ANTHROPIC_VERSION)
             connection.setRequestProperty("Content-Type", "application/json")
             connection.doOutput = true
-            connection.outputStream.writer(Charsets.UTF_8).use { it.write(payload(request).toString()) }
+            connection.outputStream.writer(Charsets.UTF_8).use { it.write(OrderedSchemaJson.encode(payload(request))) }
             JSONObject(readProviderBody(connection))
         } finally {
             connection.disconnect()
@@ -55,7 +55,7 @@ class AnthropicModelProvider(
         )
     }
 
-    private fun payload(request: ModelRequest): JSONObject {
+    internal fun payload(request: ModelRequest): JSONObject {
         val model = request.modelId.removePrefix("$providerId:")
         val payload = JSONObject()
             .put("model", model)

@@ -165,6 +165,8 @@ internal fun chatGptResponseError(value: Any?, status: Int? = null): ChatGptExce
 
 private val TEMPORARY_CHATGPT_CODES = setOf("subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable")
 
+internal fun chatGptRequestText(request: ModelRequest): String = OrderedSchemaJson.encode(chatGptRequestBody(request))
+
 internal fun chatGptRequestBody(request: ModelRequest): JSONObject {
     if (!request.modelId.startsWith("chatgpt:") || request.pipelineAction !in CHATGPT_EFFECTS || request.imageJpeg != null || request.tool == null) {
         throw ChatGptException("chatgpt_operation_not_supported")

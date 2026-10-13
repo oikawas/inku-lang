@@ -49,6 +49,19 @@ When updating Android specifications:
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
 
+## 2026-10-13 Schema field order for non-Gemini requests
+
+OpenAI Responses and compatible Chat function parameters, ollama response_format schemas,
+Anthropic input_schema and ChatGPT plan namespace function parameters also serialize properties
+in propertyOrdering order. Apply the same rule inside items, arrays and nested objects;
+unlisted properties follow in their previous order. Preserve every other key and value,
+propertyOrdering itself and all keywords. Composition readings put thesis first;
+the C5 schema puts joints last when all its fields are listed.
+Share GeminiJsonSchema's ordering calculation, keeping Gemini's projection, compaction and transport unchanged.
+Write the order explicitly in the sent text rather than relying only on reinsertion into JSONObject.
+JSON whose order does not change uses its original toString, so Stage 1, Stage 2 and other requests
+without propertyOrdering keep the same bytes.
+
 ## 2026-10-13 OpenAI API drawing and reasoning
 
 Only a connection whose host is `api.openai.com` sends pipeline drawing to `POST /v1/responses`.

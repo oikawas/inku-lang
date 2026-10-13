@@ -23,6 +23,7 @@ from ...limits import (
 )
 from ...persistence.backup import SQLiteSnapshotError
 from ...plugins import plugin_status_items
+from ...model_catalog import catalog_models
 from ...model_settings import MODEL_METADATA_KEYS, connection_for, model_provider_catalog, normalize_model_settings, public_model_settings, update_model_settings
 from ... import db as _db
 from ... import logging_setup as _logging_setup
@@ -591,9 +592,16 @@ def api_settings_fetch_provider_models(
         # 403 が返る)。取得のたびに消えては困るので、EOL と違って再提供で外さない。
         "requires_subscription",
     )
+    catalog = catalog_models(provider_id)
     for model in models:
         previous = previous_models.get(str(model["id"]))
         if not previous:
+            # A model this installation meets for the first time takes what the catalog
+            # (model_catalog.json) knows about it. The provider names it, and listing it
+            # means it is offered, so the catalog's end-of-life mark is not taken.
+            known = catalog.get(str(model["id"]))
+            if known:
+                model.update({key: value for key, value in known.items() if key not in ("id", "label", "eol", "eol_date")})
             continue
         for key in carried:
             if key in previous:

@@ -1,0 +1,4763 @@
+{
+ "schema": "inku.model-catalog.v2",
+ "version": "3.0.0",
+ "updated": "2026-10-13T13:30:00Z",
+ "labels": [
+  {
+   "id": "unmeasured",
+   "ja": "未計測",
+   "en": "Not measured",
+   "publishable": true
+  },
+  {
+   "id": "legacy",
+   "ja": "旧モデル",
+   "en": "Older model",
+   "publishable": true
+  },
+  {
+   "id": "subscription",
+   "ja": "有料プラン限定",
+   "en": "Paid plan only",
+   "publishable": false
+  },
+  {
+   "id": "no_response",
+   "ja": "計測で応答なし",
+   "en": "No response when measured",
+   "publishable": false
+  },
+  {
+   "id": "not_supported",
+   "ja": "ノンサポート",
+   "en": "Not supported",
+   "publishable": false
+  },
+  {
+   "id": "eol",
+   "ja": "提供終了",
+   "en": "End of life",
+   "publishable": false
+  }
+ ],
+ "providers": {
+  "openai": {
+   "defaults": [
+    "gpt-5.1",
+    "gpt-5.1-mini",
+    "gpt-4.1",
+    "gpt-4.1-mini"
+   ],
+   "models": [
+    {
+     "id": "gpt-3.5-turbo-0125",
+     "label": "gpt-3.5-turbo-0125",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 6.0,
+     "comment_ja": "描画は速い。画像は読めない。単価は未確認。",
+     "comment_en": "Draws fast; cannot read pictures. Pricing unconfirmed."
+    },
+    {
+     "id": "gpt-5.4-2026-03-05",
+     "label": "gpt-5.4-2026-03-05",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 7.2,
+     "speed_vision_seconds": 3.0,
+     "comment_ja": "描画は速い。画像の読み取りは長く、出力の上限で途中で切れる。単価は未確認。",
+     "comment_en": "Draws fast; picture reading runs long and stops at the output limit. Pricing unconfirmed."
+    },
+    {
+     "id": "gpt-5-nano",
+     "label": "gpt-5-nano",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 27.0,
+     "speed_vision_seconds": 3.1,
+     "cost_usd_llm": 0.001282,
+     "cost_usd_vision": 0.000242,
+     "comment_ja": "とても安い。描画は遅い。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
+     "comment_en": "Very cheap. Draws slowly; picture reading can mistake the number or shape of figures placed together."
+    },
+    {
+     "id": "tts-1",
+     "label": "tts-1",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-5-mini",
+     "label": "gpt-5-mini",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 18.2,
+     "speed_vision_seconds": 3.2,
+     "cost_usd_llm": 0.005597,
+     "cost_usd_vision": 0.00086,
+     "comment_ja": "安い。描画は遅め。画像の読み取りはおおむね正確。",
+     "comment_en": "Cheap. Draws somewhat slowly; reads pictures mostly accurately."
+    },
+    {
+     "id": "gpt-5-mini-2025-08-07",
+     "label": "gpt-5-mini-2025-08-07",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 5,
+     "speed_llm_seconds": 17.8,
+     "speed_vision_seconds": 3.0,
+     "comment_ja": "描画は遅め。画像の読み取りも正確。単価は未確認。",
+     "comment_en": "Draws somewhat slowly; reads pictures accurately. Pricing unconfirmed."
+    },
+    {
+     "id": "gpt-4-turbo-2024-04-09",
+     "label": "gpt-4-turbo-2024-04-09",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 11.3,
+     "speed_vision_seconds": 6.6,
+     "comment_ja": "描画はやや速め。画像の読み取りは要点の一部を落とす。単価は未確認。",
+     "comment_en": "Draws fairly fast; picture reading misses some points. Pricing unconfirmed."
+    },
+    {
+     "id": "gpt-realtime-2.1-mini",
+     "label": "gpt-realtime-2.1-mini",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-realtime-2025-08-28",
+     "label": "gpt-realtime-2025-08-28",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-4",
+     "label": "gpt-4",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 14.5,
+     "cost_usd_llm": 0.256755,
+     "comment_ja": "とても高い。描画は遅め。画像は読めない。",
+     "comment_en": "Very costly. Draws somewhat slowly; cannot read pictures."
+    },
+    {
+     "id": "gpt-5.4-mini",
+     "label": "gpt-5.4-mini",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 4.3,
+     "speed_vision_seconds": 1.5,
+     "cost_usd_llm": 0.005202,
+     "cost_usd_vision": 0.001146,
+     "comment_ja": "安い。描画は速い。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
+     "comment_en": "Cheap. Draws fast; picture reading can mistake the number or shape of figures placed together."
+    },
+    {
+     "id": "o1-pro",
+     "label": "o1-pro",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "vision"
+     ],
+     "comment_ja": "描画は1件だけ（125秒）で、旧モデルのため測定の対象から外した。画像の読み取りは Chat Completions に対応せず使えない。",
+     "comment_en": "Drew one description (125 s) before being left out as an older model. Cannot read pictures here, as it does not take Chat Completions."
+    },
+    {
+     "id": "gpt-5.1-codex",
+     "label": "gpt-5.1-codex",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "提供元で廃止された（404）。",
+     "comment_en": "Deprecated by the provider (404)."
+    },
+    {
+     "id": "tts-1-hd",
+     "label": "tts-1-hd",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-realtime-1.5",
+     "label": "gpt-realtime-1.5",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-realtime",
+     "label": "gpt-realtime",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-5.2-pro",
+     "label": "gpt-5.2-pro",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "このアプリが送る推論の段 none を受け付けない（400、medium 以上）。",
+     "comment_en": "Refuses the reasoning effort this app sends, none (400; medium and up)."
+    },
+    {
+     "id": "gpt-5-chat-latest",
+     "label": "gpt-5-chat-latest",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "提供元で廃止された（404）。",
+     "comment_en": "Deprecated by the provider (404)."
+    },
+    {
+     "id": "omni-moderation-2024-09-26",
+     "label": "omni-moderation-2024-09-26",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-live-transcribe",
+     "label": "gpt-live-transcribe",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-5.6-luna",
+     "label": "gpt-5.6-luna",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 6.9,
+     "speed_vision_seconds": 2.0,
+     "cost_usd_llm": 0.001504,
+     "cost_usd_vision": 0.000305,
+     "comment_ja": "とても安い。描画は速い。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
+     "comment_en": "Very cheap. Draws fast; picture reading can mistake the number or shape of figures placed together."
+    },
+    {
+     "id": "omni-moderation-latest",
+     "label": "omni-moderation-latest",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "o4-mini-2025-04-16",
+     "label": "o4-mini-2025-04-16",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_vision": 3,
+     "speed_vision_seconds": 2.4,
+     "comment_ja": "描画は測っていない（旧モデルのため対象外）。画像の読み取りはおおむね正確。",
+     "comment_en": "Drawing not measured (left out as an older model). Reads pictures mostly accurately."
+    },
+    {
+     "id": "gpt-4o-2024-11-20",
+     "label": "gpt-4o-2024-11-20",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 3.5,
+     "speed_vision_seconds": 1.3,
+     "comment_ja": "描画は速い。画像の読み取りは要点の一部を落とす。単価は未確認。",
+     "comment_en": "Draws fast; picture reading misses some points. Pricing unconfirmed."
+    },
+    {
+     "id": "gpt-5.1",
+     "label": "GPT-5.1",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 8.4,
+     "speed_vision_seconds": 4.7,
+     "cost_usd_llm": 0.009089,
+     "cost_usd_vision": 0.00277,
+     "comment_ja": "描画はやや速め。画像の読み取りは長く、出力の上限で途中で切れる。",
+     "comment_en": "Draws fairly fast; picture reading runs long and stops at the output limit."
+    },
+    {
+     "id": "whisper-1",
+     "label": "whisper-1",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-5-pro",
+     "label": "gpt-5-pro",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "このアプリが送る推論の段 low を受け付けない（400、high だけ）。",
+     "comment_en": "Refuses the reasoning effort this app sends, low (400; high only)."
+    },
+    {
+     "id": "gpt-realtime-whisper",
+     "label": "gpt-realtime-whisper",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-5-2025-08-07",
+     "label": "gpt-5-2025-08-07",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 5,
+     "speed_llm_seconds": 71.4,
+     "speed_vision_seconds": 6.6,
+     "comment_ja": "描画はとても遅い。画像の読み取りも正確。単価は未確認。",
+     "comment_en": "Draws very slowly; reads pictures accurately. Pricing unconfirmed."
+    },
+    {
+     "id": "gpt-5.5-pro",
+     "label": "gpt-5.5-pro",
+     "purposes": [],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "このアプリが送る推論の段 none を受け付けない（400、medium 以上）。",
+     "comment_en": "Refuses the reasoning effort this app sends, none (400; medium and up)."
+    },
+    {
+     "id": "gpt-audio-2025-08-28",
+     "label": "gpt-audio-2025-08-28",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-4o-mini-transcribe-2025-03-20",
+     "label": "gpt-4o-mini-transcribe-2025-03-20",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy",
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-realtime-2",
+     "label": "gpt-realtime-2",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-5-search-api",
+     "label": "gpt-5-search-api",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "描画に使う Responses API に対応しない（400）。",
+     "comment_en": "Does not take the Responses API this app draws with (400)."
+    },
+    {
+     "id": "gpt-5.5-2026-04-23",
+     "label": "gpt-5.5-2026-04-23",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 7.5,
+     "speed_vision_seconds": 2.8,
+     "comment_ja": "描画は速い。画像の読み取りは、並んだ形の数や形を取り違えることがある。単価は未確認。",
+     "comment_en": "Draws fast; picture reading can mistake the number or shape of figures placed together. Pricing unconfirmed."
+    },
+    {
+     "id": "chat-latest",
+     "label": "chat-latest",
+     "purposes": [],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "このアプリが送る temperature を受け付けない（400）。",
+     "comment_en": "Refuses the temperature this app sends (400)."
+    },
+    {
+     "id": "gpt-realtime-translate",
+     "label": "gpt-realtime-translate",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-5.4-pro-2026-03-05",
+     "label": "gpt-5.4-pro-2026-03-05",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "このアプリが送る推論の段 none を受け付けない（400、medium 以上）。",
+     "comment_en": "Refuses the reasoning effort this app sends, none (400; medium and up)."
+    },
+    {
+     "id": "tts-1-1106",
+     "label": "tts-1-1106",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-5.5-pro-2026-04-23",
+     "label": "gpt-5.5-pro-2026-04-23",
+     "purposes": [],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "このアプリが送る推論の段 none を受け付けない（400、medium 以上）。",
+     "comment_en": "Refuses the reasoning effort this app sends, none (400; medium and up)."
+    },
+    {
+     "id": "gpt-audio-mini-2025-10-06",
+     "label": "gpt-audio-mini-2025-10-06",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-5.2-pro-2025-12-11",
+     "label": "gpt-5.2-pro-2025-12-11",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "このアプリが送る推論の段 none を受け付けない（400、medium 以上）。",
+     "comment_en": "Refuses the reasoning effort this app sends, none (400; medium and up)."
+    },
+    {
+     "id": "gpt-5.4-mini-2026-03-17",
+     "label": "gpt-5.4-mini-2026-03-17",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 4.3,
+     "speed_vision_seconds": 1.4,
+     "comment_ja": "描画は速い。画像の読み取りは、並んだ形の数や形を取り違えることがある。単価は未確認。",
+     "comment_en": "Draws fast; picture reading can mistake the number or shape of figures placed together. Pricing unconfirmed."
+    },
+    {
+     "id": "babbage-002",
+     "label": "babbage-002",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "この API キーでは使えない（404）。",
+     "comment_en": "Not available with this API key (404)."
+    },
+    {
+     "id": "gpt-4o-2024-05-13",
+     "label": "gpt-4o-2024-05-13",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 4.1,
+     "speed_vision_seconds": 1.6,
+     "comment_ja": "描画は速い。画像の読み取りはおおむね正確。単価は未確認。",
+     "comment_en": "Draws fast; reads pictures mostly accurately. Pricing unconfirmed."
+    },
+    {
+     "id": "text-embedding-3-large",
+     "label": "text-embedding-3-large",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-4-turbo",
+     "label": "gpt-4-turbo",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 1,
+     "speed_llm_seconds": 12.7,
+     "speed_vision_seconds": 7.9,
+     "cost_usd_llm": 0.083342,
+     "cost_usd_vision": 0.014745,
+     "comment_ja": "高い。描画はやや速め。画像の読み取りは取り違えが多い。",
+     "comment_en": "Costly. Draws fairly fast; picture reading gets much wrong."
+    },
+    {
+     "id": "gpt-4o-2024-08-06",
+     "label": "gpt-4o-2024-08-06",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 3.9,
+     "speed_vision_seconds": 1.4,
+     "comment_ja": "描画は速い。画像の読み取りはおおむね正確。単価は未確認。",
+     "comment_en": "Draws fast; reads pictures mostly accurately. Pricing unconfirmed."
+    },
+    {
+     "id": "o3",
+     "label": "o3",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_vision": 5,
+     "speed_vision_seconds": 2.1,
+     "cost_usd_vision": 0.001457,
+     "comment_ja": "描画は測っていない（旧モデルのため対象外）。画像の読み取りも正確。",
+     "comment_en": "Drawing not measured (left out as an older model). Reads pictures accurately."
+    },
+    {
+     "id": "gpt-4o-mini-search-preview-2025-03-11",
+     "label": "gpt-4o-mini-search-preview-2025-03-11",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "描画に使う Responses API に対応しない（400）。",
+     "comment_en": "Does not take the Responses API this app draws with (400)."
+    },
+    {
+     "id": "gpt-4o-mini-transcribe-2025-12-15",
+     "label": "gpt-4o-mini-transcribe-2025-12-15",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy",
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-4.1-nano",
+     "label": "gpt-4.1-nano",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 6.3,
+     "speed_vision_seconds": 1.5,
+     "cost_usd_llm": 0.000839,
+     "cost_usd_vision": 0.000218,
+     "comment_ja": "とても安い。描画は速い。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
+     "comment_en": "Very cheap. Draws fast; picture reading can mistake the number or shape of figures placed together."
+    },
+    {
+     "id": "gpt-image-2",
+     "label": "gpt-image-2",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-3.5-turbo-16k",
+     "label": "gpt-3.5-turbo-16k",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 4.5,
+     "comment_ja": "描画は速い。画像は読めない。単価は未確認。",
+     "comment_en": "Draws fast; cannot read pictures. Pricing unconfirmed."
+    },
+    {
+     "id": "text-embedding-ada-002",
+     "label": "text-embedding-ada-002",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-realtime-2.1",
+     "label": "gpt-realtime-2.1",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-4.1",
+     "label": "GPT-4.1",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 3.8,
+     "speed_vision_seconds": 1.4,
+     "cost_usd_llm": 0.01604,
+     "cost_usd_vision": 0.002768,
+     "comment_ja": "描画は速い。画像の読み取りは要点の一部を落とす。",
+     "comment_en": "Draws fast; picture reading misses some points."
+    },
+    {
+     "id": "gpt-5.5",
+     "label": "gpt-5.5",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 7.2,
+     "speed_vision_seconds": 2.3,
+     "cost_usd_llm": 0.040397,
+     "cost_usd_vision": 0.00809,
+     "comment_ja": "高い。描画は速い。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
+     "comment_en": "Costly. Draws fast; picture reading can mistake the number or shape of figures placed together."
+    },
+    {
+     "id": "o3-mini-2025-01-31",
+     "label": "o3-mini-2025-01-31",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "vision"
+     ],
+     "comment_ja": "描画は測っていない（旧モデルのため対象外）。画像は読めない。",
+     "comment_en": "Drawing not measured (left out as an older model). Cannot read pictures."
+    },
+    {
+     "id": "gpt-audio-1.5",
+     "label": "gpt-audio-1.5",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-image-1.5",
+     "label": "gpt-image-1.5",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-4o-transcribe-diarize",
+     "label": "gpt-4o-transcribe-diarize",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy",
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-5-codex",
+     "label": "gpt-5-codex",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "提供元で廃止された（404）。",
+     "comment_en": "Deprecated by the provider (404)."
+    },
+    {
+     "id": "gpt-4-0613",
+     "label": "gpt-4-0613",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 12.9,
+     "comment_ja": "描画はやや速め。画像は読めない。単価は未確認。",
+     "comment_en": "Draws fairly fast; cannot read pictures. Pricing unconfirmed."
+    },
+    {
+     "id": "gpt-5.1-2025-11-13",
+     "label": "gpt-5.1-2025-11-13",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 8.3,
+     "speed_vision_seconds": 3.7,
+     "comment_ja": "描画はやや速め。画像の読み取りは長く、出力の上限で途中で切れる。単価は未確認。",
+     "comment_en": "Draws fairly fast; picture reading runs long and stops at the output limit. Pricing unconfirmed."
+    },
+    {
+     "id": "gpt-4o-search-preview",
+     "label": "gpt-4o-search-preview",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "描画に使う Responses API に対応しない（400）。",
+     "comment_en": "Does not take the Responses API this app draws with (400)."
+    },
+    {
+     "id": "gpt-5-pro-2025-10-06",
+     "label": "gpt-5-pro-2025-10-06",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "このアプリが送る推論の段 low を受け付けない（400、high だけ）。",
+     "comment_en": "Refuses the reasoning effort this app sends, low (400; high only)."
+    },
+    {
+     "id": "gpt-5.6-sol",
+     "label": "gpt-5.6-sol",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 7.6,
+     "speed_vision_seconds": 2.1,
+     "cost_usd_llm": 0.025251,
+     "cost_usd_vision": 0.00586,
+     "comment_ja": "描画は速い。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
+     "comment_en": "Draws fast; picture reading can mistake the number or shape of figures placed together."
+    },
+    {
+     "id": "gpt-realtime-mini",
+     "label": "gpt-realtime-mini",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-image-1-mini",
+     "label": "gpt-image-1-mini",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-5.6-terra",
+     "label": "gpt-5.6-terra",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 6.3,
+     "speed_vision_seconds": 2.6,
+     "cost_usd_llm": 0.013364,
+     "cost_usd_vision": 0.003068,
+     "comment_ja": "描画は速い。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
+     "comment_en": "Draws fast; picture reading can mistake the number or shape of figures placed together."
+    },
+    {
+     "id": "gpt-3.5-turbo-instruct-0914",
+     "label": "gpt-3.5-turbo-instruct-0914",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "この API キーでは使えない（404）。",
+     "comment_en": "Not available with this API key (404)."
+    },
+    {
+     "id": "sora-2",
+     "label": "sora-2",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-4.1-mini",
+     "label": "GPT-4.1 mini",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 5.0,
+     "speed_vision_seconds": 1.9,
+     "cost_usd_llm": 0.003299,
+     "cost_usd_vision": 0.000638,
+     "comment_ja": "とても安い。描画は速い。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
+     "comment_en": "Very cheap. Draws fast; picture reading can mistake the number or shape of figures placed together."
+    },
+    {
+     "id": "gpt-4o-mini",
+     "label": "gpt-4o-mini",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 5.1,
+     "speed_vision_seconds": 2.0,
+     "cost_usd_llm": 0.001239,
+     "cost_usd_vision": 0.003928,
+     "comment_ja": "とても安い。描画は速い。画像の読み取りは要点の一部を落とす。",
+     "comment_en": "Very cheap. Draws fast; picture reading misses some points."
+    },
+    {
+     "id": "gpt-5.4-pro",
+     "label": "gpt-5.4-pro",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "このアプリが送る推論の段 none を受け付けない（400、medium 以上）。",
+     "comment_en": "Refuses the reasoning effort this app sends, none (400; medium and up)."
+    },
+    {
+     "id": "gpt-4o-mini-tts",
+     "label": "gpt-4o-mini-tts",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy",
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-realtime-mini-2025-12-15",
+     "label": "gpt-realtime-mini-2025-12-15",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-5.1-codex-max",
+     "label": "gpt-5.1-codex-max",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "提供元で廃止された（404）。",
+     "comment_en": "Deprecated by the provider (404)."
+    },
+    {
+     "id": "gpt-5.1-chat-latest",
+     "label": "gpt-5.1-chat-latest",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "提供元で廃止された（404）。",
+     "comment_en": "Deprecated by the provider (404)."
+    },
+    {
+     "id": "gpt-5",
+     "label": "gpt-5",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 63.9,
+     "speed_vision_seconds": 10.6,
+     "cost_usd_llm": 0.042751,
+     "cost_usd_vision": 0.006955,
+     "comment_ja": "高い。描画はとても遅い。画像の読み取りは要点の一部を落とす。",
+     "comment_en": "Costly. Draws very slowly; picture reading misses some points."
+    },
+    {
+     "id": "gpt-4o-mini-transcribe",
+     "label": "gpt-4o-mini-transcribe",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy",
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-image-2-2026-04-21",
+     "label": "gpt-image-2-2026-04-21",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-5.2-chat-latest",
+     "label": "gpt-5.2-chat-latest",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "提供元で廃止された（404）。",
+     "comment_en": "Deprecated by the provider (404)."
+    },
+    {
+     "id": "sora-2-pro",
+     "label": "sora-2-pro",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-3.5-turbo-instruct",
+     "label": "gpt-3.5-turbo-instruct",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "この API キーでは使えない（404）。",
+     "comment_en": "Not available with this API key (404)."
+    },
+    {
+     "id": "gpt-transcribe",
+     "label": "gpt-transcribe",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-4.1-nano-2025-04-14",
+     "label": "gpt-4.1-nano-2025-04-14",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 4.4,
+     "speed_vision_seconds": 1.7,
+     "comment_ja": "描画は速い。画像の読み取りは、並んだ形の数や形を取り違えることがある。単価は未確認。",
+     "comment_en": "Draws fast; picture reading can mistake the number or shape of figures placed together. Pricing unconfirmed."
+    },
+    {
+     "id": "o1-2024-12-17",
+     "label": "o1-2024-12-17",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 33.5,
+     "speed_vision_seconds": 7.0,
+     "comment_ja": "描画は遅い。画像の読み取りはおおむね正確。単価は未確認。",
+     "comment_en": "Draws slowly; reads pictures mostly accurately. Pricing unconfirmed."
+    },
+    {
+     "id": "tts-1-hd-1106",
+     "label": "tts-1-hd-1106",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-5.2-codex",
+     "label": "gpt-5.2-codex",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "提供元で廃止された（404）。",
+     "comment_en": "Deprecated by the provider (404)."
+    },
+    {
+     "id": "gpt-4o",
+     "label": "gpt-4o",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 3.8,
+     "speed_vision_seconds": 1.2,
+     "cost_usd_llm": 0.018479,
+     "cost_usd_vision": 0.00319,
+     "comment_ja": "描画は速い。画像の読み取りはおおむね正確。",
+     "comment_en": "Draws fast; reads pictures mostly accurately."
+    },
+    {
+     "id": "gpt-4o-mini-tts-2025-12-15",
+     "label": "gpt-4o-mini-tts-2025-12-15",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy",
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-image-1",
+     "label": "gpt-image-1",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-audio",
+     "label": "gpt-audio",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-5.3-codex",
+     "label": "gpt-5.3-codex",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 7.2,
+     "cost_usd_llm": 0.01368,
+     "comment_ja": "描画は速い。画像の読み取りは Chat Completions に対応せず使えない。",
+     "comment_en": "Draws fast; cannot read pictures here, as it does not take Chat Completions."
+    },
+    {
+     "id": "gpt-5-search-api-2025-10-14",
+     "label": "gpt-5-search-api-2025-10-14",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "描画に使う Responses API に対応しない（400）。",
+     "comment_en": "Does not take the Responses API this app draws with (400)."
+    },
+    {
+     "id": "gpt-5-nano-2025-08-07",
+     "label": "gpt-5-nano-2025-08-07",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 25.3,
+     "speed_vision_seconds": 3.0,
+     "comment_ja": "描画は遅い。画像の読み取りは、並んだ形の数や形を取り違えることがある。単価は未確認。",
+     "comment_en": "Draws slowly; picture reading can mistake the number or shape of figures placed together. Pricing unconfirmed."
+    },
+    {
+     "id": "gpt-4o-transcribe",
+     "label": "gpt-4o-transcribe",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy",
+      "not_supported"
+     ]
+    },
+    {
+     "id": "o4-mini",
+     "label": "o4-mini",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_vision": 3,
+     "speed_vision_seconds": 2.2,
+     "cost_usd_vision": 0.002266,
+     "comment_ja": "描画は測っていない（旧モデルのため対象外）。画像の読み取りはおおむね正確。",
+     "comment_en": "Drawing not measured (left out as an older model). Reads pictures mostly accurately."
+    },
+    {
+     "id": "gpt-5.1-codex-mini",
+     "label": "gpt-5.1-codex-mini",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "提供元で廃止された（404）。",
+     "comment_en": "Deprecated by the provider (404)."
+    },
+    {
+     "id": "o4-mini-deep-research",
+     "label": "o4-mini-deep-research",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "提供元で廃止された（404）。",
+     "comment_en": "Deprecated by the provider (404)."
+    },
+    {
+     "id": "gpt-5.4",
+     "label": "gpt-5.4",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 7.3,
+     "speed_vision_seconds": 3.2,
+     "cost_usd_llm": 0.018407,
+     "cost_usd_vision": 0.004315,
+     "comment_ja": "描画は速い。画像の読み取りは長く、出力の上限で途中で切れる。",
+     "comment_en": "Draws fast; picture reading runs long and stops at the output limit."
+    },
+    {
+     "id": "gpt-4o-search-preview-2025-03-11",
+     "label": "gpt-4o-search-preview-2025-03-11",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "描画に使う Responses API に対応しない（400）。",
+     "comment_en": "Does not take the Responses API this app draws with (400)."
+    },
+    {
+     "id": "text-embedding-3-small",
+     "label": "text-embedding-3-small",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-3.5-turbo-1106",
+     "label": "gpt-3.5-turbo-1106",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "この API キーでは使えない（404）。",
+     "comment_en": "Not available with this API key (404)."
+    },
+    {
+     "id": "gpt-4o-mini-tts-2025-03-20",
+     "label": "gpt-4o-mini-tts-2025-03-20",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy",
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-5.2",
+     "label": "gpt-5.2",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 7.8,
+     "speed_vision_seconds": 2.6,
+     "cost_usd_llm": 0.014644,
+     "cost_usd_vision": 0.003271,
+     "comment_ja": "描画は速い。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
+     "comment_en": "Draws fast; picture reading can mistake the number or shape of figures placed together."
+    },
+    {
+     "id": "gpt-5.4-nano-2026-03-17",
+     "label": "gpt-5.4-nano-2026-03-17",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 7.3,
+     "speed_vision_seconds": 1.4,
+     "comment_ja": "描画は速い。画像の読み取りは、並んだ形の数や形を取り違えることがある。単価は未確認。",
+     "comment_en": "Draws fast; picture reading can mistake the number or shape of figures placed together. Pricing unconfirmed."
+    },
+    {
+     "id": "o1",
+     "label": "o1",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 34.1,
+     "speed_vision_seconds": 14.0,
+     "cost_usd_llm": 0.370078,
+     "cost_usd_vision": 0.053985,
+     "comment_ja": "とても高い。描画は遅い。画像の読み取りは要点の一部を落とす。",
+     "comment_en": "Very costly. Draws slowly; picture reading misses some points."
+    },
+    {
+     "id": "gpt-5.3-chat-latest",
+     "label": "gpt-5.3-chat-latest",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "提供元で廃止された（404）。",
+     "comment_en": "Deprecated by the provider (404)."
+    },
+    {
+     "id": "o3-2025-04-16",
+     "label": "o3-2025-04-16",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_vision": 5,
+     "speed_vision_seconds": 2.9,
+     "comment_ja": "描画は測っていない（旧モデルのため対象外）。画像の読み取りも正確。",
+     "comment_en": "Drawing not measured (left out as an older model). Reads pictures accurately."
+    },
+    {
+     "id": "gpt-5.2-2025-12-11",
+     "label": "gpt-5.2-2025-12-11",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 8.0,
+     "speed_vision_seconds": 2.6,
+     "comment_ja": "描画はやや速め。画像の読み取りは、並んだ形の数や形を取り違えることがある。単価は未確認。",
+     "comment_en": "Draws fairly fast; picture reading can mistake the number or shape of figures placed together. Pricing unconfirmed."
+    },
+    {
+     "id": "chatgpt-image-latest",
+     "label": "chatgpt-image-latest",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-3.5-turbo",
+     "label": "gpt-3.5-turbo",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 5.2,
+     "cost_usd_llm": 0.004153,
+     "comment_ja": "安い。描画は速い。画像は読めない。",
+     "comment_en": "Cheap. Draws fast; cannot read pictures."
+    },
+    {
+     "id": "gpt-4o-mini-2024-07-18",
+     "label": "gpt-4o-mini-2024-07-18",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 5.0,
+     "speed_vision_seconds": 1.8,
+     "comment_ja": "描画は速い。画像の読み取りは、並んだ形の数や形を取り違えることがある。単価は未確認。",
+     "comment_en": "Draws fast; picture reading can mistake the number or shape of figures placed together. Pricing unconfirmed."
+    },
+    {
+     "id": "gpt-4.1-2025-04-14",
+     "label": "gpt-4.1-2025-04-14",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 3.5,
+     "speed_vision_seconds": 2.4,
+     "comment_ja": "描画は速い。画像の読み取りは要点の一部を落とす。単価は未確認。",
+     "comment_en": "Draws fast; picture reading misses some points. Pricing unconfirmed."
+    },
+    {
+     "id": "gpt-image-2.5-flare",
+     "label": "gpt-image-2.5-flare",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "davinci-002",
+     "label": "davinci-002",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "この API キーでは使えない（404）。",
+     "comment_en": "Not available with this API key (404)."
+    },
+    {
+     "id": "gpt-5.4-nano",
+     "label": "gpt-5.4-nano",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 6.6,
+     "speed_vision_seconds": 1.7,
+     "cost_usd_llm": 0.002012,
+     "cost_usd_vision": 0.000402,
+     "comment_ja": "とても安い。描画は速い。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
+     "comment_en": "Very cheap. Draws fast; picture reading can mistake the number or shape of figures placed together."
+    },
+    {
+     "id": "o3-mini",
+     "label": "o3-mini",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "vision"
+     ],
+     "comment_ja": "描画は測っていない（旧モデルのため対象外）。画像は読めない。",
+     "comment_en": "Drawing not measured (left out as an older model). Cannot read pictures."
+    },
+    {
+     "id": "o4-mini-deep-research-2025-06-26",
+     "label": "o4-mini-deep-research-2025-06-26",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "提供元で廃止された（404）。",
+     "comment_en": "Deprecated by the provider (404)."
+    },
+    {
+     "id": "gpt-audio-mini-2025-12-15",
+     "label": "gpt-audio-mini-2025-12-15",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "o1-pro-2025-03-19",
+     "label": "o1-pro-2025-03-19",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "vision"
+     ],
+     "comment_ja": "描画は1件だけ（106秒）で、旧モデルのため測定の対象から外した。画像の読み取りは Chat Completions に対応せず使えない。",
+     "comment_en": "Drew one description (106 s) before being left out as an older model. Cannot read pictures here, as it does not take Chat Completions."
+    },
+    {
+     "id": "gpt-6-luna",
+     "label": "gpt-6-luna",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 6.4,
+     "speed_vision_seconds": 2.3,
+     "cost_usd_llm": 0.000641,
+     "cost_usd_vision": 0.000135,
+     "comment_ja": "とても安い。描画は速い。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
+     "comment_en": "Very cheap. Draws fast; picture reading can mistake the number or shape of figures placed together."
+    },
+    {
+     "id": "gpt-image-2.5-sunburst",
+     "label": "gpt-image-2.5-sunburst",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-image-2.5-flare-2026-09-08",
+     "label": "gpt-image-2.5-flare-2026-09-08",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-audio-mini",
+     "label": "gpt-audio-mini",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-4.1-mini-2025-04-14",
+     "label": "gpt-4.1-mini-2025-04-14",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "legacy"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 4.1,
+     "speed_vision_seconds": 1.7,
+     "comment_ja": "描画は速い。画像の読み取りは、並んだ形の数や形を取り違えることがある。単価は未確認。",
+     "comment_en": "Draws fast; picture reading can mistake the number or shape of figures placed together. Pricing unconfirmed."
+    },
+    {
+     "id": "gpt-image-2.5-sunburst-2026-09-08",
+     "label": "gpt-image-2.5-sunburst-2026-09-08",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-live-1",
+     "label": "gpt-live-1",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gpt-6-astra",
+     "label": "gpt-6-astra",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ],
+     "comment_ja": "tokenコストが高すぎるためノンサポート（動作はする）",
+     "comment_en": "Not supported: its token cost is too high (it does work)."
+    },
+    {
+     "id": "gpt-4o-mini-search-preview",
+     "label": "gpt-4o-mini-search-preview",
+     "purposes": [],
+     "labels": [
+      "legacy"
+     ],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "描画に使う Responses API に対応しない（400）。",
+     "comment_en": "Does not take the Responses API this app draws with (400)."
+    },
+    {
+     "id": "gpt-6-sol",
+     "label": "gpt-6-sol",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 6.9,
+     "speed_vision_seconds": 2.3,
+     "cost_usd_llm": 0.011283,
+     "cost_usd_vision": 0.00278,
+     "comment_ja": "描画は速い。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
+     "comment_en": "Draws fast; picture reading can mistake the number or shape of figures placed together."
+    },
+    {
+     "id": "gpt-6.1-sol",
+     "label": "gpt-6.1-sol",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 14.7,
+     "speed_vision_seconds": 5.4,
+     "cost_usd_llm": 0.012943,
+     "cost_usd_vision": 0.003075,
+     "comment_ja": "描画は遅め。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
+     "comment_en": "Draws somewhat slowly; picture reading can mistake the number or shape of figures placed together."
+    },
+    {
+     "id": "dall-e-2",
+     "label": "dall-e-2",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-27"
+    },
+    {
+     "id": "dall-e-3",
+     "label": "dall-e-3",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-27"
+    },
+    {
+     "id": "gpt-4o-audio-preview",
+     "label": "gpt-4o-audio-preview",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy",
+      "eol"
+     ],
+     "eol_date": "2026-09-27"
+    },
+    {
+     "id": "gpt-4o-audio-preview-2024-12-17",
+     "label": "gpt-4o-audio-preview-2024-12-17",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy",
+      "eol"
+     ],
+     "eol_date": "2026-09-27"
+    },
+    {
+     "id": "gpt-4o-audio-preview-2025-06-03",
+     "label": "gpt-4o-audio-preview-2025-06-03",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy",
+      "eol"
+     ],
+     "eol_date": "2026-09-27"
+    },
+    {
+     "id": "gpt-4o-mini-audio-preview",
+     "label": "gpt-4o-mini-audio-preview",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy",
+      "eol"
+     ],
+     "eol_date": "2026-09-27"
+    },
+    {
+     "id": "gpt-4o-mini-audio-preview-2024-12-17",
+     "label": "gpt-4o-mini-audio-preview-2024-12-17",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy",
+      "eol"
+     ],
+     "eol_date": "2026-09-27"
+    },
+    {
+     "id": "gpt-4o-mini-realtime-preview",
+     "label": "gpt-4o-mini-realtime-preview",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy",
+      "eol"
+     ],
+     "eol_date": "2026-09-27"
+    },
+    {
+     "id": "gpt-4o-mini-realtime-preview-2024-12-17",
+     "label": "gpt-4o-mini-realtime-preview-2024-12-17",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy",
+      "eol"
+     ],
+     "eol_date": "2026-09-27"
+    },
+    {
+     "id": "gpt-4o-realtime-preview",
+     "label": "gpt-4o-realtime-preview",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy",
+      "eol"
+     ],
+     "eol_date": "2026-09-27"
+    },
+    {
+     "id": "gpt-4o-realtime-preview-2024-12-17",
+     "label": "gpt-4o-realtime-preview-2024-12-17",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy",
+      "eol"
+     ],
+     "eol_date": "2026-09-27"
+    },
+    {
+     "id": "gpt-4o-realtime-preview-2025-06-03",
+     "label": "gpt-4o-realtime-preview-2025-06-03",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "legacy",
+      "eol"
+     ],
+     "eol_date": "2026-09-27"
+    },
+    {
+     "id": "gpt-realtime-mini-2025-10-06",
+     "label": "gpt-realtime-mini-2025-10-06",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-27"
+    },
+    {
+     "id": "gpt-5.1-mini",
+     "label": "GPT-5.1 mini",
+     "labels": [
+      "legacy"
+     ]
+    }
+   ]
+  },
+  "anthropic": {
+   "defaults": [
+    "claude-opus-4-7",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5-20251001"
+   ],
+   "models": [
+    {
+     "id": "claude-haiku-5-5",
+     "label": "Claude Haiku 5.5",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 18.2,
+     "speed_vision_seconds": 2.9,
+     "cost_usd_llm": 0.002842,
+     "cost_usd_vision": 0.000331,
+     "comment_ja": "とても安い。描画は遅め、画像の読み取りは重なりの順を取り違えることがある。",
+     "comment_en": "Very cheap. Draws slowly; picture reading can mistake which shape lies on top."
+    },
+    {
+     "id": "claude-sonnet-5-5",
+     "label": "Claude Sonnet 5.5",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 5,
+     "speed_llm_seconds": 7.6,
+     "speed_vision_seconds": 3.5,
+     "cost_usd_llm": 0.031419,
+     "cost_usd_vision": 0.005018,
+     "comment_ja": "速く、画像の読み取りも正確。",
+     "comment_en": "Fast and reads pictures accurately."
+    },
+    {
+     "id": "claude-opus-5-5",
+     "label": "Claude Opus 5.5",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 18.4,
+     "speed_vision_seconds": 5.8,
+     "cost_usd_llm": 0.07887,
+     "cost_usd_vision": 0.011486,
+     "comment_ja": "描画は遅めで高い。画像の読み取りは重なりの順を取り違えることがある。",
+     "comment_en": "Draws slowly and costs more; picture reading can mistake which shape lies on top."
+    },
+    {
+     "id": "claude-fable-5-1",
+     "label": "Claude Fable 5.1",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "not_supported"
+     ],
+     "comment_ja": "用途に対してのtokenコストが高すぎるため、サポート対象から除外（動作はする）",
+     "comment_en": "Excluded from support: its token cost is too high for this use (it does work)."
+    },
+    {
+     "id": "claude-opus-5",
+     "label": "Claude Opus 5",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 33.4,
+     "speed_vision_seconds": 8.7,
+     "cost_usd_llm": 0.118438,
+     "cost_usd_vision": 0.016997,
+     "comment_ja": "遅く、最も高い。画像の読み取りは重なりの順を取り違えることがある。",
+     "comment_en": "Slow and the most costly; picture reading can mistake which shape lies on top."
+    },
+    {
+     "id": "claude-sonnet-5",
+     "label": "Claude Sonnet 5",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 57.9,
+     "speed_vision_seconds": 2.9,
+     "cost_usd_llm": 0.071754,
+     "cost_usd_vision": 0.003814,
+     "comment_ja": "長く考えるので描画はとても遅い。画像の読み取りはおおむね正確。",
+     "comment_en": "Thinks at length, so it draws very slowly; reads pictures mostly accurately."
+    },
+    {
+     "id": "claude-fable-5",
+     "label": "Claude Fable 5",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "not_supported"
+     ],
+     "comment_ja": "用途に対してのtokenコストが高すぎるため、サポート対象から除外（動作はする）",
+     "comment_en": "Excluded from support: its token cost is too high for this use (it does work)."
+    },
+    {
+     "id": "claude-opus-4-8",
+     "label": "Claude Opus 4.8",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 13.8,
+     "speed_vision_seconds": 5.3,
+     "cost_usd_llm": 0.077477,
+     "cost_usd_vision": 0.010722,
+     "comment_ja": "描画はやや速め。画像の読み取りはおおむね正確。",
+     "comment_en": "Draws fairly quickly; reads pictures mostly accurately."
+    },
+    {
+     "id": "claude-opus-4-7",
+     "label": "Claude Opus 4.7",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 18.4,
+     "speed_vision_seconds": 5.1,
+     "cost_usd_llm": 0.088154,
+     "cost_usd_vision": 0.01014,
+     "comment_ja": "描画は遅め。画像の読み取りはおおむね正確。",
+     "comment_en": "Draws slowly; reads pictures mostly accurately."
+    },
+    {
+     "id": "claude-sonnet-4-6",
+     "label": "Claude Sonnet 4.6",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 23.5,
+     "speed_vision_seconds": 4.4,
+     "cost_usd_llm": 0.051488,
+     "cost_usd_vision": 0.005772,
+     "comment_ja": "描画は遅め。画像の読み取りはおおむね正確。",
+     "comment_en": "Draws slowly; reads pictures mostly accurately."
+    },
+    {
+     "id": "claude-opus-4-6",
+     "label": "Claude Opus 4.6",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 36.5,
+     "speed_vision_seconds": 9.0,
+     "cost_usd_llm": 0.095478,
+     "cost_usd_vision": 0.011308,
+     "comment_ja": "遅く高い。画像の読み取りはおおむね正確。",
+     "comment_en": "Slow and costly; reads pictures mostly accurately."
+    },
+    {
+     "id": "claude-opus-4-5-20251101",
+     "label": "Claude Opus 4.5",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 13.4,
+     "speed_vision_seconds": 3.6,
+     "cost_usd_llm": 0.070021,
+     "cost_usd_vision": 0.008977,
+     "comment_ja": "描画はやや速め。画像の読み取りはおおむね正確。",
+     "comment_en": "Draws fairly quickly; reads pictures mostly accurately."
+    },
+    {
+     "id": "claude-haiku-4-5-20251001",
+     "label": "Claude Haiku 4.5",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 12.9,
+     "speed_vision_seconds": 1.9,
+     "cost_usd_llm": 0.016269,
+     "cost_usd_vision": 0.001655,
+     "comment_ja": "安く、画像の読み取りは速いが、向きを取り違えることがある。",
+     "comment_en": "Inexpensive; reads pictures quickly but can mistake directions."
+    },
+    {
+     "id": "claude-sonnet-4-5-20250929",
+     "label": "Claude Sonnet 4.5",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 18.2,
+     "speed_vision_seconds": 4.3,
+     "cost_usd_llm": 0.048669,
+     "cost_usd_vision": 0.005552,
+     "comment_ja": "描画は遅め。画像の読み取りは要点の一部を落とす。",
+     "comment_en": "Draws slowly; picture reading misses some points."
+    },
+    {
+     "id": "claude-opus-4-1-20250805",
+     "label": "Claude Opus 4.1",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-27"
+    },
+    {
+     "id": "claude-opus-4-20250514",
+     "label": "Claude Opus 4",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-27"
+    },
+    {
+     "id": "claude-sonnet-4-20250514",
+     "label": "Claude Sonnet 4",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-27"
+    }
+   ]
+  },
+  "gemini": {
+   "defaults": [
+    "gemini-3.5-flash-lite",
+    "gemma-4-31b-it"
+   ],
+   "models": [
+    {
+     "id": "gemini-2.5-flash",
+     "label": "Gemini 2.5 Flash",
+     "purposes": [],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "この API キーでは使えない（404）。",
+     "comment_en": "Not available with this API key (404)."
+    },
+    {
+     "id": "gemini-2.5-pro",
+     "label": "Gemini 2.5 Pro",
+     "purposes": [],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "この API キーでは使えない（404）。",
+     "comment_en": "Not available with this API key (404)."
+    },
+    {
+     "id": "gemini-2.5-flash-preview-tts",
+     "label": "Gemini 2.5 Flash Preview TTS",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gemini-2.5-pro-preview-tts",
+     "label": "Gemini 2.5 Pro Preview TTS",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gemma-4-26b-a4b-it",
+     "label": "Gemma 4 26B A4B IT",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 19.6,
+     "speed_vision_seconds": 4.4,
+     "cost_usd_llm": 0.0,
+     "cost_usd_vision": 0.0,
+     "comment_ja": "無料枠で使える。描画は遅め、画像の読み取りはおおむね正確。",
+     "comment_en": "Free tier. Draws slowly; reads pictures mostly accurately."
+    },
+    {
+     "id": "gemma-4-31b-it",
+     "label": "Gemma 4 31B Instruct",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 5,
+     "speed_llm_seconds": 19.1,
+     "speed_vision_seconds": 13.9,
+     "cost_usd_llm": 0.0,
+     "cost_usd_vision": 0.0,
+     "comment_ja": "無料枠で使える。描画は遅めだが、画像の読み取りは正確。",
+     "comment_en": "Free tier. Draws slowly, but reads pictures accurately."
+    },
+    {
+     "id": "gemini-flash-latest",
+     "label": "Gemini Flash Latest",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 6.3,
+     "speed_vision_seconds": 2.8,
+     "cost_usd_llm": 0.00789,
+     "cost_usd_vision": 0.001378,
+     "comment_ja": "速い。別名で、応答は Gemini 3.8 Flash が返す。",
+     "comment_en": "Fast; an alias that Gemini 3.8 Flash answers."
+    },
+    {
+     "id": "gemini-flash-lite-latest",
+     "label": "Gemini Flash-Lite Latest",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 2.4,
+     "speed_vision_seconds": 1.5,
+     "cost_usd_llm": 0.003171,
+     "cost_usd_vision": 0.000601,
+     "comment_ja": "とても速く安い。別名で、応答は Gemini 3.5 Flash-Lite が返す。",
+     "comment_en": "Very fast and cheap; an alias that Gemini 3.5 Flash-Lite answers."
+    },
+    {
+     "id": "gemini-pro-latest",
+     "label": "Gemini Pro Latest",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 5,
+     "speed_llm_seconds": 18.7,
+     "speed_vision_seconds": 4.4,
+     "cost_usd_llm": 0.035382,
+     "cost_usd_vision": 0.005614,
+     "comment_ja": "画像の読み取りは正確だが、遅く高い。別名で、応答は 3.1 Pro Preview が返す。",
+     "comment_en": "Reads pictures accurately but slow and costly; an alias that 3.1 Pro Preview answers."
+    },
+    {
+     "id": "gemini-2.5-flash-lite",
+     "label": "Gemini 2.5 Flash-Lite",
+     "purposes": [],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "この API キーでは使えない（404）。",
+     "comment_en": "Not available with this API key (404)."
+    },
+    {
+     "id": "gemini-2.5-flash-image",
+     "label": "Nano Banana",
+     "purposes": [
+      "vision"
+     ],
+     "unsupported_purposes": [
+      "llm"
+     ],
+     "speed_vision_seconds": 7.2,
+     "cost_usd_vision": 0.03902185,
+     "comment_ja": "描画には使えない（関数呼び出しを受け付けない）。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
+     "comment_en": "Cannot draw (refuses the function call). Picture reading can mistake the number or shape of figures placed together."
+    },
+    {
+     "id": "gemini-3-flash-preview",
+     "label": "Gemini 3 Flash Preview",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 4.7,
+     "speed_vision_seconds": 1.9,
+     "cost_usd_llm": 0.00536,
+     "cost_usd_vision": 0.000899,
+     "comment_ja": "速く安い。画像の読み取りはおおむね正確。",
+     "comment_en": "Fast and inexpensive; reads pictures mostly accurately."
+    },
+    {
+     "id": "gemini-3.1-pro-preview",
+     "label": "Gemini 3.1 Pro Preview",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 20.6,
+     "speed_vision_seconds": 37.4,
+     "cost_usd_llm": 0.037112,
+     "cost_usd_vision": 0.006598,
+     "comment_ja": "遅く高い。画像の読み取りはおおむね正確だが時間がかかる。",
+     "comment_en": "Slow and costly; reads pictures mostly accurately but takes long."
+    },
+    {
+     "id": "gemini-3.1-pro-preview-customtools",
+     "label": "Gemini 3.1 Pro Preview Custom Tools",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 5,
+     "speed_llm_seconds": 17.9,
+     "speed_vision_seconds": 5.0,
+     "cost_usd_llm": 0.035225,
+     "cost_usd_vision": 0.005788,
+     "comment_ja": "画像の読み取りは正確。遅めで高い。",
+     "comment_en": "Reads pictures accurately; slower and costly."
+    },
+    {
+     "id": "gemini-3.1-flash-lite-preview",
+     "label": "Gemini 3.1 Flash Lite Preview",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 2.5,
+     "speed_vision_seconds": 1.3,
+     "cost_usd_llm": 0.002277,
+     "cost_usd_vision": 0.000442,
+     "comment_ja": "とても速く、最も安い部類。応答は 3.1 Flash-Lite が返す。",
+     "comment_en": "Very fast and among the cheapest; 3.1 Flash-Lite answers."
+    },
+    {
+     "id": "gemini-3.1-flash-lite",
+     "label": "Gemini 3.1 Flash Lite",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 2.5,
+     "speed_vision_seconds": 1.3,
+     "cost_usd_llm": 0.002225,
+     "cost_usd_vision": 0.000444,
+     "comment_ja": "とても速く、最も安い部類。画像の読み取りは要点の一部を落とす。",
+     "comment_en": "Very fast and among the cheapest; picture reading misses some points."
+    },
+    {
+     "id": "gemini-3-pro-image-preview",
+     "label": "Nano Banana Pro",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 29.2,
+     "speed_vision_seconds": 5.2,
+     "comment_ja": "描画は遅い。画像の読み取りはおおむね正確。単価は未確定。",
+     "comment_en": "Draws slowly; reads pictures mostly accurately. Pricing unconfirmed."
+    },
+    {
+     "id": "gemini-3-pro-image",
+     "label": "Nano Banana Pro",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 25.9,
+     "speed_vision_seconds": 6.0,
+     "cost_usd_llm": 0.049404,
+     "cost_usd_vision": 0.006322,
+     "comment_ja": "遅く高い。画像の読み取りは要点の一部を落とす。",
+     "comment_en": "Slow and costly; picture reading misses some points."
+    },
+    {
+     "id": "nano-banana-pro-preview",
+     "label": "Nano Banana Pro",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 25.1,
+     "speed_vision_seconds": 5.3,
+     "comment_ja": "描画は遅い。画像の読み取りはおおむね正確。単価は未確定。",
+     "comment_en": "Draws slowly; reads pictures mostly accurately. Pricing unconfirmed."
+    },
+    {
+     "id": "gemini-3.1-flash-image-preview",
+     "label": "Nano Banana 2",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 16.8,
+     "speed_vision_seconds": 1.7,
+     "comment_ja": "描画はやや遅い。画像の読み取りは速く、おおむね正確。単価は未確定。",
+     "comment_en": "Draws somewhat slowly; reads pictures quickly and mostly accurately. Pricing unconfirmed."
+    },
+    {
+     "id": "gemini-3.1-flash-image",
+     "label": "Nano Banana 2",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 23.9,
+     "speed_vision_seconds": 1.7,
+     "cost_usd_llm": 0.017637,
+     "cost_usd_vision": 0.000511,
+     "comment_ja": "描画は遅め。画像の読み取りは速いが、向きを取り違えることがある。",
+     "comment_en": "Draws slowly; reads pictures quickly but can mistake directions."
+    },
+    {
+     "id": "gemini-3.1-flash-lite-image",
+     "label": "Nano Banana 2 Lite",
+     "purposes": [
+      "vision"
+     ],
+     "unsupported_purposes": [
+      "llm"
+     ],
+     "recommendation_vision": 2,
+     "speed_vision_seconds": 0.9,
+     "cost_usd_vision": 0.000485,
+     "comment_ja": "描画には使えない（画像だけを返す）。画像の読み取りは速く安い。",
+     "comment_en": "Cannot draw (answers with a picture only); reads pictures fast and cheaply."
+    },
+    {
+     "id": "gemini-nano-banana-2.1",
+     "label": "Nano Banana 2.1",
+     "purposes": [],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "描画は6件中4件だけ。Vision の助言を返さない。",
+     "comment_en": "Drew 4 of 6; returns no Vision advice."
+    },
+    {
+     "id": "gemini-3.5-flash",
+     "label": "Gemini 3.5 Flash",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 5,
+     "speed_llm_seconds": 5.5,
+     "speed_vision_seconds": 2.2,
+     "cost_usd_llm": 0.007718,
+     "cost_usd_vision": 0.001309,
+     "comment_ja": "速く、画像の読み取りも正確。応答は Gemini 3.6 Flash が返す。",
+     "comment_en": "Fast and reads pictures accurately; Gemini 3.6 Flash answers."
+    },
+    {
+     "id": "gemini-3.5-flash-lite",
+     "label": "Gemini 3.5 Flash-Lite",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 2.6,
+     "speed_vision_seconds": 1.2,
+     "cost_usd_llm": 0.003306,
+     "cost_usd_vision": 0.000605,
+     "comment_ja": "とても速く安い。画像の読み取りは要点の一部を落とす。",
+     "comment_en": "Very fast and cheap; picture reading misses some points."
+    },
+    {
+     "id": "gemini-omni-flash-preview",
+     "label": "Gemini Omni Flash Preview",
+     "purposes": [],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "Interactions API 専用で、このアプリからは使えない。",
+     "comment_en": "Interactions API only; not usable from this app."
+    },
+    {
+     "id": "gemini-omni-1.1-flash",
+     "label": "Gemini Omni 1.1 Flash",
+     "purposes": [],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "Interactions API 専用で、このアプリからは使えない。",
+     "comment_en": "Interactions API only; not usable from this app."
+    },
+    {
+     "id": "gemini-3.5-transcribe",
+     "label": "Gemini 3.5 Transcribe",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gemini-3.6-flash",
+     "label": "Gemini 3.6 Flash",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 5,
+     "speed_llm_seconds": 5.3,
+     "speed_vision_seconds": 2.0,
+     "cost_usd_llm": 0.00759,
+     "cost_usd_vision": 0.001337,
+     "comment_ja": "速く、画像の読み取りも正確。",
+     "comment_en": "Fast and reads pictures accurately."
+    },
+    {
+     "id": "gemini-3.7-flash",
+     "label": "Gemini 3.7 Flash",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 7.3,
+     "speed_vision_seconds": 2.6,
+     "cost_usd_llm": 0.008024,
+     "cost_usd_vision": 0.001362,
+     "comment_ja": "速い。応答は Gemini 3.8 Flash が返す。",
+     "comment_en": "Fast; Gemini 3.8 Flash answers."
+    },
+    {
+     "id": "gemini-3.8-flash",
+     "label": "Gemini 3.8 Flash",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 5,
+     "speed_llm_seconds": 6.9,
+     "speed_vision_seconds": 3.2,
+     "cost_usd_llm": 0.00778,
+     "cost_usd_vision": 0.001334,
+     "comment_ja": "速く、画像の読み取りも正確。Flash の最新版。",
+     "comment_en": "Fast and reads pictures accurately; the newest Flash."
+    },
+    {
+     "id": "lyria-3-clip-preview",
+     "label": "Lyria 3 Clip Preview",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "lyria-3-pro-preview",
+     "label": "Lyria 3 Pro Preview",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "lyria-3.5",
+     "label": "Lyria 3.5",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gemini-3.1-flash-tts-preview",
+     "label": "Gemini 3.1 Flash TTS Preview",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gemini-3.8-flash-tts",
+     "label": "Gemini 3.8 Flash TTS",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gemini-3.8-flash-lite-tts",
+     "label": "Gemini 3.8 Flash Lite TTS",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gemini-robotics-er-2-preview",
+     "label": "Gemini Robotics-ER 2 Preview",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 5,
+     "speed_llm_seconds": 4.3,
+     "speed_vision_seconds": 2.2,
+     "cost_usd_llm": 0.009543,
+     "cost_usd_vision": 0.001783,
+     "comment_ja": "速く、画像の読み取りも正確。ロボット向けのプレビュー版。",
+     "comment_en": "Fast and reads pictures accurately; a robotics-oriented preview."
+    },
+    {
+     "id": "gemini-2.5-computer-use-preview-10-2025",
+     "label": "Gemini 2.5 Computer Use Preview 10-2025",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ],
+     "comment_ja": "2026-10-12実測・v2.15.103 Build 1179。指定6記述を各1回（日本語3・英語3）。技術的描画完了：日本語0/3・英語0/3。測定経路に必須のComputer Use toolがない。比較条件が6件揃わずLLM推奨度は保留。Stage 2実呼出し0件で未評価。Vision判定不能（必須のComputer Use toolを測定経路が付けていない）。C未実施。",
+     "comment_en": "Measured 2026-10-12 on v2.15.103 Build 1179; one draw per specified description (3 Japanese, 3 English). Technical completion: Japanese 0/3, English 0/3. The measured route lacks the required Computer Use tool. LLM recommendation withheld because all 6 comparable outcomes were not established. Stage 2 unassessed: 0 actual calls. Vision indeterminate (the measured route does not supply the required Computer Use tool). C not run."
+    },
+    {
+     "id": "antigravity-preview-05-2026",
+     "label": "Antigravity Agent Preview",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ],
+     "comment_ja": "2026-10-12実測・v2.15.103 Build 1179。指定6記述を各1回（日本語3・英語3）。技術的描画完了：日本語0/3・英語0/3。providerのHTTP 500を含む。描画前のcountTokens経路で失敗。比較条件が6件揃わずLLM推奨度は保留。Stage 2実呼出し0件で未評価。Visionは画像入力の明示的拒否と陽性対照から非対応を確認。C未実施。",
+     "comment_en": "Measured 2026-10-12 on v2.15.103 Build 1179; one draw per specified description (3 Japanese, 3 English). Technical completion: Japanese 0/3, English 0/3. Includes provider HTTP 500 responses. Failed in the pre-draw countTokens route. LLM recommendation withheld because all 6 comparable outcomes were not established. Stage 2 unassessed: 0 actual calls. Vision non-support confirmed by explicit image-input rejection and a working positive control. C not run."
+    },
+    {
+     "id": "antigravity-preview-09-2026",
+     "label": "Antigravity Agent Preview",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ],
+     "comment_ja": "2026-10-12実測・v2.15.103 Build 1179。指定6記述を各1回（日本語3・英語3）。技術的描画完了：日本語0/3・英語0/3。providerのHTTP 500を含む。描画前のcountTokens経路で失敗。比較条件が6件揃わずLLM推奨度は保留。Stage 2実呼出し0件で未評価。Visionは画像入力の明示的拒否と陽性対照から非対応を確認。C未実施。",
+     "comment_en": "Measured 2026-10-12 on v2.15.103 Build 1179; one draw per specified description (3 Japanese, 3 English). Technical completion: Japanese 0/3, English 0/3. Includes provider HTTP 500 responses. Failed in the pre-draw countTokens route. LLM recommendation withheld because all 6 comparable outcomes were not established. Stage 2 unassessed: 0 actual calls. Vision non-support confirmed by explicit image-input rejection and a working positive control. C not run."
+    },
+    {
+     "id": "antigravity-preview-latest",
+     "label": "Antigravity Agent Preview Latest",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ],
+     "comment_ja": "2026-10-12実測・v2.15.103 Build 1179。指定6記述を各1回（日本語3・英語3）。技術的描画完了：日本語0/3・英語0/3。providerのHTTP 500を含む。描画前のcountTokens経路で失敗。比較条件が6件揃わずLLM推奨度は保留。Stage 2実呼出し0件で未評価。Visionは画像入力の明示的拒否と陽性対照から非対応を確認。C未実施。",
+     "comment_en": "Measured 2026-10-12 on v2.15.103 Build 1179; one draw per specified description (3 Japanese, 3 English). Technical completion: Japanese 0/3, English 0/3. Includes provider HTTP 500 responses. Failed in the pre-draw countTokens route. LLM recommendation withheld because all 6 comparable outcomes were not established. Stage 2 unassessed: 0 actual calls. Vision non-support confirmed by explicit image-input rejection and a working positive control. C not run."
+    },
+    {
+     "id": "deep-research-max-preview-04-2026",
+     "label": "Deep Research Max Preview (Apr-21-2026)",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ],
+     "comment_ja": "2026-10-12実測・v2.15.103 Build 1179。指定6記述を各1回（日本語3・英語3）。技術的描画完了：日本語0/3・英語0/3。必須のInteractions APIを測定経路が実装していない。比較条件が6件揃わずLLM推奨度は保留。Stage 2実呼出し0件で未評価。Vision判定不能（モデル専用のInteractions APIを測定経路が実装していない）。C未実施。",
+     "comment_en": "Measured 2026-10-12 on v2.15.103 Build 1179; one draw per specified description (3 Japanese, 3 English). Technical completion: Japanese 0/3, English 0/3. The measured route does not implement the required Interactions API. LLM recommendation withheld because all 6 comparable outcomes were not established. Stage 2 unassessed: 0 actual calls. Vision indeterminate (the measured route does not implement the model's required Interactions API). C not run."
+    },
+    {
+     "id": "deep-research-preview-04-2026",
+     "label": "Deep Research Preview (Apr-21-2026)",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ],
+     "comment_ja": "2026-10-12実測・v2.15.103 Build 1179。指定6記述を各1回（日本語3・英語3）。技術的描画完了：日本語0/3・英語0/3。必須のInteractions APIを測定経路が実装していない。比較条件が6件揃わずLLM推奨度は保留。Stage 2実呼出し0件で未評価。Vision判定不能（モデル専用のInteractions APIを測定経路が実装していない）。C未実施。",
+     "comment_en": "Measured 2026-10-12 on v2.15.103 Build 1179; one draw per specified description (3 Japanese, 3 English). Technical completion: Japanese 0/3, English 0/3. The measured route does not implement the required Interactions API. LLM recommendation withheld because all 6 comparable outcomes were not established. Stage 2 unassessed: 0 actual calls. Vision indeterminate (the measured route does not implement the model's required Interactions API). C not run."
+    },
+    {
+     "id": "deep-research-pro-preview-12-2025",
+     "label": "Deep Research Pro Preview (Dec-12-2025)",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ],
+     "comment_ja": "2026-10-12実測・v2.15.103 Build 1179。指定6記述を各1回（日本語3・英語3）。技術的描画完了：日本語0/3・英語0/3。必須のInteractions APIを測定経路が実装していない。比較条件が6件揃わずLLM推奨度は保留。Stage 2実呼出し0件で未評価。Vision判定不能（モデル専用のInteractions APIを測定経路が実装していない）。C未実施。",
+     "comment_en": "Measured 2026-10-12 on v2.15.103 Build 1179; one draw per specified description (3 Japanese, 3 English). Technical completion: Japanese 0/3, English 0/3. The measured route does not implement the required Interactions API. LLM recommendation withheld because all 6 comparable outcomes were not established. Stage 2 unassessed: 0 actual calls. Vision indeterminate (the measured route does not implement the model's required Interactions API). C not run."
+    },
+    {
+     "id": "gemini-embedding-001",
+     "label": "Gemini Embedding 001",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gemini-embedding-2-preview",
+     "label": "Gemini Embedding 2 Preview",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gemini-embedding-2",
+     "label": "Gemini Embedding 2",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "aqa",
+     "label": "Model that performs Attributed Question Answering.",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "veo-3.1-generate-preview",
+     "label": "Veo 3.1",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "veo-3.1-fast-generate-preview",
+     "label": "Veo 3.1 fast",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "veo-3.1-lite-generate-preview",
+     "label": "Veo 3.1 lite",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gemini-3.5-transcribe-live",
+     "label": "Gemini 3.5 Transcribe Live",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gemini-2.5-flash-native-audio-latest",
+     "label": "Gemini 2.5 Flash Native Audio Latest",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gemini-2.5-flash-native-audio-preview-09-2025",
+     "label": "Gemini 2.5 Flash Native Audio Preview 09-2025",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gemini-2.5-flash-native-audio-preview-12-2025",
+     "label": "Gemini 2.5 Flash Native Audio Preview 12-2025",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gemini-3.1-flash-live-preview",
+     "label": "Gemini 3.1 Flash Live Preview",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gemini-3.8-live",
+     "label": "Gemini 3.8 Live",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gemini-3.8-live-extended-thinking",
+     "label": "Gemini 3.8 Live Extended Thinking",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gemini-robotics-er-2-streaming-preview",
+     "label": "Gemini Robotics-ER 2 Streaming Preview",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gemini-3.5-live-translate-preview",
+     "label": "Gemini 3.5 Live Translate Preview",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "lyria-realtime-exp",
+     "label": "Lyria Realtime Experimental",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "not_supported"
+     ]
+    },
+    {
+     "id": "gemini-2.0-flash",
+     "label": "Gemini 2.0 Flash",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-20"
+    },
+    {
+     "id": "gemini-2.0-flash-001",
+     "label": "Gemini 2.0 Flash 001",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-20"
+    },
+    {
+     "id": "gemini-2.0-flash-lite",
+     "label": "Gemini 2.0 Flash-Lite",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-20"
+    },
+    {
+     "id": "gemini-2.0-flash-lite-001",
+     "label": "Gemini 2.0 Flash-Lite 001",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-20"
+    },
+    {
+     "id": "gemini-3-pro-preview",
+     "label": "Gemini 3 Pro Preview",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-20"
+    },
+    {
+     "id": "gemini-robotics-er-1.5-preview",
+     "label": "Gemini Robotics-ER 1.5 Preview",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-20"
+    },
+    {
+     "id": "gemini-robotics-er-1.6-preview",
+     "label": "Gemini Robotics-ER 1.6 Preview",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-20"
+    },
+    {
+     "id": "gemma-3-12b-it",
+     "label": "Gemma 3 12B",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-20"
+    },
+    {
+     "id": "gemma-3-1b-it",
+     "label": "Gemma 3 1B",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-20"
+    },
+    {
+     "id": "gemma-3-27b-it",
+     "label": "Gemma 3 27B",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-20"
+    },
+    {
+     "id": "gemma-3-4b-it",
+     "label": "Gemma 3 4B",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-20"
+    },
+    {
+     "id": "gemma-3n-e2b-it",
+     "label": "Gemma 3n E2B",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-20"
+    },
+    {
+     "id": "gemma-3n-e4b-it",
+     "label": "Gemma 3n E4B",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-20"
+    },
+    {
+     "id": "imagen-4.0-fast-generate-001",
+     "label": "Imagen 4 Fast",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-20"
+    },
+    {
+     "id": "imagen-4.0-generate-001",
+     "label": "Imagen 4",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-20"
+    },
+    {
+     "id": "imagen-4.0-ultra-generate-001",
+     "label": "Imagen 4 Ultra",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-20"
+    },
+    {
+     "id": "veo-2.0-generate-001",
+     "label": "Veo 2",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-20"
+    },
+    {
+     "id": "veo-3.0-fast-generate-001",
+     "label": "Veo 3 fast",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-20"
+    },
+    {
+     "id": "veo-3.0-generate-001",
+     "label": "Veo 3",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-20"
+    }
+   ]
+  },
+  "nvidia": {
+   "defaults": [
+    "mistralai/mistral-nemotron",
+    "meta/llama-3.1-70b-instruct",
+    "meta/llama-3.2-3b-instruct",
+    "qwen/qwen3-next-80b-a3b-instruct",
+    "poolside/laguna-xs-2.1",
+    "nvidia/ising-calibration-1-35b-a3b",
+    "nvidia/llama-3.3-nemotron-super-49b-v1",
+    "nvidia/nemotron-nano-12b-v2-vl",
+    "google/gemma-4-31b-it",
+    "meta/llama-3.3-70b-instruct",
+    "mistralai/mistral-large-3-675b-instruct-2512",
+    "qwen/qwen3.5-397b-a17b",
+    "z-ai/glm-5.2",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+    "deepseek-ai/deepseek-v4-flash",
+    "openai/gpt-oss-120b",
+    "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+    "minimaxai/minimax-m3",
+    "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
+    "deepseek-ai/deepseek-v4-pro",
+    "minimaxai/minimax-m2.7",
+    "nvidia/nemotron-3-super-120b-a12b",
+    "bytedance/seed-oss-36b-instruct",
+    "nvidia/nvidia-nemotron-nano-9b-v2",
+    "meta/llama-3.1-8b-instruct",
+    "mistralai/mistral-medium-3.5-128b",
+    "mistralai/mistral-small-4-119b-2603",
+    "nvidia/nemotron-3-ultra-550b-a55b",
+    "mistralai/mixtral-8x7b-instruct-v0.1",
+    "openai/gpt-oss-20b",
+    "stepfun-ai/step-3.7-flash",
+    "google/gemma-3n-e2b-it",
+    "google/gemma-3n-e4b-it",
+    "meta/llama-3.2-11b-vision-instruct",
+    "nvidia/nemotron-3-nano-30b-a3b",
+    "meta/llama-3.2-1b-instruct",
+    "meta/llama-3.2-90b-vision-instruct",
+    "meta/llama-4-maverick-17b-128e-instruct",
+    "mistralai/ministral-14b-instruct-2512",
+    "nvidia/llama-3.1-nemotron-nano-8b-v1",
+    "stepfun-ai/step-3.5-flash",
+    "thinkingmachines/inkling",
+    "qwen/qwen3.5-122b-a10b",
+    "qwen/qwen3-coder-480b-a35b-instruct"
+   ],
+   "models": [
+    {
+     "id": "mistralai/mistral-nemotron",
+     "label": "mistralai/mistral-nemotron",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-10-13",
+     "recommendation_llm": 4,
+     "speed_class": "ultra-fast",
+     "speed_label": "昼 121s / 夕 10s / 深夜 8s",
+     "comment_ja": "実測 9/9 成功。スキーマ違反なし。補正発火 平均 5.0。応答中央値 昼 121s / 夕 10s / 深夜 8s。",
+     "comment_en": "9 of 9 attempts succeeded; no schema violations; 5.0 corrections on average; median response midday 121s / evening 10s / late night 8s."
+    },
+    {
+     "id": "meta/llama-3.1-70b-instruct",
+     "label": "meta/llama-3.1-70b-instruct",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14",
+     "recommendation_llm": 4,
+     "speed_class": "fast",
+     "speed_label": "昼 52s / 夕 29s / 深夜 64s",
+     "comment_ja": "実測 9/9 成功。スキーマ違反なし。補正発火 平均 5.8。応答中央値 昼 52s / 夕 29s / 深夜 64s。",
+     "comment_en": "9 of 9 attempts succeeded; no schema violations; 5.8 corrections on average; median response midday 52s / evening 29s / late night 64s."
+    },
+    {
+     "id": "meta/llama-3.2-3b-instruct",
+     "label": "meta/llama-3.2-3b-instruct",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14",
+     "recommendation_llm": 4,
+     "speed_class": "fast",
+     "speed_label": "昼 121s / 夕 13s / 深夜 121s",
+     "comment_ja": "実測 9/9 成功。スキーマ違反なし。補正発火 平均 5.9。応答中央値 昼 121s / 夕 13s / 深夜 121s。",
+     "comment_en": "9 of 9 attempts succeeded; no schema violations; 5.9 corrections on average; median response midday 121s / evening 13s / late night 121s."
+    },
+    {
+     "id": "qwen/qwen3-next-80b-a3b-instruct",
+     "label": "qwen/qwen3-next-80b-a3b-instruct",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11",
+     "recommendation_llm": 4,
+     "speed_class": "ultra-fast",
+     "speed_label": "昼 7s / 夕 7s / 深夜 8s",
+     "comment_ja": "実測 9/9 成功。スキーマ違反なし。補正発火 平均 6.0。応答中央値 昼 7s / 夕 7s / 深夜 8s。",
+     "comment_en": "9 of 9 attempts succeeded; no schema violations; 6.0 corrections on average; median response midday 7s / evening 7s / late night 8s."
+    },
+    {
+     "id": "poolside/laguna-xs-2.1",
+     "label": "poolside/laguna-xs-2.1",
+     "purposes": [
+      "llm"
+     ],
+     "recommendation_llm": 4,
+     "speed_class": "ultra-fast",
+     "speed_label": "昼 4s / 夕 4s / 深夜 4s",
+     "comment_ja": "実測 9/9 成功。スキーマ違反なし。補正発火 平均 7.2。応答中央値 昼 4s / 夕 4s / 深夜 4s。",
+     "comment_en": "9 of 9 attempts succeeded; no schema violations; 7.2 corrections on average; median response midday 4s / evening 4s / late night 4s."
+    },
+    {
+     "id": "nvidia/ising-calibration-1-35b-a3b",
+     "label": "nvidia/ising-calibration-1-35b-a3b",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11",
+     "recommendation_llm": 3,
+     "speed_class": "fast",
+     "speed_label": "昼 12s / 夕 22s / 深夜 13s",
+     "comment_ja": "実測 9/9 成功。スキーマ違反なし。補正発火 平均 14.4。応答中央値 昼 12s / 夕 22s / 深夜 13s。",
+     "comment_en": "9 of 9 attempts succeeded; no schema violations; 14.4 corrections on average; median response midday 12s / evening 22s / late night 13s."
+    },
+    {
+     "id": "nvidia/llama-3.3-nemotron-super-49b-v1",
+     "label": "nvidia/llama-3.3-nemotron-super-49b-v1",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14",
+     "recommendation_llm": 5,
+     "speed_class": "fast",
+     "speed_label": "昼 24s / 夕 57s / 深夜 44s",
+     "comment_ja": "実測 8/8 成功。スキーマ違反なし。補正発火 平均 4.6。混雑時の Stage 1 無応答 1 回。応答中央値 昼 24s / 夕 57s / 深夜 44s。",
+     "comment_en": "8 of 8 attempts succeeded; no schema violations; 4.6 corrections on average; Stage 1 silent once under load; median response midday 24s / evening 57s / late night 44s."
+    },
+    {
+     "id": "nvidia/nemotron-nano-12b-v2-vl",
+     "label": "nvidia/nemotron-nano-12b-v2-vl",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14",
+     "recommendation_llm": 3,
+     "recommendation_vision": 4,
+     "speed_class": "fast",
+     "speed_label": "昼 19s / 夕 29s / 深夜 16s",
+     "comment_ja": "実測 8/8 成功。スキーマ違反なし。補正発火 平均 8.4。応答中央値 昼 19s / 夕 29s / 深夜 16s。Vision 再現率 0.89。",
+     "comment_en": "8 of 8 attempts succeeded; no schema violations; 8.4 corrections on average; median response midday 19s / evening 29s / late night 16s; Vision recall 0.89."
+    },
+    {
+     "id": "google/gemma-4-31b-it",
+     "label": "Google Gemma 4 31B Instruct",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 4,
+     "recommendation_vision": 5,
+     "speed_class": "medium",
+     "speed_label": "昼 221s / 夕 114s / 深夜 199s",
+     "comment_ja": "実測 7/7 成功。スキーマ違反なし。補正発火 平均 5.9。混雑時の Stage 1 無応答 1 回。応答中央値 昼 221s / 夕 114s / 深夜 199s。Vision 再現率 1.00。",
+     "comment_en": "7 of 7 attempts succeeded; no schema violations; 5.9 corrections on average; Stage 1 silent once under load; median response midday 221s / evening 114s / late night 199s; Vision recall 1.00."
+    },
+    {
+     "id": "meta/llama-3.3-70b-instruct",
+     "label": "Meta Llama 3.3 70B Instruct",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14",
+     "recommendation_llm": 4,
+     "speed_class": "slow",
+     "speed_label": "昼 174s / 夕 149s / 深夜 180s",
+     "comment_ja": "実測 6/6 成功。スキーマ違反なし。補正発火 平均 6.7。混雑時の Stage 1 無応答 2 回。応答中央値 昼 174s / 夕 149s / 深夜 180s。",
+     "comment_en": "6 of 6 attempts succeeded; no schema violations; 6.7 corrections on average; Stage 1 silent 2 times under load; median response midday 174s / evening 149s / late night 180s."
+    },
+    {
+     "id": "mistralai/mistral-large-3-675b-instruct-2512",
+     "label": "mistralai/mistral-large-3-675b-instruct-2512",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11",
+     "recommendation_llm": 3,
+     "speed_class": "slow",
+     "speed_label": "昼 165s / 夕 156s / 深夜 158s",
+     "comment_ja": "実測 6/6 成功。スキーマ違反なし。補正発火 平均 8.0。混雑時の Stage 1 無応答 3 回。応答中央値 昼 165s / 夕 156s / 深夜 158s。",
+     "comment_en": "6 of 6 attempts succeeded; no schema violations; 8.0 corrections on average; Stage 1 silent 3 times under load; median response midday 165s / evening 156s / late night 158s."
+    },
+    {
+     "id": "qwen/qwen3.5-397b-a17b",
+     "label": "qwen/qwen3.5-397b-a17b",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11",
+     "recommendation_llm": 5,
+     "speed_class": "slow",
+     "speed_label": "昼 190s / 深夜 162s",
+     "comment_ja": "実測 5/5 成功。スキーマ違反なし。補正発火 平均 3.8。混雑時の Stage 1 無応答 4 回。応答中央値 昼 190s / 深夜 162s。",
+     "comment_en": "5 of 5 attempts succeeded; no schema violations; 3.8 corrections on average; Stage 1 silent 4 times under load; median response midday 190s / late night 162s."
+    },
+    {
+     "id": "z-ai/glm-5.2",
+     "label": "z-ai/glm-5.2",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14",
+     "recommendation_llm": 5,
+     "speed_class": "medium",
+     "speed_label": "夕 148s / 深夜 110s",
+     "comment_ja": "実測 5/5 成功。スキーマ違反なし。補正発火 平均 4.2。混雑時の Stage 1 無応答 1 回。応答中央値 夕 148s / 深夜 110s。",
+     "comment_en": "5 of 5 attempts succeeded; no schema violations; 4.2 corrections on average; Stage 1 silent once under load; median response evening 148s / late night 110s."
+    },
+    {
+     "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+     "label": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 4,
+     "speed_class": "medium",
+     "speed_label": "昼 119s / 夕 70s / 深夜 153s",
+     "comment_ja": "実測 4/4 成功。スキーマ違反なし。補正発火 平均 7.8。応答中央値 昼 119s / 夕 70s / 深夜 153s。Vision 再現率 0.89。",
+     "comment_en": "4 of 4 attempts succeeded; no schema violations; 7.8 corrections on average; median response midday 119s / evening 70s / late night 153s; Vision recall 0.89."
+    },
+    {
+     "id": "deepseek-ai/deepseek-v4-flash",
+     "label": "deepseek-ai/deepseek-v4-flash",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11",
+     "recommendation_llm": 3,
+     "speed_class": "fast",
+     "speed_label": "昼 16s / 深夜 101s",
+     "comment_ja": "実測 3/3 成功。スキーマ違反なし。補正発火 平均 9.3。応答中央値 昼 16s / 深夜 101s。",
+     "comment_en": "3 of 3 attempts succeeded; no schema violations; 9.3 corrections on average; median response midday 16s / late night 101s."
+    },
+    {
+     "id": "openai/gpt-oss-120b",
+     "label": "openai/gpt-oss-120b",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14",
+     "recommendation_llm": 2,
+     "speed_class": "ultra-fast",
+     "speed_label": "昼 13s / 夕 10s / 深夜 11s",
+     "comment_ja": "実測 6/7 成功。スキーマ違反 1 回。補正発火 平均 3.5。混雑時の Stage 1 無応答 2 回。応答中央値 昼 13s / 夕 10s / 深夜 11s。",
+     "comment_en": "6 of 7 attempts succeeded; 1 score schema violations; 3.5 corrections on average; Stage 1 silent 2 times under load; median response midday 13s / evening 10s / late night 11s."
+    },
+    {
+     "id": "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+     "label": "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14",
+     "recommendation_llm": 4,
+     "speed_class": "slow",
+     "speed_label": "昼 136s",
+     "comment_ja": "実測 1/1 成功。スキーマ違反なし。補正発火 平均 1.0。混雑時の Stage 1 無応答 1 回。応答中央値 昼 136s。",
+     "comment_en": "1 of 1 attempts succeeded; no schema violations; 1.0 corrections on average; Stage 1 silent once under load; median response midday 136s."
+    },
+    {
+     "id": "minimaxai/minimax-m3",
+     "label": "minimaxai/minimax-m3",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14",
+     "recommendation_llm": 2,
+     "speed_class": "medium",
+     "speed_label": "昼 132s / 夕 53s",
+     "comment_ja": "実測 6/9 成功。tool calling の引数不正 3 回。補正発火 平均 6.3。応答中央値 昼 132s / 夕 53s。",
+     "comment_en": "6 of 9 attempts succeeded; 3 malformed tool calls; 6.3 corrections on average; median response midday 132s / evening 53s."
+    },
+    {
+     "id": "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
+     "label": "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14",
+     "recommendation_llm": 2,
+     "recommendation_vision": 3,
+     "speed_class": "slow",
+     "speed_label": "昼 122s / 夕 122s / 深夜 122s",
+     "comment_ja": "実測 6/9 成功。スキーマ違反 3 回。補正発火 平均 6.3。応答中央値 昼 122s / 夕 122s / 深夜 122s。Vision 再現率 0.67。",
+     "comment_en": "6 of 9 attempts succeeded; 3 score schema violations; 6.3 corrections on average; median response midday 122s / evening 122s / late night 122s; Vision recall 0.67."
+    },
+    {
+     "id": "deepseek-ai/deepseek-v4-pro",
+     "label": "deepseek-ai/deepseek-v4-pro",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11",
+     "recommendation_llm": 2,
+     "speed_class": "fast",
+     "speed_label": "昼 16s / 夕 28s",
+     "comment_ja": "実測 6/9 成功。tool calling の引数不正 3 回。補正発火 平均 7.8。応答中央値 昼 16s / 夕 28s。",
+     "comment_en": "6 of 9 attempts succeeded; 3 malformed tool calls; 7.8 corrections on average; median response midday 16s / evening 28s."
+    },
+    {
+     "id": "minimaxai/minimax-m2.7",
+     "label": "minimaxai/minimax-m2.7",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11",
+     "recommendation_llm": 2,
+     "speed_class": "fast",
+     "speed_label": "昼 22s / 夕 74s / 深夜 33s",
+     "comment_ja": "実測 6/9 成功。スキーマ違反 3 回。補正発火 平均 8.5。応答中央値 昼 22s / 夕 74s / 深夜 33s。",
+     "comment_en": "6 of 9 attempts succeeded; 3 score schema violations; 8.5 corrections on average; median response midday 22s / evening 74s / late night 33s."
+    },
+    {
+     "id": "nvidia/nemotron-3-super-120b-a12b",
+     "label": "nvidia/nemotron-3-super-120b-a12b",
+     "purposes": [
+      "llm"
+     ],
+     "recommendation_llm": 2,
+     "speed_class": "fast",
+     "speed_label": "昼 21s / 夕 35s / 深夜 23s",
+     "comment_ja": "実測 5/9 成功。スキーマ違反 4 回。補正発火 平均 10.4。応答中央値 昼 21s / 夕 35s / 深夜 23s。",
+     "comment_en": "5 of 9 attempts succeeded; 4 score schema violations; 10.4 corrections on average; median response midday 21s / evening 35s / late night 23s."
+    },
+    {
+     "id": "bytedance/seed-oss-36b-instruct",
+     "label": "bytedance/seed-oss-36b-instruct",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11",
+     "recommendation_llm": 2,
+     "speed_class": "medium",
+     "speed_label": "昼 95s",
+     "comment_ja": "実測 1/2 成功。tool calling の引数不正 1 回。補正発火 平均 10.0。混雑時の Stage 1 無応答 5 回。応答中央値 昼 95s。",
+     "comment_en": "1 of 2 attempts succeeded; 1 malformed tool calls; 10.0 corrections on average; Stage 1 silent 5 times under load; median response midday 95s."
+    },
+    {
+     "id": "nvidia/nvidia-nemotron-nano-9b-v2",
+     "label": "nvidia/nvidia-nemotron-nano-9b-v2",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14",
+     "recommendation_llm": 2,
+     "speed_class": "fast",
+     "speed_label": "昼 73s / 深夜 40s",
+     "comment_ja": "実測 2/4 成功。tool calling の引数不正 2 回。補正発火 平均 2.5。応答中央値 昼 73s / 深夜 40s。",
+     "comment_en": "2 of 4 attempts succeeded; 2 malformed tool calls; 2.5 corrections on average; median response midday 73s / late night 40s."
+    },
+    {
+     "id": "meta/llama-3.1-8b-instruct",
+     "label": "meta/llama-3.1-8b-instruct",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14",
+     "recommendation_llm": 2,
+     "speed_class": "ultra-fast",
+     "speed_label": "昼 3s / 夕 4s / 深夜 13s",
+     "comment_ja": "実測 4/9 成功。スキーマ違反 5 回。補正発火 平均 3.5。応答中央値 昼 3s / 夕 4s / 深夜 13s。",
+     "comment_en": "4 of 9 attempts succeeded; 5 score schema violations; 3.5 corrections on average; median response midday 3s / evening 4s / late night 13s."
+    },
+    {
+     "id": "mistralai/mistral-medium-3.5-128b",
+     "label": "mistralai/mistral-medium-3.5-128b",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11",
+     "recommendation_llm": 2,
+     "recommendation_vision": 4,
+     "speed_class": "medium",
+     "speed_label": "昼 128s / 夕 168s / 深夜 92s",
+     "comment_ja": "実測 4/9 成功。スキーマ違反 5 回。補正発火 平均 3.8。応答中央値 昼 128s / 夕 168s / 深夜 92s。Vision 再現率 0.94。",
+     "comment_en": "4 of 9 attempts succeeded; 5 score schema violations; 3.8 corrections on average; median response midday 128s / evening 168s / late night 92s; Vision recall 0.94."
+    },
+    {
+     "id": "mistralai/mistral-small-4-119b-2603",
+     "label": "mistralai/mistral-small-4-119b-2603",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11",
+     "recommendation_llm": 2,
+     "recommendation_vision": 4,
+     "speed_class": "ultra-fast",
+     "speed_label": "昼 3s / 夕 6s / 深夜 4s",
+     "comment_ja": "実測 4/9 成功。スキーマ違反 5 回。補正発火 平均 5.5。応答中央値 昼 3s / 夕 6s / 深夜 4s。Vision 再現率 0.94。",
+     "comment_en": "4 of 9 attempts succeeded; 5 score schema violations; 5.5 corrections on average; median response midday 3s / evening 6s / late night 4s; Vision recall 0.94."
+    },
+    {
+     "id": "nvidia/nemotron-3-ultra-550b-a55b",
+     "label": "nvidia/nemotron-3-ultra-550b-a55b",
+     "purposes": [
+      "llm"
+     ],
+     "recommendation_llm": 2,
+     "speed_class": "fast",
+     "speed_label": "昼 40s / 夕 95s / 深夜 38s",
+     "comment_ja": "実測 3/7 成功。スキーマ違反 4 回。補正発火 平均 10.3。応答中央値 昼 40s / 夕 95s / 深夜 38s。",
+     "comment_en": "3 of 7 attempts succeeded; 4 score schema violations; 10.3 corrections on average; median response midday 40s / evening 95s / late night 38s."
+    },
+    {
+     "id": "mistralai/mixtral-8x7b-instruct-v0.1",
+     "label": "mistralai/mixtral-8x7b-instruct-v0.1",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11",
+     "recommendation_llm": 2,
+     "speed_class": "slow",
+     "speed_label": "昼 125s / 夕 236s / 深夜 125s",
+     "comment_ja": "実測 3/9 成功。スキーマ違反 6 回。補正発火 平均 1.0。応答中央値 昼 125s / 夕 236s / 深夜 125s。",
+     "comment_en": "3 of 9 attempts succeeded; 6 score schema violations; 1.0 corrections on average; median response midday 125s / evening 236s / late night 125s."
+    },
+    {
+     "id": "openai/gpt-oss-20b",
+     "label": "openai/gpt-oss-20b",
+     "purposes": [
+      "llm"
+     ],
+     "recommendation_llm": 2,
+     "speed_class": "fast",
+     "speed_label": "深夜 14s",
+     "comment_ja": "実測 1/5 成功。スキーマ違反 4 回。補正発火 平均 1.0。混雑時の Stage 1 無応答 4 回。応答中央値 深夜 14s。",
+     "comment_en": "1 of 5 attempts succeeded; 4 score schema violations; 1.0 corrections on average; Stage 1 silent 4 times under load; median response late night 14s."
+    },
+    {
+     "id": "stepfun-ai/step-3.7-flash",
+     "label": "stepfun-ai/step-3.7-flash",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14",
+     "recommendation_llm": 2,
+     "speed_class": "medium",
+     "speed_label": "夕 43s",
+     "comment_ja": "実測 1/6 成功。スキーマ違反 5 回。補正発火 平均 3.0。混雑時の Stage 1 無応答 3 回。応答中央値 夕 43s。",
+     "comment_en": "1 of 6 attempts succeeded; 5 score schema violations; 3.0 corrections on average; Stage 1 silent 3 times under load; median response evening 43s."
+    },
+    {
+     "id": "google/gemma-3n-e2b-it",
+     "label": "google/gemma-3n-e2b-it",
+     "purposes": [
+      "vision"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11",
+     "recommendation_vision": 4,
+     "speed_class": "unknown",
+     "speed_label": "Vision 12s",
+     "comment_ja": "実測 0/9 成功。tool calling の引数不正 9 回。応答中央値 Vision 12s。Vision 再現率 0.94。",
+     "comment_en": "0 of 9 attempts succeeded; 9 malformed tool calls; median response Vision 12s; Vision recall 0.94."
+    },
+    {
+     "id": "google/gemma-3n-e4b-it",
+     "label": "google/gemma-3n-e4b-it",
+     "purposes": [
+      "vision"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11",
+     "recommendation_vision": 4,
+     "speed_class": "unknown",
+     "speed_label": "Vision 15s",
+     "comment_ja": "実測 0/9 成功。tool calling の引数不正 9 回。応答中央値 Vision 15s。Vision 再現率 0.94。",
+     "comment_en": "0 of 9 attempts succeeded; 9 malformed tool calls; median response Vision 15s; Vision recall 0.94."
+    },
+    {
+     "id": "meta/llama-3.2-11b-vision-instruct",
+     "label": "meta/llama-3.2-11b-vision-instruct",
+     "purposes": [
+      "vision"
+     ],
+     "recommendation_vision": 4,
+     "speed_class": "unknown",
+     "speed_label": "Vision 9s",
+     "comment_ja": "実測 0/9 成功。スキーマ違反 9 回。応答中央値 Vision 9s。Vision 再現率 0.94。",
+     "comment_en": "0 of 9 attempts succeeded; 9 score schema violations; median response Vision 9s; Vision recall 0.94."
+    },
+    {
+     "id": "nvidia/nemotron-3-nano-30b-a3b",
+     "label": "nvidia/nemotron-3-nano-30b-a3b",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14",
+     "recommendation_llm": 1,
+     "speed_class": "unknown",
+     "speed_label": "未計測",
+     "comment_ja": "実測 0/9 成功。スキーマ違反 9 回。",
+     "comment_en": "0 of 9 attempts succeeded; 9 score schema violations."
+    },
+    {
+     "id": "meta/llama-3.2-1b-instruct",
+     "label": "meta/llama-3.2-1b-instruct",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14",
+     "speed_class": "unknown",
+     "speed_label": "未計測",
+     "comment_ja": "提供は継続中。2026-07-20 の 2 回の計測では 9 回とも Stage 1 が 120 秒以内に応答せず、品質を測定できなかった。混雑の影響とみられる。",
+     "comment_en": "Still offered. In both 2026-07-20 runs Stage 1 did not answer within 120 seconds, so nothing about its quality was measured. Consistent with provider load."
+    },
+    {
+     "id": "meta/llama-3.2-90b-vision-instruct",
+     "label": "Llama 3.2 90B Vision Instruct",
+     "purposes": [
+      "vision"
+     ],
+     "speed_class": "unknown",
+     "speed_label": "未計測",
+     "comment_ja": "提供は継続中。2026-07-20 の 2 回の計測では 9 回とも Stage 1 が 120 秒以内に応答せず、品質を測定できなかった。混雑の影響とみられる。",
+     "comment_en": "Still offered. In both 2026-07-20 runs Stage 1 did not answer within 120 seconds, so nothing about its quality was measured. Consistent with provider load."
+    },
+    {
+     "id": "meta/llama-4-maverick-17b-128e-instruct",
+     "label": "meta/llama-4-maverick-17b-128e-instruct",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11",
+     "speed_class": "unknown",
+     "speed_label": "未計測",
+     "comment_ja": "提供は継続中。2026-07-20 の 2 回の計測では 9 回とも Stage 1 が 120 秒以内に応答せず、品質を測定できなかった。混雑の影響とみられる。",
+     "comment_en": "Still offered. In both 2026-07-20 runs Stage 1 did not answer within 120 seconds, so nothing about its quality was measured. Consistent with provider load."
+    },
+    {
+     "id": "mistralai/ministral-14b-instruct-2512",
+     "label": "mistralai/ministral-14b-instruct-2512",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11",
+     "speed_class": "unknown",
+     "speed_label": "未計測",
+     "comment_ja": "提供は継続中。2026-07-20 の 2 回の計測では 9 回とも Stage 1 が 120 秒以内に応答せず、品質を測定できなかった。混雑の影響とみられる。",
+     "comment_en": "Still offered. In both 2026-07-20 runs Stage 1 did not answer within 120 seconds, so nothing about its quality was measured. Consistent with provider load."
+    },
+    {
+     "id": "nvidia/llama-3.1-nemotron-nano-8b-v1",
+     "label": "nvidia/llama-3.1-nemotron-nano-8b-v1",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14",
+     "speed_class": "unknown",
+     "speed_label": "未計測",
+     "comment_ja": "提供は継続中。2026-07-20 の 2 回の計測では 9 回とも Stage 1 が 120 秒以内に応答せず、品質を測定できなかった。混雑の影響とみられる。",
+     "comment_en": "Still offered. In both 2026-07-20 runs Stage 1 did not answer within 120 seconds, so nothing about its quality was measured. Consistent with provider load."
+    },
+    {
+     "id": "stepfun-ai/step-3.5-flash",
+     "label": "stepfun-ai/step-3.5-flash",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11",
+     "speed_class": "unknown",
+     "speed_label": "未計測",
+     "comment_ja": "提供は継続中。2026-07-20 の 2 回の計測では 9 回とも Stage 1 が 120 秒以内に応答せず、品質を測定できなかった。混雑の影響とみられる。",
+     "comment_en": "Still offered. In both 2026-07-20 runs Stage 1 did not answer within 120 seconds, so nothing about its quality was measured. Consistent with provider load."
+    },
+    {
+     "id": "thinkingmachines/inkling",
+     "label": "thinkingmachines/inkling",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14",
+     "speed_class": "unknown",
+     "speed_label": "未計測",
+     "comment_ja": "提供は継続中。2026-07-20 の 2 回の計測では 9 回とも Stage 1 が 120 秒以内に応答せず、品質を測定できなかった。混雑の影響とみられる。",
+     "comment_en": "Still offered. In both 2026-07-20 runs Stage 1 did not answer within 120 seconds, so nothing about its quality was measured. Consistent with provider load."
+    },
+    {
+     "id": "qwen/qwen3.5-122b-a10b",
+     "label": "qwen/qwen3.5-122b-a10b",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-07-20",
+     "speed_class": "unknown",
+     "speed_label": "提供終了",
+     "comment_ja": "提供終了。過去の作品は保存済みの Score と SVG で閲覧できるが、再描画はできない。",
+     "comment_en": "Retired by the provider. Existing artworks still render from their stored score and SVG, but cannot be redrawn."
+    },
+    {
+     "id": "qwen/qwen3-coder-480b-a35b-instruct",
+     "label": "qwen/qwen3-coder-480b-a35b-instruct",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-07-20",
+     "speed_class": "unknown",
+     "speed_label": "提供終了",
+     "comment_ja": "提供終了。過去の作品は保存済みの Score と SVG で閲覧できるが、再描画はできない。",
+     "comment_en": "Retired by the provider. Existing artworks still render from their stored score and SVG, but cannot be redrawn."
+    },
+    {
+     "id": "microsoft/phi-3-vision-128k-instruct",
+     "label": "microsoft/phi-3-vision-128k-instruct",
+     "purposes": [
+      "vision"
+     ]
+    },
+    {
+     "id": "abacusai/dracarys-llama-3.1-70b-instruct",
+     "label": "abacusai/dracarys-llama-3.1-70b-instruct",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11"
+    },
+    {
+     "id": "baai/bge-m3",
+     "label": "baai/bge-m3",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14"
+    },
+    {
+     "id": "deepseek-ai/deepseek-v4-flash-0731",
+     "label": "deepseek-ai/deepseek-v4-flash-0731",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-10-13"
+    },
+    {
+     "id": "google/gemma-2-2b-it",
+     "label": "google/gemma-2-2b-it",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11"
+    },
+    {
+     "id": "nvidia/gliner-pii",
+     "label": "nvidia/gliner-pii",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11"
+    },
+    {
+     "id": "nvidia/llama-nemotron-embed-1b-v2",
+     "label": "nvidia/llama-nemotron-embed-1b-v2",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14"
+    },
+    {
+     "id": "nvidia/nemoretriever-parse",
+     "label": "nvidia/nemoretriever-parse",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14"
+    },
+    {
+     "id": "nvidia/nemotron-mini-4b-instruct",
+     "label": "nvidia/nemotron-mini-4b-instruct",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14"
+    },
+    {
+     "id": "nvidia/nv-embed-v1",
+     "label": "nvidia/nv-embed-v1",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14"
+    },
+    {
+     "id": "nvidia/nv-embedcode-7b-v1",
+     "label": "nvidia/nv-embedcode-7b-v1",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14"
+    },
+    {
+     "id": "nvidia/nv-embedqa-e5-v5",
+     "label": "nvidia/nv-embedqa-e5-v5",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-14"
+    },
+    {
+     "id": "nvidia/riva-translate-4b-instruct-v1.1",
+     "label": "nvidia/riva-translate-4b-instruct-v1.1",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-10-13"
+    },
+    {
+     "id": "sarvamai/sarvam-m",
+     "label": "sarvamai/sarvam-m",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11"
+    },
+    {
+     "id": "upstage/solar-10.7b-instruct",
+     "label": "upstage/solar-10.7b-instruct",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11"
+    }
+   ]
+  },
+  "ollama": {
+   "defaults": [
+    "qwen3.5:4b-q4_K_M",
+    "ministral-3:8b-instruct-2512-q4_K_M",
+    "gemma4:e4b-it-q4_K_M",
+    "gemma4:31b-it-q4_K_M",
+    "gemma4:12b-it-q4_K_M",
+    "qwen3.5:27b-q4_K_M",
+    "qwen3.5:9b-q4_K_M",
+    "granite4.1:8b-q4_K_M",
+    "qwen3.5:2b-q4_K_M",
+    "qwen3.5:0.8b-q8_0"
+   ],
+   "models": [
+    {
+     "id": "qwen3.5:4b-q4_K_M",
+     "label": "qwen3.5:4b-q4_K_M (3.4GB)",
+     "purposes": [
+      "llm"
+     ],
+     "recommendation_stage1": 5,
+     "recommendation_stage2": 2,
+     "speed_class": "fast",
+     "speed_label": "1 件 39〜73s",
+     "comment_ja": "第一段階の推奨。日本語・英語とも 6/6 が正規化 DDL として成立した唯一の小型モデルで、しかも候補中の最小。明文規則の違反は英語 6 件中 0 件。第二段階では被覆 9/28 と低いので、そちらは別のモデルに任せる。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+     "comment_en": "Recommended for Stage 1. The only small model whose 6 Japanese and 6 English attempts all came back as usable normalized DDL, and the smallest candidate at that; zero explicit-rule violations in English. Its Stage 2 coverage is 9 of 28, so leave that stage to another model. Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over."
+    },
+    {
+     "id": "ministral-3:8b-instruct-2512-q4_K_M",
+     "label": "ministral-3:8b-instruct-2512-q4_K_M (6.0GB)",
+     "purposes": [
+      "llm"
+     ],
+     "recommendation_stage1": 3,
+     "recommendation_stage2": 5,
+     "speed_class": "slow",
+     "speed_label": "1 件 50〜576s",
+     "comment_ja": "第二段階の推奨。被覆 20/28 は計測した中で最も高く、8 件とも Score になった。思考する機能を持たないので、思考が予算を食い切って何も返らない失敗を構造的に踏まない。第一段階は日本語 6/6 が成立するが、英語で座標を直書きして崩れる。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+     "comment_en": "Recommended for Stage 2. Its coverage of 20 of 28 is the highest measured, and all eight cases produced a Score. It has no thinking capability, so it cannot fail the way models do when thinking eats the whole token budget. Stage 1 holds up in Japanese but breaks down in English, where it writes raw coordinates. Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over."
+    },
+    {
+     "id": "gemma4:e4b-it-q4_K_M",
+     "label": "gemma4:e4b-it-q4_K_M (9.6GB)",
+     "purposes": [
+      "llm"
+     ],
+     "recommendation_stage1": 3,
+     "recommendation_stage2": 4,
+     "speed_class": "fast",
+     "speed_label": "1 件 9〜141s",
+     "comment_ja": "第二段階の被覆 18/28。8 件とも Score になり、所要は計測した中で最も短い。第一段階は日本語 6/6 が成立するが、英語で説明の文を 5 件付け、数量が落ちる（「七つ」が several になる）。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+     "comment_en": "Stage 2 coverage 18 of 28, all eight cases producing a Score, and the shortest times measured. Stage 1 holds up in Japanese but in English it adds explanatory sentences in 5 of 6 cases and drops counts (\"seven\" becomes \"several\"). Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over."
+    },
+    {
+     "id": "gemma4:31b-it-q4_K_M",
+     "label": "gemma4:31b-it-q4_K_M (19GB)",
+     "purposes": [
+      "llm"
+     ],
+     "recommendation_stage1": 5,
+     "recommendation_stage2": 4,
+     "comment_ja": "第一段階は日本語・英語とも計測した中で最良。説明の文も灰背景の指示も 0 件で、「地: 生成りの紙。」の固定形を正しく使う唯一のモデル。第二段階の被覆 18/28 は Build 748/749 より前の経路で採った数字で、他の行とは条件が違う。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+     "comment_en": "The best Stage 1 measured in either language: no explanatory sentences, no gray background, and the only model that uses the fixed ground form correctly. Its Stage 2 coverage of 18 of 28 was taken on the path that preceded Build 748 and 749, so it is not comparable with the other entries here. Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over."
+    },
+    {
+     "id": "gemma4:12b-it-q4_K_M",
+     "label": "gemma4:12b-it-q4_K_M (7.6GB)",
+     "purposes": [
+      "llm"
+     ],
+     "recommendation_stage1": 3,
+     "recommendation_stage2": 3,
+     "speed_class": "medium",
+     "speed_label": "1 件 18〜110s",
+     "comment_ja": "第二段階の被覆 14/28。8 件とも Score になった。第一段階は英語が 6/6 成立して説明の文も 0 件だが、日本語で助詞が壊れる（「水たまりを楕円を七つ並べる」・「三ひゃく七十本」）。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+     "comment_en": "Stage 2 coverage 14 of 28, all eight cases producing a Score. Its English Stage 1 is clean across all 6 cases with no explanatory sentences, but its Japanese breaks grammatically and mangles a numeral. Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over."
+    },
+    {
+     "id": "qwen3.5:27b-q4_K_M",
+     "label": "qwen3.5:27b-q4_K_M (17GB)",
+     "purposes": [
+      "llm"
+     ],
+     "recommendation_stage1": 4,
+     "recommendation_stage2": 2,
+     "speed_class": "slow",
+     "speed_label": "1 件 224〜410s",
+     "comment_ja": "第一段階は日本語 6/6・英語 6/6 が成立する。第二段階の被覆は 10/28 で、5 分の 1 の大きさの qwen3.5:4b（9/28）とほとんど変わらない。同じ系統では規模を上げても被覆が伸びず、所要だけが伸びる。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+     "comment_en": "Stage 1 holds up across all 6 Japanese and all 6 English cases. Its Stage 2 coverage of 10 of 28 is barely above qwen3.5:4b at 9 of 28, a model a fifth its size: within this family, size buys time rather than coverage. Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over."
+    },
+    {
+     "id": "qwen3.5:9b-q4_K_M",
+     "label": "qwen3.5:9b-q4_K_M (6.6GB)",
+     "purposes": [
+      "llm"
+     ],
+     "recommendation_stage1": 3,
+     "recommendation_stage2": 2,
+     "speed_class": "medium",
+     "speed_label": "1 件 67〜114s",
+     "comment_ja": "第二段階の被覆 8/28 は、半分の大きさの qwen3.5:4b（9/28）を下回る。複雑な 5 件のうち 4 件で指示を 1 本しか出さない。第一段階は日本語 6/6 が成立するが、英語で説明の文を 4 件付ける。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+     "comment_en": "Stage 2 coverage of 8 of 28 falls below qwen3.5:4b at 9 of 28, half its size; on four of the five complex cases it emits a single instruction. Stage 1 holds up in Japanese but adds explanatory sentences in 4 English cases. Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over."
+    },
+    {
+     "id": "granite4.1:8b-q4_K_M",
+     "label": "granite4.1:8b-q4_K_M (5.3GB)",
+     "purposes": [
+      "llm"
+     ],
+     "recommendation_stage1": 1,
+     "comment_ja": "第一段階が日本語 6 件中 4 件で成立しない。感情語「静かに」が残り、禁止された動詞を 3 回使い、1 件は「面:」の誤用で図形の指示が 1 つも出ない。第二段階は測っていない。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+     "comment_en": "Stage 1 fails on 4 of 6 Japanese cases: an emotional adverb survives, three forbidden verbs appear, and one case produces no shape instruction at all through misuse of the surface form. Stage 2 was not measured. Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over."
+    },
+    {
+     "id": "qwen3.5:2b-q4_K_M",
+     "label": "qwen3.5:2b-q4_K_M (1.9GB)",
+     "purposes": [
+      "llm"
+     ],
+     "recommendation_stage1": 1,
+     "comment_ja": "第一段階が日本語 6 件中 3 件で成立しない。同じ段落を 3 回繰り返す 1 件と、図形を表す語が抜けて配置の句だけが並ぶ 2 件。第二段階は測っていない。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+     "comment_en": "Stage 1 fails on 3 of 6 Japanese cases: one repeats the same paragraph three times, two list placements with the shape word missing. Stage 2 was not measured. Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over."
+    },
+    {
+     "id": "qwen3.5:0.8b-q8_0",
+     "label": "qwen3.5:0.8b-q8_0 (1.0GB)",
+     "purposes": [
+      "llm"
+     ],
+     "recommendation_stage1": 1,
+     "comment_ja": "第一段階が日本語 6 件中 3 件で成立しない。述語のない断片（「中央付近に。」）と、入力の情景語をそのまま写した 2 件。第二段階は測っていない。計測は GPU なし 8 スレッドの機体。所要はその機体のもので、他所の機体には当てはまらない。",
+     "comment_en": "Stage 1 fails on 3 of 6 Japanese cases: a fragment with no predicate, and two that copy the scenic nouns of the input straight through without normalizing them. Stage 2 was not measured. Measured on a GPU-less eight-thread machine. The timings are that machine's and do not carry over."
+    }
+   ]
+  },
+  "ollama-cloud": {
+   "defaults": [
+    "nemotron-3-ultra",
+    "minimax-m2.5",
+    "nemotron-3-super",
+    "gemma4:31b",
+    "nemotron-3-nano:30b",
+    "gpt-oss:120b",
+    "gpt-oss:20b",
+    "minimax-m3",
+    "deepseek-v4-flash",
+    "deepseek-v4-pro",
+    "glm-5.1",
+    "glm-5.2",
+    "kimi-k2.5",
+    "kimi-k2.6",
+    "kimi-k2.7-code",
+    "minimax-m2.7",
+    "mistral-large-3:675b",
+    "qwen3.5:397b"
+   ],
+   "models": [
+    {
+     "id": "kimi-k2.7-code",
+     "label": "kimi-k2.7-code",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "subscription"
+     ],
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。Free プランでは使えない（402・有料プランが要る）。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not in the Free plan (402; a paid plan is required)."
+    },
+    {
+     "id": "gpt-oss:120b",
+     "label": "gpt-oss:120b",
+     "purposes": [
+      "llm"
+     ],
+     "unsupported_purposes": [
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 11.2,
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。Free プランで使える。考えてから描くので、やや時間がかかる。画像は読めない。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Free plan. Thinks before drawing, so it takes a little longer; cannot read pictures."
+    },
+    {
+     "id": "minimax-m2.7",
+     "label": "minimax-m2.7",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "subscription"
+     ],
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。Free プランでは使えない（402・有料プランが要る）。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not in the Free plan (402; a paid plan is required)."
+    },
+    {
+     "id": "nemotron-3-super",
+     "label": "nemotron-3-super",
+     "purposes": [
+      "llm"
+     ],
+     "unsupported_purposes": [
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 7.7,
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。Free プランで使える。描画は速めだが、記述と食い違うことがある。画像は読めない。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Free plan. Draws fairly fast but can stray from the description; cannot read pictures."
+    },
+    {
+     "id": "deepseek-v4-pro:0813",
+     "label": "deepseek-v4-pro:0813",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "subscription"
+     ],
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。Free プランでは使えない（402・有料プランが要る）。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not in the Free plan (402; a paid plan is required)."
+    },
+    {
+     "id": "nemotron-3-nano:30b",
+     "label": "nemotron-3-nano:30b",
+     "purposes": [],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。描画は6件中5件だけ。画像は読めない。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Drew 5 of 6; cannot read pictures."
+    },
+    {
+     "id": "gpt-oss:20b",
+     "label": "gpt-oss:20b",
+     "purposes": [
+      "llm"
+     ],
+     "unsupported_purposes": [
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 11.0,
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。Free プランで使える。考えてから描くが、記述と食い違うことがある。画像は読めない。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Free plan. Thinks before drawing but can stray from the description; cannot read pictures."
+    },
+    {
+     "id": "minimax-m3",
+     "label": "minimax-m3",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "subscription"
+     ],
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。Free プランでは使えない（402・有料プランが要る）。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not in the Free plan (402; a paid plan is required)."
+    },
+    {
+     "id": "gemma4:31b",
+     "label": "gemma4:31b",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 3.3,
+     "speed_vision_seconds": 4.7,
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。Free プランで使える。描画は速く、画像の読み取りは要点の一部を落とす。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Free plan. Draws fast; picture reading misses some points."
+    },
+    {
+     "id": "nemotron-3-ultra",
+     "label": "nemotron-3-ultra",
+     "purposes": [
+      "llm"
+     ],
+     "unsupported_purposes": [
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 24.6,
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。Free プランで使える。描画は遅い。画像は読めない。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Free plan. Draws slowly; cannot read pictures."
+    },
+    {
+     "id": "glm-5.3",
+     "label": "glm-5.3",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "subscription"
+     ],
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。Free プランでは使えない（402・有料プランが要る）。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not in the Free plan (402; a paid plan is required)."
+    },
+    {
+     "id": "glm-5.3-flash",
+     "label": "glm-5.3-flash",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "subscription"
+     ],
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。Free プランでは使えない（402・有料プランが要る）。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not in the Free plan (402; a paid plan is required)."
+    },
+    {
+     "id": "kimi-k3",
+     "label": "kimi-k3",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "subscription"
+     ],
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。Free プランでは使えない（402・有料プランが要る）。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not in the Free plan (402; a paid plan is required)."
+    },
+    {
+     "id": "mistral-large-3:675b",
+     "label": "mistral-large-3:675b",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "subscription"
+     ],
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。Free プランでは使えない（402・有料プランが要る）。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not in the Free plan (402; a paid plan is required)."
+    },
+    {
+     "id": "glm-5.2",
+     "label": "glm-5.2",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "subscription"
+     ],
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。Free プランでは使えない（402・有料プランが要る）。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not in the Free plan (402; a paid plan is required)."
+    },
+    {
+     "id": "kimi-k2.6",
+     "label": "kimi-k2.6",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "subscription"
+     ],
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。Free プランでは使えない（402・有料プランが要る）。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not in the Free plan (402; a paid plan is required)."
+    },
+    {
+     "id": "deepseek-v4.1-flash",
+     "label": "deepseek-v4.1-flash",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "subscription"
+     ],
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。Free プランでは使えない（402・有料プランが要る）。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not in the Free plan (402; a paid plan is required)."
+    },
+    {
+     "id": "mistral-large-4",
+     "label": "mistral-large-4",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "subscription"
+     ],
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。提供の準備中で、このアカウントではまだ使えない（403）。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Still rolling out; not yet available to this account (403)."
+    },
+    {
+     "id": "deepseek-v4-flash",
+     "label": "deepseek-v4-flash",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "subscription",
+      "eol"
+     ],
+     "eol_date": "2026-08-11",
+     "speed_class": "unknown",
+     "speed_label": "未計測",
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。無料枠では選べない (403・提供元の有料プランが要る)。そのため品質は未計測。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not available on the free tier (403; the provider's paid plan is required), so its quality has not been measured."
+    },
+    {
+     "id": "deepseek-v4-flash:0731",
+     "label": "deepseek-v4-flash:0731",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-27"
+    },
+    {
+     "id": "deepseek-v4-flash:preview",
+     "label": "deepseek-v4-flash:preview",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-09-21"
+    },
+    {
+     "id": "deepseek-v4-pro",
+     "label": "deepseek-v4-pro",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "subscription",
+      "eol"
+     ],
+     "eol_date": "2026-09-21",
+     "speed_class": "unknown",
+     "speed_label": "未計測",
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。無料枠では選べない (403・提供元の有料プランが要る)。そのため品質は未計測。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not available on the free tier (403; the provider's paid plan is required), so its quality has not been measured."
+    },
+    {
+     "id": "glm-5.1",
+     "label": "glm-5.1",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "subscription",
+      "eol"
+     ],
+     "eol_date": "2026-09-27",
+     "speed_class": "unknown",
+     "speed_label": "未計測",
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。無料枠では選べない (403・提供元の有料プランが要る)。そのため品質は未計測。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not available on the free tier (403; the provider's paid plan is required), so its quality has not been measured."
+    },
+    {
+     "id": "kimi-k2.5",
+     "label": "kimi-k2.5",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "subscription",
+      "eol"
+     ],
+     "eol_date": "2026-08-11",
+     "speed_class": "unknown",
+     "speed_label": "未計測",
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。無料枠では選べない (403・提供元の有料プランが要る)。そのため品質は未計測。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not available on the free tier (403; the provider's paid plan is required), so its quality has not been measured."
+    },
+    {
+     "id": "minimax-m2.5",
+     "label": "minimax-m2.5",
+     "purposes": [
+      "llm"
+     ],
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-08-11",
+     "recommendation_llm": 2,
+     "speed_class": "unknown",
+     "speed_label": "中央値 26s / 16〜26s (2026-07-29)",
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。4 実行のうち 3 回完走し、1 回は空の応答が返った。補正の発火は平均 8.0。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Completed three of four runs; the fourth came back empty. Correction load averaged 8.0."
+    },
+    {
+     "id": "qwen3.5:397b",
+     "label": "qwen3.5:397b",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "labels": [
+      "subscription",
+      "eol"
+     ],
+     "eol_date": "2026-09-27",
+     "speed_class": "unknown",
+     "speed_label": "未計測",
+     "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。無料枠では選べない (403・提供元の有料プランが要る)。そのため品質は未計測。",
+     "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not available on the free tier (403; the provider's paid plan is required), so its quality has not been measured."
+    }
+   ]
+  },
+  "chatgpt": {
+   "defaults": [],
+   "models": [
+    {
+     "id": "gpt-6.1-sol",
+     "label": "GPT-6.1-Sol",
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 30.4,
+     "speed_vision_seconds": 8.1,
+     "comment_ja": "描画は遅め。画像の読み取りは要点を押さえるが、物の数や形を取り違えることがある。",
+     "comment_en": "Draws slowly; reads pictures well but can miscount or misshape objects."
+    },
+    {
+     "id": "gpt-6-astra",
+     "label": "GPT-6-Astra",
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 17.8,
+     "speed_vision_seconds": 14.5,
+     "comment_ja": "描画は比較的速い。画像の読み取りは正確な方だが、時間がかかることがある。",
+     "comment_en": "Draws fairly fast; reads pictures fairly accurately, sometimes slowly."
+    },
+    {
+     "id": "gpt-6-sol",
+     "label": "GPT-6-Sol",
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 25.8,
+     "speed_vision_seconds": 6.8,
+     "comment_ja": "描画は遅め。画像の読み取りは速いが、細かな形を省いたり取り違えたりする。",
+     "comment_en": "Draws slowly; reads pictures quickly but may drop or misread small shapes."
+    },
+    {
+     "id": "gpt-6-luna",
+     "label": "GPT-6-Luna",
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 15.1,
+     "speed_vision_seconds": 9.5,
+     "comment_ja": "描画は速め。画像の読み取りは粗く、形の細部を落とすことがある。",
+     "comment_en": "Draws fairly fast; reads pictures roughly and can miss detail in shapes."
+    },
+    {
+     "id": "gpt-5.6-sol",
+     "label": "GPT-5.6-Sol",
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 30.1,
+     "speed_vision_seconds": 5.2,
+     "comment_ja": "描画は遅め。画像の読み取りは速く要点を押さえるが、数や形を取り違えることがある。",
+     "comment_en": "Draws slowly; reads pictures quickly and well but can miscount or misshape objects."
+    },
+    {
+     "id": "gpt-5.6-terra",
+     "label": "GPT-5.6-Terra",
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 40.4,
+     "speed_vision_seconds": 5.9,
+     "comment_ja": "描画はいちばん遅い。画像の読み取りは速く要点を押さえるが、数や形を取り違えることがある。",
+     "comment_en": "Slowest to draw; reads pictures quickly and well but can miscount or misshape objects."
+    },
+    {
+     "id": "gpt-5.6-luna",
+     "label": "GPT-5.6-Luna",
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 25.1,
+     "speed_vision_seconds": 5.0,
+     "comment_ja": "描画は遅め。画像の読み取りは速く、おおむね正確。",
+     "comment_en": "Draws slowly; reads pictures quickly and mostly accurately."
+    }
+   ]
+  }
+ }
+}

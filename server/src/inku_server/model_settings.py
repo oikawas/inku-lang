@@ -11,9 +11,14 @@ import os
 from copy import deepcopy
 from typing import Any
 
+from .model_catalog import catalog_models, labelled
 from .secrets import decrypt_secret, encrypt_secret
 from .verified_model_catalog import (
+    DEFAULT_ANTHROPIC_MODELS,
+    DEFAULT_GEMINI_MODELS,
+    DEFAULT_OPENAI_MODELS,
     MODEL_CONFIG_VERSION,
+    STORED_LABEL_KEYS,
     VERIFIED_NVIDIA_MODELS,
     VERIFIED_OLLAMA_CLOUD_MODELS,
     VERIFIED_OLLAMA_LOCAL_MODELS,
@@ -60,6 +65,10 @@ MODEL_METADATA_KEYS = (
     "comment_ja",
     "comment_en",
 )
+# What the catalog decides about a model (model_catalog.json): laid over an installation's copy
+# whole when the catalog changes. The name an installation shows and the paid-plan mark its own
+# key's probe found are the installation's.
+CATALOG_MODEL_KEYS = (*MODEL_METADATA_KEYS, "eol", "eol_date", "notes")
 
 
 def normalize_rate_limits(value: Any, *, provider_id: str = "") -> dict[str, int]:
@@ -79,12 +88,9 @@ PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
         "base_url_env": "OPENAI_BASE_URL",
         "default_base_url": "https://api.openai.com/v1",
         "requires_api_key": True,
-        "models": [
-            {"id": "gpt-5.1", "label": "GPT-5.1"},
-            {"id": "gpt-5.1-mini", "label": "GPT-5.1 mini"},
-            {"id": "gpt-4.1", "label": "GPT-4.1"},
-            {"id": "gpt-4.1-mini", "label": "GPT-4.1 mini"},
-        ],
+        # The defaults of every builtin provider, and all model information, are in
+        # model_catalog.json.
+        "models": DEFAULT_OPENAI_MODELS,
     },
     {
         "id": "anthropic",
@@ -94,11 +100,7 @@ PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
         "base_url_env": "ANTHROPIC_BASE_URL",
         "default_base_url": "https://api.anthropic.com",
         "requires_api_key": True,
-        "models": [
-            {"id": "claude-opus-4-7", "label": "Claude Opus 4.7"},
-            {"id": "claude-sonnet-4-6", "label": "Claude Sonnet 4.6"},
-            {"id": "claude-haiku-4-5-20251001", "label": "Claude Haiku 4.5"},
-        ],
+        "models": DEFAULT_ANTHROPIC_MODELS,
     },
     {
         "id": "gemini",
@@ -113,10 +115,7 @@ PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
         # worked. These two answered through this API in the draw session's
         # 2026-09-22/23 Stage 1 comparisons. A stored list is not touched: it
         # decides which models an installation has.
-        "models": [
-            {"id": "gemini-3.5-flash-lite", "label": "Gemini 3.5 Flash-Lite"},
-            {"id": "gemma-4-31b-it", "label": "Gemma 4 31B Instruct"},
-        ],
+        "models": DEFAULT_GEMINI_MODELS,
     },
     {
         "id": "nvidia",
@@ -288,6 +287,13 @@ def _normalize_models(models: Any) -> list[dict[str, Any]]:
             # administration only folds it away below the list.
             if model.get("legacy") is True:
                 item["legacy"] = True
+            # The common format (model_catalog.json, the API) names the stored labels in
+            # `labels`; the Server keeps each as the boolean above. Labels it works out
+            # itself (no response, not measured) are not stored.
+            labels = model.get("labels")
+            for label in labels if isinstance(labels, list) else []:
+                if label in STORED_LABEL_KEYS:
+                    item[STORED_LABEL_KEYS[label]] = True
             normalized.append(item)
     return normalized
 
@@ -304,14 +310,30 @@ def normalize_chatgpt_models(entries: Any) -> list[dict[str, Any]]:
 
 
 def chatgpt_assessments(settings: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
-    """The shared assessment of each ChatGPT plan model, by model id."""
-    entries = settings.get("chatgpt_models") if isinstance(settings, dict) else None
-    return {model["id"]: model for model in normalize_chatgpt_models(entries)}
+    """The shared assessment of each ChatGPT plan model, by model id.
+
+    The catalog's `chatgpt` entries, with what an administrator changed since the catalog last
+    changed laid over them (see normalize_model_settings).
+    """
+    entries = normalize_model_settings(settings)["chatgpt_models"]
+    return {model["id"]: model for model in entries}
+
+
+def _chatgpt_models(stored: Any, *, catalog_moved: bool) -> list[dict[str, Any]]:
+    """The catalog's ChatGPT plan entries and an installation's own, by model id.
+
+    An administrator's change outlives a read but not a change of catalog, as for every other
+    provider: while the catalog stays, the stored entry wins; once it changes, the catalog's.
+    """
+    catalog = {model["id"]: model for model in normalize_chatgpt_models(list(catalog_models("chatgpt").values()))}
+    own = {model["id"]: model for model in normalize_chatgpt_models(stored)}
+    return list(({**own, **catalog} if catalog_moved else {**catalog, **own}).values())
 
 
 def default_model_settings() -> dict[str, Any]:
     return {
         "model_catalog_version": MODEL_CONFIG_VERSION,
+        "chatgpt_models": _chatgpt_models(None, catalog_moved=True),
         "providers": {
             str(provider["id"]): {
                 "id": provider["id"],
@@ -373,9 +395,8 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
         return default
     clean = deepcopy(default)
     incoming_catalog_version = str(settings.get("model_catalog_version") or "")
-    chatgpt_models = normalize_chatgpt_models(settings.get("chatgpt_models"))
-    if chatgpt_models:
-        clean["chatgpt_models"] = chatgpt_models
+    catalog_moved = incoming_catalog_version != MODEL_CONFIG_VERSION
+    clean["chatgpt_models"] = _chatgpt_models(settings.get("chatgpt_models"), catalog_moved=catalog_moved)
     providers = settings.get("providers")
     if isinstance(providers, dict):
         for raw_provider_id, incoming in providers.items():
@@ -437,12 +458,11 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
                 # the stored copy carries whatever metadata was current when it was
                 # written, and a list refreshed from a live endpoint carries none at
                 # all (pentala's Ollama entries held id, label and purposes only). So
-                # on a catalog version bump the builtin metadata is laid back over the
+                # on a change of catalog the catalog's information is laid back over the
                 # matching ids, which is the whole reason MODEL_CONFIG_VERSION exists.
-                catalog_moved = incoming_catalog_version != MODEL_CONFIG_VERSION
                 builtin_by_id = {str(model["id"]): model for model in provider["models"]}
                 if builtin and (provider_id == "nvidia" or catalog_moved):
-                    metadata_keys = MODEL_METADATA_KEYS
+                    catalog = catalog_models(provider_id)
                     # NVIDIA additionally keeps builtin-only models the stored list has
                     # dropped, because artworks name them and a dropped id would leave
                     # those artworks labelless.
@@ -450,13 +470,14 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
                     for model in models:
                         model_id = str(model["id"])
                         combined = {**builtin_by_id.get(model_id, {}), **model}
-                        if catalog_moved and model_id in builtin_by_id:
-                            combined.update({
-                                key: builtin_by_id[model_id][key]
-                                for key in metadata_keys if key in builtin_by_id[model_id]
-                            })
+                        if catalog_moved and model_id in catalog:
+                            # The catalog is the one source of model information (the
+                            # author, 2026-10-13), so its entry replaces all of it: a key
+                            # the catalog dropped must not linger from the stored copy.
+                            combined = {key: value for key, value in combined.items() if key not in CATALOG_MODEL_KEYS}
+                            combined.update({key: value for key, value in catalog[model_id].items() if key not in ("id", "label")})
                         merged[model_id] = combined
-                    provider["models"] = list(merged.values())
+                    provider["models"] = _normalize_models(list(merged.values()))
                 else:
                     provider["models"] = models
             if not provider.get("default_base_url") and provider.get("base_url"):
@@ -642,7 +663,7 @@ def model_provider_catalog(
             if purpose and purpose not in model.get("purposes", ["llm"]):
                 continue
             if include_disabled or enabled:
-                shown = {**model, "enabled": enabled}
+                shown = labelled({**model, "enabled": enabled})
                 if hide_speed:
                     for key in ("speed_class", "speed_label", "speed_llm_seconds", "speed_vision_seconds"):
                         shown.pop(key, None)
@@ -728,7 +749,17 @@ def public_model_settings(
 
 def update_model_settings(current: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
     clean = normalize_model_settings(current)
+    # The ChatGPT plan's shared assessments arrive like any provider's models (the common
+    # format, 2026-10-13) or, from an older client, as `chatgpt_models`. Each entry replaces
+    # the stored assessment of the same model and leaves the others.
+    incoming_chatgpt = patch.get("chatgpt_models")
     providers = patch.get("providers")
+    if isinstance(providers, dict) and isinstance(providers.get("chatgpt"), dict):
+        incoming_chatgpt = providers["chatgpt"].get("models")
+    if isinstance(incoming_chatgpt, list):
+        merged = {str(model["id"]): model for model in clean.get("chatgpt_models", [])}
+        merged.update({model["id"]: model for model in normalize_chatgpt_models(incoming_chatgpt)})
+        clean["chatgpt_models"] = list(merged.values())
     if isinstance(providers, dict):
         for raw_provider_id, incoming in providers.items():
             provider_id = _normalize_provider_id(raw_provider_id)
@@ -787,12 +818,6 @@ def update_model_settings(current: dict[str, Any], patch: dict[str, Any]) -> dic
                             known_models[model_id].get("eol") or known_models[model_id].get("requires_subscription")
                         )
                         clean["providers"][provider_id]["enabled_models"][model_id] = bool(enabled) and callable_model
-    # An entry replaces the stored assessment of the same model and leaves the others.
-    incoming_chatgpt = patch.get("chatgpt_models")
-    if isinstance(incoming_chatgpt, list):
-        merged = {str(model["id"]): model for model in clean.get("chatgpt_models", [])}
-        merged.update({model["id"]: model for model in normalize_chatgpt_models(incoming_chatgpt)})
-        clean["chatgpt_models"] = list(merged.values())
     return normalize_model_settings(clean)
 
 

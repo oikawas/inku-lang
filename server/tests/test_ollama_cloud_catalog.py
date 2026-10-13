@@ -25,7 +25,9 @@ from inku_server.verified_model_catalog import (
 
 _BY_ID = {str(provider["id"]): provider for provider in PROVIDER_DEFINITIONS}
 
-# 2026-07-29 実測。`cli/out2/766-v2.9.7-ollama-cloud-bench/probe.json` が生ログ。
+# 2026-07-29 実測。`cli/out2/766-v2.9.7-ollama-cloud-bench/probe.json` が生ログ。2026-10-13 の
+# 計測（run ce176ec2・d3ab43b9）と Free プランの鍵での確かめで minimax-m3 が有料（402）に移った。
+# 値の正本は model_catalog.json。
 SUBSCRIPTION_ONLY = {
     "deepseek-v4-flash",
     "deepseek-v4-pro",
@@ -35,6 +37,7 @@ SUBSCRIPTION_ONLY = {
     "kimi-k2.6",
     "kimi-k2.7-code",
     "minimax-m2.7",
+    "minimax-m3",
     "mistral-large-3:675b",
     "qwen3.5:397b",
 }
@@ -43,7 +46,6 @@ FREE_TIER_REACHABLE = {
     "gpt-oss:20b",
     "gpt-oss:120b",
     "minimax-m2.5",
-    "minimax-m3",
     "nemotron-3-nano:30b",
     "nemotron-3-super",
     "nemotron-3-ultra",
@@ -55,7 +57,7 @@ def _by_id() -> dict[str, dict]:
 
 
 def test_the_measured_split_covers_the_whole_list() -> None:
-    """18 本は「叩ける 8」と「有料 10」に尽きる。片方に足すともう片方が減る。"""
+    """18 本は「叩ける 7」と「有料 11」に尽きる。片方に足すともう片方が減る。"""
     shipped = set(_by_id())
     assert shipped == SUBSCRIPTION_ONLY | FREE_TIER_REACHABLE
     assert not (SUBSCRIPTION_ONLY & FREE_TIER_REACHABLE)
@@ -69,12 +71,16 @@ def test_every_paid_model_is_marked_and_no_free_one_is() -> None:
 
 
 def test_the_paid_models_say_why_in_both_languages() -> None:
-    """印だけでは読み手に理由が届かない。ツールチップの本文が唯一の説明。"""
+    """印だけでは読み手に理由が届かない。ツールチップの本文が唯一の説明。
+
+    7月は 403、2026-10-13 の Free プランの鍵では 402 が返った。どちらでも、返った番号と
+    有料プランが要ることを両方の言語で書く。
+    """
     for model_id in SUBSCRIPTION_ONLY:
         model = _by_id()[model_id]
-        assert "403" in str(model["comment_ja"]), model_id
+        assert re.search(r"40[23]", str(model["comment_ja"])), model_id
         assert "有料プラン" in str(model["comment_ja"]), model_id
-        assert "403" in str(model["comment_en"]), model_id
+        assert re.search(r"40[23]", str(model["comment_en"])), model_id
         assert "paid plan" in str(model["comment_en"]).lower(), model_id
 
 
@@ -87,10 +93,15 @@ def test_paid_models_carry_no_recommendation() -> None:
 
 
 def test_every_reachable_model_carries_a_measured_level() -> None:
-    """叩ける 8 本は全部 2026-07-29 に測ってある。1 本でも欠ければ一覧に穴が空く。"""
+    """叩ける 7 本は全部測ってある。1 本でも欠ければ一覧に穴が空く。
+
+    測って描けなかったもの（2026-10-13 の nemotron-3-nano:30b、6 件中 5 件）は推奨度を
+    持たず、応答の無い用途を持つ。測っていないことと見分けられる。
+    """
     for model_id in FREE_TIER_REACHABLE:
-        level = _by_id()[model_id].get("recommendation_llm")
-        assert isinstance(level, int) and 1 <= level <= 5, (model_id, level)
+        model = _by_id()[model_id]
+        level = model.get("recommendation_llm")
+        assert (isinstance(level, int) and 1 <= level <= 5) or model.get("unsupported_purposes"), (model_id, level)
 
 
 def test_nothing_reaches_five() -> None:
@@ -98,13 +109,19 @@ def test_nothing_reaches_five() -> None:
 
     4 試行では共有基盤の当たり外れと実力を分けられない。5 は名乗らせない。
     """
-    assert max(m.get("recommendation_llm") or 0 for m in VERIFIED_OLLAMA_CLOUD_MODELS) == 4
+    assert max(m.get("recommendation_llm") or 0 for m in VERIFIED_OLLAMA_CLOUD_MODELS) < 5
 
 
 def test_the_speed_numbers_are_dated() -> None:
-    """速度は時間帯とセットでしか意味を持たない。日付の無いラベルを置かない。"""
-    for model_id in FREE_TIER_REACHABLE:
-        assert "2026-07-29" in str(_by_id()[model_id]["speed_label"]), model_id
+    """速度は時間帯とセットでしか意味を持たない。日付の無いラベルを置かない。
+
+    2026-10-13 からは計測の平均秒数を出し、画面が「参考値」と添える。ラベルが残るもの
+    （7月の計測のまま）は日付を持つ。
+    """
+    labelled = [model for model in VERIFIED_OLLAMA_CLOUD_MODELS if model.get("speed_label") not in (None, "未計測")]
+    assert labelled
+    for model in labelled:
+        assert re.search(r"\d{4}-\d{2}-\d{2}", str(model["speed_label"])), model["id"]
 
 
 def _web_fallback_models() -> dict[str, bool]:

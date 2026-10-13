@@ -5,7 +5,16 @@
 // check in scripts/model-recommendation-check.mjs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { isModelUnselectable, modelCost, modelFold, modelPurposeBadges, modelSpeed, modelStatusLabel } from './modelMeta';
+import { readFileSync } from 'node:fs';
+import { isModelUnselectable, modelCost, modelFold, modelFoldTitle, modelFolds, modelPurposeBadges, modelSpeed, modelStatusLabel, setModelLabelTable } from './modelMeta';
+import type { ModelLabel, ModelOption } from './models';
+
+// The Server's model catalog and the cases every client checks itself against (2026-10-13).
+const catalog = JSON.parse(readFileSync(new URL('../../../server/src/inku_server/model_catalog.json', import.meta.url), 'utf8')) as { labels: ModelLabel[] };
+const cases = JSON.parse(readFileSync(new URL('../../../server/tests/data/model-catalog-cases.json', import.meta.url), 'utf8')) as {
+	cases: { name: string; labels: string[]; fold: string | null; publishable: boolean }[];
+};
+setModelLabelTable(catalog.labels);
 
 test('both purposes are listed, and the one a model cannot be chosen for is marked', () => {
 	assert.deepEqual(
@@ -17,32 +26,36 @@ test('both purposes are listed, and the one a model cannot be chosen for is mark
 });
 
 test('a purpose measured without a response is greyed, and a model with neither cannot be chosen', () => {
-	const drawsNothing = { id: 'x', label: 'x', purposes: ['llm', 'vision'] as ('llm' | 'vision')[], unsupported_purposes: ['llm'] as ('llm' | 'vision')[] };
+	const drawsNothing = { id: 'x', label: 'x', purposes: ['vision'] as ('llm' | 'vision')[], unsupported_purposes: ['llm'] as ('llm' | 'vision')[], labels: [], fold: null };
 	assert.deepEqual(modelPurposeBadges(drawsNothing).map((badge) => badge.selectable), [false, true]);
 	assert.equal(isModelUnselectable(drawsNothing), false);
-	const answersNothing = { id: 'x', label: 'x', purposes: [], unsupported_purposes: ['llm', 'vision'] as ('llm' | 'vision')[] };
+	const answersNothing = { id: 'x', label: 'x', purposes: [], unsupported_purposes: ['llm', 'vision'] as ('llm' | 'vision')[], labels: ['no_response'], fold: 'no_response' };
 	assert.equal(isModelUnselectable(answersNothing), true);
 	assert.equal(modelStatusLabel(answersNothing, true), '計測で応答なし');
 });
 
-test('models that cannot be published are filed into their folds; a usable one stays in the list', () => {
-	const both = ['llm', 'vision'] as ('llm' | 'vision')[];
-	const folds = [
-		{ id: 'retired', label: 'x', eol: true, not_supported: true },
-		{ id: 'tts', label: 'x', not_supported: true },
-		{ id: 'silent', label: 'x', purposes: [], unsupported_purposes: both },
-		{ id: 'vision-only', label: 'x', purposes: ['vision'] as ('llm' | 'vision')[], unsupported_purposes: ['llm'] as ('llm' | 'vision')[] },
-		{ id: 'paid', label: 'x', requires_subscription: true },
-		{ id: 'older', label: 'x', legacy: true },
-		{ id: 'older-silent', label: 'x', legacy: true, purposes: [], unsupported_purposes: both }
-	].map((model) => [model.id, modelFold(model), isModelUnselectable(model)]);
-	assert.deepEqual(folds, [
-		['retired', 'eol', true], ['tts', 'not_supported', true], ['silent', 'no_response', true],
-		['vision-only', null, false], ['paid', 'subscription', true],
-		['older', 'legacy', false], ['older-silent', 'no_response', true]
-	]);
-	assert.equal(modelStatusLabel({ id: 'older', label: 'x', legacy: true }, true), null);
-	assert.equal(modelStatusLabel({ id: 'tts', label: 'x', not_supported: true }, true), 'ノンサポート');
+test('the labels the Server worked out decide the fold and the publication, as the shared cases say', () => {
+	assert.deepEqual(modelFolds(), ['unmeasured', 'legacy', 'subscription', 'no_response', 'not_supported', 'eol']);
+	for (const entry of cases.cases) {
+		const model: ModelOption = { id: 'x', label: 'x', labels: entry.labels, fold: entry.fold };
+		assert.deepEqual([modelFold(model), !isModelUnselectable(model)], [entry.fold, entry.publishable], entry.name);
+	}
+	assert.equal(cases.cases.length, 15);
+});
+
+test('a model shows every label it carries, and a fold is titled from the table', () => {
+	const retired = { id: 'x', label: 'x', labels: ['legacy', 'eol'], fold: 'eol', eol_date: '2026-10-13' };
+	assert.equal(modelStatusLabel(retired, true), '旧モデル · 提供終了 (2026-10-13)');
+	assert.equal(modelStatusLabel(retired, false), 'Older model · End of life (2026-10-13)');
+	assert.equal(modelStatusLabel({ id: 'x', label: 'x', labels: [], fold: null }, true), null);
+	assert.equal(modelFoldTitle('unmeasured', 5, true), '未計測（5）');
+	assert.equal(modelFoldTitle('legacy', 46, false), 'Older model (46)');
+});
+
+test('the startup list, which has no labels yet, keeps to its stored marks', () => {
+	assert.equal(isModelUnselectable({ id: 'paid', label: 'x', requires_subscription: true }), true);
+	assert.equal(isModelUnselectable({ id: 'free', label: 'x' }), false);
+	assert.equal(modelFold({ id: 'paid', label: 'x', requires_subscription: true }), null);
 });
 
 test('cost prints per drawing and per image, and a free model costs $0 rather than nothing', () => {

@@ -23,6 +23,8 @@
 	/* Strike through retired models only; a paid-plan model has not disappeared. */
 	.settings-feature-root .generation-model-grid button.eol strong { text-decoration: line-through; }
 	.settings-feature-root .eol-mark { color: var(--danger); font-weight: 600; }
+	/* A label that leaves the model selectable (older model, not measured) is not a warning. */
+	.settings-feature-root .model-label-mark { color: var(--fg3); }
 	.settings-feature-root .generation-model-grid button.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-light); color: var(--fg); }
 	.settings-feature-root .generation-model-grid strong { font-size: var(--ui-font-size-13); font-weight: 500; overflow-wrap: anywhere; }
 	.settings-feature-root .generation-model-grid span { color: var(--fg3); font-size: var(--ui-font-size-11); }

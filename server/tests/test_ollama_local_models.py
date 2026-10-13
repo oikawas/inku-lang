@@ -285,8 +285,8 @@ def test_the_cloud_hides_its_timings_too() -> None:
     }
     cloud = {str(m["id"]): m for m in release["ollama-cloud"]["models"]}
     for model in cloud.values():
-        assert "speed_label" not in model, model["id"]
-        assert "speed_class" not in model, model["id"]
+        for key in ("speed_label", "speed_class", "speed_llm_seconds", "speed_vision_seconds"):
+            assert key not in model, (model["id"], key)
         # Quality still shows; only the timing is withheld.
         assert str(model["comment_ja"]).strip()
 
@@ -296,7 +296,8 @@ def test_the_cloud_hides_its_timings_too() -> None:
         if str(provider["id"]) == "ollama-cloud"
         for m in provider["models"]
     }
-    assert developer_cloud["nemotron-3-ultra"]["speed_label"] == "中央値 43s / 17〜51s (2026-07-29)"
+    # Since 2026-10-13 the measured mean, not the July label (model_catalog.json).
+    assert developer_cloud["nemotron-3-ultra"]["speed_llm_seconds"] == 24.6
 
     # NVIDIA is `developer_only`, so a release hides the provider outright -- there is
     # no release view of its labels to check.

@@ -78,9 +78,13 @@ def test_the_two_stages_disagree_which_is_why_the_keys_exist():
 
 
 def test_models_measured_end_to_end_keep_their_single_number():
-    """Nothing was migrated. Ollama Cloud's eight carry recommendation_llm alone."""
+    """Nothing was migrated. Ollama Cloud's measured six carry recommendation_llm alone.
+
+    Eight in July; on 2026-10-13 minimax-m3 moved to the paid plan and nemotron-3-nano:30b
+    drew 5 of 6, so it has no level (model_catalog.json).
+    """
     scored = [model for model in VERIFIED_OLLAMA_CLOUD_MODELS if "recommendation_llm" in model]
-    assert len(scored) == 8
+    assert len(scored) == 6
     for model in scored:
         assert "recommendation_stage1" not in model
         assert "recommendation_stage2" not in model

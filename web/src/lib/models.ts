@@ -14,6 +14,11 @@ export type ModelOption = {
 	// An older generation the provider has superseded (2026-10-13). It can still be
 	// published; model administration folds it away as an older model.
 	legacy?: boolean;
+	// Every label of the model and the fold it is filed in, worked out by the Server from
+	// the model catalog's label table (ModelLabel, 2026-10-13). The marks above stay for
+	// an older reader.
+	labels?: string[];
+	fold?: string | null;
 	enabled?: boolean;
 	// v1.98: Recommendations are per purpose; recommendation_level reads the legacy format.
 	recommendation_llm?: number;
@@ -40,6 +45,15 @@ export type ModelOption = {
 	// A model limited to the provider's paid tier. It is unselectable like EOL,
 	// but the reason is subscription access rather than retirement.
 	requires_subscription?: boolean;
+};
+
+// One row of the model catalog's label table (`model_labels` in every model list), in
+// fold order.
+export type ModelLabel = {
+	id: string;
+	ja: string;
+	en: string;
+	publishable: boolean;
 };
 
 export type ProviderGroup = {
@@ -130,7 +144,7 @@ export const PROVIDER_GROUPS: ProviderGroup[] = [
 			{ id: 'nemotron-3-nano:30b', label: 'nemotron-3-nano:30b' },
 			{ id: 'gpt-oss:120b', label: 'gpt-oss:120b' },
 			{ id: 'gpt-oss:20b', label: 'gpt-oss:20b' },
-			{ id: 'minimax-m3', label: 'minimax-m3' },
+			{ id: 'minimax-m3', label: 'minimax-m3', requires_subscription: true },
 			{ id: 'deepseek-v4-flash', label: 'deepseek-v4-flash', requires_subscription: true },
 			{ id: 'deepseek-v4-pro', label: 'deepseek-v4-pro', requires_subscription: true },
 			{ id: 'glm-5.1', label: 'glm-5.1', requires_subscription: true },

@@ -201,6 +201,8 @@ data class InkuUiState(
     val providerSettings: List<ProviderSettingEntity> = emptyList(),
     val chatGptPlan: app.inku.mobile.llm.ChatGptPlanView = app.inku.mobile.llm.ChatGptPlanView(),
     val providerModelCandidates: Map<String, List<String>> = emptyMap(),
+    val modelCatalog: app.inku.mobile.data.ModelCatalog = app.inku.mobile.data.ModelCatalog.EMPTY,
+    val modelCatalogObservations: Map<String, app.inku.mobile.data.ModelCatalogObservation> = emptyMap(),
     val providerModelFetchStates: Map<String, ProviderModelFetchState> = emptyMap(),
     val exportTemplates: List<ExportTemplateEntity> = emptyList(),
     val activeModelDownloadId: String? = null,
@@ -494,19 +496,21 @@ class InkuViewModel @JvmOverloads constructor(
     private var lastHistorySwipeAt = 0L
     private var presentationNavigationSerial = 0L
 
-    private val providerConfig = combine(providerSettings, providerModelCandidates, repository.chatGptPlan.state) { providers, candidates, plan ->
+    private val providerConfig = combine(providerSettings, providerModelCandidates, repository.chatGptPlan.state, repository.modelCatalogObservations()) { providers, candidates, plan, observations ->
         val personalCandidates = candidates - "chatgpt" + (plan.models?.let { mapOf("chatgpt" to it.map { model -> model.id }) } ?: emptyMap())
-        Triple(providers, personalCandidates, plan)
+        Triple(providers, personalCandidates, plan) to observations
     }
 
     val state: StateFlow<InkuUiState> = combine(localState, history, modelAssets, providerConfig, exportTemplates) { state, items, assets, providerPair, templates ->
-        val (providers, candidates, plan) = providerPair
+        val (providers, candidates, plan) = providerPair.first
         val selectedModel = assets.firstOrNull { it.modelId == state.selectedModelId }
         val modelState = selectedModel?.let { modelStatusText(it) } ?: "model catalog initializing"
         state.copy(
             modelAssets = assets,
             providerSettings = providers,
             providerModelCandidates = candidates,
+            modelCatalog = repository.modelCatalog,
+            modelCatalogObservations = providerPair.second,
             chatGptPlan = plan,
             exportTemplates = templates,
             modelLicenseAccepted = selectedModel?.licenseAcceptedAt != null,
@@ -3462,6 +3466,20 @@ class InkuViewModel @JvmOverloads constructor(
                 }
                 setFetchState(ProviderModelFetchState(message, failed = true))
             }
+        }
+    }
+
+    fun checkModelAccess(providerId: String, modelId: String) {
+        if (localState.value.providerModelFetchStates[providerId]?.loading == true) return
+        fun report(message: String, loading: Boolean = false, failed: Boolean = false) {
+            localState.value = localState.value.copy(providerModelFetchStates = localState.value.providerModelFetchStates +
+                (providerId to ProviderModelFetchState(message, loading = loading, failed = failed)))
+        }
+        report(strings().modelAccessChecking, loading = true)
+        viewModelScope.launch {
+            runCatching { repository.checkModelAccess(providerId, modelId) }
+                .onSuccess { report(when (it) { true -> strings().modelAccessAvailable; false -> strings().modelAccessUnavailable; null -> strings().modelAccessUnknown }) }
+                .onFailure { report(messageFor(it, strings(), strings().modelAccessUnknown), failed = true) }
         }
     }
 

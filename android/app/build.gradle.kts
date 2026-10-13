@@ -66,6 +66,15 @@ fun nextAndroidBuildNumber(): Int {
 }
 
 val androidVersionName = rootProject.file("VERSION").readText().trim()
+val modelCatalogAssets = layout.buildDirectory.dir("generated/modelCatalogAssets")
+val syncModelCatalog = tasks.register<Sync>("syncModelCatalog") {
+    from(rootProject.file("../server/src/inku_server/model_catalog.json"))
+    into(modelCatalogAssets)
+}
+tasks.withType<Test>().configureEach {
+    systemProperty("inku.modelCatalogSource", rootProject.file("../server/src/inku_server/model_catalog.json").absolutePath)
+    systemProperty("inku.modelCatalogCases", rootProject.file("../server/tests/data/model-catalog-cases.json").absolutePath)
+}
 val androidVersionCode = nextAndroidBuildNumber()
 val androidMinSdk = 35
 val rustAndroidTarget = "aarch64-linux-android"
@@ -141,6 +150,7 @@ android {
         jniLibs.srcDir(displayCheckJniDirectory)
     }
     sourceSets.getByName("main") {
+        assets.srcDir(modelCatalogAssets)
         jniLibs.srcDir(rustGeneratedJniLibsDirectory)
     }
 
@@ -152,6 +162,8 @@ android {
         unitTests.isReturnDefaultValues = true
     }
 }
+
+tasks.named("preBuild") { dependsOn(syncModelCatalog) }
 
 val rustNdkDirectory = androidComponents.sdkComponents.ndkDirectory
 val rustLibrary = rustTargetDirectory.map {

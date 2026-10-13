@@ -316,7 +316,6 @@ internal data class SaijikiGroup(val key: String, val label: String, val en: Str
 internal data class DdlVocabularyToken(val word: String, val group: SaijikiGroup, val color: Color)
 private data class ModelChoice(val id: String, val label: String, val providerName: String)
 private data class ModelOptionChoice(val rawId: String, val qualifiedId: String, val label: String, val notes: String? = null)
-private data class ProviderModelCandidate(val id: String, val label: String, val notes: String? = null)
 
 private object HistoryThumbnailCache {
     private const val THUMBNAIL_PX = 384
@@ -1468,6 +1467,7 @@ private fun WebStyleModelStageEditor(
                                 if (option.notes != null) {
                                     Text(option.notes, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
+                                if (selectedProviderId != "local-litert-lm") ModelCatalogDetails(catalogModelFor(state, selectedProviderId, option.rawId), S)
                             }
                         }
                     }
@@ -4049,7 +4049,7 @@ private fun RefinementAdjustControls(
  */
 @Composable
 private fun ModelInspectionControls(state: InkuUiState, viewModel: InkuViewModel) {
-    val choices = remember(state.modelAssets, state.providerSettings) { modelChoicesFor(state, includeChatGpt = false) }
+    val choices = modelChoicesFor(state, includeChatGpt = false)
     Text(S.modelsToCompare(MAX_COMPARE_SELECTION), style = MaterialTheme.typography.labelMedium)
     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
         choices.forEach { choice ->
@@ -4731,6 +4731,7 @@ private fun ChatGptModelCard(state: InkuUiState, viewModel: InkuViewModel) {
     }
     if (picker && session != null) {
         ProviderModelPickerDialog(
+            state = state,
             provider = provider.copy(displayName = S.chatGptPlan),
             candidateModelIds = plan.models?.map { it.id }, selectedModels = plan.publishedModels,
             candidateLabels = plan.models?.associate { it.id to it.label }.orEmpty(),
@@ -4759,6 +4760,7 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
                     ChatGptModelCard(state, viewModel)
                 } else {
                 ProviderConnectionCard(
+                    state = state,
                     provider = provider,
                     candidateModelIds = state.providerModelCandidates[provider.providerId],
                     modelAssets = state.modelAssets,
@@ -4766,6 +4768,7 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
                     onClearApiKey = { viewModel.clearProviderApiKey(provider.providerId) },
                     onDelete = { viewModel.deleteProvider(provider.providerId) },
                     onFetchModels = { viewModel.fetchProviderModels(provider.providerId) },
+                    onCheckAccess = { viewModel.checkModelAccess(provider.providerId, it) },
                     onAcceptModelLicense = viewModel::acceptModelLicense,
                     onDownloadModel = viewModel::downloadModel,
                     onRedownloadModel = viewModel::redownloadModel,
@@ -4786,6 +4789,7 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
 
 @Composable
 private fun ProviderConnectionCard(
+    state: InkuUiState,
     provider: app.inku.mobile.data.db.ProviderSettingEntity,
     candidateModelIds: List<String>?,
     modelAssets: List<app.inku.mobile.data.db.ModelAssetEntity>,
@@ -4793,6 +4797,7 @@ private fun ProviderConnectionCard(
     onClearApiKey: () -> Unit,
     onDelete: () -> Unit,
     onFetchModels: () -> Unit,
+    onCheckAccess: (String) -> Unit,
     onAcceptModelLicense: (String) -> Unit,
     onDownloadModel: (String) -> Unit,
     onRedownloadModel: (String) -> Unit,
@@ -4949,12 +4954,14 @@ private fun ProviderConnectionCard(
             )
         } else {
             ProviderModelPickerDialog(
+                state = state,
                 provider = provider,
                 candidateModelIds = candidateModelIds,
                 selectedModels = publishedModelIds,
                 onDismiss = { modelPickerOpen = false },
                 onFetchModels = onFetchModels,
                 fetchState = fetchState,
+                onCheckAccess = onCheckAccess,
                 onSave = { selected ->
                     modelPickerOpen = false
                     onSave(provider.providerId, displayName, kind, baseUrl, "", selected.joinToString("\n"))
@@ -5061,6 +5068,7 @@ private fun TextEditDialog(
 
 @Composable
 private fun ProviderModelPickerDialog(
+    state: InkuUiState,
     provider: app.inku.mobile.data.db.ProviderSettingEntity,
     candidateModelIds: List<String>?,
     selectedModels: List<String>,
@@ -5068,21 +5076,24 @@ private fun ProviderModelPickerDialog(
     onFetchModels: () -> Unit,
     fetchState: ProviderModelFetchState?,
     candidateLabels: Map<String, String> = emptyMap(),
+    onCheckAccess: ((String) -> Unit)? = null,
     onSave: (List<String>) -> Unit,
 ) {
     var search by remember(provider.providerId) { mutableStateOf("") }
-    var selected by remember(provider.providerId, provider.publishedModelsJson) { mutableStateOf(selectedModels.toSet()) }
-    val candidateModels = remember(provider.providerId, provider.publishedModelsJson, candidateModelIds, candidateLabels) {
-        if (provider.providerId == "chatgpt") {
-            (candidateModelIds.orEmpty() + selectedModels).distinct().map { id -> ProviderModelCandidate(id, candidateLabels[id] ?: id, id) }
-        } else providerModelCandidates(provider, candidateModelIds)
-    }
-    val candidateIds = candidateModels.map { it.id }.toSet()
-    val selectionChanged = selected != selectedModels.toSet()
+    val normalizedSelection = selectedModels.map { app.inku.mobile.data.ModelCatalog.rawId(provider.providerId, it) }.toSet()
+    var selected by remember(provider.providerId, provider.publishedModelsJson) { mutableStateOf(normalizedSelection) }
+    val catalog = state.modelCatalog
+    val observation = state.modelCatalogObservations[provider.providerId]
+    val candidateModels = (catalog.defaults(provider.providerId) + catalog.ids(provider.providerId) + candidateModelIds.orEmpty() + observation?.seen.orEmpty() + normalizedSelection)
+        .map { app.inku.mobile.data.ModelCatalog.rawId(provider.providerId, it) }.distinct()
+        .map { catalog.resolve(provider.providerId, it, candidateModelIds?.toSet(), observation?.access?.get(it)) }
+    val offeredForSelection = if (provider.providerId == "chatgpt") candidateModelIds.orEmpty().toSet() else null
+    val candidateIds = candidateModels.filter { it.publishable && (offeredForSelection == null || it.id in offeredForSelection) }.map { it.id }.toSet()
+    val selectionChanged = selected != normalizedSelection
     val fetching = fetchState?.loading == true
     val filtered = candidateModels.filter { model ->
         val query = search.trim().lowercase()
-        query.isBlank() || model.id.lowercase().contains(query) || model.label.lowercase().contains(query) || (model.notes?.lowercase()?.contains(query) == true)
+        query.isBlank() || model.id.lowercase().contains(query) || (candidateLabels[model.id] ?: model.name).lowercase().contains(query) || model.record.toString().lowercase().contains(query) || model.labels.any { it.name(S.code == "en").lowercase().contains(query) }
     }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -5102,7 +5113,7 @@ private fun ProviderModelPickerDialog(
                         enabled = !fetching && !selectionChanged,
                         modifier = Modifier.weight(1.5f),
                     )
-                    ModelPickerActionButton(text = S.selectAll, onClick = { selected = filtered.map { it.id }.toSet() }, modifier = Modifier.weight(1f), enabled = !fetching)
+                    ModelPickerActionButton(text = S.selectAll, onClick = { selected = filtered.filter { it.id in candidateIds }.map { it.id }.toSet() }, modifier = Modifier.weight(1f), enabled = !fetching)
                     ModelPickerActionButton(text = S.selectNone, onClick = { selected = emptySet() }, modifier = Modifier.weight(1f), enabled = !fetching)
                 }
                 ImeAwareOutlinedTextField(
@@ -5113,29 +5124,11 @@ private fun ProviderModelPickerDialog(
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
                 )
-                Column(
-                    modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
-                ) {
-                    filtered.forEach { model ->
-                        val checked = selected.contains(model.id)
-                        Row(
-                            modifier = Modifier.fillMaxWidth().clickable(enabled = !fetching) {
-                                selected = if (checked) selected - model.id else selected + model.id
-                            }.padding(vertical = Dimens.spaceXs),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-                        ) {
-                            Checkbox(checked = checked, enabled = !fetching, onCheckedChange = { enabled ->
-                                selected = if (enabled) selected + model.id else selected - model.id
-                            })
-                            Column(modifier = Modifier.weight(1f)) {
-                                ModelLabelWithSupportMark(model.label, SupportedModels.isSupported(provider.providerId, model.id))
-                                Text(model.notes ?: model.id, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                        }
-                    }
-                }
+                ModelCatalogRows(catalog, filtered, selected, S,
+                    onSelect = { id, checked -> selected = if (checked) selected + id else selected - id },
+                    modifier = Modifier.fillMaxWidth().weight(1f), enabled = !fetching, names = candidateLabels,
+                    offeredForSelection = offeredForSelection,
+                    onCheckAccess = if (provider.providerId == "ollama-cloud" && !provider.encryptedApiKey.isNullOrBlank()) onCheckAccess else null)
                 fetchState?.let {
                     Text(
                         it.message,
@@ -5530,50 +5523,9 @@ private fun connectionKindLabel(value: String): String {
     }
 }
 
-private fun providerModelCandidates(provider: app.inku.mobile.data.db.ProviderSettingEntity, fetchedModelIds: List<String>?): List<ProviderModelCandidate> {
-    val defaults = when (provider.providerId) {
-        "local-litert-lm" -> listOf(
-            ProviderModelCandidate("local-litert-lm:gemma-4-e2b", "Gemma 4 E2B", "LiteRT-LM"),
-        )
-        "openai" -> listOf(
-            ProviderModelCandidate("openai:gpt-5.1", "GPT-5.1"),
-            ProviderModelCandidate("openai:gpt-5.1-mini", "GPT-5.1 mini"),
-            ProviderModelCandidate("openai:gpt-4.1", "GPT-4.1"),
-            ProviderModelCandidate("openai:gpt-4.1-mini", "GPT-4.1 mini"),
-        )
-        "nvidia" -> listOf(
-            ProviderModelCandidate("google/gemma-4-31b-it", "Google Gemma 4 31B Instruct"),
-            ProviderModelCandidate("meta/llama-3.3-70b-instruct", "Meta Llama 3.3 70B Instruct"),
-            ProviderModelCandidate("mistralai/mistral-large-2-instruct", "Mistral AI Mistral Large 2 Instruct"),
-        )
-        "anthropic" -> listOf(
-            ProviderModelCandidate("anthropic:claude-opus-4-7", "Claude Opus 4.7"),
-            ProviderModelCandidate("anthropic:claude-sonnet-4-6", "Claude Sonnet 4.6"),
-            ProviderModelCandidate("anthropic:claude-haiku-4-5-20251001", "Claude Haiku 4.5"),
-        )
-        // The server's builtin Gemini models (model_settings.py). The 2.5
-        // models refuse API accounts made after their retirement.
-        "gemini" -> listOf(
-            ProviderModelCandidate("gemini:gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite"),
-            ProviderModelCandidate("gemini:gemma-4-31b-it", "Gemma 4 31B Instruct"),
-        )
-        // The server's verified Ollama Cloud models, in its order of
-        // recommendation (verified_model_catalog.py).
-        "ollama-cloud" -> listOf(
-            "nemotron-3-ultra", "minimax-m2.5", "nemotron-3-super", "gemma4:31b", "nemotron-3-nano:30b",
-            "gpt-oss:120b", "gpt-oss:20b", "minimax-m3", "deepseek-v4-flash", "deepseek-v4-pro",
-            "glm-5.1", "glm-5.2", "kimi-k2.5", "kimi-k2.6", "kimi-k2.7-code", "minimax-m2.7",
-            "mistral-large-3:675b", "qwen3.5:397b",
-        ).map { ProviderModelCandidate("ollama-cloud:$it", it) }
-        else -> emptyList()
-    }
-    val fetched = fetchedModelIds.orEmpty().map { id ->
-        ProviderModelCandidate(id, modelDisplayName(id), id)
-    }
-    val stored = parsePublishedModelIds(provider.publishedModelsJson).map { id ->
-        ProviderModelCandidate(id, modelDisplayName(id), id)
-    }
-    return ((if (fetchedModelIds == null) defaults else fetched) + stored).distinctBy { it.id }
+private fun catalogModelFor(state: InkuUiState, providerId: String, modelId: String): app.inku.mobile.data.CatalogModel {
+    val id = app.inku.mobile.data.ModelCatalog.rawId(providerId, modelId)
+    return state.modelCatalog.resolve(providerId, id, state.providerModelCandidates[providerId]?.toSet(), state.modelCatalogObservations[providerId]?.access?.get(id))
 }
 
 private fun modelChoicesFor(state: InkuUiState, includeChatGpt: Boolean = true): List<ModelChoice> {
@@ -5586,7 +5538,7 @@ private fun modelChoicesFor(state: InkuUiState, includeChatGpt: Boolean = true):
         .forEach { provider ->
             availablePublishedModels(provider, state).forEach { modelId ->
                 val qualified = qualifyModelId(provider.providerId, modelId)
-                val label = if (provider.providerId == "chatgpt") state.chatGptPlan.models?.firstOrNull { it.id == modelId }?.label ?: modelId else modelDisplayName(modelId)
+                val label = if (provider.providerId == "chatgpt") state.chatGptPlan.models?.firstOrNull { it.id == modelId }?.label ?: catalogModelFor(state, provider.providerId, modelId).name else catalogModelFor(state, provider.providerId, modelId).name
                 choices += ModelChoice(qualified, label, if (provider.providerId == "chatgpt") stringsFor(state.uiLanguage).chatGptPlan else provider.displayName)
             }
         }
@@ -5620,7 +5572,7 @@ private fun modelOptionsForProvider(state: InkuUiState, providerId: String, stri
         ModelOptionChoice(
             rawId = id,
             qualifiedId = qualifyModelId(provider.providerId, id),
-            label = if (providerId == "chatgpt") state.chatGptPlan.models?.firstOrNull { it.id == id }?.label ?: id else modelDisplayName(id),
+            label = if (providerId == "chatgpt") state.chatGptPlan.models?.firstOrNull { it.id == id }?.label ?: catalogModelFor(state, providerId, id).name else catalogModelFor(state, providerId, id).name,
             notes = id,
         )
     }
@@ -5636,9 +5588,10 @@ private fun providerOfModelId(modelId: String, state: InkuUiState): String {
 
 private fun availablePublishedModels(provider: app.inku.mobile.data.db.ProviderSettingEntity, state: InkuUiState): List<String> {
     val published = parsePublishedModelIds(provider.publishedModelsJson)
-    if (provider.providerId != "chatgpt") return published
+    val usable = published.filter { catalogModelFor(state, provider.providerId, it).publishable }
+    if (provider.providerId != "chatgpt") return usable
     val offered = state.chatGptPlan.models.orEmpty().map { it.id }.toSet()
-    return published.filter { it in offered }
+    return usable.filter { it in offered }
 }
 
 private fun modelChoiceStatusLabel(downloadState: String, strings: InkuStrings): String {

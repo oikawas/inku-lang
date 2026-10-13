@@ -6,6 +6,32 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-10-13.
 
+## 2026-10-13 Canonical model information and labels
+
+`server/src/inku_server/model_catalog.json` (`inku.model-catalog.v2`) is the model-information
+source. Gradle's `syncModelCatalog` copies it into generated assets for every APK. Android
+commits no duplicate evaluations, candidates, initial published models or label wording.
+Startup preserves existing publication choices. ChatGPT-plan evaluations also come from
+`providers.chatgpt`; personal offerings and publication choices remain within their registration.
+
+Model management shows six folds in label-table order, with counts, initially closed. Every
+label appears in rows and descriptions: blocking labels use the warning color and publishable
+labels use subdued color. The last label determines the fold; only models whose labels are
+all `publishable` can be newly published or selected. No remaining purpose adds `no_response`;
+no measurement and only publishable other labels adds `unmeasured`. Management and drawing
+model selection show the available recommendations (LLM, Stage 1, Stage 2, Vision), average
+seconds, estimated USD costs and comments from the source. Missing values are not invented.
+
+A refetched list adds `eol` to missing models and removes it from models offered again.
+Previously seen models remain visible. A successful request with this installation's key
+removes `subscription`; 402/403 adds it. Ollama Cloud offers an explicit per-model
+“Check with this key” action, sending only `max_tokens: 1` for the selected model. Only 200
+confirms access, and only 402/403 denies it. Other statuses and transport failures leave
+labels unchanged. There are no automatic mass probes or measurements. Observations live
+in existing `app_settings` and are invalidated by key or connection changes; they never
+modify canonical evaluations. No Room table or migration is added. Acceptance uses the
+15 shared cases and the Pixel 9 display check.
+
 ## Generated-SVG ceiling (I-375)
 
 Settings → Limits stores an integer ceiling from 1 to 32 MiB on the device, with 12 MiB as the default and recommendation. Cancel and restoring draft defaults do not apply changes until saved. Each actual draw reads the current value for the shared renderer's output allowance and SVG-body UTF-8 check. Added JNI entries return SVG separately from JSON, so transport escaping is not mistaken for a work's size. Oversized works are not saved. The attempted limit and failure remain in execution state, preventing restart from presenting an earlier success as the current attempt's success. The setting is not part of compiler budgets, Score, or work identity and is not automatically synchronized from Server. Stored-work display and export use a separate 64 MiB consumer envelope without retroactively applying the generation setting.

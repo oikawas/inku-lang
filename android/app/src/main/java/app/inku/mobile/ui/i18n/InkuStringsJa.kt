@@ -7,6 +7,14 @@ package app.inku.mobile.ui.i18n
  * first and [InkuStringsEn] follows; the reverse never happens.
  */
 object InkuStringsJa : InkuStrings {
+    override val modelRecommendation = "推奨度"
+    override val modelAverageSeconds = "平均秒数"
+    override val modelEstimatedCost = "概算コスト"
+    override val modelAccessCheck = "この鍵で確かめる"
+    override val modelAccessChecking = "この鍵で使えるか確認中"
+    override val modelAccessAvailable = "この鍵で使えます。"
+    override val modelAccessUnavailable = "この鍵では使えません。プランを確認してください。"
+    override val modelAccessUnknown = "この鍵で使えるかは確認できませんでした。札は変えていません。"
     override val chatGptPlan = "ChatGPTプラン"
     override val chatGptConnectionSubtitle = "ChatGPTのアカウントをこの端末へ接続"
     override val chatGptPlanDescription = "対応する描画には、ChatGPTプランの利用枠または設定されたクレジットが使われます。利用枠と上限はChatGPTの設定で管理できます。"

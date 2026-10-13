@@ -1,8 +1,10 @@
 import Foundation
+import OSLog
 
 /// This adapter changes HTTP shape only. The core owns prompt, schema and response validation.
 public enum ProviderWire {
     public static let responseName = "submit_pipeline_response"
+    private static let logger = Logger(subsystem: "app.inku", category: "provider")
 
     public static func request(action: Data, provider: ProviderSettings, model: String, maxTokens: Int, key: String?) throws -> URLRequest {
         try provider.validate()
@@ -41,6 +43,7 @@ public enum ProviderWire {
                         body["temperature"] = .number("1.0"); body["top_p"] = .number("0.95"); body["top_k"] = .integer(64)
                     }
                 }
+                applyOllamaSampling(to: &body, providerID: provider.id, model: model, maxTokens: maxTokens)
             }
             if provider.id == "ollama" || provider.apiProfile == "mlx" {
                 body["response_format"] = .object(["type": .string("json_schema"), "json_schema": .object(["name": .string(responseName), "schema": schema, "strict": .bool(true)])])
@@ -48,7 +51,6 @@ public enum ProviderWire {
                 body["tools"] = .array([.object(["type": .string("function"), "function": function])])
                 body["tool_choice"] = .object(["type": .string("function"), "function": .object(["name": .string(responseName)])])
             }
-            if ["ollama", "ollama-cloud"].contains(provider.id) { body["reasoning_effort"] = .string("none") }
         case .anthropic:
             endpoint = base + "/v1/messages"
             headers["x-api-key"] = key ?? ""; headers["anthropic-version"] = "2023-06-01"
@@ -73,6 +75,14 @@ public enum ProviderWire {
         request.httpMethod = "POST"; request.httpBody = provider.kind == .gemini ? Data(body.orderedText.utf8) : body.data
         request.allHTTPHeaderFields = headers
         return request
+    }
+
+    // Mirrors Server openai_sampling for both local and Cloud Ollama.
+    static func applyOllamaSampling(to body: inout ExactJSON, providerID: String, model: String, maxTokens: Int) {
+        guard ["ollama", "ollama-cloud"].contains(providerID) else { return }
+        let levelsOnly = model.range(of: "^gpt-oss(?:[:-]|$)", options: .regularExpression) != nil
+        body["reasoning_effort"] = .string(levelsOnly ? "low" : "none")
+        if levelsOnly { body["max_tokens"] = .integer(maxTokens + 8192) }
     }
 
     private static let geminiMinimalModels: Set<String> = [
@@ -105,6 +115,12 @@ public enum ProviderWire {
         switch kind {
         case .chatGPTPlan: throw HostError("chatgpt_operation_not_supported")
         case .openAICompatible:
+            if value["choices"].array?.first?["finish_reason"].string == "length" {
+                let output = value["usage"]["completion_tokens"].number ?? "unknown"
+                let reasoning = value["usage"]["completion_tokens_details"]["reasoning_tokens"].number ?? "unknown"
+                logger.error("provider_output_limit finish_reason=length output_tokens=\(output, privacy: .public) reasoning_tokens=\(reasoning, privacy: .public)")
+                throw HostError("malformed_payload")
+            }
             guard let message = value["choices"].array?.first?["message"] else { throw HostError("malformed_payload") }
             let calls = message["tool_calls"].array ?? []
             if calls.isEmpty { text = message["content"].string }

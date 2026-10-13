@@ -14,6 +14,15 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-13 Match Server's Ollama reasoning controls and output budgets
+
+Drawing, Vision (refinement advice and colophons), and demo instruction requests to local and Cloud Ollama use the reasoning controls in Server's [`openai_request.py`](../server/src/inku_server/openai_request.py).
+
+- For OpenAI-compatible connection IDs `ollama` and `ollama-cloud`, model names matching `^gpt-oss(:|-|$)` receive `reasoning_effort: low` and 8,192 extra `max_tokens` (drawing 2,048→10,240, advice 320→8,512, demo 180→8,372). Other models receive `none` without extra tokens. All three paths share the matching.
+- These Ollama settings are not added to other providers. Official OpenAI URLs retain the existing official API settings, as on Server. The provider specifications are [OpenAI compatibility](https://docs.ollama.com/api/openai-compatibility) and [thinking](https://docs.ollama.com/capabilities/thinking).
+- If the first OpenAI-compatible drawing choice has `finish_reason: length`, reject it as `malformed_payload` even if text or a tool call looks complete. The system log (subsystem `app.inku`, category `provider`) records `provider_output_limit`, the finish reason, and the provider's output and reasoning token counts (`unknown` when absent). It includes no answer or reasoning text. Core failure classification and retry behavior are unchanged.
+- Check: InkuHost's `OllamaReasoningEffortTests` verifies outgoing JSON for all three paths, a non-Ollama control, model-name boundaries, and rejection of cut-off responses containing only reasoning, text, or a tool call.
+
 ## 2026-10-13 Match Server's Gemini requests and Claude demo requests
 
 Gemini drawing pipeline, Vision, and demo instruction requests use the model matching and output budgets in Server's [`gemini_request.py`](../server/src/inku_server/gemini_request.py). This updates the matching introduced on 2026-10-12.

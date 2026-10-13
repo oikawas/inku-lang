@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Match Server's Ollama requests in Swift
+
+Swift local and Cloud Ollama requests now send `reasoning_effort: low` with 8,192 extra output tokens for `gpt-oss`, and `none` for other models, across drawing, Vision, and demo instructions. OpenAI-compatible drawing responses ended at `finish_reason: length` are rejected as `malformed_payload` even when text or tool calls look complete. The system log records `provider_output_limit` and token counts, retaining the existing retry classification.
+
 ### 2026-10-13 — Send Ollama's gpt-oss "low" with room to reason, and give Vision and the demo Ollama's reasoning setting
 
 On Ollama Cloud, `gpt-oss:20b` reasoned through the whole 2,048-token budget in all six drawings despite `reasoning_effort: "none"` and answered nothing, as did `gpt-oss:120b` in two (draw session, 2026-10-12). Ollama resolves a reasoning effort a model does not list to that model's default, and gpt-oss lists only low, medium, and high. Ollama requests, local and cloud, now send gpt-oss `low` with 8,192 tokens of room, and every other model `none` as before. The setting moved into `openai_sampling()`, so Vision and the demo instruction now carry it too. An OpenAI-compatible drawing response that stops with `finish_reason: length` is not used as an answer and logs `provider_output_limit`; the core retries it as before.

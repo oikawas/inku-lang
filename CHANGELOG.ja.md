@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-13 — SwiftのOllama要求をServerに揃える
+
+SwiftのOllamaローカル・Cloudも、描画・Vision・デモで`gpt-oss`に`reasoning_effort: low`と8,192の追加出力枠を送り、ほかのモデルには`none`を送る。OpenAI互換の描画応答が`finish_reason: length`で終わったら、本文やtool callが揃っていても答えに使わず`malformed_payload`で拒否し、`provider_output_limit`とトークン数をシステムログに残す。既存の再試行の分類は変えない。
+
 ### 2026-10-13 — Ollamaのgpt-ossにlowと推論の分の出力枠を送り、VisionとデモにもOllamaの推論の指定を付ける
 
 作者の指示（Ollamaの資料とOllama Cloudへの要求の照合）。描画セッションの2026-10-12の実測（run d3ab43b9、Build 1179）で、`gpt-oss:20b`は6件とも、`reasoning_effort: "none"`を送っても推論だけで出力枠2,048を使い切り（`finish_reason: length`）、本文も関数呼び出しも空だった。`gpt-oss:120b`も日本語の2件で同じだった。OllamaのOpenAI互換APIでは、`reasoning_effort`の値はモデルごとに決まり（`/api/show`の`thinking.values`）、モデルに無い値はそのモデルの既定に戻る。gpt-ossが受け付けるのは`low`・`medium`・`high`だけで、既定は`medium`である。

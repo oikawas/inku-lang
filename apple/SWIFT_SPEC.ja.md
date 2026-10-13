@@ -14,6 +14,15 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-13 Ollamaの推論指定と出力枠をServerに揃える
+
+Ollamaローカル・Cloudへの描画・Vision（推敲の助言・奥書）・デモの指示文は、Serverの[`openai_request.py`](../server/src/inku_server/openai_request.py)と同じ推論指定を使う。
+
+- OpenAI互換の接続IDが`ollama`または`ollama-cloud`のとき、モデル名が`^gpt-oss(:|-|$)`に一致すれば`reasoning_effort: low`を送り、`max_tokens`に8,192を足す（描画2,048→10,240、助言320→8,512、デモ180→8,372）。ほかのモデルは`none`を送り、出力枠を増やさない。判定は3経路で共通とする。
+- このOllama向けの指定は、他providerへ付けない。公式OpenAIのURLでは、Serverと同じく公式API用の既存指定を使う。根拠となるproviderの仕様は[OpenAI互換API](https://docs.ollama.com/api/openai-compatibility)と[thinking](https://docs.ollama.com/capabilities/thinking)を参照する。
+- OpenAI互換の描画応答の先頭候補が`finish_reason: length`なら、本文やtool callが揃っていても答えとして使わず、`malformed_payload`で拒否する。システムログ（subsystem `app.inku`、category `provider`）に`provider_output_limit`、終了理由、提供元が返した出力・推論トークン数（不明なら`unknown`）を残す。本文・推論文はログに含めない。coreへの失敗の分類と再試行の扱いは変えない。
+- 確認：InkuHostの`OllamaReasoningEffortTests`で、3経路の送信JSON、Ollama以外の対照、モデル名の境界、推論だけ／本文あり／tool callありの打切り応答の拒否を確認する。
+
 ## 2026-10-13 Geminiの要求とデモのClaude要求をServerに揃える
 
 Geminiへの描画pipeline・Vision・デモの指示文は、Serverの[`gemini_request.py`](../server/src/inku_server/gemini_request.py)と同じモデル判定・出力枠を使う。2026-10-12の判定を更新する。

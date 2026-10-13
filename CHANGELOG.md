@@ -8,6 +8,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — Reflect the NVIDIA NIM measurement in the model information
+
+At the author's request, the catalog `model_catalog.json` now carries the measurement of every model NIM lists today (80), with an 800-second response limit: six descriptions and Vision A/B sent once each, plus image C for the three models whose A/B held (run `provider-20261014-run-a93fb5ed`, drawing session). The rules are the ones applied to the other providers on 2026-10-13.
+
+- `nvidia/ising-calibration-1.5-31b` and `poolside/laguna-xs-2.1`, which drew all six descriptions, can be chosen for LLM at ★★☆. The six models that read the picture can be chosen for Vision. C gives the level: ★★☆ for `google/diffusiongemma-26b-a4b-it` and ★☆☆ for `moonshotai/kimi-k3`. Models that misread the picture, or whose C did not hold, have no level.
+- The 20 embedding, CLIP, reward, document-parsing, chart-reading, video-detection, safety-classifier and translation models are not supported (the author's choice, including the safety classifier that drew all six).
+- The other 53 models could not draw, drew only part of the six, or could not read pictures, so they fall under "No response when measured". The 44 that answered only 404 say "Not available with this API key (404)."
+- Seconds: LLM is the mean, over drawn descriptions, of each description's generation requests summed (Stage 1 and the composition reading). Vision is the mean of the A/B requests that returned advice. NIM's per-model prices are unconfirmed, so no cost is given. The nine models still carrying July figures were re-rated from this measurement. The 50 end-of-life entries are unchanged.
+
 ## macOS 1.1.3 (2026-10-14 / Build 11; Server reference v2.15.114 / Build 1190)
 
 Publish the macOS changes integrated after 1.1.2 from the current main. The Server Build 1190 catch-up brings whole-text instruction editing, discarding edits, folded numeric ranges and frames, saijiki completion, completion records and states, the author's original words and completion reasons, retrying only failed batch works, choosing the composition again, and prompt display. It also includes model information, labels and six folds from the shared v2 catalog. The copied screen text refers to Server v2.15.114 / Build 1190; that value does not claim parity with every Server feature. Existing works, names, purposes and publication choices are preserved.

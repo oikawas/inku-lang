@@ -58,6 +58,23 @@ struct DdlAuthoringView: View {
                 Text(model.display.localized("補完はモデルへ送信します。変更案は承認後に確定します。"))
                     .inkuFont(12).foregroundStyle(.secondary)
             }
+            if !model.completionIssues.isEmpty {
+                // PipelineStatus.svelte: each hole the completion could not fill, with the author's sentence and why.
+                VStack(alignment: .leading, spacing: 8) {
+                    Label(model.display.localized("補えなかった箇所"), systemImage: "exclamationmark.bubble").inkuFont(14, weight: .semibold)
+                    ForEach(model.completionIssues) { issue in
+                        VStack(alignment: .leading, spacing: 4) {
+                            if !issue.source.isEmpty {
+                                Text(issue.source).inkuFont(12, design: .monospaced).textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading).padding(8)
+                                    .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 6))
+                            }
+                            Text(HoleCompletionReasons.text(issue.reason, display: model.display)).inkuFont(12).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .padding(12).background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 8))
+            }
             if !model.patchProposalJSON.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Label(model.display.localized("補完案の承認待ち"), systemImage: "checkmark.bubble").inkuFont(14, weight: .semibold)

@@ -1095,7 +1095,8 @@ private actor ExecutionDriver {
                             deliveryJSON: snapshot["delivery"].object == nil ? nil : snapshot["delivery"].data,
                             promptJSON: state.prompts,
                             holeIDs: snapshot["delivery"]["compiler_lock"]["hole_identities"].array?.compactMap(\.string) ?? [], candidateWork: state.candidate?.work,
-                            providerMetrics: state.providerObservations?.map(\.metric) ?? [])
+                            providerMetrics: state.providerObservations?.map(\.metric) ?? [],
+                            completionIssues: state.svgFailure == nil ? HoleCompletionIssue.issues(snapshot: snapshot) : [])
     }
     private func executionID() throws -> String { try snapshot.requiredString("execution_id") }
     private func canonicalUnsigned(_ value: ExactJSON, key: String) throws -> UInt64 {

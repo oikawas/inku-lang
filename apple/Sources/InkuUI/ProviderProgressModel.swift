@@ -40,6 +40,8 @@ public struct ProviderProgressSnapshot: Sendable, Equatable {
     public private(set) var stageEndedAt: Date?
     public private(set) var outcome: Outcome = .running
     public private(set) var awaitingReply = true
+    /// A completion proposal the check refused is being asked for again with its reasons (core `asked_again`).
+    public private(set) var askedAgain = false
     public private(set) var receivedBytes: Int?
     public private(set) var tokensIn: UInt64?
     public private(set) var tokensOut: UInt64?
@@ -55,7 +57,7 @@ public struct ProviderProgressSnapshot: Sendable, Equatable {
         max(0, (attemptEndedAt ?? date).timeIntervalSince(attemptBeganAt))
     }
 
-    static func start(executionID: String, report: Data, beganAt: Date, deadline: Date,
+    public static func start(executionID: String, report: Data, beganAt: Date, deadline: Date,
                       models: ModelSelection?, comparison: Bool, previous: Self?) -> Self? {
         guard let report = try? ExactJSON(data: report), let action = report["provider_attempt"]["action"].string,
               let attempt = report["provider_attempt"]["attempt"].number.flatMap(Int.init), attempt > 0,
@@ -70,9 +72,11 @@ public struct ProviderProgressSnapshot: Sendable, Equatable {
         case .some(.sketch), .some(.catalog), .some(.interpretation), .some(.composition): reference = models?.stage1Model
         case .none: reference = nil
         }
-        return Self(executionID: executionID, action: action, stage: stage, attempt: attempt, maxAttempts: maximum,
+        var snapshot = Self(executionID: executionID, action: action, stage: stage, attempt: attempt, maxAttempts: maximum,
             modelReference: reference.flatMap { $0.isEmpty ? nil : $0 }, comparison: comparison,
             stageBeganAt: sameStage ? previous!.stageBeganAt : beganAt, attemptBeganAt: beganAt, deadline: deadline)
+        snapshot.askedAgain = report["provider_attempt"]["asked_again"].bool == true
+        return snapshot
     }
 
     mutating func receive(bytes: Int) {

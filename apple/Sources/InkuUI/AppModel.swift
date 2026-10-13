@@ -110,6 +110,7 @@ public final class AppModel {
     public private(set) var holeIDs: [String] = []
     public private(set) var patchProposalJSON = ""
     public private(set) var patchCandidate = ""
+    public private(set) var completionIssues: [HoleCompletionIssue] = []
     public private(set) var unreadOutputs: Set<String> = []
     private var workActionStates: [String: SavedWorkActionState] = [:]
     public let library = LibraryModel()
@@ -370,6 +371,7 @@ public final class AppModel {
         selectedHoleIDs = []
         patchProposalJSON = ""
         patchCandidate = ""
+        completionIssues = []
         diagnosticsJSON = ""
         promptJSON = ""
         promptAvailability = .loading
@@ -1042,7 +1044,7 @@ public final class AppModel {
             authoringAuthority = context.authority; authoringOrigin = context.origin; authoringRevision = context.revision
             authoringPhase = "completed"
             currentExecutionID = nil; currentView = nil
-            holeIDs = []; selectedHoleIDs = []; patchProposalJSON = ""; patchCandidate = ""
+            holeIDs = []; selectedHoleIDs = []; patchProposalJSON = ""; patchCandidate = ""; completionIssues = []
             status = "選択した候補を保存しました"
         } catch { report(error) }
         return saved
@@ -1424,6 +1426,7 @@ public final class AppModel {
         authoringPhase = ""
         patchProposalJSON = ""
         patchCandidate = ""
+        completionIssues = []
         holeIDs = []
         selectedHoleIDs = []
         diagnosticsJSON = ""
@@ -1895,6 +1898,7 @@ public final class AppModel {
         authoringOrigin = view.origin
         authoringPhase = view.phase
         holeIDs = view.holeIDs
+        completionIssues = view.completionIssues
         selectedHoleIDs.formIntersection(Set(holeIDs))
         patchProposalJSON = view.patchProposalJSON.map { (try? Self.pretty($0)) ?? String(decoding: $0, as: UTF8.self) } ?? ""
         if let bytes = view.patchProposalJSON, let proposal = try? ExactJSON(data: bytes) {

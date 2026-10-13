@@ -170,6 +170,29 @@ public struct PipelineView: Sendable {
     public let holeIDs: [String]
     public let candidateWork: SavedWork?
     public let providerMetrics: [ProviderAttemptMetric]
+    /// Holes the completion left uncompleted, shown when the author must decide or edit (Web holeCompletionIssues).
+    public var completionIssues: [HoleCompletionIssue] = []
+}
+
+/// One hole the completion check refused or left unresolved: the author's sentence and the check's reason code.
+public struct HoleCompletionIssue: Sendable, Equatable, Identifiable {
+    public let holeID: String
+    public let source: String
+    public let reason: String
+    public var id: String { holeID }
+    public init(holeID: String, source: String, reason: String) { self.holeID = holeID; self.source = source; self.reason = reason }
+
+    /// Web `holeCompletionIssues`: only while a patch awaits approval, or when completion stopped the run.
+    public static func issues(snapshot: ExactJSON) -> [HoleCompletionIssue] {
+        let tag = snapshot["phase"]["tag"].string, reason = snapshot["phase"]["reason"].string
+        let stopped = (tag == "needs_user_edit" || tag == "failed")
+            && (reason == "hole_completion_failed" || reason == "hole_completion_context_limit")
+        guard tag == "awaiting_patch_approval" || stopped else { return [] }
+        return (snapshot["hole_completion_check"]["results"].array ?? []).compactMap { result in
+            guard ["rejected", "unresolved"].contains(result["status"].string ?? ""), let hole = result["hole_id"].string else { return nil }
+            return HoleCompletionIssue(holeID: hole, source: result["source"].string ?? "", reason: result["reason"].string ?? "unknown")
+        }
+    }
 }
 
 public struct PreparedCandidate: Identifiable, Sendable {

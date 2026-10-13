@@ -112,6 +112,9 @@ struct AppCheck {
             try await runComparisonChecks()
             return
         }
+        if CommandLine.arguments.contains("--completion-issues-only") {
+            try runCompletionIssueChecks(); return
+        }
         if CommandLine.arguments.contains("--automation-only") {
             try await runAutomationChecks()
             return

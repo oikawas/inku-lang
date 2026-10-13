@@ -14,6 +14,14 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-13 Show the author's text and the reason for gaps that could not be completed, and asking again
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage D1). The sources are Web `holeCompletionIssues`, `PipelineStatus.svelte` and `providerAttemptText`.
+
+- When completion stops (phase `needs_user_edit` or `failed` for `hole_completion_failed` or `hole_completion_context_limit`) and while a proposal awaits approval, the DDL completion view shows "Gaps that could not be completed". For each hole the shared core's `hole_completion_check` refused (`rejected`) or left `unresolved` it shows the author's text and a plain reason; holes that passed are not listed. The reasons are the Web's (including a context that was too long), and an unknown reason reads "Refused by the check (code)".
+- An attempt after the check refused a proposal (the attempt report's `asked_again`) reads "Asking again with the reasons the proposal was refused n/m", apart from a communication retry.
+- Checks: InkuHost `HoleCompletionIssueTests` (when issues show and which holes), AppCheck `--completion-issues-only` (reason texts and `asked_again`).
+
 ## 2026-10-13 Retry only the failed works of the last batch
 
 At the author's instruction (bringing in the differences from Server Build 1190, stage F). The sources are Web `BatchState.retryFailed` and `BatchPanel.svelte`.

@@ -60,7 +60,9 @@ public struct ProviderProgressView: View {
 
     private func timing(_ snapshot: ProviderProgressSnapshot, at date: Date) -> some View {
         HStack(spacing: 10) {
-            Text(model.display.localizedFormat(snapshot.awaitingReply ? (snapshot.attempt > 1 ? "再試行 %d/%d" : "応答待ち %d/%d") : "試行 %d/%d",
+            // paintStream.ts providerAttemptText: a refused completion proposal asked for again is not a resend.
+            Text(model.display.localizedFormat(snapshot.askedAgain ? "断られた案を理由を添えて問い直し中 %d/%d"
+                                               : snapshot.awaitingReply ? (snapshot.attempt > 1 ? "再試行 %d/%d" : "応答待ち %d/%d") : "試行 %d/%d",
                                                snapshot.attempt, snapshot.maxAttempts))
             Text(model.display.localizedFormat("経過 %.1f秒", snapshot.stageElapsed(at: date)))
             if snapshot.attempt > 1 {

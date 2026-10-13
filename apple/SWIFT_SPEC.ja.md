@@ -14,6 +14,14 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-13 補えなかった箇所の原文と理由、問い直し中を表示する
+
+作者の指示（Server Build 1190との差の取り込み、段D1）。正本はWebの`holeCompletionIssues`・`PipelineStatus.svelte`・`providerAttemptText`。
+
+- 補完が止まったとき（段が`needs_user_edit`か`failed`で、理由が`hole_completion_failed`か`hole_completion_context_limit`）と、変更案の承認を待つときに、指示書の補完の画面へ「補えなかった箇所」を出す。共有coreの`hole_completion_check`のうち断られた（`rejected`）・解けなかった（`unresolved`）穴ごとに、作者の原文と平易な理由を出し、通った穴は出さない。理由の文はWebと同じ（文脈が長すぎた場合も含む）で、知らない理由は「検査で断られた（符号）」と出す。
+- 案が検査で断られた後の試行（試行の報告の`asked_again`）は「断られた案を理由を添えて問い直し中 n/m」と出し、通信の再試行と分ける。
+- 確認：InkuHostの`HoleCompletionIssueTests`（出す条件と出す穴）、AppCheck `--completion-issues-only`（理由の文と`asked_again`）。
+
 ## 2026-10-13 前回のバッチのエラー作品だけを再描画する
 
 作者の指示（Server Build 1190との差の取り込み、段F）。正本はWebの`BatchState.retryFailed`と`BatchPanel.svelte`。

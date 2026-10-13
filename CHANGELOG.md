@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Swift shows the author's text and reason for gaps completion could not fill, and asking again
+
+At the author's instruction (bringing in the differences from Server Build 1190, stage D1). Swift's DDL completion view showed only the committed text and the proposal. As on the Web, when completion stops and while a proposal awaits approval, each gap it could not fill shows the author's text and a plain reason. An attempt after the check refused a proposal reads "Asking again with the reasons the proposal was refused", apart from a communication retry.
+
 ### 2026-10-13 — Swift retries only the failed works of the last batch
 
 At the author's instruction (bringing in the differences from Server Build 1190, stage F). Swift batches could only "Resume the last batch", which draws waiting, failed and uncertain rows together. As on the Web, "Retry failed works" now draws only the failed rows again with their original text, line numbers and the drawing conditions pinned at the start. Waiting, uncertain and successful rows are left alone.

@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.115 (2026-10-13 / Build 1191)
+
 ### 2026-10-13 — A completion no longer repeats the sentence end
 
 At the author's choice (drop it on receipt). A hole that a completion rewrites stops before the sentence end, but a proposal that also closed the sentence left the saved instructions ending twice, as in 「…散らす。。」 (found on the Pixel 9 approval card). Almost every Japanese proposal that reached approval closed its sentence.

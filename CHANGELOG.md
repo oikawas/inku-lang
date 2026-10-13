@@ -8,6 +8,13 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-13 — Paid-plan models get their own fold, and a 402 also reads as plan-only
+
+At the author's instruction (update model settings and publication selection from the draw session's measurement of Ollama Cloud). Of the 18 Ollama Cloud models on offer, 11 answered 402 as outside the Free plan and one answered 403 as still rolling out.
+
+- Publication selection gains a "Paid plan only" fold, making four (Paid plan only, No response when measured, Not supported, End of life). Paid-plan models no longer stay in the list.
+- When fetching the model list checks each model, a 402 from the one-token call also marks it plan-only (only 403 did). A model outside the Free plan answers 402, so such models went unmarked and looked publishable.
+
 ### 2026-10-13 — Every sender writes a schema's properties in its propertyOrdering
 
 At the draw session's request (the author's choice to fix the senders). The core's JSON keeps no key order, so a schema's `properties` arrive in name order (thesis last, for the composition reading). Only the Gemini path reordered them; OpenAI Responses and Chat Completions, Ollama and mlx `response_format`, Anthropic `input_schema` and the ChatGPT plan's function sent the name order. They now write `properties` in the schema's `propertyOrdering`, nested ones too (the new `schema_order.ordered_schema`); unnamed properties follow in their present order, and every other key and `propertyOrdering` stay. Today only the composition reading names an order; Stage 1 and other schemas go out byte for byte as before.

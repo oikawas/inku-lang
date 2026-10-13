@@ -539,7 +539,9 @@ def _probe_model_access(base_url: str, api_key: str, model_id: str) -> dict:
         {"Authorization": f"Bearer {api_key}"},
         {"model": model_id, "messages": [{"role": "user", "content": "."}], "max_tokens": 1},
     )
-    if status == 403:
+    # A model outside the Free plan answers 402 (2026-10-13), one the account
+    # cannot reach yet 403; neither can be called on this key.
+    if status in (402, 403):
         return {"subscription": True}
     if status == 200:
         return {"subscription": False}
@@ -585,8 +587,8 @@ def api_settings_fetch_provider_models(
     carried = (
         *MODEL_METADATA_KEYS,
         "eol", "eol_date",
-        # 有料プラン限定の印は提供元の一覧に現れない (一覧には載るが叩くと 403 が
-        # 返る)。取得のたびに消えては困るので、EOL と違って再提供で外さない。
+        # 有料プラン限定の印は提供元の一覧に現れない (一覧には載るが叩くと 402 か
+        # 403 が返る)。取得のたびに消えては困るので、EOL と違って再提供で外さない。
         "requires_subscription",
     )
     for model in models:

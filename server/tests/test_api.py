@@ -2744,7 +2744,7 @@ def test_an_ollama_cloud_fetch_marks_the_models_this_key_cannot_call(monkeypatch
 
 
 def test_the_access_probe_reads_retired_and_plan_only_from_the_status(monkeypatch):
-    """410 from /api/show is retirement, 403 from a call is the plan; anything else settles nothing."""
+    """410 from /api/show is retirement, 402 or 403 from a call is the plan; anything else settles nothing."""
     import urllib.error
 
     statuses = {}
@@ -2764,6 +2764,8 @@ def test_the_access_probe_reads_retired_and_plan_only_from_the_status(monkeypatc
     statuses.update({
         "retired": {"/api/show": (410, '{"error":"retired was retired at 2026-09-25 00:00:00 -0700 PDT"}')},
         "paid": {"/v1/chat/completions": (403, "")},
+        # Ollama Cloud's answer for a model outside the Free plan (2026-10-13).
+        "free-plan-excluded": {"/v1/chat/completions": (402, '{"error":"This model is not in the Free plan."}')},
         "open": {},
         "busy": {"/v1/chat/completions": (429, "")},
     })
@@ -2772,6 +2774,7 @@ def test_the_access_probe_reads_retired_and_plan_only_from_the_status(monkeypatc
     base = "https://ollama.com/v1"
     assert probe(base, "key", "retired") == {"retired": "2026-09-25"}
     assert probe(base, "key", "paid") == {"subscription": True}
+    assert probe(base, "key", "free-plan-excluded") == {"subscription": True}
     assert probe(base, "key", "open") == {"subscription": False}
     assert probe(base, "key", "busy") == {}
     # Without a key only retirement can be told.

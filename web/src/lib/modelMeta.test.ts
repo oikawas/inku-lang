@@ -36,7 +36,7 @@ test('models that cannot be published are filed into their folds; a usable one s
 	].map((model) => [model.id, modelFold(model), isModelUnselectable(model)]);
 	assert.deepEqual(folds, [
 		['retired', 'eol', true], ['tts', 'not_supported', true], ['silent', 'no_response', true],
-		['vision-only', null, false], ['paid', null, true]
+		['vision-only', null, false], ['paid', 'subscription', true]
 	]);
 	assert.equal(modelStatusLabel({ id: 'tts', label: 'x', not_supported: true }, true), 'ノンサポート');
 });

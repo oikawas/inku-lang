@@ -185,19 +185,24 @@ export function modelStatusLabel(model: ModelOption, isJapanese: boolean): strin
 
 // Where model administration files a model that cannot be published (the
 // author, 2026-10-13): each kind is folded away at the bottom of the list,
-// closed at first. A paid-plan model stays in the list; a plan can change.
-export type ModelFold = 'no_response' | 'not_supported' | 'eol';
-export const MODEL_FOLDS: ModelFold[] = ['no_response', 'not_supported', 'eol'];
+// closed at first. Paid-plan models stayed in the list until a measurement
+// found twelve Ollama Cloud models this account cannot call; they now have the
+// first fold (the author, 2026-10-13), and a plan that reaches one clears its
+// mark on the next fetch.
+export type ModelFold = 'subscription' | 'no_response' | 'not_supported' | 'eol';
+export const MODEL_FOLDS: ModelFold[] = ['subscription', 'no_response', 'not_supported', 'eol'];
 
 export function modelFold(model: ModelOption): ModelFold | null {
 	if (model.eol) return 'eol';
 	if (model.not_supported) return 'not_supported';
+	if (model.requires_subscription) return 'subscription';
 	if (answersNothing(model)) return 'no_response';
 	return null;
 }
 
 export function modelFoldTitle(fold: ModelFold, count: number, isJapanese: boolean): string {
 	const [ja, en] = {
+		subscription: ['有料プラン限定', 'Paid plan only'],
 		no_response: ['計測で応答なし', 'No response when measured'],
 		not_supported: ['ノンサポート', 'Not supported'],
 		eol: ['提供終了', 'End of life']

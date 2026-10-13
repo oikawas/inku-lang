@@ -386,11 +386,11 @@
 			});
 		return provider.id === 'chatgpt' ? models : sortModels(models);
 	});
-	// Models that cannot be published -- measured to answer nothing, not
-	// supported, or retired -- are folded at the bottom, closed at first (the
-	// author, 2026-10-13). The search and the filter still count them.
+	// Models that cannot be published -- paid-plan only, measured to answer
+	// nothing, not supported, or retired -- are folded at the bottom, closed at
+	// first (the author, 2026-10-13). The search and the filter still count them.
 	const modelPickerSections = $derived.by(() => {
-		const sections: Record<'main' | ModelFold, ModelOption[]> = { main: [], no_response: [], not_supported: [], eol: [] };
+		const sections: Record<'main' | ModelFold, ModelOption[]> = { main: [], subscription: [], no_response: [], not_supported: [], eol: [] };
 		for (const model of filteredModelPickerModels) sections[modelFold(model) ?? 'main'].push(model);
 		return sections;
 	});

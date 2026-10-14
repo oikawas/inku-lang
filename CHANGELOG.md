@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-14 — Remove the X shapes and zigzags from oil fills
-
-The hand line's single-sample events (a catch, a fade or a correction) also reached the passes of an oil fill. Because a fill lays its passes side by side and widens them threefold, a pass pinched into an X at one point and its marks kinked into a Z (the author's sample work `227139cd…`). Oil fill passes now take no such events. Oil lines and outlines, and the other tools, are unchanged. Redrawing 69 recent works with oil fills changes the SVG of 41, and 4 of them differ by 24/255 or more in a 1000 px image. The author chose this fix over a comparison sheet. Render engine 78. Saved works are unchanged.
-
 ### 2026-10-14 — Correct the explanation beside Android composition candidates
 
 A sentence with no range or place now explains that the ranges in the instructions cannot be chosen again. When the ranges stay, the accompanying text says the work was redrawn with a new composition seed and unchanged instructions. The author's Japanese and English wording matches Web.
@@ -23,6 +19,12 @@ When a sentence states no range or place, the reason now explains that the instr
 ### 2026-10-14 — Remove reading and touch refinement on macOS
 
 Following the author's decision, Another reading, word-based touch, and the empty Edit drawing parameters menu are removed. Layout keeps its separate entrance. Autonomous refinement and Vision advice allow only color catalog and layout, excluding old reading and touch selections from requests. Direction is Vision observation material only and is never added to the drawing description. Color generations draw the parent's saved DDL without calling Stage 1. Archived Reading and Touch lineage labels and interpretation_seed/seed_text display remain readable; replay uses recorded render_seed. Removed Web copy keys and tooltip mappings are aligned.
+
+## v2.15.134 (2026-10-14 / Build 1210)
+
+### 2026-10-14 — Remove the X shapes and zigzags from oil fills
+
+The hand line's single-sample events (a catch, a fade or a correction) also reached the passes of an oil fill. Because a fill lays its passes side by side and widens them threefold, a pass pinched into an X at one point and its marks kinked into a Z (the author's sample work `227139cd…`). Oil fill passes now take no such events. Oil lines and outlines, and the other tools, are unchanged. Redrawing 69 recent works with oil fills changes the SVG of 41, and 4 of them differ by 24/255 or more in a 1000 px image. The author chose this fix over a comparison sheet. Render engine 78. Saved works are unchanged.
 
 ## v2.15.133 (2026-10-14 / Build 1209)
 

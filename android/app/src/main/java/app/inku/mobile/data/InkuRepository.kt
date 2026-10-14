@@ -797,7 +797,6 @@ class InkuRepository(
                     renderSeed = seeds.renderSeed,
                     compositionSeed = seeds.compositionSeed,
                     interpretationSeed = seeds.interpretationSeed,
-                    seedText = seeds.seedText,
                     instructionLang = instructionLang,
                     uiLang = uiLang,
                     sketch = sketch,
@@ -848,7 +847,6 @@ class InkuRepository(
                 renderSeed = seeds.renderSeed,
                 compositionSeed = seeds.compositionSeed,
                 interpretationSeed = seeds.interpretationSeed,
-                seedText = seeds.seedText,
                 instructionLang = instructionLang,
                 uiLang = uiLang,
                 sketch = sketch,
@@ -922,7 +920,6 @@ class InkuRepository(
                 renderSeed = seeds.renderSeed,
                 compositionSeed = seeds.compositionSeed,
                 interpretationSeed = seeds.interpretationSeed,
-                seedText = seeds.seedText,
             ),
         )
         val model = drawingModelOf(stage1ModelId, stage2ModelId)
@@ -948,14 +945,13 @@ class InkuRepository(
             stage2Model = plan.stage2Model ?: parent.stage2Model,
             colorCatalogId = plan.catalogId,
             canvasAspect = plan.canvasAspect,
-            // The colour and touch refinements replay a Score that is already
-            // expanded; the other three go back through Stage 1.5.
+            // The colour refinement replays a Score that is already
+            // expanded; reading, layout and model comparison go through Stage 1.5.
             autoRepair = plan.route != RefinementRoute.RenderFromScore,
             renderSeed = plan.seeds.renderSeed,
             compositionSeed = plan.seeds.compositionSeed,
             recomposeMode = plan.recomposeMode,
             interpretationSeed = plan.seeds.interpretationSeed,
-            seedText = plan.seeds.seedText,
             // 写生 (Stage 0.5) is not re-run for a candidate: a refinement varies
             // a stage after it, and the layer is not deterministic, so asking it
             // again would move the one thing the refinement is not varying. The

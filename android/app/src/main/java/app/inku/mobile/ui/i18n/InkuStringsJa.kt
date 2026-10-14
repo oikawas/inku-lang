@@ -194,15 +194,11 @@ object InkuStringsJa : InkuStrings {
 
     override val refinementInProgress = "推敲の候補を生成中です。"
     override val refinementFailed = "候補の生成に失敗しました。"
-    override val refinementTouchWordsRequired = "タッチを変える言葉を入力してください。"
     override val refinementNeedsDescription = "この作品には記述が無いため、推敲の候補を作れません。記述から描いた作品を選んでください。"
     override val refinementNeedsDdl = "この作品には指示書が無いため、推敲の候補を作れません。"
     override val refinementNoOtherCatalog = "別の色カタログがありません。"
-    override val refinementTouchFanoutRefusal =
-        "同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。"
     override val refinementElementLabel: (String) -> String = { id ->
         when (id) {
-            "touch" -> "タッチ"
             "layout" -> "配置"
             "reading" -> "読み取り"
             "color" -> "色カタログ"
@@ -386,7 +382,6 @@ object InkuStringsJa : InkuStrings {
     override val uiModeSimple = "シンプルモード"
     override val uiModeSimpleLong = "シンプルモード表示"
     override val seedPhrase = "シードフレーズ"
-    override val touchWords = "タッチを変える言葉"
     override val download = "ダウンロード"
     override val licenseBeforeDownload = "ダウンロード前に Gemma のライセンス同意が必要です。"
     override val templateEdit = "テンプレートを編集"

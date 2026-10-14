@@ -200,16 +200,12 @@ object InkuStringsEn : InkuStrings {
 
     override val refinementInProgress = "Making refinement candidates."
     override val refinementFailed = "The candidates could not be made."
-    override val refinementTouchWordsRequired = "Write the words that change the performance."
     override val refinementNeedsDescription = "This work has no description, so no refinement options can be made. Choose a work drawn from a description."
     override val refinementNeedsDdl = "This work has no instructions, so no refinement options can be made."
     override val refinementNoOtherCatalog = "No other color catalog is available."
-    override val refinementTouchFanoutRefusal =
-        "The same words give the same performance (seed). Only one option can be made."
     override val refinementElementLabel: (String) -> String = { id ->
-        // The nouns of the four refinement operations.
+        // The nouns of the three refinement operations.
         when (id) {
-            "touch" -> "Performance"
             "layout" -> "Composition"
             "reading" -> "Reading"
             "color" -> "Color catalog"
@@ -412,7 +408,6 @@ object InkuStringsEn : InkuStrings {
     override val uiModeSimple = "Simple"
     override val uiModeSimpleLong = "Simple layout"
     override val seedPhrase = "Seed phrase"
-    override val touchWords = "Words that change the performance"
     override val download = "Download"
     override val licenseBeforeDownload = "The Gemma license must be accepted before downloading."
     override val templateEdit = "Edit the template"

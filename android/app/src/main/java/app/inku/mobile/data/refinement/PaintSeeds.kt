@@ -7,8 +7,7 @@ import java.security.SecureRandom
  * What a caller asks a drawing to be made with.
  *
  * The render, composition, and interpretation seeds are the active request
- * values; [seedText] supplies the words from which touch derives its render
- * seed. Every one of them is `null` by default, which is the server's
+ * values. Every one of them is `null` by default, which is the server's
  * `None`: a caller that says nothing leaves every decision where it was.
  *
  * They travel together because every drawing entry point accepts the same
@@ -19,7 +18,6 @@ data class PaintSeeds(
     val renderSeed: Long? = null,
     val compositionSeed: Long? = null,
     val interpretationSeed: String? = null,
-    val seedText: String? = null,
 ) {
     companion object {
         /**
@@ -34,7 +32,6 @@ data class PaintSeeds(
             renderSeed = item.renderSeed?.let { parseSeed(it) },
             compositionSeed = item.compositionSeed?.let { parseSeed(it) },
             interpretationSeed = item.interpretationSeed,
-            seedText = item.seedText,
         )
 
         /**

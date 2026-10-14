@@ -545,15 +545,64 @@ class SharedPipelineHostTest {
     }
 
     @Test
-    fun wordsDecideTheRenderSeedThroughTheSharedRule() = runBlocking {
-        val binding = ScriptedBinding()
-        val result = androidPipeline(binding).composeFromDdl(
+    fun drawingRequestsUseTheirRenderSeedWithoutSendingSeedWords() = runBlocking {
+        val binding = ScriptedBinding().apply { wordSeed = { error("retired word seed must not be called") } }
+        val store = MemoryExecutionStore()
+        val pipeline = AndroidWorkPipeline(
+            binding = binding,
+            modelProvider = object : ModelProvider {
+                override val providerId = "fixture"
+                override suspend fun generate(request: ModelRequest): ModelResponse = error("no model call expected")
+            },
+            commitStore = RecordingCommitStore(), executionStore = store, readHistory = { null },
+            legacyRenderer = object : SvgRenderer {
+                override fun render(request: RenderRequest): RenderResult = error("shared renderer expected")
+            }, bundledPluginsEnabled = { false },
+        )
+        val result = pipeline.composeFromDdl(
             "place one red circle.",
-            describe("").copy(seedText = "しずかに\u0085", renderSeed = 9L),
+            describe("").copy(renderSeed = 9L),
         )
 
-        assertEquals(123L, result.renderSeed)
-        assertEquals("しずかに", result.seedText)
+        assertEquals(9L, result.renderSeed)
+        assertNull(result.seedText)
+        val options = JSONObject(store.load(AndroidWorkPipeline.OWNER_ID, result.pipelineView!!.executionId)!!
+            .toString(Charsets.UTF_8)).getJSONObject("host_context").getJSONObject("result_options")
+        assertFalse(options.has("seed_text"))
+    }
+
+    @Test
+    fun aSavedWorkWithSeedWordsReplaysItsStoredSeedWithoutDerivingTheWords() = runBlocking {
+        val delegate = ScriptedBinding().apply { wordSeed = { error("retired word seed must not be called") } }
+        val renderInputs = mutableListOf<JSONObject>()
+        val binding = object : SharedPipelineBinding by delegate {
+            override fun renderSaved(inputBytes: ByteArray): ByteArray {
+                renderInputs += JSONObject(inputBytes.toString(Charsets.UTF_8))
+                return """{"svg":"<svg/>","metadata":{}}""".encodeToByteArray()
+            }
+            override fun renderSavedSvgLimited(inputBytes: ByteArray, maxSvgBytes: Long) =
+                NativeSvgOutput(renderSaved(inputBytes), null)
+        }
+        val initial = androidPipeline(binding).composeFromDdl("place one red circle.", describe("").copy(renderSeed = 9L))
+        val link = initial.managedHistoryLink!!
+        val savedContext = JSONObject(link.contextJson).put("config", JSONObject(link.snapshotJson).getJSONObject("config"))
+            .put("pipeline_diagnostics", JSONObject().put("upstream_diagnostics", JSONArray())
+                .put("downstream_diagnostics", JSONArray()).put("resource_omissions", JSONArray()).put("relation_omissions", JSONArray()))
+        val parent = HistoryItemEntity(
+            id = "word-parent", createdAt = 1, updatedAt = 2, originalInput = "", normalizedDdl = initial.normalizedDdl,
+            scoreJson = initial.scoreJson, displaySvg = initial.displaySvg, stage1Model = null, stage2Model = null,
+            renderMetadataJson = initial.renderMetadataJson, renderHash = "hash", renderHashShort = "0000",
+            colorCatalogId = "default", canvasAspect = "square", starred = false, trashed = false,
+            elapsedMs = null, tokenMetadataJson = null, renderSeed = "14859340650796947346", seedText = "しずかに",
+        )
+        val stored = ManagedHistoryRead(parent, "ddl_authoritative", variationId = link.variationId, forkContextJson = savedContext.toString())
+        val replay = androidPipeline(binding, readHistory = { stored }).renderFromScore(
+            initial.scoreJson, describe("").copy(parentHistoryId = parent.id),
+        )
+        assertEquals(parent.renderSeed, renderInputs.single().getJSONObject("request").getJSONObject("options").get("render_seed").toString())
+        assertEquals(parent.renderSeed, java.lang.Long.toUnsignedString(replay.renderSeed!!))
+        assertEquals(parent.seedText, replay.seedText)
+        assertEquals(parent.seedText, JSONObject(replay.renderMetadataJson).getString("seed_text"))
     }
 
     @Test

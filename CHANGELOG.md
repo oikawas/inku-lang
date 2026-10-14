@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Fit library thumbnail rows when switching the work preview
+
+Page capacity now adds the measured height of each thumbnail row. Applying the tallest card to every row could remove a bottom row that still fit after closing the preview. Only rows whose works have not arrived use the conservative estimate. Measurements retain fractional pixels, and the list reserves scrollbar space so its column count stays consistent as the preview changes or works arrive.
+
 ## v2.15.141 (2026-10-14 / Build 1217)
 
 ### 2026-10-14 — Clear library searches and distinguish models in the history strip

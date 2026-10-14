@@ -641,15 +641,15 @@
 	// is only a prediction for the first fetch made before the manager opens.
 	// minCardWidth mirrors the minmax() in the .history-thumb-grid rule below and
 	// must move whenever the CSS does. Card metadata is variable-height, so the
-	// painted cards, rather than a fixed chrome estimate, own the row height.
+	// painted cards, rather than a fixed chrome estimate, own each row's height.
 	function calculatePageSize(element: HTMLElement): number {
 		const grid = element.querySelector('.history-thumb-grid');
 		const elementStyle = getComputedStyle(element);
 		const cssPixels = (value: string): number => Number.parseFloat(value) || 0;
 		const width = grid instanceof HTMLElement
-			? grid.clientWidth
+			? grid.getBoundingClientRect().width
 			: Math.max(0, element.clientWidth - cssPixels(elementStyle.paddingLeft) - cssPixels(elementStyle.paddingRight));
-		const height = Math.max(0, element.clientHeight - cssPixels(elementStyle.paddingTop) - cssPixels(elementStyle.paddingBottom));
+		const height = Math.max(0, element.getBoundingClientRect().height - cssPixels(elementStyle.paddingTop) - cssPixels(elementStyle.paddingBottom));
 		if (width <= 0 || height <= 0) return 1;
 		const computed = grid ? getComputedStyle(grid) : null;
 		const gap = computed ? Number.parseFloat(computed.rowGap || computed.gap || '8') || 8 : 8;
@@ -1544,7 +1544,7 @@
 		padding: 8px 10px 6px;
 		min-height: 0;
 	}
-	.history-thumb-grid-wrap { overflow: auto; }
+	.history-thumb-grid-wrap { overflow: auto; scrollbar-gutter: stable; }
 	.history-table-wrap { overflow: auto; }
 	@media (max-width: 760px) {
 		.history-content.has-preview { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(220px, 38%); }

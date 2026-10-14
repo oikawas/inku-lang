@@ -63,6 +63,7 @@ def get_service():
             prepare_for=effects.prepare, provider_with_context=effects.provider_for,
             render_with_context=effects.render_options, project_result=effects.save_result,
             replay_for=effects.replay, provider_observations=effects.provider_observations,
+            reading_config_for=effects.reading_config,
             max_workers=limits["max_workers"], max_effect_steps=limits["max_effect_steps"],
             max_retained_runs=limits["max_retained_runs"],
         )

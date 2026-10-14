@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.142 (2026-10-15 / Build 1218)
+
 ### 2026-10-15 — Redraw the seven grounds so no tile is seen repeating and their light and dark show
 
 At the author's report. The charcoal ground laid an 81 px tile of short upright marks twelve times across and down the canvas, so its pattern repeated exactly (0.99 when the image is laid over itself shifted by one tile). Reviewing all seven grounds from zero at the author's request found more:

@@ -273,14 +273,25 @@ fn band_opacity(instruction: &Instruction) -> Option<f64> {
     }
 }
 
+/// How many times its tool's width the band of a line or an arc's sweep or wash is.
+const BAND_WIDTH_SCALE: f64 = 3.0;
+
 pub(crate) fn mark_width(instruction: &Instruction, canvas: CanvasSize) -> f64 {
     let width = thinned_width(instruction.weight, instruction.thinness) * canvas.unit() / 1000.0;
     width
         * if band_opacity(instruction).is_some() {
-            3.0
+            BAND_WIDTH_SCALE
         } else {
             1.0
         }
+}
+
+/// The width of the band the mark's tool sweeps (刷き) as a line or an arc:
+/// the size of its flat brush, the same for the mark's lines and its closed
+/// shape's passes.
+pub(crate) fn sweep_band_width(instruction: &Instruction, canvas: CanvasSize) -> f64 {
+    thinned_width(instruction.weight, instruction.thinness) * canvas.unit() / 1000.0
+        * BAND_WIDTH_SCALE
 }
 
 pub(crate) fn weight_opacity(weight: Weight) -> f64 {

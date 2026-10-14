@@ -229,6 +229,14 @@ fn ridge_tone(color: &str, step: ToneStep) -> String {
     })
 }
 
+/// The pigment of a flat brush's bristle streak: the same hue and chroma,
+/// `step` lighter or darker in OKLCH.
+pub(crate) fn bristle_tone(color: &str, step: f64) -> String {
+    adjust_pigment(color, |lightness, chroma, hue| {
+        ((lightness + step).clamp(0.0, 1.0), chroma, hue)
+    })
+}
+
 /// The colour one loaded pass carries: the pigment varied a little in OKLCH,
 /// never mixed with black or white.
 pub(crate) fn oil_paint_load(color: &str, seed: Seed, order: i64) -> String {

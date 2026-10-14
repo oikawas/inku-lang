@@ -5,10 +5,11 @@ use std::collections::BTreeSet;
 use sha2::{Digest, Sha256};
 
 use crate::determinism::{hash_to_unit, hash01, seed_salt_index_digest};
+use crate::flat_brush::{FlatBandRequest, FlatHold, flat_band, flat_band_element, sweeps_flat};
 use crate::geometry::{centerline_normals, points_center, stroke_sample_count};
 use crate::mark_geometry::MarkGeometry;
 use crate::mark_paths::{contour_stroke_path, grid_step, rotate, uses_hand_stroke};
-use crate::marks::{MarkContext, intensity_factor, mark_width, reaches_canvas};
+use crate::marks::{MarkContext, intensity_factor, mark_width, reaches_canvas, sweep_band_width};
 use crate::materials::with_texture_filter;
 use crate::palette::resolve_color;
 use crate::stroke::{ContourStrokeRequest, StrokeTerminal, synthesize_contour};
@@ -232,6 +233,50 @@ fn sweep(
             )
         })
         .collect::<Vec<_>>();
+    if sweeps_flat(instruction) {
+        // The flat brush passes straight across: its tip stays square to the pass.
+        let stroke_seed = salted_seed(seed, "surface-stroke", index);
+        let stroke = synthesize_contour(ContourStrokeRequest {
+            centerline: &centerline,
+            base_width: width,
+            weight: instruction.weight,
+            seed: stroke_seed,
+            closed: false,
+            anchors: &BTreeSet::new(),
+            grid_step: grid_step(instruction.weight, context.canvas),
+            wild: context.wild,
+            support: context.support,
+            terminal: StrokeTerminal::Taper,
+        });
+        let points = stroke
+            .samples
+            .iter()
+            .map(|sample| sample.point)
+            .collect::<Vec<_>>();
+        let energies = stroke
+            .samples
+            .iter()
+            .map(|sample| sample.energy)
+            .collect::<Vec<_>>();
+        if let Some(band) = flat_band(FlatBandRequest {
+            centerline: &points,
+            energies: &energies,
+            hold: FlatHold::Fixed,
+            base_width: width,
+            weight: instruction.weight,
+            seed: stroke_seed,
+            support: context.support,
+            scale: context.canvas.unit() / 1000.0,
+            brush_size: sweep_band_width(instruction, context.canvas),
+        }) {
+            return Some(with_texture_filter(
+                flat_band_element(&band, color, &format!("{class_name} flat-brush-v1"))
+                    .attr("opacity", format_number(opacity)),
+                instruction.weight,
+                context.use_filters,
+            ));
+        }
+    }
     Some(stroke_element(
         instruction,
         context,

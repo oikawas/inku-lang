@@ -3,11 +3,12 @@
 use std::collections::BTreeSet;
 
 use crate::determinism::{needs_contour_variation, needs_path_variation};
+use crate::flat_brush::{FlatBandRequest, FlatHold, flat_band, flat_band_element, sweeps_flat};
 use crate::geometry::{
     ArcGeometry, arc_points, arc_points_with_variation, open_line_with_variation, point_to_pixels,
     size_to_pixels, stroke_sample_count,
 };
-use crate::marks::{MarkContext, MarkStyle, apply_style, is_closed, mark_width};
+use crate::marks::{MarkContext, MarkStyle, apply_style, is_closed, mark_width, sweep_band_width};
 use crate::materials::{OilPaintStyle, oil_paint_stroke, with_texture_filter};
 use crate::planning::instruction_anchor_on_canvas;
 use crate::stroke::{
@@ -375,7 +376,23 @@ pub(crate) fn hand_line(
     // The class records the straight stroke's controls and events. With a
     // varied centerline only the stroke along that centerline is drawn, so the
     // straight one is not synthesized just for these two counts.
-    let (outline, event_count) = if let Some(centerline) = centerline {
+    // A sweep of the thin or thick brush lays a flat band along the same
+    // centerline; the straight stroke still gives its pressure and the counts.
+    let flat = sweeps_flat(instruction);
+    let lay_flat = |points: &[Point], energies: &[f64], hold: FlatHold| {
+        flat_band(FlatBandRequest {
+            centerline: points,
+            energies,
+            hold,
+            base_width: style.width,
+            weight: instruction.weight,
+            seed,
+            support,
+            scale: context.canvas.unit() / 1000.0,
+            brush_size: sweep_band_width(instruction, context.canvas),
+        })
+    };
+    let (outline, event_count, band) = if let Some(centerline) = centerline {
         let varied = synthesize_stroke(StrokeRequest {
             start,
             end,
@@ -387,15 +404,31 @@ pub(crate) fn hand_line(
             grid_step: grid_step(instruction.weight, context.canvas),
             support,
         });
-        let widths = varied
-            .samples
-            .iter()
-            .map(|sample| sample.width)
-            .collect::<Vec<_>>();
-        (
-            outline_for_centerline(&centerline, &widths, &varied.cuts),
-            stroke_event_count(instruction.weight, seed, sample_count),
-        )
+        let event_count = stroke_event_count(instruction.weight, seed, sample_count);
+        let band = if flat {
+            let energies = varied
+                .samples
+                .iter()
+                .map(|sample| sample.energy)
+                .collect::<Vec<_>>();
+            lay_flat(&centerline, &energies, FlatHold::Turning)
+        } else {
+            None
+        };
+        if band.is_some() {
+            (Vec::new(), event_count, band)
+        } else {
+            let widths = varied
+                .samples
+                .iter()
+                .map(|sample| sample.width)
+                .collect::<Vec<_>>();
+            (
+                outline_for_centerline(&centerline, &widths, &varied.cuts),
+                event_count,
+                None,
+            )
+        }
     } else {
         let stroke = synthesize_stroke(StrokeRequest {
             start,
@@ -408,13 +441,31 @@ pub(crate) fn hand_line(
             grid_step: grid_step(instruction.weight, context.canvas),
             support,
         });
-        (stroke.outline, stroke.event_count)
+        let band = if flat {
+            let points = stroke
+                .samples
+                .iter()
+                .map(|sample| sample.point)
+                .collect::<Vec<_>>();
+            let energies = stroke
+                .samples
+                .iter()
+                .map(|sample| sample.energy)
+                .collect::<Vec<_>>();
+            lay_flat(&points, &energies, FlatHold::Fixed)
+        } else {
+            None
+        };
+        (stroke.outline, stroke.event_count, band)
     };
     let mut group = Element::new("g").attr(
         "class",
         format!("stroke-engine-v1 controls-{sample_count} events-{event_count}"),
     );
-    if instruction.weight == Weight::OilPaint {
+    if let Some(band) = band {
+        group.set_attr("opacity", format_number(style.stroke_opacity));
+        group.push(flat_band_element(&band, &style.color, "flat-brush-v1"));
+    } else if instruction.weight == Weight::OilPaint {
         let middle = outline.len() / 2;
         let right = outline[middle..].iter().rev().copied().collect::<Vec<_>>();
         group.push(oil_paint_stroke(
@@ -475,6 +526,42 @@ pub(crate) fn hand_contour(
         support: instruction_support(instruction, context.support),
         terminal: StrokeTerminal::Taper,
     });
+    if !closed && sweeps_flat(instruction) {
+        let points = stroke
+            .samples
+            .iter()
+            .map(|sample| sample.point)
+            .collect::<Vec<_>>();
+        let energies = stroke
+            .samples
+            .iter()
+            .map(|sample| sample.energy)
+            .collect::<Vec<_>>();
+        if let Some(band) = flat_band(FlatBandRequest {
+            centerline: &points,
+            energies: &energies,
+            hold: FlatHold::Turning,
+            base_width: style.width,
+            weight: instruction.weight,
+            seed: context.seed_for(instruction),
+            support: instruction_support(instruction, context.support),
+            scale: context.canvas.unit() / 1000.0,
+            brush_size: sweep_band_width(instruction, context.canvas),
+        }) {
+            let mut group = Element::new("g")
+                .attr(
+                    "class",
+                    format!(
+                        "contour-stroke-v1 controls-{} events-{}",
+                        stroke.samples.len(),
+                        stroke.event_count
+                    ),
+                )
+                .attr("opacity", format_number(style.stroke_opacity));
+            group.push(flat_band_element(&band, &style.color, "flat-brush-v1"));
+            return with_texture_filter(group, instruction.weight, context.use_filters);
+        }
+    }
     if instruction.weight == Weight::OilPaint {
         return oil_paint_stroke(
             contour_stroke_path(&stroke),

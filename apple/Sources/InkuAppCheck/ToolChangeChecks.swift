@@ -25,11 +25,16 @@ func runToolChangeChecks(folder: URL) async throws {
     app.ddlText = "DRAFT_MUST_NOT_REACH_TOUCH_OPTIONS"
     app.setDdlBoxText(app.ddlText, for: parent)
     app.sketchText = "DRAFT_MUST_NOT_REACH_TOUCH_OPTIONS"
+    let beforeOpening = try await db.listExecutionIDs()
     let change = ToolChangeModel(work: parent)
     guard change.mode == .uniform else { throw CheckFailure.message("Touch mode is not uniform by default") }
-    await change.initialize(app: app)
+    guard change.candidates.isEmpty, !change.hasUnsaved, !change.running,
+          try await db.listExecutionIDs() == beforeOpening, try await db.list().count == 1,
+          await transport.calls == 0 else { throw CheckFailure.message("Opening drew or saved touch options") }
+    await change.generate(app: app)
     guard change.errorText == nil, change.failures.isEmpty, change.candidates.count == 4,
-          try await db.list().count == 1 else { throw CheckFailure.message("Opening did not draw four private options: \(change.errorText ?? change.failures.joined(separator: "; "))") }
+          try await db.list().count == 1 else { throw CheckFailure.message("Button did not draw four private options: \(change.errorText ?? change.failures.joined(separator: "; "))") }
+    let uniformCandidates = change.candidates
     let firstIDs = change.candidates.map(\.id)
     guard change.candidates.allSatisfy({ Set($0.plan.tools.values).count == 1 }),
           Set(change.candidates.compactMap { $0.plan.tools.values.first }).count == 4,
@@ -37,14 +42,16 @@ func runToolChangeChecks(folder: URL) async throws {
         throw CheckFailure.message("Uniform options offered duplicates or an unchanged whole")
     }
     change.mode = .perSentence
+    change.selectCandidate(firstIDs[0], selected: true)
+    guard change.selectedCount == 1 else { throw CheckFailure.message("Prior option could not be selected") }
     await change.generate(app: app)
-    guard change.errorText == nil, change.failures.isEmpty, change.candidates.count == 8,
-          Array(change.candidates.prefix(4).map(\.id)) == firstIDs,
-          change.candidates.map(\.number) == Array(1...8),
-          change.candidates.suffix(4).allSatisfy({ $0.plan.mode == .perSentence && $0.plan.changes.count == $0.plan.tools.count && $0.plan.changes.allSatisfy { $0.from != $0.to } }) else {
-        throw CheckFailure.message("Per-sentence round replaced earlier options or reused a sentence's current tool")
+    guard change.errorText == nil, change.failures.isEmpty, change.candidates.count == 4,
+          change.candidates.allSatisfy({ !firstIDs.contains($0.id) }), change.selectedCount == 0,
+          change.candidates.map(\.number) == Array(1...4),
+          change.candidates.allSatisfy({ $0.plan.mode == .perSentence && $0.plan.changes.count == $0.plan.tools.count && $0.plan.changes.allSatisfy { $0.from != $0.to } }) else {
+        throw CheckFailure.message("Second press retained earlier options/selection or reused a sentence's current tool")
     }
-    for candidate in change.candidates {
+    for candidate in uniformCandidates + change.candidates {
         let work = candidate.work
         let score = try ExactJSON(data: Data(work.score.utf8))
         var restored = score
@@ -87,7 +94,7 @@ func runToolChangeChecks(folder: URL) async throws {
           app.descriptionText == "DRAFT_MUST_NOT_REACH_TOUCH_OPTIONS" else {
         throw CheckFailure.message("Private touch options saved, changed the parent/draft or called an LLM")
     }
-    let chosen = change.candidates[4]
+    let chosen = change.candidates[0]
     change.selectCandidate(chosen.id, selected: true)
     guard await change.saveSelected(app: app), let saved = try await db.work(id: chosen.work.id),
           try await db.list().count == 2, let edge = try await db.edge(childNodeID: saved.lineageNodeID!),
@@ -121,7 +128,7 @@ func runToolChangeChecks(folder: URL) async throws {
           await transport.calls == 0 else { throw CheckFailure.message("Unchangeable work offered touch options") }
     try metadata.data.write(to: folder.appendingPathComponent("saved-metadata.json"))
     try Data(saved.ddl!.utf8).write(to: folder.appendingPathComponent("saved.ddl"))
-    print("Touch changes PASS: opening uniform=4, per_sentence adds=4 and keeps earlier options; 12 core tools; only owned Score weights change; DDL reads back; parent seeds/colors/ground/options/model/input preserved; draft ignored; preview history=1; selected adoption=2 with tool_change metadata; saved child replay/retouch works; all-pen skips pen; no shape offers no options; provider=0. Isolated SQLite only.")
+    print("Touch changes PASS: opening=0 with execution/history unchanged; button uniform=4; second press replaces with per_sentence=4, new IDs, prior selection=0 and numbers=1...4; 12 core tools; only owned Score weights change; DDL reads back; parent seeds/colors/ground/options/model/input preserved; draft ignored; preview history=1; selected adoption=2 with tool_change metadata; saved child replay/retouch works; all-pen skips pen; no shape offers no options; provider=0. Isolated SQLite only.")
 }
 
 private actor ToolChangeNoProvider: ProviderTransport {

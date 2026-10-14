@@ -26,26 +26,19 @@ public final class ToolChangeModel {
     public private(set) var errorText: String?
     public private(set) var failures: [String] = []
     public private(set) var lanes: [ComparisonLaneState] = []
-    @ObservationIgnored private var initialized = false
     @ObservationIgnored private var runID: UUID?
-    @ObservationIgnored private var nextNumber = 1
     @ObservationIgnored private var completionWaiters: [CheckedContinuation<Void, Never>] = []
 
     public init(work: SavedWork) { self.work = work }
     public var hasUnsaved: Bool { candidates.contains { $0.savedWork == nil } }
     public var selectedCount: Int { candidates.filter { $0.selected && $0.savedWork == nil }.count }
 
-    public func initialize(app: AppModel) async {
-        guard !initialized else { return }
-        initialized = true
-        await generate(app: app)
-    }
-
     public func generate(app: AppModel) async {
         guard !running, !app.isBusy else { return }
         let chosenMode = mode
         let run = UUID(); runID = run
         running = true; stopping = false; errorText = nil; failures = []
+        candidates = []; lanes = []; noChangeableSentences = false
         defer { finish() }
         let succeeded = await app.performComparison(status: "てざわりの候補を用意中", restoreDisplayStatus: true) { token in
             let plans = try await app.makeToolVariantPlans(work: self.work, mode: chosenMode)
@@ -53,8 +46,6 @@ public final class ToolChangeModel {
             guard self.runID == run else { throw CancellationError() }
             self.noChangeableSentences = plans.isEmpty
             self.lanes = plans.map { _ in .waiting }
-            let firstNumber = self.nextNumber
-            self.nextNumber += plans.count
             try await RefinementFanout.run(count: plans.count, onStart: { index in self.lanes[index] = .running }) { index in
                 try Task.checkCancellation()
                 guard self.runID == run, !self.stopping else { throw CancellationError() }
@@ -62,7 +53,7 @@ public final class ToolChangeModel {
                     let prepared = try await app.prepareToolVariant(plans[index], token: token)
                     try Task.checkCancellation()
                     guard self.runID == run, !self.stopping else { throw CancellationError() }
-                    self.candidates.append(ToolChangeCandidate(prepared: prepared, plan: plans[index], number: firstNumber + index))
+                    self.candidates.append(ToolChangeCandidate(prepared: prepared, plan: plans[index], number: index + 1))
                     self.candidates.sort { $0.number < $1.number }
                 } catch {
                     try Task.checkCancellation()

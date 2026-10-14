@@ -34,8 +34,8 @@ public struct ToolChangeView: View {
                     }
                 }
                 Picker(model.display.localized("てざわりを変える"), selection: $change.mode) {
-                    Text(model.display.localized("全文を揃える")).tag(ToolChangeMode.uniform)
-                    Text(model.display.localized("文ごとに引く")).tag(ToolChangeMode.perSentence)
+                    Text(model.display.localized("すべての文を同じ筆記具にする")).tag(ToolChangeMode.uniform)
+                    Text(model.display.localized("文ごとに違う筆記具にする")).tag(ToolChangeMode.perSentence)
                 }
                 #if os(macOS)
                 .pickerStyle(.radioGroup)
@@ -63,7 +63,7 @@ public struct ToolChangeView: View {
                     Text(model.display.localized("この作品には、てざわりを替えられる文がありません。")).foregroundStyle(.secondary)
                 }
                 if change.candidates.isEmpty {
-                    Text(model.display.localized("筆記具を替えた候補を4案ずつ並べます。「4案を作る」を押すと、選んだ替え方の4案を加えます。"))
+                    Text(model.display.localized("替え方を選んで「4案を作る」を押すと、筆記具を替えた4案を並べます。もう一度押すと、並んでいる案を捨てて新しい4案に替えます。"))
                         .inkuFont(12).foregroundStyle(.secondary)
                 }
                 if change.hasUnsaved {
@@ -79,7 +79,6 @@ public struct ToolChangeView: View {
         #if os(macOS)
         .frame(minWidth: 540, idealWidth: 850, minHeight: 550)
         #endif
-        .task { await change.initialize(app: model) }
         .interactiveDismissDisabled(change.running || change.hasUnsaved || model.isBusy)
         .onDisappear { Task { await change.stop(app: model); change.discardCandidates() } }
     }

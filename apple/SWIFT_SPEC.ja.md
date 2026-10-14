@@ -530,7 +530,7 @@ Swift物理schemaはv3で、v2の作品・系譜・execution、local annotation�
 
 読み取りと言葉によるタッチの推敲は2026-10-14に削除した。保存済みの辺・語句・interpretation_seed・数値seedは旧記録として保持し、再演では保存したrender_seedを使う。
 
-「てざわりを変える」は旧タッチ推敲とは別の独立操作として、作品編集メニューの色カタログの次に置く。ラジオは「全文を揃える」（既定）／「文ごとに引く」。開くと4案を描き、「4案を作る」で選んだ方式の4案を追加し、前の案を保持する。全文の案名は筆記具、文ごとの案名は「文ごと N」で、1から数える文番号と元→新の筆記具を示す。替えられる文と書き換えは共有coreのretouch（inku.touch-change.v1）に任せる。保存済みScoreのsource_instruction owner.instruction_indexに対応する命令のweightのみ替え、親の配置・色・支持体・用紙・seed・wild・描画上限を保ち、LLMを呼ばない。候補の指示書と保存document.sourceもcoreの読み戻せた書き換え結果にそろえる。明示採用だけをtool_changeの子として保存し、付記にtool_mode／tools／changesを記録する。系譜の札は「てざわり」／Touches。保存・破棄・未保存のまま閉じない約束は他の比較と同じで、制作欄のdraftを読まない。
+「てざわりを変える」は旧タッチ推敲とは別の独立操作として、作品編集メニューの色カタログの次に置く。ラジオは「すべての文を同じ筆記具にする」（既定）／「文ごとに違う筆記具にする」。開いただけでは描かず、「4案を作る」を押したときだけ選んだ方式で4案を描く。再び押すと並んでいる案と選択を破棄し、新しい4案に置き換える。全文の案名は筆記具、文ごとの案名は「文ごと N」で、1から数える文番号と元→新の筆記具を示す。替えられる文と書き換えは共有coreのretouch（inku.touch-change.v1）に任せる。保存済みScoreのsource_instruction owner.instruction_indexに対応する命令のweightのみ替え、親の配置・色・支持体・用紙・seed・wild・描画上限を保ち、LLMを呼ばない。候補の指示書と保存document.sourceもcoreの読み戻せた書き換え結果にそろえる。明示採用だけをtool_changeの子として保存し、付記にtool_mode／tools／changesを記録する。系譜の札は「てざわり」／Touches。保存・破棄・未保存のまま閉じない約束は他の比較と同じで、制作欄のdraftを読まない。
 
 新しい変奏は共通coreとHost入口で退役しており、生成・採用・助言の選択肢を用意しない。過去に保存されたvariation amplitude／seed、Score・SVGと系譜は読み出せる。旧記録を新しい操作や別の推敲要素へ変換しない。
 

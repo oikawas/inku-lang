@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-14 — Web refinement reads the shown saved work's own words and instructions
-
-Refine in the library's work preview opens the work and keeps the left pane's draft. Refinement options read that pane's description, instructions, sketch and thinking, so Change composition drew another work's instructions under the shown work's id and lineage, and saving left them as its child (reproduced on 5173 Build 1208; nothing was saved). Change catalog, Change model and colour arrangement did the same; support change took only the thinking, and saving the options took the description, from the pane. Refinement now reads the shown saved work's record when there is one, and the left pane only for a result not yet saved. The pane keeps its draft as before.
-
 ### 2026-10-14 — Correct the explanation beside Android composition candidates
 
 A sentence with no range or place now explains that the ranges in the instructions cannot be chosen again. When the ranges stay, the accompanying text says the work was redrawn with a new composition seed and unchanged instructions. The author's Japanese and English wording matches Web.
@@ -23,6 +19,12 @@ When a sentence states no range or place, the reason now explains that the instr
 ### 2026-10-14 — Remove reading and touch refinement on macOS
 
 Following the author's decision, Another reading, word-based touch, and the empty Edit drawing parameters menu are removed. Layout keeps its separate entrance. Autonomous refinement and Vision advice allow only color catalog and layout, excluding old reading and touch selections from requests. Direction is Vision observation material only and is never added to the drawing description. Color generations draw the parent's saved DDL without calling Stage 1. Archived Reading and Touch lineage labels and interpretation_seed/seed_text display remain readable; replay uses recorded render_seed. Removed Web copy keys and tooltip mappings are aligned.
+
+## v2.15.133 (2026-10-14 / Build 1209)
+
+### 2026-10-14 — Web refinement reads the shown saved work's own words and instructions
+
+Refine in the library's work preview opens the work and keeps the left pane's draft. Refinement options read that pane's description, instructions, sketch and thinking, so Change composition drew another work's instructions under the shown work's id and lineage, and saving left them as its child (reproduced on 5173 Build 1208; nothing was saved). Change catalog, Change model and colour arrangement did the same; support change took only the thinking, and saving the options took the description, from the pane. Refinement now reads the shown saved work's record when there is one, and the left pane only for a result not yet saved. The pane keeps its draft as before.
 
 ## v2.15.132 (2026-10-14 / Build 1208)
 

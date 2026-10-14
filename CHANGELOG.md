@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Keep canvas wheel zoom working after switching tabs
+
+Returning from Lineage or another tab left the wheel listener on the old canvas element, so zoom stopped responding. Wheel input and size observation now follow the current canvas element and release the old registrations. Zoom direction, increments, center anchoring, and scrolling within menus or vertical captions stay the same.
+
 ## v2.15.142 (2026-10-15 / Build 1218)
 
 ### 2026-10-15 — Redraw the seven grounds so no tile is seen repeating and their light and dark show

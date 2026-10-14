@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { ComposeLayoutGeneration } from '$lib/features/canvas/recomposition';
-	import { onMount, tick } from 'svelte';
+	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { AnimationExportSettings } from '$lib/animationExport';
@@ -587,11 +587,12 @@
 		viewport.updateFitZoom(+nextZoom.toFixed(2));
 	}
 
-	onMount(() => {
+	$effect(() => {
+		const wheelTarget = canvasContentEl;
+		if (!wheelTarget) return;
 		updateFitZoom();
 		const observer = new ResizeObserver(updateFitZoom);
-		if (canvasContentEl) observer.observe(canvasContentEl);
-		const wheelTarget = canvasContentEl;
+		observer.observe(wheelTarget);
 		const onWheel = (event: WheelEvent) => {
 			if (outputTab !== 'canvas' || !result) return;
 			// A menu over the canvas (the export menu) scrolls itself; the wheel is not a zoom there.
@@ -600,10 +601,10 @@
 			const step = event.deltaY < 0 ? 0.15 : -0.15;
 			viewport.setZoom(viewport.zoom + step);
 		};
-		wheelTarget?.addEventListener('wheel', onWheel, { passive: false });
+		wheelTarget.addEventListener('wheel', onWheel, { passive: false });
 		return () => {
 			observer.disconnect();
-			wheelTarget?.removeEventListener('wheel', onWheel);
+			wheelTarget.removeEventListener('wheel', onWheel);
 		};
 	});
 

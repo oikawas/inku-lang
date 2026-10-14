@@ -573,6 +573,8 @@ Implemented:
   - the Kotlin host transports each provider action once and returns control to shared Rust
   - visible DDL and authority revision are atomically saved in Room; known-hole patches commit only after author approval
   - raw Score, render metadata, opaque execution, and context for the selected history revision are retained
+  - A description drawing stopped before its first work save retains its saved parent separately from the displayed selection. Repeated stops and redraws join that same parent; a drawing without a parent remains a new root. An unsaved stopped drawing is never used as the parent.
+  - The first successful work save, including an early safe performance save, ends parent retention. Adopting a saved work, starting a new work, explicitly detaching the lineage, or starting another drawing operation also clears the previous retained parent.
 - `AndroidRenderHost` serializes the coerced Score, resolved canvas and color map, catalog,
   profile, seeds, and `wild` into one canonical JSON request and calls the shared Rust render
   engine (the server's `inku-render`; its version is the one the binding reports) through `NativeRenderBridge`.

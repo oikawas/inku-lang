@@ -534,6 +534,8 @@ Rust authoring pipelineとraster presentationを導入済みである。以下�
   - provider actionはKotlin hostが一回だけtransportし、継続判断は共有Rustへ返す
   - visible DDLとauthority revisionをRoomへ原子保存し、known-hole patchは作者承認後だけ確定する
   - raw Score、render metadata、opaque execution、当該履歴revisionのcontextを保持する
+  - 保存済み作品からの記述描画を最初の作品保存前に停止しても、画面の表示選択とは別にその保存済み親を保持する。停止・描き直しを繰り返しても同じ親へ系譜をつなぎ、親なしなら新しい根とする。停止した未保存の描画は親にしない。
+  - 最初の作品保存（途中の安全な演奏の保存も含む）の成功で親の保持を終了する。保存作品の採用、新規制作、系譜の明示的な切断、ほかの描画操作でも古い保持を残さない。
 - `AndroidRenderHost`が、coerce済みScore、解決済みcanvas／色map、catalog、profile、seed、`wild`を
   1個のcanonical JSON requestへまとめ、`NativeRenderBridge`から共有Rust描画engine（Serverと同じ`inku-render`。版はbindingが名乗る）を呼ぶ。
 - `inku-svg-raster`は`core/Cargo.toml`で固定した`resvg`（0.48.1、`core/vendor/resvg/`に同梱）を使い、保存済み／現行SVGを明示的な

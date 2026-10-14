@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — Android keeps a description drawing's saved parent after a stop before saving
+
+Stopping a description drawing from a saved work before its first save used to disconnect the next drawing's lineage. Android now retains the saved parent separately from the displayed work, so repeated stops and redraws still join that parent. A drawing without a parent remains a new root. The first successful work save, selecting a saved work, starting a new work, or detaching the lineage ends retention. An unsaved stopped drawing is never used as the parent. The persistence schema, version, and Build are unchanged.
+
 ## v2.15.122 (2026-10-14 / Build 1198)
 
 ### 2026-10-14 — Show recommendation stars on model selection buttons

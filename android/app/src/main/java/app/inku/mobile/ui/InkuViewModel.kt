@@ -81,6 +81,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.SharedFlow
@@ -217,6 +218,8 @@ data class InkuUiState(
     val selectedCatalogId: String = "default",
     val selectedCanvasAspect: String = "square",
     val selectedHistory: HistoryItemEntity? = null,
+    /** Saved parent retained across description stops until the first successful history save. */
+    val pendingDescriptionParent: HistoryItemEntity? = null,
     /** Work being shown to someone from the Works gallery, separate from the editing selection. */
     val presentationHistory: HistoryItemEntity? = null,
     /** Gallery order at the moment presentation began (including search and favorite filters). */
@@ -640,6 +643,7 @@ class InkuViewModel @JvmOverloads constructor(
             refinementOpen = false,
             refinementBusy = false,
             selectedHistory = selected,
+            pendingDescriptionParent = null,
             lineageDetached = selected == null,
             selectedCanvasAspect = options?.optString("canvas_aspect")?.takeIf { it.isNotBlank() } ?: localState.value.selectedCanvasAspect,
             selectedCatalogId = if (options?.optString("catalog_mode") == "auto") CatalogSelection.AUTO_ID else options?.optString("catalog_id")?.takeIf { it.isNotBlank() } ?: localState.value.selectedCatalogId,
@@ -1218,6 +1222,7 @@ class InkuViewModel @JvmOverloads constructor(
             cameraCaptureState = captureState,
             isDrawing = phase >= CameraInstantPrintPhase.InterpretingStage1,
             selectedHistory = if (phase >= CameraInstantPrintPhase.InterpretingStage1) null else current.selectedHistory,
+            pendingDescriptionParent = if (phase >= CameraInstantPrintPhase.InterpretingStage1) null else current.pendingDescriptionParent,
             pipelineView = if (phase >= CameraInstantPrintPhase.InterpretingStage1) null else current.pipelineView,
             historyAuthority = if (phase >= CameraInstantPrintPhase.InterpretingStage1) null else current.historyAuthority,
             historyDescriptionLocked = if (phase >= CameraInstantPrintPhase.InterpretingStage1) null else current.historyDescriptionLocked,
@@ -1428,6 +1433,7 @@ class InkuViewModel @JvmOverloads constructor(
             descriptionForkRequested = false,
             selectedHistory = null,
             descriptionEditing = false,
+            pendingDescriptionParent = null,
             workContextId = null,
             tab = AppTab.Compose,
             canvasPresentationMode = false,
@@ -1474,6 +1480,7 @@ class InkuViewModel @JvmOverloads constructor(
             ddlEditedAfterGeneration = true,
             lineageDetached = true,
             pipelineView = null,
+            pendingDescriptionParent = null,
             historyAuthority = null,
             historyDescriptionLocked = null,
             importedPlugins = parsed.plugins,
@@ -1596,6 +1603,7 @@ class InkuViewModel @JvmOverloads constructor(
             tab = AppTab.Compose, composeMode = ComposeMode.Write,
             descriptionEditing = false, workContextId = null, descriptionFocused = false,
             lineageDetached = true, lineageGraph = null, lineageLoading = false,
+            pendingDescriptionParent = null,
             canvasPresentationMode = false, presentationHistory = null,
             presentationSequence = emptyList(), workActionsTarget = null, workSketchTarget = null,
             ddlEditorOpen = false, confirmDdlOverwrite = false,
@@ -1719,6 +1727,7 @@ class InkuViewModel @JvmOverloads constructor(
         historyDescriptionLocked = source.historyDescriptionLocked,
         historyAuthorityLoading = source.historyAuthorityLoading, descriptionForkRequested = source.descriptionForkRequested,
         selectedHistory = source.selectedHistory, selectedCatalogId = source.selectedCatalogId,
+        pendingDescriptionParent = source.pendingDescriptionParent,
         selectedCanvasAspect = source.selectedCanvasAspect, sketchMode = source.sketchMode,
         lineageDetached = source.lineageDetached, cameraSourcePhotoPath = source.cameraSourcePhotoPath,
         cameraCaptureState = source.cameraCaptureState, importedPlugins = source.importedPlugins,
@@ -2204,6 +2213,7 @@ class InkuViewModel @JvmOverloads constructor(
     ) {
         localState.value = update(localState.value).copy(
             selectedHistory = item,
+            pendingDescriptionParent = null,
             cameraSourcePhotoPath = originalPhotos.savedPhoto(item.id)?.absolutePath,
             pipelineView = null,
             historyAuthority = null,
@@ -2282,6 +2292,7 @@ class InkuViewModel @JvmOverloads constructor(
     fun detachLineage() {
         localState.value = localState.value.copy(
             selectedHistory = null,
+            pendingDescriptionParent = null,
             sketchMode = Sketches.DEFAULT_MODE,
             pipelineView = null,
             historyAuthority = null,
@@ -2434,10 +2445,13 @@ class InkuViewModel @JvmOverloads constructor(
         drawFromDdl()
     }
 
-    private fun beginDrawingRun(): Long {
+    private fun beginDrawingRun(keepDescriptionParent: Boolean = false): Long {
         drawingRunSerial += 1
         drawingJob?.cancel()
-        localState.value = localState.value.copy(isDrawing = true)
+        localState.value = localState.value.copy(
+            isDrawing = true,
+            pendingDescriptionParent = localState.value.pendingDescriptionParent.takeIf { keepDescriptionParent },
+        )
         return drawingRunSerial
     }
 
@@ -2464,9 +2478,9 @@ class InkuViewModel @JvmOverloads constructor(
 
     private fun lineageFor(
         current: InkuUiState,
+        parent: HistoryItemEntity? = lineageParent(current),
         kindOf: (parent: HistoryItemEntity?, canvasAspectChanged: Boolean) -> String?,
     ): LineageDeclaration {
-        val parent = lineageParent(current)
         val canvasAspectChanged = parent != null && current.selectedCanvasAspect != parent.canvasAspect
         val kind = kindOf(parent, canvasAspectChanged)
         if (parent == null || kind == null) return LineageDeclaration()
@@ -2485,7 +2499,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     private fun describeLineage(current: InkuUiState): LineageDeclaration =
-        lineageFor(current) { parent, canvasAspectChanged ->
+        lineageFor(current, current.descriptionDrawingParent?.takeIf { !it.lineageNodeId.isNullOrEmpty() }) { parent, canvasAspectChanged ->
             SubmitDerivationKind.forDescribeSubmit(
                 hasParent = parent != null,
                 canvasAspectChanged = canvasAspectChanged,
@@ -2505,7 +2519,7 @@ class InkuViewModel @JvmOverloads constructor(
      * explicit per-work action forces a fresh request, even at the same mode.
      */
     private fun describeSketchInput(current: InkuUiState, forceFresh: Boolean = false): SketchInput {
-        val parent = lineageParent(current)
+        val parent = current.descriptionDrawingParent?.takeIf { !it.lineageNodeId.isNullOrEmpty() }
         val replaying = !forceFresh && parent != null &&
             !descriptionChanged(current.prompt, parent) &&
             !grainChanged(current.sketchMode, parent)
@@ -2546,6 +2560,7 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = current.copy(message = REFINEMENT_IN_PROGRESS(strings()))
             return
         }
+        val descriptionParent = if (cameraProvenance == null) current.descriptionDrawingParent else null
         // Read before the coroutine starts: the first thing it does is clear
         // `selectedHistory` (below), so a parent read from inside would be gone.
         val declared = when {
@@ -2576,7 +2591,7 @@ class InkuViewModel @JvmOverloads constructor(
         val stage2ModelId = current.selectedStage2ModelId
         val stage1CatalogId = current.selectedCatalogId
         val autoRepair = true
-        val runId = beginDrawingRun()
+        val runId = beginDrawingRun(keepDescriptionParent = true)
         drawingJob = viewModelScope.launch {
             // The selected work's authority was still being read. A DDL-led
             // work is not redrawn from its description unless a fork was asked for.
@@ -2612,17 +2627,7 @@ class InkuViewModel @JvmOverloads constructor(
                 }
             }
             val lineage = withPreviewParent(current, declared)
-            localState.value = localState.value.copy(
-                isDrawing = true,
-                selectedHistory = null,
-                ddl = "",
-                ddlEditedAfterGeneration = false,
-                confirmDdlOverwrite = false,
-                pipelineView = null,
-                historyAuthority = null,
-                historyDescriptionLocked = null,
-                message = strings().statusStage1,
-            )
+            localState.value = localState.value.beginDescriptionDrawing(parent = descriptionParent, message = strings().statusStage1)
             runCatching {
                 withContext(Dispatchers.IO) {
                     repository.paint(
@@ -2636,9 +2641,12 @@ class InkuViewModel @JvmOverloads constructor(
                         instructionLang = InstructionLanguages.AUTO,
                         uiLang = current.uiLanguage.code,
                         sketch = sketchInput,
-                        parentHistoryId = current.selectedHistory?.id?.takeUnless { current.lineageDetached },
+                        parentHistoryId = descriptionParent?.id,
                         inputProvenance = cameraProvenance,
                         renderWild = current.renderWild,
+                        onPerformanceSaved = {
+                            withContext(Dispatchers.Main.immediate) { descriptionPerformanceSaved(runId) }
+                        },
                     )
                 }
             }.onSuccess { item ->
@@ -2979,6 +2987,13 @@ class InkuViewModel @JvmOverloads constructor(
             viewModelScope.launch { runCatching { repository.cancelPipeline(view.executionId) } }
         }
         localState.value = localState.value.copy(isDrawing = false, demoWaitingSeconds = null, message = strings().statusStopped)
+    }
+
+    /** A successful early performance save ends the pre-save parent retention too. */
+    private fun descriptionPerformanceSaved(runId: Long) {
+        if (isCurrentDrawingRun(runId)) {
+            localState.update { it.copy(pendingDescriptionParent = null) }
+        }
     }
 
     // ── 推敲 (SPEC :614, :678) ──────────────────────────────
@@ -3646,9 +3661,10 @@ class InkuViewModel @JvmOverloads constructor(
             if (!row.trashed) return@launch
             repository.deleteHistoryPermanently(id)
             val current = localState.value
-            localState.value = if (current.selectedHistory?.id == id) {
+            localState.value = if (current.selectedHistory?.id == id || current.pendingDescriptionParent?.id == id) {
                 current.copy(
                     selectedHistory = null,
+                    pendingDescriptionParent = null,
                     lineageDetached = true,
                     lineageGraph = null,
                     pipelineView = null,
@@ -3666,6 +3682,7 @@ class InkuViewModel @JvmOverloads constructor(
         val current = localState.value
         localState.value = current.copy(
             selectedHistory = current.selectedHistory?.let { if (it.id == id) it.copy(trashed = trashed) else it },
+            pendingDescriptionParent = current.pendingDescriptionParent?.let { if (it.id == id) it.copy(trashed = trashed) else it },
             workNotice = notice,
         )
         if (current.tab == AppTab.Lineage) refreshLineage()

@@ -10,7 +10,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-10-14 — Change the color arrangement spreads its options
 
-At the author's request. The options were the assignments' lexicographic ranks taken eight at a time from the start, so the first options ran the last color through the palette and then moved the one before it (for a work using four of nine colors, the first five options differed only in the fourth). The ranks are now visited by a stride near the golden ratio of their count, coprime with it, from a start the work's identity decides. It stays one-to-one: eight at a time still meets every assignment once and never the work's own. Saving draws the child again from the same work with the same order. Saved children are drawn from their saved assignment and do not change; only the meaning of their recorded index does.
+At the author's request. The options were the assignments' lexicographic ranks taken eight at a time from the start, so the first options ran the last color through the catalog's colors and then moved the one before it (for a work using four of nine colors, the first five options differed only in the fourth). The ranks are now visited by a stride near the golden ratio of their count, coprime with it, from a start the work's identity decides. It stays one-to-one: eight at a time still meets every assignment once and never the work's own. Saving draws the child again from the same work with the same order. Saved children are drawn from their saved assignment and do not change; only the meaning of their recorded index does.
 
 ### 2026-10-14 — Search the library by hash or work ID beginnings and show work UUIDs
 

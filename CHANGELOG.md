@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-14 — Smooth the jagged marks in small oil fills
-
-In very small oil fills the marks turned into a fine jagged line (the ovals of work `11dd7da3…`, found on the comparison sheet for the X shapes). The noise behind a pass's wander was measured by the pass's own length, so a short pass packed the wave into a few samples and kicked sideways at each one, and the fill's threefold widening made the kinks show. An oil fill pass now draws that noise against the brush's size, eight pass widths; a longer pass is unchanged. Over a comparison sheet of three spans (eight, sixteen and thirty-two pass widths) the author chose eight, which keeps the wander of large shapes closest to before. Across 69 recent works with oil fills nothing outside the oil fills changes, and 31 works differ by 24/255 or more in a 1000 px image. Some angular marks in very small ovals have another cause and remain. Render engine 79. Saved works are unchanged.
-
 ### 2026-10-14 — Draw macOS touch options only when asked, replacing the previous four
 
 Following the author's correction, opening the dialog no longer draws. Make four options draws only when pressed, and a subsequent press discards the previous options and selections, replacing them with four new options. The radio now reads Same tool for every sentence / A different tool for each sentence, with Japanese and English copy and specifications matching Web.
@@ -31,6 +27,12 @@ When a sentence states no range or place, the reason now explains that the instr
 ### 2026-10-14 — Remove reading and touch refinement on macOS
 
 Following the author's decision, Another reading, word-based touch, and the empty Edit drawing parameters menu are removed. Layout keeps its separate entrance. Autonomous refinement and Vision advice allow only color catalog and layout, excluding old reading and touch selections from requests. Direction is Vision observation material only and is never added to the drawing description. Color generations draw the parent's saved DDL without calling Stage 1. Archived Reading and Touch lineage labels and interpretation_seed/seed_text display remain readable; replay uses recorded render_seed. Removed Web copy keys and tooltip mappings are aligned.
+
+## v2.15.139 (2026-10-14 / Build 1215)
+
+### 2026-10-14 — Smooth the jagged marks in small oil fills
+
+In very small oil fills the marks turned into a fine jagged line (the ovals of work `11dd7da3…`, found on the comparison sheet for the X shapes). The noise behind a pass's wander was measured by the pass's own length, so a short pass packed the wave into a few samples and kicked sideways at each one, and the fill's threefold widening made the kinks show. An oil fill pass now draws that noise against the brush's size, eight pass widths; a longer pass is unchanged. Over a comparison sheet of three spans (eight, sixteen and thirty-two pass widths) the author chose eight, which keeps the wander of large shapes closest to before. Across 69 recent works with oil fills nothing outside the oil fills changes, and 31 works differ by 24/255 or more in a 1000 px image. Some angular marks in very small ovals have another cause and remain. Render engine 79. Saved works are unchanged.
 
 ## v2.15.138 (2026-10-14 / Build 1214)
 

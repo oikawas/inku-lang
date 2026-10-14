@@ -65,7 +65,7 @@ class ThumbnailWriteWaitsForCloseTest {
             canvasAspect = "square",
             stage1ModelId = "test-stage1",
             stage2ModelId = "test-stage2",
-            seeds = PaintSeeds(renderSeed = 4242L, compositionSeed = 77L, interpretationSeed = "thumbnail-close"),
+            seeds = PaintSeeds(renderSeed = 4242L, compositionSeed = 77L),
         )
 
     @Test

@@ -285,7 +285,7 @@ data class InkuUiState(
     // exclusive because a lineage edge has one cause.
     val refinementOpen: Boolean = false,
     val refinementParent: HistoryItemEntity? = null,
-    val refinementElement: RefinementElement = RefinementElement.Reading,
+    val refinementElement: RefinementElement = RefinementElement.Layout,
     val refinementLayoutMode: RecomposeMode = RecomposeMode.Principled,
     val refinementCount: Int = 1,
     /**
@@ -1665,6 +1665,14 @@ class InkuViewModel @JvmOverloads constructor(
         if (state.value.isRunning) return
         enterWorkContext(item)
         openRefinement(item, subview)
+    }
+
+    /** Open a remaining refinement on the same immutable saved-work target. */
+    fun refineWork(item: HistoryItemEntity, element: RefinementElement) {
+        if (state.value.isRunning) return
+        enterWorkContext(item)
+        localState.value = localState.value.copy(refinementElement = element)
+        openRefinement(item, RefinementSubview.Adjust)
     }
 
     fun openWorkLineage(item: HistoryItemEntity) {
@@ -3090,7 +3098,7 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = localState.value.copy(refinementLayoutMode = mode, refinementStatus = null)
     }
 
-    /** 1 案 or 4 案 for reading and layout; colour compares all other catalogues. */
+    /** 1 案 or 4 案 for layout; colour compares all other catalogues. */
     fun setRefinementCount(count: Int) {
         if (localState.value.refinementBusy) return
         localState.value = localState.value.copy(refinementCount = count.coerceIn(1, 4), refinementStatus = null)
@@ -3351,7 +3359,6 @@ class InkuViewModel @JvmOverloads constructor(
             renderHashShort = candidate.renderHashShort,
             renderSeed = candidate.plan.seeds.renderSeed ?: renderSeedOf(candidate.renderMetadataJson),
             compositionSeed = candidate.plan.seeds.compositionSeed,
-            interpretationSeed = candidate.plan.seeds.interpretationSeed,
             instructionLangRequested = candidate.instructionLangRequested,
             instructionLangResolved = candidate.instructionLangResolved,
         ),

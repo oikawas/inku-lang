@@ -89,7 +89,8 @@ interface InkuStrings {
     val back: String
     val descriptionEditAction: String
     val instructionEditAction: String
-    val drawingEditAction: String
+    val layoutEditAction: String
+    val colorCatalogEditAction: String
     val modelEditAction: String
     val editingWorkLabel: (String) -> String
     val nextDrawingConditions: String
@@ -163,7 +164,7 @@ interface InkuStrings {
     val refinementFailed: String
     /** The web's `refineNeedsDescription`, pointing at a work: Android refines a saved work's description. */
     val refinementNeedsDescription: String
-    /** The web's `refineNeedsDdl`: layout and reading need the work's DDL. */
+    /** The web's `refineNeedsDdl`: layout needs the work's DDL. */
     val refinementNeedsDdl: String
     val refinementNoOtherCatalog: String
     val refinementElementLabel: (String) -> String

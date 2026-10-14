@@ -273,7 +273,7 @@ class ComparisonScreenTest {
         awaitState("the lineage to be drawn") { it.lineageGraph != null }
 
         composeTestRule.onAllNodesWithTag(LINEAGE_MENU_TAG)[0].performClick()
-        assertEquals("描画要素 is in the card menu", 1, nodesWithTag(REFINE_ENTRY_TAG))
+        assertEquals("layout is in the card menu", 1, nodesWithTag(LAYOUT_REFINE_ENTRY_TAG))
         assertEquals("モデル is in the card menu", 1, nodesWithTag(MODEL_ENTRY_TAG))
         assertEquals("言語 is not", 0, composeTestRule.onAllNodesWithText("言語").fetchSemanticsNodes().size)
 
@@ -289,7 +289,7 @@ class ComparisonScreenTest {
         assertEquals("and the card is back", 1, nodesWithTag(LINEAGE_MENU_TAG))
 
         composeTestRule.onAllNodesWithTag(LINEAGE_MENU_TAG)[0].performClick()
-        composeTestRule.onAllNodesWithTag(REFINE_ENTRY_TAG)[0].performClick()
+        composeTestRule.onAllNodesWithTag(LAYOUT_REFINE_ENTRY_TAG)[0].performClick()
         awaitState("the adjust sub-view") {
             it.refinementOpen && it.refinementSubview == RefinementSubview.Adjust
         }

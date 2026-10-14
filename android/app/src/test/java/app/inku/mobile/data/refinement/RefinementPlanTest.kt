@@ -115,7 +115,6 @@ class RefinementPlanTest {
 
         listOf(
             RefinementElement.Layout,
-            RefinementElement.Reading,
         ).forEach { element ->
             val plan = RefinementPlanner.plan(element, parent)
             assertEquals("$element keeps the parent's catalogue", parent.catalogId, plan.catalogId)
@@ -136,7 +135,6 @@ class RefinementPlanTest {
         // 「親作品のDDL・Score・キャンバス・配置seed・render seed を固定し」.
         assertEquals("the render seed is held", parent.seeds.renderSeed, plan.seeds.renderSeed)
         assertEquals("the composition seed is held", parent.seeds.compositionSeed, plan.seeds.compositionSeed)
-        assertEquals("the reading is held", parent.seeds.interpretationSeed, plan.seeds.interpretationSeed)
         assertEquals("the Score is replayed, not recomposed", RefinementRoute.RenderFromScore, plan.route)
     }
 
@@ -172,22 +170,18 @@ class RefinementPlanTest {
      * be recorded and never read again.
      */
     @Test
-    fun t5_allThreeElementsDeclareTheirEdgeWithoutInheritingRetiredVariation() {
+    fun t5_bothElementsDeclareTheirEdgeWithoutInheritingRetiredVariation() {
         val oldItem = parentItem().copy(variationAmplitude = "large", variationSeed = "7")
         val parent = parent(oldItem)
-        assertEquals(listOf("reading", "color", "layout"), RefinementElement.entries.map { it.id })
+        assertEquals(listOf("color", "layout"), RefinementElement.entries.map { it.id })
         assertNull(RefinementElement.byId("touch"))
+        assertNull(RefinementElement.byId("reading"))
         assertNull(RefinementElement.byId("variation"))
 
         val layout = RefinementPlanner.plan(RefinementElement.Layout, parent)
         assertEquals("layout_change", layout.derivationKind)
         assertEquals(setOf("composition_seed", "recompose_mode"), layout.derivationMetadata.keys)
         assertEquals(layout.seeds.compositionSeed, layout.derivationMetadata["composition_seed"])
-
-        val reading = RefinementPlanner.plan(RefinementElement.Reading, parent)
-        assertEquals("reinterpretation", reading.derivationKind)
-        assertEquals(setOf("interpretation_seed"), reading.derivationMetadata.keys)
-        assertEquals(reading.seeds.interpretationSeed, reading.derivationMetadata["interpretation_seed"])
 
         // SPEC :678 -- 「色変更は系譜の catalog_change として変更前後のcatalog IDを記録する」.
         val color = RefinementPlanner.plan(RefinementElement.Color, parent, newCatalogId = "vivid_material")
@@ -196,7 +190,7 @@ class RefinementPlanTest {
         assertEquals("ink_season", color.derivationMetadata["catalog_id_from"])
         assertEquals("vivid_material", color.derivationMetadata["catalog_id_to"])
 
-        listOf(layout, reading, color).forEach { plan ->
+        listOf(layout, color).forEach { plan ->
             assertFalse(plan.derivationMetadata.containsKey("variation_amplitude"))
             assertFalse(plan.derivationMetadata.containsKey("variation_seed"))
         }
@@ -234,23 +228,7 @@ class RefinementPlanTest {
         RefinementElement.entries.forEach { element ->
             assertTrue("${element.derivationKind} is a server kind", registered.contains(element.derivationKind))
         }
-        assertEquals("four elements, four distinct kinds", 4, RefinementElement.entries.map { it.derivationKind }.toSet().size)
-    }
-
-    // ── the reading is upstream ────────────────────────────
-
-    /**
-     * 「読み取りは一つの上流介入として扱い、その結果として配置とタッチを下流工程で
-     * 再生成する」: holding the parent's composition or render seed would pin the
-     * two things the SPEC says are made again.
-     */
-    @Test
-    fun theReadingRegeneratesWhatIsDownstreamOfIt() {
-        val plan = RefinementPlanner.plan(RefinementElement.Reading, parent())
-
-        assertNull("the layout is regenerated", plan.seeds.compositionSeed)
-        assertNull("the touch is regenerated", plan.seeds.renderSeed)
-        assertEquals(RefinementRoute.Paint, plan.route)
+        assertEquals("two elements, two distinct kinds", 2, RefinementElement.entries.map { it.derivationKind }.toSet().size)
     }
 
     /** A work saved before the seed columns existed reports no seeds, not zeros. */
@@ -260,7 +238,6 @@ class RefinementPlanTest {
 
         assertNull(seeds.renderSeed)
         assertNull(seeds.compositionSeed)
-        assertNull(seeds.interpretationSeed)
     }
 
     /**
@@ -282,8 +259,8 @@ class RefinementPlanTest {
 
     /**
      * web's order (`generateVariationCandidates`, `generateModelCandidates`):
-     * a colour and a layout need no description; reading and the model
-     * comparison do; everything but colour needs the DDL. The refusal is read
+     * colour and layout need no description; the model comparison does;
+     * layout needs the DDL. The refusal is read
      * as the sentence it carries, so a refusal for the wrong reason fails too.
      */
     private fun refusal(element: RefinementElement?, parent: RefinementParent): String? = try {
@@ -299,7 +276,6 @@ class RefinementPlanTest {
 
         assertNull(refusal(RefinementElement.Color, parent))
         assertNull(refusal(RefinementElement.Layout, parent))
-        assertEquals(InkuStringsJa.refinementNeedsDescription, refusal(RefinementElement.Reading, parent))
         assertEquals("the model comparison reads the description", InkuStringsJa.refinementNeedsDescription, refusal(null, parent))
     }
 
@@ -311,8 +287,7 @@ class RefinementPlanTest {
 
         assertNull(refusal(RefinementElement.Color, bare))
         assertEquals(InkuStringsJa.refinementNeedsDdl, refusal(RefinementElement.Layout, bare))
-        assertEquals("the description is asked first", InkuStringsJa.refinementNeedsDescription, refusal(RefinementElement.Reading, bare))
-        assertEquals(InkuStringsJa.refinementNeedsDdl, refusal(RefinementElement.Reading, described))
+        assertEquals("the model comparison needs a description", InkuStringsJa.refinementNeedsDescription, refusal(null, bare))
         assertEquals(InkuStringsJa.refinementNeedsDdl, refusal(RefinementElement.Layout, described))
         assertNull("the model comparison draws from the description alone", refusal(null, described))
     }

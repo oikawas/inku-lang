@@ -129,6 +129,22 @@ class RefinementScreenTest {
         )
     }
 
+    /** A color generation must not read the description through any model. */
+    private fun useNoModel() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        runBlocking { repository.close() }
+        repository = InkuRepository(context, database, modelProviderOverride = object : ModelProvider {
+            override val providerId = "fixture-no-model"
+            override suspend fun generate(request: ModelRequest): ModelResponse = error("color must replay the saved Score")
+        })
+    }
+
+    /** The remaining model comparison can exercise slow-run guards. */
+    private fun selectModelCandidate() {
+        vm().setRefinementSubview(RefinementSubview.Model)
+        vm().toggleModelCompareSelection("local-litert-lm:gemma-4-e2b")
+    }
+
     /**
      * Reads a setting off the main thread.
      *
@@ -181,7 +197,7 @@ class RefinementScreenTest {
         requireNotNull(repository.getHistoryById(drawn.id))
     }
 
-    private fun openPanel(description: String = "赤い線を引く", ddl: String? = "赤い線を一本引く。"): HistoryItemEntity {
+    private fun openPanel(description: String = "赤い線を引く", ddl: String? = "赤い線を一本引く。", fullApp: Boolean = false): HistoryItemEntity {
         val parent = paintParent(description, ddl)
         val created = ViewModelStore()
         store = created
@@ -192,11 +208,17 @@ class RefinementScreenTest {
         }
         viewModel = ViewModelProvider(created, factory)[InkuViewModel::class.java]
         composeTestRule.setContent {
-            val state by vm().state.collectAsState()
-            LineageScreen(state, vm())
+            if (fullApp) {
+                InkuApp(vm())
+            } else {
+                val state by vm().state.collectAsState()
+                LineageScreen(state, vm())
+            }
         }
-        composeTestRule.runOnIdle { vm().openRefinement(parent) }
-        awaitState("the panel to open") { it.refinementOpen }
+        composeTestRule.runOnIdle {
+            if (fullApp) vm().openWorkActions(parent) else vm().openRefinement(parent)
+        }
+        awaitState("the panel to open") { if (fullApp) it.workActionsTarget?.id == parent.id else it.refinementOpen }
         return parent
     }
 
@@ -276,12 +298,12 @@ class RefinementScreenTest {
      */
     @Test
     fun t10_noOtherGenerationStartsWhileCandidatesAreBeingMade() {
-        // A reading that waits on a slow model keeps the run busy for seconds.
+        // A model comparison keeps the run busy for seconds.
         // A colour run makes no model call and can end before drawing is asked.
         useSlowModel(2_000)
         openPanel()
         composeTestRule.runOnIdle {
-            vm().setRefinementElement(RefinementElement.Reading)
+            selectModelCandidate()
             vm().setRefinementCount(4)
             vm().generateRefinementCandidates()
         }
@@ -309,7 +331,7 @@ class RefinementScreenTest {
         useSlowModel(4_000)
         openPanel()
         composeTestRule.runOnIdle {
-            vm().setRefinementElement(RefinementElement.Reading)
+            selectModelCandidate()
             vm().setRefinementCount(4)
             vm().generateRefinementCandidates()
         }
@@ -338,7 +360,7 @@ class RefinementScreenTest {
         useEchoModel()
         openPanel()
         composeTestRule.runOnIdle {
-            vm().setRefinementElement(RefinementElement.Reading)
+            selectModelCandidate()
             vm().setRefinementCount(1)
             vm().generateRefinementCandidates()
         }
@@ -414,27 +436,48 @@ class RefinementScreenTest {
         }
     }
 
-    /** A retired selection must not bring back the touch control or its words field. */
+    /** Retired controls stay absent, while color replays the work without Stage 1. */
     @Test
-    fun onlyReadingColorAndLayoutAreOfferedAfterARetiredTouchSelection() {
-        runBlocking { repository.saveSetting(SETTING_KEY_REFINEMENT_ELEMENT, """{"value":"touch"}""") }
-        openPanel()
-        awaitState("restored settings") { it.message == null && it.refinementElement == RefinementElement.Reading }
-        composeTestRule.onNodeWithText("読み取り").assertExists()
+    fun onlyColorAndLayoutRemainAfterARetiredReadingSelection() {
+        useNoModel()
+        runBlocking { repository.saveSetting(SETTING_KEY_REFINEMENT_ELEMENT, """{"value":"reading"}""") }
+        val parent = openPanel(fullApp = true)
+        composeTestRule.onNodeWithText("描画パラメータの編集").assertDoesNotExist()
+        composeTestRule.onNodeWithText("配置を変える").assertExists()
+        composeTestRule.onNodeWithText("色カタログを変える").assertExists()
+        saveScreen("menu")
+        composeTestRule.onAllNodesWithTag(LAYOUT_REFINE_ENTRY_TAG)[0].performClick()
+        awaitState("the remaining refinement") { it.refinementOpen && it.refinementElement == RefinementElement.Layout }
+        composeTestRule.onNodeWithText("読み取り").assertDoesNotExist()
         composeTestRule.onNodeWithText("色カタログ").assertExists()
         composeTestRule.onNodeWithText("配置").assertExists()
         composeTestRule.onNodeWithText("タッチ").assertDoesNotExist()
         composeTestRule.onNodeWithText("タッチを変える言葉").assertDoesNotExist()
-        assertEquals("the retired stored value is not erased", """{"value":"touch"}""", settingOffMainThread(SETTING_KEY_REFINEMENT_ELEMENT))
+        assertEquals("the retired stored value is not erased", """{"value":"reading"}""", settingOffMainThread(SETTING_KEY_REFINEMENT_ELEMENT))
         assertTrue("opening makes no candidates", vm().state.value.refinementCandidates.isEmpty())
-        assertEquals(RefinementElement.Reading, vm().state.value.refinementElement)
+        assertEquals(RefinementElement.Layout, vm().state.value.refinementElement)
+        saveScreen("elements")
+        composeTestRule.runOnIdle {
+            vm().setRefinementElement(RefinementElement.Color)
+            vm().generateRefinementCandidates()
+        }
+        val expected = ColorCatalogs.all.map { it.id }.filter { it != parent.colorCatalogId }
+        awaitState("color candidates without a model") { !it.refinementBusy && it.refinementCandidates.size == expected.size }
+        assertEquals(expected, vm().state.value.refinementCandidates.map { it.plan.catalogId })
+        assertTrue(vm().state.value.refinementCandidates.all { it.scoreJson == parent.scoreJson })
+    }
+
+    private fun saveScreen(name: String) {
+        composeTestRule.waitForIdle()
+        // Compose idle does not wait for Android's dialog-window exit animation.
+        InstrumentationRegistry.getInstrumentation().uiAutomation.waitForIdle(500, 5_000)
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val screenshot = java.io.File(context.getExternalFilesDir(null), "touch-removal-${System.currentTimeMillis()}.png")
+        val screenshot = java.io.File(context.getExternalFilesDir(null), "reading-removal-$name-${System.currentTimeMillis()}.png")
         screenshot.outputStream().use {
             assertTrue(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
                 .compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
         }
-        android.util.Log.i("TouchRemovalCheck", "screen=${screenshot.absolutePath}")
+        android.util.Log.i("ReadingRemovalCheck", "screen=${screenshot.absolutePath}")
     }
 
     /** A work drawn from hand-written DDL has no description to refine from; say so, as web does. */
@@ -442,7 +485,7 @@ class RefinementScreenTest {
     fun aWorkWithoutADescriptionSaysWhyNoCandidateIsMade() {
         openPanel(description = "")
         composeTestRule.runOnIdle {
-            vm().setRefinementElement(RefinementElement.Reading)
+            selectModelCandidate()
             vm().generateRefinementCandidates()
         }
         awaitState("the refusal") { it.refinementStatus != null && !it.refinementBusy }
@@ -515,8 +558,8 @@ class RefinementScreenTest {
         composeTestRule.waitForIdle()
 
         composeTestRule.onAllNodesWithTag(LINEAGE_MENU_TAG)[0].performClick()
-        assertEquals("the entry is in the card menu", 1, nodesWithTag(REFINE_ENTRY_TAG))
-        composeTestRule.onAllNodesWithTag(REFINE_ENTRY_TAG)[0].performClick()
+        assertEquals("the layout entry is in the card menu", 1, nodesWithTag(LAYOUT_REFINE_ENTRY_TAG))
+        composeTestRule.onAllNodesWithTag(LAYOUT_REFINE_ENTRY_TAG)[0].performClick()
         awaitState("the panel to open") { it.refinementOpen }
         assertEquals(parent.id, vm().state.value.refinementParent?.id)
     }

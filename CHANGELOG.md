@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — Remove Android reading refinement
+
+Remove reading refinement and Edit drawing parameters. The work menu opens composition and color catalog separately; retired touch and reading selections display layout. Drawing requests omit `interpretation_seed`, while historical reading lineage and recorded identifiers remain readable. Color candidates replay the saved Score without reading the description through Stage 1.
+
 ## v2.15.129 (2026-10-14 / Build 1205)
 
 ### 2026-10-14 — Show SVG sizes beside the Replay comparison labels

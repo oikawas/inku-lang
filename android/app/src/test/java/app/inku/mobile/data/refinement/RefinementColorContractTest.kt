@@ -42,7 +42,7 @@ class RefinementColorContractTest {
     @Test
     fun nonColorRefinementKeepsTheParentSnapshot() {
         val parent = parent()
-        val plan = RefinementPlanner.plan(RefinementElement.Reading, parent)
+        val plan = RefinementPlanner.plan(RefinementElement.Layout, parent)
 
         assertEquals(snapshot, refinementColorSnapshot(parent, plan))
     }
@@ -50,7 +50,7 @@ class RefinementColorContractTest {
     @Test
     fun missingParentSnapshotStaysMissing() {
         val parent = parent(null)
-        val plan = RefinementPlanner.plan(RefinementElement.Reading, parent)
+        val plan = RefinementPlanner.plan(RefinementElement.Layout, parent)
 
         assertNull(refinementColorSnapshot(parent, plan))
     }

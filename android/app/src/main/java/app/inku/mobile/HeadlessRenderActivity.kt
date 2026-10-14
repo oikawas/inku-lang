@@ -115,11 +115,10 @@ class HeadlessRenderActivity : Activity() {
             }
             val saveHistory = intent.getBooleanExtra("save_history", false)
             val originalText = intent.getStringExtra("original_text")?.takeIf { it.isNotBlank() } ?: text
-            // Seed words are retired request input; old extras are ignored.
+            // Seed words and interpretation seeds are retired; old extras are ignored.
             val seeds = PaintSeeds(
                 renderSeed = intent.longExtraOrNull("render_seed"),
                 compositionSeed = intent.longExtraOrNull("composition_seed"),
-                interpretationSeed = intent.getStringExtra("interpretation_seed")?.takeIf { it.isNotBlank() },
             )
 
             val image = if (inputMode == "image") analyzeHeadlessImage(repository, outputDir, runId, stage1Model) else null

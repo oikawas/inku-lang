@@ -10,8 +10,8 @@ enum class ComposeFromDdlProgress {
 }
 
 /**
- * Render and composition seeds are numbers; interpretation_seed is a string.
- * Retired variation seed/amplitude are not drawing requests. `null` means
+ * Render and composition seeds are numbers.
+ * Retired interpretation and variation seeds are not drawing requests. `null` means
  * "not given" for every one of them, which is the server's `None`; a caller that
  * wants a specific value says so.
  *
@@ -33,7 +33,6 @@ data class PaintRequest(
     val compositionSeed: Long? = null,
     /** Present only when selecting another composition for a layout candidate. */
     val recomposeMode: RecomposeMode? = null,
-    val interpretationSeed: String? = null,
     /**
      * The instruction language the caller asks for, with the server's key name
      * (`instruction_lang`) and the server's three requestable words: `ja`, `en`

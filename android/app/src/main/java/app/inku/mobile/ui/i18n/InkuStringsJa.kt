@@ -80,7 +80,8 @@ object InkuStringsJa : InkuStrings {
     override val back = "戻る"
     override val descriptionEditAction = "記述を変える"
     override val instructionEditAction = "指示書を編集"
-    override val drawingEditAction = "描画パラメータの編集"
+    override val layoutEditAction = "配置を変える"
+    override val colorCatalogEditAction = "色カタログを変える"
     override val modelEditAction = "モデルを変える"
     override val editingWorkLabel: (String) -> String = { hash -> "対象作品 $hash" }
     override val nextDrawingConditions = "次に描く条件"
@@ -200,7 +201,6 @@ object InkuStringsJa : InkuStrings {
     override val refinementElementLabel: (String) -> String = { id ->
         when (id) {
             "layout" -> "配置"
-            "reading" -> "読み取り"
             "color" -> "色カタログ"
             else -> id
         }

@@ -709,7 +709,8 @@ private fun WorkActionsDialog(item: HistoryItemEntity, viewModel: InkuViewModel)
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                 Text(S.editingWorkLabel(item.renderHashShort), style = MaterialTheme.typography.labelMedium)
-                TextButton(onClick = { viewModel.refineWork(item, RefinementSubview.Adjust) }, modifier = Modifier.fillMaxWidth().testTag(REFINE_ENTRY_TAG)) { Text(S.drawingEditAction) }
+                TextButton(onClick = { viewModel.refineWork(item, RefinementElement.Layout) }, modifier = Modifier.fillMaxWidth().testTag(LAYOUT_REFINE_ENTRY_TAG)) { Text(S.layoutEditAction) }
+                TextButton(onClick = { viewModel.refineWork(item, RefinementElement.Color) }, modifier = Modifier.fillMaxWidth().testTag(COLOR_REFINE_ENTRY_TAG)) { Text(S.colorCatalogEditAction) }
                 TextButton(onClick = { viewModel.editWorkDescription(item) }, modifier = Modifier.fillMaxWidth()) { Text(S.descriptionEditAction) }
                 TextButton(onClick = { viewModel.editWorkInstructions(item) }, modifier = Modifier.fillMaxWidth().testTag(DDL_ENTRY_TAG)) { Text(S.instructionEditAction) }
                 TextButton(onClick = { viewModel.showWorkSketch(item) }, modifier = Modifier.fillMaxWidth()) { Text(S.workActionSketchRedraw) }
@@ -3714,7 +3715,8 @@ internal const val LINEAGE_MENU_TAG = "lineage_menu"
 internal const val LINEAGE_GRAPH_TAG = "lineage_graph"
 
 /** Tags for the refinement, so a test counts candidates rather than labels. */
-internal const val REFINE_ENTRY_TAG = "refine_entry"
+internal const val LAYOUT_REFINE_ENTRY_TAG = "layout_refine_entry"
+internal const val COLOR_REFINE_ENTRY_TAG = "color_refine_entry"
 internal const val DDL_ENTRY_TAG = "ddl_entry"
 internal const val REFINE_CANDIDATE_TAG = "refine_candidate"
 internal const val REFINE_SAVE_TAG = "refine_save"
@@ -3777,7 +3779,7 @@ internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
  * lineage card (S.refinementElements). The comparison sub-views beside it there belong to
  * other contracts.
  *
- * The radio selects one of the three active elements at a time.
+ * The radio selects one of the two active elements at a time.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -3828,7 +3830,7 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
             horizontal = Dimens.spaceM,
             vertical = Dimens.spaceM,
         ) {
-            // Reading and layout offer one or four candidates. The colour
+            // Layout offers one or four candidates. The colour
             // change draws every other catalogue, so it has no count.
             if (state.refinementSubview == RefinementSubview.Adjust && state.refinementElement != RefinementElement.Color) {
                 listOf(1, 4).forEach { count ->
@@ -3989,7 +3991,7 @@ private fun RefinementProgressLanes(
 /** Lanes per row of [RefinementProgressLanes]. */
 private const val REFINEMENT_LANES_PER_ROW = 4
 
-/** Adjustment: reading, color catalog and layout. */
+/** Adjustment: color catalog and layout. */
 @Composable
 private fun RefinementAdjustControls(
     state: InkuUiState,
@@ -4054,12 +4056,6 @@ private fun RefinementCandidateCard(
     onPreview: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // 「読み取りを含む候補は画像hoverで正規化DDLを表示する」. A phone has no hover, so
-    // the DDL opens on a long press instead (contract 段 3 leaves the gesture to
-    // the port); everything else about the candidate is the same.
-    var ddlOpen by remember(candidate.id) { mutableStateOf(false) }
-    var rangeBounds by remember(candidate.id) { mutableStateOf<DdlRangeBounds?>(null) }
-    val readingCandidate = candidate.plan.element == RefinementElement.Reading
     Card(
         modifier = modifier
             .testTag(REFINE_CANDIDATE_TAG)
@@ -4071,14 +4067,10 @@ private fun RefinementCandidateCard(
             RefinementCandidateImage(
                 renderHash = candidate.renderHash,
                 svg = candidate.displaySvg,
-                rangeBounds = rangeBounds,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
-                    .combinedClickable(
-                        onClick = onPreview,
-                        onLongClick = { if (readingCandidate) ddlOpen = !ddlOpen },
-                    ),
+                    .clickable(onClick = onPreview),
             )
             Column(modifier = Modifier.padding(horizontal = Dimens.spaceM).padding(bottom = Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                 Text(candidate.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -4089,19 +4081,6 @@ private fun RefinementCandidateCard(
                     Text(line, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text(candidate.renderHashShort, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (readingCandidate && ddlOpen) {
-                    DdlHeading(
-                        InstructionLanguages.ofDdl(
-                            ddl = candidate.normalizedDdl,
-                            savedDdl = candidate.normalizedDdl,
-                            savedLang = candidate.instructionLangResolved,
-                            uiLang = LocalUiLanguage.current.code,
-                        ),
-                    )
-                    CompositionLocalProvider(LocalDdlRangePreview provides { value -> rangeBounds = value?.bounds }) {
-                        RangeDdlText(candidate.normalizedDdl, style = MaterialTheme.typography.labelSmall)
-                    }
-                }
                 // The three states are three different labels, and only the
                 // first one is a button that does anything.
                 when (candidate.saveState) {

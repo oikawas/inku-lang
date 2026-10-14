@@ -299,7 +299,7 @@ Mutually inconsistent values are rounded rather than rejected — if the represe
 
 ## 6. Renderer and Replay
 
-`render_seed` controls touch, `composition_seed` controls placement, and `interpretation_seed` supports rereading. From render engine 23 the placement is decided by `composition_seed`, and follows `render_seed` only when it is omitted. The test is `is not None`, so `0` is the seed zero and not "not given". `seed_text`, which made a seed from words (Another performance), was removed on 2026-10-14; a request that carries it is not read. A saved work's `seed_text` is shown as a record only, and a redraw uses its saved `render_seed`.
+`render_seed` controls touch and `composition_seed` controls placement. `interpretation_seed`, the identifier of a reading refinement, never reached Stage 1 and was only recorded, so it left requests on 2026-10-14; an earlier work's value is still shown as a record. From render engine 23 the placement is decided by `composition_seed`, and follows `render_seed` only when it is omitted. The test is `is not None`, so `0` is the seed zero and not "not given". `seed_text`, which made a seed from words (Another performance), was removed on 2026-10-14; a request that carries it is not read. A saved work's `seed_text` is shown as a record only, and a redraw uses its saved `render_seed`.
 
 Variation is retired. Its seed, amplitude and focus columns and saved values stay in the database, but new works do not record them. New compiler configurations omit `stage15_variation`; saved configurations lose it only from the copy passed to the next execution. There is no database migration.
 

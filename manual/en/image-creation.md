@@ -220,7 +220,7 @@ A `namespace.word` such as `Nature.青葉` is marked in the plugin color only wh
 A work whose instructions (DDL) were edited follows its DDL, not its description. Drawing it again from the description would lose the edits, so **its description is held**.
 
 - The Describe tab heading shows `Held (DDL edited)` and the description cannot be changed. In place of `Paint`, `Start a new work from this description` appears: it draws the description as it stands as a new work (this work stays as it is, and the description can be changed in the new work).
-- In the work's edit menu, `Edit drawing parameters`, `Change the description`, `Redraw with or without sketch from life` and `Change the model` are shown but not offered, with the reason. `Another reading` in refinement is not offered either.
+- In the work's edit menu, `Change the description`, `Redraw with or without sketch from life` and `Change the model` are shown but not offered, with the reason.
 - A child made by layout or color (or by touch, before it was removed) carries the DDL and is held as well. A child made by reading the description again is not.
 - The history strip shows a lock mark, and a lineage card shows `Held (DDL edited)`.
 - Autonomous refinement uses no reading rounds and no Vision method, and draws each color or layout round from the DDL.
@@ -267,16 +267,15 @@ The conditions of the displayed work and the conditions for the next work are se
 
 ## 8. Refine
 
-In the refinement area of the work tab, choose exactly one element to change at a time.
+A refinement changes exactly one element at a time, chosen from the work-editing menu (`Refine` on the Work tab, or `…` on each work in the Lineage tab).
 
 | Element | What changes | Cost |
 |---|---|---|
 | Another composition | Chooses numeric ranges again, except corners. The option's seed also reselects explicit tilt angles and corners | Fast (choosing ranges calls no LLM; existing completion only runs when the instructions still have gaps) |
-| Another reading | Reads again from Stage 1 and regenerates the instructions, composition, and performance | Slow (LLM and API) |
 
-You may choose `Make one option` or `Make four options`. `Edit drawing parameters` in the work-editing menu draws `Another reading`. It is not shown for a work drawn from DDL, and a work held by its edited instructions shows it unavailable with the reason.
+In `Another composition` you may choose `Make one option` or `Make four options`.
 
-`Another performance` (changing the touch with words) was removed on 2026-10-14: the words were never read for their meaning and only made the drawing's seed. The `Touch` element of autonomous refinement was removed with it. Works made by a touch before then keep their `Touch` edge in the lineage, and redraw from their saved seed.
+`Another performance` (changing the touch with words) and `Another reading` were removed on 2026-10-14: the touch's words were never read for their meaning and only made the drawing's seed. `Edit drawing parameters` in the work-editing menu, which drew them, and the `Touch` and `Reading` elements of autonomous refinement were removed with them. Works made by a touch or a reading before then keep their `Touch` or `Reading` edge in the lineage, and redraw from their saved instructions and seed.
 
 The color catalog is changed from the work-editing menu instead (8.3).
 
@@ -319,9 +318,11 @@ From the lineage tab the application can build generations on its own.
 | Mode | Contents |
 |---|---|
 | Random autonomous refinement | Builds generations at random from the chosen elements |
-| Autonomous refinement with Vision | Observes the picture and passes a direction to try to each generation |
+| Autonomous refinement with Vision | Observes the picture and chooses the element the next generation changes |
 
-You choose the number of generations and which refinement elements to use. A direction you write reaches every generation under Vision; under random autonomous refinement it applies only to `Another reading` generations, and not at all if `Another reading` is removed.
+You choose the number of generations and which refinement elements to use (color catalog and composition). The direction field appears only with the Vision method, where it is material for Vision's advice; it is not added to the drawing.
+
+In either form of autonomous refinement, a color generation draws its parent's saved instructions in another color catalog, without reading the description again (until 2026-10-14 a work drawn from a description was drawn again from Stage 1).
 
 In either form of autonomous refinement, a composition generation rebuilds its parent's saved instructions `By principle`. A manual choice of `By chance` does not change this default. Choosing the composition ranges calls no LLM.
 

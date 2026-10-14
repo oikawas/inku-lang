@@ -8,6 +8,16 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — Remove Another reading and Edit drawing parameters
+
+At the author's request. `Another reading` called Stage 1 again on the same description, and the `interpretation_seed` made for each option was only recorded: it reached neither Stage 1 nor the drawing. With the author's choices, the reading leaves every entry point.
+
+- Web: Edit drawing parameters leaves the work-editing menu, since it drew only the touch and the reading. Refinement is now Another composition and the color catalog, color arrangement, ground, description, instruction and model actions.
+- Autonomous refinement: two elements, color catalog and layout. The direction field shows only for the Vision method, as material for Vision's advice (not added to the drawing). A color generation draws the parent's saved instructions in another color catalog, for works with a description too (the author's choice; it used to draw again from Stage 1, which changed the reading as well).
+- Server and CLI: requests no longer carry `interpretation_seed`, and Vision advice chooses among two kinds. The CLI's `refine --kind reading` and `--interpretation-seed` are gone.
+- Saved works: `reinterpretation` lineage edges (Reading) and a work's recorded `interpretation_seed` stay visible.
+- SPEC's refinement sections, which the touch removal had missed, and the autonomous-kind gate are corrected as well.
+
 ## v2.15.128 (2026-10-14 / Build 1204)
 
 ### 2026-10-14 — Remove Another performance and the touch refinement

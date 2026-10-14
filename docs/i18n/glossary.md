@@ -65,10 +65,9 @@
 | 日本語（正本） | 英語 | 用法 | 退けた訳・注 |
 |---|---|---|---|
 | 推敲 | **refinement** / **refine** | 名詞／動詞 | ~~revision~~（事務的）、~~iteration~~（工学的） |
-| 配置を変える | **Another composition** | **lint 固定**。推敲の操作は Another + 名詞で統一（言葉でタッチを変える〈Another performance〉は 2026-10-14 に削除） | — |
+| 配置を変える | **Another composition** | **lint 固定**。推敲の操作は Another + 名詞で統一（言葉でタッチを変える〈Another performance〉と読み取りを変える〈Another reading〉は 2026-10-14 に削除） | — |
 | 原理に沿う | **By principle** | 配置を変えるときの選び。作者裁定（2026-10-05）、**lint 固定** | 指示書から分かることだけで解き直す |
 | 偶然に委ねる | **By chance** | 配置を変えるときの選び。作者裁定（2026-10-05）、**lint 固定** | 層の種類が許す範囲からseedで選ぶ |
-| 読み取りを変える | **Another reading** | **lint 固定** | — |
 | 色カタログを変える | **Another catalog** | **lint 固定** | — |
 | 配色を変える | **Change the color arrangement** | 同じ色カタログの中で色の割当を変える独立した作品編集メニュー（2026-10-14 作者）。系譜の短札は **Color arrangement** | — |
 | 支持体を変える | **Change the ground** | 作品の支持体（歳時記のじ、英語のカテゴリ名 grounds）だけを、使っていない支持体に差し替える独立した作品編集メニュー（2026-10-14 作者）。系譜の短札は **Ground** | ~~support~~（じの英語は ground に揃える） |

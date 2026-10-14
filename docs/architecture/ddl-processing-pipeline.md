@@ -110,7 +110,6 @@ The Server's Python adapter and Android's Kotlin/JNI adapter are thin host bound
 
 | Operation | Preserved | Reentry |
 |---|---|---|
-| Reinterpretation | Original work and explicit parent relation | A new description-origin variation from saved context (`fork-description`) |
 | DDL edit | Authoring origin, CAS, and original history | With unchanged settings, the compiler after CAS-saving the author DDL. With changed settings, a parent-linked direct-DDL variation |
 | Approve or decline a proposal | Base revision and proposal digest | Approval revalidates the base and CAS-saves. A decline keeps the saved DDL |
 | Another composition | Saved visible DDL, source meaning, and drawing attributes | Typed Stage 1.5 / lowerer with a new `composition_seed` |

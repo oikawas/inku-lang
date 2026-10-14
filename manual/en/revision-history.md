@@ -2,6 +2,14 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-14 — Another reading and Edit drawing parameters removed
+
+`Another reading` and Edit drawing parameters in the work-editing menu are gone,
+so sections 6 and 8 of Creating Images (the refinement table, and autonomous
+refinement's elements, direction and color generations), the CLI Reference and
+the CLI reference for AI (`refine --kind reading` and `--interpretation-seed`),
+and section 6 of Server Configuration (`interpretation_seed`) were revised.
+
 ## 2026-10-14 — Another performance removed
 
 `Another performance` and the `Touch` element of autonomous refinement are gone,

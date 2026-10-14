@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — Open the macOS refinement menu from lineage details
+
+Fixed the inactive Refine control in saved information and comments. It now opens the shared refinement menu and passes the clicked node's saved work to the selected action, preserving the target when another work is displayed or the creation boxes contain a draft.
+
 ## v2.15.140 (2026-10-14 / Build 1216)
 
 ### 2026-10-14 — CLI refinements draw from the saved instructions; Vision autonomous refinement for held works

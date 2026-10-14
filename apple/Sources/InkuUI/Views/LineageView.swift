@@ -507,7 +507,7 @@ struct LineageView: View {
                     replayAfterDetails = parent
                     details = nil
                 }, onOpenInCreate: { parent in queueDetailsAction(parent, "create") },
-                   onAdjustWork: { parent in queueDetailsAction(parent, "parameters") },
+                   showsRefinementMenu: true,
                    onWorkAction: queueDetailsAction,
                    onOpenLineage: { parent in queueDetailsAction(parent, "lineage") },
                    writingLocked: writingDisabled).id(work.id)

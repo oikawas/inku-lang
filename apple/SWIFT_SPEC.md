@@ -14,6 +14,10 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-14 Open the refinement menu from lineage details
+
+Refine in a lineage node's saved information and comments opens the shared work refinement menu. It uses the same available layout, catalog, touch, and other actions and restrictions as the other entrances. The selected action receives the saved work belonging to that node, preserving the target when another work is displayed or the creation boxes contain a draft. It no longer routes to the removed drawing parameter editor.
+
 ## 2026-10-14 Remove reading and touch refinement
 
 Following the author's decision in product SPEC §8.4, Another reading and word-based touch refinement are removed.

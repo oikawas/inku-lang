@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-14 — Change the touches in the refine menu
-
-At the author's request, the work-editing menu offers Change the touches after Change the ground. A radio in its dialog chooses One touch for all (the default) or Per sentence; four options are drawn on opening, and each press of Make four options adds four more. The Server swaps only the instructions' `weight` in the saved Score and draws it with the parent's seeds, so placement, color and ground stay (another instruction's strokes do not move, measured on 5173). The child's instructions are written by a new shared-core function, `retouch` (`inku.touch-change.v1`; the Python and uniffi entries are `pipeline_retouch` and `retouch`): touch words are replaced, a sentence without one gets the word before the shape's name, and only options that read back as asked are offered. A chosen option is saved as a `tool_change` child and drawn again on the Server from the parent. No LLM is called. The new APIs are `POST /api/tool-variants/plan` and `POST /api/render-tool-variant`. A CLI command and Android and macOS come later.
-
 ### 2026-10-14 — Correct the explanation beside Android composition candidates
 
 A sentence with no range or place now explains that the ranges in the instructions cannot be chosen again. When the ranges stay, the accompanying text says the work was redrawn with a new composition seed and unchanged instructions. The author's Japanese and English wording matches Web.
@@ -23,6 +19,12 @@ When a sentence states no range or place, the reason now explains that the instr
 ### 2026-10-14 — Remove reading and touch refinement on macOS
 
 Following the author's decision, Another reading, word-based touch, and the empty Edit drawing parameters menu are removed. Layout keeps its separate entrance. Autonomous refinement and Vision advice allow only color catalog and layout, excluding old reading and touch selections from requests. Direction is Vision observation material only and is never added to the drawing description. Color generations draw the parent's saved DDL without calling Stage 1. Archived Reading and Touch lineage labels and interpretation_seed/seed_text display remain readable; replay uses recorded render_seed. Removed Web copy keys and tooltip mappings are aligned.
+
+## v2.15.135 (2026-10-14 / Build 1211)
+
+### 2026-10-14 — Change the touches in the refine menu
+
+At the author's request, the work-editing menu offers Change the touches after Change the ground. A radio in its dialog chooses One touch for all (the default) or Per sentence; four options are drawn on opening, and each press of Make four options adds four more. The Server swaps only the instructions' `weight` in the saved Score and draws it with the parent's seeds, so placement, color and ground stay (another instruction's strokes do not move, measured on 5173). The child's instructions are written by a new shared-core function, `retouch` (`inku.touch-change.v1`; the Python and uniffi entries are `pipeline_retouch` and `retouch`): touch words are replaced, a sentence without one gets the word before the shape's name, and only options that read back as asked are offered. A chosen option is saved as a `tool_change` child and drawn again on the Server from the parent. No LLM is called. The new APIs are `POST /api/tool-variants/plan` and `POST /api/render-tool-variant`. A CLI command and Android and macOS come later.
 
 ## v2.15.134 (2026-10-14 / Build 1210)
 

@@ -584,7 +584,8 @@ def api_tool_variant_plan(req: ToolVariantPlanRequest, actor: dict = Depends(_cu
 
 
 def _render_tool_variant_for_work(actor: dict, work: dict, mode: str, asked: dict[str, str]) -> ToolVariantResponse:
-    if work.get("render_seed") is None and not work.get("seed_text"):
+    render_seed = work.get("render_seed")
+    if render_seed is None:
         raise HTTPException(status_code=422, detail="saved work has no performance seed to preserve its drawing")
     score, drawn = _tool_sentences(actor, work)
     try:
@@ -603,11 +604,9 @@ def _render_tool_variant_for_work(actor: dict, work: dict, mode: str, asked: dic
         score=_tools.score_with_tools(score, tools), input=work.get("input") or "", ddl=ddl,
         catalog_id=work.get("render_color_catalog_id") or work.get("catalog_id"),
         canvas_aspect=work.get("render_canvas_aspect_id") or work.get("render_canvas_aspect"),
-        render_seed=work.get("render_seed"), composition_seed=work.get("composition_seed"),
-        interpretation_seed=work.get("interpretation_seed"), seed_text=work.get("seed_text"),
+        render_seed=render_seed, composition_seed=work.get("composition_seed"),
         wild=bool(work.get("render_wild")),
     ), actor, work)
-    result.interpretation_seed = work.get("interpretation_seed")
     entry = _tool_entry(drawn, tools, ddl)
     result.derivation_metadata = {"tool_mode": mode, "tools": entry["tools"], "changes": entry["changes"]}
     return ToolVariantResponse(**result.model_dump(), ddl=ddl)

@@ -35,9 +35,11 @@ EXPECTED_KINDS = {
     "age_change",
     "canvas_aspect_change",
     "catalog_change",
+    "color_arrangement_change",
     "ddl_edit",
     "description_edit",
     "external_seed_change",
+    "ground_change",
     "hacho_change",
     "language_comparison",
     "layout_change",
@@ -47,6 +49,7 @@ EXPECTED_KINDS = {
     "renga_reply",
     "replay",
     "sketch_grain_change",
+    # No refinement makes a touch since 2026-10-14; the works made before keep it.
     "touch_change",
 }
 
@@ -78,7 +81,7 @@ def _web_client_kinds() -> set[str]:
     return kinds
 
 
-def test_the_server_accepts_exactly_the_sixteen_named_kinds():
+def test_the_server_accepts_exactly_the_eighteen_named_kinds():
     assert db.LINEAGE_DERIVATION_KINDS == EXPECTED_KINDS
 
 

@@ -492,7 +492,7 @@ def api_history_post(
         body = body.model_copy(update={"derivation_metadata": {
             "replay_work_id": parent["id"], "replay_render_hash": replayed["render_hash"],
             "replay_svg_sha256": replayed["svg_sha256"],
-            "provisional_render_seed": provisional_seed,
+            "provisional_render_seed": source_seed is None,
         }})
         if replay_link is not None:
             diagnostics = dict(linked.pipeline_diagnostics or {

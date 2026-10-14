@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.122 (2026-10-14 / Build 1198)
+
 ### 2026-10-14 — Show recommendation stars on model selection buttons
 
 The model selection panel and model picker dialogs show a three-tier recommendation (★★★, ★★☆, or ★☆☆) at the right edge of each model button. The rating follows the purpose being selected; the shared Stage 1/2 selection uses the lower stage score. Models without a rating show “—”. Long model names wrap before the stars.

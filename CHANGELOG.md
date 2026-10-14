@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.131 (2026-10-14 / Build 1207)
+
 ### 2026-10-14 — Draw the fine and thick brushes' sweep as a flat brush
 
 Every mark of the fine and thick brushes had the shape of a round brush, tapered at its entry and its end. At the author's request, and without adding a surface word, a sweep of the fine or thick brush (lines, arcs and the passes of a closed shape) is now drawn with a flat brush. Its width is nearly even, its entry square, and its end runs dry and parts into bundles of bristles; inside it run streaks in the selected colour, only lighter or darker. The dry end runs one to two brush sizes (9 for the fine brush and 24 for the thick one per 1000 of the short side), whatever the length of the line or pass, and a line or pass shorter than twice that ends square. On curved lines and arcs the tip stays square to the direction of travel. The centerline is unchanged. Flat fills, pale ink, other tools and outlines are unchanged. Over three comparison sheets the author chose the hold, fewer and wider bundles for the fine brush, a shorter dry end on closed shapes, keeping the flat fill as it is, a dry end set by the brush's size, and a shorter dry end for the thick brush too. Render engine 77. Saved works are unchanged. A sweep's marks make the SVG larger (1.84 times in the author's sample, 2.58 times in an example of closed-shape sweeps).

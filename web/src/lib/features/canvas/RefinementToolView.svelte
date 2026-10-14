@@ -7,7 +7,7 @@
 	import type { RefinementSession } from '$lib/features/canvas/refinement-session.svelte';
 
 	// The work's touches changed (the author, 2026-10-14): every sentence on one
-	// tool, the default, or a tool drawn for each sentence. Placement, color and
+	// tool, the default, or a different tool for each sentence. Placement, color and
 	// ground stay the parent's.
 	type Props = {
 		isJapanese: boolean;
@@ -58,8 +58,8 @@
 				</section>
 				<section class="refine-action-section">
 					<div class="refine-actions refine-paint-actions">
-						<!-- The options are drawn when the dialog opens; each press adds
-						     four more in the chosen way. -->
+						<!-- Nothing is drawn until this is pressed; each press replaces the
+						     options shown with four new ones in the chosen way. -->
 						<div class="refine-action-wrap">
 							<PaintButton onclick={onGenerateCandidates} disabled={!resultAvailable || busy}>{t().variationGridDefault}</PaintButton>
 						</div>

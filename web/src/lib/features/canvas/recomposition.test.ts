@@ -254,7 +254,7 @@ test('a saved work opened beside an unfinished draft is refined from its own wor
 	}
 });
 
-test('a touch change adds four options in the chosen way and names what each sentence took', async () => {
+test('a touch change draws four options in the chosen way, replaces them on the next press, and names what each sentence took', async () => {
 	installOwnerRuneShim();
 	const host = globalThis as unknown as Record<string, unknown>;
 	const previousWindow = host.window;
@@ -288,6 +288,9 @@ test('a touch change adds four options in the chosen way and names what each sen
 		} as unknown as RefinementCoordinatorDeps);
 		assert.equal(session.toolMode, 'uniform');
 		await coordinator.generateToolCandidates();
+		assert.deepEqual(session.candidates.map((candidate) => [candidate.label, candidate.details, candidate.result.derivation_kind, candidate.result.derivation_metadata]), [
+			['チョーク', [], 'tool_change', { tool_mode: 'uniform', tools: { '0': 'chalk', '1': 'chalk' } }]
+		]);
 		session.setToolMode('per_sentence');
 		await coordinator.generateToolCandidates();
 		assert.deepEqual(requests.map(({ path, payload }) => [path, payload.mode, payload.tools ?? null]), [
@@ -296,11 +299,11 @@ test('a touch change adds four options in the chosen way and names what each sen
 			['/api/tool-variants/plan', 'per_sentence', null],
 			['/api/render-tool-variant', 'per_sentence', { '0': 'oil_paint', '1': 'pen' }]
 		]);
+		// The second press replaces the options shown.
 		assert.deepEqual(session.candidates.map((candidate) => [candidate.label, candidate.details, candidate.result.derivation_kind, candidate.result.derivation_metadata]), [
-			['チョーク', [], 'tool_change', { tool_mode: 'uniform', tools: { '0': 'chalk', '1': 'chalk' } }],
 			['文ごと 1', ['1: ペン → 油彩', '2: 油彩 → ペン'], 'tool_change', { tool_mode: 'per_sentence', tools: { '0': 'oil_paint', '1': 'pen' } }]
 		]);
-		assert.equal(session.candidates[1].result.ddl, 'retouched');
+		assert.equal(session.candidates[0].result.ddl, 'retouched');
 	} finally {
 		host.window = previousWindow;
 	}

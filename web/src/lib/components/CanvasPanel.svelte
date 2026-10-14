@@ -445,7 +445,6 @@
 		if (view === 'color') void onGenerateColorCatalogCandidates();
 		if (view === 'color-arrangement') void onGenerateColorArrangementCandidates();
 		if (view === 'ground') void onGenerateGroundCandidates();
-		if (view === 'tool') void onGenerateToolCandidates();
 	}
 
 	export async function openDirectActionMenu(): Promise<void> {
@@ -475,7 +474,6 @@
 		if (view === 'color') void onGenerateColorCatalogCandidates();
 		if (view === 'color-arrangement') void onGenerateColorArrangementCandidates();
 		if (view === 'ground') void onGenerateGroundCandidates();
-		if (view === 'tool') void onGenerateToolCandidates();
 	}
 
 	function openDirectEdit(node: LineageNode, mode: 'description' | 'sketch-grain'): void {

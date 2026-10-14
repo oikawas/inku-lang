@@ -71,7 +71,7 @@
 | 色カタログを変える | **Another catalog** | **lint 固定** | — |
 | 配色を変える | **Change the color arrangement** | 同じ色カタログの中で色の割当を変える独立した作品編集メニュー（2026-10-14 作者）。系譜の短札は **Color arrangement** | — |
 | 支持体を変える | **Change the ground** | 作品の支持体（歳時記のじ、英語のカテゴリ名 grounds）だけを、使っていない支持体に差し替える独立した作品編集メニュー（2026-10-14 作者）。系譜の短札は **Ground** | ~~support~~（じの英語は ground に揃える） |
-| てざわりを変える | **Change the touches** | 作品の文のてざわり（歳時記のてざわり、英語のカテゴリ名 touches）だけを別の筆記具に替える独立した作品編集メニュー（2026-10-14 作者）。選び方は「全文を揃える」**One touch for all**（既定）と「文ごとに引く」**Per sentence**。系譜の短札は **Touches**。2026-10-14 に削除した「タッチ」（Touch、`touch_change`）とは別の操作 | ~~tool~~（内部名 `tool_change` は Score の `weight` に合わせた名で、画面には出さない） |
+| てざわりを変える | **Change the touches** | 作品の文のてざわり（歳時記のてざわり、英語のカテゴリ名 touches）だけを別の筆記具に替える独立した作品編集メニュー（2026-10-14 作者）。選び方は「すべての文を同じ筆記具にする」**Same tool for every sentence**（既定）と「文ごとに違う筆記具にする」**A different tool for each sentence**（2026-10-14 作者の指摘で「全文を揃える」「文ごとに引く」から言い換えた）。系譜の短札は **Touches**。2026-10-14 に削除した「タッチ」（Touch、`touch_change`）とは別の操作 | ~~tool~~（内部名 `tool_change` は Score の `weight` に合わせた名で、画面には出さない） |
 | 変奏（旧） | **Variation (retired)** | 2026-10-04 に廃止した（作者裁定）。古い系譜の辺の札と、古い作品の生成情報の行にだけ使う。強度の Subtle／Moderate／Sweeping も廃止した | — |
 | 作品（新しい作品として保存） | **work** | 名詞。pipeline の variation（記述や設定を変えて保存する新しい単位）を画面で言う語（2026-10-04 作者裁定）。変奏とは言わない | ~~variation~~ |
 | 候補・案 | **option** / **candidate** | 名詞 | ~~variation~~（pipeline の variation と紛れる） |

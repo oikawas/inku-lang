@@ -313,12 +313,12 @@ Choosing, saving, and discarding options work as in 8.2.
 
 ### 8.6 Change the Touches
 
-Choose `Change the touches` in the work-editing menu to see four options with only the touches of the work's sentences (the saijiki's touches: twelve drawing tools such as silverpoint, pencil, pen, crayon, chalk, fine-brush and oil paint) replaced by other tools. A radio chooses the way:
+Choose `Change the touches` in the work-editing menu to open a dialog that replaces only the touches of the work's sentences (the saijiki's touches: twelve drawing tools such as silverpoint, pencil, pen, crayon, chalk, fine-brush and oil paint) with other tools. Opening it draws nothing. Choose a way with the radio and press `Make four options` to see four options:
 
-- `One touch for all` (the default): each option gives every sentence one tool, and is named after it.
-- `Per sentence`: each sentence draws a tool other than its own, and the option lists which sentence took which tool.
+- `Same tool for every sentence` (the default): each option gives every sentence one tool, and is named after it.
+- `A different tool for each sentence`: each sentence draws a tool other than its own, and the option lists which sentence took which tool.
 
-`Make four options` adds four more in the chosen way, so options made both ways can be compared. Placement, color, and ground stay the same, and no LLM is called. A saved option's instructions name the new touches; a sentence that named none (drawn with the pen) has the new word written before the shape's name.
+Pressing `Make four options` again discards the options shown and draws four new ones. Save an option you want to keep before pressing it again. Placement, color, and ground stay the same, and no LLM is called. A saved option's instructions name the new touches; a sentence that named none (drawn with the pen) has the new word written before the shape's name.
 
 Choosing, saving, and discarding options work as in 8.2.
 

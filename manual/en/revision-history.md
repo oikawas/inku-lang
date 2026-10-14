@@ -2,6 +2,13 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-14 — Change the touches: the ways and the options
+
+At the author's request, section 8.6 of Creating Images names the ways Same tool
+for every sentence and A different tool for each sentence, says that opening the
+dialog draws nothing, and that each press of Make four options replaces the
+options shown with four new ones.
+
 ## 2026-10-14 — Change the touches
 
 Section 8.6 of Creating Images now describes the work-editing menu's Change the

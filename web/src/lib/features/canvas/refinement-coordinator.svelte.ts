@@ -241,10 +241,10 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 	}
 
 	// Four touch changes of the work (the author, 2026-10-14): every sentence on
-	// one tool, or a tool drawn for each sentence. The Server draws the parent's
-	// Score with only the tools changed and writes the tool words into the
-	// instructions; a saved option is drawn again from the parent. The options
-	// are added to those already made, so the two ways can be compared.
+	// one tool, or a different tool for each sentence. The Server draws the
+	// parent's Score with only the tools changed and writes the tool words into
+	// the instructions; a saved option is drawn again from the parent. Nothing is
+	// drawn until the author asks, and each request replaces the options shown.
 	async function generateToolCandidates(): Promise<void> {
 		if (!work.result || refinementSession.gridBusy || work.loading) return;
 		const parent = work.result;
@@ -260,7 +260,6 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		const parentNodeId = deps.lineageParentId();
 		const { thinking } = refinementTarget();
 		const ja = getLang() === 'ja';
-		const earlier = refinementSession.candidates;
 		const controller = refinementSession.beginGrid({ includesReading: false, taskLabel: t().workActionTool, count: 4 });
 		const abortTimer = window.setTimeout(() => refinementSession.enableAbort(controller), 3000);
 		try {
@@ -307,7 +306,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				onStart: (index) => refinementSession.seatSlot(controller, index, 'running'),
 				onDone: (index) => { refinementSession.finishSlot(controller, index); }
 			});
-			refinementSession.commitCandidates(controller, [...earlier, ...candidates]);
+			refinementSession.commitCandidates(controller, candidates);
 		} catch (error) {
 			if (!controller.signal.aborted) refinementSession.failGrid(controller, error instanceof Error ? error.message : String(error));
 		} finally {

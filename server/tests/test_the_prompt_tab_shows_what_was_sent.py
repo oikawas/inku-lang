@@ -71,7 +71,9 @@ def _system_prompts(headers: dict[str, str], variation_id: str):
 
 
 def test_a_drawing_shows_the_stage_1_system_prompt_it_sent(author, sent):
-    painted = client.post("/api/paint", json={"description": "一滴の墨"}, headers=author)
+    painted = client.post("/api/paint", json={
+        "description": "一滴の墨", "stage1_model": "nvidia:poolside/laguna-xs-2.1",
+    }, headers=author)
     assert painted.status_code == 200, painted.text
 
     response = _system_prompts(author, painted.json()["pipeline_variation_id"])

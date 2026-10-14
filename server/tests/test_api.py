@@ -938,9 +938,12 @@ def test_retired_models_are_marked_eol_in_the_catalog():
     assert all(model.get("eol_date") for model in retired)
 
 
-def test_fetch_models_keeps_retired_models_as_eol(monkeypatch):
+def test_fetch_models_keeps_retired_models_as_eol(monkeypatch, request):
     """取得ボタンを押しても、過去の作品が参照するモデルの情報を落とさない。"""
     monkeypatch.setenv("INKU_DEVELOPER_MODE", "1")
+    # A failed assertion must not leave every other provider model retired for
+    # later tests on the same worker.
+    request.addfinalizer(lambda: db.update_model_settings(default_model_settings()))
     suffix = uuid.uuid4().hex[:8]
     group = db.add_user_group(f"fetch-models-{suffix}")
     admin = db.add_user(
@@ -970,15 +973,15 @@ def test_fetch_models_keeps_retired_models_as_eol(monkeypatch):
     # 提供が続くモデルは EOL 印が付かず、整えたラベルと評価が残る。
     assert models["google/gemma-4-31b-it"].get("eol") is not True
     assert models["google/gemma-4-31b-it"]["label"] == "Google Gemma 4 31B Instruct"
-    assert models["google/gemma-4-31b-it"]["recommendation_llm"] == 4
+    assert models["google/gemma-4-31b-it"]["unsupported_purposes"] == ["llm", "vision"]
+    assert "recommendation_llm" not in models["google/gemma-4-31b-it"]
+    assert "504" in models["google/gemma-4-31b-it"]["comment_ja"]
     # 提供が消えたモデルは一覧から消えず、EOL として日付付きで残る。
     retired = models["mistralai/mistral-medium-3.5-128b"]
     assert retired["eol"] is True
     assert retired["eol_date"]
     assert retired["comment_ja"]
 
-    # 共有 DB を元の一覧へ戻す（他テストがカタログ件数を前提にしているため）。
-    db.update_model_settings(default_model_settings())
     db.delete_session(admin_token)
     db.delete_user(admin["id"])
     db.delete_user_group(group["id"])
@@ -2426,18 +2429,21 @@ def test_verified_nvidia_model_metadata_and_purpose_catalogs():
     assert len(nvidia_models) == 44
 
     gemma = next(model for model in nvidia_models if model["id"] == "google/gemma-4-31b-it")
-    assert gemma["purposes"] == ["llm", "vision"]
-    # v1.98: 推奨度は用途ごと。旧 recommendation_level は用途別の値が無いときだけ読む。
-    assert gemma["recommendation_llm"] == 4
-    assert gemma["recommendation_vision"] == 5
-    assert gemma["speed_class"] == "medium"
-    assert gemma["speed_label"] == "昼 221s / 夕 114s / 深夜 199s"
-    assert "スキーマ違反なし" in gemma["comment_ja"]
+    assert gemma["purposes"] == []
+    assert gemma["unsupported_purposes"] == ["llm", "vision"]
+    assert "recommendation_llm" not in gemma
+    assert "recommendation_vision" not in gemma
+    assert "504" in gemma["comment_ja"]
+    laguna = next(model for model in nvidia_models if model["id"] == "poolside/laguna-xs-2.1")
+    assert laguna["purposes"] == ["llm"]
+    assert laguna["recommendation_llm"] == 3
+    assert laguna["speed_llm_seconds"] == 122.5
 
     llm_nvidia = next(provider for provider in model_provider_catalog(settings, purpose="llm") if provider["id"] == "nvidia")
     vision_nvidia = next(provider for provider in model_provider_catalog(settings, purpose="vision") if provider["id"] == "nvidia")
-    assert len(llm_nvidia["models"]) == 40
-    assert len(vision_nvidia["models"]) == 10
+    assert len(llm_nvidia["models"]) == 35
+    assert len(vision_nvidia["models"]) == 9
+    assert all(model["id"] != gemma["id"] for model in llm_nvidia["models"] + vision_nvidia["models"])
 
     normalized = normalize_model_settings({
         "model_catalog_version": settings["model_catalog_version"],
@@ -2460,11 +2466,11 @@ def test_verified_nvidia_model_metadata_and_purpose_catalogs():
     assert len(normalized_models) == 44
     overridden = next(model for model in normalized_models if model["id"] == "google/gemma-4-31b-it")
     assert overridden["label"] == "Gemma custom label"
-    assert overridden["purposes"] == ["vision"]
-    # 上書きは vision 側だけに効く。LLM 側は組み込みカタログの値が残るが、purposes が
-    # vision のみなので LLM の一覧には出ない。
+    # An administrator's assessment is retained, but cannot offer a purpose
+    # that the measured canonical catalog marks unsupported.
+    assert overridden["purposes"] == []
     assert overridden["recommendation_vision"] == 2
-    assert overridden["recommendation_llm"] == 4
+    assert "recommendation_llm" not in overridden
     assert overridden["speed_label"] == "再計測 約30秒"
     assert overridden["comment_en"] == "Administrator override"
 
@@ -2481,9 +2487,10 @@ def test_verified_nvidia_model_metadata_and_purpose_catalogs():
     })
     legacy_gemma = next(model for model in legacy["providers"]["nvidia"]["models"] if model["id"] == "google/gemma-4-31b-it")
     assert legacy_gemma["label"] == "Legacy stored label"
-    assert legacy_gemma["purposes"] == ["llm", "vision"]
-    assert legacy_gemma["recommendation_llm"] == 4
-    assert legacy_gemma["speed_label"] == "昼 221s / 夕 114s / 深夜 199s"
+    assert legacy_gemma["purposes"] == []
+    assert legacy_gemma["unsupported_purposes"] == ["llm", "vision"]
+    assert "recommendation_llm" not in legacy_gemma
+    assert "speed_label" not in legacy_gemma
 
 
 def test_model_settings_store_keys_server_side(monkeypatch):
@@ -2552,8 +2559,8 @@ def test_model_settings_store_keys_server_side(monkeypatch):
     assert all(model["id"] != "gpt-5.6-luna" for model in openai_catalog["models"])
     nvidia_llm = next(provider for provider in public_models.json()["llm_catalog"] if provider["id"] == "nvidia")
     nvidia_vision = next(provider for provider in public_models.json()["vision_catalog"] if provider["id"] == "nvidia")
-    assert len(nvidia_llm["models"]) == 40
-    assert len(nvidia_vision["models"]) == 10
+    assert len(nvidia_llm["models"]) == 35
+    assert len(nvidia_vision["models"]) == 9
     assert all("llm" in model["purposes"] for model in nvidia_llm["models"])
     assert all("vision" in model["purposes"] for model in nvidia_vision["models"])
 

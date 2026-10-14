@@ -44,11 +44,11 @@ def test_a_member_cannot_name_a_model_no_provider_offers(monkeypatch) -> None:
 
 
 def test_switching_a_model_off_withholds_it_and_developer_mode_does_not() -> None:
-    # The built-in Stage default sits with a provider only developer mode shows.
+    # This measured drawing model sits with a provider only developer mode shows.
     settings = default_model_settings()
-    assert model_is_offered("nvidia", "google/gemma-4-31b-it", settings, purpose="llm")
+    assert model_is_offered("nvidia", "poolside/laguna-xs-2.1", settings, purpose="llm")
 
     switched_off = update_model_settings(
-        settings, {"providers": {"nvidia": {"enabled_models": {"google/gemma-4-31b-it": False}}}}
+        settings, {"providers": {"nvidia": {"enabled_models": {"poolside/laguna-xs-2.1": False}}}}
     )
-    assert not model_is_offered("nvidia", "google/gemma-4-31b-it", switched_off, purpose="llm")
+    assert not model_is_offered("nvidia", "poolside/laguna-xs-2.1", switched_off, purpose="llm")

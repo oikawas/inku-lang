@@ -197,7 +197,8 @@ def test_bundled_macro_enters_new_work_with_localized_summary_and_saved_lock(tmp
     effects = ProductPipelineEffects(binding, default_manifest(binding))
     source = "Nature.青葉。"
     config, context = effects.prepare("author", "direct_ddl", source,
-        {"instruction_lang": "ja", "catalog_id": "default", "composition_seed": 17, "render_seed": 77}, None)
+        {"instruction_lang": "ja", "catalog_id": "default", "composition_seed": 17, "render_seed": 77,
+         "stage1_model": "nvidia:poolside/laguna-xs-2.1"}, None)
     assert len(config["definitions"]) == 7
     assert config["language"] == "ja"
     assert any("青葉" in summary for summary in config["macro_summaries"])
@@ -390,7 +391,8 @@ def test_an_issued_render_seed_survives_a_javascript_number(tmp_path, monkeypatc
     monkeypatch.setattr(secrets, "randbits", lambda bits: (1 << bits) - 1)
     effects = ProductPipelineEffects(binding, default_manifest(binding))
     _config, context = effects.prepare("author", "direct_ddl", "Nature.青葉。",
-                                       {"instruction_lang": "ja", "catalog_id": "default"}, None)
+                                       {"instruction_lang": "ja", "catalog_id": "default",
+                                        "stage1_model": "nvidia:poolside/laguna-xs-2.1"}, None)
     assert context["host_options"]["render_seed"] == str(2**53 - 1)
     engine.dispose()
 
@@ -462,7 +464,8 @@ def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkey
         "score": {}, "svg": "<svg id='old-parent'/>",
     })
     options, context = effects.prepare("author", "direct_ddl", source,
-                                       {"canvas_aspect": "hd_monitor", "render_seed": "71"}, None)
+                                       {"canvas_aspect": "hd_monitor", "render_seed": "71",
+                                        "stage1_model": "nvidia:poolside/laguna-xs-2.1"}, None)
     context.update(description="Old description", committed_description="Old description",
                    derivation_kind="legacy_ddl_fork", parent_legacy_history_id=legacy_parent["id"])
     assert options["definitions"][0]["heading"] == "Circle"

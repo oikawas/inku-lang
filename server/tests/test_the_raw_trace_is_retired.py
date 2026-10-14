@@ -39,7 +39,8 @@ def auth():
 def test_an_older_client_asking_for_the_trace_is_drawn_without_one(auth):
     composed = client.post(
         "/api/compose",
-        json={"ddl": "中心に黒い円を置く。", "include_trace": True},
+        json={"ddl": "中心に黒い円を置く。", "include_trace": True,
+              "model": "nvidia:poolside/laguna-xs-2.1"},
         headers=auth,
     )
     assert composed.status_code == 200, composed.text

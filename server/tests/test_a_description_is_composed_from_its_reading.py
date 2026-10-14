@@ -94,7 +94,9 @@ def test_a_description_is_composed_from_its_reading(author, sent):
     assert table.status_code == 200, table.text
     assert table.json()["schema"] == "inku.composition-ranges.v1"
     assert len(table.json()["ranges"]) == 32
-    painted = client.post("/api/paint", json={"description": DESCRIPTION}, headers=author)
+    painted = client.post("/api/paint", json={
+        "description": DESCRIPTION, "stage1_model": "nvidia:poolside/laguna-xs-2.1",
+    }, headers=author)
     assert painted.status_code == 200, painted.text
     assert [action["tag"] for action in sent] == ["generate_normalized_ddl", "read_composition"]
     reading = sent[1]["payload"]["prompt"]

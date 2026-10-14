@@ -20,16 +20,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import app.inku.mobile.data.CatalogModel
 import app.inku.mobile.data.ModelCatalog
 import app.inku.mobile.ui.i18n.InkuStrings
+import app.inku.mobile.ui.theme.Dimens
 import java.util.Locale
 
 /** Used by both the publication picker and the drawing model chooser. */
 @Composable
 internal fun ModelCatalogDetails(model: CatalogModel, strings: InkuStrings) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.testTag("CatalogDetails:${model.id}")) {
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.modelCatalogDetailsGap), modifier = Modifier.testTag("CatalogDetails:${model.id}")) {
         model.labels.forEach { label ->
             Text(label.name(strings.code == "en"), style = MaterialTheme.typography.labelSmall,
                 color = if (label.publishable) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error)
@@ -66,14 +66,14 @@ internal fun ModelCatalogRows(
 ) {
     var expanded by remember(catalog) { mutableStateOf(emptySet<String>()) }
     val grouped = models.groupBy { it.fold }
-    LazyColumn(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    LazyColumn(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
         fun androidx.compose.foundation.lazy.LazyListScope.rows(rows: List<CatalogModel>) {
             items(rows, key = { "model:${it.id}" }) { model ->
                 Column {
                     val checked = model.id in selected
                     val selectable = enabled && model.publishable && (offeredForSelection == null || model.id in offeredForSelection)
                     Row(modifier = Modifier.fillMaxWidth().testTag("CatalogRow:${model.id}")
-                        .clickable(enabled = selectable) { onSelect(model.id, !checked) }.padding(vertical = 4.dp),
+                        .clickable(enabled = selectable) { onSelect(model.id, !checked) }.padding(vertical = Dimens.spaceXs),
                         verticalAlignment = Alignment.Top) {
                         Checkbox(checked = checked, enabled = selectable,
                             onCheckedChange = { onSelect(model.id, it) }, modifier = Modifier.testTag("CatalogSelect:${model.id}"))

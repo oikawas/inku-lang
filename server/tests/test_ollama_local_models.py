@@ -221,8 +221,11 @@ def test_nvidia_fills_a_bare_stored_entry_from_the_catalog() -> None:
         },
     })
     by_id = {str(m["id"]): m for m in settings["providers"]["nvidia"]["models"]}
-    assert by_id["google/gemma-4-31b-it"]["recommendation_llm"] == 4
-    assert "Vision 再現率 1.00" in str(by_id["google/gemma-4-31b-it"]["comment_ja"])
+    gemma = by_id["google/gemma-4-31b-it"]
+    assert gemma["purposes"] == []
+    assert gemma["unsupported_purposes"] == ["llm", "vision"]
+    assert "recommendation_llm" not in gemma
+    assert "504" in str(gemma["comment_ja"])
 
 
 def test_nvidia_still_keeps_builtin_models_the_stored_list_dropped() -> None:
@@ -307,7 +310,7 @@ def test_the_cloud_hides_its_timings_too() -> None:
         for provider in model_provider_catalog(None, include_developer=True)
     }
     nvidia = {str(m["id"]): m for m in developer["nvidia"]["models"]}
-    assert nvidia["google/gemma-4-31b-it"]["speed_label"] == "昼 221s / 夕 114s / 深夜 199s"
+    assert nvidia["poolside/laguna-xs-2.1"]["speed_llm_seconds"] == 122.5
 
 
 def test_hiding_speed_does_not_touch_what_is_stored() -> None:

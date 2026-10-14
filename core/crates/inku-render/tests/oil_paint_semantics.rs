@@ -2,7 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use inku_render::render::render;
 use inku_render::stroke::{
-    ContourStrokeRequest, StrokeRequest, StrokeTerminal, synthesize_contour, synthesize_stroke,
+    ContourStrokeRequest, StrokeRequest, StrokeTerminal, latent_energy, synthesize_contour,
+    synthesize_stroke,
 };
 use inku_render::support::DEFAULT_SUPPORT;
 use inku_render::types::{
@@ -87,6 +88,53 @@ fn oil_fill_passes_take_no_hand_events_and_oil_lines_keep_them() {
             oil_fill.samples.iter().all(|sample| sample.event.is_none()),
             "seed {seed}"
         );
+    }
+}
+
+#[test]
+fn a_short_oil_fill_pass_draws_its_noise_against_the_brush_size() {
+    // A short pass meets only part of the wave, so its marks no longer turn
+    // into a jagged line once the fill widens them (render engine 79).
+    let width = 24.0;
+    let anchors = BTreeSet::new();
+    for widths in [1.5, 4.0, 12.0] {
+        let length = width * widths;
+        let centerline = (0..17)
+            .map(|index| Point::new(f64::from(index) * length / 16.0, 0.0))
+            .collect::<Vec<_>>();
+        let pass = |terminal| {
+            synthesize_contour(ContourStrokeRequest {
+                centerline: &centerline,
+                base_width: width,
+                weight: Weight::OilPaint,
+                seed: 431,
+                closed: false,
+                anchors: &anchors,
+                grid_step: 0.0,
+                wild: false,
+                support: DEFAULT_SUPPORT,
+                terminal,
+            })
+        };
+        // Eight pass widths are the span of the wave; a longer pass keeps it whole.
+        let scale = (widths / 8.0_f64).min(1.0);
+        for sample in pass(StrokeTerminal::Loaded).samples {
+            let expected = latent_energy(sample.t * scale, 431);
+            assert!(
+                (sample.energy - expected).abs() < 1.0e-12,
+                "{widths} {}",
+                sample.t
+            );
+        }
+        // An oil line keeps drawing the wave along its own length.
+        for sample in pass(StrokeTerminal::Taper).samples {
+            let expected = latent_energy(sample.t, 431);
+            assert!(
+                (sample.energy - expected).abs() < 1.0e-12,
+                "{widths} {}",
+                sample.t
+            );
+        }
     }
 }
 

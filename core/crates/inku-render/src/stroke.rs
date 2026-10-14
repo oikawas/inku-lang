@@ -697,6 +697,11 @@ pub fn synthesize_stroke(request: StrokeRequest) -> StrokeResult {
     }
 }
 
+/// Pass widths over which an oil fill pass draws its latent energy. A pass
+/// shorter than this meets only part of the wave, so the noise follows the
+/// brush's size rather than the pass's own length (render engine 79).
+const OIL_FILL_NOISE_SPAN: f64 = 8.0;
+
 /// Synthesize one performed stroke along an arbitrary intended centerline.
 #[must_use]
 pub fn synthesize_contour(request: ContourStrokeRequest<'_>) -> ContourStrokeResult {
@@ -751,6 +756,17 @@ pub fn synthesize_contour(request: ContourStrokeRequest<'_>) -> ContourStrokeRes
         event_map(seed, grammar.event_rate, count)
     };
     let mut noise = StrokeNoise::new(seed);
+    // A short oil fill pass would pack every octave of the wave into a few
+    // samples; widened threefold, its marks turned into a jagged line.
+    let noise_scale = if terminal == StrokeTerminal::Loaded && weight == Weight::OilPaint {
+        let length = centerline
+            .windows(2)
+            .map(|pair| (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y))
+            .sum::<f64>();
+        (length / (OIL_FILL_NOISE_SPAN * base_width)).min(1.0)
+    } else {
+        1.0
+    };
     let mut gesture_amplitude = 0.0;
     if wild && !grammar.periodic {
         let total_length = centerline
@@ -800,9 +816,12 @@ pub fn synthesize_contour(request: ContourStrokeRequest<'_>) -> ContourStrokeRes
                 if closed { 1.0 } else { machine_swell(t) },
             )
         } else if closed {
-            (noise.latent_energy(t), noise.swell(t))
+            (noise.latent_energy(t * noise_scale), noise.swell(t))
         } else {
-            (noise.latent_energy(t), edge_window(t) * noise.swell(t))
+            (
+                noise.latent_energy(t * noise_scale),
+                edge_window(t) * noise.swell(t),
+            )
         };
         let mut lateral = energy * grammar.energy_lateral * base_width * (0.18 + 0.82 * envelope);
         let mut event = events.get(&index).copied();

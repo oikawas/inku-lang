@@ -129,6 +129,7 @@ test('connected guide leads to personal model settings with explicit publication
 
 	const adminSource = ts.transpileModule(readFileSync(new URL('./model-administration.svelte.ts', import.meta.url), 'utf8')
 		.replace("import { t } from '$lib/i18n/index.svelte';", `import { ja } from ${JSON.stringify(new URL('../../i18n/ja.ts', import.meta.url).href)}; const t = () => ja;`)
+		.replace(/(['"])\$lib\/modelMeta\1/g, JSON.stringify(new URL('../../modelMeta.ts', import.meta.url).href))
 		.replace(/(['"])\$lib\/models\1/g, JSON.stringify(new URL('../../models.ts', import.meta.url).href)), {
 		compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext }
 	}).outputText;
@@ -147,8 +148,8 @@ test('connected guide leads to personal model settings with explicit publication
 				if (init?.method === 'PUT') {
 					const body = JSON.parse(String(init.body));
 					// A ChatGPT assessment is shared model settings, saved whole for the model that changed.
-					if (body.chatgpt_models) {
-						assert.deepEqual(body, { chatgpt_models: [{ id: 'second-slug', label: 'First offered', recommendation_vision: 3, comment_ja: '共通の評価' }] });
+					if (body.providers?.chatgpt) {
+						assert.deepEqual(body, { providers: { chatgpt: { models: [{ id: 'second-slug', label: 'First offered', recommendation_vision: 3, comment_ja: '共通の評価' }] } } });
 						return response({ catalog: [], settings: { providers: {} } });
 					}
 					assert.deepEqual(Object.keys(body.providers), ['openai']);

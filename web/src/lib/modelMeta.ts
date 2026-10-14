@@ -78,13 +78,22 @@ export function recommendationTier(level: number): number {
 	return level >= 4 ? 3 : level >= 3 ? 2 : level >= 1 ? 1 : 0;
 }
 
+export function modelRecommendationStars(
+	model: ModelOption,
+	purpose?: ModelPurpose,
+	stage?: ModelStage
+): string {
+	const tier = recommendationTier(modelRecommendationLevel(model, purpose, stage));
+	return tier > 0 ? `${'★'.repeat(tier)}${'☆'.repeat(3 - tier)}` : '—';
+}
+
 export function modelRecommendation(
 	model: ModelOption,
 	purpose?: ModelPurpose,
 	stage?: ModelStage
 ): string {
 	const tier = recommendationTier(modelRecommendationLevel(model, purpose, stage));
-	return tier > 0 ? `${'★'.repeat(tier)}${'☆'.repeat(3 - tier)} (${tier}/3)` : '—';
+	return tier > 0 ? `${modelRecommendationStars(model, purpose, stage)} (${tier}/3)` : '—';
 }
 
 /**

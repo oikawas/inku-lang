@@ -2,7 +2,7 @@
 	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { pickerSelection, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
-	import { modelRecommendation, modelSpeed, modelCost, modelComment, modelStatusLabel, modelStatusParts, isModelUnselectable, sortModels, type ModelPurpose } from '$lib/modelMeta';
+	import { modelRecommendation, modelRecommendationStars, modelSpeed, modelCost, modelComment, modelStatusLabel, modelStatusParts, isModelUnselectable, sortModels, type ModelPurpose } from '$lib/modelMeta';
 	import { openFloatingCard } from '$lib/floatingCard';
 	import ModelPurposeBadges from './ModelPurposeBadges.svelte';
 
@@ -99,7 +99,11 @@
 				<section><h3>{group.id === 'chatgpt' ? t().chatgptPlanLabel : group.label}</h3><div class="model-grid">
 					{#each sortModels(group.models, purpose) as model (model.id)}
 						<button type="button" class:selected={selected?.group.id === group.id && selected?.model.id === model.id} class:eol={model.eol} class:unselectable={isModelUnselectable(model)} disabled={isModelUnselectable(model)} onpointerenter={positionMeta} onfocus={positionMeta} onclick={() => choose(group.id, model.id)}>
-							<strong>{model.label}</strong>{#if modelStatusLabel(model, isJapanese)}<small class="model-label-mark">{#each modelStatusParts(model, isJapanese) as part, partIndex (partIndex)}{#if partIndex > 0}{' · '}{/if}<span class:eol-mark={part.blocking}>{part.text}</span>{/each}</small>{/if}{#if model.notes}<small>{model.notes}</small>{/if}
+							<div class="model-button-heading">
+								<strong>{model.label}</strong>
+								<span class="model-recommendation" aria-label={`${t().settingsModelRecommendationFields[purpose === 'vision' ? 'recommendation_vision' : 'recommendation_llm']} ${modelRecommendation(model, purpose)}`}>{modelRecommendationStars(model, purpose)}</span>
+							</div>
+							{#if modelStatusLabel(model, isJapanese)}<small class="model-label-mark">{#each modelStatusParts(model, isJapanese) as part, partIndex (partIndex)}{#if partIndex > 0}{' · '}{/if}<span class:eol-mark={part.blocking}>{part.text}</span>{/each}</small>{/if}{#if model.notes}<small>{model.notes}</small>{/if}
 							<span class="metadata" role="tooltip">
 								{#if modelStatusLabel(model, isJapanese)}<span><b>状態 / Status</b><span class="status-muted">{#each modelStatusParts(model, isJapanese) as part, partIndex (partIndex)}{#if partIndex > 0}{' · '}{/if}<span class:status-warning={part.blocking}>{part.text}</span>{/each}</span></span>{/if}
 								<span><b>用途 / Use</b><ModelPurposeBadges {model} {isJapanese} /></span>
@@ -154,7 +158,9 @@
 	.model-grid > button { position: relative; display: grid; gap: 3px; min-width: 0; padding: 9px 10px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--fg2); text-align: left; cursor: pointer; font: inherit; }
 	.model-grid > button:hover { border-color: var(--accent); background: var(--bg2); }
 	.model-grid > button.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-light); color: var(--fg); }
-	.model-grid > button > strong { font-size: var(--ui-font-size-12); font-weight: 500; overflow-wrap: anywhere; }
+	.model-button-heading { display: flex; align-items: baseline; gap: 8px; width: 100%; min-width: 0; }
+	.model-button-heading strong { flex: 1 1 auto; min-width: 0; font-size: var(--ui-font-size-12); font-weight: 500; overflow-wrap: anywhere; }
+	.model-recommendation { flex: 0 0 auto; font-size: var(--ui-font-size-11); white-space: nowrap; }
 	.model-grid > button > small { color: var(--fg3); font-size: var(--ui-font-size-10); }
 	.metadata { display: none; position: fixed; left: 0; top: 0; z-index: 1610; width: min(340px, 75vw); box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--tooltip-border); border-radius: var(--r); background: var(--tooltip-bg); box-shadow: var(--tooltip-shadow); pointer-events: none; }
 	.model-grid > button:hover .metadata, .model-grid > button:focus-visible .metadata { display: grid; gap: 6px; }

@@ -66,11 +66,11 @@
   // null = inherit the parent work's setting (field omitted).
   let wildOverride = $state<boolean | null>(null);
   const parentWild = $derived(node.history?.render_wild === true);
-  // A work its edited DDL holds is not read again from its description: no
-  // reading generations and no Vision (its direction is added to the words);
-  // every generation is drawn from the parent's DDL.
+  // A work its edited DDL holds is not read again from its description. Every
+  // generation of any work is drawn from the parent's DDL, and Vision's advice
+  // only picks the element, so Vision is offered here too (the author, 2026-10-14).
   const held = $derived(node.history?.description_locked === true);
-  const mode = $derived<RefineMode>(held ? 'random' : refineMode);
+  const mode = $derived<RefineMode>(refineMode);
 
   $effect(() => { if (!selectedVisionModel) selectedVisionModel = visionModel; });
 
@@ -253,7 +253,7 @@
         </RunStatus>
       {:else}
         {#if held}<p class="held-note">{t().aiRefineHeldNote}</p>{/if}
-        <fieldset class="mode-choice"><legend>{t().aiRefineModeLabel}</legend><label><input type="radio" name="ai-refine-mode" value="random" checked={mode === 'random'} onchange={() => (refineMode = 'random')} /><span><b>{t().aiRefineRandomMode}</b><small>{t().aiRefineRandomModeHint}</small></span></label><label class:held title={held ? t().descriptionLockedReason : undefined}><input type="radio" name="ai-refine-mode" value="vision" checked={mode === 'vision'} disabled={held} onchange={() => (refineMode = 'vision')} /><span><b>{t().aiRefineVisionMode}</b><small>{t().aiRefineVisionModeHint}</small></span></label></fieldset>
+        <fieldset class="mode-choice"><legend>{t().aiRefineModeLabel}</legend><label><input type="radio" name="ai-refine-mode" value="random" checked={mode === 'random'} onchange={() => (refineMode = 'random')} /><span><b>{t().aiRefineRandomMode}</b><small>{t().aiRefineRandomModeHint}</small></span></label><label><input type="radio" name="ai-refine-mode" value="vision" checked={mode === 'vision'} onchange={() => (refineMode = 'vision')} /><span><b>{t().aiRefineVisionMode}</b><small>{t().aiRefineVisionModeHint}</small></span></label></fieldset>
         {#if mode === 'vision'}<ModelCardPicker label={t().aiRefineVisionModel} selectedModel={selectedVisionModel} providerGroups={visionProviderGroups} purpose="vision" onSelect={(provider: Provider, model: string) => { selectedVisionModel = qualifiedModelId(provider, model); void onSaveVisionModel(provider, model); }} />{/if}
         {#if mode === 'vision'}<div class="form-group"><label for="ai-direction">{t().aiRefineDirectionLabel}</label><textarea id="ai-direction" placeholder={t().aiRefineDirectionPlaceholder} bind:value={prompt} maxlength="160" rows="2"></textarea></div>{/if}
         <div class="form-row"><div class="form-group wild-group"><span class="wild-group-label">&nbsp;</span><WildToggle value={wildOverride ?? parentWild} {isJapanese} inherited={wildOverride === null} onSelect={(next) => (wildOverride = next)} /></div><div class="form-group select-generations"><label for="ai-gens">{t().aiRefineGensLabel}</label><div class="gen-stepper"><button type="button" aria-label="−" onclick={() => (generations = Math.max(1, generations - 1))} disabled={generations <= 1}>−</button><span id="ai-gens" class="gen-value">{generations}</span><button type="button" aria-label="＋" onclick={() => (generations = Math.min(10, generations + 1))} disabled={generations >= 10}>＋</button></div></div></div>
@@ -273,7 +273,6 @@
   .close-btn { border:0; background:transparent; color:var(--fg3); font-size:1.4rem; cursor:pointer; padding:0 4px; }
   .modal-body { padding:18px; min-height:200px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; max-height:68vh; }
   .held-note { margin:0; padding:8px 10px; border:1px solid var(--border); border-radius:var(--r); background:var(--bg2); color:var(--fg2); font-size:.78rem; line-height:1.55; }
-  label.held { opacity:.5; cursor:not-allowed; }
   .mode-choice { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:0; padding:0; border:0; } .mode-choice legend { margin-bottom:6px; color:var(--fg3); font-size:.76rem; font-weight:500; }
   .mode-choice label { display:flex; align-items:flex-start; gap:8px; padding:10px; border:1px solid var(--border2); border-radius:8px; background:var(--bg2); cursor:pointer; } .mode-choice input { margin-top:2px; accent-color:var(--accent); } .mode-choice span { display:grid; gap:3px; } .mode-choice b { font-size:.78rem; } .mode-choice small { color:var(--fg3); font-size:.68rem; line-height:1.35; }
   .form-group { display:flex; flex-direction:column; gap:6px; } .form-group label { font-size:.76rem; color:var(--fg3); font-weight:500; }

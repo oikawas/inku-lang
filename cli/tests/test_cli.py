@@ -452,20 +452,12 @@ def test_the_drawing_commands_have_no_description_flag(command):
     assert "--description" not in _all_option_strings(_subparser(command))
 
 
-def test_refine_perform_keeps_its_own_description_flag():
-    """同じ綴りの別定義。**巻き込んで消していないことの表明。**
-
-    `refine perform --description` は既存作品の記述を上書きして描き直す旗で、
-    出自を後から貼る旗ではない。読み手は `command_refine` の payload。
-    """
-    flags = _all_option_strings(_subparser("refine"))
-    assert "--description" in flags
-    action = next(
-        item
-        for item in _subparser("refine")._subparsers._group_actions[0].choices["perform"]._actions
-        if "--description" in (item.option_strings or [])
-    )
-    assert "override" in (action.help or "")
+def test_refine_perform_has_no_description_flag():
+    """Both kinds draw from the parent's saved DDL (the author, 2026-10-14), so
+    there is no description to override: `--description` went with the redraw."""
+    parser = cli.build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["refine", "perform", "work-1", "--kind", "layout", "--description", "夏の野"])
 
 
 def _all_help_strings(parser) -> list[str]:
@@ -1643,32 +1635,46 @@ def test_no_warning_when_resvg_is_present(tmp_path, monkeypatch, capsys):
 
     assert capsys.readouterr().err == ""
 
-def test_refine_perform_replaces_generate_but_keeps_the_legacy_spelling(monkeypatch):
-    """`perform` is public; `generate` remains parseable without appearing in help."""
-    calls = []
+REFINE_PARENT = {
+    "id": "work-1",
+    "lineage_node_id": "node-1",
+    "source_text": "a small black circle",
+    "ddl": "小さな黒い円を中央に置く。",
+    "score": {"version": "0.10", "marks": []},
+    "render_seed": 1,
+    "composition_seed": 2,
+    "render_color_catalog_id": "default",
+    "render_canvas_aspect_id": "square",
+}
 
+
+def _refine_client(calls, parent):
     class FakeClient:
         def __init__(self, *args, **kwargs):
             pass
 
         def request(self, method, path, *, data=None, **kwargs):
             calls.append((method, path, data))
-            if method == "GET":
-                return {
-                    "items": [
-                        {
-                            "id": "work-1",
-                            "lineage_node_id": "node-1",
-                            "source_text": "a small black circle",
-                            "render_seed": 1,
-                            "composition_seed": 2,
-                            "interpretation_seed": "seed",
-                            "render_color_catalog_id": "default",
-                        }
-                    ]
-                }, None
-            return {"svg": "<svg />", "render_hash_short": "ABCD"}, None
+            if path == "/api/history" and method == "GET":
+                return {"items": [parent]}, None
+            if path == "/api/color-catalogs":
+                return {"default_catalog_id": "default",
+                        "catalogs": [{"id": "default"}, {"id": "ink_season"}]}, None
+            if path == "/api/history":
+                return {"id": "child-1", "lineage_node_id": "node-2"}, None
+            return {"svg": "<svg />", "score": {"version": "0.10"}, "render_hash_short": "ABCD"}, None
 
+    return FakeClient
+
+
+def _posted(calls, path):
+    return [data for method, p, data in calls if method == "POST" and p == path]
+
+
+def test_refine_perform_replaces_generate_but_keeps_the_legacy_spelling(monkeypatch):
+    """`perform` is public; `generate` remains parseable without appearing in help."""
+    calls = []
+    FakeClient = _refine_client(calls, dict(REFINE_PARENT))
     monkeypatch.setattr(cli, "ApiClient", FakeClient)
     monkeypatch.setattr(cli, "_print_json", lambda data: None)
     parser = cli.build_parser()
@@ -1680,9 +1686,9 @@ def test_refine_perform_replaces_generate_but_keeps_the_legacy_spelling(monkeypa
     assert cli.command_refine(public) == 0
     assert cli.command_refine(legacy) == 0
 
-    posted = [data for method, path, data in calls if method == "POST" and path == "/api/paint"]
+    posted = _posted(calls, "/api/render-score")
     assert len(posted) == 2
-    assert posted[0] == posted[1]
+    assert posted[0] == posted[1]   # one other catalog, so both draw it
 
     refine = next(
         action.choices["refine"]
@@ -1694,56 +1700,44 @@ def test_refine_perform_replaces_generate_but_keeps_the_legacy_spelling(monkeypa
     assert "generate" not in help_text
 
 
-def test_refine_color_asks_the_server_to_draw_a_different_catalog(monkeypatch):
-    """The payload key is the whole feature here.
+def test_refine_draws_from_the_parent_s_saved_instructions(monkeypatch):
+    """Neither kind reads the description again (the author, 2026-10-14).
 
-    `/api/paint` ignores fields it does not declare, so a stale key name is
-    accepted with a 200 and silently leaves `catalog_mode` at "fixed" -- the
-    refinement then redraws the same catalog it started from. Asserting the exit
-    code or the response cannot see that, so read the key the CLI actually sent.
+    `refine` used to send both kinds to `/api/paint`, where Stage 1 read the
+    description again and wrote new instructions. A color now draws the
+    parent's saved Score in another catalog, and a layout chooses the saved
+    DDL's ranges again under a new composition seed, as the web does.
     """
     calls = []
-
-    class FakeClient:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def request(self, method, path, *, data=None, **kwargs):
-            calls.append((method, path, data))
-            if method == "GET":
-                return {
-                    "items": [
-                        {
-                            "id": "work-1",
-                            "lineage_node_id": "node-1",
-                            "source_text": "a small black circle",
-                            "render_seed": 1,
-                            "composition_seed": 2,
-                            "interpretation_seed": "seed",
-                            "render_color_catalog_id": "ink_season",
-                        }
-                    ]
-                }, None
-            return {"svg": "<svg />", "render_hash_short": "ABCD"}, None
-
-    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    monkeypatch.setattr(cli, "ApiClient", _refine_client(calls, dict(REFINE_PARENT)))
     monkeypatch.setattr(cli, "_print_json", lambda data: None)
     parser = cli.build_parser()
+
     assert cli.command_refine(parser.parse_args(["refine", "perform", "work-1", "--kind", "color"])) == 0
+    assert _posted(calls, "/api/paint") == []
+    [color] = _posted(calls, "/api/render-score")
+    assert color["score"] == REFINE_PARENT["score"] and color["ddl"] == REFINE_PARENT["ddl"]
+    assert color["catalog_id"] == "ink_season"
+    assert (color["render_seed"], color["composition_seed"]) == (1, 2)
+    [saved] = _posted(calls, "/api/history")
+    assert saved["derivation_kind"] == "catalog_change" and saved["lineage_parent_node_id"] == "node-1"
+    assert saved["derivation_metadata"] == {"catalog_id_from": "default", "catalog_id_to": "ink_season"}
+    assert saved["ddl"] == REFINE_PARENT["ddl"] and saved["input"] == REFINE_PARENT["source_text"]
 
-    posted = [data for method, path, data in calls if method == "POST" and path == "/api/paint"]
-    assert len(posted) == 1
-    assert posted[0].get("catalog_mode") == "random"
-    # The name the server dropped on 2026-08-01. Sending it again is a no-op.
-    assert "random_color_catalog" not in posted[0]
+    calls.clear()
+    assert cli.command_refine(parser.parse_args(["refine", "perform", "work-1", "--kind", "layout"])) == 0
+    assert _posted(calls, "/api/paint") == []
+    [layout] = _posted(calls, "/api/compose")
+    assert layout["ddl"] == REFINE_PARENT["ddl"] and layout["recompose_mode"] == "principled"
+    assert layout["composition_seed"] not in (1, 2) and layout["render_seed"] == 1
+    assert layout["catalog_id"] == "default" and layout["work_id"] == "work-1"
+    [saved] = _posted(calls, "/api/history")
+    assert saved["derivation_kind"] == "layout_change"
+    assert saved["derivation_metadata"] == {"composition_seed": layout["composition_seed"], "recompose_mode": "principled"}
 
-    # The other kind must not ask for a draw.
-    for kind in ("layout",):
-        calls.clear()
-        assert cli.command_refine(parser.parse_args(["refine", "perform", "work-1", "--kind", kind])) == 0
-        other = [data for method, path, data in calls if method == "POST" and path == "/api/paint"]
-        assert other[0].get("catalog_mode") is None
-
+    calls.clear()
+    assert cli.command_refine(parser.parse_args(["refine", "perform", "work-1", "--kind", "layout", "--no-save"])) == 0
+    assert _posted(calls, "/api/history") == []
 
 def test_refine_no_longer_offers_a_touch_or_a_reading():
     """A touch alone and another reading were removed from refinement (2026-10-14, the author)."""
@@ -1756,65 +1750,35 @@ def test_refine_no_longer_offers_a_touch_or_a_reading():
         parser.parse_args(["paint", "一滴の墨", "--interpretation-seed", "reading-2"])
 
 
-def test_refine_perform_refuses_a_work_its_ddl_holds(monkeypatch):
-    """A work whose DDL was edited is not redrawn from its description."""
-    posted = []
-
-    class FakeClient:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def request(self, method, path, *, data=None, **kwargs):
-            if method == "GET":
-                return {"items": [{"id": "work-1", "lineage_node_id": "node-1", "source_text": "春の野",
-                                   "description_locked": True}]}, None
-            posted.append(path)
-            return {"svg": "<svg />"}, None
-
-    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+def test_refine_perform_refines_a_work_its_ddl_holds(monkeypatch):
+    """A work whose DDL was edited is refined from that DDL like any other: it
+    used to be refused, because the refinement redrew from the description."""
+    calls = []
+    monkeypatch.setattr(cli, "ApiClient", _refine_client(calls, {**REFINE_PARENT, "description_locked": True}))
+    monkeypatch.setattr(cli, "_print_json", lambda data: None)
     args = cli.build_parser().parse_args(["refine", "perform", "work-1", "--kind", "layout"])
-    with pytest.raises(cli.CliError, match="held by its edited DDL"):
-        cli.command_refine(args)
-    assert posted == []
-
+    assert cli.command_refine(args) == 0
+    assert _posted(calls, "/api/compose")[0]["ddl"] == REFINE_PARENT["ddl"]
 
 def test_refine_perform_follows_the_parent_sketch(monkeypatch):
-    """I-704: a refinement is drawn from the parent's sketch prose, as the web does (I-300).
+    """I-704: a refinement keeps the parent's sketch prose, as the web does (I-300).
 
-    The server never inherits the sketch from a parent, so without this every
-    refinement of a sketched work was drawn from the description alone.
+    The server never inherits the sketch from a parent, so the CLI carries it to
+    the layout and into the saved child; a parent drawn without one has none.
     """
     calls = []
-    parent = {"id": "work-1", "lineage_node_id": "node-1", "source_text": "春の野"}
-
-    class FakeClient:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def request(self, method, path, *, data=None, **kwargs):
-            calls.append((method, path, data))
-            if method == "GET":
-                return {"items": [parent]}, None
-            return {"svg": "<svg />", "render_hash_short": "ABCD"}, None
-
-    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    parent = {**REFINE_PARENT, "sketch_text": "遠くに山、朝の光"}
+    monkeypatch.setattr(cli, "ApiClient", _refine_client(calls, parent))
     monkeypatch.setattr(cli, "_print_json", lambda data: None)
     parser = cli.build_parser()
 
-    def sent(*extra):
-        calls.clear()
-        assert cli.command_refine(parser.parse_args(["refine", "perform", "work-1", "--kind", "layout", *extra])) == 0
-        body = [data for method, path, data in calls if method == "POST" and path == "/api/paint"][0]
-        return {key: body[key] for key in ("sketch", "sketch_text") if key in body}
-
-    parent["sketch_text"] = "遠くに山、朝の光"
-    assert sent() == {"sketch_text": "遠くに山、朝の光"}
-    assert sent("--description", "春の野") == {"sketch_text": "遠くに山、朝の光"}
-    assert sent("--description", "夏の野") == {"sketch": True}
+    assert cli.command_refine(parser.parse_args(["refine", "perform", "work-1", "--kind", "layout"])) == 0
+    assert _posted(calls, "/api/compose")[0]["sketch_text"] == "遠くに山、朝の光"
+    assert _posted(calls, "/api/history")[0]["sketch_text"] == "遠くに山、朝の光"
     parent.pop("sketch_text")
-    assert sent() == {}
-    assert sent("--description", "夏の野") == {}
-
+    calls.clear()
+    assert cli.command_refine(parser.parse_args(["refine", "perform", "work-1", "--kind", "layout"])) == 0
+    assert "sketch_text" not in _posted(calls, "/api/compose")[0]
 
 # --------------------------------------------------------------------------- #
 # The eight request keys the CLI never named                                    #
@@ -3103,8 +3067,8 @@ def test_refine_perform_resolves_a_parent_the_listing_cannot_reach(monkeypatch):
                         "redacted": None,
                         "history": {
                             "id": "their-work", "lineage_node_id": "their-node",
-                            "source_text": "a pine", "render_seed": 1,
-                            "composition_seed": 2, "interpretation_seed": "s",
+                            "source_text": "a pine", "ddl": "松を一本立てる。", "render_seed": 1,
+                            "composition_seed": 2,
                             "render_color_catalog_id": "default",
                         },
                     }],

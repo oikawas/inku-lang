@@ -55,3 +55,12 @@ test('T-167  random mode is left alone, because it never offered a choice', () =
 	assert.match(MODAL, /mode === 'vision' && selectedVisionModel \? selectedVisionModel : null/);
 	assert.match(MODAL, /\{#if mode === 'vision'\}<ModelCardPicker/);
 });
+
+test('a work its edited DDL holds offers the Vision method too (the author, 2026-10-14)', () => {
+	// Every generation is drawn from the parent's DDL and Vision only picks the
+	// element, so holding the description is no reason to withhold Vision.
+	assert.match(MODAL, /const mode = \$derived<RefineMode>\(refineMode\);/);
+	const visionRadio = MODAL.match(/<input type="radio" name="ai-refine-mode" value="vision"[^>]*>/)?.[0] ?? '';
+	assert.ok(visionRadio, 'the Vision radio was not found');
+	assert.doesNotMatch(visionRadio, /disabled/);
+});

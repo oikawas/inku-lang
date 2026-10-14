@@ -118,8 +118,8 @@ Variation is retired. Do not use the old amplitude or seed flags. Refinement has
   * Promotes a hidden intermediate work (`lineage_only` visibility) to standard history.
 
 ### 2. `refine`
-* **`refine perform <ITEM_ID> --kind {layout|color} [-o DIR] [--png] [--description TEXT]`**
-  * Generates an option from the target work and connects it to the parent. `--description` replaces the description used for composition refinements.
+* **`refine perform <ITEM_ID> --kind {layout|color} [-o DIR] [--png] [--no-save]`**
+  * Draws an option from the target work's saved instructions (DDL) and connects it to the parent. The description is not read again (`layout` changes only the composition seed, `color` only the color catalog).
 * **`refine save <PARENT_NODE_ID> --kind K --file SCORE_JSON --input-text T`**
   * Manually imports a Score JSON as a child node connected to a parent.
 

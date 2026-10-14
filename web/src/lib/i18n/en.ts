@@ -61,7 +61,7 @@ export const en: LangPack = {
 	tooltipForkDescription: 'Draw again as a new work from this description as it stands. The DDL edits are not carried over; the description can be changed in the new work.',
 	descriptionLockedMark: 'Held (DDL edited)',
 	descriptionLockedShort: 'Held',
-	aiRefineHeldNote: "This work's DDL was edited, so the Vision method, which reads the description, is not offered. Each round of color or layout is drawn from this work's DDL.",
+	aiRefineHeldNote: "This work's DDL was edited. Each round of color or layout is drawn from this work's DDL.",
 	pipelineSaveDdl: 'Save DDL',
 	pipelineCancel: 'Cancel',
 	pipelineReload: 'Reload saved work',

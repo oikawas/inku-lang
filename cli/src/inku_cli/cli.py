@@ -3313,27 +3313,117 @@ def command_colophon(args: argparse.Namespace) -> int:
 # same kinds differently, and sending a flag value straight through is refused.
 # A touch alone and another reading are no longer refinements (removed
 # 2026-10-14, the author); the server still keeps `touch_change` and
-# `reinterpretation` for the works refined that way before.
+# `reinterpretation` for the works refined that way before. Both kinds draw
+# from the parent's saved DDL, as the web does (the author, 2026-10-14).
 _DERIVATION_KIND_BY_REFINE_KIND = {
     "layout": "layout_change",
     "color": "catalog_change",
 }
 
 
-def _refine_sketch(parent_prose: str | None, text_changed: bool) -> dict[str, Any]:
-    """The sketch of a refinement, following its parent (ledger I-704, as I-300).
+def _fresh_seed(taken: set[Any]) -> int:
+    """A layout seed the parent did not use."""
+    import secrets
+    while True:
+        seed = secrets.randbelow(2**31 - 1) + 1
+        if seed not in taken:
+            return seed
 
-    The server never inherits a sketch from the parent, so the CLI carries it:
-    the parent's prose while the text is the parent's own, so the sketch is not
-    run again; a new sketch when --description changed the text; none for a
-    parent drawn without one.
+
+def _refine_from_saved_instructions(client: ApiClient, target: dict[str, Any], kind: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Draw a refinement the way the web does: from the parent's saved DDL.
+
+    Neither kind reads the description again (the author, 2026-10-14). A layout
+    keeps the instructions and chooses their ranges again under a new
+    composition seed (`/api/compose`, principled); a color draws the parent's
+    saved Score in another catalog (`/api/render-score`). The description and
+    the sketch prose are carried as they were, so a work its edited DDL holds is
+    refined like any other. Returns the drawing and its derivation metadata.
     """
-    prose = (parent_prose or "").strip()
-    if not prose:
-        return {}
-    if text_changed:
-        return {"sketch": True}
-    return {"sketch_text": prose}
+    ddl = str(target.get("ddl") or "")
+    if not ddl.strip():
+        raise CliError(f"history item {target.get('id')} has no saved DDL to refine")
+    source = str(target.get("source_text") or target.get("input") or "")
+    aspect = target.get("render_canvas_aspect_id") or target.get("render_canvas_aspect")
+    common: dict[str, Any] = {
+        "ddl": ddl,
+        "canvas_aspect": aspect,
+        "render_seed": target.get("render_seed"),
+        "wild": target.get("render_wild") is True,
+    }
+    if kind == "layout":
+        seed = _fresh_seed({target.get("composition_seed"), target.get("render_seed")})
+        prose = str(target.get("sketch_text") or "").strip()
+        data, _ = client.request("POST", "/api/compose", data={
+            **common,
+            "description": source,
+            **({"sketch_text": prose} if prose else {}),
+            "instruction_lang": target.get("instruction_lang_resolved") or target.get("instruction_lang_requested") or "auto",
+            "catalog_id": target.get("render_color_catalog_id"),
+            "composition_seed": seed,
+            "recompose_mode": "principled",
+            "work_id": target.get("id"),
+            "lineage_parent_node_id": target.get("lineage_node_id"),
+        })
+        data.setdefault("ddl", ddl)
+        data.setdefault("composition_seed", seed)
+        return data, {"composition_seed": seed, "recompose_mode": "principled"}
+    score = target.get("score")
+    if not isinstance(score, dict):
+        raise CliError(f"history item {target.get('id')} has no saved Score to recolor")
+    current = target.get("render_color_catalog_id")
+    others = sorted(key for key in _fetch_color_catalogs(client)["catalogs"] if key != current)
+    if not others:
+        raise CliError("the server offers no other color catalog")
+    import secrets
+    catalog_id = others[secrets.randbelow(len(others))]
+    data, _ = client.request("POST", "/api/render-score", data={
+        **common,
+        "score": score,
+        "input": source,
+        "composition_seed": target.get("composition_seed"),
+        "catalog_id": catalog_id,
+    })
+    data.setdefault("ddl", ddl)
+    return data, {"catalog_id_from": current, "catalog_id_to": catalog_id}
+
+
+def _refinement_history_body(target: dict[str, Any], data: dict[str, Any], kind: str, metadata: dict[str, Any]) -> dict[str, Any]:
+    """The child as the web saves it: the parent's words, the drawn DDL and Score."""
+    source = str(target.get("source_text") or target.get("input") or "")
+    aspect = data.get("render_canvas_aspect_id") or target.get("render_canvas_aspect_id") or target.get("render_canvas_aspect")
+    body = {
+        "input": source,
+        "source_text": source,
+        "ddl": data.get("ddl") or target.get("ddl"),
+        "ddl_source_origin": target.get("ddl_source_origin"),
+        "score": data.get("score"),
+        "at": int(time.time() * 1000),
+        "stage1_model": target.get("stage1_model"),
+        "stage2_model": data.get("stage2_model") or target.get("stage2_model"),
+        "catalog_id": data.get("render_color_catalog_id") or target.get("render_color_catalog_id"),
+        "canvas_aspect": aspect,
+        "render_canvas_aspect_id": aspect,
+        "render_seed": data.get("render_seed", target.get("render_seed")),
+        "composition_seed": data.get("composition_seed", target.get("composition_seed")),
+        "instruction_lang_requested": target.get("instruction_lang_requested"),
+        "instruction_lang_resolved": target.get("instruction_lang_resolved"),
+        "sketch_text": target.get("sketch_text"),
+        "sketch_grain": target.get("sketch_grain"),
+        "save_artifacts": True,
+        "history_visibility": "normal",
+        "lineage_parent_node_id": target.get("lineage_node_id"),
+        "derivation_kind": _DERIVATION_KIND_BY_REFINE_KIND[kind],
+        "derivation_metadata": metadata,
+    }
+    for key in ("render_color_catalog_id", "render_color_catalog_name", "render_color_catalog_sub",
+                "render_color_map", "render_engine_id", "render_engine_version", "render_build_number",
+                "render_color_profile", "render_canvas_aspect_ratio"):
+        if data.get(key) is not None:
+            body[key] = data[key]
+    if target.get("render_wild") is True:
+        body["render_wild"] = True
+    return body
 
 
 def command_refine(args: argparse.Namespace) -> int:
@@ -3373,36 +3463,12 @@ def command_refine(args: argparse.Namespace) -> int:
         parent_node_id = target.get("lineage_node_id")
         if not parent_node_id:
             raise CliError(f"lineage node ID is missing on item {args.item_id}")
-        if target.get("description_locked"):
-            # Every kind here draws from the description, which would throw the
-            # work's edited DDL away; the server refuses it as well.
-            raise CliError(
-                f"history item {args.item_id} is held by its edited DDL, so it is not redrawn from its "
-                "description; refine it in the web app, or start a new work from its description there"
+        data, metadata = _refine_from_saved_instructions(client, target, args.kind)
+        if args.save_history:
+            saved, _ = client.request(
+                "POST", "/api/history", data=_refinement_history_body(target, data, args.kind, metadata)
             )
-        
-        derivation_kind = _DERIVATION_KIND_BY_REFINE_KIND[args.kind]
-
-        parent_text = target.get("source_text") or target.get("input") or ""
-        description = args.description or parent_text
-        params = {
-            "description": description,
-            "save_history": args.save_history,
-            "lineage_parent_node_id": parent_node_id,
-            "derivation_kind": derivation_kind,
-        }
-        params.update(_refine_sketch(target.get("sketch_text"), description.strip() != parent_text.strip()))
-        
-        if args.kind == "layout":
-            params["render_seed"] = target.get("render_seed")
-            params["composition_seed"] = int(time.time() * 1000) & 0x7fffffff
-            params["catalog_id"] = target.get("render_color_catalog_id")
-        elif args.kind == "color":
-            params["render_seed"] = target.get("render_seed")
-            params["composition_seed"] = target.get("composition_seed")
-            params["catalog_mode"] = "random"
-            
-        data, _ = client.request("POST", "/api/paint", data=params)
+            data = {**data, "history_id": saved.get("id"), "lineage_node_id": saved.get("lineage_node_id")}
         
         if args.out_dir:
             out_dir = Path(args.out_dir)
@@ -4359,7 +4425,6 @@ def build_parser() -> argparse.ArgumentParser:
     def add_refine_perform_arguments(command: argparse.ArgumentParser) -> None:
         command.add_argument("item_id", help="target history item ID to refine")
         command.add_argument("--kind", choices=("layout", "color"), required=True, help="refinement element type")
-        command.add_argument("--description", help="override the description for layout/reading works; without it the parent's Sketch from life prose is carried over, and with it that prose is written again")
         command.add_argument("--save-history", action="store_true", default=True, help="automatically save the result to history")
         command.add_argument("--no-save", dest="save_history", action="store_false", help="do not save the result to history")
         command.add_argument("-o", "--out-dir", help="save outputs (svg/json) to this directory")

@@ -211,7 +211,7 @@ Attach an existing work as the parent node and produce a local option, saved int
   ```sh
   uv run inku-cli refine perform WORK_ID --kind layout -o ./refinements --png
   ```
-  `--kind` takes `layout` (composition) or `color` (color catalog); the option is painted and stored on the server. With `-o` it is also written locally. `--description` replaces the description used for composition refinements. `Sketch from life` follows the work you refine: a work drawn with it is redrawn from its sketch prose without running the layer again, and only a description changed with `--description` goes through the layer again; a work drawn without it is redrawn without it.
+  `--kind` takes `layout` (composition) or `color` (color catalog); the option is painted and stored on the server. With `-o` it is also written locally. As in the web refinements, both draw from the work's saved instructions (DDL) and do not read the description again: `layout` chooses the instructions' ranges again under a new composition seed, and `color` draws the saved Score in another color catalog. A work whose DDL was edited is refined the same way. The work's `Sketch from life` prose is carried over as it is, without running the layer again. `--no-save` leaves the option unsaved.
 * **Save a manual option into the lineage**:
   ```sh
   uv run inku-cli refine save PARENT_NODE_ID --kind layout --file score.json --input-text "the description"

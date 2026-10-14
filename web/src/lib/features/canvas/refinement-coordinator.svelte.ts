@@ -211,7 +211,6 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				canvas_aspect: refinementCanvasAspectId(),
 				render_seed: work.result.render_seed,
 				composition_seed: work.result.composition_seed,
-				interpretation_seed: work.result.interpretation_seed,
 				...renderSettingsPayload('render-score', colorCatalogOverride(catalogId)),
 			}),
 		});

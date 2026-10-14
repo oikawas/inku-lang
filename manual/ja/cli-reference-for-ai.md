@@ -118,8 +118,8 @@ uv run inku-cli paint "TEXT" --sketch --catalog-mode auto -o ./out --png
   * 中間ノード（通常履歴に表示されない `lineage_only`）を通常履歴に昇格させます。
 
 ### 2. `refine`
-* **`refine perform <ITEM_ID> --kind {layout|color} [-o DIR] [--png] [--description TEXT]`**
-  * 対象作品から局所的な別案を自動生成し、系譜を繋いで履歴に保存します。`--description` は構図の推敲で使う記述を差し替えます。
+* **`refine perform <ITEM_ID> --kind {layout|color} [-o DIR] [--png] [--no-save]`**
+  * 対象作品の保存した指示書（DDL）から局所的な別案を描き、系譜を繋いで履歴に保存します。記述は読み直しません（`layout` は配置の seed、`color` は色カタログだけを替える）。
 * **`refine save <PARENT_NODE_ID> --kind K --file SCORE_JSON --input-text T`**
   * ローカルで編集・生成した Score JSON を、任意の親ノードに接続する子ノードとして直接インポートします。
 

@@ -223,7 +223,7 @@ A work whose instructions (DDL) were edited follows its DDL, not its description
 - In the work's edit menu, `Change the description`, `Redraw with or without sketch from life` and `Change the model` are shown but not offered, with the reason.
 - A child made by layout or color (or by touch, before it was removed) carries the DDL and is held as well. A child made by reading the description again is not.
 - The history strip shows a lock mark, and a lineage card shows `Held (DDL edited)`.
-- Autonomous refinement uses no reading rounds and no Vision method, and draws each color or layout round from the DDL.
+- Autonomous refinement draws each color or layout round from the DDL. The Vision method is offered too: its advice only picks the element to change and is not added to the drawing.
 
 ## 7. Choose Model, Color Catalog, Sketch, Wild, and Canvas
 

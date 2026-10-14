@@ -1232,8 +1232,7 @@ options:
 ### `inku-cli refine perform`
 
 ```
-usage: inku-cli refine perform [-h] --kind {layout,color}
-                               [--description DESCRIPTION] [--save-history]
+usage: inku-cli refine perform [-h] --kind {layout,color} [--save-history]
                                [--no-save] [-o OUT_DIR] [--png]
                                item_id
 
@@ -1244,10 +1243,6 @@ options:
   -h, --help            show this help message and exit
   --kind {layout,color}
                         refinement element type
-  --description DESCRIPTION
-                        override the description for layout/reading works;
-                        without it the parent's Sketch from life prose is
-                        carried over, and with it that prose is written again
   --save-history        automatically save the result to history
   --no-save             do not save the result to history
   -o OUT_DIR, --out-dir OUT_DIR
@@ -1259,8 +1254,7 @@ options:
 ### `inku-cli refine generate`
 
 ```
-usage: inku-cli refine generate [-h] --kind {layout,color}
-                                [--description DESCRIPTION] [--save-history]
+usage: inku-cli refine generate [-h] --kind {layout,color} [--save-history]
                                 [--no-save] [-o OUT_DIR] [--png]
                                 item_id
 
@@ -1271,10 +1265,6 @@ options:
   -h, --help            show this help message and exit
   --kind {layout,color}
                         refinement element type
-  --description DESCRIPTION
-                        override the description for layout/reading works;
-                        without it the parent's Sketch from life prose is
-                        carried over, and with it that prose is written again
   --save-history        automatically save the result to history
   --no-save             do not save the result to history
   -o OUT_DIR, --out-dir OUT_DIR

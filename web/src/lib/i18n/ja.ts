@@ -61,7 +61,7 @@ export const ja: LangPack = {
 	tooltipForkDescription: 'この記述をそのまま使って、新しい作品として描き直します。DDLの編集は引き継ぎません。記述は新しい作品で書き換えられます。',
 	descriptionLockedMark: '固定（DDL編集済み）',
 	descriptionLockedShort: '記述固定',
-	aiRefineHeldNote: 'DDLを編集した作品なので、記述を読むAI Visionの方式は使えません。色・配置の世代を、この作品のDDLから描きます。',
+	aiRefineHeldNote: 'DDLを編集した作品です。色・配置の世代を、この作品のDDLから描きます。',
 	pipelineSaveDdl: 'DDLを保存する',
 	pipelineCancel: 'キャンセル',
 	pipelineReload: '保存された作品を読み直す',

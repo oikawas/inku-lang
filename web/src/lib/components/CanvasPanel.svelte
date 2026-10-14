@@ -184,7 +184,6 @@
 		onDetachLineage: () => void;
 		onLoadLineageOverview: () => void | Promise<void>;
 		onLoadLineageBranch: (nodeId: string) => void | Promise<void>;
-		onPaintOne: (text: string, options: any) => Promise<any>;
 		onPaintDdl: (parent: { id: string; pipeline_variation_id?: string | null }, ddl: string, options: any) => Promise<any>;
 		onComposeLayout: ComposeLayoutGeneration;
 		onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<any>;
@@ -305,7 +304,6 @@
 		onDetachLineage,
 		onLoadLineageOverview,
 		onLoadLineageBranch,
-		onPaintOne,
 		onPaintDdl,
 		onComposeLayout,
 		onVisionAdvice
@@ -415,7 +413,7 @@
 		});
 	}
 	let generationInfoToggleEl = $state<HTMLButtonElement | null>(null);
-	let refineView = $state<RefinementView>('adjust');
+	let refineView = $state<RefinementView>('layout');
 	let refineModalOpen = $state(false);
 	let refineReturnTab = $state<OutputTab>('lineage');
 	let directRefinementActive = $state(false);
@@ -488,9 +486,6 @@
 
 	async function runDirectWorkAction(action: WorkAction, node: LineageNode): Promise<void> {
 		switch (action) {
-			case 'adjust':
-				startDirectRefinement(node, 'adjust');
-				break;
 			case 'layout': startDirectRefinement(node, 'layout'); break;
 			case 'color-catalog': startDirectRefinement(node, 'color'); break;
 			case 'color-arrangement': startDirectRefinement(node, 'color-arrangement'); break;
@@ -847,7 +842,6 @@
 					{canvasAspectHeight}
 					{refinementSession}
 					{modelInspection}
-					{statusDdlOrigin}
 					{statusDescriptionLocked}
 					{statusStage1Model}
 					{statusStage2Model}
@@ -878,7 +872,7 @@
 						stage2ModelLabel={runStage2ModelLabel} {runTokensIn} {runTokensOut} {runAttempt} onSaveOkugakiModel={onSaveOkugakiModel}
 						{onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote}
 						onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview}
-						onLoadBranch={onLoadLineageBranch} {onPaintOne} {onPaintDdl} {onComposeLayout} {onVisionAdvice} {visionModel} {okugakiModel}
+						onLoadBranch={onLoadLineageBranch} {onPaintDdl} {onComposeLayout} {onVisionAdvice} {visionModel} {okugakiModel}
 						{visionProviderGroups} {animationExportSettings} {pngTemplates}
 						onDownloadSavedWorkSVG={savedWorkExportActions.onDownloadSVG}
 						onDownloadSavedWorkPNG={savedWorkExportActions.onDownloadPNG}
@@ -968,7 +962,6 @@
 		<AIRefineModal
 			node={directAIRefineNode}
 			onClose={() => { directAIRefineNode = null; if (directAIRefineSaved) outputTab = 'lineage'; }}
-			{onPaintOne}
 			{onPaintDdl}
 			{onComposeLayout}
 			{onVisionAdvice}

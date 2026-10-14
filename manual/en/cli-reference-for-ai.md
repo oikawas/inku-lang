@@ -41,11 +41,10 @@ uv run inku-cli refine perform PARENT_ID --kind layout -o ./test_output --png
 ```
 * **Choosing the `--kind` parameter**:
   * `layout`: Reconstruct coordinates and size balance. It sets a new `composition_seed` and Stage 2 recomposes.
-  * `reading`: Read the description anew. It sets a new `interpretation_seed` and **Stage 1** interprets again.
   * `color`: Apply a different color catalog (very fast; no LLM call).
 * **Expected Output**: A JSON object containing the refined child work's metadata.
 
-`--kind` is recorded on the server as `derivation_kind`, in the same order: `layout_change`, `reinterpretation`, and `catalog_change`. Read that value when verifying a lineage edge. The touch refinement (`touch`) was removed on 2026-10-14; edges made before then stay `touch_change`.
+`--kind` is recorded on the server as `derivation_kind`, in the same order: `layout_change` and `catalog_change`. Read that value when verifying a lineage edge. The touch (`touch`) and reading (`reading`) refinements were removed on 2026-10-14; edges made before then stay `touch_change` and `reinterpretation`.
 
 ### Step 4: Traverse and Verify the Lineage Tree
 Verify that the newly generated child node is correctly connected to the parent node.
@@ -109,7 +108,7 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
 uv run inku-cli paint "TEXT" --sketch --catalog-mode auto -o ./out --png
 ```
 
-Variation is retired. Do not use the old amplitude or seed flags. Refinement has three operations: placement, reading and color catalog (touch was removed on 2026-10-14). Saved variation metadata remains a historical record and is never sent in new requests or saves. Pipeline work IDs and Score variation are separate contracts and are unchanged.
+Variation is retired. Do not use the old amplitude or seed flags. Refinement has two operations: placement and color catalog (touch and reading were removed on 2026-10-14). Saved variation metadata remains a historical record and is never sent in new requests or saves. Pipeline work IDs and Score variation are separate contracts and are unchanged.
 
 ### 1. `lineage`
 * **`lineage show <ITEM_ID> [--depth D] [--limit L] [--json]`**
@@ -119,8 +118,8 @@ Variation is retired. Do not use the old amplitude or seed flags. Refinement has
   * Promotes a hidden intermediate work (`lineage_only` visibility) to standard history.
 
 ### 2. `refine`
-* **`refine perform <ITEM_ID> --kind {layout|reading|color} [-o DIR] [--png] [--description TEXT]`**
-  * Generates an option from the target work and connects it to the parent. `--description` replaces the description used for composition and reading refinements.
+* **`refine perform <ITEM_ID> --kind {layout|color} [-o DIR] [--png] [--description TEXT]`**
+  * Generates an option from the target work and connects it to the parent. `--description` replaces the description used for composition refinements.
 * **`refine save <PARENT_NODE_ID> --kind K --file SCORE_JSON --input-text T`**
   * Manually imports a Score JSON as a child node connected to a parent.
 

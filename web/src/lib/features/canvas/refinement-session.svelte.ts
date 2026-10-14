@@ -2,9 +2,9 @@ import { createElapsed, type Elapsed } from '../../elapsed.svelte.ts';
 import type { PaintResult } from '../run/current-work.ts';
 import type { RecomposeMode } from './recomposition.ts';
 
-export type RefineKind = 'layout' | 'reading' | 'color';
+export type RefineKind = 'layout' | 'color';
 /** Which dialog the refinement modal shows: parameters, models, color catalog, or layout. */
-export type RefinementView = 'adjust' | 'compare' | 'color' | 'layout' | 'color-arrangement' | 'ground';
+export type RefinementView = 'compare' | 'color' | 'layout' | 'color-arrangement' | 'ground';
 
 export type VariationCandidate = {
 	id: string;

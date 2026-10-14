@@ -22,7 +22,8 @@ def test_retired_requests_results_and_seed_route_leave_history_readable():
         assert not retired.intersection(model.model_fields), model.__name__
     with pytest.raises(ValidationError):
         RunOptions.model_validate({"variation_seed": 7})
-    assert set(ALLOWED_KINDS) == {"touch_change", "layout_change", "reinterpretation", "catalog_change"}
+    # The touch and the reading left refinement on 2026-10-14.
+    assert set(ALLOWED_KINDS) == {"layout_change", "catalog_change"}
     app = FastAPI()
     app.include_router(render.router)
     with TestClient(app) as client:
@@ -36,6 +37,24 @@ def test_retired_requests_results_and_seed_route_leave_history_readable():
     assert old.pipeline_variation_id == "work-authority"
     new = HistoryPostBody.model_validate(old.model_dump())
     assert not retired.intersection(new.model_dump())
+
+
+def test_removed_refinement_words_and_reading_are_records_only():
+    """The touch's words and the reading's identifier are no longer asked for (2026-10-14, the author)."""
+    from inku_server.api_core.models import HistoryItem, HistoryPostBody
+    from inku_server.api_core.routers import render
+    from inku_server.pipeline_product import RunOptions
+
+    removed = {"seed_text", "interpretation_seed"}
+    for model in (HistoryPostBody, render.PaintRequest, render.ComposeRequest, render.RenderSvgRequest,
+                  render.RenderScoreRequest, render.PaintResponse, render.ComposeResponse,
+                  render.RenderScoreResponse, RunOptions):
+        assert not removed.intersection(model.model_fields), model.__name__
+    with pytest.raises(ValidationError):
+        RunOptions.model_validate({"interpretation_seed": "reading"})
+    old = HistoryItem.model_validate({"id": "old-work", "input": "old prose", "score": {}, "at": 1,
+                                      "seed_text": "夕立", "interpretation_seed": "reading"})
+    assert old.seed_text == "夕立" and old.interpretation_seed == "reading"
 
 
 def test_prepare_drops_only_retired_execution_options_and_preserves_saved_config(monkeypatch):

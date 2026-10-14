@@ -85,7 +85,7 @@ tooltip の型: 一文目に「何が起きるか」、二文目に「何が保�
 
 ## 4. 文体規則
 
-1. **Sentence case。** ラベル・ボタン・見出しはすべて先頭のみ大文字（"Another reading"。"Another Reading" としない）。
+1. **Sentence case。** ラベル・ボタン・見出しはすべて先頭のみ大文字（"Another composition"。"Another Composition" としない）。
    固有名詞の例外は **Saijiki / inku / JSON Score / DDL** と製品名・技術トークン（API, DB, SVG, PNG, Stage 1 …）のみ。
    **`inku` は文頭でも小文字。**
 2. **三点リーダは `…`（U+2026）一文字。** `...` を書かない。進行形 + `…` は進行中表示だけに使う。

@@ -15,7 +15,6 @@ vocabulary are collected here.
 | **Score (JSON Score)** | The intermediate form the Typed Compiler writes out from the instructions. Stored deterministically |
 | **Performance (SVG)** | The one-time result of playing the score |
 | **Headnote** | The description raised beside the finished work — kotobagaki, the note set beside a poem |
-| **Reading** | Rebuilding candidates by re-reading the words (another interpretation) |
 
 ## One work, followed through the layers
 

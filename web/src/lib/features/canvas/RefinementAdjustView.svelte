@@ -14,7 +14,6 @@
 	} from '$lib/features/canvas/refinement-session.svelte';
 
 	type Props = {
-		layoutOnly?: boolean;
 		isJapanese: boolean;
 		resultAvailable: boolean;
 		artworkUrl: string | null;
@@ -22,8 +21,6 @@
 		canvasAspectWidth: number;
 		canvasAspectHeight: number;
 		refinementSession: RefinementSession;
-		statusDdlOrigin: boolean;
-		statusDescriptionLocked: boolean;
 		statusStage1Model: string;
 		statusStage2Model: string;
 		refineDrawingModelId: string;
@@ -40,7 +37,6 @@
 	};
 
 	let {
-		layoutOnly = false,
 		isJapanese,
 		resultAvailable,
 		artworkUrl,
@@ -48,8 +44,6 @@
 		canvasAspectWidth,
 		canvasAspectHeight,
 		refinementSession,
-		statusDdlOrigin,
-		statusDescriptionLocked,
 		statusStage1Model,
 		statusStage2Model,
 		refineDrawingModelId,
@@ -63,13 +57,11 @@
 		onSetRefineWild
 	}: Props = $props();
 
-	// The layout dialog draws layout options; the drawing parameters draw
-	// another reading, the one element left there once words no longer chose
-	// the touch (removed 2026-10-14, the author).
-	const activeKind = $derived<RefineKind>(layoutOnly ? 'layout' : 'reading');
-	const costLabel = $derived(activeKind === 'reading' ? t().refineCostReading : t().refineCostLayout);
-	// A work its DDL holds, or one drawn from DDL, has no reading to draw again.
-	const readingHeld = $derived(!layoutOnly && (statusDdlOrigin || statusDescriptionLocked));
+	// The layout dialog. It was also the drawing parameters until the elements
+	// drawn there -- words for the touch, then another reading -- were removed
+	// (2026-10-14, the author).
+	const activeKind: RefineKind = 'layout';
+	const costLabel = t().refineCostLayout;
 </script>
 
 		<div class="refine-panel">
@@ -83,29 +75,17 @@
 			<div class="refine-target-controls">
 				<section class="refine-action-section">
 					<div class="refine-section-head">
-						{#if layoutOnly}
-							<Tooltip placement="bottom" text={t().tooltipCanvasVaryComposition}>
-								<span class="refine-section-title refine-choice-label">
-									<strong>{t().canvasVaryComposition}</strong>
-									<span class="refine-info-mark" aria-hidden="true">i</span>
-								</span>
-							</Tooltip>
-						{:else}
-							<Tooltip placement="bottom" text={readingHeld ? t().descriptionLockedReason : t().tooltipCanvasVaryInterpretation}>
-								<span class="refine-section-title refine-choice-label">
-									<strong>{t().canvasVaryInterpretation}</strong>
-									<span class="refine-info-mark" aria-hidden="true">i</span>
-								</span>
-							</Tooltip>
-							{#if readingHeld}<div class="refine-selection-hint">{t().descriptionLockedReason}</div>{/if}
-						{/if}
+						<Tooltip placement="bottom" text={t().tooltipCanvasVaryComposition}>
+							<span class="refine-section-title refine-choice-label">
+								<strong>{t().canvasVaryComposition}</strong>
+								<span class="refine-info-mark" aria-hidden="true">i</span>
+							</span>
+						</Tooltip>
 					</div>
-					{#if activeKind === 'layout'}
-						<div class="recompose-mode-options" role="radiogroup" aria-label={t().canvasVaryComposition}>
-							<label><input type="radio" name="recompose-mode" value="principled" checked={refinementSession.recomposeMode === 'principled'} onchange={() => refinementSession.setRecomposeMode('principled')} disabled={refinementSession.busy || refinementSession.gridBusy} />{t().recomposeByPrinciple}</label>
-							<label><input type="radio" name="recompose-mode" value="chance" checked={refinementSession.recomposeMode === 'chance'} onchange={() => refinementSession.setRecomposeMode('chance')} disabled={refinementSession.busy || refinementSession.gridBusy} />{t().recomposeByChance}</label>
-						</div>
-					{/if}
+					<div class="recompose-mode-options" role="radiogroup" aria-label={t().canvasVaryComposition}>
+						<label><input type="radio" name="recompose-mode" value="principled" checked={refinementSession.recomposeMode === 'principled'} onchange={() => refinementSession.setRecomposeMode('principled')} disabled={refinementSession.busy || refinementSession.gridBusy} />{t().recomposeByPrinciple}</label>
+						<label><input type="radio" name="recompose-mode" value="chance" checked={refinementSession.recomposeMode === 'chance'} onchange={() => refinementSession.setRecomposeMode('chance')} disabled={refinementSession.busy || refinementSession.gridBusy} />{t().recomposeByChance}</label>
+					</div>
 				</section>
 				<section class="refine-action-section">
 					<div class="refine-actions refine-paint-actions">
@@ -113,7 +93,7 @@
 							<div class="refine-action-wrap">
 								<PaintButton
 								onclick={() => onGenerateVariationCandidates(activeKind, 1)}
-								disabled={!resultAvailable || readingHeld || refinementSession.busy || refinementSession.gridBusy}
+								disabled={!resultAvailable || refinementSession.busy || refinementSession.gridBusy}
 								>
 									{t().refineSingleButton}
 								</PaintButton>
@@ -123,7 +103,7 @@
 							<div class="refine-action-wrap">
 								<PaintButton
 								onclick={() => onGenerateVariationCandidates(activeKind, 4)}
-								disabled={!resultAvailable || readingHeld || refinementSession.busy || refinementSession.gridBusy}
+								disabled={!resultAvailable || refinementSession.busy || refinementSession.gridBusy}
 								>
 									{t().variationGridDefault}
 								</PaintButton>

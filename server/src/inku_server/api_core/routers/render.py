@@ -81,7 +81,6 @@ class ComposeRequest(BaseModel):
         default=None,
         description="Choose the saved DDL's numeric ranges again; omission keeps the existing rebuild",
     )
-    interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
     fires_on: str | None = Field(
         default=None,
         max_length=200,
@@ -148,7 +147,6 @@ class ComposeResponse(BaseModel):
     render_seed: JsonSeed | None = None
     render_wild: bool | None = None
     composition_seed: JsonSeed | None = None
-    interpretation_seed: str | None = None
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
@@ -237,7 +235,6 @@ class PaintRequest(BaseModel):
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     wild: bool = Field(default=False, description="Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed")
     composition_seed: int | None = Field(default=None, description="Composition seed: it re-salts the intermediate expansion (Stage 1.5) and, from render engine 23, decides where the renderer places the marks; omitted means the placement follows the performance seed")
-    interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
     # The sketch. Carried per request, the way render_seed is: it is an
     # option of one drawing, not a setting of the user.
     sketch: bool = Field(default=False, description="写生を通すか（場所の広がりと季節・時刻の光を記述の横に補う）。既定は通さない")
@@ -277,7 +274,6 @@ class PaintResponse(BaseModel):
     render_seed: JsonSeed | None = None
     render_wild: bool | None = None
     composition_seed: JsonSeed | None = None
-    interpretation_seed: str | None = None
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
@@ -361,7 +357,6 @@ class RenderScoreRequest(BaseModel):
     render_seed: int | None = None
     wild: bool = False
     composition_seed: int | None = None
-    interpretation_seed: str | None = None
 
 
 class RenderScoreResponse(BaseModel):
@@ -394,7 +389,6 @@ class RenderScoreResponse(BaseModel):
     render_seed: JsonSeed
     render_wild: bool = False
     composition_seed: JsonSeed | None = None
-    interpretation_seed: str | None = None
     render_hash: str
     # Which source decided the colors: the work's own snapshot, or today's
     # catalog. A work that predates the snapshot still draws, but not in the
@@ -463,11 +457,9 @@ def _render_color_arrangement_for_work(actor: dict, work: dict, index: int) -> R
         score=work["score"], input=work.get("input") or "", ddl=work.get("ddl"),
         catalog_id=catalog_id, canvas_aspect=work.get("render_canvas_aspect_id") or work.get("render_canvas_aspect"),
         render_seed=render_seed, composition_seed=work.get("composition_seed"),
-        interpretation_seed=work.get("interpretation_seed"),
         wild=bool(work.get("render_wild")),
     ), actor, snapshot)
     result.render_color_source = "color_arrangement"
-    result.interpretation_seed = work.get("interpretation_seed")
     result.derivation_metadata = {"color_arrangement_index": index}
     return result
 
@@ -522,10 +514,8 @@ def _render_ground_variant_for_work(actor: dict, work: dict, material: str) -> G
         catalog_id=work.get("render_color_catalog_id") or work.get("catalog_id"),
         canvas_aspect=work.get("render_canvas_aspect_id") or work.get("render_canvas_aspect"),
         render_seed=render_seed, composition_seed=work.get("composition_seed"),
-        interpretation_seed=work.get("interpretation_seed"),
         wild=bool(work.get("render_wild")),
     ), actor, work)
-    result.interpretation_seed = work.get("interpretation_seed")
     result.derivation_metadata = {"ground_material": material, "parent_ground_material": _ground.current_material(score)}
     return GroundVariantResponse(**result.model_dump(), ddl=ddl)
 
@@ -540,7 +530,7 @@ class VisionRefineAdviceBody(BaseModel):
     model: str | None = Field(default=None, min_length=1, max_length=200)
     instruction: str = Field(..., min_length=1, max_length=100_000)
     direction: str = Field(default="", max_length=2000)
-    enabled_kinds: list[str] = Field(..., min_length=1, max_length=3)
+    enabled_kinds: list[str] = Field(..., min_length=1, max_length=2)
     language: str = Field(default="ja", pattern="^(ja|en)$")
 
 
@@ -575,7 +565,7 @@ def _saved_work_replay_request(work: dict) -> RenderScoreRequest:
         canvas_aspect=work.get("render_canvas_aspect_id") or work.get("render_canvas_aspect"),
         render_seed=0 if seed is None else seed,
         composition_seed=work.get("composition_seed"),
-        interpretation_seed=work.get("interpretation_seed"), wild=bool(work.get("render_wild")),
+        wild=bool(work.get("render_wild")),
     )
 
 
@@ -609,7 +599,6 @@ def _render_authorized_score(req: RenderScoreRequest, actor: dict, work: dict | 
             "render_seed": render_seed,
             "render_wild": req.wild,
             "composition_seed": req.composition_seed,
-            "interpretation_seed": req.interpretation_seed,
             "render_limits": limits_as_dict(limits),
         }
         svg, render_metadata = _render_with_metadata(

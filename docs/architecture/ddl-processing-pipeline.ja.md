@@ -110,7 +110,6 @@ ServerのPython adapterとAndroidのKotlin/JNI adapterはhost処理を行う薄�
 
 | 操作 | 保つもの | 再開点 |
 |---|---|---|
-| 読み取りを変える | 元作品と明示parent relation | 保存済みcontextから新しい記述起点variation（`fork-description`） |
 | DDL編集 | authoring origin、CAS、元history | 同じ設定なら作者DDLのCAS保存後にcompilerへ再入。設定が変わるなら親付きのdirect-DDL variation |
 | 補完案の承認・辞退 | base revisionとproposal digest | 承認はbaseを再検証してCAS保存。辞退は保存済みDDLのまま |
 | 別の構図 | 保存済みvisible DDL、元meaning、描画属性 | 新しい`composition_seed`でtyped Stage 1.5／lowerer |

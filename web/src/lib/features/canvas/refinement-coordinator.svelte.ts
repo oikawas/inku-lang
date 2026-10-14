@@ -48,7 +48,6 @@ export type RefinementCoordinatorDeps = {
 	};
 	seeds: {
 		composition: (excluded?: Set<number>) => number;
-		interpretation: () => string;
 	};
 	lineageParentId: () => string | null;
 	ensureVisibleLineageParentId: () => Promise<string | null>;
@@ -182,25 +181,6 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		if (!saved?.id) throw new Error(t().pipelineAttentionReason('host_commit_failed'));
 		return { ...result, history_id: saved.id, history_at: saved.at, lineage_node_id: saved.lineage_node_id };
 	};
-
-	async function interpretationVariationCandidate(label: string, signal?: AbortSignal): Promise<VariationCandidate> {
-		const source = work.input.trim();
-		const interpretationSeed = deps.seeds.interpretation();
-		const r = await work.paintOne(source, {
-			historyInput: source,
-			sourceText: source,
-			saveHistory: false,
-			saveArtifacts: false,
-			countGeneration: false,
-			canvasAspectId: refinementCanvasAspectId(),
-			sketchText: work.sketchTextFor(source),
-			interpretationSeed,
-			signal,
-			renderOverrides: refinementRenderOverrides(),
-			lineageParentNodeId: deps.lineageParentId(),
-		});
-		return { id: "interp-" + interpretationSeed, label, selected: false, result: { ...r, lineage_parent_node_id: deps.lineageParentId(), derivation_kind: deps.lineageParentId() ? "reinterpretation" : null, derivation_metadata: { interpretation_seed: interpretationSeed } } };
-	}
 
 	async function renderColorCatalogCandidate(catalogId: string, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
 		if (!work.result) throw new Error("missing result");
@@ -448,13 +428,9 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		const contextVersion = targetIdentityVersion;
 		await deps.ensureVisibleLineageParentId();
 		if (contextVersion !== targetIdentityVersion) return;
-		const taskLabel = kind === "layout"
-			? t().canvasVaryComposition
-			: kind === "reading"
-				? t().canvasVaryInterpretation
-				: t().canvasVaryColor;
+		const taskLabel = kind === "layout" ? t().canvasVaryComposition : t().canvasVaryColor;
 		const abortController = refinementSession.beginGrid({
-			includesReading: kind === 'reading',
+			includesReading: false,
 			taskLabel,
 			count
 		});
@@ -468,7 +444,6 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				signal: abortController.signal,
 				labels: {
 					layout: t().canvasVaryComposition,
-					reading: t().canvasVaryInterpretation,
 					noAlternateCatalog: t().refineNoAlternateCatalog
 				},
 				currentCompositionSeed: work.result.composition_seed,
@@ -479,7 +454,6 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				createCompositionSeed: deps.seeds.composition,
 				catalogName: deps.catalog.name,
 				renderLayout: (seed, label, signal) => composeVariationCandidate(seed, label, signal, recomposeMode),
-				renderReading: interpretationVariationCandidate,
 				renderColor: renderColorCatalogCandidate
 			});
 			refinementSession.setPlans(abortController, plans.map((plan) => plan.label));

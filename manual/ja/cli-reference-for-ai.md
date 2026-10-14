@@ -33,7 +33,7 @@ uv run inku-cli paint "白い余白に、黒い太筆の波線を一本引く。
 * **AIの判断ロジック**: 出力から `"history_id"` を抽出して `PARENT_ID` として変数に保持します。
 
 ### ステップ 3: 派生作品の自動生成（推敲 / Refine）
-作成した作品を親ノードとし、特定の要素（構図・解釈・色）を変動させた推敲作品を生成して系譜に繋げます。
+作成した作品を親ノードとし、特定の要素（構図・色）を変動させた推敲作品を生成して系譜に繋げます。
 
 ```sh
 # 親ID: PARENT_ID (例: d5989732-9f3a-4dd2-82df-c49c50761119) の配置を推敲
@@ -41,11 +41,10 @@ uv run inku-cli refine perform PARENT_ID --kind layout -o ./test_output --png
 ```
 * **パラメータ `--kind` の選択基準**:
   * `layout`: 線の位置や大きさを再構築したいとき。新しい `composition_seed` を置き、Stage 2が再配置する
-  * `reading`: 記述の解釈からやり直したいとき。新しい `interpretation_seed` を置き、**Stage 1** が読み直す
   * `color`: 他の色カタログを適用したいとき（LLM呼び出しなし）
 * **期待される出力**: 新しい派生作品の JSON メタデータ。
 
-`--kind` はサーバーへ `derivation_kind` として記録されます（順に `layout_change` / `reinterpretation` / `catalog_change`）。系譜のedgeを検証するときはこの値を読みます。タッチの推敲（`touch`）は2026-10-14に削除しました。前に作った作品の辺は `touch_change` のまま残ります。
+`--kind` はサーバーへ `derivation_kind` として記録されます（順に `layout_change` / `catalog_change`）。系譜のedgeを検証するときはこの値を読みます。タッチ（`touch`）と読み取り（`reading`）の推敲は2026-10-14に削除しました。前に作った作品の辺は `touch_change`・`reinterpretation` のまま残ります。
 
 ### ステップ 4: 作品系譜の探索と状態確認
 追加した派生作品が、親作品のツリーに対して正しくエッジ（派生タイプ）で連結されているかをコンソール上で探索します。
@@ -109,7 +108,7 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
 uv run inku-cli paint "TEXT" --sketch --catalog-mode auto -o ./out --png
 ```
 
-変奏は廃止しました。旧強度・seedの旗を使わないでください。推敲は配置・読み取り・色カタログの3操作です（タッチは2026-10-14に削除）。保存済みの変奏情報は旧作品の記録として保持し、新規要求や保存には渡しません。pipelineの作品IDとScoreの揺らぎは別の契約で、変更しません。
+変奏は廃止しました。旧強度・seedの旗を使わないでください。推敲は配置・色カタログの2操作です（タッチと読み取りは2026-10-14に削除）。保存済みの変奏情報は旧作品の記録として保持し、新規要求や保存には渡しません。pipelineの作品IDとScoreの揺らぎは別の契約で、変更しません。
 
 ### 1. `lineage`
 * **`lineage show <ITEM_ID> [--depth D] [--limit L] [--json]`**
@@ -119,8 +118,8 @@ uv run inku-cli paint "TEXT" --sketch --catalog-mode auto -o ./out --png
   * 中間ノード（通常履歴に表示されない `lineage_only`）を通常履歴に昇格させます。
 
 ### 2. `refine`
-* **`refine perform <ITEM_ID> --kind {layout|reading|color} [-o DIR] [--png] [--description TEXT]`**
-  * 対象作品から局所的な別案を自動生成し、系譜を繋いで履歴に保存します。`--description` は構図・解釈の推敲で使う記述を差し替えます。
+* **`refine perform <ITEM_ID> --kind {layout|color} [-o DIR] [--png] [--description TEXT]`**
+  * 対象作品から局所的な別案を自動生成し、系譜を繋いで履歴に保存します。`--description` は構図の推敲で使う記述を差し替えます。
 * **`refine save <PARENT_NODE_ID> --kind K --file SCORE_JSON --input-text T`**
   * ローカルで編集・生成した Score JSON を、任意の親ノードに接続する子ノードとして直接インポートします。
 

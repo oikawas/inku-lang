@@ -116,7 +116,6 @@ class RunOptions(BaseModel):
     # stands, without a request.
     sketch: Literal["off", "on"] | None = None
     sketch_text: str | None = Field(default=None, max_length=100_000)
-    interpretation_seed: str | None = None
     history_display_label: str | None = None
     batch_line_number: int | None = None
     batch_run_id: str | None = None

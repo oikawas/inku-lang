@@ -13,7 +13,6 @@ import {
 
 const labels: RefinementFanoutLabels = {
 	layout: 'Layout',
-	reading: 'Reading',
 	noAlternateCatalog: 'No alternate catalog'
 };
 
@@ -37,7 +36,6 @@ function capabilities(
 		createCompositionSeed: () => 1,
 		catalogName: (id) => id.toUpperCase(),
 		renderLayout: async (_seed, label) => candidate(label),
-		renderReading: async (label) => candidate(label),
 		renderColor: async (_catalogId, label) => candidate(label),
 		...overrides
 	};
@@ -45,7 +43,7 @@ function capabilities(
 
 function input(overrides: Partial<RefinementFanoutInput> = {}): RefinementFanoutInput {
 	return {
-		kind: 'reading' as const,
+		kind: 'layout' as const,
 		count: 1 as const,
 		signal: new AbortController().signal,
 		labels,
@@ -124,21 +122,22 @@ test('T-323: color plan offers every other catalog in list order and rejects no 
 	);
 });
 
-test('T-324: reading dispatches its exact arguments and shared signal', async () => {
+test('T-324: layout dispatches its exact arguments and shared signal', async () => {
+	// It was the reading's test until another reading was removed (2026-10-14).
 	const calls: unknown[][] = [];
 	const signal = new AbortController().signal;
+	let next = 10;
 	const shared = capabilities({
-		renderReading: async (...args) => { calls.push(['reading', ...args]); return candidate('reading'); }
+		createCompositionSeed: () => next++,
+		renderLayout: async (...args) => { calls.push(['layout', ...args]); return candidate('layout'); }
 	});
-	const readingPlans = await planRefinementCandidates(input({ kind: 'reading', count: 4, signal }), shared);
+	const layoutPlans = await planRefinementCandidates(input({ kind: 'layout', count: 2, signal }), shared);
 
-	assert.deepEqual(readingPlans.map((plan) => plan.label), ['Reading 1', 'Reading 2', 'Reading 3', 'Reading 4']);
-	await Promise.all(readingPlans.map((plan) => plan.run()));
+	assert.deepEqual(layoutPlans.map((plan) => plan.label), ['Layout 1', 'Layout 2']);
+	await Promise.all(layoutPlans.map((plan) => plan.run()));
 	assert.deepEqual(calls, [
-		['reading', 'Reading 1', signal],
-		['reading', 'Reading 2', signal],
-		['reading', 'Reading 3', signal],
-		['reading', 'Reading 4', signal]
+		['layout', 10, 'Layout 1', signal],
+		['layout', 11, 'Layout 2', signal]
 	]);
 });
 

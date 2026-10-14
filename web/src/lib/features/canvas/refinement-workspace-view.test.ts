@@ -56,8 +56,8 @@ test('T-346: CanvasPanel keeps refinement view coordination and local choices', 
 	]) {
 		assert.match(panel, new RegExp(`\\b${owner}\\b`), `${owner} left CanvasPanel`);
 	}
-	// The drawing parameters draw another reading only (words choosing the touch
-	// were removed 2026-10-14), so there is no kind left to remember or restore.
+	// The drawing parameters are gone with the touch and the reading they drew
+	// (removed 2026-10-14), so there is no kind left to remember or restore.
 	assert.doesNotMatch(panel, /REFINE_KIND_KEY|\brefineKind\b|touchSeedText/);
 	assert.match(panel, /if \(refineModalOpen\) requestCloseRefineModal\(\)/);
 	assert.match(panel, /view=\{refineView\}/);
@@ -73,14 +73,13 @@ test('T-1002/T-1005: focused refinement views reuse typed owners without cross-v
 	const grid = read('./RefinementCandidateGrid.svelte');
 	const session = read('./refinement-session.svelte.ts');
 
-	assert.match(session, /type RefinementView = 'adjust' \| 'compare' \| 'color'/);
+	assert.match(session, /type RefinementView = 'compare' \| 'color' \| 'layout'/);
 	assert.match(shell, /view: RefinementView/);
 	assert.match(shell, /onClose: \(\) => void/);
 	assert.match(adjust, /refinementSession: RefinementSession/);
 	assert.doesNotMatch(adjust, /onSetRefineKind|touchSeedText|'touch'/);
-	// A work its DDL holds has no reading to draw again: both buttons stay off.
-	assert.match(adjust, /const readingHeld = \$derived\(!layoutOnly && \(statusDdlOrigin \|\| statusDescriptionLocked\)\)/);
-	assert.equal(adjust.match(/disabled=\{!resultAvailable \|\| readingHeld \|\|/g)?.length, 2);
+	// The view draws layout options only: no reading, no held reading.
+	assert.doesNotMatch(adjust, /canvasVaryInterpretation|readingHeld|layoutOnly/);
 	assert.doesNotMatch(adjust, /modelInspection/);
 	assert.match(models, /modelInspection: ModelInspection/);
 	assert.doesNotMatch(models, /onGenerateVariationCandidates|touchSeedText|LANGUAGE_COMBOS/);

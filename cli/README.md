@@ -354,7 +354,6 @@ usage: inku-cli paint [-h] [--base-url BASE_URL]
                       [--sketch-text SKETCH_TEXT] [--wild]
                       [--limits KEY=VALUE [KEY=VALUE ...]]
                       [--catalog-mode {fixed,auto,random}]
-                      [--interpretation-seed INTERPRETATION_SEED]
                       [--instruction-lang {auto,ja,en}] [--ui-lang UI_LANG]
                       [--include-thinking] [--save-history]
                       [--save-artifacts | --no-save-artifacts] [--no-progress]
@@ -418,10 +417,6 @@ options:
                         how the color catalog is chosen: fixed (use --color-
                         catalog), auto (the server reads the description and
                         picks), random (draw one other than --color-catalog)
-  --interpretation-seed INTERPRETATION_SEED
-                        ask Stage 1 for an explicit re-interpretation under
-                        this identifier instead of reusing the previous
-                        reading
   --instruction-lang {auto,ja,en}
   --ui-lang UI_LANG
   --include-thinking
@@ -452,7 +447,6 @@ usage: inku-cli batch [-h] [--base-url BASE_URL]
                       [--sketch-text SKETCH_TEXT] [--wild]
                       [--limits KEY=VALUE [KEY=VALUE ...]]
                       [--catalog-mode {fixed,auto,random}]
-                      [--interpretation-seed INTERPRETATION_SEED]
                       [--instruction-lang {auto,ja,en}] [--ui-lang UI_LANG]
                       [--include-thinking] [--save-history]
                       [--save-artifacts | --no-save-artifacts] [--no-progress]
@@ -514,10 +508,6 @@ options:
                         how the color catalog is chosen: fixed (use --color-
                         catalog), auto (the server reads the description and
                         picks), random (draw one other than --color-catalog)
-  --interpretation-seed INTERPRETATION_SEED
-                        ask Stage 1 for an explicit re-interpretation under
-                        this identifier instead of reusing the previous
-                        reading
   --instruction-lang {auto,ja,en}
   --ui-lang UI_LANG
   --include-thinking
@@ -1242,7 +1232,7 @@ options:
 ### `inku-cli refine perform`
 
 ```
-usage: inku-cli refine perform [-h] --kind {layout,reading,color}
+usage: inku-cli refine perform [-h] --kind {layout,color}
                                [--description DESCRIPTION] [--save-history]
                                [--no-save] [-o OUT_DIR] [--png]
                                item_id
@@ -1252,7 +1242,7 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  --kind {layout,reading,color}
+  --kind {layout,color}
                         refinement element type
   --description DESCRIPTION
                         override the description for layout/reading works;
@@ -1269,7 +1259,7 @@ options:
 ### `inku-cli refine generate`
 
 ```
-usage: inku-cli refine generate [-h] --kind {layout,reading,color}
+usage: inku-cli refine generate [-h] --kind {layout,color}
                                 [--description DESCRIPTION] [--save-history]
                                 [--no-save] [-o OUT_DIR] [--png]
                                 item_id
@@ -1279,7 +1269,7 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  --kind {layout,reading,color}
+  --kind {layout,color}
                         refinement element type
   --description DESCRIPTION
                         override the description for layout/reading works;
@@ -1296,7 +1286,7 @@ options:
 ### `inku-cli refine save`
 
 ```
-usage: inku-cli refine save [-h] --kind {layout,reading,color} --file FILE
+usage: inku-cli refine save [-h] --kind {layout,color} --file FILE
                             [--svg-file SVG_FILE] --input-text INPUT_TEXT
                             [--ddl-text DDL_TEXT]
                             [--visibility {normal,lineage_only}]
@@ -1307,7 +1297,7 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  --kind {layout,reading,color}
+  --kind {layout,color}
                         derivation kind
   --file FILE           path to Score JSON file
   --svg-file SVG_FILE   path to SVG file

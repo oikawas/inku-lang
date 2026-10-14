@@ -1519,8 +1519,7 @@
 			fanoutLimit: () => renderFanoutLimit
 		},
 		seeds: {
-			composition: createSafeIntegerSeed,
-			interpretation: createInterpretationSeed
+			composition: createSafeIntegerSeed
 		},
 		lineageParentId: currentLineageParentId,
 		ensureVisibleLineageParentId,
@@ -2146,30 +2145,6 @@ $effect(() => {
 			if (!excluded.has(seed)) return seed;
 		}
 		throw new Error('Could not allocate a unique seed');
-	}
-
-	function createInterpretationSeed(): string {
-		if (typeof globalThis.crypto?.randomUUID === 'function') {
-			return globalThis.crypto.randomUUID();
-		}
-		const bytes = new Uint8Array(16);
-		if (typeof globalThis.crypto?.getRandomValues === 'function') {
-			globalThis.crypto.getRandomValues(bytes);
-		} else {
-			for (let index = 0; index < bytes.length; index += 1) {
-				bytes[index] = Math.floor(Math.random() * 256);
-			}
-		}
-		bytes[6] = (bytes[6] & 0x0f) | 0x40;
-		bytes[8] = (bytes[8] & 0x3f) | 0x80;
-		const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
-		return [
-			hex.slice(0, 8),
-			hex.slice(8, 12),
-			hex.slice(12, 16),
-			hex.slice(16, 20),
-			hex.slice(20),
-		].join('-');
 	}
 
 	const unsavedRefinementPreview = $derived(!!work.result && !work.result.lineage_node_id && !!work.result.lineage_parent_node_id && !!work.result.derivation_kind);
@@ -3154,7 +3129,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onDetachLineage={detachLineage}
 				onLoadLineageOverview={() => lineageState.loadOverview(currentLineageNodeId)}
 				onLoadLineageBranch={lineageState.loadBranch}
-				onPaintOne={work.paintOne}
 				onPaintDdl={paintFromParentDdl}
 				onComposeLayout={refinement.composeLayoutGeneration}
 				onVisionAdvice={work.requestVisionRefineAdvice}

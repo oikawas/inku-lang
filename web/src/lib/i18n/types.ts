@@ -374,7 +374,6 @@ export interface LangPack {
 	recomposeByChance: string;
 	recomposeReason: (reason?: string | null) => string;
 	recomposeKeptRanges: string;
-	canvasVaryInterpretation: string;
 	canvasVaryColor: string;
 	retiredVariationSmall: string;
 	retiredVariationMedium: string;
@@ -448,7 +447,6 @@ export interface LangPack {
 	tooltipCanvasVaryComposition: string;
 	ddlRangeNumbers: string;
 	ddlRangeInvalid: string;
-	tooltipCanvasVaryInterpretation: string;
 	tooltipCanvasVaryColor: string;
 	tooltipCanvasNavNewer: string;
 	tooltipCanvasNavOlder: string;
@@ -501,10 +499,8 @@ export interface LangPack {
 	aiRefineVisionObservation: string;
 	aiRefineVisionDirection: string;
 	aiRefineVisionSourceError: string;
-	aiRefineAppliedDirection: string;
 	aiRefineDirectionLabel: string;
 	aiRefineDirectionPlaceholder: string;
-	aiRefineDirectionRandomHint: string;
 	aiRefineGensLabel: string;
 	aiRefineElementsLabel: string;
 	aiRefineStartButton: string;
@@ -602,7 +598,6 @@ export interface LangPack {
 	workActionOpenMenu: string;
 	workActionMenuTitle: string;
 	workActionDdlOrigin: string;
-	workActionAdjust: string;
 	workActionColorArrangement: string;
 	workActionGround: string;
 	workActionDescription: string;

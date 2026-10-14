@@ -1035,6 +1035,7 @@ def test_render_score_changes_only_catalog_metadata_and_colors(auth_context):
         "canvas_aspect": "square",
         "render_seed": 123,
         "composition_seed": 456,
+        # Removed from requests on 2026-10-14: sent anyway, it is not read.
         "interpretation_seed": "reading-seed",
     }
 
@@ -1049,7 +1050,7 @@ def test_render_score_changes_only_catalog_metadata_and_colors(auth_context):
     assert data["render_canvas_aspect_id"] == "square"
     assert data["render_seed"] == "123"
     assert data["composition_seed"] == "456"
-    assert data["interpretation_seed"] == "reading-seed"
+    assert "interpretation_seed" not in data
     assert data["score"]["instructions"][0]["primitive"] == "circle"
     assert data["score"]["instructions"][0]["center"] == [0.5, 0.5]
     assert data["score"]["instructions"][0]["radius"] == 0.1
@@ -1067,7 +1068,6 @@ def test_render_score_changes_only_catalog_metadata_and_colors(auth_context):
     assert alternate_data["score"] == data["score"]
     assert alternate_data["render_seed"] == data["render_seed"]
     assert alternate_data["composition_seed"] == data["composition_seed"]
-    assert alternate_data["interpretation_seed"] == data["interpretation_seed"]
     assert alternate_data["render_color_catalog_id"] == "ink_season"
     assert alternate_data["render_hash"] != data["render_hash"]
     assert alternate_data["svg"] != data["svg"]

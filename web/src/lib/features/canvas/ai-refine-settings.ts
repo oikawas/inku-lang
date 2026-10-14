@@ -8,7 +8,6 @@ export type AiRefineMode = 'random' | 'vision';
 export type AiRefineSettings = {
 	mode: AiRefineMode;
 	generations: number;
-	reading: boolean;
 	color: boolean;
 	layout: boolean;
 	direction: string;
@@ -17,7 +16,6 @@ export type AiRefineSettings = {
 export const DEFAULT_AI_REFINE_SETTINGS: AiRefineSettings = {
 	mode: 'random',
 	generations: 5,
-	reading: true,
 	color: true,
 	layout: true,
 	direction: ''
@@ -40,7 +38,6 @@ export function parseAiRefineSettings(raw: string | null): AiRefineSettings {
 	return {
 		mode: stored.mode === 'vision' || stored.mode === 'random' ? stored.mode : d.mode,
 		generations: Number.isInteger(generations) && (generations as number) >= 1 && (generations as number) <= 10 ? generations as number : d.generations,
-		reading: flag('reading', d.reading),
 		color: flag('color', d.color),
 		layout: flag('layout', d.layout),
 		direction: typeof stored.direction === 'string' ? stored.direction : d.direction

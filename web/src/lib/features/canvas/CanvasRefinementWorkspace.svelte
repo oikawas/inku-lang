@@ -25,7 +25,6 @@
 		canvasAspectHeight: number;
 		refinementSession: RefinementSession;
 		modelInspection: ModelInspection;
-		statusDdlOrigin: boolean;
 		statusDescriptionLocked: boolean;
 		statusStage1Model: string;
 		statusStage2Model: string;
@@ -58,7 +57,6 @@
 		canvasAspectHeight,
 		refinementSession,
 		modelInspection,
-		statusDdlOrigin,
 		statusDescriptionLocked,
 		statusStage1Model,
 		statusStage2Model,
@@ -80,9 +78,7 @@
 	}: Props = $props();
 
 	const dialogTitle = $derived(
-		view === 'adjust'
-			? (isJapanese ? '描画要素を編集' : 'Edit drawing elements')
-			: view === 'layout'
+		view === 'layout'
 				? t().canvasVaryComposition
 				: view === 'color-arrangement'
 					? t().workActionColorArrangement
@@ -104,9 +100,8 @@
 			<button type="button" aria-label={isJapanese ? '閉じる' : 'Close'} onclick={onClose}>×</button>
 		</div>
 	{/if}
-	{#if view === 'adjust' || view === 'layout'}
+	{#if view === 'layout'}
 		<RefinementAdjustView
-			layoutOnly={view === 'layout'}
 			{isJapanese}
 			{resultAvailable}
 			{artworkUrl}
@@ -114,8 +109,6 @@
 			{canvasAspectWidth}
 			{canvasAspectHeight}
 			{refinementSession}
-			{statusDdlOrigin}
-			{statusDescriptionLocked}
 			{statusStage1Model}
 			{statusStage2Model}
 			{refineDrawingModelId}

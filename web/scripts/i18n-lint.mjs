@@ -31,7 +31,6 @@ const FIXED = {
 	canvasVaryComposition: 'Another composition',
 	recomposeByPrinciple: 'By principle',
 	recomposeByChance: 'By chance',
-	canvasVaryInterpretation: 'Another reading',
 	canvasVaryColor: 'Another catalog',
 	retiredVariationSmall: 'Subtle',
 	retiredVariationMedium: 'Moderate',

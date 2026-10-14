@@ -153,6 +153,10 @@ class HistoryPostBody(BaseModel):
     batch_run_id: str | None = None
     history_visibility: str = "normal"
     lineage_parent_node_id: str | None = None
+    # Request-only: save the current performance of an authorized saved work.
+    replay_work_id: str | None = Field(default=None, min_length=1, max_length=100, exclude=True)
+    replay_render_hash: str | None = Field(default=None, pattern="^rh3:[0-9a-f]{64}$", exclude=True)
+    replay_svg_sha256: str | None = Field(default=None, pattern="^[0-9a-f]{64}$", exclude=True)
     derivation_kind: str | None = None
     derivation_metadata: dict[str, object] = Field(default_factory=dict)
     instruction_lang_requested: str | None = None

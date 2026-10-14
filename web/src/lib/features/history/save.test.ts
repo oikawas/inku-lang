@@ -19,6 +19,32 @@ const jsonResponse = (value: unknown, status = 200): Response => new Response(
 	{ status, headers: { 'Content-Type': 'application/json' } }
 );
 
+test('replay save sends the source, exact preview identity and retry key, and reports a rejected save', async () => {
+	let init: RequestInit | undefined;
+	await assert.rejects(saveHistoryItem(item(), {
+		lineageParentNodeId: 'parent-node', derivationKind: 'replay',
+		replayWorkId: 'work-1', replayRenderHash: 'rh3:new', replaySvgSha256: 'svg-sha256',
+		idempotencyKey: 'save-key', rejectOnFailure: true,
+	}, {
+		catalogId: 'default', catalogMode: 'fixed', canvasAspectId: 'square', instructionLang: 'ja', uiLang: 'ja',
+	}, {
+		apiFetch: async (_path, nextInit) => { init = nextInit; return jsonResponse({ detail: 'changed' }, 409); },
+		apiError: async () => new Error('The displayed performance changed.'),
+		signedIn: () => true, ensureSvg: async () => '<svg>new</svg>', composeFallbackFor: () => null,
+		refreshCountedUser: async () => {}, activeHistoryId: () => null, currentOffset: () => 0,
+		fetchOffset: async () => { assert.fail('a refused save must stay in the dialog'); },
+		clearSelection: () => { assert.fail('a refused save must retain the source'); },
+	}), /The displayed performance changed/);
+	assert.equal(new Headers(init?.headers).get('Idempotency-Key'), 'save-key');
+	const body = JSON.parse(String(init?.body));
+	assert.equal(body.replay_work_id, 'work-1');
+	assert.equal(body.replay_render_hash, 'rh3:new');
+	assert.equal(body.replay_svg_sha256, 'svg-sha256');
+	assert.equal(body.lineage_parent_node_id, 'parent-node');
+	assert.equal(body.derivation_kind, 'replay');
+	assert.equal('svg' in body, false);
+});
+
 test('T-292/T-293: save owns the payload and selects the saved identity after refresh', async () => {
 	const calls: Array<{ path: string; init?: RequestInit }> = [];
 	const order: string[] = [];

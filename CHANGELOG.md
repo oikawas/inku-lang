@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — A full-screen Replay comparison can save the new performance as a child
+
+The Japanese replay action and heading now say 再演. The comparison dialog fills the viewport, stacking the works on narrow screens, and adds Save this performance as a child. It keeps the source's saved conditions and saves the current engine's result as a `replay` child in normal history without changing the source. Both rh3 and SVG SHA256 must match the displayed preview. Saving, success, and failure remain visible; retries of the same save do not duplicate a child. Managed works retain their saved authority and policy link for the owner's child; shared sources whose link cannot be retained are refused before saving. Rendering semantics and the engine version are unchanged.
+
 ### 2026-10-14 — Add Change the ground to the refine menu
 
 At the author's request, the work-editing menu (the work's Refine control and the lineage menu) has Change the ground after Change the color arrangement. It draws options with the work's ground (the saijiki's grounds) replaced by each ground the work is not on: 6 for a work that names a ground, 7 for one that names none (the author's choice).

@@ -6,12 +6,13 @@ import itertools
 import json
 import logging
 from collections.abc import AsyncIterator, Callable, Iterator
+from hashlib import sha256
 from typing import Literal
 
 import anyio
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, computed_field, field_validator
 
 from ... import db as _db
 from ... import pipeline_compat as _pipeline_compat
@@ -371,6 +372,12 @@ class RenderScoreRequest(BaseModel):
 
 class RenderScoreResponse(BaseModel):
     score: Score | dict
+    @computed_field
+    @property
+    def svg_sha256(self) -> str:
+        """Bind a save to the exact preview without changing render identity."""
+        return sha256(self.svg.encode("utf-8")).hexdigest()
+
     render_diagnostics: dict | None = None
     # What the core drew around without stopping (an unusable host color); absent when nothing.
     render_warnings: list[dict] | None = None

@@ -132,6 +132,7 @@
 	import { saveHistoryItem, type SaveHistoryOptions } from '$lib/features/history/save';
 	import {
 		replayHistoryItem as replaySavedHistoryItem,
+		saveReplayComparison,
 		type ReplayComparison,
 		type ReplaySource
 	} from '$lib/features/history/replay';
@@ -1410,6 +1411,7 @@
 		}, {
 			apiFetch,
 			signedIn: () => !!session.authToken,
+			apiError,
 			ensureSvg: ensureIterationSvg,
 			composeFallbackFor: (item) => item.compose_fallback
 				?? (typeof item.compose_fallback_used === 'boolean' ? composeFallbackValue(item) : null),
@@ -1556,7 +1558,7 @@
 				currentRenderEngineVersion,
 				renderPayload: (item, catalogId) => ({
 					...refinement.workReferencePayload(item.id),
-					...renderSettingsPayload('render-svg', {
+					...renderSettingsPayload('render-score', {
 						...colorCatalogOverride(catalogId),
 						...wildOverride(Boolean(item.render_wild))
 					})
@@ -1578,7 +1580,21 @@
 		}
 	}
 
+	async function saveReplayAsChild(): Promise<void> {
+		const comparison = work.replayComparison;
+		if (!comparison) return;
+		const wasSaved = Boolean(comparison.savedItem);
+		const saved = await saveReplayComparison(comparison, pushHistory, t().replayComparisonSaveFailed);
+		if (!saved || wasSaved || work.replayComparison !== comparison) return;
+		// Refresh the existing owners without switching the comparison's source.
+		await Promise.allSettled([
+			historyManager.fetch(),
+			...(saved.lineage_node_id ? [lineageState.load(saved.lineage_node_id, true)] : []),
+		]);
+	}
+
 	function closeReplayComparison() {
+		if (work.replayComparison?.saving) return;
 		const source = work.replayComparison?.source;
 		work.replayComparison = null;
 		if (!source) return;
@@ -3569,6 +3585,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			currentVersion={work.replayComparison.currentVersion}
 			versionMessage={work.replayComparison.versionMessage}
 			provisionalSeed={work.replayComparison.provisionalSeed}
+			canSave={Boolean(session.authToken && work.replayComparison.originalItem.id && work.replayComparison.originalItem.lineage_node_id && work.replayComparison.renderHash && work.replayComparison.svgSha256)}
+			saving={work.replayComparison.saving}
+			saved={Boolean(work.replayComparison.savedItem)}
+			saveError={work.replayComparison.saveError}
+			onSaveChild={saveReplayAsChild}
 			onClose={closeReplayComparison}
 		/>
 	{/await}

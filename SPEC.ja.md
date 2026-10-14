@@ -85,6 +85,8 @@ SVGへ出す小数は `MASTER_GRID_DECIMALS` が定めるmaster gridに従い、
 
 記録されたengine版は来歴であり、再描画の入力にはしない。現在の版と異なる場合はUIで知らせる。DDLの再解釈も常に最新の処理を使い、新しいエディションを作る。保存済みSVG・Score・seed・エディションIDはそのまま保持する。
 
+Webの保存済みScoreとseedの比較は「再演」と表示し、画面いっぱいのダイアログで保存済みSVGと現行engineの描き直しを並べる。狭い画面では上下に並べる。「描き直しを子として保存」は元作品のScore・色・seed・wild・紙・描画上限を引き継いだ現行engineの結果を、元作品の系譜の子（`replay`）として通常履歴へ保存する。世代の実行回数は増やさない。保存時は読取可能な元作品と親nodeを検証し、プレビューのrh3とSVG SHA256が一致しなければ保存せず409を返す。保存中の重複操作を防ぎ、同じ保存の再試行は同じidempotency keyを使う。管理済み作品は所有者自身の保存済みauthority・policyリンクを子へ引き継ぐ。他者所有の管理済み作品でそのリンクを引き継げない場合は、子を作る前に409を返す。元作品は変更しない。
+
 PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・地のfilterを黙って落としてはならない。`feTurbulence` / `feDisplacementMap` / `feGaussianBlur`を省略する`cairosvg`は使わず、必要なラスタライザが無い場合は劣化したPNGへのfallbackではなく停止する。ServerとCLIは`shared/src/inku_analysis/rasterizer.py`のresvg経路、Androidは §12.14 の共有native raster APIを使う。これは旧版史に残るPNG規則と現在のhost接続をまとめたもので、描画の意味や実行経路を変更しない。
 
 ---

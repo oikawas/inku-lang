@@ -410,6 +410,7 @@ def api_history_post(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200),
     actor: dict = Depends(_current_user),
 ) -> HistoryItem:
+    replay_link = None
     # A work read again from the description (model or language comparison
     # and the like) cannot descend from a work its DDL holds.
     if (
@@ -418,12 +419,100 @@ def api_history_post(
         and _db.lineage_node_description_locked(body.lineage_parent_node_id)
     ):
         raise HTTPException(status_code=409, detail=DESCRIPTION_LOCKED_DETAIL)
-    metadata_seed_text = body.derivation_metadata.get("seed_text")
-    requested_seed_text = body.seed_text
-    if requested_seed_text is None and isinstance(metadata_seed_text, str):
-        requested_seed_text = metadata_seed_text
-    render_seed, seed_text = _render_seed_from_text(requested_seed_text, body.render_seed)
-    if body.derivation_kind in ("color_arrangement_change", "ground_change"):
+    replay_save = any(value is not None for value in (
+        body.replay_work_id, body.replay_render_hash, body.replay_svg_sha256,
+    ))
+    if not replay_save:
+        metadata_seed_text = body.derivation_metadata.get("seed_text")
+        requested_seed_text = body.seed_text
+        if requested_seed_text is None and isinstance(metadata_seed_text, str):
+            requested_seed_text = metadata_seed_text
+        render_seed, seed_text = _render_seed_from_text(requested_seed_text, body.render_seed)
+    if replay_save:
+        from .render import RenderScoreRequest, _render_authorized_score
+        from ..rendering import _work_for_color_snapshot
+
+        if not all((body.replay_work_id, body.replay_render_hash, body.replay_svg_sha256)) or body.derivation_kind != "replay":
+            raise HTTPException(status_code=422, detail="replay save requires a source work and preview hashes")
+        parent = _work_for_color_snapshot(actor, body.replay_work_id)
+        if not body.lineage_parent_node_id or body.lineage_parent_node_id != parent.get("lineage_node_id"):
+            raise HTTPException(status_code=422, detail="replay parent must match the source work")
+        if parent.get("pipeline_variation_id"):
+            from ...persistence.schema import VariationAuthorityActionRow
+            from ...persistence.variation_authority import VariationAuthorityAdapterError, VariationAuthorityStore
+
+            store = VariationAuthorityStore(_db.engine)
+            try:
+                linked = store.read_linked_history(actor["id"], parent["id"])
+            except VariationAuthorityAdapterError as error:
+                raise HTTPException(status_code=409, detail="saved source authority is unavailable") from error
+            if linked is None:
+                raise HTTPException(status_code=409, detail="managed replay requires the source owner's saved authority")
+            with _db.SessionLocal() as session:
+                acknowledged = session.query(VariationAuthorityActionRow.action_id).filter(
+                    VariationAuthorityActionRow.owner_id == actor["id"],
+                    VariationAuthorityActionRow.variation_id == linked.variation_id,
+                    VariationAuthorityActionRow.revision == linked.revision,
+                    VariationAuthorityActionRow.ddl_digest == linked.ddl_digest,
+                ).first()
+            if acknowledged is None:
+                raise HTTPException(status_code=409, detail="saved source authority is unavailable")
+            replay_link = (store, linked)
+        # The source row decides every performance condition. Old works that
+        # recorded neither seed use the same provisional zero as the preview.
+        source_seed_text = parent.get("seed_text")
+        if source_seed_text is not None and not source_seed_text.strip():
+            source_seed_text = None
+        provisional_seed = parent.get("render_seed") is None and source_seed_text is None
+        replayed = _render_authorized_score(RenderScoreRequest(
+            work_id=body.replay_work_id,
+            score=parent["score"],
+            input=parent.get("input") or "",
+            ddl=parent.get("ddl"),
+            catalog_id=parent.get("catalog_id"),
+            canvas_aspect=parent.get("render_canvas_aspect_id") or parent.get("render_canvas_aspect"),
+            render_seed=0 if provisional_seed else parent.get("render_seed"),
+            seed_text=source_seed_text,
+            composition_seed=parent.get("composition_seed"),
+            interpretation_seed=parent.get("interpretation_seed"),
+            wild=bool(parent.get("render_wild")),
+        ), actor, parent).model_dump(exclude_none=True, by_alias=True)
+        if replayed["render_hash"] != body.replay_render_hash or replayed["svg_sha256"] != body.replay_svg_sha256:
+            raise HTTPException(status_code=409, detail="replay preview changed; redraw before saving")
+        inherited = {key: parent.get(key) for key in (
+            "input", "ddl", "ddl_source_origin", "source_text", "interpret_fallback", "compose_fallback",
+            "catalog_mode", "stage1_model", "stage2_model", "stage1_prompt_digest",
+            "stage1_prompt_base_digest", "stage2_prompt_digest", "instruction_lang_requested",
+            "instruction_lang_resolved", "ui_lang", "sketch_text", "sketch_grain", "sketch_state",
+            "elapsed_ms", "tokens_in", "tokens_out", "display_label", "batch_line_number", "batch_run_id",
+        )}
+        inherited.update(input=inherited["input"] or "", history_visibility="normal", count_generation=False)
+        body = body.model_copy(update=inherited)
+        score, svg, catalog_id = replayed["score"], replayed["svg"], replayed["catalog_id"]
+        coerce_observability = None
+        render_metadata = {
+            **{key: value for key, value in replayed.items() if key not in {"score", "svg", "catalog_id"}},
+            **{key: parent.get(key) for key in (
+                "stage1_prompt_digest", "stage1_prompt_base_digest", "stage2_prompt_digest",
+                "instruction_lang_requested", "instruction_lang_resolved", "ui_lang", "interpretation_seed",
+            )},
+        }
+        body = body.model_copy(update={"derivation_metadata": {
+            "replay_work_id": parent["id"], "replay_render_hash": replayed["render_hash"],
+            "replay_svg_sha256": replayed["svg_sha256"],
+            "provisional_render_seed": provisional_seed,
+        }})
+        if replay_link is not None:
+            diagnostics = dict(linked.pipeline_diagnostics or {
+                "upstream_diagnostics": [], "downstream_diagnostics": [],
+                "resource_omissions": [], "relation_omissions": [],
+            })
+            diagnostics.update(render_diagnostics=replayed.get("render_diagnostics"),
+                               resource_execution=replayed.get("resource_execution"))
+            diagnostics.pop("render_warnings", None)
+            if replayed.get("render_warnings"):
+                diagnostics["render_warnings"] = replayed["render_warnings"]
+    elif body.derivation_kind in ("color_arrangement_change", "ground_change"):
         from .render import _render_color_arrangement_for_work, _render_ground_variant_for_work
         from ..rendering import _work_for_color_snapshot
 
@@ -590,6 +679,18 @@ def api_history_post(
         sketch_state=body.sketch_state or _derived_sketch_state(body),
         coerce_observability=coerce_observability.persistable() if coerce_observability else None,
     )
+    if replay_link is not None:
+        store, linked = replay_link
+        # Reuse the source's exact immutable authoring revision. Only this
+        # performance's renderer diagnostics are replaced by the fresh render.
+        store.link_history(actor["id"], item_dict["id"], linked.variation_id, linked.revision,
+            linked.ddl_digest, snapshot={
+                "variation_id": linked.variation_id, "authority": {"revision": linked.revision},
+                "document": {"source": body.ddl}, "delivery": {"source_digest": linked.ddl_digest},
+                "config": linked.saved_config, "completion_ranges": linked.completion_ranges,
+            }, context={"host_options": linked.host_options, "macro_catalog": linked.macro_catalog},
+            pipeline_diagnostics=diagnostics)
+        item_dict = _db.get_items(actor["id"], [item_dict["id"]])[0]
     if body.count_generation and not item_dict.get("_idempotent_replay"):
         if _db.increment_user_generation_count(actor["id"]) is None:
             raise HTTPException(status_code=404, detail="user not found")

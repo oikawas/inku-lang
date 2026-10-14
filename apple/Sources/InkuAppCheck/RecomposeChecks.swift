@@ -63,7 +63,7 @@ import InkuUI
         // Failure: a work without ranges did not say why, or did not keep its document.
         let kept = try await app.makeDrawingAdjustmentPlans(work: still, kind: "layout_change", count: 1)
         guard let recomposition = kept[0].recomposition, !recomposition.recomposed, recomposition.reason == "nothing_to_move",
-              recomposition.lines(display: app.display) == ["この作品には構図の範囲が無い。", "構図の範囲を保って描き直しました。"] else {
+              recomposition.lines(display: app.display) == ["この作品には構図の範囲が無い。", "指示書は変えず、配置の seed を変えて描き直しました。"] else {
             throw CheckFailure.message("Unranged option: \(String(describing: kept[0].recomposition))")
         }
         let keptCandidate = try await app.prepareDrawingAdjustmentCandidate(plan: kept[0], token: token)

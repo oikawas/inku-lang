@@ -140,7 +140,7 @@ public struct RefinementView: View {
 
     private func kindTooltip(_ kind: RefinementKind) -> String {
         switch kind {
-        case .layout: return model.display.tooltip("保存した指示書の数で書いた範囲を、原理に沿うか偶然に委ねるかで選び直します。明示したかたむきと「隅」も候補のseedで選び直します。動かせないときは理由を示し、元の指示書で描き直します", serverKey: "tooltipCanvasVaryComposition")
+        case .layout: return model.display.tooltip("保存した指示書の数で書いた範囲を、原理に沿うか偶然に委ねるかで選び直します。明示したかたむきと「隅」も候補のseedで選び直します。動かせないときは理由を示し、元の指示書を配置の seed だけ変えて描き直します", serverKey: "tooltipCanvasVaryComposition")
         }
     }
 

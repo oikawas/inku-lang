@@ -53,6 +53,7 @@ test('T-294: replay keeps recorded seeds, work payload, source, and version mism
 	assert.equal(body.composition_seed, '23');
 	assert.equal(body.catalog_id, 'catalog-recorded');
 	assert.equal(body.work_id, 'work-1');
+	assert.equal(body.replay_saved_work, true);
 	assert.equal(comparison.source, 'lineage');
 	assert.equal(comparison.originalSvg, '<svg>old</svg>');
 	assert.equal(comparison.replayedSvg, '<svg>new</svg>');

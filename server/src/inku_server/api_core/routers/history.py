@@ -429,7 +429,7 @@ def api_history_post(
             requested_seed_text = metadata_seed_text
         render_seed, seed_text = _render_seed_from_text(requested_seed_text, body.render_seed)
     if replay_save:
-        from .render import RenderScoreRequest, _render_authorized_score
+        from .render import _render_authorized_score, _saved_work_replay_request
         from ..rendering import _work_for_color_snapshot
 
         if not all((body.replay_work_id, body.replay_render_hash, body.replay_svg_sha256)) or body.derivation_kind != "replay":
@@ -458,25 +458,9 @@ def api_history_post(
             if acknowledged is None:
                 raise HTTPException(status_code=409, detail="saved source authority is unavailable")
             replay_link = (store, linked)
-        # The source row decides every performance condition. Old works that
-        # recorded neither seed use the same provisional zero as the preview.
-        source_seed_text = parent.get("seed_text")
-        if source_seed_text is not None and not source_seed_text.strip():
-            source_seed_text = None
-        provisional_seed = parent.get("render_seed") is None and source_seed_text is None
-        replayed = _render_authorized_score(RenderScoreRequest(
-            work_id=body.replay_work_id,
-            score=parent["score"],
-            input=parent.get("input") or "",
-            ddl=parent.get("ddl"),
-            catalog_id=parent.get("catalog_id"),
-            canvas_aspect=parent.get("render_canvas_aspect_id") or parent.get("render_canvas_aspect"),
-            render_seed=0 if provisional_seed else parent.get("render_seed"),
-            seed_text=source_seed_text,
-            composition_seed=parent.get("composition_seed"),
-            interpretation_seed=parent.get("interpretation_seed"),
-            wild=bool(parent.get("render_wild")),
-        ), actor, parent).model_dump(exclude_none=True, by_alias=True)
+        replay_request = _saved_work_replay_request(parent)
+        provisional_seed = parent.get("render_seed") is None and replay_request.seed_text is None
+        replayed = _render_authorized_score(replay_request, actor, parent).model_dump(exclude_none=True, by_alias=True)
         if replayed["render_hash"] != body.replay_render_hash or replayed["svg_sha256"] != body.replay_svg_sha256:
             raise HTTPException(status_code=409, detail="replay preview changed; redraw before saving")
         inherited = {key: parent.get(key) for key in (

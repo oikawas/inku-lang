@@ -1,5 +1,6 @@
 """A replay child saves the authorized source's exact current performance."""
 
+import json
 import uuid
 from hashlib import sha256
 
@@ -168,16 +169,41 @@ def test_managed_replay_child_replays_its_inherited_saved_policy(monkeypatch):
         parent = db.get_items(user["id"], [parent["id"]])[0]
         request = {"work_id": parent["id"], "score": parent["score"], "render_seed": 0,
                    "composition_seed": 17, "wild": True}
-        response = client.post("/api/render-score", json=request, headers=headers)
+        # JavaScript JSON.stringify emits whole-valued floats as integers.
+        browser_score = json.loads(json.dumps(parent["score"]), parse_float=lambda text:
+            int(float(text)) if float(text).is_integer() else float(text))
+        assert json.dumps(browser_score, sort_keys=True) != json.dumps(parent["score"], sort_keys=True)
+        browser_request = {**request, "score": browser_score}
+        response = client.post("/api/render-score", json=browser_request, headers=headers)
         assert response.status_code == 200, response.text
-        preview = response.json()
+        browser_preview = response.json()
+        assert browser_preview["render_seed"] == "0"
         payload = {"input": "ignored", "score": {}, "at": 2, "save_artifacts": False,
             "derivation_kind": "replay", "lineage_parent_node_id": parent["lineage_node_id"],
-            "replay_work_id": parent["id"], "replay_render_hash": preview["render_hash"],
-            "replay_svg_sha256": preview["svg_sha256"]}
+            "replay_work_id": parent["id"], "replay_render_hash": browser_preview["render_hash"],
+            "replay_svg_sha256": browser_preview["svg_sha256"]}
+        before = db.list_state(user["id"])
+        incompatible = client.post("/api/history", json=payload, headers=headers)
+        assert incompatible.status_code == 409, incompatible.text
+        assert db.list_state(user["id"]) == before
+        response = client.post("/api/render-score", json={**browser_request, "replay_saved_work": True}, headers=headers)
+        assert response.status_code == 200, response.text
+        preview = response.json()
+        assert preview["score"] == parent["score"]
+        assert json.dumps(preview["score"], sort_keys=True) == json.dumps(parent["score"], sort_keys=True)
+        assert preview["render_seed"] == "0" and preview["composition_seed"] == "17"
+        assert preview["render_wild"] is True and preview["render_canvas_aspect_id"] == "square"
+        payload.update(replay_render_hash=preview["render_hash"], replay_svg_sha256=preview["svg_sha256"])
+        for field, wrong in (("replay_render_hash", "rh3:" + "0" * 64), ("replay_svg_sha256", "0" * 64)):
+            modified = client.post("/api/history", json={**payload, field: wrong}, headers=headers)
+            assert modified.status_code == 409, modified.text
+        assert db.list_state(user["id"]) == before
         saved = client.post("/api/history", json=payload, headers=headers)
         assert saved.status_code == 200, saved.text
         child = saved.json()
+        assert child["svg"] == preview["svg"]
+        assert child["lineage_parent_node_id"] == parent["lineage_node_id"]
+        assert db.get_items(user["id"], [parent["id"]])[0] == parent
         assert child["pipeline_variation_id"] == parent["pipeline_variation_id"]
         assert child["pipeline_revision"] == parent["pipeline_revision"]
         assert child["pipeline_diagnostics"]["render_diagnostics"] == preview["render_diagnostics"]

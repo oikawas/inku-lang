@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — Replay previews and saved children use the same stored Score
+
+A browser turns compact Score JSON numbers such as `0.0` and `1.0` into `0` and `1`. The preview and saved-source rh3 then differed even with identical SVG, refusing the child save with 409. Explicit saved-work replay now uses the same stored Score and conditions for preview and child saving. The rh3 definition, SVG match guard, ordinary performances with explicit conditions, and engine version are unchanged. Save this performance as a child moves to the left of Close at the top right; success and failure remain visible.
+
 ## v2.15.126 (2026-10-14 / Build 1202)
 
 ### 2026-10-14 — Remove the whisker at the ends of waving and swaying lines and arcs

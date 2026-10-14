@@ -70,7 +70,10 @@ export async function replayHistoryItem(
 			composition_seed: item.composition_seed ?? null,
 			interpretation_seed: item.interpretation_seed ?? null,
 			seed_text: hasSeedText ? item.seed_text : null,
-			...defaults.renderPayload(item, catalogId)
+			...defaults.renderPayload(item, catalogId),
+			// Saved-work replay uses the same server-owned Score and conditions
+			// as saving its child, including JSON numbers the browser normalizes.
+			...(item.id ? { work_id: item.id, replay_saved_work: true } : {}),
 		})
 	});
 	if (!response.ok) throw await deps.apiError(response);

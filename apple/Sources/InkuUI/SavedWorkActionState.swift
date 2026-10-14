@@ -40,6 +40,7 @@ struct SavedWorkRefinementActions: View {
             // Layout keeps its own dialog after the reading and touch parameters are retired.
             Button(model.display.localized("配置を変える"), systemImage: "square.grid.2x2") { onAction(work, "layout") }
             Button(model.display.localized("色カタログを変える"), systemImage: "paintpalette") { onAction(work, "color") }
+            Button(model.display.localized("てざわりを変える"), systemImage: "pencil.tip") { onAction(work, "tool") }
             if state?.showsDescriptionActions != false {
                 Button(model.display.localized("記述を変える"), systemImage: "text.cursor") { onAction(work, "description") }
                     .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? model.display.tooltip("記述を変える") : reason)

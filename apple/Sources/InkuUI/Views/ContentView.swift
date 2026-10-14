@@ -51,7 +51,7 @@ private struct NewDdlSession {
 
 private enum WorkDialog: Identifiable {
     case export(ExportSession), edit(WorkEditSession), refinement(RefinementSession), replay(ReplaySession)
-    case ddl(DdlEditingSession), newDDL(NewDdlSession), comparison(ComparisonSession), advice(RefinementSession), colophon(RefinementSession), information(RefinementSession), drawingLogs
+    case ddl(DdlEditingSession), newDDL(NewDdlSession), comparison(ComparisonSession), tool(RefinementSession), advice(RefinementSession), colophon(RefinementSession), information(RefinementSession), drawingLogs
     var id: String {
         switch self {
         case .export(let session): session.id.uuidString
@@ -61,6 +61,7 @@ private enum WorkDialog: Identifiable {
         case .ddl(let session): session.id.uuidString
         case .newDDL(let session): session.id.uuidString
         case .comparison(let session): session.id.uuidString
+        case .tool(let session): session.id.uuidString
         case .advice(let session): session.id.uuidString
         case .colophon(let session): session.id.uuidString
         case .information(let session): session.id.uuidString
@@ -467,6 +468,9 @@ public struct ContentView: View {
         case .comparison(let session):
             ComparisonView(model: model, work: session.work, kind: session.kind).id(session.id).environment(model.display)
                 .inkuDialogFrame(.comparison)
+        case .tool(let session):
+            ToolChangeView(model: model, work: session.work).id(session.id).environment(model.display)
+                .inkuDialogFrame(.comparison)
         case .advice(let session):
             AuxiliaryView(model: model, mode: .advice, work: session.work).id(session.id).environment(model.display)
                 .inkuDialogFrame(.auxiliary)
@@ -527,6 +531,7 @@ public struct ContentView: View {
         // The editor opens on the box's draft; its discard returns to the work's saved instructions.
         case "ddl": dialog = .ddl(DdlEditingSession(work: work, draft: model.ddlBoxText(for: work)))
         case "color": dialog = .comparison(ComparisonSession(work: work, kind: .catalog))
+        case "tool": dialog = .tool(RefinementSession(work: work))
         case "model": dialog = .comparison(ComparisonSession(work: work, kind: .model))
         case "ai": dialog = .advice(RefinementSession(work: work))
         case "colophon": dialog = .colophon(RefinementSession(work: work))

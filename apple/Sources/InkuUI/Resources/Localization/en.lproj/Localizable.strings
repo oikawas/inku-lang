@@ -1487,4 +1487,15 @@
 "編集を破棄" = "Discard edits";
 "この作品を描いたときの指示書に戻します。編集した内容は失われます。" = "This returns to the instructions this work was drawn from. Your edits will be lost.";
 "破棄する" = "Discard";
+"てざわりを変える" = "Change the touches";
+"てざわり" = "Touches";
+"すべての文を同じ筆記具にする" = "Same tool for every sentence";
+"文ごとに違う筆記具にする" = "A different tool for each sentence";
+"文ごと %ld" = "Per sentence %ld";
+"4案を作る" = "Make four options";
+"てざわりの候補を用意中" = "Preparing touch options";
+"てざわり（筆記具）だけを替えます。配置・色・支持体は保ちます。てざわりを書いていない文には、新しい語を書き足します。" = "Changes only the touches (the drawing tools). Placement, color and ground stay the same. A sentence that names no touch has the new word written in.";
+"替え方を選んで「4案を作る」を押すと、筆記具を替えた4案を並べます。もう一度押すと、並んでいる案を捨てて新しい4案に替えます。" = "Choose a way and press Make four options to see four options with other drawing tools. Pressing it again discards the options shown and draws four new ones.";
+"この作品には、てざわりを替えられる文がありません。" = "This work has no sentence whose touch can change.";
+"この作品のてざわりを替えられません。" = "This work's touches cannot change.";
 "横1/3〜2/3、縦2/3〜1 の形で、0〜1の数を、始まりを終わりより小さく書いてください。「-」「－」も使えます。枠は最後の有効な範囲です" = "Use horizontal 1/3 to 2/3, vertical 2/3 to 1, with numbers from 0 to 1 and each start below its end. You may also join numbers with - or –. The frame shows the last valid range";

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — Remove the whisker at the ends of waving and swaying lines and arcs
+
+Lines and arcs with sway moved only their interior points by the sway and kept their start and end unshifted. The seeded wave phase (v2.0.5) and the perlin values are rarely zero at the ends, so the first and last segment jumped sideways, and where a brush tapers that jump read as a thin, whisker-like straight line (up to about 46 px sideways on a brush line swept broadly). Open lines and arcs now keep their start and end where the Score puts them and let the sway settle to nothing towards both, over the shorter of 0.16 of the line (the share over which a hand stroke tapers) and half a wave, rising as a raised cosine. The sway inside is unchanged. Polygon edges keep their full sway up to the corners. Connection resolving and drawing share the same centerline. Shifting the whole wave sideways to pass through the ends was not taken, because it widened how far a line swings to one side (the author's choice). Render engine 76. Saved works are unchanged. In the author's sample, the ends bent by more than 20° went from 50 of 56 to none.
+
 ## v2.15.125 (2026-10-14 / Build 1201)
 
 ### 2026-10-14 — A full-screen Replay comparison can save the new performance as a child

@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 
 use crate::determinism::{needs_contour_variation, needs_path_variation};
 use crate::geometry::{
-    ArcGeometry, arc_points, arc_points_with_variation, line_with_variation, point_to_pixels,
+    ArcGeometry, arc_points, arc_points_with_variation, open_line_with_variation, point_to_pixels,
     size_to_pixels, stroke_sample_count,
 };
 use crate::marks::{MarkContext, MarkStyle, apply_style, is_closed, mark_width};
@@ -217,7 +217,7 @@ pub(crate) fn connected_line_centerline(
     }
     let start = point_to_pixels(instruction.from_?, canvas);
     let end = point_to_pixels(instruction.to?, canvas);
-    let mut centerline = line_with_variation(
+    let mut centerline = open_line_with_variation(
         start,
         end,
         variation,
@@ -362,7 +362,7 @@ pub(crate) fn hand_line(
             .as_ref()
             .filter(|variation| needs_path_variation(variation))
             .map(|variation| {
-                line_with_variation(
+                open_line_with_variation(
                     start,
                     end,
                     variation,

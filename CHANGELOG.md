@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — Remove the X shapes and zigzags from oil fills
+
+The hand line's single-sample events (a catch, a fade or a correction) also reached the passes of an oil fill. Because a fill lays its passes side by side and widens them threefold, a pass pinched into an X at one point and its marks kinked into a Z (the author's sample work `227139cd…`). Oil fill passes now take no such events. Oil lines and outlines, and the other tools, are unchanged. Redrawing 69 recent works with oil fills changes the SVG of 41, and 4 of them differ by 24/255 or more in a 1000 px image. The author chose this fix over a comparison sheet. Render engine 78. Saved works are unchanged.
+
 ### 2026-10-14 — Correct the explanation beside Android composition candidates
 
 A sentence with no range or place now explains that the ranges in the instructions cannot be chosen again. When the ranges stay, the accompanying text says the work was redrawn with a new composition seed and unchanged instructions. The author's Japanese and English wording matches Web.

@@ -742,7 +742,14 @@ pub fn synthesize_contour(request: ContourStrokeRequest<'_>) -> ContourStrokeRes
     let count = centerline.len();
     let normals = centerline_normals(centerline, closed);
     let parameters = arc_length_parameters(centerline, closed);
-    let events = event_map(seed, grammar.event_rate, count);
+    // An oil fill pass is one of many laid side by side as an area of paint,
+    // where a single-sample hand event pinches the pass into an X or kicks it
+    // into a zigzag; oil lines and outlines keep their events.
+    let events = if terminal == StrokeTerminal::Loaded && weight == Weight::OilPaint {
+        BTreeMap::new()
+    } else {
+        event_map(seed, grammar.event_rate, count)
+    };
     let mut noise = StrokeNoise::new(seed);
     let mut gesture_amplitude = 0.0;
     if wild && !grammar.periodic {

@@ -1,7 +1,9 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use inku_render::render::render;
-use inku_render::stroke::{StrokeRequest, synthesize_stroke};
+use inku_render::stroke::{
+    ContourStrokeRequest, StrokeRequest, StrokeTerminal, synthesize_contour, synthesize_stroke,
+};
 use inku_render::support::DEFAULT_SUPPORT;
 use inku_render::types::{
     CanvasSize, Point, RenderOptions, RenderRequest, SurfaceIntensity, SvgProfile, Weight,
@@ -39,6 +41,53 @@ fn oil_retains_loaded_ends_and_a_seeded_body_distinct_from_ink_brush() {
         })
         .outline
     );
+}
+
+#[test]
+fn oil_fill_passes_take_no_hand_events_and_oil_lines_keep_them() {
+    // A fill lays its passes side by side, so a single-sample hand event
+    // pinched a pass into an X or kicked it into a zigzag (render engine 78).
+    let centerline = (0..49)
+        .map(|index| Point::new(f64::from(index) * 10.0, 0.0))
+        .collect::<Vec<_>>();
+    let anchors = BTreeSet::new();
+    let pass = |weight, seed, terminal| {
+        synthesize_contour(ContourStrokeRequest {
+            centerline: &centerline,
+            base_width: 24.0,
+            weight,
+            seed,
+            closed: false,
+            anchors: &anchors,
+            grid_step: 0.0,
+            wild: false,
+            support: DEFAULT_SUPPORT,
+            terminal,
+        })
+    };
+    let seeds = 0..200;
+    // The same seeds give oil lines and another tool's fill passes their
+    // events, so the oil fill passes are held against events that do occur.
+    let oil_lines = seeds
+        .clone()
+        .filter(|seed| pass(Weight::OilPaint, *seed, StrokeTerminal::Taper).event_count > 0)
+        .count();
+    let brush_fills = seeds
+        .clone()
+        .filter(|seed| pass(Weight::BrushThick, *seed, StrokeTerminal::Loaded).event_count > 0)
+        .count();
+    assert!(
+        oil_lines > 0 && brush_fills > 0,
+        "{oil_lines} {brush_fills}"
+    );
+    for seed in seeds {
+        let oil_fill = pass(Weight::OilPaint, seed, StrokeTerminal::Loaded);
+        assert_eq!(oil_fill.event_count, 0, "seed {seed}");
+        assert!(
+            oil_fill.samples.iter().all(|sample| sample.event.is_none()),
+            "seed {seed}"
+        );
+    }
 }
 
 #[test]

@@ -103,7 +103,7 @@ class ToolChangeDeviceTest {
         bitmap.recycle()
     }
 
-    @Test fun fourOptionsAppendWithoutModelsAndSavedTouchChildrenRemainManaged() = runBlocking {
+    @Test fun fourOptionsReplaceOnRequestWithoutModelsAndSavedTouchChildrenRemainManaged() = runBlocking {
         val application = isolatedApplication()
         val db = Room.inMemoryDatabaseBuilder(application, InkuDatabase::class.java).allowMainThreadQueries().build()
         database = db
@@ -138,6 +138,19 @@ class ToolChangeDeviceTest {
         ui.runOnIdle { requireNotNull(vm).openWorkActions(parent) }
         await { it.workActionsTarget?.id == parent.id }
         ui.onNodeWithTag(TOOL_CHANGE_ENTRY_TAG).performClick()
+        await { it.toolChangeOpen }
+        ui.onNodeWithTag(TOOL_CHANGE_DIALOG_TAG).assertIsDisplayed()
+        ui.runOnIdle {
+            assertFalse(requireNotNull(vm).state.value.refinementBusy)
+            assertTrue(requireNotNull(vm).state.value.refinementCandidates.isEmpty())
+            assertEquals(ToolChangeMode.Uniform, requireNotNull(vm).state.value.toolChangeMode)
+        }
+        ui.onNodeWithText("すべての文を同じ筆記具にする").assertIsDisplayed()
+        ui.onNodeWithText("文ごとに違う筆記具にする").assertIsDisplayed()
+        ui.onNodeWithText("替え方を選んで「4案を作る」を押すと、筆記具を替えた4案を並べます。もう一度押すと、並んでいる案を捨てて新しい4案に替えます。")
+            .assertIsDisplayed()
+        capture("tool-change-manual-empty-20261014.png")
+        ui.onNodeWithTag(TOOL_CHANGE_GENERATE_TAG).performScrollTo().performClick()
         await { !it.refinementBusy && it.refinementCandidates.size == 4 }
         ui.onNodeWithTag(TOOL_CHANGE_DIALOG_TAG).assertIsDisplayed()
         val first = requireNotNull(vm).state.value.refinementCandidates
@@ -152,23 +165,30 @@ class ToolChangeDeviceTest {
         assertTrue(first.all { it.pipelineResult?.renderSeed == 4242L })
         ui.runOnIdle { requireNotNull(vm).closeToolChange() }
         assertTrue(requireNotNull(vm).state.value.toolChangeOpen)
-        capture("tool-change-uniform-20261014.png")
+        capture("tool-change-manual-uniform-20261014.png")
         ui.onNodeWithTag("tool-mode-per_sentence").performScrollTo().performClick()
+        ui.runOnIdle {
+            assertFalse(requireNotNull(vm).state.value.refinementBusy)
+            assertEquals(first.map { it.id }, requireNotNull(vm).state.value.refinementCandidates.map { it.id })
+            requireNotNull(vm).previewRefinementCandidate(first.first().id)
+        }
         ui.onNodeWithTag(TOOL_CHANGE_GENERATE_TAG).performScrollTo().performClick()
-        await { !it.refinementBusy && it.refinementCandidates.size == 8 }
+        await { !it.refinementBusy && it.refinementCandidates.size == 4 && it.refinementCandidates.first().id != first.first().id }
         val all = requireNotNull(vm).state.value.refinementCandidates
-        assertEquals(first.map { it.id }, all.take(4).map { it.id })
-        assertTrue(all.drop(4).all { candidate ->
-            candidate.plan.toolChange!!.changes.all { it.from != it.to } && candidate.label.startsWith("文ごと ")
+        assertTrue(first.map { it.id }.toSet().intersect(all.map { it.id }.toSet()).isEmpty())
+        assertNull(requireNotNull(vm).state.value.refinementPreviewId)
+        assertTrue(all.all { candidate ->
+            candidate.plan.toolChange!!.mode == ToolChangeMode.PerSentence &&
+                candidate.plan.toolChange!!.changes.all { it.from != it.to } && candidate.label.startsWith("文ごと ")
         })
-        ui.onNodeWithText(all[4].label).performScrollTo().assertIsDisplayed()
-        val changed = all[4].plan.toolChange!!.changes.first()
-        val words = all[4].plan.toolChange!!.source.tools.associateBy { it.value }
+        ui.onNodeWithText(all.first().label).performScrollTo().assertIsDisplayed()
+        val changed = all.first().plan.toolChange!!.changes.first()
+        val words = all.first().plan.toolChange!!.source.tools.associateBy { it.value }
         val line = "${changed.index + 1}: ${words.getValue(changed.from).ja} → ${words.getValue(changed.to).ja}"
         ui.onAllNodesWithText(line).onFirst().performScrollTo().assertIsDisplayed()
-        ui.onNodeWithText(all[4].renderHashShort).performScrollTo().assertIsDisplayed()
+        ui.onNodeWithText(all.first().renderHashShort).performScrollTo().assertIsDisplayed()
         ui.onAllNodesWithText(line).onFirst().assertIsDisplayed()
-        capture("tool-change-per-sentence-20261014.png")
+        capture("tool-change-manual-per-sentence-20261014.png")
         ui.onAllNodesWithTag(REFINE_SAVE_TAG).onFirst().performScrollTo().performClick()
         await { it.refinementCandidates.first().saveState == RefinementSaveState.Saved }
         val childId = requireNotNull(requireNotNull(vm).state.value.refinementCandidates.first().savedHistoryId)
@@ -191,7 +211,7 @@ class ToolChangeDeviceTest {
             assertTrue(cursor.moveToFirst())
             assertEquals("tool_change", cursor.getString(0))
             val metadata = JSONObject(cursor.getString(1))
-            assertEquals("uniform", metadata.getString("tool_mode"))
+            assertEquals("per_sentence", metadata.getString("tool_mode"))
             assertTrue(metadata.getJSONArray("changes").length() > 0)
             assertTrue(metadata.getJSONObject("tools").length() > 0)
         }

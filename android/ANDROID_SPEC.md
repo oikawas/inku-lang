@@ -8,7 +8,7 @@ Last updated: 2026-10-14.
 
 ## 2026-10-14 Change the touches
 
-The saved-work menu places Change the touches after Another catalog. Its separate dialog offers One touch for all by default and Per sentence. Opening draws four options; Make four options appends four more in the chosen mode while retaining earlier options. Uniform options use the drawing tool's name; per-sentence options show a number and each sentence's change. Unsaved options must be saved or discarded before closing; discarding keeps works already saved.
+The saved-work menu places Change the touches after Another catalog. Its separate dialog offers Same tool for every sentence by default and A different tool for each sentence. Opening draws nothing; Make four options draws four in the chosen mode. Pressing it again discards the options shown and draws four new ones. Uniform options use the drawing tool's name; per-sentence options show a number and each sentence's change. Unsaved options must be saved or discarded before closing; discarding keeps works already saved.
 
 JNI forwards shared-core retouch (`inku.touch-change.v1`). The core supplies eligible sentences and twelve tools; the saved Score's source_instruction owners supply the tools actually drawn. Only the corresponding instructions' weight changes. Placement, color, ground, canvas, seeds, Wild and drawing policy remain the parent's, and plugin-owned instructions stay intact. Only the core's rewritten and verified instructions are used. No model is called.
 

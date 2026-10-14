@@ -3099,7 +3099,6 @@ class InkuViewModel @JvmOverloads constructor(
             toolChangeOpen = true, toolChangeMode = app.inku.mobile.data.refinement.ToolChangeMode.Uniform,
             refinementParent = item, refinementCandidates = emptyList(),
         )
-        generateToolChangeCandidates()
     }
 
     fun setToolChangeMode(mode: app.inku.mobile.data.refinement.ToolChangeMode) {
@@ -3126,7 +3125,7 @@ class InkuViewModel @JvmOverloads constructor(
         )
     }
 
-    /** Append four options in the chosen mode; earlier options still belong to this target. */
+    /** Replace the displayed options with four in the chosen mode, only on request. */
     fun generateToolChangeCandidates() {
         val current = localState.value
         if (!current.toolChangeOpen || current.refinementBusy || current.isDrawing ||
@@ -3135,7 +3134,8 @@ class InkuViewModel @JvmOverloads constructor(
         val parent = RefinementParent.of(item, sourceTextOf(item))
         localState.value = current.copy(
             refinementBusy = true, refinementStatus = null,
-            refinementPlannedCount = current.refinementCandidates.size + 4,
+            refinementCandidates = emptyList(), refinementPreviewId = null,
+            refinementPlannedCount = 4,
         )
         val run = viewModelScope.launch {
             runCatching {
@@ -3161,7 +3161,7 @@ class InkuViewModel @JvmOverloads constructor(
                     )
                     localState.value = localState.value.copy(refinementCandidates = localState.value.refinementCandidates + candidate)
                 }
-                if (localState.value.refinementCandidates.size == current.refinementCandidates.size) {
+                if (localState.value.refinementCandidates.isEmpty()) {
                     localState.value = localState.value.copy(refinementStatus =
                         if (options.isEmpty()) strings().toolChangeNone else strings().refinementFailed)
                 }

@@ -932,7 +932,16 @@ class InkuRepository(
      * history table on the way.
      */
     suspend fun renderRefinementCandidate(parent: RefinementParent, plan: RefinementPlan): PaintResult {
-        val request = PaintRequest(
+        val request = refinementRequest(parent, plan)
+        return when (plan.route) {
+            RefinementRoute.RenderFromScore -> pipeline.renderFromScore(parent.scoreJson, request)
+            RefinementRoute.ComposeFromDdl -> pipeline.composeFromDdl(parent.ddl, request)
+            RefinementRoute.Paint -> pipeline.paint(request)
+        }
+    }
+
+    private fun refinementRequest(parent: RefinementParent, plan: RefinementPlan): PaintRequest =
+        PaintRequest(
             description = parent.description,
             originalText = parent.description,
             // A comparison candidate is the only thing that overrides these; a
@@ -960,11 +969,48 @@ class InkuRepository(
             parentHistoryId = parent.historyId,
             saveHistory = false,
         )
-        return when (plan.route) {
-            RefinementRoute.RenderFromScore -> pipeline.renderFromScore(parent.scoreJson, request)
-            RefinementRoute.ComposeFromDdl -> pipeline.composeFromDdl(parent.ddl, request)
-            RefinementRoute.Paint -> pipeline.paint(request)
-        }
+    private fun toolChangePlan(
+        parent: RefinementParent,
+        option: app.inku.mobile.data.refinement.ToolChangeOption? = null,
+    ) = RefinementPlan(
+        element = null, route = RefinementRoute.RenderFromScore,
+        catalogId = parent.catalogId, canvasAspect = parent.canvasAspect, seeds = parent.seeds,
+        derivationKind = "tool_change", derivationMetadata = option?.metadata().orEmpty(), toolChange = option,
+    )
+
+    suspend fun toolChangeOptions(
+        parent: RefinementParent,
+        mode: app.inku.mobile.data.refinement.ToolChangeMode,
+    ): List<app.inku.mobile.data.refinement.ToolChangeOption> {
+        val source = pipeline.toolChangeSource(parent.ddl, parent.scoreJson, refinementRequest(parent, toolChangePlan(parent)))
+        return app.inku.mobile.data.refinement.ToolChangePlanner.options(source, mode)
+    }
+
+    suspend fun renderToolChangeCandidate(
+        parent: RefinementParent,
+        option: app.inku.mobile.data.refinement.ToolChangeOption,
+    ): Pair<RefinementPlan, PaintResult>? {
+        val plan = toolChangePlan(parent, option)
+        return pipeline.renderToolChange(option, refinementRequest(parent, plan))?.let { plan to it }
+    }
+
+    /** Redraw from the saved parent/tools at save time; candidate Score/DDL are never trusted. */
+    suspend fun saveToolChangeCandidate(
+        parentItem: HistoryItemEntity,
+        option: app.inku.mobile.data.refinement.ToolChangeOption,
+        elapsedMs: Long,
+        historyVisibility: String?,
+    ): HistoryItemEntity {
+        val item = getHistoryById(parentItem.id)?.takeUnless { it.trashed }
+            ?: error("tool parent was not found")
+        val parent = RefinementParent.of(item, (item.sourceText ?: item.originalInput).trim())
+        val source = pipeline.toolChangeSource(parent.ddl, parent.scoreJson, refinementRequest(parent, toolChangePlan(parent)))
+        val fresh = option.copy(source = source)
+        val (plan, result) = renderToolChangeCandidate(parent, fresh) ?: error("touch change could not be verified")
+        return saveRefinementCandidate(
+            result, plan, item.lineageNodeId, elapsedMs, historyVisibility,
+            parent.stage1Model, parent.stage2Model, parent.description,
+        )
     }
 
     /**
@@ -1104,6 +1150,7 @@ class InkuRepository(
         try {
             when {
                 result.managedHistoryLink != null -> sharedPipelineStore.saveManagedHistory(item, write, result.managedHistoryLink)
+                result.managedToolChange != null -> sharedPipelineStore.saveManagedToolHistory(item, write, result.managedToolChange)
                 result.managedHistoryReplay != null -> sharedPipelineStore.saveManagedReplayHistory(item, write, result.managedHistoryReplay)
                 else -> database.withTransaction {
                     database.historyDao().insert(item)

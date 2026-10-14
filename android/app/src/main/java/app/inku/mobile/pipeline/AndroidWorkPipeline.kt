@@ -285,6 +285,68 @@ class AndroidWorkPipeline(
 
     suspend fun renderFromScore(scoreJson: String, request: PaintRequest): PaintResult {
         val replaySource = replaySource(request.parentHistoryId, scoreJson)
+        return renderScoreWithSource(scoreJson, request, replaySource)
+    }
+
+    /** A touch change reads the parent's policy, not the editor or today's model choices. */
+    suspend fun toolChangeSource(
+        ddl: String,
+        scoreJson: String,
+        request: PaintRequest,
+    ): app.inku.mobile.data.refinement.ToolChangeSource {
+        replaySource(request.parentHistoryId, scoreJson)
+        val config = prepare(request, descriptionFlow = false, text = ddl).request.config.configJson
+        val input = JSONObject().put("config", JSONObject(config)).put("source", ddl).put("tools", JSONObject())
+        val answer = JSONObject(binding.retouch(input.toString().encodeToByteArray()).toString(Charsets.UTF_8))
+        return app.inku.mobile.data.refinement.ToolChangePlanner.read(ddl, scoreJson, config, answer)
+    }
+
+    suspend fun renderToolChange(
+        option: app.inku.mobile.data.refinement.ToolChangeOption,
+        request: PaintRequest,
+    ): PaintResult? {
+        val source = option.source
+        require(option.tools.isNotEmpty() && option.changes.isNotEmpty())
+        require(option.tools.all { (index, tool) ->
+            index in source.drawn && source.tools.any { it.value == tool }
+        })
+        val parent = replaySource(request.parentHistoryId, source.scoreJson)
+        require(parent?.history?.normalizedDdl == source.source) { "tool source changed" }
+        val savedOptions = parent?.forkContextJson?.let(::JSONObject)?.optJSONObject("host_options")
+        val metadata = parent?.history?.renderMetadataJson?.let(::JSONObject)
+        val parentSeed = request.renderSeed
+            ?: parent?.history?.renderSeed?.let { java.lang.Long.parseUnsignedLong(it) }
+            ?: savedOptions?.optionalUnsignedLong("render_seed")
+            ?: metadata?.optionalUnsignedLong("render_seed")
+            ?: throw InkuFailure { it.refinementFailed }
+        val fixedRequest = request.copy(
+            renderSeed = parentSeed,
+            compositionSeed = request.compositionSeed
+                ?: JSONObject(source.configJson).optJSONObject("compiler")?.optionalUnsignedLong("composition_seed")
+                ?: metadata?.optionalUnsignedLong("composition_seed"),
+        )
+        val input = JSONObject().put("config", JSONObject(source.configJson)).put("source", source.source)
+            .put("tools", JSONObject(option.tools.mapKeys { it.key.toString() }))
+        val answer = JSONObject(binding.retouch(input.toString().encodeToByteArray()).toString(Charsets.UTF_8))
+        require(answer.optString("schema") == "inku.touch-change.v1") { "retouch schema mismatch" }
+        if (answer.optString("outcome") != "retouched") return null
+        val changedSource = answer.getString("source")
+        val changedScore = app.inku.mobile.data.refinement.ToolChangePlanner.scoreWithTools(source.scoreJson, option.tools)
+        val result = renderScoreWithSource(changedScore, fixedRequest, parent)
+        return result.copy(
+            normalizedDdl = changedSource,
+            managedHistoryReplay = null,
+            managedToolChange = result.managedHistoryReplay?.let {
+                app.inku.mobile.data.db.ManagedToolChangeInput(it, source.source, option.tools, changedSource)
+            },
+        )
+    }
+
+    private suspend fun renderScoreWithSource(
+        scoreJson: String,
+        request: PaintRequest,
+        replaySource: ManagedHistoryRead?,
+    ): PaintResult {
         if (request.canvasAspect == PIXEL9_HOST_ONLY_FORMAT) {
             val rendered = legacyRenderer.render(
                 RenderRequest(

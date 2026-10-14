@@ -8,6 +8,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — Draw and replace four Android touch options only on request
+
+Following the author's update, opening the dialog draws nothing; Make four options draws only when pressed. Pressing it again discards the shown options and draws four new ones. The radios now read Same tool for every sentence and A different tool for each sentence, and the empty-list explanation matches Web.
+
+### 2026-10-14 — Add Change the touches on Android
+
+The work menu places Change the touches after Another catalog. One touch for all or Per sentence draws four options on opening and adds four more on request. Only the drawing tools of the chosen source sentences change in the saved Score; shared-core retouch writes the corresponding instructions. No model is called, and only saved options become Touches children.
+
 ### 2026-10-14 — Draw macOS touch options only when asked, replacing the previous four
 
 Following the author's correction, opening the dialog no longer draws. Make four options draws only when pressed, and a subsequent press discards the previous options and selections, replacing them with four new options. The radio now reads Same tool for every sentence / A different tool for each sentence, with Japanese and English copy and specifications matching Web.

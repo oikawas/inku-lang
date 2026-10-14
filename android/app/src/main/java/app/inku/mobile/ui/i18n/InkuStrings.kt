@@ -91,6 +91,17 @@ interface InkuStrings {
     val instructionEditAction: String
     val layoutEditAction: String
     val colorCatalogEditAction: String
+    val workActionTool: String
+    val toolChangeHint: String
+    val toolChangeUniform: String
+    val toolChangePerSentence: String
+    val toolChangePerSentenceCandidate: (Int) -> String
+    val toolChangePlaceholder: String
+    val toolChangeNone: String
+    val toolChangeMakeFour: String
+    val toolChangeDiscard: String
+    val toolChangeDiscardAndClose: String
+    val toolChangeSaveOrDiscard: String
     val modelEditAction: String
     val editingWorkLabel: (String) -> String
     val nextDrawingConditions: String

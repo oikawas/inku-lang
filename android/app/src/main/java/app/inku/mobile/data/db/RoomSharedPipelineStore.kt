@@ -32,6 +32,14 @@ data class ManagedHistoryReplayInput(
     val pipelineDiagnosticsJson: String,
 )
 
+/** A verified retouch, independently redrawn from its saved parent at save time. */
+data class ManagedToolChangeInput(
+    val replay: ManagedHistoryReplayInput,
+    val parentSource: String,
+    val tools: Map<Int, String>,
+    val verifiedSource: String,
+)
+
 data class ManagedHistoryRead(
     val history: HistoryItemEntity,
     val authority: String?,
@@ -301,6 +309,72 @@ class RoomSharedPipelineStore(
             database.lineageDao().insertNode(lineage.node)
             lineage.edge?.let { database.lineageDao().insertEdge(it) }
             dao.insertHistoryLink(link)
+        }
+    }
+
+    /**
+     * Retouch is a core-verified DDL operation, not a replay of identical source.
+     * Keep the replay guard above strict and give this child its own DDL authority.
+     * The repository redraws the parent/tools again before calling this port.
+     */
+    suspend fun saveManagedToolHistory(
+        history: HistoryItemEntity,
+        lineage: LineageWrite,
+        input: ManagedToolChangeInput,
+    ) {
+        database.withTransaction {
+            val replay = input.replay
+            val parent = database.historyDao().getById(replay.sourceHistoryId)?.takeUnless { it.trashed }
+                ?: throw SharedPipelinePersistenceException("tool parent was not found")
+            val parentLink = dao.getHistoryLink(replay.ownerId, parent.id)
+                ?: throw SharedPipelinePersistenceException("tool parent is not managed")
+            val context = decodeForkContextObject(parent, parentLink)
+            require(parent.normalizedDdl == input.parentSource && history.normalizedDdl == input.verifiedSource)
+            val edge = requireNotNull(lineage.edge)
+            require(edge.parentNodeId == parent.lineageNodeId && edge.derivationKind == "tool_change")
+            require(
+                LineagePlanner.canonicalJson(JSONObject(history.scoreJson)) ==
+                    LineagePlanner.canonicalJson(JSONObject(
+                        app.inku.mobile.data.refinement.ToolChangePlanner.scoreWithTools(parent.scoreJson, input.tools),
+                    )),
+            ) { "tool Score must differ only in the requested source owners' weights" }
+            val variationId = java.util.UUID.randomUUID().toString()
+            val revision = "1"
+            val source = input.verifiedSource
+            val digest = source.sha256()
+            val frozen = JSONObject().put("protocol_version", AUTHORITY_PROTOCOL).put("revision", revision)
+                .put("origin", "user_authored_ddl").put("authority", "ddl_authoritative")
+            val parentAuthority = dao.getAuthority(replay.ownerId, parentLink.variationId)
+                ?: throw SharedPipelinePersistenceException("tool parent's authority was not found")
+            val document = JSONObject(parentAuthority.documentJson).put("source", source)
+                .put("language", context.objectField("config").stringField("language"))
+                .put("macro_locks", context.objectField("macro_catalog").getJSONArray("definition_locks"))
+            // No core commit action is invented: the native retouch result is this
+            // operation's source authority. Ordinary pipeline acknowledgments stay unchanged.
+            dao.insertAuthority(VariationAuthorityEntity(
+                ownerId = replay.ownerId, variationId = variationId, protocolVersion = AUTHORITY_PROTOCOL,
+                revision = revision, origin = "user_authored_ddl", authority = "ddl_authoritative",
+                source = source, documentJson = document.toString(), ddlDigest = digest,
+                authorityDigest = LineagePlanner.canonicalJson(frozen).sha256(),
+                description = history.sourceText ?: history.originalInput, derivationKind = "variation_ddl_fork",
+                parentLegacyHistoryId = null, parentVariationId = parentLink.variationId, updatedAt = now(),
+            ))
+            val options = JSONObject(replay.hostOptionsJson)
+            val maps = JSONObject(context.objectField("color_maps").toString())
+                .put(options.stringField("catalog_id"), JSONObject(replay.resolvedColorMapJson))
+            val diagnostics = JSONObject(replay.pipelineDiagnosticsJson)
+            validateDiagnostics(diagnostics)
+            context.put("variation_id", variationId).put("revision", revision).put("ddl_digest", digest)
+                .put("authority", frozen).put("host_options", options).put("color_maps", maps)
+                .put("pipeline_diagnostics", diagnostics)
+            val bytes = LineagePlanner.canonicalJson(context).toByteArray(Charsets.UTF_8)
+            database.historyDao().insert(history)
+            database.lineageDao().insertNode(lineage.node)
+            dao.insertHistoryLink(PipelineHistoryLinkEntity(
+                ownerId = replay.ownerId, historyId = history.id, variationId = variationId, revision = revision,
+                ddlDigest = digest, forkContextBytes = bytes, forkContextDigest = sha256(bytes),
+            ))
+            database.lineageDao().insertEdge(edge)
         }
     }
 

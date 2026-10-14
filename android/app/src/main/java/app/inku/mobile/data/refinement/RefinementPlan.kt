@@ -122,6 +122,7 @@ data class RefinementPlan(
     val stage1Model: String? = null,
     val stage2Model: String? = null,
     val recomposeMode: RecomposeMode? = null,
+    val toolChange: ToolChangeOption? = null,
 )
 
 /**

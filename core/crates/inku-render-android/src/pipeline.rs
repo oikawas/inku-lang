@@ -178,6 +178,16 @@ pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_recomp
 
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_retouch(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    input: JByteArray<'_>,
+) -> jbyteArray {
+    unary_bytes(env, input, inku_pipeline_uniffi::retouch)
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
 pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_completionRangeStates(
     env: JNIEnv<'_>,
     _receiver: JObject<'_>,

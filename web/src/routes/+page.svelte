@@ -3102,6 +3102,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				bind:touchSeedText={work.touchSeedText}
 				onGenerateVariationCandidates={refinement.generateVariationCandidates}
 				onGenerateColorCatalogCandidates={refinement.generateColorCatalogCandidates}
+				onGenerateColorArrangementCandidates={refinement.generateColorArrangementCandidates}
 				onGenerateModelCandidates={generateModelCandidates}
 				onSaveSelectedVariationCandidates={refinement.saveSelectedVariationCandidates}
 				lineageGraph={lineageState.graph}

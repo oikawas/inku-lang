@@ -16,6 +16,7 @@ from ... import db as _db
 from ... import thumbs_db as _thumbs_db
 from ..common import DESCRIPTION_LOCKED_DETAIL, _unexpected_http_error
 from ...persistence.description_lock import DESCRIPTION_READING_KINDS
+from ...persistence.schema import LineageNodeRow
 from ..deps import _current_user
 from ..models import HistoryItem, HistoryListResponse, HistoryPostBody
 from ..rendering import _COMPACT_SCORE_VERSIONS, _capture_history_coerce_observability, _effective_limits, _add_history_item, _output_save_settings, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile
@@ -422,7 +423,42 @@ def api_history_post(
     if requested_seed_text is None and isinstance(metadata_seed_text, str):
         requested_seed_text = metadata_seed_text
     render_seed, seed_text = _render_seed_from_text(requested_seed_text, body.render_seed)
-    if isinstance(body.score, dict) and body.score.get("version") in _COMPACT_SCORE_VERSIONS:
+    if body.derivation_kind == "color_arrangement_change":
+        from .render import _render_color_arrangement_for_work
+        from ..rendering import _work_for_color_snapshot
+
+        index = body.derivation_metadata.get("color_arrangement_index")
+        if type(index) is not int or index < 0 or not body.lineage_parent_node_id:
+            raise HTTPException(status_code=422, detail="color arrangement requires a parent and valid index")
+        with _db.SessionLocal() as session:
+            node = session.get(LineageNodeRow, body.lineage_parent_node_id)
+            parent_id = node.history_id if node else None
+        if not parent_id:
+            raise HTTPException(status_code=404, detail="unknown work")
+        parent = _work_for_color_snapshot(actor, parent_id)
+        replayed = _render_color_arrangement_for_work(actor, parent, index).model_dump(exclude_none=True, by_alias=True)
+        # Only the parent and the server-derived index decide this child. Sent
+        # Score, map, seeds and limits cannot rewrite the work being recolored.
+        inherited = {key: parent.get(key) for key in (
+            "input", "ddl", "ddl_source_origin", "source_text", "interpret_fallback", "compose_fallback",
+            "catalog_mode", "stage1_model", "stage2_model", "stage1_prompt_digest",
+            "stage1_prompt_base_digest", "stage2_prompt_digest", "instruction_lang_requested",
+            "instruction_lang_resolved", "sketch_text", "sketch_grain", "sketch_state",
+        )}
+        inherited["input"] = inherited["input"] or ""
+        body = body.model_copy(update=inherited)
+        score = replayed["score"]
+        svg = replayed["svg"]
+        catalog_id = replayed["catalog_id"]
+        coerce_observability = None
+        render_metadata = {
+            **{key: value for key, value in replayed.items() if key not in {"score", "svg", "catalog_id", "derivation_metadata"}},
+            **{key: body.model_dump()[key] for key in (
+                "stage1_prompt_digest", "stage1_prompt_base_digest", "stage2_prompt_digest",
+                "instruction_lang_requested", "instruction_lang_resolved", "ui_lang",
+            )},
+        }
+    elif isinstance(body.score, dict) and body.score.get("version") in _COMPACT_SCORE_VERSIONS:
         # A compact Score (0.10 and later, every work the app makes now) is
         # drawn only through the shared replay with its resource policy, as
         # /api/render-score and a saved work's SVG are. The plain render below

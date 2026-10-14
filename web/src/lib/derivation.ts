@@ -5,6 +5,7 @@ export type DerivationKind =
 	| 'touch_change'
 	| 'layout_change'
 	| 'catalog_change'
+	| 'color_arrangement_change'
 	| 'reinterpretation'
 	| 'model_comparison'
 	| 'language_comparison'
@@ -19,6 +20,7 @@ const JA: Record<string, string> = {
 	touch_change: 'タッチ',
 	layout_change: '構図',
 	catalog_change: '色',
+	color_arrangement_change: '配色',
 	reinterpretation: '解釈',
 	model_comparison: 'モデル',
 	language_comparison: '言語',
@@ -34,6 +36,7 @@ const EN: Record<string, string> = {
 	touch_change: 'Touch',
 	layout_change: 'Layout',
 	catalog_change: 'Color',
+	color_arrangement_change: 'Color arrangement',
 	reinterpretation: 'Reading',
 	model_comparison: 'Model',
 	language_comparison: 'Language',

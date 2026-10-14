@@ -7,6 +7,7 @@
 	import type { RefinementSession } from '$lib/features/canvas/refinement-session.svelte';
 
 	type Props = {
+		mode?: 'catalog' | 'arrangement';
 		isJapanese: boolean;
 		resultAvailable: boolean;
 		artworkUrl: string | null;
@@ -17,13 +18,13 @@
 		catalogName: string;
 		statusStage1Model: string;
 		statusStage2Model: string;
-		/** Draws the work in every other catalog; the dialog starts it on open. */
-		onGenerateColorCatalogCandidates: () => void | Promise<void>;
+		onGenerateCandidates: () => void | Promise<void>;
 		onSaveAndClose: () => void | Promise<void>;
 		onDiscardAndClose: () => void | Promise<void>;
 	};
 
 	let {
+		mode = 'catalog',
 		isJapanese,
 		resultAvailable,
 		artworkUrl,
@@ -34,7 +35,7 @@
 		catalogName,
 		statusStage1Model,
 		statusStage2Model,
-		onGenerateColorCatalogCandidates,
+		onGenerateCandidates,
 		onSaveAndClose,
 		onDiscardAndClose
 	}: Props = $props();
@@ -54,18 +55,19 @@
 				<section class="refine-action-section">
 					<div class="refine-section-head">
 						<div class="refine-section-title">{t().colorCatalogChangeCurrent}: {catalogName}</div>
-						<div class="refine-selection-hint">{t().tooltipCanvasVaryColor}</div>
+						<div class="refine-selection-hint">{mode === 'arrangement' ? t().colorArrangementHint : t().tooltipCanvasVaryColor}</div>
 					</div>
 					<div class="refine-actions refine-paint-actions">
 						<!-- The options are drawn when the dialog opens; this redraws
 						     them after a stop or a failure. -->
-						{#if refinementSession.candidates.length === 0 && !busy}
+						{#if !busy && (mode === 'arrangement' || refinementSession.candidates.length === 0)}
 							<div class="refine-action-wrap">
-								<PaintButton onclick={onGenerateColorCatalogCandidates} disabled={!resultAvailable}>
-									{t().colorCatalogChangeDraw}
+								<PaintButton onclick={onGenerateCandidates} disabled={!resultAvailable || (mode === 'arrangement' && refinementSession.colorArrangementExhausted)}>
+									{mode === 'arrangement' ? (refinementSession.candidates.length > 0 ? t().colorArrangementNext : t().colorArrangementDraw) : t().colorCatalogChangeDraw}
 								</PaintButton>
 							</div>
 						{/if}
+						{#if mode === 'arrangement' && refinementSession.colorArrangementExhausted}<p class="refine-selection-hint">{t().colorArrangementExhausted}</p>{/if}
 						<div class="refine-cost-indicator" aria-live="polite">
 							<svg viewBox="0 0 24 24" aria-hidden="true">
 								<circle cx="12" cy="12" r="8.5" />
@@ -93,6 +95,6 @@
 				</section>
 			</div>
 		</div>
-		<RefinementCandidateGrid {isJapanese} {refinementSession} {onSaveAndClose} {onDiscardAndClose} maxColumns={4} placeholder={t().colorCatalogChangePlaceholder} />
+		<RefinementCandidateGrid {isJapanese} {refinementSession} {onSaveAndClose} {onDiscardAndClose} maxColumns={4} placeholder={mode === 'arrangement' ? t().colorArrangementPlaceholder : t().colorCatalogChangePlaceholder} />
 	</div>
 </div>

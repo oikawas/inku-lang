@@ -4,7 +4,7 @@ import type { RecomposeMode } from './recomposition.ts';
 
 export type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
 /** Which dialog the refinement modal shows: parameters, models, color catalog, or layout. */
-export type RefinementView = 'adjust' | 'compare' | 'color' | 'layout';
+export type RefinementView = 'adjust' | 'compare' | 'color' | 'layout' | 'color-arrangement';
 
 export type VariationCandidate = {
 	id: string;
@@ -40,6 +40,7 @@ export type RefinementSession = {
 	readonly previewId: string | null;
 	/** Options not yet saved: the dialog does not close over them. */
 	readonly hasUnsaved: boolean;
+	readonly colorArrangementExhausted?: boolean;
 	abort(): void;
 	toggleCandidate(id: string): void;
 	preview(id: string | null): void;
@@ -85,6 +86,7 @@ export class RefinementSessionState implements RefinementSession {
 	gridSlotLabels = $state<string[]>([]);
 	status = $state<string | null>(null);
 	previewId = $state<string | null>(null);
+	colorArrangementExhausted = $state(false);
 	tokensIn = $state<number | null>(null);
 	tokensOut = $state<number | null>(null);
 
@@ -215,6 +217,7 @@ export class RefinementSessionState implements RefinementSession {
 		this.candidates = [];
 		this.previewId = null;
 		this.gridIncludesReading = false;
+		this.colorArrangementExhausted = false;
 		this.gridTaskLabel = '';
 		this.gridDone = 0;
 		this.gridTotal = 0;

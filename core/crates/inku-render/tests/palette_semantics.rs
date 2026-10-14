@@ -31,6 +31,24 @@ fn map() -> BTreeMap<String, String> {
 }
 
 #[test]
+fn concrete_recolor_swaps_once_after_hue_selection_and_keeps_defaults() {
+    let mut colors = map();
+    let original = work_color_assignment(&colors, Some(431), Some("fixture"));
+    colors.insert("recolor:#101010".to_owned(), "#EE2200".to_owned());
+    colors.insert("recolor:#Ee2200".to_owned(), "#101010".to_owned());
+    let swapped = work_color_assignment(&colors, Some(431), Some("fixture"));
+    assert_eq!(swapped["black"], "#ee2200");
+    assert_eq!(swapped["red"], "#101010");
+    assert_eq!(swapped["white"], original["white"]);
+    assert_eq!(
+        resolve_color(Color::Black, Some("桜色"), &colors, &swapped),
+        "#101010"
+    );
+    let neutral = default_color_map();
+    assert_eq!(work_color_assignment(&neutral, None, None), neutral);
+}
+
+#[test]
 fn work_assignment_matches_engine_40_seed_selection() {
     let colors = map();
     let assignment = work_color_assignment(&colors, Some(431), Some("fixture"));

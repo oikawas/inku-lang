@@ -141,6 +141,7 @@
 		touchSeedText: string;
 		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string) => void | Promise<void>;
 		onGenerateColorCatalogCandidates: () => void | Promise<void>;
+		onGenerateColorArrangementCandidates: () => void | Promise<void>;
 		/** Draws the work with each model picked in the "change the model" dialog. */
 		onGenerateModelCandidates: () => void | Promise<void>;
 		/** True when every chosen option is now in the history. */
@@ -267,6 +268,7 @@
 		touchSeedText = $bindable(''),
 		onGenerateVariationCandidates,
 		onGenerateColorCatalogCandidates,
+		onGenerateColorArrangementCandidates,
 		onGenerateModelCandidates,
 		onSaveSelectedVariationCandidates,
 		lineageGraph = null,
@@ -460,6 +462,7 @@
 		refineModalOpen = true;
 		outputTab = 'refine';
 		if (view === 'color') void onGenerateColorCatalogCandidates();
+		if (view === 'color-arrangement') void onGenerateColorArrangementCandidates();
 	}
 
 	export async function openDirectActionMenu(): Promise<void> {
@@ -487,6 +490,7 @@
 		refineModalOpen = true;
 		outputTab = 'refine';
 		if (view === 'color') void onGenerateColorCatalogCandidates();
+		if (view === 'color-arrangement') void onGenerateColorArrangementCandidates();
 	}
 
 	function openDirectEdit(node: LineageNode, mode: 'description' | 'sketch-grain'): void {
@@ -506,6 +510,7 @@
 				break;
 			case 'layout': startDirectRefinement(node, 'layout'); break;
 			case 'color-catalog': startDirectRefinement(node, 'color'); break;
+			case 'color-arrangement': startDirectRefinement(node, 'color-arrangement'); break;
 			case 'description': openDirectEdit(node, 'description'); break;
 			case 'instructions': onOpenLineageDdlEditor(node); break;
 			case 'sketch-grain': openDirectEdit(node, 'sketch-grain'); break;
@@ -872,6 +877,7 @@
 					onSetRefineKind={setRefineKind}
 					{onGenerateVariationCandidates}
 					{onGenerateColorCatalogCandidates}
+					{onGenerateColorArrangementCandidates}
 					{onGenerateModelCandidates}
 					catalogName={statusCatalogName}
 					onSaveAndClose={saveCandidatesAndClose}

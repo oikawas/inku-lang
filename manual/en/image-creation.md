@@ -299,6 +299,12 @@ Choose `Another catalog` in the work-editing menu (`Refine` on the work tab, or 
 
 Choosing, saving, and discarding options work as in 8.2. After a stop or a failure, `Draw in the other catalogs` draws them again. Only the saved JSON Score is redrawn, so a work without a description (one written directly in DDL) makes options too.
 
+### 8.4 Change the Color Arrangement
+
+Choose `Change the color arrangement` in the work-editing menu to see 8 options with colors reassigned within the current color catalog. Placement, touch, and instructions stay the same, and no LLM is called. `Next 8 options` appends options that do not repeat earlier ones, keeping the earlier options and selections. Once the possibilities run out, only the remaining options appear and no next page can be drawn.
+
+Choosing, saving, and discarding options work as in 8.2. A saved option retains its chosen colors when the work is drawn again.
+
 ## 9. Autonomous Refinement
 
 From the lineage tab the application can build generations on its own.

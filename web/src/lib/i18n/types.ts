@@ -400,6 +400,12 @@ export interface LangPack {
 	colorCatalogChangeCurrent: string;
 	colorCatalogChangeDraw: string;
 	colorCatalogChangePlaceholder: string;
+	colorArrangementDraw: string;
+	colorArrangementNext: string;
+	colorArrangementHint: string;
+	colorArrangementPlaceholder: string;
+	colorArrangementExhausted: string;
+	colorArrangementCandidate: (number: number) => string;
 	refineNeedsDescription: string;
 	refineNeedsDdl: string;
 	tooltipVariationGridDefault: string;
@@ -597,6 +603,7 @@ export interface LangPack {
 	workActionMenuTitle: string;
 	workActionDdlOrigin: string;
 	workActionAdjust: string;
+	workActionColorArrangement: string;
 	workActionDescription: string;
 	workActionInstructions: string;
 	workActionSketchGrain: string;

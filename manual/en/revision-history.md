@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-14 — Change colors within the same catalog
+
+Section 8.4 of Creating Images now describes the work-editing menu's Change the color arrangement action: 8 distinct options and the next page, keeping earlier options and selections, reaching the end of the combinations, and replaying saved color choices.
+
 ## 2026-10-13 — The composition reading in the running indicator
 
 The running indicator now reads `Reading the composition…` while the composition is being read, so the paragraph on the wait in section 2 of Creating Images in both languages is corrected. It now also says, as the screen behaves today, that a single drawing with `Paint` shows `Interpreting your words…` until it is done, and that the layer names switch for the candidates refinement makes, the demo, and batches.

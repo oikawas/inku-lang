@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — Change colors within the same catalog
+
+The work-editing menu now offers Change the color arrangement: 8 distinct assignments within the current color catalog, excluding the source work's arrangement. Next 8 options appends unseen combinations while retaining earlier options and selections. When the combinations run out, only the remainder is shown. Placement and touch stay fixed and no LLM is called. Saved options retain their chosen colors for replay.
+
 ## Android 2.1.4-android.99 (2026-10-14 / Build 148397)
 
 ### 2026-10-14 — Android keeps a description drawing's saved parent after a stop before saving

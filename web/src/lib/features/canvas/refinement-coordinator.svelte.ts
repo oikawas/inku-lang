@@ -59,6 +59,8 @@ export type RefinementCoordinatorDeps = {
 export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 	const { apiFetch, apiError, work, session: refinementSession } = deps;
 	let targetIdentityVersion = 0;
+	// Keep each saved work's next page even when its dialog is closed and reopened.
+	const colorArrangementCursors = new Map<string, number | null>();
 
 	function resetTarget(options: { preserveVariationCandidates?: boolean; } = {}): void {
 		targetIdentityVersion += 1;
@@ -339,6 +341,78 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		await generateVariationCandidates('color', others.length);
 	}
 
+	async function generateColorArrangementCandidates(): Promise<void> {
+		if (!work.result || refinementSession.gridBusy || work.loading) return;
+		const parent = work.result;
+		const workId = refinementWorkId();
+		if (!workId) {
+			refinementSession.setStatus(t().workActionSaveFirst);
+			return;
+		}
+		const cursor = colorArrangementCursors.get(workId) ?? 0;
+		if (colorArrangementCursors.has(workId) && colorArrangementCursors.get(workId) === null) {
+			refinementSession.colorArrangementExhausted = true;
+			refinementSession.setStatus(t().colorArrangementExhausted);
+			return;
+		}
+		const contextVersion = targetIdentityVersion;
+		await deps.ensureVisibleLineageParentId();
+		if (contextVersion !== targetIdentityVersion || work.result !== parent || refinementSession.gridBusy) return;
+		const parentNodeId = deps.lineageParentId();
+		const ddl = work.ddl ?? '';
+		const thinking = work.thinking;
+		const controller = refinementSession.beginGrid({ includesReading: false, taskLabel: t().workActionColorArrangement, count: 8 });
+		const abortTimer = window.setTimeout(() => refinementSession.enableAbort(controller), 3000);
+		try {
+			const response = await apiFetch('/api/color-arrangements/plan', {
+				method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ work_id: workId, cursor })
+			});
+			if (!response.ok) throw await apiError(response);
+			const plan = await response.json() as { entries: Array<{ index: number }>; next_cursor: number | null; total: number };
+			if (contextVersion !== targetIdentityVersion || !refinementSession.isActive(controller)) return;
+			// Reserve the whole page before rendering: stopped and failed options
+			// are not silently redrawn when the author asks for the next page.
+			colorArrangementCursors.set(workId, plan.next_cursor);
+			refinementSession.colorArrangementExhausted = plan.next_cursor === null;
+			refinementSession.gridTotal = plan.entries.length;
+			refinementSession.setPlans(controller, plan.entries.map((entry) => t().colorArrangementCandidate(entry.index + 1)));
+			if (plan.entries.length === 0) {
+				refinementSession.setStatus(t().colorArrangementExhausted);
+				return;
+			}
+			const candidates = await runRefinementFanout(plan.entries.map((entry) => async (): Promise<VariationCandidate> => {
+				const rendered = await apiFetch('/api/render-color-arrangement', {
+					method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ work_id: workId, index: entry.index })
+				});
+				if (!rendered.ok) throw await apiError(rendered);
+				const data = await rendered.json() as Partial<PaintResult> & Pick<PaintResult, 'svg' | 'score'>;
+				return {
+					id: `color-arrangement-${workId}-${entry.index}`, kind: 'color',
+					label: t().colorArrangementCandidate(entry.index + 1), selected: false,
+					result: {
+						...parent, ...data, ddl, thinking,
+						focus: undefined, variation_amplitude: undefined, variation_seed: undefined, recomposition: undefined,
+						history_id: null, history_at: null, lineage_node_id: null,
+						lineage_parent_node_id: parentNodeId,
+						derivation_kind: 'color_arrangement_change',
+						derivation_metadata: { color_arrangement_index: entry.index, catalog_id: data.render_color_catalog_id }
+					}
+				};
+			}), deps.render.fanoutLimit(), {
+				onStart: (index) => refinementSession.seatSlot(controller, index, 'running'),
+				onDone: (index) => { refinementSession.finishSlot(controller, index); }
+			});
+			refinementSession.commitCandidates(controller, [...refinementSession.candidates, ...candidates]);
+		} catch (error) {
+			if (!controller.signal.aborted) refinementSession.failGrid(controller, error instanceof Error ? error.message : String(error));
+		} finally {
+			window.clearTimeout(abortTimer);
+			refinementSession.finishGrid(controller);
+		}
+	}
+
 	async function generateVariationCandidates(kind: RefineKind, count: number, touchWords?: string) {
 		if (!work.result || refinementSession.gridBusy || work.loading) return;
 		// Every option in this round uses the choice made before any await.
@@ -537,6 +611,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		generateVariationCandidates,
 		composeLayoutGeneration,
 		generateColorCatalogCandidates,
+		generateColorArrangementCandidates,
 		generateModelCandidates,
 		saveSelectedVariationCandidates,
 	};

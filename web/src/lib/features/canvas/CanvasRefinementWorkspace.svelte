@@ -40,6 +40,7 @@
 		onSetRefineKind: (kind: RefineKind) => void;
 		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string) => void | Promise<void>;
 		onGenerateColorCatalogCandidates: () => void | Promise<void>;
+		onGenerateColorArrangementCandidates: () => void | Promise<void>;
 		onGenerateModelCandidates: () => void | Promise<void>;
 		onSaveAndClose: () => void | Promise<void>;
 		onDiscardAndClose: () => void | Promise<void>;
@@ -73,6 +74,7 @@
 		onSetRefineKind,
 		onGenerateVariationCandidates,
 		onGenerateColorCatalogCandidates,
+		onGenerateColorArrangementCandidates,
 		onGenerateModelCandidates,
 		onSaveAndClose,
 		onDiscardAndClose,
@@ -85,7 +87,9 @@
 			? (isJapanese ? '描画要素を編集' : 'Edit drawing elements')
 			: view === 'layout'
 				? t().canvasVaryComposition
-				: view === 'color'
+				: view === 'color-arrangement'
+					? t().workActionColorArrangement
+					: view === 'color'
 					? t().canvasVaryColor
 					: t().workActionModels
 	);
@@ -128,8 +132,9 @@
 			{onSelectRefineDrawingModel}
 			{onSetRefineWild}
 		/>
-	{:else if view === 'color'}
+	{:else if view === 'color' || view === 'color-arrangement'}
 		<RefinementColorCatalogView
+			mode={view === 'color-arrangement' ? 'arrangement' : 'catalog'}
 			{isJapanese}
 			{resultAvailable}
 			{artworkUrl}
@@ -140,7 +145,7 @@
 			{catalogName}
 			{statusStage1Model}
 			{statusStage2Model}
-			{onGenerateColorCatalogCandidates}
+			onGenerateCandidates={view === 'color-arrangement' ? onGenerateColorArrangementCandidates : onGenerateColorCatalogCandidates}
 			{onSaveAndClose}
 			{onDiscardAndClose}
 		/>

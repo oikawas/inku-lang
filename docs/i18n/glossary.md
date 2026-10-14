@@ -71,6 +71,7 @@
 | 偶然に委ねる | **By chance** | 配置を変えるときの選び。作者裁定（2026-10-05）、**lint 固定** | 層の種類が許す範囲からseedで選ぶ |
 | 読み取りを変える | **Another reading** | **lint 固定** | — |
 | 色カタログを変える | **Another catalog** | **lint 固定** | — |
+| 配色を変える | **Change the color arrangement** | 同じ色カタログの中で色の割当を変える独立した作品編集メニュー（2026-10-14 作者）。系譜の短札は **Color arrangement** | — |
 | 変奏（旧） | **Variation (retired)** | 2026-10-04 に廃止した（作者裁定）。古い系譜の辺の札と、古い作品の生成情報の行にだけ使う。強度の Subtle／Moderate／Sweeping も廃止した | — |
 | 作品（新しい作品として保存） | **work** | 名詞。pipeline の variation（記述や設定を変えて保存する新しい単位）を画面で言う語（2026-10-04 作者裁定）。変奏とは言わない | ~~variation~~ |
 | 候補・案 | **option** / **candidate** | 名詞 | ~~variation~~（pipeline の variation と紛れる） |

@@ -299,6 +299,21 @@ pub fn work_color_assignment(
         };
         assignment.insert(name.to_owned(), value);
     }
+    // Server-owned concrete recoloring follows palette/hue selection. Read
+    // each original value once so swaps never cascade through another entry.
+    let recolors = color_map
+        .iter()
+        .filter_map(|(key, value)| {
+            let original = key.strip_prefix("recolor:")?;
+            (is_hex_color(original) && is_hex_color(value))
+                .then(|| (original.to_ascii_lowercase(), value.to_ascii_lowercase()))
+        })
+        .collect::<BTreeMap<_, _>>();
+    for value in assignment.values_mut() {
+        if let Some(recolored) = recolors.get(&value.to_ascii_lowercase()) {
+            *value = recolored.clone();
+        }
+    }
     assignment
 }
 

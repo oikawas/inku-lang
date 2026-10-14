@@ -17,6 +17,8 @@ from ... import db as _db
 from ... import pipeline_compat as _pipeline_compat
 from ...autonomous_refine import ALLOWED_KINDS as AUTONOMOUS_REFINE_KINDS, vision_refine_advice
 from ...limits import limits_as_dict
+from ...color_arrangements import ColorArrangements
+from ...color_catalogs import get_color_catalog, render_color_map_for_catalog
 from ...saved_score_compat import coerce_saved_score
 from ...schema import Score
 from ..common import DESCRIPTION_LOCKED_DETAIL, _resolve_instruction_lang, _resolved_vision_model, _unexpected_http_error
@@ -388,6 +390,7 @@ class RenderScoreResponse(BaseModel):
     render_canvas_aspect_id: str
     render_canvas_aspect_ratio: float
     render_seed: JsonSeed
+    render_wild: bool = False
     composition_seed: JsonSeed | None = None
     interpretation_seed: str | None = None
     seed_text: str | None = None
@@ -407,6 +410,69 @@ class RenderScoreResponse(BaseModel):
     # like a work that asked for 400.
     render_limit_notes: list[str] | None = None
     render_hash_short: str
+    derivation_metadata: dict[str, object] | None = None
+
+
+class ColorArrangementPlanRequest(BaseModel):
+    work_id: str = Field(min_length=1, max_length=200)
+    cursor: int = Field(default=0, ge=0, strict=True)
+
+
+class ColorArrangementRenderRequest(BaseModel):
+    work_id: str = Field(min_length=1, max_length=200)
+    index: int = Field(ge=0, strict=True)
+
+
+def _saved_color_arrangements(work: dict) -> tuple[ColorArrangements, dict[str, str], str]:
+    catalog_id = work.get("render_color_catalog_id") or work.get("catalog_id")
+    color_map = work.get("render_color_map")
+    if not isinstance(color_map, dict) or not color_map:
+        # Unlike ordinary replay, this action cannot guess a default palette.
+        catalog = get_color_catalog(catalog_id) if catalog_id else None
+        if catalog is None:
+            raise HTTPException(status_code=422, detail="saved color catalog is unknown and has no snapshot")
+        catalog_id = catalog["id"]
+        color_map = render_color_map_for_catalog(catalog_id)
+    if not catalog_id:
+        raise HTTPException(status_code=422, detail="saved color catalog is unknown")
+    try:
+        return ColorArrangements.from_saved(work.get("svg") or "", color_map), color_map, str(catalog_id)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@router.post("/api/color-arrangements/plan")
+def api_color_arrangement_plan(req: ColorArrangementPlanRequest, actor: dict = Depends(_current_user)) -> dict:
+    work = _work_for_color_snapshot(actor, req.work_id)
+    arrangements, _, _ = _saved_color_arrangements(work)
+    return arrangements.page(req.cursor)
+
+
+def _render_color_arrangement_for_work(actor: dict, work: dict, index: int) -> RenderScoreResponse:
+    arrangements, color_map, catalog_id = _saved_color_arrangements(work)
+    try:
+        recolored = arrangements.color_map(color_map, index)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    snapshot = {**work, "render_color_map": recolored, "render_color_catalog_id": catalog_id}
+    if work.get("render_seed") is None and not work.get("seed_text"):
+        raise HTTPException(status_code=422, detail="saved work has no performance seed to preserve its drawing")
+    result = _render_authorized_score(RenderScoreRequest(
+        score=work["score"], input=work.get("input") or "", ddl=work.get("ddl"),
+        catalog_id=catalog_id, canvas_aspect=work.get("render_canvas_aspect_id") or work.get("render_canvas_aspect"),
+        render_seed=work.get("render_seed"), composition_seed=work.get("composition_seed"),
+        interpretation_seed=work.get("interpretation_seed"), seed_text=work.get("seed_text"),
+        wild=bool(work.get("render_wild")),
+    ), actor, snapshot)
+    result.render_color_source = "color_arrangement"
+    result.interpretation_seed = work.get("interpretation_seed")
+    result.derivation_metadata = {"color_arrangement_index": index}
+    return result
+
+
+@router.post("/api/render-color-arrangement", response_model=RenderScoreResponse, response_model_exclude_none=True)
+def api_render_color_arrangement(req: ColorArrangementRenderRequest, actor: dict = Depends(_current_user)) -> RenderScoreResponse:
+    return _render_color_arrangement_for_work(actor, _work_for_color_snapshot(actor, req.work_id), req.index)
 
 
 class VisionRefineAdviceBody(BaseModel):
@@ -426,14 +492,16 @@ class VisionRefineAdviceResponse(BaseModel):
 
 @router.post("/api/render-score", response_model=RenderScoreResponse, response_model_exclude_none=True)
 def api_render_score(req: RenderScoreRequest, actor: dict = Depends(_current_user)) -> RenderScoreResponse:
+    # Authorization stays outside the render handler: an unknown work is 404.
+    work = _work_for_color_snapshot(actor, req.work_id) if req.work_id else None
+    return _render_authorized_score(req, actor, work)
+
+
+def _render_authorized_score(req: RenderScoreRequest, actor: dict, work: dict | None) -> RenderScoreResponse:
     if req.score.get("version") in _COMPACT_SCORE_VERSIONS:
         from ...pipeline_runtime import get_service
-        work = _work_for_color_snapshot(actor, req.work_id) if req.work_id else None
         return RenderScoreResponse(**get_service().replay_for(actor["id"], req.model_dump(), work))
     render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
-    # Outside the try: a 404 for an unknown work is the answer, not a render
-    # failure to be relabelled 422 by the handler below.
-    work = _work_for_color_snapshot(actor, req.work_id) if req.work_id else None
     try:
         # Site 4 of 5. The work is resolved above for its colors; its row also
         # records the limits it was drawn under, and this is the route a redraw

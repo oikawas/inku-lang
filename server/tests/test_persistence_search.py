@@ -6,6 +6,8 @@ import inspect
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 
 from inku_server import db
 from inku_server.persistence import history
@@ -321,13 +323,64 @@ def test_quote_hash_clause_and_fts_selection_behavior_remains_exact() -> None:
 
     suffix = search._history_search_clause("A1b2")
     assert "history.render_hash" in _sql(suffix)
-    assert set(suffix.compile().params.values()) == {"%A1b2%", "%A1b2"}
+    assert set(suffix.compile().params.values()) == {"%A1b2%", "%A1b2", "A1b2%", "%:A1b2%"}
 
-    assert _service(fts_enabled=True, dialect_name="sqlite").use_history_fts("abc")
+    assert not _service(fts_enabled=True, dialect_name="sqlite").use_history_fts("abc")
+    assert _service(fts_enabled=True, dialect_name="sqlite").use_history_fts("quiet")
     assert not _service(fts_enabled=False, dialect_name="sqlite").use_history_fts("abc")
     assert not _service(fts_enabled=True, dialect_name="postgresql").use_history_fts("abc")
     assert not _service(fts_enabled=True, dialect_name="sqlite").use_history_fts("ab")
     assert not _service(fts_enabled=True, dialect_name="sqlite").use_history_fts("A1b2")
+    assert not _service(fts_enabled=True, dialect_name="sqlite").use_history_fts("rh3:abcde")
+    assert not _service(fts_enabled=True, dialect_name="sqlite").use_history_fts("12345678-")
+    assert _service(fts_enabled=True, dialect_name="sqlite").use_history_fts("1234-5678")
+
+
+def test_identifier_prefixes_find_sqlite_history_without_losing_text_or_visibility(tmp_path) -> None:
+    engine = create_engine(f"sqlite:///{tmp_path / 'search.sqlite3'}")
+    HistoryRow.__table__.create(engine)
+    sessions = sessionmaker(bind=engine)
+    digest = "abcde" + "0" * 55 + "a1b2"
+    ids = [f"12345678-1234-4000-8000-{number:012d}" for number in range(1, 5)]
+    text_id = "beef1234-1111-4000-8000-000000000001"
+    with sessions() as session:
+        session.add_all([
+            HistoryRow(id=ids[index], user_id="reader" if index < 3 else "other", at=index + 1,
+                input="quiet circle", ddl="draw shapes", stage1_model="model-blue", stage2_model="artist",
+                catalog_id="sea_stone", render_hash=prefix + digest, score="{}", svg="<svg/>")
+            for index, prefix in enumerate(("rh3:", "rh2:", "", "rh3:"))
+        ])
+        session.add(HistoryRow(id=text_id, user_id="reader", at=5, input="a cabed phrase", score="{}", svg="<svg/>"))
+        session.commit()
+    with engine.begin() as connection:
+        connection.execute(text("CREATE VIRTUAL TABLE history_fts USING fts5(input, ddl, stage1_model, stage2_model, catalog_id, tokenize='trigram')"))
+        connection.execute(text("INSERT INTO history_fts(rowid, input, ddl, stage1_model, stage2_model, catalog_id) SELECT rowid, input, ddl, stage1_model, stage2_model, catalog_id FROM history"))
+    service = _service(
+        session_factory=sessions,
+        readable_sql=lambda actor, owner, history_id: (f"{owner} = :reader", {"reader": actor["id"]}),
+        rows_to_dicts_with_lineage=lambda session, rows, actor: [{"id": row.id} for row in rows],
+    )
+    try:
+        # The FTS index has no hashes or ids: this exact prefix used to return zero.
+        with sessions() as session:
+            assert service.list_items_with_fts(session, {"id": "reader"}, 0, 10, False, "abcde", False) == ([], 0)
+        cases = (
+            ("abcde", set(ids[:3])), ("ABCDE", set(ids[:3])),
+            ("rh3:abcde", {ids[0]}), ("RH2:ABCDE", {ids[1]}), ("rh3:a", {ids[0]}),
+            (digest, set(ids[:3])), ("rh3:" + digest, {ids[0]}), ("a1b2", set(ids[:3])),
+            (ids[0], {ids[0]}), (ids[0].upper(), {ids[0]}), ("12345678", set(ids[:3])),
+            ("12345678-", set(ids[:3])), ("12345678-1234-4", set(ids[:3])), ("1", set(ids[:3])),
+            ("cabed", {text_id}), ("quiet", set(ids[:3])), ("draw shapes", set(ids[:3])),
+            ("model-blue", set(ids[:3])), ("artist", set(ids[:3])), ("sea_stone", set(ids[:3])),
+        )
+        for query, expected in cases:
+            items, total = service.list_items("reader", query_text=query)
+            assert {item["id"] for item in items} == expected, query
+            assert total == len(expected), query
+        assert service.list_items("reader", query_text="abcde", offset=1, limit=1) == ([{"id": ids[1]}], 3)
+        assert service.list_items("other", query_text="abcde") == ([{"id": ids[3]}], 1)
+    finally:
+        engine.dispose()
 
 
 def test_fts_execution_preserves_visibility_filters_order_and_hydration() -> None:

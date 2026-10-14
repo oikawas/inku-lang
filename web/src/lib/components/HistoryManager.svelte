@@ -899,7 +899,7 @@
 				/>
 			{/if}
 		</div>
-		<label class="history-search">{t().historySearchLabel} <input bind:value={historySearch} /></label>
+		<label class="history-search">{t().historySearchLabel} <input bind:value={historySearch} title={t().historySearchHint} /></label>
 	</div>
 	{#if selectedHistoryIds.length > 0}
 		<div class="history-selection-status">{t().historySelectionCount(selectedHistoryIds.length)}</div>

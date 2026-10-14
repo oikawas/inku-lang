@@ -1158,6 +1158,7 @@ export interface LangPack {
 	historyRestoreSelected: string;
 	historyPermanentDelete: string;
 	historySearchLabel: string;
+	historySearchHint: string;
 	historyNewer: string;
 	historyOlder: string;
 	historyOldest: string;
@@ -1207,6 +1208,9 @@ export interface LangPack {
 	provenanceSectionInterpretation: string;
 	provenanceSectionPerformance: string;
 	provenanceSectionIdentity: string;
+	provenanceLabelWorkId: string;
+	provenanceHintWorkId: string;
+	provenanceWorkNotSaved: string;
 	provenanceSectionOrigin: string;
 	provenanceSectionRun: string;
 	provenanceLabelLangRequested: string;

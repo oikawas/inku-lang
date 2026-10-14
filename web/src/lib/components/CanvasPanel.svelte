@@ -915,6 +915,7 @@
 		bind:tabsScrollEl
 		{result}
 		{statusHistoryItem}
+		workId={unsavedRefinementPreview ? null : currentHistoryId}
 		{isJapanese}
 		{developerMode}
 		{statusTenkei}

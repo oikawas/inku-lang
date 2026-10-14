@@ -102,6 +102,7 @@ composition / color catalog と食い違って見える（→ §8）。
 | 履歴 | **history** | 名詞 | — |
 | ごみ箱 | **trash** | 名詞 | — |
 | 生成情報 | **provenance** | 名詞。モデル・seed・版数のドロワー | ~~Generation Info~~ |
+| 作品ID（UUID） | **work ID (UUID)** | 保存済み作品を特定するID。生成情報に表示し、ライブラリで検索する | hash（絵の同一性とは別の保存ID） |
 | 記録なし | **not recorded** | 状態表示。値を推測しない契約の表示 | ~~unknown~~（調査の「未確認」は別概念 → §5） |
 | UIモード | **UI mode**（**Simple UI / Full UI / Custom UI**） | 表示構成のプリセットと個人設定 | ~~Beginner / Expert~~（習熟度の評価にしない） |
 | 権限グループ | **Permission groups** | 名詞・**常に複数形**。1 人が複数を持てる（v2.12.0） | ~~Role~~（判定から消えた語）、~~Access level~~ |

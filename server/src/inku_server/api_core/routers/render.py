@@ -353,6 +353,7 @@ class RenderScoreRequest(BaseModel):
     ddl: str | None = None
     # Same key, same rule as RenderSvgRequest.
     work_id: str | None = Field(default=None, description="Id of the work being redrawn; its recorded colors decide this render")
+    replay_saved_work: bool = Field(default=False, description="Replay the referenced saved work's Score and recorded conditions instead of client conditions")
     limits: dict[str, int] | None = Field(default=None, description=_LIMITS_FIELD_DESCRIPTION)
     catalog_id: str | None = None
     canvas_aspect: str | None = None
@@ -552,8 +553,30 @@ class VisionRefineAdviceResponse(BaseModel):
 @router.post("/api/render-score", response_model=RenderScoreResponse, response_model_exclude_none=True)
 def api_render_score(req: RenderScoreRequest, actor: dict = Depends(_current_user)) -> RenderScoreResponse:
     # Authorization stays outside the render handler: an unknown work is 404.
+    if req.replay_saved_work and not req.work_id:
+        raise HTTPException(status_code=422, detail="saved-work replay requires a work id")
     work = _work_for_color_snapshot(actor, req.work_id) if req.work_id else None
+    if req.replay_saved_work:
+        req = _saved_work_replay_request(work)
     return _render_authorized_score(req, actor, work)
+
+
+def _saved_work_replay_request(work: dict) -> RenderScoreRequest:
+    """Use one server-owned request for a saved replay's preview and child.
+
+    A work refined by words before that was removed (2026-10-14) recorded the
+    seed its words gave, so the recorded seed alone draws it again; a work that
+    recorded no seed uses the provisional zero.
+    """
+    seed = work.get("render_seed")
+    return RenderScoreRequest(
+        work_id=work["id"], score=work["score"], input=work.get("input") or "", ddl=work.get("ddl"),
+        catalog_id=work.get("catalog_id"),
+        canvas_aspect=work.get("render_canvas_aspect_id") or work.get("render_canvas_aspect"),
+        render_seed=0 if seed is None else seed,
+        composition_seed=work.get("composition_seed"),
+        interpretation_seed=work.get("interpretation_seed"), wild=bool(work.get("render_wild")),
+    )
 
 
 def _render_authorized_score(req: RenderScoreRequest, actor: dict, work: dict | None) -> RenderScoreResponse:

@@ -51,7 +51,12 @@
 	<div class="replay-dialog" role="dialog" aria-modal="true" aria-labelledby="replay-comparison-title" tabindex="-1">
 		<header class="replay-header">
 			<h2 id="replay-comparison-title">{t().replayComparisonTitle}</h2>
-			<button type="button" class="ghost-btn" onclick={close} disabled={saving}>{t().closeLabel}</button>
+			<div class="header-actions">
+				<button type="button" class="save-child-btn" onclick={onSaveChild} disabled={!canSave || saving || saved}>
+					{saving ? t().replayComparisonSaving : t().replayComparisonSaveChild}
+				</button>
+				<button type="button" class="ghost-btn" onclick={close} disabled={saving}>{t().closeLabel}</button>
+			</div>
 		</header>
 
 		{#if provisionalSeed !== null}
@@ -77,16 +82,15 @@
 				<div class="artwork-frame"><img use:svgImage={replayedSvg} alt="" /></div>
 			</article>
 		</div>
-		<footer class="replay-actions">
-			{#if saveError}
-				<p class="save-message" role="alert">{saveError}</p>
-			{:else if saved}
-				<p class="save-message" role="status">{t().replayComparisonSaved}</p>
-			{/if}
-			<button type="button" class="save-child-btn" onclick={onSaveChild} disabled={!canSave || saving || saved}>
-				{saving ? t().replayComparisonSaving : t().replayComparisonSaveChild}
-			</button>
-		</footer>
+		{#if saveError || saved}
+			<footer class="replay-status">
+				{#if saveError}
+					<p class="save-message" role="alert">{saveError}</p>
+				{:else if saved}
+					<p class="save-message" role="status">{t().replayComparisonSaved}</p>
+				{/if}
+			</footer>
+		{/if}
 	</div>
 </div>
 
@@ -119,6 +123,7 @@
 	.replay-header { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 16px; }
 	.replay-header h2 { margin: 0; color: var(--fg); font-size: var(--ui-font-size-16); font-weight: 600; }
 	.replay-header button { flex-shrink: 0; white-space: nowrap; }
+	.header-actions { display: flex; flex-shrink: 0; align-items: center; gap: 8px; }
 	.version-message { flex-shrink: 0; margin-top: 14px; padding: 9px 12px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--bg2); color: var(--fg); font-size: var(--ui-font-size-12); line-height: 1.5; text-align: center; }
 	.comparison-grid { display: grid; flex: 1; min-height: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 14px; margin-top: 14px; }
 	.artwork-card { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel2); }
@@ -127,15 +132,16 @@
 	.artwork-heading span { color: var(--fg2); font-size: var(--ui-font-size-12); font-variant-numeric: tabular-nums; }
 	.artwork-frame { display: flex; flex: 1; min-height: 0; align-items: center; justify-content: center; padding: 12px; overflow: hidden; background: var(--canvas-paper); }
 	.artwork-frame img { display: block; width: 100%; height: 100%; object-fit: contain; }
-	.replay-actions { display: flex; flex-shrink: 0; align-items: center; justify-content: flex-end; gap: 14px; margin-top: 14px; }
+	.replay-status { flex-shrink: 0; margin-top: 14px; text-align: right; }
 	.save-message { margin: 0; color: var(--fg); font-size: var(--ui-font-size-13); }
 	.save-child-btn { flex-shrink: 0; border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); padding: var(--btn-sm-padding); background: var(--action-bg); color: var(--action-fg); font-size: var(--btn-sm-font-size); cursor: pointer; }
 	.save-child-btn:hover:not(:disabled) { background: var(--action-hover); }
 	.save-child-btn:disabled { opacity: 0.55; cursor: default; }
 	@media (max-width: 760px) {
 		.replay-dialog { padding: 14px; }
+		.replay-header { flex-wrap: wrap; gap: 8px; }
+		.header-actions { margin-left: auto; }
 		.comparison-grid { grid-template-columns: 1fr; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 10px; }
 		.artwork-frame { padding: 8px; }
-		.replay-actions { flex-wrap: wrap; gap: 8px; }
 	}
 </style>

@@ -1331,6 +1331,7 @@ export const ja: LangPack = {
 	historyPermanentDelete: '完全削除',
 	historySearchLabel: '検索（記述 / ハッシュ値 / 作品ID）:',
 	historySearchHint: 'ハッシュ値と作品IDは全体か先頭部分、ハッシュ値は下位4桁でも検索できます。',
+	historySearchClear: '検索をクリア',
 	historyNewer: '← 新しい',
 	historyOlder: '古い →',
 	historyOldest: '最古',

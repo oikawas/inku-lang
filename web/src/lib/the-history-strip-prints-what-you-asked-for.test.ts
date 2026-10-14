@@ -122,17 +122,22 @@ test('T-163  the file size is read from the server, not counted from what arrive
 	assert.match(HISTORY_OWNER, /include_svg: 'false'/);
 });
 
-test('the model is printed as provider (2), family (3) and version (3)', () => {
-	// The table the author chose on 2026-09-29.
-	const cases: [string, string, string][] = [
-		['Claude API (Cloud)', 'Claude Sonnet 5', 'Cl Son 5'],
-		['Claude API (Cloud)', 'Claude Opus 4.7', 'Cl Opu 4.7'],
-		['Claude API (Cloud)', 'Claude Haiku 4.5', 'Cl Hai 4.5'],
-		['Gemini API (Cloud)', 'Gemini 3.5 Flash-Lite', 'Ge Gem 3.5'],
-		['Gemini API (Cloud)', 'Gemma 4 31B Instruct', 'Ge Gem 4'],
-		['OpenAI API Platform', 'GPT-5.1 mini', 'Op GPT 5.1'],
-		['NVIDIA NIM (Cloud)', 'gemma-4-31b-it', 'NV gem 4'],
-		['Ollama Cloud (ollama.com)', 'gemma4:31b', 'Ol gem 4']
+test('the strip keeps model versions, families, sizes and variants distinct', () => {
+	const pairs = [
+		['ChatGPT plan', 'GPT 6 sol', 'GPT 6.1 sol'],
+		['ChatGPT plan', 'GPT 6.1 sol', 'GPT 6.1 luna'],
+		['Claude API (Cloud)', 'Claude Sonnet 5', 'Claude Opus 5'],
+		['Gemini API (Cloud)', 'Gemini 3.5 Flash-Lite', 'Gemini 3.5 Pro'],
+		['Gemini API (Cloud)', 'Gemma 4 31B Instruct', 'Gemma 4 12B Instruct'],
+		['OpenAI API Platform', 'GPT-5.1 mini', 'GPT-5.1 nano'],
+		['NVIDIA NIM (Cloud)', 'meta/llama-3.3-70b-instruct', 'meta/llama-3.3-70b-instruct-v2'],
+		['Ollama Cloud (ollama.com)', 'gemma4:31b', 'gemma4:12b']
 	];
-	for (const [owner, name, expected] of cases) assert.equal(abbreviateStripModel(owner, name), expected, name);
+	for (const [owner, first, second] of pairs) {
+		const a = abbreviateStripModel(owner, first);
+		const b = abbreviateStripModel(owner, second);
+		assert.notEqual(a, b, `${first} and ${second} must be readable as different models`);
+		assert.ok(a.includes(first), first);
+		assert.ok(b.includes(second), second);
+	}
 });

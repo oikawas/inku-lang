@@ -1159,6 +1159,7 @@ export interface LangPack {
 	historyPermanentDelete: string;
 	historySearchLabel: string;
 	historySearchHint: string;
+	historySearchClear: string;
 	historyNewer: string;
 	historyOlder: string;
 	historyOldest: string;

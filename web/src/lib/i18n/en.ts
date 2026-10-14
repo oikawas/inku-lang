@@ -1333,6 +1333,7 @@ export const en: LangPack = {
 	historyPermanentDelete: 'Permanently delete',
 	historySearchLabel: 'Search (description / hash / work ID):',
 	historySearchHint: 'Enter a whole hash or work ID, or its beginning. A hash also matches its last 4 characters.',
+	historySearchClear: 'Clear search',
 	historyNewer: '← newer',
 	historyOlder: 'older →',
 	historyOldest: 'Oldest',

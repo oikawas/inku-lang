@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.123 (2026-10-14 / Build 1199)
+
 ### 2026-10-14 — Oil paint bristle marks keep the pigment's color
 
 Oil bristle marks were too strong. Dark marks were darkened towards black and light marks mixed with white, so every color showed grey and white streaks, and four full-length pairs per pass at fixed places lined up into a wood-grain pattern and rings along outlines. Marks are now the selected color moved in OKLCH: a small lightness step with chroma kept, dark marks leaning slightly cool and light marks slightly warm. Each pass carries 2–4 marks (dense 3–5) at seeded places, widths and lengths that start and end within the pass. Marks are not paired, except that dense adds at most one light partner per pass facing an upper-left light. Marks thin away where a pass pinches, outlines carry at most two, pass-to-pass color variation is smaller, and lines and arcs keep wider, longer marks. Render engine 75. Saved works do not change. The author's example work goes from 451,016 to 216,704 SVG bytes.

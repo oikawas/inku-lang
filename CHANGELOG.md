@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## Android 2.1.4-android.100 (2026-10-14 / Build 148398)
+
 ### 2026-10-14 — Remove Android touch refinement
 
 Remove the touch choice and words field from refinement, leaving reading, color catalog and layout. Retired touch selections display reading. Drawing requests omit `seed_text`, and saved works replay with their stored `render_seed`. Historical touch lineage and generation information remain readable.

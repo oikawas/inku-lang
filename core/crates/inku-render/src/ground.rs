@@ -2,15 +2,11 @@
 
 use sha2::{Digest, Sha256};
 
-use crate::determinism::hash01;
-use crate::ground_patterns::build_ground_layers;
+use crate::ground_patterns::build_ground_plan;
 use crate::svg::{Element, format_number};
 use crate::types::{
     Canvas, CanvasGroundSpec, CanvasSize, Color, GroundMaterial, GroundTone, Score, Seed,
 };
-
-const GROUND_OPACITY_DEFAULT: f64 = 0.12;
-const MEZZOTINT_PLATE: &str = "#0d0d0d";
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct GroundRender {
@@ -49,10 +45,11 @@ fn tone_color(ground: &CanvasGroundSpec, background: &str) -> String {
 }
 
 /// The Score colour the canvas shows under the marks. The ground paints its
-/// tone over the whole background, and the mezzotint plate over that, so the
-/// background shows only without a ground, on the plain material, or under a
-/// white tone of any other material but mezzotint. Other tones paint colours
-/// no Score colour names, so they give `None`.
+/// tone over the whole background, and the mezzotint plate or the charcoal
+/// over that, so the background shows only without a ground, on the plain
+/// material, or under a white tone of any other material but those two. The
+/// ink wash's thin wash tints the background without hiding it. Other tones
+/// paint colours no Score colour names, so they give `None`.
 #[must_use]
 pub fn shown_background(score: &Score) -> Option<Color> {
     let ground = match &score.canvas {
@@ -61,7 +58,10 @@ pub fn shown_background(score: &Score) -> Option<Color> {
     };
     let covered = ground.is_some_and(|ground| {
         ground.material != GroundMaterial::Plain
-            && (ground.material == GroundMaterial::Mezzotint || ground.tone != GroundTone::White)
+            && (matches!(
+                ground.material,
+                GroundMaterial::Mezzotint | GroundMaterial::CharcoalGround
+            ) || ground.tone != GroundTone::White)
     });
     (!covered).then_some(score.background)
 }
@@ -89,40 +89,17 @@ pub fn render_ground(
     }
     let seed = ground_seed(ground, render_seed);
     let mut group = Element::new("g").attr("id", "layer_01_canvas_ground");
-    if ground.material == GroundMaterial::Mezzotint {
-        let shift = canvas.unit() * (0.001 + hash01(0, seed, "register-shift") * 0.003);
-        let angle = hash01(1, seed, "register-angle") * std::f64::consts::TAU;
-        group.set_attr(
-            "transform",
-            format!(
-                "translate({} {})",
-                format_number(angle.cos() * shift),
-                format_number(angle.sin() * shift)
-            ),
-        );
+    let tone = tone_color(ground, background);
+    group.push(rect(0.0, 0.0, canvas.width, canvas.height, &tone, 0.98));
+    let plan = build_ground_plan(ground, seed, canvas, &tone);
+    if let Some((colour, opacity)) = plan.body {
+        group.push(rect(0.0, 0.0, canvas.width, canvas.height, colour, opacity));
     }
-    group.push(rect(
-        0.0,
-        0.0,
-        canvas.width,
-        canvas.height,
-        &tone_color(ground, background),
-        0.98,
-    ));
-    if ground.material == GroundMaterial::Mezzotint {
-        group.push(rect(
-            0.0,
-            0.0,
-            canvas.width,
-            canvas.height,
-            MEZZOTINT_PLATE,
-            1.0,
-        ));
+    for element in plan.broad {
+        group.push(element);
     }
-    let opacity_scale = ground.opacity.max(0.0) / GROUND_OPACITY_DEFAULT;
-    let mut definitions = Vec::new();
-    for (index, layer) in build_ground_layers(ground, seed).into_iter().enumerate() {
-        definitions.extend(layer.definitions);
+    let mut definitions = plan.definitions;
+    for (index, layer) in plan.layers.into_iter().enumerate() {
         let pattern_id = format!("ground_pattern_{index}");
         let mut pattern = Element::new("pattern")
             .attr("id", &pattern_id)
@@ -140,18 +117,14 @@ pub fn render_ground(
         }
         definitions.push(pattern);
         group.push(
-            rect(
-                0.0,
-                0.0,
-                canvas.width,
-                canvas.height,
-                &format!("url(#{pattern_id})"),
-                (layer.opacity * opacity_scale).min(1.0),
-            )
-            .attr(
-                "class",
-                format!("canvas-ground-{}", ground.material.as_str()),
-            ),
+            Element::new("rect")
+                .attr("width", format_number(canvas.width))
+                .attr("height", format_number(canvas.height))
+                .attr("fill", format!("url(#{pattern_id})"))
+                .attr(
+                    "class",
+                    format!("canvas-ground-{}", ground.material.as_str()),
+                ),
         );
     }
     Some(GroundRender { group, definitions })
@@ -160,8 +133,39 @@ pub fn render_ground(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::svg::Node;
+    use crate::svg::{Document, Node};
     use crate::types::GroundGrain;
+
+    const MATERIALS: [GroundMaterial; 7] = [
+        GroundMaterial::Paper,
+        GroundMaterial::Washi,
+        GroundMaterial::InkWash,
+        GroundMaterial::CharcoalGround,
+        GroundMaterial::Canvas,
+        GroundMaterial::DrawingPaper,
+        GroundMaterial::Mezzotint,
+    ];
+    const TONES: [GroundTone; 6] = [
+        GroundTone::White,
+        GroundTone::OffWhite,
+        GroundTone::Warm,
+        GroundTone::Cool,
+        GroundTone::Gray,
+        GroundTone::Black,
+    ];
+    /// Square, the widest and the narrowest registered canvas, 1000 px high.
+    const CANVASES: [(f64, f64); 3] = [(1000.0, 1000.0), (2350.0, 1000.0), (562.0, 1000.0)];
+
+    fn rects(group: &Element) -> Vec<&Element> {
+        group
+            .children()
+            .iter()
+            .filter_map(|node| match node {
+                Node::Element(element) if element.name() == "rect" => Some(element),
+                _ => None,
+            })
+            .collect()
+    }
 
     fn ground(material: GroundMaterial) -> CanvasGroundSpec {
         CanvasGroundSpec {
@@ -242,17 +246,18 @@ mod tests {
                     "instructions": [],
                 }))
                 .unwrap();
-                // The renderer draws no ground for the plain material.
+                // The renderer draws no ground for the plain material. A rect
+                // painting at half opacity or more hides the background; the
+                // ink wash's thin wash and the patterns' rects do not.
                 let fills = render_ground(&spec, CanvasSize::new(100.0, 100.0), "#abcdef", Some(1))
                     .map(|rendered| {
-                        rendered
-                            .group
-                            .children()
-                            .iter()
-                            .filter_map(|node| match node {
-                                Node::Element(element) => element.attribute("fill"),
-                                Node::Text(_) => None,
+                        rects(&rendered.group)
+                            .into_iter()
+                            .filter(|rect| {
+                                rect.attribute("opacity")
+                                    .is_none_or(|opacity| opacity.parse::<f64>().unwrap() >= 0.5)
                             })
+                            .filter_map(|rect| rect.attribute("fill"))
                             .filter(|fill| !fill.starts_with("url("))
                             .map(str::to_owned)
                             .collect::<Vec<_>>()
@@ -271,5 +276,62 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(shown_background(&without_ground), Some(Color::Yellow));
+    }
+
+    #[test]
+    fn every_ground_covers_the_canvas_without_a_transform() {
+        // Engine 79 moved the whole mezzotint layer to set its plate off by a
+        // few pixels, and the background showed along two edges.
+        for material in MATERIALS {
+            for tone in TONES {
+                for (width, height) in CANVASES {
+                    let canvas = CanvasSize::new(width, height);
+                    let spec = CanvasGroundSpec {
+                        tone,
+                        ..ground(material)
+                    };
+                    let rendered = render_ground(&spec, canvas, "#abcdef", Some(431)).unwrap();
+                    assert_eq!(rendered.group.attribute("transform"), None, "{material:?}");
+                    let rects = rects(&rendered.group);
+                    assert!(!rects.is_empty(), "{material:?}");
+                    for rect in rects {
+                        assert!(matches!(rect.attribute("x"), None | Some("0")), "{rect:?}");
+                        assert!(matches!(rect.attribute("y"), None | Some("0")), "{rect:?}");
+                        assert_eq!(rect.attribute("width"), Some(format_number(width).as_str()));
+                        assert_eq!(
+                            rect.attribute("height"),
+                            Some(format_number(height).as_str())
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn every_ground_stays_within_its_byte_budget() {
+        // The ground's cost is held by its bytes, not by its element count
+        // (24 KB, the author's ruling of 2026-08-14). A light, a middle and a
+        // dark background draw different marks, so all three are measured.
+        for material in MATERIALS {
+            for background in ["#f2f7f7", "#b2beb5", "#10141a"] {
+                for (width, height) in CANVASES {
+                    let canvas = CanvasSize::new(width, height);
+                    let rendered =
+                        render_ground(&ground(material), canvas, background, Some(431)).unwrap();
+                    let empty = Document::new(canvas).serialize().len();
+                    let mut document = Document::new(canvas);
+                    for definition in rendered.definitions {
+                        document.push_definition(definition);
+                    }
+                    document.push(rendered.group);
+                    let bytes = document.serialize().len() - empty;
+                    assert!(
+                        bytes <= 24 * 1024,
+                        "{material:?} {background} {width}x{height}: {bytes} bytes"
+                    );
+                }
+            }
+        }
     }
 }

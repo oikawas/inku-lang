@@ -181,7 +181,7 @@ are exactly what they were before the clipping.
 A sweep (and a saved Score's wash) lays each stroke as wide as the pitch or wider, so no paper is left between two sweeps: it
 reads as a field rather than as stripes. Each sweep is correspondingly lighter, and the ink a reader
 sees is the composite of the overlapping layers.
-The ground is one of seven supports you can name (paper, washi, ink-wash ground, charcoal ground, canvas, drawing paper, mezzotint), tiled as a `<pattern>`.
+The ground is one of seven supports you can name (paper, washi, ink-wash ground, charcoal ground, canvas, drawing paper, mezzotint): its broad light and dark is drawn once, never tiled, and its fine texture is laid as several `<pattern>` tiles whose sizes never line up.
 **No filter is used at all, so all three profiles emit exactly the same ground.**
 A mark's extents become pixels through the canvas's short edge, so the same description draws the same shape on any aspect (placement still scales with width and height).
 The layer that arranges marks follows the same rule: a `radial` ring's radius, an `at.region`'s extent, a cluster's band, and the cross-axis spread of a `path` all become pixels through the short edge.

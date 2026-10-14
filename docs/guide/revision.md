@@ -22,4 +22,4 @@ Candidates can be made one at a time or as a grid of four. Keep the ones you lik
 
 <table><tr><td><img src="../assets/ui/lineage-dark.en.png" width="900" alt="The lineage tab: two arrows descend from the first-generation work card to two second-generation candidates, while the description and instructions remain on the left"></td></tr></table>
 
-What you keep becomes the next parent. Another performance from there, another catalog, another composition — the whole back and forth is recorded in the **lineage**, so you can trace later which generation you redrew what from to arrive at the drawing in front of you. History stores seeds and an edition ID, so any generation along the way can be reproduced exactly as it was.
+What you keep becomes the next parent. Another catalog from there, another composition, another reading — the whole back and forth is recorded in the **lineage**, so you can trace later which generation you redrew what from to arrive at the drawing in front of you. History stores seeds and an edition ID, so any generation along the way can be reproduced exactly as it was.

@@ -21,7 +21,6 @@ from ..limits import (
 )
 from ..plugins import canvas_aspect_ids, canvas_aspect_ratio_for_aspect, normalize_canvas_aspect_id
 from ..render_engines import SVG_PROFILES, current_render_engine, new_render_seed
-from ..render_engines.default.adapter import render_seed_from_text as _derive_render_seed_from_text
 from ..saved_score_compat import coerce_saved_score
 from ..schema import CanvasSpec, Score
 from .. import db as _db
@@ -586,13 +585,6 @@ def _validated_canvas_aspect(value: str | None) -> str:
     if value not in canvas_aspect_ids():
         raise HTTPException(status_code=422, detail=f"unsupported canvas aspect: {value}")
     return value
-
-
-def _render_seed_from_text(seed_text: str | None, render_seed: int | None) -> tuple[int | None, str | None]:
-    if seed_text is None or seed_text == "":
-        return render_seed, None
-    derived = _derive_render_seed_from_text(seed_text)
-    return derived if derived is not None else (render_seed, None)
 
 
 def _validated_canvas_aspect_override(value: str | None) -> str | None:

@@ -10,7 +10,6 @@ export type RefinementCandidatePlan = {
 };
 
 export type RefinementFanoutLabels = {
-	touch: string;
 	layout: string;
 	reading: string;
 	noAlternateCatalog: string;
@@ -20,7 +19,6 @@ export type RefinementFanoutInput = {
 	kind: RefineKind;
 	/** Ignored for color: that plan offers every other catalog. */
 	count: number;
-	touchWords: string;
 	signal: AbortSignal;
 	labels: RefinementFanoutLabels;
 	currentCompositionSeed: Seed | null | undefined;
@@ -32,7 +30,6 @@ export type RefinementFanoutInput = {
 export type RefinementFanoutCapabilities = {
 	createCompositionSeed(excluded: Set<number>): number;
 	catalogName(id: string): string;
-	renderTouch(words: string, label: string, signal: AbortSignal): Promise<VariationCandidate>;
 	renderLayout(seed: number, label: string, signal: AbortSignal): Promise<VariationCandidate>;
 	renderReading(label: string, signal: AbortSignal): Promise<VariationCandidate>;
 	renderColor(catalogId: string, label: string, signal: AbortSignal): Promise<VariationCandidate>;
@@ -64,13 +61,6 @@ export async function planRefinementCandidates(
 
 	return Array.from({ length: planCount }, (_, index) => {
 		const sequence = index + 1;
-		if (input.kind === 'touch') {
-			const label = input.labels.touch;
-			return {
-				label,
-				run: () => capabilities.renderTouch(input.touchWords, label, input.signal)
-			};
-		}
 		if (input.kind === 'layout') {
 			const compositionSeed = capabilities.createCompositionSeed(usedCompositionSeeds);
 			usedCompositionSeeds.add(compositionSeed);

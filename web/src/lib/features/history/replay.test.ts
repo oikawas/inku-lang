@@ -90,7 +90,7 @@ test('T-294: a seedless old work gets provisional zero without inventing a place
 	assert.ok(comparison);
 	assert.equal(body.render_seed, 0);
 	assert.equal(body.composition_seed, null);
-	assert.equal(body.seed_text, null);
+	assert.equal('seed_text' in body, false);
 	assert.equal(comparison.provisionalSeed, 0);
 	assert.equal(comparison.versionMessage, 'missing:engine-new');
 });

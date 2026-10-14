@@ -349,8 +349,7 @@ usage: inku-cli paint [-h] [--base-url BASE_URL]
                       [--color-catalog COLOR_CATALOG]
                       [--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}]
                       [--render-seed RENDER_SEED]
-                      [--composition-seed COMPOSITION_SEED]
-                      [--seed-text SEED_TEXT] [--sketch]
+                      [--composition-seed COMPOSITION_SEED] [--sketch]
                       [--sketch-grain {fine,coarse}]
                       [--sketch-text SKETCH_TEXT] [--wild]
                       [--limits KEY=VALUE [KEY=VALUE ...]]
@@ -398,9 +397,6 @@ options:
   --composition-seed COMPOSITION_SEED
                         seed for where the marks are placed; without it the
                         placement follows --render-seed
-  --seed-text SEED_TEXT
-                        explicit text used only to derive the renderer
-                        performance seed
   --sketch              run the sketch before Stage 1: it supplements the
                         extent of place and the seasonal or time-of-day light
                         beside the description; server default is off, and so
@@ -451,8 +447,7 @@ usage: inku-cli batch [-h] [--base-url BASE_URL]
                       [--color-catalog COLOR_CATALOG]
                       [--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}]
                       [--render-seed RENDER_SEED]
-                      [--composition-seed COMPOSITION_SEED]
-                      [--seed-text SEED_TEXT] [--sketch]
+                      [--composition-seed COMPOSITION_SEED] [--sketch]
                       [--sketch-grain {fine,coarse}]
                       [--sketch-text SKETCH_TEXT] [--wild]
                       [--limits KEY=VALUE [KEY=VALUE ...]]
@@ -498,9 +493,6 @@ options:
   --composition-seed COMPOSITION_SEED
                         seed for where the marks are placed; without it the
                         placement follows --render-seed
-  --seed-text SEED_TEXT
-                        explicit text used only to derive the renderer
-                        performance seed
   --sketch              run the sketch before Stage 1: it supplements the
                         extent of place and the seasonal or time-of-day light
                         beside the description; server default is off, and so
@@ -1250,7 +1242,7 @@ options:
 ### `inku-cli refine perform`
 
 ```
-usage: inku-cli refine perform [-h] --kind {touch,layout,reading,color}
+usage: inku-cli refine perform [-h] --kind {layout,reading,color}
                                [--description DESCRIPTION] [--save-history]
                                [--no-save] [-o OUT_DIR] [--png]
                                item_id
@@ -1260,7 +1252,7 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  --kind {touch,layout,reading,color}
+  --kind {layout,reading,color}
                         refinement element type
   --description DESCRIPTION
                         override the description for layout/reading works;
@@ -1277,7 +1269,7 @@ options:
 ### `inku-cli refine generate`
 
 ```
-usage: inku-cli refine generate [-h] --kind {touch,layout,reading,color}
+usage: inku-cli refine generate [-h] --kind {layout,reading,color}
                                 [--description DESCRIPTION] [--save-history]
                                 [--no-save] [-o OUT_DIR] [--png]
                                 item_id
@@ -1287,7 +1279,7 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  --kind {touch,layout,reading,color}
+  --kind {layout,reading,color}
                         refinement element type
   --description DESCRIPTION
                         override the description for layout/reading works;
@@ -1304,8 +1296,8 @@ options:
 ### `inku-cli refine save`
 
 ```
-usage: inku-cli refine save [-h] --kind {touch,layout,reading,color} --file
-                            FILE [--svg-file SVG_FILE] --input-text INPUT_TEXT
+usage: inku-cli refine save [-h] --kind {layout,reading,color} --file FILE
+                            [--svg-file SVG_FILE] --input-text INPUT_TEXT
                             [--ddl-text DDL_TEXT]
                             [--visibility {normal,lineage_only}]
                             parent_node_id
@@ -1315,7 +1307,7 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  --kind {touch,layout,reading,color}
+  --kind {layout,reading,color}
                         derivation kind
   --file FILE           path to Score JSON file
   --svg-file SVG_FILE   path to SVG file

@@ -75,8 +75,6 @@ export function createWorkState(deps: WorkStateDeps) {
 
 	let input = $state(DEFAULT_INPUT);
 
-	let touchSeedText = $state('');
-
 	const instructionLang: InstructionLang = 'auto';
 
 	let stage1UserPrompt = $state('');
@@ -228,7 +226,6 @@ export function createWorkState(deps: WorkStateDeps) {
 			composition_seed: options.compositionSeed,
 			wild: typeof render.wild === 'boolean' ? render.wild : undefined,
 			interpretation_seed: options.interpretationSeed,
-			seed_text: options.seedText,
 			history_display_label: options.displayLabel,
 			batch_line_number: options.batchLineNumber,
 			batch_run_id: options.batchRunId,
@@ -1001,8 +998,6 @@ export function createWorkState(deps: WorkStateDeps) {
 		set inputMode(value) { inputMode = value; },
 		get input() { return input; },
 		set input(value) { input = value; },
-		get touchSeedText() { return touchSeedText; },
-		set touchSeedText(value) { touchSeedText = value; },
 		get stage1UserPrompt() { return stage1UserPrompt; },
 		set stage1UserPrompt(value) { stage1UserPrompt = value; },
 		get loading() { return loading; },

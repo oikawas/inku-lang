@@ -25,10 +25,9 @@ const JA = join(SRC, 'lib/i18n/ja.ts');
 const listMode = process.argv.includes('--list');
 
 // ── the dictionary the UI must hold to ────────────────────────────────────
-// Fixed English for the four refinement operations and the historical variation amplitudes.
+// Fixed English for the refinement operations and the historical variation amplitudes.
 // These are the labels the author ruled on; drift here is a real regression.
 const FIXED = {
-	canvasVaryPerformance: 'Another performance',
 	canvasVaryComposition: 'Another composition',
 	recomposeByPrinciple: 'By principle',
 	recomposeByChance: 'By chance',

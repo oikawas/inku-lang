@@ -27,8 +27,6 @@
 		modelInspection: ModelInspection;
 		statusDdlOrigin: boolean;
 		statusDescriptionLocked: boolean;
-		refineKind: RefineKind;
-		touchSeedText: string;
 		statusStage1Model: string;
 		statusStage2Model: string;
 		refineDrawingModelId: string;
@@ -38,8 +36,7 @@
 		/** The catalog the work uses, named in the color change dialog. */
 		catalogName: string;
 		onClose: () => void;
-		onSetRefineKind: (kind: RefineKind) => void;
-		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string) => void | Promise<void>;
+		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4) => void | Promise<void>;
 		onGenerateColorCatalogCandidates: () => void | Promise<void>;
 		onGenerateColorArrangementCandidates: () => void | Promise<void>;
 		onGenerateGroundCandidates: () => void | Promise<void>;
@@ -63,8 +60,6 @@
 		modelInspection,
 		statusDdlOrigin,
 		statusDescriptionLocked,
-		refineKind,
-		touchSeedText = $bindable(''),
 		statusStage1Model,
 		statusStage2Model,
 		refineDrawingModelId,
@@ -73,7 +68,6 @@
 		refineWildInherited,
 		catalogName,
 		onClose,
-		onSetRefineKind,
 		onGenerateVariationCandidates,
 		onGenerateColorCatalogCandidates,
 		onGenerateColorArrangementCandidates,
@@ -122,15 +116,12 @@
 			{refinementSession}
 			{statusDdlOrigin}
 			{statusDescriptionLocked}
-			{refineKind}
-			bind:touchSeedText
 			{statusStage1Model}
 			{statusStage2Model}
 			{refineDrawingModelId}
 			{refineDrawingModelGroups}
 			{refineWildValue}
 			{refineWildInherited}
-			{onSetRefineKind}
 			{onGenerateVariationCandidates}
 			{onSaveAndClose}
 			{onDiscardAndClose}

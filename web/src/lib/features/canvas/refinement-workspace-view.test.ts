@@ -50,16 +50,15 @@ test('T-346: CanvasPanel keeps refinement view coordination and local choices', 
 	for (const owner of [
 		'refineView',
 		'refineModalOpen',
-		'refineKind',
-		'setRefineKind',
 		'openLineageRefinement',
 		'closeRefineModal',
 		'artworkUrl'
 	]) {
 		assert.match(panel, new RegExp(`\\b${owner}\\b`), `${owner} left CanvasPanel`);
 	}
-	assert.match(panel, /localStorage\.setItem\(REFINE_KIND_KEY, kind\)/);
-	assert.match(panel, /\(statusDdlOrigin \|\| statusDescriptionLocked\) && refineKind === 'reading'/);
+	// The drawing parameters draw another reading only (words choosing the touch
+	// were removed 2026-10-14), so there is no kind left to remember or restore.
+	assert.doesNotMatch(panel, /REFINE_KIND_KEY|\brefineKind\b|touchSeedText/);
 	assert.match(panel, /if \(refineModalOpen\) requestCloseRefineModal\(\)/);
 	assert.match(panel, /view=\{refineView\}/);
 	assert.match(panel, /onClose=\{requestCloseRefineModal\}/);
@@ -78,7 +77,10 @@ test('T-1002/T-1005: focused refinement views reuse typed owners without cross-v
 	assert.match(shell, /view: RefinementView/);
 	assert.match(shell, /onClose: \(\) => void/);
 	assert.match(adjust, /refinementSession: RefinementSession/);
-	assert.match(adjust, /onSetRefineKind: \(kind: RefineKind\)/);
+	assert.doesNotMatch(adjust, /onSetRefineKind|touchSeedText|'touch'/);
+	// A work its DDL holds has no reading to draw again: both buttons stay off.
+	assert.match(adjust, /const readingHeld = \$derived\(!layoutOnly && \(statusDdlOrigin \|\| statusDescriptionLocked\)\)/);
+	assert.equal(adjust.match(/disabled=\{!resultAvailable \|\| readingHeld \|\|/g)?.length, 2);
 	assert.doesNotMatch(adjust, /modelInspection/);
 	assert.match(models, /modelInspection: ModelInspection/);
 	assert.doesNotMatch(models, /onGenerateVariationCandidates|touchSeedText|LANGUAGE_COMBOS/);

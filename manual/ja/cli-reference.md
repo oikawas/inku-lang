@@ -19,7 +19,7 @@ inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです�
 | login / logout / me | セッションの開始、破棄、本人確認 |
 | models | CLI既定の描画モデル（Stage 1/2共通）・Visionモデルと色カタログの設定 |
 | paint / batch | 記述または指示書から単体・一括描画 |
-| refine | 既存作品から要素（タッチ・構図・解釈・色）を推敲し派生を生成・保存 |
+| refine | 既存作品から要素（構図・解釈・色）を推敲し派生を生成・保存 |
 | lineage | 作品の系譜（親・子・兄弟）ツリーの探索表示、中間ノードの昇格 |
 | colophon | 起点から対象作品までの一本の枝を、追記専用の読みとして朗読 |
 | inspect | 同一記述に対する複数モデルの解釈・描画の並列比較 |
@@ -91,7 +91,6 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 |---|---|
 | `--render-seed SEED` | 演奏のseed。同じseedと同じScoreなら同じ絵になる |
 | `--composition-seed SEED` | 墨を置く位置のseed。省略すると配置は`--render-seed`に従う（render engine 23〜） |
-| `--seed-text TEXT` | 演奏のseedだけを導く文字列（Web UIの「言葉でタッチを変える」に相当） |
 | `--interpretation-seed ID` | 前の読み取りを使い回さず、この識別子でStage 1へ明示的な読み直しを求める |
 | `--limits KEY=VALUE ...` | `paint` と `render-score` で、その1枚だけ制限値を指定する。**下げることしかできません** —— 要素ごとにサーバーの現行設定と小さいほうが採られるので、管理者の上限を越えられません。旗を書かなければ鍵ごと送りません（空の指定は「何も上書きしない」ではなく上書きの宣言になるため） |
 
@@ -208,9 +207,9 @@ AIエージェントによる自動生成、評価、および系譜ツリーを
 
 * **推敲候補の自動生成**:
   ```sh
-  uv run inku-cli refine perform WORK_ID --kind touch -o ./refinements --png
+  uv run inku-cli refine perform WORK_ID --kind layout -o ./refinements --png
   ```
-  `--kind` に `touch` (タッチ), `layout` (構図), `reading` (解釈), `color` (配色カタログ) のいずれかを指定し、別案を生成してサーバーに保存します。`-o` が指定された場合はローカルファイルとしても書き出します。`--description` で構図・解釈の推敲に使う記述を差し替えられます。写生は元の作品に合わせます。写生ありで描いた作品は、その写生文のまま描き直し、写生を呼び直しません。`--description` で記述を変えたときだけ写生を書き直します。写生なしで描いた作品は、写生なしで描き直します。
+  `--kind` に `layout` (構図), `reading` (解釈), `color` (配色カタログ) のいずれかを指定し、別案を生成してサーバーに保存します。`-o` が指定された場合はローカルファイルとしても書き出します。`--description` で構図・解釈の推敲に使う記述を差し替えられます。写生は元の作品に合わせます。写生ありで描いた作品は、その写生文のまま描き直し、写生を呼び直しません。`--description` で記述を変えたときだけ写生を書き直します。写生なしで描いた作品は、写生なしで描き直します。
 * **手動候補の系譜保存**:
   ```sh
   uv run inku-cli refine save PARENT_NODE_ID --kind layout --file score.json --input-text "入力記述"

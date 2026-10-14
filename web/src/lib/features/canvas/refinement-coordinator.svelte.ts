@@ -117,55 +117,6 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		return normalizeCanvasAspectId(work.result?.render_canvas_aspect_id ?? work.result?.render_canvas_aspect ?? work.result?.score?.canvas ?? deps.render.canvasAspectId());
 	}
 
-	async function renderWordTouchCandidate(seedText: string, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
-		if (!work.result) throw new Error("missing result");
-		const normalizedSeedText = seedText.trim();
-		if (!normalizedSeedText) throw new Error(getLang() === 'ja' ? 'タッチを変える言葉を入力してください。' : 'Enter words to vary the touch.');
-		const r = await apiFetch('/api/render-score', {
-			method: 'POST',
-			signal,
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				score: work.result.score,
-				input: work.input.trim(),
-				ddl: work.ddl ?? '',
-				canvas_aspect: refinementCanvasAspectId(),
-				// The renderer places a work with composition_seed when present and otherwise
-				// with render_seed. A work that carries no composition_seed was placed by its
-				// render_seed, so sending the raw field would send null and let the placement
-				// follow the new performance seed instead. Nullish, because seed zero is valid.
-				composition_seed: work.result.composition_seed ?? work.result.render_seed ?? null,
-				interpretation_seed: work.result.interpretation_seed,
-				seed_text: normalizedSeedText,
-				...workReferencePayload(refinementWorkId()),
-				...renderSettingsPayload('render-score', colorCatalogOverride(refinementCatalogId())),
-			}),
-		});
-		if (!r.ok) throw await apiError(r);
-		const data = await r.json() as Partial<PaintResult> & Pick<PaintResult, 'svg' | 'score' | 'render_seed'>;
-		return {
-			id: `word-touch-${String(data.render_seed)}`,
-			label,
-			selected: false,
-			result: {
-				...work.result,
-				focus: undefined,
-				variation_amplitude: undefined,
-				variation_seed: undefined,
-				recomposition: undefined,
-				...data,
-				ddl: work.ddl ?? '',
-				thinking: work.thinking,
-				history_id: null,
-				history_at: null,
-				lineage_node_id: null,
-				lineage_parent_node_id: deps.lineageParentId(),
-				derivation_kind: deps.lineageParentId() ? 'touch_change' : null,
-				derivation_metadata: { render_seed_from: work.result.render_seed ?? null, render_seed_to: data.render_seed, seed_text: normalizedSeedText },
-			},
-		};
-	}
-
 	async function composeVariationCandidate(compositionSeed: number, label: string, signal: AbortSignal, mode: RecomposeMode): Promise<VariationCandidate> {
 		const source = work.input.trim();
 		const baseDdl = work.ddl ?? "";
@@ -477,7 +428,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		}
 	}
 
-	async function generateVariationCandidates(kind: RefineKind, count: number, touchWords?: string) {
+	async function generateVariationCandidates(kind: RefineKind, count: number) {
 		if (!work.result || refinementSession.gridBusy || work.loading) return;
 		// Every option in this round uses the choice made before any await.
 		const recomposeMode = refinementSession.recomposeMode;
@@ -492,27 +443,16 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 			refinementSession.setStatus(t().refineNeedsDdl);
 			return;
 		}
-		const normalizedTouchWords = touchWords?.trim() ?? '';
-		if (kind === 'touch' && !normalizedTouchWords) {
-			refinementSession.setStatus(getLang() === 'ja' ? 'タッチを変える言葉を入力してください。' : 'Enter words to vary the touch.');
-			return;
-		}
-		if (kind === 'touch' && count === 4) {
-			refinementSession.setStatus(getLang() === 'ja' ? '同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。' : 'The same words produce the same touch (Seed). Only one option can be made.');
-			return;
-		}
 		// Ask before the words are carried into a child (contract § stage 4).
 		if (!(await work.confirmFallbackRefine(work.currentRefineParent()))) return;
 		const contextVersion = targetIdentityVersion;
 		await deps.ensureVisibleLineageParentId();
 		if (contextVersion !== targetIdentityVersion) return;
-		const taskLabel = kind === "touch"
-			? t().canvasVaryPerformance
-			: kind === "layout"
-				? t().canvasVaryComposition
-				: kind === "reading"
-					? t().canvasVaryInterpretation
-					: t().canvasVaryColor;
+		const taskLabel = kind === "layout"
+			? t().canvasVaryComposition
+			: kind === "reading"
+				? t().canvasVaryInterpretation
+				: t().canvasVaryColor;
 		const abortController = refinementSession.beginGrid({
 			includesReading: kind === 'reading',
 			taskLabel,
@@ -525,10 +465,8 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 			const plans = await planRefinementCandidates({
 				kind,
 				count,
-				touchWords: normalizedTouchWords,
 				signal: abortController.signal,
 				labels: {
-					touch: t().canvasVaryPerformance,
 					layout: t().canvasVaryComposition,
 					reading: t().canvasVaryInterpretation,
 					noAlternateCatalog: t().refineNoAlternateCatalog
@@ -540,7 +478,6 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 			}, {
 				createCompositionSeed: deps.seeds.composition,
 				catalogName: deps.catalog.name,
-				renderTouch: renderWordTouchCandidate,
 				renderLayout: (seed, label, signal) => composeVariationCandidate(seed, label, signal, recomposeMode),
 				renderReading: interpretationVariationCandidate,
 				renderColor: renderColorCatalogCandidate

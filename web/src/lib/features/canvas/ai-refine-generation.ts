@@ -1,7 +1,6 @@
 // The seeds of an autonomous refinement generation drawn from its parent's DDL
 // (a work its edited DDL holds). Only what the kind changes is drawn anew: the
-// performance for a touch, the placement for a layout; color keeps both and
-// changes the catalog instead.
+// placement for a layout; color keeps both seeds and changes the catalog instead.
 
 type Seed = number | string;
 
@@ -13,10 +12,6 @@ export function ddlGenerationSeeds(
 	fresh: () => number
 ): GenerationSeeds {
 	const render = parent.renderSeed ?? undefined;
-	// The renderer places a work by its composition seed, or by its render seed
-	// when it has none, so that is the placement a touch keeps.
-	const placement = parent.compositionSeed ?? parent.renderSeed ?? undefined;
-	if (kind === 'touch_change') return { renderSeed: fresh(), compositionSeed: placement };
 	if (kind === 'layout_change') return { renderSeed: render, compositionSeed: fresh() };
 	return { renderSeed: render, compositionSeed: parent.compositionSeed ?? undefined };
 }

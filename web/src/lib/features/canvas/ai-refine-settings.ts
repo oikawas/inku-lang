@@ -11,7 +11,6 @@ export type AiRefineSettings = {
 	reading: boolean;
 	color: boolean;
 	layout: boolean;
-	touch: boolean;
 	direction: string;
 };
 
@@ -21,7 +20,6 @@ export const DEFAULT_AI_REFINE_SETTINGS: AiRefineSettings = {
 	reading: true,
 	color: true,
 	layout: true,
-	touch: true,
 	direction: ''
 };
 
@@ -45,7 +43,6 @@ export function parseAiRefineSettings(raw: string | null): AiRefineSettings {
 		reading: flag('reading', d.reading),
 		color: flag('color', d.color),
 		layout: flag('layout', d.layout),
-		touch: flag('touch', d.touch),
 		direction: typeof stored.direction === 'string' ? stored.direction : d.direction
 	};
 }

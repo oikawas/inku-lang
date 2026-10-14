@@ -48,11 +48,10 @@
   let enableReading = $state(saved.reading);
   let enableColor = $state(saved.color);
   let enableLayout = $state(saved.layout);
-  let enableTouch = $state(saved.touch);
   $effect(() => {
     saveAiRefineSettings({
       mode: refineMode, generations, reading: enableReading, color: enableColor, layout: enableLayout,
-      touch: enableTouch, direction: prompt
+      direction: prompt
     });
   });
   let running = $state(false);
@@ -106,13 +105,11 @@
     if (enableReading && !held) kinds.push('reinterpretation');
     if (enableColor) kinds.push('catalog_change');
     if (enableLayout) kinds.push('layout_change');
-    if (enableTouch) kinds.push('touch_change');
     return kinds;
   });
 
   function kindLabel(kind: string): string {
     const labels: Record<string, string> = {
-      touch_change: t().refineCostTouch,
       layout_change: t().refineCostLayout,
       catalog_change: t().refineCostColor,
       reinterpretation: t().refineCostReading
@@ -266,7 +263,7 @@
         {#if mode === 'vision'}<ModelCardPicker label={t().aiRefineVisionModel} selectedModel={selectedVisionModel} providerGroups={visionProviderGroups} purpose="vision" onSelect={(provider: Provider, model: string) => { selectedVisionModel = qualifiedModelId(provider, model); void onSaveVisionModel(provider, model); }} />{/if}
         <div class="form-group"><label for="ai-direction">{t().aiRefineDirectionLabel}</label><textarea id="ai-direction" placeholder={t().aiRefineDirectionPlaceholder} bind:value={prompt} maxlength="160" rows="2" disabled={held}></textarea>{#if mode === 'random'}<small class="field-hint">{t().aiRefineDirectionRandomHint}</small>{/if}</div>
         <div class="form-row"><div class="form-group wild-group"><span class="wild-group-label">&nbsp;</span><WildToggle value={wildOverride ?? parentWild} {isJapanese} inherited={wildOverride === null} onSelect={(next) => (wildOverride = next)} /></div><div class="form-group select-generations"><label for="ai-gens">{t().aiRefineGensLabel}</label><div class="gen-stepper"><button type="button" aria-label="−" onclick={() => (generations = Math.max(1, generations - 1))} disabled={generations <= 1}>−</button><span id="ai-gens" class="gen-value">{generations}</span><button type="button" aria-label="＋" onclick={() => (generations = Math.min(10, generations + 1))} disabled={generations >= 10}>＋</button></div></div></div>
-        <details class="advanced-settings" open><summary>{t().aiRefineElementsLabel}</summary><div class="checkbox-group"><Tooltip placement="bottom" text={t().refineCostReading}><label class:held title={held ? t().descriptionLockedReason : undefined}><input type="checkbox" checked={enableReading && !held} disabled={held} onchange={(event) => (enableReading = event.currentTarget.checked)} /><span>{t().canvasVaryInterpretation}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostColor}><label><input type="checkbox" bind:checked={enableColor} /><span>{t().canvasVaryColor}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostLayout}><label><input type="checkbox" bind:checked={enableLayout} /><span>{t().canvasVaryComposition}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostTouch}><label><input type="checkbox" bind:checked={enableTouch} /><span>{t().canvasVaryPerformance}</span></label></Tooltip></div></details>
+        <details class="advanced-settings" open><summary>{t().aiRefineElementsLabel}</summary><div class="checkbox-group"><Tooltip placement="bottom" text={t().refineCostReading}><label class:held title={held ? t().descriptionLockedReason : undefined}><input type="checkbox" checked={enableReading && !held} disabled={held} onchange={(event) => (enableReading = event.currentTarget.checked)} /><span>{t().canvasVaryInterpretation}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostColor}><label><input type="checkbox" bind:checked={enableColor} /><span>{t().canvasVaryColor}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostLayout}><label><input type="checkbox" bind:checked={enableLayout} /><span>{t().canvasVaryComposition}</span></label></Tooltip></div></details>
       {/if}
       {#if latestAdvice}<section class="vision-advice"><h4>{t().aiRefineVisionObservation}</h4><p>{latestAdvice.observation}</p><h4>{t().aiRefineVisionDirection}</h4><p>{latestAdvice.next_direction}</p></section>{/if}
       {#if errorText}<div class="error-banner">{errorText}</div>{/if}

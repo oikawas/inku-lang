@@ -114,7 +114,6 @@ The Server's Python adapter and Android's Kotlin/JNI adapter are thin host bound
 | DDL edit | Authoring origin, CAS, and original history | With unchanged settings, the compiler after CAS-saving the author DDL. With changed settings, a parent-linked direct-DDL variation |
 | Approve or decline a proposal | Base revision and proposal digest | Approval revalidates the base and CAS-saves. A decline keeps the saved DDL |
 | Another composition | Saved visible DDL, source meaning, and drawing attributes | Typed Stage 1.5 / lowerer with a new `composition_seed` |
-| Another performance | Saved Score and authoring revision | Renderer only with a new `render_seed` |
 | Catalog / canvas change | Original variation remains unchanged | A parent-linked new variation with current options |
 | Derivation from an older work | The original history row is never changed | A new `legacy_description_fork` / `legacy_ddl_fork` variation through `legacy/{history_id}/fork` |
 

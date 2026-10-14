@@ -1972,7 +1972,6 @@ def _paint_payload(
         "canvas_aspect": getattr(args, "canvas_aspect", None),
         "render_seed": getattr(args, "render_seed", None),
         "composition_seed": getattr(args, "composition_seed", None),
-        "seed_text": getattr(args, "seed_text", None),
         # Layers the server has always accepted but the CLI never named. `or None`
         # matters: the filter below drops None, not False, so a bare False would be
         # sent explicitly on every run and change the request shape of every
@@ -3311,11 +3310,11 @@ def command_colophon(args: argparse.Namespace) -> int:
 
 
 # What `refine --kind` is called on the command line, and what the server calls
-# it. The flag's four choices are short verbs; `LINEAGE_DERIVATION_KINDS` names
-# the same four differently, and sending a flag value straight through is
-# refused.
+# it. The flag's choices are short verbs; `LINEAGE_DERIVATION_KINDS` names the
+# same kinds differently, and sending a flag value straight through is refused.
+# A touch alone is no longer a refinement (removed 2026-10-14, the author); the
+# server still keeps `touch_change` for the works refined that way before.
 _DERIVATION_KIND_BY_REFINE_KIND = {
-    "touch": "touch_change",
     "layout": "layout_change",
     "reading": "reinterpretation",
     "color": "catalog_change",
@@ -3395,12 +3394,7 @@ def command_refine(args: argparse.Namespace) -> int:
         }
         params.update(_refine_sketch(target.get("sketch_text"), description.strip() != parent_text.strip()))
         
-        if args.kind == "touch":
-            params["render_seed"] = int(time.time() * 1000) & 0x7fffffff
-            params["composition_seed"] = target.get("composition_seed")
-            params["interpretation_seed"] = target.get("interpretation_seed")
-            params["catalog_id"] = target.get("render_color_catalog_id")
-        elif args.kind == "layout":
+        if args.kind == "layout":
             params["render_seed"] = target.get("render_seed")
             params["composition_seed"] = int(time.time() * 1000) & 0x7fffffff
             params["interpretation_seed"] = target.get("interpretation_seed")
@@ -3940,7 +3934,6 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--canvas-aspect", choices=CANVAS_ASPECTS, help="canvas aspect id for paint, compose, and history")
     parser.add_argument("--render-seed", type=int, help="renderer performance seed for reproducible replay")
     parser.add_argument("--composition-seed", type=int, help="seed for where the marks are placed; without it the placement follows --render-seed")
-    parser.add_argument("--seed-text", help="explicit text used only to derive the renderer performance seed")
     # Spelled straight from the server request keys (`sketch_grain` -> `--sketch-grain`).
     # These layers have always been accepted by /api/paint; the CLI simply never named
     # them, so every run so far took the server default rather than a chosen one.
@@ -4377,7 +4370,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     def add_refine_perform_arguments(command: argparse.ArgumentParser) -> None:
         command.add_argument("item_id", help="target history item ID to refine")
-        command.add_argument("--kind", choices=("touch", "layout", "reading", "color"), required=True, help="refinement element type")
+        command.add_argument("--kind", choices=("layout", "reading", "color"), required=True, help="refinement element type")
         command.add_argument("--description", help="override the description for layout/reading works; without it the parent's Sketch from life prose is carried over, and with it that prose is written again")
         command.add_argument("--save-history", action="store_true", default=True, help="automatically save the result to history")
         command.add_argument("--no-save", dest="save_history", action="store_false", help="do not save the result to history")
@@ -4394,7 +4387,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     refine_save = refine_sub.add_parser("save", help="save a candidate score into history connected to a parent")
     refine_save.add_argument("parent_node_id", help="parent lineage node ID")
-    refine_save.add_argument("--kind", choices=("touch", "layout", "reading", "color"), required=True, help="derivation kind")
+    refine_save.add_argument("--kind", choices=("layout", "reading", "color"), required=True, help="derivation kind")
     refine_save.add_argument("--file", required=True, help="path to Score JSON file")
     refine_save.add_argument("--svg-file", help="path to SVG file")
     refine_save.add_argument("--input-text", required=True, help="original user text")

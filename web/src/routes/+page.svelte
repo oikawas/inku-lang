@@ -2565,7 +2565,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		if (work.result.render_canvas_aspect_ratio !== undefined) payload.render_canvas_aspect_ratio = work.result.render_canvas_aspect_ratio;
 		if (work.result.instruction_lang_requested !== undefined) payload.instruction_lang_requested = work.result.instruction_lang_requested;
 		if (work.result.instruction_lang_resolved !== undefined) payload.instruction_lang_resolved = work.result.instruction_lang_resolved;
-		if (work.result.seed_text !== undefined) payload.seed_text = work.result.seed_text;
 		const derivationMetadata = work.result.derivation_metadata ?? {};
 		const resolvedLang = work.result.instruction_lang_resolved ?? null;
 		payload.stage1_instruction_lang = typeof derivationMetadata.stage1_language === 'string' ? derivationMetadata.stage1_language : resolvedLang;
@@ -3115,7 +3114,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				runTokensOut={work.activeRunTokensOut}
 				runAttempt={work.activeRunAttempt}
 				{modelInspection}
-				bind:touchSeedText={work.touchSeedText}
 				onGenerateVariationCandidates={refinement.generateVariationCandidates}
 				onGenerateColorCatalogCandidates={refinement.generateColorCatalogCandidates}
 				onGenerateColorArrangementCandidates={refinement.generateColorArrangementCandidates}

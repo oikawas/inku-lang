@@ -28,7 +28,9 @@
 	};
 
 	let { node, isJapanese, variant, open, available = undefined, unavailableReason, onRequestOpen, onOpenChange, onAction }: Props = $props();
-	const READS_THE_DESCRIPTION = new Set<WorkAction>(['description', 'sketch-grain', 'models']);
+	// The drawing parameters draw another reading, now that words no longer
+	// choose the touch (removed 2026-10-14), so they read the description too.
+	const READS_THE_DESCRIPTION = new Set<WorkAction>(['adjust', 'description', 'sketch-grain', 'models']);
 	let triggerEl = $state<HTMLButtonElement | null>(null);
 	let menuEl = $state<HTMLDivElement | null>(null);
 	let wrapperEl = $state<HTMLDivElement | null>(null);
@@ -120,7 +122,9 @@
 				{#if ddlOrigin}<span class="work-action-origin">{t().workActionDdlOrigin}</span>{/if}
 				{#if descriptionLocked}<span class="work-action-origin">{t().descriptionLockedMark}</span>{/if}
 			</div>
-			<button type="button" role="menuitem" onclick={(event) => select('adjust', event)}>{t().workActionAdjust}</button>
+			{#if !ddlOrigin}
+				<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('adjust', event)}>{t().workActionAdjust}</button>
+			{/if}
 			<button type="button" role="menuitem" onclick={(event) => select('layout', event)}>{t().canvasVaryComposition}</button>
 			<button type="button" role="menuitem" onclick={(event) => select('color-catalog', event)}>{t().canvasVaryColor}</button>
 			<button type="button" role="menuitem" onclick={(event) => select('color-arrangement', event)}>{t().workActionColorArrangement}</button>

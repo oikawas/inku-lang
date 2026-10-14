@@ -243,13 +243,12 @@ The instructions can be edited by hand and drawn again. Selecting a word in the 
 
 The drawing that comes back from the first piece of writing is not the finished piece. It is the **first generation**. You redraw from it, then redraw from what came back — **the work is made by accumulating generations**.
 
-This is not the same as redrawing until something good appears. (Though you may redraw that way too.) Revision is split across four axes, and **you decide which one moves and which ones hold**. Then **you choose** among what comes back. That loop of redrawing and choice makes a work rather than a mere output.
+This is not the same as redrawing until something good appears. (Though you may redraw that way too.) Revision is split across three axes, and **you decide which one moves and which ones hold**. Then **you choose** among what comes back. That loop of redrawing and choice makes a work rather than a mere output.
 
 None of them breaks default reproducibility; each acts only on your explicit request.
 
 | Operation | What is redrawn | What is kept | Cost |
 |---|---|---|---|
-| **Another performance** | Line tremor, placement phase | Interpretation and composition | Very fast, no LLM call |
 | **Another catalog** | The color assignment | Interpretation, composition, performance | Very fast, no LLM call |
 | **Another composition** | The concrete angle of a slant, the position in a corner | The instructions; technique, color, touch, and element count | Fast, no LLM call |
 | **Another reading** | The reading of the words themselves | Your sentence | Slower, from Stage 1 |

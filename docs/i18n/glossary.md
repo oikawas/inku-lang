@@ -65,8 +65,7 @@
 | 日本語（正本） | 英語 | 用法 | 退けた訳・注 |
 |---|---|---|---|
 | 推敲 | **refinement** / **refine** | 名詞／動詞 | ~~revision~~（事務的）、~~iteration~~（工学的） |
-| 言葉でタッチを変える | **Another performance** | **lint 固定**。四操作は Another + 名詞で統一 | — |
-| 配置を変える | **Another composition** | **lint 固定** | — |
+| 配置を変える | **Another composition** | **lint 固定**。推敲の操作は Another + 名詞で統一（言葉でタッチを変える〈Another performance〉は 2026-10-14 に削除） | — |
 | 原理に沿う | **By principle** | 配置を変えるときの選び。作者裁定（2026-10-05）、**lint 固定** | 指示書から分かることだけで解き直す |
 | 偶然に委ねる | **By chance** | 配置を変えるときの選び。作者裁定（2026-10-05）、**lint 固定** | 層の種類が許す範囲からseedで選ぶ |
 | 読み取りを変える | **Another reading** | **lint 固定** | — |

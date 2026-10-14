@@ -12,7 +12,6 @@ import {
 } from './refinement-fanout.ts';
 
 const labels: RefinementFanoutLabels = {
-	touch: 'Touch',
 	layout: 'Layout',
 	reading: 'Reading',
 	noAlternateCatalog: 'No alternate catalog'
@@ -37,7 +36,6 @@ function capabilities(
 	return {
 		createCompositionSeed: () => 1,
 		catalogName: (id) => id.toUpperCase(),
-		renderTouch: async (_words, label) => candidate(label),
 		renderLayout: async (_seed, label) => candidate(label),
 		renderReading: async (label) => candidate(label),
 		renderColor: async (_catalogId, label) => candidate(label),
@@ -47,9 +45,8 @@ function capabilities(
 
 function input(overrides: Partial<RefinementFanoutInput> = {}): RefinementFanoutInput {
 	return {
-		kind: 'touch' as const,
+		kind: 'reading' as const,
 		count: 1 as const,
-		touchWords: 'soft ink',
 		signal: new AbortController().signal,
 		labels,
 		currentCompositionSeed: null,
@@ -127,21 +124,17 @@ test('T-323: color plan offers every other catalog in list order and rejects no 
 	);
 });
 
-test('T-324: touch and reading dispatch their exact arguments and shared signal', async () => {
+test('T-324: reading dispatches its exact arguments and shared signal', async () => {
 	const calls: unknown[][] = [];
 	const signal = new AbortController().signal;
 	const shared = capabilities({
-		renderTouch: async (...args) => { calls.push(['touch', ...args]); return candidate('touch'); },
 		renderReading: async (...args) => { calls.push(['reading', ...args]); return candidate('reading'); }
 	});
-	const touchPlans = await planRefinementCandidates(input({ kind: 'touch', signal }), shared);
 	const readingPlans = await planRefinementCandidates(input({ kind: 'reading', count: 4, signal }), shared);
 
-	assert.deepEqual(touchPlans.map((plan) => plan.label), ['Touch']);
 	assert.deepEqual(readingPlans.map((plan) => plan.label), ['Reading 1', 'Reading 2', 'Reading 3', 'Reading 4']);
-	await Promise.all([...touchPlans, ...readingPlans].map((plan) => plan.run()));
+	await Promise.all(readingPlans.map((plan) => plan.run()));
 	assert.deepEqual(calls, [
-		['touch', 'soft ink', 'Touch', signal],
 		['reading', 'Reading 1', signal],
 		['reading', 'Reading 2', signal],
 		['reading', 'Reading 3', signal],

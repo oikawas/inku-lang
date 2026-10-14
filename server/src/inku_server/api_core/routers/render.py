@@ -37,7 +37,6 @@ from ..rendering import (
     _limits_for_render,
     _render_hash_metadata,
     _render_score_svg,
-    _render_seed_from_text,
     _render_with_metadata,
     _score_canvas_aspect_value,
     _score_with_canvas,
@@ -83,7 +82,6 @@ class ComposeRequest(BaseModel):
         description="Choose the saved DDL's numeric ranges again; omission keeps the existing rebuild",
     )
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
-    seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
     fires_on: str | None = Field(
         default=None,
         max_length=200,
@@ -151,7 +149,6 @@ class ComposeResponse(BaseModel):
     render_wild: bool | None = None
     composition_seed: JsonSeed | None = None
     interpretation_seed: str | None = None
-    seed_text: str | None = None
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
@@ -241,7 +238,6 @@ class PaintRequest(BaseModel):
     wild: bool = Field(default=False, description="Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed")
     composition_seed: int | None = Field(default=None, description="Composition seed: it re-salts the intermediate expansion (Stage 1.5) and, from render engine 23, decides where the renderer places the marks; omitted means the placement follows the performance seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
-    seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
     # The sketch. Carried per request, the way render_seed is: it is an
     # option of one drawing, not a setting of the user.
     sketch: bool = Field(default=False, description="写生を通すか（場所の広がりと季節・時刻の光を記述の横に補う）。既定は通さない")
@@ -282,7 +278,6 @@ class PaintResponse(BaseModel):
     render_wild: bool | None = None
     composition_seed: JsonSeed | None = None
     interpretation_seed: str | None = None
-    seed_text: str | None = None
     instruction_lang_requested: str | None = None
     instruction_lang_resolved: str | None = None
     ui_lang: str | None = None
@@ -350,7 +345,6 @@ class RenderSvgRequest(BaseModel):
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     composition_seed: int | None = Field(default=None, description="Placement seed for arrangements; omitted means the placement follows the performance seed")
     wild: bool = Field(default=False, description="Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed")
-    seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
 
 
 class RenderScoreRequest(BaseModel):
@@ -367,7 +361,6 @@ class RenderScoreRequest(BaseModel):
     wild: bool = False
     composition_seed: int | None = None
     interpretation_seed: str | None = None
-    seed_text: str | None = None
 
 
 class RenderScoreResponse(BaseModel):
@@ -401,7 +394,6 @@ class RenderScoreResponse(BaseModel):
     render_wild: bool = False
     composition_seed: JsonSeed | None = None
     interpretation_seed: str | None = None
-    seed_text: str | None = None
     render_hash: str
     # Which source decided the colors: the work's own snapshot, or today's
     # catalog. A work that predates the snapshot still draws, but not in the
@@ -463,13 +455,14 @@ def _render_color_arrangement_for_work(actor: dict, work: dict, index: int) -> R
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     snapshot = {**work, "render_color_map": recolored, "render_color_catalog_id": catalog_id}
-    if work.get("render_seed") is None and not work.get("seed_text"):
+    render_seed = work.get("render_seed")
+    if render_seed is None:
         raise HTTPException(status_code=422, detail="saved work has no performance seed to preserve its drawing")
     result = _render_authorized_score(RenderScoreRequest(
         score=work["score"], input=work.get("input") or "", ddl=work.get("ddl"),
         catalog_id=catalog_id, canvas_aspect=work.get("render_canvas_aspect_id") or work.get("render_canvas_aspect"),
-        render_seed=work.get("render_seed"), composition_seed=work.get("composition_seed"),
-        interpretation_seed=work.get("interpretation_seed"), seed_text=work.get("seed_text"),
+        render_seed=render_seed, composition_seed=work.get("composition_seed"),
+        interpretation_seed=work.get("interpretation_seed"),
         wild=bool(work.get("render_wild")),
     ), actor, snapshot)
     result.render_color_source = "color_arrangement"
@@ -519,15 +512,16 @@ def _render_ground_variant_for_work(actor: dict, work: dict, material: str) -> G
         raise HTTPException(status_code=422, detail="saved work has no Score to redraw")
     if material not in _ground.unused_materials(score):
         raise HTTPException(status_code=422, detail="ground must be a named support the work is not on")
-    if work.get("render_seed") is None and not work.get("seed_text"):
+    render_seed = work.get("render_seed")
+    if render_seed is None:
         raise HTTPException(status_code=422, detail="saved work has no performance seed to preserve its drawing")
     ddl = _ground.ddl_with_ground(work.get("ddl") or "", material, work.get("instruction_lang_resolved"))
     result = _render_authorized_score(RenderScoreRequest(
         score=_ground.score_with_ground(score, material), input=work.get("input") or "", ddl=ddl,
         catalog_id=work.get("render_color_catalog_id") or work.get("catalog_id"),
         canvas_aspect=work.get("render_canvas_aspect_id") or work.get("render_canvas_aspect"),
-        render_seed=work.get("render_seed"), composition_seed=work.get("composition_seed"),
-        interpretation_seed=work.get("interpretation_seed"), seed_text=work.get("seed_text"),
+        render_seed=render_seed, composition_seed=work.get("composition_seed"),
+        interpretation_seed=work.get("interpretation_seed"),
         wild=bool(work.get("render_wild")),
     ), actor, work)
     result.interpretation_seed = work.get("interpretation_seed")
@@ -545,7 +539,7 @@ class VisionRefineAdviceBody(BaseModel):
     model: str | None = Field(default=None, min_length=1, max_length=200)
     instruction: str = Field(..., min_length=1, max_length=100_000)
     direction: str = Field(default="", max_length=2000)
-    enabled_kinds: list[str] = Field(..., min_length=1, max_length=4)
+    enabled_kinds: list[str] = Field(..., min_length=1, max_length=3)
     language: str = Field(default="ja", pattern="^(ja|en)$")
 
 
@@ -566,7 +560,7 @@ def _render_authorized_score(req: RenderScoreRequest, actor: dict, work: dict | 
     if req.score.get("version") in _COMPACT_SCORE_VERSIONS:
         from ...pipeline_runtime import get_service
         return RenderScoreResponse(**get_service().replay_for(actor["id"], req.model_dump(), work))
-    render_seed, seed_text = _render_seed_from_text(req.seed_text, req.render_seed)
+    render_seed = req.render_seed
     try:
         # Site 4 of 5. The work is resolved above for its colors; its row also
         # records the limits it was drawn under, and this is the route a redraw
@@ -593,7 +587,6 @@ def _render_authorized_score(req: RenderScoreRequest, actor: dict, work: dict | 
             "render_wild": req.wild,
             "composition_seed": req.composition_seed,
             "interpretation_seed": req.interpretation_seed,
-            "seed_text": seed_text,
             "render_limits": limits_as_dict(limits),
         }
         svg, render_metadata = _render_with_metadata(
@@ -636,7 +629,7 @@ def api_render_svg(req: RenderSvgRequest, actor: dict = Depends(_current_user)) 
             COLOR_CATALOG_ID_HEADER: result["render_color_catalog_id"],
             LIMITS_SOURCE_HEADER: result["render_limits_source"],
         })
-    render_seed, _ = _render_seed_from_text(req.seed_text, req.render_seed)
+    render_seed = req.render_seed
     work = _work_for_color_snapshot(actor, req.work_id) if req.work_id else None
     try:
         svg, resolved_catalog_id, color_source, limits_source = _render_score_svg(

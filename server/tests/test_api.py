@@ -1888,7 +1888,11 @@ def test_history_is_scoped_to_authenticated_user():
         "score": {"instructions": []},
         "svg": "<svg><script>alert(1)</script></svg>",
         "at": 1_700_000_000_000,
+        # Words no longer choose the touch (removed 2026-10-14): a save that
+        # still carries them keeps the seed it was sent and records no words.
         "derivation_metadata": {"seed_text": "夕立"},
+        "seed_text": "夕立",
+        "render_seed": 41,
     }
     post_a = client.post("/api/history", json=payload, headers=headers_a)
     assert post_a.status_code == 200
@@ -1896,8 +1900,8 @@ def test_history_is_scoped_to_authenticated_user():
     assert item_a["svg"] != payload["svg"]
     assert "<script" not in item_a["svg"]
     assert "<svg" in item_a["svg"]
-    assert item_a["seed_text"] == "夕立"
-    assert item_a["render_seed"] == str(api_rendering._render_seed_from_text("夕立", None)[0])
+    assert item_a.get("seed_text") is None
+    assert item_a["render_seed"] == "41"
     post_a_second = client.post(
         "/api/history",
         json={**payload, "input": "blue crayon search target", "ddl": "青い線", "at": payload["at"] + 1},

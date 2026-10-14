@@ -40,20 +40,20 @@ def test_vision_refine_advice_falls_back_to_enabled_kind_and_rejects_invalid_jso
         svg=SVG,
         instruction="circle",
         direction="",
-        enabled_kinds=["touch_change"],
+        enabled_kinds=["layout_change"],
         model="test:vision",
         language="ja",
         settings={},
         reader=lambda **_: '{"observation":"円が見える","next_direction":"線を揺らす","suggested_kind":"catalog_change"}',
     )
-    assert result["suggested_kind"] == "touch_change"
+    assert result["suggested_kind"] == "layout_change"
 
     with pytest.raises(ValueError, match="invalid refinement advice JSON"):
         vision_refine_advice(
             svg=SVG,
             instruction="circle",
             direction="",
-            enabled_kinds=["touch_change"],
+            enabled_kinds=["layout_change"],
             model="test:vision",
             language="ja",
             settings={},

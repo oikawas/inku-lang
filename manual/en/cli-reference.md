@@ -19,7 +19,7 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 | login / logout / me | Start, discard, and inspect a session |
 | models | Configure the default drawing model (shared Stage 1/2), Vision model and color catalog |
 | paint / batch | Paint one or many works from descriptions or instructions |
-| refine | Refine an existing work's touch, composition, reading, or color |
+| refine | Refine an existing work's composition, reading, or color |
 | lineage | Inspect lineage node trees and promote intermediate works |
 | colophon | Recite one origin-to-target lineage branch as an append-only reading |
 | inspect | Inspect and compare multiple inference models in parallel |
@@ -91,7 +91,6 @@ Variation is retired. The old amplitude and seed flags are rejected. Saved varia
 |---|---|
 | `--render-seed SEED` | Performance seed. The same seed and the same score give the same picture |
 | `--composition-seed SEED` | Seed for where the marks are placed. Without it the placement follows `--render-seed` (render engine 23 onwards) |
-| `--seed-text TEXT` | Text used only to derive the performance seed; the counterpart of `Another performance` in the Web UI |
 | `--interpretation-seed ID` | Ask Stage 1 for an explicit re-interpretation under this identifier instead of reusing the previous reading |
 | `--limits KEY=VALUE ...` | On `paint` and `render-score`, set limits for this one drawing. **It can only lower them** — each element is taken as the smaller of the given value and the server's current setting, so an administrator's ceiling cannot be exceeded. Without the flag the key is not sent at all (an empty setting reads as a declaration to override, not as leaving things alone) |
 
@@ -211,9 +210,9 @@ Attach an existing work as the parent node and produce a local option, saved int
 
 * **Generate a refinement option**:
   ```sh
-  uv run inku-cli refine perform WORK_ID --kind touch -o ./refinements --png
+  uv run inku-cli refine perform WORK_ID --kind layout -o ./refinements --png
   ```
-  `--kind` takes `touch`, `layout` (composition), `reading` (interpretation), or `color` (color catalog); the option is painted and stored on the server. With `-o` it is also written locally. `--description` replaces the description used for composition and reading refinements. `Sketch from life` follows the work you refine: a work drawn with it is redrawn from its sketch prose without running the layer again, and only a description changed with `--description` goes through the layer again; a work drawn without it is redrawn without it.
+  `--kind` takes `layout` (composition), `reading` (interpretation), or `color` (color catalog); the option is painted and stored on the server. With `-o` it is also written locally. `--description` replaces the description used for composition and reading refinements. `Sketch from life` follows the work you refine: a work drawn with it is redrawn from its sketch prose without running the layer again, and only a description changed with `--description` goes through the layer again; a work drawn without it is redrawn without it.
 * **Save a manual option into the lineage**:
   ```sh
   uv run inku-cli refine save PARENT_NODE_ID --kind layout --file score.json --input-text "the description"

@@ -117,7 +117,6 @@ class RunOptions(BaseModel):
     sketch: Literal["off", "on"] | None = None
     sketch_text: str | None = Field(default=None, max_length=100_000)
     interpretation_seed: str | None = None
-    seed_text: str | None = None
     history_display_label: str | None = None
     batch_line_number: int | None = None
     batch_run_id: str | None = None
@@ -233,7 +232,6 @@ class ProductPipelineEffects:
     def prepare(self, owner: str, kind: str, text: str, options: dict, work: dict | None) -> tuple[dict, dict]:
         from . import db
         from .api_core.common import _env_flag, _model_offered_to, _resolve_instruction_lang
-        from .api_core.rendering import _render_seed_from_text
         from .render_engines import new_render_seed
 
         try:
@@ -275,7 +273,7 @@ class ProductPipelineEffects:
                                "diagnostics": catalog["diagnostics"]}
         if selected.get("canvas_aspect") is not None:
             config = select_canvas(config, self.binding.canvas_registry, selected["canvas_aspect"])
-        seed, seed_text = _render_seed_from_text(selected.get("seed_text"), selected.get("render_seed"))
+        seed = selected.get("render_seed")
         seed = new_render_seed() if seed is None else int(seed)
         composition_seed = selected.get("composition_seed")
         config["compiler"]["composition_seed"] = None if composition_seed is None else str(int(composition_seed))
@@ -320,7 +318,7 @@ class ProductPipelineEffects:
         selected.update(
             stage1_model=model,
             stage2_model=model,
-            render_seed=str(seed), seed_text=seed_text, catalog_mode=mode,
+            render_seed=str(seed), catalog_mode=mode,
             instruction_lang=selected.get("instruction_lang") or "auto",
             instruction_lang_resolved=language, catalog_id=catalog_id,
         )
@@ -579,7 +577,7 @@ class ProductPipelineEffects:
         from . import db
         from .api_core.common import _build_number
         from .api_core.rendering import (
-            _limits_for_render, _render_seed_from_text, _render_warnings, _SRGB_COLOR_PROFILE,
+            _limits_for_render, _render_warnings, _SRGB_COLOR_PROFILE,
             _generated_svg_limit_bytes, _validate_generated_svg, _svg_limit_binding_unavailable,
         )
         from .render_engines import new_render_seed
@@ -620,7 +618,7 @@ class ProductPipelineEffects:
         if not snapshot_colors and catalog is None:
             raise CandidateHostError("unknown_color_catalog")
         colors = deepcopy(snapshot_colors) if snapshot_colors else render_color_map_for_catalog(catalog_id)
-        seed, seed_text = _render_seed_from_text(request.get("seed_text"), request.get("render_seed"))
+        seed = request.get("render_seed")
         seed = new_render_seed() if seed is None else seed
         composition_seed = request.get("composition_seed")
         options = deepcopy(self.manifest["render"]["options"])
@@ -660,7 +658,7 @@ class ProductPipelineEffects:
                   "render_canvas_aspect": canvas, "render_canvas_aspect_id": canvas,
                   "render_canvas_aspect_ratio": entry["width_units"] / entry["height_units"],
                   "render_seed": seed, "composition_seed": composition_seed, "render_wild": options["wild"],
-                  "seed_text": seed_text, "render_limits": four_limits, "render_limits_source": limits_source,
+                  "render_limits": four_limits, "render_limits_source": limits_source,
                   "render_diagnostics": metadata.get("execution"), "resource_execution": metadata.get("resource_execution")}
         warnings = _render_warnings(metadata, "saved replay")
         if warnings:

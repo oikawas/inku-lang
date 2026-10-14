@@ -1135,7 +1135,7 @@ Adjustment candidates are temporary state owned by their source work: explicitly
 
 The web UI keeps direct operational labels while the specification retains the musical metaphor: performance is shown as touch, composition as layout, and interpretation as reading. Model comparison lives beside `Adjust` as a subview inside the Canvas-side `Refine` tab and shows no judge values. The user explicitly selects up to four models, and each selected model runs both Stage 1 and Stage 2. Comparisons that fix one stage are retired. A model used by the target work cannot be selected; when an old work used different models for its two stages, neither can be selected. A floating tooltip explains prohibited choices. No unselected fallback model is run. Changing the target clears stale comparison results and aborts any comparison still in flight. The drawings are laid out as options, as in Another catalog, and only the ones chosen with `+` are saved. A saved option records the actual model under both Stage 1 and Stage 2 keys. Old works' model records are not rewritten.
 
-The work header's Refine control and Lineage cards share the same work-editing menu: Edit drawing parameters, Another composition, Another catalog, Change the color arrangement, Change the ground, Change the description, Instruction editor, Change the sketch-from-life grain, Change the model, and Autonomous refinement process, in that order. Opening the menu does not draw or save. The header entry targets the displayed saved work and asks the user to save an unsaved preview first. DDL-authored works omit Change the description, Change the sketch-from-life grain, and Change the model. Drawing parameters, composition, and model changes open the target's existing Refine workspace without duplicating comparison logic. Another composition has its own dialog: choose By principle or By chance, then explicitly draw one or four options. Opening it does not draw, and drawing parameters no longer offer the composition choice. Another catalog is a dialog of its own, apart from drawing parameters: on opening it draws the same Score in every color catalog except the target's, in catalog-list order, without calling an LLM. Change the model is a dialog of the same shape: it lays out the options the chosen models draw, and shows each option's progress while they are drawn. These dialogs share saving, discarding, and staying open while options are unsaved with drawing parameters. Description and instruction dialogs initialize from that work and save a `description_edit` or `ddl_edit` child. Closing without saving returns to the originating work or Lineage view without replacing the description being written. After saving children, Lineage focuses the newest child and its ancestors while retaining the other saved branches; newest does not mean best. The regular top-level Refine tab retains its panel layout, and the former Manual Refine modal has no menu entry. A flag icon and an explicit revision-mark label distinguish the mark from editing; the stored `for_revision` meaning is unchanged.
+The work header's Refine control and Lineage cards share the same work-editing menu: Edit drawing parameters, Another composition, Another catalog, Change the color arrangement, Change the ground, Change the description, Instruction editor, Change the sketch-from-life grain, Change the model, and Autonomous refinement process, in that order. Opening the menu does not draw or save. The header entry targets the displayed saved work and asks the user to save an unsaved preview first. DDL-authored works omit Edit drawing parameters, Change the description, Change the sketch-from-life grain, and Change the model. Edit drawing parameters draws Another reading only, so it is treated as an action that reads the description, and a work its instructions hold shows it unavailable with the reason (2026-10-14, after Another performance was removed). Drawing parameters, composition, and model changes open the target's existing Refine workspace without duplicating comparison logic. Another composition has its own dialog: choose By principle or By chance, then explicitly draw one or four options. Opening it does not draw, and drawing parameters no longer offer the composition choice. Another catalog is a dialog of its own, apart from drawing parameters: on opening it draws the same Score in every color catalog except the target's, in catalog-list order, without calling an LLM. Change the model is a dialog of the same shape: it lays out the options the chosen models draw, and shows each option's progress while they are drawn. These dialogs share saving, discarding, and staying open while options are unsaved with drawing parameters. Description and instruction dialogs initialize from that work and save a `description_edit` or `ddl_edit` child. Closing without saving returns to the originating work or Lineage view without replacing the description being written. After saving children, Lineage focuses the newest child and its ancestors while retaining the other saved branches; newest does not mean best. The regular top-level Refine tab retains its panel layout, and the former Manual Refine modal has no menu entry. A flag icon and an explicit revision-mark label distinguish the mark from editing; the stored `for_revision` meaning is unchanged.
 
 History lists place the description in a wide column beside the thumbnail without a character cutoff. A preview of up to three lines expands or collapses by mouse or keyboard without selecting or drawing a work; the thumbnail view also offers the full text. Model names are combined only when both stages record the same complete provider-qualified ID. Missing values remain unrecorded for their respective stages, and details retain the provider and full model name. Presentation changes do not alter the saved description or conditions.
 
@@ -1312,14 +1312,19 @@ Once the description is written, several options are generated at once, and the
 author picks one, rewrites the description, or regenerates.  The cost drops from
 "make something out of a blank page" to "look at what is laid out."
 
-### 8.4 Making the Afterwards Choice Concrete: Two Stages of Regeneration (v1.52)
+### 8.4 Making the Afterwards Choice Concrete: Regenerating the Composition (v1.52)
 
-Regeneration splits into two stages.  Neither breaks the default determinism,
-and both change only on an explicit action.
+Regeneration happens at the composition stage.  It does not break the default
+determinism, and changes only on an explicit action.  The performance stage
+(Another performance: the refinement "Change the touch with words", and the
+touch of autonomous refinement and of the CLI's `refine --kind touch`) was
+removed on 2026-10-14 by the author's decision, because the words were used only
+as a seed and never for their meaning.  The performance seed (§13.8 / §14.4) is
+decided when a work is drawn and is not changed by refinement.  `touch_change`
+works saved before then redraw from their saved `render_seed`.
 
 | Stage | Name | What changes | Cost |
 |---|---|---|---|
-| Performance | Another performance | region, relation, and placement phase as resolved by the performance seed (§13.8 / §14.4) | no LLM call (re-render only) |
 | Composition | Another composition | The ranges written as numbers, by principle or by chance (§12.6.3), and the concrete angle and corner for explicitly authored angle and corner meaning, from the composition seed (§12.11 / §18) | no LLM call (rebuilt from the saved normalized DDL with its numeric ranges chosen again) |
 
 Another composition chooses again the ranges written as numbers (not corners), by
@@ -1328,7 +1333,7 @@ angle when the description has an angle, and the corner among its four
 candidates. `center` is the canvas-center region and is not reselected, so a work
 with no numeric range, no angle, and no corner redraws the same. The shared lowerer resolves the angle from `composition_seed`.
 It must not invent or reselect a composition family, technique, color, touch,
-relation, or element count. Another performance preserves the resolved angle.
+relation, or element count.
 Stage 1.5 used to reinterpret `center` as one of six focus candidates and let
 variation move that focus; on 2026-09-27 this was removed so an author's
 position word is never read as another position, and variation, left with
@@ -3430,8 +3435,8 @@ pre- and expanded-meaning digests, a composition seed tagged to distinguish None
 original direct logical ordinal or the Macro semantic ordinal, expansion path, and generated ordinal.
 The first SHA-256 byte modulo four selects upper-left, upper-right, lower-left, then lower-right.
 Different composition seeds may select the same corner. Source, canonical meaning, and provenance never receive the
-selected corner; the existing Renderer render seed chooses its anchor within that region. Another performance
-preserves the corner. One rational policy table converts to Score f64 only at the final boundary.
+selected corner; the existing Renderer render seed chooses its anchor within that region.
+One rational policy table converts to Score f64 only at the final boundary.
 The policy ID stays unchanged while its content digest changes; this does not introduce a semantic schema version.
 Unspecified position remains unsupported; named/numeric conflicts and numeric must-fit remain enforced.
 
@@ -3728,14 +3733,12 @@ composition, variation, and interpretation seeds where applicable. `Draw` in
 the DDL editor dialog saves the edited DDL under authoring authority, then runs the shared compiler, lowerer, and renderer,
 and does not reinterpret the natural-language description.
 
-The drawing tab also exposes two explicit regeneration actions. **Another
-performance** keeps the same Score and asks only the renderer for a new
-performance seed. **Another composition** preserves saved normalized DDL,
+The drawing tab also exposes an explicit regeneration action, **Another
+composition** (**Another performance** was removed on 2026-10-14, §8.4). It preserves saved normalized DDL,
 advances `composition_seed`, and reselects the concrete angle or corner in the
 shared lowerer when that meaning is explicitly present. It changes no composition family, technique, color, touch,
 relation, or element count. The same lock-verified meaning and attested
-`composition_seed` reproduce the same effective meaning, angle, and corner. Another
-performance preserves the resolved angle and corner. Saved Score / expanded
+`composition_seed` reproduce the same effective meaning, angle, and corner. Saved Score / expanded
 artifacts take precedence, source text remains saved, silent backfill does not
 occur, and no permanent old/new runtime switch is introduced. Semantic schema /
 identity never presents changed bytes as an old identity. The normal Server, Web, and Android
@@ -4429,12 +4432,12 @@ archive](docs/history/changelog-v1.72-v2.4.md).
 
 Lineage's autonomous refinement is a bounded run of 1–10 generations whose final judgment remains human. Before starting, the user chooses one method:
 
-- `Random automatic refinement` randomly chooses each generation's refinement kind from the enabled reading, color-catalog, layout, and touch elements. It does not use Vision. Because the direction text only reaches the drawing text of reading generations, the random-method UI states that condition explicitly.
+- `Random automatic refinement` randomly chooses each generation's refinement kind from the enabled reading, color-catalog, and layout elements. It does not use Vision. Because the direction text only reaches the drawing text of reading generations, the random-method UI states that condition explicitly.
 - `AI Vision automatic refinement` lets the user explicitly choose a Vision model from provider-grouped cards. During that run, the selected model serves both Stage 1 / Stage 2 generation and Vision advice, while those three roles and their prompts remain separate. The server rasterizes each saved generation to PNG and sends it with the original instruction, user direction, and allowed refinement kinds. Vision returns visible observations, one direction to try next, and one allowed refinement kind; that advice becomes input to the next generation.
 
 Sketch from life (§12.6.1) follows each generation's parent; the Describe tab's Sketch from life setting is not used. When the parent has sketch prose and the generation's drawing text equals the parent's, the parent's prose is passed and the layer is not run (as the refinement candidates' `Another reading too` does). A generation whose drawing text changed because a direction was added goes through the layer again. A parent without sketch prose gives a generation drawn without the layer.
 
-Either method can enable four refinement elements: reading, color catalog, layout, and touch (variation was retired on 2026-10-04, §12.13).
+Either method can enable three refinement elements: reading, color catalog, and layout (variation was retired on 2026-10-04 and touch on 2026-10-14, §12.13 / §8.4).
 
 The Vision method is a finite advisory loop, not quality optimization or automatic acceptance. Vision must not score, rank, accept, reject, praise, condemn, or discard a generated work. Intermediate generations remain `lineage_only`, the final generation enters regular history, and all generations remain in lineage. Derivation metadata records the method, Vision model, observation, and next direction, while the modal shows the latest advice. The model may be changed between runs but remains fixed during one run. Only the human may save, promote, star, or finally choose a work.
 

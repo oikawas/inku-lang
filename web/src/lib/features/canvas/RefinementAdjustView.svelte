@@ -24,16 +24,13 @@
 		refinementSession: RefinementSession;
 		statusDdlOrigin: boolean;
 		statusDescriptionLocked: boolean;
-		refineKind: RefineKind;
-		touchSeedText: string;
 		statusStage1Model: string;
 		statusStage2Model: string;
 		refineDrawingModelId: string;
 		refineDrawingModelGroups: ProviderGroup[];
 		refineWildValue: boolean;
 		refineWildInherited: boolean;
-		onSetRefineKind: (kind: RefineKind) => void;
-		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string) => void | Promise<void>;
+		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4) => void | Promise<void>;
 		/** Save the chosen options, then leave; the rest are dropped. */
 		onSaveAndClose: () => void | Promise<void>;
 		/** Drop every unsaved option, then leave. */
@@ -53,15 +50,12 @@
 		refinementSession,
 		statusDdlOrigin,
 		statusDescriptionLocked,
-		refineKind,
-		touchSeedText = $bindable(''),
 		statusStage1Model,
 		statusStage2Model,
 		refineDrawingModelId,
 		refineDrawingModelGroups,
 		refineWildValue,
 		refineWildInherited,
-		onSetRefineKind,
 		onGenerateVariationCandidates,
 		onSaveAndClose,
 		onDiscardAndClose,
@@ -69,15 +63,13 @@
 		onSetRefineWild
 	}: Props = $props();
 
-	// The layout dialog always draws layout options, regardless of remembered parameters.
-	const activeKind = $derived<RefineKind>(layoutOnly ? 'layout' : refineKind);
-	const costLabel = $derived(
-		activeKind === 'reading'
-			? t().refineCostReading
-			: activeKind === 'layout'
-				? t().refineCostLayout
-				: t().refineCostTouch
-	);
+	// The layout dialog draws layout options; the drawing parameters draw
+	// another reading, the one element left there once words no longer chose
+	// the touch (removed 2026-10-14, the author).
+	const activeKind = $derived<RefineKind>(layoutOnly ? 'layout' : 'reading');
+	const costLabel = $derived(activeKind === 'reading' ? t().refineCostReading : t().refineCostLayout);
+	// A work its DDL holds, or one drawn from DDL, has no reading to draw again.
+	const readingHeld = $derived(!layoutOnly && (statusDdlOrigin || statusDescriptionLocked));
 </script>
 
 		<div class="refine-panel">
@@ -99,46 +91,20 @@
 								</span>
 							</Tooltip>
 						{:else}
-							<div class="refine-section-title">{t().refineSingleTitle}</div>
-							<div class="refine-selection-hint">{t().refineSingleSelectionHint}</div>
+							<Tooltip placement="bottom" text={readingHeld ? t().descriptionLockedReason : t().tooltipCanvasVaryInterpretation}>
+								<span class="refine-section-title refine-choice-label">
+									<strong>{t().canvasVaryInterpretation}</strong>
+									<span class="refine-info-mark" aria-hidden="true">i</span>
+								</span>
+							</Tooltip>
+							{#if readingHeld}<div class="refine-selection-hint">{t().descriptionLockedReason}</div>{/if}
 						{/if}
 					</div>
-					{#if !layoutOnly}
-						<div class="model-choice-grid" role="radiogroup" aria-label={t().refineSingleSelectionHint}>
-							{#if !statusDdlOrigin}
-								<!-- Held by its edited DDL: another reading is shown, not offered. -->
-								<label class="model-choice" class:checked={refineKind === 'reading'} class:held={statusDescriptionLocked}>
-									<input type="radio" name="refine-kind" value="reading" checked={refineKind === 'reading'} onchange={() => onSetRefineKind('reading')} disabled={statusDescriptionLocked || refinementSession.busy || refinementSession.gridBusy} />
-									<Tooltip placement={statusDescriptionLocked ? 'right' : 'bottom'} text={statusDescriptionLocked ? t().descriptionLockedReason : t().tooltipCanvasVaryInterpretation}>
-										<span class="refine-choice-label">
-											<strong>{t().canvasVaryInterpretation}</strong>
-											<span class="refine-info-mark" aria-hidden="true">i</span>
-										</span>
-									</Tooltip>
-								</label>
-							{/if}
-							<label class="model-choice" class:checked={refineKind === 'touch'}>
-								<input type="radio" name="refine-kind" value="touch" checked={refineKind === 'touch'} onchange={() => onSetRefineKind('touch')} disabled={refinementSession.busy || refinementSession.gridBusy} />
-								<Tooltip placement="bottom" text={t().tooltipCanvasVaryPerformance}>
-									<span class="refine-choice-label">
-										<strong>{t().canvasVaryPerformance}</strong>
-										<span class="refine-info-mark" aria-hidden="true">i</span>
-									</span>
-								</Tooltip>
-							</label>
-						</div>
-					{/if}
 					{#if activeKind === 'layout'}
 						<div class="recompose-mode-options" role="radiogroup" aria-label={t().canvasVaryComposition}>
 							<label><input type="radio" name="recompose-mode" value="principled" checked={refinementSession.recomposeMode === 'principled'} onchange={() => refinementSession.setRecomposeMode('principled')} disabled={refinementSession.busy || refinementSession.gridBusy} />{t().recomposeByPrinciple}</label>
 							<label><input type="radio" name="recompose-mode" value="chance" checked={refinementSession.recomposeMode === 'chance'} onchange={() => refinementSession.setRecomposeMode('chance')} disabled={refinementSession.busy || refinementSession.gridBusy} />{t().recomposeByChance}</label>
 						</div>
-					{/if}
-					{#if activeKind === 'touch'}
-						<label class="touch-seed-field">
-							<input bind:value={touchSeedText} aria-label={t().canvasVaryPerformance} placeholder={isJapanese ? 'タッチへ託す言葉' : 'Words for the touch'} disabled={refinementSession.busy || refinementSession.gridBusy} />
-							<small>{isJapanese ? '同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。' : 'The same words produce the same touch (Seed). Only one option can be made.'}</small>
-						</label>
 					{/if}
 				</section>
 				<section class="refine-action-section">
@@ -146,8 +112,8 @@
 						<Tooltip text={t().tooltipRefineSingle}>
 							<div class="refine-action-wrap">
 								<PaintButton
-								onclick={() => onGenerateVariationCandidates(activeKind, 1, activeKind === 'touch' ? touchSeedText : undefined)}
-								disabled={!resultAvailable || refinementSession.busy || refinementSession.gridBusy || (activeKind === 'touch' && !touchSeedText.trim())}
+								onclick={() => onGenerateVariationCandidates(activeKind, 1)}
+								disabled={!resultAvailable || readingHeld || refinementSession.busy || refinementSession.gridBusy}
 								>
 									{t().refineSingleButton}
 								</PaintButton>
@@ -156,8 +122,8 @@
 						<Tooltip text={t().tooltipVariationGridDefault}>
 							<div class="refine-action-wrap">
 								<PaintButton
-								onclick={() => onGenerateVariationCandidates(activeKind, 4, undefined)}
-								disabled={!resultAvailable || refinementSession.busy || refinementSession.gridBusy || activeKind === 'touch'}
+								onclick={() => onGenerateVariationCandidates(activeKind, 4)}
+								disabled={!resultAvailable || readingHeld || refinementSession.busy || refinementSession.gridBusy}
 								>
 									{t().variationGridDefault}
 								</PaintButton>

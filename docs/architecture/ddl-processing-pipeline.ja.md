@@ -114,7 +114,6 @@ ServerのPython adapterとAndroidのKotlin/JNI adapterはhost処理を行う薄�
 | DDL編集 | authoring origin、CAS、元history | 同じ設定なら作者DDLのCAS保存後にcompilerへ再入。設定が変わるなら親付きのdirect-DDL variation |
 | 補完案の承認・辞退 | base revisionとproposal digest | 承認はbaseを再検証してCAS保存。辞退は保存済みDDLのまま |
 | 別の構図 | 保存済みvisible DDL、元meaning、描画属性 | 新しい`composition_seed`でtyped Stage 1.5／lowerer |
-| 別の演奏 | 保存Scoreとauthoring revision | 新しい`render_seed`でrendererだけ |
 | catalog / canvas変更 | 元variationを変更しない | 現在optionsを持つ親付きnew variation |
 | 旧作品からの派生 | 元history行を変更しない | `legacy/{history_id}/fork`で`legacy_description_fork` / `legacy_ddl_fork`の新variation |
 

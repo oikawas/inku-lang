@@ -109,7 +109,6 @@ export type PaintOptions = {
 	renderOverrides?: RenderOverrides;
 	compositionSeed?: Seed;
 	interpretationSeed?: string;
-	seedText?: string;
 	signal?: AbortSignal;
 	sourceText?: string;
 	displayLabel?: string;
@@ -202,7 +201,6 @@ export async function runCurrentWork(
 			render_seed: options.renderSeed,
 			composition_seed: options.compositionSeed,
 			interpretation_seed: options.interpretationSeed,
-			seed_text: options.seedText,
 			save_history: options.saveHistory ?? true,
 			save_artifacts: options.saveArtifacts ?? true,
 			count_generation: options.countGeneration ?? true,

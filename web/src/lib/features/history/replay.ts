@@ -45,9 +45,10 @@ export async function replayHistoryItem(
 	defaults: ReplayHistoryDefaults,
 	deps: ReplayHistoryDependencies
 ): Promise<ReplayComparison | null> {
+	// A work refined by words before that was removed (2026-10-14) recorded
+	// the seed its words gave, so the recorded seed alone draws it again.
 	const hasRecordedSeed = item.render_seed != null;
-	const hasSeedText = Boolean(item.seed_text?.trim());
-	const provisionalSeed = !hasRecordedSeed && !hasSeedText ? 0 : null;
+	const provisionalSeed = !hasRecordedSeed ? 0 : null;
 	const replaySeed = hasRecordedSeed ? item.render_seed : provisionalSeed;
 	const catalogId = item.render_color_catalog_id ?? item.catalog_id ?? defaults.effectiveCatalogId;
 	const canvasId = item.render_canvas_aspect_id
@@ -69,7 +70,6 @@ export async function replayHistoryItem(
 			// here would make engine differences include an invented placement.
 			composition_seed: item.composition_seed ?? null,
 			interpretation_seed: item.interpretation_seed ?? null,
-			seed_text: hasSeedText ? item.seed_text : null,
 			...defaults.renderPayload(item, catalogId)
 		})
 	});

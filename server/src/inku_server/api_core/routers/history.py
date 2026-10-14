@@ -19,7 +19,7 @@ from ...persistence.description_lock import DESCRIPTION_READING_KINDS
 from ...persistence.schema import LineageNodeRow
 from ..deps import _current_user
 from ..models import HistoryItem, HistoryListResponse, HistoryPostBody
-from ..rendering import _COMPACT_SCORE_VERSIONS, _capture_history_coerce_observability, _effective_limits, _add_history_item, _output_save_settings, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile
+from ..rendering import _COMPACT_SCORE_VERSIONS, _capture_history_coerce_observability, _effective_limits, _add_history_item, _output_save_settings, _render_metadata, _render_score_svg, _render_with_metadata, _resolved_catalog_id, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile
 
 
 router = APIRouter(dependencies=[Depends(_current_user)])
@@ -423,11 +423,7 @@ def api_history_post(
         body.replay_work_id, body.replay_render_hash, body.replay_svg_sha256,
     ))
     if not replay_save:
-        metadata_seed_text = body.derivation_metadata.get("seed_text")
-        requested_seed_text = body.seed_text
-        if requested_seed_text is None and isinstance(metadata_seed_text, str):
-            requested_seed_text = metadata_seed_text
-        render_seed, seed_text = _render_seed_from_text(requested_seed_text, body.render_seed)
+        render_seed = body.render_seed
     if replay_save:
         from .render import RenderScoreRequest, _render_authorized_score
         from ..rendering import _work_for_color_snapshot
@@ -460,10 +456,7 @@ def api_history_post(
             replay_link = (store, linked)
         # The source row decides every performance condition. Old works that
         # recorded neither seed use the same provisional zero as the preview.
-        source_seed_text = parent.get("seed_text")
-        if source_seed_text is not None and not source_seed_text.strip():
-            source_seed_text = None
-        provisional_seed = parent.get("render_seed") is None and source_seed_text is None
+        source_seed = parent.get("render_seed")
         replayed = _render_authorized_score(RenderScoreRequest(
             work_id=body.replay_work_id,
             score=parent["score"],
@@ -471,8 +464,7 @@ def api_history_post(
             ddl=parent.get("ddl"),
             catalog_id=parent.get("catalog_id"),
             canvas_aspect=parent.get("render_canvas_aspect_id") or parent.get("render_canvas_aspect"),
-            render_seed=0 if provisional_seed else parent.get("render_seed"),
-            seed_text=source_seed_text,
+            render_seed=0 if source_seed is None else source_seed,
             composition_seed=parent.get("composition_seed"),
             interpretation_seed=parent.get("interpretation_seed"),
             wild=bool(parent.get("render_wild")),
@@ -574,7 +566,6 @@ def api_history_post(
             "catalog_id": catalog_id,
             "canvas_aspect": _validated_canvas_aspect_override(body.canvas_aspect),
             "render_seed": render_seed,
-            "seed_text": seed_text,
             "composition_seed": body.composition_seed,
             "wild": bool(body.render_wild),
         }, None)
@@ -627,7 +618,6 @@ def api_history_post(
                 "ui_lang": body.ui_lang,
                 "render_seed": render_seed,
                 "composition_seed": body.composition_seed,
-                "seed_text": seed_text,
                 "interpretation_seed": body.interpretation_seed,
                 # What actually governed this work. Without it a per-install setting
                 # would make the same description a different work with nothing on

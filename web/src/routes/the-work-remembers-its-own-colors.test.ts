@@ -45,10 +45,10 @@ function request(sourceText: string, fnName: string): string {
 }
 
 test('every redraw of a saved work names the work it is redrawing', () => {
-	// The word-touch candidate builds its request in the coordinator. The history
+	// The layout candidate builds its request in the coordinator. The history
 	// replay owns its request in the history module and receives only the
 	// page-built work reference and render preferences.
-	assert.match(request(coordinator, 'renderWordTouchCandidate'), /workReferencePayload\(refinementWorkId\(\)\)/);
+	assert.match(body(coordinator, 'composeVariationCandidate'), /workReferencePayload\(refinementWorkId\(\)\)/);
 	const replayWiring = page.slice(page.indexOf('async function replayHistoryItem'), page.indexOf('function closeReplayComparison'));
 	assert.match(replayWiring, /refinement\.workReferencePayload\(item\.id\)/);
 	assert.match(replay, /\.\.\.defaults\.renderPayload\(item, catalogId\)/);
@@ -57,7 +57,8 @@ test('every redraw of a saved work names the work it is redrawing', () => {
 test('a redraw keeps sending the catalog id as the nameplate', () => {
 	// The colors stopped coming from it; the name did not. Dropping it here would
 	// leave the status line with nothing to show.
-	assert.match(request(coordinator, 'renderWordTouchCandidate'), /colorCatalogOverride\(refinementCatalogId\(\)\)/);
+	assert.match(body(coordinator, 'composeVariationCandidate'), /renderSettingsPayload\('compose', refinementRenderOverrides\(\)\)/);
+	assert.match(body(coordinator, 'refinementRenderOverrides'), /colorCatalogOverride\(refinementCatalogId\(\)\)/);
 });
 
 test('asking for another catalog does not name a work', () => {

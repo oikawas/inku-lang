@@ -138,8 +138,7 @@
 		runAttempt?: ProviderAttemptCount | null;
 		/** The whole feature, so a new field costs no line here. */
 		modelInspection: ModelInspection;
-		touchSeedText: string;
-		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string) => void | Promise<void>;
+		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4) => void | Promise<void>;
 		onGenerateColorCatalogCandidates: () => void | Promise<void>;
 		onGenerateColorArrangementCandidates: () => void | Promise<void>;
 		onGenerateGroundCandidates: () => void | Promise<void>;
@@ -266,7 +265,6 @@
 		runTokensOut = null,
 		runAttempt = null,
 		modelInspection,
-		touchSeedText = $bindable(''),
 		onGenerateVariationCandidates,
 		onGenerateColorCatalogCandidates,
 		onGenerateColorArrangementCandidates,
@@ -431,25 +429,6 @@
 	let directEditMode = $state<'description' | 'sketch-grain' | null>(null);
 	let directAIRefineNode = $state<LineageNode | null>(null);
 	let directAIRefineSaved = $state(false);
-	// Refinement dimensions retain the previous selection.
-	const REFINE_KIND_KEY = 'inku-refine-kind';
-	// Layout and color changes have their own dialogs, apart from remembered parameters.
-	const REFINE_KINDS: RefineKind[] = ['touch', 'reading'];
-	let refineKind = $state<RefineKind>('touch');
-	onMount(() => {
-		try {
-			const stored = localStorage.getItem(REFINE_KIND_KEY) as RefineKind | null;
-			if (stored && REFINE_KINDS.includes(stored)) refineKind = stored;
-		} catch {}
-	});
-	function setRefineKind(kind: RefineKind) {
-		refineKind = kind;
-		try { localStorage.setItem(REFINE_KIND_KEY, kind); } catch {}
-	}
-	// DDL-origin works cannot vary interpretation, so remove a restored choice.
-	$effect(() => {
-		if ((statusDdlOrigin || statusDescriptionLocked) && refineKind === 'reading') refineKind = 'touch';
-	});
 	const statusGenerationValue = $derived(
 		statusGeneration
 			? (isJapanese ? `第${statusGeneration}世代` : `Gen. ${statusGeneration}`)
@@ -870,8 +849,6 @@
 					{modelInspection}
 					{statusDdlOrigin}
 					{statusDescriptionLocked}
-					{refineKind}
-					bind:touchSeedText
 					{statusStage1Model}
 					{statusStage2Model}
 					{refineDrawingModelId}
@@ -879,7 +856,6 @@
 					{refineWildValue}
 					{refineWildInherited}
 					onClose={requestCloseRefineModal}
-					onSetRefineKind={setRefineKind}
 					{onGenerateVariationCandidates}
 					{onGenerateColorCatalogCandidates}
 					{onGenerateColorArrangementCandidates}

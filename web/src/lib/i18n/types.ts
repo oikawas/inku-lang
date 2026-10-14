@@ -369,7 +369,6 @@ export interface LangPack {
 	settingsTextSizeSaving: string;
 	settingsTextSizeSaveFailed: string;
 	settingsTextSizeRetry: string;
-	canvasVaryPerformance: string;
 	canvasVaryComposition: string;
 	recomposeByPrinciple: string;
 	recomposeByChance: string;
@@ -389,8 +388,6 @@ export interface LangPack {
 	refinePreviewBack: string;
 	refineSingleButton: string;
 	tooltipRefineSingle: string;
-	refineSingleSelectionHint: string;
-	refineCostTouch: string;
 	refineCostLayout: string;
 	refineCostReading: string;
 	refineCostColor: string;
@@ -448,7 +445,6 @@ export interface LangPack {
 	tooltipCanvasZoomIn: string;
 	tooltipCanvasZoomOut: string;
 	tooltipCanvasZoomReset: string;
-	tooltipCanvasVaryPerformance: string;
 	tooltipCanvasVaryComposition: string;
 	ddlRangeNumbers: string;
 	ddlRangeInvalid: string;
@@ -489,7 +485,6 @@ export interface LangPack {
 	canvasSeedSummary: string;
 	seedBaseLabel: string;
 	refineTargetTitle: string;
-	refineSingleTitle: string;
 	refineSingleSubtitle: string;
 	refineGridSubtitle: string;
 	refineGenerating: string;

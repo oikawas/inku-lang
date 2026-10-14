@@ -299,11 +299,11 @@ Mutually inconsistent values are rounded rather than rejected — if the represe
 
 ## 6. Renderer and Replay
 
-`render_seed` controls touch, `composition_seed` controls placement, and `interpretation_seed` supports rereading. From render engine 23 the placement is decided by `composition_seed`, and follows `render_seed` only when it is omitted. The test is `is not None`, so `0` is the seed zero and not "not given". `seed_text` deterministically hashes explicit words into only the Renderer performance seed. It never changes interpretation, DDL, JSON Score, or composition.
+`render_seed` controls touch, `composition_seed` controls placement, and `interpretation_seed` supports rereading. From render engine 23 the placement is decided by `composition_seed`, and follows `render_seed` only when it is omitted. The test is `is not None`, so `0` is the seed zero and not "not given". `seed_text`, which made a seed from words (Another performance), was removed on 2026-10-14; a request that carries it is not read. A saved work's `seed_text` is shown as a record only, and a redraw uses its saved `render_seed`.
 
 Variation is retired. Its seed, amplitude and focus columns and saved values stay in the database, but new works do not record them. New compiler configurations omit `stage15_variation`; saved configurations lose it only from the copy passed to the next execution. There is no database migration.
 
-The API's JSON answers carry `render_seed` and `composition_seed` as decimal strings (`"1553303611486672067"`). A seed from `seed_text` takes 64 bits, past what a JavaScript number holds exactly, and a rounded seed sent back draws another picture. Send a seed back as it came; requests take either a number or a decimal string.
+The API's JSON answers carry `render_seed` and `composition_seed` as decimal strings (`"1553303611486672067"`). A seed can take 64 bits (one made from `seed_text` before it was removed, for example), past what a JavaScript number holds exactly, and a rounded seed sent back draws another picture. Send a seed back as it came; requests take either a number or a decimal string.
 
 `render_wild` applies to the whole work and is part of the `rh3` material. The same score and the same seed with a different Wild setting is a different edition.
 

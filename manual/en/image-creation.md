@@ -64,7 +64,7 @@ The new password must be at least eight characters. **It does not change unless 
 
 While you wait, the indicator names the stage that is working. When `Paint` draws a single work, it reads `Interpreting your words…` until the drawing is done, and beside it `Awaiting reply (try 1/4)` and the like count the attempts at the model's reply. For the candidates refinement makes, the demo, and batches, the layer names (`sketching from life…`, `interpreting your words…`, `writing the score…`, `performing…`) **are switched by a signal the server sends when each layer finishes** (v2.13.39). With `Sketch from life` set to `Off`, the wait does not open on `sketching from life…`. Either way, while the composition is being read (after Stage 1, before the instructions are settled), it reads `Reading the composition…`.
 
-The first work is the source work. The refinement action `Another performance` is never applied to this first painting.
+The first work is the source work.
 
 Examples:
 
@@ -220,10 +220,10 @@ A `namespace.word` such as `Nature.青葉` is marked in the plugin color only wh
 A work whose instructions (DDL) were edited follows its DDL, not its description. Drawing it again from the description would lose the edits, so **its description is held**.
 
 - The Describe tab heading shows `Held (DDL edited)` and the description cannot be changed. In place of `Paint`, `Start a new work from this description` appears: it draws the description as it stands as a new work (this work stays as it is, and the description can be changed in the new work).
-- In the work's edit menu, `Change the description`, `Redraw with or without sketch from life` and `Change the model` are shown but not offered, with the reason. `Another reading` in refinement is not offered either.
-- A child made by touch, layout or color carries the DDL and is held as well. A child made by reading the description again is not.
+- In the work's edit menu, `Edit drawing parameters`, `Change the description`, `Redraw with or without sketch from life` and `Change the model` are shown but not offered, with the reason. `Another reading` in refinement is not offered either.
+- A child made by layout or color (or by touch, before it was removed) carries the DDL and is held as well. A child made by reading the description again is not.
 - The history strip shows a lock mark, and a lineage card shows `Held (DDL edited)`.
-- Autonomous refinement uses no reading rounds and no Vision method, and draws each color, layout or touch round from the DDL.
+- Autonomous refinement uses no reading rounds and no Vision method, and draws each color or layout round from the DDL.
 
 ## 7. Choose Model, Color Catalog, Sketch, Wild, and Canvas
 
@@ -273,9 +273,10 @@ In the refinement area of the work tab, choose exactly one element to change at 
 |---|---|---|
 | Another composition | Chooses numeric ranges again, except corners. The option's seed also reselects explicit tilt angles and corners | Fast (choosing ranges calls no LLM; existing completion only runs when the instructions still have gaps) |
 | Another reading | Reads again from Stage 1 and regenerates the instructions, composition, and performance | Slow (LLM and API) |
-| Another performance | Derives only the renderer's performance seed from your words, changing line quality, weight sway, and bleed | Very fast (no LLM) |
 
-You may choose `Make one option` or `Make four options`. `Another performance` is deterministic, the same words giving the same touch seed, so it makes one option only. The words do not act on the work's meaning, reading, DDL, JSON Score, or composition.
+You may choose `Make one option` or `Make four options`. `Edit drawing parameters` in the work-editing menu draws `Another reading`. It is not shown for a work drawn from DDL, and a work held by its edited instructions shows it unavailable with the reason.
+
+`Another performance` (changing the touch with words) was removed on 2026-10-14: the words were never read for their meaning and only made the drawing's seed. The `Touch` element of autonomous refinement was removed with it. Works made by a touch before then keep their `Touch` edge in the lineage, and redraw from their saved seed.
 
 The color catalog is changed from the work-editing menu instead (8.3).
 

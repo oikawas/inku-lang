@@ -1737,12 +1737,20 @@ def test_refine_color_asks_the_server_to_draw_a_different_catalog(monkeypatch):
     # The name the server dropped on 2026-08-01. Sending it again is a no-op.
     assert "random_color_catalog" not in posted[0]
 
-    # The other three kinds must not ask for a draw.
-    for kind in ("touch", "layout", "reading"):
+    # The other two kinds must not ask for a draw.
+    for kind in ("layout", "reading"):
         calls.clear()
         assert cli.command_refine(parser.parse_args(["refine", "perform", "work-1", "--kind", kind])) == 0
         other = [data for method, path, data in calls if method == "POST" and path == "/api/paint"]
         assert other[0].get("catalog_mode") is None
+
+
+def test_refine_no_longer_offers_a_touch():
+    """A touch alone was removed from refinement (2026-10-14, the author)."""
+    parser = cli.build_parser()
+    for command in (["refine", "perform", "work-1"], ["refine", "save", "node-1", "--file", "s.json", "--input-text", "t"]):
+        with pytest.raises(SystemExit):
+            parser.parse_args([*command, "--kind", "touch"])
 
 
 def test_refine_perform_refuses_a_work_its_ddl_holds(monkeypatch):
@@ -1761,7 +1769,7 @@ def test_refine_perform_refuses_a_work_its_ddl_holds(monkeypatch):
             return {"svg": "<svg />"}, None
 
     monkeypatch.setattr(cli, "ApiClient", FakeClient)
-    args = cli.build_parser().parse_args(["refine", "perform", "work-1", "--kind", "touch"])
+    args = cli.build_parser().parse_args(["refine", "perform", "work-1", "--kind", "layout"])
     with pytest.raises(cli.CliError, match="held by its edited DDL"):
         cli.command_refine(args)
     assert posted == []
@@ -1848,7 +1856,6 @@ PAYLOAD_KEYS_BEFORE = {
     "render_seed",
     "save_artifacts",
     "save_history",
-    "seed_text",
     "stage1_input",
     "stage1_model",
     "stage2_model",
@@ -1867,7 +1874,6 @@ ALL_PRIOR_FLAGS = [
     "--canvas-aspect", "golden",
     "--render-seed", "11",
     "--composition-seed", "22",
-    "--seed-text", "seed",
 ]
 
 
@@ -1901,21 +1907,22 @@ def test_paint_payload_without_the_new_flags_is_byte_for_byte_the_old_request():
 
 
 def test_paint_payload_grows_by_exactly_the_six_keys():
-    """15 keys before, 21 after -- and the 15 are the same 15.
+    """14 keys before, 20 after -- and the 14 are the same 14.
 
     It was 17 and 25 until the staffage level was folded away (v2.11.0) and
-    `tenkei` left the request body with the `--staffage` flag, and 16 and 24
-    until `include_trace` left with the `--trace` flag (2026-09-25).
+    `tenkei` left the request body with the `--staffage` flag, 16 and 24
+    until `include_trace` left with the `--trace` flag (2026-09-25), and 15
+    and 21 until `seed_text` left with the `--seed-text` flag (2026-10-14).
     """
     parser = cli.build_parser()
     argv = ["paint", "一滴の墨", *ALL_PRIOR_FLAGS]
     prior_only = cli._paint_payload(parser.parse_args(argv), "一滴の墨")
     assert set(prior_only) == PAYLOAD_KEYS_BEFORE
-    assert len(prior_only) == 15
+    assert len(prior_only) == 14
 
     new_flags = [item for argv_fragment, _, _ in SENDER_PARITY_FLAGS for item in argv_fragment]
     everything = cli._paint_payload(parser.parse_args([*argv, *new_flags]), "一滴の墨")
-    assert len(everything) == 21
+    assert len(everything) == 20
     assert set(everything) - PAYLOAD_KEYS_BEFORE == {key for _, key, _ in SENDER_PARITY_FLAGS}
 
 
@@ -3101,7 +3108,7 @@ def test_refine_perform_resolves_a_parent_the_listing_cannot_reach(monkeypatch):
 
     monkeypatch.setattr(cli, "ApiClient", FakeClient)
     monkeypatch.setattr(cli, "_print_json", lambda data: None)
-    args = cli.build_parser().parse_args(["refine", "perform", "their-work", "--kind", "touch"])
+    args = cli.build_parser().parse_args(["refine", "perform", "their-work", "--kind", "layout"])
     assert cli.command_refine(args) == 0
     assert ("GET", "/api/history/their-work/lineage") in calls
 

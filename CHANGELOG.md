@@ -8,6 +8,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — Remove Another performance and the touch refinement
+
+At the author's request. `Another performance` never read the words for their meaning: it hashed them into the drawing's seed with SHA-256 (and that seed also chose which color to use among candidates with the same name). With the author's choices, the `Touch` element of autonomous refinement and the CLI's `refine --kind touch` are removed as well, so no refinement changes the touch alone.
+
+- Web: Edit drawing parameters draws Another reading only, so the work-editing menu treats it as an action that reads the description: it is not shown for a work drawn from DDL, and a work held by its instructions shows it unavailable with the reason. Autonomous refinement offers three elements: reading, color catalog, and layout.
+- Server and CLI (the author's choice): compose, paint, render-svg, render-score, history, and run requests no longer carry `seed_text`, and the CLI's `--seed-text` is gone. An old sender that still writes it is not read. Vision advice chooses among three refinement kinds.
+- Saved works: `touch_change` lineage edges and a work's recorded `seed_text` stay visible. A redraw uses the saved `render_seed` (of 5173's 4,678 works, one had `seed_text`, and it had its `render_seed` too).
+- The Android and macOS screens are requested from their sessions.
+
 ## v2.15.126 (2026-10-14 / Build 1202)
 
 ### 2026-10-14 — Remove the whisker at the ends of waving and swaying lines and arcs

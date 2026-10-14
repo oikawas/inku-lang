@@ -2,6 +2,15 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-14 — Another performance removed
+
+`Another performance` and the `Touch` element of autonomous refinement are gone,
+so sections 2, 6 and 8 of Creating Images, the CLI Reference and the CLI reference
+for AI (`--seed-text` and `refine --kind touch`), and section 6 of Server
+Configuration (`seed_text`) were revised. Edit drawing parameters is now said to
+be absent for a work drawn from DDL and unavailable for one held by its
+instructions.
+
 ## 2026-10-14 — Change the ground
 
 Section 8.5 of Creating Images now describes the work-editing menu's Change the

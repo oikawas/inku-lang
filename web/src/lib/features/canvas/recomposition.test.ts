@@ -69,8 +69,8 @@ test('recomposition cards show human layer numbers and explain unchanged ranges 
 		{ layer: 0, from_key: null, from: '右下', to_key: 'cell-00', to: '左上' }
 	] }, ja), ['1: 右下 → 左上']);
 	const unchanged = (reason: string): Recomposition => ({ mode: 'principled', outcome: 'unchanged', reason, moves: [] });
-	assert.deepEqual(recompositionLines(unchanged('nothing_to_move'), ja), ['この作品には構図の範囲が無い。', '構図の範囲を保って描き直しました。']);
-	assert.deepEqual(recompositionLines(unchanged('unsolved'), en), ['There are too many combinations to find another composition.', 'Redrawn with the same composition ranges.']);
+	assert.deepEqual(recompositionLines(unchanged('nothing_to_move'), ja), ['この作品には構図の範囲が無い。', '指示書は変えず、配置の seed を変えて描き直しました。']);
+	assert.deepEqual(recompositionLines(unchanged('unsolved'), en), ['There are too many combinations to find another composition.', 'Redrawn with a new composition seed; the instructions are unchanged.']);
 	for (const strings of [ja, en]) {
 		assert.equal(recompositionLines(unchanged('binding_unavailable'), strings)[0], strings.recomposeReason('unknown'));
 		assert.equal(recompositionLines(unchanged('invalid_request'), strings)[1], strings.recomposeKeptRanges);

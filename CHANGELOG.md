@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — State the Web layout change's unchanged reason as it is
+
+From the author's report (work `53a616c9…`). Change composition rechooses the instructions' numeric ranges. When a sentence states no range or place, the shared core answers `unplaced_sentence`, yet each option is redrawn with a new composition seed, so the picture still changes; "the composition cannot move" contradicted that. The reason now reads "A sentence states no range or place, so the ranges in the instructions cannot be chosen again.", the note "Redrawn with a new composition seed; the instructions are unchanged.", and the layout tooltip agrees. On 5173, 312 of 4,647 works carry numeric ranges. Behaviour, API and core are unchanged.
+
 ### 2026-10-14 — Remove reading and touch refinement on macOS
 
 Following the author's decision, Another reading, word-based touch, and the empty Edit drawing parameters menu are removed. Layout keeps its separate entrance. Autonomous refinement and Vision advice allow only color catalog and layout, excluding old reading and touch selections from requests. Direction is Vision observation material only and is never added to the drawing description. Color generations draw the parent's saved DDL without calling Stage 1. Archived Reading and Touch lineage labels and interpretation_seed/seed_text display remain readable; replay uses recorded render_seed. Removed Web copy keys and tooltip mappings are aligned.

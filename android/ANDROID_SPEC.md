@@ -4,7 +4,13 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-10-13.
+Last updated: 2026-10-14.
+
+## 2026-10-14 Remove touch refinement
+
+At the author's decision, refinement no longer changes touch with words. Its three elements are reading, color catalog and layout. The words field, word-seed plan and dedicated messages are removed. A saved `touch` or `variation` selection displays reading without deleting the old setting.
+
+New drawing requests and execution options omit `seed_text`, and do not call the core's `render_seed_from_text`. Saved works replay with their stored `render_seed`. Historical `seed_text` remains in generation information and saved records; saved `touch_change` lineage edges and their Touch label remain readable. Room columns, schema and migrations are unchanged. The current Android app has no autonomous-refinement screen, execution entry point or Vision-advice `enabled_kinds`.
 
 ## 2026-10-13 Canonical model information and labels
 
@@ -257,7 +263,7 @@ The differences found by the Server/Web parity audit now follow the rules below.
 
 - **Description labels**: leading numbers and bracketed notes are cut by the shared core's `pipeline_description` (JNI; the rule of Server's `description_labels.py`, with lines broken at `\n` only) before the description reaches the core. The work keeps the description as written. A description of labels alone is refused in the Web's words.
 - **Instruction language**: a run from a description reads the label-free description; a run from DDL reads the DDL itself. Without a request the parent's `instruction_lang_requested` is inherited, else `auto`. The interface language is inherited from the parent too. An edit to a running execution that changes the language forks a new variation.
-- **Word seeds**: the render seed comes from the shared core's `render_seed_from_text` (JNI), and the normalized words are recorded. A request without words inherits the parent's, and words take precedence over an explicit `render_seed`, as on Server. Replays follow the same rule; there is no Kotlin copy.
+- **Stored seeds**: requests deriving render seeds from words were removed on 2026-10-14. Replays use the stored `render_seed`; historical words remain only in generation information.
 - **Fork colors**: a fork from a saved work or a run resolves every catalog's colors from today's catalogs. A replay of a saved work still uses the work's own colors.
 - **Another composition**: the work identity passed to the core is `sha256:` plus the SHA-256 of the visible DDL, and the seed is `composition_seed`, else `render_seed`, as in Server's `/api/compose`.
 - **Input length**: a description, DDL or sketch text is limited to 100,000 characters (code points) and refused before anything is sent beyond it, the compatibility API's limit.
@@ -276,7 +282,7 @@ The differences found by the Server/Web parity audit now follow the rules below.
   - A replay records the catalog name and sub, `render_color_source`, `render_color_profile`, `seed_text`, and `render_limits` / `render_limits_source`.
   - `ddl_version` / `ddl_engine_version` are Server's Python constants and `render_build_number` is the Web build number; Android has no counterpart and does not record them.
 - **`rh3`**: the hashed text is written as Python's `json.dumps(ensure_ascii=False, sort_keys=True, separators=(",", ":"))` writes it (no escaping of `/`, numbers as Python's `repr`). Saved rows keep the hash they were saved with.
-- **Refinement**: a work without a description can still take color and layout refinements. Every element but color needs the DDL, and touch, reading and model comparison need the description (the Web's rule and wording). The color refinement draws every catalog but the parent's in list order, one option each, named after the catalog, with no 1/4 option count. Progress lanes count the planned options, four per row.
+- **Refinement**: a work without a description can still take color and layout refinements. Every element but color needs the DDL, and reading and model comparison need the description. The color refinement draws every catalog but the parent's in list order, one option each, named after the catalog, with no 1/4 option count. Progress lanes count the planned options, four per row.
 - **Description lock**: a saved work follows the lineage rule of Server's `description_lock.py`; an unsaved one follows its authority, as on the Web.
 - **Export**: PNG height is 64–2160px (author's decision, 2026-10-06). A height out of range is refused, not shrunk. The width is computed from the canvas ratio before drawing, and a size beyond `inku-svg-raster`'s limits (8192px per side, 16,777,216 pixels) is refused. The default templates are `PNG 1080px` and `PNG 2160px`; the built-in `png-4320` row is removed at start-up (templates the author made are kept, and one above 2160px is refused at export with the reason). Like the Web, a PNG carries the work's creation time as `eXIf` and a tEXt `Creation Time`, and the display SVG export inserts the description as `<desc>` right after the first `<svg>` tag.
 - **Kept as Android decisions**:
@@ -312,11 +318,11 @@ Only a chosen candidate is saved. Its layout_change edge records composition_see
 
 ## 2026-10-04 Retiring variation refinement
 
-Refinement offers four elements: touch, layout, reading and color catalog. The variation choice, notice, amplitude and seed allocation/input are removed. New drawing requests, results and saves carry no variation values. The compiler configuration omits `stage15_variation`, and `variation_pair_required` is no longer checked. A new work derived from a saved configuration removes the retired field from its copy; the original saved configuration remains intact.
+Variation refinement is retired. Following the 2026-10-14 removal of touch, the current elements are reading, color catalog and layout. The variation choice, notice, amplitude and seed allocation/input are removed. New drawing requests, results and saves carry no variation values. The compiler configuration omits `stage15_variation`, and `variation_pair_required` is no longer checked. A new work derived from a saved configuration removes the retired field from its copy; the original saved configuration remains intact.
 
 Room schema 14 retains the `variation_amplitude` and `variation_seed` columns, their saved values, historical schemas and migrations. This retirement adds no database migration. New works leave the old columns NULL. Saved lineage edges of kind `variation` remain readable as “変奏（旧） / Variation (retired)”, while new saves cannot declare that kind. Generation information shows a recorded amplitude and seed with the retired label only when each value exists; works without these values have no corresponding rows.
 
-The DDL authority and description-based creation messages use “work”. Work-version identifiers such as `pipeline_variation_id`, authority records and Score variation for line tremor retain their meaning. A remembered refinement choice of `variation` displays touch instead, without deleting the old setting or saved works. This supersedes the 2026-09-27 decision to keep the inactive variation choice and notice.
+The DDL authority and description-based creation messages use “work”. Work-version identifiers such as `pipeline_variation_id`, authority records and Score variation for line tremor retain their meaning. A remembered refinement choice of `variation` displays reading instead, without deleting the old setting or saved works. This supersedes the 2026-09-27 decision to keep the inactive variation choice and notice.
 
 ## 2026-10-04 Connect a personal ChatGPT plan
 
@@ -416,7 +422,7 @@ The Wild setting is saved in `app_settings` as `render_wild` (`{"enabled":bool}`
 
 The display SVG export is the saved SVG itself; the editable, compat and live SVGs (live has editable's structure with display's textures and touch, as the Web's "Live") are the saved Score drawn again in that profile with the work's colors, seeds and Wild (as the server's `GET /api/history/{id}/svg?profile=`). Files written to `cacheDir/exports` for sharing are removed by the next export once they are a day old.
 
-While the keyboard is up, Draw for the description and Batch draw for the batch editor are pinned above it, with room of the same height at the end of the scroll. Add AI service and a connection's model picker shrink for the keyboard. The touch-words field of Refinement brings the Make candidates row into view. Back from an open Refinement closes it, and Back while revising a work returns to the work's result (the camera and the overwrite question keep Back when they are showing).
+While the keyboard is up, Draw for the description and Batch draw for the batch editor are pinned above it, with room of the same height at the end of the scroll. Add AI service and a connection's model picker shrink for the keyboard. Back from an open Refinement closes it, and Back while revising a work returns to the work's result (the camera and the overwrite question keep Back when they are showing).
 
 Refinement has two sub-views, Adjust and Model, and a lineage card offers Refinement elements, DDL edit and Model. The language comparison (Language) is not offered, as the web retired it on 2026-08-29; works saved as `language_comparison` still show Language on their lineage card. When the target changes or the refinement closes during a run, the stopped run leaves the new target's state alone when it ends.
 

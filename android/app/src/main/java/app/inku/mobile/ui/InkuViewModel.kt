@@ -285,9 +285,8 @@ data class InkuUiState(
     // exclusive because a lineage edge has one cause.
     val refinementOpen: Boolean = false,
     val refinementParent: HistoryItemEntity? = null,
-    val refinementElement: RefinementElement = RefinementElement.Touch,
+    val refinementElement: RefinementElement = RefinementElement.Reading,
     val refinementLayoutMode: RecomposeMode = RecomposeMode.Principled,
-    val refinementTouchWords: String = "",
     val refinementCount: Int = 1,
     /**
      * How many candidates the running round draws. The colour change draws
@@ -3086,20 +3085,12 @@ class InkuViewModel @JvmOverloads constructor(
         persistSetting(SETTING_KEY_REFINEMENT_ELEMENT, JSONObject().put("value", element.id).toString())
     }
 
-    fun setRefinementTouchWords(value: String) {
-        localState.value = localState.value.copy(refinementTouchWords = value, refinementStatus = null)
-    }
-
     fun setRefinementLayoutMode(mode: RecomposeMode) {
         if (localState.value.refinementBusy) return
         localState.value = localState.value.copy(refinementLayoutMode = mode, refinementStatus = null)
     }
 
-    /**
-     * 1 案 or 4 案. The count is kept independent of the element, as web keeps
-     * its own pair: four touches is refused when the button is pressed, and a
-     * count silently clamped here would make that refusal unreachable.
-     */
+    /** 1 案 or 4 案 for reading and layout; colour compares all other catalogues. */
     fun setRefinementCount(count: Int) {
         if (localState.value.refinementBusy) return
         localState.value = localState.value.copy(refinementCount = count.coerceIn(1, 4), refinementStatus = null)
@@ -3131,14 +3122,6 @@ class InkuViewModel @JvmOverloads constructor(
         val element = current.refinementElement
         RefinementPlanner.requireSource(element, parent)
         val count = current.refinementCount
-        if (element == RefinementElement.Touch && current.refinementTouchWords.isBlank()) {
-            inkuError { it.refinementTouchWordsRequired }
-        }
-        // The same words give the same seed, so four touch candidates would be
-        // four copies. web refuses in the same place with the same sentence.
-        if (count > RefinementPlanner.maxCandidates(element)) {
-            throw InkuFailure(RefinementPlanner.TOUCH_FANOUT_REFUSAL)
-        }
         // The colour change draws every other catalogue, one candidate each and
         // named after it, whatever the count says (web's `planRefinementCandidates`).
         val catalogIds = if (element == RefinementElement.Color) {
@@ -3156,7 +3139,6 @@ class InkuViewModel @JvmOverloads constructor(
                     element = element,
                     parent = parent,
                     newCatalogId = catalogIds.getOrNull(index),
-                    seedText = current.refinementTouchWords.takeIf { element == RefinementElement.Touch },
                     recomposeMode = current.refinementLayoutMode,
                 ),
             )
@@ -3370,7 +3352,6 @@ class InkuViewModel @JvmOverloads constructor(
             renderSeed = candidate.plan.seeds.renderSeed ?: renderSeedOf(candidate.renderMetadataJson),
             compositionSeed = candidate.plan.seeds.compositionSeed,
             interpretationSeed = candidate.plan.seeds.interpretationSeed,
-            seedText = candidate.plan.seeds.seedText,
             instructionLangRequested = candidate.instructionLangRequested,
             instructionLangResolved = candidate.instructionLangResolved,
         ),

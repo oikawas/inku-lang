@@ -18,6 +18,12 @@ At the author's request. `Another reading` called Stage 1 again on the same desc
 - Saved works: `reinterpretation` lineage edges (Reading) and a work's recorded `interpretation_seed` stay visible.
 - SPEC's refinement sections, which the touch removal had missed, and the autonomous-kind gate are corrected as well.
 
+## Android 2.1.4-android.100 (2026-10-14 / Build 148398)
+
+### 2026-10-14 — Remove Android touch refinement
+
+Remove the touch choice and words field from refinement, leaving reading, color catalog and layout. Retired touch selections display reading. Drawing requests omit `seed_text`, and saved works replay with their stored `render_seed`. Historical touch lineage and generation information remain readable.
+
 ## v2.15.128 (2026-10-14 / Build 1204)
 
 ### 2026-10-14 — Remove Another performance and the touch refinement

@@ -3777,16 +3777,12 @@ internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
  * lineage card (S.refinementElements). The comparison sub-views beside it there belong to
  * other contracts.
  *
- * The radio selects one of the four active elements at a time.
+ * The radio selects one of the three active elements at a time.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
     val parent = state.refinementParent
-    // The touch words field is the last thing above 「候補を作る」; when the
-    // keyboard comes up for it, the button row is scrolled up with it.
-    val generateRowRequester = remember { BringIntoViewRequester() }
-    val scope = rememberCoroutineScope()
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
@@ -3824,23 +3820,16 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
         )
 
         when (state.refinementSubview) {
-            RefinementSubview.Adjust -> RefinementAdjustControls(
-                state,
-                viewModel,
-                onTouchWordsFocused = { scope.launchImeBringIntoViewGuard(generateRowRequester) },
-            )
+            RefinementSubview.Adjust -> RefinementAdjustControls(state, viewModel)
             RefinementSubview.Model -> ModelInspectionControls(state, viewModel)
         }
 
         WrapRow(
-            modifier = Modifier.bringIntoViewRequester(generateRowRequester),
             horizontal = Dimens.spaceM,
             vertical = Dimens.spaceM,
         ) {
-            // Both counts stay pressable for touch, layout and reading, the way
-            // web leaves its own pair alone: the refusal for four touches is
-            // stated when the button is pressed, not by hiding the choice. The
-            // colour change draws every other catalogue, so it has no count.
+            // Reading and layout offer one or four candidates. The colour
+            // change draws every other catalogue, so it has no count.
             if (state.refinementSubview == RefinementSubview.Adjust && state.refinementElement != RefinementElement.Color) {
                 listOf(1, 4).forEach { count ->
                     ChipButton(
@@ -4000,12 +3989,11 @@ private fun RefinementProgressLanes(
 /** Lanes per row of [RefinementProgressLanes]. */
 private const val REFINEMENT_LANES_PER_ROW = 4
 
-/** 調整: the four elements and the touch words. */
+/** Adjustment: reading, color catalog and layout. */
 @Composable
 private fun RefinementAdjustControls(
     state: InkuUiState,
     viewModel: InkuViewModel,
-    onTouchWordsFocused: () -> Unit = {},
 ) {
     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
         RefinementElement.entries.forEach { element ->
@@ -4017,16 +4005,6 @@ private fun RefinementAdjustControls(
         }
     }
 
-    if (state.refinementElement == RefinementElement.Touch) {
-        OutlinedTextField(
-            value = state.refinementTouchWords,
-            onValueChange = viewModel::setRefinementTouchWords,
-            label = { Text(S.touchWords) },
-            singleLine = true,
-            enabled = !state.refinementBusy,
-            modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) onTouchWordsFocused() },
-        )
-    }
     if (state.refinementElement == RefinementElement.Layout) {
         WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
             RecomposeMode.entries.forEach { mode ->

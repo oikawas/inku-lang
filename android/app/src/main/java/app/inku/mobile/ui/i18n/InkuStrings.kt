@@ -161,13 +161,11 @@ interface InkuStrings {
     // --- Refinement ---------------------------------------------------------
     val refinementInProgress: String
     val refinementFailed: String
-    val refinementTouchWordsRequired: String
     /** The web's `refineNeedsDescription`, pointing at a work: Android refines a saved work's description. */
     val refinementNeedsDescription: String
-    /** The web's `refineNeedsDdl`: a layout, touch or reading needs the work's DDL. */
+    /** The web's `refineNeedsDdl`: layout and reading need the work's DDL. */
     val refinementNeedsDdl: String
     val refinementNoOtherCatalog: String
-    val refinementTouchFanoutRefusal: String
     val refinementElementLabel: (String) -> String
     val recomposeModeLabel: (String) -> String
     fun recomposeReason(reason: String): String
@@ -278,7 +276,6 @@ interface InkuStrings {
     val uiModeSimple: String
     val uiModeSimpleLong: String
     val seedPhrase: String
-    val touchWords: String
     val download: String
     val licenseBeforeDownload: String
     val templateEdit: String

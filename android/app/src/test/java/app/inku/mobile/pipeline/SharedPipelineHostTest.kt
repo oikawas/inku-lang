@@ -4,13 +4,24 @@ import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.data.DdlSource
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.ManagedHistoryRead
+import app.inku.mobile.data.db.LineageNodeEntity
+import app.inku.mobile.data.lineage.LineageDeclaration
+import app.inku.mobile.data.lineage.LineagePlanner
 import app.inku.mobile.render.SvgRenderer
 import app.inku.mobile.render.RenderResult
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ModelResponse
+import app.inku.mobile.ui.InkuUiState
+import app.inku.mobile.ui.InkuViewModel
+import app.inku.mobile.ui.beginDescriptionDrawing
+import app.inku.mobile.ui.descriptionDrawingParent
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
@@ -25,6 +36,183 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SharedPipelineHostTest {
+    @Test
+    fun descriptionRedrawKeepsItsSavedParentAfterOnePrecommitStop() = descriptionRedrawAfterStops(true, 1)
+
+    @Test
+    fun descriptionRedrawKeepsItsSavedParentAfterRepeatedPrecommitStops() = descriptionRedrawAfterStops(true, 2)
+
+    @Test
+    fun descriptionRedrawWithoutAParentRemainsARootAfterAPrecommitStop() = descriptionRedrawAfterStops(false, 1)
+
+    @Test
+    fun descriptionRedrawParentDoesNotSurviveSaveDetachOrAnotherDrawingOperation() {
+        val parent = HistoryItemEntity(
+            id = "saved-parent", createdAt = 1, updatedAt = 2, originalInput = "old mist",
+            normalizedDdl = "place one circle.", scoreJson = "{}", displaySvg = "<svg/>",
+            stage1Model = "fixture:model", stage2Model = "fixture:model", renderMetadataJson = "{}",
+            renderHash = "hash", renderHashShort = "0000", colorCatalogId = "default", canvasAspect = "square",
+            starred = false, trashed = false, elapsedMs = null, tokenMetadataJson = null, lineageNodeId = "saved-parent-node",
+        )
+        val stopped = InkuUiState(selectedHistory = parent).beginDescriptionDrawing().copy(isDrawing = false)
+        assertEquals(parent, stopped.descriptionDrawingParent)
+        assertEquals("newly-saved", stopped.copy(selectedHistory = parent.copy(id = "newly-saved")).descriptionDrawingParent?.id)
+        assertNull(stopped.copy(lineageDetached = true).descriptionDrawingParent)
+        val state = MutableStateFlow(stopped)
+        val viewModel = unconstructedViewModel(state)
+        val saved = InkuViewModel::class.java.getDeclaredMethod("descriptionPerformanceSaved", Long::class.javaPrimitiveType)
+            .apply { isAccessible = true }
+        saved.invoke(viewModel, -1L)
+        assertEquals("a stale run cannot clear a newer run's parent", parent, state.value.descriptionDrawingParent)
+        saved.invoke(viewModel, 0L)
+        assertNull("the first successful save ends retention", state.value.descriptionDrawingParent)
+        state.value = stopped
+        viewModel.detachLineage()
+        assertNull(state.value.pendingDescriptionParent)
+        assertNull(state.value.descriptionDrawingParent)
+        state.value = stopped
+        InkuViewModel::class.java.getDeclaredMethod("beginDrawingRun", Boolean::class.javaPrimitiveType)
+            .apply { isAccessible = true }.invoke(viewModel, false)
+        assertNull("another drawing operation cannot inherit the pending description parent", state.value.pendingDescriptionParent)
+    }
+
+    /** Exercise the UI start/stop boundary without constructing the application or opening SQLite. */
+    private fun descriptionRedrawAfterStops(hasSavedParent: Boolean, stopCount: Int) = runBlocking {
+        val binding = ScriptedBinding(uniqueExecutions = true).apply { holeDelivers = true }
+        val memoryExecutions = MemoryExecutionStore()
+        var latestExecutionId: String? = null
+        val executions = object : PipelineExecutionStore by memoryExecutions {
+            override suspend fun create(ownerId: String, executionId: String, variationId: String, sequence: String, stateBytes: ByteArray) {
+                latestExecutionId = executionId
+                memoryExecutions.create(ownerId, executionId, variationId, sequence, stateBytes)
+            }
+        }
+        val recording = RecordingCommitStore()
+        val contexts = mutableListOf<AuthoringContext>()
+        val commits = object : PipelineCommitStore {
+            override suspend fun commit(ownerId: String, actionJson: String, createIfMissing: Boolean, context: AuthoringContext): String {
+                contexts += context
+                return recording.commit(ownerId, actionJson, createIfMissing, context)
+            }
+        }
+        val entered = Channel<Unit>(Channel.UNLIMITED)
+        var stage1Calls = 0
+        val provider = object : ModelProvider {
+            override val providerId = "fixture-only"
+            override suspend fun generate(request: ModelRequest): ModelResponse {
+                if (request.pipelineAction == "generate_normalized_ddl" && ++stage1Calls <= stopCount) {
+                    entered.send(Unit)
+                    awaitCancellation()
+                }
+                return ModelResponse("{}", request.modelId)
+            }
+        }
+        val parent = HistoryItemEntity(
+            id = "saved-parent", createdAt = 1, updatedAt = 2, originalInput = "old mist",
+            normalizedDdl = "place one circle.", scoreJson = "{}", displaySvg = "<svg/>",
+            stage1Model = "fixture:model", stage2Model = "fixture:model", renderMetadataJson = "{}",
+            renderHash = "hash", renderHashShort = "0000", colorCatalogId = "default", canvasAspect = "square",
+            starred = false, trashed = false, elapsedMs = null, tokenMetadataJson = null, lineageNodeId = "saved-parent-node",
+        )
+        val config = SharedPipelineConfigBuilder(binding).build(
+            SharedPipelineConfigRequest("en", "square", "default", bundledPluginsEnabled = false),
+        )
+        val forkContext = JSONObject()
+            .put("config", JSONObject(config.configJson))
+            .put("color_maps", JSONObject().put("default", JSONObject(config.renderColorMaps.getValue("default"))))
+            .put("macro_catalog", JSONObject().put("definition_locks", JSONArray()).put("diagnostics", JSONArray()))
+            .put("host_options", JSONObject().put("render_seed", "7"))
+        val safeResults = mutableListOf<PaintResult>()
+        val pipeline = AndroidWorkPipeline(
+            binding = binding, modelProvider = provider, commitStore = commits, executionStore = executions,
+            readHistory = { id ->
+                check(id == parent.id)
+                ManagedHistoryRead(parent, "description_authoritative", variationId = "saved-parent-variation", forkContextJson = forkContext.toString())
+            },
+            legacyRenderer = object : SvgRenderer {
+                override fun render(request: RenderRequest): RenderResult = error("legacy renderer must not run")
+            },
+            bundledPluginsEnabled = { false },
+            saveSafePerformance = { safeResults += it },
+        )
+        fun request(parentId: String?) = PaintRequest(
+            description = "new mist", originalText = "new mist", stage1Model = "fixture:model", stage2Model = "fixture:model",
+            colorCatalogId = "default", canvasAspect = "square", autoRepair = true, renderSeed = 7, instructionLang = "en", parentHistoryId = parentId,
+        )
+        val state = MutableStateFlow(InkuUiState(prompt = "new mist", selectedHistory = parent.takeIf { hasSavedParent }))
+        val viewModel = unconstructedViewModel(state)
+        val stoppedParents = mutableListOf<String?>()
+        val stoppedVariations = mutableListOf<String>()
+        repeat(stopCount) {
+            val source = state.value
+            val savedParentId = source.descriptionDrawingParent?.id
+            state.value = source.beginDescriptionDrawing()
+            val drawing = async { pipeline.paint(request(savedParentId)) }
+            InkuViewModel::class.java.getDeclaredField("drawingJob").apply { isAccessible = true }.set(viewModel, drawing as Job)
+            withTimeout(5_000) { entered.receive() }
+            assertTrue("no commit before each stop", contexts.isEmpty())
+            assertTrue("no saved performance before each stop", safeResults.isEmpty())
+            viewModel.stopDrawing()
+            withTimeout(5_000) { drawing.join() }
+            assertTrue(drawing.isCancelled)
+            assertFalse(state.value.isDrawing)
+            assertNull("a stopped run is not a displayed saved work", state.value.selectedHistory)
+            val stopped = pipeline.view(requireNotNull(latestExecutionId))
+            assertEquals("cancelled", stopped.phaseTag)
+            stoppedVariations += stopped.variationId
+            val stored = JSONObject(executions.load(AndroidWorkPipeline.OWNER_ID, stopped.executionId)!!.toString(Charsets.UTF_8))
+            stoppedParents += stored.getJSONObject("context").optString("parent_variation_id").takeIf(String::isNotEmpty)
+        }
+        val source = state.value
+        val declaration = InkuViewModel::class.java.getDeclaredMethod("describeLineage", InkuUiState::class.java)
+            .apply { isAccessible = true }.invoke(viewModel, source) as LineageDeclaration
+        val nextParentId = source.descriptionDrawingParent?.id
+        state.value = source.beginDescriptionDrawing()
+        val interaction = runCatching { pipeline.paint(request(nextParentId)) }.exceptionOrNull()
+        assertTrue("the scripted core reached approval after its first commit", interaction is PipelineInteractionRequired)
+        val awaiting = (interaction as PipelineInteractionRequired).view
+        assertFalse(stoppedVariations.contains(awaiting.variationId))
+        assertEquals(1, contexts.size)
+        assertTrue("the first committed work can be performed and saved", safeResults.isNotEmpty())
+        val finished = pipeline.approvePatch(awaiting.executionId, awaiting.revision, awaiting.patchProposal!!.proposalDigest)
+        assertEquals("completed", finished.pipelineView!!.phaseTag)
+        val parentNode = parent.takeIf { hasSavedParent }?.let {
+            LineageNodeEntity(id = it.lineageNodeId!!, historyId = it.id, state = "active", descriptionHash = "parent-description",
+                renderHash = "hash", at = 1, rootNodeId = it.lineageNodeId)
+        }
+        val write = LineagePlanner.plan(
+            nodeId = "redrawn-node", edgeId = "redrawn-edge", historyId = "redrawn-history", at = 3,
+            descriptionHash = "description", renderHash = finished.renderHash, historyVisibility = null,
+            declaration = declaration, parentNode = parentNode,
+        )
+        println("DESCRIPTION_REDRAW " + JSONObject()
+            .put("saved_parent", hasSavedParent).put("stop_count", stopCount)
+            .put("stopped_parent_variations", JSONArray(stoppedParents.map { it ?: JSONObject.NULL }))
+            .put("commits_before_redraw", 0).put("redraw_parent_history_id", nextParentId ?: JSONObject.NULL)
+            .put("redraw_parent_variation_id", contexts.first().parentVariationId ?: JSONObject.NULL)
+            .put("redraw_phase", finished.pipelineView.phaseTag)
+            .put("lineage_parent_node_id", write.edge?.parentNodeId ?: JSONObject.NULL)
+            .put("lineage_root_node_id", write.node.rootNodeId)
+            .put("fake_stage1_calls", stage1Calls).put("llm_calls", 0).put("real_db_writes", 0))
+        val expectedVariationParent = "saved-parent-variation".takeIf { hasSavedParent }
+        assertEquals("the next run must keep the saved history", parent.id.takeIf { hasSavedParent }, nextParentId)
+        assertEquals(List(stopCount) { expectedVariationParent }, stoppedParents)
+        assertTrue(contexts.all { it.parentVariationId == expectedVariationParent && it.parentLegacyHistoryId == null })
+        assertTrue(contexts.none { stoppedVariations.contains(it.parentVariationId) })
+        assertEquals(if (hasSavedParent) "description_fork" else "new", contexts.first().derivationKind)
+        assertEquals(parent.lineageNodeId.takeIf { hasSavedParent }, write.edge?.parentNodeId)
+        assertEquals(if (hasSavedParent) parent.lineageNodeId else "redrawn-node", write.node.rootNodeId)
+        assertEquals(nextParentId.orEmpty(), JSONObject(finished.renderMetadataJson).optString("parent_history_id"))
+    }
+
+    private fun unconstructedViewModel(state: MutableStateFlow<InkuUiState>): InkuViewModel {
+        val unsafeType = Class.forName("sun.misc.Unsafe")
+        val unsafe = unsafeType.getDeclaredField("theUnsafe").apply { isAccessible = true }.get(null)
+        val viewModel = unsafeType.getMethod("allocateInstance", Class::class.java).invoke(unsafe, InkuViewModel::class.java) as InkuViewModel
+        InkuViewModel::class.java.getDeclaredField("localState").apply { isAccessible = true }.set(viewModel, state)
+        return viewModel
+    }
+
     @Test
     fun svgLimitRefusalPersistsWithoutStaleSuccessAndRerenderReadsCurrentAllowance() = runBlocking {
         val scripted = ScriptedBinding()

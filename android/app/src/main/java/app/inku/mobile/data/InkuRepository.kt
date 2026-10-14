@@ -68,6 +68,8 @@ import app.inku.mobile.render.RustArtworkRasterizer
 import app.inku.mobile.render.SvgOutputLimit
 import java.io.File
 import java.io.FileOutputStream
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -153,7 +155,10 @@ class InkuRepository(
                 }
             },
             saveSafePerformance = { result ->
-                result.pipelineView?.let { view -> safePerformances[view.executionId] = saveResumedPerformance(result) }
+                result.pipelineView?.let { view ->
+                    safePerformances[view.executionId] = saveResumedPerformance(result)
+                    currentCoroutineContext()[PerformanceSaveObserver]?.onSaved?.invoke()
+                }
             },
         )
     }
@@ -770,33 +775,40 @@ class InkuRepository(
         )
     }
 
-    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), parentHistoryId: String? = null, inputProvenance: CameraInputProvenance? = null, renderWild: Boolean? = null): HistoryItemEntity {
+    /** A call's successful early saves notify only the UI run that started that call. */
+    private class PerformanceSaveObserver(val onSaved: suspend () -> Unit) : AbstractCoroutineContextElement(Key) {
+        companion object Key : CoroutineContext.Key<PerformanceSaveObserver>
+    }
+
+    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), parentHistoryId: String? = null, inputProvenance: CameraInputProvenance? = null, renderWild: Boolean? = null, onPerformanceSaved: suspend () -> Unit = {}): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val stage1Text = description
-        val result = pipeline.paint(
-            PaintRequest(
-                description = stage1Text,
-                originalText = description,
-                stage1Model = stage1ModelId,
-                stage2Model = stage2ModelId,
-                colorCatalogId = catalogId,
-                canvasAspect = canvasAspect,
-                autoRepair = autoRepair,
-                litertStage1PromptOptimization = litertStage1PromptOptimization,
-                renderSeed = seeds.renderSeed,
-                compositionSeed = seeds.compositionSeed,
-                interpretationSeed = seeds.interpretationSeed,
-                seedText = seeds.seedText,
-                instructionLang = instructionLang,
-                uiLang = uiLang,
-                sketch = sketch,
-                parentHistoryId = parentHistoryId,
-                inputProvenance = inputProvenance,
-                renderWild = renderWild,
-            ),
-        )
+        val result = withContext(PerformanceSaveObserver(onPerformanceSaved)) {
+            pipeline.paint(
+                PaintRequest(
+                    description = stage1Text,
+                    originalText = description,
+                    stage1Model = stage1ModelId,
+                    stage2Model = stage2ModelId,
+                    colorCatalogId = catalogId,
+                    canvasAspect = canvasAspect,
+                    autoRepair = autoRepair,
+                    litertStage1PromptOptimization = litertStage1PromptOptimization,
+                    renderSeed = seeds.renderSeed,
+                    compositionSeed = seeds.compositionSeed,
+                    interpretationSeed = seeds.interpretationSeed,
+                    seedText = seeds.seedText,
+                    instructionLang = instructionLang,
+                    uiLang = uiLang,
+                    sketch = sketch,
+                    parentHistoryId = parentHistoryId,
+                    inputProvenance = inputProvenance,
+                    renderWild = renderWild,
+                ),
+            )
+        }
         val model = drawingModelOf(stage1ModelId, stage2ModelId)
-        return saveResult(result, catalogId, canvasAspect, model, model, System.currentTimeMillis() - started, historyInput, lineage, historyVisibility, sourceText, inputProvenance)
+        return saveResult(result, catalogId, canvasAspect, model, model, System.currentTimeMillis() - started, historyInput, lineage, historyVisibility, sourceText, inputProvenance).also { onPerformanceSaved() }
     }
 
     suspend fun interpret(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, instructionLang: String? = null, uiLang: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null, renderWild: Boolean? = null): InterpretResult {

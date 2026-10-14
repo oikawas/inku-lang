@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.130 (2026-10-14 / Build 1206)
+
 ### 2026-10-14 — Remove Another reading and Edit drawing parameters
 
 At the author's request. `Another reading` called Stage 1 again on the same description, and the `interpretation_seed` made for each option was only recorded: it reached neither Stage 1 nor the drawing. With the author's choices, the reading leaves every entry point.

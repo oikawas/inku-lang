@@ -20,6 +20,10 @@ interface SharedPipelineBinding {
     fun recompose(inputBytes: ByteArray): ByteArray =
         """{"error":"unavailable"}""".encodeToByteArray()
 
+    /** Read changeable touches and write verified tool words into the saved instructions. */
+    fun retouch(inputBytes: ByteArray): ByteArray =
+        """{"error":"unavailable"}""".encodeToByteArray()
+
     /** The shared record's three states; an older binding reports no recorded ranges. */
     fun completionRangeStates(inputBytes: ByteArray): ByteArray =
         """{"schema":"inku.completion-range-states.v1","ranges":[]}""".encodeToByteArray()

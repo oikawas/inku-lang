@@ -624,6 +624,7 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
                     CanvasAspectSelectionDialog(state, viewModel)
                 }
                 state.workActionsTarget?.let { WorkActionsDialog(it, viewModel) }
+                if (state.toolChangeOpen) ToolChangeDialog(state, viewModel, S)
                 state.workSketchTarget?.let { WorkSketchDialog(it, viewModel) }
                 CameraDevelopmentSurface(state, viewModel)
             }
@@ -711,6 +712,7 @@ private fun WorkActionsDialog(item: HistoryItemEntity, viewModel: InkuViewModel)
                 Text(S.editingWorkLabel(item.renderHashShort), style = MaterialTheme.typography.labelMedium)
                 TextButton(onClick = { viewModel.refineWork(item, RefinementElement.Layout) }, modifier = Modifier.fillMaxWidth().testTag(LAYOUT_REFINE_ENTRY_TAG)) { Text(S.layoutEditAction) }
                 TextButton(onClick = { viewModel.refineWork(item, RefinementElement.Color) }, modifier = Modifier.fillMaxWidth().testTag(COLOR_REFINE_ENTRY_TAG)) { Text(S.colorCatalogEditAction) }
+                TextButton(onClick = { viewModel.openToolChange(item) }, modifier = Modifier.fillMaxWidth().testTag(TOOL_CHANGE_ENTRY_TAG)) { Text(S.workActionTool) }
                 TextButton(onClick = { viewModel.editWorkDescription(item) }, modifier = Modifier.fillMaxWidth()) { Text(S.descriptionEditAction) }
                 TextButton(onClick = { viewModel.editWorkInstructions(item) }, modifier = Modifier.fillMaxWidth().testTag(DDL_ENTRY_TAG)) { Text(S.instructionEditAction) }
                 TextButton(onClick = { viewModel.showWorkSketch(item) }, modifier = Modifier.fillMaxWidth()) { Text(S.workActionSketchRedraw) }
@@ -4049,12 +4051,13 @@ private fun ModelInspectionControls(state: InkuUiState, viewModel: InkuViewModel
 }
 
 @Composable
-private fun RefinementCandidateCard(
+internal fun RefinementCandidateCard(
     candidate: RefinementCandidate,
     shownOnCanvas: Boolean,
     onSave: () -> Unit,
     onPreview: () -> Unit,
     modifier: Modifier = Modifier,
+    onDiscard: (() -> Unit)? = null,
 ) {
     Card(
         modifier = modifier
@@ -4074,6 +4077,15 @@ private fun RefinementCandidateCard(
             )
             Column(modifier = Modifier.padding(horizontal = Dimens.spaceM).padding(bottom = Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                 Text(candidate.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                candidate.plan.toolChange?.takeIf { it.mode == app.inku.mobile.data.refinement.ToolChangeMode.PerSentence }?.let { option ->
+                    option.changes.forEach { change ->
+                        val words = option.source.tools.associateBy { it.value }
+                        val japanese = S === app.inku.mobile.ui.i18n.InkuStringsJa
+                        val from = words.getValue(change.from).label(japanese)
+                        val to = words.getValue(change.to).label(japanese)
+                        Text("${change.index + 1}: $from → $to", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
                 candidate.plan.recomposeMode?.let { mode ->
                     Text(S.recomposeModeLabel(mode.id), style = MaterialTheme.typography.labelSmall)
                 }
@@ -4085,7 +4097,10 @@ private fun RefinementCandidateCard(
                 // first one is a button that does anything.
                 when (candidate.saveState) {
                     RefinementSaveState.Unsaved ->
-                        ChipButton(S.save, modifier = Modifier.testTag(REFINE_SAVE_TAG), onClick = onSave)
+                        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+                            ChipButton(S.save, modifier = Modifier.testTag(REFINE_SAVE_TAG), onClick = onSave)
+                            onDiscard?.let { discard -> ChipButton(S.toolChangeDiscard, onClick = discard) }
+                        }
                     RefinementSaveState.Saving -> Text(S.saving, style = MaterialTheme.typography.labelSmall)
                     RefinementSaveState.Saved -> Text(S.saved, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

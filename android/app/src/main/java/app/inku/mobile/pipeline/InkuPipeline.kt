@@ -138,6 +138,7 @@ data class PaintResult(
     val sketchState: String? = null,
     val managedHistoryLink: ManagedHistoryLinkInput? = null,
     val managedHistoryReplay: ManagedHistoryReplayInput? = null,
+    val managedToolChange: app.inku.mobile.data.db.ManagedToolChangeInput? = null,
     val pipelineView: PipelineView? = null,
     val inputProvenance: app.inku.mobile.data.model.CameraInputProvenance? = null,
     val ddlSourceOrigin: String? = null,

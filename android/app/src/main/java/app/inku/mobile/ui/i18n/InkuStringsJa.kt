@@ -252,6 +252,17 @@ object InkuStringsJa : InkuStrings {
         }
     }
 
+    override val workActionTool = "てざわりを変える"
+    override val toolChangeHint = "てざわり（筆記具）だけを替えます。配置・色・支持体は保ちます。てざわりを書いていない文には、新しい語を書き足します。"
+    override val toolChangeUniform = "全文を揃える"
+    override val toolChangePerSentence = "文ごとに引く"
+    override val toolChangePerSentenceCandidate: (Int) -> String = { number -> "文ごと $number" }
+    override val toolChangePlaceholder = "筆記具を替えた候補を4案ずつ並べます。「4案を作る」を押すと、選んだ替え方の4案を加えます。"
+    override val toolChangeNone = "この作品には、てざわりを替えられる文がありません。"
+    override val toolChangeMakeFour = "4案を作る"
+    override val toolChangeDiscard = "破棄"
+    override val toolChangeDiscardAndClose = "すべて破棄して閉じる"
+    override val toolChangeSaveOrDiscard = "候補を保存するか、破棄してから閉じてください。"
     override val derivationOrigin = "起点"
     override val derivationUnknown = "不明"
     override val derivationLabel: (String) -> String = { kind ->
@@ -271,6 +282,7 @@ object InkuStringsJa : InkuStrings {
             "renga_reply" -> "連歌の付句"
             "replay" -> "再描画"
             "sketch_grain_change" -> "写生の有無"
+            "tool_change" -> "てざわり"
             "touch_change" -> "タッチ"
             "variation" -> "変奏（旧）"
             else -> derivationUnknown

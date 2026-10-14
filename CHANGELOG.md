@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — Add Change the touches on Android
+
+The work menu places Change the touches after Another catalog. One touch for all or Per sentence draws four options on opening and adds four more on request. Only the drawing tools of the chosen source sentences change in the saved Score; shared-core retouch writes the corresponding instructions. No model is called, and only saved options become Touches children.
+
 ### 2026-10-14 — Correct the explanation beside Android composition candidates
 
 A sentence with no range or place now explains that the ranges in the instructions cannot be chosen again. When the ranges stay, the accompanying text says the work was redrawn with a new composition seed and unchanged instructions. The author's Japanese and English wording matches Web.

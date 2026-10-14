@@ -264,6 +264,17 @@ object InkuStringsEn : InkuStrings {
     // 起点 = origin (GLOSSARY :93). web answers "Root" here (`derivation.ts:50`),
     // which its own glossary contradicts; that file is outside what
     // `lint:i18n` reads, so the divergence has never been reported.
+    override val workActionTool = "Change the touches"
+    override val toolChangeHint = "Changes only the touches (the drawing tools). Placement, color and ground stay the same. A sentence that names no touch has the new word written in."
+    override val toolChangeUniform = "One touch for all"
+    override val toolChangePerSentence = "Per sentence"
+    override val toolChangePerSentenceCandidate: (Int) -> String = { number -> "Per sentence $number" }
+    override val toolChangePlaceholder = "Options with other drawing tools appear here, four at a time. Make four options adds four more in the chosen way."
+    override val toolChangeNone = "This work has no sentence whose touch can change."
+    override val toolChangeMakeFour = "Make four options"
+    override val toolChangeDiscard = "Discard"
+    override val toolChangeDiscardAndClose = "Discard all and close"
+    override val toolChangeSaveOrDiscard = "Save or discard the options before closing."
     override val derivationOrigin = "Origin"
     override val derivationUnknown = "Unknown"
     override val derivationLabel: (String) -> String = { kind ->
@@ -287,6 +298,7 @@ object InkuStringsEn : InkuStrings {
             "renga_reply" -> "Renga reply"
             "replay" -> "Replay"
             "sketch_grain_change" -> "Sketch from life"
+            "tool_change" -> "Touches"
             "touch_change" -> "Touch"
             "variation" -> "Variation (retired)"
             else -> derivationUnknown

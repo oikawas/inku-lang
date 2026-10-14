@@ -285,6 +285,8 @@ data class InkuUiState(
     // exclusive because a lineage edge has one cause.
     val refinementOpen: Boolean = false,
     val refinementParent: HistoryItemEntity? = null,
+    val toolChangeOpen: Boolean = false,
+    val toolChangeMode: app.inku.mobile.data.refinement.ToolChangeMode = app.inku.mobile.data.refinement.ToolChangeMode.Uniform,
     val refinementElement: RefinementElement = RefinementElement.Layout,
     val refinementLayoutMode: RecomposeMode = RecomposeMode.Principled,
     val refinementCount: Int = 1,
@@ -473,6 +475,7 @@ class InkuViewModel @JvmOverloads constructor(
     private var drawingJob: Job? = null
     private var lineageJob: Job? = null
     private var refinementJob: Job? = null
+    private var toolChangeNextNumber = 1
     private var litertWarmupJob: Job? = null
     private var cameraJob: Job? = null
     private val cameraFiles = CameraCaptureFileStore(application.applicationContext)
@@ -3022,6 +3025,7 @@ class InkuViewModel @JvmOverloads constructor(
         val previous = localState.value.refinementParent
         localState.value = localState.value.copy(
             refinementOpen = true,
+            toolChangeOpen = false,
             refinementParent = item,
             refinementSubview = subview,
             // A new target owns its own candidates; the previous work's are gone.
@@ -3076,6 +3080,7 @@ class InkuViewModel @JvmOverloads constructor(
         refinementJob = null
         localState.value = localState.value.copy(
             refinementOpen = false,
+            toolChangeOpen = false,
             refinementParent = null,
             refinementCandidates = emptyList(),
             refinementPreviewId = null,
@@ -3083,6 +3088,90 @@ class InkuViewModel @JvmOverloads constructor(
             refinementCanAbort = false,
             refinementStatus = null,
         )
+    }
+
+    fun openToolChange(item: HistoryItemEntity) {
+        if (state.value.isRunning || item.trashed) return
+        enterWorkContext(item)
+        closeRefinement()
+        toolChangeNextNumber = 1
+        localState.value = localState.value.copy(
+            toolChangeOpen = true, toolChangeMode = app.inku.mobile.data.refinement.ToolChangeMode.Uniform,
+            refinementParent = item, refinementCandidates = emptyList(),
+        )
+        generateToolChangeCandidates()
+    }
+
+    fun setToolChangeMode(mode: app.inku.mobile.data.refinement.ToolChangeMode) {
+        if (localState.value.refinementBusy) return
+        localState.value = localState.value.copy(toolChangeMode = mode)
+    }
+
+    fun closeToolChange(discard: Boolean = false) {
+        val current = localState.value
+        if (current.refinementBusy || current.refinementCandidates.any { it.saveState == RefinementSaveState.Saving }) return
+        if (!discard && current.refinementCandidates.any { it.saveState == RefinementSaveState.Unsaved }) {
+            localState.value = current.copy(refinementStatus = strings().toolChangeSaveOrDiscard)
+            return
+        }
+        closeRefinement()
+    }
+
+    fun discardToolChangeCandidate(id: String) {
+        val current = localState.value
+        if (current.refinementBusy) return
+        localState.value = current.copy(
+            refinementCandidates = current.refinementCandidates.filterNot { it.id == id && it.saveState == RefinementSaveState.Unsaved },
+            refinementPreviewId = current.refinementPreviewId?.takeUnless { it == id },
+        )
+    }
+
+    /** Append four options in the chosen mode; earlier options still belong to this target. */
+    fun generateToolChangeCandidates() {
+        val current = localState.value
+        if (!current.toolChangeOpen || current.refinementBusy || current.isDrawing ||
+            current.refinementCandidates.any { it.saveState == RefinementSaveState.Saving }) return
+        val item = current.refinementParent ?: return
+        val parent = RefinementParent.of(item, sourceTextOf(item))
+        localState.value = current.copy(
+            refinementBusy = true, refinementStatus = null,
+            refinementPlannedCount = current.refinementCandidates.size + 4,
+        )
+        val run = viewModelScope.launch {
+            runCatching {
+                val options = withContext(Dispatchers.IO) { repository.toolChangeOptions(parent, current.toolChangeMode) }
+                for (option in options) {
+                    val started = System.currentTimeMillis()
+                    val rendered = withContext(Dispatchers.IO) { repository.renderToolChangeCandidate(parent, option) } ?: continue
+                    if (!localState.value.toolChangeOpen || localState.value.refinementParent?.id != item.id) return@launch
+                    val (plan, result) = rendered
+                    val number = toolChangeNextNumber++
+                    val label = if (option.mode == app.inku.mobile.data.refinement.ToolChangeMode.Uniform) {
+                        option.source.tools.first { it.value == option.tools.values.first() }.label(current.uiLanguage.code == "ja")
+                    } else strings().toolChangePerSentenceCandidate(number)
+                    val candidate = RefinementCandidate(
+                        id = "tool-$number-${result.renderHash.takeLast(8)}", label = label, plan = plan,
+                        displaySvg = result.displaySvg, scoreJson = result.scoreJson,
+                        normalizedDdl = result.normalizedDdl.orEmpty(), renderHash = result.renderHash,
+                        renderHashShort = result.renderHashShort, renderMetadataJson = result.renderMetadataJson,
+                        pipelineResult = result, elapsedMs = System.currentTimeMillis() - started,
+                        stage1Model = parent.stage1Model, stage2Model = parent.stage2Model,
+                        instructionLangRequested = result.instructionLangRequested,
+                        instructionLangResolved = result.instructionLangResolved,
+                    )
+                    localState.value = localState.value.copy(refinementCandidates = localState.value.refinementCandidates + candidate)
+                }
+                if (localState.value.refinementCandidates.size == current.refinementCandidates.size) {
+                    localState.value = localState.value.copy(refinementStatus =
+                        if (options.isEmpty()) strings().toolChangeNone else strings().refinementFailed)
+                }
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                localState.value = localState.value.copy(refinementStatus = messageFor(error, strings(), strings().refinementFailed))
+            }
+            localState.value = localState.value.copy(refinementBusy = false)
+        }
+        refinementJob = run
     }
 
     /** The radio. One value replaces the previous one; two are not spellable. */
@@ -3306,6 +3395,7 @@ class InkuViewModel @JvmOverloads constructor(
         val current = localState.value
         val candidate = current.refinementCandidates.firstOrNull { it.id == candidateId } ?: return
         if (candidate.saveState != RefinementSaveState.Unsaved) return
+        if (candidate.plan.toolChange != null && current.refinementBusy) return
         val parentItem = current.refinementParent ?: return
         updateCandidate(candidateId) { it.copy(saveState = RefinementSaveState.Saving) }
         viewModelScope.launch {
@@ -3348,7 +3438,11 @@ class InkuViewModel @JvmOverloads constructor(
         candidate: RefinementCandidate,
         parentItem: HistoryItemEntity,
         historyVisibility: String?,
-    ): HistoryItemEntity = repository.saveRefinementCandidate(
+    ): HistoryItemEntity {
+        candidate.plan.toolChange?.let { option ->
+            return repository.saveToolChangeCandidate(parentItem, option, candidate.elapsedMs, historyVisibility)
+        }
+        return repository.saveRefinementCandidate(
         result = candidate.pipelineResult ?: PaintResult(
             originalInput = sourceTextOf(parentItem),
             normalizedDdl = candidate.normalizedDdl,
@@ -3372,6 +3466,7 @@ class InkuViewModel @JvmOverloads constructor(
         stage2ModelId = candidate.stage2Model,
         sourceText = sourceTextOf(parentItem),
     )
+    }
 
     /** The seed the drawing was performed with, when the plan left it to be drawn. */
     private fun renderSeedOf(renderMetadataJson: String): Long? = runCatching {

@@ -12,12 +12,8 @@ data class DerivationKindInfo(
 )
 
 object DerivationKindRegistry {
-    // The server's `LINEAGE_DERIVATION_KINDS` (db.py:50), sorted, exactly as
-    // the baked `lineage_wiring.json` carries it. The five kinds no screen
-    // here reaches yet are still listed: which operations exist is the
-    // server's judgment, not the client's. (`sketch_grain_change` used to be a
-    // sixth; the 写生 layer arrived with contract 5/5 and the describe screen
-    // writes that edge now -- `SubmitDerivationKind.forDescribeSubmit`.)
+    // Kinds this client records or keeps readable, in sorted order. Retired
+    // Touch edges stay distinct from the new tool_change / Touches operation.
     val KINDS: List<String> = listOf(
         "age_change",
         "canvas_aspect_change",
@@ -34,6 +30,7 @@ object DerivationKindRegistry {
         "renga_reply",
         "replay",
         "sketch_grain_change",
+        "tool_change",
         "touch_change",
         "variation",
     )

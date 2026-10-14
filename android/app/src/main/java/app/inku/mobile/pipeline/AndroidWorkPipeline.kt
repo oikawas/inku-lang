@@ -169,7 +169,6 @@ class AndroidWorkPipeline(
                 inherited = InheritedRun(
                     config = stored.config,
                     renderSeed = stored.renderSeed,
-                    seedText = stored.resultOptions.optionalString("seed_text"),
                     instructionLang = stored.resultOptions.optionalString("instruction_lang_requested"),
                     uiLang = stored.resultOptions.optionalString("ui_lang"),
                     completionRangesJson = current.completionRangesJson,
@@ -338,7 +337,7 @@ class AndroidWorkPipeline(
             .put("render_color_profile", srgbColorProfile())
             .put("render_seed", java.lang.Long.toUnsignedString(renderSeed))
             .put("render_wild", request.renderWild == true)
-            .put("seed_text", saved.seedText ?: JSONObject.NULL)
+            .put("seed_text", replaySource?.history?.seedText ?: JSONObject.NULL)
             .put("render_limits", saved.limits)
             .put(
                 "render_limits_source",
@@ -348,7 +347,7 @@ class AndroidWorkPipeline(
                     else -> "work_unrecorded"
                 },
             )
-        val replayRequest = request.copy(renderSeed = renderSeed, seedText = saved.seedText)
+        val replayRequest = request.copy(renderSeed = renderSeed)
         return replayResult(
             scoreJson,
             replayRequest,
@@ -391,7 +390,6 @@ class AndroidWorkPipeline(
         val colors: Map<String, String>,
         val canvas: CanvasInfo,
         val renderSeed: Long,
-        val seedText: String?,
         val colorSource: String,
         val limits: JSONObject,
     )
@@ -419,8 +417,11 @@ class AndroidWorkPipeline(
         val colors = request.workColorSnapshot?.colorMap ?: run.request.config.renderColorMaps[catalogId]
             ?: throw PipelineHostException("saved_color_catalog_unavailable")
         val canvas = canvas(request.canvasAspect)
-        val (textSeed, seedText) = textSeed(request.seedText, request.renderSeed)
-        val renderSeed = textSeed ?: newRenderSeed()
+        val renderSeed = request.renderSeed
+            ?: request.parentHistoryId?.let { readHistory(it)?.history?.renderSeed }?.let {
+                runCatching { java.lang.Long.parseUnsignedLong(it) }.getOrNull()
+            }
+            ?: newRenderSeed()
         val options = JSONObject()
             .put("resolved_color_map", JSONObject(colors))
             .put("catalog_id", catalogId)
@@ -460,7 +461,6 @@ class AndroidWorkPipeline(
             colors,
             canvas,
             renderSeed,
-            seedText,
             colorSource = if (request.workColorSnapshot != null) "snapshot" else "catalog",
             limits = renderLimits(operationalBudget),
         )
@@ -609,7 +609,7 @@ class AndroidWorkPipeline(
             renderSeed = request.renderSeed,
             compositionSeed = request.compositionSeed,
             interpretationSeed = request.interpretationSeed,
-            seedText = request.seedText,
+            seedText = source?.history?.seedText,
             sketchText = request.sketch.text,
             sketchGrain = request.sketch.grain,
             sketchState = request.sketch.claimedState,
@@ -704,16 +704,13 @@ class AndroidWorkPipeline(
         }
         val saved = history?.forkContextJson?.let(::JSONObject)
         // The server merges the parent's options under the request's
-        // (`pipeline_product.py` `prepare`): words, seeds and languages a request
-        // leaves out are the parent's. A legacy parent passes on its languages
-        // but not its words.
+        // (`pipeline_product.py` `prepare`): seeds and languages a request
+        // leaves out are the parent's. Historical words never decide a seed.
         val parentMetadata = history?.history?.renderMetadataJson
             ?.let { runCatching { JSONObject(it) }.getOrNull() }
-        val inheritedSeedText = inherited?.seedText ?: history?.takeIf { saved != null }?.history?.seedText
         val inheritedRenderSeed = inherited?.renderSeed
             ?: saved?.requiredObject("host_options")?.optionalUnsignedLong("render_seed")
-        val (textSeed, seedText) = textSeed(request.seedText ?: inheritedSeedText, request.renderSeed ?: inheritedRenderSeed)
-        val renderSeed = textSeed ?: newRenderSeed()
+        val renderSeed = request.renderSeed ?: inheritedRenderSeed ?: newRenderSeed()
         val requestedLang = InstructionLanguages.normalize(
             request.instructionLang
                 ?: inherited?.instructionLang
@@ -778,7 +775,6 @@ class AndroidWorkPipeline(
                 renderSeed = renderSeed,
                 wild = request.renderWild == true,
                 interpretationSeed = request.interpretationSeed,
-                seedText = seedText,
                 instructionLangRequested = requestedLang,
                 instructionLangResolved = resolvedLang,
                 uiLang = uiLang,
@@ -796,18 +792,6 @@ class AndroidWorkPipeline(
             instructionLangRequested = requestedLang,
             instructionLangResolved = resolvedLang,
         )
-    }
-
-    /**
-     * The server's `_render_seed_from_text` (`api_core/rendering.py`): words,
-     * when there are any, decide the render seed through the shared rule, and
-     * the normalized words are what the work records.
-     */
-    private fun textSeed(seedText: String?, renderSeed: Long?): Pair<Long?, String?> {
-        if (seedText.isNullOrEmpty()) return renderSeed to null
-        val derived = binding.renderSeedFromText(seedText)?.let(::JSONObject) ?: return renderSeed to null
-        return java.lang.Long.parseUnsignedLong(derived.requiredString("render_seed")) to
-            derived.requiredString("seed_text")
     }
 
     /**
@@ -1117,7 +1101,6 @@ class AndroidWorkPipeline(
     private data class InheritedRun(
         val config: PreparedPipelineConfig,
         val renderSeed: Long?,
-        val seedText: String?,
         val instructionLang: String?,
         val uiLang: String?,
         val completionRangesJson: String? = null,

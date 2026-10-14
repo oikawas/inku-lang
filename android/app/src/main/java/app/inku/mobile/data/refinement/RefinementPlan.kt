@@ -5,26 +5,21 @@ import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.drawnWild
 import app.inku.mobile.data.model.WorkColorSnapshot
 import app.inku.mobile.data.model.workColorSnapshot
-import app.inku.mobile.pipeline.NativePipelineBridge
 import app.inku.mobile.pipeline.RecomposeMode
-import app.inku.mobile.pipeline.SharedPipelineBinding
-import org.json.JSONObject
-import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.i18n.inkuError
 
 /**
  * The one intervention a round of refinement makes.
  *
- * A refinement selects one of touch, layout, reading, or color catalog.
+ * A refinement selects reading, color catalog, or layout.
  * That is why this is an enum and not a set
  * of flags -- 「系譜の各辺を単一の介入として説明可能にするため」, and a lineage edge
  * whose cause is two things at once cannot be labelled with one kind.
  */
 enum class RefinementElement(val id: String, val derivationKind: String) {
-    Touch("touch", "touch_change"),
-    Layout("layout", "layout_change"),
     Reading("reading", "reinterpretation"),
     Color("color", "catalog_change"),
+    Layout("layout", "layout_change"),
     ;
 
     companion object {
@@ -113,7 +108,7 @@ data class RefinementParent(
  * one thing this round varies. There is no second place where a seed is decided.
  */
 data class RefinementPlan(
-    /** `null` for a comparison candidate: it varies the model, which is not one of the four elements. */
+    /** `null` for a comparison candidate: it varies the model, which is not one of the three elements. */
     val element: RefinementElement?,
     val route: RefinementRoute,
     val catalogId: String,
@@ -141,7 +136,7 @@ object RefinementPlanner {
 
     /**
      * @param element the single intervention. One value, never a collection:
-     *   there is no way to spell "touch and colour" here, which is what makes
+     *   there is no way to spell "reading and colour" here, which is what makes
      *   the exclusivity a property of the type rather than of a check.
      * @param newCatalogId the catalogue to apply, for the colour refinement only.
      */
@@ -149,31 +144,8 @@ object RefinementPlanner {
         element: RefinementElement,
         parent: RefinementParent,
         newCatalogId: String? = null,
-        seedText: String? = null,
         recomposeMode: RecomposeMode = RecomposeMode.Principled,
-        textSeed: (String) -> TextSeed? = TextSeeds::derive,
     ): RefinementPlan = when (element) {
-        // The Score, the DDL, the canvas and the catalogue all stay; only the
-        // performance is played again. web derives the seed from the words the
-        // author typed (`renderWordTouchCandidate`), so the same words always
-        // give the same touch.
-        RefinementElement.Touch -> {
-            val touch = seedText?.let(textSeed) ?: inkuError { it.refinementTouchWordsRequired }
-            RefinementPlan(
-                element = element,
-                route = RefinementRoute.RenderFromScore,
-                catalogId = parent.catalogId,
-                canvasAspect = parent.canvasAspect,
-                seeds = parent.seeds.copy(renderSeed = touch.renderSeed, seedText = touch.seedText),
-                derivationKind = element.derivationKind,
-                derivationMetadata = mapOf(
-                    "render_seed_from" to parent.seeds.renderSeed?.let { unsigned(it) },
-                    "render_seed_to" to unsigned(touch.renderSeed),
-                    "seed_text" to touch.seedText,
-                ),
-            )
-        }
-
         // A new composition seed goes to Stage 1.5, which is where the server
         // spends it (`_call_compose_detail`). The render seed is left unset so a
         // new one is drawn: web's `/api/compose` sends none either.
@@ -231,25 +203,13 @@ object RefinementPlanner {
     }
 
     /**
-     * How many candidates the element can offer.
-     *
-     * Touch is the one that cannot fan out: its seed comes from the words, so
-     * four candidates would be four copies of one drawing. web says so in the
-     * same place and refuses (`generateVariationCandidates`, `+page.svelte:5245`).
-     */
-    fun maxCandidates(element: RefinementElement): Int =
-        if (element == RefinementElement.Touch) 1 else 4
-
-    val TOUCH_FANOUT_REFUSAL: (InkuStrings) -> String = { it.refinementTouchFanoutRefusal }
-
-    /**
      * Refuses a round the parent cannot feed, in web's order
      * (`generateVariationCandidates`, `generateModelCandidates`). [element] is
      * `null` for the model comparison.
      *
      * A colour change replays the saved Score and a layout draws the saved DDL,
      * so neither needs a description: a work drawn from hand-written DDL can
-     * still take them. Touch, reading and the model comparison keep the
+     * still take them. Reading and the model comparison keep the
      * description guard -- before it, a route through Stage 1 sent the core an
      * empty description and the panel showed its bare `schema_violation`.
      * Every element but colour then needs the DDL, as web asks for it.
@@ -274,24 +234,4 @@ object RefinementPlanner {
         return others
     }
 
-    private fun unsigned(seed: Long): String = java.lang.Long.toUnsignedString(seed)
-}
-
-/** A word-touch seed and the words as the work records them. */
-data class TextSeed(val renderSeed: Long, val seedText: String)
-
-/**
- * The server's `_render_seed_from_text`, from the shared core rather than a
- * Kotlin copy: the same words give the same touch on every host.
- */
-object TextSeeds {
-    fun derive(seedText: String): TextSeed? = derive(seedText, NativePipelineBridge)
-
-    fun derive(seedText: String, binding: SharedPipelineBinding): TextSeed? =
-        binding.renderSeedFromText(seedText)?.let(::JSONObject)?.let { seed ->
-            TextSeed(
-                renderSeed = java.lang.Long.parseUnsignedLong(seed.getString("render_seed")),
-                seedText = seed.getString("seed_text"),
-            )
-        }
 }

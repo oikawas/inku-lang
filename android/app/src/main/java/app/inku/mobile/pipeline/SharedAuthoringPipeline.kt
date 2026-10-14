@@ -10,7 +10,6 @@ data class SharedPipelineRunRequest(
     val renderSeed: Long? = null,
     val wild: Boolean = false,
     val interpretationSeed: String? = null,
-    val seedText: String? = null,
     val instructionLangRequested: String? = null,
     val instructionLangResolved: String? = null,
     /** The interface language the request came with, kept as the server keeps `ui_lang`. */
@@ -192,7 +191,6 @@ class SharedAuthoringPipeline(
                 org.json.JSONObject()
                     .put("original_input", request.originalInput)
                     .put("interpretation_seed", request.interpretationSeed)
-                    .put("seed_text", request.seedText)
                     .put("instruction_lang_requested", request.instructionLangRequested)
                     .put("instruction_lang_resolved", request.instructionLangResolved)
                     .put("ui_lang", request.uiLang)

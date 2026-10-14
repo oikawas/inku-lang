@@ -115,15 +115,11 @@ class HeadlessRenderActivity : Activity() {
             }
             val saveHistory = intent.getBooleanExtra("save_history", false)
             val originalText = intent.getStringExtra("original_text")?.takeIf { it.isNotBlank() } ?: text
-            // The five the server's render and compose bodies take
-            // (`api_core/models.py:14-15`, `:42-45`). A harness that cannot name
-            // a seed cannot draw the same picture twice, and a sender that never
-            // sets a field is a road no test walks.
+            // Seed words are retired request input; old extras are ignored.
             val seeds = PaintSeeds(
                 renderSeed = intent.longExtraOrNull("render_seed"),
                 compositionSeed = intent.longExtraOrNull("composition_seed"),
                 interpretationSeed = intent.getStringExtra("interpretation_seed")?.takeIf { it.isNotBlank() },
-                seedText = intent.getStringExtra("seed_text")?.takeIf { it.isNotBlank() },
             )
 
             val image = if (inputMode == "image") analyzeHeadlessImage(repository, outputDir, runId, stage1Model) else null

@@ -352,31 +352,29 @@ class RefinementScreenTest {
 
     /**
      * T-6 on the screen: unsaved → saved, and a second press writes no second row.
-     * One touch is the fast single candidate: it replays the Score and asks no
-     * model, and the colour change now draws every other catalogue.
+     * The first colour candidate replays the Score without asking a model.
      */
     @Test
     fun t6_theSaveGoesUnsavedThenSavedAndRefusesASecondPress() {
         openPanel()
         composeTestRule.runOnIdle {
-            vm().setRefinementElement(RefinementElement.Touch)
-            vm().setRefinementTouchWords("しずかに")
+            vm().setRefinementElement(RefinementElement.Color)
             vm().setRefinementCount(1)
             vm().generateRefinementCandidates()
         }
-        awaitState("one candidate") { it.refinementCandidates.size == 1 && !it.refinementBusy }
-        val candidate = vm().state.value.refinementCandidates.single()
+        awaitState("colour candidates") { it.refinementCandidates.isNotEmpty() && !it.refinementBusy }
+        val candidate = vm().state.value.refinementCandidates.first()
         assertEquals(RefinementSaveState.Unsaved, candidate.saveState)
 
         val before = countRows("history_items")
         val nodesBefore = countRows("lineage_nodes")
         composeTestRule.runOnIdle { vm().saveRefinementCandidate(candidate.id) }
         awaitState("the candidate to be saved") {
-            it.refinementCandidates.single().saveState == RefinementSaveState.Saved
+            it.refinementCandidates.first().saveState == RefinementSaveState.Saved
         }
         assertEquals("one work was added", before + 1, countRows("history_items"))
         assertEquals("and one node", nodesBefore + 1, countRows("lineage_nodes"))
-        val savedNode = vm().state.value.refinementCandidates.single().savedNodeId
+        val savedNode = vm().state.value.refinementCandidates.first().savedNodeId
         assertNotNull(savedNode)
 
         // 「保存済み候補は再保存できない」. Counted in both tables, because a save
@@ -387,8 +385,8 @@ class RefinementScreenTest {
         composeTestRule.waitForIdle()
         assertEquals("nothing more was written", before + 1, countRows("history_items"))
         assertEquals("no second node was minted", nodesBefore + 1, countRows("lineage_nodes"))
-        assertEquals("the candidate still points at the first save", savedNode, vm().state.value.refinementCandidates.single().savedNodeId)
-        assertEquals(RefinementSaveState.Saved, vm().state.value.refinementCandidates.single().saveState)
+        assertEquals("the candidate still points at the first save", savedNode, vm().state.value.refinementCandidates.first().savedNodeId)
+        assertEquals(RefinementSaveState.Saved, vm().state.value.refinementCandidates.first().saveState)
     }
 
     /** 「推敲要素の選択は前回値を…記憶する」-- here the device remembers it. */
@@ -416,23 +414,27 @@ class RefinementScreenTest {
         }
     }
 
-    /** The same words are one touch, so four of them is refused rather than drawn. */
+    /** A retired selection must not bring back the touch control or its words field. */
     @Test
-    fun fourTouchCandidatesAreRefused() {
+    fun onlyReadingColorAndLayoutAreOfferedAfterARetiredTouchSelection() {
+        runBlocking { repository.saveSetting(SETTING_KEY_REFINEMENT_ELEMENT, """{"value":"touch"}""") }
         openPanel()
-        composeTestRule.runOnIdle {
-            vm().setRefinementElement(RefinementElement.Touch)
-            vm().setRefinementTouchWords("しずかに")
-            vm().setRefinementCount(4)
-            vm().generateRefinementCandidates()
+        awaitState("restored settings") { it.message == null && it.refinementElement == RefinementElement.Reading }
+        composeTestRule.onNodeWithText("読み取り").assertExists()
+        composeTestRule.onNodeWithText("色カタログ").assertExists()
+        composeTestRule.onNodeWithText("配置").assertExists()
+        composeTestRule.onNodeWithText("タッチ").assertDoesNotExist()
+        composeTestRule.onNodeWithText("タッチを変える言葉").assertDoesNotExist()
+        assertEquals("the retired stored value is not erased", """{"value":"touch"}""", settingOffMainThread(SETTING_KEY_REFINEMENT_ELEMENT))
+        assertTrue("opening makes no candidates", vm().state.value.refinementCandidates.isEmpty())
+        assertEquals(RefinementElement.Reading, vm().state.value.refinementElement)
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val screenshot = java.io.File(context.getExternalFilesDir(null), "touch-removal-${System.currentTimeMillis()}.png")
+        screenshot.outputStream().use {
+            assertTrue(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+                .compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
         }
-        composeTestRule.runOnIdle {
-            assertEquals(
-                "同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。",
-                vm().state.value.refinementStatus,
-            )
-            assertTrue("nothing was drawn", vm().state.value.refinementCandidates.isEmpty())
-        }
+        android.util.Log.i("TouchRemovalCheck", "screen=${screenshot.absolutePath}")
     }
 
     /** A work drawn from hand-written DDL has no description to refine from; say so, as web does. */

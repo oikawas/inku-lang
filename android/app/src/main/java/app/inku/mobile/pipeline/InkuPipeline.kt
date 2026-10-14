@@ -16,9 +16,8 @@ enum class ComposeFromDdlProgress {
  * wants a specific value says so.
  *
  * `Long` rather than `Int` because the server's own values do not fit one:
- * `new_render_seed()` is `secrets.randbits(53)`, and a touch seed derived from
- * words (`_render_seed_from_text`, `rendering.py:324`) is a full unsigned 64-bit
- * integer. That one is held here as the same 64 bits, and printed unsigned
+ * `new_render_seed()` is `secrets.randbits(53)`, and a historical saved seed
+ * may be a full unsigned 64-bit integer. It is held here as the same bits and printed unsigned
  * wherever it becomes part of a hash key, so it agrees with Python's int.
  */
 data class PaintRequest(
@@ -35,7 +34,6 @@ data class PaintRequest(
     /** Present only when selecting another composition for a layout candidate. */
     val recomposeMode: RecomposeMode? = null,
     val interpretationSeed: String? = null,
-    val seedText: String? = null,
     /**
      * The instruction language the caller asks for, with the server's key name
      * (`instruction_lang`) and the server's three requestable words: `ja`, `en`

@@ -279,7 +279,7 @@ class AndroidSharedPipelineTest {
         val snapshot = workColorSnapshot(original.renderMetadataJson)!!
         val parent = RefinementParent.of(original, original.originalInput)
             .copy(workColorSnapshot = snapshot.copy(colorMap = snapshot.colorMap + ("black" to "black")))
-        val plan = RefinementPlanner.plan(RefinementElement.Touch, parent, seedText = "damaged color")
+        val plan = savedScoreReplay(parent)
 
         val replay = repo.renderRefinementCandidate(parent, plan)
         assertTrue(replay.displaySvg.startsWith("<svg"))
@@ -320,7 +320,7 @@ class AndroidSharedPipelineTest {
             catalogId = retiredId,
             workColorSnapshot = snapshot,
         )
-        val plan = RefinementPlanner.plan(RefinementElement.Touch, parent, seedText = "new touch")
+        val plan = savedScoreReplay(parent)
 
         val replay = repo.renderRefinementCandidate(parent, plan)
 
@@ -332,11 +332,22 @@ class AndroidSharedPipelineTest {
         val oldWork = parent.copy(workColorSnapshot = null)
         val oldReplay = repo.renderRefinementCandidate(
             oldWork,
-            RefinementPlanner.plan(RefinementElement.Touch, oldWork, seedText = "older work"),
+            savedScoreReplay(oldWork),
         )
         assertEquals("default", JSONObject(oldReplay.renderMetadataJson).getString("render_color_catalog_id"))
         assertTrue(provider.requests.isEmpty())
     }
+
+    /** A saved-Score replay tests compatibility without reintroducing touch refinement. */
+    private fun savedScoreReplay(parent: RefinementParent) = app.inku.mobile.data.refinement.RefinementPlan(
+        element = null,
+        route = app.inku.mobile.data.refinement.RefinementRoute.RenderFromScore,
+        catalogId = parent.catalogId,
+        canvasAspect = parent.canvasAspect,
+        seeds = parent.seeds,
+        derivationKind = "variation_replay",
+        derivationMetadata = emptyMap(),
+    )
 
     private class ScriptedProvider : ModelProvider {
         override val providerId = "fixture"

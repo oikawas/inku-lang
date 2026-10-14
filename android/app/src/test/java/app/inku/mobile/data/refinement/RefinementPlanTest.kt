@@ -114,11 +114,10 @@ class RefinementPlanTest {
         assertNotEquals(nextDrawCanvas, parent.canvasAspect)
 
         listOf(
-            RefinementElement.Touch to "しずかに",
-            RefinementElement.Layout to null,
-            RefinementElement.Reading to null,
-        ).forEach { (element, words) ->
-            val plan = RefinementPlanner.plan(element, parent, seedText = words, textSeed = WORD_SEED)
+            RefinementElement.Layout,
+            RefinementElement.Reading,
+        ).forEach { element ->
+            val plan = RefinementPlanner.plan(element, parent)
             assertEquals("$element keeps the parent's catalogue", parent.catalogId, plan.catalogId)
             assertEquals("$element keeps the parent's canvas", parent.canvasAspect, plan.canvasAspect)
             assertNotEquals("$element did not read the next-draw catalogue", nextDrawCatalog, plan.catalogId)
@@ -173,17 +172,12 @@ class RefinementPlanTest {
      * be recorded and never read again.
      */
     @Test
-    fun t5_allFourElementsDeclareTheirEdgeWithoutInheritingRetiredVariation() {
+    fun t5_allThreeElementsDeclareTheirEdgeWithoutInheritingRetiredVariation() {
         val oldItem = parentItem().copy(variationAmplitude = "large", variationSeed = "7")
         val parent = parent(oldItem)
-        assertEquals(listOf("touch", "layout", "reading", "color"), RefinementElement.entries.map { it.id })
+        assertEquals(listOf("reading", "color", "layout"), RefinementElement.entries.map { it.id })
+        assertNull(RefinementElement.byId("touch"))
         assertNull(RefinementElement.byId("variation"))
-
-        val touch = RefinementPlanner.plan(RefinementElement.Touch, parent, seedText = "しずかに", textSeed = WORD_SEED)
-        assertEquals("touch_change", touch.derivationKind)
-        assertEquals(setOf("render_seed_from", "render_seed_to", "seed_text"), touch.derivationMetadata.keys)
-        assertEquals("4242", touch.derivationMetadata["render_seed_from"])
-        assertNotEquals(touch.derivationMetadata["render_seed_from"], touch.derivationMetadata["render_seed_to"])
 
         val layout = RefinementPlanner.plan(RefinementElement.Layout, parent)
         assertEquals("layout_change", layout.derivationKind)
@@ -202,7 +196,7 @@ class RefinementPlanTest {
         assertEquals("ink_season", color.derivationMetadata["catalog_id_from"])
         assertEquals("vivid_material", color.derivationMetadata["catalog_id_to"])
 
-        listOf(touch, layout, reading, color).forEach { plan ->
+        listOf(layout, reading, color).forEach { plan ->
             assertFalse(plan.derivationMetadata.containsKey("variation_amplitude"))
             assertFalse(plan.derivationMetadata.containsKey("variation_seed"))
         }
@@ -259,15 +253,6 @@ class RefinementPlanTest {
         assertEquals(RefinementRoute.Paint, plan.route)
     }
 
-    /** The touch is the one element that cannot fan out; the others can. */
-    @Test
-    fun onlyTheTouchRefusesFourCandidates() {
-        assertEquals(1, RefinementPlanner.maxCandidates(RefinementElement.Touch))
-        RefinementElement.entries.filter { it != RefinementElement.Touch }.forEach {
-            assertEquals("$it can offer four", 4, RefinementPlanner.maxCandidates(it))
-        }
-    }
-
     /** A work saved before the seed columns existed reports no seeds, not zeros. */
     @Test
     fun aWorkWithNoStoredSeedsReportsNoneRatherThanZero() {
@@ -285,7 +270,7 @@ class RefinementPlanTest {
      */
     @Test
     fun aTouchSeedAboveTheSignedRangeSurvivesTheRoundTrip() {
-        val seed = WORD_SEED("しずかに")!!.renderSeed
+        val seed = java.lang.Long.parseUnsignedLong("14859340650796947346")
         val stored = java.lang.Long.toUnsignedString(seed)
         val readBack = PaintSeeds.of(parentItem(renderSeed = stored)).renderSeed
 
@@ -293,28 +278,11 @@ class RefinementPlanTest {
         assertEquals(stored, java.lang.Long.toUnsignedString(readBack!!))
     }
 
-    /** The touch takes the words and the seed the shared rule gives them. */
-    @Test
-    fun theTouchUsesTheSharedRulesSeedAndWords() {
-        val touch = RefinementPlanner.plan(RefinementElement.Touch, parent(), seedText = " しずかに ", textSeed = WORD_SEED)
-        assertEquals(WORD_SEED("しずかに")!!.renderSeed, touch.seeds.renderSeed)
-        assertEquals("しずかに", touch.seeds.seedText)
-    }
-
-    private companion object {
-        /** The shared rule is tested in Rust; here it is scripted, with a seed past Long.MAX_VALUE. */
-        val WORD_SEED: (String) -> TextSeed? = { words ->
-            words.trim().takeIf(String::isNotEmpty)?.let {
-                TextSeed(java.lang.Long.parseUnsignedLong("14859340650796947346"), it)
-            }
-        }
-    }
-
     // ── what the parent must have ─────────────────────────
 
     /**
      * web's order (`generateVariationCandidates`, `generateModelCandidates`):
-     * a colour and a layout need no description; touch, reading and the model
+     * a colour and a layout need no description; reading and the model
      * comparison do; everything but colour needs the DDL. The refusal is read
      * as the sentence it carries, so a refusal for the wrong reason fails too.
      */
@@ -331,7 +299,6 @@ class RefinementPlanTest {
 
         assertNull(refusal(RefinementElement.Color, parent))
         assertNull(refusal(RefinementElement.Layout, parent))
-        assertEquals(InkuStringsJa.refinementNeedsDescription, refusal(RefinementElement.Touch, parent))
         assertEquals(InkuStringsJa.refinementNeedsDescription, refusal(RefinementElement.Reading, parent))
         assertEquals("the model comparison reads the description", InkuStringsJa.refinementNeedsDescription, refusal(null, parent))
     }
@@ -344,8 +311,7 @@ class RefinementPlanTest {
 
         assertNull(refusal(RefinementElement.Color, bare))
         assertEquals(InkuStringsJa.refinementNeedsDdl, refusal(RefinementElement.Layout, bare))
-        assertEquals("the description is asked first", InkuStringsJa.refinementNeedsDescription, refusal(RefinementElement.Touch, bare))
-        assertEquals(InkuStringsJa.refinementNeedsDdl, refusal(RefinementElement.Touch, described))
+        assertEquals("the description is asked first", InkuStringsJa.refinementNeedsDescription, refusal(RefinementElement.Reading, bare))
         assertEquals(InkuStringsJa.refinementNeedsDdl, refusal(RefinementElement.Reading, described))
         assertEquals(InkuStringsJa.refinementNeedsDdl, refusal(RefinementElement.Layout, described))
         assertNull("the model comparison draws from the description alone", refusal(null, described))

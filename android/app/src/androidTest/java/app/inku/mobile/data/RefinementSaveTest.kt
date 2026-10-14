@@ -116,7 +116,6 @@ class RefinementSaveTest {
         parentItem: HistoryItemEntity,
         element: RefinementElement,
         newCatalogId: String? = null,
-        seedText: String? = null,
         historyVisibility: String? = null,
     ): HistoryItemEntity {
         val parent = parentOf(parentItem)
@@ -124,7 +123,6 @@ class RefinementSaveTest {
             element = element,
             parent = parent,
             newCatalogId = newCatalogId,
-            seedText = seedText,
         )
         val result = repository.renderRefinementCandidate(parent, plan)
         return repository.saveRefinementCandidate(
@@ -196,27 +194,25 @@ class RefinementSaveTest {
     // ── T-8 ────────────────────────────────────────────────
 
     /**
-     * Each of the four elements writes one edge, and the edge says which
+     * Each of the three elements writes one edge, and the edge says which
      * intervention it was. The metadata is read back from the row, not from the
      * plan, so a declaration dropped between the two is visible here.
      */
     @Test
     fun t8_eachElementWritesOneEdgeOfItsOwnKind() = runBlocking {
         val cases = listOf(
-            Triple(RefinementElement.Touch, "touch_change", "しずかに"),
-            Triple(RefinementElement.Color, "catalog_change", null),
-            Triple(RefinementElement.Layout, "layout_change", null),
-            Triple(RefinementElement.Reading, "reinterpretation", null),
+            RefinementElement.Color to "catalog_change",
+            RefinementElement.Layout to "layout_change",
+            RefinementElement.Reading to "reinterpretation",
         )
 
-        cases.forEachIndexed { index, (element, expectedKind, words) ->
+        cases.forEachIndexed { index, (element, expectedKind) ->
             val parent = composeParent("親$index")
             val edgesBefore = countRows("lineage_edges")
             val child = refineAndSave(
                 parent,
                 element,
                 newCatalogId = if (element == RefinementElement.Color) "vivid_material" else null,
-                seedText = words,
             )
 
             assertEquals("$element wrote exactly one edge", edgesBefore + 1, countRows("lineage_edges"))
@@ -227,11 +223,6 @@ class RefinementSaveTest {
 
             val metadata = JSONObject(edge.metadataJson)
             when (element) {
-                RefinementElement.Touch -> {
-                    assertTrue(metadata.has("render_seed_from"))
-                    assertTrue(metadata.has("render_seed_to"))
-                    assertEquals("4242", metadata.getString("render_seed_from"))
-                }
                 RefinementElement.Color -> {
                     // SPEC :678 -- the edge records both catalogue ids.
                     assertEquals("ink_season", metadata.getString("catalog_id_from"))

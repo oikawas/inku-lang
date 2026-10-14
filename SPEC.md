@@ -284,8 +284,21 @@ saving or delivering an empty Score with its background as an omitted success.
   canvas itself is**, and a description names it as a sentence of its own, such as “washi.” or
   “ink-wash ground.” Headed forms such as `Ground: ...` and `Surface: ...` are
   not accepted (2026-09-24); a surface quality is written as a modifier of its
-  shape, as in “a sweep circle”. **All seven are tiled as a `<pattern>` and use no
-  `<filter>`, so the three SVG profiles emit the same ground.** **The cost limit
+  shape, as in “a sweep circle”. **A ground is made of three parts (render
+  engine 80)**: rects that paint the whole canvas (the background's colour, with
+  the ink, the charcoal or the plate laid over it for the ink-wash ground, the
+  charcoal ground and mezzotint), a broad layer of soft lighter and darker shapes
+  drawn once and never tiled, and fine textures in `<pattern>` tiles. Each texture
+  is split over tiles whose sizes never line up on the canvas (dots' tiles are
+  also turned), and a mark crossing a tile's edge is written again on the other
+  side, so no single tile's repeat stands out. Each mark's depth follows the
+  lightness of what lies under it, and on a dark support a darkening mark turns
+  pale. The charcoal ground is a dark grey ground rubbed with charcoal, the
+  ink-wash ground a pale grey ground washed with thin ink, and mezzotint a black
+  ground whose plate covers the background, so on one background paper, ink-wash
+  ground, charcoal ground and mezzotint step down in lightness. The ground layer
+  carries no transform, and its painting rects cover the canvas exactly. **It uses
+  no `<filter>`, so the three SVG profiles emit the same ground.** **The cost limit
   is the byte size of the ground layer (24 KB), not a count of elements.**
 
 `Random` is not forbidden as an author word.  The restriction applies to internal normalized DDL and JSON Score: unordered placement must be interpreted into observable placement such as dotted across the whole canvas, scattered, varied, top-to-bottom, or along a trace.

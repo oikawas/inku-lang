@@ -8,6 +8,30 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Redraw the seven grounds so no tile is seen repeating and their light and dark show
+
+At the author's report. The charcoal ground laid an 81 px tile of short upright marks twelve times across and down the canvas, so its pattern repeated exactly (0.99 when the image is laid over itself shifted by one tile). Reviewing all seven grounds from zero at the author's request found more:
+- The ink-wash ground (every 437 px down) and mezzotint's specks (every 219 px) also repeated.
+- The texture of paper, washi, drawing paper, canvas and mezzotint hardly showed on screen.
+- Every ground was flat in its light and dark when seen from a distance.
+- Mezzotint set its plate off with a `translate` on the whole ground layer, which moved the plate's rect and let the background show as a strip along two edges.
+
+A ground is now drawn in three parts:
+- Colour that paints the whole canvas: the ink-wash ground, the charcoal ground and mezzotint lay ink, charcoal or the plate over the background.
+- A broad layer of soft shapes, drawn once and never tiled.
+- Fine texture, split over tiles whose sizes never line up on the canvas, with any mark crossing a tile's edge written again on the other side.
+
+Each mark's depth follows the lightness under it, and on a dark background a darkening mark turns pale. The charcoal ground is redrawn as a dark grey ground rubbed with charcoal (the author's choice), so on one background paper, the ink-wash ground, the charcoal ground and mezzotint step down in lightness. The ground layer carries no transform.
+
+Small marks are written into one path each, so the seven grounds together shrink from 82.9 KB to 45.8 KB on a white background, and canvas lays 1,454 tiles on the canvas instead of 21,614.
+
+The author decided on two comparison sheets:
+- Of three strengths, the author chose 0.6.
+- For the ink-wash ground, the thinner ink (0.09).
+- For mezzotint, the version whose burnishing and rocker marks show clearly.
+
+Marks are drawn as before: in 11 works everything outside the ground is byte-identical. Because the charcoal ground now covers the background, Stage 1 is no longer told of marks drawn in the background's colour on it, as with mezzotint. Render engine 80. Saved works are unchanged.
+
 ### 2026-10-15 — Fit library thumbnail rows when switching the work preview
 
 Page capacity now adds the measured height of each thumbnail row. Applying the tallest card to every row could remove a bottom row that still fit after closing the preview. Only rows whose works have not arrived use the conservative estimate. Measurements retain fractional pixels, and the list reserves scrollbar space so its column count stays consistent as the preview changes or works arrive.

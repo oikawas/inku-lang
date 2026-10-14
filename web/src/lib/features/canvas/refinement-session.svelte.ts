@@ -4,7 +4,7 @@ import type { RecomposeMode } from './recomposition.ts';
 
 export type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
 /** Which dialog the refinement modal shows: parameters, models, color catalog, or layout. */
-export type RefinementView = 'adjust' | 'compare' | 'color' | 'layout' | 'color-arrangement';
+export type RefinementView = 'adjust' | 'compare' | 'color' | 'layout' | 'color-arrangement' | 'ground';
 
 export type VariationCandidate = {
 	id: string;
@@ -41,6 +41,8 @@ export type RefinementSession = {
 	/** Options not yet saved: the dialog does not close over them. */
 	readonly hasUnsaved: boolean;
 	readonly colorArrangementExhausted?: boolean;
+	/** The name of the ground the work being changed is on, shown in its dialog. */
+	readonly groundCurrent?: string | null;
 	abort(): void;
 	toggleCandidate(id: string): void;
 	preview(id: string | null): void;
@@ -87,6 +89,7 @@ export class RefinementSessionState implements RefinementSession {
 	status = $state<string | null>(null);
 	previewId = $state<string | null>(null);
 	colorArrangementExhausted = $state(false);
+	groundCurrent = $state<string | null>(null);
 	tokensIn = $state<number | null>(null);
 	tokensOut = $state<number | null>(null);
 
@@ -218,6 +221,7 @@ export class RefinementSessionState implements RefinementSession {
 		this.previewId = null;
 		this.gridIncludesReading = false;
 		this.colorArrangementExhausted = false;
+		this.groundCurrent = null;
 		this.gridTaskLabel = '';
 		this.gridDone = 0;
 		this.gridTotal = 0;

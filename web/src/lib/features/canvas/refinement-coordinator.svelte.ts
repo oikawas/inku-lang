@@ -413,6 +413,70 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		}
 	}
 
+	// The work's ground swapped for every named support it is not on: six, or
+	// all seven when it names none. The Server draws the parent's Score with only
+	// the ground changed, and draws it again from the parent when one is saved.
+	async function generateGroundCandidates(): Promise<void> {
+		if (!work.result || refinementSession.gridBusy || work.loading) return;
+		const parent = work.result;
+		const workId = refinementWorkId();
+		if (!workId) {
+			refinementSession.setStatus(t().workActionSaveFirst);
+			return;
+		}
+		const contextVersion = targetIdentityVersion;
+		await deps.ensureVisibleLineageParentId();
+		if (contextVersion !== targetIdentityVersion || work.result !== parent || refinementSession.gridBusy) return;
+		const parentNodeId = deps.lineageParentId();
+		const thinking = work.thinking;
+		const ja = getLang() === 'ja';
+		const controller = refinementSession.beginGrid({ includesReading: false, taskLabel: t().workActionGround, count: 7 });
+		const abortTimer = window.setTimeout(() => refinementSession.enableAbort(controller), 3000);
+		try {
+			const response = await apiFetch('/api/ground-variants/plan', {
+				method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ work_id: workId })
+			});
+			if (!response.ok) throw await apiError(response);
+			type Named = { label_ja?: string | null; label_en?: string | null; current_label_ja?: string | null; current_label_en?: string | null };
+			const plan = await response.json() as Named & { entries: Array<Named & { material: string }> };
+			if (contextVersion !== targetIdentityVersion || !refinementSession.isActive(controller)) return;
+			refinementSession.groundCurrent = (ja ? plan.current_label_ja : plan.current_label_en) ?? t().groundChangePlain;
+			const label = (entry: Named & { material: string }) => (ja ? entry.label_ja : entry.label_en) ?? entry.material;
+			refinementSession.gridTotal = plan.entries.length;
+			refinementSession.setPlans(controller, plan.entries.map(label));
+			const candidates = await runRefinementFanout(plan.entries.map((entry) => async (): Promise<VariationCandidate> => {
+				const rendered = await apiFetch('/api/render-ground-variant', {
+					method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ work_id: workId, material: entry.material })
+				});
+				if (!rendered.ok) throw await apiError(rendered);
+				const data = await rendered.json() as Partial<PaintResult> & Pick<PaintResult, 'svg' | 'score'> & { ddl: string };
+				return {
+					id: `ground-${workId}-${entry.material}`, kind: 'color',
+					label: label(entry), selected: false,
+					result: {
+						...parent, ...data, thinking,
+						focus: undefined, variation_amplitude: undefined, variation_seed: undefined, recomposition: undefined,
+						history_id: null, history_at: null, lineage_node_id: null,
+						lineage_parent_node_id: parentNodeId,
+						derivation_kind: 'ground_change',
+						derivation_metadata: { ground_material: entry.material }
+					}
+				};
+			}), deps.render.fanoutLimit(), {
+				onStart: (index) => refinementSession.seatSlot(controller, index, 'running'),
+				onDone: (index) => { refinementSession.finishSlot(controller, index); }
+			});
+			refinementSession.commitCandidates(controller, candidates);
+		} catch (error) {
+			if (!controller.signal.aborted) refinementSession.failGrid(controller, error instanceof Error ? error.message : String(error));
+		} finally {
+			window.clearTimeout(abortTimer);
+			refinementSession.finishGrid(controller);
+		}
+	}
+
 	async function generateVariationCandidates(kind: RefineKind, count: number, touchWords?: string) {
 		if (!work.result || refinementSession.gridBusy || work.loading) return;
 		// Every option in this round uses the choice made before any await.
@@ -612,6 +676,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		composeLayoutGeneration,
 		generateColorCatalogCandidates,
 		generateColorArrangementCandidates,
+		generateGroundCandidates,
 		generateModelCandidates,
 		saveSelectedVariationCandidates,
 	};

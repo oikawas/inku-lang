@@ -6,6 +6,7 @@ export type DerivationKind =
 	| 'layout_change'
 	| 'catalog_change'
 	| 'color_arrangement_change'
+	| 'ground_change'
 	| 'reinterpretation'
 	| 'model_comparison'
 	| 'language_comparison'
@@ -21,6 +22,7 @@ const JA: Record<string, string> = {
 	layout_change: '構図',
 	catalog_change: '色',
 	color_arrangement_change: '配色',
+	ground_change: '支持体',
 	reinterpretation: '解釈',
 	model_comparison: 'モデル',
 	language_comparison: '言語',
@@ -37,6 +39,7 @@ const EN: Record<string, string> = {
 	layout_change: 'Layout',
 	catalog_change: 'Color',
 	color_arrangement_change: 'Color arrangement',
+	ground_change: 'Ground',
 	reinterpretation: 'Reading',
 	model_comparison: 'Model',
 	language_comparison: 'Language',

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import RefinementAdjustView from './RefinementAdjustView.svelte';
 	import RefinementColorCatalogView from './RefinementColorCatalogView.svelte';
+	import RefinementGroundView from './RefinementGroundView.svelte';
 	import RefinementModelCompareView from './RefinementModelCompareView.svelte';
 	import './refinement-workspace.css';
 	import { t } from '$lib/i18n/index.svelte';
@@ -41,6 +42,7 @@
 		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string) => void | Promise<void>;
 		onGenerateColorCatalogCandidates: () => void | Promise<void>;
 		onGenerateColorArrangementCandidates: () => void | Promise<void>;
+		onGenerateGroundCandidates: () => void | Promise<void>;
 		onGenerateModelCandidates: () => void | Promise<void>;
 		onSaveAndClose: () => void | Promise<void>;
 		onDiscardAndClose: () => void | Promise<void>;
@@ -75,6 +77,7 @@
 		onGenerateVariationCandidates,
 		onGenerateColorCatalogCandidates,
 		onGenerateColorArrangementCandidates,
+		onGenerateGroundCandidates,
 		onGenerateModelCandidates,
 		onSaveAndClose,
 		onDiscardAndClose,
@@ -89,6 +92,8 @@
 				? t().canvasVaryComposition
 				: view === 'color-arrangement'
 					? t().workActionColorArrangement
+				: view === 'ground'
+					? t().workActionGround
 					: view === 'color'
 					? t().canvasVaryColor
 					: t().workActionModels
@@ -146,6 +151,19 @@
 			{statusStage1Model}
 			{statusStage2Model}
 			onGenerateCandidates={view === 'color-arrangement' ? onGenerateColorArrangementCandidates : onGenerateColorCatalogCandidates}
+			{onSaveAndClose}
+			{onDiscardAndClose}
+		/>
+	{:else if view === 'ground'}
+		<RefinementGroundView
+			{isJapanese}
+			{resultAvailable}
+			{artworkUrl}
+			{seedSummary}
+			{canvasAspectWidth}
+			{canvasAspectHeight}
+			{refinementSession}
+			onGenerateCandidates={onGenerateGroundCandidates}
 			{onSaveAndClose}
 			{onDiscardAndClose}
 		/>

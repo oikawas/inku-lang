@@ -8,6 +8,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — Add Change the ground to the refine menu
+
+At the author's request, the work-editing menu (the work's Refine control and the lineage menu) has Change the ground after Change the color arrangement. It draws options with the work's ground (the saijiki's grounds) replaced by each ground the work is not on: 6 for a work that names a ground, 7 for one that names none (the author's choice).
+
+- Only `canvas.ground.material` in the saved Score is replaced (the author's choice). Placement, color, touch and seeds stay the parent's, and no LLM is called. Recompiling edited instructions is not used, because seeded angles are drawn again from the whole document and would move more than the ground.
+- A selected option is saved as a `ground_change` child recording the old and new materials. Its instructions replace the ground sentence with the new ground's, or place one first when there is none. On saving, the Server draws it again from the parent and ignores any sent Score or instructions.
+- API: `POST /api/ground-variants/plan` (the grounds the work is not on) and `POST /api/render-ground-variant` (draws one option and returns the child's instructions).
+
 ## v2.15.124 (2026-10-14 / Build 1200)
 
 ### 2026-10-14 — Next 8 color options switches the displayed page

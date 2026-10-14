@@ -426,6 +426,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 			case 'layout': await onOpenRefinement(node, 'layout'); break;
 			case 'color-catalog': await onOpenRefinement(node, 'color'); break;
 			case 'color-arrangement': await onOpenRefinement(node, 'color-arrangement'); break;
+			case 'ground': await onOpenRefinement(node, 'ground'); break;
 			case 'description': openEditDialog(node); break;
 			case 'instructions': onOpenDdlEditor(node); break;
 			case 'sketch-grain': openSketchDialog(node); break;

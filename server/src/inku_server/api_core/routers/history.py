@@ -423,20 +423,28 @@ def api_history_post(
     if requested_seed_text is None and isinstance(metadata_seed_text, str):
         requested_seed_text = metadata_seed_text
     render_seed, seed_text = _render_seed_from_text(requested_seed_text, body.render_seed)
-    if body.derivation_kind == "color_arrangement_change":
-        from .render import _render_color_arrangement_for_work
+    if body.derivation_kind in ("color_arrangement_change", "ground_change"):
+        from .render import _render_color_arrangement_for_work, _render_ground_variant_for_work
         from ..rendering import _work_for_color_snapshot
 
-        index = body.derivation_metadata.get("color_arrangement_index")
-        if type(index) is not int or index < 0 or not body.lineage_parent_node_id:
-            raise HTTPException(status_code=422, detail="color arrangement requires a parent and valid index")
+        if body.derivation_kind == "color_arrangement_change":
+            index = body.derivation_metadata.get("color_arrangement_index")
+            if type(index) is not int or index < 0 or not body.lineage_parent_node_id:
+                raise HTTPException(status_code=422, detail="color arrangement requires a parent and valid index")
+        else:
+            material = body.derivation_metadata.get("ground_material")
+            if not isinstance(material, str) or not body.lineage_parent_node_id:
+                raise HTTPException(status_code=422, detail="ground change requires a parent and a ground material")
         with _db.SessionLocal() as session:
             node = session.get(LineageNodeRow, body.lineage_parent_node_id)
             parent_id = node.history_id if node else None
         if not parent_id:
             raise HTTPException(status_code=404, detail="unknown work")
         parent = _work_for_color_snapshot(actor, parent_id)
-        replayed = _render_color_arrangement_for_work(actor, parent, index).model_dump(exclude_none=True, by_alias=True)
+        if body.derivation_kind == "color_arrangement_change":
+            replayed = _render_color_arrangement_for_work(actor, parent, index).model_dump(exclude_none=True, by_alias=True)
+        else:
+            replayed = _render_ground_variant_for_work(actor, parent, material).model_dump(exclude_none=True, by_alias=True)
         # Only the parent and the server-derived index decide this child. Sent
         # Score, map, seeds and limits cannot rewrite the work being recolored.
         inherited = {key: parent.get(key) for key in (
@@ -446,13 +454,17 @@ def api_history_post(
             "instruction_lang_resolved", "sketch_text", "sketch_grain", "sketch_state",
         )}
         inherited["input"] = inherited["input"] or ""
+        if body.derivation_kind == "ground_change":
+            # The child's instructions name the ground it is drawn on.
+            inherited["ddl"] = replayed["ddl"]
+            inherited["derivation_metadata"] = replayed["derivation_metadata"]
         body = body.model_copy(update=inherited)
         score = replayed["score"]
         svg = replayed["svg"]
         catalog_id = replayed["catalog_id"]
         coerce_observability = None
         render_metadata = {
-            **{key: value for key, value in replayed.items() if key not in {"score", "svg", "catalog_id", "derivation_metadata"}},
+            **{key: value for key, value in replayed.items() if key not in {"score", "svg", "catalog_id", "derivation_metadata", "ddl"}},
             **{key: body.model_dump()[key] for key in (
                 "stage1_prompt_digest", "stage1_prompt_base_digest", "stage2_prompt_digest",
                 "instruction_lang_requested", "instruction_lang_resolved", "ui_lang",

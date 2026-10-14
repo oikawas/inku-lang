@@ -2,6 +2,12 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-14 — Change the ground
+
+Section 8.5 of Creating Images now describes the work-editing menu's Change the
+ground action: options on each ground the work is not on (6, or 7 when it names
+none), and the saved option's ground sentence.
+
 ## 2026-10-14 — Switch color options one page of 8 at a time
 
 Section 8.4 of Creating Images now follows the author's correction: Next 8

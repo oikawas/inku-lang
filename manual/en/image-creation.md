@@ -305,6 +305,12 @@ Choose `Change the color arrangement` in the work-editing menu to see 8 options 
 
 Choosing, saving, and discarding options work as in 8.2. A saved option retains its chosen colors when the work is drawn again.
 
+### 8.5 Change the Ground
+
+Choose `Change the ground` in the work-editing menu to see options with the work's ground (the saijiki's grounds: paper, washi, ink wash ground, charcoal ground, canvas, drawing paper, mezzotint) replaced by each ground the work is not on: 6 options for a work that names a ground, 7 for one that names none. Placement, color, and touch stay the same, and no LLM is called. A saved option's instructions name its new ground (the ground sentence is replaced, or placed first when the work had none).
+
+Choosing, saving, and discarding options work as in 8.2.
+
 ## 9. Autonomous Refinement
 
 From the lineage tab the application can build generations on its own.

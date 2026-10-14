@@ -18,6 +18,7 @@ from ... import pipeline_compat as _pipeline_compat
 from ...autonomous_refine import ALLOWED_KINDS as AUTONOMOUS_REFINE_KINDS, vision_refine_advice
 from ...limits import limits_as_dict
 from ...color_arrangements import ColorArrangements
+from ... import ground_variants as _ground
 from ...color_catalogs import get_color_catalog, render_color_map_for_catalog
 from ...saved_score_compat import coerce_saved_score
 from ...schema import Score
@@ -473,6 +474,63 @@ def _render_color_arrangement_for_work(actor: dict, work: dict, index: int) -> R
 @router.post("/api/render-color-arrangement", response_model=RenderScoreResponse, response_model_exclude_none=True)
 def api_render_color_arrangement(req: ColorArrangementRenderRequest, actor: dict = Depends(_current_user)) -> RenderScoreResponse:
     return _render_color_arrangement_for_work(actor, _work_for_color_snapshot(actor, req.work_id), req.index)
+
+
+class GroundVariantPlanRequest(BaseModel):
+    work_id: str = Field(min_length=1, max_length=200)
+
+
+class GroundVariantRenderRequest(BaseModel):
+    work_id: str = Field(min_length=1, max_length=200)
+    material: str = Field(min_length=1, max_length=40)
+
+
+class GroundVariantResponse(RenderScoreResponse):
+    # The child's instructions with the new ground sentence.
+    ddl: str
+
+
+@router.post("/api/ground-variants/plan")
+def api_ground_variant_plan(req: GroundVariantPlanRequest, actor: dict = Depends(_current_user)) -> dict:
+    """Every named support the work is not on, in the saijiki's order."""
+    work = _work_for_color_snapshot(actor, req.work_id)
+    score = work.get("score") if isinstance(work.get("score"), dict) else {}
+    current = _ground.current_material(score)
+
+    def labels(material: str, key: str) -> dict:
+        named = material in _ground.GROUND_MATERIALS
+        return {f"{key}_ja": _ground.ground_label(material, "ja") if named else None,
+                f"{key}_en": _ground.ground_label(material, "en") if named else None}
+
+    return {"current": current, **labels(current, "current_label"),
+            "entries": [{"material": material, **labels(material, "label")} for material in _ground.unused_materials(score)]}
+
+
+def _render_ground_variant_for_work(actor: dict, work: dict, material: str) -> GroundVariantResponse:
+    score = work.get("score")
+    if not isinstance(score, dict):
+        raise HTTPException(status_code=422, detail="saved work has no Score to redraw")
+    if material not in _ground.unused_materials(score):
+        raise HTTPException(status_code=422, detail="ground must be a named support the work is not on")
+    if work.get("render_seed") is None and not work.get("seed_text"):
+        raise HTTPException(status_code=422, detail="saved work has no performance seed to preserve its drawing")
+    ddl = _ground.ddl_with_ground(work.get("ddl") or "", material, work.get("instruction_lang_resolved"))
+    result = _render_authorized_score(RenderScoreRequest(
+        score=_ground.score_with_ground(score, material), input=work.get("input") or "", ddl=ddl,
+        catalog_id=work.get("render_color_catalog_id") or work.get("catalog_id"),
+        canvas_aspect=work.get("render_canvas_aspect_id") or work.get("render_canvas_aspect"),
+        render_seed=work.get("render_seed"), composition_seed=work.get("composition_seed"),
+        interpretation_seed=work.get("interpretation_seed"), seed_text=work.get("seed_text"),
+        wild=bool(work.get("render_wild")),
+    ), actor, work)
+    result.interpretation_seed = work.get("interpretation_seed")
+    result.derivation_metadata = {"ground_material": material, "parent_ground_material": _ground.current_material(score)}
+    return GroundVariantResponse(**result.model_dump(), ddl=ddl)
+
+
+@router.post("/api/render-ground-variant", response_model=GroundVariantResponse, response_model_exclude_none=True)
+def api_render_ground_variant(req: GroundVariantRenderRequest, actor: dict = Depends(_current_user)) -> GroundVariantResponse:
+    return _render_ground_variant_for_work(actor, _work_for_color_snapshot(actor, req.work_id), req.material)
 
 
 class VisionRefineAdviceBody(BaseModel):

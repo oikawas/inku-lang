@@ -108,7 +108,6 @@ export type PaintOptions = {
 	/** Per-feature overrides for the render request; built by the features. */
 	renderOverrides?: RenderOverrides;
 	compositionSeed?: Seed;
-	interpretationSeed?: string;
 	signal?: AbortSignal;
 	sourceText?: string;
 	displayLabel?: string;
@@ -200,7 +199,6 @@ export async function runCurrentWork(
 			canvas_aspect: options.canvasAspectId ?? defaults.canvasAspectId,
 			render_seed: options.renderSeed,
 			composition_seed: options.compositionSeed,
-			interpretation_seed: options.interpretationSeed,
 			save_history: options.saveHistory ?? true,
 			save_artifacts: options.saveArtifacts ?? true,
 			count_generation: options.countGeneration ?? true,

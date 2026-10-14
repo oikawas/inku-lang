@@ -568,7 +568,6 @@ def api_history_post(
             "instruction_lang_requested": body.instruction_lang_requested,
             "instruction_lang_resolved": body.instruction_lang_resolved,
             "ui_lang": body.ui_lang,
-            "interpretation_seed": body.interpretation_seed,
         }
     else:
         # A Score that does not validate is the sender's to fix: say where, the way a
@@ -606,7 +605,6 @@ def api_history_post(
                 "ui_lang": body.ui_lang,
                 "render_seed": render_seed,
                 "composition_seed": body.composition_seed,
-                "interpretation_seed": body.interpretation_seed,
                 # What actually governed this work. Without it a per-install setting
                 # would make the same description a different work with nothing on
                 # the row to say why.

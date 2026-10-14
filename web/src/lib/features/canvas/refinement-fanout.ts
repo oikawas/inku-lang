@@ -11,7 +11,6 @@ export type RefinementCandidatePlan = {
 
 export type RefinementFanoutLabels = {
 	layout: string;
-	reading: string;
 	noAlternateCatalog: string;
 };
 
@@ -31,7 +30,6 @@ export type RefinementFanoutCapabilities = {
 	createCompositionSeed(excluded: Set<number>): number;
 	catalogName(id: string): string;
 	renderLayout(seed: number, label: string, signal: AbortSignal): Promise<VariationCandidate>;
-	renderReading(label: string, signal: AbortSignal): Promise<VariationCandidate>;
 	renderColor(catalogId: string, label: string, signal: AbortSignal): Promise<VariationCandidate>;
 };
 
@@ -68,13 +66,6 @@ export async function planRefinementCandidates(
 			return {
 				label,
 				run: () => capabilities.renderLayout(compositionSeed, label, input.signal)
-			};
-		}
-		if (input.kind === 'reading') {
-			const label = `${input.labels.reading} ${sequence}`;
-			return {
-				label,
-				run: () => capabilities.renderReading(label, input.signal)
 			};
 		}
 		const catalogId = catalogIds[index];

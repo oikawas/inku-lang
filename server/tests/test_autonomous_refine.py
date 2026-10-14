@@ -18,7 +18,7 @@ def test_vision_refine_advice_is_observational_and_kind_is_bounded():
         svg=SVG,
         instruction="a quiet circle",
         direction="leave more space",
-        enabled_kinds=["reinterpretation", "layout_change"],
+        enabled_kinds=["catalog_change", "layout_change"],
         model="test:vision",
         language="en",
         settings={},

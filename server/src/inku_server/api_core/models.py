@@ -135,7 +135,6 @@ class HistoryPostBody(BaseModel):
     render_seed: JsonSeed | None = None
     render_wild: bool | None = None
     composition_seed: JsonSeed | None = None
-    interpretation_seed: str | None = None
     # Stage 0.5 (v2.10). Carried with the work so a redraw replays the same
     # prose instead of asking a non-deterministic layer for it again.
     sketch_text: str | None = None
@@ -173,9 +172,11 @@ class HistoryItem(HistoryPostBody):
     focus: str | None = None
     variation_amplitude: str | None = None
     variation_seed: int | None = None
-    # The words a touch was refined by, on works refined that way before it was
-    # removed (2026-10-14). A save no longer carries them.
+    # The words a touch was refined by, and the identifier of an explicit
+    # reading, on works refined that way before both were removed (2026-10-14).
+    # A save no longer carries them.
     seed_text: str | None = None
+    interpretation_seed: str | None = None
     pipeline_variation_id: str | None = None
     # True when the work is held by its DDL (edited, or derived from an edited
     # work without reading the description again): it is not redrawn from its

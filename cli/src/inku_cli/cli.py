@@ -1984,7 +1984,6 @@ def _paint_payload(
         # server must see no `limits` at all to run at its own settings.
         "limits": _limits_argument(getattr(args, "limits", None)),
         "catalog_mode": getattr(args, "catalog_mode", None),
-        "interpretation_seed": getattr(args, "interpretation_seed", None),
     }
     return {k: v for k, v in payload.items() if v is not None}
 
@@ -3312,11 +3311,11 @@ def command_colophon(args: argparse.Namespace) -> int:
 # What `refine --kind` is called on the command line, and what the server calls
 # it. The flag's choices are short verbs; `LINEAGE_DERIVATION_KINDS` names the
 # same kinds differently, and sending a flag value straight through is refused.
-# A touch alone is no longer a refinement (removed 2026-10-14, the author); the
-# server still keeps `touch_change` for the works refined that way before.
+# A touch alone and another reading are no longer refinements (removed
+# 2026-10-14, the author); the server still keeps `touch_change` and
+# `reinterpretation` for the works refined that way before.
 _DERIVATION_KIND_BY_REFINE_KIND = {
     "layout": "layout_change",
-    "reading": "reinterpretation",
     "color": "catalog_change",
 }
 
@@ -3397,17 +3396,10 @@ def command_refine(args: argparse.Namespace) -> int:
         if args.kind == "layout":
             params["render_seed"] = target.get("render_seed")
             params["composition_seed"] = int(time.time() * 1000) & 0x7fffffff
-            params["interpretation_seed"] = target.get("interpretation_seed")
-            params["catalog_id"] = target.get("render_color_catalog_id")
-        elif args.kind == "reading":
-            params["render_seed"] = target.get("render_seed")
-            params["composition_seed"] = target.get("composition_seed")
-            params["interpretation_seed"] = str(uuid.uuid4())
             params["catalog_id"] = target.get("render_color_catalog_id")
         elif args.kind == "color":
             params["render_seed"] = target.get("render_seed")
             params["composition_seed"] = target.get("composition_seed")
-            params["interpretation_seed"] = target.get("interpretation_seed")
             params["catalog_mode"] = "random"
             
         data, _ = client.request("POST", "/api/paint", data=params)
@@ -3971,10 +3963,6 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
         choices=["fixed", "auto", "random"],
         help="how the color catalog is chosen: fixed (use --color-catalog), auto (the server reads the description and picks), random (draw one other than --color-catalog)",
     )
-    parser.add_argument(
-        "--interpretation-seed",
-        help="ask Stage 1 for an explicit re-interpretation under this identifier instead of reusing the previous reading",
-    )
     parser.add_argument("--instruction-lang", default="auto", choices=["auto", "ja", "en"])
     parser.add_argument("--ui-lang")
     parser.add_argument("--include-thinking", action="store_true")
@@ -4370,7 +4358,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     def add_refine_perform_arguments(command: argparse.ArgumentParser) -> None:
         command.add_argument("item_id", help="target history item ID to refine")
-        command.add_argument("--kind", choices=("layout", "reading", "color"), required=True, help="refinement element type")
+        command.add_argument("--kind", choices=("layout", "color"), required=True, help="refinement element type")
         command.add_argument("--description", help="override the description for layout/reading works; without it the parent's Sketch from life prose is carried over, and with it that prose is written again")
         command.add_argument("--save-history", action="store_true", default=True, help="automatically save the result to history")
         command.add_argument("--no-save", dest="save_history", action="store_false", help="do not save the result to history")
@@ -4387,7 +4375,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     refine_save = refine_sub.add_parser("save", help="save a candidate score into history connected to a parent")
     refine_save.add_argument("parent_node_id", help="parent lineage node ID")
-    refine_save.add_argument("--kind", choices=("layout", "reading", "color"), required=True, help="derivation kind")
+    refine_save.add_argument("--kind", choices=("layout", "color"), required=True, help="derivation kind")
     refine_save.add_argument("--file", required=True, help="path to Score JSON file")
     refine_save.add_argument("--svg-file", help="path to SVG file")
     refine_save.add_argument("--input-text", required=True, help="original user text")

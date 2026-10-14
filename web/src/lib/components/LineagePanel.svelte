@@ -49,7 +49,6 @@
 		onDetach: () => void;
 		onLoadOverview: () => void | Promise<void>;
 		onLoadBranch: (nodeId: string) => void | Promise<void>;
-		onPaintOne: (text: string, options: any) => Promise<any>;
 		onPaintDdl: (parent: { id: string; pipeline_variation_id?: string | null }, ddl: string, options: any) => Promise<any>;
 		onComposeLayout: ComposeLayoutGeneration;
 		/** Redraw a work with the sketch off or on, as its child. */
@@ -82,7 +81,7 @@
 	}
 
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
-	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, runAttempt = null, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onPaintDdl, onComposeLayout, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, runAttempt = null, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintDdl, onComposeLayout, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
 
 	let lineageColumnsEl = $state<HTMLDivElement | null>(null);
 	let lineageScrollEl = $state<HTMLDivElement | null>(null);
@@ -422,7 +421,6 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 
 	async function runWorkAction(action: WorkAction, node: LineageNode): Promise<void> {
 		switch (action) {
-			case 'adjust': await onOpenRefinement(node, 'adjust'); break;
 			case 'layout': await onOpenRefinement(node, 'layout'); break;
 			case 'color-catalog': await onOpenRefinement(node, 'color'); break;
 			case 'color-arrangement': await onOpenRefinement(node, 'color-arrangement'); break;
@@ -962,7 +960,6 @@ $effect(() => {
 		<AIRefineModal
 			node={activeAIRefineNode}
 			onClose={() => (activeAIRefineNode = null)}
-			{onPaintOne}
 			{onPaintDdl}
 			{onComposeLayout}
 			{onVisionAdvice}

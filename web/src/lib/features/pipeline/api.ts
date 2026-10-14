@@ -87,7 +87,6 @@ export type PipelineOptions = {
 	render_seed?: Seed;
 	composition_seed?: Seed;
 	wild?: boolean;
-	interpretation_seed?: string;
 	history_display_label?: string;
 	batch_line_number?: number;
 	batch_run_id?: string;

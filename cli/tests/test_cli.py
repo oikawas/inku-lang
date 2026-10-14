@@ -1737,20 +1737,23 @@ def test_refine_color_asks_the_server_to_draw_a_different_catalog(monkeypatch):
     # The name the server dropped on 2026-08-01. Sending it again is a no-op.
     assert "random_color_catalog" not in posted[0]
 
-    # The other two kinds must not ask for a draw.
-    for kind in ("layout", "reading"):
+    # The other kind must not ask for a draw.
+    for kind in ("layout",):
         calls.clear()
         assert cli.command_refine(parser.parse_args(["refine", "perform", "work-1", "--kind", kind])) == 0
         other = [data for method, path, data in calls if method == "POST" and path == "/api/paint"]
         assert other[0].get("catalog_mode") is None
 
 
-def test_refine_no_longer_offers_a_touch():
-    """A touch alone was removed from refinement (2026-10-14, the author)."""
+def test_refine_no_longer_offers_a_touch_or_a_reading():
+    """A touch alone and another reading were removed from refinement (2026-10-14, the author)."""
     parser = cli.build_parser()
     for command in (["refine", "perform", "work-1"], ["refine", "save", "node-1", "--file", "s.json", "--input-text", "t"]):
-        with pytest.raises(SystemExit):
-            parser.parse_args([*command, "--kind", "touch"])
+        for kind in ("touch", "reading"):
+            with pytest.raises(SystemExit):
+                parser.parse_args([*command, "--kind", kind])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["paint", "一滴の墨", "--interpretation-seed", "reading-2"])
 
 
 def test_refine_perform_refuses_a_work_its_ddl_holds(monkeypatch):
@@ -1800,7 +1803,7 @@ def test_refine_perform_follows_the_parent_sketch(monkeypatch):
 
     def sent(*extra):
         calls.clear()
-        assert cli.command_refine(parser.parse_args(["refine", "perform", "work-1", "--kind", "reading", *extra])) == 0
+        assert cli.command_refine(parser.parse_args(["refine", "perform", "work-1", "--kind", "layout", *extra])) == 0
         body = [data for method, path, data in calls if method == "POST" and path == "/api/paint"][0]
         return {key: body[key] for key in ("sketch", "sketch_text") if key in body}
 
@@ -1829,11 +1832,10 @@ SENDER_PARITY_FLAGS = [
     (["--sketch-text", "a wet black line"], "sketch_text", "a wet black line"),
     (["--wild"], "wild", True),
     (["--catalog-mode", "auto"], "catalog_mode", "auto"),
-    (["--interpretation-seed", "reading-2"], "interpretation_seed", "reading-2"),
 ]
 
 # What a bare `paint TEXT` puts on the wire today. Frozen deliberately: the whole
-# point of the change is that adding the six keys must not alter the request of
+# point of the change is that adding the new keys must not alter the request of
 # a run that names none of them, or every past bench stops being comparable.
 PAYLOAD_KEYS_WITHOUT_FLAGS = {
     "catalog_id",
@@ -1893,7 +1895,7 @@ def test_paint_payload_carries_each_layer_flag(argv, key, value):
 
 
 def test_paint_payload_without_the_new_flags_is_byte_for_byte_the_old_request():
-    """Without this, an implementation that always sends all six passes above.
+    """Without this, an implementation that always sends all of them passes above.
 
     `False` is not `None`, so a bare `"wild": args.wild` survives the drop-None
     filter and puts an eighteenth key on the wire for every existing bench run.
@@ -1906,8 +1908,11 @@ def test_paint_payload_without_the_new_flags_is_byte_for_byte_the_old_request():
         assert key not in payload, f"{key} を渡していないのに送っている"
 
 
-def test_paint_payload_grows_by_exactly_the_six_keys():
-    """14 keys before, 20 after -- and the 14 are the same 14.
+def test_paint_payload_grows_by_exactly_the_five_keys():
+    """14 keys before, 19 after -- and the 14 are the same 14.
+
+    The new keys were six until `interpretation_seed` left with the
+    `--interpretation-seed` flag (2026-10-14).
 
     It was 17 and 25 until the staffage level was folded away (v2.11.0) and
     `tenkei` left the request body with the `--staffage` flag, 16 and 24
@@ -1922,7 +1927,7 @@ def test_paint_payload_grows_by_exactly_the_six_keys():
 
     new_flags = [item for argv_fragment, _, _ in SENDER_PARITY_FLAGS for item in argv_fragment]
     everything = cli._paint_payload(parser.parse_args([*argv, *new_flags]), "一滴の墨")
-    assert len(everything) == 20
+    assert len(everything) == 19
     assert set(everything) - PAYLOAD_KEYS_BEFORE == {key for _, key, _ in SENDER_PARITY_FLAGS}
 
 

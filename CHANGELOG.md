@@ -8,6 +8,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — Test Score rendering with a local core from the CLI
+
+`inku-cli render-local` builds a selected checkout's core incrementally offline
+and renders SVG from a history-export item or Score with explicit conditions.
+Non-Git copies also work. JSON reports saved-SVG byte comparisons, SVG bytes and
+SHA256, separate build/render timings and core provenance. Optional PNG uses
+the same core's raster path. It calls no server and changes neither render
+results, the engine version nor application behavior.
+
 ### 2026-10-14 — Change colors within the same catalog
 
 The work-editing menu now offers Change the color arrangement: 8 distinct assignments within the current color catalog, excluding the source work's arrangement. Next 8 options appends unseen combinations while retaining earlier options and selections. When the combinations run out, only the remainder is shown. Placement and touch stay fixed and no LLM is called. Saved options retain their chosen colors for replay.

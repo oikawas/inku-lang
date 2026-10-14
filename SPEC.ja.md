@@ -2321,6 +2321,8 @@ DB 設定タブは現在のSQLite DBファイルサイズも示す。管理者�
 
 CLI の設定はローカルで編集可能である。ベース URL・プロバイダとモデルの選択・タイムアウト値を**サーバー DB の外に**保持する。
 
+`inku-cli render-local` は、Serverを通さず指定したproduct checkoutのcoreでScoreを描くテスト用の入口である。`--core-root` の既定はCLIの属するcheckoutで、Gitのないarchive写しも指定できる。固定Rust toolchainと依存を事前に用意し、実行ごとにoffline差分ビルドしてソースの変更を反映する。`--from-work-file` はhistory-exportの作品JSONからScore・色表・種・wild・実際の紙の比と大きさ・profile・描画上限を引き継ぎ、保存SVGとバイト比較する。`--file` はScore JSONを読み、色表・種・紙の比・profile・wildを明示できる。色表を省けばcoreの既定を使う。保存Scoreのresource policyを保持し、`--limits` はその上限内の再演予算を指定する。`--output` にSVG、任意の `--png` に同じcoreのraster経路でPNGを書き、stdout JSONにパス・SVG bytesとSHA256・組立と描画それぞれの時間・checkoutとGit HEAD／未commit変更の有無・比較結果を出す。作品を保存・変更せず、render engineの版も変えない。
+
 描画モデルは`--stage1-provider` / `--stage1-model`で選び、両段に同じ値を送る。`--stage2-provider` / `--stage2-model`は廃止し、設定ファイルのStage 2の鍵は読まない・書かない。
 
 `inku-cli paint` と `inku-cli batch` は `--input-mode paint|ddl` に対応する。既定の `paint` モードは自然言語の入力を `/api/paint` へ送り、Stage 1 → Stage 1.5 → Stage 2 → 描画のパイプライン全体を走らせる。`--input-mode ddl` は入力テキストを**既に正規化された DDL** として扱い、Stage 1 を飛ばして `/api/compose` へ送る。`--input-mode ddl --save-history` を使うと、CLI は compose の結果を `POST /api/history` で保存するので、出力は通常のサーバー履歴に現れる。`/api/compose` は Stage 1.5 の展開後の**実効 DDL** を返し、CLI の出力と履歴はその実効 DDL を使う — DDL から描画までのベンチマークの対応を保つためである。

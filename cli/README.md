@@ -110,6 +110,27 @@ The output directory contains:
 
 Hash suffixes are matched against `render_hash_short` or the trailing characters of `render_hash`. If a suffix is ambiguous, use more characters.
 
+## Test a Score with a local core
+
+`render-local` is a testing tool for comparing core changes on the same Score.
+It needs the checkout's pinned Rust toolchain and cached dependencies, and builds
+incrementally offline on every invocation. It requires no server or login.
+
+```sh
+inku-cli render-local --from-work-file review-set/items/001-F3DE.json --core-root /path/to/product-copy --output test.svg
+inku-cli render-local --file score.json --color-map colors.json --catalog-id sea_stone --render-seed 6902696091315693 --canvas-aspect square --canvas-height 1000 --svg-profile display --no-wild --output test.svg --png test.png
+```
+
+`--core-root` defaults to the checkout containing this CLI. A directory extracted
+with `git archive` works too; the selected checkout's sources are never edited.
+The exported-work input inherits the recorded render conditions and compares the
+saved SVG automatically. Score input uses core default colors when `--color-map`
+is absent. `--compare-svg` adds a file comparison. Resource-aware Scores keep
+their recorded hard policy; the four `--limits` replay caps may lower its budget.
+The command writes JSON to stdout with paths, SVG byte count and SHA256, separate
+build/render/raster times, core provenance, conditions and comparison results.
+Build progress goes to stderr. PNG uses the selected core's rasterizer.
+
 ## Write one work as a shareable card
 
 `export-card` asks the server to typeset one work as a single sheet — the picture,
@@ -179,13 +200,13 @@ no value at all, which is not the same as carrying the defaults.
 
 ```
 usage: inku-cli [-h]
-                {login,logout,me,models,paint,batch,contact-sheet,rasterize,measure-raster,analyze,ddl-compare,vision-review,ddl-export,render-score,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
+                {login,logout,me,models,paint,batch,contact-sheet,rasterize,measure-raster,analyze,ddl-compare,vision-review,ddl-export,render-score,render-local,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
                 ...
 
 Control an inku API server from the command line
 
 positional arguments:
-  {login,logout,me,models,paint,batch,contact-sheet,rasterize,measure-raster,analyze,ddl-compare,vision-review,ddl-export,render-score,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
+  {login,logout,me,models,paint,batch,contact-sheet,rasterize,measure-raster,analyze,ddl-compare,vision-review,ddl-export,render-score,render-local,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
     login               log in and store an API session
     logout              log out and clear the stored session
     me                  show the current logged-in user
@@ -204,6 +225,8 @@ positional arguments:
                         it names (read back with paint --input-mode ddl
                         --file)
     render-score        render a Score JSON object without Stage 1 or Stage 2
+    render-local        test a checkout's core by rendering Score locally,
+                        without a server
     demo-instruction    generate one demo prompt from a seed phrase
     history             list history items
     unread-words        report words the interpreter could not confidently
@@ -734,6 +757,66 @@ options:
                         --from-work it overrides the work's own recorded
                         limits
   --full-json           print SVG and Score as well
+
+```
+
+### `inku-cli render-local`
+
+```
+usage: inku-cli render-local [-h] (--from-work-file PATH | --file PATH)
+                             [--core-root PATH] --output SVG_PATH
+                             [--color-map PATH] [--catalog-id CATALOG_ID]
+                             [--render-seed RENDER_SEED]
+                             [--composition-seed COMPOSITION_SEED]
+                             [--canvas-aspect CANVAS_ASPECT]
+                             [--canvas-height CANVAS_HEIGHT]
+                             [--svg-profile {display,editable,compat,live}]
+                             [--wild | --no-wild]
+                             [--limits KEY=VALUE [KEY=VALUE ...]]
+                             [--png PNG_PATH] [--compare-svg PATH]
+
+Testing tool: build the chosen checkout's core offline and render SVG without
+contacting a server. The pinned Rust toolchain and dependencies must already
+be installed. Print output paths, hashes, timings and core provenance as JSON.
+
+options:
+  -h, --help            show this help message and exit
+  --from-work-file PATH
+                        history-export item JSON; inherit recorded conditions
+                        and compare its saved SVG
+  --file PATH, -f PATH  read Score JSON from this file
+  --core-root PATH      product checkout or git-archive directory (default:
+                        the checkout containing this CLI)
+  --output SVG_PATH, -o SVG_PATH
+                        write the rendered SVG here
+  --color-map PATH      JSON object mapping color names to hex values;
+                        defaults to the work's map or core's defaults
+  --catalog-id CATALOG_ID
+                        catalog identity recorded in the render options; does
+                        not fetch a catalog
+  --render-seed RENDER_SEED
+                        renderer performance seed; inherits the work's seed
+  --composition-seed COMPOSITION_SEED
+                        placement seed; defaults to following the performance
+                        seed
+  --canvas-aspect CANVAS_ASPECT
+                        core canvas registry id; inherits the work's performed
+                        aspect, otherwise square
+  --canvas-height CANVAS_HEIGHT
+                        canvas height in pixels; inherits the saved SVG size,
+                        otherwise 1000
+  --svg-profile {display,editable,compat,live}
+                        SVG output profile; inherits the work's profile,
+                        otherwise display
+  --wild, --no-wild     wild performance; inherits the work, otherwise
+                        disabled
+  --limits KEY=VALUE [KEY=VALUE ...]
+                        replay caps: max_expanded_primitives,
+                        max_expanded_per_instruction, max_instructions,
+                        schema_count_max; bounded by the Score's resource
+                        policy
+  --png PNG_PATH        also rasterize with the same core and write PNG here
+  --compare-svg PATH    also compare bytes with this SVG file
 
 ```
 

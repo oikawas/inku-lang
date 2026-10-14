@@ -2945,6 +2945,17 @@ def _limits_argument(pairs: list[str] | None) -> dict[str, int] | None:
     return limits
 
 
+def command_render_local(args: argparse.Namespace) -> int:
+    from .local_render import LocalRenderError, render_local
+
+    try:
+        result = render_local(args)
+    except LocalRenderError as exc:
+        raise CliError(str(exc)) from exc
+    _print_json(result)
+    return 0
+
+
 def command_render_score(args: argparse.Namespace) -> int:
     config = load_config()
     client = ApiClient(
@@ -4133,6 +4144,34 @@ def build_parser() -> argparse.ArgumentParser:
     )
     render_score.add_argument("--full-json", action="store_true", help="print SVG and Score as well")
     render_score.set_defaults(func=command_render_score)
+
+    render_local = subparsers.add_parser(
+        "render-local",
+        help="test a checkout's core by rendering Score locally, without a server",
+        description=(
+            "Testing tool: build the chosen checkout's core offline and render SVG "
+            "without contacting a server. The pinned Rust toolchain and dependencies "
+            "must already be installed. Print output paths, hashes, timings and "
+            "core provenance as JSON."
+        ),
+    )
+    local_input = render_local.add_mutually_exclusive_group(required=True)
+    local_input.add_argument("--from-work-file", metavar="PATH", help="history-export item JSON; inherit recorded conditions and compare its saved SVG")
+    local_input.add_argument("--file", "-f", metavar="PATH", help="read Score JSON from this file")
+    render_local.add_argument("--core-root", metavar="PATH", help="product checkout or git-archive directory (default: the checkout containing this CLI)")
+    render_local.add_argument("--output", "-o", metavar="SVG_PATH", required=True, help="write the rendered SVG here")
+    render_local.add_argument("--color-map", metavar="PATH", help="JSON object mapping color names to hex values; defaults to the work's map or core's defaults")
+    render_local.add_argument("--catalog-id", help="catalog identity recorded in the render options; does not fetch a catalog")
+    render_local.add_argument("--render-seed", type=int, help="renderer performance seed; inherits the work's seed")
+    render_local.add_argument("--composition-seed", type=int, help="placement seed; defaults to following the performance seed")
+    render_local.add_argument("--canvas-aspect", help="core canvas registry id; inherits the work's performed aspect, otherwise square")
+    render_local.add_argument("--canvas-height", type=int, help="canvas height in pixels; inherits the saved SVG size, otherwise 1000")
+    render_local.add_argument("--svg-profile", choices=SVG_PROFILES, help="SVG output profile; inherits the work's profile, otherwise display")
+    render_local.add_argument("--wild", action=argparse.BooleanOptionalAction, default=None, help="wild performance; inherits the work, otherwise disabled")
+    render_local.add_argument("--limits", metavar="KEY=VALUE", nargs="+", help="replay caps: max_expanded_primitives, max_expanded_per_instruction, max_instructions, schema_count_max; bounded by the Score's resource policy")
+    render_local.add_argument("--png", metavar="PNG_PATH", help="also rasterize with the same core and write PNG here")
+    render_local.add_argument("--compare-svg", metavar="PATH", help="also compare bytes with this SVG file")
+    render_local.set_defaults(func=command_render_local)
 
     demo = subparsers.add_parser("demo-instruction", help="generate one demo prompt from a seed phrase")
     _add_common_server_args(demo)

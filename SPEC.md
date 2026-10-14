@@ -4275,6 +4275,21 @@ renderer behavior.
 CLI configuration is local and editable.  It stores base URL, provider/model
 selection, and timeout values outside the server DB.
 
+`inku-cli render-local` is a testing command that renders Score with a selected
+product checkout's core without a server. `--core-root` defaults to the checkout
+containing the CLI and also accepts a non-Git archive directory. With the pinned
+Rust toolchain and dependencies installed beforehand, each execution builds
+incrementally offline to pick up source changes. `--from-work-file` inherits the
+Score, color map, seeds, wild, performed canvas aspect and size, profile and
+render limits from a history-export item and compares the saved SVG bytes.
+`--file` reads Score JSON with explicit color map, seeds, aspect, profile and wild
+options; omitting the map uses core defaults. The saved Score's resource policy
+is preserved and `--limits` selects a replay budget within those bounds.
+`--output` writes SVG and optional `--png` uses that core's raster path. Standard
+output JSON records paths, SVG bytes and SHA256, separate build and render times,
+checkout provenance with Git HEAD/dirty state when available, and comparisons.
+It does not save or change history, or change the render engine version.
+
 Choose the drawing model with `--stage1-provider` / `--stage1-model`; the CLI sends the same values for both stages. `--stage2-provider` / `--stage2-model` are retired, and Stage 2 keys in the configuration file are neither read nor written.
 
 `inku-cli paint` and `inku-cli batch` support `--input-mode paint|ddl`.

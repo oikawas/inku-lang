@@ -92,7 +92,7 @@ def test_retired_catalog_arrangement_render_save_and_replay(monkeypatch):
         selected = selected_response.json()
         assert selected["render_color_source"] == "color_arrangement"
         assert selected["render_color_catalog_id"] == retired
-        assert selected["render_seed"] == 77 and selected["composition_seed"] == 17
+        assert selected["render_seed"] == "77" and selected["composition_seed"] == "17"
         assert selected["render_wild"] is True
         assert selected["render_canvas_aspect_id"] == "hd_monitor"
         substitution = ColorArrangements.from_saved(parent["svg"], colors).substitution(index)

@@ -16,8 +16,31 @@ from inku_server.pipeline_defaults import default_manifest
 from inku_server.pipeline_product import ProductPipelineEffects
 
 
-def test_retired_catalog_arrangement_render_save_and_replay(monkeypatch):
+def test_saved_zero_performance_seed_is_preserved(monkeypatch):
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+
     from inku_server.api_core import rendering
+
+    received = []
+
+    class Engine:
+        def render(self, _score, **options):
+            received.append(options["render_seed"])
+            return SimpleNamespace(svg="<svg/>", metadata={})
+
+    monkeypatch.setattr(rendering, "current_render_engine", lambda: Engine())
+    monkeypatch.setattr(rendering, "_render_capacity", lambda _owner: nullcontext())
+    monkeypatch.setattr(rendering, "_generated_svg_limit_bytes", lambda: 10_000)
+    _, metadata = rendering._render_with_metadata(
+        SimpleNamespace(), {"render_seed": 0, "render_color_map": {"black": "#000000"}}
+    )
+    assert received == [0]
+    assert metadata["render_seed"] == 0
+
+
+def test_retired_catalog_arrangement_render_save_and_replay(monkeypatch):
+    from inku_server.api_core import common, rendering
 
     monkeypatch.setattr(rendering, "_submit_thumbnail_build", lambda _item: None)
     suffix = uuid.uuid4().hex[:8]
@@ -31,8 +54,13 @@ def test_retired_catalog_arrangement_render_save_and_replay(monkeypatch):
         binding = PipelineBinding()
         effects = ProductPipelineEffects(binding, default_manifest(binding))
         source = "Nature.青葉。"
-        config, context = effects.prepare(user["id"], "direct_ddl", source,
-            {"instruction_lang": "ja", "catalog_id": "default", "render_seed": 77, "composition_seed": 17}, None)
+        # The complete built-in macro needs no provider, but prepare still
+        # checks the user's model catalog. Isolate that fixture preflight;
+        # restore the production gate before exercising any API request.
+        with monkeypatch.context() as preparation:
+            preparation.setattr(common, "_model_offered_to", lambda *args, **kwargs: True)
+            config, context = effects.prepare(user["id"], "direct_ddl", source,
+                {"instruction_lang": "ja", "catalog_id": "default", "render_seed": 77, "composition_seed": 17}, None)
         context.update(description="saved leaves", committed_description="saved leaves", derivation_kind="new")
         run = CandidateExecution(binding, VariationAuthorityStore(db.engine), owner_id=user["id"],
             config=config, context=context, provider=lambda _action: pytest.fail("recolor called a provider"))

@@ -448,7 +448,8 @@ def _render_warnings(metadata: dict, during: str) -> list | None:
 def _render_with_metadata(
     score: Score, render_metadata: dict, *, svg_profile: str | None = None, owner: str | None = None
 ) -> tuple[str, dict]:
-    effective_seed = int(render_metadata.get("render_seed") or new_render_seed())
+    recorded_seed = render_metadata.get("render_seed")
+    effective_seed = int(new_render_seed() if recorded_seed is None else recorded_seed)
     # The two seeds are read differently on purpose: an absent performance seed
     # is drawn fresh, while an absent composition seed means "the placement
     # follows the performance seed" and 0 means the seed 0.

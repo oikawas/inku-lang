@@ -312,6 +312,19 @@ class AndroidWorkPipeline(
         })
         val parent = replaySource(request.parentHistoryId, source.scoreJson)
         require(parent?.history?.normalizedDdl == source.source) { "tool source changed" }
+        val savedOptions = parent?.forkContextJson?.let(::JSONObject)?.optJSONObject("host_options")
+        val metadata = parent?.history?.renderMetadataJson?.let(::JSONObject)
+        val parentSeed = request.renderSeed
+            ?: parent?.history?.renderSeed?.let { java.lang.Long.parseUnsignedLong(it) }
+            ?: savedOptions?.optionalUnsignedLong("render_seed")
+            ?: metadata?.optionalUnsignedLong("render_seed")
+            ?: throw InkuFailure { it.refinementFailed }
+        val fixedRequest = request.copy(
+            renderSeed = parentSeed,
+            compositionSeed = request.compositionSeed
+                ?: JSONObject(source.configJson).optJSONObject("compiler")?.optionalUnsignedLong("composition_seed")
+                ?: metadata?.optionalUnsignedLong("composition_seed"),
+        )
         val input = JSONObject().put("config", JSONObject(source.configJson)).put("source", source.source)
             .put("tools", JSONObject(option.tools.mapKeys { it.key.toString() }))
         val answer = JSONObject(binding.retouch(input.toString().encodeToByteArray()).toString(Charsets.UTF_8))
@@ -319,7 +332,7 @@ class AndroidWorkPipeline(
         if (answer.optString("outcome") != "retouched") return null
         val changedSource = answer.getString("source")
         val changedScore = app.inku.mobile.data.refinement.ToolChangePlanner.scoreWithTools(source.scoreJson, option.tools)
-        val result = renderScoreWithSource(changedScore, request, parent)
+        val result = renderScoreWithSource(changedScore, fixedRequest, parent)
         return result.copy(
             normalizedDdl = changedSource,
             managedHistoryReplay = null,

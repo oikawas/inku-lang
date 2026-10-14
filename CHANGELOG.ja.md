@@ -8,6 +8,8 @@
 
 ## 未リリース
 
+## v2.15.140（2026-10-14 / Build 1216）
+
 ### 2026-10-14 — CLIの推敲を保存した指示書から描き、固定の作品でもVisionの自動推敲を選べるようにした
 
 作者の選択（推奨案）で3点を直した。`inku-cli refine perform` の `layout` と `color` は、記述を `/api/paint` で読み直して指示書を書き換えていたが、Webと同じく親の保存した指示書から描く。`layout` は `/api/compose` で指示書の範囲を新しい配置のseedで選び直し、`color` は保存したScoreを `/api/render-score` で別の色カタログに描き、どちらも `/api/history` へ系譜の子として保存する。DDLを編集した作品も断らずに推敲する。記述を差し替える `--description` は描画に使われなくなるので外した。WebのAI自動推敲は、DDLを編集した作品でもAI Visionの方式を選べる。どの世代も親のDDLから描き、Visionの助言は変える要素を選ぶだけで描画に加えないため。Webの「色カタログを変える」の候補が、削除済みの `interpretation_seed` を送っていたのも外した（Serverは無視していた）。

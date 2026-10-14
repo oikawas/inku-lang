@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.140 (2026-10-14 / Build 1216)
+
 ### 2026-10-14 — CLI refinements draw from the saved instructions; Vision autonomous refinement for held works
 
 Three fixes the author chose. `inku-cli refine perform --kind layout|color` used to read the description again through `/api/paint`, which rewrote the instructions; like the web, it now draws from the parent's saved instructions. `layout` chooses the instructions' ranges again under a new composition seed through `/api/compose`, and `color` draws the saved Score in another color catalog through `/api/render-score`; both save the child to the lineage through `/api/history`. A work whose DDL was edited is refined instead of refused. `--description`, which no longer reaches the drawing, is removed. The web's autonomous refinement offers the Vision method for a work whose DDL was edited too: every generation is drawn from the parent's DDL, and Vision's advice only picks the element to change. The web's Another catalog options no longer send the retired `interpretation_seed` (the server ignored it).

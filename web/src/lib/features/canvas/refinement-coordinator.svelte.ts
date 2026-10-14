@@ -4,6 +4,7 @@ import { renderSettingsPayload, type RenderOverrides } from '$lib/features/rende
 import { wildOverride } from '$lib/features/wild/render';
 import { normalizeCanvasAspectId, type CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
 import type { HistoryItem } from '$lib/historyManagerState.svelte';
+import { projectHistoryCurrentWork } from '$lib/features/history/current-work';
 import type { SaveHistoryOptions } from '$lib/features/history/save';
 import type { PaintResult, PaintOptions } from '$lib/features/run/current-work';
 import type { WorkState } from '$lib/features/work/state.svelte';
@@ -16,7 +17,7 @@ type Iteration = HistoryItem;
 type RefinementWork = Pick<WorkState,
 	'confirmFallbackRefine' | 'currentRefineParent' | 'ddl' | 'displayedHistoryItem' |
 	'input' | 'instructionLang' | 'loading' | 'paintOne' | 'paintTokensIn' | 'paintTokensOut' |
-	'result' | 'pipelineCompatibilityError' | 'sketchPayloadFor' | 'sketchTextFor' | 'thinking'
+	'result' | 'pipelineCompatibilityError' | 'sketchTextFor' | 'thinking'
 >;
 
 export type RefinementCoordinatorDeps = {
@@ -66,11 +67,11 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		refinementSession.reset({ preserveCandidates: options.preserveVariationCandidates });
 	}
 
-	function composeCandidateResult(source: string, baseDdl: string, data: LayoutComposeResponse & { ddl: string; thinking?: string | null; }): PaintResult & { ddl: string; thinking: string | null; } {
+	function composeCandidateResult(thinking: string | null, data: LayoutComposeResponse & { ddl: string; thinking?: string | null; }): PaintResult & { ddl: string; thinking: string | null; } {
 		return {
 			...data,
 			ddl: data.ddl,
-			thinking: data.thinking ?? work.thinking,
+			thinking: data.thinking ?? thinking,
 			stage1_model: work.result?.stage1_model ?? deps.models.stage1(),
 			stage2_model: data.stage2_model ?? deps.models.stage2(),
 			elapsed_stage1_ms: 0,
@@ -99,6 +100,19 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		return work.result?.history_id ?? work.displayedHistoryItem?.id ?? null;
 	}
 
+	// The words, instructions, sketch and thinking of the work being refined.
+	// Opening a saved work for refinement keeps an unfinished draft in the left
+	// pane, so the pane is the target only for a result not yet in the history.
+	function refinementTarget(): { source: string; ddl: string; thinking: string | null; sketchText: string | null; } {
+		const shown = work.displayedHistoryItem;
+		if (shown?.id && shown.id === refinementWorkId()) {
+			const saved = projectHistoryCurrentWork(shown);
+			return { source: saved.sourceText.trim(), ddl: saved.ddl, thinking: saved.thinking, sketchText: saved.sketchText };
+		}
+		const source = work.input.trim();
+		return { source, ddl: work.ddl ?? '', thinking: work.thinking, sketchText: work.sketchTextFor(source) };
+	}
+
 	function workReferencePayload(workId: string | null | undefined): Record<string, string> {
 		return workId ? { work_id: workId } : {};
 	}
@@ -117,12 +131,12 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 	}
 
 	async function composeVariationCandidate(compositionSeed: number, label: string, signal: AbortSignal, mode: RecomposeMode): Promise<VariationCandidate> {
-		const source = work.input.trim();
-		const baseDdl = work.ddl ?? "";
+		const target = refinementTarget();
+		const baseDdl = target.ddl;
 		const data = await requestLayoutComposition({
 				ddl: baseDdl,
-				description: source,
-				...work.sketchPayloadFor(source),
+				description: target.source,
+				...(target.sketchText ? { sketch_text: target.sketchText } : {}),
 				model: deps.models.stage2(),
 				instruction_lang: work.instructionLang,
 				ui_lang: getLang(),
@@ -135,7 +149,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				...(deps.lineageParentId() ? { lineage_parent_node_id: deps.lineageParentId() } : {}),
 		}, mode, signal, apiFetch, work.pipelineCompatibilityError);
 		const layout = layoutCandidateResult(data, baseDdl, compositionSeed, mode);
-		return { id: `comp-${compositionSeed}`, kind: 'layout', label, selected: false, result: { ...composeCandidateResult(source, baseDdl, layout), lineage_parent_node_id: deps.lineageParentId(), derivation_kind: deps.lineageParentId() ? 'layout_change' : null, derivation_metadata: layout.derivation_metadata } };
+		return { id: `comp-${compositionSeed}`, kind: 'layout', label, selected: false, result: { ...composeCandidateResult(target.thinking, layout), lineage_parent_node_id: deps.lineageParentId(), derivation_kind: deps.lineageParentId() ? 'layout_change' : null, derivation_metadata: layout.derivation_metadata } };
 	}
 
 	const composeLayoutGeneration: ComposeLayoutGeneration = async (parent, source, options: PaintOptions) => {
@@ -156,7 +170,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		}, 'principled', options.signal, apiFetch, work.pipelineCompatibilityError);
 		const layout = layoutCandidateResult(data, parent.ddl, seed, 'principled');
 		const result = {
-			...composeCandidateResult(source, parent.ddl, layout),
+			...composeCandidateResult(work.thinking, layout),
 			stage1_model: parent.stage1Model,
 			lineage_parent_node_id: options.lineageParentNodeId ?? null,
 			derivation_kind: 'layout_change' as const,
@@ -184,7 +198,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 
 	async function renderColorCatalogCandidate(catalogId: string, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
 		if (!work.result) throw new Error("missing result");
-		const source = work.input.trim();
+		const target = refinementTarget();
 		const fromCatalogId = refinementCatalogId();
 		const r = await apiFetch("/api/render-score", {
 			method: "POST",
@@ -192,8 +206,8 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				score: work.result.score,
-				input: source,
-				ddl: work.ddl ?? "",
+				input: target.source,
+				ddl: target.ddl,
 				canvas_aspect: refinementCanvasAspectId(),
 				render_seed: work.result.render_seed,
 				composition_seed: work.result.composition_seed,
@@ -214,8 +228,8 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				variation_seed: undefined,
 				recomposition: undefined,
 				...data,
-				ddl: work.ddl ?? "",
-				thinking: work.thinking,
+				ddl: target.ddl,
+				thinking: target.thinking,
 				history_id: null,
 				history_at: null,
 				lineage_node_id: null,
@@ -234,7 +248,8 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 	// both stages. The render settings are the work's own, as for the other
 	// options, so only the model differs.
 	async function renderModelCandidate(model: string, label: string, signal: AbortSignal): Promise<VariationCandidate> {
-		const source = work.input.trim();
+		const target = refinementTarget();
+		const source = target.source;
 		const r = await work.paintOne(source, {
 			historyInput: source,
 			sourceText: source,
@@ -242,7 +257,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 			saveArtifacts: false,
 			countGeneration: false,
 			canvasAspectId: refinementCanvasAspectId(),
-			sketchText: work.sketchTextFor(source),
+			sketchText: target.sketchText,
 			signal,
 			renderOverrides: refinementRenderOverrides(),
 			lineageParentNodeId: deps.lineageParentId(),
@@ -290,8 +305,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		await deps.ensureVisibleLineageParentId();
 		if (contextVersion !== targetIdentityVersion || work.result !== parent || refinementSession.gridBusy) return;
 		const parentNodeId = deps.lineageParentId();
-		const ddl = work.ddl ?? '';
-		const thinking = work.thinking;
+		const { ddl, thinking } = refinementTarget();
 		const controller = refinementSession.beginGrid({ includesReading: false, taskLabel: t().workActionColorArrangement, count: 8 });
 		const abortTimer = window.setTimeout(() => refinementSession.enableAbort(controller), 3000);
 		try {
@@ -359,7 +373,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		await deps.ensureVisibleLineageParentId();
 		if (contextVersion !== targetIdentityVersion || work.result !== parent || refinementSession.gridBusy) return;
 		const parentNodeId = deps.lineageParentId();
-		const thinking = work.thinking;
+		const { thinking } = refinementTarget();
 		const ja = getLang() === 'ja';
 		const controller = refinementSession.beginGrid({ includesReading: false, taskLabel: t().workActionGround, count: 7 });
 		const abortTimer = window.setTimeout(() => refinementSession.enableAbort(controller), 3000);
@@ -412,14 +426,14 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		if (!work.result || refinementSession.gridBusy || work.loading) return;
 		// Every option in this round uses the choice made before any await.
 		const recomposeMode = refinementSession.recomposeMode;
-		const source = work.input.trim();
+		const { source, ddl } = refinementTarget();
 		// A layout draws the saved DDL, and a catalog change draws the saved
 		// Score. Neither needs a description; the other kinds keep their guard.
 		if (!source && kind !== 'color' && kind !== 'layout') {
 			refinementSession.setStatus(t().refineNeedsDescription);
 			return;
 		}
-		if (!work.ddl && kind !== 'color') {
+		if (!ddl && kind !== 'color') {
 			refinementSession.setStatus(t().refineNeedsDdl);
 			return;
 		}
@@ -483,7 +497,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 	 */
 	async function generateModelCandidates(models: readonly string[]): Promise<Record<string, string>> {
 		if (!work.result || refinementSession.gridBusy || work.loading) return {};
-		const source = work.input.trim();
+		const { source } = refinementTarget();
 		if (!source) {
 			refinementSession.setStatus(t().refineNeedsDescription);
 			return {};
@@ -555,7 +569,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		try {
 			const outcome = await saveRefinementCandidates({
 				candidates: selected,
-				sourceText: () => work.input.trim(),
+				sourceText: () => refinementTarget().source,
 				fallbackCatalogId: () => deps.catalog.effectiveId()
 			}, {
 				saveHistory: deps.pushHistory,

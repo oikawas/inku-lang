@@ -160,7 +160,7 @@ test('manual layout draws a saved DDL without a description and saves its chosen
 			work: {
 				input: '', ddl: 'saved parent instructions', loading: false, thinking: null,
 				result: { svg: '<svg/>', score: { instructions: [] }, composition_seed: 7, history_id: 'parent-work' },
-				instructionLang: 'auto', sketchPayloadFor: () => ({}),
+				instructionLang: 'auto', sketchTextFor: () => null,
 				confirmFallbackRefine: async () => true, currentRefineParent: () => null,
 				paintTokensIn: () => null, paintTokensOut: () => null,
 				pipelineCompatibilityError: async () => new Error('unexpected error')
@@ -201,6 +201,54 @@ test('manual layout draws a saved DDL without a description and saves its chosen
 		assert.equal(await coordinator.saveSelectedVariationCandidates(), true);
 		assert.equal(saves, 1);
 		assert.equal(session.candidates[0].saved, true);
+	} finally {
+		host.window = previousWindow;
+	}
+});
+
+test('a saved work opened beside an unfinished draft is refined from its own words and instructions', async () => {
+	installOwnerRuneShim();
+	const host = globalThis as unknown as Record<string, unknown>;
+	const previousWindow = host.window;
+	host.window = { setTimeout: () => 0, clearTimeout: () => {} };
+	try {
+		const { RefinementSessionState } = await import('./refinement-session.svelte.ts');
+		const { createRefinementCoordinator } = await import('./refinement-coordinator.svelte.ts');
+		const session = new RefinementSessionState({ ms: 0, start() {}, stop() {} });
+		const bodies: Array<{ path: string; payload: Record<string, unknown> }> = [];
+		const saved: HistoryItem[] = [];
+		const coordinator = createRefinementCoordinator({
+			session,
+			// The library's refine opens the shown work and keeps the draft in the left pane.
+			work: {
+				input: 'draft words', ddl: 'draft instructions', loading: false, thinking: 'draft thinking',
+				displayedHistoryItem: { id: 'shown-work', input: 'shown words', ddl: 'shown instructions', sketch_text: 'shown sketch', thinking: 'shown thinking' },
+				result: { svg: '<svg/>', score: { instructions: [] }, composition_seed: 7, history_id: 'shown-work', render_color_catalog_id: 'catalog' },
+				instructionLang: 'auto', sketchTextFor: () => 'draft sketch',
+				confirmFallbackRefine: async () => true, currentRefineParent: () => null,
+				paintTokensIn: () => null, paintTokensOut: () => null,
+				pipelineCompatibilityError: async () => new Error('unexpected error')
+			},
+			models: { stage1: () => 'reader', stage2: () => 'performer' },
+			seeds: { composition: () => 42 },
+			render: { canvasAspectId: () => 'square', wild: () => false, fanoutLimit: () => 1 },
+			catalog: { defaultId: () => 'catalog', effectiveId: () => 'catalog', available: () => [{ id: 'catalog' }, { id: 'other' }], name: (id: string) => id },
+			lineageParentId: () => 'shown-node', ensureVisibleLineageParentId: async () => 'shown-node',
+			apiFetch: async (path: string, init?: RequestInit) => {
+				bodies.push({ path, payload: JSON.parse(String(init?.body)) });
+				return new Response(JSON.stringify({ ddl: 'recomposed shown instructions', svg: '<svg/>', score: { instructions: [] } }));
+			},
+			pushHistory: async (item: HistoryItem) => { saved.push(item); return { ...item, id: `child-${saved.length}` }; }
+		} as unknown as RefinementCoordinatorDeps);
+		await coordinator.generateVariationCandidates('layout', 1);
+		await coordinator.generateVariationCandidates('color', 1);
+		assert.deepEqual(bodies.map(({ path, payload }) => [path, payload.ddl, payload.description ?? payload.input, payload.sketch_text ?? null]), [
+			['/api/compose', 'shown instructions', 'shown words', 'shown sketch'],
+			['/api/render-score', 'shown instructions', 'shown words', null]
+		]);
+		for (const candidate of session.candidates) session.toggleCandidate(candidate.id);
+		assert.equal(await coordinator.saveSelectedVariationCandidates(), true);
+		assert.deepEqual(saved.map((item) => [item.input, item.thinking]), [['shown words', 'shown thinking']]);
 	} finally {
 		host.window = previousWindow;
 	}

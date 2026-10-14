@@ -21,6 +21,21 @@ def _fts_match_query(search: str) -> str:
 # loosely rather than spelled `rh3` so that a later version does not silently
 # stop being searchable.
 _WHOLE_RENDER_HASH = re.compile(r"(?:[a-z0-9]+:)?[0-9a-f]{64}", re.IGNORECASE)
+_RENDER_HASH_PREFIX = re.compile(r"(?:[a-z0-9]+:)?[0-9a-f]{1,64}", re.IGNORECASE)
+
+
+def _is_render_hash_prefix_search(search: str) -> bool:
+    return bool(_RENDER_HASH_PREFIX.fullmatch(search))
+
+
+def _is_history_id_prefix_search(search: str) -> bool:
+    """Only prefixes of the canonical UUID spelling, including partial groups."""
+    if not 1 <= len(search) <= 36:
+        return False
+    return all(
+        character == "-" if position in (8, 13, 18, 23) else character.lower() in "0123456789abcdef"
+        for position, character in enumerate(search)
+    )
 
 
 def _is_render_hash_suffix_search(search: str) -> bool:
@@ -50,6 +65,14 @@ def _history_search_clause(search: str):
     ]
     if _is_render_hash_suffix_search(search):
         clauses.append(HistoryRow.render_hash.ilike(f"%{search}"))
+    if _is_render_hash_prefix_search(search):
+        clauses.append(HistoryRow.render_hash.ilike(f"{search}%"))
+        if ":" not in search:
+            # The digest begins after a version delimiter, or at the start of
+            # an unversioned legacy hash. Neither is indexed by text FTS.
+            clauses.append(HistoryRow.render_hash.ilike(f"%:{search}%"))
+    if _is_history_id_prefix_search(search):
+        clauses.append(HistoryRow.id.ilike(f"{search}%"))
     return or_(*clauses)
 
 
@@ -59,6 +82,8 @@ def _use_history_fts(search: str, *, fts_enabled: bool, dialect_name: str) -> bo
         and dialect_name == "sqlite"
         and len(search) >= 3
         and not _is_render_hash_suffix_search(search)
+        and not _is_render_hash_prefix_search(search)
+        and not _is_history_id_prefix_search(search)
     )
 
 

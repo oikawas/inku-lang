@@ -256,6 +256,46 @@ public actor PipelineHost {
             variationAmplitude: variationAmplitude, variationSeed: variationSeed)
     }
 
+    /// Four validated touch assignments, built entirely from the saved parent's Score and core reading.
+    public func makeToolVariantPlans(workID: String, mode: ToolChangeMode) async throws -> [ToolVariantPlan] {
+        let base = try await makeSavedScoreReplayPlan(workID: workID, derivationKind: "tool_change")
+        guard base.work.renderSeed != nil, let source = base.work.ddl else { throw HostError("saved_refinement_options_unavailable") }
+        let context = try ExactJSON(data: base.context)
+        let configuration = try context.requiredObject("configuration")
+        let read = try ToolVariants.read(configuration: configuration, source: source)
+        guard read["outcome"].string == "read" else { throw HostError("touch_change_unavailable") }
+        let labels = try (read["tools"].array ?? []).map { value in
+            TouchTool(value: try value.requiredString("value"), ja: try value.requiredString("ja"), en: try value.requiredString("en"))
+        }
+        let sentences = (read["sentences"].array ?? []).compactMap { $0["index"].number.flatMap(Int.init) }
+        let score = try ExactJSON(data: Data(base.work.score.utf8))
+        let drawn = ToolVariants.drawnTools(score: score, sentences: sentences, known: Set(labels.map(\.value)))
+        var plans: [ToolVariantPlan] = []
+        for tools in ToolVariants.options(drawn: drawn, mode: mode, tools: labels.map(\.value)) {
+            try Task.checkCancellation()
+            let written = try ToolVariants.read(configuration: configuration, source: source, tools: tools)
+            guard written["outcome"].string == "retouched", let ddl = written["source"].string else { continue }
+            let changes = drawn.keys.sorted().compactMap { index -> ToolChange? in
+                guard let to = tools[String(index)], let from = drawn[index], from != to else { return nil }
+                return ToolChange(index: index, from: from, to: to)
+            }
+            let metadata: ExactJSON = .object(["tool_mode": .string(mode.rawValue), "tools": .object(tools.mapValues(ExactJSON.string)),
+                "changes": .array(changes.map { .object(["index": .number(String($0.index)), "from": .string($0.from), "to": .string($0.to)]) })])
+            var render = try ExactJSON(data: base.renderRequest)
+            render["request"]["score"] = ToolVariants.scoreWithTools(score, tools: tools)
+            var replay = SavedScoreReplayPlan(work: base.work, parentNode: base.parentNode, context: base.context,
+                renderRequest: render.data, derivationKind: "tool_change", derivationMetadata: metadata.data,
+                variationAmplitude: nil, variationSeed: nil)
+            replay.retouchedSource = ddl
+            plans.append(ToolVariantPlan(mode: mode, tools: tools, changes: changes, source: ddl, labels: labels, replay: replay))
+        }
+        return plans
+    }
+
+    public func previewToolVariant(_ plan: ToolVariantPlan) async throws -> PreparedCandidate {
+        try await previewSavedScoreReplay(plan.replay)
+    }
+
     public func previewSavedScoreReplay(_ plan: SavedScoreReplayPlan) async throws -> PreparedCandidate {
         guard plan.derivationKind != "variation", plan.variationAmplitude == nil, plan.variationSeed == nil else {
             throw HostError("variation_retired")
@@ -279,6 +319,10 @@ public actor PipelineHost {
         let nodeID = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
         let now = Int64(Date().timeIntervalSince1970 * 1000)
         var work = source
+        if let ddl = plan.retouchedSource {
+            work.ddl = ddl
+            work.score = request["request"]["score"].text
+        }
         work.id = id; work.at = now; work.svg = svg; work.lineageNodeID = nodeID
         work.elapsedMS = max(0, Int64(Date().timeIntervalSince(began) * 1000))
         work.starred = false; work.trashed = false; work.historyVisibility = "normal"
@@ -304,6 +348,11 @@ public actor PipelineHost {
         let edge = LineageEdge(id: UUID().uuidString, parentNodeID: plan.parentNode.id, childNodeID: nodeID,
                                derivationKind: plan.derivationKind, metadataJSON: try metadataText(plan.derivationMetadata), at: now)
         var nextContext = context
+        if let ddl = plan.retouchedSource {
+            guard nextContext["document"].object != nil else { throw HostError("saved_document_unavailable") }
+            nextContext["document"]["source"] = .string(ddl)
+            nextContext["score_sha256"] = .string(WorkIdentity.sha256(request["request"]["score"].data))
+        }
         var stringOptions = options
         for key in ["render_seed", "composition_seed"] { if let number = options[key].number { stringOptions[key] = .string(number) } }
         nextContext["options"] = stringOptions

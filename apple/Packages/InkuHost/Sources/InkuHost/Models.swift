@@ -263,6 +263,7 @@ public struct SavedScoreReplayPlan: Sendable {
     let derivationMetadata: Data?
     let variationAmplitude: String?
     let variationSeed: String?
+    var retouchedSource: String? = nil
 }
 
 /// Owned saved input data. Export and derivation never receive a mutable database handle.

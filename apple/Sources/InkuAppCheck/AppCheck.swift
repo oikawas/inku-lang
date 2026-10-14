@@ -148,6 +148,10 @@ struct AppCheck {
             try await runWorkEditChecks(nativeFixtureURL: fixtureURL)
             return
         }
+        if let index = CommandLine.arguments.firstIndex(of: "--tool-change-only") {
+            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Missing isolated touch fixture folder") }
+            try await runToolChangeChecks(folder: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
+        }
         if CommandLine.arguments.contains("--refinement-only") {
             try await runRefinementChecks()
             return

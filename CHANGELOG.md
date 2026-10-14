@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — Change the touches on macOS
+
+The work-editing menu now offers touch changes for saved works: One touch for all or Per sentence, drawing four options at a time and retaining earlier options. The shared core writes and reads back the new instructions; only the matching saved Score weights change, preserving the parent's placement, colors, ground and seeds without an LLM. Only selected options become tool_change children with their assignments and changes recorded. Japanese and English controls and the Touches lineage label are included.
+
 ### 2026-10-14 — Correct the explanation beside Android composition candidates
 
 A sentence with no range or place now explains that the ranges in the instructions cannot be chosen again. When the ranges stay, the accompanying text says the work was redrawn with a new composition seed and unchanged instructions. The author's Japanese and English wording matches Web.

@@ -214,6 +214,11 @@ public enum InkuCore {
         InkuCoreBindings.recompose(inputBytes: input)
     }
 
+    /// `inku.touch-change.v1` for `{config, source, tools}`. Empty tools read the changeable sentences.
+    public static func retouch(_ input: Data) -> Data {
+        InkuCoreBindings.retouch(inputBytes: input)
+    }
+
     /// `inku.completion-range-states.v1` for `{config, source, completion_ranges}`: each range a completion wrote,
     /// as completed, numbers changed or words changed, with UTF-16 positions in the source.
     public static func completionRangeStates(_ input: Data) -> Data {

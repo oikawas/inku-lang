@@ -1333,6 +1333,20 @@ public final class AppModel {
         return snapshot
     }
 
+    public func makeToolVariantPlans(work: SavedWork, mode: ToolChangeMode) async throws -> [ToolVariantPlan] {
+        guard !isPreview, !stopping, let host else { throw HostError("authoring_busy_or_unavailable") }
+        _ = try await checkedSavedAdjustmentParent(work)
+        return try await host.makeToolVariantPlans(workID: work.id, mode: mode)
+    }
+
+    public func prepareToolVariant(_ plan: ToolVariantPlan, token: UUID) async throws -> PreparedCandidate {
+        guard generationToken == token, !stopping, let host else { throw CancellationError() }
+        let candidate = try await host.previewToolVariant(plan)
+        try Task.checkCancellation()
+        guard generationToken == token, !stopping else { throw CancellationError() }
+        return candidate
+    }
+
     public func previewCatalogCandidate(work: SavedWork, catalogID: String, token: UUID) async throws -> PreparedCandidate {
         guard generationToken == token, !stopping, let host, let bootstrap else { throw CancellationError() }
         let context = try await savedConfiguration(workID: work.id)
@@ -1997,6 +2011,9 @@ public final class AppModel {
     }
 
     public func failureMessage(_ error: Error) -> String {
+        if (error as? HostError)?.code == "touch_change_unavailable" {
+            return display.localized("この作品のてざわりを替えられません。")
+        }
         if (error as? HostError)?.code == "svg_too_large" {
             if let limit = (error as? HostError)?.svgLimitMiB {
                 return DrawingFailureMessage.svgLimitText(limit, language: display.preferences.language)

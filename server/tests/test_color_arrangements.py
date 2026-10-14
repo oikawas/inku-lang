@@ -42,3 +42,22 @@ def test_no_recolorable_paints_exhausts_and_empty_palette_refuses():
     assert plan.page() == {"entries": [], "next_cursor": None, "total": 0}
     with pytest.raises(ValueError, match="no usable palette"):
         ColorArrangements.from_saved("<svg/>", {"black": "#111111"})
+
+
+def test_a_page_changes_every_color_rather_than_running_through_the_last_one():
+    # Nine colors, four of them used: 3,023 other assignments. In rank order the
+    # first page kept the first three colors and moved only the last (2026-10-14).
+    palette = {f"palette:{index}": f"#{index:02x}0000" for index in range(1, 10)}
+    svg = "<svg>" + "".join(f'<path fill="#{index:02x}0000"/>' for index in range(1, 5)) + "</svg>"
+    plan = ColorArrangements.from_saved(svg, palette, "work-a")
+    first_page = [tuple(plan.substitution(entry["index"]).values()) for entry in plan.page()["entries"]]
+    for position in range(len(plan.used)):
+        assert len({assignment[position] for assignment in first_page}) >= 5
+    # The order is the work's own and stays the same when it is asked again.
+    again = ColorArrangements.from_saved(svg, palette, "work-a")
+    assert [again.substitution(index) for index in range(8)] == [plan.substitution(index) for index in range(8)]
+    other = ColorArrangements.from_saved(svg, palette, "work-b")
+    assert [other.substitution(index) for index in range(8)] != [plan.substitution(index) for index in range(8)]
+    # Still one-to-one over every assignment but the work's own.
+    assert len({tuple(plan.substitution(index).values()) for index in range(plan.total)}) == plan.total
+    assert plan.used not in {tuple(plan.substitution(index).values()) for index in range(plan.total)}

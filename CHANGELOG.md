@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — Change the color arrangement spreads its options
+
+At the author's request. The options were the assignments' lexicographic ranks taken eight at a time from the start, so the first options ran the last color through the palette and then moved the one before it (for a work using four of nine colors, the first five options differed only in the fourth). The ranks are now visited by a stride near the golden ratio of their count, coprime with it, from a start the work's identity decides. It stays one-to-one: eight at a time still meets every assignment once and never the work's own. Saving draws the child again from the same work with the same order. Saved children are drawn from their saved assignment and do not change; only the meaning of their recorded index does.
+
 ### 2026-10-14 — Correct the explanation beside Android composition candidates
 
 A sentence with no range or place now explains that the ranges in the instructions cannot be chosen again. When the ranges stay, the accompanying text says the work was redrawn with a new composition seed and unchanged instructions. The author's Japanese and English wording matches Web.

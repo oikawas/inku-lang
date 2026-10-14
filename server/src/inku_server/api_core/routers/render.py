@@ -432,7 +432,7 @@ def _saved_color_arrangements(work: dict) -> tuple[ColorArrangements, dict[str, 
     if not catalog_id:
         raise HTTPException(status_code=422, detail="saved color catalog is unknown")
     try:
-        return ColorArrangements.from_saved(work.get("svg") or "", color_map), color_map, str(catalog_id)
+        return ColorArrangements.from_saved(work.get("svg") or "", color_map, str(work.get("id") or "")), color_map, str(catalog_id)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 

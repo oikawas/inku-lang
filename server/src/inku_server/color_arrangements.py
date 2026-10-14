@@ -1,7 +1,16 @@
-"""Index distinct concrete-color assignments without sampling or factorial lists."""
+"""Index distinct concrete-color assignments without sampling or factorial lists.
+
+The assignments are ranked in lexicographic order, where neighbouring ranks differ
+only in the last colors. Shown in that order, a page moved one color through the
+palette and then the one before it (the author, 2026-10-14), so an option number
+is spread over all the ranks by a golden-ratio stride coprime with their count,
+from a start the work decides. It stays one-to-one: the pages still meet every
+assignment once.
+"""
 
 from __future__ import annotations
 
+import hashlib
 import math
 import re
 from dataclasses import dataclass
@@ -27,9 +36,11 @@ class ColorArrangements:
     palette: tuple[str, ...]
     used: tuple[str, ...]
     identity_rank: int
+    # Where the spread order starts, from the work (see the module note).
+    start: int = 0
 
     @classmethod
-    def from_saved(cls, svg: str, color_map: dict[str, str]) -> ColorArrangements:
+    def from_saved(cls, svg: str, color_map: dict[str, str], key: str = "") -> ColorArrangements:
         colors = [normalized_hex(value) for key, value in color_map.items() if key.startswith("palette:")]
         if not colors or any(color is None for color in colors):
             raise ValueError("saved color catalog has no usable palette")
@@ -56,7 +67,8 @@ class ColorArrangements:
             digit = remaining.index(color)
             identity_rank += digit * math.perm(len(remaining) - 1, len(used) - position - 1)
             remaining.pop(digit)
-        return cls(palette, used, identity_rank)
+        start = int.from_bytes(hashlib.sha256(key.encode("utf-8")).digest()[:8], "big")
+        return cls(palette, used, identity_rank, start)
 
     @property
     def total(self) -> int:
@@ -72,10 +84,17 @@ class ColorArrangements:
             "total": self.total,
         }
 
+    def _stride(self) -> int:
+        stride = max(1, round(self.total * (math.sqrt(5) - 1) / 2))
+        while math.gcd(stride, self.total) != 1:
+            stride += 1
+        return stride
+
     def substitution(self, index: int) -> dict[str, str]:
         if not 0 <= index < self.total:
             raise ValueError("color arrangement index is exhausted or invalid")
-        rank = index + (index >= self.identity_rank)
+        spread = (self.start + index * self._stride()) % self.total
+        rank = spread + (spread >= self.identity_rank)
         remaining = list(self.palette)
         chosen = []
         for position in range(len(self.used)):

@@ -95,7 +95,7 @@ def test_retired_catalog_arrangement_render_save_and_replay(monkeypatch):
         assert selected["render_seed"] == "77" and selected["composition_seed"] == "17"
         assert selected["render_wild"] is True
         assert selected["render_canvas_aspect_id"] == "hd_monitor"
-        substitution = ColorArrangements.from_saved(parent["svg"], colors).substitution(index)
+        substitution = ColorArrangements.from_saved(parent["svg"], colors, parent["id"]).substitution(index)
         before, after = ElementTree.fromstring(parent["svg"]), ElementTree.fromstring(selected["svg"])
         assert len(list(before.iter())) == len(list(after.iter()))
         changed = False

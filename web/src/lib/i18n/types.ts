@@ -1197,6 +1197,10 @@ export interface LangPack {
 	replayComparisonOriginal: string;
 	replayComparisonCurrent: string;
 	replayComparisonProvisionalSeed: (seed: number) => string;
+	replayComparisonSaveChild: string;
+	replayComparisonSaving: string;
+	replayComparisonSaved: string;
+	replayComparisonSaveFailed: string;
 	provenanceSectionInterpretation: string;
 	provenanceSectionPerformance: string;
 	provenanceSectionIdentity: string;

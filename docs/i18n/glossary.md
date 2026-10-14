@@ -52,7 +52,7 @@
 | drop-only 優先 | **drop-only preference** | 名詞句。不正値を補正せず落とす設計傾向 | — |
 | 演奏可能な Score | **performable Score** | 名詞句。coerce 後に Render Engine へ渡せる状態 | ~~renderable~~（技術文脈では可） |
 | ★ 作品として引き直す | **new performance** | 名詞句。保存 Score からの別演奏（"Stored SVG and a new performance"） | 芸術文脈は performance、技術文脈だけ render、と分ける従来規則の適用 |
-| ★ 同条件で再実行 | **replay** | 名詞／動詞。履歴の再現描画 | — |
+| ★ 同条件で再実行 | **replay** | 名詞／動詞。履歴の再演描画 | — |
 | ★ 描画（技術操作） | **render** | 動詞・名詞。API・関数・engine の技術文脈のみ（`render-score`・Render Engine・`renderer.py`） | UI の芸術文脈では使わない |
 | ★ ラスタ化（SVG→PNG） | **rasterize** | 動詞。PNG は SVG の派生物 | ~~convert~~ |
 | 描画エンジン | **Render engine** | 名詞句。版数は **engine version** | ~~Drawing engine~~ |

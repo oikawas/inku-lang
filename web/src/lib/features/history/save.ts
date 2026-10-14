@@ -13,6 +13,11 @@ export type SaveHistoryOptions = {
 	lineageParentNodeId?: string | null;
 	derivationKind?: DerivationKind | null;
 	derivationMetadata?: Record<string, unknown>;
+	replayWorkId?: string;
+	replayRenderHash?: string;
+	replaySvgSha256?: string;
+	idempotencyKey?: string;
+	rejectOnFailure?: boolean;
 	/** False when more saves follow at once: the listing and the generation count
 	 *  are fetched again after the last one, not after each. Each costs a round
 	 *  trip, and the listing's is about 0.4 s on production whatever its size.
@@ -30,6 +35,7 @@ export type SaveHistoryDefaults = {
 
 export type SaveHistoryDependencies = {
 	apiFetch: ApiFetch;
+	apiError?: (response: Response) => Promise<Error>;
 	signedIn: () => boolean;
 	ensureSvg: (item: HistoryItem) => Promise<string>;
 	composeFallbackFor: (item: HistoryItem) => string | null;
@@ -65,7 +71,10 @@ export async function saveHistoryItem(
 	try {
 		const response = await deps.apiFetch('/api/history', {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			headers: {
+				'Content-Type': 'application/json',
+				...(options.idempotencyKey ? { 'Idempotency-Key': options.idempotencyKey } : {}),
+			},
 			body: JSON.stringify({
 				input: item.input,
 				ddl: item.ddl,
@@ -107,6 +116,11 @@ export async function saveHistoryItem(
 				lineage_parent_node_id: options.lineageParentNodeId ?? null,
 				derivation_kind: options.derivationKind ?? null,
 				derivation_metadata: options.derivationMetadata ?? {},
+				...(options.replayWorkId ? {
+					replay_work_id: options.replayWorkId,
+					replay_render_hash: options.replayRenderHash,
+					replay_svg_sha256: options.replaySvgSha256,
+				} : {}),
 				sketch_text: item.sketch_text ?? null,
 				sketch_grain: item.sketch_grain ?? null,
 				...(item.sketch_state ? { sketch_state: item.sketch_state } : {}),
@@ -114,7 +128,11 @@ export async function saveHistoryItem(
 			})
 		});
 		if (response.ok) saved = await response.json() as HistoryItem;
-	} catch {
+		else if (options.rejectOnFailure) throw deps.apiError
+			? await deps.apiError(response)
+			: new Error(`HTTP ${response.status}`);
+	} catch (error) {
+		if (options.rejectOnFailure) throw error;
 		// Preserve the existing best-effort save contract. Callers reconcile the
 		// listing even when the transport failed and receive null for the save.
 	}

@@ -275,11 +275,6 @@ object Dimens {
     /** 2.5dp. The plotter-like stroke of the finishing forms. */
     val cameraPlotterStroke: Dp = 2.5.dp
 
-    // --- Model catalog -----------------------------------------------------
-
-    /** 2dp. Between the metadata lines within one catalog model. */
-    val modelCatalogDetailsGap: Dp = 2.dp
-
     // --- Database startup refusal -----------------------------------------
 
     /** 32dp. Page inset on the startup refusal screen. */

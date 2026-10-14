@@ -29,7 +29,7 @@ import java.util.Locale
 /** Used by both the publication picker and the drawing model chooser. */
 @Composable
 internal fun ModelCatalogDetails(model: CatalogModel, strings: InkuStrings) {
-    Column(verticalArrangement = Arrangement.spacedBy(Dimens.modelCatalogDetailsGap), modifier = Modifier.testTag("CatalogDetails:${model.id}")) {
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs), modifier = Modifier.testTag("CatalogDetails:${model.id}")) {
         model.labels.forEach { label ->
             Text(label.name(strings.code == "en"), style = MaterialTheme.typography.labelSmall,
                 color = if (label.publishable) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error)

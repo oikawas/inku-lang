@@ -132,8 +132,7 @@
 
 	/** What one chosen field says about one work, and what the hover shows.
 	 *
-	 *  The full form is separate because two of the four are cut short on the
-	 *  tile: the model id is long and the strip is a thumbnail wide. */
+	 *  The model keeps its name on the tile; the hover adds the full provider. */
 	function stripFieldText(field: HistoryStripField, item: HistoryItem): { short: string; full: string } {
 		if (field === 'generation') {
 			const label = lineageGenerationLabel(item);
@@ -279,7 +278,7 @@
 							<div class="thumb-meta">
 								{#each historyStripFields as field, index (field)}
 									{@const text = stripFieldText(field, it)}
-									<span class={index === 0 ? 'thumb-meta-first' : 'thumb-meta-rest'} title={text.full}>{text.short}</span>
+									<span class={index === 0 ? 'thumb-meta-first' : 'thumb-meta-rest'} class:thumb-meta-model={field === 'model'} title={text.full}>{text.short}</span>
 								{/each}
 							</div>
 						{/if}
@@ -527,12 +526,19 @@
 		flex-direction: column;
 		gap: 1px;
 	}
-	/* The first line reads as the heading of the tile and the rest as its
-	   footnotes, whichever facts are in them -- the weight belongs to the
-	   position, not to the fact that used to sit there. Three lines fit under
-	   an 82px tile at this size. */
+	/* Weight follows the field's position. A model may take several lines to
+	   keep the version and variant readable on an 82px tile. */
 	.thumb-meta-first { font-size: var(--ui-font-size-10); line-height: 1.3; font-weight: 650; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.thumb-meta-rest { font-size: var(--ui-font-size-10); line-height: 1.3; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.thumb-meta-model {
+		font-size: var(--ui-font-size-11);
+		line-height: 1.4;
+		color: var(--fg);
+		white-space: normal;
+		overflow: visible;
+		overflow-wrap: anywhere;
+		text-overflow: clip;
+	}
 	.thumb-held-badge {
 		position: absolute;
 		top: 3px;

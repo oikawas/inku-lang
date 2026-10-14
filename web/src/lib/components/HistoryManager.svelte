@@ -209,6 +209,7 @@
 	}
 
 	let thumbGridWrapEl = $state<HTMLDivElement | null>(null);
+	let searchInputEl = $state<HTMLInputElement | null>(null);
 	let historyDisplayMode = $state<'chronological' | 'lineage'>('chronological');
 	let lineageGroups = $state<LineageHistoryGroup[]>([]);
 	let lineageGroupTotal = $state(0);
@@ -899,7 +900,20 @@
 				/>
 			{/if}
 		</div>
-		<label class="history-search">{t().historySearchLabel} <input bind:value={historySearch} title={t().historySearchHint} /></label>
+		<div class="history-search">
+			<label for="library-history-search">{t().historySearchLabel}</label>
+			<div class="history-search-input">
+				<input id="library-history-search" bind:this={searchInputEl} bind:value={historySearch} title={t().historySearchHint} />
+				<button
+					class="ghost-btn history-search-clear"
+					type="button"
+					aria-label={t().historySearchClear}
+					title={t().historySearchClear}
+					disabled={!historySearch}
+					onclick={() => { historySearch = ''; searchInputEl?.focus(); }}
+				>×</button>
+			</div>
+		</div>
 	</div>
 	{#if selectedHistoryIds.length > 0}
 		<div class="history-selection-status">{t().historySelectionCount(selectedHistoryIds.length)}</div>
@@ -1443,17 +1457,40 @@
 		color: var(--fg2);
 		font-size: var(--ui-font-size-12);
 	}
-	.history-search input {
+	.history-search-input {
+		position: relative;
 		width: min(240px, 30vw);
 		flex: 1;
 		min-width: 0;
-		padding: 5px 7px;
+	}
+	.history-search input {
+		box-sizing: border-box;
+		width: 100%;
+		min-width: 0;
+		padding: 5px 34px 5px 7px;
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
 		background: var(--panel);
 		color: var(--fg);
 		font-size: var(--ui-font-size-12);
 		font-family: inherit;
+	}
+	.history-search-clear {
+		position: absolute;
+		right: 1px;
+		top: 50%;
+		transform: translateY(-50%);
+		padding: var(--btn-sm-padding);
+		font-size: var(--btn-sm-font-size);
+		border-radius: var(--btn-sm-radius);
+		border: 0;
+		line-height: 1;
+		background: transparent;
+		color: var(--fg2);
+	}
+	.history-search-clear:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: -2px;
 	}
 	.history-selection-status,
 	.history-selection-reset {

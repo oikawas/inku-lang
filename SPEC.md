@@ -939,6 +939,11 @@ DDL, Score, provenance, and lineage. Refinement shows its relation to the source
 work through derivation metadata and presentation; a programmer's diff is not
 the center of the making surface.
 
+The Library search field has an × button that clears the query and returns
+focus to the input. The history strip abbreviates the provider while wrapping
+model names without dropping versions, families, sizes or variants. The full
+provider and model names are also available in the tooltip.
+
 **How much is shown is the writer's choice (v2.9.8).** The number of tools on
 screen is too many for someone opening inku for the first time and too few for
 someone building a work up, so the visible surface is one of three **UI modes**,

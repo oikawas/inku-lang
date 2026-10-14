@@ -223,7 +223,7 @@ object InkuStringsEn : InkuStrings {
         "nothing_to_move" -> "This work has no numeric ranges."
         "not_canonical" -> "The instructions have unresolved parts, so the composition cannot move."
         "unsupported_sentence" -> "These instructions include a sentence that cannot change composition."
-        "unplaced_sentence" -> "A sentence has no recoverable placement, so the composition cannot move."
+        "unplaced_sentence" -> "A sentence states no range or place, so the ranges in the instructions cannot be chosen again."
         "author_range" -> "The ranges the author specified keep the composition in place."
         "no_other_answer" -> "No other composition was found."
         "same_ranges" -> "Chance chose the same composition ranges."
@@ -231,7 +231,7 @@ object InkuStringsEn : InkuStrings {
         "not_canonical_after" -> "The changed instructions could not be checked, so the composition cannot move."
         else -> "Another composition is unavailable, so the composition ranges are kept."
     }
-    override val recomposeKeptRanges = "Redrawn with the same numeric ranges."
+    override val recomposeKeptRanges = "Redrawn with a new composition seed; the instructions are unchanged."
 
     override val variationAmplitudeLabel: (String) -> String = { id ->
         // Keep the recorded legacy amplitudes readable; these are not controls.

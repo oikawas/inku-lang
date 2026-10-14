@@ -216,7 +216,7 @@ object InkuStringsJa : InkuStrings {
         "nothing_to_move" -> "この作品には数で書いた範囲が無い。"
         "not_canonical" -> "指示書に未確定の部分があるため、構図を動かせない。"
         "unsupported_sentence" -> "この指示書には構図の変更に対応していない文がある。"
-        "unplaced_sentence" -> "配置を読み戻せない文があるため、構図を動かせない。"
+        "unplaced_sentence" -> "範囲も場所も書かれていない文があるため、指示書の範囲は選び直せない。"
         "author_range" -> "作者が指定した範囲を保つため、構図を動かせない。"
         "no_other_answer" -> "今と違う構図が見つからない。"
         "same_ranges" -> "偶然が今と同じ構図の範囲を選んだ。"
@@ -224,7 +224,7 @@ object InkuStringsJa : InkuStrings {
         "not_canonical_after" -> "変更後の指示書を確かめられないため、構図を動かせない。"
         else -> "別の構図を使えないため、構図の範囲を保つ。"
     }
-    override val recomposeKeptRanges = "数で書いた範囲を保って描き直しました。"
+    override val recomposeKeptRanges = "指示書は変えず、配置の seed を変えて描き直しました。"
 
     override val variationAmplitudeLabel: (String) -> String = { id ->
         when (id) {

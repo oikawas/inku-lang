@@ -86,6 +86,25 @@ pub fn sample_offset(
     }
 }
 
+/// The share of an open stroke, at each end, over which its variation settles:
+/// the 0.16 over which a hand stroke tapers (`stroke.rs`), or half a wave when
+/// the wave is shorter.
+fn settle_span(variation: &Variation) -> f64 {
+    (0.5 / frequency_cycles(variation.frequency)).min(0.16)
+}
+
+/// Raised-cosine weight: 0 at both ends, 1 from `span` inwards.
+fn settle(t: f64, span: f64) -> f64 {
+    let edge = t.min(1.0 - t);
+    if edge >= span {
+        1.0
+    } else {
+        0.5 * (1.0 - (std::f64::consts::PI * edge / span).cos())
+    }
+}
+
+/// A polygon edge's varied centerline. The variation keeps its full size up to
+/// the corners, which the contour stroke anchors and continues through.
 #[must_use]
 pub fn line_with_variation(
     start: Point,
@@ -94,6 +113,36 @@ pub fn line_with_variation(
     seed: Seed,
     amplitude: f64,
     canvas: CanvasSize,
+) -> Vec<Point> {
+    varied_line(start, end, variation, seed, amplitude, canvas, None)
+}
+
+/// An open line's varied centerline. Its ends stay where the Score put them,
+/// and the variation settles to nothing towards both: the seeded wave phase
+/// and the noise are rarely zero at the ends, and a pinned end otherwise made
+/// the first and last segment jump sideways, a thin straight whisker on a
+/// tapered brush (render engine 76).
+#[must_use]
+pub fn open_line_with_variation(
+    start: Point,
+    end: Point,
+    variation: &Variation,
+    seed: Seed,
+    amplitude: f64,
+    canvas: CanvasSize,
+) -> Vec<Point> {
+    let span = settle_span(variation);
+    varied_line(start, end, variation, seed, amplitude, canvas, Some(span))
+}
+
+fn varied_line(
+    start: Point,
+    end: Point,
+    variation: &Variation,
+    seed: Seed,
+    amplitude: f64,
+    canvas: CanvasSize,
+    settle_within: Option<f64>,
 ) -> Vec<Point> {
     let dx = end.x - start.x;
     let dy = end.y - start.y;
@@ -110,7 +159,10 @@ pub fn line_with_variation(
     for index in 1..segments {
         let t = index as f64 / segments as f64;
         let mut point = Point::new(start.x + t * dx, start.y + t * dy);
-        let offset = sample_offset(t, variation, seed, index, amplitude);
+        let mut offset = sample_offset(t, variation, seed, index, amplitude);
+        if let Some(span) = settle_within {
+            offset *= settle(t, span);
+        }
         if axis_x && !axis_y {
             point.x += offset;
         } else if axis_y && !axis_x {
@@ -251,6 +303,8 @@ pub fn edge_contour_with_anchors(
     AnchoredContour { points, anchors }
 }
 
+/// An arc's varied centerline. Both ends stay on the arc for the touching
+/// contract, and, as on an open line, the variation settles towards them.
 #[must_use]
 pub fn arc_points_with_variation(
     arc: ArcGeometry,
@@ -271,16 +325,12 @@ pub fn arc_points_with_variation(
     let axis_x = variation.dimensions.contains(&Dimension::PositionX);
     let axis_y = variation.dimensions.contains(&Dimension::PositionY);
     let last = base.len() - 1;
+    let span = settle_span(variation);
     let mut result = Vec::with_capacity(base.len());
     result.push(base[0]);
     for (index, point) in base.iter().copied().enumerate().take(last).skip(1) {
-        let offset = sample_offset(
-            index as f64 / last as f64,
-            variation,
-            seed,
-            index,
-            amplitude,
-        );
+        let t = index as f64 / last as f64;
+        let offset = sample_offset(t, variation, seed, index, amplitude) * settle(t, span);
         result.push(offset_contour_point(
             point, offset, arc.center, axis_x, axis_y,
         ));
@@ -636,4 +686,98 @@ pub fn point_to_pixels(point: Point, canvas: CanvasSize) -> Point {
 #[must_use]
 pub fn size_to_pixels(size: Point, canvas: CanvasSize) -> Point {
     Point::new(size.x * canvas.unit(), size.y * canvas.unit())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn variation(json: &str) -> Variation {
+        serde_json::from_str(json).expect("a variation")
+    }
+
+    const BROAD_SLOW_WAVE: &str = r#"{"amplitude":"broad","frequency":"slow","quality":"wave",
+        "dimensions":["position_x","position_y"]}"#;
+
+    #[test]
+    fn the_settling_share_is_the_tapered_end_or_half_a_wave() {
+        for (frequency, span) in [("slow", 0.16), ("medium", 0.5 / 6.0), ("high", 0.5 / 14.0)] {
+            let json = format!(
+                r#"{{"amplitude":"broad","frequency":"{frequency}","quality":"wave",
+                    "dimensions":["position_x","position_y"]}}"#
+            );
+            assert_eq!(settle_span(&variation(&json)), span, "{frequency}");
+        }
+    }
+
+    #[test]
+    fn an_open_line_keeps_its_ends_and_settles_its_variation_towards_them() {
+        let canvas = CanvasSize::new(1000.0, 1000.0);
+        let (start, end) = (Point::new(100.0, 500.0), Point::new(766.7, 500.0));
+        let amplitude = 48.0;
+        let variation = variation(BROAD_SLOW_WAVE);
+        let span = settle_span(&variation);
+        for seed in [7, 431, 4_434_821_668_328_665] {
+            let edge = line_with_variation(start, end, &variation, seed, amplitude, canvas);
+            let open = open_line_with_variation(start, end, &variation, seed, amplitude, canvas);
+            assert_eq!(open.len(), edge.len());
+            assert_eq!((open[0], open[open.len() - 1]), (start, end));
+            // The chord is horizontal, so a point's variation is its height off it.
+            let last = open.len() - 1;
+            for neighbour in [open[1], open[last - 1]] {
+                assert!(
+                    (neighbour.y - start.y).abs() <= 0.03 * amplitude,
+                    "{seed}: {neighbour:?}"
+                );
+            }
+            for (index, (open, edge)) in open.iter().zip(&edge).enumerate() {
+                let t = index as f64 / last as f64;
+                if (span..=1.0 - span).contains(&t) {
+                    assert_eq!(open, edge, "{seed}: the middle keeps the full variation");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn an_arc_keeps_its_ends_and_settles_its_variation_towards_them() {
+        let canvas = CanvasSize::new(1000.0, 1000.0);
+        let arc = ArcGeometry {
+            center: Point::new(500.0, 500.0),
+            radius: 300.0,
+            start_degrees: 0.0,
+            end_degrees: 180.0,
+        };
+        let amplitude = 48.0;
+        let variation = variation(BROAD_SLOW_WAVE);
+        let span = settle_span(&variation);
+        let length = arc.radius * std::f64::consts::PI;
+        let base = arc_points(
+            arc.center,
+            arc.radius,
+            arc.start_degrees,
+            arc.end_degrees,
+            segment_count(length, canvas) + 1,
+        );
+        let last = base.len() - 1;
+        for seed in [7, 431, 4_434_821_668_328_665] {
+            let points = arc_points_with_variation(arc, &variation, seed, amplitude, canvas);
+            assert_eq!((points[0], points[last]), (base[0], base[last]));
+            for neighbour in [points[1], points[last - 1]] {
+                let off_the_arc = (distance(neighbour, arc.center) - arc.radius).abs();
+                assert!(off_the_arc <= 0.03 * amplitude, "{seed}: {off_the_arc}");
+            }
+            for index in 1..last {
+                let t = index as f64 / last as f64;
+                if (span..=1.0 - span).contains(&t) {
+                    let offset = sample_offset(t, &variation, seed, index, amplitude);
+                    let full = offset_contour_point(base[index], offset, arc.center, true, true);
+                    assert_eq!(
+                        points[index], full,
+                        "{seed}: the middle keeps the full variation"
+                    );
+                }
+            }
+        }
+    }
 }

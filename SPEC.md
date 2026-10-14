@@ -2618,6 +2618,15 @@ was invisible under a brush and a different line under a thin pencil. The clamp 
 0.40 of the representative dimension stays, as the safety valve for a figure
 smaller than its own mark.
 
+Open lines and arcs keep their start and end where the Score puts them and let the
+sway settle to nothing towards both (render engine 76): over the shorter of 0.16 of
+the line (the share over which a hand stroke tapers) and half a wave, rising as a
+raised cosine. The sway inside is unchanged. The seeded wave phase (v2.0.5) and the
+perlin values are rarely zero at the ends, so pinning only the ends made the first
+and last segment jump sideways, and on a brush's thin end that jump read as a thin,
+whisker-like straight line. Polygon edges keep their full sway up to the corners,
+where the contour stroke continues into the next edge.
+
 `quality` is chosen roughly as follows:
 
 - `perlin`: fine, irregular sway of a line — "swaying", "swaying narrowly"

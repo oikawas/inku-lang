@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.124 (2026-10-14 / Build 1200)
+
 ### 2026-10-14 — Next 8 color options switches the displayed page
 
 Next 8 options replaces the displayed page once the next options are ready,

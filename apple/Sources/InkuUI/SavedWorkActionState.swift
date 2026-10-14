@@ -37,8 +37,7 @@ struct SavedWorkRefinementActions: View {
 
     var body: some View {
         Group {
-            Button(model.display.localized("描画パラメータの編集"), systemImage: "slider.horizontal.3") { onAction(work, "parameters") }
-            // WorkActionMenu.svelte: layout opens its own dialog, after the parameters.
+            // Layout keeps its own dialog after the reading and touch parameters are retired.
             Button(model.display.localized("配置を変える"), systemImage: "square.grid.2x2") { onAction(work, "layout") }
             Button(model.display.localized("色カタログを変える"), systemImage: "paintpalette") { onAction(work, "color") }
             if state?.showsDescriptionActions != false {

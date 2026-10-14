@@ -15,15 +15,12 @@ public struct RefinementView: View {
 
     public init(model: AppModel, work: SavedWork, onCommitted: @escaping @MainActor () -> Void = {},
                 onConfigureModels: @escaping @MainActor (String) -> Void = { _ in },
-                onClose: (@MainActor () -> Void)? = nil, layoutOnly: Bool = false) {
+                onClose: (@MainActor () -> Void)? = nil) {
         self.model = model
         self.onCommitted = onCommitted
         self.onConfigureModels = onConfigureModels
         self.onClose = onClose
-        // Web `inku-refine-kind`: the last dimension chosen comes back (initialize drops a locked reading).
-        let refinement = RefinementModel(work: work, layoutOnly: layoutOnly)
-        if !layoutOnly, let saved = model.display.preferences.refineKind.flatMap(RefinementKind.init(rawValue:)),
-           RefinementKind.availableKinds.contains(saved) { refinement.kind = saved }
+        let refinement = RefinementModel(work: work)
         _refinement = State(initialValue: refinement)
     }
 
@@ -34,7 +31,7 @@ public struct RefinementView: View {
     public var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
-                Text(model.display.localized("描画要素を編集")).inkuFont(16, weight: .semibold)
+                Text(model.display.localized("配置を変える")).inkuFont(16, weight: .semibold)
                 Spacer()
                 Button { Task { await close() } } label: { Image(systemName: "xmark") }
                     .buttonStyle(.plain)
@@ -105,35 +102,14 @@ public struct RefinementView: View {
     private var adjustmentControls: some View {
         @Bindable var refinement = refinement
         return VStack(alignment: .leading, spacing: 14) {
-            if self.refinement.layoutOnly {
-                // RefinementAdjustView.svelte layoutOnly: the title with its tooltip, then by principle or by chance.
-                Text(model.display.localized("配置を変える")).inkuFont(14, weight: .semibold)
-                    .inkuTooltip(kindTooltip(.layout, locked: false))
-                Picker(model.display.localized("配置を変える"), selection: $refinement.recomposeMode) {
-                    Text(model.display.localized("原理に沿う")).tag(Recomposition.Mode.principled)
-                    Text(model.display.localized("偶然に委ねる")).tag(Recomposition.Mode.chance)
-                }.pickerStyle(.radioGroup).labelsHidden().disabled(controlsDisabled)
-            } else {
-                Text(model.display.localized("変更する要素を1つ選択")).inkuFont(14, weight: .semibold)
-                LazyVGrid(columns: [GridItem(.flexible(minimum: 120)), GridItem(.flexible(minimum: 120))], alignment: .leading, spacing: 10) {
-                    ForEach(RefinementKind.availableKinds.filter { !self.refinement.sourceIsDDLOrigin || $0 != .reading }, id: \.self) { kind in
-                        kindButton(kind)
-                    }
-                }
-            }
-            if self.refinement.sourceIsLocked {
-                Label(model.display.localized("この作品はDDLが確定しているため、記述を読み直せません。配置・タッチの候補は用意できます。"), systemImage: "lock")
-                    .inkuFont(12).foregroundStyle(.secondary)
-            }
+            // The separate layout dialog remains after the parameters dialog is retired.
+            Text(model.display.localized("配置を変える")).inkuFont(14, weight: .semibold)
+                .inkuTooltip(kindTooltip(.layout))
+            Picker(model.display.localized("配置を変える"), selection: $refinement.recomposeMode) {
+                Text(model.display.localized("原理に沿う")).tag(Recomposition.Mode.principled)
+                Text(model.display.localized("偶然に委ねる")).tag(Recomposition.Mode.chance)
+            }.pickerStyle(.radioGroup).labelsHidden().disabled(controlsDisabled)
             Text(model.display.localized(kindDescription)).inkuFont(13).foregroundStyle(.secondary)
-            if self.refinement.kind == .touch {
-                TextField(model.display.localized("タッチへ託す言葉"), text: $refinement.words, axis: .vertical)
-                    .lineLimit(1...3).textFieldStyle(.roundedBorder)
-                    .accessibilityLabel(model.display.localized("タッチへ託す言葉"))
-                    .disabled(controlsDisabled)
-                Text(model.display.localized("タッチの変更では、元の配色・配置・ワイルド設定を保ちます。"))
-                    .inkuFont(12).foregroundStyle(.secondary)
-            }
             HStack {
                 Text(model.display.localized(self.refinement.inheritWild ? "筆致制限（継承）" : "筆致制限"))
                     .inkuFont(12).foregroundStyle(.secondary)
@@ -152,55 +128,19 @@ public struct RefinementView: View {
     private var kindDescription: String {
         switch refinement.kind {
         case .layout: "元の指示書を使い、配置を変えます。記述は読み直しません。"
-        case .reading: "元の記述を読み直して描きます。"
-        case .variation: "いまの変奏では、指示書・配色・タッチ・要素数は変わりません。"
-        case .touch: "同じ言葉は同じタッチ（シード）になります。1案だけ用意できます。"
         }
     }
 
     private var effectiveWild: Bool { refinement.inheritWild ? refinement.work.renderWild ?? false : refinement.wildOverride }
     private var costDescription: String {
         switch refinement.kind {
-        case .touch: "超高速（LLM不要）"
         case .layout: "高速（補完の穴があるときだけLLM）"
-        case .reading: "低速（LLM・API使用）"
-        case .variation: "この操作は現在使用できません。"
         }
     }
 
-    private func kindButton(_ kind: RefinementKind) -> some View {
-        let selected = refinement.kind == kind
-        let locked = kind == .reading && refinement.sourceIsLocked
-        return Button {
-            refinement.kind = kind
-            model.display.preferences.refineKind = kind.rawValue
-        } label: {
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: kind.symbol).frame(width: 18)
-                Text(model.display.localized(kind.titleKey)).inkuFont(13, weight: .semibold)
-                    .frame(maxWidth: .infinity, alignment: .leading).multilineTextAlignment(.leading)
-                Image(systemName: selected ? "checkmark.circle.fill" : locked ? "lock.fill" : "circle")
-                    .accessibilityHidden(true)
-            }.padding(12).frame(maxWidth: .infinity, minHeight: 55, alignment: .leading)
-                .background(selected ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(selected ? Color.accentColor : Color.secondary.opacity(0.2)))
-        }.buttonStyle(.plain).disabled(controlsDisabled || !refinement.initialized || locked)
-            .inkuTooltip(kindTooltip(kind, locked: locked), placement: locked ? .right : .bottom)
-            .accessibilityLabel(model.display.localized(kind.titleKey))
-            .accessibilityValue(model.display.localized(selected ? "選択済み" : "未選択"))
-            .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-
-    /// RefinementAdjustView.svelte:96-117: what each element does; a held work names why reading is off.
-    private func kindTooltip(_ kind: RefinementKind, locked: Bool) -> String {
-        if locked {
-            return model.display.tooltip("編集した指示書で確定した作品です。記述を読み直す操作は使えません。", serverKey: "descriptionLockedReason")
-        }
+    private func kindTooltip(_ kind: RefinementKind) -> String {
         switch kind {
         case .layout: return model.display.tooltip("保存した指示書の数で書いた範囲を、原理に沿うか偶然に委ねるかで選び直します。明示したかたむきと「隅」も候補のseedで選び直します。動かせないときは理由を示し、元の指示書で描き直します", serverKey: "tooltipCanvasVaryComposition")
-        case .reading: return model.display.tooltip("AIによる言葉の読み取りからやり直し、新しい正規化DDLを生成します。配置とタッチは下流工程として再生成されます", serverKey: "tooltipCanvasVaryInterpretation")
-        case .touch: return model.display.tooltip("入力した言葉から、線の質感、太さの揺らぎ、インクの滲みなどのタッチだけを決めます。同じ言葉は同じタッチになり、読み取りとJSON Scoreは保たれ、LLMを呼びません", serverKey: "tooltipCanvasVaryPerformance")
-        case .variation: return ""
         }
     }
 
@@ -211,10 +151,6 @@ public struct RefinementView: View {
                 VStack(alignment: .leading, spacing: 10) { generateButton(count: 1); generateButton(count: 4) }
             }
             Label(model.display.localized(costDescription), systemImage: "clock").inkuFont(12).foregroundStyle(.secondary)
-            if refinement.kind == .reading && !model.hasNextDrawingModel {
-                Text(model.display.localized("描画モデルが未設定です。設定でAIサービスとモデルを選択してください。"))
-                    .inkuFont(12).foregroundStyle(.secondary)
-            }
             if refinement.hasUnsaved {
                 Text(model.display.localized("別の候補を描くには、今の候補を採用するか破棄してください。"))
                     .inkuFont(12).foregroundStyle(.secondary)
@@ -228,8 +164,7 @@ public struct RefinementView: View {
         Button(model.display.localized(count == 1 ? "1案を描く" : "4案を描く"), systemImage: count == 1 ? "paintbrush" : "square.grid.2x2") {
             Task { await refinement.generate(app: model, count: count) }
         }.buttonStyle(.bordered)
-            .disabled(!refinement.canGenerate(count: count) || controlsDisabled || model.isPreview
-                || refinement.kind == .reading && !model.hasNextDrawingModel)
+            .disabled(!refinement.canGenerate(count: count) || controlsDisabled || model.isPreview)
             // RefinementAdjustView.svelte:134,144.
             .inkuTooltip(count == 1 ? model.display.tooltip("選択した1種類の要素だけを変更した1案を作ります。選んだ候補は履歴に保存できます", serverKey: "tooltipRefineSingle")
                          : model.display.tooltip("選択した1種類の要素だけを変えて4案を作ります。", serverKey: "tooltipVariationGridDefault"))
@@ -284,9 +219,6 @@ public struct RefinementView: View {
             Text(model.display.localizedFormat("候補 %ld", candidate.number)).inkuFont(14, weight: .semibold)
             Text(model.display.localized(candidate.kind.titleKey)).inkuFont(12).foregroundStyle(.secondary)
             workFacts(candidate.work)
-            if candidate.kind == .variation {
-                Text(model.display.localized("動いたもの: なし")).inkuFont(12, weight: .semibold)
-            }
             // RefinementCandidateGrid.svelte: what moved, or why the ranges stayed.
             if let recomposition = candidate.recomposition {
                 ForEach(recomposition.lines(display: model.display), id: \.self) { line in
@@ -303,11 +235,6 @@ public struct RefinementView: View {
                     .disabled(controlsDisabled)
                     .accessibilityLabel(model.display.localizedFormat("候補 %ld を採用", candidate.number))
                 Text(model.display.localized("未保存")).inkuFont(12).foregroundStyle(.secondary)
-            }
-            if candidate.kind == .reading, let ddl = candidate.work.ddl, !ddl.isEmpty {
-                DisclosureGroup(model.display.localized("指示書")) {
-                    Text(ddl).inkuFont(12, design: .monospaced).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-                }.inkuFont(12)
             }
         }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))

@@ -33,7 +33,7 @@ func runReplayComparisonChecks() async throws {
     legacy.renderEngineVersion = nil
     legacy = try await saveReplayComparisonFixture(legacy, parentNodeID: originalNodeID, context: context, database: database)
     var wordSeeded = original
-    // The saved words override this deliberately disagreeing recorded number, as on Server.
+    // Archived words are display-only; the recorded performance seed must win.
     wordSeeded.renderSeed = "7"; wordSeeded.seedText = "\u{001c}\u{3000}春風e\u{0301}\u{200b}\u{00a0}\u{001f}"
     wordSeeded.compositionSeed = nil; wordSeeded.renderEngineVersion = "archived-check-engine"
     wordSeeded = try await saveReplayComparisonFixture(wordSeeded, parentNodeID: originalNodeID, context: context, database: database)
@@ -74,9 +74,9 @@ func runReplayComparisonChecks() async throws {
 
     // Failure: an old seedless work randomized replay or borrowed an invented composition seed.
     let expectedLegacy = try expectedReplayComparisonSVG(work: legacy, context: context, seed: "0")
-    let expectedWords = try expectedReplayComparisonSVG(work: wordSeeded, context: context, seed: "14859340650796947346")
-    let staleNumericWords = try expectedReplayComparisonSVG(work: wordSeeded, context: context, seed: "7")
-    guard expectedWords != staleNumericWords else { throw CheckFailure.message("Saved-word fixture does not distinguish Server seed precedence") }
+    let expectedWords = try expectedReplayComparisonSVG(work: wordSeeded, context: context, seed: "7")
+    let obsoleteWordSeed = try expectedReplayComparisonSVG(work: wordSeeded, context: context, seed: "14859340650796947346")
+    guard expectedWords != obsoleteWordSeed else { throw CheckFailure.message("Saved-word fixture does not distinguish recorded seed from obsolete word hashing") }
     var legacySnapshot: ReplayComparisonSnapshot?
     var wordSnapshot: ReplayComparisonSnapshot?
     let boundaryCompleted = await app.performComparison(status: "legacy replay check", restoreDisplayStatus: true) { token in
@@ -101,7 +101,7 @@ func runReplayComparisonChecks() async throws {
           app.selectedWork == original, app.currentSVG == svg, app.visibleDDL == ddl, app.scoreJSON == score,
           app.status == status, try await database.list() == rows,
           try await database.lineage(focusNodeID: originalNodeID) == lineage, await provider.calls == 0 else {
-        throw CheckFailure.message("Old-work replay lost raw seed absence, exact word seed, versions or read-only state")
+        throw CheckFailure.message("Old-work replay lost raw seed absence, recorded numeric seed, archived words, versions or read-only state")
     }
 
     // Failure: a suspended comparison callback accepted a snapshot after Stop.
@@ -132,7 +132,7 @@ func runReplayComparisonChecks() async throws {
           try await database.work(id: original.id) == original, await provider.calls == 0 else {
         throw CheckFailure.message("Stopped replay accepted a late snapshot or changed persisted/displayed state")
     }
-    print("Replay comparison passed: saved SVG/current SVG and versions captured; no history, lineage or display mutation; old seedless work uses provisional 0 with raw missing composition; saved Unicode words override a numeric seed exactly; stale parent/token and stopped callback refused. Provider calls: 0.")
+    print("Replay comparison passed: saved SVG/current SVG and versions captured; no history, lineage or display mutation; old seedless work uses provisional 0 with raw missing composition; archived Unicode words stay unchanged and replay uses the recorded numeric seed; stale parent/token and stopped callback refused. Provider calls: 0.")
 }
 
 private func saveReplayComparisonFixture(_ source: SavedWork, parentNodeID: String, context: ExactJSON,

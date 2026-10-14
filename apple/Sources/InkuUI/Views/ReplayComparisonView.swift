@@ -78,7 +78,7 @@ public struct ReplayComparisonView: View {
     @ViewBuilder private var warnings: some View {
         if let snapshot = comparison.snapshot {
             if let seed = snapshot.provisionalSeed {
-                warning(model.display.localizedFormat("描画シードとタッチの言葉が保存されていないため、シード %@ を補った暫定表示です。", seed))
+                warning(model.display.localizedFormat("描画シードが保存されていないため、シード %@ を補った暫定表示です。", seed))
             }
             if let recorded = snapshot.recordedVersion {
                 if recorded != snapshot.currentVersion {

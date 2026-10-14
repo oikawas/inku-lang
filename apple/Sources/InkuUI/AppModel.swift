@@ -944,13 +944,13 @@ public final class AppModel {
     }
 
     /// Allocate the entire round before any drawing, keeping saved colors, locks, policies and source authority.
-    public func makeDrawingAdjustmentPlans(work: SavedWork, kind: String, count: Int, words: String = "",
+    public func makeDrawingAdjustmentPlans(work: SavedWork, kind: String, count: Int,
                                            amplitude: String = "medium", wildOverride: Bool? = nil,
                                            modelReference: String? = nil,
                                            recomposeMode: Recomposition.Mode = .principled) async throws -> [DrawingAdjustmentPlan] {
         guard !isPreview, !stopping, let host else { throw HostError("authoring_busy_or_unavailable") }
-        guard ["layout_change", "reinterpretation", "variation", "touch_change"].contains(kind) else { throw HostError("unknown_refinement_kind") }
-        guard [1, 4].contains(count), kind != "touch_change" || count == 1 else { throw HostError("invalid_adjustment_count") }
+        guard ["layout_change", "variation"].contains(kind) else { throw HostError("unknown_refinement_kind") }
+        guard [1, 4].contains(count) else { throw HostError("invalid_adjustment_count") }
         let drawing = settings
         let source = try await checkedSavedAdjustmentParent(work)
         let saved = try await host.savedAuthoringContext(workID: source.id)
@@ -960,21 +960,6 @@ public final class AppModel {
         let baseOptions = try ExactJSON(data: saved.renderOptions)
         guard let catalog = baseOptions["catalog_id"].string, baseOptions["resolved_color_map"].object != nil else {
             throw HostError("saved_refinement_options_unavailable")
-        }
-        if kind == "touch_change" {
-            let resolved = try InkuCore.renderSeedWords(fromText: words)
-            guard let placement = source.compositionSeed ?? baseOptions["composition_seed"].string ?? baseOptions["composition_seed"].number
-                    ?? source.renderSeed ?? baseOptions["render_seed"].string ?? baseOptions["render_seed"].number else {
-                throw HostError("saved_refinement_options_unavailable")
-            }
-            let from = source.renderSeed ?? baseOptions["render_seed"].string ?? baseOptions["render_seed"].number
-            let metadata: ExactJSON = .object(["render_seed_from": from.map(ExactJSON.number) ?? .null,
-                "render_seed_to": .number(resolved.seed), "seed_text": .string(resolved.text)])
-            let replay = try await host.makeSavedScoreReplayPlan(workID: source.id, renderSeed: resolved.seed,
-                compositionSeed: placement, derivationKind: kind, derivationMetadata: metadata.data, seedText: resolved.text)
-            try Task.checkCancellation()
-            return [DrawingAdjustmentPlan(stage1Model: source.stage1Model, stage2Model: source.stage2Model,
-                parent: source, operation: .replay(replay))]
         }
         if kind == "variation" {
             guard ["small", "medium", "large"].contains(amplitude) else { throw HostError("invalid_variation") }
@@ -997,20 +982,11 @@ public final class AppModel {
         guard let document = saved.document, let ddl = source.ddl, !ddl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw HostError("saved_document_unavailable")
         }
-        let reading = kind == "reinterpretation"
-        if reading && saved.authority != "description_authoritative" { throw HostError("description_source_locked") }
         let description = source.effectiveSourceText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if reading && description.isEmpty { throw HostError("description_required") }
         var models = drawing.models
-        if reading {
-            // The Web's Stage 2 picker leaves Stage 1 alone. Server preparation chooses Stage 1 for a rereading.
-            try validateAdjustmentModel(models.stage1Model, providers: drawing.providers)
-            models.stage2Model = models.stage1Model
-        } else {
-            models.stage1Model = source.stage1Model ?? ""
-            models.stage2Model = modelReference ?? (drawing.models.stage2Model.isEmpty ? source.stage2Model ?? "" : drawing.models.stage2Model)
-            if let modelReference { try validateAdjustmentModel(modelReference, providers: drawing.providers) }
-        }
+        models.stage1Model = source.stage1Model ?? ""
+        models.stage2Model = modelReference ?? (drawing.models.stage2Model.isEmpty ? source.stage2Model ?? "" : drawing.models.stage2Model)
+        if let modelReference { try validateAdjustmentModel(modelReference, providers: drawing.providers) }
         var usedSeeds = Set([source.compositionSeed].compactMap { $0 }.compactMap(UInt64.init))
         var requests: [GenerationRequest] = []
         var recompositions: [Recomposition?] = []
@@ -1022,7 +998,6 @@ public final class AppModel {
             options["wild"] = .bool(wildOverride ?? source.renderWild ?? baseOptions["wild"].bool ?? false)
             options["svg_profile"] = .string("display")
             var metadata: ExactJSON = .object([:])
-            var interpretation: String?
             var recomposition: Recomposition?
             if kind == "layout_change" {
                 var seed: UInt64
@@ -1033,30 +1008,25 @@ public final class AppModel {
                 // Server compose: the numeric ranges are chosen again with this option's exact configuration.
                 recomposition = Recomposition.choose(configuration: configuration, source: ddl, mode: recomposeMode, seed: String(seed))
                 metadata = .object(["composition_seed": .number(String(seed)), "recompose_mode": .string(recomposeMode.rawValue)])
-            } else {
-                interpretation = UUID().uuidString.lowercased()
-                metadata = .object(["interpretation_seed": .string(interpretation!)])
             }
             // A recomposed option is a new direct DDL from the saved work; unchanged ranges keep its document.
             let chosen = recomposition?.source
-            let authoring: GenerationAuthoring = reading
-                ? .description(description, autoCatalog: false, sketch: source.sketchText.map(SketchRequest.supplied) ?? .off)
-                : .directDDL(chosen ?? ddl)
-            let retains = !reading && chosen == nil
+            let authoring: GenerationAuthoring = .directDDL(chosen ?? ddl)
+            let retains = chosen == nil
             requests.append(GenerationRequest(authoring: authoring, configuration: configuration.data, renderOptions: options.data,
                 clipPolicy: saved.clipPolicy, models: models, providers: drawing.providers,
                 renderColorMaps: [catalog: baseOptions["resolved_color_map"].data], description: description,
                 parentWorkID: source.id, derivationKind: kind, saveHistory: false,
                 retainedDocument: retains ? document : nil, retainedAuthority: retains ? saved.authorityJSON : nil,
-                derivationMetadata: metadata.data, interpretationSeed: interpretation))
+                derivationMetadata: metadata.data))
             recompositions.append(recomposition)
             // A redraw of the saved DDL keeps the parent's completion range record (Server fork).
-            if !reading { requests[requests.count - 1].completionRanges = saved.completionRanges }
+            requests[requests.count - 1].completionRanges = saved.completionRanges
         }
         requests = try await pinPersonalPlanRequests(requests)
         try Task.checkCancellation()
         return zip(requests, recompositions).map { request, recomposition in
-            DrawingAdjustmentPlan(stage1Model: reading ? request.models.stage1Model : source.stage1Model,
+            DrawingAdjustmentPlan(stage1Model: source.stage1Model,
                 stage2Model: request.models.stage2Model.isEmpty ? nil : request.models.stage2Model, parent: source, operation: .author(request),
                 recomposition: recomposition)
         }
@@ -1120,19 +1090,19 @@ public final class AppModel {
         throw HostError("provider_selection_required")
     }
 
-    public func makeRefinementRequest(work: SavedWork, kind: String, direction: String = "", amplitude: String = "medium",
+    public func makeRefinementRequest(work: SavedWork, kind: String, amplitude: String = "medium",
                                       modelReference: String? = nil, catalogIDOverride: String? = nil,
-                                      readDescription: Bool? = nil, wildOverride: Bool? = nil) async throws -> GenerationRequest {
+                                      wildOverride: Bool? = nil) async throws -> GenerationRequest {
         guard let bootstrap else { throw HostError("installation_unavailable") }
-        guard ["touch_change", "layout_change", "catalog_change", "variation", "reinterpretation", "model_comparison"].contains(kind) else {
+        guard ["layout_change", "catalog_change", "variation", "model_comparison"].contains(kind) else {
             throw HostError("unknown_refinement_kind")
         }
         let saved = try await savedConfiguration(workID: work.id)
         let config = try ExactJSON(data: saved.configuration)
         let options = try ExactJSON(data: saved.renderOptions)
         let held = saved.authority == "ddl_authoritative"
-        let reading = readDescription ?? (kind == "reinterpretation" || kind == "model_comparison" || !direction.isEmpty && kind != "catalog_change")
-        if held && (reading || kind == "model_comparison" || kind == "reinterpretation") { throw HostError("description_source_locked") }
+        let reading = kind == "model_comparison"
+        if held && reading { throw HostError("description_source_locked") }
         let language = work.instructionLangResolved ?? config["language"].string ?? instructionLanguage(for: work.effectiveSourceText)
         guard let renderSeed = work.renderSeed ?? options["render_seed"].string ?? options["render_seed"].number,
               let canvasID = work.renderCanvasAspectID ?? options["canvas_aspect_id"].string,
@@ -1140,20 +1110,17 @@ public final class AppModel {
             throw HostError("saved_refinement_options_unavailable")
         }
         let fresh = String(UInt64.random(in: 0...((UInt64(1) << 53) - 1)))
-        let chosenRenderSeed = kind == "touch_change" ? fresh : renderSeed
-        let chosenCatalog = catalogIDOverride ?? (kind == "catalog_change" ? direction : catalogID)
-        let description = work.effectiveSourceText + (reading && !direction.isEmpty ? "\n" + direction : "")
+        let chosenCatalog = catalogIDOverride ?? catalogID
+        let description = work.effectiveSourceText
         let sketch: SketchRequest = work.sketchText.map(SketchRequest.supplied) ?? .off
         var request = try bootstrap.request(inputMode: reading ? "description" : "ddl", source: work.ddl ?? "", description: description,
-            language: language, catalogID: chosenCatalog, canvasID: canvasID, seed: chosenRenderSeed, wild: wildOverride ?? work.renderWild ?? false,
+            language: language, catalogID: chosenCatalog, canvasID: canvasID, seed: renderSeed, wild: wildOverride ?? work.renderWild ?? false,
             settings: nextGenerationHostSettings, parentWorkID: work.id, derivationKind: kind, sketch: sketch,
             variationAmplitude: kind == "variation" ? amplitude : nil, variationSeed: kind == "variation" ? fresh : nil,
             savedConfiguration: saved.configuration)
         var nextConfig = try ExactJSON(data: request.configuration)
         var nextOptions = try ExactJSON(data: request.renderOptions)
-        let composition: ExactJSON = kind == "layout_change" ? .string(fresh)
-            : kind == "touch_change" ? config["compiler"]["composition_seed"] == .null ? .string(renderSeed) : config["compiler"]["composition_seed"]
-            : config["compiler"]["composition_seed"]
+        let composition: ExactJSON = kind == "layout_change" ? .string(fresh) : config["compiler"]["composition_seed"]
         nextConfig["compiler"]["composition_seed"] = composition
         nextOptions["composition_seed"] = composition
         request.configuration = nextConfig.data; request.renderOptions = nextOptions.data

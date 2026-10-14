@@ -82,6 +82,7 @@ public final class AuxiliaryModel {
             }
         }
         language = app.display.preferences.language
+        enabledKinds.formIntersection(AuxiliaryProvider.allowedKinds)
         do { database = try app.auxiliaryDatabase() }
         catch { errorText = error.localizedDescription; return }
         if let work {
@@ -92,7 +93,7 @@ public final class AuxiliaryModel {
                 sourceIsLocked = true
                 errorText = "保存された制作状態を取得できません。記述を読み直す操作は使えません。"
             }
-            if sourceIsLocked { visionMode = false; enabledKinds.remove("reinterpretation") }
+            if sourceIsLocked { visionMode = false }
         }
         guard sourceWorkID == work?.id else { return }
         if mode == .colophon { await refreshColophonPath() }
@@ -154,7 +155,7 @@ public final class AuxiliaryModel {
         guard let work = sourceWork, !work.trashed, !sourceIsLocked else {
             errorText = "画像助言には記述から描いた保存作品が必要です。"; return
         }
-        let direction = direction
+        let direction = visionMode ? direction : ""
         let reference = modelReference
         let language = language
         let kinds = orderedKinds
@@ -205,15 +206,16 @@ public final class AuxiliaryModel {
         }
     }
 
-    /// A user adopts a direction into a new child, leaving the parent document intact.
+    /// Adopting advice changes an allowed drawing dimension while retaining the parent's saved DDL.
     public func adoptAdvice(app: AppModel) async {
         guard let work = sourceWork, !app.isBusy, !running, !selectingSource, !draftText.isEmpty else { return }
         do {
-            let kind = advice?.suggestedKind ?? "reinterpretation"
+            let suggestedKind = advice?.suggestedKind ?? ""
+            let kind = orderedKinds.contains(suggestedKind) ? suggestedKind : (orderedKinds.first ?? AuxiliaryProvider.allowedKinds[0])
             let catalog = kind == "catalog_change" ? randomCatalog(app: app, parent: work) : nil
-            var request = try await app.makeRefinementRequest(work: work, kind: kind, direction: draftText,
+            var request = try await app.makeRefinementRequest(work: work, kind: kind,
                 amplitude: amplitude, modelReference: modelReference.isEmpty ? nil : modelReference,
-                catalogIDOverride: catalog, readDescription: !sourceIsLocked,
+                catalogIDOverride: catalog,
                 wildOverride: inheritWild ? nil : wildOverride)
             request = try await app.pinPersonalPlanRequests([request])[0]
             let result = await app.runAutomation(request: request)
@@ -227,7 +229,8 @@ public final class AuxiliaryModel {
         guard let first = sourceWork, !first.trashed, !running, !selectingSource, !app.isBusy else { return }
         let count = min(10, max(1, generations))
         let useVision = visionMode && !sourceIsLocked
-        let kinds = orderedKinds.filter { !sourceIsLocked || $0 != "reinterpretation" }
+        enabledKinds.formIntersection(AuxiliaryProvider.allowedKinds)
+        let kinds = orderedKinds
         guard !kinds.isEmpty else { errorText = "少なくとも1つの推敲要素を選んでください。"; return }
         let model = modelReference
         if useVision, !SettingsModel.isRegisteredModelAvailable(model, purpose: "vision", settings: await app.hostSettings()) {
@@ -269,17 +272,13 @@ public final class AuxiliaryModel {
                     }
                     let kind: String
                     if let answer = nextAdvice { kind = answer.suggestedKind }
-                    else if index == 0, !userDirection.isEmpty, kinds.contains("reinterpretation") { kind = "reinterpretation" }
                     else { kind = kinds.randomElement()! }
-                    let directions = useVision ? [userDirection, nextAdvice?.nextDirection ?? ""].filter { !$0.isEmpty }
-                        : (kind == "reinterpretation" && !userDirection.isEmpty ? [userDirection] : [])
                     self.status = "\(index + 1) / \(count) 世代: \(Self.kindLabel(kind))を生成中"
-                    let appliedDirection = directions.isEmpty ? "" : "推敲方針: " + directions.joined(separator: " / ")
                     let catalog = kind == "catalog_change" ? self.randomCatalog(app: app, parent: parent) : nil
                     var request = try await app.makeRefinementRequest(work: parent, kind: kind,
-                        direction: appliedDirection, amplitude: amplitude,
+                        amplitude: amplitude,
                         modelReference: useVision && !model.isEmpty ? model : nil,
-                        catalogIDOverride: catalog, readDescription: !self.sourceIsLocked,
+                        catalogIDOverride: catalog,
                         wildOverride: wild)
                     request.models = settings.models
                     request.providers = settings.providers
@@ -341,7 +340,8 @@ public final class AuxiliaryModel {
             inheritWild = true; wildOverride = saved.renderWild ?? false
             colophonPathToken = UUID(); colophonPath = nil; colophonPathCount = nil; loadingColophonPath = false
             storedColophons = []
-            if sourceIsLocked { visionMode = false; enabledKinds.remove("reinterpretation") }
+            enabledKinds.formIntersection(AuxiliaryProvider.allowedKinds)
+            if sourceIsLocked { visionMode = false }
             errorText = nil; status = "自律推敲の親作品を変更しました。"
             return true
         } catch {

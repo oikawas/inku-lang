@@ -16,8 +16,8 @@ import InkuUI
                                     models: [ProviderModelSettings(id: "m")])
     try await app.updateHostSettings(HostSettings(providers: [provider], models: ModelSelection(stage1Model: "check:m", stage2Model: "check:m")))
 
-    // Failure: the parameters dialog still offered layout, which now has its own dialog (WorkActionMenu).
-    guard RefinementKind.availableKinds == [.reading, .touch] else { throw CheckFailure.message("Parameters still offer \(RefinementKind.availableKinds)") }
+    // Failure: a retired parameter still appears in the remaining layout dialog.
+    guard RefinementKind.availableKinds == [.layout] else { throw CheckFailure.message("Layout still offers \(RefinementKind.availableKinds)") }
 
     let ranged = """
     Paper.
@@ -77,7 +77,7 @@ import InkuUI
         }
     }
     guard succeeded else { throw CheckFailure.message("Recompose check failed: \(app.errorText ?? app.status)") }
-    print("Recompose passed: parameters offer reading and touch only; 4 principled options recomposed (\(report[0])) and drew the chosen sources; the adopted child records recompose_mode; chance options (\(report[1])); a work without ranges keeps its DDL with nothing_to_move; the AI process layout recomposes by principle. Real core, no provider.")
+    print("Recompose passed: layout-only dialog; 4 principled options recomposed (\(report[0])) and drew the chosen sources; the adopted child records recompose_mode; chance options (\(report[1])); a work without ranges keeps its DDL with nothing_to_move; the AI process layout recomposes by principle. Real core, no provider.")
 }
 
 private actor RecomposeNoProvider: ProviderTransport {

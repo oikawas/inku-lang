@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.128 (2026-10-14 / Build 1204)
+
 ### 2026-10-14 — Remove Another performance and the touch refinement
 
 At the author's request. `Another performance` never read the words for their meaning: it hashed them into the drawing's seed with SHA-256 (and that seed also chose which color to use among candidates with the same name). With the author's choices, the `Touch` element of autonomous refinement and the CLI's `refine --kind touch` are removed as well, so no refinement changes the touch alone.

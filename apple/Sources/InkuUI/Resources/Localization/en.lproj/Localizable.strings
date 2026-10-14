@@ -762,16 +762,10 @@
 "描画要素を編集" = "Edit drawing elements";
 "変更する要素を1つ選択" = "Choose one element to change";
 "配置を変える" = "Another composition";
-"読み取りを変える" = "Another reading";
-"言葉でタッチを変える" = "Another performance";
 "変奏（いまは何も動かない）" = "Variation (nothing moves now)";
 "元の指示書を使い、配置を変えます。記述は読み直しません。" = "Change the composition using the original instructions, without another reading.";
 "元の記述を読み直して描きます。" = "Paint from another reading of the original description.";
 "いまの変奏では、指示書・配色・タッチ・要素数は変わりません。" = "Variation currently leaves the instructions, colors, touch, and element count unchanged.";
-"同じ言葉は同じタッチ（シード）になります。1案だけ用意できます。" = "The same words produce the same touch (seed). Only one option can be made.";
-"タッチへ託す言葉" = "Words for the touch";
-"タッチの変更では、元の配色・配置・ワイルド設定を保ちます。" = "A new touch keeps the original colors, composition, and Wild setting.";
-"タッチの候補は1案だけ用意できます。" = "Only one touch option can be made.";
 "この作品はDDLが確定しているため、記述を読み直せません。配置・変奏・タッチの候補は用意できます。" = "This work is held by its DDL, so its description cannot be read again. Composition, variation, and touch options remain available.";
 "小・中・大のどれを選んでも、いまの変奏で動くものはありません。" = "Nothing currently moves in variation, regardless of amplitude.";
 "控えめな変奏" = "Subtle";
@@ -837,7 +831,7 @@
 "再現の比較結果が元の作品と一致しません。" = "The replay comparison result does not match the original work.";
 "再現を比較" = "Compare replay";
 "描画エンジンの版: %@" = "Engine version: %@";
-"描画シードとタッチの言葉が保存されていないため、シード %@ を補った暫定表示です。" = "No performance seed or touch words were saved. This provisional comparison uses seed %@.";
+"描画シードが保存されていないため、シード %@ を補った暫定表示です。" = "No performance seed was saved. This provisional comparison uses seed %@.";
 "未取得" = "Not yet available";
 "比較結果はまだありません。" = "No comparison result yet.";
 "現行エンジンで描き直し中" = "Performing with the current engine…";
@@ -1247,7 +1241,8 @@
 "デモの生成に失敗しました。次の生成を準備します。" = "Could not paint the demo work. Preparing the next work.";
 "Visionモデルを選択" = "Choose a vision model";
 "画像を扱える登録モデルから選択します。" = "Choose from registered models that can read images.";
-"DDL を編集した作品は記述を読み直しません。色・配置・タッチを元の DDL から描けます。" = "A work with edited instructions keeps its source. Color, composition and touch can be changed from those instructions.";
+"DDL を編集した作品は記述を読み直しません。色・配置を元の DDL から描けます。" = "A work with edited instructions keeps its source. Color and composition can be changed from those instructions.";
+"制作のモデルで描きます。" = "Uses Creation's model.";
 "奥書を追記" = "Append a colophon";
 "リセット" = "Reset";
 "もう一度保存" = "Save again";
@@ -1284,7 +1279,7 @@
 "指示書を編集" = "Edit instructions";
 "モデルを変える" = "Change the model";
 "AIプロセス" = "Autonomous refinement process";
-"この作品はDDLが確定しているため、記述を読み直せません。配置・タッチの候補は用意できます。" = "This work has committed instructions, so its description cannot be read again. Composition and touch options remain available.";
+"この作品はDDLが確定しているため、記述を読み直せません。配置の候補は用意できます。" = "This work has committed instructions, so its description cannot be read again. Composition options remain available.";
 "選択したモデルを構造化の既定モデルとして保存します。読み取りの既定モデルは変わりません。" = "Sets the selected model as the default for structuring. The interpretation default stays unchanged.";
 "中心の作品" = "Focused work";
 "デモの設定を読み込めませんでした。" = "Could not load the demo settings.";

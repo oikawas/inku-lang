@@ -5,7 +5,11 @@ import InkuUI
 
 @MainActor
 func runAuxiliaryProvenanceChecks() async throws {
-    // Failure: autonomous children persisted empty edges, losing the mode and each generation's Vision advice.
+    guard AuxiliaryProvider.allowedKinds == ["catalog_change", "layout_change"] else {
+        throw CheckFailure.message("Vision advice still offers a retired refinement kind")
+    }
+    // Failure: autonomous refinements reread a description or append directions instead of drawing the saved DDL.
+    // This same controller-to-SQLite check also preserves each generation's observation and excludes retired kinds.
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-auxiliary-provenance-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: folder) }
@@ -13,7 +17,7 @@ func runAuxiliaryProvenanceChecks() async throws {
     let transport = AuxiliaryProvenanceProvider()
     let app = AppModel(databaseURL: databaseURL, transport: transport)
     await app.initialize()
-    // Drawing takes only a registered LLM model (Swift's drawing guard); the Vision model also draws its children.
+    // Only the initial parent fixture uses Stage 1; later generations must retain its saved DDL.
     let service = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
                                    models: [.init(id: "generation"), .init(id: "vision", purposes: ["llm", "vision"])])
     try await app.updateHostSettings(HostSettings(providers: [service],
@@ -25,22 +29,28 @@ func runAuxiliaryProvenanceChecks() async throws {
     }
     let database = try InkuDatabase(url: databaseURL)
     let parentContext = try await app.savedConfiguration(workID: parent.id)
+    guard parentContext.authority == "description_authoritative", await transport.generationModels == ["check:generation"] else {
+        throw CheckFailure.message("Auxiliary fixture must start with one description-authoritative Stage 1 call")
+    }
     let auxiliary = AuxiliaryModel(provider: AuxiliaryProvider(transport: transport, credentials: AuxiliaryProvenanceCredentials()))
     await auxiliary.initialize(app: app)
-    auxiliary.enabledKinds = ["reinterpretation"]
+    // Obsolete stored reading and touch selections must never reach Vision or generation.
+    auxiliary.enabledKinds = ["reinterpretation", "touch_change", "catalog_change"]
     auxiliary.generations = 2; auxiliary.visionMode = true
     auxiliary.modelReference = "check:vision"; auxiliary.direction = "keep the circle"
     await auxiliary.startRefinement(app: app)
     guard auxiliary.errorText == nil, auxiliary.completedGenerations == 2,
-          auxiliary.generatedWorks.count == 2, !auxiliary.running, !app.isBusy else {
+          auxiliary.generatedWorks.count == 2, auxiliary.enabledKinds == ["catalog_change"],
+          !auxiliary.running, !app.isBusy else {
         throw CheckFailure.message("Vision provenance run failed: \(auxiliary.errorText ?? auxiliary.status)")
     }
     let visionChildren = auxiliary.generatedWorks
     var previousNodeID = parentNodeID
     for (index, child) in visionChildren.enumerated() {
         guard let nodeID = child.lineageNodeID, let edge = try await database.edge(childNodeID: nodeID),
-              edge.parentNodeID == previousNodeID, edge.derivationKind == "reinterpretation",
+              edge.parentNodeID == previousNodeID, edge.derivationKind == "catalog_change",
               let stored = try await database.work(id: child.id), stored == child,
+              stored.ddl == parent.ddl, stored.effectiveSourceText == parent.effectiveSourceText,
               stored.historyVisibility == (index == 0 ? "lineage_only" : "normal") else {
             throw CheckFailure.message("Vision child did not persist its parent edge or history visibility")
         }
@@ -57,11 +67,14 @@ func runAuxiliaryProvenanceChecks() async throws {
     // A later random run must not attach the advice still displayed from the previous Vision run. Like Web's
     // AIRefineModal, every run starts again from the chosen source, not from the previous run's last child.
     auxiliary.visionMode = false; auxiliary.generations = 1; auxiliary.modelReference = "check:unused"
+    auxiliary.enabledKinds = ["reinterpretation", "touch_change", "layout_change"]
     await auxiliary.startRefinement(app: app)
     guard auxiliary.errorText == nil, auxiliary.completedGenerations == 1,
           auxiliary.generatedWorks.count == 1, let child = auxiliary.generatedWorks.first,
           let nodeID = child.lineageNodeID, let edge = try await database.edge(childNodeID: nodeID),
-          edge.parentNodeID == parentNodeID, edge.derivationKind == "reinterpretation",
+          edge.parentNodeID == parentNodeID, edge.derivationKind == "layout_change",
+          child.ddl == parent.ddl, child.effectiveSourceText == parent.effectiveSourceText,
+          auxiliary.enabledKinds == ["layout_change"],
           try await database.work(id: child.id)?.historyVisibility == "normal" else {
         throw CheckFailure.message("Random provenance child failed: \(auxiliary.errorText ?? auxiliary.status)")
     }
@@ -70,13 +83,34 @@ func runAuxiliaryProvenanceChecks() async throws {
           ["vision_model", "vision_observation", "vision_next_direction"].allSatisfy({ metadata.object?[$0] == nil }),
           auxiliary.advice?.observation == "observation 2",
           await transport.visionModels == ["check:vision", "check:vision"],
-          await transport.generationModels == ["check:generation", "check:vision", "check:vision", "check:generation"],
+          await transport.generationModels == ["check:generation"],
           try await database.work(id: parent.id) == parent,
           try await app.savedConfiguration(workID: parent.id).configuration == parentContext.configuration,
+          try await app.savedConfiguration(workID: parent.id).document == parentContext.document,
           !auxiliary.running, !app.isBusy else {
         throw CheckFailure.message("Random edge retained stale Vision fields, changed the parent or exceeded the provider budget")
     }
-    print("Auxiliary provenance passed: persisted Vision advice per generation; random mode excludes stale advice; parent chain/visibility/snapshots and 4 generation + 2 observation calls retained. Isolated SQLite + mock transports + real Rust only.")
+    // The displayed Vision advice suggests color, but a later adoption has only layout enabled. Its edited
+    // draft is observation material and must never become drawing source text through the fallback path.
+    let rowsBeforeAdoption = try await database.list().count
+    auxiliary.modelReference = "check:generation"
+    auxiliary.draftText = "do not append this edited advice to the drawing"
+    await auxiliary.adoptAdvice(app: app)
+    let adoptedWorks = try await database.list()
+    guard auxiliary.errorText == nil, adoptedWorks.count == rowsBeforeAdoption + 1,
+          let adopted = adoptedWorks.first(where: { work in
+              work.id != parent.id && !visionChildren.contains(where: { $0.id == work.id }) && work.id != child.id
+          }), let adoptedNodeID = adopted.lineageNodeID,
+          let adoptedEdge = try await database.edge(childNodeID: adoptedNodeID),
+          adoptedEdge.parentNodeID == parentNodeID, adoptedEdge.derivationKind == "layout_change",
+          adopted.ddl == parent.ddl, adopted.effectiveSourceText == parent.effectiveSourceText,
+          await transport.generationModels == ["check:generation"],
+          try await database.work(id: parent.id) == parent,
+          try await app.savedConfiguration(workID: parent.id).configuration == parentContext.configuration,
+          try await app.savedConfiguration(workID: parent.id).document == parentContext.document else {
+        throw CheckFailure.message("Adopted advice reread, appended its draft, ignored the allowed fallback or changed the parent")
+    }
+    print("Auxiliary provenance passed: color Vision x2 and layout random x1 + advice adoption use saved DDL; retired reading/touch excluded; directions remain observation metadata; one fixture Stage 1 and zero subsequent provider calls. Isolated SQLite + mock transports + real Rust only.")
 }
 
 private actor AuxiliaryProvenanceCredentials: CredentialStore {
@@ -100,8 +134,15 @@ private actor AuxiliaryProvenanceProvider: ProviderTransport, AuxiliaryTransport
         guard prompt.images.count == 1, prompt.maximumTokens == 320 else {
             throw CheckFailure.message("Autonomous Vision changed its existing observation budget")
         }
+        guard let start = prompt.message.firstIndex(of: "{") else { throw CheckFailure.message("Vision prompt has no context") }
+        let payload = try ExactJSON(data: Data(prompt.message[start...].utf8))
+        guard payload["allowed_suggested_kinds"].array?.compactMap(\.string) == ["catalog_change"],
+              payload["user_direction"].string == "keep the circle",
+              payload["instruction"].string == "a red circle" else {
+            throw CheckFailure.message("Vision received retired kinds or direction text leaked into the parent description")
+        }
         visionModels.append(modelReference)
         return ExactJSON.object(["observation": .string("observation \(visionModels.count)"),
-            "next_direction": .string("direction \(visionModels.count)"), "suggested_kind": .string("reinterpretation")]).text
+            "next_direction": .string("direction \(visionModels.count)"), "suggested_kind": .string("catalog_change")]).text
     }
 }

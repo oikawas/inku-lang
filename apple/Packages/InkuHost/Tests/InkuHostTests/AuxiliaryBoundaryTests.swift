@@ -71,7 +71,7 @@ struct AuxiliaryBoundaryTests {
 
     @Test func fencedAdviceAndActualVisionWireShape() throws {
         let answer = try AuxiliaryProvider.parseAdvice("before\n```json\n{\"observation\":\"red on the left\",\"next_direction\":\"try a narrower band\",\"suggested_kind\":\"rank\"}\n```after",
-            kinds: ["layout_change", "touch_change"], model: "service:vision")
+            kinds: ["layout_change", "catalog_change"], model: "service:vision")
         #expect(answer.suggestedKind == "layout_change" && answer.nextDirection == "try a narrower band")
         #expect(throws: HostError("empty_refinement_advice")) {
             try AuxiliaryProvider.parseAdvice("{\"observation\":\"\",\"next_direction\":\"x\"}", kinds: ["layout_change"], model: "m")

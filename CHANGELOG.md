@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — Remove reading and touch refinement on macOS
+
+Following the author's decision, Another reading, word-based touch, and the empty Edit drawing parameters menu are removed. Layout keeps its separate entrance. Autonomous refinement and Vision advice allow only color catalog and layout, excluding old reading and touch selections from requests. Direction is Vision observation material only and is never added to the drawing description. Color generations draw the parent's saved DDL without calling Stage 1. Archived Reading and Touch lineage labels and interpretation_seed/seed_text display remain readable; replay uses recorded render_seed. Removed Web copy keys and tooltip mappings are aligned.
+
 ## Android 2.1.4-android.101 (2026-10-14 / Build 148401)
 
 ### 2026-10-14 — Remove Android reading refinement

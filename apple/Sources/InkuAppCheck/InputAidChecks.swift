@@ -27,7 +27,6 @@ func runInputAidChecks() async throws {
     fresh.preferences.inputTab = "batch"
     fresh.preferences.libraryLayout = "list"
     fresh.preferences.libraryGrouped = true
-    fresh.preferences.refineKind = "layout_change"
     fresh.preferences.comparisonModels = ["a:one", "b:two"]
     fresh.preferences.aiRefine = AIRefineChoices(visionMode: true, generations: 7, kinds: ["layout_change"], direction: "夜へ")
     let reread = DisplaySettings()

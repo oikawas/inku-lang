@@ -63,7 +63,7 @@ public typealias ColophonDraft = ColophonRecord
 
 /// The auxiliary reader never mutates a work or selects a preferred generation.
 public actor AuxiliaryProvider {
-    public static let allowedKinds = ["reinterpretation", "catalog_change", "layout_change", "touch_change"]
+    public static let allowedKinds = ["catalog_change", "layout_change"]
     private let transport: any AuxiliaryTransport
     private let credentials: any CredentialStore
     private var observationsCache: [(key: String, at: Date, response: String)] = []

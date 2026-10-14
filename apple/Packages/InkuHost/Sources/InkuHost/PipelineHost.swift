@@ -233,12 +233,13 @@ public actor PipelineHost {
     /// Freeze all saved rendering facts before any candidate starts, without resolving today's colors.
     public func makeSavedScoreReplayPlan(workID: String, renderSeed: String? = nil, wild: Bool? = nil,
                                         options replayOptions: ReplayOptions? = nil, compositionSeed: String? = nil,
-                                        derivationKind: String = "touch_change", derivationMetadata: Data? = nil,
-                                        seedText: String? = nil, variationAmplitude: String? = nil,
+                                        derivationKind: String = "replay", derivationMetadata: Data? = nil,
+                                        variationAmplitude: String? = nil,
                                         variationSeed: String? = nil) async throws -> SavedScoreReplayPlan {
         guard derivationKind != "variation", variationAmplitude == nil, variationSeed == nil else {
             throw HostError("variation_retired")
         }
+        guard derivationKind != "touch_change" else { throw HostError("touch_refinement_retired") }
         let source = try await restoreSavedWork(workID: workID)
         let location = try WorkIdentity.location(workID)
         guard let acknowledgement = try await database.acknowledgement(executionID: location.executionID, effectID: location.effectID) else { throw HostError("saved_performance_context_unavailable") }
@@ -251,7 +252,7 @@ public actor PipelineHost {
         _ = try metadataText(derivationMetadata)
         try Task.checkCancellation()
         return SavedScoreReplayPlan(work: source, parentNode: parentNode, context: context.data, renderRequest: request.data,
-            derivationKind: derivationKind, derivationMetadata: derivationMetadata, seedText: seedText,
+            derivationKind: derivationKind, derivationMetadata: derivationMetadata,
             variationAmplitude: variationAmplitude, variationSeed: variationSeed)
     }
 
@@ -284,7 +285,6 @@ public actor PipelineHost {
         let options = request["request"]["options"]
         work.renderSeed = options["render_seed"].number ?? options["render_seed"].string
         work.compositionSeed = options["composition_seed"].number ?? options["composition_seed"].string
-        if let seedText = plan.seedText { work.seedText = seedText }
         work.variationAmplitude = nil; work.variationSeed = nil
         work.renderWild = options["wild"].bool
         work.catalogID = options["catalog_id"].string

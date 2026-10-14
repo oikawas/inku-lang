@@ -31,7 +31,6 @@ private struct WorkEditSession {
 private struct RefinementSession {
     let id = UUID()
     let work: SavedWork
-    var layoutOnly = false
 }
 
 private struct ReplaySession {
@@ -300,7 +299,7 @@ public struct ContentView: View {
             RefinementView(model: model, work: session.work, onCommitted: { closeLibrary() }, onConfigureModels: { destination in
                 dialog = nil
                 openSettings(SettingsSection(rawValue: destination) ?? .models)
-            }, onClose: { dialog = nil }, layoutOnly: session.layoutOnly)
+            }, onClose: { dialog = nil })
                 .id(session.id)
                 .environment(model.display)
         )
@@ -495,13 +494,13 @@ public struct ContentView: View {
         dialog = .edit(WorkEditSession(work: work, mode: mode))
     }
 
-    private func openRefinement(_ work: SavedWork, layoutOnly: Bool = false) {
+    private func openRefinement(_ work: SavedWork) {
         guard canUseWork, !work.trashed else { return }
         // The refine workspace replaces the canvas, so the library and settings step aside.
         ui.libraryOpen = false
         ui.settingsOpen = false
         ui.generationInfoOpen = false
-        dialog = .refinement(RefinementSession(work: work, layoutOnly: layoutOnly))
+        dialog = .refinement(RefinementSession(work: work))
     }
 
     private func openReplay(_ work: SavedWork) {
@@ -532,8 +531,7 @@ public struct ContentView: View {
         case "ai": dialog = .advice(RefinementSession(work: work))
         case "colophon": dialog = .colophon(RefinementSession(work: work))
         case "export": dialog = .export(ExportSession(works: [work], preserveOrder: false))
-        case "parameters": openRefinement(work)
-        case "layout": openRefinement(work, layoutOnly: true)
+        case "layout": openRefinement(work)
         case "description": openWorkEdit(work, .description)
         case "sketch": openWorkEdit(work, .sketch)
         case "create":

@@ -1,6 +1,9 @@
-// Generated from the Build1162 Web source (every `<Tooltip>` and `title=` in web/src, 173 sites) and the Swift
+// Generated from the Build1162 Web source (every `<Tooltip>` and `title=` in web/src, originally 173 sites) and the Swift
 // counterpart chosen for each. The Web column is the regex `<Tooltip\b` (with its `text=`) and `\btitle=` over
 // web/src at Build1162 (7a0f0180), in file order.
+// AIRefineModal, RefinementAdjustView and WorkActionMenu follow the touch removal at
+// 8273b3ef82b95ba1d729eed7a21a7755867bd3bf and reading removal at 074bc00a984c9a65cfbc31ae1cddd1f20503ca8e,
+// verified through d7cd05f7b1ae198fe62cac6d2497748f30446313: 168 sites remain; other mappings keep their baseline.
 
 /// One Web tooltip site and the Swift source that carries it, or why the single-user app has none.
 struct TooltipParityEntry {
@@ -22,12 +25,9 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "+page.svelte:3260", swift: "Views/AboutInkuView.swift", marker: "\"appInfoHintDdlEngine\""),
     .init(web: "+page.svelte:3262", swift: "Views/AboutInkuView.swift", marker: "\"appInfoHintRenderEngine\""),
     .init(web: "+page.svelte:3264", swift: "Views/AboutInkuView.swift", marker: "\"appInfoHintBindingProtocol\""),
-    .init(web: "AIRefineModal.svelte:251", swift: "Views/AuxiliaryView.swift", marker: "auxiliary.sourceIsLocked ? lockedReason : \"\""),
-    .init(web: "AIRefineModal.svelte:255", swift: "Views/AuxiliaryView.swift", marker: "serverKey: \"refineCostReading\""),
-    .init(web: "AIRefineModal.svelte:255", swift: "Views/AuxiliaryView.swift", marker: "? lockedReason : model.display.tooltip(\"低速"),
-    .init(web: "AIRefineModal.svelte:255", swift: "Views/AuxiliaryView.swift", marker: "serverKey: \"refineCostColor\""),
-    .init(web: "AIRefineModal.svelte:255", swift: "Views/AuxiliaryView.swift", marker: "serverKey: \"refineCostLayout\""),
-    .init(web: "AIRefineModal.svelte:255", swift: "Views/AuxiliaryView.swift", marker: "serverKey: \"refineCostTouch\""),
+    .init(web: "AIRefineModal.svelte:256", swift: "Views/AuxiliaryView.swift", marker: "auxiliary.sourceIsLocked ? lockedReason : \"\""),
+    .init(web: "AIRefineModal.svelte:260", swift: "Views/AuxiliaryView.swift", marker: "serverKey: \"refineCostColor\""),
+    .init(web: "AIRefineModal.svelte:260", swift: "Views/AuxiliaryView.swift", marker: "serverKey: \"refineCostLayout\""),
     .init(web: "AppRail.svelte:81", swift: "Views/AppRailView.swift", marker: "serverKey: \"tooltipAppRailToggle\""),
     .init(web: "AppRail.svelte:94", swift: "Views/AppRailView.swift", marker: "serverKey: \"tooltipAppRailLogo\""),
     .init(web: "AppRail.svelte:108", excluded: "単一利用者アプリに利用者メニュー・プロフィールが無い"),
@@ -164,11 +164,9 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "OutputTabsContent.svelte:62", swift: "Views/CreationWorkInfoView.swift", marker: "serverKey: \"promptCopied\""),
     .init(web: "OutputTabsContent.svelte:94", swift: "Views/CreationWorkInfoView.swift", marker: "serverKey: \"promptCopied\""),
     .init(web: "OutputTabsContent.svelte:130", swift: "Views/CreationWorkInfoView.swift", marker: "serverKey: \"promptCopied\""),
-    .init(web: "RefinementAdjustView.svelte:96", swift: "Views/RefinementView.swift", marker: "serverKey: \"tooltipCanvasVaryComposition\""),
-    .init(web: "RefinementAdjustView.svelte:107", swift: "Views/RefinementView.swift", marker: "serverKey: \"tooltipCanvasVaryInterpretation\""),
-    .init(web: "RefinementAdjustView.svelte:117", swift: "Views/RefinementView.swift", marker: "serverKey: \"tooltipCanvasVaryPerformance\""),
-    .init(web: "RefinementAdjustView.svelte:134", swift: "Views/RefinementView.swift", marker: "serverKey: \"tooltipRefineSingle\""),
-    .init(web: "RefinementAdjustView.svelte:144", swift: "Views/RefinementView.swift", marker: "serverKey: \"tooltipVariationGridDefault\""),
+    .init(web: "RefinementAdjustView.svelte:78", swift: "Views/RefinementView.swift", marker: "serverKey: \"tooltipCanvasVaryComposition\""),
+    .init(web: "RefinementAdjustView.svelte:92", swift: "Views/RefinementView.swift", marker: "serverKey: \"tooltipRefineSingle\""),
+    .init(web: "RefinementAdjustView.svelte:102", swift: "Views/RefinementView.swift", marker: "serverKey: \"tooltipVariationGridDefault\""),
     .init(web: "RefinementCandidateGrid.svelte:34", swift: "Views/RefinementView.swift", marker: "serverKey: \"tooltipRefineDiscardAndClose\""),
     .init(web: "RefinementCandidateGrid.svelte:39", swift: "Views/RefinementView.swift", marker: "serverKey: \"tooltipVariationGridSaveSelected\""),
     .init(web: "RefinementCandidateGrid.svelte:63", swift: "Views/RefinementView.swift", marker: "tooltip(\"保存済み\")"),
@@ -184,7 +182,7 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "UnreadWordsPanel.svelte:90", swift: "Views/UnreadWordsView.swift", marker: "tooltipValue(context)"),
     .init(web: "VariationLanes.svelte:85", swift: "Views/RunStatusView.swift", marker: ".inkuTooltip(display.tooltipValue(label))"),
     .init(web: "WorkActionMenu.svelte:107", swift: "Views/CreationView.swift", marker: "serverKey: \"workActionGenerationLocked\""),
-    .init(web: "WorkActionMenu.svelte:126", swift: "SavedWorkActionState.swift", marker: "tooltip(\"記述を変える\") : reason"),
-    .init(web: "WorkActionMenu.svelte:130", swift: "SavedWorkActionState.swift", marker: "tooltip(\"写生なし／ありで描き直す\") : reason"),
-    .init(web: "WorkActionMenu.svelte:131", swift: "SavedWorkActionState.swift", marker: "tooltip(\"モデルを変える\") : reason"),
+    .init(web: "WorkActionMenu.svelte:128", swift: "SavedWorkActionState.swift", marker: "tooltip(\"記述を変える\") : reason"),
+    .init(web: "WorkActionMenu.svelte:132", swift: "SavedWorkActionState.swift", marker: "tooltip(\"写生なし／ありで描き直す\") : reason"),
+    .init(web: "WorkActionMenu.svelte:133", swift: "SavedWorkActionState.swift", marker: "tooltip(\"モデルを変える\") : reason"),
 ]

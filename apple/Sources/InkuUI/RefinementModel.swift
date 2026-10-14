@@ -1,33 +1,23 @@
 import Foundation
-import InkuCore
 import InkuHost
 import InkuPersistence
 import Observation
 
 public enum RefinementKind: String, CaseIterable, Hashable, Sendable {
     case layout = "layout_change"
-    case reading = "reinterpretation"
-    case variation
-    case touch = "touch_change"
 
-    /// The parameters dialog (Web RefinementAdjustView): layout has its own dialog from the work menu.
-    public static var availableKinds: [Self] { [.reading, .touch] }
+    /// Only the separate layout dialog remains after retiring the parameters dialog.
+    public static var availableKinds: [Self] { [.layout] }
 
     public var titleKey: String {
         switch self {
         case .layout: "配置を変える"
-        case .reading: "読み取りを変える"
-        case .variation: "変奏（いまは何も動かない）"
-        case .touch: "言葉でタッチを変える"
         }
     }
 
     public var symbol: String {
         switch self {
         case .layout: "square.grid.2x2"
-        case .reading: "text.book.closed"
-        case .variation: "circle.dotted"
-        case .touch: "paintbrush.pointed"
         }
     }
 }
@@ -55,9 +45,7 @@ public struct RefinementSlot: Identifiable, Sendable {
 @MainActor @Observable
 public final class RefinementModel {
     public let work: SavedWork
-    public var kind = RefinementKind.touch
-    public var words = ""
-    public var amplitude = "medium"
+    public let kind = RefinementKind.layout
     public var inheritWild = true
     public var wildOverride: Bool
     public var modelReference = ""
@@ -81,30 +69,22 @@ public final class RefinementModel {
     @ObservationIgnored private var runID: UUID?
     @ObservationIgnored private var ownsAppOperation = false
 
-    /// Web `layoutOnly`: the layout dialog always draws layout options, regardless of remembered parameters.
-    public let layoutOnly: Bool
     public var recomposeMode = Recomposition.Mode.principled
 
-    public init(work: SavedWork, layoutOnly: Bool = false) {
+    public init(work: SavedWork) {
         self.work = work
-        self.layoutOnly = layoutOnly
         wildOverride = work.renderWild ?? false
-        if layoutOnly { kind = .layout }
     }
 
     public var selectedCount: Int { candidates.filter { $0.selected && $0.savedWork == nil }.count }
     public var hasUnsaved: Bool { candidates.contains { $0.savedWork == nil } }
     public var completedCount: Int { slots.filter { $0.state == .ready || $0.state == .failed }.count }
     public var canSave: Bool { initialized && !running && !closed && selectedCount > 0 }
-    private var hasTouchWords: Bool { (try? InkuCore.renderSeed(fromText: words)) != nil }
 
     public func canGenerate(count: Int) -> Bool {
         initialized && !running && !closed && !work.trashed && !hasUnsaved
-            && isAvailable(kind) && [1, 4].contains(count) && !(kind == .reading && sourceIsLocked)
-            && !(kind == .touch && (count != 1 || !hasTouchWords))
+            && [1, 4].contains(count)
     }
-
-    private func isAvailable(_ kind: RefinementKind) -> Bool { layoutOnly ? kind == .layout : RefinementKind.availableKinds.contains(kind) }
 
     public func initialize(app: AppModel) async {
         guard !initialized, !initializing, !closed else { return }
@@ -119,7 +99,6 @@ public final class RefinementModel {
             }
             sourceIsLocked = context.authority != "description_authoritative"
             sourceIsDDLOrigin = context.origin == "direct_ddl"
-            if sourceIsLocked && kind == .reading { kind = .touch }
             if modelReference.isEmpty {
                 let settings = await app.hostSettings()
                 if SettingsModel.isBatchModelAvailable(settings.models.stage2Model, settings: settings) {
@@ -152,20 +131,17 @@ public final class RefinementModel {
     }
 
     public func generate(app: AppModel, count: Int) async {
-        guard canGenerate(count: count), !app.isBusy, !app.isPreview, operation == nil,
-              kind != .reading || app.hasNextDrawingModel else { return }
+        guard canGenerate(count: count), !app.isBusy, !app.isPreview, operation == nil else { return }
         let selectedKind = kind
-        let selectedWords = words
-        let selectedAmplitude = amplitude
         let selectedMode = recomposeMode
-        let selectedWild: Bool? = selectedKind == .touch || inheritWild ? nil : wildOverride
-        let selectedModel: String? = [.layout, .reading].contains(selectedKind) && !modelReference.isEmpty ? modelReference : nil
+        let selectedWild: Bool? = inheritWild ? nil : wildOverride
+        let selectedModel: String? = !modelReference.isEmpty ? modelReference : nil
         let run = UUID()
         runID = run; running = true; saving = false; stopping = false
         candidates = []; previewID = nil; errorText = nil
         slots = (1...count).map { RefinementSlot(id: $0) }
-        capturedStage1Model = selectedKind == .reading ? app.nextDrawingModelReference : work.stage1Model
-        capturedStage2Model = [.touch, .variation].contains(selectedKind) ? work.stage2Model : selectedModel ?? app.nextDrawingModelReference
+        capturedStage1Model = work.stage1Model
+        capturedStage2Model = selectedModel ?? app.nextDrawingModelReference
         status = "候補の準備中"
         let pending = Task { @MainActor [weak self] in
             guard let self else { return false }
@@ -178,7 +154,7 @@ public final class RefinementModel {
                 let succeeded = await app.performComparison(status: "調整候補を用意中", restoreDisplayStatus: true) { token in
                     try Task.checkCancellation()
                     let plans = try await app.makeDrawingAdjustmentPlans(work: self.work, kind: selectedKind.rawValue,
-                        count: count, words: selectedWords, amplitude: selectedAmplitude,
+                        count: count,
                         wildOverride: selectedWild, modelReference: selectedModel, recomposeMode: selectedMode)
                     try Task.checkCancellation()
                     guard self.runID == run, !self.closed, !self.stopping else { throw CancellationError() }

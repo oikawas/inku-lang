@@ -48,8 +48,7 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
     public var inputTab: String?
     public var libraryLayout: String?
     public var libraryGrouped: Bool?
-    /// Dialog choices (Web `inku-refine-kind`, `model_inspection_selected_models`, `inku-ai-refine-settings`).
-    public var refineKind: String?
+    /// Dialog choices (Web `model_inspection_selected_models`, `inku-ai-refine-settings`).
     public var comparisonModels: [String]?
     public var aiRefine: AIRefineChoices?
     /// Web `inku-result-log-open`: the result log under the input starts closed.

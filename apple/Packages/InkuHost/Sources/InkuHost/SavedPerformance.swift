@@ -39,11 +39,8 @@ enum SavedPerformance {
         ExactJSON.object(["tag": .string("saved_work_committed"), "work_id": .string(workID), "performance": context]).data
     }
     static func replayComparisonRequest(work: SavedWork, context: ExactJSON) throws -> (request: ExactJSON, provisionalSeed: String?) {
-        let wordSeed: String?
-        do { wordSeed = try InkuCore.renderSeed(fromText: work.seedText ?? "") }
-        catch CoreFailure.emptySeedText { wordSeed = nil }
-        let seed = wordSeed ?? work.renderSeed ?? "0"
-        let provisionalSeed = wordSeed == nil && work.renderSeed == nil ? "0" : nil
+        let seed = work.renderSeed ?? "0"
+        let provisionalSeed = work.renderSeed == nil ? "0" : nil
         var context = context
         // Preserve the recorded absence. The renderer owns fallback to the performance seed.
         context["options"]["composition_seed"] = .optional(work.compositionSeed)

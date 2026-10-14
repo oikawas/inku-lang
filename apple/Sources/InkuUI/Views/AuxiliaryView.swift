@@ -77,7 +77,7 @@ public struct AuxiliaryView: View {
             if mode == .advice && !refineChoicesRestored { restoreRefineChoices() }
             await auxiliary.initialize(app: model, work: work, mode: mode)
         }
-        // A held work turns Vision and reading off for itself; that is not the author's choice, so it is not kept.
+        // A held work turns Vision off for itself; that is not the author's choice, so it is not kept.
         .onChange(of: refineChoices) { _, choices in
             if mode == .advice, refineChoicesRestored, !auxiliary.sourceIsLocked { model.display.preferences.aiRefine = choices }
         }
@@ -99,15 +99,17 @@ public struct AuxiliaryView: View {
         return GroupBox(model.display.localized("モデルから画像の助言を受ける")) {
             VStack(alignment: .leading, spacing: 10) {
                 Text(model.display.localized("画像に見える事実と次に試す方向を受け取ります。採点や順位付けは行いません。")).inkuFont(12).foregroundStyle(.secondary)
-                TextField(model.display.localized("AI に伝える方向性"), text: $auxiliary.direction, axis: .vertical).lineLimit(2...4)
-                    .disabled(auxiliary.sourceIsLocked || auxiliary.running || auxiliary.selectingSource || model.isBusy)
-                    .inkuTooltip(model.display.tooltip("AIへ伝える方針は160文字までです。"))
-                Text("\(auxiliary.direction.utf16.count) / \(AuxiliaryModel.directionLimit)")
-                    .inkuFont(12).monospacedDigit().foregroundStyle(.secondary)
+                if auxiliary.visionMode {
+                    TextField(model.display.localized("AI に伝える方向性"), text: $auxiliary.direction, axis: .vertical).lineLimit(2...4)
+                        .disabled(auxiliary.sourceIsLocked || auxiliary.running || auxiliary.selectingSource || model.isBusy)
+                        .inkuTooltip(model.display.tooltip("AIへ伝える方針は160文字までです。"))
+                    Text("\(auxiliary.direction.utf16.count) / \(AuxiliaryModel.directionLimit)")
+                        .inkuFont(12).monospacedDigit().foregroundStyle(.secondary)
+                }
                 Button(model.display.localized("画像から助言を読む"), systemImage: "eye") { Task { await auxiliary.requestAdvice(app: model) } }
                     .disabled(auxiliary.sourceIsLocked || auxiliary.sourceWork == nil || auxiliary.modelReference.isEmpty || auxiliary.running || model.isBusy)
                 if auxiliary.sourceIsLocked {
-                    Text(model.display.localized("DDL を編集した作品は記述を読み直しません。色・配置・タッチを元の DDL から描けます。"))
+                    Text(model.display.localized("DDL を編集した作品は記述を読み直しません。色・配置を元の DDL から描けます。"))
                         .inkuFont(12).foregroundStyle(.secondary)
                 }
                 if let advice = auxiliary.advice {
@@ -120,7 +122,7 @@ public struct AuxiliaryView: View {
         }
     }
 
-    /// Web `inku-ai-refine-settings`: mode, generations, the four dimensions and the direction, not the wild switch.
+    /// Web `inku-ai-refine-settings`: mode, generations, the two dimensions and the Vision direction, not the wild switch.
     private var refineChoices: AIRefineChoices {
         AIRefineChoices(visionMode: auxiliary.visionMode, generations: auxiliary.generations,
                         kinds: AuxiliaryProvider.allowedKinds.filter(auxiliary.enabledKinds.contains), direction: auxiliary.direction)
@@ -142,9 +144,9 @@ public struct AuxiliaryView: View {
                     Text(model.display.localized("方式")).inkuFont(12).foregroundStyle(.secondary)
                     InkuSegmentedButtons(options: [(false, model.display.localized("ランダム")), (true, "AI Vision")], selection: $auxiliary.visionMode)
                 }.disabled(auxiliary.sourceIsLocked)
-                    // AIRefineModal.svelte:251: a held work names why Vision is off.
+                    // AIRefineModal.svelte:256: a held work names why Vision is off.
                     .inkuTooltip(auxiliary.sourceIsLocked ? lockedReason : "")
-                Text(model.display.localized(auxiliary.visionMode ? "上のモデルが観察し、同じモデルで各世代を描きます。" : "制作のモデルで描きます。方向性は読み取りを変える世代にだけ渡します。"))
+                Text(model.display.localized(auxiliary.visionMode ? "上のモデルが観察し、同じモデルで各世代を描きます。" : "制作のモデルで描きます。"))
                     .inkuFont(12).foregroundStyle(.secondary)
                 Stepper(model.display.localizedFormat("生成する世代数: %ld", auxiliary.generations), value: $auxiliary.generations, in: 1...10)
                 HStack {
@@ -152,7 +154,7 @@ public struct AuxiliaryView: View {
                         Toggle(model.display.localized(AuxiliaryModel.kindLabel(kind)), isOn: Binding(
                             get: { auxiliary.enabledKinds.contains(kind) },
                             set: { if $0 { auxiliary.enabledKinds.insert(kind) } else { auxiliary.enabledKinds.remove(kind) } }))
-                            .toggleStyle(.button).disabled(kind == "reinterpretation" && auxiliary.sourceIsLocked)
+                            .toggleStyle(.button)
                             .inkuTooltip(kindTooltip(kind), placement: .bottom)
                     }
                 }
@@ -170,14 +172,12 @@ public struct AuxiliaryView: View {
         model.display.tooltip("編集した指示書で確定した作品です。記述を読み直す操作は使えません。", serverKey: "descriptionLockedReason")
     }
 
-    /// AIRefineModal.svelte:255: what each element costs; reading names the lock on a held work.
+    /// AIRefineModal.svelte:260: what the color and layout elements cost.
     private func kindTooltip(_ kind: String) -> String {
         switch kind {
-        case "reinterpretation":
-            return auxiliary.sourceIsLocked ? lockedReason : model.display.tooltip("低速（LLM・API使用）", serverKey: "refineCostReading")
         case "catalog_change": return model.display.tooltip("超高速（LLM不要）", serverKey: "refineCostColor")
         case "layout_change": return model.display.tooltip("高速（補完の穴があるときだけLLM）", serverKey: "refineCostLayout")
-        default: return model.display.tooltip("超高速（LLM不要）", serverKey: "refineCostTouch")
+        default: return ""
         }
     }
 

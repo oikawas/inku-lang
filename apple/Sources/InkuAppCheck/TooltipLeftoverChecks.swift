@@ -3,7 +3,7 @@ import InkuHost
 import InkuPersistence
 import InkuUI
 
-/// The tooltip port against the Build1162 Web, and the leftover UI items, each against the failure it prevents.
+/// The tooltip port against the Build1162 Web with the 8273b3ef touch and 074bc00a reading removals, and the leftover UI items, each against the failure it prevents.
 /// Offline: temporary SQLite, offline provider mocks, and the Swift sources read as text.
 @MainActor
 func runTooltipAndLeftoverChecks() async throws {
@@ -36,7 +36,7 @@ func runTooltipAndLeftoverChecks() async throws {
     }
     let equal = counts.values.map(\.equal).reduce(0, +)
     let excluded = counts.values.map(\.excluded).reduce(0, +)
-    guard tooltipParityTable.count == 173, missing.isEmpty, excluded == 8, equal == 165 else {
+    guard tooltipParityTable.count == 168, missing.isEmpty, excluded == 8, equal == 160 else {
         throw CheckFailure.message("Tooltip parity: \(tooltipParityTable.count) sites, \(equal) equal, \(excluded) excluded, missing \(missing)")
     }
 
@@ -194,7 +194,7 @@ func runTooltipAndLeftoverChecks() async throws {
         let row = counts[component]!
         return "\(component) \(row.equal)/\(row.missing)/\(row.excluded)"
     }
-    print("Tooltips and leftovers passed: 173 Web tooltip sites compared — \(equal) equal, 0 missing, \(excluded) excluded "
+    print("Tooltips and leftovers passed: 168 Web tooltip sites compared — \(equal) equal, 0 missing, \(excluded) excluded "
           + "(per component equal/missing/excluded: \(table.joined(separator: ", "))); \(bubbles) inkuTooltip calls, "
           + "9 menu-item .help; 4 placements inside the window; switch copy and off state; failed status text; demo wild off "
           + "and 3600 s; fetch notice; 3 chatgptStatus strings; batch rows [2, 5] kept after reconnect; fork edge and 2 refusals; "

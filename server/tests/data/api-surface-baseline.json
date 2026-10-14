@@ -1,7 +1,7 @@
 {
-  "endpoint_count": 126,
-  "operation_count": 126,
-  "schema_count": 182,
+  "endpoint_count": 128,
+  "operation_count": 128,
+  "schema_count": 185,
   "operations": [
     {
       "path": "/api/admin/unread-words",
@@ -1425,6 +1425,20 @@
       }
     },
     {
+      "path": "/api/render-tool-variant",
+      "method": "POST",
+      "operationId": "api_render_tool_variant_api_render_tool_variant_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ToolVariantRenderRequest\"}}},\"required\":true}",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ToolVariantResponse\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
       "path": "/api/saijiki",
       "method": "GET",
       "operationId": "api_saijiki_api_saijiki_get",
@@ -1705,6 +1719,20 @@
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ThumbnailStatus\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/tool-variants/plan",
+      "method": "POST",
+      "operationId": "api_tool_variant_plan_api_tool_variants_plan_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/ToolVariantPlanRequest\"}}},\"required\":true}",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Tool Variant Plan Api Tool Variants Plan Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
         "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
       }
     },
@@ -2003,6 +2031,9 @@
     "ThumbnailRebuildStatus": "{\"properties\":{\"built\":{\"title\":\"Built\",\"type\":\"integer\"},\"done\":{\"title\":\"Done\",\"type\":\"integer\"},\"ended_short\":{\"default\":false,\"title\":\"Ended Short\",\"type\":\"boolean\"},\"failed\":{\"title\":\"Failed\",\"type\":\"integer\"},\"finished_at\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"title\":\"Finished At\"},\"remaining\":{\"title\":\"Remaining\",\"type\":\"integer\"},\"running\":{\"title\":\"Running\",\"type\":\"boolean\"},\"started_at\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"title\":\"Started At\"},\"total\":{\"title\":\"Total\",\"type\":\"integer\"},\"workers\":{\"title\":\"Workers\",\"type\":\"integer\"}},\"required\":[\"running\",\"total\",\"done\",\"remaining\",\"built\",\"failed\",\"workers\"],\"title\":\"ThumbnailRebuildStatus\",\"type\":\"object\"}",
     "ThumbnailSettingsBody": "{\"properties\":{\"hidpi\":{\"default\":false,\"title\":\"Hidpi\",\"type\":\"boolean\"},\"workers\":{\"default\":4,\"maximum\":16.0,\"minimum\":1.0,\"title\":\"Workers\",\"type\":\"integer\"}},\"title\":\"ThumbnailSettingsBody\",\"type\":\"object\"}",
     "ThumbnailStatus": "{\"properties\":{\"completed\":{\"title\":\"Completed\",\"type\":\"integer\"},\"count_scale_1\":{\"title\":\"Count Scale 1\",\"type\":\"integer\"},\"count_scale_2\":{\"title\":\"Count Scale 2\",\"type\":\"integer\"},\"failed\":{\"title\":\"Failed\",\"type\":\"integer\"},\"hidpi\":{\"title\":\"Hidpi\",\"type\":\"boolean\"},\"note\":{\"title\":\"Note\",\"type\":\"string\"},\"rebuild\":{\"$ref\":\"#/components/schemas/ThumbnailRebuildStatus\"},\"skipped\":{\"title\":\"Skipped\",\"type\":\"integer\"},\"store_path\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Store Path\"},\"stored_bytes\":{\"title\":\"Stored Bytes\",\"type\":\"integer\"},\"submitted\":{\"title\":\"Submitted\",\"type\":\"integer\"},\"unavailable\":{\"title\":\"Unavailable\",\"type\":\"integer\"},\"workers\":{\"default\":4,\"title\":\"Workers\",\"type\":\"integer\"}},\"required\":[\"hidpi\",\"store_path\",\"stored_bytes\",\"count_scale_1\",\"count_scale_2\",\"rebuild\",\"submitted\",\"completed\",\"failed\",\"skipped\",\"unavailable\",\"note\"],\"title\":\"ThumbnailStatus\",\"type\":\"object\"}",
+    "ToolVariantPlanRequest": "{\"properties\":{\"mode\":{\"default\":\"uniform\",\"enum\":[\"uniform\",\"per_sentence\"],\"title\":\"Mode\",\"type\":\"string\"},\"work_id\":{\"maxLength\":200,\"minLength\":1,\"title\":\"Work Id\",\"type\":\"string\"}},\"required\":[\"work_id\"],\"title\":\"ToolVariantPlanRequest\",\"type\":\"object\"}",
+    "ToolVariantRenderRequest": "{\"properties\":{\"mode\":{\"default\":\"uniform\",\"enum\":[\"uniform\",\"per_sentence\"],\"title\":\"Mode\",\"type\":\"string\"},\"tools\":{\"additionalProperties\":{\"type\":\"string\"},\"maxProperties\":200,\"minProperties\":1,\"title\":\"Tools\",\"type\":\"object\"},\"work_id\":{\"maxLength\":200,\"minLength\":1,\"title\":\"Work Id\",\"type\":\"string\"}},\"required\":[\"work_id\",\"tools\"],\"title\":\"ToolVariantRenderRequest\",\"type\":\"object\"}",
+    "ToolVariantResponse": "{\"properties\":{\"catalog_id\":{\"title\":\"Catalog Id\",\"type\":\"string\"},\"composition_seed\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Composition Seed\"},\"ddl\":{\"title\":\"Ddl\",\"type\":\"string\"},\"ddl_engine_version\":{\"title\":\"Ddl Engine Version\",\"type\":\"string\"},\"ddl_version\":{\"title\":\"Ddl Version\",\"type\":\"string\"},\"derivation_metadata\":{\"anyOf\":[{\"additionalProperties\":true,\"type\":\"object\"},{\"type\":\"null\"}],\"title\":\"Derivation Metadata\"},\"render_build_number\":{\"title\":\"Render Build Number\",\"type\":\"string\"},\"render_canvas_aspect\":{\"title\":\"Render Canvas Aspect\",\"type\":\"string\"},\"render_canvas_aspect_id\":{\"title\":\"Render Canvas Aspect Id\",\"type\":\"string\"},\"render_canvas_aspect_ratio\":{\"title\":\"Render Canvas Aspect Ratio\",\"type\":\"number\"},\"render_color_catalog_id\":{\"title\":\"Render Color Catalog Id\",\"type\":\"string\"},\"render_color_catalog_name\":{\"title\":\"Render Color Catalog Name\",\"type\":\"string\"},\"render_color_catalog_sub\":{\"title\":\"Render Color Catalog Sub\",\"type\":\"string\"},\"render_color_map\":{\"additionalProperties\":{\"type\":\"string\"},\"title\":\"Render Color Map\",\"type\":\"object\"},\"render_color_profile\":{\"additionalProperties\":{\"type\":\"string\"},\"title\":\"Render Color Profile\",\"type\":\"object\"},\"render_color_source\":{\"title\":\"Render Color Source\",\"type\":\"string\"},\"render_diagnostics\":{\"anyOf\":[{\"additionalProperties\":true,\"type\":\"object\"},{\"type\":\"null\"}],\"title\":\"Render Diagnostics\"},\"render_engine_id\":{\"title\":\"Render Engine Id\",\"type\":\"string\"},\"render_engine_version\":{\"title\":\"Render Engine Version\",\"type\":\"string\"},\"render_hash\":{\"title\":\"Render Hash\",\"type\":\"string\"},\"render_hash_short\":{\"title\":\"Render Hash Short\",\"type\":\"string\"},\"render_limit_notes\":{\"anyOf\":[{\"items\":{\"type\":\"string\"},\"type\":\"array\"},{\"type\":\"null\"}],\"title\":\"Render Limit Notes\"},\"render_limits\":{\"anyOf\":[{\"additionalProperties\":{\"type\":\"integer\"},\"type\":\"object\"},{\"type\":\"null\"}],\"title\":\"Render Limits\"},\"render_limits_source\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Render Limits Source\"},\"render_seed\":{\"title\":\"Render Seed\",\"type\":\"string\"},\"render_warnings\":{\"anyOf\":[{\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"type\":\"array\"},{\"type\":\"null\"}],\"title\":\"Render Warnings\"},\"render_wild\":{\"default\":false,\"title\":\"Render Wild\",\"type\":\"boolean\"},\"resource_execution\":{\"anyOf\":[{\"additionalProperties\":true,\"type\":\"object\"},{\"type\":\"null\"}],\"title\":\"Resource Execution\"},\"score\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/Score\"},{\"additionalProperties\":true,\"type\":\"object\"}],\"title\":\"Score\"},\"svg\":{\"title\":\"Svg\",\"type\":\"string\"},\"svg_sha256\":{\"description\":\"Bind a save to the exact preview without changing render identity.\",\"readOnly\":true,\"title\":\"Svg Sha256\",\"type\":\"string\"}},\"required\":[\"score\",\"svg\",\"catalog_id\",\"ddl_version\",\"ddl_engine_version\",\"render_build_number\",\"render_color_profile\",\"render_engine_id\",\"render_engine_version\",\"render_color_catalog_id\",\"render_color_catalog_name\",\"render_color_catalog_sub\",\"render_color_map\",\"render_canvas_aspect\",\"render_canvas_aspect_id\",\"render_canvas_aspect_ratio\",\"render_seed\",\"render_hash\",\"render_color_source\",\"render_hash_short\",\"ddl\",\"svg_sha256\"],\"title\":\"ToolVariantResponse\",\"type\":\"object\"}",
     "TouchingConstraints": "{\"additionalProperties\":false,\"properties\":{\"dimensions_fixed\":{\"title\":\"Dimensions Fixed\",\"type\":\"boolean\"},\"direction_fixed\":{\"title\":\"Direction Fixed\",\"type\":\"boolean\"}},\"required\":[\"dimensions_fixed\",\"direction_fixed\"],\"title\":\"TouchingConstraints\",\"type\":\"object\"}",
     "TransformGroup": "{\"additionalProperties\":false,\"description\":\"One postorder Macro transform over a contiguous Score instruction span.\",\"properties\":{\"anchor_indices\":{\"description\":\"この lexical transform に属する非描画 Score anchor index\",\"items\":{\"minimum\":0.0,\"type\":\"integer\"},\"title\":\"Anchor Indices\",\"type\":\"array\"},\"end\":{\"description\":\"変換する Score instruction 範囲の終端 exclusive index\",\"minimum\":0.0,\"title\":\"End\",\"type\":\"integer\"},\"fixed_position_indices\":{\"description\":\"追加平行移動できない、範囲内の元 Score instruction index\",\"items\":{\"minimum\":0.0,\"type\":\"integer\"},\"title\":\"Fixed Position Indices\",\"type\":\"array\"},\"rotation_degrees\":{\"description\":\"まとまり全体の回転角(度)。正=時計回り\",\"title\":\"Rotation Degrees\",\"type\":\"number\"},\"scale_x\":{\"default\":1.0,\"title\":\"Scale X\",\"type\":\"number\"},\"scale_y\":{\"default\":1.0,\"title\":\"Scale Y\",\"type\":\"number\"},\"start\":{\"description\":\"変換する Score instruction 範囲の開始 index\",\"minimum\":0.0,\"title\":\"Start\",\"type\":\"integer\"},\"translate_x\":{\"default\":0.0,\"title\":\"Translate X\",\"type\":\"number\"},\"translate_y\":{\"default\":0.0,\"title\":\"Translate Y\",\"type\":\"number\"}},\"required\":[\"start\",\"end\",\"rotation_degrees\"],\"title\":\"TransformGroup\",\"type\":\"object\"}",
     "UnreadWordsBody": "{\"properties\":{\"context\":{\"default\":\"\",\"maxLength\":1000,\"title\":\"Context\",\"type\":\"string\"},\"words\":{\"items\":{\"type\":\"string\"},\"maxItems\":100,\"title\":\"Words\",\"type\":\"array\"}},\"title\":\"UnreadWordsBody\",\"type\":\"object\"}",
@@ -2020,5 +2051,5 @@
     "VisionRefineAdviceBody": "{\"properties\":{\"direction\":{\"default\":\"\",\"maxLength\":2000,\"title\":\"Direction\",\"type\":\"string\"},\"enabled_kinds\":{\"items\":{\"type\":\"string\"},\"maxItems\":2,\"minItems\":1,\"title\":\"Enabled Kinds\",\"type\":\"array\"},\"history_id\":{\"maxLength\":200,\"minLength\":1,\"title\":\"History Id\",\"type\":\"string\"},\"instruction\":{\"maxLength\":100000,\"minLength\":1,\"title\":\"Instruction\",\"type\":\"string\"},\"language\":{\"default\":\"ja\",\"pattern\":\"^(ja|en)$\",\"title\":\"Language\",\"type\":\"string\"},\"model\":{\"anyOf\":[{\"maxLength\":200,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Model\"}},\"required\":[\"history_id\",\"instruction\",\"enabled_kinds\"],\"title\":\"VisionRefineAdviceBody\",\"type\":\"object\"}",
     "VisionRefineAdviceResponse": "{\"properties\":{\"model\":{\"title\":\"Model\",\"type\":\"string\"},\"next_direction\":{\"title\":\"Next Direction\",\"type\":\"string\"},\"observation\":{\"title\":\"Observation\",\"type\":\"string\"},\"suggested_kind\":{\"title\":\"Suggested Kind\",\"type\":\"string\"}},\"required\":[\"observation\",\"next_direction\",\"suggested_kind\",\"model\"],\"title\":\"VisionRefineAdviceResponse\",\"type\":\"object\"}"
   },
-  "digest": "e853a7e86dba51f22861211b4c2f58f544f69a954eeca03f4501a66d4316c8e9"
+  "digest": "72fd29172974f5dd7eda56a9a601024f5c6683575a4a6e5df9e55395125fd193"
 }

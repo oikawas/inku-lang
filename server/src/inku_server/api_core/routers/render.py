@@ -20,6 +20,7 @@ from ...autonomous_refine import ALLOWED_KINDS as AUTONOMOUS_REFINE_KINDS, visio
 from ...limits import limits_as_dict
 from ...color_arrangements import ColorArrangements
 from ... import ground_variants as _ground
+from ... import tool_variants as _tools
 from ...color_catalogs import get_color_catalog, render_color_map_for_catalog
 from ...saved_score_compat import coerce_saved_score
 from ...schema import Score
@@ -523,6 +524,97 @@ def _render_ground_variant_for_work(actor: dict, work: dict, material: str) -> G
 @router.post("/api/render-ground-variant", response_model=GroundVariantResponse, response_model_exclude_none=True)
 def api_render_ground_variant(req: GroundVariantRenderRequest, actor: dict = Depends(_current_user)) -> GroundVariantResponse:
     return _render_ground_variant_for_work(actor, _work_for_color_snapshot(actor, req.work_id), req.material)
+
+
+class ToolVariantPlanRequest(BaseModel):
+    work_id: str = Field(min_length=1, max_length=200)
+    mode: Literal["uniform", "per_sentence"] = "uniform"
+
+
+class ToolVariantRenderRequest(BaseModel):
+    work_id: str = Field(min_length=1, max_length=200)
+    mode: Literal["uniform", "per_sentence"] = "uniform"
+    # The tool asked for each sentence, keyed by its instruction index.
+    tools: dict[str, str] = Field(min_length=1, max_length=200)
+
+
+class ToolVariantResponse(RenderScoreResponse):
+    # The child's instructions with the new tool words.
+    ddl: str
+
+
+def _retouch(actor: dict, work: dict, tools: dict[int, str]) -> dict:
+    from ...pipeline_runtime import get_service
+
+    return get_service().retouch(actor["id"], work["id"], work.get("ddl") or "", tools)
+
+
+def _tool_sentences(actor: dict, work: dict) -> tuple[dict, dict[int, str]]:
+    """The work's Score and the tool each changeable sentence was drawn with."""
+    score = work.get("score")
+    if not isinstance(score, dict):
+        raise HTTPException(status_code=422, detail="saved work has no Score to redraw")
+    read = _retouch(actor, work, {})
+    if read.get("outcome") != "read":
+        raise HTTPException(status_code=422, detail=f"touch cannot change: {read.get('reason') or read.get('error') or 'unknown'}")
+    return score, _tools.drawn_tools(score, [sentence["index"] for sentence in read.get("sentences") or []])
+
+
+def _tool_entry(drawn: dict[int, str], tools: dict[int, str], ddl: str) -> dict:
+    return {
+        "tools": {str(index): tool for index, tool in tools.items()},
+        "changes": [{"index": index, "from": drawn[index], "to": tool} for index, tool in tools.items() if drawn[index] != tool],
+        "ddl": ddl,
+    }
+
+
+@router.post("/api/tool-variants/plan")
+def api_tool_variant_plan(req: ToolVariantPlanRequest, actor: dict = Depends(_current_user)) -> dict:
+    """Four touch changes of a saved work: one tool for every sentence, or a tool drawn for each."""
+    work = _work_for_color_snapshot(actor, req.work_id)
+    _score, drawn = _tool_sentences(actor, work)
+    entries = []
+    for tools in _tools.options(drawn, req.mode):
+        written = _retouch(actor, work, tools)
+        if written.get("outcome") == "retouched":
+            entries.append(_tool_entry(drawn, tools, written["source"]))
+    labels = {tool: {"ja": _tools.tool_label(tool, "ja"), "en": _tools.tool_label(tool, "en")} for tool in _tools.TOOLS}
+    return {"mode": req.mode, "tools": labels,
+            "sentences": [{"index": index, "tool": tool} for index, tool in drawn.items()], "entries": entries}
+
+
+def _render_tool_variant_for_work(actor: dict, work: dict, mode: str, asked: dict[str, str]) -> ToolVariantResponse:
+    render_seed = work.get("render_seed")
+    if render_seed is None:
+        raise HTTPException(status_code=422, detail="saved work has no performance seed to preserve its drawing")
+    score, drawn = _tool_sentences(actor, work)
+    try:
+        tools = {int(index): tool for index, tool in asked.items()}
+    except ValueError:
+        raise HTTPException(status_code=422, detail="tools are keyed by sentence index") from None
+    if not tools or any(index not in drawn or tool not in _tools.TOOLS for index, tool in tools.items()):
+        raise HTTPException(status_code=422, detail="tools must name changeable sentences and known tools")
+    if all(drawn[index] == tool for index, tool in tools.items()):
+        raise HTTPException(status_code=422, detail="tools must change at least one sentence")
+    written = _retouch(actor, work, tools)
+    if written.get("outcome") != "retouched":
+        raise HTTPException(status_code=422, detail=f"touch cannot change: {written.get('reason') or written.get('error') or 'unknown'}")
+    ddl = written["source"]
+    result = _render_authorized_score(RenderScoreRequest(
+        score=_tools.score_with_tools(score, tools), input=work.get("input") or "", ddl=ddl,
+        catalog_id=work.get("render_color_catalog_id") or work.get("catalog_id"),
+        canvas_aspect=work.get("render_canvas_aspect_id") or work.get("render_canvas_aspect"),
+        render_seed=render_seed, composition_seed=work.get("composition_seed"),
+        wild=bool(work.get("render_wild")),
+    ), actor, work)
+    entry = _tool_entry(drawn, tools, ddl)
+    result.derivation_metadata = {"tool_mode": mode, "tools": entry["tools"], "changes": entry["changes"]}
+    return ToolVariantResponse(**result.model_dump(), ddl=ddl)
+
+
+@router.post("/api/render-tool-variant", response_model=ToolVariantResponse, response_model_exclude_none=True)
+def api_render_tool_variant(req: ToolVariantRenderRequest, actor: dict = Depends(_current_user)) -> ToolVariantResponse:
+    return _render_tool_variant_for_work(actor, _work_for_color_snapshot(actor, req.work_id), req.mode, req.tools)
 
 
 class VisionRefineAdviceBody(BaseModel):

@@ -49,6 +49,7 @@ EXPECTED_KINDS = {
     "renga_reply",
     "replay",
     "sketch_grain_change",
+    "tool_change",
     # No refinement makes a touch since 2026-10-14; the works made before keep it.
     "touch_change",
 }

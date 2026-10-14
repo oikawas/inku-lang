@@ -228,6 +228,25 @@ class ProductPipelineEffects:
                                          admin_limits_for=lambda owner: db.get_render_limit_settings(),
                                          plugin_storage_for=db.get_user_plugin_storage)
 
+    def reading_config(self, owner: str, text: str, work: dict | None) -> dict:
+        """The config that reads a work's instructions back, as `prepare` builds it.
+
+        Reading draws nothing, so the checks a drawing needs (an offered model,
+        a catalog, seeds) are not made: a work whose model is no longer offered
+        still reads.
+        """
+        from .api_core.common import _resolve_instruction_lang
+
+        metadata = (work or {}).get("metadata", {})
+        config = self.settings.config_for(owner, work, None)
+        requested = metadata.get("instruction_lang_resolved") or metadata.get("instruction_lang_requested") or "auto"
+        config["language"] = _resolve_instruction_lang(text, requested, ui_lang=metadata.get("ui_lang"))
+        if not (work and "saved_config" in work):
+            catalog = resolve_new_work_macro_catalog(self.binding, config, ())
+            config["definitions"] = catalog["definitions"]
+            config["macro_summaries"] = catalog["macro_summaries"]
+        return config
+
     def prepare(self, owner: str, kind: str, text: str, options: dict, work: dict | None) -> tuple[dict, dict]:
         from . import db
         from .api_core.common import _env_flag, _model_offered_to, _resolve_instruction_lang

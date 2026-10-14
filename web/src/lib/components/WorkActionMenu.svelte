@@ -1,5 +1,5 @@
 <script module lang="ts">
-	export type WorkAction = 'layout' | 'color-catalog' | 'color-arrangement' | 'ground' | 'description' | 'instructions' | 'sketch-grain' | 'models' | 'autonomous';
+	export type WorkAction = 'layout' | 'color-catalog' | 'color-arrangement' | 'ground' | 'tool' | 'description' | 'instructions' | 'sketch-grain' | 'models' | 'autonomous';
 
 	let lastWorkActionTrigger: HTMLButtonElement | null = null;
 
@@ -124,6 +124,7 @@
 			<button type="button" role="menuitem" onclick={(event) => select('color-catalog', event)}>{t().canvasVaryColor}</button>
 			<button type="button" role="menuitem" onclick={(event) => select('color-arrangement', event)}>{t().workActionColorArrangement}</button>
 			<button type="button" role="menuitem" onclick={(event) => select('ground', event)}>{t().workActionGround}</button>
+			<button type="button" role="menuitem" onclick={(event) => select('tool', event)}>{t().workActionTool}</button>
 			{#if !ddlOrigin}
 				<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('description', event)}>{t().workActionDescription}</button>
 			{/if}

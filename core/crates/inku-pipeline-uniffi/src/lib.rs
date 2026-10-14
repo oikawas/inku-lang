@@ -127,6 +127,22 @@ pub fn recompose(input_bytes: Vec<u8>) -> Vec<u8> {
     .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
 }
 
+/// Another touch written into a work's visible instructions (the author,
+/// 2026-10-14): the request names the pipeline configuration, the source and the
+/// tool asked for each sentence by its instruction index. The answer carries the
+/// schema `inku.touch-change.v1`, the sentences whose tool can change, the tools,
+/// and the rewritten source or the reason the work stays as it is; an unreadable
+/// request is `{"error": "invalid_request"}` and a panic
+/// `{"error": "internal_invariant"}`. The binding version is unchanged: this only
+/// adds a call.
+#[uniffi::export]
+pub fn retouch(input_bytes: Vec<u8>) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::retouch::retouch_json(&input_bytes)
+    }))
+    .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
+}
+
 /// The states of a work's completion ranges for the instruction editors (A3):
 /// the request names the pipeline configuration, the editor's source and the
 /// work's record (`completion_ranges`, schema `inku.completion-ranges.v1`). The

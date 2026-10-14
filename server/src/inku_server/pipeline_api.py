@@ -138,6 +138,7 @@ class PipelineService:
         project_result: Callable[[str, dict, dict, dict], dict] | None = None,
         replay_for: Callable[[str, dict, dict | None], dict] | None = None,
         provider_observations: Callable[[str, str], list[dict]] | None = None,
+        reading_config_for: Callable[[str, str, dict | None], dict] | None = None,
     ):
         if max_workers <= 0 or max_effect_steps <= 0 or max_retained_runs < max_workers:
             raise ValueError("explicit positive pipeline host limits required")
@@ -151,6 +152,7 @@ class PipelineService:
         self.render_with_context, self.project_result = render_with_context, project_result
         self.replay_for = replay_for
         self.provider_observations = provider_observations
+        self.reading_config_for = reading_config_for
         self._runs: dict[tuple[str, str], CandidateExecution] = {}
         self._jobs: dict[tuple[str, str], Future] = {}
         self._lock = threading.RLock()
@@ -419,6 +421,29 @@ class PipelineService:
             return {"schema": "inku.completion-range-states.v1", "ranges": []}
         request = {"config": config, "source": body.source, "completion_ranges": record}
         return json.loads(states(json.dumps(request, ensure_ascii=False, allow_nan=False).encode("utf-8")))
+
+    def retouch(self, owner: str, history_id: str, source: str, tools: dict[int, str]) -> dict:
+        """Ask the shared core to write other tools into a saved work's instructions.
+
+        A work the shared pipeline drew reads with its saved config; an older work
+        with the config a drawing of it would take, less the drawing's checks.
+        Nothing is started. An empty `tools` reads the sentences whose tool can change.
+        """
+        native = getattr(self.binding, "retouch", None)
+        if native is None:
+            return {"outcome": "unchanged", "reason": "binding_unavailable"}
+        linked = self.store.read_linked_history(owner, history_id)
+        if linked is not None:
+            config = linked.saved_config
+        else:
+            work = self.store.read_legacy_history(owner, history_id)
+            if work is None:
+                raise HTTPException(404, "history_not_found")
+            if self.reading_config_for is None:
+                return {"outcome": "unchanged", "reason": "binding_unavailable"}
+            config = self.reading_config_for(owner, source, asdict(work))
+        request = {"config": config, "source": source, "tools": {str(index): tool for index, tool in tools.items()}}
+        return json.loads(native(json.dumps(request, ensure_ascii=False, allow_nan=False).encode("utf-8")))
 
     def provider_capture_status(self, owner: str, execution_id: str) -> dict:
         """Read saved state only; transcript inspection must not resume work."""

@@ -407,6 +407,12 @@ export interface LangPack {
 	groundChangeDraw: string;
 	groundChangeHint: string;
 	groundChangePlaceholder: string;
+	toolChangeHint: string;
+	toolChangeUniform: string;
+	toolChangePerSentence: string;
+	toolChangePerSentenceCandidate: (number: number) => string;
+	toolChangePlaceholder: string;
+	toolChangeNone: string;
 	refineNeedsDescription: string;
 	refineNeedsDdl: string;
 	tooltipVariationGridDefault: string;
@@ -600,6 +606,7 @@ export interface LangPack {
 	workActionDdlOrigin: string;
 	workActionColorArrangement: string;
 	workActionGround: string;
+	workActionTool: string;
 	workActionDescription: string;
 	workActionInstructions: string;
 	workActionSketchGrain: string;

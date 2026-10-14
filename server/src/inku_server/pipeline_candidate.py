@@ -170,6 +170,8 @@ class PipelineBinding:
             # The display keeps the complete DDL when this table is unavailable.
             self.composition_ranges = getattr(module, "pipeline_composition_ranges", None)
             self.completion_range_states = getattr(module, "pipeline_completion_range_states", None)
+            # Older compatible wheels offer no touch change.
+            self.retouch = getattr(module, "pipeline_retouch", None)
         except (AttributeError, ImportError) as error:
             raise CandidateHostError("binding_unavailable") from error
         self.versions = json.loads(version_report())

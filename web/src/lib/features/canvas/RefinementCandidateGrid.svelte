@@ -55,6 +55,9 @@
 									{#each recompositionLines(candidate.result.recomposition, t()) as line}
 										<span class="recomposition-detail">{line}</span>
 									{/each}
+									{#each candidate.details ?? [] as line}
+										<span class="recomposition-detail">{line}</span>
+									{/each}
 									<span>r {candidate.result.render_seed ?? "-"} / v {candidate.result.composition_seed ?? t().seedBaseLabel}{candidate.result.interpretation_seed ? ` / i ${candidate.result.interpretation_seed.slice(0, 8)}` : ""}</span>
 								</span>
 							</button>

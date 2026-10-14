@@ -14,6 +14,7 @@ pub mod prompts;
 pub mod protocol;
 pub mod recompose;
 pub mod replay;
+pub mod retouch;
 
 #[cfg(test)]
 mod focused_flow;

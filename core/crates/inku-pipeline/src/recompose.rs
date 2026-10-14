@@ -124,7 +124,7 @@ pub(crate) fn document(
     NormalizedDdlDocument::new(source, language, locks).ok()
 }
 
-fn canonical(
+pub(crate) fn canonical(
     source: &str,
     language: ResolvedInstructionLanguage,
     definitions: &[MacroDefinition],

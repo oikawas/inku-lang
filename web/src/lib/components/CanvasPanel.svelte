@@ -142,6 +142,7 @@
 		onGenerateColorCatalogCandidates: () => void | Promise<void>;
 		onGenerateColorArrangementCandidates: () => void | Promise<void>;
 		onGenerateGroundCandidates: () => void | Promise<void>;
+		onGenerateToolCandidates: () => void | Promise<void>;
 		/** Draws the work with each model picked in the "change the model" dialog. */
 		onGenerateModelCandidates: () => void | Promise<void>;
 		/** True when every chosen option is now in the history. */
@@ -268,6 +269,7 @@
 		onGenerateColorCatalogCandidates,
 		onGenerateColorArrangementCandidates,
 		onGenerateGroundCandidates,
+		onGenerateToolCandidates,
 		onGenerateModelCandidates,
 		onSaveSelectedVariationCandidates,
 		lineageGraph = null,
@@ -443,6 +445,7 @@
 		if (view === 'color') void onGenerateColorCatalogCandidates();
 		if (view === 'color-arrangement') void onGenerateColorArrangementCandidates();
 		if (view === 'ground') void onGenerateGroundCandidates();
+		if (view === 'tool') void onGenerateToolCandidates();
 	}
 
 	export async function openDirectActionMenu(): Promise<void> {
@@ -472,6 +475,7 @@
 		if (view === 'color') void onGenerateColorCatalogCandidates();
 		if (view === 'color-arrangement') void onGenerateColorArrangementCandidates();
 		if (view === 'ground') void onGenerateGroundCandidates();
+		if (view === 'tool') void onGenerateToolCandidates();
 	}
 
 	function openDirectEdit(node: LineageNode, mode: 'description' | 'sketch-grain'): void {
@@ -490,6 +494,7 @@
 			case 'color-catalog': startDirectRefinement(node, 'color'); break;
 			case 'color-arrangement': startDirectRefinement(node, 'color-arrangement'); break;
 			case 'ground': startDirectRefinement(node, 'ground'); break;
+			case 'tool': startDirectRefinement(node, 'tool'); break;
 			case 'description': openDirectEdit(node, 'description'); break;
 			case 'instructions': onOpenLineageDdlEditor(node); break;
 			case 'sketch-grain': openDirectEdit(node, 'sketch-grain'); break;
@@ -854,6 +859,7 @@
 					{onGenerateColorCatalogCandidates}
 					{onGenerateColorArrangementCandidates}
 					{onGenerateGroundCandidates}
+					{onGenerateToolCandidates}
 					{onGenerateModelCandidates}
 					catalogName={statusCatalogName}
 					onSaveAndClose={saveCandidatesAndClose}

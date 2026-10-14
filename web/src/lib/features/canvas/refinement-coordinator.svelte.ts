@@ -240,6 +240,82 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		};
 	}
 
+	// Four touch changes of the work (the author, 2026-10-14): every sentence on
+	// one tool, or a tool drawn for each sentence. The Server draws the parent's
+	// Score with only the tools changed and writes the tool words into the
+	// instructions; a saved option is drawn again from the parent. The options
+	// are added to those already made, so the two ways can be compared.
+	async function generateToolCandidates(): Promise<void> {
+		if (!work.result || refinementSession.gridBusy || work.loading) return;
+		const parent = work.result;
+		const workId = refinementWorkId();
+		if (!workId) {
+			refinementSession.setStatus(t().workActionSaveFirst);
+			return;
+		}
+		const mode = refinementSession.toolMode;
+		const contextVersion = targetIdentityVersion;
+		await deps.ensureVisibleLineageParentId();
+		if (contextVersion !== targetIdentityVersion || work.result !== parent || refinementSession.gridBusy) return;
+		const parentNodeId = deps.lineageParentId();
+		const { thinking } = refinementTarget();
+		const ja = getLang() === 'ja';
+		const earlier = refinementSession.candidates;
+		const controller = refinementSession.beginGrid({ includesReading: false, taskLabel: t().workActionTool, count: 4 });
+		const abortTimer = window.setTimeout(() => refinementSession.enableAbort(controller), 3000);
+		try {
+			const response = await apiFetch('/api/tool-variants/plan', {
+				method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ work_id: workId, mode })
+			});
+			if (!response.ok) throw await apiError(response);
+			type Change = { index: number; from: string; to: string };
+			const plan = await response.json() as { tools: Record<string, { ja: string; en: string }>; entries: Array<{ tools: Record<string, string>; changes: Change[] }> };
+			if (contextVersion !== targetIdentityVersion || !refinementSession.isActive(controller)) return;
+			const word = (tool: string) => plan.tools[tool]?.[ja ? 'ja' : 'en'] ?? tool;
+			const label = (entry: { changes: Change[] }, number: number) => mode === 'uniform'
+				? word(entry.changes[0]?.to ?? '')
+				: t().toolChangePerSentenceCandidate(number);
+			if (plan.entries.length === 0) {
+				refinementSession.setStatus(t().toolChangeNone);
+				return;
+			}
+			refinementSession.gridTotal = plan.entries.length;
+			refinementSession.setPlans(controller, plan.entries.map((entry, index) => label(entry, index + 1)));
+			const stamp = Date.now();
+			const candidates = await runRefinementFanout(plan.entries.map((entry, index) => async (): Promise<VariationCandidate> => {
+				const rendered = await apiFetch('/api/render-tool-variant', {
+					method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ work_id: workId, mode, tools: entry.tools })
+				});
+				if (!rendered.ok) throw await apiError(rendered);
+				const data = await rendered.json() as Partial<PaintResult> & Pick<PaintResult, 'svg' | 'score'> & { ddl: string };
+				return {
+					id: `tool-${workId}-${stamp}-${index}`, kind: 'color',
+					label: label(entry, index + 1), selected: false,
+					details: mode === 'uniform' ? [] : entry.changes.map((change) => `${change.index + 1}: ${word(change.from)} → ${word(change.to)}`),
+					result: {
+						...parent, ...data, thinking,
+						focus: undefined, variation_amplitude: undefined, variation_seed: undefined, recomposition: undefined,
+						history_id: null, history_at: null, lineage_node_id: null,
+						lineage_parent_node_id: parentNodeId,
+						derivation_kind: 'tool_change',
+						derivation_metadata: { tool_mode: mode, tools: entry.tools }
+					}
+				};
+			}), deps.render.fanoutLimit(), {
+				onStart: (index) => refinementSession.seatSlot(controller, index, 'running'),
+				onDone: (index) => { refinementSession.finishSlot(controller, index); }
+			});
+			refinementSession.commitCandidates(controller, [...earlier, ...candidates]);
+		} catch (error) {
+			if (!controller.signal.aborted) refinementSession.failGrid(controller, error instanceof Error ? error.message : String(error));
+		} finally {
+			window.clearTimeout(abortTimer);
+			refinementSession.finishGrid(controller);
+		}
+	}
+
 	function modelCandidateId(model: string): string {
 		return `model-${model}`;
 	}
@@ -602,6 +678,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		generateColorCatalogCandidates,
 		generateColorArrangementCandidates,
 		generateGroundCandidates,
+		generateToolCandidates,
 		generateModelCandidates,
 		saveSelectedVariationCandidates,
 	};

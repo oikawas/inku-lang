@@ -280,6 +280,17 @@ fn pipeline_recompose<'py>(
     PyBytes::new(py, &output)
 }
 
+/// Another touch written into a work's visible instructions (the author, 2026-10-14).
+#[pyfunction]
+fn pipeline_retouch<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::retouch(input));
+    PyBytes::new(py, &output)
+}
+
 /// The ranges the composition writes by name, for the host's display (draw-system05).
 #[pyfunction]
 fn pipeline_composition_ranges() -> String {
@@ -327,6 +338,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     module.add_function(wrap_pyfunction!(pipeline_migrate_saijiki_v1, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_recompose, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_retouch, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_composition_ranges, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_completion_range_states, module)?)?;
     Ok(())

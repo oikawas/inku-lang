@@ -62,6 +62,7 @@
 		tabsScrollEl?: HTMLElement | null;
 		result: GenerationInfoWork | null;
 		statusHistoryItem: GenerationInfoWork | null;
+		workId: string | null;
 		isJapanese: boolean;
 		developerMode: boolean;
 		statusTenkei: string | null;
@@ -98,6 +99,7 @@
 		tabsScrollEl = $bindable(null),
 		result,
 		statusHistoryItem,
+		workId,
 		isJapanese,
 		developerMode,
 		statusTenkei,
@@ -308,6 +310,7 @@
 				<section class="detail-group">
 					<h4>{t().provenanceSectionIdentity}</h4>
 					<dl>
+						{@render term(t().provenanceLabelWorkId, t().provenanceHintWorkId)}<dd><code>{workId ?? (hasSketchDetails ? t().provenanceWorkNotSaved : '-')}</code></dd>
 						{@render term(detailRenderHashLabel, t().provenanceHintRenderHash)}<dd class="detail-copy-row"><code>{detailRenderHash || '-'}</code><button type="button" disabled={!statusHashLabel} onclick={onCopyStatusHash}>{statusHashCopied ? t().promptCopied : t().promptCopy}</button></dd>
 						{@render term(detailDescriptionHashLabel, t().provenanceHintDescriptionHash)}<dd><code>{detailDescriptionHash || '-'}</code></dd>
 						{@render term('Render engine version', t().provenanceHintRenderEngine)}<dd>{detailEngineVersion || '-'}</dd>

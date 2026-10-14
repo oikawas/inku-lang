@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.141 (2026-10-14 / Build 1217)
+
 ### 2026-10-14 — Clear library searches and distinguish models in the history strip
 
 The search field now has an × button labeled “Clear search.” It is disabled when empty and returns focus to the input after clearing the query. The history strip abbreviates only the provider to two characters, wrapping the complete model name in slightly larger text. Versions, families, sizes and variants remain visible: GPT 6／6.1 and sol／luna, Claude families, Gemini Flash／Pro, and Gemma or Llama sizes and variants. Thumbnail width and page capacity stay the same.

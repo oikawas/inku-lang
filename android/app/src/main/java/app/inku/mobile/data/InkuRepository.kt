@@ -796,7 +796,6 @@ class InkuRepository(
                     litertStage1PromptOptimization = litertStage1PromptOptimization,
                     renderSeed = seeds.renderSeed,
                     compositionSeed = seeds.compositionSeed,
-                    interpretationSeed = seeds.interpretationSeed,
                     instructionLang = instructionLang,
                     uiLang = uiLang,
                     sketch = sketch,
@@ -846,7 +845,6 @@ class InkuRepository(
                 litertStage1PromptOptimization = litertStage1PromptOptimization,
                 renderSeed = seeds.renderSeed,
                 compositionSeed = seeds.compositionSeed,
-                interpretationSeed = seeds.interpretationSeed,
                 instructionLang = instructionLang,
                 uiLang = uiLang,
                 sketch = sketch,
@@ -919,7 +917,6 @@ class InkuRepository(
                 parentHistoryId = parentHistoryId,
                 renderSeed = seeds.renderSeed,
                 compositionSeed = seeds.compositionSeed,
-                interpretationSeed = seeds.interpretationSeed,
             ),
         )
         val model = drawingModelOf(stage1ModelId, stage2ModelId)
@@ -946,12 +943,11 @@ class InkuRepository(
             colorCatalogId = plan.catalogId,
             canvasAspect = plan.canvasAspect,
             // The colour refinement replays a Score that is already
-            // expanded; reading, layout and model comparison go through Stage 1.5.
+            // expanded; layout and model comparison go through Stage 1.5.
             autoRepair = plan.route != RefinementRoute.RenderFromScore,
             renderSeed = plan.seeds.renderSeed,
             compositionSeed = plan.seeds.compositionSeed,
             recomposeMode = plan.recomposeMode,
-            interpretationSeed = plan.seeds.interpretationSeed,
             // 写生 (Stage 0.5) is not re-run for a candidate: a refinement varies
             // a stage after it, and the layer is not deterministic, so asking it
             // again would move the one thing the refinement is not varying. The

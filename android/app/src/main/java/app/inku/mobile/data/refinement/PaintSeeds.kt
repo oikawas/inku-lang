@@ -6,7 +6,7 @@ import java.security.SecureRandom
 /**
  * What a caller asks a drawing to be made with.
  *
- * The render, composition, and interpretation seeds are the active request
+ * The render and composition seeds are the active request
  * values. Every one of them is `null` by default, which is the server's
  * `None`: a caller that says nothing leaves every decision where it was.
  *
@@ -17,7 +17,6 @@ import java.security.SecureRandom
 data class PaintSeeds(
     val renderSeed: Long? = null,
     val compositionSeed: Long? = null,
-    val interpretationSeed: String? = null,
 ) {
     companion object {
         /**
@@ -31,7 +30,6 @@ data class PaintSeeds(
         fun of(item: HistoryItemEntity): PaintSeeds = PaintSeeds(
             renderSeed = item.renderSeed?.let { parseSeed(it) },
             compositionSeed = item.compositionSeed?.let { parseSeed(it) },
-            interpretationSeed = item.interpretationSeed,
         )
 
         /**
@@ -49,7 +47,7 @@ data class PaintSeeds(
  * Where new seeds come from.
  *
  * The device allocates render and composition seeds from a cryptographic
- * source, and interpretation seeds as UUIDs. Retired variation seeds are
+ * source. Retired variation and interpretation seeds are
  * retained only in saved history, and are never allocated or inherited here.
  */
 object SeedFactory {
@@ -68,6 +66,4 @@ object SeedFactory {
         error("Could not allocate a unique seed")
     }
 
-    /** `createInterpretationSeed` -- an opaque uuid4, never read as a number. */
-    fun newInterpretationSeed(): String = java.util.UUID.randomUUID().toString()
 }

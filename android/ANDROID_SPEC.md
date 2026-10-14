@@ -8,9 +8,15 @@ Last updated: 2026-10-14.
 
 ## 2026-10-14 Remove touch refinement
 
-At the author's decision, refinement no longer changes touch with words. Its three elements are reading, color catalog and layout. The words field, word-seed plan and dedicated messages are removed. A saved `touch` or `variation` selection displays reading without deleting the old setting.
+At the author's decision, refinement no longer changes touch with words. After reading was removed on the same day, its two elements are color catalog and layout. The words field, word-seed plan and dedicated messages are removed. A saved `touch`, `reading` or `variation` selection displays layout without deleting the old setting.
 
 New drawing requests and execution options omit `seed_text`, and do not call the core's `render_seed_from_text`. Saved works replay with their stored `render_seed`. Historical `seed_text` remains in generation information and saved records; saved `touch_change` lineage edges and their Touch label remain readable. Room columns, schema and migrations are unchanged. The current Android app has no autonomous-refinement screen, execution entry point or Vision-advice `enabled_kinds`.
+
+## 2026-10-14 Remove reading refinement
+
+Remove Another reading from refinement and Edit drawing parameters from the work menu. Another composition and Another catalog open the same saved work's existing refinement workspace; opening makes no drawing or save. The remaining elements are color catalog and layout, with layout as the default. Color candidates replay the parent's saved Score in another catalog without reading the description again through Stage 1.
+
+New drawing requests and execution options omit `interpretation_seed`, and allocate no such identifier. Saved `reinterpretation` lineage edges and their Reading label, and a work's recorded `interpretation_seed` in generation information, remain readable. Description editing and model comparison keep their existing drawing entries.
 
 ## 2026-10-13 Canonical model information and labels
 
@@ -282,7 +288,7 @@ The differences found by the Server/Web parity audit now follow the rules below.
   - A replay records the catalog name and sub, `render_color_source`, `render_color_profile`, `seed_text`, and `render_limits` / `render_limits_source`.
   - `ddl_version` / `ddl_engine_version` are Server's Python constants and `render_build_number` is the Web build number; Android has no counterpart and does not record them.
 - **`rh3`**: the hashed text is written as Python's `json.dumps(ensure_ascii=False, sort_keys=True, separators=(",", ":"))` writes it (no escaping of `/`, numbers as Python's `repr`). Saved rows keep the hash they were saved with.
-- **Refinement**: a work without a description can still take color and layout refinements. Every element but color needs the DDL, and reading and model comparison need the description. The color refinement draws every catalog but the parent's in list order, one option each, named after the catalog, with no 1/4 option count. Progress lanes count the planned options, four per row.
+- **Refinement**: a work without a description can still take color and layout refinements. Layout needs the DDL, and model comparison needs the description. The color refinement draws every catalog but the parent's in list order, one option each, named after the catalog, with no 1/4 option count. Progress lanes count the planned options, four per row.
 - **Description lock**: a saved work follows the lineage rule of Server's `description_lock.py`; an unsaved one follows its authority, as on the Web.
 - **Export**: PNG height is 64–2160px (author's decision, 2026-10-06). A height out of range is refused, not shrunk. The width is computed from the canvas ratio before drawing, and a size beyond `inku-svg-raster`'s limits (8192px per side, 16,777,216 pixels) is refused. The default templates are `PNG 1080px` and `PNG 2160px`; the built-in `png-4320` row is removed at start-up (templates the author made are kept, and one above 2160px is refused at export with the reason). Like the Web, a PNG carries the work's creation time as `eXIf` and a tEXt `Creation Time`, and the display SVG export inserts the description as `<desc>` right after the first `<svg>` tag.
 - **Kept as Android decisions**:
@@ -318,11 +324,11 @@ Only a chosen candidate is saved. Its layout_change edge records composition_see
 
 ## 2026-10-04 Retiring variation refinement
 
-Variation refinement is retired. Following the 2026-10-14 removal of touch, the current elements are reading, color catalog and layout. The variation choice, notice, amplitude and seed allocation/input are removed. New drawing requests, results and saves carry no variation values. The compiler configuration omits `stage15_variation`, and `variation_pair_required` is no longer checked. A new work derived from a saved configuration removes the retired field from its copy; the original saved configuration remains intact.
+Variation refinement is retired. Following the 2026-10-14 removal of touch and reading, the current elements are color catalog and layout. The variation choice, notice, amplitude and seed allocation/input are removed. New drawing requests, results and saves carry no variation values. The compiler configuration omits `stage15_variation`, and `variation_pair_required` is no longer checked. A new work derived from a saved configuration removes the retired field from its copy; the original saved configuration remains intact.
 
 Room schema 14 retains the `variation_amplitude` and `variation_seed` columns, their saved values, historical schemas and migrations. This retirement adds no database migration. New works leave the old columns NULL. Saved lineage edges of kind `variation` remain readable as “変奏（旧） / Variation (retired)”, while new saves cannot declare that kind. Generation information shows a recorded amplitude and seed with the retired label only when each value exists; works without these values have no corresponding rows.
 
-The DDL authority and description-based creation messages use “work”. Work-version identifiers such as `pipeline_variation_id`, authority records and Score variation for line tremor retain their meaning. A remembered refinement choice of `variation` displays reading instead, without deleting the old setting or saved works. This supersedes the 2026-09-27 decision to keep the inactive variation choice and notice.
+The DDL authority and description-based creation messages use “work”. Work-version identifiers such as `pipeline_variation_id`, authority records and Score variation for line tremor retain their meaning. A remembered refinement choice of `variation` displays layout instead, without deleting the old setting or saved works. This supersedes the 2026-09-27 decision to keep the inactive variation choice and notice.
 
 ## 2026-10-04 Connect a personal ChatGPT plan
 
@@ -398,7 +404,7 @@ Startup opens Studio for writing without automatically selecting a saved work. R
 
 Global bottom navigation offers Studio, Camera, Works, and Settings. Camera is a primary creative entrance on mobile: capture the reality in front of you and receive an abstract painting. Studio, Works, Settings, and work-editing screens start capture in one action without first moving to Studio. Camera is a capture action rather than a selected tab. New photo input uses camera capture only, with no Photo Picker or input-source dialog. Confirming a shot automatically continues through observation, poetic description writing, drawing, saving, and the finished work, without an intervening editor or stage selector. A shared model choice before capture is retained; development follows real processing stages, cancellation restores the prior screen and input, and failures retain the existing retry flow. Original photos, provenance, and replay remain available for works previously drawn from picked photos.
 
-The work display, gallery viewer, and lineage open the same Refine menu on the selected work. Edit drawing parameters, Change the description, Edit instructions, Redraw with or without sketch from life, and Change the model lead directly to existing operations. The Android-only Series name and destination are removed; lineage opens from a work action. Its origin, star, and trash operations remain, as do Studio's batch and instruction editing and Settings' demo. Server-only refinement operations are not added.
+The work display, gallery viewer, and lineage open the same Refine menu on the selected work. Another composition, Another catalog, Change the description, Edit instructions, Redraw with or without sketch from life, and Change the model lead directly to existing operations. The Android-only Series name and destination are removed; lineage opens from a work action. Its origin, star, and trash operations remain, as do Studio's batch and instruction editing and Settings' demo. Server-only refinement operations are not added.
 
 Description editing starts with the input field and names its target work. The authoring input, selected work, color catalog, and canvas are retained separately from the work being viewed or edited; closing a work edit returns to its entrance. Settings remembers its entrance and screens retain their scroll positions. Candidate generation, subview changes, target changes, closure, and saving keep their existing lifecycle. Navigation alone must not make another work's candidate the parent of a new drawing.
 

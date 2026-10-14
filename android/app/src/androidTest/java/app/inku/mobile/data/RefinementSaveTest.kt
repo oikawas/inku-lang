@@ -86,7 +86,7 @@ class RefinementSaveTest {
             canvasAspect = "square",
             stage1ModelId = "test-stage1",
             stage2ModelId = "test-stage2",
-            seeds = PaintSeeds(renderSeed = 4242L, compositionSeed = 77L, interpretationSeed = "parent-reading"),
+            seeds = PaintSeeds(renderSeed = 4242L, compositionSeed = 77L),
         )
 
     /**
@@ -106,7 +106,7 @@ class RefinementSaveTest {
             stage1ModelId = "test-stage1",
             stage2ModelId = "test-stage2",
             autoRepair = true,
-            seeds = PaintSeeds(renderSeed = 4242L, compositionSeed = 77L, interpretationSeed = "parent-reading"),
+            seeds = PaintSeeds(renderSeed = 4242L, compositionSeed = 77L),
         )
 
     private fun parentOf(item: HistoryItemEntity) = RefinementParent.of(item, item.originalInput)
@@ -194,7 +194,7 @@ class RefinementSaveTest {
     // ── T-8 ────────────────────────────────────────────────
 
     /**
-     * Each of the three elements writes one edge, and the edge says which
+     * Both elements write one edge, and the edge says which
      * intervention it was. The metadata is read back from the row, not from the
      * plan, so a declaration dropped between the two is visible here.
      */
@@ -203,7 +203,6 @@ class RefinementSaveTest {
         val cases = listOf(
             RefinementElement.Color to "catalog_change",
             RefinementElement.Layout to "layout_change",
-            RefinementElement.Reading to "reinterpretation",
         )
 
         cases.forEachIndexed { index, (element, expectedKind) ->
@@ -229,7 +228,6 @@ class RefinementSaveTest {
                     assertEquals("vivid_material", metadata.getString("catalog_id_to"))
                 }
                 RefinementElement.Layout -> assertTrue(metadata.has("composition_seed"))
-                RefinementElement.Reading -> assertTrue(metadata.has("interpretation_seed"))
             }
         }
     }
@@ -243,7 +241,7 @@ class RefinementSaveTest {
         val stored = database.historyDao().getById(child.id)!!
         assertEquals("the colour refinement held the parent's touch", "4242", stored.renderSeed)
         assertEquals("and its layout", "77", stored.compositionSeed)
-        assertEquals("and its reading", "parent-reading", stored.interpretationSeed)
+        assertNull("new requests record no retired reading identifier", stored.interpretationSeed)
         assertEquals("only the catalogue moved", "vivid_material", stored.colorCatalogId)
         assertEquals("the canvas is the parent's", parent.canvasAspect, stored.canvasAspect)
     }

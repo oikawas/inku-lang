@@ -87,7 +87,8 @@ object InkuStringsEn : InkuStrings {
     override val back = "Back"
     override val descriptionEditAction = "Change the description"
     override val instructionEditAction = "Edit instructions"
-    override val drawingEditAction = "Edit drawing parameters"
+    override val layoutEditAction = "Another composition"
+    override val colorCatalogEditAction = "Another catalog"
     override val modelEditAction = "Change the model"
     override val editingWorkLabel: (String) -> String = { hash -> "Target work $hash" }
     override val nextDrawingConditions = "Settings for the next drawing"
@@ -204,10 +205,9 @@ object InkuStringsEn : InkuStrings {
     override val refinementNeedsDdl = "This work has no instructions, so no refinement options can be made."
     override val refinementNoOtherCatalog = "No other color catalog is available."
     override val refinementElementLabel: (String) -> String = { id ->
-        // The nouns of the three refinement operations.
+        // The nouns of the two refinement operations.
         when (id) {
             "layout" -> "Composition"
-            "reading" -> "Reading"
             "color" -> "Color catalog"
             else -> id
         }

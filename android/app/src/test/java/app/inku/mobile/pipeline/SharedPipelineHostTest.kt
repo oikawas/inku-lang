@@ -545,7 +545,7 @@ class SharedPipelineHostTest {
     }
 
     @Test
-    fun drawingRequestsUseTheirRenderSeedWithoutSendingSeedWords() = runBlocking {
+    fun drawingRequestsUseTheirRenderSeedWithoutSendingRetiredSeedInputs() = runBlocking {
         val binding = ScriptedBinding().apply { wordSeed = { error("retired word seed must not be called") } }
         val store = MemoryExecutionStore()
         val pipeline = AndroidWorkPipeline(
@@ -566,9 +566,11 @@ class SharedPipelineHostTest {
 
         assertEquals(9L, result.renderSeed)
         assertNull(result.seedText)
+        assertNull(result.interpretationSeed)
         val options = JSONObject(store.load(AndroidWorkPipeline.OWNER_ID, result.pipelineView!!.executionId)!!
             .toString(Charsets.UTF_8)).getJSONObject("host_context").getJSONObject("result_options")
         assertFalse(options.has("seed_text"))
+        assertFalse(options.has("interpretation_seed"))
     }
 
     @Test
@@ -594,6 +596,7 @@ class SharedPipelineHostTest {
             renderMetadataJson = initial.renderMetadataJson, renderHash = "hash", renderHashShort = "0000",
             colorCatalogId = "default", canvasAspect = "square", starred = false, trashed = false,
             elapsedMs = null, tokenMetadataJson = null, renderSeed = "14859340650796947346", seedText = "しずかに",
+            interpretationSeed = "historic-reading",
         )
         val stored = ManagedHistoryRead(parent, "ddl_authoritative", variationId = link.variationId, forkContextJson = savedContext.toString())
         val replay = androidPipeline(binding, readHistory = { stored }).renderFromScore(
@@ -602,6 +605,7 @@ class SharedPipelineHostTest {
         assertEquals(parent.renderSeed, renderInputs.single().getJSONObject("request").getJSONObject("options").get("render_seed").toString())
         assertEquals(parent.renderSeed, java.lang.Long.toUnsignedString(replay.renderSeed!!))
         assertEquals(parent.seedText, replay.seedText)
+        assertEquals(parent.interpretationSeed, replay.interpretationSeed)
         assertEquals(parent.seedText, JSONObject(replay.renderMetadataJson).getString("seed_text"))
     }
 

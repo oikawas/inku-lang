@@ -11,13 +11,12 @@ import app.inku.mobile.ui.i18n.inkuError
 /**
  * The one intervention a round of refinement makes.
  *
- * A refinement selects reading, color catalog, or layout.
+ * A refinement selects color catalog or layout.
  * That is why this is an enum and not a set
  * of flags -- 「系譜の各辺を単一の介入として説明可能にするため」, and a lineage edge
  * whose cause is two things at once cannot be labelled with one kind.
  */
 enum class RefinementElement(val id: String, val derivationKind: String) {
-    Reading("reading", "reinterpretation"),
     Color("color", "catalog_change"),
     Layout("layout", "layout_change"),
     ;
@@ -108,7 +107,7 @@ data class RefinementParent(
  * one thing this round varies. There is no second place where a seed is decided.
  */
 data class RefinementPlan(
-    /** `null` for a comparison candidate: it varies the model, which is not one of the three elements. */
+    /** `null` for a comparison candidate: it varies the model, which is not one of the two elements. */
     val element: RefinementElement?,
     val route: RefinementRoute,
     val catalogId: String,
@@ -136,7 +135,7 @@ object RefinementPlanner {
 
     /**
      * @param element the single intervention. One value, never a collection:
-     *   there is no way to spell "reading and colour" here, which is what makes
+     *   there is no way to spell "layout and colour" here, which is what makes
      *   the exclusivity a property of the type rather than of a check.
      * @param newCatalogId the catalogue to apply, for the colour refinement only.
      */
@@ -156,27 +155,10 @@ object RefinementPlanner {
                 route = RefinementRoute.ComposeFromDdl,
                 catalogId = parent.catalogId,
                 canvasAspect = parent.canvasAspect,
-                seeds = PaintSeeds(compositionSeed = seed, interpretationSeed = parent.seeds.interpretationSeed),
+                seeds = PaintSeeds(compositionSeed = seed),
                 derivationKind = element.derivationKind,
                 derivationMetadata = mapOf("composition_seed" to seed, "recompose_mode" to recomposeMode.id),
                 recomposeMode = recomposeMode,
-            )
-        }
-
-        // 「読み取りは一つの上流介入として扱い、その結果として配置とタッチを下流工程
-        // で再生成する」-- so neither the composition seed nor the render seed is
-        // carried: they are downstream of the reading, and holding them would
-        // pin what the SPEC says is regenerated.
-        RefinementElement.Reading -> {
-            val seed = SeedFactory.newInterpretationSeed()
-            RefinementPlan(
-                element = element,
-                route = RefinementRoute.Paint,
-                catalogId = parent.catalogId,
-                canvasAspect = parent.canvasAspect,
-                seeds = PaintSeeds(interpretationSeed = seed),
-                derivationKind = element.derivationKind,
-                derivationMetadata = mapOf("interpretation_seed" to seed),
             )
         }
 
@@ -209,7 +191,7 @@ object RefinementPlanner {
      *
      * A colour change replays the saved Score and a layout draws the saved DDL,
      * so neither needs a description: a work drawn from hand-written DDL can
-     * still take them. Reading and the model comparison keep the
+     * still take them. The model comparison keeps the
      * description guard -- before it, a route through Stage 1 sent the core an
      * empty description and the panel showed its bare `schema_violation`.
      * Every element but colour then needs the DDL, as web asks for it.

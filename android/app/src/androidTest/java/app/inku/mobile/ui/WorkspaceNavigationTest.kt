@@ -162,7 +162,7 @@ class WorkspaceNavigationTest {
         compose.onAllNodesWithTag(WORK_LINEAGE_ENTRY_TAG)[0].performClick()
         await { it.tab == AppTab.Lineage && it.lineageGraph != null }
         compose.onAllNodesWithTag(LINEAGE_MENU_TAG)[0].performClick()
-        compose.onNodeWithTag(REFINE_ENTRY_TAG).performClick()
+        compose.onNodeWithTag(LAYOUT_REFINE_ENTRY_TAG).performClick()
         await { it.refinementOpen && it.refinementParent?.id == work.id }
         destination(InkuStringsJa.studioTitle).performClick()
         await { it.tab == AppTab.Compose && !it.refinementOpen && it.workContextId == null }

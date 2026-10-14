@@ -8,6 +8,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — Next 8 color options switches the displayed page
+
+Next 8 options replaces the displayed page once the next options are ready,
+clearing earlier options and selections and keeping at most 8 visible. The
+cursor continues to exclude color arrangements already offered.
+
 ## v2.15.123 (2026-10-14 / Build 1199)
 
 ### 2026-10-14 — Oil paint bristle marks keep the pigment's color

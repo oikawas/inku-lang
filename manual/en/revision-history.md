@@ -2,6 +2,11 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-14 — Switch color options one page of 8 at a time
+
+Section 8.4 of Creating Images now follows the author's correction: Next 8
+options switches the displayed page and clears earlier options and selections.
+
 ## 2026-10-14 — Change colors within the same catalog
 
 Section 8.4 of Creating Images now describes the work-editing menu's Change the color arrangement action: 8 distinct options and the next page, keeping earlier options and selections, reaching the end of the combinations, and replaying saved color choices.

@@ -404,7 +404,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				onStart: (index) => refinementSession.seatSlot(controller, index, 'running'),
 				onDone: (index) => { refinementSession.finishSlot(controller, index); }
 			});
-			refinementSession.commitCandidates(controller, [...refinementSession.candidates, ...candidates]);
+			refinementSession.commitCandidates(controller, candidates);
 		} catch (error) {
 			if (!controller.signal.aborted) refinementSession.failGrid(controller, error instanceof Error ? error.message : String(error));
 		} finally {

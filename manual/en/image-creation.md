@@ -301,7 +301,7 @@ Choosing, saving, and discarding options work as in 8.2. After a stop or a failu
 
 ### 8.4 Change the Color Arrangement
 
-Choose `Change the color arrangement` in the work-editing menu to see 8 options with colors reassigned within the current color catalog. Placement, touch, and instructions stay the same, and no LLM is called. `Next 8 options` appends options that do not repeat earlier ones, keeping the earlier options and selections. Once the possibilities run out, only the remaining options appear and no next page can be drawn.
+Choose `Change the color arrangement` in the work-editing menu to see 8 options with colors reassigned within the current color catalog. Placement, touch, and instructions stay the same, and no LLM is called. `Next 8 options` switches the displayed page once the next distinct options are ready. Earlier options and selections are cleared. Once the possibilities run out, only the remaining options appear and no next page can be drawn.
 
 Choosing, saving, and discarding options work as in 8.2. A saved option retains its chosen colors when the work is drawn again.
 

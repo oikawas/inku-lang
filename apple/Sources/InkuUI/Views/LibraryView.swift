@@ -913,6 +913,7 @@ struct LibraryWorkDetails: View {
     var onAnnotationSaved: ((String, LibraryAnnotation) -> Void)? = nil
     var onOpenInCreate: ((SavedWork) -> Void)? = nil
     var onAdjustWork: ((SavedWork) -> Void)? = nil
+    var showsRefinementMenu = false
     var onWorkAction: ((SavedWork, String) -> Void)? = nil
     var onOpenLineage: ((SavedWork) -> Void)? = nil
     var writingLocked = false
@@ -1014,7 +1015,11 @@ struct LibraryWorkDetails: View {
             Button(model.display.localized("系譜"), systemImage: "point.3.connected.trianglepath.dotted") { onOpenLineage(work) }
                 .disabled(work.lineageNodeID == nil)
         }
-        if let onAdjustWork {
+        if showsRefinementMenu {
+            Menu(model.display.localized("推敲する"), systemImage: "slider.horizontal.3") {
+                SavedWorkRefinementActions(model: model, work: work, onAction: action, writingLocked: writingDisabled)
+            }.disabled(writingDisabled)
+        } else if let onAdjustWork {
             Button(model.display.localized("推敲する"), systemImage: "slider.horizontal.3") { onAdjustWork(work) }
                 .disabled(writingDisabled)
         }

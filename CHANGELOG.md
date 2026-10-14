@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-14 — Change the touches draws only when asked and replaces its options
-
-At the author's request, opening the dialog no longer draws four options: they are drawn only when Make four options is pressed, and pressing it again discards the options shown and draws four new ones (they used to be added). The ways are now named Same tool for every sentence and A different tool for each sentence (in Japanese 「すべての文を同じ筆記具にする」「文ごとに違う筆記具にする」, formerly 「全文を揃える」「文ごとに引く」). The Server and the API are unchanged.
-
 ### 2026-10-14 — Correct the explanation beside Android composition candidates
 
 A sentence with no range or place now explains that the ranges in the instructions cannot be chosen again. When the ranges stay, the accompanying text says the work was redrawn with a new composition seed and unchanged instructions. The author's Japanese and English wording matches Web.
@@ -23,6 +19,12 @@ When a sentence states no range or place, the reason now explains that the instr
 ### 2026-10-14 — Remove reading and touch refinement on macOS
 
 Following the author's decision, Another reading, word-based touch, and the empty Edit drawing parameters menu are removed. Layout keeps its separate entrance. Autonomous refinement and Vision advice allow only color catalog and layout, excluding old reading and touch selections from requests. Direction is Vision observation material only and is never added to the drawing description. Color generations draw the parent's saved DDL without calling Stage 1. Archived Reading and Touch lineage labels and interpretation_seed/seed_text display remain readable; replay uses recorded render_seed. Removed Web copy keys and tooltip mappings are aligned.
+
+## v2.15.136 (2026-10-14 / Build 1212)
+
+### 2026-10-14 — Change the touches draws only when asked and replaces its options
+
+At the author's request, opening the dialog no longer draws four options: they are drawn only when Make four options is pressed, and pressing it again discards the options shown and draws four new ones (they used to be added). The ways are now named Same tool for every sentence and A different tool for each sentence (in Japanese 「すべての文を同じ筆記具にする」「文ごとに違う筆記具にする」, formerly 「全文を揃える」「文ごとに引く」). The Server and the API are unchanged.
 
 ## v2.15.135 (2026-10-14 / Build 1211)
 

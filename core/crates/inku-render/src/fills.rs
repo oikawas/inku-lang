@@ -8,7 +8,7 @@ use crate::determinism::{hash01, seed_salt_index_digest};
 use crate::geometry::{point_to_pixels, stroke_sample_count};
 use crate::mark_paths::{contour_stroke_path, grid_step, polygon_path, uses_hand_stroke};
 use crate::marks::{MarkContext, MarkStyle, reaches_canvas};
-use crate::materials::{OilPaintStyle, oil_paint_shade, oil_paint_stroke, with_texture_filter};
+use crate::materials::{OilPaintStyle, oil_paint_load, oil_paint_stroke, with_texture_filter};
 use crate::planning::instruction_anchor_on_canvas;
 use crate::stroke::{ContourStrokeRequest, StrokeTerminal, synthesize_contour};
 use crate::svg::{Element, format_number};
@@ -119,7 +119,6 @@ fn stroke_path(
                     opacity,
                     instruction.surface_intensity,
                     context.canvas,
-                    true,
                 )
             } else {
                 OilPaintStyle::plain(&style.color, opacity)
@@ -367,10 +366,7 @@ fn oil_paint_fill(
             })
             .collect::<Vec<_>>();
         let mut pass_style = style.clone();
-        pass_style.color = oil_paint_shade(
-            &style.color,
-            (hash01(order as i64, seed, "oil-fill-load") - 0.5) * 0.10,
-        );
+        pass_style.color = oil_paint_load(&style.color, seed, order as i64);
         let pass_seed = fill_seed(seed, order);
         let stroke = synthesize_contour(ContourStrokeRequest {
             centerline: &centerline,
@@ -416,7 +412,6 @@ fn oil_paint_fill(
                     1.0,
                     instruction.surface_intensity,
                     context.canvas,
-                    true,
                 )
             } else {
                 OilPaintStyle::plain(&pass_style.color, 1.0)

@@ -66,6 +66,8 @@ fn oil_accepted_intensities_preserve_pigment_and_shape_without_compat_clipping()
         },
     };
     let mut results = Vec::new();
+    // Bristle marks counted for normal, dense and faint.
+    let mut marks = [0_usize; 3];
     for intensity in [
         SurfaceIntensity::Normal,
         SurfaceIntensity::Dense,
@@ -93,42 +95,37 @@ fn oil_accepted_intensities_preserve_pigment_and_shape_without_compat_clipping()
         for (index, group) in groups.iter().enumerate() {
             let body = elements(group, "path", "oil-paint-body-v1")[0];
             let outline = attr(body, "fill-rule") == "evenodd";
-            let relief = if index < 2 {
-                1.0
-            } else {
-                (if intensity == SurfaceIntensity::Dense {
-                    1.75
-                } else {
-                    1.0
-                }) * if outline { 1.0 } else { 0.6 }
-            };
             let expected_opacity = if index >= 2 && intensity == SurfaceIntensity::Faint {
                 0.54
             } else {
                 1.0
             };
-            // The selected pigment and ridge banks share one deposited-paint opacity.
+            // The selected pigment and its bristle marks share one deposited-paint opacity.
             assert!(
                 (attr(group, "opacity").parse::<f64>().unwrap() - expected_opacity).abs() < 0.00001
             );
-            for (class, shade) in [
-                ("oil-paint-ridge-shadow-v1", -0.23 * relief),
-                ("oil-paint-ridge-light-v1", 0.20 * relief),
-            ] {
-                let ridges = elements(group, "path", class);
-                assert_eq!(ridges.len(), 4);
+            let shadows = elements(group, "path", "oil-paint-ridge-shadow-v1");
+            let lights = elements(group, "path", "oil-paint-ridge-light-v1");
+            // A pass carries at most five seeded marks and one lit partner; an
+            // outline at most two and the partner. Never the old four full pairs.
+            assert!(shadows.len() + lights.len() <= if outline { 3 } else { 6 });
+            let (body_lightness, body_chroma, body_hue) = oklch(attr(body, "fill"));
+            for (ridges, darker) in [(shadows, true), (lights, false)] {
                 for ridge in ridges {
-                    for (base, value) in rgb(attr(body, "fill"))
-                        .into_iter()
-                        .zip(rgb(attr(ridge, "fill")))
-                    {
-                        let expected = if shade < 0.0 {
-                            base * (1.0 + shade)
-                        } else {
-                            base + (255.0 - base) * shade
-                        };
-                        assert!((value - expected).abs() <= 0.500001);
-                    }
+                    let (lightness, chroma, hue) = oklch(attr(ridge, "fill"));
+                    // A mark steps a little in lightness and keeps the pigment's
+                    // colour: no greying towards black, no mixing with white.
+                    let step = lightness - body_lightness;
+                    assert!(if darker { step < 0.0 } else { step > 0.0 }, "{step}");
+                    assert!(step.abs() <= 0.08, "{step}");
+                    assert!(chroma >= body_chroma * 0.85, "{chroma} {body_chroma}");
+                    let turn = (hue - body_hue + 540.0).rem_euclid(360.0) - 180.0;
+                    assert!(turn.abs() <= 6.0, "{turn}");
+                    marks[match intensity {
+                        SurfaceIntensity::Normal => 0,
+                        SurfaceIntensity::Dense => 1,
+                        SurfaceIntensity::Faint => 2,
+                    }] += 1;
                 }
             }
         }
@@ -160,9 +157,11 @@ fn oil_accepted_intensities_preserve_pigment_and_shape_without_compat_clipping()
         elements(dense, "g", "oil-intensity-width-field-v1")
     );
     assert_eq!(tags(normal, "path"), tags(faint, "path"));
-    assert_eq!(tags(normal, "path").len(), tags(dense, "path").len());
-    assert!(dense.matches(" L ").count() < normal.matches(" L ").count());
-    assert!(dense.len() < normal.len());
+    // Dense lays one more mark on each pass, and some passes a lit partner.
+    assert!(marks[0] > 0);
+    assert_eq!(marks[2], marks[0], "{marks:?}");
+    assert!(marks[1] > marks[0], "{marks:?}");
+    assert!(tags(dense, "path").len() > tags(normal, "path").len());
 }
 
 fn tags<'a>(svg: &'a str, name: &str) -> Vec<&'a str> {
@@ -190,4 +189,27 @@ fn attr<'a>(tag: &'a str, name: &str) -> &'a str {
 
 fn rgb(color: &str) -> [f64; 3] {
     [1, 3, 5].map(|start| f64::from(u8::from_str_radix(&color[start..start + 2], 16).unwrap()))
+}
+
+/// OKLCH lightness, chroma and hue (degrees) of a `#rrggbb` colour.
+fn oklch(color: &str) -> (f64, f64, f64) {
+    let [r, g, b] = rgb(color).map(|channel| {
+        let channel = channel / 255.0;
+        if channel <= 0.04045 {
+            channel / 12.92
+        } else {
+            ((channel + 0.055) / 1.055).powf(2.4)
+        }
+    });
+    let l = (0.412_221_470_8 * r + 0.536_332_536_3 * g + 0.051_445_992_9 * b).cbrt();
+    let m = (0.211_903_498_2 * r + 0.680_699_545_1 * g + 0.107_396_956_6 * b).cbrt();
+    let s = (0.088_302_461_9 * r + 0.281_718_837_6 * g + 0.629_978_700_5 * b).cbrt();
+    let lightness = 0.210_454_255_3 * l + 0.793_617_785_0 * m - 0.004_072_046_8 * s;
+    let a = 1.977_998_495_1 * l - 2.428_592_205_0 * m + 0.450_593_709_9 * s;
+    let b = 0.025_904_037_1 * l + 0.782_771_766_2 * m - 0.808_675_766_0 * s;
+    (
+        lightness,
+        a.hypot(b),
+        b.atan2(a).to_degrees().rem_euclid(360.0),
+    )
 }

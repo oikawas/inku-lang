@@ -421,7 +421,7 @@ pub(crate) fn hand_line(
             polygon_path(&outline),
             &outline[..middle],
             &right,
-            OilPaintStyle::plain(&style.color, style.stroke_opacity),
+            OilPaintStyle::stroke(&style.color, style.stroke_opacity),
             seed,
             false,
         ));
@@ -486,10 +486,9 @@ pub(crate) fn hand_contour(
                     style.stroke_opacity,
                     instruction.surface_intensity,
                     context.canvas,
-                    false,
                 )
             } else {
-                OilPaintStyle::plain(&style.color, style.stroke_opacity)
+                OilPaintStyle::stroke(&style.color, style.stroke_opacity)
             },
             context.seed_for(instruction),
             closed,

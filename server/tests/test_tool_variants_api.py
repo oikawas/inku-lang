@@ -55,6 +55,10 @@ def test_tool_variant_render_save_and_replay(monkeypatch):
                                  for i in value["instructions"]}
         assert weights(score) == {0: "brush_thin", 1: "pen"}
 
+        # The shipped wheel carries the core's touch change, and the work's sentences read back.
+        assert callable(getattr(get_service().binding, "retouch", None))
+        read = get_service().retouch(user["id"], parent["id"], source, {})
+        assert read["outcome"] == "read", read
         plan = client.post("/api/tool-variants/plan", json={"work_id": parent["id"]}, headers=headers)
         assert plan.status_code == 200, plan.text
         plan = plan.json()

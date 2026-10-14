@@ -71,6 +71,7 @@
 | 色カタログを変える | **Another catalog** | **lint 固定** | — |
 | 配色を変える | **Change the color arrangement** | 同じ色カタログの中で色の割当を変える独立した作品編集メニュー（2026-10-14 作者）。系譜の短札は **Color arrangement** | — |
 | 支持体を変える | **Change the ground** | 作品の支持体（歳時記のじ、英語のカテゴリ名 grounds）だけを、使っていない支持体に差し替える独立した作品編集メニュー（2026-10-14 作者）。系譜の短札は **Ground** | ~~support~~（じの英語は ground に揃える） |
+| てざわりを変える | **Change the touches** | 作品の文のてざわり（歳時記のてざわり、英語のカテゴリ名 touches）だけを別の筆記具に替える独立した作品編集メニュー（2026-10-14 作者）。選び方は「全文を揃える」**One touch for all**（既定）と「文ごとに引く」**Per sentence**。系譜の短札は **Touches**。2026-10-14 に削除した「タッチ」（Touch、`touch_change`）とは別の操作 | ~~tool~~（内部名 `tool_change` は Score の `weight` に合わせた名で、画面には出さない） |
 | 変奏（旧） | **Variation (retired)** | 2026-10-04 に廃止した（作者裁定）。古い系譜の辺の札と、古い作品の生成情報の行にだけ使う。強度の Subtle／Moderate／Sweeping も廃止した | — |
 | 作品（新しい作品として保存） | **work** | 名詞。pipeline の variation（記述や設定を変えて保存する新しい単位）を画面で言う語（2026-10-04 作者裁定）。変奏とは言わない | ~~variation~~ |
 | 候補・案 | **option** / **candidate** | 名詞 | ~~variation~~（pipeline の variation と紛れる） |
@@ -90,7 +91,7 @@
 系譜の辺の札（web `derivation.ts` の写し。**正本は実装**で、本表は 2026-08-17 に写した）:
 タッチ = Touch ／ 構図 = Layout ／ 色 = Color ／ 解釈 = Reading ／ モデル = Model ／ 言語 = Language ／
 DDL編集 = DDL edit ／ 記述編集 = Description edit ／ 再描画 = Replay ／ キャンバス変更 = Canvas change ／
-変奏（旧） = Variation (retired) ／ 写生の区切り = Sketch grain。
+変奏（旧） = Variation (retired) ／ 写生の区切り = Sketch grain ／ 支持体 = Ground ／ てざわり = Touches。
 **注**: 辺の札は 1 語の短札という別の register で、`Layout` / `Color` は §3 の
 composition / color catalog と食い違って見える（→ §8）。
 

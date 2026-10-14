@@ -311,6 +311,17 @@ Choose `Change the ground` in the work-editing menu to see options with the work
 
 Choosing, saving, and discarding options work as in 8.2.
 
+### 8.6 Change the Touches
+
+Choose `Change the touches` in the work-editing menu to see four options with only the touches of the work's sentences (the saijiki's touches: twelve drawing tools such as silverpoint, pencil, pen, crayon, chalk, fine-brush and oil paint) replaced by other tools. A radio chooses the way:
+
+- `One touch for all` (the default): each option gives every sentence one tool, and is named after it.
+- `Per sentence`: each sentence draws a tool other than its own, and the option lists which sentence took which tool.
+
+`Make four options` adds four more in the chosen way, so options made both ways can be compared. Placement, color, and ground stay the same, and no LLM is called. A saved option's instructions name the new touches; a sentence that named none (drawn with the pen) has the new word written before the shape's name.
+
+Choosing, saving, and discarding options work as in 8.2.
+
 ## 9. Autonomous Refinement
 
 From the lineage tab the application can build generations on its own.

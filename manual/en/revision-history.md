@@ -2,6 +2,12 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-14 — Change the touches
+
+Section 8.6 of Creating Images now describes the work-editing menu's Change the
+touches action: One touch for all or Per sentence, and the touch words in a
+saved option's instructions.
+
 ## 2026-10-14 — Another reading and Edit drawing parameters removed
 
 `Another reading` and Edit drawing parameters in the work-editing menu are gone,

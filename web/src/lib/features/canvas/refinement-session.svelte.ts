@@ -4,7 +4,7 @@ import type { RecomposeMode } from './recomposition.ts';
 
 export type RefineKind = 'layout' | 'color';
 /** Which dialog the refinement modal shows: parameters, models, color catalog, or layout. */
-export type RefinementView = 'compare' | 'color' | 'layout' | 'color-arrangement' | 'ground';
+export type RefinementView = 'compare' | 'color' | 'layout' | 'color-arrangement' | 'ground' | 'tool';
 
 export type VariationCandidate = {
 	id: string;
@@ -14,7 +14,12 @@ export type VariationCandidate = {
 	result: PaintResult & { ddl: string; thinking: string | null };
 	selected: boolean;
 	saved?: boolean;
+	/** Lines under the label, such as which sentence took which tool. */
+	details?: string[];
 };
+
+/** A touch change gives every sentence one tool, or draws a tool for each (the author, 2026-10-14). */
+export type ToolMode = 'uniform' | 'per_sentence';
 
 /** One fan-out job is queued, drawing, or finished. */
 export type VariationSlotState = 'waiting' | 'running' | 'done';
@@ -22,6 +27,8 @@ export type VariationSlotState = 'waiting' | 'running' | 'done';
 export type RefinementSession = {
 	readonly recomposeMode: RecomposeMode;
 	setRecomposeMode(mode: RecomposeMode): void;
+	readonly toolMode: ToolMode;
+	setToolMode(mode: ToolMode): void;
 	readonly busy: boolean;
 	readonly candidates: readonly VariationCandidate[];
 	readonly gridBusy: boolean;
@@ -71,6 +78,12 @@ export class RefinementSessionState implements RefinementSession {
 
 	setRecomposeMode(mode: RecomposeMode): void {
 		this.recomposeMode = mode;
+	}
+
+	toolMode = $state<ToolMode>('uniform');
+
+	setToolMode(mode: ToolMode): void {
+		this.toolMode = mode;
 	}
 
 	busy = $state(false);

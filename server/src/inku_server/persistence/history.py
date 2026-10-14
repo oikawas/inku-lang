@@ -38,6 +38,7 @@ LINEAGE_DERIVATION_KINDS = {
     "catalog_change",
     "color_arrangement_change",
     "ground_change",
+    "tool_change",
     "reinterpretation",
     "model_comparison",
     "language_comparison",

@@ -492,18 +492,27 @@ def api_history_post(
             diagnostics.pop("render_warnings", None)
             if replayed.get("render_warnings"):
                 diagnostics["render_warnings"] = replayed["render_warnings"]
-    elif body.derivation_kind in ("color_arrangement_change", "ground_change"):
-        from .render import _render_color_arrangement_for_work, _render_ground_variant_for_work
+    elif body.derivation_kind in ("color_arrangement_change", "ground_change", "tool_change"):
+        from .render import (
+            _render_color_arrangement_for_work, _render_ground_variant_for_work, _render_tool_variant_for_work,
+        )
         from ..rendering import _work_for_color_snapshot
 
         if body.derivation_kind == "color_arrangement_change":
             index = body.derivation_metadata.get("color_arrangement_index")
             if type(index) is not int or index < 0 or not body.lineage_parent_node_id:
                 raise HTTPException(status_code=422, detail="color arrangement requires a parent and valid index")
-        else:
+        elif body.derivation_kind == "ground_change":
             material = body.derivation_metadata.get("ground_material")
             if not isinstance(material, str) or not body.lineage_parent_node_id:
                 raise HTTPException(status_code=422, detail="ground change requires a parent and a ground material")
+        else:
+            tool_mode = body.derivation_metadata.get("tool_mode")
+            tools = body.derivation_metadata.get("tools")
+            if (tool_mode not in ("uniform", "per_sentence") or not isinstance(tools, dict)
+                    or not all(isinstance(key, str) and isinstance(value, str) for key, value in tools.items())
+                    or not body.lineage_parent_node_id):
+                raise HTTPException(status_code=422, detail="touch change requires a parent, a mode and the tools")
         with _db.SessionLocal() as session:
             node = session.get(LineageNodeRow, body.lineage_parent_node_id)
             parent_id = node.history_id if node else None
@@ -512,8 +521,10 @@ def api_history_post(
         parent = _work_for_color_snapshot(actor, parent_id)
         if body.derivation_kind == "color_arrangement_change":
             replayed = _render_color_arrangement_for_work(actor, parent, index).model_dump(exclude_none=True, by_alias=True)
-        else:
+        elif body.derivation_kind == "ground_change":
             replayed = _render_ground_variant_for_work(actor, parent, material).model_dump(exclude_none=True, by_alias=True)
+        else:
+            replayed = _render_tool_variant_for_work(actor, parent, tool_mode, tools).model_dump(exclude_none=True, by_alias=True)
         # Only the parent and the server-derived index decide this child. Sent
         # Score, map, seeds and limits cannot rewrite the work being recolored.
         inherited = {key: parent.get(key) for key in (
@@ -523,8 +534,8 @@ def api_history_post(
             "instruction_lang_resolved", "sketch_text", "sketch_grain", "sketch_state",
         )}
         inherited["input"] = inherited["input"] or ""
-        if body.derivation_kind == "ground_change":
-            # The child's instructions name the ground it is drawn on.
+        if body.derivation_kind in ("ground_change", "tool_change"):
+            # The child's instructions name the ground or the tools it is drawn with.
             inherited["ddl"] = replayed["ddl"]
             inherited["derivation_metadata"] = replayed["derivation_metadata"]
         body = body.model_copy(update=inherited)

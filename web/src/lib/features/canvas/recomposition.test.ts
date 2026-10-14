@@ -253,3 +253,55 @@ test('a saved work opened beside an unfinished draft is refined from its own wor
 		host.window = previousWindow;
 	}
 });
+
+test('a touch change adds four options in the chosen way and names what each sentence took', async () => {
+	installOwnerRuneShim();
+	const host = globalThis as unknown as Record<string, unknown>;
+	const previousWindow = host.window;
+	host.window = { setTimeout: () => 0, clearTimeout: () => {} };
+	try {
+		const { RefinementSessionState } = await import('./refinement-session.svelte.ts');
+		const { createRefinementCoordinator } = await import('./refinement-coordinator.svelte.ts');
+		const session = new RefinementSessionState({ ms: 0, start() {}, stop() {} });
+		const requests: Array<{ path: string; payload: Record<string, unknown> }> = [];
+		const tools = { chalk: { ja: 'チョーク', en: 'chalk' }, pen: { ja: 'ペン', en: 'pen' }, oil_paint: { ja: '油彩', en: 'oil paint' } };
+		const plans: Record<string, unknown> = {
+			uniform: { tools, entries: [{ tools: { '0': 'chalk', '1': 'chalk' }, changes: [{ index: 0, from: 'pen', to: 'chalk' }, { index: 1, from: 'oil_paint', to: 'chalk' }] }] },
+			per_sentence: { tools, entries: [{ tools: { '0': 'oil_paint', '1': 'pen' }, changes: [{ index: 0, from: 'pen', to: 'oil_paint' }, { index: 1, from: 'oil_paint', to: 'pen' }] }] }
+		};
+		const coordinator = createRefinementCoordinator({
+			session,
+			work: {
+				input: 'words', ddl: 'instructions', loading: false, thinking: null, displayedHistoryItem: null,
+				result: { svg: '<svg/>', score: { instructions: [] }, history_id: 'shown-work' },
+				instructionLang: 'auto', sketchTextFor: () => null,
+				pipelineCompatibilityError: async () => new Error('unexpected error')
+			},
+			render: { fanoutLimit: () => 1 },
+			lineageParentId: () => 'shown-node', ensureVisibleLineageParentId: async () => 'shown-node',
+			apiFetch: async (path: string, init?: RequestInit) => {
+				const payload = JSON.parse(String(init?.body));
+				requests.push({ path, payload });
+				if (path === '/api/tool-variants/plan') return new Response(JSON.stringify(plans[payload.mode as string]));
+				return new Response(JSON.stringify({ ddl: 'retouched', svg: '<svg/>', score: { instructions: [] } }));
+			}
+		} as unknown as RefinementCoordinatorDeps);
+		assert.equal(session.toolMode, 'uniform');
+		await coordinator.generateToolCandidates();
+		session.setToolMode('per_sentence');
+		await coordinator.generateToolCandidates();
+		assert.deepEqual(requests.map(({ path, payload }) => [path, payload.mode, payload.tools ?? null]), [
+			['/api/tool-variants/plan', 'uniform', null],
+			['/api/render-tool-variant', 'uniform', { '0': 'chalk', '1': 'chalk' }],
+			['/api/tool-variants/plan', 'per_sentence', null],
+			['/api/render-tool-variant', 'per_sentence', { '0': 'oil_paint', '1': 'pen' }]
+		]);
+		assert.deepEqual(session.candidates.map((candidate) => [candidate.label, candidate.details, candidate.result.derivation_kind, candidate.result.derivation_metadata]), [
+			['チョーク', [], 'tool_change', { tool_mode: 'uniform', tools: { '0': 'chalk', '1': 'chalk' } }],
+			['文ごと 1', ['1: ペン → 油彩', '2: 油彩 → ペン'], 'tool_change', { tool_mode: 'per_sentence', tools: { '0': 'oil_paint', '1': 'pen' } }]
+		]);
+		assert.equal(session.candidates[1].result.ddl, 'retouched');
+	} finally {
+		host.window = previousWindow;
+	}
+});

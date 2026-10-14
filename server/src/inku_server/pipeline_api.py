@@ -420,6 +420,28 @@ class PipelineService:
         request = {"config": config, "source": body.source, "completion_ranges": record}
         return json.loads(states(json.dumps(request, ensure_ascii=False, allow_nan=False).encode("utf-8")))
 
+    def retouch(self, owner: str, history_id: str, source: str, tools: dict[int, str]) -> dict:
+        """Ask the shared core to write other tools into a saved work's instructions.
+
+        The work's saved config reads the source, as the composition does; nothing
+        is started. An empty `tools` reads the sentences whose tool can change.
+        """
+        native = getattr(self.binding, "retouch", None)
+        if native is None:
+            return {"outcome": "unchanged", "reason": "binding_unavailable"}
+        linked = self.store.read_linked_history(owner, history_id)
+        if linked is not None:
+            config = linked.saved_config
+        else:
+            work = self.store.read_legacy_history(owner, history_id)
+            if work is None:
+                raise HTTPException(404, "history_not_found")
+            if self.prepare_for is None:
+                return {"outcome": "unchanged", "reason": "binding_unavailable"}
+            config, _context = self.prepare_for(owner, "direct_ddl", source, {}, asdict(work))
+        request = {"config": config, "source": source, "tools": {str(index): tool for index, tool in tools.items()}}
+        return json.loads(native(json.dumps(request, ensure_ascii=False, allow_nan=False).encode("utf-8")))
+
     def provider_capture_status(self, owner: str, execution_id: str) -> dict:
         """Read saved state only; transcript inspection must not resume work."""
         record = self.store.read_execution(owner, execution_id)

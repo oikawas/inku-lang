@@ -2,6 +2,7 @@
 	import RefinementAdjustView from './RefinementAdjustView.svelte';
 	import RefinementColorCatalogView from './RefinementColorCatalogView.svelte';
 	import RefinementGroundView from './RefinementGroundView.svelte';
+	import RefinementToolView from './RefinementToolView.svelte';
 	import RefinementModelCompareView from './RefinementModelCompareView.svelte';
 	import './refinement-workspace.css';
 	import { t } from '$lib/i18n/index.svelte';
@@ -39,6 +40,7 @@
 		onGenerateColorCatalogCandidates: () => void | Promise<void>;
 		onGenerateColorArrangementCandidates: () => void | Promise<void>;
 		onGenerateGroundCandidates: () => void | Promise<void>;
+		onGenerateToolCandidates: () => void | Promise<void>;
 		onGenerateModelCandidates: () => void | Promise<void>;
 		onSaveAndClose: () => void | Promise<void>;
 		onDiscardAndClose: () => void | Promise<void>;
@@ -70,6 +72,7 @@
 		onGenerateColorCatalogCandidates,
 		onGenerateColorArrangementCandidates,
 		onGenerateGroundCandidates,
+		onGenerateToolCandidates,
 		onGenerateModelCandidates,
 		onSaveAndClose,
 		onDiscardAndClose,
@@ -84,6 +87,8 @@
 					? t().workActionColorArrangement
 				: view === 'ground'
 					? t().workActionGround
+				: view === 'tool'
+					? t().workActionTool
 					: view === 'color'
 					? t().canvasVaryColor
 					: t().workActionModels
@@ -148,6 +153,19 @@
 			{canvasAspectHeight}
 			{refinementSession}
 			onGenerateCandidates={onGenerateGroundCandidates}
+			{onSaveAndClose}
+			{onDiscardAndClose}
+		/>
+	{:else if view === 'tool'}
+		<RefinementToolView
+			{isJapanese}
+			{resultAvailable}
+			{artworkUrl}
+			{seedSummary}
+			{canvasAspectWidth}
+			{canvasAspectHeight}
+			{refinementSession}
+			onGenerateCandidates={onGenerateToolCandidates}
 			{onSaveAndClose}
 			{onDiscardAndClose}
 		/>

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-14 — Show SVG sizes beside the Replay comparison labels
+
+Original and A new impression by the current engine each show their SVG's UTF-8 byte size using the existing B/KB format. The size is measured from the displayed SVG; performance and child-save conditions are unchanged.
+
 ## v2.15.128 (2026-10-14 / Build 1204)
 
 ### 2026-10-14 — Remove Another performance and the touch refinement

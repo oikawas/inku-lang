@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
+	import { formatByteSize } from '$lib/formatNumber';
 	import { svgImage } from '$lib/svgImage';
 
 	type Props = {
@@ -31,6 +32,10 @@
 		onSaveChild,
 		onClose,
 	}: Props = $props();
+
+	const encoder = new TextEncoder();
+	let originalSvgBytes = $derived(encoder.encode(originalSvg).byteLength);
+	let replayedSvgBytes = $derived(encoder.encode(replayedSvg).byteLength);
 
 	function close() {
 		if (!saving) onClose();
@@ -69,14 +74,20 @@
 		<div class="comparison-grid">
 			<article class="artwork-card">
 				<header class="artwork-heading">
-					<strong>{t().replayComparisonOriginal}</strong>
+					<div class="artwork-title">
+						<strong>{t().replayComparisonOriginal}</strong>
+						<span class="svg-size">SVG {formatByteSize(originalSvgBytes)}</span>
+					</div>
 					<span>engine {recordedVersion ?? t().historyVersionNotRecorded}</span>
 				</header>
 				<div class="artwork-frame"><img use:svgImage={originalSvg} alt="" /></div>
 			</article>
 			<article class="artwork-card">
 				<header class="artwork-heading">
-					<strong>{t().replayComparisonCurrent}</strong>
+					<div class="artwork-title">
+						<strong>{t().replayComparisonCurrent}</strong>
+						<span class="svg-size">SVG {formatByteSize(replayedSvgBytes)}</span>
+					</div>
 					<span>engine {currentVersion ?? t().historyVersionUnknown}</span>
 				</header>
 				<div class="artwork-frame"><img use:svgImage={replayedSvg} alt="" /></div>
@@ -128,6 +139,8 @@
 	.comparison-grid { display: grid; flex: 1; min-height: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 14px; margin-top: 14px; }
 	.artwork-card { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel2); }
 	.artwork-heading { display: flex; flex-shrink: 0; align-items: baseline; justify-content: space-between; gap: 12px; padding: 9px 11px; border-bottom: 1px solid var(--border2); color: var(--fg); }
+	.artwork-title { display: flex; min-width: 0; align-items: baseline; gap: 8px; }
+	.artwork-title .svg-size { flex-shrink: 0; white-space: nowrap; }
 	.artwork-heading strong { font-size: var(--ui-font-size-13); }
 	.artwork-heading span { color: var(--fg2); font-size: var(--ui-font-size-12); font-variant-numeric: tabular-nums; }
 	.artwork-frame { display: flex; flex: 1; min-height: 0; align-items: center; justify-content: center; padding: 12px; overflow: hidden; background: var(--canvas-paper); }
@@ -141,6 +154,8 @@
 		.replay-dialog { padding: 14px; }
 		.replay-header { flex-wrap: wrap; gap: 8px; }
 		.header-actions { margin-left: auto; }
+		.artwork-heading { flex-wrap: wrap; gap: 4px; }
+		.artwork-title { flex: 1 1 100%; }
 		.comparison-grid { grid-template-columns: 1fr; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 10px; }
 		.artwork-frame { padding: 8px; }
 	}

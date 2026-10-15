@@ -421,11 +421,13 @@ Combine `Thumbnails` with `By lineage` to show only lineages with at least two w
 
 The revision mark is a second mark, independent of the star. Use it for works you mean to return to.
 
-The share mark is a third one. Raise it with `Mark for sharing` at the bottom of the canvas on the Work tab. **Once it is up, the members of your own organisation group can read that work.** Press it again to lower it. An administrator may aim it at another organisation group instead.
+In multi-user mode, the share mark is a third one. Raise it with `Share with group` at the bottom of the canvas on the Work tab. **Once it is up, the members of your own organisation group can read that work.** Use `Stop group sharing` to lower it. An administrator may aim it at another organisation group instead.
 
 **Lowering the mark keeps the destination.** Marking the same work again returns it to the same recipients. **What this mark widens is reading only, never writing** — a work shared to you cannot be starred or moved to trash by you. Lineage nodes follow the mark, but **the colophon does not**.
 
-Both the history strip and `Library` carry a `Shared only` filter, so the marked works can be listed on their own.
+Both the history strip and `Library` carry a `Group shared only` filter, so the marked works can be listed on their own.
+
+In single-user mode, group-sharing buttons, the sharing dialog, sharing filters such as `Group shared only`, and sharing-status marks are hidden. Group and permission administration remain available.
 
 `Replay` compares the saved SVG with a performance of the stored Score and conditions on the current engine. An engine-version difference is reported. Old works without a recorded render seed can also be compared using provisional seed 0; this does not guarantee exact recovery of their original performance.
 

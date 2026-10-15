@@ -118,6 +118,7 @@
 		 * screen until both the field and this handler arrive. See $lib/shareTarget.
 		 */
 		onToggleForShare?: ((item: HistoryItem | null | undefined, event?: Event) => void | Promise<void>) | null;
+		singleUserMode?: boolean;
 		onReplayCurrent: () => void | Promise<void>;
 		replayDisabled: boolean;
 		// The card is built from a saved work, so the toolbar needs its id, not
@@ -249,6 +250,7 @@
 		onToggleStar,
 		onToggleForRevision,
 		onToggleForShare = null,
+		singleUserMode = false,
 		onReplayCurrent,
 		replayDisabled,
 		currentHistoryId,
@@ -813,6 +815,7 @@
 				{onToggleStar}
 				{onToggleForRevision}
 				{onToggleForShare}
+				{singleUserMode}
 				{onCopyStatusHash}
 				{onReplayCurrent}
 				onToggleGenerationInfo={() => (generationInfoOpen ? closeGenerationInfo() : openGenerationInfo())}

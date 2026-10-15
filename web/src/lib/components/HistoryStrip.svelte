@@ -62,6 +62,7 @@
 		onSetForRevisionOnly: (value: boolean) => void;
 		historyForShareOnly: boolean;
 		onSetForShareOnly: (value: boolean) => void;
+		singleUserMode?: boolean;
 		historyIndexLabel: (index: number) => number;
 		historyModelStage1Short: (item: HistoryItem) => string;
 		historyModelStage1Full: (item: HistoryItem) => string;
@@ -100,6 +101,7 @@
 		onSetForRevisionOnly,
 		historyForShareOnly,
 		onSetForShareOnly,
+		singleUserMode = false,
 		historyIndexLabel,
 		historyModelStage1Short,
 		historyModelStage1Full,
@@ -188,12 +190,14 @@
 							aria-pressed={historyForRevisionOnly}
 							onclick={() => onSetForRevisionOnly(!historyForRevisionOnly)}
 						><span class="history-filter-check" class:visible={historyForRevisionOnly} aria-hidden="true">✓</span>{t().historyForRevisionOnly}</button>
-						<button
-							class="ghost-btn history-filter-btn"
-							class:ghost-active={historyForShareOnly}
-							aria-pressed={historyForShareOnly}
-							onclick={() => onSetForShareOnly(!historyForShareOnly)}
-						><span class="history-filter-check" class:visible={historyForShareOnly} aria-hidden="true">✓</span>{t().historyForShareOnly}</button>
+						{#if !singleUserMode}
+							<button
+								class="ghost-btn history-filter-btn"
+								class:ghost-active={historyForShareOnly}
+								aria-pressed={historyForShareOnly}
+								onclick={() => onSetForShareOnly(!historyForShareOnly)}
+							><span class="history-filter-check" class:visible={historyForShareOnly} aria-hidden="true">✓</span>{t().historyForShareOnly}</button>
+						{/if}
 					</div>
 				{/if}
 				{#if interactionLocked}

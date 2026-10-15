@@ -350,7 +350,9 @@ struct LibraryView: View {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: LibraryGridPaging.minCardWidth), spacing: LibraryGridPaging.gap, alignment: .top)],
                           alignment: .leading, spacing: LibraryGridPaging.gap) {
-                    ForEach(library.works, id: \.id) { work in gridCard(work) }
+                    // Reuse the finite page's native card slots instead of destroying every
+                    // button/menu on each turn. Work-specific state has its own identity below.
+                    ForEach(Array(library.works.enumerated()), id: \.offset) { _, work in gridCard(work) }
                 }
                 .padding(.top, 8).padding(.horizontal, 10).padding(.bottom, 6)
             }
@@ -416,6 +418,7 @@ struct LibraryView: View {
                     Text("DDL").inkuFont(12, weight: .semibold).foregroundStyle(.tertiary)
                 }
                 LibraryExpandableTitle(work: work, display: display, size: 14)
+                    .id(work.id)
                     .foregroundStyle(.secondary)
                 if let note = library.annotation(for: work.id).note, !note.isEmpty {
                     (Text(display.webCopy("historyPreviewCommentLabel", fallback: "作品へのコメント") + " ").fontWeight(.semibold) + Text(note))
@@ -433,6 +436,7 @@ struct LibraryView: View {
             GeometryReader { proxy in
                 Color.clear
                     .onAppear { recordCardHeight(proxy.size.height, for: work.id) }
+                    .onChange(of: work.id) { _, _ in recordCardHeight(proxy.size.height, for: work.id) }
                     .onChange(of: proxy.size.height) { _, height in recordCardHeight(height, for: work.id) }
             }
         }

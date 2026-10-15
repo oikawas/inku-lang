@@ -14,6 +14,8 @@ Library pages follow Web/Server by leaving SVG text out and using persisted PNGs
 
 Menu eligibility projects only the required saved fields and publishes one page of results together, reducing full-context JSON reads for every card and repeated updates of all menus.
 
+Page card slots, buttons, and menus are reused while images, expanded descriptions, and action targets follow work IDs.
+
 ## v2.15.151 (2026-10-15 / Build 1227)
 
 ### 2026-10-15 — Reflect the second NVIDIA NIM measurement in the model information

@@ -20,6 +20,8 @@ Chronological and grouped library pages follow Web/Server by omitting SVG text a
 
 Menu eligibility reads only saved origin and authority for the page and publishes the results together, without loading each card's entire instructions, Score, and rendering context. It checks the same required objects, strings, and work ID as the full context reader. Missing or invalid records do not become eligible.
 
+Card slots, buttons, and menus are reused within a page. An image appears only when its rendered work ID and hash match the current work; expanded descriptions reset by work ID. Checks and action targets follow saved work IDs rather than carrying the previous page's state.
+
 ## 2026-10-15 Library preview, search, and history strip
 
 The work preview follows the order of image, opening hint, full description, lineage/refinement/export actions, work-information table, and comment. Double-clicking the image or activating it from the keyboard opens that work in Create; inspection alone does not replace the Create draft. Closing and reopening the same preview retains an unsaved comment without mixing another work's information. Details show save time, stage models (one row when equal), catalog, canvas, seconds, SVG size, render version, generation, and a short hash with full-hash copy. Export first selects a format, then opens settings for that work.

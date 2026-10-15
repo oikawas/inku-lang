@@ -8,6 +8,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — The free line in the manual and the README
+
+By the author's choice (I-715 stage B3). No version changes.
+
+- Section 3 of Creating Images (Japanese and English) lists the free line among the shapes in its table, together with point and cloudform, which the table had left out (those two at the author's request). One paragraph says how a free line's path is decided (the tool decides how it is built; it bends away from the paper's edges and from the shapes drawn before it), its default length, when it is chosen from a description, and the angle the composition writes; Joint phrases in section 6 say that a free line takes only the relations connected and touching. The example sentence also reads as DDL (`Draw one black pen rising free line at center`). The manual's revision history records the change.
+- The README (Japanese and English) adds the free line to the saijiki's forms row and to Primitives and arrangement.
+- The macOS copy of the Web reference (`ui-reference.json`) is exported again, so the SHA-256 values of `+page.svelte` and the other copied files, which the integration had left behind, and the copies of new Web strings follow the current main.
+
 ## v2.15.150 (2026-10-15 / Build 1226)
 
 ### 2026-10-15 — Hide sharing controls in single-user mode

@@ -266,7 +266,7 @@ The reference dictionary is called **Saijiki**（歳時記）— a word borrowed
 
 | Category (EN) | Category (JA) | Vocabulary |
 |---|---|---|
-| forms | かたち | circle, ellipse, triangle, square, line, arc, point, cloudform |
+| forms | かたち | circle, ellipse, triangle, square, line, arc, free line, point, cloudform |
 | angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
 | touches | てざわり | silverpoint, pencil, pen, rotring, crayon, chalk, fine-brush, thick-brush, oil paint, burin, drypoint, computer |
 | continuity | つらなり | solid, dashed, dotted, dash-dot |
@@ -320,7 +320,7 @@ During development, we always move forward while comparing with saved reference 
 
 - **Multi-stage pipeline** — Sketch from life and automatic color catalog selection, both optional; Stage 1 (underdrawing); the Typed Compiler; Stage 1.5 (meaning verification); and the Renderer. Non-deterministic AI layers and deterministic algorithmic layers alternate
 - **Shared core** — the flow of the processing, the Typed Compiler, the score, and the Renderer are gathered in a shared Rust core that the server (Python) and Android (Kotlin) both call
-- **Primitives and arrangement** — point, line, circle, ellipse, arc, square, triangle, cloudform; placing, lining up, drawing, scattering, filling, and tiling, with paths such as waves and diagonal bands, and "alternating" or "in order" sequences
+- **Primitives and arrangement** — point, line, circle, ellipse, arc, square, triangle, cloudform, free line; placing, lining up, drawing, scattering, filling, and tiling, with paths such as waves and diagonal bands, and "alternating" or "in order" sequences
 - **Regions and relations** — scores can state eleven kinds of relation between elements ("along the previous line," "not touching the previous shape," "mirrored with the previous shape") that the performance resolves
 - **Material rendering** — silverpoint, pencil, pen, rotring, crayon, chalk, brushes, oil paint, burin, and drypoint, differentiated through the shared stroke engine's width, tracking, and sparse events plus tool-specific edges. Surface qualities (flat, sweep, stipple, hatch, crosshatch, aquatint, and more) and grounds (washi, charcoal ground, canvas, mezzotint, and more) can be chosen too
 - **Plugins** — namespaced vocabulary macros such as `Nature.YoungLeaves` (alias `Nature.若葉`); they may expand only into core vocabulary and cannot modify the core. When a description names one of their words, the underdrawing can choose it. Instructions that use an unregistered plugin draw everything else and give the reason on that sentence alone. Instructions can be exported together with their plugin definitions and imported elsewhere

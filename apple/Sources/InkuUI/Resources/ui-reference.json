@@ -1,8 +1,8 @@
 {
   "schema": "inku.apple-ui-reference.v1",
-  "version": "v2.15.147",
-  "build": "1223",
-  "buildDate": "2026-10-15T05:32:52.675Z",
+  "version": "v2.15.150",
+  "build": "1226",
+  "buildDate": "2026-10-15T09:05:03.837Z",
   "versions": {
     "ddlSpec": "19",
     "ddlEngine": "60",
@@ -569,6 +569,8 @@
         "savedWorkExportDdl": "DDL（プラグイン定義付き）",
         "savedWorkExportAiContactSheet": "AI用コンタクトシート",
         "savedWorkExportUnavailable": "保存済みの利用可能な作品を確認できませんでした。",
+        "savedWorkExportFolderDenied": "設定したフォルダへの書き込みが許可されなかったため、ブラウザのダウンロードに切り替えました。",
+        "savedWorkExportFolderFailed": "設定したフォルダに保存できなかったため、ブラウザのダウンロードに切り替えました。",
         "workActionRefine": "推敲する",
         "workActionOpenMenu": "作品編集メニューを開く",
         "workActionMenuTitle": "作品編集",
@@ -1992,6 +1994,8 @@
         "savedWorkExportDdl": "DDL (with plugin definitions)",
         "savedWorkExportAiContactSheet": "AI contact sheet",
         "savedWorkExportUnavailable": "No saved available works could be confirmed.",
+        "savedWorkExportFolderDenied": "Write permission for the configured folder was denied, so browser downloads were used.",
+        "savedWorkExportFolderFailed": "Saving to the configured folder failed, so browser downloads were used.",
         "workActionRefine": "Refine",
         "workActionOpenMenu": "Open work editing menu",
         "workActionMenuTitle": "Edit the work",
@@ -3571,18 +3575,18 @@
     }
   },
   "source": {
-    "commit": "dd07a2f0247b5219017b9e61a00c4b11dcab1ba0",
+    "commit": "d5570792716db3d3f5d3c639d0bb25c9e7c5ca39",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
-      "web/src/routes/+page.svelte": "1b53a3654120a4b11cfdb153c92384933aeece5f472357dfe3ef7705549493fe",
+      "web/src/routes/+page.svelte": "b6a77131f786c19364a882d100a03e40f94822514e7a916eedbc4bb296822d38",
       "web/src/lib/saijiki-surface.ts": "12221f46e142abf2b2066358a89446674941c9a4df57e7a969ae3c6f289fcc08",
       "web/src/lib/instructionLang.ts": "2af540a1b98d4aa688fcf96632de1309b30c3f137137a66596f1285e09f2dcbe",
-      "web/APP_VERSION": "2917617203bc2474717639988da4f4aab9d0335586c7f8183e004a5ff25629e0",
-      "web/BUILD_NUMBER": "af250e83ad1db1a5120fb2903168dbdfe1f99eb9799177e050ab44392874916f",
+      "web/APP_VERSION": "fee489e15c2e25bcc2e3280b66c40d3c9af8dd55b4d5149349e752a3e58f1ed9",
+      "web/BUILD_NUMBER": "c001106746d4a4a4928ef8b628af6834f3654254248ccf7ce4dda6fdc2bc4c8a",
       "server/src/inku_server/layer_versions.py": "f9ddff03c72397c9ac87761dc38eee4be4d1196a8c9438c8c0423381ffab9ca1",
       "core/crates/inku-render/src/lib.rs": "de98bf70ba2e4c0a211bb67ae302ef981fbb2bb563a9a86f39e2a20e74cf4918",
-      "web/src/lib/i18n/ja.ts": "f4a9aa90c502e591dfc76db3d2799dc5891299127dedd5d4ec104d0a76d3ae12",
-      "web/src/lib/i18n/en.ts": "b4955a49d94f004b9e5e59505a52dc89691db796f7e8fe65af37bfcdbb4fa686"
+      "web/src/lib/i18n/ja.ts": "b92f2d2e5e56e6bcdb967edb6ec8dc9bc3468f80933af98d3150b1e135530175",
+      "web/src/lib/i18n/en.ts": "6011968bedaa6191c3dc5f8982c6f1bf485e1293cfa6e97f8d066279601f9aea"
     },
     "tooltipKeys": [
       "tooltipAppRailLang",

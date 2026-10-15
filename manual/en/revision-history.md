@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-15 — The free line among the shapes
+
+With the free line added to the shapes (an instruction word from v2.15.147, and chosen from descriptions from v2.15.149), section 3 of Creating Images lists it in the table and adds a paragraph on how its path is decided, its default length, when it is chosen from a description, and the angle the composition writes. The table now also lists point and cloudform, which it had left out. Joint phrases in section 6 now say that a free line takes only the relations connected and touching.
+
 ## 2026-10-15 — Align operation guidance with the Build 1223 baseline
 
 Aligned the target version to v2.15.147 / Web Build 1223 and updated sketch off/on and editing, direct instruction editing, shared-model ratings and selection, demo start intervals, and the history strip's three-field maximum. Added Library search and UUID guidance, lineage thumbnails requiring two matches after filtering, replay with a provisional seed and child saving, Provenance following history-strip selection, and height-based PNG templates. Clarified that autonomous refinement uses direction for Vision advice without adding it to drawing text. Installation, settings, and CLI guidance now describe current paths, separately from older settings and saved-work compatibility. This allocates no new version and makes no deployment claim.

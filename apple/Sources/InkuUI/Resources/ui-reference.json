@@ -1,12 +1,12 @@
 {
   "schema": "inku.apple-ui-reference.v1",
-  "version": "v2.15.143",
-  "build": "1219",
-  "buildDate": "2026-10-15T03:09:06.127Z",
+  "version": "v2.15.147",
+  "build": "1223",
+  "buildDate": "2026-10-15T05:32:52.675Z",
   "versions": {
-    "ddlSpec": "18",
-    "ddlEngine": "58",
-    "renderEngine": "80"
+    "ddlSpec": "19",
+    "ddlEngine": "60",
+    "renderEngine": "81"
   },
   "canvasMetadata": {
     "square": {
@@ -2967,6 +2967,13 @@
       "exampleJa": "上弦の弧を引く",
       "exampleEn": "Draw a waxing arc"
     },
+    "katachi:自由線": {
+      "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22.0 60.3 L22.4 57.1 L23.2 54.0 L24.2 50.9 L25.6 48.0 L27.3 45.3 L29.2 42.7 L31.4 40.4 L33.8 38.2 L36.5 36.4 L39.3 34.8 L42.3 33.6 L45.3 32.6 L48.5 32.0 L51.7 31.7 L54.9 31.7 L58.1 32.1 L61.3 32.8 L64.3 33.8 L67.3 35.1 L70.0 36.8 L72.6 38.7 L76.4 41.7 L80.1 44.8 L83.8 47.8 L87.6 50.9 L91.3 53.9 L95.0 57.0 L99.2 55.0 L103.5 53.0 L107.7 51.0 L111.9 48.9 L116.2 46.9 L120.4 44.9 L124.6 42.9 L128.9 40.9 L133.1 38.9 L137.3 36.9 L141.6 34.8 L145.8 32.8 L147.8 37.4 L149.9 42.0 L151.9 46.6 L153.9 51.2 L156.0 55.7 L158.0 60.3\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/></svg>",
+      "effectJa": "始点と終点のあいだの道筋を、演奏ごとに直線・円弧・自由な曲がりで組んで引く。",
+      "effectEn": "Draws the path between a start and an end point, built anew for each performance from straight parts, arcs, and free bends.",
+      "exampleJa": "左から右へ自由線を引く",
+      "exampleEn": "Draw a free line from left to right"
+    },
     "katachi:点": {
       "svg": "<svg viewBox=\"0 0 180 92\" aria-hidden=\"true\"><rect width=\"180\" height=\"92\" rx=\"6\" fill=\"#fffdf8\"/><path d=\"M22 56 C56 26 95 76 158 38\" fill=\"none\" stroke=\"#2b2b2b\" stroke-width=\"5\" stroke-linecap=\"round\" /></svg>",
       "effectJa": "記述の解釈に影響する語彙です。",
@@ -3564,16 +3571,16 @@
     }
   },
   "source": {
-    "commit": "01a7691eddf3fba7f2476eb8687e4b942c1bd6fa",
+    "commit": "dd07a2f0247b5219017b9e61a00c4b11dcab1ba0",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
-      "web/src/routes/+page.svelte": "8e12c77fa1bdbda2ff301c49ed6b299498eaf4a02bd06c3c863fbfad7ac5bb17",
+      "web/src/routes/+page.svelte": "1b53a3654120a4b11cfdb153c92384933aeece5f472357dfe3ef7705549493fe",
       "web/src/lib/saijiki-surface.ts": "12221f46e142abf2b2066358a89446674941c9a4df57e7a969ae3c6f289fcc08",
       "web/src/lib/instructionLang.ts": "2af540a1b98d4aa688fcf96632de1309b30c3f137137a66596f1285e09f2dcbe",
-      "web/APP_VERSION": "897974714ef8ea18c35250e27ae64f1d39a6b7b9397b9f56587de29800838b40",
-      "web/BUILD_NUMBER": "e5ce28767b5c0ead517d74d64d4957fd2f0149976104810e9dd12af80363b5bd",
-      "server/src/inku_server/layer_versions.py": "a0728a00b95298e152b3a2c61bda5f364b086234f765a0a0b711225999c7c5ce",
-      "core/crates/inku-render/src/lib.rs": "22aa2df245269d4ccd34b8d3b11660bad5d6d66fb988765f4dc3960b8f903a8f",
+      "web/APP_VERSION": "2917617203bc2474717639988da4f4aab9d0335586c7f8183e004a5ff25629e0",
+      "web/BUILD_NUMBER": "af250e83ad1db1a5120fb2903168dbdfe1f99eb9799177e050ab44392874916f",
+      "server/src/inku_server/layer_versions.py": "f9ddff03c72397c9ac87761dc38eee4be4d1196a8c9438c8c0423381ffab9ca1",
+      "core/crates/inku-render/src/lib.rs": "de98bf70ba2e4c0a211bb67ae302ef981fbb2bb563a9a86f39e2a20e74cf4918",
       "web/src/lib/i18n/ja.ts": "f4a9aa90c502e591dfc76db3d2799dc5891299127dedd5d4ec104d0a76d3ae12",
       "web/src/lib/i18n/en.ts": "b4955a49d94f004b9e5e59505a52dc89691db796f7e8fe65af37bfcdbb4fa686"
     },

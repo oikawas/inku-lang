@@ -77,12 +77,13 @@ def test_saijiki_prose_categories_track_enum_sizes() -> None:
     assert len(saijiki["core_categories_ja"]["てざわり"]) == weight_count
     assert "silverpoint" in get_args(schema.Weight)
     assert "hair" not in get_args(schema.Weight)
-    # en form surfaces are Primitive values, minus polygon (collected in schema)
-    # and free_line, which DDL reads before the saijiki lists it (I-715 B1).
-    forms_en = set(saijiki["core_categories_en"]["forms"])
+    # en form surfaces name Primitive values, minus polygon (collected in
+    # schema). A surface of two words is one value joined by "_": the saijiki
+    # lists "free line", the Score writes free_line (I-715 B2).
+    forms_en = {form.replace(" ", "_") for form in saijiki["core_categories_en"]["forms"]}
     primitives = set(get_args(schema.Primitive))
     assert forms_en <= primitives
-    assert primitives - forms_en <= {"polygon", "free_line"}
+    assert primitives - forms_en <= {"polygon"}
     assert set(saijiki["core_categories_ja"]) == {
         "かたち",
         "かたむき",

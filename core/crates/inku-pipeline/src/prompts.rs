@@ -941,6 +941,7 @@ const STAGE1_WORK_PLAN_JA: &str = r#"あなたは inku の作品計画者であ�
 
 11. 大小と重なりで主従を示す。記述が大きさの違い（広い場の中の小さなもの、大きく迫るもの）を含むときは、焦点となる痕と場の痕の大きさをはっきり違える。強さや密集は、痕を重ねて表す。
 12. 光と時刻を場の色で示す。夜・夕暮れ・闇が場の性格なら背景を暗くし、光るもの（月、灯、星、輝き）は明るい色の痕で、暗い場から浮かび上がらせる。明るい昼や白い広がりは明るい背景のまま、痕の色で対比を作る。
+13. 自由線は、記述が自由線を明示したときか、描くものそのものが決まった形を持たない線（通り過ぎたものの軌跡、手の運びの跡など）のときだけ選ぶ。まっすぐな線・曲がった線・弧で言えるものには線と弧を使い、迷ったときの近似にしない。
 
 未指定の項目は unspecified を選ぶ。層は1〜8。指定のJSONだけを返す。"#;
 
@@ -960,6 +961,7 @@ const STAGE1_WORK_PLAN_EN: &str = r#"You are inku's work planner. Read the autho
 
 11. Show what leads through size and overlap. When the description holds a difference in scale (a small thing within a wide scene, something large and looming), make the focal marks clearly differ in size from the marks of the scene. Express strength or crowding by overlapping marks.
 12. Show light and time through the color of the scene. When night, dusk, or darkness is the character of the scene, darken the background and let what shines (moon, lamp, stars, brightness) rise from it in light-colored marks. Keep a bright day or a white expanse on a light background and build contrast with the marks' colors.
+13. Choose a free line only when the description names one, or when what is drawn is itself a line without a set shape (the track of something that passed, the trace of a moving hand). Use lines and arcs for what straight lines, curves, and arcs can say, and never use a free line to approximate what you are unsure of.
 
 Choose unspecified for a field you leave open. Use one to eight layers. Return only the specified JSON."#;
 

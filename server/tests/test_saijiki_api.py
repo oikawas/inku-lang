@@ -80,7 +80,7 @@ def test_generated_ts_matches_table():
 _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
     "katachi": (
         ("円", "circle"), ("楕円", "ellipse"), ("三角", "triangle"), ("四角", "square"),
-        ("線", "line"), ("弧", "arc"), ("点", "point"), ("雲形", "cloudform"),
+        ("線", "line"), ("弧", "arc"), ("自由線", "free line"), ("点", "point"), ("雲形", "cloudform"),
     ),
     "katamuki": (
         ("水平", "horizontal"), ("垂直", "vertical"), ("斜め", "diagonal"),

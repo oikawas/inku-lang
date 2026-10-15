@@ -337,7 +337,12 @@
 # works that draw one): a line's ends, length 11/20 of the short side by
 # default, whose path the performance builds. It takes only the connection
 # and the touch, on either side; any other relation is omitted with its reason.
-DDL_ENGINE_VERSION = "59"
+# 60: The work planner may choose 自由線 / free line, only when the description
+# names one or draws a line without a set shape. The composition writes a free
+# line's direction from how its reading moves it (rising, falling, horizontal
+# for flowing) when the plan gave none, joins it only by the connection, and
+# weighs it as a line.
+DDL_ENGINE_VERSION = "60"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

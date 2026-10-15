@@ -8,6 +8,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — The description reader may choose a free line (DDL engine 60)
+
+By the author's choice (I-715 stage B2). The free line, a DDL word since the previous stage, is listed in the saijiki and offered to the description reader.
+
+- The saijiki's forms list 自由線 / free line (after arc), and the Web and Android lists and the macOS word resources follow. The Web saijiki preview shows a free line's path drawn by the product's renderer with a rotring, scaled into the frame.
+- Item 13 of the work-plan instruction (Japanese and English): choose a free line only when the description names one, or when what is drawn is itself a line without a set shape (the track of something that passed, the trace of a moving hand). Use lines and arcs for what straight lines, curves, and arcs can say, and never use a free line to approximate what you are unsure of.
+- The composition writes a direction on a free line layer that has none, from the reading's motion (rising for rising, falling for falling, horizontal for flowing). The solving never reads a direction, so the placement does not move. Of the joints, only the connection joins a free line; resting on, inside, overlapping and crossing are not written. A free line weighs as a line or an arc.
+- DDL engine 60. DDL 19, render engine 81 and the Score are unchanged. A work without a free line compiles to the same Score (checked on the 69 recorded works).
+
 ### 2026-10-15 — Match macOS lineage-card ellipsis menus to Web
 
 The ellipsis now opens shared refinement actions for that card's work, instead of mixing in node navigation, marks, export, and deletion. Direct-DDL and held-description conditions follow the Web menu. Nodes without a saved work and trashed works have no ellipsis button.

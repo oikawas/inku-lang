@@ -19,7 +19,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ops::{Add, Mul, Sub};
 use std::sync::OnceLock;
 
-use inku_ddl::work_plan::{ComposedRange, WorkPlan, WorkPlanLayer, WorkPlanSlot};
+use inku_ddl::work_plan::{
+    ComposedRange, WorkPlan, WorkPlanLayer, WorkPlanSlot, work_plan_capabilities,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -1270,8 +1272,10 @@ pub fn check(
 /// The joints a composition can write, in the given order, and a finding for
 /// each one it drops: a layer number out of range, a layer whose place the
 /// description states, a partner or a layer already joined, a joint that would
-/// close a loop, or a connection the joined shape cannot start (only a line, an
-/// arc or a point connects, and not to a cloudform).
+/// close a loop, a connection the joined shape cannot start (only a line, an
+/// arc, a free line or a point connects, and not to a cloudform), or any other
+/// joint with a free line on either side (I-715: a free line is joined only at
+/// its ends).
 #[must_use]
 pub fn check_joints(
     joints: &[Joint],
@@ -1286,10 +1290,7 @@ pub fn check_joints(
             Some("joint_layer")
         } else if fixed.contains_key(&joint.a) {
             Some("joint_stated")
-        } else if joint.kind == JointKind::ContinuesFrom
-            && (!matches!(layers[joint.a].shape.as_str(), "line" | "arc" | "point")
-                || layers[joint.b].shape == "cloudform")
-        {
+        } else if !shapes_can_join(joint, layers) {
             Some("joint_not_writable")
         } else if kept.iter().any(|other| other.b == joint.b) {
             Some("joint_partner_taken")
@@ -1314,6 +1315,22 @@ pub fn check_joints(
         }
     }
     (kept, findings)
+}
+
+/// Whether the joint's relation can join its two shapes: a connection starts
+/// only from a line, an arc, a free line or a point, and never reaches a
+/// cloudform; a free line takes no other joint (I-715: it is joined only at its
+/// ends).
+fn shapes_can_join(joint: &Joint, layers: &[WorkPlanLayer]) -> bool {
+    let (a, b) = (
+        layers[joint.a].shape.as_str(),
+        layers[joint.b].shape.as_str(),
+    );
+    if joint.kind == JointKind::ContinuesFrom {
+        matches!(a, "line" | "arc" | "free_line" | "point") && b != "cloudform"
+    } else {
+        a != "free_line" && b != "free_line"
+    }
 }
 
 /// The reading to solve when no reading can be used.
@@ -2284,7 +2301,7 @@ fn weight_parts(layer: &WorkPlanLayer, background_lightness: f64) -> (f64, f64, 
         None
     } else {
         let shape = match layer.shape.as_str() {
-            "line" | "arc" => 0.5,
+            "line" | "arc" | "free_line" => 0.5,
             "point" => 0.3,
             _ => 1.0,
         };
@@ -3192,6 +3209,38 @@ fn print_order(count: usize, attached: &BTreeMap<usize, Joint>) -> Vec<usize> {
         }
     }
     order
+}
+
+/// The plan with a direction on each free line the reading moves (I-715 B2):
+/// rising for a layer that rises, falling for one that falls, horizontal for one
+/// that flows. A free line has no set shape, so the way it moves is said by its
+/// direction. Only a layer whose plan gave no direction is written, and only a
+/// direction the capability table accepts for its form; the first motion the
+/// reading names for a layer is the one written. The solver never reads a
+/// direction, so the placement is the same before and after.
+#[must_use]
+pub fn with_free_line_angles(plan: &WorkPlan, reading: &CheckedReading) -> WorkPlan {
+    let mut plan = plan.clone();
+    for relation in &reading.relations {
+        let angle = match relation.kind {
+            RelationKind::Rising => "rising",
+            RelationKind::Falling => "falling",
+            RelationKind::Flowing => "horizontal",
+            _ => continue,
+        };
+        let Some(layer) = plan.layers.get_mut(relation.a) else {
+            continue;
+        };
+        if layer.shape == "free_line"
+            && !layer.attributes.contains_key(&WorkPlanSlot::Angle)
+            && work_plan_capabilities().accepts(&layer.form(), WorkPlanSlot::Angle, angle)
+        {
+            layer
+                .attributes
+                .insert(WorkPlanSlot::Angle, angle.to_owned());
+        }
+    }
+    plan
 }
 
 /// [`composed_plan`] for a placement with joints: the layers and their ranges

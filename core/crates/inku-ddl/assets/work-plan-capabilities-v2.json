@@ -2119,6 +2119,319 @@
         "bleeding"
       ]
     },
+    "free_line": {
+      "action": [
+        "place",
+        "line_up",
+        "draw",
+        "scatter",
+        "fill",
+        "tile"
+      ],
+      "position": [
+        "top",
+        "bottom",
+        "center",
+        "left_edge",
+        "right_edge",
+        "top_edge",
+        "bottom_edge",
+        "corner"
+      ],
+      "size": [
+        "very_small",
+        "normal_sized",
+        "very_large",
+        "extra_large",
+        "huge",
+        "slightly_small",
+        "small",
+        "slightly_large",
+        "large"
+      ],
+      "color": [
+        "white",
+        "black",
+        "blue",
+        "red",
+        "green",
+        "gray",
+        "yellow",
+        "orange",
+        "purple"
+      ],
+      "tool": [
+        "silverpoint",
+        "pencil",
+        "pen",
+        "rotring",
+        "crayon",
+        "chalk",
+        "fine_brush",
+        "thick_brush",
+        "oil_paint",
+        "burin",
+        "drypoint",
+        "computer"
+      ],
+      "thinness": [
+        "extra_fine",
+        "thin",
+        "extra_thick",
+        "thick"
+      ],
+      "continuity": [
+        "solid",
+        "dashed",
+        "dotted",
+        "dash_dot"
+      ],
+      "surface": [
+        "empty",
+        "flat",
+        "sweep",
+        "grain",
+        "stipple",
+        "hatch",
+        "crosshatch",
+        "aquatint"
+      ],
+      "handling": [
+        "dense",
+        "temperate",
+        "faint"
+      ],
+      "angle": [
+        "horizontal",
+        "vertical",
+        "diagonal",
+        "rising",
+        "falling",
+        "rotated"
+      ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
+      "motion_quality": [
+        "swaying",
+        "undulating"
+      ],
+      "motion_amplitude": [
+        "narrowly",
+        "broadly"
+      ],
+      "motion_spacing": [
+        "loosely",
+        "tightly"
+      ],
+      "bleeding": [
+        "bleeding"
+      ]
+    },
+    "free_line/full_width": {
+      "action": [
+        "place",
+        "line_up",
+        "draw",
+        "scatter",
+        "fill",
+        "tile"
+      ],
+      "position": [
+        "top",
+        "bottom",
+        "center",
+        "left_edge",
+        "right_edge",
+        "top_edge",
+        "bottom_edge",
+        "corner"
+      ],
+      "size": [],
+      "color": [
+        "white",
+        "black",
+        "blue",
+        "red",
+        "green",
+        "gray",
+        "yellow",
+        "orange",
+        "purple"
+      ],
+      "tool": [
+        "silverpoint",
+        "pencil",
+        "pen",
+        "rotring",
+        "crayon",
+        "chalk",
+        "fine_brush",
+        "thick_brush",
+        "oil_paint",
+        "burin",
+        "drypoint",
+        "computer"
+      ],
+      "thinness": [
+        "extra_fine",
+        "thin",
+        "extra_thick",
+        "thick"
+      ],
+      "continuity": [
+        "solid",
+        "dashed",
+        "dotted",
+        "dash_dot"
+      ],
+      "surface": [
+        "empty",
+        "flat",
+        "sweep",
+        "grain",
+        "stipple",
+        "hatch",
+        "crosshatch",
+        "aquatint"
+      ],
+      "handling": [
+        "dense",
+        "temperate",
+        "faint"
+      ],
+      "angle": [
+        "horizontal",
+        "vertical",
+        "diagonal",
+        "rising",
+        "falling",
+        "rotated"
+      ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
+      "motion_quality": [
+        "swaying",
+        "undulating"
+      ],
+      "motion_amplitude": [
+        "narrowly",
+        "broadly"
+      ],
+      "motion_spacing": [
+        "loosely",
+        "tightly"
+      ],
+      "bleeding": [
+        "bleeding"
+      ]
+    },
+    "free_line/half_width": {
+      "action": [
+        "place",
+        "line_up",
+        "draw",
+        "scatter",
+        "fill",
+        "tile"
+      ],
+      "position": [
+        "top",
+        "bottom",
+        "center",
+        "left_edge",
+        "right_edge",
+        "top_edge",
+        "bottom_edge",
+        "corner"
+      ],
+      "size": [],
+      "color": [
+        "white",
+        "black",
+        "blue",
+        "red",
+        "green",
+        "gray",
+        "yellow",
+        "orange",
+        "purple"
+      ],
+      "tool": [
+        "silverpoint",
+        "pencil",
+        "pen",
+        "rotring",
+        "crayon",
+        "chalk",
+        "fine_brush",
+        "thick_brush",
+        "oil_paint",
+        "burin",
+        "drypoint",
+        "computer"
+      ],
+      "thinness": [
+        "extra_fine",
+        "thin",
+        "extra_thick",
+        "thick"
+      ],
+      "continuity": [
+        "solid",
+        "dashed",
+        "dotted",
+        "dash_dot"
+      ],
+      "surface": [
+        "empty",
+        "flat",
+        "sweep",
+        "grain",
+        "stipple",
+        "hatch",
+        "crosshatch",
+        "aquatint"
+      ],
+      "handling": [
+        "dense",
+        "temperate",
+        "faint"
+      ],
+      "angle": [
+        "horizontal",
+        "vertical",
+        "diagonal",
+        "rising",
+        "falling",
+        "rotated"
+      ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
+      "motion_quality": [
+        "swaying",
+        "undulating"
+      ],
+      "motion_amplitude": [
+        "narrowly",
+        "broadly"
+      ],
+      "motion_spacing": [
+        "loosely",
+        "tightly"
+      ],
+      "bleeding": [
+        "bleeding"
+      ]
+    },
     "line": {
       "action": [
         "place",

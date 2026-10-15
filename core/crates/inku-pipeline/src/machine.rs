@@ -1092,6 +1092,7 @@ impl PipelineSnapshot {
             self.stage1_prompt(&description)?,
             &candidate.source,
             found.background,
+            found.ground,
             &found.sentences,
             &found.mark_colours,
             self.config.compiler.host.background(),
@@ -1102,16 +1103,18 @@ impl PipelineSnapshot {
         self.reissue_stage1(prompt, description, elapsed_ms, next, events)?;
         self.stage1_fallback = Some(candidate.clone());
         self.stage1_fallback_plan = plan.cloned();
-        self.event(
-            events,
-            "stage1_returned",
-            json!({
-                "identity": self.action.as_ref().unwrap().identity,
-                "reason": "ground_coloured_layers",
-                "background": found.background,
-                "layers": found.sentences.len(),
-            }),
-        )?;
+        let mut returned = json!({
+            "identity": self.action.as_ref().unwrap().identity,
+            "reason": "ground_coloured_layers",
+            "background": found.background,
+            "layers": found.sentences.len(),
+        });
+        // A support that covers the background is named; where the background
+        // shows, the event is as before.
+        if let Some(ground) = found.ground {
+            returned["ground"] = json!(ground);
+        }
+        self.event(events, "stage1_returned", returned)?;
         Ok(true)
     }
 

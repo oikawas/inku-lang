@@ -19,10 +19,10 @@ use inku_render::{
     types::{RenderOptions, RenderOutput, RenderRequest},
 };
 use inku_score::{
-    CANVAS_FORMAT_REGISTRY_ID, Canvas, Color, HardResourcePolicy, InstructionMode,
+    CANVAS_FORMAT_REGISTRY_ID, Canvas, Color, GroundMaterial, HardResourcePolicy, InstructionMode,
     OperationalResourceBudget, ResolvedPaletteColor, ResolvedPaletteContext, ResourceDemand, Score,
     ScoreErrorPolicy, canonical_score_digest, canvas_format_registry_digest, lookup_canvas_format,
-    validate_canvas_format_id,
+    oklab_difference, shown_support, validate_canvas_format_id,
 };
 use serde::{Deserialize, Deserializer, Serialize, de};
 use serde_json::Value;
@@ -479,21 +479,48 @@ pub fn compile_committed(
     Ok(delivery)
 }
 
-/// The colour the canvas shows under a candidate's marks, the source
-/// sentences drawn only in it, and every colour its additive marks use.
+/// The candidate's background, the support when it covers the background, the
+/// source sentences drawn only in colours lost in what the canvas shows under
+/// them, and every colour its additive marks use.
 pub(crate) struct GroundColouredSentences {
     pub background: Color,
+    pub ground: Option<GroundMaterial>,
     pub sentences: Vec<SourceSpan>,
     pub mark_colours: Vec<Color>,
 }
 
+/// How near (OKLab colour difference) a mark's actual colour may lie to what a
+/// covering support shows before the mark is lost in it. The nearest two of the
+/// nine colours a catalog sets apart lie 0.042 to 0.121 apart (0.092 at the
+/// median), so a mark this near the support is harder to tell from it than a
+/// catalog's neighbouring colours are from each other (DDL engine 61).
+const LOST_IN_THE_SUPPORT: f64 = 0.08;
+
+/// The actual colour (sRGB channels 0 to 1) the host's palette observes for
+/// `colour`, if it observes one.
+fn observed_colour(palette: &ResolvedPaletteContext, colour: Color) -> Option<[f64; 3]> {
+    [palette.background(), palette.black(), palette.white()]
+        .into_iter()
+        .chain(palette.observations().into_iter().flatten().copied())
+        .find(|observation| observation.abstract_color() == colour)
+        .map(|observation| {
+            observation
+                .concrete_rgb()
+                .map(|channel| f64::from(channel) / 255.0)
+        })
+}
+
 /// Find, from one compile of the exact document, the source sentences whose
-/// marks are drawn only in the colour the canvas shows under them.
+/// marks are drawn only in colours lost in what the canvas shows under them.
 ///
-/// Such a mark is not seen where no mark of another colour lies beneath it.
-/// Only additive marks the source asks for itself count, not a Macro's; a
-/// Score whose ground covers the background gives no sentence. The colours
-/// of every additive mark, a Macro's too, come along for the new background.
+/// Where the background shows, that is a mark in the background's colour.
+/// Where a support covers it (the mezzotint plate, the charcoal), it is a mark
+/// whose actual colour lies within [`LOST_IN_THE_SUPPORT`] of the colour the
+/// support shows over the background (DDL engine 61); a colour the palette does
+/// not observe is not counted as lost. Such a mark is not seen where no mark of
+/// another colour lies beneath it. Only additive marks the source asks for
+/// itself count, not a Macro's. The colours of every additive mark, a Macro's
+/// too, come along for the new background.
 pub(crate) fn ground_coloured_sentences(
     document: NormalizedDdlDocument,
     definitions: &[MacroDefinition],
@@ -514,8 +541,33 @@ pub(crate) fn ground_coloured_sentences(
     else {
         return Ok(None);
     };
-    let Some(ground) = shown_background(score) else {
-        return Ok(None);
+    let palette = options.host.palette().resolved();
+    let covering = match &score.canvas {
+        Canvas::Spec(canvas) => canvas
+            .ground
+            .as_ref()
+            .map(|ground| ground.material)
+            .filter(|material| material.covers_the_background()),
+        Canvas::Id(_) => None,
+    };
+    let (background, ground, support) = match (shown_background(score), covering) {
+        (Some(background), _) => (background, None, None),
+        (None, Some(material)) => {
+            let Some(tone) = observed_colour(&palette, score.background) else {
+                return Ok(None);
+            };
+            (
+                score.background,
+                Some(material),
+                Some(shown_support(material, tone)),
+            )
+        }
+        (None, None) => return Ok(None),
+    };
+    let lost = |colour: &Color| match support {
+        None => *colour == background,
+        Some(shown) => observed_colour(&palette, *colour)
+            .is_some_and(|actual| oklab_difference(actual, shown) < LOST_IN_THE_SUPPORT),
     };
     if result.instruction_origins().len() != score.instructions.len() {
         return Ok(None);
@@ -548,7 +600,7 @@ pub(crate) fn ground_coloured_sentences(
         let ScoreInstructionOrigin::SourceInstruction { instruction_index } = origin else {
             continue;
         };
-        if colours.iter().any(|colour| *colour != ground) {
+        if !colours.iter().all(lost) {
             continue;
         }
         let Some(head) = semantic
@@ -567,7 +619,8 @@ pub(crate) fn ground_coloured_sentences(
         }
     }
     Ok((!sentences.is_empty()).then_some(GroundColouredSentences {
-        background: ground,
+        background,
+        ground,
         sentences,
         mark_colours,
     }))

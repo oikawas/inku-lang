@@ -58,10 +58,7 @@ pub fn shown_background(score: &Score) -> Option<Color> {
     };
     let covered = ground.is_some_and(|ground| {
         ground.material != GroundMaterial::Plain
-            && (matches!(
-                ground.material,
-                GroundMaterial::Mezzotint | GroundMaterial::CharcoalGround
-            ) || ground.tone != GroundTone::White)
+            && (ground.material.covers_the_background() || ground.tone != GroundTone::White)
     });
     (!covered).then_some(score.background)
 }

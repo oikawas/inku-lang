@@ -342,7 +342,14 @@
 # line's direction from how its reading moves it (rising, falling, horizontal
 # for flowing) when the plan gave none, joins it only by the connection, and
 # weighs it as a line.
-DDL_ENGINE_VERSION = "60"
+# 61: On a support that covers the background (the mezzotint plate, the
+# charcoal ground), a color the DDL omits is the farther of black and white
+# from what the support shows there (its body over the background), not from
+# the background it hides. A plan whose marks are lost in such a support (OKLab
+# colour difference under 0.08) goes back to the reader once, whose ground
+# choices then leave out the covering supports and whose background choices
+# leave out the marks' colours, as on a background.
+DDL_ENGINE_VERSION = "61"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

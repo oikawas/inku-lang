@@ -7,6 +7,7 @@ pub mod canvas_format;
 pub mod compatibility;
 pub mod error_policy;
 pub mod execution_diagnostics;
+pub mod ground_body;
 pub mod resource;
 pub mod schema;
 pub mod score_resources;
@@ -26,6 +27,7 @@ pub use execution_diagnostics::{
     ScoreExecutionDiagnostic, ScoreExecutionDisposition, ScoreExecutionReason,
     ScoreExecutionSummary,
 };
+pub use ground_body::{oklab_difference, oklab_from_srgb, shown_support, srgb_channels};
 pub use resource::{
     HardResourcePolicy, OperationalResourceBudget, RESOURCE_ACCOUNTING_ID, ResourceAuthority,
     ResourceBudget, ResourceBudgetExceeded, ResourceDemand, ResourceDimension,

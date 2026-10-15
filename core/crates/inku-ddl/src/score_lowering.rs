@@ -16,7 +16,7 @@ use inku_score::{
     ConnectedPositionAuthority, GroundMaterial, Instruction, InstructionMode, LineStyle, Point,
     Primitive, Relation, RelationGap, RelationType, ResolvedPaletteContext, Score,
     SurfaceIntensity, SurfaceSpec, SurfaceTexture, Thinness, TouchingConstraints, TransformGroup,
-    Weight, lookup_canvas_format,
+    Weight, lookup_canvas_format, oklab_from_srgb, shown_support,
 };
 
 use crate::geometry::{
@@ -110,6 +110,9 @@ pub struct ScoreLoweringContext {
     canvas_format: CanvasFormat,
     background: Color,
     resolved_palette: Option<ResolvedPaletteContext>,
+    /// The document's support, once its ground is read: a support that covers
+    /// the background decides an omitted color (DDL engine 61).
+    ground: Option<GroundMaterial>,
 }
 
 impl ScoreLoweringContext {
@@ -123,6 +126,7 @@ impl ScoreLoweringContext {
             canvas_format: *canvas_format,
             background,
             resolved_palette: None,
+            ground: None,
         })
     }
 
@@ -2207,6 +2211,12 @@ fn lower_verified_stage15_shared<'a>(
                 }
             }
         });
+    // An omitted color is told from what the canvas shows under the marks,
+    // which a covering support decides (DDL engine 61).
+    let context = ScoreLoweringContext {
+        ground: ground.as_ref().map(|ground| ground.material),
+        ..context
+    };
     for (projected_group_index, group) in document.coordinated_head_groups.iter().enumerate() {
         let group_index = candidate
             .verified_effective_view()
@@ -6420,7 +6430,23 @@ fn resolve_omitted_color(
         gaps.push(ScoreFieldGap::MissingResolvedPaletteContext);
         return None;
     };
-    let background = resolved_palette.background().oklch_lightness();
+    // A support that covers the background (the mezzotint plate, the charcoal)
+    // lays its own body over it, so the mark is told from what the support
+    // shows there (DDL engine 61). The DDL writes no tone, so the tone under the
+    // body is the background itself.
+    let background = context
+        .ground
+        .filter(|material| material.covers_the_background())
+        .map_or_else(
+            || resolved_palette.background().oklch_lightness(),
+            |material| {
+                let tone = resolved_palette
+                    .background()
+                    .concrete_rgb()
+                    .map(|channel| f64::from(channel) / 255.0);
+                oklab_from_srgb(shown_support(material, tone))[0]
+            },
+        );
     let black_distance = (background - resolved_palette.black().oklch_lightness()).abs();
     let white_distance = (background - resolved_palette.white().oklch_lightness()).abs();
     Some(if black_distance >= white_distance {
@@ -7781,6 +7807,7 @@ mod tests {
                 },
                 background: Color::White,
                 resolved_palette: None,
+                ground: None,
             };
             for (action, count) in [("tile", 8), ("line_up", 4)] {
                 let mut fields = complete_macro_fields();
@@ -7885,6 +7912,7 @@ mod tests {
                 },
                 background: Color::White,
                 resolved_palette: None,
+                ground: None,
             };
             for (word, y) in [("縦", 0), ("右上がり", -1), ("右下がり", 1), ("斜め", 2)]
             {

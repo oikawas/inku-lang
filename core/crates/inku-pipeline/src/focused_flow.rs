@@ -2095,6 +2095,133 @@ fn stage1_keeps_its_candidate_without_budget_or_where_the_ground_covers_the_back
     }
 }
 
+/// The run configuration with the default catalog's nine observed colours, so
+/// a mark's actual colour can be told from what a covering ground shows.
+fn observed_config(language: inku_ddl::ResolvedInstructionLanguage) -> PipelineConfig {
+    let palette = inku_render::palette::work_palette_context(
+        &inku_render::palette::default_color_map(),
+        None,
+        None,
+        Color::White,
+    )
+    .unwrap();
+    let dto = |colour: inku_score::ResolvedPaletteColor| ResolvedPaletteColorDto {
+        abstract_color: colour.abstract_color(),
+        concrete_rgb: colour.concrete_rgb(),
+        oklch_lightness: colour.oklch_lightness(),
+    };
+    let mut pipeline_config = config();
+    pipeline_config.language = language;
+    pipeline_config.compiler.host = ResolvedHostOptions::new(
+        "square",
+        CANVAS_FORMAT_REGISTRY_ID,
+        canvas_format_registry_digest().unwrap(),
+        "default",
+        CatalogMode::Default,
+        Color::White,
+        ResolvedPaletteDto {
+            background: dto(palette.background()),
+            black: dto(palette.black()),
+            white: dto(palette.white()),
+            observations: palette.observations().map(|colours| colours.map(dto)),
+        },
+    )
+    .unwrap();
+    pipeline_config
+}
+
+#[test]
+fn stage1_returns_the_layers_a_covering_ground_hides() {
+    // The mezzotint plate covers the background, and the default catalog's
+    // black lies 0.019 from the plate in OKLab, so the black circle is not
+    // seen. The reader gets the candidate back once with the ground, and
+    // chooses again a ground that does not cover the background and a
+    // background every mark can be told from; the marks keep their colours.
+    use inku_ddl::ResolvedInstructionLanguage::{En, Ja};
+    for (language, source, circle, choose_again, ground_choices) in [
+        (
+            En,
+            "Mezzotint.\nplace one black circle at center.\nplace one white square at center.",
+            "place one black circle at center",
+            "choose again a ground that does not cover the background and a background color that every mark of the plan can be told from",
+            "The ground choices leave out the grounds that cover the background (charcoal_ground, mezzotint).",
+        ),
+        (
+            Ja,
+            "メゾチント。\n中心に、黒の円を1個置く。\n中心に、白の四角を1個置く。",
+            "中心に、黒の円を1個置く",
+            "地を背景を覆わないものに、背景を下絵のどの痕とも見分けられる色に選び直して",
+            "地の選択肢からは、背景を覆う地（charcoal_ground・mezzotint）を除いてある。",
+        ),
+    ] {
+        let output = ground_answer(&ground_start(observed_config(language)), source);
+        let state = output.snapshot;
+        let returned = output
+            .events
+            .iter()
+            .find(|event| event.tag == "stage1_returned")
+            .expect("the candidate goes back to the reader");
+        assert_eq!(returned.payload["reason"], "ground_coloured_layers");
+        assert_eq!(returned.payload["ground"], "mezzotint");
+        assert_eq!(returned.payload["layers"], 1);
+        let feedback = &stage1_message(&state)["background_feedback"];
+        assert_eq!(feedback["ground"], "mezzotint");
+        let layers = feedback["layers"].as_array().unwrap();
+        assert_eq!(layers.len(), 1, "{source}");
+        assert_eq!(
+            layers[0]["text"]
+                .as_str()
+                .unwrap()
+                .trim_end_matches(['.', '。']),
+            circle
+        );
+        let action = state.action.as_ref().unwrap();
+        let system = action.payload["prompt"]["system"].as_str().unwrap();
+        assert!(system.contains(choose_again), "{system}");
+        assert!(system.contains(ground_choices), "{system}");
+        let schema = &action.payload["prompt"]["response_schema"]["properties"];
+        let grounds = schema["ground"]["enum"].as_array().unwrap();
+        for ground in ["charcoal_ground", "mezzotint"] {
+            assert!(!grounds.iter().any(|choice| choice == ground), "{ground}");
+        }
+        for ground in ["paper", "ink_wash_ground", "unspecified"] {
+            assert!(grounds.iter().any(|choice| choice == ground), "{ground}");
+        }
+        let backgrounds = schema["background"]["enum"].as_array().unwrap();
+        for colour in ["white", "black", "unspecified"] {
+            assert!(
+                !backgrounds.iter().any(|choice| choice == colour),
+                "{colour}"
+            );
+        }
+    }
+}
+
+#[test]
+fn stage1_keeps_a_covering_ground_whose_marks_show() {
+    // White and gray stand clear of the mezzotint plate, and black lies 0.41
+    // from the charcoal over white: no layer hides, so nothing goes back.
+    for source in [
+        "Mezzotint.\nplace one white circle at center.\nplace one gray square at center.",
+        "Charcoal ground.\nplace one black circle at center.",
+    ] {
+        let output = ground_answer(
+            &ground_start(observed_config(inku_ddl::ResolvedInstructionLanguage::En)),
+            source,
+        );
+        assert!(
+            output
+                .events
+                .iter()
+                .all(|event| event.tag != "stage1_returned"),
+            "{source}"
+        );
+        let commit = output.snapshot.action.as_ref().unwrap();
+        assert_eq!(commit.tag, "commit_visible_normalized_ddl", "{source}");
+        assert_eq!(commit.payload["document"]["source"], source);
+    }
+}
+
 #[test]
 fn the_background_choices_stay_whole_when_every_colour_is_a_mark() {
     let every_colour = [

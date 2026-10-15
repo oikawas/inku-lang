@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
+use inku_score::oklab_from_srgb;
 use sha2::{Digest, Sha256};
 
 use crate::types::{Color, ResolvedPaletteColor, ResolvedPaletteContext, Seed};
@@ -112,29 +113,8 @@ fn hex_to_rgb(value: &str) -> Option<(u8, u8, u8)> {
 
 fn oklch_from_hex(value: &str) -> Option<(f64, f64, f64)> {
     let (red, green, blue) = hex_to_rgb(value)?;
-    let linearize = |component: u8| {
-        let channel = f64::from(component) / 255.0;
-        if channel <= 0.04045 {
-            channel / 12.92
-        } else {
-            ((channel + 0.055) / 1.055).powf(2.4)
-        }
-    };
-    let (red, green, blue) = (linearize(red), linearize(green), linearize(blue));
-    let light_channel = 0.412_221_470_8 * red + 0.536_332_536_3 * green + 0.051_445_992_9 * blue;
-    let medium_channel = 0.211_903_498_2 * red + 0.680_699_545_1 * green + 0.107_396_956_6 * blue;
-    let short_channel = 0.088_302_461_9 * red + 0.281_718_837_6 * green + 0.629_978_700_5 * blue;
-    let (light_root, medium_root, short_root) = (
-        light_channel.cbrt(),
-        medium_channel.cbrt(),
-        short_channel.cbrt(),
-    );
-    let lightness =
-        0.210_454_255_3 * light_root + 0.793_617_785 * medium_root - 0.004_072_046_8 * short_root;
-    let a =
-        1.977_998_495_1 * light_root - 2.428_592_205 * medium_root + 0.450_593_709_9 * short_root;
-    let b =
-        0.025_904_037_1 * light_root + 0.782_771_766_2 * medium_root - 0.808_675_766 * short_root;
+    let [lightness, a, b] =
+        oklab_from_srgb([red, green, blue].map(|component| f64::from(component) / 255.0));
     Some((
         lightness,
         a.hypot(b),

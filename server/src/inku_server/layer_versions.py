@@ -349,7 +349,12 @@
 # colour difference under 0.08) goes back to the reader once, whose ground
 # choices then leave out the covering supports and whose background choices
 # leave out the marks' colours, as on a background.
-DDL_ENGINE_VERSION = "61"
+# 62: A source-unit sequence after a continuation sentence ("線は波打つ。")
+# names the members it names without that sentence. Its members kept their
+# numbers from before the continuation joined the instruction it continues,
+# so they named the next instruction, or none when the sequence closed the
+# description and the compiler stopped (I-722).
+DDL_ENGINE_VERSION = "62"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

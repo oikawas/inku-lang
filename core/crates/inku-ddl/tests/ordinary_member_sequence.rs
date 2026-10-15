@@ -305,6 +305,69 @@ fn fill_cycle_delivers_and_u64_count_reaches_local_resource_omission() {
     assert_eq!(score.instructions[0].primitive, Primitive::Square);
 }
 
+#[test]
+fn a_sequence_closing_the_document_after_a_continuation_lines_up_its_own_members() {
+    assert_a_continuation_leaves_the_sequence_alone(
+        "中心に、黒の線を1個引く。\n円の周囲に灰色の細筆の円を三つ、半径を順に大きくして並べる。",
+        "中心に、黒の線を1個引く。線は波打つ。\n円の周囲に灰色の細筆の円を三つ、半径を順に大きくして並べる。",
+    );
+}
+
+#[test]
+fn a_sequence_after_a_continuation_lines_up_the_members_it_names_without_it() {
+    assert_a_continuation_leaves_the_sequence_alone(
+        "中心に、黒の線を1個引く。\n円の周囲に灰色の細筆の円を三つ、半径を順に大きくして並べる。\n中心に、黒の四角を1個置く。",
+        "中心に、黒の線を1個引く。線は波打つ。\n円の周囲に灰色の細筆の円を三つ、半径を順に大きくして並べる。\n中心に、黒の四角を1個置く。",
+    );
+}
+
+/// The continuation only adds the line's sway; a later sequence keeps the members it
+/// names in the description without the continuation sentence.
+fn assert_a_continuation_leaves_the_sequence_alone(without: &str, with: &str) {
+    let [without, with] = [without, with].map(|source| {
+        execute(
+            source,
+            ResolvedInstructionLanguage::Ja,
+            &[],
+            Vec::new(),
+            standard_budget(),
+            ScoreErrorPolicy::OmitAndContinue,
+        )
+    });
+    let reasons = |result: &CompilerResourceExecutionResult| {
+        (
+            result.outcome(),
+            result
+                .upstream_diagnostics()
+                .iter()
+                .map(|diagnostic| format!("{:?}", diagnostic.reason))
+                .collect::<Vec<_>>(),
+            result
+                .downstream_diagnostics()
+                .iter()
+                .map(|diagnostic| format!("{:?}", diagnostic.reason))
+                .collect::<Vec<_>>(),
+        )
+    };
+    assert_eq!(reasons(&with), reasons(&without));
+    let score = |result: &CompilerResourceExecutionResult| {
+        let mut score =
+            serde_json::to_value(result.score().expect("the sequence keeps a Score")).unwrap();
+        score["instructions"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("variation");
+        score
+    };
+    let without = score(&without);
+    assert!(
+        without["placement_groups"]
+            .as_array()
+            .is_some_and(|groups| !groups.is_empty())
+    );
+    assert_eq!(score(&with), without);
+}
+
 fn execute(
     source: &str,
     language: ResolvedInstructionLanguage,

@@ -8,6 +8,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Preserve catalog purposes and align existing Server checks
+
+Known stored models without a purpose selection now inherit their catalog purposes instead of having them overwritten by an inferred LLM default. Explicit stored purpose selections keep their precedence.
+
+Updated Server checks for hash-prefix search, approved model measurements, retired CLI fields, additional Swift CodingKeys conformance, and accepted API additions. The portable verifier allows additional conformance while still rejecting missing or incorrectly renamed persistence keys.
+
 ## v2.15.153 (2026-10-15 / Build 1229)
 
 ### 2026-10-15 — On a ground that covers the background, show marks whose color is omitted, and return marks lost in the ground (DDL engine 61)

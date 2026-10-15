@@ -973,7 +973,9 @@ def test_fetch_models_keeps_retired_models_as_eol(monkeypatch, request):
     # 提供が続くモデルは EOL 印が付かず、整えたラベルと評価が残る。
     assert models["google/gemma-4-31b-it"].get("eol") is not True
     assert models["google/gemma-4-31b-it"]["label"] == "Google Gemma 4 31B Instruct"
-    assert models["google/gemma-4-31b-it"]["unsupported_purposes"] == ["llm", "vision"]
+    assert models["google/gemma-4-31b-it"]["purposes"] == ["vision"]
+    assert models["google/gemma-4-31b-it"]["unsupported_purposes"] == ["llm"]
+    assert models["google/gemma-4-31b-it"]["speed_vision_seconds"] == 224.5
     assert "recommendation_llm" not in models["google/gemma-4-31b-it"]
     assert "504" in models["google/gemma-4-31b-it"]["comment_ja"]
     # 提供が消えたモデルは一覧から消えず、EOL として日付付きで残る。
@@ -1913,10 +1915,10 @@ def test_history_is_scoped_to_authenticated_user():
         session.query(db.HistoryRow).filter(db.HistoryRow.id == item_a_second["id"]).update(
             {db.HistoryRow.render_hash: "rh3:" + "a" * 60 + "Ab12"}
         )
-        # The same four characters, but in the middle of the hash. The search reads the
-        # last four, so this row must stay out of the result -- a substring match finds it.
+        # The same four characters strictly inside the digest: neither its
+        # supported prefix nor its four-character suffix may match this row.
         session.query(db.HistoryRow).filter(db.HistoryRow.id == item_a["id"]).update(
-            {db.HistoryRow.render_hash: "rh3:" + "ab12" + "c" * 60}
+            {db.HistoryRow.render_hash: "rh3:" + "c" * 30 + "ab12" + "c" * 30}
         )
         session.commit()
 
@@ -1950,16 +1952,25 @@ def test_history_is_scoped_to_authenticated_user():
     assert hash_search_a.json()["total"] == 1
     assert hash_search_a.json()["items"][0]["id"] == item_a_second["id"]
 
+    prefix_search_a = client.get("/api/history?q=rh3:cccc", headers=headers_a)
+    assert prefix_search_a.status_code == 200
+    assert prefix_search_a.json()["total"] == 1
+    assert prefix_search_a.json()["items"][0]["id"] == item_a["id"]
+    prefix_search_b = client.get("/api/history?q=rh3:cccc", headers=headers_b)
+    assert prefix_search_b.status_code == 200
+    assert prefix_search_b.json()["total"] == 0
+    assert prefix_search_b.json()["items"] == []
+
     four_character_description_search_a = client.get("/api/history?q=blue", headers=headers_a)
     assert four_character_description_search_a.status_code == 200
     assert four_character_description_search_a.json()["total"] == 1
     assert four_character_description_search_a.json()["items"][0]["id"] == item_a_second["id"]
 
-    short_hash_search_a = client.get("/api/history?q=b12", headers=headers_a)
+    short_hash_search_a = client.get("/api/history?q=rh3:b12", headers=headers_a)
     assert short_hash_search_a.status_code == 200
     assert short_hash_search_a.json()["total"] == 0
 
-    long_hash_search_a = client.get("/api/history?q=aab12", headers=headers_a)
+    long_hash_search_a = client.get("/api/history?q=rh3:aab12", headers=headers_a)
     assert long_hash_search_a.status_code == 200
     assert long_hash_search_a.json()["total"] == 0
 
@@ -2433,21 +2444,30 @@ def test_verified_nvidia_model_metadata_and_purpose_catalogs():
     assert len(nvidia_models) == 44
 
     gemma = next(model for model in nvidia_models if model["id"] == "google/gemma-4-31b-it")
-    assert gemma["purposes"] == []
-    assert gemma["unsupported_purposes"] == ["llm", "vision"]
+    assert gemma["purposes"] == ["vision"]
+    assert gemma["unsupported_purposes"] == ["llm"]
+    assert gemma["speed_vision_seconds"] == 224.5
     assert "recommendation_llm" not in gemma
     assert "recommendation_vision" not in gemma
     assert "504" in gemma["comment_ja"]
     laguna = next(model for model in nvidia_models if model["id"] == "poolside/laguna-xs-2.1")
     assert laguna["purposes"] == ["llm"]
     assert laguna["recommendation_llm"] == 3
-    assert laguna["speed_llm_seconds"] == 122.5
+    assert laguna["speed_llm_seconds"] == 147.4
+    no_response = next(model for model in nvidia_models if model["id"] == "nvidia/nemotron-3-super-120b-a12b")
+    assert no_response["purposes"] == []
+    assert no_response["unsupported_purposes"] == ["llm", "vision"]
 
     llm_nvidia = next(provider for provider in model_provider_catalog(settings, purpose="llm") if provider["id"] == "nvidia")
     vision_nvidia = next(provider for provider in model_provider_catalog(settings, purpose="vision") if provider["id"] == "nvidia")
-    assert len(llm_nvidia["models"]) == 35
-    assert len(vision_nvidia["models"]) == 9
-    assert all(model["id"] != gemma["id"] for model in llm_nvidia["models"] + vision_nvidia["models"])
+    assert {model["id"] for model in llm_nvidia["models"]} == {
+        model["id"] for model in nvidia_models if "llm" in model["purposes"]
+    }
+    assert {model["id"] for model in vision_nvidia["models"]} == {
+        model["id"] for model in nvidia_models if "vision" in model["purposes"]
+    }
+    assert all(model["id"] != gemma["id"] for model in llm_nvidia["models"])
+    assert any(model["id"] == gemma["id"] for model in vision_nvidia["models"])
 
     normalized = normalize_model_settings({
         "model_catalog_version": settings["model_catalog_version"],
@@ -2456,8 +2476,8 @@ def test_verified_nvidia_model_metadata_and_purpose_catalogs():
                 "models": [{
                     "id": "google/gemma-4-31b-it",
                     "label": "Gemma custom label",
-                    "purposes": ["vision"],
-                    "recommendation_level": 2,
+                    "purposes": ["llm", "vision"],
+                    "recommendation_vision": 2,
                     "speed_class": "medium",
                     "speed_label": "再計測 約30秒",
                     "comment_ja": "管理者による再評価",
@@ -2472,7 +2492,8 @@ def test_verified_nvidia_model_metadata_and_purpose_catalogs():
     assert overridden["label"] == "Gemma custom label"
     # An administrator's assessment is retained, but cannot offer a purpose
     # that the measured canonical catalog marks unsupported.
-    assert overridden["purposes"] == []
+    assert overridden["purposes"] == ["vision"]
+    assert overridden["unsupported_purposes"] == ["llm"]
     assert overridden["recommendation_vision"] == 2
     assert "recommendation_llm" not in overridden
     assert overridden["speed_label"] == "再計測 約30秒"
@@ -2491,8 +2512,8 @@ def test_verified_nvidia_model_metadata_and_purpose_catalogs():
     })
     legacy_gemma = next(model for model in legacy["providers"]["nvidia"]["models"] if model["id"] == "google/gemma-4-31b-it")
     assert legacy_gemma["label"] == "Legacy stored label"
-    assert legacy_gemma["purposes"] == []
-    assert legacy_gemma["unsupported_purposes"] == ["llm", "vision"]
+    assert legacy_gemma["purposes"] == ["vision"]
+    assert legacy_gemma["unsupported_purposes"] == ["llm"]
     assert "recommendation_llm" not in legacy_gemma
     assert "speed_label" not in legacy_gemma
 
@@ -2563,8 +2584,14 @@ def test_model_settings_store_keys_server_side(monkeypatch):
     assert all(model["id"] != "gpt-5.6-luna" for model in openai_catalog["models"])
     nvidia_llm = next(provider for provider in public_models.json()["llm_catalog"] if provider["id"] == "nvidia")
     nvidia_vision = next(provider for provider in public_models.json()["vision_catalog"] if provider["id"] == "nvidia")
-    assert len(nvidia_llm["models"]) == 35
-    assert len(nvidia_vision["models"]) == 9
+    saved_nvidia = saved["providers"]["nvidia"]
+    for purpose, catalog in (("llm", nvidia_llm), ("vision", nvidia_vision)):
+        assert {model["id"] for model in catalog["models"]} == {
+            model["id"] for model in saved_nvidia["models"]
+            if purpose in model["purposes"] and saved_nvidia["enabled_models"][model["id"]]
+        }
+    assert all(model["id"] != "google/gemma-4-31b-it" for model in nvidia_llm["models"])
+    assert any(model["id"] == "google/gemma-4-31b-it" for model in nvidia_vision["models"])
     assert all("llm" in model["purposes"] for model in nvidia_llm["models"])
     assert all("vision" in model["purposes"] for model in nvidia_vision["models"])
 

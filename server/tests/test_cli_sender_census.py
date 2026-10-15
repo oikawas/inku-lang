@@ -93,9 +93,10 @@ def test_the_cli_names_every_paint_field_or_excuses_it():
     # State how many were looked at. An enumeration that silently empties out --
     # a renamed model, a parser that finds no dict -- would otherwise pass by
     # asserting nothing at all.
-    # Variation amplitude and seed left both senders when variation was retired.
-    assert len(fields) >= 34, f"PaintRequest のフィールドが {len(fields)} 件しか見えていない"
-    assert len(sent) >= 22, f"_paint_payload の鍵が {len(sent)} 件しか読めていない"
+    # After variation retired, seed_text and interpretation_seed also left both
+    # the request model and the CLI (8273b3ef and 074bc00a respectively).
+    assert len(fields) >= 32, f"PaintRequest のフィールドが {len(fields)} 件しか見えていない"
+    assert len(sent) >= 20, f"_paint_payload の鍵が {len(sent)} 件しか読めていない"
 
     missing = sorted(fields - sent - set(EXCUSED))
     assert not missing, (

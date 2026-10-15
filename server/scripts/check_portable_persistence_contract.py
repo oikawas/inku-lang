@@ -506,7 +506,7 @@ def _validate_swift(
             rf"public struct {re.escape(mapping['model'])}:.*?(?=\npublic struct|\npublic enum|\Z)",
             source, re.DOTALL,
         )
-        keys = re.search(r"public enum CodingKeys: String, CodingKey \{(.*?)\n    \}",
+        keys = re.search(r"public enum CodingKeys:\s*String,\s*CodingKey(?:,\s*\w+)*\s*\{(.*?)\n    \}",
                          declaration.group(0) if declaration else "", re.DOTALL)
         if keys is None:
             raise ContractError(f"missing Swift Codable mapping: {mapping['model']}")

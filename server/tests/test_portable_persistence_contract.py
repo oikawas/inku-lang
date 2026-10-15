@@ -1,7 +1,10 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from scripts.check_portable_persistence_contract import (
+    ContractError,
     canonical_schema_objects,
     fingerprint_evidence,
     parse_server_models,
@@ -9,6 +12,7 @@ from scripts.check_portable_persistence_contract import (
     schema_fingerprint,
     validate_reference,
     _validate_contract_shape,
+    _validate_swift,
 )
 
 
@@ -23,6 +27,30 @@ def test_current_host_definitions_satisfy_the_portable_contract():
     assert summary["declared_gaps"] == 0
     assert summary["server_tables"] >= 3
     assert summary["room_tables"] == 13
+
+
+@pytest.mark.parametrize(
+    ("original", "replacement", "error"),
+    [
+        ('sourceText = "source_text", ', "", "Swift Codable fields differ for SavedWork"),
+        ('sourceText = "source_text"', 'sourceText = "wrong_source_text"', "Swift Codable fields differ for SavedWork"),
+        ("String, CodingKey, CaseIterable", "String, CaseIterable", "missing Swift Codable mapping: SavedWork"),
+    ],
+)
+def test_swift_codable_mapping_rejects_missing_or_changed_keys(monkeypatch, original, replacement, error):
+    contract = json.loads((ROOT / "persistence/contract.json").read_text(encoding="utf-8"))
+    records = _validate_contract_shape(contract)
+    records_source = ROOT / contract["hosts"]["swift"]["records_source"]
+    read_text = Path.read_text
+    assert original in records_source.read_text(encoding="utf-8")
+
+    def changed_records(path, *args, **kwargs):
+        source = read_text(path, *args, **kwargs)
+        return source.replace(original, replacement, 1) if path == records_source else source
+
+    monkeypatch.setattr(Path, "read_text", changed_records)
+    with pytest.raises(ContractError, match=error):
+        _validate_swift(ROOT, contract, records)
 
 
 def test_physical_names_are_mappings_not_portable_authority():

@@ -463,6 +463,10 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
                 builtin_by_id = {str(model["id"]): model for model in provider["models"]}
                 if builtin and (provider_id == "nvidia" or catalog_moved):
                     catalog = catalog_models(provider_id)
+                    stored_by_id = {}
+                    for stored_model in incoming["models"]:
+                        if isinstance(stored_model, dict):
+                            stored_by_id.setdefault(str(stored_model.get("id") or "").strip(), stored_model)
                     # NVIDIA additionally keeps builtin-only models the stored list has
                     # dropped, because artworks name them and a dropped id would leave
                     # those artworks labelless.
@@ -470,6 +474,10 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
                     for model in models:
                         model_id = str(model["id"])
                         combined = {**builtin_by_id.get(model_id, {}), **model}
+                        # Inferred LLM use is not a stored purpose override.
+                        # An id-only entry inherits the known model's purposes.
+                        if model_id in builtin_by_id and not isinstance(stored_by_id[model_id].get("purposes"), list):
+                            combined["purposes"] = builtin_by_id[model_id]["purposes"]
                         if catalog_moved and model_id in catalog:
                             # The catalog is the one source of model information (the
                             # author, 2026-10-13), so its entry replaces all of it: a key

@@ -198,7 +198,7 @@ pub(crate) fn bounds(
         ])
     };
     match instruction.primitive {
-        Primitive::Line => point_bounds(
+        Primitive::Line | Primitive::FreeLine => point_bounds(
             [instruction.from_?, instruction.to?]
                 .map(|p| transform.apply(point_to_short_side_units(p, canvas))),
         ),

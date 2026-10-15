@@ -52,7 +52,7 @@ fn clamp_point(point: Point) -> Point {
 
 #[must_use]
 pub fn ensure_line_coordinates(instruction: &Instruction) -> Instruction {
-    if instruction.primitive != Primitive::Line
+    if !matches!(instruction.primitive, Primitive::Line | Primitive::FreeLine)
         || (instruction.from_.is_some() && instruction.to.is_some())
     {
         return instruction.clone();
@@ -84,7 +84,7 @@ pub fn instruction_anchor_on_canvas(
     canvas: Option<CanvasSize>,
 ) -> Point {
     match instruction.primitive {
-        Primitive::Line => instruction
+        Primitive::Line | Primitive::FreeLine => instruction
             .from_
             .zip(instruction.to)
             .map_or(Point::new(0.5, 0.5), |(start, end)| {
@@ -133,7 +133,7 @@ pub fn move_anchor_to_on_canvas(
         moved.relation = None;
     }
     match instruction.primitive {
-        Primitive::Line => {
+        Primitive::Line | Primitive::FreeLine => {
             if let (Some(start), Some(end)) = (instruction.from_, instruction.to) {
                 moved.from_ = Some(clamp_point(Point::new(
                     start.x + delta.x,
@@ -326,7 +326,9 @@ fn performed_instruction_bounds_with_options(
 ) -> Option<Bounds> {
     let rotation = instruction.rotation.unwrap_or(0.0);
     match instruction.primitive {
-        Primitive::Line => {
+        // A free line is bounded by its chord here, as a Line is: its path is
+        // built only when the mark is drawn (I-715).
+        Primitive::Line | Primitive::FreeLine => {
             let points = [instruction.from_?, instruction.to?]
                 .map(|point| point_to_short_side_units(point, canvas));
             let anchor = point_to_short_side_units(
@@ -491,7 +493,7 @@ pub fn endpoint_geometry(
 ) -> Option<(Point, Point, Point, Point)> {
     let rotation = instruction.rotation.unwrap_or(0.0);
     match instruction.primitive {
-        Primitive::Line => {
+        Primitive::Line | Primitive::FreeLine => {
             let center = point_to_short_side_units(
                 instruction_anchor_on_canvas(instruction, canvas),
                 canvas,
@@ -558,7 +560,7 @@ pub(crate) fn translate_endpoint_instruction_on_canvas(
 ) -> Option<Instruction> {
     let mut moved = stripped(instruction);
     match instruction.primitive {
-        Primitive::Line => {
+        Primitive::Line | Primitive::FreeLine => {
             let start = point_to_short_side_units(instruction.from_?, canvas);
             let end = point_to_short_side_units(instruction.to?, canvas);
             moved.from_ = Some(point_from_short_side_units(
@@ -703,11 +705,17 @@ pub(crate) fn touching_candidate_with_transform(
     canvas: Option<CanvasSize>,
     transform: crate::affine::AffineTransform,
 ) -> Result<Instruction, &'static str> {
-    if !matches!(instruction.primitive, Primitive::Line | Primitive::Arc) {
-        return Err("touching requires a line or arc with a prior");
+    if !matches!(
+        instruction.primitive,
+        Primitive::Line | Primitive::Arc | Primitive::FreeLine
+    ) {
+        return Err("touching requires a line, arc or free line with a prior");
     }
-    if !matches!(prior.primitive, Primitive::Line | Primitive::Arc) {
-        return Err("prior is not a line or arc");
+    if !matches!(
+        prior.primitive,
+        Primitive::Line | Primitive::Arc | Primitive::FreeLine
+    ) {
+        return Err("prior is not a line, arc or free line");
     }
     let Some((start, end, _, _)) = crate::affine_geometry::endpoints(prior, canvas, transform)
     else {
@@ -715,7 +723,7 @@ pub(crate) fn touching_candidate_with_transform(
     };
     let mut resolved = stripped(instruction);
     resolved.rotation = None;
-    if instruction.primitive == Primitive::Line {
+    if matches!(instruction.primitive, Primitive::Line | Primitive::FreeLine) {
         resolved.from_ = Some(point_from_short_side_units(start, canvas));
         resolved.to = Some(point_from_short_side_units(end, canvas));
         return Ok(resolved);

@@ -10,7 +10,7 @@ use crate::types::{
 fn scale_member(instruction: &Instruction, scale: f64) -> Instruction {
     let mut scaled = instruction.clone();
     match instruction.primitive {
-        Primitive::Line => {
+        Primitive::Line | Primitive::FreeLine => {
             if let (Some(start), Some(end)) = (instruction.from_, instruction.to) {
                 let middle = Point::new((start.x + end.x) / 2.0, (start.y + end.y) / 2.0);
                 scaled.from_ = Some(Point::new(
@@ -87,7 +87,10 @@ fn member_rotations(
         return items;
     }
     let stated = &items[0];
-    if matches!(stated.primitive, Primitive::Line | Primitive::Circle) || stated.rotation.is_some()
+    if matches!(
+        stated.primitive,
+        Primitive::Line | Primitive::FreeLine | Primitive::Circle
+    ) || stated.rotation.is_some()
     {
         return items;
     }

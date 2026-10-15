@@ -5,12 +5,16 @@ use std::fmt;
 
 use crate::accepted_fills;
 use crate::cloudform::{CloudformRequest, generate_cloudform_contour, sample_closed_catmull_rom};
-use crate::determinism::{instruction_seed, needs_contour_variation};
+use crate::determinism::{instruction_seed, needs_contour_variation, needs_path_variation};
 use crate::fills::{is_noncomputer_solid_fill, render_interior_fill};
+use crate::free_line::{
+    FreeLinePath, FreeLineRequest, Obstacle, Sheet, free_line_path, free_line_seed,
+};
 use crate::geometry::{
-    ArcGeometry, arc_points, arc_points_with_variation, circle_points,
-    closed_contour_with_variation, crescent_contour_points, edge_contour_with_anchors,
-    ellipse_perimeter, point_to_pixels, polygon_points, size_to_pixels, stroke_sample_count,
+    ArcGeometry, SEGMENT_TARGET_RATIO, STROKE_SAMPLE_TARGET_RATIO, arc_points,
+    arc_points_with_variation, circle_points, closed_contour_with_variation,
+    crescent_contour_points, edge_contour_with_anchors, ellipse_perimeter,
+    open_path_with_variation, point_to_pixels, polygon_points, size_to_pixels, stroke_sample_count,
 };
 use crate::mark_geometry::{ArcSpan, MarkGeometry};
 use crate::mark_paths::{
@@ -881,6 +885,7 @@ fn render_affine_instruction(
     style: &MarkStyle,
     context: MarkContext<'_>,
     connected_centerline: Option<&[Point]>,
+    obstacles: &[Obstacle],
 ) -> Element {
     debug_assert!(!context.geometry_transform.is_identity());
     let canvas = context.canvas;
@@ -995,6 +1000,9 @@ fn render_affine_instruction(
             let sampled = sample_closed_catmull_rom(&controls, 5);
             render_affine_closed(instruction, &sampled, &BTreeSet::new(), style, context)
         }
+        MarkGeometry::FreeLine { from, to } => {
+            render_free_line(instruction, from, to, style, context, obstacles)
+        }
     }
 }
 
@@ -1009,6 +1017,7 @@ pub fn render_instruction(
         geometry,
         context,
         None,
+        &[],
     ))
 }
 
@@ -1177,12 +1186,15 @@ fn render_cloudform(
 /// Draw one mark of `geometry`, which [`MarkGeometry::of`] read from `instruction`.
 ///
 /// A Line or an open Arc that a path connection targets follows the
-/// `connected_centerline` fixed during execution, in short-side units.
+/// `connected_centerline` fixed during execution, in short-side units. A free
+/// line turns away from `obstacles`, the pixel boxes of the marks drawn before
+/// it that are not lines.
 pub(crate) fn render_instruction_with_line_centerline(
     instruction: &Instruction,
     geometry: MarkGeometry,
     context: MarkContext<'_>,
     connected_centerline: Option<&[Point]>,
+    obstacles: &[Obstacle],
 ) -> Element {
     let mut style = mark_style(instruction, context);
     accepted_fills::prepare_style(instruction, &mut style);
@@ -1193,6 +1205,7 @@ pub(crate) fn render_instruction_with_line_centerline(
             &style,
             context,
             connected_centerline,
+            obstacles,
         );
     }
     let canvas = context.canvas;
@@ -1281,7 +1294,185 @@ pub(crate) fn render_instruction_with_line_centerline(
         MarkGeometry::Cloudform { center, size } => {
             render_cloudform(instruction, center, size, &style, context)
         }
+        MarkGeometry::FreeLine { from, to } => {
+            render_free_line(instruction, from, to, &style, context, obstacles)
+        }
     }
+}
+
+/// A free line's centerline in pixels and its corners (I-715).
+///
+/// The ends take the instruction's rotation and the group transform first, so
+/// the path is built where it is drawn and turns away from the paper's edges
+/// and `obstacles` there. The path is built once, for this mark, and a
+/// variation then moves it about its own course with the ends kept.
+pub(crate) fn free_line_centerline(
+    instruction: &Instruction,
+    from: Point,
+    to: Point,
+    context: MarkContext<'_>,
+    obstacles: &[Obstacle],
+) -> (Vec<Point>, BTreeSet<usize>) {
+    let canvas = context.canvas;
+    let place = |point: Point| {
+        let point = point_to_pixels(point, canvas);
+        if context.geometry_transform.is_identity() {
+            rotated_instruction_point(instruction, context, point)
+        } else {
+            geometry_point(instruction, context, point)
+        }
+    };
+    let variation = instruction
+        .variation
+        .as_ref()
+        .filter(|variation| needs_path_variation(variation));
+    // A varied path is sampled as finely as a varied line, a plain one as a
+    // stroke.
+    let spacing = canvas.unit()
+        * if variation.is_some() {
+            SEGMENT_TARGET_RATIO
+        } else {
+            STROKE_SAMPLE_TARGET_RATIO
+        };
+    let FreeLinePath { points, corners } = free_line_path(FreeLineRequest {
+        weight: instruction.weight,
+        seed: free_line_seed(
+            context.seed_for(instruction),
+            context.instruction_index,
+            context.mark_index,
+        ),
+        start: place(from),
+        end: place(to),
+        sheet: Sheet {
+            width: canvas.width,
+            height: canvas.height,
+        },
+        obstacles,
+        spacing,
+    });
+    let points = match variation {
+        Some(variation) => open_path_with_variation(
+            &points,
+            variation,
+            context.seed_for(instruction),
+            amplitude(instruction, canvas),
+        ),
+        None => points,
+    };
+    (points, corners)
+}
+
+/// The pixel box a drawn mark leaves for the free lines drawn after it, or
+/// none for a Line or a free line, which a free line does not avoid (I-715).
+///
+/// The box holds the mark's geometry after its rotation and the group
+/// `transform` (in short-side units, as performance keeps it), before any
+/// clipping. A cloudform's is the contour this very mark drew, since each
+/// copy draws its own.
+pub(crate) fn free_line_obstacle(
+    instruction: &Instruction,
+    geometry: MarkGeometry,
+    context: MarkContext<'_>,
+    transform: crate::affine::AffineTransform,
+) -> Option<Obstacle> {
+    let canvas = context.canvas;
+    match geometry {
+        MarkGeometry::Line { .. } | MarkGeometry::FreeLine { .. } => None,
+        MarkGeometry::Cloudform { center, size } => {
+            let controls = generate_cloudform_contour(CloudformRequest {
+                center: point_to_pixels(center, canvas),
+                size: size_to_pixels(size, canvas),
+                performance_seed: Some(context.seed_for(instruction)),
+                instruction_index: context.instruction_index,
+                mark_index: context.mark_index,
+                variation: instruction.variation.as_ref(),
+                weight: instruction.weight,
+                point_count: 49,
+            });
+            let mut obstacle = [
+                f64::INFINITY,
+                f64::INFINITY,
+                f64::NEG_INFINITY,
+                f64::NEG_INFINITY,
+            ];
+            for point in controls {
+                let point = if context.geometry_transform.is_identity() {
+                    rotated_instruction_point(instruction, context, point)
+                } else {
+                    geometry_point(instruction, context, point)
+                };
+                obstacle = [
+                    obstacle[0].min(point.x),
+                    obstacle[1].min(point.y),
+                    obstacle[2].max(point.x),
+                    obstacle[3].max(point.y),
+                ];
+            }
+            obstacle
+                .iter()
+                .all(|value| value.is_finite())
+                .then_some(obstacle)
+        }
+        _ => {
+            let bounds = crate::affine_geometry::bounds(
+                instruction,
+                context.render_seed,
+                context.instruction_index,
+                Some(canvas),
+                context.instruction_seed_override,
+                transform,
+            )?;
+            let unit = canvas.unit();
+            let obstacle = [
+                bounds.min.x * unit,
+                bounds.min.y * unit,
+                bounds.max.x * unit,
+                bounds.max.y * unit,
+            ];
+            obstacle
+                .iter()
+                .all(|value| value.is_finite())
+                .then_some(obstacle)
+        }
+    }
+}
+
+/// Draw a free line along [`free_line_centerline`]: a hand tool's open stroke,
+/// tapered at both ends and anchored at the corners, or the rotring's path. A
+/// broken style lays the thin broken line along it, as on a hand-drawn Line.
+fn render_free_line(
+    instruction: &Instruction,
+    from: Point,
+    to: Point,
+    style: &MarkStyle,
+    context: MarkContext<'_>,
+    obstacles: &[Obstacle],
+) -> Element {
+    let (points, corners) = free_line_centerline(instruction, from, to, context, obstacles);
+    let drawn = points
+        .windows(2)
+        .any(|pair| (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y) > 1.0e-9);
+    if !drawn || !uses_hand_stroke(instruction.weight) {
+        return apply_style(
+            Element::new("path").attr("d", open_path(&points)),
+            style,
+            false,
+        );
+    }
+    let stroke = hand_contour(instruction, &points, &corners, style, context, false);
+    if instruction.style == LineStyle::Solid {
+        return stroke;
+    }
+    let mut line_style = style.clone();
+    line_style.width = (context.canvas.unit() / 1000.0 * 0.45).max(style.width * 0.42);
+    let mut group = Element::new("g");
+    group.push(stroke);
+    group.push(apply_style(
+        Element::new("path").attr("d", open_path(&points)),
+        &line_style,
+        false,
+    ));
+    group
 }
 
 fn render_corner_shape(
@@ -1376,6 +1567,75 @@ mod tests {
             off,
             1.0
         ));
+    }
+
+    #[test]
+    fn a_free_line_path_runs_between_its_rotated_ends_and_its_variation_keeps_them() {
+        let colors = BTreeMap::new();
+        let context = MarkContext {
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            color_map: &colors,
+            work_assignment: &colors,
+            render_seed: Some(7),
+            instruction_seed_override: None,
+            instruction_index: 1,
+            mark_index: 0,
+            wild: false,
+            use_filters: false,
+            profile: SvgProfile::Display,
+            support: crate::support::DEFAULT_SUPPORT,
+            geometry_transform: crate::affine::AffineTransform::identity(),
+            oil_fill_pass_limit: crate::fills::MAX_OIL_FILL_PASSES,
+            effects: crate::effects::MarkEffects::default(),
+        };
+        let free_line = |extra: &str| {
+            serde_json::from_str::<Instruction>(&format!(
+                r#"{{"primitive":"free_line","from":[0.225,0.5],"to":[0.775,0.5],"rotation":-23,"weight":"brush_thin"{extra}}}"#
+            ))
+            .unwrap()
+        };
+        // -23 degrees about the chord's midpoint (500, 500).
+        let (sin, cos) = (-23.0_f64).to_radians().sin_cos();
+        let turned = |x: f64| Point::new(500.0 + (x - 500.0) * cos, 500.0 + (x - 500.0) * sin);
+        let (start, end) = (turned(225.0), turned(775.0));
+        for extra in [
+            "",
+            r#","variation":{"quality":"wave","frequency":"high","amplitude":"broad","dimensions":["position_x","position_y"]}"#,
+        ] {
+            let instruction = free_line(extra);
+            let (points, _) = free_line_centerline(
+                &instruction,
+                Point::new(0.225, 0.5),
+                Point::new(0.775, 0.5),
+                context,
+                &[],
+            );
+            for (point, expected) in [(points[0], start), (points[points.len() - 1], end)] {
+                assert!(
+                    (point.x - expected.x).abs() <= 1.0e-6
+                        && (point.y - expected.y).abs() <= 1.0e-6,
+                    "{extra}: {point:?} {expected:?}"
+                );
+            }
+            assert!(points.len() > 2, "{extra}");
+        }
+        let plain = free_line_centerline(
+            &free_line(""),
+            Point::new(0.225, 0.5),
+            Point::new(0.775, 0.5),
+            context,
+            &[],
+        );
+        let varied = free_line_centerline(
+            &free_line(
+                r#","variation":{"quality":"wave","frequency":"high","amplitude":"broad","dimensions":["position_x","position_y"]}"#,
+            ),
+            Point::new(0.225, 0.5),
+            Point::new(0.775, 0.5),
+            context,
+            &[],
+        );
+        assert_ne!(plain.0, varied.0, "a variation moves the path");
     }
 
     #[test]

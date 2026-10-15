@@ -3,7 +3,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const EXPECTED_SCHEMA_DIGEST: &str =
-    "a55f3353772d0333a0c435e3f4efbc66bab14b4dd4621c7ba569e4bd97507c53";
+    "6091c2994ded4fb5c4e346714e2fef02eab1e7bfefd7eff5e01868da01f17e4b";
 
 #[test]
 fn canonical_score_schema_identity_is_stable() {
@@ -104,6 +104,17 @@ fn canonical_score_schema_identity_is_stable() {
             .iter()
             .any(|value| value == "point")
     );
+    // The Server's schema names every primitive the core performs, the free
+    // line (Score 0.21.0) among them.
+    let primitives = instruction["primitive"]["enum"]
+        .as_array()
+        .expect("primitive enum");
+    for primitive in inku_score::Primitive::ALL {
+        assert!(
+            primitives.iter().any(|value| value == primitive.as_str()),
+            "{primitive:?}"
+        );
+    }
     assert!(
         instruction["position"]["description"]
             .as_str()

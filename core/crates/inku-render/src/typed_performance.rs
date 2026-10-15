@@ -1385,7 +1385,7 @@ fn translate_instruction_to(
     result.position = result.position.map(moved);
     let target = crate::geometry::point_from_short_side_units(target, canvas);
     match result.primitive {
-        Primitive::Line => {}
+        Primitive::Line | Primitive::FreeLine => {}
         Primitive::Square | Primitive::Triangle => {
             if result.position.is_none()
                 && let Some(size) = result.size

@@ -385,7 +385,7 @@ fn mirror_ideal_frame(
     ));
     let zero = Point::new(0.0, 0.0);
     let (origin, x, y) = match instruction.primitive {
-        Primitive::Line => {
+        Primitive::Line | Primitive::FreeLine => {
             let start = physical(instruction.from_?);
             let end = physical(instruction.to?);
             (
@@ -443,8 +443,10 @@ fn mirror_direction(
     instruction: &Instruction,
     canvas: Option<crate::types::CanvasSize>,
 ) -> Option<Point> {
-    if matches!(instruction.primitive, Primitive::Line | Primitive::Arc)
-        && instruction.arc_form != Some(crate::types::ArcForm::Crescent)
+    if matches!(
+        instruction.primitive,
+        Primitive::Line | Primitive::Arc | Primitive::FreeLine
+    ) && instruction.arc_form != Some(crate::types::ArcForm::Crescent)
     {
         let (from, to, _, _) = crate::planning::endpoint_geometry(instruction, canvas)?;
         return Some(Point::new(to.x - from.x, to.y - from.y));
@@ -858,6 +860,24 @@ impl Execution<'_> {
             self.mirror_diagnostic(relation, ScoreExecutionReason::MirrorReferenceOmitted);
             return;
         }
+        // A free line's path is its own performance, which a mirror cannot
+        // reflect (I-715): a body that holds one drops the relation.
+        if relation
+            .target_bodies
+            .iter()
+            .chain(&relation.follower_bodies)
+            .flat_map(|body| body.instruction_indices.iter())
+            .any(|&index| {
+                self.request
+                    .score
+                    .instructions
+                    .get(index)
+                    .is_some_and(|instruction| instruction.primitive == Primitive::FreeLine)
+            })
+        {
+            self.mirror_diagnostic(relation, ScoreExecutionReason::MirrorBodyMismatch);
+            return;
+        }
         if relation.target_bodies.len() != relation.follower_bodies.len() {
             self.mirror_diagnostic(relation, ScoreExecutionReason::MirrorBodyMismatch);
             return;
@@ -1016,7 +1036,7 @@ impl Execution<'_> {
             if relation.target_path_position.is_some()
                 || !matches!(
                     prior.instruction.primitive,
-                    Primitive::Line | Primitive::Arc
+                    Primitive::Line | Primitive::Arc | Primitive::FreeLine
                 )
             {
                 return Err(ScoreExecutionReason::UnsupportedConnectedPrimitive);
@@ -1167,6 +1187,51 @@ impl Execution<'_> {
         Ok(instruction)
     }
 
+    /// A free line joins another mark only at its ends (I-715): it takes a
+    /// connection to an end, or a touch, as the current mark or as the mark
+    /// the relation refers to. Any other relation, and a connection to a free
+    /// line's middle, is dropped for the reason its kind gives a shape it does
+    /// not support.
+    fn free_line_refusal(
+        &self,
+        index: usize,
+        current: &Instruction,
+        relation: &inku_score::Relation,
+    ) -> Option<ScoreExecutionReason> {
+        let free = |target: usize| {
+            self.request
+                .score
+                .instructions
+                .get(target)
+                .is_some_and(|instruction| instruction.primitive == Primitive::FreeLine)
+        };
+        let target_free = if relation.kind == RelationType::Between {
+            (index.saturating_sub(2)..index).any(free)
+        } else {
+            relation.target_anchor_index.is_none()
+                && relation
+                    .target_instruction_index
+                    .or_else(|| index.checked_sub(1))
+                    .is_some_and(free)
+        };
+        if current.primitive != Primitive::FreeLine && !target_free {
+            return None;
+        }
+        match relation.kind {
+            RelationType::Touching => None,
+            RelationType::Connected => (target_free && relation.target_path_position.is_some())
+                .then_some(ScoreExecutionReason::UnsupportedConnectedPrimitive),
+            RelationType::Along => Some(ScoreExecutionReason::UnsupportedAlongPrimitive),
+            RelationType::Cutting => Some(ScoreExecutionReason::UnsupportedCuttingPrimitive),
+            RelationType::NotTouching => Some(ScoreExecutionReason::UnsupportedNotTouchingGeometry),
+            RelationType::Between => Some(ScoreExecutionReason::UnsupportedBetweenGeometry),
+            RelationType::RestingOn
+            | RelationType::Inside
+            | RelationType::Overlapping
+            | RelationType::Crossing => Some(ScoreExecutionReason::UnsupportedJointGeometry),
+        }
+    }
+
     fn prepare_instruction(
         &mut self,
         index: usize,
@@ -1182,6 +1247,9 @@ impl Execution<'_> {
         };
         if relation.target_anchor_index.is_some() && relation.kind != RelationType::Connected {
             return Err(ScoreExecutionReason::UnsupportedAnchorRelation);
+        }
+        if let Some(reason) = self.free_line_refusal(index, &instruction, relation) {
+            return Err(reason);
         }
         if self.request.score.placement_groups.iter().any(|group| {
             group.start <= index
@@ -1799,9 +1867,13 @@ impl Execution<'_> {
             relation
                 .touching_constraints
                 .ok_or(ScoreExecutionReason::MissingTouchingConstraints)?;
-            if !matches!(instruction.primitive, Primitive::Line | Primitive::Arc)
-                || !matches!(prior.primitive, Primitive::Line | Primitive::Arc)
-            {
+            if !matches!(
+                instruction.primitive,
+                Primitive::Line | Primitive::Arc | Primitive::FreeLine
+            ) || !matches!(
+                prior.primitive,
+                Primitive::Line | Primitive::Arc | Primitive::FreeLine
+            ) {
                 return Err(unsupported);
             }
             if (length - target_length).abs() > GEOMETRY_EPSILON {

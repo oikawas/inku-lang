@@ -57,6 +57,7 @@ fn full_language_projections_preserve_python_prompt_and_marker_behavior() {
             "四角",
             "多角形",
             "弧",
+            "自由線",
             "点",
             "雲形"
         ]
@@ -71,6 +72,7 @@ fn full_language_projections_preserve_python_prompt_and_marker_behavior() {
             "square",
             "polygon",
             "arc",
+            "free line",
             "point",
             "cloudform",
             "place",

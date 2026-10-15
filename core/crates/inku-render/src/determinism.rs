@@ -222,7 +222,7 @@ fn variation_seed_fields(instruction: &Instruction) -> VariationSeedFields {
     if needs_blur(variation) {
         return VariationSeedFields::AmplitudeQuality;
     }
-    if instruction.primitive == Primitive::Line {
+    if matches!(instruction.primitive, Primitive::Line | Primitive::FreeLine) {
         return if needs_path_variation(variation) {
             VariationSeedFields::All
         } else {

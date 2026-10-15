@@ -77,11 +77,12 @@ def test_saijiki_prose_categories_track_enum_sizes() -> None:
     assert len(saijiki["core_categories_ja"]["てざわり"]) == weight_count
     assert "silverpoint" in get_args(schema.Weight)
     assert "hair" not in get_args(schema.Weight)
-    # en form surfaces are Primitive values, minus polygon (collected in schema).
+    # en form surfaces are Primitive values, minus polygon (collected in schema)
+    # and free_line, which DDL reads before the saijiki lists it (I-715 B1).
     forms_en = set(saijiki["core_categories_en"]["forms"])
     primitives = set(get_args(schema.Primitive))
     assert forms_en <= primitives
-    assert primitives - forms_en <= {"polygon"}
+    assert primitives - forms_en <= {"polygon", "free_line"}
     assert set(saijiki["core_categories_ja"]) == {
         "かたち",
         "かたむき",

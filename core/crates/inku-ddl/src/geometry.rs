@@ -14,7 +14,7 @@ pub const GEOMETRY_RESOLUTION_POLICY_ID: &str = "inku.geometry-resolution-policy
 
 const GEOMETRY_RESOLUTION_POLICY_PREFIX: &str = concat!(
     "{\"anchor\":{\"arc_legacy\":\"circle_center\",\"arc_typed\":\"chord_midpoint\",",
-    "\"closed_primitive\":\"center\",\"line\":\"endpoint_midpoint\",\"point\":\"center\",",
+    "\"closed_primitive\":\"center\",\"free_line\":\"endpoint_midpoint\",\"line\":\"endpoint_midpoint\",\"point\":\"center\",",
     "\"square_score\":\"top_left_from_center\"},"
 );
 const GEOMETRY_RESOLUTION_POLICY_MIDDLE: &str = concat!(
@@ -30,7 +30,7 @@ const GEOMETRY_RESOLUTION_POLICY_MIDDLE: &str = concat!(
     "\"values\":\"exact_decimal_or_fraction_unit_interval_nonzero_width\",\"words\":\"kept_unread\"}},",
     "\"capability\":[\"circle_radius_or_diameter\",\"ellipse_width_height\",",
     "\"cloudform_width_height\",\"square_side\",\"square_rotated_declared_rectangle\",",
-    "\"line_length\",\"arc_chord_sagitta\",\"point_radius_or_diameter\",",
+    "\"line_length\",\"free_line_length\",\"arc_chord_sagitta\",\"point_radius_or_diameter\",",
     "\"endpoint_rotated_finite_extent\",\"axis_position\",\"triangle_width_height\",\"regular_triangle_exact_side\",\"square_width_height\",\"polygon_circumradius_sides\"],",
     "\"decimal\":{\"canonical\":\"signed_base10_coefficient_scale\",",
     "\"score_conversion\":\"single_final_f64_boundary\"},"
@@ -38,7 +38,7 @@ const GEOMETRY_RESOLUTION_POLICY_MIDDLE: &str = concat!(
 const GEOMETRY_RESOLUTION_POLICY_SUFFIX: &str = concat!(
     "\"normal_geometry\":{\"aspect\":{\"cloudform\":\"5:3\",\"ellipse\":\"5:3\"},",
     "\"basis\":\"canvas_short_edge\",\"count_dependency\":\"none\",",
-    "\"endpoint_family\":{\"arc\":{\"chord\":\"6/25\",\"sagitta\":\"3/50\"},",
+    "\"endpoint_family\":{\"arc\":{\"chord\":\"6/25\",\"sagitta\":\"3/50\"},\"free_line\":{\"length\":\"11/20\"},",
     "\"line\":{\"length\":\"6/25\"},\"point\":{\"diameter\":\"3/250\"}},",
     "\"width_or_diameter\":\"6/25\"},",
     "\"numeric_basis\":{\"position\":\"canvas_axes\",\"size\":\"canvas_short_edge\"},",
@@ -104,6 +104,9 @@ pub(crate) fn omitted_position_bounds() -> [f64; 4] {
 }
 
 pub(crate) const NORMAL_SHORT_EDGE_RATIO: (i128, i128) = (6, 25);
+/// A free line's normal length in short sides: the long chord of the I-715
+/// prototypes, chosen by the author over the line's 6/25.
+pub(crate) const NORMAL_FREE_LINE_LENGTH_RATIO: (i128, i128) = (11, 20);
 pub(crate) const NORMAL_ELLIPTICAL_ASPECT_RATIO: (i128, i128) = (3, 5);
 
 // One exact rational table feeds both policy bytes and the final Score boundary.
@@ -397,7 +400,7 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
                     "\"repetition\":\"symbolic_plan_materialization_deferred\"},",
                     "\"placement_members\":{\"source_head\":\"atomic_logical_slot\",\"primitive\":{\"logical_count\":\"object_count\",\"body_repeat_count\":1,\"recipe\":\"local_place_only\"},\"macro\":{\"logical_count\":\"outer_count\",\"body_repeat_count\":\"outer_count\",\"internal\":\"emit_counts_positions_recipes_preserved\"},\"bbox\":\"drawables_else_anchor_points\",\"owned_internal_transforms\":\"before_member_placement\",\"unowned_outer_transforms\":\"after_placement_including_equal_range\",\"standalone_repeats\":{\"unplaced_macro_caller\":\"one_member_group\",\"cells\":\"no_action_place_scatter_draw\",\"cells_size\":\"largest_performed_copy_bbox_floor_per_axis_one_to_count\",\"cells_order\":\"seeded_partial_fisher_yates_then_same_order\",\"cells_shift\":\"seeded_inside_cell_room\",\"line_up\":\"horizontal_source_order\",\"tile\":\"tile\",\"position_fill_order_relation_mirror\":\"body_scopes_preserved_no_group_layout_target\"}},",
                     "\"size_basis\":\"canvas_short_edge_independent_of_count\",",
-                    "\"supported_geometry\":[\"line\",\"circle\",\"ellipse\",\"square\",\"arc\",\"cloudform\",\"point\"],",
+                    "\"supported_geometry\":[\"line\",\"circle\",\"ellipse\",\"square\",\"arc\",\"cloudform\",\"point\",\"free_line\"],",
                     "\"geometry_gap\":[\"triangle\",\"polygon\"],",
                     "\"line_up\":\"horizontal_domain_width_equal_cell_centers\",",
                     "\"layout_direction\":{\"owner\":\"instruction_or_emit\",\"default\":\"named_range_long_side_in_canvas_fractions_else_horizontal\",",
@@ -422,7 +425,7 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
                 "\"unimplemented\":[]",
                 concat!(
                     "\"width_extent\":{\"basis\":\"canvas_width_before_rotation\",\"full_width\":\"1\",\"half_width\":\"1/2\",",
-                    "\"closed\":\"reference_contour_width\",\"cloudform\":\"declared_width\",\"line\":\"length\",\"open_arc\":\"chord\",\"aspect\":\"preserved\"},",
+                    "\"closed\":\"reference_contour_width\",\"cloudform\":\"declared_width\",\"line\":\"length\",\"free_line\":\"length\",\"open_arc\":\"chord\",\"aspect\":\"preserved\"},",
                     "\"arc_form\":{\"semicircle\":\"upper_open_180\",\"waxing\":\"right_open_180\",\"waning\":\"left_open_180\",",
                     "\"crescent\":\"filled_saijiki_three_cubic_contour\",\"crescent_anchor\":\"reference_bbox_center\"},",
                     "\"size_conflict\":{\"diagnostic\":\"error\",\"recovery\":\"minimum_independent_reference_extent\",\"policies\":[\"stop\",\"continue\"],\"originals\":\"preserved\",\"scale_applications\":1},",
@@ -1172,7 +1175,7 @@ mod tests {
         );
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "db954d1dcf37b4fa33d49c01d1b0cd720fc1e869ccb9761e42b9c49730e720b1"
+            "4d06b6ce4cc6631aea0c8fdcfa7f5f1d3d9b07207cdc2ead64da2284ac747c4f"
         );
         assert_eq!(
             payload["object_placement"]["layout_direction"]["vertical"],

@@ -138,7 +138,7 @@ To learn why something took its current shape, search the changelog by term, ver
 The shared Rust asset `core/crates/inku-ddl/assets/saijiki-v2.json` is canonical; the Literals in
 the Server's `schema.py` and the saijiki table (`saijiki.py`) are projections of it.
 
-- 9 primitives — `line` / `circle` / `ellipse` / `triangle` / `square` / `polygon` / `arc` / `point` / `cloudform`
+- 10 primitives — `line` / `circle` / `ellipse` / `triangle` / `square` / `polygon` / `arc` / `point` / `cloudform` / `free_line`
 - 4 line styles — `solid` / `dashed` / `dotted` / `dash_dot`
 - 11 tools — `silverpoint` / `pencil` / `pen` / `rotring` / `crayon` / `chalk` / `brush_thin` / `brush_thick` / `burin` / `drypoint` / `computer`
 - 2 thinness values — `fine` / `extra_fine` (an axis independent of the tool)

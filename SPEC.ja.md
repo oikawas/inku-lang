@@ -101,7 +101,7 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 
 | カテゴリ | 語彙（概観） |
 |---|---|
-| **かたち** | 円、楕円、三角、四角、線、弧、雲形 |
+| **かたち** | 円、楕円、三角、四角、線、弧、雲形、自由線（DDL 19。歳時記の一覧と Stage 1 へは I-715 段B2 で出す、§14.10） |
 | **かたむき** | 水平、垂直、斜め、右上がり、右下がり、回転 |
 | **てざわり** | 銀筆、鉛筆、ペン、ロットリング、クレヨン、チョーク、細筆、太筆、油彩、ビュラン、ドライポイント、コンピュータ |
 | **つらなり** | 実線、破線、点線、一点鎖線 |
@@ -1339,7 +1339,7 @@ DB が保存するのは `history.svg` の `display` SVG だけである。編�
 
 共通Rustの`plan_verified_stage15[_with_policy]`は、verified Stage 1.5と既存のhost canvas / palette contextから、通常instructionと宣言済みflat Macro Emitに同じobject-size / placement resolverを使う。省略をsourceへ書き戻さず、`line-up` / `scatter` / `tile`の数量省略は解決結果だけで8、`place`は従来の1とする。明示正整数1..u32::MAXを保ち、zero・範囲外・不明・競合・定性的数量や必須Macro引数の欠落を8へ変えない。
 
-Object sizeの基準はcanvas短辺で、count・cell・密度に依存しない。実planはline / circle / ellipse / square / triangle / polygon / arc / cloudform / pointの9shapeへ届く。Normalは幅または直径6/25、ellipse / cloudformの高さは幅の3/5、arcの矢高3/50、pointの直径3/250。既存の全大小倍率とshape固有anchorを保ち、thinnessを外形sizeにしない。例えばlarge circleの直径9/25は4個でも8個でも同じで、重なりを許す。Numeric geometryは元のexact decimal / Rational、basis、dimension、provenanceを保持する。
+Object sizeの基準はcanvas短辺で、count・cell・密度に依存しない。実planはline / circle / ellipse / square / triangle / polygon / arc / cloudform / point / free_lineの10shapeへ届く。Normalは幅または直径6/25、free_lineの長さ11/20、ellipse / cloudformの高さは幅の3/5、arcの矢高3/50、pointの直径3/250。既存の全大小倍率とshape固有anchorを保ち、thinnessを外形sizeにしない。例えばlarge circleの直径9/25は4個でも8個でも同じで、重なりを許す。Numeric geometryは元のexact decimal / Rational、basis、dimension、provenanceを保持する。
 
 形状制約はprimitive identityと別のoptional meaningである。正三角形はtriangle、正方形 / 正四角形はsquare、五〜八角形はpolygonを保ち、core-head continuationにも制約と元出典を運ぶ。制約不在の旧canonical / source bytesへnull fieldを加えない。通常三角は上頂点・下底の二等辺でnormal幅=高さ=6/25。正三角は一辺sから高さs√3/2を求め、planにはexact sideと固定規則を保持し、irrationalな高さを有限decimalへ偽装しない。通常四角は既定1:1、WidthHeightを明示すれば既存square wireの独立幅高さへ届く。正方形は等辺を要求する。多角形は正多角形で省略5辺、明示5〜8辺、Radius / Diameterは外接円の寸法である。辺数は図形個数と区別する。
 
@@ -1895,8 +1895,8 @@ id 参照が必要になった場合も、その必要が実測で示されて�
 - `along` → 直前要素の軌跡に沿う帯領域内で、位置・位相を演奏ごとに決める
 - `cutting` → 直前要素と交差する角度・交点を、レンジ内で演奏ごとに決める
 - `between` → 直前2要素の間の領域内で決める
-- `touching` → line / arc だけに適用し、直前の line / arc の演奏実現後の両端点へ当該要素の両端点を一致させる
-- `connected` → Line / Arc / Pointに適用する。`target_endpoint`があればcurrentのcanonical始端（Pointはcenter）を指定したprior Line / Arc端点へ、なければpriorのcanonical終端（Pointはcenter）へ平行移動する。priorが閉じた四角・円・楕円・三角・多角形なら、揺らぎの前の輪郭（rotationと変形の後）の上で、currentの始端に最も近い点へ平行移動する（Score 0.20.0。雲形と三日月は相手にしない）。prior、寸法、曲率、rotationは変えない
+- `touching` → line / arc / 自由線だけに適用し、直前の line / arc / 自由線の演奏実現後の両端点へ当該要素の両端点を一致させる（自由線は両端を受け、道筋はその間に決まる）
+- `connected` → Line / Arc / Point / 自由線に適用する。自由線は既定の終点と端点の指定で相手にもなるが、途中（`target_path_position`）の相手にはならない（§14.10.4）。`target_endpoint`があればcurrentのcanonical始端（Pointはcenter）を指定したprior Line / Arc端点へ、なければpriorのcanonical終端（Pointはcenter）へ平行移動する。priorが閉じた四角・円・楕円・三角・多角形なら、揺らぎの前の輪郭（rotationと変形の後）の上で、currentの始端に最も近い点へ平行移動する（Score 0.20.0。雲形と三日月は相手にしない）。prior、寸法、曲率、rotationは変えない
 - `resting_on` / `inside` / `overlapping` / `crossing` → どの図形にも適用し、currentと直前要素の演奏後の外接矩形から、currentを平行移動だけで合わせる。直前要素は動かさず、currentの形・寸法・向きは変えない。残る自由は演奏seedで選ぶ。直前要素が塗り（`fill_groups`の構成員）なら、塗りの区画（target）で切り抜いた見える部分を直前要素の外接矩形とし、`inside`の内側の矩形も区画と重ねた部分にする（区画と重ならなければ切り抜く前のまま）。載せる横の位置・横切る位置・中に入れる位置は、直前要素（中にでは内側の矩形）の紙の上の部分にcurrentが収まるならその部分から選び、収まらなければ直前要素全体から選ぶ。選んだ載る・横切るの位置でcurrent（群れなら全体）が紙からはみ出すときは、関係が成り立つ範囲の中で紙に収まる最も近い位置へ動かし、収まる位置が無ければ範囲の中で紙に最も近い位置にする。重なるは、seedの向きでcurrentが紙からはみ出すときだけ、ほかの向きを順に試し、currentが紙に収まる最初の向き、無ければ中心が紙の上に来る最初の向きにする（作者の判断 2026-10-12・2026-10-13）。`resting_on`はcurrentの下端を直前要素の上端に合わせ、横の中心をcurrentが直前要素の横幅に収まる範囲から選ぶ（currentが広ければ中心）。`inside`は直前の閉じた要素の内側の矩形（四角は外接矩形、ほかの閉じた形は中心を同じにして1/√2に縮めた矩形）に収まる位置を選び、開いた形・点・入りきらないcurrentでは成り立たない。`overlapping`はcurrentの外接矩形の面積のうち直前要素と重なる割合を1/3〜2/3から選び（判定は1/4〜3/4）、seedの向きへずらす。`crossing`は直前要素の細い向き（横長なら縦、縦長なら横）でcurrentを直前要素の両側へはみ出させ、もう一方の向きの中心を直前要素の範囲から選ぶ。直前要素の縦横が同じなら、currentの長い向きで越える。currentがその向きで直前要素より短ければ成り立たない（作者の判断 2026-10-12）。成り立たないときは`missing_joint_reference` / `joint_reference_omitted` / `unsupported_joint_geometry` / `numeric_joint_position_conflict`を記録して関係だけを外す。個数が2以上の群れ（同じ直前要素を指す連続した個）は、`resting_on` / `overlapping` / `crossing`では群れ全体の外接矩形から一つの平行移動を求めて全体を動かし（並びや散らばりは保つ）、`inside`では個ごとに直前要素の内側へ動かす（作者の判断 2026-10-12）。群れの相手が群れなら、相手の全体の外接矩形を使う。組の外部関係では組の全体を一つの平行移動で合わせる。Macroのemitはこの4語をまだ運ばない
 
 現行のtyped Along / Cutting描画はCount1のactual Scoreを対象とする。Macroの反復CompositionPlanは共通のrelation intentを保持するが、反復個体の演奏は後続materializationで扱う。Typed Alongではcurrentと直前要素がともに線で、currentの方向が未指定なら、その方向を直前の線と平行に揃える。明示された方向・寸法・数値位置は保持する。Typed Cuttingも、共通resolverが決めた通常寸法または明示寸法を保持し、専用のランダム長に置き換えない。明示方向は交差角の演奏より優先する。通常DDLとMacroは同じ意味を使う。旧metadata-free Scoreの関係処理は保存形式の互換用に保持する。
@@ -1989,6 +1989,45 @@ relation は記述者が Stage 1 または direct typed DDL で明示した場�
 
 雲形を含む現行描画の identity domain は `rh3` である。保存済み `rh2` は読み取り互換の legacy domain として再計算しない。
 
+### 14.10 自由線の設計（DDL 19、Score 0.21.0）
+
+#### 14.10.1 なぜ自由線か
+
+> 線は動く点の跡である。一つの力に押された点は直線を描き、二つの力が同時に働けば曲線、交互に働けば折れ線になる。（カンディンスキー『点と線から面へ』の要約）
+
+線は始点から終点へ真っすぐ引く。自由線は、同じ始点と終点の間の道筋を演奏が決める線である。道筋は偶然の歩みではなく、少数の読める部分で組む——一つの力の直線、同時の二つの力の円弧と自由な曲がり、交互の二つの力の角。自由でありながら、見る人が力の働き方を読める線にする（作者の指示、I-715）。
+
+#### 14.10.2 生成の過程（道筋は演奏が決める）
+
+楽譜は線と同じく始点・終点・回転・置き場所を持ち、道筋の座標を持たない。描画は痕を描くときに、その痕の種から一度だけ道筋を決める。
+
+1. **部分**: 3〜7 の部分（直、円弧、曲率が一様に変わる自由な曲がり）を、滑らかに、または角でつなぐ。一つの部分が長さの主になり、ほかは長短を交互にする
+2. **組み方は道具が決める**: 先の細い、点で引く道具（銀筆・鉛筆・ペン・ロットリング・コンピュータ・ビュラン・ドライポイント）は直と円弧だけ、穂や面で引く道具（クレヨン・チョーク・細筆・太筆・油彩）は自由な曲がりも使う
+3. **条件**: 弦は道筋の長さの 1/4 以上、道筋は横へ弦の 0.6 倍まで、前後へ弦の −0.25〜1.25 倍まで、曲がりの正味は 450° まで、和は 900° まで。自分との交差は許す。満たすまで 64 回作り直し、だめなら決まった形にする
+4. **曲がりの左右**: 硬貨の組とほかの 31 の組から、紙の端と、描く順で先に描いた形（線と自由線でない痕の外接矩形）から最も離れる組を選ぶ。線どうしは避けない
+5. 道筋は、回転と組の変形を掛けた後の端点の間に置き、そのまま描く
+
+#### 14.10.3 既存語彙との合成（修飾語を新設しない）
+
+- **大きさ・わりあい** → 弦の長さ。既定は短辺の 11/20（線は 6/25）。大きさの語は線と同じ倍率、全幅・半幅は弦の長さ
+- **かたむき・置き場所・引く・散らす・並べる** → 線と同じ。一つの命令で何本も引くと、痕ごとに独立した道筋になる
+- **てざわり** → 組み方と筆致。手の道具は端を細らせた開いた筆致（角に印を付ける）、ロットリングは道筋の折れ線。刷き・粒・油彩・つらなりも線と同じ道を通る
+- **ゆらぎ** → 道筋のまわりの振れ。両端で 0 へ収め、端は動かない
+- **暴れる** → 線と同じく、筆致の合成が振れを大きくする
+- **あいだ** → 端点でつながる関係だけ（§14.10.4）
+
+#### 14.10.4 関係（端点でつながるものだけ）
+
+自由線は、後（current）でも前（相手）でも、つながる（既定の終点、端点の指定、閉じた形の輪郭）と触れるを受ける。沿う・触れない・切る・間に・載る・中に・重なる・横切る・鏡写しと、自由線の途中へのつながるは、関係だけを外して理由を残し、自由線は描く（作者の選択、2026-10-15）。道筋は先に描いた形で決まるので、外接矩形を使う関係を受けると、関係の解決と道筋の決め方が互いに依存するためである。演奏の段の外接矩形（まとまり、並べる区画、紙に収まる検査）は、線と同じく始点と終点で測る。DDL の句は、自由線を前にするときは `前の形につながる`（終点へ）だけである。
+
+#### 14.10.5 選択規則（逃げ場にしない）
+
+雲形（§14.9.4）と同じく、Stage 1 が自由線を選べるのは、記述が自由線を明示したとき、または指す物そのものが定義の無い線のときに限る。この規則を下絵の指示文に書くまで（I-715 段B2）、自由線は DDL に書けば描けるが、歳時記の一覧にも Stage 1 にも出さない（歳時記の `prompt` / `display` は false、`marker` は true）。
+
+#### 14.10.6 決定性と識別
+
+道筋は痕の種（`free-line-v1`: 演奏 seed、命令、痕の番号）からの決定的な導出であり、新しい乱数源を足さない。同じ楽譜・同じ seed・同じ暴れるなら同じ SVG になる。`rh3` の算出 domain は変えない。楽譜は道筋の座標を保存しない。自由線を持つ作品だけ Score 0.21.0 で、ほかの作品の Score と絵は変わらない。
+
 ## 15. 開発方針
 
 ### 15.1 開発軸
@@ -2080,7 +2119,7 @@ JSON Score は共有lowererが検証済みmeaningから作る機械可読の楽�
 
 - `canvas`: 選ばれたキャンバス比の識別子（`square`・`golden` など）
 - `instructions`: 順序を持つ描画命令
-- primitive のフィールド: canonical exact 9であるline・circle・ellipse・triangle・square・polygon・arc・point・cloudformと関連する処理データ。PointはCircleとは別のidentityを持つ丸いfilled markである。`rectangle`は10番目のprimitiveではなく、別の作者裁定とschema / versionなしに追加しない
+- primitive のフィールド: canonical exact 10であるline・circle・ellipse・triangle・square・polygon・arc・point・cloudform・free_lineと関連する処理データ。PointはCircleとは別のidentityを持つ丸いfilled markである。free_line（自由線、Score 0.21.0）は線の幾何を持ち、道筋は演奏が決める（§14.10）。`rectangle`はprimitiveではなく、別の作者裁定とschema / versionなしに追加しない
 - `weight`: 素材／道具の質
 - `variation`: 目に見える揺れ・にじみ・震え・運動の挙動
 - `arrangement`: 個数・分布・経路・グループ化・密度・減衰・色循環
@@ -2092,7 +2131,7 @@ JSON Score は共有lowererが検証済みmeaningから作る機械可読の楽�
 
 **記述が明示した個数は、その後のいかなる読み取りより優先する。** Canonical meaningは値をlosslessなsymbolic intentとして保持する。Step 11のpure ceiling preflightは、展開、配列確保、またはその他のO(count) materializationより前に走る。`u32::MAX`等もclampや代表数へsilent rewriteせず、単独primitiveは予算内のsource順prefixを描画して要求数と実行数を診断する。現行runtimeに残る閾値と代表化はcompatibility behaviorであり、canonical countを別の値へ変えるsemantic authorityではない。
 
-**大きさには三つのauthorityがある。** `unspecified`、`explicit qualitative`、`explicit numeric geometry`を混同しない。現行subsetでは、allocationを持たないcount1のcircle / square / ellipse / cloudform / triangle / polygonについて、normalのdiameter / side / widthをcanvas短辺の`6/25`（0.24）、ellipse / cloudformのheightをwidthの`3/5`とする。Lineのnormal lengthとArcのnormal chordも`6/25`で、Arcのsagittaはchordの`1/4`、Pointのnormal diameterは`3/250`（0.012）である。Finite relative factorはsmall側がweak / standard / strong=`3/4` / `1/2` / `3/8`、large側が`5/4` / `3/2` / `7/4`で、その上にstandard・strong smallを反転した`2`（`特大の` / `extra-large`）と`8/3`（`巨大な` / `huge`）がある。normalは`1`で、通常geometryへexact rationalとして一度だけ掛ける。Lineはlength、Arcはchordとsagittaを相似に、Pointはdiameterを拡縮する。既存`small`はstandard-smallであり、`普通の大きさ`というexplicit normalはunspecifiedへ畳まない。Explicit numeric geometryはqualitative sizeで変更せず、両方の併記はconflictにする。このsubset外のunspecified normalは未裁定であり、自由なdegree同義語やhidden LLMで補わない。
+**大きさには三つのauthorityがある。** `unspecified`、`explicit qualitative`、`explicit numeric geometry`を混同しない。現行subsetでは、allocationを持たないcount1のcircle / square / ellipse / cloudform / triangle / polygonについて、normalのdiameter / side / widthをcanvas短辺の`6/25`（0.24）、ellipse / cloudformのheightをwidthの`3/5`とする。Lineのnormal lengthとArcのnormal chordも`6/25`、free_lineのnormal lengthは`11/20`（0.55）で、Arcのsagittaはchordの`1/4`、Pointのnormal diameterは`3/250`（0.012）である。Finite relative factorはsmall側がweak / standard / strong=`3/4` / `1/2` / `3/8`、large側が`5/4` / `3/2` / `7/4`で、その上にstandard・strong smallを反転した`2`（`特大の` / `extra-large`）と`8/3`（`巨大な` / `huge`）がある。normalは`1`で、通常geometryへexact rationalとして一度だけ掛ける。Lineはlength、Arcはchordとsagittaを相似に、Pointはdiameterを拡縮する。既存`small`はstandard-smallであり、`普通の大きさ`というexplicit normalはunspecifiedへ畳まない。Explicit numeric geometryはqualitative sizeで変更せず、両方の併記はconflictにする。このsubset外のunspecified normalは未裁定であり、自由なdegree同義語やhidden LLMで補わない。
 
 Explicit numeric geometryはdimension、basis、canonical base-10 coefficient / scale、source spelling provenanceを保持する。Scoreの`f64`へ変換するのは一つのdeterministic lowering boundaryだけで、silent clamp / rescaleをしない。過去のcircle `0.038` / ellipse `0.06×0.032`という固定寸法 calibration は現役candidateではなく、context前のcandidateはsymbolic size intentを保持する。値と経緯は CHANGELOG に置く。
 
@@ -2100,7 +2139,7 @@ Sizeとpositionを解決するcanonical policyの単一ownerは`inku-ddl`で、�
 
 同じpolicyは明示angleも所有する。`horizontal=0`、`vertical=90`、`diagonal`は`45 / 135 / 225 / 315`、`rising` / `falling`はそれぞれ整数度`[-37,-23]` / `[23,37]`、`left_rising` / `left_falling`は`[203,217]` / `[143,157]`、`rotated`は各45度境界から5度を超えて離れた整数度を有限一様に選ぶ。SHA-256のangle専用domainへ、lock検証済みoriginal pre / expanded meaning digest、tag付きoptional `composition_seed`、logical occurrence、angle identityをframeして選ぶ。同じmeaningのinline / continuationは同じ選択になり、真の別occurrenceは別keyを持つ。render seed、raw source bytes、full-lock digestは材料にしない。
 
-CircleとPointの回転extentは同じ半径、ellipseは理想楕円、cloudformとsquareは宣言width / heightの矩形envelope、LineとArcは最終的な有限端点・弧を使う。数値配置では短辺単位の宣言寸法を物理空間で回してcanvas各軸へ戻し、回転後extentだけをmust-fit判定する。回転前bboxで先に拒否せず、位置移動、縮小、count削減、別角度retryを行わない。Named位置は従来どおりmust-fitを追加せず寸法と`at.region`を保つ。Line / Arc / Squareのangleはdirectとflat Macro Emitの両方で同じresolverを通って`Score.rotation`へ届く。丸いPointの明示angleはunsupportedであり、別の回転形へ読み替えない。
+CircleとPointの回転extentは同じ半径、ellipseは理想楕円、cloudformとsquareは宣言width / heightの矩形envelope、Line・free_line・Arcは最終的な有限端点・弧を使う（free_lineは道筋でなく始点と終点）。数値配置では短辺単位の宣言寸法を物理空間で回してcanvas各軸へ戻し、回転後extentだけをmust-fit判定する。回転前bboxで先に拒否せず、位置移動、縮小、count削減、別角度retryを行わない。Named位置は従来どおりmust-fitを追加せず寸法と`at.region`を保つ。Line / Arc / Squareのangleはdirectとflat Macro Emitの両方で同じresolverを通って`Score.rotation`へ届く。丸いPointの明示angleはunsupportedであり、別の回転形へ読み替えない。
 
 既存4 closed shapeのNamed Score instructionは`center` / `position`を持たず、解決済みの`radius` / `size`と`at.region`を持つ。Line / Arc / Pointは有限な基準geometryとsemantic anchorに加えて`at.region`を持ち、Rendererがそのanchorをregionへ移す。数値positionだけはanchorのunit intervalとshape extentのmust-fitを検査する。Named経路はregionをshape-safe範囲と交差させず、寸法の縮小、fit目的の再配置・再抽選、空intersection停止を行わない。
 

@@ -135,6 +135,62 @@ pub fn open_line_with_variation(
     varied_line(start, end, variation, seed, amplitude, canvas, Some(span))
 }
 
+/// A free line's varied centerline (I-715). Each inner point moves along the
+/// path's normal, or along the one axis the variation names, by the open
+/// line's offset at its share of the path's length, and the variation
+/// settles to nothing towards both ends, which stay where they are.
+#[must_use]
+pub fn open_path_with_variation(
+    points: &[Point],
+    variation: &Variation,
+    seed: Seed,
+    amplitude: f64,
+) -> Vec<Point> {
+    let mut lengths = Vec::with_capacity(points.len());
+    let mut total = 0.0;
+    for (index, point) in points.iter().enumerate() {
+        if index > 0 {
+            total += distance(points[index - 1], *point);
+        }
+        lengths.push(total);
+    }
+    if points.len() < 3 || total < 1.0e-6 {
+        return points.to_vec();
+    }
+    let axis_x = variation.dimensions.contains(&Dimension::PositionX);
+    let axis_y = variation.dimensions.contains(&Dimension::PositionY);
+    let span = settle_span(variation);
+    let last = points.len() - 1;
+    let mut varied = Vec::with_capacity(points.len());
+    varied.push(points[0]);
+    for index in 1..last {
+        let t = lengths[index] / total;
+        let offset = sample_offset(t, variation, seed, index, amplitude) * settle(t, span);
+        let point = points[index];
+        varied.push(if axis_x && !axis_y {
+            Point::new(point.x + offset, point.y)
+        } else if axis_y && !axis_x {
+            Point::new(point.x, point.y + offset)
+        } else {
+            let tangent = Point::new(
+                points[index + 1].x - points[index - 1].x,
+                points[index + 1].y - points[index - 1].y,
+            );
+            let length = tangent.x.hypot(tangent.y);
+            if length < 1.0e-12 {
+                point
+            } else {
+                Point::new(
+                    point.x - offset * tangent.y / length,
+                    point.y + offset * tangent.x / length,
+                )
+            }
+        });
+    }
+    varied.push(points[last]);
+    varied
+}
+
 fn varied_line(
     start: Point,
     end: Point,

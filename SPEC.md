@@ -138,7 +138,7 @@ The core vocabulary consists of thirteen Saijiki categories plus relations. Its 
 
 | English | Japanese | Vocabulary |
 | --- | --- | --- |
-| forms | かたち | circle, ellipse, triangle, square, line, arc, cloudform |
+| forms | かたち | circle, ellipse, triangle, square, line, arc, cloudform, free line (DDL 19; offered to the saijiki list and Stage 1 in I-715 stage B2, §14.10) |
 | touches | てざわり | silverpoint, pencil, pen, rotring, crayon, chalk, fine-brush, thick-brush, oil paint, burin, drypoint, computer |
 | continuity | つらなり | solid, dashed, dotted, dash-dot |
 | surfaces | おもて | empty, flat, sweep, grain, stipple, hatch, crosshatch, aquatint |
@@ -2303,7 +2303,7 @@ it is the drawing's own rule, moved to the door.
 
 The shared Rust `plan_verified_stage15[_with_policy]` API takes verified Stage 1.5 and the existing host canvas / color catalog context. Ordinary instructions and declared flat Macro Emits share one object-size / placement resolver. Omitted quantity resolves to eight for `line-up`, `scatter`, and `tile`, and remains one for `place`; source meaning stays omitted. Explicit positive integers through u32::MAX are preserved. Zero, out-of-range, unknown, conflicting, or qualitative quantities and missing required Macro arguments do not become eight.
 
-Object size uses the canvas short edge independently of count, cells, or density. Delivered plans support all nine primitives: line, circle, ellipse, square, triangle, polygon, arc, cloudform, and point. Normal width or diameter is 6/25; ellipse / cloudform height is 3/5 of width, arc sagitta is 3/50, and point diameter is 3/250. Existing size factors and shape-specific anchors remain, and thinness does not change outer size. A large circle keeps diameter 9/25 at both four and eight objects, allowing overlap. Numeric geometry retains its exact decimal / Rational, basis, dimension, and provenance.
+Object size uses the canvas short edge independently of count, cells, or density. Delivered plans support all ten primitives: line, circle, ellipse, square, triangle, polygon, arc, cloudform, point, and free_line. Normal width or diameter is 6/25, a free line's length 11/20; ellipse / cloudform height is 3/5 of width, arc sagitta is 3/50, and point diameter is 3/250. Existing size factors and shape-specific anchors remain, and thinness does not change outer size. A large circle keeps diameter 9/25 at both four and eight objects, allowing overlap. Numeric geometry retains its exact decimal / Rational, basis, dimension, and provenance.
 
 Shape constraints are optional meaning separate from primitive identity. Equilateral triangle remains triangle; regular square remains square; pentagon through octagon remain polygon. Core-head continuations preserve these constraints and their source ownership. Absent constraints add no null field to old canonical or source bytes. The ordinary triangle is an isosceles triangle with its apex above the base and normal width = height = 6/25. An equilateral triangle retains exact side s and the fixed height rule s√3/2 in the plan; only the final geometry boundary evaluates the irrational height. Ordinary square retains its 1:1 default but accepts independent WidthHeight through the existing square wire. A regular square requires equal sides. Polygons are regular, default to five sides, accept five through eight, and interpret Radius / Diameter as the circumcircle. Side count is distinct from object count.
 
@@ -3141,10 +3141,13 @@ sequential resolution.
 - `cutting` -> the crossing angle and the intersection with the preceding
   element, decided per performance within a range
 - `between` -> decided inside the region between the preceding two elements
-- `touching` -> applies to line and arc only; the element's two endpoints are made
-  to coincide with the two endpoints of the preceding line or arc as the
-  performance realized them
-- `connected` -> applies to Line, Arc, and Point; with `target_endpoint`, the
+- `touching` -> applies to line, arc, and free line only; the element's two
+  endpoints are made to coincide with the two endpoints of the preceding line,
+  arc, or free line as the performance realized them (a free line takes the
+  ends, and its path is decided between them)
+- `connected` -> applies to Line, Arc, Point, and free line (a free line is also
+  a target at its end or a selected endpoint, but never at its middle,
+  §14.10.4); with `target_endpoint`, the
   current canonical start (Point center) is translated to the selected endpoint
   of a prior Line or Arc; without it, it is translated to the prior canonical
   end (Point center). When the prior is a closed square, circle, ellipse,
@@ -3393,6 +3396,92 @@ performance.
 The current identity domain for cloudform and other rendered work is `rh3`.
 Stored `rh2` is a legacy read-compatibility domain and is never recalculated.
 
+### 14.10 The Design of the Free Line (DDL 19, Score 0.21.0)
+
+#### 14.10.1 Why a free line
+
+> A line is the track of a moving point. Pushed by one force, the point draws a
+> straight line; two forces acting at once bend it into a curve, and two forces
+> acting in turn break it into an angle. (After Kandinsky, *Point and Line to
+> Plane*.)
+
+A line runs straight from its start to its end. A free line runs between the
+same start and end along a path the performance decides. The path is not a
+random walk: it is built from a few readable parts, the straight run of one
+force, the arc and the free curve of two forces at once, and the corner of two
+forces in turn, so the line is free and the viewer can still read the forces in
+it (the author's instruction, I-715).
+
+#### 14.10.2 How the path is made (the performance decides it)
+
+The Score keeps a line's start, end, rotation, and placement, and no path
+coordinates. The renderer builds the path once, when it draws the mark, from
+the mark's seed.
+
+1. **Parts**: three to seven parts (straight runs, circular arcs, and free
+   curves whose curvature changes evenly), joined smoothly or at corners. One
+   part leads in length and the others alternate long and short
+2. **The tool chooses the build**: the fine point tools (silverpoint, pencil,
+   pen, rotring, computer, burin, drypoint) use straight runs and arcs only; the
+   brushes and broad tools (crayon, chalk, thin and thick brush, oil paint) also
+   use free curves
+3. **Conditions**: the chord is at least a quarter of the path length; the path
+   strays sideways at most 0.6 chords and runs from -0.25 to 1.25 chords along
+   it; the net turn is at most 450 degrees and the total turn at most 900. The
+   path may cross itself. A failed draw is retried up to 64 times, then a fixed
+   phrase is used
+4. **Sides of the bends**: of the coin's sides and 31 other sets, the set that
+   keeps the line farthest from the paper's edges and from the shapes drawn
+   before it in drawing order (the boxes of marks that are not lines or free
+   lines) is chosen. Lines do not avoid each other
+5. The path is laid between the ends after the rotation and the group transform,
+   and drawn as it stands
+
+#### 14.10.3 Composition with existing vocabulary (no new modifiers)
+
+- **Size and proportion** -> the chord's length: 11/20 of the short edge by
+  default (a line has 6/25), the line's size factors, full and half width
+- **Angle, placement, draw, scatter, line up** -> as for a line. One
+  instruction drawing several free lines gives each mark its own path
+- **Touch** -> the build and the stroke: a hand tool draws an open stroke
+  tapered at both ends with its corners marked; the rotring draws the path's
+  polyline. Sweep, grain, oil paint, and continuity take the line's routes
+- **Variation** -> sway about the path, settling to nothing at both ends, which
+  stay where they are
+- **Wild** -> the stroke synthesis widens the sway, as for a line
+- **Relations** -> only those that join at the ends (§14.10.4)
+
+#### 14.10.4 Relations (only those that join at the ends)
+
+A free line takes the connection (to the prior end, a selected endpoint, or a
+closed outline) and the touch, both as the current mark and as the one referred
+to. Along, not touching, cutting, between, resting on, inside, overlapping,
+crossing, mirrored, and a connection to a free line's middle drop only the
+relation with its reason, and the free line is drawn (the author's choice,
+2026-10-15). The path depends on the shapes drawn before it, so a relation
+placed from bounds would make relation solving and path building depend on each
+other. Performance bounds (groups, line-up cells, must-fit checks) measure a
+free line by its start and end, as for a line. In DDL, a free line is the
+previous shape only through `connected to the previous shape` (to its end).
+
+#### 14.10.5 Selection rule (not an escape hatch)
+
+As for cloudform (§14.9.4), Stage 1 may choose a free line only when the
+description names one, or when the thing described is itself a line without a
+definition. Until that rule is written into the work-plan instruction (I-715
+stage B2), a free line is drawn when DDL names it but is neither listed in the
+saijiki nor offered to Stage 1 (its saijiki `prompt` and `display` are false and
+`marker` is true).
+
+#### 14.10.6 Determinism and identity
+
+The path derives deterministically from the mark's seed (`free-line-v1`: the
+performance seed, the instruction, and the mark) and adds no new source of
+randomness. The same Score, seed, and wild setting give the same SVG. The `rh3`
+domain is unchanged, and the Score stores no path coordinates. Only works that
+draw a free line use Score 0.21.0; every other work keeps its Score and its
+picture.
+
 ---
 
 ## 15. Development Policy
@@ -3505,7 +3594,7 @@ Important score concepts:
 
 - `canvas`: selected canvas aspect identifier, such as `square` or `golden`
 - `instructions`: ordered drawing instructions
-- primitive fields: the canonical exact nine, line, circle, ellipse, triangle, square, polygon, arc, point, and cloudform, plus related process data. Point is a round filled mark with an identity distinct from Circle. `rectangle` is not a tenth primitive and requires a separate author ruling and schema / version before it can be added
+- primitive fields: the canonical exact ten, line, circle, ellipse, triangle, square, polygon, arc, point, cloudform, and free_line, plus related process data. Point is a round filled mark with an identity distinct from Circle. free_line (the free line, Score 0.21.0) has a line's geometry and a path the performance decides (§14.10). `rectangle` is not a primitive and requires a separate author ruling and schema / version before it can be added
 - `weight`: material / tool quality
 - `variation`: visible wobble, blur, tremble, or motion behavior
 - `arrangement`: count, distribution, paths, grouping, density, fade, and color cycles
@@ -3529,7 +3618,8 @@ value.
 numeric geometry remain distinct. In the current subset, an unallocated
 count-one circle, square, ellipse, cloudform, triangle, or polygon uses `6/25` (0.24) of the canvas
 short edge for diameter, side, or width; ellipse and cloudform height is `3/5`
-of width. Normal line length and normal arc chord are also `6/25`; arc sagitta
+of width. Normal line length and normal arc chord are also `6/25`, and a free
+line's normal length is `11/20` (0.55); arc sagitta
 is one quarter of its chord, and normal point diameter is `3/250` (0.012).
 Finite relative factors are `3/4`, `1/2`, and `3/8` for mild,
 standard, and strong small; `5/4`, `3/2`, and `7/4` for the corresponding large
@@ -3567,7 +3657,7 @@ Render seed, raw source bytes, and the full lock digest are excluded.
 
 A circle or point keeps the same radial extent under rotation. An ellipse uses its ideal
 rotated ellipse extent, cloudform and square use the rotated rectangular envelope of
-their declared width and height, and line and arc use their final finite geometry. Numeric placement rotates short-edge units in
+their declared width and height, and line, free line, and arc use their final finite geometry (a free line its ends, not its path). Numeric placement rotates short-edge units in
 physical space, converts the result back to each canvas axis, and applies
 must-fit only to the rotated extent; it does not reject the unrotated box first,
 relocate, shrink, reduce count, or retry another angle. Named placement keeps the

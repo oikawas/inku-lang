@@ -173,7 +173,7 @@ pub(crate) fn amplitude(instruction: &Instruction, canvas: CanvasSize) -> f64 {
                         / 2.0
                 })
             }
-            Primitive::Line => instruction.from_.zip(instruction.to).map_or(
+            Primitive::Line | Primitive::FreeLine => instruction.from_.zip(instruction.to).map_or(
                 canvas.unit() * 0.02,
                 |(start, end)| {
                     let start = point_to_pixels(start, canvas);

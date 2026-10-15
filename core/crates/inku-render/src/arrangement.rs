@@ -44,7 +44,7 @@ fn shift_instruction(instruction: &Instruction, delta: Point) -> Instruction {
         }
     }
     match instruction.primitive {
-        Primitive::Line => {
+        Primitive::Line | Primitive::FreeLine => {
             if let (Some(start), Some(end)) = (instruction.from_, instruction.to) {
                 shifted.from_ = Some(Point::new(start.x + delta.x, start.y + delta.y));
                 shifted.to = Some(Point::new(end.x + delta.x, end.y + delta.y));

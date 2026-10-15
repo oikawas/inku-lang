@@ -61,7 +61,7 @@ def _with_structural_defaults(ins: Instruction) -> Instruction:
     if ins.arc_form == "crescent":
         return ins
     data = ins.model_dump(by_alias=True)
-    if ins.primitive == "line":
+    if ins.primitive in {"line", "free_line"}:
         data["from"] = data.get("from") or [0.1, 0.5]
         data["to"] = data.get("to") or [0.9, 0.5]
     elif ins.primitive in {"circle", "arc", "polygon"}:
@@ -105,7 +105,7 @@ def _with_legacy_fill_spelling(instructions: list[Instruction]) -> list[Instruct
 
 
 def _has_contour(ins: Instruction) -> bool:
-    if ins.primitive == "line":
+    if ins.primitive in {"line", "free_line"}:
         return ins.from_ is not None and ins.to is not None
     if ins.primitive == "arc" and ins.arc_form == "crescent":
         return ins.center is not None and ins.size is not None
@@ -129,8 +129,8 @@ def _without_invalid_relations(instructions: list[Instruction]) -> list[Instruct
         if relation.type == "between":
             invalid = invalid or len(result) < 2 or not _has_contour(result[-2])
         elif relation.type == "touching":
-            invalid = invalid or ins.primitive not in {"line", "arc"}
-            invalid = invalid or result[-1].primitive not in {"line", "arc"}
+            invalid = invalid or ins.primitive not in {"line", "arc", "free_line"}
+            invalid = invalid or result[-1].primitive not in {"line", "arc", "free_line"}
         if invalid:
             result.append(ins.model_copy(update={"relation": None}))
         else:

@@ -85,6 +85,7 @@ string_enum!(Primitive {
     Arc => "arc",
     Point => "point",
     Cloudform => "cloudform",
+    FreeLine => "free_line",
 });
 string_enum!(ArcForm { Crescent });
 
@@ -631,6 +632,14 @@ pub fn instructions_use_joint_relations(instructions: &[Instruction]) -> bool {
     })
 }
 
+/// Whether any instruction draws a free line, which needs Score 0.21.0.
+#[must_use]
+pub fn instructions_use_free_line(instructions: &[Instruction]) -> bool {
+    instructions
+        .iter()
+        .any(|instruction| instruction.primitive == Primitive::FreeLine)
+}
+
 /// A Score edition, named by `Score::version`.
 ///
 /// Editions accumulate: each keeps every field of the editions before it, so
@@ -658,10 +667,11 @@ pub enum ScoreEdition {
     V0_18,
     V0_19,
     V0_20,
+    V0_21,
 }
 
 impl ScoreEdition {
-    pub const ALL: [Self; 20] = [
+    pub const ALL: [Self; 21] = [
         Self::V0_1,
         Self::V0_2,
         Self::V0_3,
@@ -682,6 +692,7 @@ impl ScoreEdition {
         Self::V0_18,
         Self::V0_19,
         Self::V0_20,
+        Self::V0_21,
     ];
 
     /// The edition a version string names.
@@ -715,6 +726,7 @@ impl ScoreEdition {
             Self::V0_18 => "0.18.0",
             Self::V0_19 => "0.19.0",
             Self::V0_20 => "0.20.0",
+            Self::V0_21 => "0.21.0",
         }
     }
 }
@@ -2470,8 +2482,17 @@ impl Score {
         instructions_use_joint_relations(&self.instructions)
     }
 
+    /// Whether an instruction draws a free line (Score 0.21.0).
+    #[must_use]
+    pub fn uses_free_line(&self) -> bool {
+        instructions_use_free_line(&self.instructions)
+    }
+
     pub fn validate_schema_edition(&self) -> Result<(), &'static str> {
         self.validate_compact_score_0_10()?;
+        if self.uses_free_line() && !self.edition_at_least(ScoreEdition::V0_21) {
+            return Err("free_line requires Score version 0.21.0");
+        }
         self.validate_mirror_relations()?;
         if !self.anchors.is_empty() && !self.edition_at_least(ScoreEdition::V0_6) {
             return Err("anchors requires Score version 0.6.0");

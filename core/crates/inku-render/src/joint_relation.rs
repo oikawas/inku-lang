@@ -120,7 +120,7 @@ pub(crate) fn inside_region(prior_primitive: Primitive, prior: Bounds) -> Option
         | Primitive::Triangle
         | Primitive::Polygon
         | Primitive::Cloudform => std::f64::consts::FRAC_1_SQRT_2,
-        Primitive::Line | Primitive::Arc | Primitive::Point => return None,
+        Primitive::Line | Primitive::Arc | Primitive::Point | Primitive::FreeLine => return None,
     };
     let center = prior.center();
     let half = Point::new(width(prior) * factor / 2.0, height(prior) * factor / 2.0);

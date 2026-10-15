@@ -3,32 +3,33 @@ import InkuHost
 
 /// Web `DdlEditor.svelte`: the language the DDL is read in, the quick-guide switch and 「N 行・N 文字」 above a
 /// numbered, highlighted editor, then the names this installation does not hold and the guide.
-/// The vocabulary stays in the native Saijiki sheet; a chosen word goes in at the caret.
+/// The inline vocabulary inserts a chosen word at the caret, without opening another sheet.
 @MainActor
 struct DdlEditorPane: View {
     @Bindable var model: AppModel
     @Binding var text: String
     var disabled = false
     @Binding var insertion: InkuEditorInsertion?
-    var onShowSaijiki: (() -> Void)?
+    @State private var showVocabulary = true
     @State private var showGuide = false
     @State private var completionStates: [CompletionRangeState] = []
     @State private var completionSource = ""
     @State private var rangeStatus = RangeEditorStatus()
     /// Web DdlEditorDialog: an invalid range or an IME composition holds the draw back.
     var onRangeBlocked: ((Bool) -> Void)?
+    var onRangePreview: ((CompositionRanges.Preview?) -> Void)?
     private var invalidSource: Bool { rangeStatus.invalid || CompositionRanges.scan(text).contains { $0.bounds == nil } }
     @State private var highlighter: DdlHighlighter
     private let plugins: PluginNameIndex
 
     init(model: AppModel, text: Binding<String>, disabled: Bool = false, insertion: Binding<InkuEditorInsertion?>,
-         onShowSaijiki: (() -> Void)? = nil, onRangeBlocked: ((Bool) -> Void)? = nil) {
+         onRangeBlocked: ((Bool) -> Void)? = nil, onRangePreview: ((CompositionRanges.Preview?) -> Void)? = nil) {
         self.onRangeBlocked = onRangeBlocked
+        self.onRangePreview = onRangePreview
         self.model = model
         _text = text
         self.disabled = disabled
         _insertion = insertion
-        self.onShowSaijiki = onShowSaijiki
         let plugins = PluginNameIndex(words: model.pluginWords)
         self.plugins = plugins
         _highlighter = State(initialValue: DdlHighlighter(saijiki: model.saijiki, plugins: plugins))
@@ -41,16 +42,27 @@ struct DdlEditorPane: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             toolbar
-            editor.frame(maxHeight: .infinity)
-            if completionSource == text { CompletionRangeSummary(display: display, states: completionStates) }
-            if invalidSource {
-                Text(display.localized("横1/3〜2/3、縦2/3〜1 の形で、0〜1の数を、始まりを終わりより小さく書いてください。「-」「－」も使えます。枠は最後の有効な範囲です"))
-                    .inkuFont(12).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+            GeometryReader { geometry in
+                VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        editor.frame(minHeight: 80)
+                        if completionSource == text { CompletionRangeSummary(display: display, states: completionStates) }
+                        if invalidSource {
+                            Text(display.localized("横1/3〜2/3、縦2/3〜1 の形で、0〜1の数を、始まりを終わりより小さく書いてください。「-」「－」も使えます。枠は最後の有効な範囲です"))
+                                .inkuFont(12).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+                        }
+                        if !unknownNames.isEmpty || showGuide { support.frame(maxHeight: min(150, geometry.size.height * 0.24)) }
+                    }.frame(height: showVocabulary ? max(160, geometry.size.height * (showGuide || !unknownNames.isEmpty ? 0.46 : 0.50)) : nil)
+                    if showVocabulary {
+                        SaijikiView(model: model, onInsertWord: { insertion = InkuEditorInsertion(text: $0) },
+                            wordLanguage: model.instructionLanguage(for: text), inline: true)
+                            .disabled(disabled)
+                    }
+                }
             }
-            if !unknownNames.isEmpty || showGuide { support }
         }
         .onChange(of: invalidSource || rangeStatus.composing, initial: true) { _, blocked in onRangeBlocked?(blocked) }
-        .onDisappear { model.rangePreview = nil }
+        .onDisappear { onRangePreview?(nil) }
     }
 
     /// `.ddl-editor-toolbar`: the language label with its tooltip, the switches, and the status at the right.
@@ -61,11 +73,10 @@ struct DdlEditorPane: View {
             Text(display.localized(model.instructionLanguage(for: text) == "ja" ? "指示書（日本語DDL）" : "指示書（英語DDL）"))
                 .inkuFont(12, weight: .medium).foregroundStyle(.secondary).lineLimit(1)
                 .inkuTooltip(display.tooltip("指示書はこの言語の文法で読みます。", serverKey: "tooltipDdlLang"))
-            if let onShowSaijiki {
-                Button(display.webCopy("ddlEditorVocabulary", "歳時記の語彙"), action: onShowSaijiki)
-                    .buttonStyle(InkuGhostButtonStyle()).disabled(disabled)
-                    .inkuTooltip(display.tooltip("選んだ語を編集中DDLのカーソル位置に挿入します。"))
-            }
+            Button(display.webCopy("ddlEditorVocabulary", "歳時記の語彙")) { showVocabulary.toggle() }
+                .buttonStyle(InkuGhostButtonStyle(active: showVocabulary))
+                .accessibilityValue(display.localized(showVocabulary ? "オン" : "オフ"))
+                .inkuTooltip(display.tooltip("選んだ語を編集中DDLのカーソル位置に挿入します。"))
             Button(display.webCopy("ddlEditorSyntaxGuideToggle", "簡易ガイド")) { showGuide.toggle() }
                 .buttonStyle(InkuGhostButtonStyle(active: showGuide))
                 .accessibilityValue(display.localized(showGuide ? "オン" : "オフ"))
@@ -85,7 +96,7 @@ struct DdlEditorPane: View {
                            rangeTable: CompositionRanges.table,
                            onRangeStatus: { status in
                                rangeStatus = status
-                               model.rangePreview = status.preview
+                               onRangePreview?(status.preview)
                            },
                            completions: model.ddlCompletions)
             if text.isEmpty {

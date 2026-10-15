@@ -1,5 +1,6 @@
 import InkuPersistence
 import InkuHost
+import InkuExport
 import SwiftUI
 #if os(macOS)
 import AppKit
@@ -20,6 +21,9 @@ private struct ExportSession {
     let works: [SavedWork]
     let preserveOrder: Bool
     var directCard = false
+    var initialFormat: SavedExportFormat? = nil
+    var initialSVGProfile: String? = nil
+    var initialPixelHeight: Int? = nil
 }
 
 private struct WorkEditSession {
@@ -429,7 +433,8 @@ public struct ContentView: View {
         switch item {
         case .export(let session):
             #if os(macOS)
-            ExportView(model: model, works: session.works, preserveOrder: session.preserveOrder, directCard: session.directCard)
+            ExportView(model: model, works: session.works, preserveOrder: session.preserveOrder, directCard: session.directCard, initialFormat: session.initialFormat,
+                       initialSVGProfile: session.initialSVGProfile, initialPixelHeight: session.initialPixelHeight)
                 .id(session.id)
                 .environment(model.display)
             #else
@@ -537,6 +542,16 @@ public struct ContentView: View {
         case "ai": dialog = .advice(RefinementSession(work: work))
         case "colophon": dialog = .colophon(RefinementSession(work: work))
         case "export": dialog = .export(ExportSession(works: [work], preserveOrder: false))
+        case let requested where requested.hasPrefix("export-svg:"):
+            let profile = String(requested.dropFirst("export-svg:".count))
+            guard ["display", "editable", "compat", "live"].contains(profile) else { return }
+            dialog = .export(ExportSession(works: [work], preserveOrder: false, initialFormat: .svg, initialSVGProfile: profile))
+        case let requested where requested.hasPrefix("export-png:"):
+            guard let height = Int(requested.dropFirst("export-png:".count)), [1080, 2160, 4320, 512, 768].contains(height) else { return }
+            dialog = .export(ExportSession(works: [work], preserveOrder: false, initialFormat: .png, initialPixelHeight: height))
+        case let requested where requested.hasPrefix("export-format:"):
+            guard let format = SavedExportFormat(rawValue: String(requested.dropFirst("export-format:".count))) else { return }
+            dialog = .export(ExportSession(works: [work], preserveOrder: false, initialFormat: format))
         case "layout": openRefinement(work)
         case "description": openWorkEdit(work, .description)
         case "sketch": openWorkEdit(work, .sketch)

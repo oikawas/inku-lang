@@ -72,6 +72,11 @@ public struct ModelGuidanceCatalog: Decodable, Sendable {
         return provider.defaults.compactMap { byID[$0] }
     }
 
+    /// Naming an old saved reference never registers or enables it for another drawing.
+    func savedModelLabel(providerID: String, modelID: String) -> String? {
+        providers[providerID]?.models.first { $0.id == modelID }?.settings.label
+    }
+
     public func guidance(for reference: String, providers configured: [ProviderSettings]) -> ModelGuidance? {
         guard let separator = reference.firstIndex(of: ":") else { return nil }
         let providerID = String(reference[..<separator])

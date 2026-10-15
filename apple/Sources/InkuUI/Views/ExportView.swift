@@ -23,7 +23,8 @@ struct ExportView: View {
     private let preserveOrder: Bool
     private let directCard: Bool
 
-    init(model: AppModel, works: [SavedWork]? = nil, preserveOrder: Bool = false, directCard: Bool = false) {
+    init(model: AppModel, works: [SavedWork]? = nil, preserveOrder: Bool = false, directCard: Bool = false, initialFormat: SavedExportFormat? = nil,
+         initialSVGProfile: String? = nil, initialPixelHeight: Int? = nil) {
         self.model = model
         let candidates = works ?? model.works.filter { !$0.trashed }
         _candidates = State(initialValue: candidates)
@@ -31,8 +32,10 @@ struct ExportView: View {
         let defaults = model.display.preferences.exportDefaults
         var initialOptions = defaults.options
         if directCard { initialOptions.format = .shareCard }
+        if let initialFormat { initialOptions.format = initialFormat }
+        if let initialSVGProfile { initialOptions.svgProfile = initialSVGProfile }
         _options = State(initialValue: initialOptions)
-        _resolution = State(initialValue: defaults.resolution)
+        _resolution = State(initialValue: initialPixelHeight ?? defaults.resolution)
         _customHeight = State(initialValue: defaults.customHeight)
         self.preserveOrder = preserveOrder
         self.directCard = directCard

@@ -41,9 +41,9 @@ struct LibraryParityTests {
         #expect(try await db.libraryPage(query: LibraryQuery(text: String(fullHash.dropFirst(4))), limit: 1).total == 101)
 
         try await db.setStarred(ids: ["work-0", "work-1"], starred: true)
-        try await db.setAnnotation(id: "work-0", forRevision: true, forShare: true)
+        try await db.setAnnotation(id: "work-0", forRevision: true)
         try await db.setAnnotation(id: "work-2", forRevision: true)
-        let both = try await db.libraryPage(query: LibraryQuery(starred: true, forRevision: true, forShare: true))
+        let both = try await db.libraryPage(query: LibraryQuery(starred: true, forRevision: true))
         #expect(both.items.map(\.id) == ["work-0"])
         try await db.setStarred(ids: ["work-0"], starred: false)
         #expect(try await db.libraryPage(query: LibraryQuery(forRevision: true)).total == 2)
@@ -66,7 +66,7 @@ struct LibraryParityTests {
         try await db.save(root, node: rootNode)
         try await db.save(child, node: childNode, edge: edge)
         let note = " \n" + String(repeating: "e\u{301}", count: 140) + " \n"
-        try await db.setAnnotation(id: root.id, note: note, forRevision: true, forShare: true)
+        try await db.setAnnotation(id: root.id, note: note, forRevision: true)
         #expect(try await db.libraryPage(query: LibraryQuery(text: "root")).items.first?.annotation.note?.unicodeScalars.count == 240)
         #expect(try await db.work(id: root.id) == root)
         let groups = try await db.libraryGroups()

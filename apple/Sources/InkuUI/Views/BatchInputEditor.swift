@@ -7,7 +7,7 @@ import AppKit
 import UIKit
 #endif
 
-/// How a native editor lays out its text. The batch box is 13pt monospaced without wrapping and numbers its lines;
+/// How a native editor lays out its text. The batch box follows Web's 14px/1.65 text without wrapping and numbers its lines;
 /// the description box is the Web `.input-ta` (14px, line height 1.65, padding 9×10, wrapping) over the panel colour;
 /// the DDL editor is `.ddl-edit-ta` (14px, line height 1.7, padding 10×11, wrapping) with a line-number gutter.
 struct InkuEditorStyle: Equatable {
@@ -18,12 +18,15 @@ struct InkuEditorStyle: Equatable {
     var lineNumbers = true
     var inset = CGSize(width: 10, height: 8)
     var drawsBackground = true
+    var focusOnAttach = false
+    var emptyLineCount = 1
 
-    static let batch = InkuEditorStyle()
+    static let batch = InkuEditorStyle(fontSize: 14, monospaced: false, lineHeightMultiple: 1.65,
+                                      inset: CGSize(width: 10, height: 9))
     static let description = InkuEditorStyle(fontSize: 14, monospaced: false, lineHeightMultiple: 1.65, wraps: true,
                                              lineNumbers: false, inset: CGSize(width: 10, height: 9), drawsBackground: false)
     static let ddl = InkuEditorStyle(fontSize: 14, monospaced: false, lineHeightMultiple: 1.7, wraps: true,
-                                     lineNumbers: true, inset: CGSize(width: 11, height: 10), drawsBackground: false)
+                                     lineNumbers: true, inset: CGSize(width: 11, height: 10), drawsBackground: false, focusOnAttach: true)
     /// Web DdlViewer's `compact` editor: the same DDL editing without line numbers.
     static let ddlCompact = InkuEditorStyle(fontSize: 14, monospaced: false, lineHeightMultiple: 1.78, wraps: true,
                                             lineNumbers: false, inset: CGSize(width: 4, height: 4), drawsBackground: false)
@@ -65,7 +68,9 @@ struct BatchInputEditor: View {
     var accessibilityLabel: String
 
     var body: some View {
-        InkuTextEditor(text: $text, isEditable: isEditable, accessibilityLabel: accessibilityLabel, style: .batch)
+        var style = InkuEditorStyle.batch
+        style.emptyLineCount = 3
+        return InkuTextEditor(text: $text, isEditable: isEditable, accessibilityLabel: accessibilityLabel, style: style)
     }
 }
 
@@ -181,6 +186,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         storage.addLayoutManager(layout)
         layout.addTextContainer(container)
         let editor = BatchEditorTextView(frame: .zero, textContainer: container)
+        editor.focusOnAttach = style.focusOnAttach
         editor.isRichText = false
         editor.importsGraphics = false
         editor.allowsUndo = true
@@ -214,6 +220,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         var ruler: BatchEditorRuler?
         if style.lineNumbers {
             let gutter = BatchEditorRuler(scrollView: scroll, orientation: .verticalRuler)
+            gutter.emptyLineCount = style.emptyLineCount
             gutter.clipsToBounds = true
             gutter.clientView = editor
             gutter.reservedThicknessForMarkers = 0
@@ -557,6 +564,16 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
 
 @MainActor
 private final class BatchEditorTextView: NSTextView {
+    var focusOnAttach = false
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard focusOnAttach, isEditable, let window else { return }
+        focusOnAttach = false
+        DispatchQueue.main.async { [weak self, weak window] in
+            guard let self, let window, self.window === window, self.isEditable else { return }
+            window.makeFirstResponder(self)
+        }
+    }
     var onCompositionEnded: (() -> Void)?
     /// Set once the author focuses the editor; until then a chosen word goes at the end.
     private(set) var used = false
@@ -647,6 +664,7 @@ private final class BatchEditorScrollView: NSScrollView {
 
 @MainActor
 private final class BatchEditorRuler: NSRulerView {
+    var emptyLineCount = 1
     var lineIndex = BatchEditorLineIndex("") { didSet { updateThickness() } }
     var numberFont = CTFontCreateWithName("Menlo" as CFString, 13, nil) { didSet { updateThickness() } }
     override var isFlipped: Bool { true }
@@ -680,6 +698,17 @@ private final class BatchEditorRuler: NSRulerView {
             ? lineIndex.line(containing: layout.characterIndexForGlyph(at: glyphs.location))
             : max(0, lineIndex.starts.count - 1)
         let length = editor.string.utf16.count
+        if length == 0, emptyLineCount > 1, let font = editor.font {
+            let lineHeight = editor.defaultParagraphStyle?.maximumLineHeight ?? layout.defaultLineHeight(for: font)
+            let baseline = layout.defaultBaselineOffset(for: font)
+            for index in 0..<emptyLineCount {
+                let point = convert(NSPoint(x: textOrigin.x, y: textOrigin.y + baseline + CGFloat(index) * lineHeight), from: editor)
+                let number = batchNumberLine(index + 1, font: numberFont, color: NSColor.secondaryLabelColor.cgColor)
+                let width = CGFloat(CTLineGetTypographicBounds(number, nil, nil, nil))
+                batchDrawNumber(number, baseline: CGPoint(x: bounds.maxX - width - 8, y: point.y), context: context)
+            }
+            return
+        }
         for index in first..<lineIndex.starts.count {
             let start = lineIndex.starts[index]
             let fragment: NSRect

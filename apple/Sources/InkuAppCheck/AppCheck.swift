@@ -67,11 +67,20 @@ struct AppCheck {
         if CommandLine.arguments.contains("--batch-ui-only") {
             try await runBatchUIPresentationChecks(); return
         }
+        if CommandLine.arguments.contains("--batch-failure-notice-only") {
+            try await runBatchUIPresentationChecks(failureNoticeOnly: true); return
+        }
         if CommandLine.arguments.contains("--library-release-only") { try await runLibraryReleaseChecks(); return }
         if CommandLine.arguments.contains("--input-aids-only") { try await runInputAidChecks(); return }
         if CommandLine.arguments.contains("--tooltips-leftovers-only") { try await runTooltipAndLeftoverChecks(); return }
         if CommandLine.arguments.contains("--library-browsing-only") {
             try await runLibraryBrowsingChecks(); return
+        }
+        if CommandLine.arguments.contains("--startup-work-only") {
+            try await runStartupWorkChecks(); return
+        }
+        if CommandLine.arguments.contains("--history-model-name-only") {
+            try runHistoryModelNameChecks(); return
         }
         if CommandLine.arguments.contains("--lineage-presentation-only") {
             try await runLineagePresentationChecks(); return

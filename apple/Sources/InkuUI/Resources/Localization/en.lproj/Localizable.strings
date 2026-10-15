@@ -260,8 +260,6 @@
 "更新" = "Refresh";
 "書き出し" = "Export";
 "書き出しの初期設定" = "Export defaults";
-"書き出し用" = "For export";
-"書き出し用の印" = "Export mark";
 "書き出す" = "Export";
 "最初から繰り返し" = "Repeat from the start";
 "最古" = "Oldest";
@@ -954,7 +952,6 @@
 "ライブラリを開き、検索や複数選択を使えます。" = "Open the library to search and select multiple works.";
 "お気に入りの作品に絞り込みます。" = "Show favorite works.";
 "推敲の印を付けた作品に絞り込みます。" = "Show works marked for refinement.";
-"書き出し用の印を付けた作品に絞り込みます。" = "Show works marked for export.";
 "系譜の方向" = "Lineage direction";
 "縦" = "Vertical";
 "横" = "Horizontal";
@@ -1239,7 +1236,6 @@
 "この作品には比較用の保存設定がありません: %@" = "This work has no saved settings for comparison: %@";
 "お気に入りを更新しました" = "Updated the star";
 "推敲の印を更新しました" = "Updated the revision mark";
-"書き出し用の印を更新しました" = "Updated the export mark";
 "作品をライブラリへ追加しました" = "Added the work to the library";
 "APIキーの状態を確認できません。" = "Could not check the API key status.";
 "APIキーを削除できませんでした。" = "Could not delete the API key.";
@@ -1327,9 +1323,6 @@
 "この作品には操作に必要な保存条件が記録されていません。" = "This work does not record the saved conditions required for these actions.";
 "この作品の系譜を開きます。" = "Open this work's lineage.";
 "作品の選択を解除" = "Deselect work";
-"書き出しの印を付けた作品だけを表示します。ほかの絞り込みと併せると、すべてに該当する作品だけになります。" = "Shows works marked for export. Combined filters show works that meet every condition.";
-"書き出しの印を外す" = "Remove the export mark";
-"書き出しの印を付ける" = "Add an export mark";
 "このアプリに登録するAIサービスのモデルと接続情報を管理します。" = "Manages the models and connections of AI services registered in this app.";
 "APIキーはKeychainに保存され、画面には再表示されません。" = "API keys are saved in Keychain and are not shown again.";
 "このアプリが同じ接続先へ送る1分当たりの要求数です。写生・解釈・カタログ選択・構図読み・再試行を含みます。0は上限なしです。" = "Requests this app sends to one provider per minute, including sketch from life, interpretation, catalog selection, composition reading and retries. 0 means no ceiling.";
@@ -1422,7 +1415,6 @@
 "保存された世代を読み込めません。" = "Could not load the saved generation.";
 "保存された世代の読込中" = "Loading the saved generation";
 "変奏（旧）" = "Variation (retired)";
-"書き出し用のみ" = "Export marks only";
 "検索" = "Search";
 "リスト" = "List";
 "表示形式" = "Display";

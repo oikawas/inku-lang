@@ -5,17 +5,28 @@ public struct SaijikiView: View {
     @Bindable var model: AppModel
     private let onInsertWord: ((String) -> Void)?
     private let wordLanguage: String?
+    private let inline: Bool
     @State private var search = ""
     @State private var selection: Selection?
     @FocusState private var focusedSelection: Selection?
 
-    public init(model: AppModel, onInsertWord: ((String) -> Void)? = nil, wordLanguage: String? = nil) {
+    public init(model: AppModel, onInsertWord: ((String) -> Void)? = nil, wordLanguage: String? = nil, inline: Bool = false) {
         self.model = model
         self.onInsertWord = onInsertWord
         self.wordLanguage = wordLanguage
+        self.inline = inline
     }
 
     public var body: some View {
+        Group {
+            if inline { inlineBody } else { fullBody }
+        }
+        .onChange(of: focusedSelection) { _, value in
+            if let value { selection = value }
+        }
+    }
+
+    private var fullBody: some View {
         GeometryReader { geometry in
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -41,8 +52,64 @@ public struct SaijikiView: View {
                 }
             }.padding(16)
         }
-        .onChange(of: focusedSelection) { _, value in
-            if let value { selection = value }
+    }
+
+    /// SaijikiInline.svelte: grouped words and a nearby example, inside the editor rather than another window.
+    private var inlineBody: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(copy?.text("saijikiTitle") ?? model.display.localized("歳時記")).inkuFont(12, weight: .semibold)
+                Text(model.display.webCopy("saijikiHint", "語彙を選ぶと、描画への効き方と作例を表示します。"))
+                    .inkuFont(11).foregroundStyle(.secondary)
+            }.padding(.horizontal, 10).padding(.top, 8)
+            Divider()
+            GeometryReader { geometry in
+                if geometry.size.width >= 580 {
+                    let previewWidth = min(220, geometry.size.width * 0.25)
+                    HStack(alignment: .top, spacing: 10) {
+                        inlineWords(columns: min(4, max(1, Int((geometry.size.width - previewWidth - 20) / 145))))
+                        previewPane.frame(width: previewWidth)
+                    }
+                } else {
+                    VStack(spacing: 8) {
+                        inlineWords(columns: max(1, Int(geometry.size.width / 155)))
+                        previewPane.frame(height: min(140, geometry.size.height * 0.4))
+                    }
+                }
+            }.padding(.horizontal, 10).padding(.bottom, 8)
+        }
+        .background(InkuColor.bg2, in: RoundedRectangle(cornerRadius: 4))
+        .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
+    }
+
+    private func inlineWords(columns: Int) -> some View {
+        ScrollView {
+            HStack(alignment: .top, spacing: 8) {
+                ForEach(0..<columns, id: \.self) { column in
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(model.saijiki.indices.filter { $0 % columns == column }, id: \.self) { index in
+                            let category = model.saijiki[index]
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(uiLanguage == "ja" ? category.name : category.englishName ?? category.name)
+                                    .inkuFont(12, weight: .medium)
+                                SaijikiFlowLayout {
+                                    ForEach(category.words) { word in wordChip(name(word), selection: .builtin(word.id)) }
+                                }
+                            }.padding(8).frame(maxWidth: .infinity, alignment: .leading)
+                                .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
+                        }
+                        if column == columns - 1, !model.pluginWords.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Plugin").inkuFont(12, weight: .medium)
+                                SaijikiFlowLayout {
+                                    ForEach(model.pluginWords) { word in wordChip(word.displayName(language: offeredLanguage), selection: .plugin(word.id)) }
+                                }
+                            }.padding(8).frame(maxWidth: .infinity, alignment: .leading)
+                                .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border2))
+                        }
+                    }.frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+            }.padding(1)
         }
     }
 
@@ -92,9 +159,9 @@ public struct SaijikiView: View {
             selection = value
             if let onInsertWord, let preview = selectedPreview, preview.insertable, !model.isBusy { onInsertWord(preview.title) }
         } label: {
-            Text(title).inkuFont(13).multilineTextAlignment(.leading)
+            Text(title).inkuFont(inline ? 12 : 13).multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 8).padding(.vertical, 5)
+                .padding(.horizontal, inline ? 5 : 8).padding(.vertical, inline ? 3 : 5)
                 .background(.quaternary.opacity(selection == value ? 0.5 : 0.2), in: RoundedRectangle(cornerRadius: 5))
                 .overlay(RoundedRectangle(cornerRadius: 5)
                     .stroke(selection == value ? Color.accentColor : Color.secondary.opacity(0.3)))
@@ -133,7 +200,7 @@ public struct SaijikiView: View {
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
             }
-            if let onInsertWord, let preview = selectedPreview {
+            if !inline, let onInsertWord, let preview = selectedPreview {
                 Button(model.display.localized("DDLに挿入")) {
                     guard !model.isBusy, preview.insertable else { return }
                     onInsertWord(preview.title)

@@ -30,7 +30,6 @@ public final class LibraryModel {
     public var query = "" { didSet { if query != oldValue { changedFilter() } } }
     public var starredOnly = false { didSet { if starredOnly != oldValue { changedFilter() } } }
     public var revisionOnly = false { didSet { if revisionOnly != oldValue { changedFilter() } } }
-    public var shareOnly = false { didSet { if shareOnly != oldValue { changedFilter() } } }
     public var isTrash = false { didSet { if isTrash != oldValue { changedFilter() } } }
     public var order: LibraryOrder = .newest { didSet { if order != oldValue { changedFilter() } } }
     public var layout: LibraryLayout = .grid {
@@ -145,7 +144,7 @@ public final class LibraryModel {
     public var isGrouped: Bool { grouped || layout == .lineage }
     public var filter: LibraryQuery {
         LibraryQuery(text: query, trashed: isTrash, starred: starredOnly,
-                     forRevision: revisionOnly, forShare: shareOnly, order: order)
+                     forRevision: revisionOnly, order: order)
     }
 
     private func changedFilter() {
@@ -304,10 +303,6 @@ public final class LibraryModel {
 
     public func toggleRevision(_ work: SavedWork) async {
         await toggleAnnotation(work, mark: .revision, status: "推敲の印を更新しました")
-    }
-
-    public func toggleShare(_ work: SavedWork) async {
-        await toggleAnnotation(work, mark: .share, status: "書き出し用の印を更新しました")
     }
 
     private func toggleAnnotation(_ work: SavedWork, mark: LibraryAnnotationMark, status: String) async {

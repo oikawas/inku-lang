@@ -20,7 +20,7 @@ import SwiftUI
     private var display: DisplaySettings { model.display }
     private var selectionID: String? { displayedWorkID ?? model.selectedWorkID }
     private var locked: Bool { model.isBrowsingLocked }
-    private var hasFilters: Bool { library.starredOnly || library.revisionOnly || library.shareOnly }
+    private var hasFilters: Bool { library.starredOnly || library.revisionOnly }
     /// Web `visibleThumbCount` (+page.svelte:1246).
     private var capacity: Int? {
         let width = windowWidth ?? measuredWindowWidth
@@ -118,9 +118,6 @@ import SwiftUI
             filterButton(display.webCopy("historyForRevisionOnly", fallback: "推敲マークのみ"),
                          isOn: Binding(get: { library.revisionOnly }, set: { library.revisionOnly = $0 }),
                          tooltip: display.tooltip("推敲の印を付けた作品に絞り込みます。", serverKey: "tooltipHistoryForRevisionOnly"))
-            filterButton(display.localized("書き出し用のみ"),
-                         isOn: Binding(get: { library.shareOnly }, set: { library.shareOnly = $0 }),
-                         tooltip: display.tooltip("書き出し用の印を付けた作品に絞り込みます。", serverKey: "tooltipHistoryForShareOnly"))
         }
         .disabled(locked)
     }
@@ -212,10 +209,12 @@ import SwiftUI
                         ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
                             // The first line is the tile's heading, whatever fact sits there.
                             Text(line.short)
-                                .inkuFont(10, weight: index == 0 ? .semibold : .regular)
+                                .inkuFont(line.model ? 9 : 10, weight: line.model ? .medium : index == 0 ? .semibold : .regular)
+                                .tracking(line.model ? -0.2 : 0)
                                 .foregroundStyle(.secondary)
-                                .lineLimit(1).truncationMode(.tail)
-                                .frame(height: 13 * display.preferences.textScale, alignment: .leading)
+                                .lineLimit(line.model ? nil : 1)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(minHeight: 13 * display.preferences.textScale, alignment: .leading)
                                 // HistoryStrip.svelte:282: each field names itself in full.
                                 .inkuTooltip(display.tooltipValue(line.full))
                         }
@@ -254,17 +253,17 @@ import SwiftUI
         .inkuTooltip(display.tooltip(work.starred ? "スターを外す" : "スターを付ける", serverKey: work.starred ? "starOn" : "starOff"))
     }
 
-    private func metadata(_ work: SavedWork) -> [(short: String, full: String)] {
+    private func metadata(_ work: SavedWork) -> [(short: String, full: String, model: Bool)] {
         let fields = display.preferences.historyStripFields
         let naming = ModelNaming(providers: providers)
-        var output: [(short: String, full: String)] = []
-        if fields.contains("generation") { let label = generationLabel(work); output.append((label, label)) }
+        var output: [(short: String, full: String, model: Bool)] = []
+        if fields.contains("generation") { let label = generationLabel(work); output.append((label, label, false)) }
         if fields.contains("model") {
             let stage1 = SavedWorkFacts.recordedModel(work.stage1Model)
-            output.append((naming.stripModel(stage1), stage1.map(naming.displayName) ?? "-"))
+            output.append((naming.stripModel(stage1), stage1.map(naming.displayName) ?? "-", true))
         }
-        if fields.contains("engine") { let version = engineVersion(work); output.append((version, version)) }
-        if fields.contains("size") { let size = Self.fileSize(SavedWorkFacts.svgBytes(work)); output.append((size, size)) }
+        if fields.contains("engine") { let version = engineVersion(work); output.append((version, version, false)) }
+        if fields.contains("size") { let size = Self.fileSize(SavedWorkFacts.svgBytes(work)); output.append((size, size, false)) }
         return Array(output.prefix(3))
     }
 

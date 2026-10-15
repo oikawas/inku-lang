@@ -313,6 +313,10 @@ public final class AppModel {
                     ? String(settings.models.stage1Model.dropFirst(provider.id.count + 1)) : settings.models.stage1Model
             }
             try await reloadWorks()
+            // Web completeAuthentication opens the first normal history item once at startup.
+            if let latest = try await database.libraryPage(limit: 1).items.first?.work, selectedWorkID == nil {
+                await selectWork(latest)
+            }
             status = "準備完了"
         } catch {
             initialized = false
@@ -1427,7 +1431,15 @@ public final class AppModel {
                 try await operation(token)
                 if !Task.isCancelled { succeeded = true }
             } catch {
-                if self.generationToken == token && !Task.isCancelled { self.report(error) }
+                if self.generationToken == token && !Task.isCancelled {
+                    if allowsBrowsing {
+                        self.automationFailureMessage = self.failureMessage(error)
+                        if !self.stopping { self.providerProgress?.finish(.failed, at: Date()) }
+                        self.status = "処理を完了できませんでした"
+                    } else {
+                        self.report(error)
+                    }
+                }
             }
         }
         activeOperation = task
@@ -1450,7 +1462,8 @@ public final class AppModel {
                 self.activeExecutionID = view.executionID
                 if let message = self.drawingFailureText(view) {
                     self.automationFailureMessage = message
-                    if self.errorText == nil { self.errorText = message }
+                    // Background batch failures belong to their original row, not the single-drawing notice.
+                    if !allowsBrowsing, self.errorText == nil { self.errorText = message }
                 }
                 if allowsBrowsing {
                     self.finishProviderStage(view)

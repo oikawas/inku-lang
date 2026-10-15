@@ -40,6 +40,8 @@ struct SavedWorkRefinementActions: View {
             // Layout keeps its own dialog after the reading and touch parameters are retired.
             Button(model.display.localized("配置を変える"), systemImage: "square.grid.2x2") { onAction(work, "layout") }
             Button(model.display.localized("色カタログを変える"), systemImage: "paintpalette") { onAction(work, "color") }
+            Button(model.display.localized("配色を変える"), systemImage: "arrow.triangle.swap") { onAction(work, "color-arrangement") }
+            Button(model.display.localized("支持体を変える"), systemImage: "square.on.square") { onAction(work, "ground") }
             Button(model.display.localized("てざわりを変える"), systemImage: "pencil.tip") { onAction(work, "tool") }
             if state?.showsDescriptionActions != false {
                 Button(model.display.localized("記述を変える"), systemImage: "text.cursor") { onAction(work, "description") }
@@ -54,7 +56,7 @@ struct SavedWorkRefinementActions: View {
                     .disabled(state?.canReadDescription != true).help(state?.canReadDescription == true ? model.display.tooltip("モデルを変える") : reason)
                 if state?.canReadDescription != true { Text(reason) }
             }
-            Button(model.display.localized("AIプロセス"), systemImage: "wand.and.stars") { onAction(work, "ai") }
+            Button(model.display.localized("AI自動推敲プロセス"), systemImage: "wand.and.stars") { onAction(work, "ai") }
         }.disabled(model.isBusy || writingLocked || work.trashed)
     }
 }

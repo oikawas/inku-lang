@@ -93,7 +93,6 @@ public final class AuxiliaryModel {
                 sourceIsLocked = true
                 errorText = "保存された制作状態を取得できません。記述を読み直す操作は使えません。"
             }
-            if sourceIsLocked { visionMode = false }
         }
         guard sourceWorkID == work?.id else { return }
         if mode == .colophon { await refreshColophonPath() }
@@ -152,8 +151,8 @@ public final class AuxiliaryModel {
     public func requestAdvice(app: AppModel) async {
         guard !selectingSource else { return }
         guard let provider else { errorText = "補助モデルの接続がありません。"; return }
-        guard let work = sourceWork, !work.trashed, !sourceIsLocked else {
-            errorText = "画像助言には記述から描いた保存作品が必要です。"; return
+        guard let work = sourceWork, !work.trashed else {
+            errorText = "画像助言には保存作品が必要です。"; return
         }
         let direction = visionMode ? direction : ""
         let reference = modelReference
@@ -167,7 +166,7 @@ public final class AuxiliaryModel {
             guard let png = try await Self.png(svgs: [work.svg], visionAdvice: true) else {
                 throw HostError("refinement_source_has_no_image")
             }
-            let result = try await provider.refineAdvice(instruction: work.effectiveSourceText,
+            let result = try await provider.refineAdvice(instruction: Self.adviceInstruction(work),
                 direction: direction, enabledKinds: kinds, png: png, modelReference: reference,
                 language: language, settings: settings)
             try Task.checkCancellation()
@@ -228,7 +227,7 @@ public final class AuxiliaryModel {
         guard let provider else { errorText = "補助モデルの接続がありません。"; return }
         guard let first = sourceWork, !first.trashed, !running, !selectingSource, !app.isBusy else { return }
         let count = min(10, max(1, generations))
-        let useVision = visionMode && !sourceIsLocked
+        let useVision = visionMode
         enabledKinds.formIntersection(AuxiliaryProvider.allowedKinds)
         let kinds = orderedKinds
         guard !kinds.isEmpty else { errorText = "少なくとも1つの推敲要素を選んでください。"; return }
@@ -259,7 +258,7 @@ public final class AuxiliaryModel {
                             guard let png = try await Self.png(svgs: [parent.svg], visionAdvice: true) else {
                                 throw HostError("refinement_source_has_no_image")
                             }
-                            let answer = try await provider.refineAdvice(instruction: parent.effectiveSourceText,
+                            let answer = try await provider.refineAdvice(instruction: Self.adviceInstruction(parent),
                                 direction: userDirection, enabledKinds: kinds, png: png, modelReference: model,
                                 language: language, settings: settings)
                             try Task.checkCancellation()
@@ -341,7 +340,6 @@ public final class AuxiliaryModel {
             colophonPathToken = UUID(); colophonPath = nil; colophonPathCount = nil; loadingColophonPath = false
             storedColophons = []
             enabledKinds.formIntersection(AuxiliaryProvider.allowedKinds)
-            if sourceIsLocked { visionMode = false }
             errorText = nil; status = "自律推敲の親作品を変更しました。"
             return true
         } catch {
@@ -404,6 +402,11 @@ public final class AuxiliaryModel {
     }
 
     private var orderedKinds: [String] { AuxiliaryProvider.allowedKinds.filter(enabledKinds.contains) }
+
+    /// A direct-DDL work may have no description. Its saved instructions still give Vision context.
+    private static func adviceInstruction(_ work: SavedWork) -> String {
+        work.effectiveSourceText.isEmpty ? (work.ddl ?? "") : work.effectiveSourceText
+    }
 
     private func randomCatalog(app: AppModel, parent: SavedWork) -> String? {
         let current = parent.renderColorCatalogID ?? parent.catalogID

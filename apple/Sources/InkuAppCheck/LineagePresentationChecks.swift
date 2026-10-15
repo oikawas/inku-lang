@@ -19,7 +19,9 @@ func runLineagePresentationChecks() async throws {
                              starred: index == 4, lineageNodeID: id)
         let edge = parents[id].map { LineageEdge(id: "edge-\(id)", parentNodeID: $0, childNodeID: id,
                                                derivationKind: "variation", at: work.at) }
-        try await database.save(work, node: LineageNode(id: id, historyID: work.id, at: work.at, rootNodeID: root), edge: edge)
+        try await database.save(work, node: LineageNode(id: id, historyID: work.id, at: work.at,
+            descriptionHash: index < 3 ? "dh1:shared-text" : nil,
+            renderHash: index < 2 ? "rh3:shared-edition" : "rh3:\(id)", rootNodeID: root), edge: edge)
     }
     _ = try await database.permanentlyDelete(ids: ["work-\(ids[3])"], requireTrashed: false, deletedAt: 10)
     let savedBefore = try await database.list()
@@ -93,7 +95,55 @@ func runLineagePresentationChecks() async throws {
           try await database.lineageOverview(focusNodeID: root) == lineageBefore else {
         throw CheckFailure.message("Closing the map must restore normal browsing without another read or any saved-work/lineage mutation")
     }
-    print("Lineage presentation passed: five SQLite nodes/four edges; favorite route and tombstone styles, both arrow directions, fixed-focus cached branch expansion, independent 40–140% map and normal-state return. Saved works/lineage unchanged.")
+    // Failure: lineage exports borrow the library's checkboxes or lose the origin-to-focus order.
+    let selected = LineageSnapshot(lineageBefore, focusNodeID: ids[4])
+    guard LineageWorkScope.focused(selected).workIDs == ["work-\(ids[4])"],
+          LineageWorkScope.path(selected) == LineageExportRequest(workIDs: ["work-\(root)", "work-\(ids[1])", "work-\(ids[4])"], preserveOrder: true),
+          LineageWorkScope.checked(selected, ids: ["work-\(ids[2])", "unrelated-library-id"]).workIDs == ["work-\(ids[2])"],
+          library.selectedIDs == ["work-\(root)"] else {
+        throw CheckFailure.message("Lineage export scopes mixed in library checks, missing work, or another branch")
+    }
+    // Failure: missing hashes or the focus itself receive a false same-text/edition badge.
+    let byID = Dictionary(uniqueKeysWithValues: selected.nodes.map { ($0.id, $0) })
+    guard LineageWorkScope.sameText(byID[root]!, focus: byID[ids[1]]),
+          LineageWorkScope.sameEdition(byID[root]!, focus: byID[ids[1]]),
+          LineageWorkScope.sameText(byID[ids[2]]!, focus: byID[ids[1]]),
+          !LineageWorkScope.sameEdition(byID[ids[2]]!, focus: byID[ids[1]]),
+          !LineageWorkScope.sameText(byID[ids[1]]!, focus: byID[ids[1]]),
+          !LineageWorkScope.sameText(byID[ids[3]]!, focus: byID[ids[4]]) else {
+        throw CheckFailure.message("Lineage identity badges inferred equality from absent hashes or the displayed work itself")
+    }
+    // Failure: closing the map drops checked descendants which the normal query did not load.
+    let selectionLibrary = LibraryModel()
+    await selectionLibrary.connect(database: database)
+    await selectionLibrary.loadLineage(nodeID: root)
+    guard selectionLibrary.lineageDisplayGraph?.nodes.contains(where: { $0.id == ids[4] }) == false else {
+        throw CheckFailure.message("The map-only selection fixture must begin with its deep work unloaded")
+    }
+    await selectionLibrary.loadLineageOverview()
+    selectionLibrary.closeLineageOverview()
+    guard let known = selectionLibrary.lineageSelectionGraph,
+          LineageWorkScope.checked(known, ids: ["work-\(ids[4])"]).workIDs == ["work-\(ids[4])"],
+          selectionLibrary.lineageDisplayGraph?.nodes.contains(where: { $0.id == ids[4] }) == false else {
+        throw CheckFailure.message("Map-only selection vanished or changed the normal branch snapshot")
+    }
+    // Failure: starting a new root erases the draft or leaves a saved parent selected.
+    let app = AppModel(databaseURL: folder.appendingPathComponent("works.sqlite"))
+    await app.initialize()
+    await app.selectWork(savedBefore[0])
+    app.descriptionText = "Detached description draft"; app.ddlText = "Another global instruction draft"
+    app.setDdlBoxText("Detached instruction draft", for: savedBefore[0])
+    app.sketchText = "Detached sketch draft"
+    let nextSeed = app.seedText
+    app.detachLineage()
+    guard app.selectedWork == nil, app.selectedWorkID == nil, app.previewWork == nil,
+          app.descriptionText == "Detached description draft", app.ddlText == "Detached instruction draft",
+          app.sketchText == "Detached sketch draft", app.seedText == nextSeed,
+          try await database.list() == savedBefore,
+          try await database.lineageOverview(focusNodeID: root) == lineageBefore else {
+        throw CheckFailure.message("Starting a new root lost the draft/conditions, kept a parent, or changed saved history")
+    }
+    print("Lineage presentation passed: five SQLite nodes/four edges; favorite route/tombstone arrows, cached branches, 40–140% map return; isolated focus/path/checked export scopes; recorded-hash badges; detach preserves description/DDL/sketch and clears parent. Saved works/lineage unchanged.")
 }
 
 private actor LineageCountingReader: LineageReading {

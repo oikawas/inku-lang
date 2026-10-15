@@ -8,6 +8,20 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Match macOS lineage-card ellipsis menus to Web
+
+The ellipsis now opens shared refinement actions for that card's work, instead of mixing in node navigation, marks, export, and deletion. Direct-DDL and held-description conditions follow the Web menu. Nodes without a saved work and trashed works have no ellipsis button.
+
+### 2026-10-15 — Add macOS color-arrangement and ground refinement with shared option dialogs
+
+Added Change the color arrangement and Change the ground to the work menu, drawing options from the saved instructions, Score, and conditions without an LLM. Composition, catalog, model, and touch dialogs now also show the target on the left and options on the right. Clicking an option enlarges it and returns to the grid independently of multiple selection. Chosen options can be saved, all options discarded, and color arrangements paged eight at a time.
+
+Autonomous refinement now also offers Vision for direct-DDL works and held descriptions, matching Web. Catalog and layout rounds draw saved instructions without rereading the description. Model and direction controls appear only in Vision mode.
+
+### 2026-10-15 — Match macOS lineage browsing and controls to Web
+
+Grouped actions by their work scope and separated lineage checks and exports from Library selection. Compact centered cards now show recorded-hash identity badges. Added Open large, a new root that preserves drafts, a separate map, and background panning. Details use a saved-facts and comments table; unsaved comments survive closing and reopening.
+
 ## v2.15.147 (2026-10-15 / Build 1223)
 
 ### 2026-10-15 — Free line becomes a DDL word (DDL 19, Score 0.21.0)

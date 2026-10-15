@@ -2,22 +2,29 @@ import InkuHost
 import InkuPersistence
 import SwiftUI
 
+private struct LineageDetailsSession: Identifiable {
+    let item: LineageItem
+    let note: LibraryNoteEditorModel
+    var id: String { item.id }
+}
+
 @MainActor
 struct LineageView: View {
     @Bindable var model: AppModel
-    let onEditWork: (SavedWork, WorkEditMode) -> Void
-    let onAdjustWork: (SavedWork) -> Void
-    let onReplayWork: (SavedWork) -> Void
     let onWorkAction: (SavedWork, String) -> Void
-    let onExport: (String) -> Void
+    let onExport: (LineageExportRequest) -> Void
     var initialWork: SavedWork? = nil
     var writingLocked = false
     var onBrowseWork: (SavedWork) -> Void = { _ in }
-    @State private var details: LineageItem?
-    @State private var replayAfterDetails: SavedWork?
+    var onOpenInCanvas: (SavedWork) -> Void = { _ in }
+    var onDetach: () -> Void = {}
+    @Environment(\.inkuWindowSize) private var windowSize
+    @State private var checkedIDs: Set<String> = []
+    @State private var afterOverview: (() -> Void)?
+    @State private var details: LineageDetailsSession?
+    @State private var noteEditors: [String: LibraryNoteEditorModel] = [:]
     @State private var actionAfterDetails: (work: SavedWork, action: String)?
     @State private var trashConfirmation: LineageTrashConfirmation?
-    @State private var scrollToFocus = 0
     @State private var providers: [ProviderSettings] = []
     @FocusState private var focusedNodeID: String?
     private var library: LibraryModel { model.library }
@@ -27,7 +34,7 @@ struct LineageView: View {
     }
     private var writingDisabled: Bool { model.isBusy || writingLocked }
 
-    var body: some View {
+    private func panel(overview: Bool) -> some View {
         VStack(spacing: 0) {
             toolbar.padding(.horizontal, 16).padding(.vertical, 12)
             Divider()
@@ -41,16 +48,19 @@ struct LineageView: View {
                                     .scaleEffect(scale, anchor: .topLeading)
                             }
                             .padding(24)
-                            .background(scrollBridge)
+                            .backgroundPreferenceValue(LineageCardBounds.self) { anchors in
+                                GeometryReader { geometry in
+                                    scrollBridge(overview: overview, cards: anchors.values.map { geometry[$0] })
+                                }
+                            }
                         }
                         .focusSection()
                         .onChange(of: graph.focusNodeID, initial: true) { _, _ in
                             if !library.lineageBrowsing.overviewOpen { proxy.scrollTo(graph.focusNodeID, anchor: .center) }
                         }
-                        .onChange(of: scrollToFocus) { _, _ in withAnimation { proxy.scrollTo(graph.focusNodeID, anchor: .center) } }
                     }
                 }
-                graphSummary(graph).padding(.horizontal, 16).padding(.vertical, 10).background(.bar)
+                if graph.truncated { graphSummary(graph).padding(.horizontal, 16).padding(.vertical, 10) }
             } else if library.lineageLoading {
                 ProgressView(model.display.localized("系譜を読み込み中")).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let error = library.lineageError {
@@ -72,6 +82,17 @@ struct LineageView: View {
                     .padding(10).background(.regularMaterial, in: Capsule()).padding(16)
             }
         }
+    }
+
+    var body: some View {
+        panel(overview: false)
+        .sheet(isPresented: Binding(get: { library.lineageBrowsing.overviewOpen }, set: { if !$0 { library.closeLineageOverview() } }), onDismiss: {
+            let action = afterOverview; afterOverview = nil; action?()
+        }) {
+            panel(overview: true)
+                .frame(width: max(640, (windowSize?.width ?? 1000) - 36), height: max(500, (windowSize?.height ?? 760) - 70))
+                .environment(\.inkuWindowSize, windowSize)
+        }
         .task(id: initialWork?.id) {
             if let work = initialWork {
                 if library.graph?.focusNodeID != work.lineageNodeID { await library.loadLineage(work: work) }
@@ -80,15 +101,14 @@ struct LineageView: View {
             }
         }
         .sheet(item: $details, onDismiss: {
-            if let work = replayAfterDetails {
-                replayAfterDetails = nil
-                onReplayWork(work)
-            }
             if let pending = actionAfterDetails {
                 actionAfterDetails = nil
                 onWorkAction(pending.work, pending.action)
             }
-        }) { item in nodeDetails(item) }
+        }) { session in nodeDetails(session) }
+        .onChange(of: library.lineageSelectionGraph) { _, graph in
+            checkedIDs.formIntersection(graph?.nodes.compactMap(\.work).filter { !$0.trashed }.map(\.id) ?? [])
+        }
         .task(id: model.providerSettingsRevision) { providers = await model.hostSettings().providers }
         .alert(item: $trashConfirmation) { request in
             Alert(title: Text(model.display.localizedFormat("%ld件をごみ箱に移動しますか？", request.ids.count)),
@@ -101,38 +121,10 @@ struct LineageView: View {
 
     private var toolbar: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                if let graph = library.lineageDisplayGraph {
-                    Text(model.display.localizedFormat("%ld 節点 · %ld 接続", graph.nodes.count, graph.edges.count)).inkuFont(12).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 8)
-                Button(model.display.localized("中心へ"), systemImage: "scope") { scrollToFocus += 1 }.disabled(library.graph == nil)
-                    .inkuTooltip(tip("表示中の中心節点へスクロールします。"))
-                Button(model.display.localized("更新"), systemImage: "arrow.clockwise") { Task { await library.reloadLineage() } }
-                    .disabled(library.graph == nil || library.lineageLoading)
-                    .inkuTooltip(tip("系譜と保存情報を読み直します。"))
-                Menu {
-                    Button(model.display.localized("中心の作品")) { onExport("center") }
-                        .disabled(library.graph?.nodes.first(where: { $0.id == library.graph?.focusNodeID })?.work?.trashed != false)
-                    Button(model.display.localized("起点からの道筋")) { onExport("path") }.disabled(library.graph == nil)
-                    Button(model.display.localizedFormat("チェックした作品: %ld 件", library.selectedIDs.count)) { onExport("checked") }
-                        .disabled(library.selectedIDs.isEmpty)
-                } label: {
-                    Label(model.display.localized("書き出す"), systemImage: "square.and.arrow.up").inkuFont(12)
-                }
-                .menuStyle(.borderlessButton).fixedSize()
-                .disabled(writingDisabled || library.lineageLoading)
-                // LineagePanel.svelte:740: the colophon reads the branch up to the displayed work.
-                Button(model.display.webCopy("okugakiRead", "奥書を読む")) { if let work = focusWork { onWorkAction(work, "colophon") } }
-                    .disabled(focusWork == nil || writingDisabled)
-                    .inkuTooltip(model.display.tooltip("表示中の作品までの枝を、一人称の読み手として朗読します", serverKey: "okugakiTooltip"))
-            }
-            .buttonStyle(InkuGhostButtonStyle())
-            navigation
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 14) { selectionControls; Spacer(minLength: 0); selectionLegend }
-                VStack(alignment: .leading, spacing: 8) { selectionControls; selectionLegend }
-            }
+                HStack(alignment: .top, spacing: 16) { toolbarTitle; toolbarActions }
+                VStack(alignment: .leading, spacing: 8) { toolbarTitle; toolbarActions }
+            }.buttonStyle(InkuGhostButtonStyle()).inkuFont(12)
             if let error = library.lineageError ?? library.errorText {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "exclamationmark.triangle").foregroundStyle(.red)
@@ -152,14 +144,73 @@ struct LineageView: View {
         }
     }
 
+    private var toolbarTitle: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(model.display.localized("作品の系譜")).inkuFont(14, weight: .semibold)
+            if library.lineageBrowsing.overviewOpen {
+                Text(model.display.localized(library.lineageVertical ? "全体を上から下へ見渡せます。" : "全体を左から右へ見渡せます。"))
+                    .inkuFont(12).foregroundStyle(.secondary)
+            }
+        }.frame(minWidth: 90, alignment: .leading)
+    }
+
+    private var toolbarActions: some View {
+        LineageToolbarLayout {
+                    toolbarGroup(model.display.webCopy("lineageViewTools", "表示")) { navigation }
+                    if let graph = library.lineageDisplayGraph {
+                        toolbarGroup(model.display.webCopy("lineageFocusedWork", "表示中の作品")) {
+                            Menu(model.display.localized("推敲する")) {
+                                if let work = focusWork {
+                                    SavedWorkRefinementActions(model: model, work: work, onAction: dispatchWorkAction, writingLocked: writingDisabled)
+                                }
+                            }.disabled(focusWork == nil || writingDisabled)
+                            Button(model.display.localized("作品を大きく見る")) { if let work = focusWork { openInCanvas(work) } }
+                                .disabled(focusWork == nil || model.isBrowsingLocked)
+                            exportButton(LineageWorkScope.focused(graph))
+                        }
+                        toolbarGroup(model.display.localizedFormat("起点から表示中まで %ld 件", LineageWorkScope.path(graph).workIDs.count)) {
+                            exportButton(LineageWorkScope.path(graph))
+                        }
+                        toolbarGroup(model.display.localizedFormat("選択 %ld 件", checkedScope.workIDs.count)) {
+                            exportButton(checkedScope)
+                            Button { trashConfirmation = LineageTrashConfirmation(ids: checkedScope.workIDs) } label: { Image(systemName: "trash") }
+                                .disabled(checkedIDs.isEmpty || writingDisabled || library.mutating)
+                                .accessibilityLabel(model.display.localized("チェックした作品をゴミ箱へ移動"))
+                                .inkuTooltip(tip("チェックした作品をゴミ箱へ移動"))
+                        }
+                    }
+                    HStack(spacing: 8) {
+                        Button(model.display.webCopy("okugakiRead", "奥書を読む")) { if let work = focusWork { dispatchWorkAction(work, "colophon") } }
+                            .disabled(focusWork == nil || writingDisabled)
+                            .inkuTooltip(model.display.tooltip("表示中の作品までの枝を、一人称の読み手として朗読します", serverKey: "okugakiTooltip"))
+                        Button(model.display.localized("新しい起点にする")) {
+                            performAfterOverview(onDetach)
+                        }.disabled(writingDisabled)
+                    }
+        }.frame(maxWidth: .infinity, alignment: .trailing)
+    }
+
+    private var checkedScope: LineageExportRequest {
+        guard let graph = library.lineageSelectionGraph else { return LineageExportRequest(workIDs: [], preserveOrder: false) }
+        return LineageWorkScope.checked(graph, ids: checkedIDs)
+    }
+
+    private func toolbarGroup<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: 8) {
+            Rectangle().fill(InkuColor.border).frame(width: 1, height: 22)
+            Text(label).foregroundStyle(.secondary).fixedSize()
+            content()
+        }.fixedSize(horizontal: true, vertical: false)
+    }
+
+    private func exportButton(_ request: LineageExportRequest) -> some View {
+        Button(model.display.localized("書き出す"), systemImage: "square.and.arrow.down") { performAfterOverview { onExport(request) } }
+            .disabled(request.workIDs.isEmpty || writingDisabled || library.lineageLoading)
+    }
+
     private var navigation: some View {
         @Bindable var library = library
         return HStack(spacing: 8) {
-            Toggle(isOn: Binding(get: { library.lineagePathOnly }, set: { value in
-                library.lineagePathOnly = value; Task { await library.reloadLineage() }
-            })) { Label(model.display.localized("起点からの道筋"), systemImage: "point.topleft.down.to.point.bottomright.curvepath") }
-                .toggleStyle(.button).disabled(library.lineageBrowsing.overviewOpen)
-                .inkuTooltip(tip("中心の作品へ至る親の道筋だけを表示します。"))
             InkuSegmentedButtons(options: [(true, model.display.localized("縦")), (false, model.display.localized("横"))],
                                  selection: $library.lineageVertical)
                 .accessibilityLabel(model.display.localized("系譜の方向"))
@@ -184,29 +235,6 @@ struct LineageView: View {
         }.buttonStyle(InkuGhostButtonStyle()).disabled(library.graph == nil || library.lineageLoading)
     }
 
-    private var selectionControls: some View {
-        HStack(spacing: 10) {
-            Label(model.display.localizedFormat("チェックした作品: %ld 件", library.selectedIDs.count), systemImage: "checkmark.square")
-                .inkuFont(12, weight: .medium).monospacedDigit().fixedSize()
-            Button(model.display.localized("表示中を選択")) {
-                if let graph = library.lineageDisplayGraph { library.selectedIDs.formUnion(visibleNodes(graph).compactMap { $0.work?.id }) }
-            }.disabled(library.lineageDisplayGraph?.nodes.contains(where: { $0.work != nil }) != true)
-                .inkuTooltip(tip("今見えている作品を複数選択に追加します。"))
-            Button(model.display.localized("解除")) { library.selectedIDs.removeAll() }.disabled(library.selectedIDs.isEmpty)
-                .inkuTooltip(tip("作品の複数選択を解除します。"))
-            // LineagePanel.svelte:734 `.bulk-trash`.
-            Button { trashConfirmation = LineageTrashConfirmation(ids: library.selectedIDs.sorted()) } label: { Image(systemName: "trash") }
-                .disabled(library.selectedIDs.isEmpty || writingDisabled)
-                .accessibilityLabel(model.display.localized("チェックした作品をゴミ箱へ移動"))
-                .inkuTooltip(tip("チェックした作品をゴミ箱へ移動"))
-        }.buttonStyle(InkuGhostButtonStyle()).disabled(library.mutating || model.isBrowsingLocked || library.lineageLoading)
-    }
-
-    private var selectionLegend: some View {
-        Text(model.display.localized("中心は系譜の表示範囲、チェックは作品の複数選択です。"))
-            .inkuFont(12).foregroundStyle(.secondary)
-    }
-
     private func graphSummary(_ graph: LineageSnapshot) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: graph.truncated ? "ellipsis.circle" : "scope").foregroundStyle(.secondary)
@@ -224,13 +252,27 @@ struct LineageView: View {
         library.lineageBrowsing.setOverviewScale(value)
     }
 
-    private var scrollBridge: some View {
-        let overview = library.lineageBrowsing.overviewOpen
-        let key = LineageViewportKey(treeID: library.lineageBrowsing.treeID, overview: overview, vertical: library.lineageVertical)
-        return LineageScrollBridge(revision: key, position: library.lineageBrowsing.scroll) { position in
+    private func scrollBridge(overview: Bool, cards: [CGRect]) -> some View {
+        // The covered normal view must reapply its own offset when the map closes.
+        let key = LineageViewportKey(treeID: library.lineageBrowsing.treeID, overview: library.lineageBrowsing.overviewOpen, vertical: library.lineageVertical)
+        return LineageScrollBridge(revision: key, position: library.lineageBrowsing.scroll, cards: cards) { position in
+            guard overview == library.lineageBrowsing.overviewOpen else { return }
             if overview { library.lineageBrowsing.overviewScroll = position }
             else { library.lineageBrowsing.normalScroll = position }
         }
+    }
+
+    private func performAfterOverview(_ action: @escaping () -> Void) {
+        if library.lineageBrowsing.overviewOpen { afterOverview = action; library.closeLineageOverview() }
+        else { action() }
+    }
+
+    private func dispatchWorkAction(_ work: SavedWork, _ action: String) {
+        performAfterOverview { onWorkAction(work, action) }
+    }
+
+    private func openInCanvas(_ work: SavedWork) {
+        performAfterOverview { onOpenInCanvas(work) }
     }
 
     private func visibleNodes(_ graph: LineageSnapshot) -> [LineageItem] {
@@ -296,101 +338,91 @@ struct LineageView: View {
     }
 
     private func generationHeading(_ graph: LineageSnapshot, generation: Int) -> some View {
-        HStack(spacing: 8) {
-            Text(model.display.localizedFormat("第 %ld 世代", generation)).inkuFont(12, weight: .semibold)
-            Text("\(visibleNodes(graph).filter { $0.generation == generation }.count)").inkuFont(12).monospacedDigit()
-                .padding(.horizontal, 6).padding(.vertical, 2).background(.quaternary, in: Capsule())
-        }.foregroundStyle(.secondary)
+        Text(model.display.preferences.language == "ja" ? "第\(generation)世代" : "Generation \(generation)").inkuFont(12)
+            .foregroundStyle(.secondary).frame(maxWidth: .infinity)
     }
 
     private func nodeCard(_ item: LineageItem, graph: LineageSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 5) {
                 if let work = item.work {
-                    Button { library.toggleSelection(work.id) } label: {
-                        Image(systemName: library.selectedIDs.contains(work.id) ? "checkmark.square.fill" : "square")
-                    }.buttonStyle(.plain).foregroundStyle(library.selectedIDs.contains(work.id) ? Color.accentColor : Color.secondary)
-                        .accessibilityLabel(model.display.localized("複数選択のチェック"))
-                        .accessibilityValue(model.display.localized(library.selectedIDs.contains(work.id) ? "選択済み" : "未選択"))
-                        .disabled(library.mutating || model.isBrowsingLocked)
+                    if !work.trashed {
+                        Toggle(model.display.localized("一括操作の対象にする"), isOn: Binding(get: { checkedIDs.contains(work.id) }, set: { value in
+                            if value { checkedIDs.insert(work.id) } else { checkedIDs.remove(work.id) }
+                        })).labelsHidden()
+                            .accessibilityLabel(model.display.localized("一括操作の対象にする"))
+                            .disabled(library.mutating || model.isBrowsingLocked)
+                    }
+                    Button { Task { await library.toggleStar(work) } } label: {
+                        Text("★").inkuFont(19).frame(width: 22, height: 22)
+                            .background(Color.secondary.opacity(0.08), in: Circle()).overlay(Circle().stroke(InkuColor.border))
+                    }
+                        .foregroundStyle(work.starred ? Color.orange : Color.secondary)
+                        .accessibilityLabel(model.display.localized(work.starred ? "お気に入りを解除" : "お気に入り"))
+                        .disabled(writingDisabled || library.mutating)
+                    Button { Task { await library.toggleRevision(work) } } label: {
+                        Image(systemName: "flag.fill").inkuFont(12).frame(width: 24, height: 24)
+                            .background(Color.secondary.opacity(0.08), in: Circle()).overlay(Circle().stroke(InkuColor.border))
+                    }
+                        .foregroundStyle(library.annotation(for: work.id).forRevision ? Color.red : Color.secondary)
+                        .accessibilityLabel(model.display.localized("推敲の印"))
+                        .disabled(writingDisabled || library.mutating)
                 }
-                Text(operation(graph.edges.first { $0.childNodeID == item.id }?.derivationKind)).inkuFont(12, weight: .semibold).lineLimit(1)
-                if let work = item.work, !stageModelNames(work).isEmpty {
-                    // LineagePanel.svelte:845: the short names, the full ones per stage on hover.
-                    Text(stageModelNames(work)).inkuFont(11).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
-                        .inkuTooltip(model.display.tooltipValue(stageModelTitle(work)))
-                }
+                identityMarks(item, graph: graph)
                 Spacer(minLength: 0)
-                if let work = item.work, model.workActionState(for: work) == .lockedDescription {
-                    // LineagePanel.svelte:819: a mark, with the reason the description is held.
-                    Image(systemName: "lock.fill").inkuFont(10).foregroundStyle(.secondary)
-                        .accessibilityLabel(model.display.webCopy("descriptionLockedMark", "ロック"))
-                        .inkuTooltip(model.display.tooltip("編集した指示書で確定した作品です。記述を読み直す操作は使えません。",
-                                                           serverKey: "descriptionLockedReason"))
+                if let work = item.work, !work.trashed {
+                    Menu {
+                        Section {
+                            SavedWorkRefinementActions(model: model, work: work, onAction: dispatchWorkAction, writingLocked: writingDisabled)
+                        } header: {
+                            Text(cardRefinementTitle(work))
+                        }
+                    } label: { Image(systemName: "ellipsis") }
+                        .fixedSize().accessibilityLabel(model.display.webCopy("workActionOpenMenu", "作品編集メニューを開く"))
+                        .disabled(writingDisabled)
                 }
-                if item.id == graph.focusNodeID {
-                    Label(model.display.localized("中心"), systemImage: "scope")
-                        .inkuFont(11).foregroundStyle(Color.accentColor)
-                        .lineLimit(1).fixedSize(horizontal: true, vertical: false)
-                }
-                Menu { nodeMenu(item, graph: graph) } label: { Image(systemName: "ellipsis") }
-                    .fixedSize().accessibilityLabel(model.display.localized("節点の操作"))
-            }
+            }.buttonStyle(.borderless).frame(minHeight: 22)
             if let work = item.work {
                 Button { openWork(item) } label: {
                     VStack(alignment: .leading, spacing: 6) {
-                        ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(height: 148)
-                        LibraryWorkTitle(work: work, untitled: model.display.localized("無題"), lineLimit: 3)
-                            // LineagePanel.svelte:853: the whole text on hover.
+                        operationRow(item, graph: graph)
+                        ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(height: 118)
+                        if work.trashed { Text(model.display.localized("ゴミ箱（復元可能）")).inkuFont(12).foregroundStyle(.secondary) }
+                        LibraryWorkTitle(work: work, untitled: model.display.localized("無題"), lineLimit: 2, size: 14)
                             .inkuTooltip(model.display.tooltipValue(work.effectiveSourceText.isEmpty ? (work.descriptionHash ?? "") : work.effectiveSourceText))
                     }
                 }.buttonStyle(.plain).disabled(model.isBrowsingLocked)
-                HStack(spacing: 8) {
-                    if model.selectedWorkID == work.id { Label(model.display.localized("表示中"), systemImage: "eye").foregroundStyle(Color.accentColor) }
-                    if LibraryWorkPresentation.usesDDLTitle(work) { Text("DDL").monospaced() }
-                    if work.trashed { Label(model.display.localized("ごみ箱の作品"), systemImage: "trash") }
-                }.inkuFont(11).foregroundStyle(.secondary)
-                HStack {
-                    LibraryWorkMarks(model: model, work: work).disabled(writingDisabled)
-                    Spacer(minLength: 6)
-                    if let hash = work.renderHash {
-                        Button("…\(hash.suffix(4))") { library.copyHash(hash) }.inkuFont(12, design: .monospaced)
-                            .inkuTooltip(model.display.tooltip("描画ハッシュ全体をコピー", serverKey: "historyHashCopyTitle"))
-                    }
-                }.buttonStyle(.borderless).inkuFont(12)
-                if let note = library.annotation(for: work.id).note {
-                    Label { Text(note).lineLimit(2) } icon: { Image(systemName: "text.bubble") }.inkuFont(12).foregroundStyle(.secondary)
-                }
-                if item.node.state == "lineage_only" {
-                    Button(model.display.localized("ライブラリへ追加"), systemImage: "plus") { Task { await library.promote(item.id) } }
-                        .buttonStyle(InkuGhostButtonStyle()).disabled(library.mutating || writingDisabled)
-                }
+                    .simultaneousGesture(TapGesture(count: 2).onEnded { openInCanvas(work) })
             } else {
+                operationRow(item, graph: graph)
                 VStack(spacing: 8) {
-                    Image(systemName: "trash.slash").font(.title)
                     Text(model.display.localized(item.node.state == "tombstone" ? "削除された作品" : "保存作品がありません"))
-                }.frame(maxWidth: .infinity, minHeight: 148).foregroundStyle(.secondary)
+                }.frame(maxWidth: .infinity, minHeight: 118).foregroundStyle(.secondary)
             }
-            HStack(spacing: 8) {
-                Text(Date(timeIntervalSince1970: Double(item.node.at) / 1000), format: .dateTime.year().month().day().hour().minute())
-                Spacer(minLength: 0)
-                Text("…\(item.id.suffix(6))").monospaced()
-            }.inkuFont(11).foregroundStyle(.secondary)
-            Divider()
-            branchNavigation(item, graph: graph)
-            HStack {
-                Button { focusNode(item.id) } label: { Label(model.display.localized("中心に表示"), systemImage: "scope") }
-                    .disabled(item.id == graph.focusNodeID || library.lineageLoading)
-                    .inkuTooltip(tip("この節点を中心に系譜を表示します。"))
-                Spacer(minLength: 0)
-                Button { details = item } label: { Image(systemName: "info.circle") }
-                    .accessibilityLabel(model.display.localized("保存情報・コメント"))
-                    .inkuTooltip(tip("作品の保存情報とコメントを開きます。"))
+            if !library.lineageBrowsing.overviewOpen {
+                if item.childCount > 0, !graph.pathOnly {
+                    let expanded = library.lineageBrowsing.expandedNodeIDs.contains(item.id)
+                    Button { Task { await library.toggleLineageBranch(item.id) } } label: {
+                        Label(model.display.localizedFormat("子作品 %ld 件", item.childCount), systemImage: expanded ? "chevron.down" : "chevron.right")
+                            .frame(maxWidth: .infinity)
+                    }.accessibilityValue(model.display.localized(expanded ? "展開中" : "折りたたみ中"))
+                        .disabled(library.lineageLoading).buttonStyle(InkuGhostButtonStyle()).inkuFont(12)
+                }
+                if item.work != nil {
+                    Button { openDetails(item) } label: {
+                        Text(model.display.localized("詳細")).frame(maxWidth: .infinity, alignment: .leading)
+                    }.buttonStyle(InkuGhostButtonStyle())
+                        .inkuFont(12).accessibilityLabel(model.display.localized("作品の詳細"))
+                }
             }
-            .inkuFont(12).buttonStyle(.borderless)
+            if item.node.state == "lineage_only" {
+                Button(model.display.localized("通常履歴に保存")) { Task { await library.promote(item.id) } }
+                    .buttonStyle(InkuGhostButtonStyle()).disabled(library.mutating || writingDisabled)
+            }
         }
-        .padding(12)
-        .modifier(LibraryCardSurface(current: item.id == graph.focusNodeID, focused: focusedNodeID == item.id, tombstone: item.node.state == "tombstone"))
+        .padding(8)
+        .modifier(LibraryCardSurface(current: item.id == graph.focusNodeID, focused: focusedNodeID == item.id, tombstone: item.node.state == "tombstone", cornerRadius: 10))
+        .opacity(item.work?.trashed == true ? 0.62 : 1)
         .contextMenu { nodeMenu(item, graph: graph) }
         .task(id: item.work?.id) { if let work = item.work { await model.loadWorkActionState(work) } }
         .focusable().focused($focusedNodeID, equals: item.id)
@@ -401,40 +433,62 @@ struct LineageView: View {
         }
         .onKeyPress(.space) {
             guard focusedNodeID == item.id, let work = item.work, !library.mutating, !model.isBrowsingLocked else { return .ignored }
-            library.toggleSelection(work.id); return .handled
+            guard !work.trashed else { return .ignored }
+            if checkedIDs.contains(work.id) { checkedIDs.remove(work.id) } else { checkedIDs.insert(work.id) }
+            return .handled
         }
         .anchorPreference(key: LineageCardBounds.self, value: .bounds) { [item.id: $0] }
         .id(item.id)
     }
 
-    private func branchNavigation(_ item: LineageItem, graph: LineageSnapshot) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            if let parent = graph.edges.first(where: { $0.childNodeID == item.id }) {
-                Button { focusNode(parent.parentNodeID) } label: {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Label(model.display.localized("親の節点"), systemImage: "arrow.left")
-                        Text("…\(parent.parentNodeID.suffix(6))").inkuFont(11, design: .monospaced).foregroundStyle(.secondary)
-                    }
-                }
-            } else {
-                Text(model.display.localized(item.id == item.node.rootNodeID ? "起点" : "親は表示範囲外"))
-                    .inkuFont(12).foregroundStyle(.secondary)
+    private func operationRow(_ item: LineageItem, graph: LineageSnapshot) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 5) {
+            Text(operation(graph.edges.first { $0.childNodeID == item.id }?.derivationKind)).fixedSize()
+            if let work = item.work, !stageModelNames(work).isEmpty {
+                Text(stageModelNames(work)).lineLimit(1).truncationMode(.tail)
+                    .inkuTooltip(model.display.tooltipValue(stageModelTitle(work)))
             }
-            Spacer(minLength: 0)
-            if item.childCount > 0, !library.lineageBrowsing.overviewOpen, !graph.pathOnly {
-                let expanded = library.lineageBrowsing.expandedNodeIDs.contains(item.id)
-                Button { Task { await library.toggleLineageBranch(item.id) } } label: {
-                    Label(model.display.localizedFormat("子作品 %ld 件", item.childCount), systemImage: expanded ? "chevron.down" : "chevron.right")
-                }.accessibilityValue(model.display.localized(expanded ? "展開中" : "折りたたみ中"))
-                    .inkuTooltip(tip("中心の作品を変えずに子作品の枝を開閉します。"))
+        }.inkuFont(12).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func cardRefinementTitle(_ work: SavedWork) -> String {
+        let title = model.display.webCopy("workActionMenuTitle", "作品編集")
+        switch model.workActionState(for: work) {
+        case .userDDL: return title + " " + model.display.webCopy("workActionDdlOrigin", "（DDL直接生成作品）")
+        case .lockedDescription: return title + " " + model.display.webCopy("descriptionLockedMark", "ロック")
+        default: return title
+        }
+    }
+
+    private func identityMarks(_ item: LineageItem, graph: LineageSnapshot) -> some View {
+        let focus = graph.nodes.first { $0.id == graph.focusNodeID }
+        return VStack(alignment: .leading, spacing: 3) {
+            if item.id == graph.focusNodeID { identityBadge("表示中", active: true) }
+            if let work = item.work, model.workActionState(for: work) == .lockedDescription {
+                Label(model.display.webCopy("descriptionLockedMark", "ロック"), systemImage: "lock.fill").inkuFont(10)
+                    .inkuTooltip(model.display.tooltip("編集した指示書で確定した作品です。記述を読み直す操作は使えません。", serverKey: "descriptionLockedReason"))
             }
-        }.inkuFont(12).buttonStyle(.borderless).disabled(library.lineageLoading)
+            if item.node.state == "lineage_only" { identityBadge("中間作品・履歴非表示") }
+            if LineageWorkScope.sameText(item, focus: focus) { identityBadge("同じ記述") }
+            if LineageWorkScope.sameEdition(item, focus: focus) { identityBadge("同じ版") }
+        }
+    }
+
+    private func identityBadge(_ key: String, active: Bool = false) -> some View {
+        Text(model.display.localized(key)).inkuFont(11, weight: active ? .semibold : .regular)
+            .foregroundStyle(active ? Color.accentColor : Color.secondary)
+            .padding(.horizontal, 5).padding(.vertical, 1)
+            .background(active ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.08), in: Capsule())
     }
 
     private func openWork(_ item: LineageItem) {
-        guard let work = item.work, !model.isBrowsingLocked else { return }
+        guard let work = item.work, !model.isBrowsingLocked,
+              work.id != model.selectedWorkID || item.id != library.lineageDisplayGraph?.focusNodeID else { return }
         onBrowseWork(work)
-        Task { await model.selectWork(work) }
+        Task {
+            if work.id == model.selectedWorkID { await library.loadLineage(work: work) }
+            else { await model.selectWork(work) }
+        }
     }
 
     private func focusNode(_ id: String) {
@@ -456,19 +510,22 @@ struct LineageView: View {
                 if !library.lineageBrowsing.expandedNodeIDs.contains(item.id) { Task { await library.toggleLineageBranch(item.id) } }
             }.disabled(library.lineageLoading).help(tip("中心の作品を変えずに子作品の枝を開閉します。"))
         }
-        Button(model.display.localized("保存情報・コメント"), systemImage: "info.circle") { details = item }
-            .help(tip("作品の保存情報とコメントを開きます。"))
+        if !library.lineageBrowsing.overviewOpen {
+            Button(model.display.localized("保存情報・コメント"), systemImage: "info.circle") { openDetails(item) }
+                .help(tip("作品の保存情報とコメントを開きます。"))
+        }
         if let work = item.work {
             Divider()
-            Button(model.display.localized("作品を開く"), systemImage: "eye") { openWork(item) }.disabled(model.isBrowsingLocked)
-            Button(model.display.localized("生成情報"), systemImage: "info.circle") { onWorkAction(work, "info") }.disabled(model.isBrowsingLocked || work.trashed)
+            Button(model.display.localized("作品を大きく見る"), systemImage: "eye") { openInCanvas(work) }.disabled(model.isBrowsingLocked)
+            Button(model.display.localized("生成情報"), systemImage: "info.circle") { dispatchWorkAction(work, "info") }.disabled(model.isBrowsingLocked || work.trashed)
             Button(model.display.localized("制作で編集"), systemImage: "pencil") {
                 Task { await model.selectWork(work); NotificationCenter.default.post(name: .inkuOpenSection, object: "create", userInfo: ["workID": work.id]) }
             }.disabled(model.isBrowsingLocked || work.trashed)
-            SavedWorkRefinementActions(model: model, work: work, onAction: onWorkAction, writingLocked: writingDisabled)
-            Button(model.display.localized("書き出す")) { onWorkAction(work, "export") }.disabled(writingDisabled || work.trashed)
-            Button(model.display.localized(library.selectedIDs.contains(work.id) ? "チェックを外す" : "複数選択に追加"), systemImage: "checkmark.square") { library.toggleSelection(work.id) }
-                .disabled(library.mutating || model.isBrowsingLocked)
+            SavedWorkRefinementActions(model: model, work: work, onAction: dispatchWorkAction, writingLocked: writingDisabled)
+            Button(model.display.localized("書き出す")) { dispatchWorkAction(work, "export") }.disabled(writingDisabled || work.trashed)
+            Button(model.display.localized(checkedIDs.contains(work.id) ? "チェックを外す" : "複数選択に追加"), systemImage: "checkmark.square") {
+                if checkedIDs.contains(work.id) { checkedIDs.remove(work.id) } else { checkedIDs.insert(work.id) }
+            }.disabled(library.mutating || model.isBrowsingLocked || work.trashed)
             Button(model.display.localized(work.starred ? "お気に入りを解除" : "お気に入り"), systemImage: "star") { Task { await library.toggleStar(work) } }
                 .disabled(library.mutating || writingDisabled)
             Button(model.display.localized("推敲の印"), systemImage: library.annotation(for: work.id).forRevision ? "pencil.circle.fill" : "pencil.circle") { Task { await library.toggleRevision(work) } }
@@ -490,39 +547,18 @@ struct LineageView: View {
         }
     }
 
-    private func nodeDetails(_ item: LineageItem) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(model.display.localized("系譜の保存情報")).inkuFont(16, weight: .semibold)
-                Spacer()
-                Button(model.display.localized("閉じる")) { details = nil }.keyboardShortcut(.cancelAction)
-            }
-            Text(model.display.localizedFormat("節点 ID: %@", item.id)).inkuFont(12, design: .monospaced).textSelection(.enabled)
-            Text(model.display.localizedFormat("第 %ld 世代 · 子の節点 %ld · 状態 %@", item.generation, item.childCount, stateLabel(item.node.state))).inkuFont(12)
-            if let deleted = item.node.deletedAt {
-                Text(model.display.localizedFormat("削除日時: %@", Date(timeIntervalSince1970: Double(deleted) / 1000).formatted())).inkuFont(12)
-            }
-            if let work = item.work {
-                LibraryWorkDetails(model: model, work: work, onReplayWork: { parent in
-                    replayAfterDetails = parent
-                    details = nil
-                }, onOpenInCreate: { parent in queueDetailsAction(parent, "create") },
-                   showsRefinementMenu: true,
-                   onWorkAction: queueDetailsAction,
-                   onOpenLineage: { parent in queueDetailsAction(parent, "lineage") },
-                   writingLocked: writingDisabled).id(work.id)
-            }
-            else { Text(model.display.localized("元の節点と接続を保持しています。作品本文は削除されています。")).foregroundStyle(.secondary) }
-        }.padding(24).frame(minWidth: 340, idealWidth: 700, minHeight: item.work == nil ? 240 : 660)
+    private func nodeDetails(_ session: LineageDetailsSession) -> some View {
+        let item = session.item
+        return LineageDetailsView(model: model, item: item,
+                          operation: operation(library.lineageDisplayGraph?.edges.first { $0.childNodeID == item.id }?.derivationKind),
+                          naming: naming, note: session.note, writingLocked: writingDisabled,
+                          onAction: queueDetailsAction, onClose: { details = nil }).id(item.id)
     }
 
-    private func stateLabel(_ state: String) -> String {
-        switch state {
-        case "tombstone": model.display.localized("削除済み")
-        case "lineage_only": model.display.localized("系譜のみ")
-        case "active": model.display.localized("保存作品")
-        default: state
-        }
+    private func openDetails(_ item: LineageItem) {
+        let note = noteEditors[item.id] ?? LibraryNoteEditorModel()
+        noteEditors[item.id] = note
+        details = LineageDetailsSession(item: item, note: note)
     }
 
     private func queueDetailsAction(_ work: SavedWork, _ action: String) {
@@ -544,10 +580,20 @@ struct LineageView: View {
     }
 
     private func operation(_ kind: String?) -> String {
+        if model.display.preferences.language == "en" {
+            if kind == nil { return "Origin" }
+            let labels = ["touch_change": "Touch", "layout_change": "Layout", "catalog_change": "Color",
+                          "color_arrangement_change": "Color arrangement", "ground_change": "Ground", "tool_change": "Touches",
+                          "reinterpretation": "Reading", "model_comparison": "Model", "language_comparison": "Language",
+                          "ddl_edit": "DDL edit", "description_edit": "Description edit", "replay": "Replay",
+                          "canvas_aspect_change": "Canvas change", "variation": "Variation (retired)", "sketch_grain_change": "Sketch from life"]
+            if let kind, let label = labels[kind] { return label }
+        }
         let labels = ["tool_change": "てざわり", "touch_change": "タッチ", "layout_change": "構図", "catalog_change": "色",
+                      "color_arrangement_change": "配色", "ground_change": "支持体",
                       "reinterpretation": "解釈", "model_comparison": "モデル", "language_comparison": "言語",
                       "ddl_edit": "DDL編集", "description_edit": "記述編集", "replay": "再描画",
-                      "canvas_aspect_change": "キャンバス変更", "variation": "変奏", "sketch_grain_change": "写生の有無",
+                      "canvas_aspect_change": "キャンバス変更", "variation": "変奏（旧）", "sketch_grain_change": "写生の有無",
                       "render_engine_change": "描画エンジン", "external_seed_change": "シード", "renga_reply": "連歌"]
         return model.display.localized(kind.flatMap { labels[$0] ?? $0 } ?? "起点")
     }

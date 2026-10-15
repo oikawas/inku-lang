@@ -10,6 +10,12 @@ public struct LineageSnapshot: Sendable, Equatable {
     public let truncated: Bool
     public let pathOnly: Bool
 
+    public var rootNodeID: String {
+        nodes.first(where: { $0.id == focusNodeID })?.node.rootNodeID
+            ?? nodes.first(where: { !Set(edges.map(\.childNodeID)).contains($0.id) })?.id
+            ?? focusNodeID
+    }
+
     public init(_ graph: LineageGraph, focusNodeID: String? = nil) {
         self.focusNodeID = focusNodeID ?? graph.focusNodeID
         nodes = graph.nodes; edges = graph.edges; truncated = graph.truncated; pathOnly = graph.pathOnly
@@ -21,10 +27,18 @@ public struct LineageSnapshot: Sendable, Equatable {
     }
 
     public func merging(_ branch: LineageGraph) -> Self {
+        merging(nodes: branch.nodes, edges: branch.edges)
+    }
+
+    public func merging(_ branch: LineageSnapshot) -> Self {
+        merging(nodes: branch.nodes, edges: branch.edges)
+    }
+
+    private func merging(nodes branchNodes: [LineageItem], edges branchEdges: [LineageEdge]) -> Self {
         var nodeMap = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
         var edgeMap = Dictionary(uniqueKeysWithValues: edges.map { ($0.id, $0) })
-        for node in branch.nodes { nodeMap[node.id] = node }
-        for edge in branch.edges { edgeMap[edge.id] = edge }
+        for node in branchNodes { nodeMap[node.id] = node }
+        for edge in branchEdges { edgeMap[edge.id] = edge }
         let missingChildren = nodeMap.values.contains { node in
             node.childCount > edgeMap.values.filter { $0.parentNodeID == node.id }.count
         }
@@ -114,6 +128,33 @@ public enum LineagePresentation {
     }
 }
 
+/// The Web toolbar wraps whole scope groups rather than clipping their controls.
+struct LineageToolbarLayout: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        arrangement(width: proposal.width ?? 900, subviews: subviews).size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = arrangement(width: bounds.width, subviews: subviews)
+        for (index, point) in result.points.enumerated() {
+            subviews[index].place(at: CGPoint(x: bounds.minX + point.x, y: bounds.minY + point.y), anchor: .topLeading,
+                                 proposal: .unspecified)
+        }
+    }
+
+    private func arrangement(width: CGFloat, subviews: Subviews) -> (points: [CGPoint], size: CGSize) {
+        var points: [CGPoint] = []
+        var x: CGFloat = 0, y: CGFloat = 0, height: CGFloat = 0, used: CGFloat = 0
+        for view in subviews {
+            let size = view.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > width { x = 0; y += height + 8; height = 0 }
+            points.append(CGPoint(x: x, y: y)); x += size.width + 8
+            used = max(used, x - 8); height = max(height, size.height)
+        }
+        return (points, CGSize(width: max(width, used), height: y + height))
+    }
+}
+
 /// A generation wraps within the viewport; card measurements also cover localized text.
 struct LineageWrappingRow: Layout {
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
@@ -132,12 +173,19 @@ struct LineageWrappingRow: Layout {
         let width = max(210, width)
         var points: [CGPoint] = []
         var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0
+        var rowStart = 0
+        func centerRow() {
+            let offset = max(0, (width - max(0, x - 18)) / 2)
+            for index in rowStart..<points.count { points[index].x += offset }
+            rowStart = points.count
+        }
         for view in subviews {
             let size = view.sizeThatFits(ProposedViewSize(width: 210, height: nil))
-            if x > 0, x + 210 > width { x = 0; y += rowHeight + 14; rowHeight = 0 }
+            if x > 0, x + 210 > width { centerRow(); x = 0; y += rowHeight + 14; rowHeight = 0 }
             points.append(CGPoint(x: x, y: y))
             x += 228; rowHeight = max(rowHeight, size.height)
         }
+        centerRow()
         return (points, CGSize(width: width, height: y + rowHeight))
     }
 }

@@ -32,7 +32,7 @@ struct CreationView: View {
     let onAdjustWork: (SavedWork) -> Void
     let onReplayWork: (SavedWork) -> Void
     let onWorkAction: (SavedWork, String) -> Void
-    let onLineageExport: (String) -> Void
+    let onLineageExport: (LineageExportRequest) -> Void
     var onPresentWork: () -> Void = {}
     var onWorkspaceWorkChange: (SavedWork?) -> Void = { _ in }
     private var controlsDisabled: Bool { model.isBusy || automation.isOccupied }
@@ -561,20 +561,11 @@ struct CreationView: View {
         .overlay(alignment: .leading) { Rectangle().fill(InkuColor.border).frame(width: 1).padding(.vertical, 2) }
     }
 
-    /// Web WorkActionMenu (header variant): every action on the displayed work in one menu.
+    /// Web WorkActionMenu (header variant): editing only; viewing tools stay in the canvas toolbar.
     @ViewBuilder private var workActionMenu: some View {
         if let work = workspaceWork, hasSavedWorkspaceWork {
             Menu {
                 SavedWorkRefinementActions(model: model, work: work, onAction: onWorkAction, writingLocked: automation.isOccupied)
-                Divider()
-                Button(display.localized("再演奏"), systemImage: "arrow.clockwise") { onReplayWork(work) }
-                    .disabled(controlsDisabled)
-                Button(display.localized("生成情報"), systemImage: "info.circle") { onWorkAction(work, "info") }
-                Button(display.localized("系譜の奥書")) { onWorkAction(work, "colophon") }.disabled(controlsDisabled)
-                Button(display.localized("系譜を開く")) { ui.workspaceTab = "lineage" }
-                Divider()
-                Button(display.localized("全画面で表示")) { onPresentWork() }
-                    .keyboardShortcut("f", modifiers: [.command, .shift])
             } label: {
                 Label(display.localized("作品の操作"), systemImage: "ellipsis.circle").inkuFont(12)
             }
@@ -602,9 +593,14 @@ struct CreationView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(InkuColor.border2))
                     .padding(.vertical, 14)
             } else if ui.workspaceTab == "lineage" && display.visible("work_tools") && workspaceWork != nil {
-                LineageView(model: model, onEditWork: onEditWork, onAdjustWork: onAdjustWork, onReplayWork: onReplayWork,
-                            onWorkAction: onWorkAction, onExport: onLineageExport, initialWork: workspaceWork,
-                            writingLocked: controlsDisabled, onBrowseWork: { _ in batchWorkspace.showHistory() })
+                LineageView(model: model, onWorkAction: onWorkAction, onExport: onLineageExport, initialWork: workspaceWork,
+                            writingLocked: controlsDisabled, onBrowseWork: { _ in batchWorkspace.showHistory() },
+                            onOpenInCanvas: { work in
+                                batchWorkspace.showHistory()
+                                Task { await model.selectWork(work); ui.workspaceTab = "artwork" }
+                            }, onDetach: {
+                                batchWorkspace.showHistory(); model.detachLineage(); ui.workspaceTab = "artwork"
+                            })
                     .background(InkuColor.bg)
                     .padding(.horizontal, display.visible("history") ? 68 : 0)
             } else {

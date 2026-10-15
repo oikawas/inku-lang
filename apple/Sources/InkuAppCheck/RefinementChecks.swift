@@ -69,6 +69,9 @@ func runRefinementChecks() async throws {
           app.selectedWork == parent else {
         throw CheckFailure.message("Layout dialog lost saved conditions, reread or saved a preview: \(layout.errorText ?? layout.status)")
     }
+    layout.preview(layout.candidates[0].id)
+    guard layout.selectedCount == 0, layout.canGenerate(count: 1) else { throw CheckFailure.message("Layout enlargement adopted an option or blocked redrawing") }
+    layout.preview(nil)
     layout.selectCandidate(layout.candidates[0].id, selected: true)
     guard await layout.saveSelected(app: app), let saved = layout.committedWorks.first,
           try await database.list().count == initialRows + 1,

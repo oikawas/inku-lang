@@ -6,91 +6,70 @@ import SwiftUI
 public struct ComparisonView: View {
     @Bindable var model: AppModel
     @State private var comparison: ComparisonModel
+    @State private var modelDetailsReference: String?
+    @Environment(\.inkuWindowSize) private var windowSize
     @Environment(\.dismiss) private var dismiss
+    private let onCommitted: (SavedWork) -> Void
 
-    public init(model: AppModel, work: SavedWork? = nil, kind: ComparisonKind = .catalog) {
+    public init(model: AppModel, work: SavedWork? = nil, kind: ComparisonKind = .catalog, onCommitted: @escaping (SavedWork) -> Void = { _ in }) {
         self.model = model
+        self.onCommitted = onCommitted
         _comparison = State(initialValue: ComparisonModel(work: work, kind: kind))
     }
 
-    /// One lane per requested candidate, in the state the fan-out reports for it.
-    private var lanes: some View {
-        VariationLanesView(display: model.display, states: comparison.laneStates.map { state in
-            switch state { case .waiting: .waiting; case .running: .running; case .done: .done }
-        }, labels: comparison.laneLabels, named: comparison.kind == .model)
-    }
-
     public var body: some View {
-        @Bindable var comparison = comparison
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack {
-                    Text(model.display.localized(comparison.kind == .catalog ? "色カタログを変える" : "モデルを変える")).inkuFont(16, weight: .semibold)
-                    Spacer()
-                    Button(model.display.localized(comparison.hasUnsaved ? "破棄して閉じる" : "閉じる")) {
-                        Task { await comparison.stop(app: model); comparison.discardCandidates(); dismiss() }
-                    }.keyboardShortcut(.cancelAction)
-                        .disabled(comparison.stopping || model.isBusy && !comparison.running)
-                }
-                if let work = comparison.original {
-                    HStack(alignment: .top, spacing: 14) {
-                        ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(width: 150, height: 130)
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(model.display.localized("元の作品")).inkuFont(14, weight: .semibold)
-                            Text(work.effectiveSourceText).textSelection(.enabled)
-                            Text(model.display.localizedFormat("配色 %@ · シード %@", work.renderColorCatalogID ?? work.catalogID ?? model.display.localized("不明"), work.renderSeed ?? model.display.localized("不明")))
-                                .inkuFont(12).foregroundStyle(.secondary)
-                            Text(model.display.localized("候補はまだ履歴に保存されていません。選択して保存した候補が履歴と系譜に追加されます。"))
-                                .inkuFont(12).foregroundStyle(.secondary)
-                        }
-                    }
-                    if comparison.kind == .catalog { catalogChoices }
-                    else { modelChoices }
-                    if comparison.running {
-                        // RefinementColorCatalogView.svelte:77 / RefinementModelCompareView.svelte:100: the drawing
-                        // indicator, and a lane per candidate (named by model when comparing models).
-                        RunStatusView(display: model.display, label: comparison.status, stopping: comparison.stopping,
-                                      onStop: { Task { await comparison.stop(app: model) } }) { ProviderProgressView(model: model) }
-                        if !comparison.saving { lanes }
-                    }
-                    HStack {
-                        if !comparison.running {
-                            Button(model.display.localizedFormat("%ld件の候補を生成", comparison.requestedCount), systemImage: "square.grid.2x2") {
+        Group {
+            if let work = comparison.original {
+                RefinementDialog(model: model, title: comparison.kind == .catalog ? "色カタログを変える" : "モデルを変える", work: work,
+                    closeDisabled: comparison.running || comparison.hasUnsaved || model.isBusy, onClose: { dismiss() },
+                    topControls: comparison.kind == .model ? AnyView(modelChoices) : nil) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if comparison.kind == .catalog { catalogControls }
+                        if !comparison.running && comparison.kind == .catalog && comparison.candidates.isEmpty {
+                            Button(model.display.webCopy("colorCatalogChangeDraw", "ほかの色カタログで描く"), systemImage: "play.fill") {
                                 Task { await comparison.generate(app: model) }
                             }.buttonStyle(.borderedProminent).disabled(!comparison.canGenerate || model.isBusy)
-                                // RefinementModelCompareView.svelte:58.
                                 .inkuTooltip(comparison.kind == .model
-                                             ? model.display.tooltip("選んだモデルで記述から描き直し、候補を並べます。記述、色カタログ、キャンバスは保ちます。", serverKey: "tooltipModelCompare")
-                                             : "", placement: .bottom)
+                                    ? model.display.tooltip("選んだモデルで記述から描き直し、候補を並べます。記述、色カタログ、キャンバスは保ちます。", serverKey: "tooltipModelCompare") : "", placement: .bottom)
                         }
-                        Spacer()
-                        Button(model.display.localizedFormat("選択した%ld案を採用して閉じる", comparison.selectedCount), systemImage: "checkmark.circle") {
-                            Task { if await comparison.saveSelected(app: model) { dismiss() } }
-                        }.disabled(comparison.selectedCount == 0 || comparison.running || model.isBusy)
-                            .buttonStyle(.borderedProminent)
+                        Text(model.display.localized(comparison.kind == .catalog ? "超高速（LLM不要）" : "低速（LLM・API使用）")).inkuFont(12).foregroundStyle(.secondary)
+                        if comparison.running {
+                            RunStatusView(display: model.display, label: comparison.status, stopping: comparison.stopping,
+                                onStop: { Task { await comparison.stop(app: model) } }) { ProviderProgressView(model: model) }
+                            if !comparison.saving {
+                                VariationLanesView(display: model.display, states: comparison.laneStates.map {
+                                    switch $0 { case .waiting: .waiting; case .running: .running; case .done: .done }
+                                }, labels: comparison.laneLabels, named: comparison.kind == .model)
+                            }
+                        }
                     }
-                    if comparison.hasUnsaved {
-                        Button(model.display.localized("候補を破棄"), role: .destructive) { comparison.discardCandidates() }
-                            .disabled(comparison.running || model.isBusy)
-                    }
-                    if !comparison.candidates.isEmpty { candidateGrid }
-                } else {
-                    ContentUnavailableView(model.display.localized("保存作品を選択"), systemImage: "photo", description: Text(model.display.localized("ライブラリか制作画面で元の作品を選択してください。")))
+                } options: {
+                    RefinementOptionsGrid(model: model, options: comparison.candidates.map {
+                        RefinementOption(id: $0.id, work: $0.work, label: $0.label, selected: $0.selected, saved: $0.savedWork != nil,
+                            observation: $0.prepared)
+                    }, previewID: comparison.previewID, maxColumns: comparison.kind == .catalog ? 4 : 2,
+                        busy: comparison.running || model.isBusy,
+                        placeholder: comparison.kind == .catalog ? "色カタログを替えた候補を並べます。" : "モデルを選んで描くと、候補をここに並べます。",
+                        errors: comparison.failures + [comparison.errorText].compactMap { $0 }, status: comparison.status,
+                        onPreview: { comparison.preview($0) }, onSelect: { comparison.selectCandidate($0, selected: $1) },
+                        onDiscard: { comparison.discardCandidates(); dismiss() },
+                        onSave: { Task {
+                            if await comparison.saveSelected(app: model) {
+                                if let latest = comparison.candidates.compactMap(\.savedWork).last { onCommitted(latest) }
+                                dismiss()
+                            }
+                        } })
                 }
-                if !comparison.running { Text(model.display.message(comparison.status)).inkuFont(13).foregroundStyle(.secondary) }
-                if let error = comparison.errorText { Text(error).foregroundStyle(.red).textSelection(.enabled) }
-                ForEach(Array(comparison.failures.enumerated()), id: \.offset) { _, failure in
-                    Text(failure).inkuFont(13).foregroundStyle(.red).textSelection(.enabled)
-                }
-            }.padding(20)
+            } else {
+                VStack {
+                    if let error = comparison.errorText { Text(model.display.message(error)).foregroundStyle(.red) }
+                    else { ProgressView() }
+                    Button(model.display.localized("閉じる")) { dismiss() }
+                }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
-        #if os(macOS)
-        .frame(minWidth: 540, idealWidth: 850, minHeight: 550)
-        #endif
         .task {
             await comparison.initialize(app: model)
-            // Web `model_inspection_selected_models`: the last choice, less models no longer offered (at most 4). Those
-            // leave the saved choice at once, as the Web's effect writes the filtered list back.
             if comparison.kind == .model, comparison.contextAvailable, let saved = model.display.preferences.comparisonModels {
                 let kept = Array(saved.filter(comparison.isModelChoice).prefix(4))
                 if kept != saved { model.display.preferences.comparisonModels = kept }
@@ -102,86 +81,80 @@ public struct ComparisonView: View {
         .onDisappear { Task { await comparison.stop(app: model); comparison.discardCandidates() } }
     }
 
-    private var catalogChoices: some View {
-        GroupBox(model.display.localized("同じScoreを別の配色で描く")) {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 145))], alignment: .leading, spacing: 10) {
-                ForEach(model.catalogs.filter { $0.id != (comparison.original?.renderColorCatalogID ?? comparison.original?.catalogID) }, id: \.id) { catalog in
-                    Text(catalog.name).inkuFont(13)
-                }
-            }.padding(6)
+    private var catalogControls: some View {
+        let id = comparison.original?.renderColorCatalogID ?? comparison.original?.catalogID ?? ""
+        return VStack(alignment: .leading, spacing: 6) {
+            Text(model.display.localized("いまの色カタログ") + ": " + (model.catalogs.first { $0.id == id }?.name ?? id)).inkuFont(12, weight: .semibold)
+            Text(model.display.tooltip("保存済みの指示書を別の色カタログで描きます。配置とタッチは保ちます。", serverKey: "tooltipCanvasVaryColor"))
+                .inkuFont(12).foregroundStyle(.secondary)
         }
     }
 
     private var modelChoices: some View {
-        return GroupBox(model.display.localized("記述を各モデルで読み直す")) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(model.display.localized("使用中のLLMモデルを4件まで選択してください。"))
-                    .inkuFont(12).foregroundStyle(.secondary)
-                ForEach(comparison.modelProviders) { provider in
-                    Text(model.display.providerName(provider)).inkuFont(12, weight: .semibold)
-                    ModelCatalogGroupsView(models: SettingsModel.batchModels(for: provider), display: model.display,
-                                           columns: [GridItem(.adaptive(minimum: 190))]) { entry in
-                        comparisonModelCard(entry, provider: provider)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(model.display.localized(comparison.inheritWild ? "筆致制限（継承）" : "筆致制限")).inkuFont(12).foregroundStyle(.secondary)
+                Button(model.display.localized("暴れる") + " " + model.display.localized(effectiveWild ? "入" : "切")) {
+                    comparison.wildOverride = !effectiveWild; comparison.inheritWild = false
+                }.disabled(comparison.running || model.isBusy)
+                Spacer()
+                Button(model.display.webCopy("modelCompareButton", "選んだモデルで描く"), systemImage: "play.fill") {
+                    Task { await comparison.generate(app: model) }
+                }.buttonStyle(.borderedProminent).disabled(!comparison.canGenerate || model.isBusy)
+                    .inkuTooltip(model.display.tooltip("選んだモデルで記述から描き直し、候補を並べます。記述、色カタログ、キャンバスは保ちます。", serverKey: "tooltipModelCompare"))
+            }
+            ScrollView {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 8)], alignment: .leading, spacing: 8) {
+                    ForEach(comparison.modelProviders) { provider in
+                        ForEach(SettingsModel.batchModels(for: provider)) { entry in comparisonModelCard(entry, provider: provider) }
                     }
                 }
-                Text(model.display.localizedFormat("選択中: %ld / 4", comparison.modelReferences.count)).inkuFont(12).monospacedDigit()
-                if comparison.modelProviders.isEmpty {
-                    Text(model.display.localized("選べるモデルがありません。設定 → モデル設定 で使用するモデルを選択してください。"))
-                        .inkuFont(12).foregroundStyle(.secondary)
-                }
-                if comparison.sourceIsLocked {
-                    Text(model.display.localized("DDLを編集した作品は記述を読み直せません。配色の比較を選択してください。"))
-                        .inkuFont(13).foregroundStyle(.secondary)
-                }
-            }.padding(6)
+            }.frame(height: modelGridHeight)
+            Text(model.display.localizedFormat("選択中: %ld / 4", comparison.modelReferences.count)).inkuFont(12).monospacedDigit()
+            if comparison.modelProviders.isEmpty {
+                Text(model.display.localized("選べるモデルがありません。設定 → モデル設定 で使用するモデルを選択してください。"))
+                    .inkuFont(12).foregroundStyle(.secondary)
+            }
+            if comparison.sourceIsLocked {
+                Text(model.display.localized("DDLを編集した作品は記述を読み直せません。配色の比較を選択してください。"))
+                    .inkuFont(13).foregroundStyle(.secondary)
+            }
         }
+    }
+
+    private var effectiveWild: Bool { comparison.inheritWild ? comparison.original?.renderWild ?? false : comparison.wildOverride }
+    private var modelGridHeight: CGFloat {
+        let choices = comparison.modelProviders.reduce(0) { $0 + SettingsModel.batchModels(for: $1).count }
+        let columns = max(1, Int(((windowSize?.width ?? 1280) - 80) / 188))
+        return min(250, CGFloat(max(1, (choices + columns - 1) / columns)) * 76)
     }
 
     private func comparisonModelCard(_ entry: ProviderModelSettings, provider: ProviderSettings) -> some View {
         let reference = provider.id + ":" + entry.id
         let selected = comparison.selectedModelReferences.contains(reference)
-        let target = reference == comparison.targetModelReference
+        let target = reference == comparison.targetModelReference || reference == comparison.original?.stage2Model
         let full = !selected && comparison.modelReferences.count >= 4
         return VStack(alignment: .leading, spacing: 6) {
-            Toggle(entry.label.isEmpty ? entry.id : entry.label, isOn: Binding(
-                get: { selected }, set: {
-                    comparison.selectModel(reference, selected: $0)
-                    model.display.preferences.comparisonModels = Array(comparison.modelReferences.prefix(4))
-                }))
-                .disabled(comparison.running || model.isBusy || comparison.hasUnsaved || comparison.sourceIsLocked || target || full || !entry.isSelectable)
-                .strikethrough(entry.modelFold == "eol")
-            if target { Text(model.display.localized("元の作品のモデル")).inkuFont(12).foregroundStyle(.secondary) }
-            ModelLabelsView(labels: entry.resolvedLabels, display: model.display)
-            if comparison.failedModelReferences.contains(reference) { Text(model.display.localized("このモデルの候補を用意できませんでした。")).inkuFont(12).foregroundStyle(.red) }
-            DisclosureGroup(model.display.localized("モデルの適性・用途")) {
-                RegisteredModelMetadataView(entry: entry, provider: provider, display: model.display)
-            }.inkuFont(12)
-        }.padding(10).background(.quaternary.opacity(0.2), in: RoundedRectangle(cornerRadius: 8))
-    }
-
-    private var candidateGrid: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 210))], alignment: .leading, spacing: 16) {
-            ForEach(comparison.candidates) { candidate in
-                VStack(alignment: .leading, spacing: 10) {
-                    ArtworkThumbnail(work: candidate.work, thumbnails: model.thumbnails).frame(height: 185)
-                    Text(candidate.label).inkuFont(14, weight: .semibold).textSelection(.enabled)
-                    ProviderObservationView(model: model, metrics: candidate.prepared.providerMetrics,
-                        workID: candidate.savedWork?.id, executionID: candidate.prepared.executionID)
-                    if let saved = candidate.savedWork {
-                        HStack {
-                            Label(model.display.localized("保存済み"), systemImage: "checkmark.circle").foregroundStyle(.secondary)
-                            Spacer()
-                            Button(model.display.localized("作品を開く")) { Task { await model.selectWork(saved) } }
-                                .disabled(comparison.running || model.isBusy)
-                        }.inkuFont(12)
-                    } else {
-                        Toggle(model.display.localized("この候補を保存"), isOn: Binding(get: { candidate.selected },
-                            set: { comparison.selectCandidate(candidate.id, selected: $0) }))
-                            .disabled(comparison.running || model.isBusy)
-                        Text(model.display.localized("未保存")).inkuFont(12).foregroundStyle(.secondary)
+            HStack(alignment: .top, spacing: 4) {
+                Toggle(entry.label.isEmpty ? entry.id : entry.label, isOn: Binding(
+                    get: { selected }, set: {
+                        comparison.selectModel(reference, selected: $0)
+                        model.display.preferences.comparisonModels = Array(comparison.modelReferences.prefix(4))
+                    })).inkuFont(12, weight: .semibold)
+                    .disabled(comparison.running || model.isBusy || comparison.sourceIsLocked || target || full || !entry.isSelectable)
+                    .strikethrough(entry.modelFold == "eol")
+                Spacer(minLength: 0)
+                Button { modelDetailsReference = reference } label: { Image(systemName: "info.circle") }
+                    .buttonStyle(.plain).accessibilityLabel(model.display.localized("モデルの適性・用途") + ": " + entry.id)
+                    .popover(isPresented: Binding(get: { modelDetailsReference == reference }, set: { if !$0 { modelDetailsReference = nil } })) {
+                        RegisteredModelMetadataView(entry: entry, provider: provider, display: model.display).padding(16).frame(width: 320)
                     }
-                }.padding(12).background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
             }
-        }
+            Text(model.display.providerName(provider)).inkuFont(10).foregroundStyle(.secondary)
+            if target { Text(model.display.localized("元の作品のモデル")).inkuFont(10).foregroundStyle(.secondary) }
+            if comparison.failedModelReferences.contains(reference) { Text(model.display.localized("このモデルの候補を用意できませんでした。")).inkuFont(10).foregroundStyle(.red) }
+        }.padding(8).frame(maxWidth: .infinity, minHeight: 50, alignment: .topLeading)
+            .background(selected ? Color.accentColor.opacity(0.12) : InkuColor.bg2)
+            .overlay(Rectangle().stroke(selected || target ? Color.accentColor : InkuColor.border))
     }
 }

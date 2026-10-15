@@ -146,37 +146,37 @@ export const SURFACE_PREVIEWS: Record<string, PreviewEntry> = {
 	},
 	粒: {
 		effect: '細かい粒を面に撒き、擦れた粗さを出す。',
-		example: '粒の立つ面にする',
+		example: '粒の四角を置く',
 		effectEn: 'Scatters fine grain across the face for a scuffed roughness.',
-		exampleEn: 'A grainy face',
+		exampleEn: 'Place a grain square',
 		svg: surfaceSvg(surfaceDabs(78, 1.3, 0.5, 1.7))
 	},
 	点描: {
 		effect: '点を面に撒いて濃淡を作る。',
 		example: '点描の円を置く',
 		effectEn: 'Scatters dots across the face to build tone.',
-		exampleEn: 'Fill the face with stipple',
+		exampleEn: 'Place a stipple square',
 		svg: surfaceSvg(surfaceDabs(34, 2.6, 0.62, 5.3))
 	},
 	平行線: {
 		effect: '平行な線で面を埋める。密度が上がるほど線の間隔が詰まる。',
-		example: '平行線で四角を埋める',
+		example: '平行線の四角を置く',
 		effectEn: 'Fills the face with parallel lines; the denser it is, the tighter the spacing.',
-		exampleEn: 'Fill a square with hatch',
+		exampleEn: 'Place a hatch square',
 		svg: surfaceSvg(surfaceHatch([45], 8, 2, 0.62))
 	},
 	交差線: {
 		effect: '平行線にもう一組を交差させて重ねる。',
-		example: '交差線で四角を埋める',
+		example: '交差線の四角を置く',
 		effectEn: 'Lays a second set of lines across the first.',
-		exampleEn: 'Fill a square with crosshatch',
+		exampleEn: 'Place a crosshatch square',
 		svg: surfaceSvg(surfaceHatch([45, 115], 9, 2, 0.5))
 	},
 	アクアチント: {
 		effect: '粒の濃さを段に分ける。既定は三段。',
-		example: 'アクアチント三段の四角',
+		example: 'アクアチントの四角を置く',
 		effectEn: 'Divides the grain into discrete tone steps, three by default.',
-		exampleEn: 'A square in three-step aquatint',
+		exampleEn: 'Place an aquatint square',
 		svg: surfaceSvg(
 			surfaceDabs(26, 1.5, 0.28, 2.3, 51, 76) +
 				surfaceDabs(26, 1.5, 0.56, 6.1, 77, 103) +
@@ -189,25 +189,25 @@ export const SURFACE_PREVIEWS: Record<string, PreviewEntry> = {
 export const HANDLING_PREVIEWS: Record<string, PreviewEntry> = {
 	濃い: {
 		effect: '道具の本来の濃さより濃く置く。線・弧・質感の面・塗りに添えられる。図は左が程よい鉛筆の点描、右が濃い点描。',
-		example: '鉛筆で濃い点描の四角を置く',
+		example: '鉛筆の濃い点描の四角を置く',
 		effectEn:
 			'Lays ink or paint more densely relative to the tool, on lines, arcs, textured faces or flat fills. Left: temperate pencil stipple; right: dense stipple.',
-		exampleEn: 'Place a dense stipple square with a pencil',
+		exampleEn: 'Place a dense stipple pencil square',
 		svg: surfaceSvg(handlingRelative(0.66 * 1.35))
 	},
 	程よい: {
 		effect: '道具の本来の濃さで置く。さばきを省略した痕と同じ。図は左右とも程よい鉛筆の点描。',
-		example: '鉛筆で程よい点描の四角を置く',
+		example: '鉛筆の程よい点描の四角を置く',
 		effectEn: 'Lays ink or paint at the tool’s own opacity, as when handling is omitted. Both halves show temperate pencil stipple.',
-		exampleEn: 'Place a temperate stipple square with a pencil',
+		exampleEn: 'Place a temperate stipple pencil square',
 		svg: surfaceSvg(handlingRelative(0.66))
 	},
 	薄い: {
 		effect: '道具の本来の濃さより淡く置く。線・弧・質感の面・塗りに添えられる。図は左が程よい鉛筆の点描、右が薄い点描。',
-		example: '鉛筆で薄い点描の四角を置く',
+		example: '鉛筆の薄い点描の四角を置く',
 		effectEn:
 			'Lays ink or paint more faintly relative to the tool, on lines, arcs, textured faces or flat fills. Left: temperate pencil stipple; right: faint stipple.',
-		exampleEn: 'Place a faint stipple square with a pencil',
+		exampleEn: 'Place a faint stipple pencil square',
 		svg: surfaceSvg(handlingRelative(0.66 * 0.55))
 	}
 };

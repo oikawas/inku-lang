@@ -8,6 +8,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Reflect the second NVIDIA NIM measurement in the model information
+
+At the author's request, the catalog `model_catalog.json` now carries the drawing session's second measurement of NIM's 81 models at another time of day (run `provider-20261015-run-58c65cd7` and its continuation `provider-20261015-run-d7cf1be7`, an 800-second response limit), read together with the first (`provider-20261014-run-a93fb5ed`). The two ran on different builds and native bindings, so they are not a comparison of the time of day alone. By the author's choice, a model qualifies when it held in either measurement.
+
+- LLM: a model that drew all six descriptions in either measurement can be chosen at ★★☆. `nvidia/ising-calibration-1.5-31b` (6 and 5) and `poolside/laguna-xs-2.1` (6 and 2) are joined by `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` (1 and 6).
+- Vision: a model that read the picture in either measurement can be chosen. `google/diffusiongemma-26b-a4b-it` is ★★☆ (C 4/5 both times), and `nvidia/ising-calibration-1.5-31b` gains ★☆☆ from this measurement's C 3/5. `google/gemma-4-31b-it`, which read A right this time, joins with no level. Omni and the two llama-3.2 vision models stay without a level.
+- `moonshotai/kimi-k3` ended on NIM during the measurement (410, 2026-10-15 08:00 UTC) and is filed as end of life. The newly listed `stepfun-ai/step-5-preview` stopped at the output limit on all six and falls under "No response when measured".
+- Comments of models measured twice now give both counts, and seconds average both measurements. The 20 not-supported models and the 44 that answered only 404 are unchanged. No cost is given, as before.
+
 ### 2026-10-15 — Match macOS library preview, search, and history labels to Web
 
 Reordered preview images, descriptions, actions, details, and comments; added inline search clearing and hash/work-ID prefixes. History model labels now preserve versions, sizes, and variants using Web abbreviations. Removed the native export mark, filter, and stored attribute through Swift DB v4, preserving comments, revision marks, and saved works.

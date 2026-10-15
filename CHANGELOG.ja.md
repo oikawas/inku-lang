@@ -8,6 +8,13 @@
 
 ## 未リリース
 
+### 2026-10-15 — Mac local LLM の測定をモデル情報へ反映する
+
+作者の依頼。描画セッションが M5 Pro で測った MLX 4bit の5モデル（run `provider-20261015-run-00c388f6` と `provider-20261015-run-c363fb86`、応答期限800秒）を、正本 `model_catalog.json` に提供元 `local-mlx` として書いた。作者の選択で組み込みの提供元にはせず、管理者が足した提供元のまま、他の提供元と同じに扱う。
+
+- 5モデルとも6記述すべて描けたので LLM ★★☆。Vision は `lmstudio-community/Qwen3.8-27B-MLX-4bit` が ★★★（C 5/5）、`mlx-community/gemma-4-12B-it-4bit` が ★★☆（C 4/5）、`mlx-community/gemma-4-31b-it-4bit` が ★☆☆（C 3/5）。正方形を長方形と読んだ `mlx-community/gemma-4-e2b-it-4bit` と `mlx-community/Qwen3.6-35B-A3B-4bit` は段なしの Vision。秒数は描画1件の生成要求の合計の平均と、画像 A/B の平均。費用はローカルなので空ける。
+- Server は、組み込みでない提供元にも、正本がその id を載せていれば、正本が変わったときに正本の情報を重ねる。名前・接続先・モデルの一覧と公開の選択は環境のもののまま。
+
 ## v2.15.154（2026-10-15 / Build 1230）
 
 ### 2026-10-15 — 続きの文の後の「順に」の並びが、別の形を並べず、compilerを止めない（DDL engine 62）

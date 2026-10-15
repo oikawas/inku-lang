@@ -39,7 +39,8 @@ def test_the_catalog_file_is_well_formed():
     assert catalog_problems() == []
     assert [label["id"] for label in MODEL_LABELS] == [
         "unmeasured", "legacy", "subscription", "no_response", "not_supported", "eol"]
-    assert set(MODEL_CATALOG["providers"]) == {"openai", "anthropic", "gemini", "nvidia", "ollama", "ollama-cloud", "chatgpt"}
+    assert set(MODEL_CATALOG["providers"]) == {
+        "openai", "anthropic", "gemini", "nvidia", "ollama", "ollama-cloud", "local-mlx", "chatgpt"}
 
 
 def test_a_model_is_labelled_and_filed_as_the_shared_cases_say():
@@ -61,6 +62,34 @@ def test_a_changed_catalog_replaces_the_model_information_an_installation_kept()
     assert {key: value for key, value in model.items() if key not in ("label", "requires_subscription")} == {
         key: value for key, value in catalog.items() if key != "label"}
     assert (model["label"], model["requires_subscription"]) == ("shown here", True)
+
+
+def test_a_provider_an_operator_added_follows_the_catalog_that_names_it():
+    # Mac local LLM is not builtin: an operator adds it with its own name and address. Its
+    # measurements are in the catalog (the author, 2026-10-15), so they are laid over the models
+    # the installation lists, which still decide what exists and what is switched on.
+    stored = {"model_catalog_version": "2.5.0", "providers": {"local-mlx": {
+        "label": "Mac local LLM", "kind": "mlx", "base_url": "http://192.168.0.11:8080/v1",
+        "models": [{"id": "mlx-community/gemma-4-12B-it-4bit", "label": "gemma 12B", "purposes": ["llm"]},
+                   {"id": "someone/unmeasured-4bit", "label": "unmeasured-4bit"}],
+        "enabled_models": {"mlx-community/gemma-4-12B-it-4bit": False}}}}
+    provider = normalize_model_settings(stored)["providers"]["local-mlx"]
+    assert (provider["builtin"], provider["kind"], provider["label"], provider["base_url"]) == (
+        False, "mlx", "Mac local LLM", "http://192.168.0.11:8080/v1")
+    models = {model["id"]: model for model in provider["models"]}
+    assert set(models) == {"mlx-community/gemma-4-12B-it-4bit", "someone/unmeasured-4bit"}
+    catalog = catalog_models("local-mlx")["mlx-community/gemma-4-12B-it-4bit"]
+    assert {key: value for key, value in models["mlx-community/gemma-4-12B-it-4bit"].items() if key != "label"} == {
+        key: value for key, value in catalog.items() if key != "label"}
+    assert models["mlx-community/gemma-4-12B-it-4bit"]["label"] == "gemma 12B"
+    assert provider["enabled_models"]["mlx-community/gemma-4-12B-it-4bit"] is False
+    shown = next(group for group in model_provider_catalog(stored) if group["id"] == "local-mlx")
+    labels = {model["id"]: model["labels"] for model in shown["models"]}
+    assert labels == {"mlx-community/gemma-4-12B-it-4bit": [], "someone/unmeasured-4bit": ["unmeasured"]}
+    # A provider the catalog does not name keeps what the installation stored.
+    other = normalize_model_settings({"model_catalog_version": "2.5.0", "providers": {"my-box": {
+        "models": [{"id": "mlx-community/gemma-4-12B-it-4bit", "label": "x", "comment_ja": "手元"}]}}})
+    assert other["providers"]["my-box"]["models"][0]["comment_ja"] == "手元"
 
 
 def test_an_administrators_change_lasts_until_the_catalog_changes():

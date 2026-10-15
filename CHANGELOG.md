@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.147 (2026-10-15 / Build 1223)
+
 ### 2026-10-15 — Free line becomes a DDL word (DDL 19, Score 0.21.0)
 
 By the author's choice (I-715 stage B). After Kandinsky's line as the trace of forces, a shape word now names a line whose path between its start and end the performance decides.

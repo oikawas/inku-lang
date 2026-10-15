@@ -3468,11 +3468,16 @@ previous shape only through `connected to the previous shape` (to its end).
 #### 14.10.5 Selection rule (not an escape hatch)
 
 As for cloudform (§14.9.4), Stage 1 may choose a free line only when the
-description names one, or when what is drawn is itself a line without a set
-shape (the track of something that passed, the trace of a moving hand). What
-straight lines, curves, and arcs can say is drawn with lines and arcs, and a
-free line never approximates what the reader is unsure of. The rule is item 13
-of the work-plan instruction in both languages (DDL engine 60, I-715 stage B2).
+description names one, or when what the description draws is itself a line
+without a set shape (a track left behind, a path something took, the trace of a
+moving hand). A moving thing or movement and propagation, a sound or its echo, a
+feeling, a crowd or a texture, and an abstract mark never become a free line.
+Lines with a set shape (a spiral, a wavy line, an arc) and straight or curved
+lines are drawn with lines and arcs. Many free lines are never piled or
+scattered into an area or a texture, and a free line never approximates what the
+reader is unsure of. The rule is item 13 of the work-plan instruction in both
+languages (DDL engine 60, I-715 stage B2; stage B2b narrowed it after readings
+had spread it to motion, sound, crowds and textures).
 The saijiki lists the free line and offers it to Stage 1 (`prompt` and
 `display` are true; it follows arc).
 

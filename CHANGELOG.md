@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.155 (2026-10-15 / Build 1231)
+
 ### 2026-10-15 — Reflect the Mac local LLM measurement in the model information
 
 At the author's request, the catalog `model_catalog.json` now carries the drawing session's measurement of five MLX 4-bit models on an M5 Pro (runs `provider-20261015-run-00c388f6` and `provider-20261015-run-c363fb86`, an 800-second response limit) under the provider `local-mlx`. By the author's choice it is not made a builtin provider: it stays one an administrator adds, treated like any other provider.

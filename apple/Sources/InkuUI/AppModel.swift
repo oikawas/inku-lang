@@ -130,7 +130,7 @@ public final class AppModel {
     }
     public private(set) var unreadOutputs: Set<String> = []
     private var workActionStates: [String: SavedWorkActionState] = [:]
-    public let library = LibraryModel()
+    public let library = LibraryModel(includeListSVG: false)
     public let display = DisplaySettings()
     public let descriptionMeter = DescriptionMeterModel()
     /// The saijiki preview's painter.

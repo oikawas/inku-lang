@@ -140,7 +140,7 @@ public actor InkuDatabase {
 
     /// Count and select the same database predicate in one consistent read.
     public func libraryPage(query: LibraryQuery = LibraryQuery(), limit: Int = 24,
-                            offset: Int = 0, rootNodeID: String? = nil) throws -> LibraryPage {
+                            offset: Int = 0, rootNodeID: String? = nil, includeSVG: Bool = true) throws -> LibraryPage {
         try Self.validatePage(limit: limit, offset: offset)
         return try queue.read { db in
             var filter = Self.libraryFilter(query)
@@ -155,7 +155,7 @@ public actor InkuDatabase {
             let total = try Int.fetchOne(db, sql: "SELECT count(*) \(Self.libraryJoin) WHERE \(filter.sql)",
                                          arguments: filter.arguments) ?? 0
             let rows = try Row.fetchAll(db, sql: """
-                SELECT h.*, a.note AS library_note,
+                SELECT \(Self.libraryProjection(includeSVG: includeSVG)), a.note AS library_note,
                        coalesce(a.for_revision, 0) AS library_revision
                 \(Self.libraryJoin) WHERE \(filter.sql)
                 ORDER BY h.at \(query.order == .newest ? "DESC" : "ASC"), h.id ASC LIMIT ? OFFSET ?
@@ -213,7 +213,7 @@ public actor InkuDatabase {
 
     /// Group filtering and pagination happen before fetching representative SVGs.
     public func libraryGroups(query: LibraryQuery = LibraryQuery(), limit: Int = 12,
-                              offset: Int = 0, minimumItemCount: Int = 1) throws -> LibraryGroupPage {
+                              offset: Int = 0, minimumItemCount: Int = 1, includeSVG: Bool = true) throws -> LibraryGroupPage {
         try Self.validatePage(limit: limit, offset: offset)
         guard minimumItemCount >= 1 else { throw PersistenceError.invalidRecord("invalid group size") }
         return try queue.read { db in
@@ -234,7 +234,7 @@ public actor InkuDatabase {
             let groups = try rows.map { row -> LibraryGroup in
                 let root: String = row["root_id"]
                 guard let representative = try Row.fetchOne(db, sql: """
-                    SELECT h.*, a.note AS library_note, coalesce(a.for_revision, 0) AS library_revision
+                    SELECT \(Self.libraryProjection(includeSVG: includeSVG)), a.note AS library_note, coalesce(a.for_revision, 0) AS library_revision
                     \(Self.libraryJoin) WHERE \(filter.sql) AND coalesce(n.root_node_id, n.id) = ?
                     ORDER BY h.at DESC, h.id ASC LIMIT 1
                     """, arguments: filter.arguments + [root]) else {
@@ -281,7 +281,7 @@ public actor InkuDatabase {
 
     public func libraryAnnotation(id: String) throws -> LibraryAnnotation {
         try queue.read { db in
-            guard try SavedWork.fetchOne(db, key: id) != nil else {
+            guard try Bool.fetchOne(db, sql: "SELECT EXISTS(SELECT 1 FROM history WHERE id = ?)", arguments: [id]) == true else {
                 throw PersistenceError.invalidRecord("work no longer exists")
             }
             return try Self.annotation(id: id, in: db)
@@ -556,9 +556,17 @@ public actor InkuDatabase {
         return (clauses.joined(separator: " AND "), arguments)
     }
 
+    /// Server `include_svg=false`: keep list metadata and byte size without copying SVG text.
+    private static func libraryProjection(includeSVG: Bool) -> String {
+        let columns = includeSVG ? "h.*" : SavedWork.CodingKeys.allCases.map {
+            $0 == .svg ? "'' AS svg" : "h.\($0.rawValue)"
+        }.joined(separator: ", ")
+        return columns + ", length(CAST(h.svg AS BLOB)) AS library_svg_bytes"
+    }
+
     private static func libraryItem(_ row: Row) throws -> LibraryItem {
         LibraryItem(work: try SavedWork(row: row), annotation: LibraryAnnotation(
-            note: row["library_note"], forRevision: row["library_revision"]))
+            note: row["library_note"], forRevision: row["library_revision"]), svgBytes: row["library_svg_bytes"])
     }
 
     private static func annotation(id: String, in db: Database) throws -> LibraryAnnotation {

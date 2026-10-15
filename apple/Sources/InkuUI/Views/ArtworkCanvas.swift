@@ -482,6 +482,10 @@ struct ArtworkThumbnail: View {
     @Environment(DisplaySettings.self) private var display: DisplaySettings?
     @State private var image: CGImage?
     @State private var failed = false
+    private struct Identity: Equatable {
+        let id: String
+        let renderHash: String?
+    }
 
     /// HistoryThumbnail.svelte:51-62: one dot for both layers, its title naming the layer that fell.
     private var fallbackMarkLabel: String? {
@@ -513,7 +517,7 @@ struct ArtworkThumbnail: View {
                     .inkuTooltip(display.tooltipValue(label))
             }
         }
-        .task(id: work.svg) {
+        .task(id: Identity(id: work.id, renderHash: work.renderHash)) {
             image = nil; failed = false
             do {
                 let rendered = try await thumbnails.image(for: work)

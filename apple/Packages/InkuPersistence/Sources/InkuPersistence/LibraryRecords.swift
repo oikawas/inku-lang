@@ -30,7 +30,14 @@ public struct LibraryQuery: Sendable, Equatable {
 public struct LibraryItem: Sendable, Equatable, Identifiable {
     public let work: SavedWork
     public let annotation: LibraryAnnotation
+    /// UTF-8 SVG size even when the listing leaves the drawing out.
+    public let svgBytes: Int64
     public var id: String { work.id }
+
+    public init(work: SavedWork, annotation: LibraryAnnotation, svgBytes: Int64? = nil) {
+        self.work = work; self.annotation = annotation
+        self.svgBytes = svgBytes ?? Int64(work.svg.utf8.count)
+    }
 }
 
 public struct LibraryPage: Sendable, Equatable {

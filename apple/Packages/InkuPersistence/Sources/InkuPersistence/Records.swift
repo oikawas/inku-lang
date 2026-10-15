@@ -89,7 +89,7 @@ public struct SavedWork: Codable, Sendable, Equatable {
         self.historyVisibility = historyVisibility; self.lineageNodeID = lineageNodeID
     }
 
-    public enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey, CaseIterable {
         case id, at, input, ddl, score, svg, starred, trashed
         case sourceText = "source_text", ddlSourceOrigin = "ddl_source_origin", elapsedMS = "elapsed_ms"
         case stage1Model = "stage1_model", stage2Model = "stage2_model", catalogID = "catalog_id"

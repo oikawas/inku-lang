@@ -159,7 +159,13 @@ public actor ArtworkThumbnails {
             return image
         }
         do {
-            let (image, png) = try await Self.bake(svg: svg, on: display)
+            // A library list deliberately carries no SVG, as Server's include_svg=false does.
+            // Read exactly this drawing only if its persisted PNG is missing or stale.
+            let source: String
+            if !svg.isEmpty { source = svg }
+            else if let database, let storedSVG = try await database.svgs(ids: [id])[id] { source = storedSVG }
+            else { throw ArtworkError.imageUnavailable }
+            let (image, png) = try await Self.bake(svg: source, on: display)
             statistics.bakedOnDisplay += 1
             try? await store?.put(historyID: id, scale: Self.scale, png: png, sourceRenderHash: renderHash)
             return image

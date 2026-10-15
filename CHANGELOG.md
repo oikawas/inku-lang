@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Reduce macOS library paging work
+
+Library pages follow Web/Server by leaving SVG text out and using persisted PNGs. SVG sizes and work information remain available; refinement, export, and other work actions read the chosen complete record on demand. Card-height notifications no longer rebuild the entire library, and paging no longer reloads the background lineage.
+
 ## v2.15.151 (2026-10-15 / Build 1227)
 
 ### 2026-10-15 — Reflect the second NVIDIA NIM measurement in the model information

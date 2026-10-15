@@ -370,8 +370,17 @@ struct LineageView: View {
                 }
                 identityMarks(item, graph: graph)
                 Spacer(minLength: 0)
-                Menu { nodeMenu(item, graph: graph) } label: { Image(systemName: "ellipsis") }
-                    .fixedSize().accessibilityLabel(model.display.localized("節点の操作"))
+                if let work = item.work, !work.trashed {
+                    Menu {
+                        Section {
+                            SavedWorkRefinementActions(model: model, work: work, onAction: dispatchWorkAction, writingLocked: writingDisabled)
+                        } header: {
+                            Text(cardRefinementTitle(work))
+                        }
+                    } label: { Image(systemName: "ellipsis") }
+                        .fixedSize().accessibilityLabel(model.display.webCopy("workActionOpenMenu", "作品編集メニューを開く"))
+                        .disabled(writingDisabled)
+                }
             }.buttonStyle(.borderless).frame(minHeight: 22)
             if let work = item.work {
                 Button { openWork(item) } label: {
@@ -440,6 +449,15 @@ struct LineageView: View {
                     .inkuTooltip(model.display.tooltipValue(stageModelTitle(work)))
             }
         }.inkuFont(12).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func cardRefinementTitle(_ work: SavedWork) -> String {
+        let title = model.display.webCopy("workActionMenuTitle", "作品編集")
+        switch model.workActionState(for: work) {
+        case .userDDL: return title + " " + model.display.webCopy("workActionDdlOrigin", "（DDL直接生成作品）")
+        case .lockedDescription: return title + " " + model.display.webCopy("descriptionLockedMark", "ロック")
+        default: return title
+        }
     }
 
     private func identityMarks(_ item: LineageItem, graph: LineageSnapshot) -> some View {

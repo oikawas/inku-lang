@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Match macOS lineage-card ellipsis menus to Web
+
+The ellipsis now opens shared refinement actions for that card's work, instead of mixing in node navigation, marks, export, and deletion. Direct-DDL and held-description conditions follow the Web menu. Nodes without a saved work and trashed works have no ellipsis button.
+
 ### 2026-10-15 — Add macOS color-arrangement and ground refinement with shared option dialogs
 
 Added Change the color arrangement and Change the ground to the work menu, drawing options from the saved instructions, Score, and conditions without an LLM. Composition, catalog, model, and touch dialogs now also show the target on the left and options on the right. Clicking an option enlarges it and returns to the grid independently of multiple selection. Chosen options can be saved, all options discarded, and color arrangements paged eight at a time.

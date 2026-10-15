@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Align the demo ownership test with its current drawing connection
+
+Update the ownership test's old inline-callback expectation for demo drawing, which now passes one shared model to both stages. Check the connection inside the current callback; product drawing behavior is unchanged.
+
 ## v2.15.150 (2026-10-15 / Build 1226)
 
 ### 2026-10-15 — Hide sharing controls in single-user mode

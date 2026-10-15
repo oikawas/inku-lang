@@ -222,10 +222,24 @@ def test_nvidia_fills_a_bare_stored_entry_from_the_catalog() -> None:
     })
     by_id = {str(m["id"]): m for m in settings["providers"]["nvidia"]["models"]}
     gemma = by_id["google/gemma-4-31b-it"]
-    assert gemma["purposes"] == []
-    assert gemma["unsupported_purposes"] == ["llm", "vision"]
+    assert gemma["purposes"] == ["vision"]
+    assert gemma["unsupported_purposes"] == ["llm"]
+    assert gemma["speed_vision_seconds"] == 224.5
     assert "recommendation_llm" not in gemma
     assert "504" in str(gemma["comment_ja"])
+    assert settings["providers"]["nvidia"]["enabled_models"][gemma["id"]] is True
+
+    # Missing purposes inherit the catalog; explicit stored choices still win
+    # while the catalog version holds, even when no selectable purpose remains.
+    for purposes in (["llm"], []):
+        stored = normalize_model_settings({
+            "model_catalog_version": MODEL_CONFIG_VERSION,
+            "providers": {"nvidia": {"models": [{"id": gemma["id"], "purposes": purposes}]}},
+        })
+        overridden = next(model for model in stored["providers"]["nvidia"]["models"] if model["id"] == gemma["id"])
+        assert overridden["purposes"] == []
+        assert overridden["unsupported_purposes"] == ["llm"]
+        assert stored["providers"]["nvidia"]["enabled_models"][gemma["id"]] is False
 
 
 def test_nvidia_still_keeps_builtin_models_the_stored_list_dropped() -> None:
@@ -310,7 +324,7 @@ def test_the_cloud_hides_its_timings_too() -> None:
         for provider in model_provider_catalog(None, include_developer=True)
     }
     nvidia = {str(m["id"]): m for m in developer["nvidia"]["models"]}
-    assert nvidia["poolside/laguna-xs-2.1"]["speed_llm_seconds"] == 122.5
+    assert nvidia["poolside/laguna-xs-2.1"]["speed_llm_seconds"] == 147.4
 
 
 def test_hiding_speed_does_not_touch_what_is_stored() -> None:

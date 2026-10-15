@@ -8,6 +8,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Preserve catalog purposes and align existing Server checks
+
+Known stored models without a purpose selection now inherit their catalog purposes instead of having them overwritten by an inferred LLM default. Explicit stored purpose selections keep their precedence.
+
+Updated Server checks for hash-prefix search, approved model measurements, retired CLI fields, additional Swift CodingKeys conformance, and accepted API additions. The portable verifier allows additional conformance while still rejecting missing or incorrectly renamed persistence keys.
+
 ### 2026-10-15 — Remove macOS thumbnail loading animations
 
 Match Web's list presentation by removing per-image loading animations. Decoded PNGs already in memory appear synchronously, avoiding a blank image and task wait whenever a page is revisited. Work/render-hash identity, bounded cache memory, and 512px image quality are preserved.

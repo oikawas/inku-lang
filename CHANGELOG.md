@@ -12,6 +12,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 Library pages follow Web/Server by leaving SVG text out and using persisted PNGs. SVG sizes and work information remain available; refinement, export, and other work actions read the chosen complete record on demand. Card-height notifications no longer rebuild the entire library, and paging no longer reloads the background lineage.
 
+Menu eligibility projects only the required saved fields and publishes one page of results together, reducing full-context JSON reads for every card and repeated updates of all menus.
+
 ## v2.15.151 (2026-10-15 / Build 1227)
 
 ### 2026-10-15 — Reflect the second NVIDIA NIM measurement in the model information

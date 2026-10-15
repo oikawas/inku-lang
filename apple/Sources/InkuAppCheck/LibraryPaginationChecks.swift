@@ -1,4 +1,5 @@
 import Foundation
+import InkuHost
 import InkuPersistence
 import InkuUI
 
@@ -68,7 +69,45 @@ func runLibraryPaginationChecks() async throws {
     guard await reader.reads > reads, try await database.list() == works else {
         throw CheckFailure.message("Explicit refresh stopped updating lineage or browsing changed saved work")
     }
+    // A menu projection must accept exactly the same complete authoring records.
+    let cases: [(String, String, String, Int, SavedWorkActionState)] = [
+        ("summary-description", "stage1_generated", "description_authoritative", 0, .description),
+        ("summary-locked", "stage1_generated", "ddl_authoritative", 0, .lockedDescription),
+        ("summary-ddl", "user_authored_ddl", "ddl_authoritative", 0, .userDDL),
+        ("summary-broken", "stage1_generated", "description_authoritative", 1, .unavailable),
+        ("summary-other", "stage1_generated", "description_authoritative", 2, .unavailable),
+        ("summary-incomplete", "stage1_generated", "description_authoritative", 3, .unavailable),
+    ]
+    for (execution, origin, authority, variant, _) in cases {
+        _ = try await database.compareAndSwapExecution(id: execution, expectedRevision: nil, snapshot: Data("{}".utf8))
+        var performance: [String: Any] = ["configuration": ["large": String(repeating: "x", count: 65_536)],
+            "options": [String: String](), "clip": [String: String](),
+            "authority": ["origin": origin, "authority": authority, "revision": "1"]]
+        if variant == 3 { performance["options"] = nil }
+        let ack = variant == 1 ? Data("{broken".utf8) : try JSONSerialization.data(withJSONObject: [
+            "work_id": variant == 2 ? "another_0" : execution + "_0", "performance": performance])
+        _ = try await database.commitEffect(id: execution, expectedRevision: 0, effectID: "save-render:0",
+            snapshot: Data("{}".utf8), acknowledgement: ack)
+    }
+    let host = PipelineHost(database: database)
+    let ids = cases.map { $0.0 + "_0" } + ["missing_0", "legacy"]
+    let summaries = try await host.savedAuthoringSummaries(workIDs: ids)
+    for id in ids {
+        if let full = try? await host.savedAuthoringContext(workID: id) {
+            guard summaries[id]?.authority == full.authority, summaries[id]?.origin == full.origin else {
+                throw CheckFailure.message("Menu authority projection differs from full context for \(id)")
+            }
+        } else if summaries[id] != nil { throw CheckFailure.message("Incomplete context became menu-eligible: \(id)") }
+    }
+    let app = AppModel(databaseURL: folder.appendingPathComponent("works.sqlite"))
+    await app.initialize()
+    await app.loadWorkActionStates(workIDs: ids)
+    for (execution, _, _, _, expected) in cases {
+        let work = SavedWork(id: execution + "_0", at: 0, input: "", score: "{}", svg: "")
+        guard app.workActionState(for: work) == expected else { throw CheckFailure.message("Batched menu state changed for \(execution)") }
+    }
     print("Library pagination passed: SVG-free list retains UTF-8 size/metadata; PNG hit1, missing drawing1; exact full action target; paging lineage reads0, explicit refresh reloads; history unchanged.")
+    print("Menu summaries passed: description/locked/user-DDL match full contexts; broken/mismatched/incomplete/missing/legacy records remain unavailable; page state published together.")
 }
 
 private actor PaginationLineageReader: LineageReading {
@@ -88,6 +127,7 @@ private actor PaginationLineageReader: LineageReading {
 func runLibraryPaginationBenchmark(url: URL) async throws {
     let database = try InkuDatabase(url: url)
     let store = try ThumbnailStore(url: ThumbnailStore.url(besideDatabase: url))
+    let host = PipelineHost(database: database)
     print("offset,include_svg,median_list_ms,svg_bytes_copied,thumbnail_ms,store_hits,memory_hits,baked")
     for offset in [0, 56, 112, 168] {
         for includeSVG in [true, false] {
@@ -109,6 +149,16 @@ func runLibraryPaginationBenchmark(url: URL) async throws {
             let stats = await thumbnails.currentStatistics()
             print("\(offset),\(includeSVG),\(times.sorted()[3]),\(items.reduce(0) { $0 + $1.work.svg.utf8.count }),\(elapsed),\(stats.storeHits),\(stats.memoryHits),\(stats.bakedOnDisplay)")
         }
+        let ids = try await database.libraryPage(limit: 56, offset: offset, includeSVG: false).items.map(\.id)
+        let fullStart = ContinuousClock.now
+        var fullCount = 0
+        for id in ids { if (try? await host.savedAuthoringContext(workID: id)) != nil { fullCount += 1 } }
+        let fullMS = milliseconds(fullStart.duration(to: .now))
+        let summaryStart = ContinuousClock.now
+        let summaries = try await host.savedAuthoringSummaries(workIDs: ids)
+        let summaryMS = milliseconds(summaryStart.duration(to: .now))
+        guard summaries.count == fullCount else { throw CheckFailure.message("Benchmark summary count changed") }
+        print("# menu,offset=\(offset),full_ms=\(fullMS),batch_ms=\(summaryMS),count=\(summaries.count)")
     }
 }
 

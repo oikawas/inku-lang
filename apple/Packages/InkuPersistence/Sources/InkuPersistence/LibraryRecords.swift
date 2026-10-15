@@ -1,5 +1,11 @@
 import Foundation
 
+/// Menu eligibility projected from the same saved authoring journal as the complete context.
+public struct SavedAuthoringSummary: Sendable, Equatable {
+    public let authority: String
+    public let origin: String
+}
+
 /// These local annotations never alter portable source, Score, SVG or identities.
 public struct LibraryAnnotation: Sendable, Equatable {
     public var note: String?

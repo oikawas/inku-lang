@@ -6,9 +6,13 @@ public enum SavedWorkActionState: Sendable, Equatable {
     case description, lockedDescription, userDDL, unavailable
 
     init(_ context: SavedAuthoringContext) {
-        if context.originKind == .userAuthoredDDL { self = .userDDL }
-        else if context.originKind == .stage1Generated {
-            self = context.authority == "ddl_authoritative" ? .lockedDescription : .description
+        self.init(origin: context.origin, authority: context.authority)
+    }
+
+    init(origin: String, authority: String) {
+        if origin == AuthoringOrigin.userAuthoredDDL.rawValue { self = .userDDL }
+        else if origin == AuthoringOrigin.stage1Generated.rawValue {
+            self = authority == "ddl_authoritative" ? .lockedDescription : .description
         } else { self = .unavailable }
     }
 

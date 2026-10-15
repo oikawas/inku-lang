@@ -65,6 +65,7 @@ struct LibraryView: View {
             }, readWork: { id in try await model.auxiliaryDatabase().work(id: id) })
         }
         .task(id: model.providerSettingsRevision) { providers = await model.hostSettings().providers }
+        .task(id: visibleIDs) { await model.loadWorkActionStates(workIDs: visibleIDs) }
         .onAppear { applyGroupedPageSize() }
         .onChange(of: library.isGrouped) { _, _ in applyGroupedPageSize() }
         #if os(macOS)
@@ -346,24 +347,11 @@ struct LibraryView: View {
     /// Web `.history-thumb-grid-wrap` (padding 8/10/6) holding `repeat(auto-fill, minmax(142px, 1fr))`, gap 8.
     private var thumbGrid: some View {
         GeometryReader { geometry in
-            let width = max(1, geometry.size.width - 20)
-            let columns = max(1, Int(((width + LibraryGridPaging.gap)
-                                     / (LibraryGridPaging.minCardWidth + LibraryGridPaging.gap)).rounded(.down)))
-            let cardWidth = max(1, (width - CGFloat(columns - 1) * LibraryGridPaging.gap) / CGFloat(columns))
-            let rows = (library.works.count + columns - 1) / columns
             ScrollView {
-                // A page already contains only the rows that fit. Virtualizing those rows
-                // adds repeated lazy-layout/accessibility walks through every card's menus.
-                VStack(alignment: .leading, spacing: LibraryGridPaging.gap) {
-                    ForEach(0..<rows, id: \.self) { row in
-                        HStack(alignment: .top, spacing: LibraryGridPaging.gap) {
-                            ForEach(Array(library.works.dropFirst(row * columns).prefix(columns)), id: \.id) { work in
-                                gridCard(work).frame(width: cardWidth)
-                            }
-                        }
-                    }
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: LibraryGridPaging.minCardWidth), spacing: LibraryGridPaging.gap, alignment: .top)],
+                          alignment: .leading, spacing: LibraryGridPaging.gap) {
+                    ForEach(library.works, id: \.id) { work in gridCard(work) }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 8).padding(.horizontal, 10).padding(.bottom, 6)
             }
             // A page holds only complete rows; an always-on scroller would also take width from the columns.
@@ -449,7 +437,6 @@ struct LibraryView: View {
             }
         }
         .contextMenu { workMenu(work) }
-        .task(id: work.id) { await model.loadWorkActionState(work) }
         .focusable().focused($focusedWorkID, equals: work.id)
         .onKeyPress(.return) {
             guard focusedWorkID == work.id, !model.isBrowsingLocked else { return .ignored }
@@ -747,7 +734,6 @@ struct LibraryView: View {
         .padding(5)
         .modifier(LibraryCardSurface(current: selected || model.selectedWorkID == work.id, focused: focusedWorkID == work.id, cornerRadius: 4))
         .contextMenu { workMenu(work) }
-        .task(id: work.id) { await model.loadWorkActionState(work) }
     }
 
     /// Web list-mode `.lineage-member`: check, 48px picture, description, actions on one row.
@@ -775,7 +761,6 @@ struct LibraryView: View {
         .padding(5)
         .modifier(LibraryCardSurface(current: library.selectedIDs.contains(work.id) || model.selectedWorkID == work.id, cornerRadius: 4))
         .contextMenu { workMenu(work) }
-        .task(id: work.id) { await model.loadWorkActionState(work) }
     }
 
     // MARK: Actions

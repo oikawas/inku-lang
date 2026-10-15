@@ -18,6 +18,8 @@ Binding and protocol identities come from the bundled Rust core's version report
 
 Chronological and grouped library pages follow Web/Server by omitting SVG text and displaying persisted PNG thumbnails. Size labels retain the saved SVG's UTF-8 byte count. A missing or stale PNG reads only its work's SVG to rebuild it. Opening in Create or lineage, refining, and exporting read the complete saved record by the chosen work ID. Thumbnail task identity does not contain SVG text. Recording card heights alone does not rebuild the whole library. Paging leaves the background lineage alone; explicit refreshes and work mutations still update it.
 
+Menu eligibility reads only saved origin and authority for the page and publishes the results together, without loading each card's entire instructions, Score, and rendering context. It checks the same required objects, strings, and work ID as the full context reader. Missing or invalid records do not become eligible.
+
 ## 2026-10-15 Library preview, search, and history strip
 
 The work preview follows the order of image, opening hint, full description, lineage/refinement/export actions, work-information table, and comment. Double-clicking the image or activating it from the keyboard opens that work in Create; inspection alone does not replace the Create draft. Closing and reopening the same preview retains an unsaved comment without mixing another work's information. Details show save time, stage models (one row when equal), catalog, canvas, seconds, SVG size, render version, generation, and a short hash with full-hash copy. Export first selects a format, then opens settings for that work.

@@ -669,6 +669,44 @@ public actor InkuDatabase {
         }
     }
 
+    /// Project menu eligibility without transferring/parsing/serializing every saved document.
+    /// The object/string guards mirror PipelineHost.savedAuthoringContext's required fields.
+    public func savedAuthoringSummaries(locations: [(workID: String, executionID: String, effectID: String)]) throws -> [String: SavedAuthoringSummary] {
+        guard !locations.isEmpty else { return [:] }
+        return try queue.read { db in
+            var result: [String: SavedAuthoringSummary] = [:]
+            for start in stride(from: 0, to: locations.count, by: 250) {
+                let chunk = locations[start..<min(locations.count, start + 250)]
+                let values = chunk.map { _ in "(?, ?, ?)" }.joined(separator: ",")
+                let arguments = chunk.flatMap { [$0.workID, $0.executionID, $0.effectID] }
+                let rows = try Row.fetchAll(db, sql: """
+                    WITH wanted(work_id, execution_id, effect_id) AS (VALUES \(values)),
+                    records AS (
+                        SELECT wanted.work_id, CASE WHEN json_valid(CAST(a.acknowledgement AS TEXT))
+                            THEN CAST(a.acknowledgement AS TEXT) ELSE '{}' END AS document
+                        FROM wanted JOIN effect_acknowledgements a
+                        ON a.execution_id = wanted.execution_id AND a.effect_id = wanted.effect_id
+                    )
+                    SELECT work_id, json_extract(document, '$.performance.authority.authority') AS authority,
+                           json_extract(document, '$.performance.authority.origin') AS origin
+                    FROM records
+                    WHERE json_extract(document, '$.work_id') = work_id
+                    AND json_type(document, '$.performance.configuration') = 'object'
+                    AND json_type(document, '$.performance.options') = 'object'
+                    AND json_type(document, '$.performance.clip') = 'object'
+                    AND json_type(document, '$.performance.authority') = 'object'
+                    AND json_type(document, '$.performance.authority.authority') = 'text'
+                    AND json_type(document, '$.performance.authority.origin') = 'text'
+                    AND json_type(document, '$.performance.authority.revision') = 'text'
+                    """, arguments: StatementArguments(arguments))
+                for row in rows {
+                    result[row["work_id"]] = SavedAuthoringSummary(authority: row["authority"], origin: row["origin"])
+                }
+            }
+            return result
+        }
+    }
+
     /// SQLite Backup API includes committed journal/WAL contents. No raw file copy is used.
     /// Actor ordering includes every save that finished before this call starts.
     public func backup(to destination: URL) throws {

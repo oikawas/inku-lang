@@ -130,6 +130,7 @@ public final class AppModel {
     }
     public private(set) var unreadOutputs: Set<String> = []
     private var workActionStates: [String: SavedWorkActionState] = [:]
+    @ObservationIgnored private var workActionReadToken = UUID()
     public let library = LibraryModel(includeListSVG: false)
     public let display = DisplaySettings()
     public let descriptionMeter = DescriptionMeterModel()
@@ -787,9 +788,25 @@ public final class AppModel {
     }
 
     public func loadWorkActionState(_ work: SavedWork) async {
-        guard workActionStates[work.id] == nil else { return }
-        do { _ = try await savedConfiguration(workID: work.id) }
-        catch { workActionStates[work.id] = .unavailable }
+        await loadWorkActionStates(workIDs: [work.id])
+    }
+
+    public func loadWorkActionStates(workIDs: [String]) async {
+        let missing = Set(workIDs).filter { workActionStates[$0] == nil }
+        guard !missing.isEmpty, let host else { return }
+        let token = workActionReadToken
+        do {
+            let summaries = try await host.savedAuthoringSummaries(workIDs: Array(missing))
+            guard token == workActionReadToken, !Task.isCancelled else { return }
+            let states = Dictionary(uniqueKeysWithValues: missing.map { id in
+                (id, summaries[id].map { SavedWorkActionState(origin: $0.origin, authority: $0.authority) } ?? .unavailable)
+            })
+            // Every menu observes this dictionary. Publish the page once, not once per card.
+            workActionStates.merge(states) { _, new in new }
+        } catch {
+            guard token == workActionReadToken, !Task.isCancelled else { return }
+            errorText = error.localizedDescription
+        }
     }
 
     public func applyDDLImport(_ value: DDLPackageImport) throws {
@@ -1770,6 +1787,7 @@ public final class AppModel {
             selectedContext = nil
             currentView = nil
             workActionStates = [:]
+            workActionReadToken = UUID()
             await library.resetAfterRestore()
             await thumbnails.synchronize()
             restorationRevision &+= 1

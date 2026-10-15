@@ -160,6 +160,14 @@ public actor PipelineHost {
             completionRanges: context["completion_ranges"].object == nil ? nil : context["completion_ranges"].data)
     }
 
+    public func savedAuthoringSummaries(workIDs: [String]) async throws -> [String: SavedAuthoringSummary] {
+        let locations = Set(workIDs).compactMap { id -> (workID: String, executionID: String, effectID: String)? in
+            guard let location = try? WorkIdentity.location(id) else { return nil }
+            return (id, location.executionID, location.effectID)
+        }
+        return try await database.savedAuthoringSummaries(locations: locations)
+    }
+
     public func exportSVG(workID: String, profile: String) async throws -> String {
         guard ["display", "editable", "compat", "live"].contains(profile) else { throw HostError("invalid_svg_profile") }
         let work = try await restoreSavedWork(workID: workID)

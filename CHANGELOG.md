@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Show the example label in macOS Saijiki
+
+Saijiki previews in the vocabulary list and instructions editor show "例文：" / "Example: " in the screen language. The label uses the bundled Web copy, while examples retain the word's language.
+
 ## v2.15.152 (2026-10-15 / Build 1228)
 
 ### 2026-10-15 — Saijiki preview examples read as DDL fragments, with an "Example:" label

@@ -187,7 +187,8 @@ public struct SaijikiView: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         if !preview.example.isEmpty {
-                            Text(preview.example).inkuFont(12, design: .monospaced).foregroundStyle(.secondary)
+                            Text((copy?.text("saijikiPreviewExampleLabel") ?? (uiLanguage == "ja" ? "例文：" : "Example: ")) + preview.example)
+                                .inkuFont(12, design: .monospaced).foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         if !preview.insertable {

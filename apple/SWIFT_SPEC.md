@@ -14,6 +14,10 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-15 Saijiki example label
+
+Saijiki previews in the vocabulary list and instructions editor prefix examples with the bundled Web copy's `saijikiPreviewExampleLabel`. The label follows the screen language ("例文：" / "Example: "), while the example itself follows the selected word's language. This distinguishes examples from effects without changing words or instructions.
+
 ## 2026-10-15 Library preview, search, and history strip
 
 The work preview follows the order of image, opening hint, full description, lineage/refinement/export actions, work-information table, and comment. Double-clicking the image or activating it from the keyboard opens that work in Create; inspection alone does not replace the Create draft. Closing and reopening the same preview retains an unsaved comment without mixing another work's information. Details show save time, stage models (one row when equal), catalog, canvas, seconds, SVG size, render version, generation, and a short hash with full-hash copy. Export first selects a format, then opens settings for that work.

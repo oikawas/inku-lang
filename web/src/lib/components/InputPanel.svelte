@@ -217,12 +217,14 @@
 					</Tooltip>
 				</div>
 				<div class="condition-value condition-model-value">
-					{#if nextStage1Model === nextStage2Model}
-						<span title={nextStage1Model}>{nextStage1Model}</span>
-					{:else}
-						<span><small>{isJapanese ? '解釈' : 'Interpretation'}</small><span title={nextStage1Model}>{nextStage1Model}</span></span>
-						<span><small>{isJapanese ? '描画' : 'Performance'}</small><span title={nextStage2Model}>{nextStage2Model}</span></span>
-					{/if}
+					<div class="condition-model-names">
+						{#if nextStage1Model === nextStage2Model}
+							<span title={nextStage1Model}>{nextStage1Model}</span>
+						{:else}
+							<span><small>{isJapanese ? '解釈' : 'Interpretation'}</small><span title={nextStage1Model}>{nextStage1Model}</span></span>
+							<span><small>{isJapanese ? '描画' : 'Performance'}</small><span title={nextStage2Model}>{nextStage2Model}</span></span>
+						{/if}
+					</div>
 					{#if chatgptPlanSelected && inputMode === 'single'}
 						<a class="chatgpt-plan-label" href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer" title={t().chatgptManageUsage}>{t().chatgptPlanLabel}</a>
 					{/if}
@@ -473,15 +475,21 @@
 		overflow-wrap: anywhere;
 	}
 	.condition-model-value {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+	}
+	.condition-model-names {
 		display: grid;
 		gap: 3px;
+		min-width: 0;
 	}
-	.condition-model-value > span {
+	.condition-model-names > span {
 		display: flex;
 		gap: 6px;
 		min-width: 0;
 	}
-	.condition-model-value > span > span { min-width: 0; overflow-wrap: anywhere; }
+	.condition-model-names > span > span { min-width: 0; overflow-wrap: anywhere; }
 	.condition-model-value small {
 		flex: none;
 		color: var(--fg3);
@@ -489,7 +497,8 @@
 		font-weight: 400;
 	}
 	.chatgpt-plan-label {
-		justify-self: start;
+		flex: none;
+		white-space: nowrap;
 		color: var(--accent);
 		font-size: var(--ui-font-size-11);
 		line-height: 1.35;

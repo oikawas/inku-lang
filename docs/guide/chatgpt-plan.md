@@ -106,7 +106,7 @@ After connecting, follow the guide to Open Model settings. Select ChatGPT plan i
 
 Then open the drawing model picker and choose one ChatGPT plan model for Stage 1/2. Fetching alone neither publishes nor selects models. Ordinary users manage only their own ChatGPT models; administrators also retain shared provider administration.
 
-On the Description tab, the ChatGPT plan label in the model-name field opens ChatGPT usage settings in a new tab. The separate Using ChatGPT plan notice and Manage usage link below the paint button are removed. An unavailable selected model still shows a warning.
+On the Description tab, the ChatGPT plan label to the right of the model name opens ChatGPT usage settings in a new tab. The separate Using ChatGPT plan notice and Manage usage link below the paint button are removed. An unavailable selected model still shows a warning.
 
 After a drawing fails, select another model and draw again. Starting the new drawing clears the previous failure display without reloading the page.
 

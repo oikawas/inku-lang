@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.150 (2026-10-15 / Build 1226)
+
 ### 2026-10-15 — Hide sharing controls in single-user mode
 
 Single-user mode now hides the canvas group-sharing button, the Group shared only filters in the history strip and Library, and Library sharing status labels. Sharing settings dialogs stay closed, and any active sharing filter is cleared. Multi-user sharing and the Starred and For revision marks and filters remain available as before.

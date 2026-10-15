@@ -51,8 +51,9 @@ def test_tool_variant_render_save_and_replay(monkeypatch):
             "composition_seed": 17, "canvas_aspect": "hd_monitor"}, initial)
         parent = db.add_item({**initial, **baseline})
 
-        weights = lambda value: {i["arrangement"]["resolved"]["owner"]["instruction_index"]: i.get("weight")
-                                 for i in value["instructions"]}
+        def weights(value):
+            return {i["arrangement"]["resolved"]["owner"]["instruction_index"]: i.get("weight")
+                    for i in value["instructions"]}
         assert weights(score) == {0: "brush_thin", 1: "pen"}
 
         # The shipped wheel carries the core's touch change, and the work's sentences read back.
@@ -80,7 +81,8 @@ def test_tool_variant_render_save_and_replay(monkeypatch):
         selected = selected.json()
         assert selected["ddl"] == "背景を白で埋める。\n青のチョークの線を3個引く。\n赤の大きな油彩の円を1個置く。"
         assert weights(selected["score"]) == {0: "chalk", 1: "oil_paint"}
-        strip = lambda value: [{k: v for k, v in i.items() if k != "weight"} for i in value["instructions"]]
+        def strip(value):
+            return [{k: v for k, v in i.items() if k != "weight"} for i in value["instructions"]]
         assert strip(selected["score"]) == strip(score)
         assert {k: v for k, v in selected["score"].items() if k != "instructions"} == {k: v for k, v in score.items() if k != "instructions"}
         assert selected["render_seed"] == "77" and selected["composition_seed"] == "17"

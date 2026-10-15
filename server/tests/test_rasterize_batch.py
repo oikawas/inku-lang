@@ -8,6 +8,8 @@ is here for the same reason.
 from __future__ import annotations
 
 import ast
+import os
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -23,12 +25,6 @@ MODULE = Path(rasterize_batch.__file__)
 # declares and rendering at one width for all of them look the same on a corpus
 # that happens to be uniform.
 INTRINSIC = {"wide": (400, 200), "narrow": (120, 120), "tall": (200, 500)}
-
-# resvg parses recursively. At this depth the child dies of a stack overflow --
-# measured as SIGSEGV on macOS and on the development server alike -- which is
-# the panic class [I-075] is about: in-process it takes the interpreter with it.
-CRASHING_DEPTH = 60_000
-
 
 def _svg(width: int, height: int) -> str:
     return (
@@ -108,24 +104,32 @@ def test_the_failure_is_reported_with_a_reason_and_the_rest_still_burn(tmp_path)
 
 
 # T-4
-def test_a_child_that_dies_hard_costs_one_picture_and_not_the_run(tmp_path):
-    """**This test crashes a Python process on purpose, twice, and that is the point.**
+def test_a_child_that_dies_hard_costs_one_picture_and_not_the_run(tmp_path, monkeypatch):
+    """Kill a real rendering child without depending on a parser vulnerability.
 
-    macOS files a crash report for each; nothing is wrong with the machine or with
-    pytest. A merely invalid SVG raises and would leave this green on an
-    in-process implementation, which is the shape [I-075] says loses a worker and
-    everything it was holding to the first bad file.
+    The old deeply nested SVG is now rejected by resvg's node limit before it
+    can overflow the stack. An ordinary exception cannot prove crash isolation,
+    so this child-only renderer dies by signal for one marked SVG instead.
     """
     src = _corpus(tmp_path)
     crashing = src / "crash.svg"
-    crashing.write_text(
-        '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">'
-        + "<g>" * CRASHING_DEPTH
-        + '<circle cx="1" cy="1" r="1"/>'
-        + "</g>" * CRASHING_DEPTH
-        + "</svg>",
+    crashing.write_text(_svg(10, 10) + "<!-- kill-rendering-child -->", encoding="utf-8")
+    child_module = "forced_rasterizer_child"
+    (tmp_path / f"{child_module}.py").write_text(
+        "import os, signal\n"
+        "from inku_analysis import rasterize_batch, rasterizer\n"
+        "original = rasterizer.svg_to_png\n"
+        "def render(svg, **kwargs):\n"
+        "    if '<!-- kill-rendering-child -->' in svg:\n"
+        "        os.kill(os.getpid(), signal.SIGKILL)\n"
+        "    return original(svg, **kwargs)\n"
+        "rasterizer.svg_to_png = render\n"
+        "raise SystemExit(rasterize_batch.main())\n",
         encoding="utf-8",
     )
+    existing = os.environ.get("PYTHONPATH")
+    monkeypatch.setenv("PYTHONPATH", os.pathsep.join([str(tmp_path), existing] if existing else [str(tmp_path)]))
+    monkeypatch.setattr(rasterize_batch, "_MODULE", child_module)
 
     # The premise, measured rather than assumed: this input does not raise, it
     # kills the interpreter. Were it only an exception, the gate below would pass
@@ -133,24 +137,23 @@ def test_a_child_that_dies_hard_costs_one_picture_and_not_the_run(tmp_path):
     premise = subprocess.run(
         [
             sys.executable,
-            "-c",
-            "import sys\n"
-            "from inku_analysis.rasterizer import svg_to_png\n"
-            "svg_to_png(open(sys.argv[1], encoding='utf-8').read())\n",
+            "-m", child_module, "--one",
             str(crashing),
+            str(tmp_path / "premise.png"),
         ],
         capture_output=True,
+        env=rasterize_batch._child_env(),
     )
-    assert premise.returncode < 0, (
-        f"{CRASHING_DEPTH} nested groups no longer kill the interpreter "
-        f"(returncode {premise.returncode}); this gate is measuring nothing"
-    )
+    assert premise.returncode == -signal.SIGKILL, premise.stderr
 
-    report = rasterize_dir(src, tmp_path / "png")
+    dst = tmp_path / "png"
+    report = rasterize_dir(src, dst)
 
+    assert report.attempted == 4
     assert report.succeeded == 3
     assert [failure.source.name for failure in report.failed] == ["crash.svg"]
-    assert "signal" in report.failed[0].reason, report.failed[0].reason
+    assert report.failed[0].reason == f"child killed by signal {signal.SIGKILL}"
+    assert _names(dst) == ["narrow.png", "tall.png", "wide.png"]
 
 
 # T-5

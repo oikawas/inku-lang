@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.146 (2026-10-15 / Build 1222)
+
 ### 2026-10-15 — Place the ChatGPT plan link beside the model name
 
 The Description tab now shows ChatGPT plan to the right of the model name. The label stays on the right in narrow fields while long model names wrap on the left. The existing usage-settings link is preserved.

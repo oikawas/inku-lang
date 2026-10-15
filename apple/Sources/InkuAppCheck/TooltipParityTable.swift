@@ -137,7 +137,7 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "HistoryStrip.svelte:282", swift: "Views/HistoryStripView.swift", marker: "tooltipValue(line.full)"),
     .init(web: "HistoryThumbnail.svelte:61", swift: "Views/ArtworkCanvas.swift", marker: "tooltipValue(label)"),
     .init(web: "InputPanel.svelte:182", swift: "Views/CreationView.swift", marker: "serverKey: \"tooltipInputTabSingle\""),
-    .init(web: "InputPanel.svelte:211", swift: "Views/CreationView.swift", marker: "tip(\"次の作品の描画モデルを選びます。\")"),
+    .init(web: "InputPanel.svelte:219", swift: "Views/CreationView.swift", marker: "serverKey: \"tooltipInputModel\""),
     .init(web: "InputPanel.svelte:217", swift: "Views/CreationView.swift", marker: "tooltipValue(value)"),
     .init(web: "InputPanel.svelte:219", swift: "Views/CreationView.swift", marker: "tooltipValue(value)"),
     .init(web: "InputPanel.svelte:220", swift: "Views/CreationView.swift", marker: "tooltipValue(value)"),

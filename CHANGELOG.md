@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Match macOS description and instructions editing to Web
+
+The instructions editor now shows its target work and range frame beside the text, with Saijiki below it and model, stroke-limit, and drawing controls in the footer. New DDL uses the same layout. Words insert at the caret without opening another sheet. Description controls now match Web's model, automatic catalog, and canvas labels, including the ChatGPT plan usage link.
+
 ### 2026-10-15 — Match macOS lineage-card ellipsis menus to Web
 
 The ellipsis now opens shared refinement actions for that card's work, instead of mixing in node navigation, marks, export, and deletion. Direct-DDL and held-description conditions follow the Web menu. Nodes without a saved work and trashed works have no ellipsis button.

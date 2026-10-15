@@ -18,12 +18,13 @@ struct InkuEditorStyle: Equatable {
     var lineNumbers = true
     var inset = CGSize(width: 10, height: 8)
     var drawsBackground = true
+    var focusOnAttach = false
 
     static let batch = InkuEditorStyle()
     static let description = InkuEditorStyle(fontSize: 14, monospaced: false, lineHeightMultiple: 1.65, wraps: true,
                                              lineNumbers: false, inset: CGSize(width: 10, height: 9), drawsBackground: false)
     static let ddl = InkuEditorStyle(fontSize: 14, monospaced: false, lineHeightMultiple: 1.7, wraps: true,
-                                     lineNumbers: true, inset: CGSize(width: 11, height: 10), drawsBackground: false)
+                                     lineNumbers: true, inset: CGSize(width: 11, height: 10), drawsBackground: false, focusOnAttach: true)
     /// Web DdlViewer's `compact` editor: the same DDL editing without line numbers.
     static let ddlCompact = InkuEditorStyle(fontSize: 14, monospaced: false, lineHeightMultiple: 1.78, wraps: true,
                                             lineNumbers: false, inset: CGSize(width: 4, height: 4), drawsBackground: false)
@@ -181,6 +182,7 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
         storage.addLayoutManager(layout)
         layout.addTextContainer(container)
         let editor = BatchEditorTextView(frame: .zero, textContainer: container)
+        editor.focusOnAttach = style.focusOnAttach
         editor.isRichText = false
         editor.importsGraphics = false
         editor.allowsUndo = true
@@ -557,6 +559,16 @@ private struct BatchNativeInputEditor: NSViewRepresentable {
 
 @MainActor
 private final class BatchEditorTextView: NSTextView {
+    var focusOnAttach = false
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard focusOnAttach, isEditable, let window else { return }
+        focusOnAttach = false
+        DispatchQueue.main.async { [weak self, weak window] in
+            guard let self, let window, self.window === window, self.isEditable else { return }
+            window.makeFirstResponder(self)
+        }
+    }
     var onCompositionEnded: (() -> Void)?
     /// Set once the author focuses the editor; until then a chosen word goes at the end.
     private(set) var used = false

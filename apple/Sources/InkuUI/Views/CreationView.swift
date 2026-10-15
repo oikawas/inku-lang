@@ -252,11 +252,19 @@ struct CreationView: View {
     /// InputPanel.svelte:201-262,445-503: "次に描く条件", two rows with a 変更 button, then the compact row.
     private var nextConditions: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(display.webCopy("nextWorkConditions", "次の生成条件")).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
-                .padding(.top, 8).padding(.bottom, 2)
+            HStack {
+                Text(display.webCopy("nextWorkConditions", "次の生成条件")).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                Button { showConditionDetails = true } label: { Image(systemName: "ellipsis") }
+                    .buttonStyle(InkuGhostButtonStyle()).disabled(controlsDisabled)
+                    .accessibilityLabel(display.localized("生成条件の詳細"))
+                    .popover(isPresented: $showConditionDetails) { conditionDetails }
+            }.padding(.top, 8).padding(.bottom, 2)
             conditionRow(display.webCopy("modelButton", "モデル"),
-                         value: model.nextBatchDrawingModelReference.isEmpty ? display.localized("選択してください") : model.nextBatchDrawingModelReference,
-                         help: tip("次の作品の描画モデルを選びます。")) { showModelPicker = true }
+                         value: model.nextBatchDrawingModelReference.isEmpty ? display.localized("選択してください")
+                            : model.nextBatchDrawingModelReference.split(separator: ":", maxSplits: 1).joined(separator: " / "),
+                         help: display.tooltip("次の作品の描画モデルを選びます。", serverKey: "tooltipInputModel"),
+                         showsPlan: model.nextBatchDrawingModelReference.hasPrefix("chatgpt:")) { showModelPicker = true }
                 .disabled(controlsDisabled)
             Rectangle().fill(InkuColor.border).frame(height: 1)
             conditionRow(display.webCopy("colorCatalogButton", "色カタログ"), value: catalogSummary,
@@ -273,11 +281,11 @@ struct CreationView: View {
     }
 
     private var catalogSummary: String {
-        model.catalogMode == "auto" ? display.localized("記述から選択")
+        model.catalogMode == "auto" ? display.webCopy("colorCatalogAuto", "記述から自動選択")
             : model.catalogs.first { $0.id == model.catalogID }?.name ?? model.catalogID
     }
 
-    private func conditionRow(_ label: String, value: String, help: String, action: @escaping () -> Void) -> some View {
+    private func conditionRow(_ label: String, value: String, help: String, showsPlan: Bool = false, action: @escaping () -> Void) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 8) {
                 Text(label).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
@@ -286,9 +294,15 @@ struct CreationView: View {
                     .buttonStyle(InkuGhostButtonStyle())
                     .inkuTooltip(help)
             }
-            Text(value).inkuFont(14).lineLimit(2).truncationMode(.middle)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .inkuTooltip(display.tooltipValue(value))
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(value).inkuFont(14).lineLimit(2).truncationMode(.middle)
+                    .inkuTooltip(display.tooltipValue(value))
+                if showsPlan {
+                    Link(display.webCopy("chatgptPlanLabel", "ChatGPTプラン"), destination: URL(string: "https://chatgpt.com/settings/usage")!)
+                        .inkuFont(11).inkuTooltip(display.tooltip("ChatGPTプランの使用状況を開きます。", serverKey: "chatgptManageUsage"))
+                }
+                Spacer(minLength: 0)
+            }.frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 7)
     }
@@ -305,8 +319,8 @@ struct CreationView: View {
         .accessibilityValue(display.localized(model.wild ? "オン" : "オフ"))
         .inkuTooltip(tip("次の作品の筆致を規則から外します。"))
         Button { showPaperPicker = true } label: {
-            Label(display.localized("用紙") + ": " + (model.canvases.first { $0.id == model.canvasID }?.label ?? model.canvasID),
-                  systemImage: "rectangle.portrait")
+            Text(display.localized("キャンバス") + (display.preferences.language == "ja" ? "：" : ": ")
+                 + (model.canvases.first { $0.id == model.canvasID }?.label ?? model.canvasID))
         }
         .buttonStyle(InkuGhostButtonStyle())
         .inkuTooltip(tip("用紙の形と意図を見て、次の作品の用紙を選びます。"))
@@ -314,11 +328,6 @@ struct CreationView: View {
             CreationPaperPicker(model: model) { showPaperPicker = false }.environment(display)
         }
         .accessibilityValue(model.canvases.first { $0.id == model.canvasID }?.name ?? model.canvasID)
-        // Native: language, seed and catalog choice, which the Web keeps in other places.
-        Button(display.localized("生成条件の詳細")) { showConditionDetails = true }
-            .buttonStyle(InkuGhostButtonStyle())
-            .inkuTooltip(tip("言語・シード・配色の選び方を確認して変更します。"))
-            .popover(isPresented: $showConditionDetails) { conditionDetails }
     }
 
     /// Web SketchSelect: the two choices with what each does.

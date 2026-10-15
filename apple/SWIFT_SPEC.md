@@ -14,6 +14,14 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-15 Description tab and instructions editor
+
+The description tab separates the next provider and model names and links to usage when a ChatGPT plan is selected. Automatic catalog selection and canvas labels follow Web. The main condition row has three controls: Sketch from life, Wild, and canvas. Native seed and catalog details remain available from the ellipsis beside Next work conditions. Missing connection and local backup notices remain available.
+
+Existing works and new DDL use the same large editor layout as Web. The instructions receive initial focus, Saijiki opens below them by default, and the clicked saved work and its active range frame appear on the right. New DDL shows that an image appears after drawing. Vocabulary and quick-guide buttons toggle their panels. Hover or focus shows a word's example; clicking inserts it at the caret or selection without opening another sheet.
+
+The drawing-model card and stroke limit, or file import for new DDL, sit beside discard, cancel, and draw controls below the editor. Narrow layouts wrap controls and move the work preview and range hint below the text. Range previews stay with the editor's fixed work instead of changing the canvas behind it. Cancel preserves the Create draft and saved work. Discard restores saved instructions as one undoable edit. Existing invalid-range, IME, and busy constraints remain. Model and stroke-limit application, saving, lineage, and shared-core semantics are unchanged.
+
 ## 2026-10-15 Refinement actions and option dialogs
 
 Each lineage card's ellipsis opens the same work editing menu as Web, with only the shared refinement actions targeting that card's saved work. It shares the omissions for direct-DDL works and disabled actions with reasons for held descriptions. Nodes without a saved work and trashed works have no ellipsis button. Native node navigation, marks, export, and deletion remain in the right-click menu.

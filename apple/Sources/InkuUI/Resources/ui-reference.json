@@ -1,12 +1,12 @@
 {
   "schema": "inku.apple-ui-reference.v1",
-  "version": "v2.15.143",
-  "build": "1219",
-  "buildDate": "2026-10-15T03:09:06.127Z",
+  "version": "v2.15.147",
+  "build": "1223",
+  "buildDate": "2026-10-15T06:21:08.090Z",
   "versions": {
-    "ddlSpec": "18",
-    "ddlEngine": "58",
-    "renderEngine": "80"
+    "ddlSpec": "19",
+    "ddlEngine": "59",
+    "renderEngine": "81"
   },
   "canvasMetadata": {
     "square": {
@@ -3564,16 +3564,16 @@
     }
   },
   "source": {
-    "commit": "01a7691eddf3fba7f2476eb8687e4b942c1bd6fa",
+    "commit": "dd07a2f0247b5219017b9e61a00c4b11dcab1ba0",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
       "web/src/routes/+page.svelte": "8e12c77fa1bdbda2ff301c49ed6b299498eaf4a02bd06c3c863fbfad7ac5bb17",
       "web/src/lib/saijiki-surface.ts": "12221f46e142abf2b2066358a89446674941c9a4df57e7a969ae3c6f289fcc08",
       "web/src/lib/instructionLang.ts": "2af540a1b98d4aa688fcf96632de1309b30c3f137137a66596f1285e09f2dcbe",
-      "web/APP_VERSION": "897974714ef8ea18c35250e27ae64f1d39a6b7b9397b9f56587de29800838b40",
-      "web/BUILD_NUMBER": "e5ce28767b5c0ead517d74d64d4957fd2f0149976104810e9dd12af80363b5bd",
-      "server/src/inku_server/layer_versions.py": "a0728a00b95298e152b3a2c61bda5f364b086234f765a0a0b711225999c7c5ce",
-      "core/crates/inku-render/src/lib.rs": "22aa2df245269d4ccd34b8d3b11660bad5d6d66fb988765f4dc3960b8f903a8f",
+      "web/APP_VERSION": "2917617203bc2474717639988da4f4aab9d0335586c7f8183e004a5ff25629e0",
+      "web/BUILD_NUMBER": "af250e83ad1db1a5120fb2903168dbdfe1f99eb9799177e050ab44392874916f",
+      "server/src/inku_server/layer_versions.py": "b354c9161aedca0a15936853fb0d0cb4ab94778f2a062f88bd1dda662a48e290",
+      "core/crates/inku-render/src/lib.rs": "de98bf70ba2e4c0a211bb67ae302ef981fbb2bb563a9a86f39e2a20e74cf4918",
       "web/src/lib/i18n/ja.ts": "f4a9aa90c502e591dfc76db3d2799dc5891299127dedd5d4ec104d0a76d3ae12",
       "web/src/lib/i18n/en.ts": "b4955a49d94f004b9e5e59505a52dc89691db796f7e8fe65af37bfcdbb4fa686"
     },

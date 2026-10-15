@@ -1,7 +1,7 @@
 {
  "schema": "inku.model-catalog.v2",
  "version": "3.0.0",
- "updated": "2026-10-15T19:30:00+09:00",
+ "updated": "2026-10-15T23:00:00+09:00",
  "labels": [
   {
    "id": "unmeasured",
@@ -5469,6 +5469,79 @@
      "speed_label": "未計測",
      "comment_ja": "記述は ollama.com へ送られる。同じ名前でもローカルの Ollama とは別物。無料枠では選べない (403・提供元の有料プランが要る)。そのため品質は未計測。",
      "comment_en": "The description is sent to ollama.com. Despite the shared name this is not the local Ollama model. Not available on the free tier (403; the provider's paid plan is required), so its quality has not been measured."
+    }
+   ]
+  },
+  "local-mlx": {
+   "defaults": [],
+   "models": [
+    {
+     "id": "lmstudio-community/Qwen3.8-27B-MLX-4bit",
+     "label": "lmstudio-community/Qwen3.8-27B-MLX-4bit",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 5,
+     "speed_llm_seconds": 63.8,
+     "speed_vision_seconds": 37.9,
+     "comment_ja": "描画はとても遅い。6記述すべて描けた。画像の読み取りは詳しい説明まで正確。",
+     "comment_en": "Draws very slowly; drew all six descriptions. Reads pictures accurately, down to the details."
+    },
+    {
+     "id": "mlx-community/gemma-4-12B-it-4bit",
+     "label": "mlx-community/gemma-4-12B-it-4bit",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 3,
+     "speed_llm_seconds": 33.2,
+     "speed_vision_seconds": 5.2,
+     "comment_ja": "描画は遅い。6記述すべて描けた。画像の読み取りはおおむね正確で、細部の一部はあいまい。",
+     "comment_en": "Draws slowly; drew all six descriptions. Reads pictures mostly accurately; some details stay vague."
+    },
+    {
+     "id": "mlx-community/gemma-4-31b-it-4bit",
+     "label": "mlx-community/gemma-4-31b-it-4bit",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "recommendation_vision": 2,
+     "speed_llm_seconds": 63.8,
+     "speed_vision_seconds": 10.9,
+     "comment_ja": "描画はとても遅い。6記述すべて描けた。画像の読み取りは要点を押さえるが、小さな淡い形を別の色と読み違える。",
+     "comment_en": "Draws very slowly; drew all six descriptions. Picture reading gets the main points but misreads a small pale shape as another colour."
+    },
+    {
+     "id": "mlx-community/gemma-4-e2b-it-4bit",
+     "label": "mlx-community/gemma-4-e2b-it-4bit",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 6.5,
+     "speed_vision_seconds": 1.7,
+     "comment_ja": "描画は速い。6記述すべて描けた。画像は読めるが、並んだ正方形を長方形と読み違える。",
+     "comment_en": "Draws fast; drew all six descriptions. Reads pictures, but takes the squares placed together for rectangles."
+    },
+    {
+     "id": "mlx-community/Qwen3.6-35B-A3B-4bit",
+     "label": "mlx-community/Qwen3.6-35B-A3B-4bit",
+     "purposes": [
+      "llm",
+      "vision"
+     ],
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 14.3,
+     "speed_vision_seconds": 11.1,
+     "comment_ja": "描画は遅め。6記述すべて描けた。画像の色・数・左右は読めるが、正方形を長方形と読み違える。",
+     "comment_en": "Draws somewhat slowly; drew all six descriptions. Reads colours, counts and sides, but takes squares for rectangles."
     }
    ]
   },

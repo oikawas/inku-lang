@@ -17,6 +17,7 @@ from .verified_model_catalog import (
     DEFAULT_ANTHROPIC_MODELS,
     DEFAULT_GEMINI_MODELS,
     DEFAULT_OPENAI_MODELS,
+    MODEL_CATALOG,
     MODEL_CONFIG_VERSION,
     STORED_LABEL_KEYS,
     VERIFIED_NVIDIA_MODELS,
@@ -461,7 +462,12 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
                 # on a change of catalog the catalog's information is laid back over the
                 # matching ids, which is the whole reason MODEL_CONFIG_VERSION exists.
                 builtin_by_id = {str(model["id"]): model for model in provider["models"]}
-                if builtin and (provider_id == "nvidia" or catalog_moved):
+                # A provider an operator added is followed too when the catalog names
+                # it (Mac local LLM, `local-mlx`, the author 2026-10-15): it is not
+                # builtin, so it has no default list, but its measurements are kept
+                # in the catalog like any other provider's.
+                in_catalog = provider_id in MODEL_CATALOG["providers"]
+                if (builtin or in_catalog) and (provider_id == "nvidia" or catalog_moved):
                     catalog = catalog_models(provider_id)
                     stored_by_id = {}
                     for stored_model in incoming["models"]:

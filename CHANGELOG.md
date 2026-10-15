@@ -8,6 +8,13 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Reflect the Mac local LLM measurement in the model information
+
+At the author's request, the catalog `model_catalog.json` now carries the drawing session's measurement of five MLX 4-bit models on an M5 Pro (runs `provider-20261015-run-00c388f6` and `provider-20261015-run-c363fb86`, an 800-second response limit) under the provider `local-mlx`. By the author's choice it is not made a builtin provider: it stays one an administrator adds, treated like any other provider.
+
+- All five drew the six descriptions, so they are LLM at ★★☆. For Vision, `lmstudio-community/Qwen3.8-27B-MLX-4bit` is ★★★ (C 5/5), `mlx-community/gemma-4-12B-it-4bit` ★★☆ (C 4/5) and `mlx-community/gemma-4-31b-it-4bit` ★☆☆ (C 3/5). `mlx-community/gemma-4-e2b-it-4bit` and `mlx-community/Qwen3.6-35B-A3B-4bit`, which read the squares as rectangles, are Vision with no level. Seconds are the mean of one drawing's generation requests summed and the mean of the picture A/B requests. No cost, as the models run locally.
+- The Server lays the catalog's information over a provider that is not builtin as well, when the catalog names its id and the catalog has changed. The provider's name, address, model list and publication choices stay the installation's.
+
 ## v2.15.154 (2026-10-15 / Build 1230)
 
 ### 2026-10-15 — A sequence after a continuation sentence lines up its own shapes and no longer stops the compiler (DDL engine 62)

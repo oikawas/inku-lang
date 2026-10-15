@@ -9,9 +9,13 @@
 //! Each request accepts `source`, `language`, optional `canvas`, optional
 //! `composition_seed`, optional `error_policy`, optional raw macro `definitions`,
 //! optional `macro_locks` (`qualified_name`, `version`, `digest`), and optional
-//! `resources` (`hard_policy`, `operational_budget`) for compact Score output. A single
+//! `resources` (`hard_policy`, `operational_budget`) for compact Score output. An
+//! optional `color_map` (a work's resolved color map), with optional `render_seed`
+//! and `catalog_id`, lowers with that work's palette as the Server does, so a
+//! color the DDL omits is resolved instead of omitted for want of a palette. A single
 //! request object is accepted for convenience; the output is always an array.
 
+use std::collections::BTreeMap;
 use std::io::{self, Read};
 
 use inku_ddl::{
@@ -20,7 +24,7 @@ use inku_ddl::{
     ScoreLoweringContext, ScoreLoweringDiagnostic, compile_ddl_to_score,
     compile_ddl_to_score_with_resources,
 };
-use inku_score::{Color, HardResourcePolicy, OperationalResourceBudget};
+use inku_score::{Color, HardResourcePolicy, OperationalResourceBudget, Seed};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -56,6 +60,15 @@ struct Request {
     macro_locks: Vec<MacroLockRequest>,
     #[serde(default)]
     resources: Option<ResourceLimits>,
+    #[serde(default)]
+    color_map: Option<BTreeMap<String, String>>,
+    // The untagged envelope buffers the request, and its buffer has no 128-bit
+    // integers, so the seed (a saved work's is never negative) is read as an
+    // unsigned 64-bit number and widened.
+    #[serde(default)]
+    render_seed: Option<u64>,
+    #[serde(default)]
+    catalog_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -165,8 +178,20 @@ fn compile(request: Request) -> Result<Response, String> {
     let document =
         NormalizedDdlDocument::new(request.source.clone(), request.language, macro_locks)
             .map_err(|error| format!("construct normalized DDL document: {error}"))?;
-    let context = ScoreLoweringContext::resolve(&request.canvas, Color::White)
-        .map_err(|error| format!("resolve canvas: {error:?}"))?;
+    let context = match &request.color_map {
+        Some(color_map) => {
+            let palette = inku_render::palette::work_palette_context(
+                color_map,
+                request.render_seed.map(Seed::from),
+                request.catalog_id.as_deref(),
+                Color::White,
+            )
+            .map_err(|error| format!("observe the work palette: {error:?}"))?;
+            ScoreLoweringContext::resolve_with_palette(&request.canvas, Color::White, palette)
+        }
+        None => ScoreLoweringContext::resolve(&request.canvas, Color::White),
+    }
+    .map_err(|error| format!("resolve canvas: {error:?}"))?;
     let (outcome, score, upstream, downstream, resource_omissions, failure) =
         if let Some(resources) = request.resources {
             let execution = compile_ddl_to_score_with_resources(

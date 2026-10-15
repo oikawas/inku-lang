@@ -4231,6 +4231,10 @@ nobody knows, so that is the only way back from single-user operation to
 ordinary operation.  The server reports whether the mode is on through the same
 public response that carries the version and build number.
 
+In single-user mode, Web hides group-sharing buttons, the sharing dialog,
+sharing filters and sharing-status marks, including `Group shared only` in the
+history strip and Library. Group and permission administration remain available.
+
 In single-user mode, browser requests resolve to the recorded owner regardless
 of the presence or validity of a session cookie. A cookie from another port on
 the same host cannot close the entry or switch it to a different account.

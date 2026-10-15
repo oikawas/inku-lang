@@ -1229,6 +1229,11 @@
 			const data = await r.json() as { developer_mode?: boolean; single_user_mode?: boolean; chatgpt_plan_available?: boolean; thumbnail_hidpi?: boolean; render_engine_version?: string; ddl_version?: string; ddl_engine_version?: string };
 			developerMode = data.developer_mode === true;
 			singleUserMode = data.single_user_mode === true;
+			if (singleUserMode) {
+				shareTarget = null;
+				if (history.forShareOnly) history.setForShareOnly(false);
+				if (historyManager.forShareOnly) historyManager.setForShareOnly(false);
+			}
 			if (data.chatgpt_plan_available !== true) {
 				modelCatalogRequest++;
 				settings.chatgpt.reset();
@@ -3030,6 +3035,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 			<CanvasPanel
 				bind:this={canvasPanelHandle}
+				{singleUserMode}
 				{savedWorkExportActions}
 				{catalogName}
 				{formatHistoryDate}
@@ -3155,6 +3161,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 
 			{#if session.uiVisibility.history}
 			<HistoryStrip
+			{singleUserMode}
 			{historyItems}
 			{historyTotal}
 			{historyCursor}
@@ -3469,6 +3476,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	{#await import('$lib/components/HistoryManager.svelte') then { default: HistoryManager }}
 		<HistoryManager
 			active={historyManager.open}
+			{singleUserMode}
 			historyManagerLoadFailed={historyManager.loadFailed}
 			onRetryLoad={historyManager.retry}
 			selectionResetReason={historyManager.selectionResetReason}
@@ -3533,7 +3541,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	{/key}
 {/if}
 
-{#if shareTarget?.id}
+{#if !singleUserMode && shareTarget?.id}
 	{#await import('$lib/components/ShareModal.svelte') then { default: ShareModal }}
 		<ShareModal
 			itemId={shareTarget.id}

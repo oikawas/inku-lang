@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Hide sharing controls in single-user mode
+
+Single-user mode now hides the canvas group-sharing button, the Group shared only filters in the history strip and Library, and Library sharing status labels. Sharing settings dialogs stay closed, and any active sharing filter is cleared. Multi-user sharing and the Starred and For revision marks and filters remain available as before.
+
 ## v2.15.149 (2026-10-15 / Build 1225)
 
 ### 2026-10-15 — The description reader may choose a free line (DDL engine 60)

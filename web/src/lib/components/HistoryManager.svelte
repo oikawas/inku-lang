@@ -70,6 +70,7 @@
 	type Props = {
 		/** Kept mounted between library visits so its list, scroll, and preview survive. */
 		active: boolean;
+		singleUserMode?: boolean;
 		historyManagerView: 'active' | 'trash';
 		historyManagerTab: 'thumbs' | 'list';
 		historyManagerPage: number;
@@ -137,6 +138,7 @@
 
 	let {
 		active,
+		singleUserMode = false,
 		historyManagerView,
 		historyManagerTab = $bindable('thumbs'),
 		historyManagerPage,
@@ -741,7 +743,7 @@
 </script>
 
 {#snippet shareStatus(item: HistoryItem)}
-	{#if item.shared || hasAclShares(item) || isGroupShared(item)}
+	{#if !singleUserMode && (item.shared || hasAclShares(item) || isGroupShared(item))}
 		<span class="share-statuses">
 			{#if item.shared}<span class="share-status" title={isJapanese ? '他の利用者が所有する作品' : 'Owned by another member'}>{isJapanese ? '他の人の作品' : 'Another member’s work'}</span>{/if}
 			{#if hasAclShares(item)}<span class="share-status" title={isJapanese ? '利用者またはグループに個別の権限を設定済み' : 'Individual access grants are set'}>{isJapanese ? '個別共有中' : 'Shared with guests'}</span>{/if}
@@ -849,6 +851,7 @@
 						onclick={() => onSetForRevisionOnly(!historyManagerForRevisionOnly)}
 					><span class="history-filter-check" class:visible={historyManagerForRevisionOnly} aria-hidden="true">✓</span>{t().historyForRevisionOnly}</button>
 				</Tooltip>
+				{#if !singleUserMode}
 				<Tooltip placement="bottom-right" text={t().tooltipHistoryForShareOnly}>
 					<button
 						class="ghost-btn history-filter-btn"
@@ -857,6 +860,7 @@
 						onclick={() => onSetForShareOnly(!historyManagerForShareOnly)}
 					><span class="history-filter-check" class:visible={historyManagerForShareOnly} aria-hidden="true">✓</span>{t().historyForShareOnly}</button>
 				</Tooltip>
+				{/if}
 			</div>
 			<Tooltip placement="bottom-right" text={t().tooltipHistoryTrashView}>
 				<button

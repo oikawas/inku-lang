@@ -73,7 +73,7 @@ test('T-104: the decision is made in one place, from the field itself', () => {
 // ------------------------------------------- T-105 (nothing is offered yet)
 
 test('T-105: the mark is behind both the flag and a handler', () => {
-	assert.match(ARTWORK, /\{#if shareTarget\.supported && onToggleForShare\}/);
+	assert.match(ARTWORK, /\{#if !singleUserMode && shareTarget\.supported && onToggleForShare\}/);
 	assert.match(ARTWORK, /const shareTarget = \$derived\(shareTargetOf\(statusHistoryItem\)\);/);
 	// The canvas must be able to read the field, or `supported` is false even
 	// after the server starts sending it.

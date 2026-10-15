@@ -52,6 +52,7 @@
 		onToggleStar: (item: CanvasStatusHistoryItem | null | undefined, event?: Event) => void | Promise<void>;
 		onToggleForRevision: (item: CanvasStatusHistoryItem | null | undefined, event?: Event) => void | Promise<void>;
 		onToggleForShare?: ((item: CanvasStatusHistoryItem | null | undefined, event?: Event) => void | Promise<void>) | null;
+		singleUserMode?: boolean;
 		onCopyStatusHash: () => void | Promise<void>;
 		onReplayCurrent: () => void | Promise<void>;
 		onToggleGenerationInfo: () => void;
@@ -101,6 +102,7 @@
 		onToggleStar,
 		onToggleForRevision,
 		onToggleForShare = null,
+		singleUserMode = false,
 		onCopyStatusHash,
 		onReplayCurrent,
 		onToggleGenerationInfo,
@@ -252,7 +254,7 @@
 							}}
 						>⚑</button>
 					</Tooltip>
-					{#if shareTarget.supported && onToggleForShare}
+					{#if !singleUserMode && shareTarget.supported && onToggleForShare}
 						<Tooltip placement="top-right" text={shareTarget.marked ? t().shareTargetOn : t().shareTargetOff}>
 							<button
 								type="button"

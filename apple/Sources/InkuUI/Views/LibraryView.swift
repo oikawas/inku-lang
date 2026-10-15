@@ -23,13 +23,15 @@ struct LibraryView: View {
     @State private var pageSizeCeiling = LibraryGridPaging.maximumPageSize
     @State private var cardHeights: [String: CGFloat] = [:]
     @FocusState private var focusedWorkID: String?
+    @FocusState private var searchFocused: Bool
+    @State private var previewComment = LibraryNoteEditorModel()
     private var library: LibraryModel { model.library }
     private var display: DisplaySettings { model.display }
     private var naming: ModelNaming { ModelNaming(providers: providers) }
     private var writingDisabled: Bool { model.isBusy || writingLocked }
     private var hasFilters: Bool {
         !library.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || library.starredOnly || library.revisionOnly || library.shareOnly
+            || library.starredOnly || library.revisionOnly
     }
     private var visibleIDs: [String] {
         library.isGrouped
@@ -203,8 +205,6 @@ struct LibraryView: View {
                              tooltip: display.tooltip("お気に入りの作品に絞り込みます。", serverKey: "tooltipHistoryStarredOnly"))
                 filterButton(display.webCopy("historyForRevisionOnly", fallback: "推敲マークのみ"), isOn: $library.revisionOnly,
                              tooltip: display.tooltip("推敲の印を付けた作品に絞り込みます。", serverKey: "tooltipHistoryForRevisionOnly"))
-                filterButton(display.localized("書き出し用のみ"), isOn: $library.shareOnly,
-                             tooltip: display.tooltip("書き出し用の印を付けた作品に絞り込みます。", serverKey: "tooltipHistoryForShareOnly"))
             }
             .padding(.leading, 10)
             .overlay(alignment: .leading) { Rectangle().fill(LibraryChrome.border).frame(width: 1) }
@@ -272,10 +272,20 @@ struct LibraryView: View {
     private var searchField: some View {
         @Bindable var library = library
         return HStack(spacing: 6) {
-            Text(display.localized("検索")).inkuFont(12).foregroundStyle(.secondary).fixedSize()
-            TextField(display.localized("記述・DDL・モデル・色・ハッシュを検索"), text: $library.query)
-                .textFieldStyle(.roundedBorder).inkuFont(12)
-                .frame(minWidth: 120, maxWidth: 240)
+            Text(display.webCopy("historySearchLabel", "検索（記述 / ハッシュ値 / 作品ID）:"))
+                .inkuFont(12).foregroundStyle(.secondary).fixedSize()
+            HStack(spacing: 0) {
+                TextField("", text: $library.query).textFieldStyle(.plain).focused($searchFocused)
+                    .accessibilityLabel(display.webCopy("historySearchLabel", "検索（記述 / ハッシュ値 / 作品ID）:"))
+                    .padding(.leading, 7)
+                Button { library.query = ""; searchFocused = true } label: { Text("×").frame(width: 28, height: 26) }
+                    .buttonStyle(.plain).disabled(library.query.isEmpty)
+                    .accessibilityLabel(display.webCopy("historySearchClear", "検索をクリア"))
+            }
+            .inkuFont(12).frame(minWidth: 120, maxWidth: 240, minHeight: 28)
+            .background(LibraryChrome.panel2, in: RoundedRectangle(cornerRadius: 4))
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(LibraryChrome.border))
+            .inkuTooltip(display.webCopy("historySearchHint", "ハッシュ値と作品IDは全体か先頭部分、ハッシュ値は下位4桁でも検索できます。"))
         }
     }
 
@@ -565,7 +575,7 @@ struct LibraryView: View {
         } actions: {
             if hasFilters {
                 Button(display.localized("検索条件を解除")) {
-                    library.query = ""; library.starredOnly = false; library.revisionOnly = false; library.shareOnly = false
+                    library.query = ""; library.starredOnly = false; library.revisionOnly = false
                 }
             } else if !library.isTrash {
                 Button(display.localized("制作へ")) {
@@ -800,8 +810,6 @@ struct LibraryView: View {
             .disabled(library.mutating || writingDisabled)
         Button(display.localized("推敲の印"), systemImage: library.annotation(for: work.id).forRevision ? "pencil.circle.fill" : "pencil.circle") { Task { await library.toggleRevision(work) } }
             .disabled(library.mutating || writingDisabled)
-        Button(display.localized("書き出し用の印"), systemImage: library.annotation(for: work.id).forShare ? "square.and.arrow.up.fill" : "square.and.arrow.up") { Task { await library.toggleShare(work) } }
-            .disabled(library.mutating || writingDisabled)
         if let hash = work.renderHash { Button(display.localized("描画ハッシュ全体をコピー"), systemImage: "doc.on.doc") { library.copyHash(hash) } }
         Divider()
         if work.trashed {
@@ -843,12 +851,9 @@ struct LibraryView: View {
                             .accessibilityLabel(display.localized("プレビューを閉じる"))
                             .inkuTooltip(tip("プレビューを閉じる"))
                     }
-                    LibraryWorkDetails(model: model, work: work, onReplayWork: onReplayWork,
-                                       annotationSource: preview.annotationState,
-                                       onAnnotationSaved: { id, value in preview.adoptAnnotation(value, workID: id) },
-                                       onOpenInCreate: openInCreate,
-                                       onAdjustWork: onAdjustWork, onWorkAction: onWorkAction,
-                                       onOpenLineage: openLineage, writingLocked: writingDisabled)
+                    LibraryPreviewPanel(model: model, preview: preview, comment: previewComment, work: work,
+                                        naming: naming, onOpen: openInCreate, onLineage: openLineage,
+                                        onWorkAction: onWorkAction, writingLocked: writingDisabled)
                         .id(work.id)
                     if let error = preview.errorText {
                         Text(error).inkuFont(12).foregroundStyle(.red).textSelection(.enabled)

@@ -14,6 +14,14 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-15 Library preview, search, and history strip
+
+The work preview follows the order of image, opening hint, full description, lineage/refinement/export actions, work-information table, and comment. Double-clicking the image or activating it from the keyboard opens that work in Create; inspection alone does not replace the Create draft. Closing and reopening the same preview retains an unsaved comment without mixing another work's information. Details show save time, stage models (one row when equal), catalog, canvas, seconds, SVG size, render version, generation, and a short hash with full-hash copy. Export first selects a format, then opens settings for that work.
+
+Search follows Web's description/hash/work-ID label, hint, and inline clear action. Clearing retains input focus. Existing description, DDL, model, and catalog searches remain, with hash prefixes and whole/prefix work IDs added. History-strip model names use Web's word abbreviations while retaining versions, sizes, variants, and quantization. Long names wrap in smaller text. Saved names can use the catalog when a connection is absent without registering or enabling a drawing model.
+
+The native export mark, filter, and work attribute that stood in for sharing are removed; they did not represent Server sharing permissions. The Swift physical schema v4 [migration](Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v4.sql) removes only `library_annotations.for_share`, preserving comments, revision marks, works, lineage, and executions. The [Swift schema export](../persistence/reference/swift-schema-v4.json) records its authority. Known v1-v3 databases migrate; older backups migrate in an isolated snapshot before restoration. Older binaries cannot open v4 databases: rolling back requires the pre-migration backup together with the old code. File export remains available.
+
 ## 2026-10-15 Work shown at startup
 
 As on Web, startup reads normal saved works in descending save-time order and opens the first work. Trashed and lineage-only works are excluded; the previous selected work ID does not determine the choice. Its image, instructions, description, and saved information come from that work's record. If no normal work exists, the canvas stays empty. This selection happens once during initialization; New and history refreshes do not reopen a saved work automatically. Startup does not redraw, call an LLM, or save history.
@@ -512,7 +520,7 @@ Database selection resolves `--database`, the optional `InkuDatabasePath` bundle
 
 ### Saved-work marks and prompt availability
 
-Revision and export marks are read by saved-work ID even when the work is outside the current library page. Page refresh retains the selected work's annotation. Mark toggles read and invert the durable SQLite value in one write transaction rather than treating a page-cache miss as an unmarked work. The schema and saved work content remain unchanged.
+Revision marks are read by saved-work ID even when the work is outside the current library page. Page refresh retains the selected work's annotation. Mark toggles read and invert the durable SQLite value in one write transaction rather than treating a page-cache miss as an unmarked work. Saved work content remains unchanged. Export-mark removal and schema v4 migration follow the current rule above.
 
 The sent-prompt pane distinguishes loading, recorded, not recorded, and unavailable. Selecting an older parent after a DDL edit creates a child in the same execution does not reuse that child's latest output for the parent. Missing or unavailable records do not establish that no model request was sent. Core editing authority and saved DDL/Score/SVG remain intact; selecting a work sends no provider request and creates no history entry.
 
@@ -560,13 +568,13 @@ Description/sketch dialogs keep the title and action footer fixed while placing 
 
 ### History, library, and lineage
 
-History strip capacity follows the work-area width across the whole database; library has independent page capacity. The app's latest-100 list is not the population for search or navigation. Latest/newer/older/oldest navigation, full-description/full-hash/final-four search, AND-combined star/refinement/export filters, and independent thumbnail/list and chronological/lineage grouping are available.
+History strip capacity follows the work-area width across the whole database; library has independent page capacity. The app's latest-100 list is not the population for search or navigation. Latest/newer/older/oldest navigation, description/full-hash/hash-prefix/final-four/work-ID search, AND-combined star/refinement filters, and independent thumbnail/list and chronological/lineage grouping are available.
 
 Comments, marks, trash/restore, explicit permanent deletion, multiple selection, and lineage graph/path use SQLite. Permanent deletion removes work content while retaining node identity, root, time, and parent relationships as tombstones. Server ACL and user/group administration are excluded.
 
 History generations follow Server: roots are generation one and each primary-parent edge adds one, including deleted ancestors. Works without a node are standalone. New preferences show generation and model; existing field choices remain intact. Variation kind or amplitude does not substitute for generation. Library distinguishes the displayed work from multiple-selection checkboxes; lineage distinguishes the displayed work from its scope-setting focus. A DDL-only work uses the first saved DDL line as its display title without filling in saved source text. Cards and menus expose hashes, comments, marks, and parent/child navigation.
 
-Swift physical schema v3 adds `provider_rate_state` to v2's nine tables for works, lineage, executions, annotations, colophons, and unread words, for ten tables. Its sources are the [bundled migration](Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v3.sql) and [schema export](../persistence/reference/swift-schema-v3.json). Only known complete v1/v2 schemas migrate atomically, preserving works/snapshots/ACKs. Unknown schemas still fail closed. Backup/restore includes all ten tables; older backups migrate in an isolated snapshot before restoration. Live request budgets and cooldowns carry over conservatively so restoring older works cannot reset today's limit. Server/Android DB and legacy work JSON import are not included.
+Swift physical schema v4 retains ten tables and removes the retired native export-mark column `for_share` from local annotations. Its sources are the [bundled migration](Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v4.sql) and [schema export](../persistence/reference/swift-schema-v4.json). Only known complete v1/v2/v3 schemas migrate atomically, preserving works, comments, refinement marks, snapshots and ACKs. Unknown schemas still fail closed. Backup/restore includes all ten tables; older backups migrate in an isolated snapshot before restoration. Live request budgets and cooldowns carry over conservatively so restoring older works cannot reset today's limit. Server/Android DB and legacy work JSON import are not included.
 
 ### Comparison, refinement, colophons, and automation
 

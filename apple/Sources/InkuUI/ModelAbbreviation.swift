@@ -31,6 +31,7 @@ public struct ModelNaming: Sendable {
     public func providerLabel(_ provider: String) -> String {
         guard !provider.isEmpty else { return "" }
         if let label = connections.first(where: { $0.id == provider })?.label, !label.isEmpty { return label }
+        if provider == "chatgpt" { return "ChatGPT plan" }
         return Self.retiredLabels[provider] ?? provider
     }
 
@@ -39,7 +40,8 @@ public struct ModelNaming: Sendable {
             let models = ModelGuidanceCatalog.bundled?.registeredModelSettings(for: connection) ?? connection.models ?? []
             if let label = models.first(where: { $0.id == model })?.label, !label.isEmpty { return label }
         }
-        return Self.retiredModels[provider]?[model]
+        return ModelGuidanceCatalog.bundled?.savedModelLabel(providerID: provider, modelID: model)
+            ?? Self.retiredModels[provider]?[model]
     }
 
     private var knownProviders: Set<String> { Set(connections.map(\.id)).union(["chatgpt"]).union(Self.retiredLabels.keys) }
@@ -110,39 +112,59 @@ public struct ModelNaming: Sendable {
 
     // MARK: historyStripFields.ts
 
-    /// The provider's first two characters, then the family (the word before the first number) and that number,
-    /// three characters each. A name with no number prints its first word alone.
+    /// Web historyStripFields.ts: compact recognizable words while retaining versions, sizes and variants.
     public static func abbreviateStripModel(owner: String, name: String) -> String {
-        let separators: (Character) -> Bool = { $0.isWhitespace || "-_/:".contains($0) }
-        let words = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            .split(whereSeparator: separators)
-            .flatMap(splitLetterDigit)
-            .filter { !$0.isEmpty }
-        let startsWithDigit: (String) -> Bool = { $0.first.map(isASCIIDigit) ?? false }
-        let at = words.firstIndex(where: startsWithDigit)
-        let family = at.map { $0 > 0 ? words[$0 - 1] : (words.first { !startsWithDigit($0) } ?? "") }
-            ?? (words.first { !startsWithDigit($0) } ?? "")
-        let version = at.map { words[$0] } ?? ""
-        return [String(owner.trimmingCharacters(in: .whitespacesAndNewlines).prefix(2)), String(family.prefix(3)), String(version.prefix(3))]
-            .filter { !$0.isEmpty }.joined(separator: " ")
-    }
-
-    /// `word.split(/(?<=[A-Za-z])(?=\d)/)`: "gemma4" is a family and a version run together.
-    private static func splitLetterDigit(_ word: Substring) -> [String] {
-        var parts: [String] = []
-        var current = ""
-        var previous: Character?
-        for character in word {
-            if let previous, isASCIILetter(previous), isASCIIDigit(character) { parts.append(current); current = "" }
-            current.append(character)
-            previous = character
+        func replace(_ text: String, _ pattern: String, _ replacement: String) -> String {
+            text.replacingOccurrences(of: pattern, with: replacement, options: [.regularExpression, .caseInsensitive])
         }
-        parts.append(current)
-        return parts
+        let provider = owner.range(of: "ollama.*cloud", options: [.regularExpression, .caseInsensitive]) != nil
+            ? "Oc" : String(owner.trimmingCharacters(in: .whitespacesAndNewlines).prefix(2))
+        var model = replace(name.trimmingCharacters(in: .whitespacesAndNewlines), "^.*/", "")
+        model = replace(model, "^(?:anthropic|google|meta|mistral\\s+ai)\\s+", "")
+        model = replace(model, "\\s*\\([\\d.]+\\s*[GM]B\\)\\s*$", "")
+        model = replace(model, "\\bdeepseek[-\\s]+v(?=\\d)", "deepseek-")
+        model = replacingMatches(model, pattern: "(?i)\\bq(\\d+)[_-]k[_-]([a-z])\\b") { match, text in
+            let bits = Range(match.range(at: 1), in: text).map { String(text[$0]) } ?? ""
+            let suffix = Range(match.range(at: 2), in: text).map { String(text[$0]).uppercased() } ?? ""
+            return "Q" + bits + "K" + suffix
+        }
+        if owner.range(of: "^claude\\b", options: [.regularExpression, .caseInsensitive]) != nil { model = replace(model, "^claude[\\s-]+", "") }
+        if owner.range(of: "^gemini\\b", options: [.regularExpression, .caseInsensitive]) != nil { model = replace(model, "^gemini[\\s-]+", "") }
+        let tokens = model.components(separatedBy: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ":_-")))
+            .filter { !$0.isEmpty }.map { token in
+                replacingMatches(token, pattern: "(?i)[a-z]+") { match, text in
+                    let word = Range(match.range, in: text).map { String(text[$0]) } ?? ""
+                    return stripWords[word.lowercased()] ?? word
+                }
+            }
+        var compact = ""
+        for (index, token) in tokens.enumerated() {
+            if index > 0, tokens[index - 1].last.map({ $0.isASCII && $0.isNumber }) == true,
+               token.first.map({ $0.isASCII && $0.isNumber }) == true { compact += "·" }
+            compact += token
+        }
+        return [provider, compact].filter { !$0.isEmpty }.joined(separator: " ")
     }
 
-    private static func isASCIILetter(_ character: Character) -> Bool { character.isASCII && character.isLetter }
-    private static func isASCIIDigit(_ character: Character) -> Bool { character.isASCII && character.isNumber }
+    private static let stripWords = [
+        "gpt": "GPT", "oss": "oss", "sol": "So", "luna": "Lu", "astra": "As", "terra": "Te",
+        "claude": "Cl", "sonnet": "So", "opus": "Op", "haiku": "Ha", "fable": "Fa",
+        "gemini": "Ge", "gemma": "Gm", "flash": "Fl", "lite": "L", "pro": "Pr", "mini": "Mi", "nano": "Na", "turbo": "T",
+        "llama": "Ll", "qwen": "Qw", "deepseek": "DS", "minimax": "MM", "kimi": "Ki",
+        "mistral": "Mi", "ministral": "Min", "mixtral": "Mx", "nemotron": "Nem", "granite": "Gr",
+        "large": "Lg", "medium": "Md", "small": "Sm", "super": "Su", "ultra": "Ul",
+        "instruct": "I", "it": "I", "vision": "V", "reasoning": "R", "thinking": "Th",
+        "preview": "Pv", "latest": "Lt", "code": "Cd", "coder": "Cdr", "a": "A", "b": "B", "e": "E"
+    ]
+
+    private static func replacingMatches(_ text: String, pattern: String, replacement: (NSTextCheckingResult, String) -> String) -> String {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
+        var result = text
+        for match in regex.matches(in: text, range: NSRange(text.startIndex..., in: text)).reversed() {
+            if let range = Range(match.range, in: result) { result.replaceSubrange(range, with: replacement(match, text)) }
+        }
+        return result
+    }
 
     // MARK: HistoryManager.svelte
 

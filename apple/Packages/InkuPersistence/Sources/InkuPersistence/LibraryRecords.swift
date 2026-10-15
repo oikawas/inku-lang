@@ -4,10 +4,8 @@ import Foundation
 public struct LibraryAnnotation: Sendable, Equatable {
     public var note: String?
     public var forRevision: Bool
-    public var forShare: Bool
-
-    public init(note: String? = nil, forRevision: Bool = false, forShare: Bool = false) {
-        self.note = note; self.forRevision = forRevision; self.forShare = forShare
+    public init(note: String? = nil, forRevision: Bool = false) {
+        self.note = note; self.forRevision = forRevision
     }
 }
 
@@ -20,13 +18,12 @@ public struct LibraryQuery: Sendable, Equatable {
     public var trashed: Bool
     public var starred: Bool
     public var forRevision: Bool
-    public var forShare: Bool
     public var order: LibraryOrder
 
     public init(text: String = "", trashed: Bool = false, starred: Bool = false,
-                forRevision: Bool = false, forShare: Bool = false, order: LibraryOrder = .newest) {
+                forRevision: Bool = false, order: LibraryOrder = .newest) {
         self.text = text; self.trashed = trashed; self.starred = starred
-        self.forRevision = forRevision; self.forShare = forShare; self.order = order
+        self.forRevision = forRevision; self.order = order
     }
 }
 

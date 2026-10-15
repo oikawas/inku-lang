@@ -21,9 +21,6 @@ public enum ServerTips {
     /// The action is shared, while storage, service ownership or sharing is local.
     private static let adaptedKeys: [String: String] = [
         "tooltipSketchToggle": "写生層が書いた文章を表示します。開閉の状態はこのMacに保存されます。",
-        "tooltipHistoryForShareOnly": "書き出しの印を付けた作品だけを表示します。ほかの絞り込みと併せると、すべてに該当する作品だけになります。",
-        "shareTargetOn": "書き出しの印を外す",
-        "shareTargetOff": "書き出しの印を付ける",
         "settingsModelsHint": "このアプリに登録するAIサービスのモデルと接続情報を管理します。",
         "settingsModelSecurityNote": "APIキーはKeychainに保存され、画面には再表示されません。",
         "settingsModelRpmHelp": "このアプリが同じ接続先へ送る1分当たりの要求数です。写生・解釈・カタログ選択・構図読み・再試行を含みます。0は上限なしです。",
@@ -50,7 +47,6 @@ public enum ServerTips {
         "同じ系譜の作品をまとめて表示します。": "tooltipHistoryLineageGrouped",
         "お気に入りの作品に絞り込みます。": "tooltipHistoryStarredOnly",
         "推敲の印を付けた作品に絞り込みます。": "tooltipHistoryForRevisionOnly",
-        "書き出し用の印を付けた作品に絞り込みます。": "tooltipHistoryForShareOnly",
         "最新の履歴": "tooltipCanvasNavLatest",
         "最古の履歴": "tooltipCanvasNavOldest",
         "新しい作品": "tooltipCanvasNavNewer",

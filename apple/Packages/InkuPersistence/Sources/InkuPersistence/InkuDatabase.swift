@@ -13,7 +13,7 @@ public enum PersistenceError: Error, Sendable, Equatable {
 }
 
 public enum LibraryAnnotationMark: Sendable {
-    case revision, share
+    case revision
 }
 
 /// One actor owns one SQLite writer. No database handle escapes this boundary.
@@ -49,6 +49,10 @@ public actor InkuDatabase {
                 if try Int.fetchOne(db, sql: "PRAGMA user_version") == 2 {
                     try Self.validateSchema(db)
                     try db.execute(sql: Self.resourceSQL("migration-v3"))
+                }
+                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 3 {
+                    try Self.validateSchema(db)
+                    try db.execute(sql: Self.resourceSQL("migration-v4"))
                 }
             }
         }
@@ -152,8 +156,7 @@ public actor InkuDatabase {
                                          arguments: filter.arguments) ?? 0
             let rows = try Row.fetchAll(db, sql: """
                 SELECT h.*, a.note AS library_note,
-                       coalesce(a.for_revision, 0) AS library_revision,
-                       coalesce(a.for_share, 0) AS library_share
+                       coalesce(a.for_revision, 0) AS library_revision
                 \(Self.libraryJoin) WHERE \(filter.sql)
                 ORDER BY h.at \(query.order == .newest ? "DESC" : "ASC"), h.id ASC LIMIT ? OFFSET ?
                 """, arguments: filter.arguments + [limit, offset])
@@ -231,8 +234,7 @@ public actor InkuDatabase {
             let groups = try rows.map { row -> LibraryGroup in
                 let root: String = row["root_id"]
                 guard let representative = try Row.fetchOne(db, sql: """
-                    SELECT h.*, a.note AS library_note, coalesce(a.for_revision, 0) AS library_revision,
-                           coalesce(a.for_share, 0) AS library_share
+                    SELECT h.*, a.note AS library_note, coalesce(a.for_revision, 0) AS library_revision
                     \(Self.libraryJoin) WHERE \(filter.sql) AND coalesce(n.root_node_id, n.id) = ?
                     ORDER BY h.at DESC, h.id ASC LIMIT 1
                     """, arguments: filter.arguments + [root]) else {
@@ -291,7 +293,6 @@ public actor InkuDatabase {
         let column: String
         switch mark {
         case .revision: column = "for_revision"
-        case .share: column = "for_share"
         }
         return try queue.write { db in
             guard try SavedWork.fetchOne(db, key: id) != nil else {
@@ -304,8 +305,7 @@ public actor InkuDatabase {
         }
     }
 
-    public func setAnnotation(id: String, note: String? = nil,
-                              forRevision: Bool? = nil, forShare: Bool? = nil) throws {
+    public func setAnnotation(id: String, note: String? = nil, forRevision: Bool? = nil) throws {
         try queue.write { db in
             guard try SavedWork.fetchOne(db, key: id) != nil else {
                 throw PersistenceError.invalidRecord("work no longer exists")
@@ -321,10 +321,6 @@ public actor InkuDatabase {
             if let forRevision {
                 try db.execute(sql: "UPDATE library_annotations SET for_revision = ? WHERE history_id = ?",
                                arguments: [forRevision, id])
-            }
-            if let forShare {
-                try db.execute(sql: "UPDATE library_annotations SET for_share = ? WHERE history_id = ?",
-                               arguments: [forShare, id])
             }
         }
     }
@@ -535,7 +531,6 @@ public actor InkuDatabase {
         var arguments: StatementArguments = [query.trashed]
         if query.starred { clauses.append("h.starred = 1") }
         if query.forRevision { clauses.append("coalesce(a.for_revision, 0) = 1") }
-        if query.forShare { clauses.append("coalesce(a.for_share, 0) = 1") }
         let search = query.text.trimmingCharacters(in: .whitespacesAndNewlines)
         if !search.isEmpty {
             var searchClauses = ["h.input LIKE ?", "h.ddl LIKE ?", "h.stage1_model LIKE ?", "h.stage2_model LIKE ?", "h.catalog_id LIKE ?"]
@@ -545,6 +540,17 @@ public actor InkuDatabase {
             }
             let wholeHash = search.range(of: "^(?:[a-z0-9]+:)?[0-9a-f]{64}$", options: [.regularExpression, .caseInsensitive]) != nil
             if shortHash || wholeHash { searchClauses.append("h.render_hash LIKE ?"); arguments += ["%\(search)"] }
+            // Server persistence/search.py: hashes accept their whole spelling, digest prefix, or chip suffix.
+            if search.range(of: "^(?:[a-z0-9]+:)?[0-9a-f]{1,64}$", options: [.regularExpression, .caseInsensitive]) != nil {
+                searchClauses.append("h.render_hash LIKE ?"); arguments += ["\(search)%"]
+                if !search.contains(":") { searchClauses.append("h.render_hash LIKE ?"); arguments += ["%:\(search)%"] }
+            }
+            let uuidPrefix = (1...36).contains(search.count) && search.enumerated().allSatisfy { index, character in
+                [8, 13, 18, 23].contains(index) ? character == "-" : character.isASCII && character.isHexDigit
+            }
+            // Saved native IDs use 32 or 64 hex digits with an optional candidate suffix.
+            let nativeID = search.range(of: "^[0-9a-f]{1,64}(?:_[0-9]*)?$", options: [.regularExpression, .caseInsensitive]) != nil
+            if uuidPrefix || nativeID { searchClauses.append("h.id LIKE ?"); arguments += ["\(search)%"] }
             clauses.append("(" + searchClauses.joined(separator: " OR ") + ")")
         }
         return (clauses.joined(separator: " AND "), arguments)
@@ -552,14 +558,14 @@ public actor InkuDatabase {
 
     private static func libraryItem(_ row: Row) throws -> LibraryItem {
         LibraryItem(work: try SavedWork(row: row), annotation: LibraryAnnotation(
-            note: row["library_note"], forRevision: row["library_revision"], forShare: row["library_share"]))
+            note: row["library_note"], forRevision: row["library_revision"]))
     }
 
     private static func annotation(id: String, in db: Database) throws -> LibraryAnnotation {
         guard let row = try Row.fetchOne(db, sql: "SELECT * FROM library_annotations WHERE history_id = ?", arguments: [id]) else {
             return LibraryAnnotation()
         }
-        return LibraryAnnotation(note: row["note"], forRevision: row["for_revision"], forShare: row["for_share"])
+        return LibraryAnnotation(note: row["note"], forRevision: row["for_revision"])
     }
 
     private static func generation(id: String, in db: Database) throws -> Int {
@@ -710,6 +716,9 @@ public actor InkuDatabase {
             if try Int.fetchOne(db, sql: "PRAGMA user_version") == 2 {
                 try db.execute(sql: Self.resourceSQL("migration-v3"))
             }
+            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 3 {
+                try db.execute(sql: Self.resourceSQL("migration-v4"))
+            }
         }
         try isolated.read { try Self.validateRestore($0) }
         // Artwork rollback must not reopen reservations already charged by this DB.
@@ -800,11 +809,13 @@ public actor InkuDatabase {
         return try String(contentsOf: resource, encoding: .utf8)
     }
 
-    private static func schemaSQL(version: Int = 3) throws -> String {
+    private static func schemaSQL(version: Int = 4) throws -> String {
         let baseline = try resourceSQL("schema-v1")
         if version == 1 { return baseline }
         let second = baseline + "\n" + (try resourceSQL("migration-v2"))
-        return version == 2 ? second : second + "\n" + (try resourceSQL("migration-v3"))
+        if version == 2 { return second }
+        let third = second + "\n" + (try resourceSQL("migration-v3"))
+        return version == 3 ? third : third + "\n" + (try resourceSQL("migration-v4"))
     }
 
     private struct SchemaObject: Equatable {
@@ -826,7 +837,7 @@ public actor InkuDatabase {
     }
 
     private static func validateSchema(_ db: Database) throws {
-        guard let version = try Int.fetchOne(db, sql: "PRAGMA user_version"), [1, 2, 3].contains(version) else {
+        guard let version = try Int.fetchOne(db, sql: "PRAGMA user_version"), [1, 2, 3, 4].contains(version) else {
             throw PersistenceError.unknownSchema
         }
         let expected = try DatabaseQueue()
@@ -835,6 +846,7 @@ public actor InkuDatabase {
         var identifiers = ["swift-v1-contract-v2"]
         if version >= 2 { identifiers.append("swift-v2-library-annotations") }
         if version >= 3 { identifiers.append("swift-v3-provider-rate-state") }
+        if version >= 4 { identifiers.append("swift-v4-remove-export-mark") }
         guard try schemaObjects(in: db) == expectedObjects,
               try String.fetchAll(db, sql: "SELECT identifier FROM schema_migrations ORDER BY identifier")
                 == identifiers else {
@@ -858,7 +870,7 @@ public actor InkuDatabase {
                 """)
             guard invalidUnread == 0 else { throw PersistenceError.corruptDatabase }
         }
-        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 3 {
+        if (try Int.fetchOne(db, sql: "PRAGMA user_version") ?? 0) >= 3 {
             for row in try Row.fetchAll(db, sql: "SELECT provider_id, state_json FROM provider_rate_state") {
                 let provider: String = row["provider_id"]
                 guard !provider.isEmpty else { throw PersistenceError.corruptDatabase }

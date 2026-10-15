@@ -79,6 +79,9 @@ struct AppCheck {
         if CommandLine.arguments.contains("--startup-work-only") {
             try await runStartupWorkChecks(); return
         }
+        if CommandLine.arguments.contains("--history-model-name-only") {
+            try runHistoryModelNameChecks(); return
+        }
         if CommandLine.arguments.contains("--lineage-presentation-only") {
             try await runLineagePresentationChecks(); return
         }

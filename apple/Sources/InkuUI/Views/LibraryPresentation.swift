@@ -138,7 +138,6 @@ struct LibraryWorkMarks: View {
             .inkuTooltip(model.display.tooltip(work.starred ? "スターを外す" : "スターを付ける",
                                         serverKey: work.starred ? "starOn" : "starOff"))
             LibraryAnnotationMarkButton(model: model, work: work, mark: .revision)
-            LibraryAnnotationMarkButton(model: model, work: work, mark: .share)
         }
         .buttonStyle(.borderless)
         .disabled(library.mutating || model.isBusy)
@@ -156,20 +155,17 @@ struct LibraryAnnotationMarkButton: View {
         guard let annotation = library.loadedAnnotation(for: work.id) else { return nil }
         switch mark {
         case .revision: return annotation.forRevision
-        case .share: return annotation.forShare
         }
     }
     private var title: String {
         switch mark {
         case .revision: return "推敲の印"
-        case .share: return "書き出し用の印"
         }
     }
     private var symbol: String {
         guard let marked else { return "questionmark.circle" }
         switch mark {
         case .revision: return marked ? "pencil.circle.fill" : "pencil.circle"
-        case .share: return marked ? "square.and.arrow.up.fill" : "square.and.arrow.up"
         }
     }
     private var accessibilityState: String {
@@ -184,9 +180,6 @@ struct LibraryAnnotationMarkButton: View {
         case .revision:
             return model.display.tooltip(marked ? "推敲マークを外す" : "推敲マークを付ける",
                                          serverKey: marked ? "forRevisionOn" : "forRevisionOff")
-        case .share:
-            return model.display.tooltip(marked ? "書き出しの印を外す" : "書き出しの印を付ける",
-                                         serverKey: marked ? "shareTargetOn" : "shareTargetOff")
         }
     }
 
@@ -195,7 +188,6 @@ struct LibraryAnnotationMarkButton: View {
             Task {
                 switch mark {
                 case .revision: await library.toggleRevision(work)
-                case .share: await library.toggleShare(work)
                 }
             }
         } label: {

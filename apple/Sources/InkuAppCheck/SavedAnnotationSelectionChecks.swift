@@ -19,7 +19,7 @@ func runSavedAnnotationSelectionChecks() async throws {
     for work in [target, other] {
         try await database.save(work, node: LineageNode(id: work.lineageNodeID!, historyID: work.id, at: work.at))
     }
-    try await database.setAnnotation(id: target.id, forRevision: true, forShare: true)
+    try await database.setAnnotation(id: target.id, note: "Keep this note", forRevision: true)
 
     let provider = SavedAnnotationNoProvider()
     let app = AppModel(databaseURL: url, transport: provider)
@@ -33,7 +33,7 @@ func runSavedAnnotationSelectionChecks() async throws {
     guard app.selectedWorkID == target.id, app.library.works.map(\.id) == [other.id],
           app.library.annotations[target.id] == nil,
           app.library.loadedAnnotation(for: target.id)?.forRevision == true,
-          app.library.loadedAnnotation(for: target.id)?.forShare == true else {
+          app.library.loadedAnnotation(for: target.id)?.note == "Keep this note" else {
         throw CheckFailure.message("Page refresh discarded the selected work's durable marks")
     }
 
@@ -46,7 +46,7 @@ func runSavedAnnotationSelectionChecks() async throws {
     await app.library.toggleRevision(target)
     let reopened = try InkuDatabase(url: url)
     let saved = try await reopened.libraryAnnotation(id: target.id)
-    guard app.library.errorText == nil, !saved.forRevision, saved.forShare,
+    guard app.library.errorText == nil, !saved.forRevision, saved.note == "Keep this note",
           app.library.loadedAnnotation(for: target.id) == saved,
           app.library.works.map(\.id) == [other.id], app.selectedWork == target,
           try await reopened.list().count == 2, await provider.calls == 0 else {
@@ -56,7 +56,7 @@ func runSavedAnnotationSelectionChecks() async throws {
     guard app.library.selectedAnnotationID == nil, app.library.selectedAnnotation == nil else {
         throw CheckFailure.message("New work retained the previous saved annotation selection")
     }
-    print("Saved annotation selection passed: two SQLite works/pageSize1; selected marks survive paging, off-page ID reload reads true, one toggle durably saves false and preserves the other mark. No provider calls or history additions.")
+    print("Saved annotation selection passed: two SQLite works/pageSize1; selected mark survives paging, off-page ID reload reads true, one toggle durably saves false and preserves the note. No provider calls or history additions.")
 }
 
 private actor SavedAnnotationNoProvider: ProviderTransport {

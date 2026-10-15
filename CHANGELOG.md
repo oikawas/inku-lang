@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Match macOS library preview, search, and history labels to Web
+
+Reordered preview images, descriptions, actions, details, and comments; added inline search clearing and hash/work-ID prefixes. History model labels now preserve versions, sizes, and variants using Web abbreviations. Removed the native export mark, filter, and stored attribute through Swift DB v4, preserving comments, revision marks, and saved works.
+
 ### 2026-10-15 — Show the latest saved work at macOS startup
 
 Fixed the empty startup canvas: as on Web, the latest normal saved work opens automatically. Trashed and lineage-only works are excluded; no normal works leaves an empty canvas. New inputs remain detached during history refreshes.

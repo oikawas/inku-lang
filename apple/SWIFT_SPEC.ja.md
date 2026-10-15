@@ -14,6 +14,14 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-15 ライブラリのプレビューと検索・履歴帯
+
+作品プレビューは画像、開き方の補足、記述全文、系譜・推敲・書出し、作品情報の表、コメントの順に並べる。画像のダブルクリックまたはキーボード操作でその作品を制作で開く。調べるだけでは制作欄を置き換えない。同じ作品を閉じて開き直しても未保存のコメントを保持し、別の作品の情報を混ぜない。作品情報は保存時刻・段階ごとのモデル（同じなら1行）・色カタログ・キャンバス・秒数・SVG容量・描画版・世代・短いhashと全hashのコピーを示す。書出しは形式を選んで、その作品を対象に設定画面を開く。
+
+検索は記述／hash／作品IDのラベル・説明と、入力欄内のクリア操作をWebへ揃える。クリア後も入力focusを保つ。既存の記述・DDL・モデル・色の検索に加えて、hashの先頭と作品IDの全体／先頭も照合する。履歴帯のモデル名はWebと同じ語の省略規則を使い、版・サイズ・variant・量子化を保つ。長い名前は小さい文字で折り返す。保存モデルの表示名は、接続が現在なくてもcatalogから読める場合はその名を使い、描画モデルを登録／有効化しない。
+
+共有の代わりに置いていたnativeの「書き出し用」の印・フィルタ・作品属性を廃止する。これは実際のServerの共有権限を表すものではない。Swift物理schema v4の[migration](Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v4.sql)で`library_annotations.for_share`だけを削除し、コメント・推敲印と作品・系譜・実行記録は保持する。正本は[Swift schema export](../persistence/reference/swift-schema-v4.json)。既知のv1〜v3を移行し、旧backupの復元も隔離snapshotでv4へ移行する。v4 DBは古いbinaryでは開けないため、旧版へ戻す場合は移行前backupと旧版を組にする。実際のファイル書出し機能は保持する。
+
 ## 2026-10-15 起動時の作品表示
 
 Webと同じく、起動時は通常の保存作品を保存時刻の新しい順で読み、先頭の1作品を開く。ごみ箱と系譜だけの作品は対象外とし、前回選んだ作品IDの復元では決めない。作品の画像・指示書・記述・保存情報は、その作品の記録から読む。通常作品がない場合は空表示にする。この選択は初期化時の一度だけで、新規作成や一覧の更新では自動的に作品を開き直さない。再描画・LLM呼出し・履歴保存は行わない。
@@ -512,7 +520,7 @@ DB指定は`--database`、任意のbundle設定`InkuDatabasePath`、従来のApp
 
 ### 保存作品の印とプロンプトの取得状態
 
-推敲／書き出し用の印は、表示中のlibrary pageに含まれない保存作品もIDから読み出す。選択作品の注釈をpage更新後も保持し、印の反転はSQLiteの保存値を同じ書込みtransactionで読み替える。現在pageのcache欠落を印なしと判断しない。schemaと保存作品本文は変更しない。
+推敲の印は、表示中のlibrary pageに含まれない保存作品もIDから読み出す。選択作品の注釈をpage更新後も保持し、印の反転はSQLiteの保存値を同じ書込みtransactionで読み替える。現在pageのcache欠落を印なしと判断しない。保存作品本文は変更しない。書き出し用の印の廃止とschema v4への移行は冒頭の規定に従う。
 
 送信プロンプト欄は読込み中・記録あり・記録なし・取得不能を区別する。同じexecutionでDDL編集childへ進んだ後に過去親を選んでも、最新childの出力を親へ流用しない。記録がない、または親の記録を取得できないことから「モデルへ送信していません」と断定しない。共通coreの編集authorityと保存DDL／Score／SVGを保持し、作品の再選択だけでprovider要求や新しい履歴を作らない。
 
@@ -560,13 +568,13 @@ DDLのdraft確認は読出しだけとし、変更確定を共通coreのrevision
 
 ### 履歴・library・系譜
 
-履歴stripはSQLite全件を対象に作品領域の幅からpage容量を決め、libraryは独立したpage容量を持つ。最新100件のapp内一覧を検索や作品移動の母集団にしない。最新／新しい／古い／最古への移動、全文記述・全文hash・末尾4桁の検索、star・推敲・export markのAND絞込、thumbnail／listと時系列／系譜groupの独立選択を提供する。
+履歴stripはSQLite全件を対象に作品領域の幅からpage容量を決め、libraryは独立したpage容量を持つ。最新100件のapp内一覧を検索や作品移動の母集団にしない。最新／新しい／古い／最古への移動、記述・hash全文／先頭／末尾4桁・作品IDの検索、star・推敲のAND絞込、thumbnail／listと時系列／系譜groupの独立選択を提供する。
 
 comment、mark、trash／復元、明示した完全削除、複数選択、系譜graph／pathをSQLiteへ接続する。完全削除後は作品本文を消し、nodeのidentity、root、日時と親子関係をtombstoneとして保持する。ACL、group利用者やServerの共有権限は追加しない。
 
 履歴の世代はServerと同じくrootを1とし、primary parentのedgeごとに1加算する。削除済みの祖先も数え、nodeのない作品は独立作品と表示する。初期表示は世代とmodel、保存済みの表示項目は保持する。世代をvariationの種類や幅で代用しない。libraryでは表示中の作品と複数選択のcheckbox、系譜では表示作品と範囲を決めるfocusを区別する。記述のないDDL作品は保存DDLの先頭行を表示名へ使い、保存本文を補わない。hash、comment、mark、親子への移動はcardとmenuから操作できる。
 
-Swift物理schemaはv3で、v2の作品・系譜・execution、local annotation、奥書、未読語の9tableへ`provider_rate_state`を追加した10table構成とする。正本は[bundled migration](Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v3.sql)と[schema export](../persistence/reference/swift-schema-v3.json)。既知の完全なv1／v2だけを原子的に移行し、作品・snapshot・ACKの値を保持する。未知schemaは引き続き拒否する。backup／restoreは全10tableを対象とし、旧backupは隔離snapshotをv3へ移行してから復元する。復元先の送信予算・待機期限も保守的に引き継ぎ、古い作品backupで当日の上限をリセットしない。Server／Android DBや旧作品JSONのimportは含めない。
+Swift物理schemaはv4で、10table構成を保ち、local annotationの廃止した書き出し印`for_share`を削除する。正本は[bundled migration](Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v4.sql)と[schema export](../persistence/reference/swift-schema-v4.json)。既知の完全なv1／v2／v3だけを原子的に移行し、作品・コメント・推敲印・snapshot・ACKの値を保持する。未知schemaは引き続き拒否する。backup／restoreは全10tableを対象とし、旧backupは隔離snapshotをv4へ移行してから復元する。復元先の送信予算・待機期限も保守的に引き継ぎ、古い作品backupで当日の上限をリセットしない。Server／Android DBや旧作品JSONのimportは含めない。
 
 ### 比較・推敲・奥書と自動実行
 

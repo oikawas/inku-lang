@@ -44,7 +44,6 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "CanvasArtworkWorkspace.svelte:193", swift: "Views/CreationControls.swift", marker: "serverKey: \"tooltipCanvasCaption\""),
     .init(web: "CanvasArtworkWorkspace.svelte:220", swift: "Views/CreationControls.swift", marker: "starred ? \"starOn\" : \"starOff\""),
     .init(web: "CanvasArtworkWorkspace.svelte:234", swift: "Views/LibraryPresentation.swift", marker: "marked ? \"forRevisionOn\" : \"forRevisionOff\""),
-    .init(web: "CanvasArtworkWorkspace.svelte:249", swift: "Views/LibraryPresentation.swift", marker: "marked ? \"shareTargetOn\" : \"shareTargetOff\""),
     .init(web: "CanvasArtworkWorkspace.svelte:278", swift: "Views/CreationControls.swift", marker: "copiedHash == hash ? \"コピーしました\" : \"クリックでfull hashをコピーします\""),
     .init(web: "CanvasArtworkWorkspace.svelte:288", swift: "Views/CreationControls.swift", marker: "serverKey: \"historyReplayTitle\""),
     .init(web: "CanvasArtworkWorkspace.svelte:302", swift: "Views/CreationControls.swift", marker: "tooltip(\"選択中作品の生成情報を表示\")"),

@@ -91,7 +91,6 @@ struct CreationCanvasControls: View {
                 .inkuTooltip(model.display.tooltip(starred ? "スターを外す" : "スターを付ける", serverKey: starred ? "starOn" : "starOff"))
             if let work, saved {
                 LibraryAnnotationMarkButton(model: model, work: work, mark: .revision).disabled(disabled)
-                LibraryAnnotationMarkButton(model: model, work: work, mark: .share).disabled(disabled)
             } else {
                 Button {} label: { Image(systemName: "pencil.circle") }
                     .accessibilityLabel(model.display.localized("推敲の印"))

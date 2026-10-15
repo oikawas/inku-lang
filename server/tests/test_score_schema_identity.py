@@ -101,6 +101,27 @@ def test_score13_keeps_interior_symbolic_and_preserves_numeric_positions() -> No
         Relation.model_validate({**relation, "target_path_position": "center"})
 
 
+def test_score21_free_line_needs_its_edition_and_keeps_a_line_geometry() -> None:
+    data = {
+        "version": "0.21.0",
+        "instructions": [
+            {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1},
+            {"primitive": "free_line", "from": [0.225, 0.5], "to": [0.775, 0.5],
+             "rotation": -23.0, "relation": {
+                 "type": "connected", "target_instruction_index": 0,
+                 "position_authority": "named_movable",
+             }},
+        ],
+    }
+    score = Score.model_validate(data).model_dump(by_alias=True)
+    free_line = score["instructions"][1]
+    assert free_line["primitive"] == "free_line"
+    assert free_line["from"] == (0.225, 0.5)
+    assert free_line["relation"]["type"] == "connected"
+    with pytest.raises(ValueError, match="free_line requires Score version 0.21.0"):
+        Score.model_validate({**data, "version": "0.20.0"})
+
+
 def _canonical_score_schema_bytes() -> bytes:
     return json.dumps(
         Score.model_json_schema(),
@@ -121,7 +142,7 @@ def test_checked_in_score_schema_matches_the_live_pydantic_model() -> None:
     assert {"version", "canvas", "background", "presence", "instructions", "anchors", "transform_groups", "placement_groups", "repetition_groups", "fill_groups", "mirror_relations", "resource_policy"} <= properties.keys()
 
     assert properties["version"]["default"] == "0.9.0"
-    assert properties["version"]["enum"] == ["0.20.0", "0.19.0", "0.18.0", "0.17.0", "0.16.0", "0.15.0", "0.14.0", "0.13.0", "0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
+    assert properties["version"]["enum"] == ["0.21.0", "0.20.0", "0.19.0", "0.18.0", "0.17.0", "0.16.0", "0.15.0", "0.14.0", "0.13.0", "0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
     transform_group = schema["$defs"]["TransformGroup"]["properties"]
     assert {"start", "end", "rotation_degrees", "scale_x", "scale_y", "translate_x", "translate_y", "fixed_position_indices", "anchor_indices"} <= transform_group.keys()
     placement_group = schema["$defs"]["PlacementGroup"]["properties"]
@@ -133,6 +154,7 @@ def test_checked_in_score_schema_matches_the_live_pydantic_model() -> None:
     assert {"start", "end", "anchor_indices", "transform_group_indices", "symbolic"} == placement_member.keys()
     instruction = schema["$defs"]["Instruction"]["properties"]
     assert "point" in instruction["primitive"]["enum"]
+    assert "free_line" in instruction["primitive"]["enum"]
     assert "oil_paint" in instruction["weight"]["enum"]
     assert "semantic anchor" in instruction["position"]["description"]
     relation = schema["$defs"]["Relation"]["properties"]

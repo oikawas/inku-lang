@@ -133,6 +133,7 @@ composition / color catalog と食い違って見える（→ §8）。
 | 中に | **inside** | 歳時記のあいだ。直前の閉じた形の内側に置く | 位置の語の「中心」とは別 |
 | 重なる | **overlaps** | 歳時記のあいだ。直前の形に一部を重ねる。句は overlapping the previous shape | 組の並べ方の overlapping（重ねて）とは別の語 |
 | 横切る | **crossing** | 歳時記のあいだ。直前の形を片方の縁から反対の縁まで越える | 「切る」（cutting、視覚の断絶）とは別 |
+| 自由線 | **free line** | 歳時記のかたち。始点と終点の間の道筋を演奏が決める線。Score の値は `free_line` | ~~free-form line~~、~~random line~~（偶然の歩みに読める） |
 
 ## 5. 文書・調査の語
 

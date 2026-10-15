@@ -20,8 +20,8 @@ use inku_score::{
 };
 
 use crate::geometry::{
-    NORMAL_ELLIPTICAL_ASPECT_RATIO, NORMAL_SHORT_EDGE_RATIO, named_region_bounds,
-    relative_scale_factor,
+    NORMAL_ELLIPTICAL_ASPECT_RATIO, NORMAL_FREE_LINE_LENGTH_RATIO, NORMAL_SHORT_EDGE_RATIO,
+    named_region_bounds, relative_scale_factor,
 };
 use crate::score_angle::{ScoreAngleContext, ScoreAngleOccurrence, resolve_score_angle};
 use crate::{
@@ -77,6 +77,7 @@ fn score_primitive_from_identity(
         ("shape", "arc") => Primitive::Arc,
         ("shape", "point") => Primitive::Point,
         ("shape", "cloudform") => Primitive::Cloudform,
+        ("shape", "free_line") => Primitive::FreeLine,
         _ => {
             return Err(ScorePrimitiveMappingError {
                 category: identity.category.to_owned(),
@@ -479,13 +480,24 @@ fn checked_object_relation(
     // decides whether the shapes admit them, as for not touching.
     let bounds_relation =
         matches!(kind, RelationType::NotTouching | RelationType::Between) || kind.is_joint();
+    // A free line joins another mark only at its ends (I-715): it takes a
+    // connection or a touch on either side and drops every other relation.
+    let free_line = score_primitive_from_identity(input.primitive).ok()
+        == Some(Primitive::FreeLine)
+        || prior.is_some_and(|(primitive, _)| primitive == Primitive::FreeLine);
+    if free_line && !matches!(kind, RelationType::Connected | RelationType::Touching) {
+        return None;
+    }
     if !bounds_relation {
         let line_relation = matches!(kind, RelationType::Along | RelationType::Cutting);
         let supported = |primitive, arc_form: Option<inku_score::ArcForm>| {
             if line_relation {
                 primitive == Primitive::Line
             } else {
-                (matches!(primitive, Primitive::Line | Primitive::Arc) && arc_form.is_none())
+                (matches!(
+                    primitive,
+                    Primitive::Line | Primitive::Arc | Primitive::FreeLine
+                ) && arc_form.is_none())
                     || (!touching && primitive == Primitive::Point)
             }
         };
@@ -3480,7 +3492,9 @@ fn lower_verified_stage15_shared<'a>(
         ScoreLoweringOutcome::Complete
     };
     let score = (objects.is_none() && outcome != ScoreLoweringOutcome::Stopped).then(|| Score {
-        version: if inku_score::instructions_use_joint_relations(&instructions) {
+        version: if inku_score::instructions_use_free_line(&instructions) {
+            inku_score::ScoreEdition::V0_21.as_str().to_owned()
+        } else if inku_score::instructions_use_joint_relations(&instructions) {
             inku_score::ScoreEdition::V0_20.as_str().to_owned()
         } else if instructions
             .iter()
@@ -4026,6 +4040,9 @@ fn direct_score_relation<'a>(
             || kind != RelationType::Connected
             || !prior.is_some_and(|(primitive, _)| {
                 matches!(primitive, Primitive::Line | Primitive::Arc)
+                    // A free line's ends are in the Score; its middle is not.
+                    || (primitive == Primitive::FreeLine
+                        && relation.target_path_selection.is_none())
             }))
     {
         return Err(unsupported_relation_reason(instruction_index, relation));
@@ -5442,7 +5459,9 @@ fn resolve_fill_region(
                 .as_ref()
                 .filter(|form| form.identity.id == "crescent")
                 .map(|_| inku_score::ArcForm::Crescent);
-            if primitive == Primitive::Line || (primitive == Primitive::Arc && arc_form.is_none()) {
+            if matches!(primitive, Primitive::Line | Primitive::FreeLine)
+                || (primitive == Primitive::Arc && arc_form.is_none())
+            {
                 return Err(ScoreFieldGap::FillRegionHasNoArea);
             }
             let target_input = ScoreLoweringInput {
@@ -6049,7 +6068,10 @@ fn resolve_complete_object<'a>(
         Some(identity)
             if identity.category == "movement"
                 && identity.id == "draw"
-                && matches!(primitive, Primitive::Line | Primitive::Arc) =>
+                && matches!(
+                    primitive,
+                    Primitive::Line | Primitive::Arc | Primitive::FreeLine
+                ) =>
         {
             PlacementAction::Place
         }
@@ -6155,6 +6177,7 @@ fn resolve_complete_object<'a>(
                 | Primitive::Polygon
                 | Primitive::Arc
                 | Primitive::Point
+                | Primitive::FreeLine
         )
     {
         if input.relative_scale.is_some() {
@@ -6208,6 +6231,7 @@ fn resolve_complete_object<'a>(
                 | Primitive::Triangle
                 | Primitive::Polygon
                 | Primitive::Cloudform
+                | Primitive::FreeLine
         )
     {
         gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
@@ -6834,7 +6858,7 @@ fn resolve_geometry_dimensions(
     };
 
     match (primitive, geometry) {
-        (Primitive::Line, crate::geometry::ExactGeometry::Length(value)) => {
+        (Primitive::Line | Primitive::FreeLine, crate::geometry::ExactGeometry::Length(value)) => {
             Ok(ResolvedGeometryDimensions::Line {
                 length: positive(value)?,
             })
@@ -6875,6 +6899,7 @@ fn resolve_geometry_dimensions(
         }
         (
             Primitive::Line
+            | Primitive::FreeLine
             | Primitive::Circle
             | Primitive::Ellipse
             | Primitive::Cloudform
@@ -6900,6 +6925,14 @@ fn resolve_normal_dimensions(
     let width = normal.mul_ratio(factor_numerator, factor_denominator)?;
     match primitive {
         Primitive::Line => Ok(ResolvedGeometryDimensions::Line { length: width }),
+        // A free line is long by default: the stage A chord (I-715).
+        Primitive::FreeLine => Ok(ResolvedGeometryDimensions::Line {
+            length: Rational::from_ratio(
+                NORMAL_FREE_LINE_LENGTH_RATIO.0,
+                NORMAL_FREE_LINE_LENGTH_RATIO.1,
+            )?
+            .mul_ratio(factor_numerator, factor_denominator)?,
+        }),
         Primitive::Circle => Ok(ResolvedGeometryDimensions::Circle {
             radius: width.div_i128(2)?,
         }),
@@ -7643,7 +7676,8 @@ fn lower_source_instruction(
                     | Primitive::Cloudform
                     | Primitive::Square
                     | Primitive::Arc
-                    | Primitive::Point,
+                    | Primitive::Point
+                    | Primitive::FreeLine,
                 ) => Some(scale.value),
                 Some(primitive) => {
                     gaps.push(ScoreFieldGap::UnsupportedRelativeScalePrimitive { primitive });

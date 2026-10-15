@@ -142,10 +142,11 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
             _w("弧", "arc"),
             _w("点", "point"),
             _w("雲形", "cloudform"),
+            _w("自由線", "free line", **_HIDDEN_MARKER),
             _w("多角形", "polygon", **_HIDDEN_MARKER),
         ),
-        marker_order_ja=("線", "円", "楕円", "三角", "四角", "多角形", "弧", "点", "雲形"),
-        marker_order_en=("line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "point", "cloudform"),
+        marker_order_ja=("線", "円", "楕円", "三角", "四角", "多角形", "弧", "自由線", "点", "雲形"),
+        marker_order_en=("line", "circle", "ellipse", "triangle", "square", "polygon", "arc", "free line", "point", "cloudform"),
     ),
     SaijikiCategory(
         key="katamuki",

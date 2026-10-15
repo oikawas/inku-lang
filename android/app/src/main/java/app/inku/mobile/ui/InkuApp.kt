@@ -7990,7 +7990,7 @@ private fun shiftPreview(base: JSONObject, x: Double, y: Double): JSONObject {
             val h = markSize?.optDouble(1, 0.18) ?: 0.18
             copy.put("position", org.json.JSONArray(listOf(x - w / 2.0, y - h / 2.0)))
         }
-        "line" -> {
+        "line", "free_line" -> {
             copy.put("from", org.json.JSONArray(listOf(x - 0.08, y - 0.18)))
             copy.put("to", org.json.JSONArray(listOf(x + 0.08, y + 0.18)))
         }

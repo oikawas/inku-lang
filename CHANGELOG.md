@@ -8,6 +8,17 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Free line becomes a DDL word (DDL 19, Score 0.21.0)
+
+By the author's choice (I-715 stage B). After Kandinsky's line as the trace of forces, a shape word now names a line whose path between its start and end the performance decides.
+
+- The forms gain 自由線 / free line (Score name `free_line`). For now it is drawn when DDL names it, but neither listed in the saijiki nor offered to the description's reader; the next stage opens it together with the reader's rule for choosing it.
+- Its geometry is a line's: start, end, rotation, placement, size, full and half width, draw, scatter, line up. Its normal length is 11/20 of the short edge (a line's is 6/25).
+- The path is built once, when the mark is drawn: three to seven parts, straight runs, circular arcs and free curves, joined smoothly or at corners. Silverpoint, pencil, pen, rotring, computer, burin and drypoint use straight runs and arcs only; crayon, chalk, thin and thick brush and oil paint also use free curves. Each bend turns away from the paper's edges and from the shapes drawn before it (marks that are not lines); lines do not avoid each other.
+- A hand tool draws an open stroke tapered at both ends, and the rotring the path's polyline. Variation sways along the path with the ends kept, and wild widens the stroke's sway as for a line.
+- Only relations that join at the ends are taken: the connection and the touch, with the free line as the current mark or as the previous one. Any other relation (along, not touching, cutting, between, resting on, inside, overlapping, crossing, mirrored) and a connection to a free line's middle drop only the relation with its reason, and the free line is drawn.
+- Only works with a free line use Score 0.21.0; every other work keeps its Score and its picture (checked against the 69 recorded works, drawing and Score). DDL engine 59, render engine 81. The Server word table and Score schema, the Android preview move, and the macOS word resource follow.
+
 ## v2.15.146 (2026-10-15 / Build 1222)
 
 ### 2026-10-15 — Place the ChatGPT plan link beside the model name

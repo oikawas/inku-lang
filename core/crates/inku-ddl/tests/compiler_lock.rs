@@ -210,7 +210,7 @@ const V21_SEED_DIGEST_KNOWN_ANSWER: &str =
 const V21_EXPANDED_MEANING_SHA256_KNOWN_ANSWER: &str =
     "251884860862eff7347cd6cf9c016c1b562d5a2682ce6739f267556a9b370a1c";
 const V21_FULL_LOCK_KNOWN_ANSWER: &str =
-    "bdf6ee5d96fed1f88cad96a17875d1cb7ef6115d988564acec60d9fd66d50e45";
+    "76db7a99923d18de55e27e785ae1ef4942aa189a5875e771c8cf6416ff96c7d6";
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,

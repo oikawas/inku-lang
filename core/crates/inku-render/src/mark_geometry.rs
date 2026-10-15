@@ -10,9 +10,11 @@
 use crate::marks::MarkError;
 use crate::types::{ArcForm, Instruction, Point, Primitive};
 
-/// Where a Line's omitted start falls: the top of the canvas's vertical midline.
+/// Where a Line's or a free line's omitted start falls: the top of the
+/// canvas's vertical midline.
 const LINE_FROM: Point = Point::new(0.5, 0.0);
-/// Where a Line's omitted end falls: the bottom of the canvas's vertical midline.
+/// Where a Line's or a free line's omitted end falls: the bottom of the
+/// canvas's vertical midline.
 const LINE_TO: Point = Point::new(0.5, 1.0);
 /// The number of sides a Polygon has when the Score leaves it out.
 const POLYGON_SIDES: u8 = 5;
@@ -58,6 +60,12 @@ pub(crate) enum MarkGeometry {
     Cloudform {
         center: Point,
         size: Point,
+    },
+    /// A free line between two ends, which fall as a Line's do. Its path is
+    /// built when the mark is drawn (I-715).
+    FreeLine {
+        from: Point,
+        to: Point,
     },
 }
 
@@ -125,6 +133,10 @@ impl MarkGeometry {
             Primitive::Cloudform => Self::Cloudform {
                 center: center()?,
                 size: size()?,
+            },
+            Primitive::FreeLine => Self::FreeLine {
+                from: instruction.from_.unwrap_or(LINE_FROM),
+                to: instruction.to.unwrap_or(LINE_TO),
             },
         })
     }

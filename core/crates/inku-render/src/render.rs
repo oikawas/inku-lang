@@ -15,7 +15,8 @@ use crate::ground::render_ground;
 use crate::layers::render_presence_layer;
 use crate::mark_geometry::MarkGeometry;
 use crate::marks::{
-    MarkContext, MarkError, render_closed_arc_pair_fill, render_instruction_with_line_centerline,
+    MarkContext, MarkError, free_line_obstacle, render_closed_arc_pair_fill,
+    render_instruction_with_line_centerline,
 };
 use crate::materials::{performance_touch_filter, texture_filter};
 use crate::palette::{default_color, work_color_assignment};
@@ -613,6 +614,11 @@ fn render_impl(
     let mut surface_definitions = Vec::new();
     let mut closed_arc_pair_spread_marks = BTreeSet::new();
     let mut first_non_finite = None;
+    // The boxes of the marks drawn so far that are not lines: each free line
+    // turns away from those drawn before it (I-715). Only a Score with a free
+    // line keeps them, so every other work draws as before.
+    let keeps_obstacles = performance.score.uses_free_line();
+    let mut obstacles = Vec::new();
     for (performed_index, (instruction, performed)) in ordered {
         let instruction_index = performed.instruction_index;
         let non_finite_before = crate::svg::non_finite_writes();
@@ -734,8 +740,19 @@ fn render_impl(
                 material_definitions.push(solid_mottle_filter(&filter_id, seed));
             }
             material_definitions.extend(accepted_fills::definitions(single, geometry, context));
-            let base_mark =
-                render_instruction_with_line_centerline(single, geometry, context, line_centerline);
+            let base_mark = render_instruction_with_line_centerline(
+                single,
+                geometry,
+                context,
+                line_centerline,
+                &obstacles,
+            );
+            if keeps_obstacles
+                && let Some(obstacle) =
+                    free_line_obstacle(single, geometry, context, instruction_transform)
+            {
+                obstacles.push(obstacle);
+            }
             let mark = if let Some(surface) = render_surface(single, geometry, context) {
                 let mut combined = Element::new("g");
                 combined.push(base_mark);

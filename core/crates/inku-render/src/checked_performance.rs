@@ -121,7 +121,7 @@ impl From<CheckedPerformanceError> for CheckedPerformanceWithResourcesError {
 fn supports_connected(instruction: &Instruction) -> bool {
     matches!(
         instruction.primitive,
-        Primitive::Line | Primitive::Arc | Primitive::Point
+        Primitive::Line | Primitive::Arc | Primitive::Point | Primitive::FreeLine
     )
 }
 

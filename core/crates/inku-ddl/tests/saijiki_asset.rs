@@ -60,7 +60,7 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
         .iter()
         .find(|category| category.key == "katachi")
         .unwrap();
-    assert_eq!(shape.words.len(), 9);
+    assert_eq!(shape.words.len(), 10);
     assert_eq!(
         shape
             .words
@@ -77,7 +77,7 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             .iter()
             .map(|category| category.words.len())
             .sum::<usize>(),
-        95
+        96
     );
     assert_eq!(asset.relations.len(), 11);
     assert_eq!(
@@ -592,6 +592,7 @@ fn embedded_asset_keeps_hidden_pruned_nullable_override_and_score_semantics() {
             "四角".to_owned(),
             "多角形".to_owned(),
             "弧".to_owned(),
+            "自由線".to_owned(),
             "点".to_owned(),
             "雲形".to_owned(),
         ])

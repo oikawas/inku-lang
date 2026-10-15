@@ -333,7 +333,11 @@
 # previous shape) are placed from the performed bounds by translation only, and
 # a connection may start from the nearest point of a closed shape's outline
 # (Score 0.20.0). A joint the shapes cannot satisfy omits only the relation.
-DDL_ENGINE_VERSION = "58"
+# 59: 自由線 / free line becomes the free_line primitive (Score 0.21.0 for
+# works that draw one): a line's ends, length 11/20 of the short side by
+# default, whose path the performance builds. It takes only the connection
+# and the touch, on either side; any other relation is omitted with its reason.
+DDL_ENGINE_VERSION = "59"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -375,4 +379,7 @@ DDL_ENGINE_VERSION = "58"
 # 横切る / crossing join the relation vocabulary through the fixed
 # previous-shape phrases (`前の形に載る`, `resting on the previous shape`, ...),
 # and つながる / connected may follow a closed shape.
-DDL_VERSION = "18"
+# 19 (2026-10-15): 自由線 / free line joins the shape vocabulary. Until the
+# reader's rule for choosing it is written (I-715 stage B2), it is read in DDL
+# but neither offered to Stage 1 nor listed in the saijiki.
+DDL_VERSION = "19"

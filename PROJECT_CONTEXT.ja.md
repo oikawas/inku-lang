@@ -119,7 +119,7 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 
 正本は共有Rustの `core/crates/inku-ddl/assets/saijiki-v2.json` で、Serverの `schema.py` の Literal と saijiki テーブル（`saijiki.py`）はその投影である。
 
-- 図形 9 — `line` / `circle` / `ellipse` / `triangle` / `square` / `polygon` / `arc` / `point` / `cloudform`
+- 図形 10 — `line` / `circle` / `ellipse` / `triangle` / `square` / `polygon` / `arc` / `point` / `cloudform` / `free_line`
 - 線種 4 — `solid` / `dashed` / `dotted` / `dash_dot`
 - 道具 11 — `silverpoint` / `pencil` / `pen` / `rotring` / `crayon` / `chalk` / `brush_thin` / `brush_thick` / `burin` / `drypoint` / `computer`
 - 細さ 2 — `fine` / `extra_fine`（道具から独立した太さの軸）

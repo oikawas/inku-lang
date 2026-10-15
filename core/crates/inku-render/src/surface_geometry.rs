@@ -76,14 +76,18 @@ pub(crate) fn shape_bbox(
             let size = size_to_pixels(size, canvas);
             Some((position.x, position.y, size.x, size.y))
         }
-        MarkGeometry::Line { .. } | MarkGeometry::Arc(_) | MarkGeometry::Crescent { .. } => None,
+        MarkGeometry::Line { .. }
+        | MarkGeometry::FreeLine { .. }
+        | MarkGeometry::Arc(_)
+        | MarkGeometry::Crescent { .. } => None,
     }
 }
 
 /// Pixel bounds of one performed mark's own geometry, after its group transform.
 ///
 /// Lines have none: a stroke keeps at most `STROKE_SAMPLE_MAX` samples, so a
-/// long line costs no more than a short one. Arcs are bounded by their circle
+/// long line costs no more than a short one. Nor do free lines, whose paths
+/// keep at most 512 points (`free_line.rs`). Arcs are bounded by their circle
 /// or crescent box; every other primitive uses [`shape_bbox`].
 pub(crate) fn mark_bbox(
     geometry: MarkGeometry,
@@ -92,7 +96,7 @@ pub(crate) fn mark_bbox(
 ) -> Option<(f64, f64, f64, f64)> {
     let canvas = context.canvas;
     let (center, half) = match geometry {
-        MarkGeometry::Line { .. } => return None,
+        MarkGeometry::Line { .. } | MarkGeometry::FreeLine { .. } => return None,
         MarkGeometry::Crescent { center, size } => {
             let size = size_to_pixels(size, canvas);
             (
@@ -204,7 +208,7 @@ pub(crate) fn surface_contour(
             size_to_pixels(size, canvas),
             25,
         )),
-        MarkGeometry::Line { .. } | MarkGeometry::Arc(_) => None,
+        MarkGeometry::Line { .. } | MarkGeometry::FreeLine { .. } | MarkGeometry::Arc(_) => None,
     };
     contour.map(|points| {
         if !context.geometry_transform.is_identity() {

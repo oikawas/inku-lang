@@ -26,6 +26,7 @@ public final class ToolChangeModel {
     public private(set) var errorText: String?
     public private(set) var failures: [String] = []
     public private(set) var lanes: [ComparisonLaneState] = []
+    public private(set) var previewID: String?
     @ObservationIgnored private var runID: UUID?
     @ObservationIgnored private var completionWaiters: [CheckedContinuation<Void, Never>] = []
 
@@ -38,7 +39,7 @@ public final class ToolChangeModel {
         let chosenMode = mode
         let run = UUID(); runID = run
         running = true; stopping = false; errorText = nil; failures = []
-        candidates = []; lanes = []; noChangeableSentences = false
+        candidates = []; lanes = []; noChangeableSentences = false; previewID = nil
         defer { finish() }
         let succeeded = await app.performComparison(status: "てざわりの候補を用意中", restoreDisplayStatus: true) { token in
             let plans = try await app.makeToolVariantPlans(work: self.work, mode: chosenMode)
@@ -71,9 +72,12 @@ public final class ToolChangeModel {
         candidates[index].selected = selected
     }
 
+    public func preview(_ id: String?) { if !running { previewID = id } }
+
     public func discardCandidates() {
         guard !running else { return }
         candidates.removeAll { $0.savedWork == nil }
+        previewID = nil
     }
 
     @discardableResult public func saveSelected(app: AppModel) async -> Bool {

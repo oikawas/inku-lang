@@ -44,6 +44,12 @@ private struct ComparisonSession {
     let kind: ComparisonKind
 }
 
+private struct SavedScoreVariantSession {
+    let id = UUID()
+    let work: SavedWork
+    let kind: SavedScoreVariantKind
+}
+
 private struct NewDdlSession {
     let id = UUID()
     let imported: InkuHost.DDLPackageImport
@@ -52,6 +58,7 @@ private struct NewDdlSession {
 private enum WorkDialog: Identifiable {
     case export(ExportSession), edit(WorkEditSession), refinement(RefinementSession), replay(ReplaySession)
     case ddl(DdlEditingSession), newDDL(NewDdlSession), comparison(ComparisonSession), tool(RefinementSession), advice(RefinementSession), colophon(RefinementSession), information(RefinementSession), drawingLogs
+    case scoreVariant(SavedScoreVariantSession)
     var id: String {
         switch self {
         case .export(let session): session.id.uuidString
@@ -62,6 +69,7 @@ private enum WorkDialog: Identifiable {
         case .newDDL(let session): session.id.uuidString
         case .comparison(let session): session.id.uuidString
         case .tool(let session): session.id.uuidString
+        case .scoreVariant(let session): session.id.uuidString
         case .advice(let session): session.id.uuidString
         case .colophon(let session): session.id.uuidString
         case .information(let session): session.id.uuidString
@@ -219,7 +227,7 @@ public struct ContentView: View {
                         onOpenAbout: openAbout)
                 .disabled(!canNavigateSections && !ui.settingsOpen)
             CreationView(model: model, history: history, automation: automation, maintenance: maintenance, ui: ui,
-                         batchWorkspace: $batchWorkspace, inlinePanel: inlineRefinement,
+                         batchWorkspace: $batchWorkspace,
                          onEditWork: openWorkEdit, onAdjustWork: { openRefinement($0) }, onReplayWork: openReplay,
                          onWorkAction: openWorkAction, onLineageExport: openLineageExport,
                          onPresentWork: { Task { await preparePresentation() } },
@@ -293,28 +301,8 @@ public struct ContentView: View {
     }
     #endif
 
-    /// Refinement opens inside the canvas area, as the Web's refine workspace does (CanvasPanel `outputTab = 'refine'`).
-    private var inlineRefinement: AnyView? {
-        guard case .refinement(let session) = dialog else { return nil }
-        return AnyView(
-            RefinementView(model: model, work: session.work, onCommitted: { closeLibrary() }, onConfigureModels: { destination in
-                dialog = nil
-                openSettings(SettingsSection(rawValue: destination) ?? .models)
-            }, onClose: { dialog = nil })
-                .id(session.id)
-                .environment(model.display)
-        )
-    }
-
-    /// Every dialog but the inline refinement is a sheet.
     private var sheetDialog: Binding<WorkDialog?> {
-        Binding(get: {
-            if case .refinement = dialog { return nil }
-            return dialog
-        }, set: { value in
-            if value == nil, case .refinement = dialog { return }
-            dialog = value
-        })
+        $dialog
     }
 
     private var importing: Bool {
@@ -452,8 +440,11 @@ public struct ContentView: View {
                 .id(session.id)
                 .environment(model.display)
                 .inkuDialogFrame(.workEdit)
-        case .refinement:
-            EmptyView()
+        case .refinement(let session):
+            RefinementView(model: model, work: session.work, onCommitted: refinementCommitted, onConfigureModels: { destination in
+                dialog = nil
+                openSettings(SettingsSection(rawValue: destination) ?? .models)
+            }).id(session.id).environment(model.display).inkuDialogFrame(.comparison)
         case .replay(let session):
             ReplayComparisonView(model: model, work: session.work)
                 .id(session.id)
@@ -466,10 +457,13 @@ public struct ContentView: View {
             NewDdlAuthoringSheet(model: model, initialImport: session.imported).id(session.id).environment(model.display)
                 .inkuDialogFrame(.ddlEditor)
         case .comparison(let session):
-            ComparisonView(model: model, work: session.work, kind: session.kind).id(session.id).environment(model.display)
+            ComparisonView(model: model, work: session.work, kind: session.kind, onCommitted: refinementCommitted).id(session.id).environment(model.display)
                 .inkuDialogFrame(.comparison)
         case .tool(let session):
-            ToolChangeView(model: model, work: session.work).id(session.id).environment(model.display)
+            ToolChangeView(model: model, work: session.work, onCommitted: refinementCommitted).id(session.id).environment(model.display)
+                .inkuDialogFrame(.comparison)
+        case .scoreVariant(let session):
+            SavedScoreVariantView(model: model, work: session.work, kind: session.kind, onCommitted: refinementCommitted).id(session.id).environment(model.display)
                 .inkuDialogFrame(.comparison)
         case .advice(let session):
             AuxiliaryView(model: model, mode: .advice, work: session.work).id(session.id).environment(model.display)
@@ -498,11 +492,16 @@ public struct ContentView: View {
         dialog = .edit(WorkEditSession(work: work, mode: mode))
     }
 
+    private func refinementCommitted(_ work: SavedWork) {
+        Task {
+            batchWorkspace.showHistory()
+            await model.showSavedRefinement(work)
+            showCreation(tab: "lineage")
+        }
+    }
+
     private func openRefinement(_ work: SavedWork) {
         guard canUseWork, !work.trashed else { return }
-        // The refine workspace replaces the canvas, so the library and settings step aside.
-        ui.libraryOpen = false
-        ui.settingsOpen = false
         ui.generationInfoOpen = false
         dialog = .refinement(RefinementSession(work: work))
     }
@@ -531,6 +530,8 @@ public struct ContentView: View {
         // The editor opens on the box's draft; its discard returns to the work's saved instructions.
         case "ddl": dialog = .ddl(DdlEditingSession(work: work, draft: model.ddlBoxText(for: work)))
         case "color": dialog = .comparison(ComparisonSession(work: work, kind: .catalog))
+        case "color-arrangement": dialog = .scoreVariant(SavedScoreVariantSession(work: work, kind: .colorArrangement))
+        case "ground": dialog = .scoreVariant(SavedScoreVariantSession(work: work, kind: .ground))
         case "tool": dialog = .tool(RefinementSession(work: work))
         case "model": dialog = .comparison(ComparisonSession(work: work, kind: .model))
         case "ai": dialog = .advice(RefinementSession(work: work))

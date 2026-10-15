@@ -27,13 +27,20 @@ func runComparisonChecks() async throws {
     // The comparison opens with every other catalog chosen; this check compares two.
     comparison.selectedCatalogIDs = []
     catalogs.forEach { comparison.selectCatalog($0.id, selected: true) }
+    let originalStatus = model.status
     await comparison.generate(app: model)
     guard comparison.candidates.count == 2, comparison.failures.isEmpty,
           try await database.list().count == 1, model.selectedWork == original,
-          comparison.candidates.allSatisfy({ $0.work.score == original.score && $0.work.renderSeed == original.renderSeed }) else {
+          comparison.candidates.allSatisfy({ $0.work.score == original.score && $0.work.renderSeed == original.renderSeed }),
+          model.status == originalStatus else {
         throw CheckFailure.message("Comparison preparation saved or altered its pinned Score: \(comparison.errorText ?? comparison.failures.joined(separator: "; "))")
     }
     let chosen = comparison.candidates[0]
+    comparison.preview(chosen.id)
+    guard comparison.previewID == chosen.id, comparison.selectedCount == 0, comparison.canGenerate else {
+        throw CheckFailure.message("Catalog enlargement selected an option or blocked replacing the grid")
+    }
+    comparison.preview(nil)
     comparison.selectCandidate(chosen.id, selected: true)
     await comparison.saveSelected(app: model)
     // Saving every chosen option discards the rest, as Web's "adopt and close" does.
@@ -73,11 +80,13 @@ func runComparisonChecks() async throws {
     await fanout.initialize(app: model)
     fanout.kind = .model
     ["check:m1", "check:m2", "check:m3", "check:m4"].forEach { fanout.selectModel($0, selected: true) }
+    fanout.inheritWild = false; fanout.wildOverride = true
     let fanoutRows = try await database.list().count
     await transport.measureConcurrency()
     await fanout.generate(app: model)
     let fanoutPeak = await transport.finishMeasuring()
     guard fanout.candidates.count == 4, fanout.failures.isEmpty, fanoutPeak == 4,
+          fanout.candidates.map(\.label) == ["m1", "m2", "m3", "m4"], fanout.candidates.allSatisfy({ $0.work.renderWild == true }),
           fanout.candidates.map(\.order) == [0, 1, 2, 3], try await database.list().count == fanoutRows else {
         throw CheckFailure.message("Model comparison was not drawn at once: \(fanout.candidates.count) candidates, peak \(fanoutPeak) in flight, \(fanout.errorText ?? fanout.failures.joined(separator: "; "))")
     }

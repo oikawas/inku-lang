@@ -152,6 +152,14 @@ struct AppCheck {
             guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Missing isolated touch fixture folder") }
             try await runToolChangeChecks(folder: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
         }
+        if let index = CommandLine.arguments.firstIndex(of: "--saved-score-variants-only") {
+            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Missing isolated variant fixture folder") }
+            try await runSavedScoreVariantChecks(folder: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
+        }
+        if let index = CommandLine.arguments.firstIndex(of: "--refinement-ui-fixture") {
+            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Missing isolated UI fixture folder") }
+            try await makeRefinementUIFixture(folder: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
+        }
         if CommandLine.arguments.contains("--refinement-only") {
             try await runRefinementChecks()
             return

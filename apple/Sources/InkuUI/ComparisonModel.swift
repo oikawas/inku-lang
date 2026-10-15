@@ -27,6 +27,8 @@ public final class ComparisonModel {
     public var kind = ComparisonKind.catalog
     public var selectedCatalogIDs: Set<String> = []
     public var modelReferencesText = ""
+    public var inheritWild = true
+    public var wildOverride = false
     public private(set) var selectedModelReferences: Set<String> = []
     public private(set) var modelProviders: [ProviderSettings] = []
     public private(set) var failedModelReferences: Set<String> = []
@@ -34,6 +36,7 @@ public final class ComparisonModel {
     public private(set) var sourceIsLocked = false
     public private(set) var contextAvailable = false
     public private(set) var candidates: [ComparisonCandidate] = []
+    public private(set) var previewID: String?
     public private(set) var failures: [String] = []
     /// The candidates of the running preparation in request order, one lane each (Web `gridSlotLabels`).
     public private(set) var laneLabels: [String] = []
@@ -61,7 +64,7 @@ public final class ComparisonModel {
     public var requestedCount: Int { kind == .catalog ? selectedCatalogIDs.count : modelReferences.count }
     public var canGenerate: Bool {
         contextAvailable && !running && requestedCount > 0
-            && !hasUnsaved && (kind != .model || modelReferences.count <= 4)
+            && (kind != .model || modelReferences.count <= 4)
             && !(kind == .model && sourceIsLocked)
     }
     public var hasUnsaved: Bool { candidates.contains { $0.savedWork == nil } }
@@ -104,18 +107,16 @@ public final class ComparisonModel {
     }
 
     public func selectModel(_ reference: String, selected: Bool) {
-        guard !running, !hasUnsaved, !sourceIsLocked else { return }
+        guard !running, !sourceIsLocked else { return }
         if !selected { selectedModelReferences.remove(reference); return }
-        guard selectedModelReferences.count < 4, reference != targetModelReference,
-              modelProviders.contains(where: { provider in
-                  SettingsModel.batchModels(for: provider).contains { provider.id + ":" + $0.id == reference && $0.isSelectable }
-              }) else { return }
+        guard selectedModelReferences.count < 4, isModelChoice(reference) else { return }
         selectedModelReferences.insert(reference)
     }
 
     public func discardCandidates() {
         guard !running else { return }
         candidates.removeAll { $0.savedWork == nil }
+        previewID = nil
         failures = []; failedModelReferences = []
         errorText = nil
     }
@@ -125,12 +126,20 @@ public final class ComparisonModel {
         candidates[index].selected = selected
     }
 
+    public func preview(_ id: String?) { if !running { previewID = id } }
+
     public func generate(app: AppModel) async {
         guard canGenerate, !app.isBusy, let work = original else { return }
         let comparisonKind = kind
+        let wild: Bool? = inheritWild ? nil : wildOverride
         let labels = comparisonKind == .catalog
             ? app.catalogs.filter { selectedCatalogIDs.contains($0.id) }.map { ($0.id, $0.name) }
-            : modelReferences.map { ($0, $0) }
+            : modelReferences.map { reference in
+                let entry = modelProviders.lazy.flatMap { provider in
+                    SettingsModel.batchModels(for: provider).filter { provider.id + ":" + $0.id == reference }
+                }.first
+                return (reference, entry.map { $0.label.isEmpty ? $0.id : $0.label } ?? reference)
+            }
         guard !labels.isEmpty, labels.count == requestedCount else {
             errorText = "比較する候補を指定してください。"
             return
@@ -147,14 +156,14 @@ public final class ComparisonModel {
         let run = UUID()
         runID = run
         running = true; saving = false; stopping = false
-        errorText = nil; failures = []; failureOrder = [:]; failedModelReferences = []; candidates = []
+        errorText = nil; failures = []; failureOrder = [:]; failedModelReferences = []; candidates = []; previewID = nil
         laneLabels = labels.map(\.1)
         laneStates = labels.map { _ in .waiting }
-        let succeeded = await app.performComparison(status: "比較候補を生成中") { token in
+        let succeeded = await app.performComparison(status: "比較候補を生成中", restoreDisplayStatus: true) { token in
             var requests: [GenerationRequest] = []
             if comparisonKind == .model {
                 for entry in labels {
-                    requests.append(try await app.makeRefinementRequest(work: work, kind: "model_comparison", modelReference: entry.0))
+                    requests.append(try await app.makeRefinementRequest(work: work, kind: "model_comparison", modelReference: entry.0, wildOverride: wild))
                 }
                 requests = try await app.pinPersonalPlanRequests(requests)
             }

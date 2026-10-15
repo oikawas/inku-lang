@@ -42,11 +42,13 @@ func runToolChangeChecks(folder: URL) async throws {
         throw CheckFailure.message("Uniform options offered duplicates or an unchanged whole")
     }
     change.mode = .perSentence
+    change.preview(firstIDs[0])
+    guard change.selectedCount == 0 else { throw CheckFailure.message("Touch enlargement adopted its option") }
     change.selectCandidate(firstIDs[0], selected: true)
     guard change.selectedCount == 1 else { throw CheckFailure.message("Prior option could not be selected") }
     await change.generate(app: app)
     guard change.errorText == nil, change.failures.isEmpty, change.candidates.count == 4,
-          change.candidates.allSatisfy({ !firstIDs.contains($0.id) }), change.selectedCount == 0,
+          change.candidates.allSatisfy({ !firstIDs.contains($0.id) }), change.selectedCount == 0, change.previewID == nil,
           change.candidates.map(\.number) == Array(1...4),
           change.candidates.allSatisfy({ $0.plan.mode == .perSentence && $0.plan.changes.count == $0.plan.tools.count && $0.plan.changes.allSatisfy { $0.from != $0.to } }) else {
         throw CheckFailure.message("Second press retained earlier options/selection or reused a sentence's current tool")

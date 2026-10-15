@@ -64,8 +64,8 @@ struct InkuDialogSize: Equatable {
     static let workEdit = InkuDialogSize(width: 780, widthInset: 0, widthFraction: 0.96, height: 760, heightInset: 0, heightFraction: 0.92)
     /// LineagePanel.svelte:1029 okugaki-dialog and AIRefineModal (`min(760px, 96vw)`, `max-height: 90vh`)
     static let auxiliary = InkuDialogSize(width: 760, widthInset: 0, widthFraction: 0.96, height: 820, heightInset: 0, heightFraction: 0.9)
-    /// refinement-workspace.css:6 candidate grids shown outside the canvas
-    static let comparison = InkuDialogSize(width: 1120, height: 940)
+    /// refinement-workspace.css:13 menu-modal: a 24-point inset from each side of the window.
+    static let comparison = InkuDialogSize(width: .infinity, widthInset: 48, height: .infinity, heightInset: 48)
     /// CanvasGenerationInfo.svelte:385 (`min(760px, 100% − 72px)`)
     static let generationInfo = InkuDialogSize(width: 760, widthInset: 72, height: 900, heightInset: 90)
     /// ColorCatalogModal.svelte:115 (`min(1180px, 100vw − 32px)`, `max-height: 92vh`)

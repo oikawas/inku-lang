@@ -1,12 +1,12 @@
 {
   "schema": "inku.apple-ui-reference.v1",
-  "version": "v2.15.136",
-  "build": "1212",
-  "buildDate": "2026-10-14T11:11:00.127Z",
+  "version": "v2.15.143",
+  "build": "1219",
+  "buildDate": "2026-10-15T03:09:06.127Z",
   "versions": {
     "ddlSpec": "18",
     "ddlEngine": "58",
-    "renderEngine": "78"
+    "renderEngine": "80"
   },
   "canvasMetadata": {
     "square": {
@@ -107,7 +107,7 @@
         "tooltipForkDescription": "この記述をそのまま使って、新しい作品として描き直します。DDLの編集は引き継ぎません。記述は新しい作品で書き換えられます。",
         "descriptionLockedMark": "固定（DDL編集済み）",
         "descriptionLockedShort": "記述固定",
-        "aiRefineHeldNote": "DDLを編集した作品なので、記述を読むAI Visionの方式は使えません。色・配置の世代を、この作品のDDLから描きます。",
+        "aiRefineHeldNote": "DDLを編集した作品です。色・配置の世代を、この作品のDDLから描きます。",
         "pipelineSaveDdl": "DDLを保存する",
         "pipelineCancel": "キャンセル",
         "pipelineReload": "保存された作品を読み直す",
@@ -1069,6 +1069,7 @@
         "historyPermanentDelete": "完全削除",
         "historySearchLabel": "検索（記述 / ハッシュ値 / 作品ID）:",
         "historySearchHint": "ハッシュ値と作品IDは全体か先頭部分、ハッシュ値は下位4桁でも検索できます。",
+        "historySearchClear": "検索をクリア",
         "historyNewer": "← 新しい",
         "historyOlder": "古い →",
         "historyOldest": "最古",
@@ -1529,7 +1530,7 @@
         "tooltipForkDescription": "Draw again as a new work from this description as it stands. The DDL edits are not carried over; the description can be changed in the new work.",
         "descriptionLockedMark": "Held (DDL edited)",
         "descriptionLockedShort": "Held",
-        "aiRefineHeldNote": "This work's DDL was edited, so the Vision method, which reads the description, is not offered. Each round of color or layout is drawn from this work's DDL.",
+        "aiRefineHeldNote": "This work's DDL was edited. Each round of color or layout is drawn from this work's DDL.",
         "pipelineSaveDdl": "Save DDL",
         "pipelineCancel": "Cancel",
         "pipelineReload": "Reload saved work",
@@ -2491,6 +2492,7 @@
         "historyPermanentDelete": "Permanently delete",
         "historySearchLabel": "Search (description / hash / work ID):",
         "historySearchHint": "Enter a whole hash or work ID, or its beginning. A hash also matches its last 4 characters.",
+        "historySearchClear": "Clear search",
         "historyNewer": "← newer",
         "historyOlder": "older →",
         "historyOldest": "Oldest",
@@ -3562,18 +3564,18 @@
     }
   },
   "source": {
-    "commit": "a9e0d58cb26a5f6255439d2ef366336c41e555de",
+    "commit": "01a7691eddf3fba7f2476eb8687e4b942c1bd6fa",
     "files": {
       "web/src/lib/plugins/system/canvas-aspect/index.ts": "51431fe06ed38cfb11f7e08a87b85b68dacdeda646525242fb561c234cf0c9ff",
       "web/src/routes/+page.svelte": "8e12c77fa1bdbda2ff301c49ed6b299498eaf4a02bd06c3c863fbfad7ac5bb17",
       "web/src/lib/saijiki-surface.ts": "12221f46e142abf2b2066358a89446674941c9a4df57e7a969ae3c6f289fcc08",
       "web/src/lib/instructionLang.ts": "2af540a1b98d4aa688fcf96632de1309b30c3f137137a66596f1285e09f2dcbe",
-      "web/APP_VERSION": "6ec8f4ffcc458fe4deba8dca4b1690385f0a91a6e17afdde79c22788c405ced6",
-      "web/BUILD_NUMBER": "3f3b477bb52279f0883280de028a0390e39adf23e769c42af854f7ccce17da6c",
+      "web/APP_VERSION": "897974714ef8ea18c35250e27ae64f1d39a6b7b9397b9f56587de29800838b40",
+      "web/BUILD_NUMBER": "e5ce28767b5c0ead517d74d64d4957fd2f0149976104810e9dd12af80363b5bd",
       "server/src/inku_server/layer_versions.py": "a0728a00b95298e152b3a2c61bda5f364b086234f765a0a0b711225999c7c5ce",
-      "core/crates/inku-render/src/lib.rs": "87542c2efe5d663b2daecdb8d584fd1e40c85bfcf89fb64fd0c06ba9a1ae8491",
-      "web/src/lib/i18n/ja.ts": "3825a8bfc7ec922dbde7e20e4afb02895b1227c7079e2046734c9005922ef611",
-      "web/src/lib/i18n/en.ts": "788563d1f8d2fee5cd5ce0a30e20a81dd25e7c973932e4178a0c2f74dd7dfcdf"
+      "core/crates/inku-render/src/lib.rs": "22aa2df245269d4ccd34b8d3b11660bad5d6d66fb988765f4dc3960b8f903a8f",
+      "web/src/lib/i18n/ja.ts": "f4a9aa90c502e591dfc76db3d2799dc5891299127dedd5d4ec104d0a76d3ae12",
+      "web/src/lib/i18n/en.ts": "b4955a49d94f004b9e5e59505a52dc89691db796f7e8fe65af37bfcdbb4fa686"
     },
     "tooltipKeys": [
       "tooltipAppRailLang",

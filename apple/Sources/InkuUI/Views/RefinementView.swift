@@ -8,317 +8,94 @@ public struct RefinementView: View {
     @State private var refinement: RefinementModel
     @State private var closing = false
     @Environment(\.dismiss) private var dismiss
-    private let onCommitted: @MainActor () -> Void
+    private let onCommitted: @MainActor (SavedWork) -> Void
     private let onConfigureModels: @MainActor (String) -> Void
-    /// Set when the view sits in the canvas area (Web refine workspace) rather than in a sheet.
     private let onClose: (@MainActor () -> Void)?
 
-    public init(model: AppModel, work: SavedWork, onCommitted: @escaping @MainActor () -> Void = {},
+    public init(model: AppModel, work: SavedWork, onCommitted: @escaping @MainActor (SavedWork) -> Void = { _ in },
                 onConfigureModels: @escaping @MainActor (String) -> Void = { _ in },
                 onClose: (@MainActor () -> Void)? = nil) {
-        self.model = model
-        self.onCommitted = onCommitted
-        self.onConfigureModels = onConfigureModels
-        self.onClose = onClose
-        let refinement = RefinementModel(work: work)
-        _refinement = State(initialValue: refinement)
+        self.model = model; self.onCommitted = onCommitted
+        self.onConfigureModels = onConfigureModels; self.onClose = onClose
+        _refinement = State(initialValue: RefinementModel(work: work))
     }
 
-    private func finish() {
-        if let onClose { onClose() } else { dismiss() }
-    }
+    private func finish() { if let onClose { onClose() } else { dismiss() } }
+    private var controlsDisabled: Bool { refinement.running || model.isBusy || closing || refinement.closed }
+    private var effectiveWild: Bool { refinement.inheritWild ? refinement.work.renderWild ?? false : refinement.wildOverride }
 
     public var body: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(model.display.localized("配置を変える")).inkuFont(16, weight: .semibold)
-                Spacer()
-                Button { Task { await close() } } label: { Image(systemName: "xmark") }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(model.display.localized(refinement.hasUnsaved ? "破棄して閉じる" : "閉じる"))
-                    .disabled(closeDisabled)
-                    .inkuTooltip(model.display.preferences.showTooltips ? model.display.localized(refinement.hasUnsaved ? "破棄して閉じる" : "閉じる") : "")
-            }.padding(.horizontal, 16).padding(.vertical, 12)
-            Divider()
-            ScrollViewReader { proxy in
-              ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    parentCard
-                    adjustmentControls
-                    generationControls
-                    if refinement.running { progressCard }
-                    if !refinement.candidates.isEmpty { candidateSection.id("refinement-candidates") }
-                    Text(model.display.message(refinement.status)).inkuFont(13).foregroundStyle(.secondary)
-                    if let error = refinement.errorText {
-                        Text(model.display.message(error)).foregroundStyle(.red).textSelection(.enabled)
+        @Bindable var refinement = refinement
+        RefinementDialog(model: model, title: "配置を変える", work: refinement.work,
+            closeDisabled: controlsDisabled || refinement.hasUnsaved, onClose: { Task { await close() } }) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(model.display.localized("元の指示書を使い、配置を変えます。記述は読み直しません。"))
+                    .inkuFont(12).foregroundStyle(.secondary)
+                    .inkuTooltip(model.display.tooltip("保存した指示書の数で書いた範囲を、原理に沿うか偶然に委ねるかで選び直します。明示したかたむきと「隅」も候補のseedで選び直します。動かせないときは理由を示し、元の指示書を配置の seed だけ変えて描き直します", serverKey: "tooltipCanvasVaryComposition"))
+                Picker(model.display.localized("配置を変える"), selection: $refinement.recomposeMode) {
+                    Text(model.display.localized("原理に沿う")).tag(Recomposition.Mode.principled)
+                    Text(model.display.localized("偶然に委ねる")).tag(Recomposition.Mode.chance)
+                }.pickerStyle(.radioGroup).labelsHidden().disabled(controlsDisabled)
+                generateButton(count: 1)
+                generateButton(count: 4)
+                Text(model.display.localized("高速（補完の穴があるときだけLLM）")).inkuFont(12).foregroundStyle(.secondary)
+                RefinementDrawingModelPicker(model: model, reference: $refinement.modelReference, disabled: controlsDisabled,
+                    configurationDisabled: controlsDisabled || self.refinement.hasUnsaved,
+                    onConfigureModels: { section in Task { await configureModels(section) } })
+                HStack {
+                    Text(model.display.localized(self.refinement.inheritWild ? "筆致制限（継承）" : "筆致制限")).inkuFont(12).foregroundStyle(.secondary)
+                    Button(model.display.localized("暴れる") + " " + model.display.localized(effectiveWild ? "入" : "切")) {
+                        refinement.wildOverride = !effectiveWild; refinement.inheritWild = false
+                    }.buttonStyle(.bordered).tint(effectiveWild ? Color.accentColor : Color.secondary)
+                }.disabled(controlsDisabled)
+                if refinement.running {
+                    RunStatusView(display: model.display, label: refinement.saving ? "選択した候補を保存中" : "候補の準備中",
+                        stopping: refinement.stopping || closing, onStop: { Task { await refinement.stop(app: model) } }) { ProviderProgressView(model: model) }
+                    if !refinement.saving {
+                        VariationLanesView(display: model.display, states: refinement.slots.map {
+                            switch $0.state { case .waiting: .waiting; case .running: .running; case .ready, .failed: .done }
+                        }, labels: refinement.slots.map { _ in model.display.localized(refinement.kind.titleKey) })
                     }
-                    ForEach(refinement.slots.filter { $0.error != nil }) { slot in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(model.display.localizedFormat("候補 %ld", slot.id)).inkuFont(12, weight: .semibold)
-                            Text(model.display.message(slot.error ?? "")).inkuFont(13).textSelection(.enabled)
-                        }.foregroundStyle(.red)
-                    }
-                }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
-              }
-              .onChange(of: refinement.candidates.count) { _, count in
-                  if count > 0 { withAnimation { proxy.scrollTo("refinement-candidates", anchor: .top) } }
-              }
+                }
             }
-            Divider()
-            footer.padding(20).background(.bar)
+        } options: {
+            RefinementOptionsGrid(model: model, options: refinement.candidates.map {
+                RefinementOption(id: $0.id, work: $0.work, label: model.display.localizedFormat("候補 %ld", $0.number),
+                    details: $0.recomposition?.lines(display: model.display) ?? [], selected: $0.selected, saved: $0.savedWork != nil)
+            }, previewID: refinement.previewID, maxColumns: 2, busy: controlsDisabled,
+                placeholder: "条件を選んで描くと、候補をここに並べます。",
+                errors: [refinement.errorText].compactMap { $0 } + refinement.slots.compactMap(\.error), status: refinement.status,
+                onPreview: { refinement.preview($0) }, onSelect: { refinement.selectCandidate($0, selected: $1) },
+                onDiscard: { Task { await close() } }, onSave: { Task { await save() } })
         }
-        #if os(macOS)
-        .frame(minWidth: onClose == nil ? 640 : nil, idealWidth: onClose == nil ? 880 : nil,
-               minHeight: onClose == nil ? 550 : nil, idealHeight: onClose == nil ? 740 : nil)
-        #endif
         .task { await refinement.initialize(app: model) }
         .interactiveDismissDisabled(refinement.running || refinement.hasUnsaved || model.isBusy || closing)
-        .onDisappear {
-            Task { _ = await refinement.close(app: model) }
-        }
-    }
-
-    private var controlsDisabled: Bool { refinement.running || model.isBusy || closing || refinement.closed }
-    private var closeDisabled: Bool { closing || refinement.stopping || model.isBusy && !refinement.running }
-
-    private var parentCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(model.display.localized("元の作品")).inkuFont(14, weight: .semibold)
-            HStack(alignment: .top, spacing: 14) {
-                ArtworkThumbnail(work: refinement.work, thumbnails: model.thumbnails)
-                    .frame(width: 120, height: 120).clipped()
-                    .accessibilityLabel(model.display.localized("元の作品"))
-                Text(refinement.work.effectiveSourceText).inkuFont(13).lineLimit(4)
-                    .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
-                    .inkuTooltip(model.display.preferences.showTooltips ? refinement.work.effectiveSourceText : "")
-                    .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
-            }.frame(minHeight: 120, alignment: .top)
-            workFacts(refinement.work)
-            Text(model.display.localized("候補を用意しても、元の作品と履歴は変わりません。採用した候補だけを子として保存します。"))
-                .inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-        }.frame(minHeight: 210, alignment: .top).refinementPanel()
-    }
-
-    private var adjustmentControls: some View {
-        @Bindable var refinement = refinement
-        return VStack(alignment: .leading, spacing: 14) {
-            // The separate layout dialog remains after the parameters dialog is retired.
-            Text(model.display.localized("配置を変える")).inkuFont(14, weight: .semibold)
-                .inkuTooltip(kindTooltip(.layout))
-            Picker(model.display.localized("配置を変える"), selection: $refinement.recomposeMode) {
-                Text(model.display.localized("原理に沿う")).tag(Recomposition.Mode.principled)
-                Text(model.display.localized("偶然に委ねる")).tag(Recomposition.Mode.chance)
-            }.pickerStyle(.radioGroup).labelsHidden().disabled(controlsDisabled)
-            Text(model.display.localized(kindDescription)).inkuFont(13).foregroundStyle(.secondary)
-            HStack {
-                Text(model.display.localized(self.refinement.inheritWild ? "筆致制限（継承）" : "筆致制限"))
-                    .inkuFont(12).foregroundStyle(.secondary)
-                Button(model.display.localized("暴れる") + " " + model.display.localized(effectiveWild ? "入" : "切")) {
-                    refinement.wildOverride = !effectiveWild
-                    refinement.inheritWild = false
-                }.buttonStyle(.bordered).tint(effectiveWild ? Color.accentColor : Color.secondary)
-            }.disabled(controlsDisabled)
-            Divider()
-            RefinementDrawingModelPicker(model: model, reference: $refinement.modelReference, disabled: controlsDisabled,
-                configurationDisabled: controlsDisabled || self.refinement.hasUnsaved,
-                onConfigureModels: { section in Task { await configureModels(section) } })
-        }.refinementPanel()
-    }
-
-    private var kindDescription: String {
-        switch refinement.kind {
-        case .layout: "元の指示書を使い、配置を変えます。記述は読み直しません。"
-        }
-    }
-
-    private var effectiveWild: Bool { refinement.inheritWild ? refinement.work.renderWild ?? false : refinement.wildOverride }
-    private var costDescription: String {
-        switch refinement.kind {
-        case .layout: "高速（補完の穴があるときだけLLM）"
-        }
-    }
-
-    private func kindTooltip(_ kind: RefinementKind) -> String {
-        switch kind {
-        case .layout: return model.display.tooltip("保存した指示書の数で書いた範囲を、原理に沿うか偶然に委ねるかで選び直します。明示したかたむきと「隅」も候補のseedで選び直します。動かせないときは理由を示し、元の指示書を配置の seed だけ変えて描き直します", serverKey: "tooltipCanvasVaryComposition")
-        }
-    }
-
-    private var generationControls: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) { generateButton(count: 1); generateButton(count: 4) }.fixedSize(horizontal: true, vertical: false)
-                VStack(alignment: .leading, spacing: 10) { generateButton(count: 1); generateButton(count: 4) }
-            }
-            Label(model.display.localized(costDescription), systemImage: "clock").inkuFont(12).foregroundStyle(.secondary)
-            if refinement.hasUnsaved {
-                Text(model.display.localized("別の候補を描くには、今の候補を採用するか破棄してください。"))
-                    .inkuFont(12).foregroundStyle(.secondary)
-                Button(model.display.localized("候補を破棄"), role: .destructive) { refinement.discardCandidates() }
-                    .disabled(controlsDisabled)
-            }
-        }
+        .onDisappear { Task { _ = await refinement.close(app: model) } }
     }
 
     private func generateButton(count: Int) -> some View {
-        Button(model.display.localized(count == 1 ? "1案を描く" : "4案を描く"), systemImage: count == 1 ? "paintbrush" : "square.grid.2x2") {
+        Button(model.display.webCopy(count == 1 ? "refineSingleButton" : "variationGridDefault", count == 1 ? "1案を作る" : "4案を作る"), systemImage: "play.fill") {
             Task { await refinement.generate(app: model, count: count) }
-        }.buttonStyle(.bordered)
-            .disabled(!refinement.canGenerate(count: count) || controlsDisabled || model.isPreview)
-            // RefinementAdjustView.svelte:134,144.
+        }.buttonStyle(.borderedProminent).disabled(!refinement.canGenerate(count: count) || controlsDisabled || model.isPreview)
             .inkuTooltip(count == 1 ? model.display.tooltip("選択した1種類の要素だけを変更した1案を作ります。選んだ候補は履歴に保存できます", serverKey: "tooltipRefineSingle")
-                         : model.display.tooltip("選択した1種類の要素だけを変えて4案を作ります。", serverKey: "tooltipVariationGridDefault"))
+                : model.display.tooltip("選択した1種類の要素だけを変えて4案を作ります。", serverKey: "tooltipVariationGridDefault"))
     }
 
-    private var progressCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // RefinementAdjustView.svelte:189-203: the drawing indicator, and a lane per candidate under it.
-            RunStatusView(display: model.display, label: refinement.saving ? "選択した候補を保存中" : "候補の準備中",
-                          stopping: refinement.stopping || closing,
-                          onStop: { Task { await refinement.stop(app: model) } }) { ProviderProgressView(model: model) }
-            if !refinement.saving {
-                // VariationLanes.svelte: a failed candidate has landed too (refinement-session finishSlot).
-                VariationLanesView(display: model.display, states: refinement.slots.map { slot in
-                    switch slot.state { case .waiting: .waiting; case .running: .running; case .ready, .failed: .done }
-                }, labels: refinement.slots.map { _ in model.display.localized(refinement.kind.titleKey) })
-            }
-            if model.isBusy { Text(model.display.message(model.status)).inkuFont(12).foregroundStyle(.secondary) }
-            if let stage1 = refinement.capturedStage1Model, !stage1.isEmpty {
-                Text(model.display.localizedFormat("読み取りモデル: %@", stage1)).inkuFont(12).foregroundStyle(.secondary).textSelection(.enabled)
-            }
-            if let stage2 = refinement.capturedStage2Model, !stage2.isEmpty {
-                Text(model.display.localizedFormat("構造化モデル: %@", stage2)).inkuFont(12).foregroundStyle(.secondary).textSelection(.enabled)
-            }
-        }.refinementPanel()
+    private func save() async {
+        let before = refinement.committedWorks.count
+        let succeeded = await refinement.saveSelected(app: model)
+        if refinement.committedWorks.count > before, let latest = refinement.committedWorks.last { onCommitted(latest) }
+        if succeeded && !refinement.running && !refinement.hasUnsaved && !model.isBusy && !closing { finish() }
     }
-
-    private var candidateSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(model.display.localized("候補を比較")).inkuFont(14, weight: .semibold)
-                Spacer()
-                if refinement.previewID != nil {
-                    Button(model.display.localized("すべての候補を表示")) { refinement.preview(nil) }.disabled(controlsDisabled)
-                }
-            }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 14)], alignment: .leading, spacing: 14) {
-                ForEach(refinement.candidates.filter { refinement.previewID == nil || $0.id == refinement.previewID }) { candidate in
-                    candidateCard(candidate)
-                }
-            }
-        }
-    }
-
-    private func candidateCard(_ candidate: RefinementCandidate) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Button { refinement.preview(refinement.previewID == candidate.id ? nil : candidate.id) } label: {
-                ArtworkThumbnail(work: candidate.work, thumbnails: model.thumbnails)
-                    .frame(height: refinement.previewID == candidate.id ? 300 : 185)
-            }.buttonStyle(.plain).disabled(controlsDisabled)
-                .accessibilityLabel(model.display.localizedFormat(refinement.previewID == candidate.id ? "候補 %ld の拡大を戻す" : "候補 %ld を拡大", candidate.number))
-            Text(model.display.localizedFormat("候補 %ld", candidate.number)).inkuFont(14, weight: .semibold)
-            Text(model.display.localized(candidate.kind.titleKey)).inkuFont(12).foregroundStyle(.secondary)
-            workFacts(candidate.work)
-            // RefinementCandidateGrid.svelte: what moved, or why the ranges stayed.
-            if let recomposition = candidate.recomposition {
-                ForEach(recomposition.lines(display: model.display), id: \.self) { line in
-                    Text(line).inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            if candidate.savedWork != nil {
-                // RefinementCandidateGrid.svelte:63: the saved mark says so.
-                Label(model.display.localized("保存済み"), systemImage: "checkmark.circle.fill").inkuFont(13).foregroundStyle(.secondary)
-                    .inkuTooltip(model.display.tooltip("保存済み"))
-            } else {
-                Toggle(model.display.localized("この候補を採用"), isOn: Binding(
-                    get: { candidate.selected }, set: { refinement.selectCandidate(candidate.id, selected: $0) }))
-                    .disabled(controlsDisabled)
-                    .accessibilityLabel(model.display.localizedFormat("候補 %ld を採用", candidate.number))
-                Text(model.display.localized("未保存")).inkuFont(12).foregroundStyle(.secondary)
-            }
-        }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(candidate.selected ? Color.accentColor : Color.secondary.opacity(0.2), lineWidth: candidate.selected ? 2 : 1))
-    }
-
-    private func workFacts(_ work: SavedWork) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(model.display.localizedFormat("配色 %@ · シード %@", work.renderColorCatalogID ?? work.catalogID ?? model.display.localized("不明"), work.renderSeed ?? model.display.localized("不明")))
-            Text(model.display.localizedFormat("配置シード: %@", work.compositionSeed ?? work.renderSeed ?? model.display.localized("不明")))
-            if let seed = work.interpretationSeed, !seed.isEmpty {
-                Text(model.display.localizedFormat("読み取りシード: %@", seed))
-            }
-            if let seedText = work.seedText, !seedText.isEmpty {
-                Text(model.display.localizedFormat("タッチの言葉: %@", seedText))
-            }
-        }.inkuFont(12).foregroundStyle(.secondary).textSelection(.enabled)
-    }
-
-    private var footer: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if !refinement.committedWorks.isEmpty {
-                Text(model.display.localizedFormat("保存済み: %ld案", refinement.committedWorks.count)).inkuFont(12).foregroundStyle(.secondary)
-            }
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) { discardButton; saveButton }.fixedSize(horizontal: true, vertical: false)
-                VStack(alignment: .leading, spacing: 10) { saveButton; discardButton }
-            }.frame(maxWidth: .infinity, alignment: .trailing)
-        }
-    }
-
-    private var discardButton: some View {
-        Button(model.display.localized(refinement.hasUnsaved ? "破棄して閉じる" : "閉じる"), role: refinement.hasUnsaved ? .destructive : nil) {
-            Task { await close() }
-        }.disabled(closeDisabled).keyboardShortcut(.cancelAction)
-            // RefinementCandidateGrid.svelte:34.
-            .inkuTooltip(refinement.hasUnsaved
-                         ? model.display.tooltip("未保存の候補をすべて捨てて閉じます。保存済みの候補は履歴に残ります。", serverKey: "tooltipRefineDiscardAndClose")
-                         : model.display.tooltip("閉じる"))
-    }
-
-    private var saveButton: some View {
-        Button(model.display.localizedFormat("選択した%ld案を採用して閉じる", refinement.selectedCount), systemImage: "checkmark.circle") {
-            Task {
-                let before = refinement.committedWorks.count
-                let succeeded = await refinement.saveSelected(app: model)
-                if refinement.committedWorks.count > before { onCommitted() }
-                if succeeded && !refinement.running && !refinement.hasUnsaved && !model.isBusy && !closing { finish() }
-            }
-        }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-            .disabled(!refinement.canSave || model.isBusy || model.isPreview || closing)
-            // RefinementCandidateGrid.svelte:39.
-            .inkuTooltip(model.display.tooltip("チェックした候補を履歴に保存して閉じます。選ばなかった候補は破棄します。保存した候補には、スターと選んだ理由を残せます。", serverKey: "tooltipVariationGridSaveSelected"))
-    }
-
-    private var settingsButton: some View {
-        Button(model.display.localized("モデル設定"), systemImage: "gearshape") {
-            Task { await configureModels("models") }
-        }.disabled(controlsDisabled || refinement.hasUnsaved)
-    }
-
     private func configureModels(_ section: String) async {
         guard !closing, !refinement.running, !refinement.hasUnsaved, !model.isBusy else { return }
         closing = true
-        if await refinement.close(app: model) {
-            onConfigureModels(section)
-            finish()
-        } else { closing = false }
+        if await refinement.close(app: model) { onConfigureModels(section); finish() } else { closing = false }
     }
-
     private func close() async {
         guard !closing else { return }
         closing = true
-        let succeeded = await refinement.close(app: model)
-        if succeeded { finish() }
-        else { closing = false }
-    }
-}
-
-private extension View {
-    func refinementPanel() -> some View {
-        padding(16).frame(maxWidth: .infinity, alignment: .leading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(.quaternary))
+        if await refinement.close(app: model) { finish() } else { closing = false }
     }
 }
 
@@ -331,26 +108,21 @@ private struct RefinementDrawingModelPicker: View {
     let configurationDisabled: Bool
     let onConfigureModels: @MainActor (String) -> Void
     @State private var showModels = false
-
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Button { showModels = true } label: {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(model.display.localized("描画モデル")).inkuFont(12, weight: .semibold)
-                    Text(reference.isEmpty ? model.display.localized("選択してください") : reference)
-                        .inkuFont(13).textSelection(.enabled)
+                    Text(reference.isEmpty ? model.display.localized("選択してください") : reference).inkuFont(13)
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }.buttonStyle(.bordered).disabled(disabled)
             Text(model.display.localized("選択したモデルを構造化の既定モデルとして保存します。読み取りの既定モデルは変わりません。"))
                 .inkuFont(12).foregroundStyle(.secondary)
-            Button(model.display.localized("モデル設定"), systemImage: "gearshape") {
-                onConfigureModels("models")
-            }.disabled(configurationDisabled)
+            Button(model.display.localized("モデル設定"), systemImage: "gearshape") { onConfigureModels("models") }.disabled(configurationDisabled)
         }
         .sheet(isPresented: $showModels) {
             BatchModelPickerView(model: model, initialReference: reference, immediateSelection: true, title: "描画モデル") { value in
-                try await model.selectDdlDrawingModel(value)
-                reference = value
+                try await model.selectDdlDrawingModel(value); reference = value
             }.disabled(disabled)
         }
     }

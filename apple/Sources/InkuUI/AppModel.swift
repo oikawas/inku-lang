@@ -177,6 +177,7 @@ public final class AppModel {
     @ObservationIgnored private var providerModelsByExecution: [String: ModelSelection] = [:]
     /// Set once the saved next-work conditions have been read, so the defaults never overwrite them.
     @ObservationIgnored private var nextConditionsRestored = false
+    @ObservationIgnored private var colorArrangementCursors: [String: ColorArrangementCursor] = [:]
 
     public init(databaseURL: URL? = nil, transport: (any ProviderTransport)? = nil) {
         self.databaseURL = databaseURL
@@ -1339,6 +1340,34 @@ public final class AppModel {
         return try await host.makeToolVariantPlans(workID: work.id, mode: mode)
     }
 
+    public func nextColorArrangementPage(work: SavedWork) async throws -> ColorArrangementPage? {
+        guard !isPreview, !stopping, let host else { throw HostError("authoring_busy_or_unavailable") }
+        _ = try await checkedSavedAdjustmentParent(work)
+        let cursor: UInt64
+        switch colorArrangementCursors[work.id] ?? .next(0) {
+        case .exhausted: return nil
+        case .next(let value): cursor = value
+        }
+        let page = try await host.makeColorArrangementPage(workID: work.id, cursor: cursor)
+        // Reserve before drawing, including failed/stopped options, as the Web coordinator does.
+        colorArrangementCursors[work.id] = page.nextCursor.map(ColorArrangementCursor.next) ?? .exhausted
+        return page
+    }
+
+    public func makeGroundVariantPlans(work: SavedWork) async throws -> [SavedScoreVariantPlan] {
+        guard !isPreview, !stopping, let host else { throw HostError("authoring_busy_or_unavailable") }
+        _ = try await checkedSavedAdjustmentParent(work)
+        return try await host.makeGroundVariantPlans(workID: work.id, vocabulary: RefinementResources.grounds())
+    }
+
+    public func prepareSavedScoreVariant(_ plan: SavedScoreVariantPlan, token: UUID) async throws -> PreparedCandidate {
+        guard generationToken == token, !stopping, let host else { throw CancellationError() }
+        let candidate = try await host.previewSavedScoreVariant(plan)
+        try Task.checkCancellation()
+        guard generationToken == token, !stopping else { throw CancellationError() }
+        return candidate
+    }
+
     public func prepareToolVariant(_ plan: ToolVariantPlan, token: UUID) async throws -> PreparedCandidate {
         guard generationToken == token, !stopping, let host else { throw CancellationError() }
         let candidate = try await host.previewToolVariant(plan)
@@ -1366,6 +1395,14 @@ public final class AppModel {
         // The explicit transaction result remains authoritative if a later refresh is interrupted.
         do { try await reloadWorks() } catch { report(error) }
         return saved
+    }
+
+    /// A committed option becomes the displayed child; the author's next description remains a draft.
+    public func showSavedRefinement(_ work: SavedWork) async {
+        let descriptionDraft = descriptionText
+        await selectWork(work)
+        descriptionText = descriptionDraft
+        await library.loadLineage(work: work)
     }
 
     /// The busy flag remains held until cancellation has drained the active task.

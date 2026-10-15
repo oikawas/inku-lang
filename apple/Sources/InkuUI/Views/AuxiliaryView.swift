@@ -21,7 +21,7 @@ public struct AuxiliaryView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack {
-                    Text(model.display.localized(mode == .colophon ? "系譜の奥書" : "AI の助言・自律推敲")).inkuFont(16, weight: .semibold)
+                    Text(model.display.localized(mode == .colophon ? "系譜の奥書" : "AI自動推敲プロセス")).inkuFont(16, weight: .semibold)
                     Spacer()
                     Button(model.display.localized("閉じる")) {
                         Task {
@@ -42,17 +42,8 @@ public struct AuxiliaryView: View {
                 } else {
                     ContentUnavailableView(model.display.localized("保存作品を選択"), systemImage: "photo", description: Text(model.display.localized("ライブラリか制作画面で元の作品を選択してください。")))
                 }
-                VStack(alignment: .leading, spacing: 10) {
-                    Button { showModels = true } label: {
-                        Label(auxiliary.modelReference.isEmpty ? model.display.localized("Visionモデルを選択") : auxiliary.modelReference, systemImage: "eye")
-                    }.inkuTooltip(model.display.tooltip("画像を扱える登録モデルから選択します。", serverKey: "modelSelectionVisionHint"))
-                    HStack(spacing: 8) {
-                        Text(model.display.localized("応答の言語")).inkuFont(12).foregroundStyle(.secondary)
-                        InkuSegmentedButtons(options: [("ja", model.display.localized("日本語")), ("en", "English")], selection: $auxiliary.language)
-                    }.accessibilityElement(children: .contain).accessibilityLabel(model.display.localized("応答の言語"))
-                }.disabled(auxiliary.running || auxiliary.selectingSource || model.isBusy)
-                if mode == .colophon { colophonControls }
-                else { adviceControls; refinementControls }
+                if mode == .colophon { visionSelection; colophonControls }
+                else { refinementControls }
                 if auxiliary.running && auxiliary.refining {
                     // AIRefineModal.svelte:252: autonomous refinement draws, so it shows the drawing indicator.
                     RunStatusView(display: model.display, label: auxiliary.status, stopping: auxiliary.stopping,
@@ -77,9 +68,8 @@ public struct AuxiliaryView: View {
             if mode == .advice && !refineChoicesRestored { restoreRefineChoices() }
             await auxiliary.initialize(app: model, work: work, mode: mode)
         }
-        // A held work turns Vision off for itself; that is not the author's choice, so it is not kept.
         .onChange(of: refineChoices) { _, choices in
-            if mode == .advice, refineChoicesRestored, !auxiliary.sourceIsLocked { model.display.preferences.aiRefine = choices }
+            if mode == .advice, refineChoicesRestored { model.display.preferences.aiRefine = choices }
         }
         .sheet(isPresented: $showModels) {
             BatchModelPickerView(model: model, initialReference: auxiliary.modelReference, immediateSelection: true,
@@ -94,32 +84,17 @@ public struct AuxiliaryView: View {
         }
     }
 
-    private var adviceControls: some View {
+    private var visionSelection: some View {
         @Bindable var auxiliary = auxiliary
-        return GroupBox(model.display.localized("モデルから画像の助言を受ける")) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(model.display.localized("画像に見える事実と次に試す方向を受け取ります。採点や順位付けは行いません。")).inkuFont(12).foregroundStyle(.secondary)
-                if auxiliary.visionMode {
-                    TextField(model.display.localized("AI に伝える方向性"), text: $auxiliary.direction, axis: .vertical).lineLimit(2...4)
-                        .disabled(auxiliary.sourceIsLocked || auxiliary.running || auxiliary.selectingSource || model.isBusy)
-                        .inkuTooltip(model.display.tooltip("AIへ伝える方針は160文字までです。"))
-                    Text("\(auxiliary.direction.utf16.count) / \(AuxiliaryModel.directionLimit)")
-                        .inkuFont(12).monospacedDigit().foregroundStyle(.secondary)
-                }
-                Button(model.display.localized("画像から助言を読む"), systemImage: "eye") { Task { await auxiliary.requestAdvice(app: model) } }
-                    .disabled(auxiliary.sourceIsLocked || auxiliary.sourceWork == nil || auxiliary.modelReference.isEmpty || auxiliary.running || model.isBusy)
-                if auxiliary.sourceIsLocked {
-                    Text(model.display.localized("DDL を編集した作品は記述を読み直しません。色・配置を元の DDL から描けます。"))
-                        .inkuFont(12).foregroundStyle(.secondary)
-                }
-                if let advice = auxiliary.advice {
-                    Text(model.display.localized("観察")).inkuFont(12, weight: .semibold)
-                    Text(advice.observation).textSelection(.enabled)
-                    Text(model.display.localizedFormat("次の操作: %@ · 読み手: %@", model.display.localized(AuxiliaryModel.kindLabel(advice.suggestedKind)), advice.model))
-                        .inkuFont(12).foregroundStyle(.secondary)
-                }
-            }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
-        }
+        return VStack(alignment: .leading, spacing: 10) {
+            Button { showModels = true } label: {
+                Label(auxiliary.modelReference.isEmpty ? model.display.localized("Visionモデルを選択") : auxiliary.modelReference, systemImage: "eye")
+            }.inkuTooltip(model.display.tooltip("画像を扱える登録モデルから選択します。", serverKey: "modelSelectionVisionHint"))
+            HStack(spacing: 8) {
+                Text(model.display.localized("応答の言語")).inkuFont(12).foregroundStyle(.secondary)
+                InkuSegmentedButtons(options: [("ja", model.display.localized("日本語")), ("en", "English")], selection: $auxiliary.language)
+            }.accessibilityElement(children: .contain).accessibilityLabel(model.display.localized("応答の言語"))
+        }.disabled(auxiliary.running || auxiliary.selectingSource || model.isBusy)
     }
 
     /// Web `inku-ai-refine-settings`: mode, generations, the two dimensions and the Vision direction, not the wild switch.
@@ -143,9 +118,18 @@ public struct AuxiliaryView: View {
                 HStack(spacing: 8) {
                     Text(model.display.localized("方式")).inkuFont(12).foregroundStyle(.secondary)
                     InkuSegmentedButtons(options: [(false, model.display.localized("ランダム")), (true, "AI Vision")], selection: $auxiliary.visionMode)
-                }.disabled(auxiliary.sourceIsLocked)
-                    // AIRefineModal.svelte:256: a held work names why Vision is off.
-                    .inkuTooltip(auxiliary.sourceIsLocked ? lockedReason : "")
+                }
+                if auxiliary.sourceIsLocked {
+                    Text(model.display.webCopy("aiRefineHeldNote", "DDLを編集した作品です。色・配置の世代を、この作品のDDLから描きます。"))
+                        .inkuFont(12).foregroundStyle(.secondary)
+                }
+                if auxiliary.visionMode {
+                    visionSelection
+                    TextField(model.display.localized("AI に伝える方向性"), text: $auxiliary.direction, axis: .vertical).lineLimit(2...4)
+                        .disabled(auxiliary.running || auxiliary.selectingSource || model.isBusy)
+                        .inkuTooltip(model.display.tooltip("AIへ伝える方針は160文字までです。"))
+                    Text("\(auxiliary.direction.utf16.count) / \(AuxiliaryModel.directionLimit)").inkuFont(12).foregroundStyle(.secondary)
+                }
                 Text(model.display.localized(auxiliary.visionMode ? "上のモデルが観察し、同じモデルで各世代を描きます。" : "制作のモデルで描きます。"))
                     .inkuFont(12).foregroundStyle(.secondary)
                 Stepper(model.display.localizedFormat("生成する世代数: %ld", auxiliary.generations), value: $auxiliary.generations, in: 1...10)
@@ -166,10 +150,6 @@ public struct AuxiliaryView: View {
                     .disabled(auxiliary.sourceWork == nil || auxiliary.enabledKinds.isEmpty || (auxiliary.visionMode && auxiliary.modelReference.isEmpty))
             }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
         }.disabled(auxiliary.running || auxiliary.selectingSource || model.isBusy)
-    }
-
-    private var lockedReason: String {
-        model.display.tooltip("編集した指示書で確定した作品です。記述を読み直す操作は使えません。", serverKey: "descriptionLockedReason")
     }
 
     /// AIRefineModal.svelte:260: what the color and layout elements cost.

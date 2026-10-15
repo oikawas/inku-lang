@@ -82,7 +82,7 @@ public final class RefinementModel {
     public var canSave: Bool { initialized && !running && !closed && selectedCount > 0 }
 
     public func canGenerate(count: Int) -> Bool {
-        initialized && !running && !closed && !work.trashed && !hasUnsaved
+        initialized && !running && !closed && !work.trashed
             && [1, 4].contains(count)
     }
 

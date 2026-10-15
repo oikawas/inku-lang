@@ -110,7 +110,33 @@ func runAuxiliaryProvenanceChecks() async throws {
           try await app.savedConfiguration(workID: parent.id).document == parentContext.document else {
         throw CheckFailure.message("Adopted advice reread, appended its draft, ignored the allowed fallback or changed the parent")
     }
-    print("Auxiliary provenance passed: color Vision x2 and layout random x1 + advice adoption use saved DDL; retired reading/touch excluded; directions remain observation metadata; one fixture Stage 1 and zero subsequent provider calls. Isolated SQLite + mock transports + real Rust only.")
+    // Failure: a DDL/held parent silently resets Vision to random although only catalog/layout are allowed now.
+    await app.selectWork(parent)
+    app.ddlText = "place one blue circle at center."
+    await app.commitDDL()
+    guard let held = app.selectedWork, app.sourceLocked else { throw CheckFailure.message("Held Vision fixture failed") }
+    guard await app.drawNewDDL("Place 1 green circle."), let direct = app.selectedWork else { throw CheckFailure.message("Direct Vision fixture failed") }
+    for source in [held, direct] {
+        await transport.expectInstruction(source.effectiveSourceText.isEmpty ? (source.ddl ?? "") : source.effectiveSourceText)
+        let vision = AuxiliaryModel(provider: AuxiliaryProvider(transport: transport, credentials: AuxiliaryProvenanceCredentials()))
+        vision.visionMode = true
+        await vision.initialize(app: app, work: source)
+        guard vision.sourceIsLocked, vision.visionMode else { throw CheckFailure.message("Held/DDL initialization switched off Vision") }
+        vision.generations = 1; vision.modelReference = "check:vision"
+        vision.enabledKinds = ["catalog_change"]; vision.direction = "keep the circle"
+        await vision.startRefinement(app: app)
+        guard vision.errorText == nil, vision.completedGenerations == 1, let next = vision.generatedWorks.first,
+              next.ddl == source.ddl, next.effectiveSourceText == source.effectiveSourceText,
+              let nextNode = next.lineageNodeID, let nextEdge = try await database.edge(childNodeID: nextNode),
+              nextEdge.parentNodeID == source.lineageNodeID,
+              try ExactJSON(data: Data(nextEdge.metadataJSON.utf8))["autonomous_refine_mode"].string == "vision" else {
+            throw CheckFailure.message("Vision did not draw the held/DDL parent's saved instructions: \(vision.errorText ?? vision.status); app=\(app.errorText ?? "none"); mock=\(await transport.lastMismatch)")
+        }
+    }
+    guard await transport.visionModels.count == 4, await transport.generationModels == ["check:generation"] else {
+        throw CheckFailure.message("Held/DDL Vision reread descriptions or failed to ask Vision")
+    }
+    print("Auxiliary provenance passed: color Vision x2 and layout random x1 + advice adoption use saved DDL; held-description and direct-DDL Vision each draw one catalog child without Stage 1; retired reading/touch excluded; directions remain observation metadata. Isolated SQLite + mock transports + real Rust only.")
 }
 
 private actor AuxiliaryProvenanceCredentials: CredentialStore {
@@ -120,6 +146,9 @@ private actor AuxiliaryProvenanceCredentials: CredentialStore {
 private actor AuxiliaryProvenanceProvider: ProviderTransport, AuxiliaryTransport {
     private(set) var generationModels: [String] = []
     private(set) var visionModels: [String] = []
+    private var expectedInstruction = "a red circle"
+    private(set) var lastMismatch = "none"
+    func expectInstruction(_ text: String) { expectedInstruction = text }
 
     func perform(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
@@ -132,13 +161,15 @@ private actor AuxiliaryProvenanceProvider: ProviderTransport, AuxiliaryTransport
     func performAuxiliary(prompt: AuxiliaryPrompt, modelReference: String, settings: HostSettings,
                           credentials: any CredentialStore, onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
         guard prompt.images.count == 1, prompt.maximumTokens == 320 else {
+            lastMismatch = "image count / advice budget"
             throw CheckFailure.message("Autonomous Vision changed its existing observation budget")
         }
         guard let start = prompt.message.firstIndex(of: "{") else { throw CheckFailure.message("Vision prompt has no context") }
         let payload = try ExactJSON(data: Data(prompt.message[start...].utf8))
         guard payload["allowed_suggested_kinds"].array?.compactMap(\.string) == ["catalog_change"],
               payload["user_direction"].string == "keep the circle",
-              payload["instruction"].string == "a red circle" else {
+              payload["instruction"].string == expectedInstruction else {
+            lastMismatch = "kinds=\(payload["allowed_suggested_kinds"].text); direction=\(payload["user_direction"].string ?? "nil"); instruction=\(payload["instruction"].string ?? "nil"); expected=\(expectedInstruction)"
             throw CheckFailure.message("Vision received retired kinds or direction text leaked into the parent description")
         }
         visionModels.append(modelReference)

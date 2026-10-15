@@ -8,6 +8,8 @@
 //! the support under it, and its ink and opacity follow from that support's lightness, so a
 //! texture stays visible on a dark background.
 
+use inku_score::{shown_support, srgb_channels};
+
 use crate::determinism::hash01;
 use crate::svg::{Element, format_number};
 use crate::types::{CanvasGroundSpec, CanvasSize, GroundGrain, GroundMaterial, Seed};
@@ -18,9 +20,6 @@ const GROUND_OPACITY_DEFAULT: f64 = 0.12;
 /// How strongly the broad layer and the textures move the lightness. The author chose 0.6 of
 /// the first prototype's steps on the comparison sheet (2026-10-15).
 const GROUND_STRENGTH: f64 = 0.6;
-/// How much ink the ink wash lays over the paper. The author found 0.16 too dark and chose
-/// 0.09 over 0.05 (2026-10-15).
-const INK_WASH_BODY: f64 = 0.09;
 /// How far the mezzotint's burnish and rocker marks lift the plate. At 1.0 the plate's grain
 /// was hard to see; the author chose 1.5 (2026-10-15).
 const MEZZOTINT_LIFT: f64 = 1.5;
@@ -100,23 +99,6 @@ fn n3(value: f64) -> String {
 struct Rgb([f64; 3]);
 
 impl Rgb {
-    fn parse(hex: &str) -> Option<Self> {
-        let digits = hex.strip_prefix('#')?;
-        if digits.len() != 6 || !digits.is_ascii() {
-            return None;
-        }
-        let mut channels = [0.0; 3];
-        for (index, channel) in channels.iter_mut().enumerate() {
-            let byte = u8::from_str_radix(&digits[index * 2..index * 2 + 2], 16).ok()?;
-            *channel = f64::from(byte) / 255.0;
-        }
-        Some(Self(channels))
-    }
-
-    fn mix(self, other: Self, amount: f64) -> Self {
-        Self([0, 1, 2].map(|index| self.0[index] * (1.0 - amount) + other.0[index] * amount))
-    }
-
     /// CIE L* of the colour.
     fn lightness(self) -> f64 {
         let linear = self.0.map(|channel| {
@@ -1024,16 +1006,6 @@ fn mezzotint(seed: Seed, shade: Shade, broad: &mut Broad, canvas: CanvasSize) ->
     layers
 }
 
-/// The material's own tone, laid over the background: colour and opacity.
-fn material_body(material: GroundMaterial) -> Option<(&'static str, f64)> {
-    match material {
-        GroundMaterial::InkWash => Some(("#1e1e1e", INK_WASH_BODY)),
-        GroundMaterial::CharcoalGround => Some(("#2b2b2b", 0.62)),
-        GroundMaterial::Mezzotint => Some(("#0d0d0d", 1.0)),
-        _ => None,
-    }
-}
-
 /// Build the ground of `material` over `tone` (the colour the tone rect paints).
 pub(crate) fn build_ground_plan(
     ground: &CanvasGroundSpec,
@@ -1041,11 +1013,13 @@ pub(crate) fn build_ground_plan(
     canvas: CanvasSize,
     tone: &str,
 ) -> GroundPlan {
-    let body = material_body(ground.material);
-    let mut support = Rgb::parse(tone).unwrap_or(Rgb([0.95; 3]));
-    if let Some((colour, opacity)) = body {
-        support = support.mix(Rgb::parse(colour).expect("body colours are hex"), opacity);
-    }
+    // The material's own tone (inku-score's table, which the DDL lowering and the
+    // pipeline read too) laid over the tone.
+    let body = ground.material.body();
+    let support = Rgb(shown_support(
+        ground.material,
+        srgb_channels(tone).unwrap_or([0.95; 3]),
+    ));
     let shade = Shade {
         support: support.lightness(),
         strength: GROUND_STRENGTH * ground.opacity.max(0.0) / GROUND_OPACITY_DEFAULT,

@@ -391,6 +391,24 @@ fn ids(slot: WorkPlanSlot) -> Vec<String> {
         .collect()
 }
 
+/// The support a plan's `ground` value names: the Score value of the Saijiki
+/// じ word the value was projected from. `None` for `unspecified` and for any
+/// value no word gives.
+#[must_use]
+pub fn work_plan_ground_material(value: &str) -> Option<inku_score::GroundMaterial> {
+    saijiki_asset()
+        .categories
+        .iter()
+        .find(|category| category.key == "ji")?
+        .words
+        .iter()
+        .filter(|word| word.prompt)
+        .find(|word| word.surface_en.as_deref().map(canonical_wire_id).as_deref() == Some(value))?
+        .score_value
+        .as_deref()
+        .and_then(|score| serde_json::from_value(Value::String(score.to_owned())).ok())
+}
+
 /// The provider response schema. It uses only object, array, string enum, and
 /// integer so every structured-output transport can carry it unchanged.
 #[must_use]

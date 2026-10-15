@@ -8,6 +8,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — On a ground that covers the background, show marks whose color is omitted, and return marks lost in the ground (DDL engine 61)
+
+A mark whose color the DDL omits was black or white by the background's lightness alone, regardless of the ground. The mezzotint and the charcoal ground cover the background, so on a white background such a mark turned black and was not seen on the mezzotint's black plate (the circle of 「メゾチント。／中心に、太筆の大きな円を1個置く。」). On a ground that covers the background, the color is now the farther of black and white from what the ground shows over the background (its body laid over the background): always white on the mezzotint, and white in most catalogs on the charcoal ground over white, whose lightness lies midway, where black and white both show. Grounds that show the background (paper, washi, the ink wash ground and the others) are unchanged.
+
+When an underdrawing's layers are drawn only in the background's color, Stage 1 returns the candidate to the reader once, but it returned nothing when the ground covered the background. On a covering ground it now returns a layer drawn only in colors within OKLab color difference 0.08 of what the ground shows. The request names the ground (`ground`), its ground choices leave out the grounds that cover the background, and its background choices leave out the marks' colors; the marks keep their colors.
+
+The ground body's color and opacity and the OKLab conversion move to `inku-score`, so the renderer, the DDL lowering and the pipeline read one copy. Drawing is unchanged (21 ground-only Scores and 69 recorded works are byte-identical). Reading the 5173 works export (2026-10-14, 4,711 works) with each work's palette, only the omitted colors on covering grounds change (black to white), in 4 works and 5 instructions. Saved works are unchanged. "Change the ground" toward a covering ground recolors marks whose color is omitted. DDL engine 61; DDL 19, render engine 81 and the Score format are unchanged. As a checking tool, the compile-score example accepts a work's palette (`color_map`, `render_seed`, `catalog_id`).
+
 ### 2026-10-15 — Remove macOS thumbnail loading animations
 
 Match Web's list presentation by removing per-image loading animations. Decoded PNGs already in memory appear synchronously, avoiding a blank image and task wait whenever a page is revisited. Work/render-hash identity, bounded cache memory, and 512px image quality are preserved.

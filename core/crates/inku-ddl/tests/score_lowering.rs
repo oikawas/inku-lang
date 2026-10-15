@@ -2415,6 +2415,37 @@ fn omission_color_uses_actual_palette_contrast_with_black_tie_and_explicit_value
 }
 
 #[test]
+fn an_omitted_color_on_a_covering_ground_is_told_from_what_the_ground_shows() {
+    // The mezzotint plate and the charcoal lay their own body over the
+    // background, so an omitted color is the farther of black and white from
+    // the color the ground shows there, not from the background it hides (DDL
+    // engine 61). Paper shows the background, and so does the thin ink wash.
+    for (ground, background, expected) in [
+        ("mezzotint", Color::White, Color::White),
+        ("mezzotint", Color::Black, Color::White),
+        ("charcoal ground", Color::White, Color::White),
+        ("charcoal ground", Color::Black, Color::White),
+        ("paper", Color::White, Color::Black),
+        ("ink wash ground", Color::White, Color::Black),
+    ] {
+        let palette = work_palette_context(&default_color_map(), None, None, background).unwrap();
+        let source =
+            format!("{ground}. place one pen solid flat circle at horizontal 0.5, vertical 0.5.");
+        let result = stage15(&source, ResolvedInstructionLanguage::En);
+        let lowered = lower_verified_stage15_score(
+            result.verified_effective_view(),
+            ScoreLoweringContext::resolve_with_palette("square", background, palette).unwrap(),
+        );
+        let score = lowered.score().unwrap();
+        assert!(
+            matches!(&score.canvas, Canvas::Spec(canvas) if canvas.ground.is_some()),
+            "{source}"
+        );
+        assert_eq!(score.instructions[0].color, expected, "{source}");
+    }
+}
+
+#[test]
 fn unsupported_instruction_among_independent_instructions_keeps_the_drawable_rest() {
     let result = stage15(
         concat!(

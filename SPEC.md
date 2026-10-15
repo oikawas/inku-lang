@@ -159,7 +159,7 @@ English writes the edges with a hyphen (`left-edge`, `right-edge`, `top-edge`, `
 
 In v1.92 the words 描く (ja draw) and 髪 / hair were removed from the vocabulary by the author's decision. In v2.7.9, 髪 / hair was replaced by 銀筆 / **silverpoint** — 0.5px, the least wavering line a hand can draw. Saved Scores that still say `hair` are rewritten to `silverpoint` as they load, so they replay unchanged in everything but the seed.
 
-Pen, solid, empty, and black remain historical baselines for comparison with legacy Score / coerce behavior, rather than values inserted into typed meaning. When visible DDL omits a corresponding field, typed meaning remains `unspecified`; neither the parser nor semantic association fills it. The current subset resolves omissions only while lowering a lock-verified view to an actual Score: for count-one circle, square, ellipse, cloudform, triangle, and polygon instructions with a numeric position or `place:center` (the canvas-center region), plus a place action, omitted count becomes one, touch becomes pen, continuity becomes solid, and an omitted closed surface becomes filled. An omitted color compares the actual work color-catalog background against actual black and white by absolute OKLCH L distance, choosing the farther color and black on a tie. Each explicit value wins independently, and these resolutions are not written back into source meaning. Legacy Stop and OmitAndContinue inputs remain accepted, but a recoverable field or execution-unit failure uses shared local recovery: it records a typed diagnostic, omits only that unit, and continues with the remaining drawing. This rule does not retroactively change physical Renderer fallbacks or read compatibility for existing works.
+Pen, solid, empty, and black remain historical baselines for comparison with legacy Score / coerce behavior, rather than values inserted into typed meaning. When visible DDL omits a corresponding field, typed meaning remains `unspecified`; neither the parser nor semantic association fills it. The current subset resolves omissions only while lowering a lock-verified view to an actual Score: for count-one circle, square, ellipse, cloudform, triangle, and polygon instructions with a numeric position or `place:center` (the canvas-center region), plus a place action, omitted count becomes one, touch becomes pen, continuity becomes solid, and an omitted closed surface becomes filled. An omitted color compares the actual work color-catalog background against actual black and white by absolute OKLCH L distance, choosing the farther color and black on a tie. On a support that covers the background (the charcoal ground and the mezzotint), it compares the OKLab L of what the support shows there (its body laid over the background) instead of the background (DDL engine 61). Each explicit value wins independently, and these resolutions are not written back into source meaning. Legacy Stop and OmitAndContinue inputs remain accepted, but a recoverable field or execution-unit failure uses shared local recovery: it records a typed diagnostic, omits only that unit, and continues with the remaining drawing. This rule does not retroactively change physical Renderer fallbacks or read compatibility for existing works.
 
 Shape size is a finite local modifier owned by the typed DDL compiler, not Saijiki vocabulary. The current classes are `slightly_small`, `small`, `very_small`, `normal`, `slightly_large`, `large`, and `very_large`. Their Japanese ordinary/small/large surfaces and the corresponding English `normal-sized`, `slightly`, and `very` forms retain exact source spans. The grammar does not grow free-form degree synonyms or use source-substring post-processing.
 
@@ -1790,6 +1790,18 @@ its canonical name in English DDL (`Nature.YoungLeaves.`) (§4.13). The underdra
 list is canonical, and a response naming an alias is read as its canonical name. Without installed plugins
 neither the list nor its prompt section appears, and schema and prompt are
 unchanged. Core vocabulary is primary and Macros are an optional extension.
+
+When an underdrawing's marks are lost in what the canvas shows under them (on a
+support that shows the background, a layer drawn only in the background's color;
+on a support that covers the background, the charcoal ground or the mezzotint, a
+layer drawn only in colors within OKLab color difference 0.08 of what the support
+shows over the background), Stage 1 keeps the candidate and returns it to the
+reader once (`background_feedback`). The request's background choices leave out
+the candidate's mark colors. Under a covering support, `background_feedback` also
+names the ground (`ground`), and the ground choices leave out the supports that
+cover the background, so the reader chooses both again. The mark colors the
+original description states are kept (DDL engine 61; 0.08 is a little nearer than
+the nearest two of the nine colors a catalog sets apart, 0.042 to 0.121).
 
 When printing a Japanese underdrawing, a modifier already ending in `な`, `い`,
 or `の` attaches directly to its shape; other forms receive `の`. The printer
@@ -3716,7 +3728,10 @@ fill path. An omitted color requires explicit observations of the actual
 background, black, and white RGB and OKLCH L values from the same Renderer
 `work_color_assignment` / `resolve_color` path. The single `inku-ddl` policy
 chooses whichever of black and white has the larger lightness distance from the
-background, choosing black on a tie. An explicit color needs no color-catalog context
+background, choosing black on a tie. On a support that covers the background (the
+charcoal ground and the mezzotint), the distance is taken from what the support
+shows instead (its body laid over the background; the body's color and opacity
+come from the `inku-score` table the renderer shares, DDL engine 61). An explicit color needs no color-catalog context
 and remains unchanged. Explicit fields win independently. Stop, the default,
 returns no actual Score when any meaning is unsupported. OmitAndContinue omits
 unsupported color, touch, continuity, surface quality, or intensity as an

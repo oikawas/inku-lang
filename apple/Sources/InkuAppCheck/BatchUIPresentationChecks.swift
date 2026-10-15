@@ -3,7 +3,7 @@ import InkuHost
 import InkuPersistence
 import InkuUI
 
-@MainActor func runBatchUIPresentationChecks() async throws {
+@MainActor func runBatchUIPresentationChecks(failureNoticeOnly: Bool = false) async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent("inku-batch-ui-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: directory) }
@@ -23,15 +23,17 @@ import InkuUI
     app.sketchMode = "supplied"; app.sketchText = "Creation sketch must not enter a batch"
     app.wild = false; app.display.preferences.batchRetries = 0
     // Failure: a saved unregistered fixture reference became a selectable new batch model.
-    app.selectNextDrawingModel("check:mock-ui")
-    guard !app.hasAvailableBatchDrawingModel, app.nextBatchDrawingModelReference.isEmpty,
-          SettingsModel.batchModels(for: service).map(\.id) == ["pinned"] else {
-        throw CheckFailure.message("Unregistered batch model leaked into choices or summary")
+    if !failureNoticeOnly {
+        app.selectNextDrawingModel("check:mock-ui")
+        guard !app.hasAvailableBatchDrawingModel, app.nextBatchDrawingModelReference.isEmpty,
+              SettingsModel.batchModels(for: service).map(\.id) == ["pinned"] else {
+            throw CheckFailure.message("Unregistered batch model leaked into choices or summary")
+        }
+        do {
+            _ = try app.requestForBatchDescription("must not run", sketchMode: "off")
+            throw CheckFailure.message("Unregistered batch model was accepted")
+        } catch let error as HostError where error.code == "drawing_model_not_available" {}
     }
-    do {
-        _ = try app.requestForBatchDescription("must not run", sketchMode: "off")
-        throw CheckFailure.message("Unregistered batch model was accepted")
-    } catch let error as HostError where error.code == "drawing_model_not_available" {}
     app.selectNextDrawingModel("check:pinned")
     let sketchRequest = try app.requestForBatchDescription("A moon over a hill", sketchMode: "on")
     guard case .description("A moon over a hill", true, .on) = sketchRequest.authoring,
@@ -78,6 +80,19 @@ import InkuUI
           batch.rows[1].request.configuration == frozen[1].configuration,
           batch.batchPromptHistory == [BatchInputLines.normalizedText(original.trimmingCharacters(in: .whitespacesAndNewlines))] else {
         throw CheckFailure.message("Batch summary, request snapshot or saved input history changed")
+    }
+
+    if failureNoticeOnly {
+        // Failure: a background row's failure was also presented as a single-drawing error.
+        guard batch.rows[1].error?.isEmpty == false, app.errorText == nil else {
+            throw CheckFailure.message("Batch failure escaped the original row into the single-drawing notice")
+        }
+        let ordinary = await app.runAutomation(request: frozen[1])
+        guard ordinary == nil, app.errorText?.isEmpty == false, app.works.count == 1 else {
+            throw CheckFailure.message("Ordinary drawing lost its error notice or failure saved another work")
+        }
+        print("Batch failure notice passed: failed original row retains its reason; background batch has no single-drawing error; ordinary drawing still has its notice. Two synthetic rows, temporary SQLite, offline provider only.")
+        return
     }
 
     // Failure: restoring input history rewrote the resume journal, or an older journal lost its original row conditions.

@@ -14,6 +14,12 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-15 Batch tab
+
+The batch heading, hint, text font and spacing, three empty-input examples with line numbers, count, and input history follow Web. Dragging the input's bottom-right corner changes its height. History uses a scrolling list capped at half the window height and names each input by its first line. Choosing one restores only the input and closes the list. Next conditions order model, catalog, Sketch from life, Wild, canvas, and New together; native seed details sit behind the heading's ellipsis. During a run, disabled condition fields show the captured starting values without changing settings for the next batch.
+
+The resume card shows an interrupted badge, original next line, remaining and completed counts, and explains that it restores original input and conditions while skipping completed works. During a run, the compact current line precedes disabled next conditions and a single progress and stop block. Read-only sketch and instructions cards below it retain the last saved line's number rather than adopting the next active line. Instruction tokens come from that saved work's measurements; missing values show `-`. A fully successful run has no fixed summary. Failures show an expanded report with original line, input, reason, and an action to paint failed lines again. Background batch failures do not also appear as single-drawing errors. Native all-row results and explicit retry or skip choices for uncertain rows remain available. Start, resume, stop, pinned requests, and persistence contracts are unchanged.
+
 ## 2026-10-15 Description tab and instructions editor
 
 The description tab separates the next provider and model names and links to usage when a ChatGPT plan is selected. Automatic catalog selection and canvas labels follow Web. The main condition row has three controls: Sketch from life, Wild, and canvas. Native seed and catalog details remain available from the ellipsis beside Next work conditions. Missing connection and local backup notices remain available.

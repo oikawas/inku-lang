@@ -146,7 +146,7 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "InputPanel.svelte:236", swift: "Views/CreationView.swift", marker: "serverKey: \"tooltipInputSketch\""),
     .init(web: "InputPanel.svelte:239", swift: "Views/CreationView.swift", marker: "tip(\"次の作品の筆致を規則から外します。\")"),
     .init(web: "InputPanel.svelte:250", swift: "Views/CreationView.swift", marker: "tip(\"用紙の形と意図を見て、次の作品の用紙を選びます。\")"),
-    .init(web: "InputPanel.svelte:263", swift: "Views/BatchPanelView.swift", marker: "serverKey: \"tooltipInputClear\""),
+    .init(web: "InputPanel.svelte:263", swift: "Views/BatchConditionsView.swift", marker: "serverKey: \"tooltipInputClear\""),
     .init(web: "InputPanel.svelte:288", swift: "Views/CreationView.swift", marker: "serverKey: \"tooltipInputClear\""),
     .init(web: "InputPanel.svelte:332", swift: "Views/CreationView.swift", marker: "serverKey: \"tooltipForkDescription\""),
     .init(web: "InputPanel.svelte:336", swift: "Views/CreationView.swift", marker: "tip(\"入力と次の生成条件から作品を描きます。\")"),

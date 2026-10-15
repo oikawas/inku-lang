@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Match the macOS batch tab to Web
+
+Aligned input headings, line numbers, height adjustment, scrolling input history, next conditions, New, and the resume card. During a run, the left panel shows the last saved line's sketch and instructions beneath one progress and stop block. Failed line numbers, inputs, and reasons are visible without expanding a section, without a duplicate single-drawing error notice. Saved works and pinned drawing conditions keep their existing behavior.
+
 ### 2026-10-15 — Match macOS description and instructions editing to Web
 
 The instructions editor now shows its target work and range frame beside the text, with Saijiki below it and model, stroke-limit, and drawing controls in the footer. New DDL uses the same layout. Words insert at the caret without opening another sheet. Description controls now match Web's model, automatic catalog, and canvas labels, including the ChatGPT plan usage link.

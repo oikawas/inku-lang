@@ -173,7 +173,8 @@ struct CreationView: View {
 
     private var batchProgress: String {
         guard automation.running, automation.mode == "batch", !automation.rows.isEmpty else { return "" }
-        let current = automation.completedCount + (automation.activeRow == nil ? 0 : 1)
+        let current = automation.activeRow.flatMap { active in automation.rows.firstIndex { $0.id == active.id } }.map { $0 + 1 }
+            ?? (automation.completedCount + automation.failedCount)
         guard current > 0 else { return "" }
         let retry = automation.currentRetryRound > 0 ? " ↻\(automation.currentRetryRound)" : ""
         return "(\(current)/\(automation.rows.count)\(retry))"

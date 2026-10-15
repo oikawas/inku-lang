@@ -1,6 +1,6 @@
 # Application Installation
 
-This guide describes a standard new installation or upgrade on Linux. It provides both the existing systemd development setup and a Compose setup using the production SvelteKit adapter. Put a TLS reverse proxy in front of any public internet deployment. The Web UI instructions in §§10 and 12 match v2.15.15 (Web Build 1091).
+This guide describes a standard new installation or upgrade on Linux. It provides both the existing systemd development setup and a Compose setup using the production SvelteKit adapter. Put a TLS reverse proxy in front of any public internet deployment. The Web UI instructions in §§10 and 12 use v2.15.147 (Web Build 1223) as their baseline.
 
 ## 1. Components
 
@@ -28,6 +28,7 @@ inku-lang/
 - uv
 - Node.js and npm
 - Git or a deployment mechanism such as rsync
+- For source/systemd installations, an `inku-render-python` wheel built from the same checkout's core. The Linux build environment needs Rust (the pinned version in `core/rust-toolchain.toml`), a C linker, and maturin 1.13.3
 - (No extra OS libraries: `resvg-py`, which rasterizes PNG output, ships as a wheel)
 - Optional: reverse proxy and a TLS certificate
 
@@ -69,6 +70,20 @@ Sync dependencies from the lockfile.
 cd /opt/inku/inku-lang/server
 sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv sync --locked
 ```
+
+**Dependency sync alone does not install the required `inku_render` binding.** Build and install a native wheel from the same checkout for the server's OS, CPU, and Python. On a Linux build host with the required tools, use `core/` as the working directory so the pinned toolchain is selected.
+
+```sh
+cd /opt/inku/inku-lang/core
+sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uvx --from maturin==1.13.3 maturin build \
+  --manifest-path crates/inku-render-python/Cargo.toml --release --locked \
+  --interpreter ../server/.venv/bin/python --out ../native-wheels
+cd /opt/inku/inku-lang/server
+sudo -u inku uv pip install --python .venv/bin/python --no-deps --force-reinstall ../native-wheels/inku_render_python-*.whl
+sudo -u inku .venv/bin/python -c 'import inku_render; from inku_server.pipeline_candidate import PipelineBinding; print(inku_render.render_engine_version()); PipelineBinding()'
+```
+
+Keep only the wheel for this target environment in `native-wheels`. If using a prebuilt wheel, check its source and target environment and still perform the install/import checks. Rebuild and reinstall when core changes. To preserve this wheel outside the lockfile, use `uv sync --locked --inexact` for later syncs and `uv run --no-sync` for startup and checks in the prepared environment. The Compose API image builds and installs the wheel from the same core in its Dockerfile, so this manual install is not needed there.
 
 The current backend runs SQLite schema migrations and existing-data backfills during initialization. Always back up the DB before an upgrade.
 
@@ -123,7 +138,7 @@ Backend:
 
 ```sh
 cd /opt/inku/inku-lang/server
-sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-server
+sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run --no-sync inku-server
 ```
 
 From another terminal:
@@ -155,7 +170,7 @@ sudo systemctl enable --now inku-api.service
 sudo systemctl enable --now inku-server.service
 ```
 
-Adapt `User`, `Group`, `WorkingDirectory`, `ExecStart`, and `EnvironmentFile`. Confirm absolute paths for `uv` and `npm`.
+Adapt `User`, `Group`, `WorkingDirectory`, `ExecStart`, and `EnvironmentFile`. The API template uses `uv run --no-sync` to start the environment prepared in §5. Confirm absolute paths for `uv` and `npm`.
 
 ```sh
 command -v uv
@@ -195,11 +210,11 @@ Check in the Web UI:
 
 - Sign-in and sign-out
 - Painting from Japanese and English descriptions
-- Painting with Sketch from life set to `Fine`, and the sketch appearing on the left
+- Painting with Sketch from life set to `On`, and a sketch adding place and light alongside the description
 - Color catalog, model, canvas, and Wild selection
 - Refinement and model comparison
 - Provenance Details, Prompts, and JSON
-- Timeline and By lineage history modes, and search by the last four hash characters or a whole render hash
+- Timeline and By lineage history modes; search by a whole render hash, its prefix or last four characters, and by a whole work UUID or its prefix
 - Choose a save location in `Export`, then export SVG, PNG, contact sheets, and animation. The location remains only in the browser that chose it; without one, exports use the browser default download location.
 - As an administrator, switch Settings between `Standard` and `Detailed`, then open and save `Limits` and `Other (server)` in Detailed mode
 - Review backup status in `DB settings` and retention settings in `Log retention`
@@ -213,10 +228,10 @@ Check in the Web UI:
 
 ```sh
 cd /opt/inku/inku-lang/server
-sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv sync --locked
-sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest
-sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests
+sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv sync --locked --inexact
 ```
+
+Rebuild and reinstall the native wheel from the updated source as in §5, then check its import and pipeline entry point. Run only checks relevant to the changed behavior, using `uv run --no-sync pytest <selected-nodeid>` and `uv run --no-sync ruff check <changed-Python-path>`. A running process alone does not prove that the wheel matches the source.
 
 ```sh
 cd /opt/inku/inku-lang/web
@@ -241,7 +256,7 @@ Before rollback, confirm whether the upgraded DB remains compatible with the old
 1. Stop services.
 2. Restore the previous code and pre-upgrade DB backup.
 3. Restore the same `INKU_SECRET_KEY_FILE`.
-4. Sync dependencies and start services.
+4. Sync dependencies with `uv sync --locked --inexact`, reinstall and check the native wheel matching the restored source as in §5, then start the services.
 5. Check health and history replay.
 
 ## 15. Uninstall

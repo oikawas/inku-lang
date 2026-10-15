@@ -8,6 +8,7 @@
 	import type { AnimationExportSettings } from '$lib/animationExport';
 	import type { SheetVariant } from '$lib/contactSheet';
 	import type { SvgProfile } from '$lib/features/export/download';
+	import type { ExportSaveActionResult } from '$lib/features/export/save-result';
 	import type { SavedWorkExportItem, SavedWorkExportScope, SavedWorkExportSnapshot } from '$lib/features/export/saved-work';
 	import { formatByteSize, groupDigits } from '$lib/formatNumber';
 	import { formatHistoryMinute, historyListDescription } from '$lib/historyManagerPresentation';
@@ -85,12 +86,12 @@
 		selectedHistoryIds: string[];
 		animationExportSettings: AnimationExportSettings;
 		pngTemplates?: ExportTemplate[];
-		onDownloadSavedWorkSVG?: (profile: SvgProfile, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
-		onDownloadSavedWorkPNG?: (height: number, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
-		onDownloadSavedWorkCard?: (historyId: string, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
-		onDownloadSavedWorkDdl?: (snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
-		onDownloadSavedWorkAnimation: (snapshot: SavedWorkExportSnapshot, settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle) => void | Promise<void>;
-		onDownloadSavedWorkContactSheet: (snapshot: SavedWorkExportSnapshot, variant: SheetVariant) => void | Promise<void>;
+		onDownloadSavedWorkSVG?: (profile: SvgProfile, snapshot: SavedWorkExportSnapshot) => ExportSaveActionResult;
+		onDownloadSavedWorkPNG?: (height: number, snapshot: SavedWorkExportSnapshot) => ExportSaveActionResult;
+		onDownloadSavedWorkCard?: (historyId: string, snapshot: SavedWorkExportSnapshot) => ExportSaveActionResult;
+		onDownloadSavedWorkDdl?: (snapshot: SavedWorkExportSnapshot) => ExportSaveActionResult;
+		onDownloadSavedWorkAnimation: (snapshot: SavedWorkExportSnapshot, settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle) => ExportSaveActionResult;
+		onDownloadSavedWorkContactSheet: (snapshot: SavedWorkExportSnapshot, variant: SheetVariant) => ExportSaveActionResult;
 		onValidateSavedWorkExport: (snapshot: SavedWorkExportSnapshot) => boolean | Promise<boolean>;
 		historySearch: string;
 		historyManagerStarredOnly: boolean;

@@ -1,4 +1,15 @@
-import { DEFAULT_MODEL, DEFAULT_PROVIDER } from '$lib/models';
+import { DEFAULT_MODEL, DEFAULT_PROVIDER, type ProviderGroup } from '$lib/models';
+
+/** Demo instruction generation cannot use the personal ChatGPT connection. */
+export function demoInstructionModelGroups(groups: ProviderGroup[]): ProviderGroup[] {
+	return groups
+		.filter((group) => group.id !== 'chatgpt')
+		.map((group) => ({
+			...group,
+			models: group.models.filter((model) => !model.purposes || model.purposes.includes('llm')),
+		}))
+		.filter((group) => group.models.length > 0);
+}
 
 export type DemoSettings = {
 	save_db: boolean;

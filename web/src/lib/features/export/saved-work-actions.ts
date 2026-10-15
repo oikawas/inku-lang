@@ -5,7 +5,8 @@ import { type SheetVariant } from '$lib/contactSheet';
 import { runContactSheet } from '$lib/features/contact-sheet/run';
 import { createExportActions, type SvgProfile } from '$lib/features/export/download';
 import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
-import { saveBlob } from '$lib/features/export/save-target';
+import { saveBlob, type SaveOutcome } from '$lib/features/export/save-target';
+import { ExportSaveError } from '$lib/features/export/save-result';
 import type { SavedWorkExportSnapshot } from '$lib/features/export/saved-work';
 import { exportSettings } from '$lib/features/export/settings.svelte';
 import type { LineageGraph } from '$lib/features/history/types';
@@ -137,46 +138,53 @@ export function makeSavedWorkExportActions(deps: SavedWorkExportActionsDeps) {
 				return false;
 			}
 		},
-		onDownloadSVG: async (profile: SvgProfile, snapshot: SavedWorkExportSnapshot): Promise<void> => {
+		onDownloadSVG: async (profile: SvgProfile, snapshot: SavedWorkExportSnapshot) => {
 			const item = await oneSavedWork(snapshot, true);
-			await exportActionsFor(item).downloadSVG(profile);
+			return exportActionsFor(item).downloadSVG(profile);
 		},
-		onDownloadPNG: async (height: number, snapshot: SavedWorkExportSnapshot): Promise<void> => {
+		onDownloadPNG: async (height: number, snapshot: SavedWorkExportSnapshot) => {
 			const item = await oneSavedWork(snapshot, true);
-			await exportActionsFor(item).downloadPNG(height);
+			return exportActionsFor(item).downloadPNG(height);
 		},
-		onDownloadCard: async (historyId: string, snapshot: SavedWorkExportSnapshot): Promise<void> => {
+		onDownloadCard: async (historyId: string, snapshot: SavedWorkExportSnapshot) => {
 			if (snapshot.ids.length !== 1 || snapshot.ids[0] !== historyId) throw new Error(t().savedWorkExportUnavailable);
 			const item = await oneSavedWork(snapshot);
-			await downloadCard(deps.apiFetch, item.id as string, exportSettings.card);
+			return downloadCard(deps.apiFetch, item.id as string, exportSettings.card);
 		},
 		/** The visible DDL with the plugin definitions it names (inku.ddl-export.v1). */
-		onDownloadDdl: async (snapshot: SavedWorkExportSnapshot): Promise<void> => {
+		onDownloadDdl: async (snapshot: SavedWorkExportSnapshot) => {
 			const item = await oneSavedWork(snapshot);
 			const response = await deps.apiFetch(`/api/pipeline/history/${encodeURIComponent(item.id as string)}/ddl-export`, { cache: 'no-store' });
 			if (!response.ok) throw await responseError(response);
 			const blob = new Blob([JSON.stringify(await response.json(), null, 2)], { type: 'application/json' });
-			await saveBlob(blob, savedWorkFilename(item, 'inku-ddl.json'), { enabled: downloadFolderSettings.enabled });
+			return saveBlob(blob, savedWorkFilename(item, 'inku-ddl.json'), { enabled: downloadFolderSettings.enabled });
 		},
-		onDownloadAnimation: async (snapshot: SavedWorkExportSnapshot, settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle): Promise<void> => {
+		onDownloadAnimation: async (snapshot: SavedWorkExportSnapshot, settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle) => {
 			const items = await resolveSnapshot(snapshot);
-			await downloadAnimation(deps.apiFetch, items.map((item) => item.id as string), settings, directory);
+			return downloadAnimation(deps.apiFetch, items.map((item) => item.id as string), settings, directory);
 		},
-		onDownloadContactSheet: async (snapshot: SavedWorkExportSnapshot, variant: SheetVariant): Promise<void> => {
+		onDownloadContactSheet: async (snapshot: SavedWorkExportSnapshot, variant: SheetVariant): Promise<SaveOutcome[]> => {
 			const items = await resolveSnapshot(snapshot, true);
 			const byId = new Map(items.map((item) => [item.id as string, item]));
-			await runContactSheet(variant, {
-				ids: () => snapshot.ids,
-				resolveWork: (id) => byId.get(id) ?? null,
-				catalogName: deps.catalogName,
-				formatDate: deps.formatDate,
-				previewText: deps.previewText,
-				save: async (blob, filename) => { await saveBlob(blob, filename, { enabled: downloadFolderSettings.enabled }); },
-				labels: {
-					title: t().historyContactSheetTitle,
-					subtitle: (count, at, page, pages) => t().historyContactSheetSubtitle(count, at, page, pages),
-				},
-			});
+			const outcomes: SaveOutcome[] = [];
+			try {
+				await runContactSheet(variant, {
+					ids: () => snapshot.ids,
+					resolveWork: (id) => byId.get(id) ?? null,
+					catalogName: deps.catalogName,
+					formatDate: deps.formatDate,
+					previewText: deps.previewText,
+					save: async (blob, filename) => { outcomes.push(await saveBlob(blob, filename, { enabled: downloadFolderSettings.enabled })); },
+					labels: {
+						title: t().historyContactSheetTitle,
+						subtitle: (count, at, page, pages) => t().historyContactSheetSubtitle(count, at, page, pages),
+					},
+				});
+			} catch (cause) {
+				if (outcomes.length) throw new ExportSaveError(cause, outcomes);
+				throw cause;
+			}
+			return outcomes;
 		},
 	};
 }

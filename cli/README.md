@@ -406,13 +406,15 @@ options:
   --sketch-text SKETCH_TEXT
                         use this sketch text as it stands instead of asking
                         for one (replay of a saved or hand-edited sketch)
-  --wild                remove the amplitude ceiling on the stroke
-                        performance, letting the renderer swing further
+  --wild                remove the amplitude ceiling on the stroke performance
+                        for prose or DDL input, letting the renderer swing
+                        further
   --limits KEY=VALUE [KEY=VALUE ...]
-                        draw under these limits instead of the server's
-                        settings, e.g. --limits represented_count_max=60
-                        max_expanded_primitives=200. Each value is capped at
-                        today's setting, so this can only draw less
+                        draw prose or DDL under these limits instead of the
+                        server's settings, e.g. --limits
+                        max_expanded_primitives=200 max_instructions=32. Each
+                        value is capped at today's setting, so this can only
+                        draw less
   --catalog-mode {fixed,auto,random}
                         how the color catalog is chosen: fixed (use --color-
                         catalog), auto (the server reads the description and
@@ -497,13 +499,15 @@ options:
   --sketch-text SKETCH_TEXT
                         use this sketch text as it stands instead of asking
                         for one (replay of a saved or hand-edited sketch)
-  --wild                remove the amplitude ceiling on the stroke
-                        performance, letting the renderer swing further
+  --wild                remove the amplitude ceiling on the stroke performance
+                        for prose or DDL input, letting the renderer swing
+                        further
   --limits KEY=VALUE [KEY=VALUE ...]
-                        draw under these limits instead of the server's
-                        settings, e.g. --limits represented_count_max=60
-                        max_expanded_primitives=200. Each value is capped at
-                        today's setting, so this can only draw less
+                        draw prose or DDL under these limits instead of the
+                        server's settings, e.g. --limits
+                        max_expanded_primitives=200 max_instructions=32. Each
+                        value is capped at today's setting, so this can only
+                        draw less
   --catalog-mode {fixed,auto,random}
                         how the color catalog is chosen: fixed (use --color-
                         catalog), auto (the server reads the description and
@@ -705,10 +709,10 @@ options:
   --timeout-seconds TIMEOUT_SECONDS
                         HTTP timeout in seconds (default: 600)
   --file FILE, -f FILE  read Score JSON from a file, or '-'
-  --ddl-text DDL_TEXT   hand this DDL to coerce, so DDL-driven repairs run as
-                        they do in paint
-  --ddl-file PATH       hand DDL from a file, or '-' for standard input, to
-                        coerce so DDL-driven repairs run
+  --ddl-text DDL_TEXT   attach DDL provenance to the request; the saved Score
+                        is rendered as-is, without DDL-driven repair
+  --ddl-file PATH       read DDL provenance from a file, or '-' for standard
+                        input; does not repair the Score
   --out-dir OUT_DIR, -o OUT_DIR
                         directory for JSON/SVG/PNG outputs
   --prefix PREFIX       output filename prefix
@@ -1652,34 +1656,38 @@ options:
                         compress log files
 
 render limits:
-  How many marks a work may carry. Raising these draws more; the effective
-  values are written into the Stage 1/2 prompts and recorded on every work.
+  Resource ceilings for the shared compiler, recorded on each work. The
+  current pipeline uses primitive, per-template, template and resolved-count
+  ceilings; the remaining settings are retained for older works. These
+  values are not injected into both model prompts or used to rewrite counts.
 
   --limit-max-expanded-primitives LIMIT_MAX_EXPANDED_PRIMITIVES
-                        marks per work; above this the whole work is scaled
-                        down to fit
+                        maximum primitive marks per work; a compiler resource
+                        ceiling, not a scale-down instruction
   --limit-max-expanded-per-instruction LIMIT_MAX_EXPANDED_PER_INSTRUCTION
-                        marks one instruction may expand to; a larger group is
-                        thinned
+                        maximum primitive marks per template, bounded by the
+                        per-work ceiling
   --limit-max-instructions LIMIT_MAX_INSTRUCTIONS
-                        instructions per work; the list is truncated past this
+                        maximum object templates per work; a compiler resource
+                        ceiling
   --limit-literal-count-threshold LIMIT_LITERAL_COUNT_THRESHOLD
-                        below this a stated number is drawn as stated; at or
-                        above it the group is shown as a band
+                        legacy literal-count threshold; does not replace
+                        counts with bands in the current pipeline
   --limit-represented-count-min LIMIT_REPRESENTED_COUNT_MIN
-                        low end of the band a too-large group is drawn as
+                        legacy lower representation bound, retained for saved-
+                        work compatibility
   --limit-represented-count-max LIMIT_REPRESENTED_COUNT_MAX
-                        high end of that band; rounded down to the literal
-                        threshold
+                        legacy upper representation bound; normalized against
+                        the literal threshold
   --limit-ddl-count-max LIMIT_DDL_COUNT_MAX
-                        ceiling on a numeral read out of the description, and
-                        the top of the density bands Stage 1 is told to use
+                        legacy description-count bound; not a count-rewriting
+                        rule in the current pipeline
   --limit-ddl-count-max-grid LIMIT_DDL_COUNT_MAX_GRID
-                        the same ceiling for a literal grid, which may go
-                        higher than an ordinary arrangement
+                        legacy grid-count bound, retained for saved-work
+                        compatibility
   --limit-schema-count-max LIMIT_SCHEMA_COUNT_MAX
-                        the only bound checked on Stage 2's own output; a
-                        larger count is clamped to it
+                        maximum resolved count in the compiler resource
+                        policy; does not clamp authored numbers
   --limits-reset        put every render limit back to its default, ignoring
                         the other --limit-* flags
 

@@ -2,7 +2,7 @@
 
 inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです。保存済みセッションを使い、`users`・`leaders`・`admins`のどの権限グループに属するかによる権限判定はサーバーが行います。
 
-対象はinku v2.13.42（Web Build 929）です。
+対象はinku v2.15.147（Web Build 1223）です。
 
 ## 基本操作
 
@@ -25,6 +25,7 @@ inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです�
 | inspect | 同一記述に対する複数モデルの解釈・描画の並列比較 |
 | review | Vision による視覚的評価、および未読語フィードバック |
 | render-score | Stage 1 / 2を通さずScore JSONを描画 |
+| render-local | 指定checkoutのcoreでScoreをoffline描画・比較。サーバー接続・DB保存なし |
 | demo-instruction | デモ用記述の生成 |
 | history / history-export | 履歴一覧とhash指定の書き出し |
 | unread-words | 本人の未読語台帳。管理者は --all で全体集計 |
@@ -46,18 +47,17 @@ paintとbatchは同じ旗を受け取ります。**旗を書かなければサ�
 ### 入力と出力
 
 JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_engine_version` に記録します。
-制限値については、使われた値を `render_limits`、その出どころを `render_limits_source`（`work`＝作品の行、`settings`＝今日の設定、`work_unrecorded`＝行はあるが制限値が記録されていない）、効いた上限の痕を `render_limit_notes` に記録します。
+制限値については、使われた値を `render_limits`、その出どころを `render_limits_source`（`work`＝作品の行、`settings`＝今日の設定、`request`＝今回の要求、`work_unrecorded`＝行はあるが制限値が記録されていない）に記録します。旧Score等の互換描画で効いた上限の痕は `render_limit_notes` に記録します。
 
 | 旗 | 内容 |
 |---|---|
-| `--file FILE` / `-f` | 記述をUTF-8ファイルから読む。paintは `-` で標準入力。batchは空行以外の1行が1作品 |
+| `--file FILE` / `-f` | 記述またはDDLをUTF-8ファイルから読む。paintは `-` で標準入力。batchは空行以外の1行が1作品 |
 | `--out-dir DIR` / `-o` | JSON / SVG / PNGの出力先 |
 | `--prefix P` | 出力ファイル名の接頭辞 |
 | `--png` | `--out-dir` を指定したとき、PNGも書き出す |
 | `--svg-profile {display,editable,compat,live}` | 保存するSVGのプロファイル |
-| `--input-mode {paint,ddl}` | `paint` は自然文をStage 1へ、`ddl` は指示書を直接Stage 2と演奏へ渡す |
-| `--fires-on PROSE` | **`--input-mode ddl` 専用。**プラグイン展開を発火させる自然文を渡す。**発火を決めるのは記述であって指示書ではない**ので、これが無いと指示書にプラグイン語を綴っても展開は起きない |
-| `--ddl-text DDL` | **`render-score` 専用。**指示書をcoerceへ手渡す。paintと同じく、指示書に基づく補修が働く（本数や関係の指定が絵に出る）。**渡さなければ従来どおり補修は働かない** |
+| `--input-mode {paint,ddl}` | `paint` は記述をStage 1へ、`ddl` は可視DDLからcompile・必要な穴補完と演奏へ進む。各段の意味はSPECを参照 |
+| `--ddl-text DDL` | **`render-score` 専用。**指示書をprovenance・hash metadataとして送る。DDLに基づく本数・関係の自動補修は行わない |
 | `--ddl-file PATH` | **`render-score` 専用。**指示書をファイルから読む。`-` は標準入力。`--ddl-text` とは併用できない |
 | `--save-history` | サーバーの履歴へ保存する |
 | `--save-artifacts` / `--no-save-artifacts` | サーバー側の成果物保存の有無 |
@@ -68,8 +68,8 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 
 | 旗 | 内容 |
 |---|---|
-| `--sketch` | 記述を写生層へ通してから解釈へ渡す。**サーバー既定は切、Web UIの既定は細かく** |
-| `--sketch-grain {fine,coarse}` | 区切りの大きさ。`fine` がサーバー既定 |
+| `--sketch` | 写生を有効にし、元の記述を残して場所と光を補って解釈へ渡す。サーバー・Web UIとも既定はなし（off）。現行選択はなし／あり（off/on） |
+| `--sketch-grain {fine,coarse}` | 旧作品との互換用の旗。現行写生には使わない |
 | `--sketch-text TEXT` | Stage 0.5を呼ばず、この写生文を使う（保存済みまたは手で直した写生の再演） |
 
 変奏は廃止しました。旧強度・seedの旗は受け付けません。保存済みの変奏情報はDBに保持し、新しい描画要求へ渡しません。
@@ -78,7 +78,7 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 
 | 旗 | 内容 |
 |---|---|
-| `--wild` | 筆致の天井を外す |
+| `--wild` | 筆致の振幅の天井を外す。`paint`／`batch`のDDL入力でも有効 |
 | `--color-catalog ID` | サーバーの色カタログID |
 | `--catalog-id ID` | `--color-catalog` の旧名 |
 | `--catalog-mode {fixed,auto,random}` | `fixed` は `--color-catalog` を使う、`auto` はサーバーが記述を読んで選ぶ、`random` は `--color-catalog` 以外から引く |
@@ -91,7 +91,7 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 |---|---|
 | `--render-seed SEED` | 演奏のseed。同じseedと同じScoreなら同じ絵になる |
 | `--composition-seed SEED` | 墨を置く位置のseed。省略すると配置は`--render-seed`に従う（render engine 23〜） |
-| `--limits KEY=VALUE ...` | `paint` と `render-score` で、その1枚だけ制限値を指定する。**下げることしかできません** —— 要素ごとにサーバーの現行設定と小さいほうが採られるので、管理者の上限を越えられません。旗を書かなければ鍵ごと送りません（空の指定は「何も上書きしない」ではなく上書きの宣言になるため） |
+| `--limits KEY=VALUE ...` | `paint`／`batch`（`--input-mode ddl`を含む）と`render-score`で、その描画の上限を指定する。要素ごとにサーバーの現行設定と小さいほうを採り、管理者の上限を越えない。省略すれば要求に送らない。通常pipelineで効く四つの値と旧互換値の区別は[サーバー設定§5.1](server-configuration.md#51-制限値)を参照 |
 
 ### モデルと言語
 
@@ -103,6 +103,27 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 | `--include-thinking` | 思考出力を応答に含める |
 
 batchはさらに `--continue-on-error` を持ちます。
+
+DDL入力へ筆致と今回の上限を指定する例です。
+
+```sh
+uv run inku-cli paint --input-mode ddl --file work.ddl --wild --limits max_expanded_primitives=200
+```
+
+## サーバーなしで描画する（render-local）
+
+サーバーへ接続せず、指定した製品checkout（または必要なsourceを含むgit-archive）のcoreでSVGと任意のPNGを作ります。`core/rust-toolchain.toml`の固定Rust toolchainとCargo依存を事前に用意してください。毎回offlineの差分buildでsourceとの鮮度を確認し、不足時には依存を自動取得せず止まります。
+
+```sh
+# (a) history-exportの個別作品JSONから保存条件を継承
+uv run inku-cli render-local --core-root /path/to/inku-lang \
+  --from-work-file exported-work.json -o replay.svg --png replay.png
+# (b) Score単体。保存時の色・seed等は必要に応じて明示
+uv run inku-cli render-local --core-root /path/to/inku-lang \
+  --file score.json -o rendered.svg --color-map colors.json --render-seed 123
+```
+
+どちらの入力も、`resource_policy.hard_policy`と`resource_policy.operational_budget`を持つ現行のcompile済みScoreが必要です。旧Score一般を自動移行するコマンドではありません。(a)は作品の色map・seed・canvas・profile・wild・制限値を継承し、保存SVGがあればbyte比較します。(b)は指定しなかった条件にcoreの既定を使います。`--limits`は四つのreplay上限だけを受け、Scoreの保存hard policyを越える指定は拒否します。`--compare-svg FILE`で別のSVGとも比較できます。標準出力のJSONにhash、時間、採用条件、checkoutのHEAD／dirty状態等を記録します。DBへは保存しません。異なるsource／条件での一致は保証しません。
 
 ## 履歴とフィードバック
 
@@ -161,7 +182,7 @@ batchはさらに `--continue-on-error` を持ちます。
 | `single-user show` | 単独利用モードのサーバーがどのアカウントで開くか、ほかに誰を選べるかを表示する |
 | `single-user set USER_ID` | 開くアカウントを移す（移す先は `admins` に属している必要があります） |
 
-`user` と `group` は`admins`または`leaders`、`config` は`admins`のセッションを必要とします。`user create` の権限グループは `--permission-group {users,leaders,admins}` で指定し、複数回渡せます。制限値、描画の並列度、ログ保存ポリシー、DBバックアップ設定は `config` の対象です。値の意味は`サーバー設定方法`を参照してください。
+`user` と `group` は`admins`または`leaders`、`config` は`admins`のセッションを必要とします。`user create` の権限グループは `--permission-group {users,leaders,admins}` で指定し、複数回渡せます。既存の制限値、ログ保存ポリシー、DBバックアップ設定は `config` の対象です。描画の並列度には専用の旗がないので、[サーバー設定§2.3](server-configuration.md#23-artifactと同時実行)の`api GET/PUT /api/settings/render-concurrency`を使います。
 
 ## 全公開APIの操作
 
@@ -181,6 +202,41 @@ batchはさらに `--continue-on-error` を持ちます。
 保存系APIを再試行する場合は、同じ Idempotency-Key を指定すると作品と系譜の二重保存を防げます。
 
     uv run inku-cli api POST /api/history --file work.json --header Idempotency-Key=import-20260715-001
+
+### 409の承認・作者編集待ちから続ける
+
+`paint`／`batch`が`pipeline_patch_approval_required`または`pipeline_author_action_required`で409になったら、同じ生成を再送せず、応答の`detail.current_view`を確認します。`pipeline_variation_id`／`pipeline_execution_id`が対象です。以下の`VARIATION_ID`／`EXECUTION_ID`と`REVISION`は、その応答または最新viewの`variation_id`／`execution_id`／`authority.revision`へ置き換えます。revisionは10進文字列のまま使います。
+
+```sh
+uv run inku-cli api GET /api/pipeline/variations/VARIATION_ID
+```
+
+`busy`がfalseになってから操作します。`phase.tag=awaiting_patch_approval`なら、現在の`document.source`と`phase.candidate.source`／`phase.patch`を読み、採用する場合だけ`phase.proposal_digest`を`DIGEST`へ写して送ります。
+
+```sh
+uv run inku-cli api POST /api/pipeline/executions/EXECUTION_ID/commands \
+  --data '{"tag":"approve_patch","expected_revision":"REVISION","proposal_digest":"DIGEST"}'
+```
+
+採用せず自分で直す場合は、同じendpointへ`{"tag":"decline_patch","proposal_digest":"DIGEST"}`を送り、最新viewを読みます。`needs_user_edit`などで編集する場合も、`document`があれば`document.source`を元にDDL全文を直し、なければ作者がDDL全文を書きます。次の内容をUTF-8の`author-ddl.json`へ保存して送ります。
+
+```json
+{"expected_revision":"REVISION","source":"修正したDDL全文"}
+```
+
+```sh
+uv run inku-cli api POST /api/pipeline/executions/EXECUTION_ID/author-ddl --file author-ddl.json
+uv run inku-cli api GET /api/pipeline/variations/VARIATION_ID
+```
+
+編集応答が新しいvariation／executionを返した場合は以後そのIDを使います。GETを間隔を空けて繰り返し、`busy=false`かつ`phase.tag=score_ready`で`delivery`があることを確認して演奏します。承認後にも同じ確認が必要です。
+
+```sh
+uv run inku-cli api POST /api/pipeline/executions/EXECUTION_ID/commands --data '{"tag":"perform"}'
+uv run inku-cli api GET /api/pipeline/variations/VARIATION_ID
+```
+
+`busy=false`で`result`が出るまでpollし、完成結果を確認します。再び承認・編集待ちなら該当手順へ戻り、`failed`／`cancelled`なら止めます。`authority_conflict`／`stale_result`の409では`current_view`を読み直し、古いrevisionやdigestを再送しません。承認・編集・演奏は同じログイン利用者のexecutionに対して行います。
 
 
 ## AI自律および作品品質向上のためのコマンド

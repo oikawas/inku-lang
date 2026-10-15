@@ -23,6 +23,7 @@ registerHooks({
 });
 
 const { DemoState } = await import('./state.svelte.ts');
+const { demoInstructionModelGroups } = await import('../../demo.ts');
 
 function paintedResult(): CurrentWorkResult {
 	return {
@@ -112,6 +113,46 @@ test('T-902: settings preserve legacy normalization, persistence, and catalog fa
 	state.resetForSignedOut();
 	assert.equal(state.settingsLoaded, false);
 	assert.equal(requests.length, signedOutRequests);
+});
+
+test('demo instructions exclude ChatGPT from the catalog and reconcile a saved ChatGPT choice', async () => {
+	const requests: unknown[] = [];
+	const state = new DemoState({
+		apiFetch: async (_path, init) => {
+			const body = JSON.parse(String(init?.body));
+			requests.push(body);
+			return jsonResponse(body);
+		},
+		signedIn: () => true, instructionLang: () => 'auto', uiLang: () => 'ja',
+		describeApiError: (_detail, status) => `HTTP ${status}`,
+	});
+	const groups = [
+		{ id: 'chatgpt', label: 'Personal ChatGPT', models: [{ id: 'drawing', label: 'Drawing', purposes: ['llm'] as ['llm'] }] },
+		{ id: 'openai', label: 'OpenAI API', models: [
+			{ id: 'vision-only', label: 'Vision only', purposes: ['vision'] as ['vision'] },
+			{ id: 'prompt', label: 'Prompt', purposes: ['llm'] as ['llm'] },
+		] },
+	];
+	assert.deepEqual(demoInstructionModelGroups(groups).map((group) => [group.id, group.models.map((model) => model.id)]), [
+		['openai', ['prompt']],
+	]);
+	assert.equal(groups[0].models[0].id, 'drawing');
+	state.settingsLoaded = true;
+	state.settings = { ...state.settings, prompt_provider: 'chatgpt', prompt_model: 'drawing' };
+	state.reconcilePromptModel(groups, true);
+	assert.equal(state.settings.prompt_provider, 'openai');
+	assert.equal(state.settings.prompt_model, 'prompt');
+	await Promise.resolve();
+	await Promise.resolve();
+	assert.equal(requests.length, 1);
+
+	state.settings = { ...state.settings, prompt_provider: 'chatgpt', prompt_model: 'drawing' };
+	state.reconcilePromptModel([groups[0]], true);
+	let finished = 0;
+	await state.start(runOptions({ onRunFinished: () => { finished += 1; } }));
+	assert.equal(state.running, false);
+	assert.equal(finished, 1);
+	assert.equal(requests.length, 1);
 });
 
 test('T-903: one run repeats in order with paint semantics, totals, refresh, and interval waits', async () => {

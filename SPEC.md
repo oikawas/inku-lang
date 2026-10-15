@@ -111,7 +111,7 @@ Versions and identity IDs are separate namespaces. The work-edition ID is `rh3`,
 
 Saved reference corpora remain comparison records for the versions they froze. Do not rewrite a frozen version's output, and retain its existing case IDs. At an explicit checkpoint after an overall migration is complete, perform one full update and record the difference from the prior version in its manifest. An intermediate render or DDL engine bump, or a rename alone, does not require a full corpus update, a current-version reference directory, or running a generator or manual comparison. Choose focused validation from the change risk. Render records remain SVGs; DDL records remain DDL text or JSON.
 
-SVG fractional values follow the master grid defined by `MASTER_GRID_DECIMALS` and retain six fixed decimal places. A negative value that rounds to zero is written `0`, never `-0`. The application has no mechanism to choose an old engine for replay: replay uses the latest engine, while a past edition is reproduced by returning its saved SVG. The version history retains the historical rationale and measurements.
+Finite values passed through the shared SVG number formatter follow the master grid defined by `MASTER_GRID_DECIMALS`, rounding to at most six fractional digits and removing trailing zeros and an unnecessary decimal point (§19). Six fixed places are not guaranteed. A negative value that rounds to zero is written `0`, never `-0`. This does not prescribe every digit elsewhere in SVG that bypasses the formatter. The application has no mechanism to choose an old engine for replay: replay uses the latest engine, while a past edition is reproduced by returning its saved SVG. The version history retains the historical rationale and measurements.
 
 A recorded engine version is provenance, not an input to replay. The UI reports when it differs from the current version. Reinterpreting DDL also uses the latest implementation and creates a new edition. Saved SVG, Score, seed, and edition ID remain intact.
 
@@ -1077,10 +1077,11 @@ order / proportions / relations.
 - the instruction editor initially shows the Saijiki below the text and lets
   the user close it as needed (§7.8)
 
-The Saijiki drawer is read-only (v1.98).  Clicking a vocabulary chip shows a
-preview rather than inserting the word; insertion happens only in the inline
-Saijiki inside the DDL editor dialog, which also shows the qualified words of
-loaded plugins.  The open/close toggle sits in the toolbar below the canvas.
+The Saijiki drawer previews words and inserts a chosen word into the instructions
+box when that box is editable. It only previews while read-only, in batch mode,
+or while the editor dialog is open. The inline Saijiki in the DDL editor dialog
+also inserts words and shows loaded plugins' qualified vocabulary. The drawer
+was read-only in v1.98. Its toggle sits in the toolbar below the canvas.
 
 ### 7.6 Interpretation Feedback
 
@@ -1166,7 +1167,7 @@ History management opens as an in-app **Library** and does not rebuild the makin
 
 Library search matches descriptions, DDL, models, and catalogs, as well as whole hashes, hash beginnings, their existing last 4 characters, and whole work IDs (UUIDs) or their beginnings. A hash beginning may contain 1–64 hex digits with or without its version prefix. A UUID beginning may contain 1–36 characters while retaining the standard hyphen positions. Matching is case-insensitive. Identifier searches bypass text FTS and join the existing text conditions with OR; read access, filters, and page totals remain intact. The Provenance drawer's Identity section shows the displayed saved work's ID (UUID). An unsaved preview shows Not saved instead of its parent's ID, and an empty canvas shows a dash.
 
-With Library thumbnails grouped by Lineage, works in each Lineage run horizontally from the root in generation order. Each group retains the height its thumbnails need; Lineages scroll vertically, and long Lineage rows scroll horizontally.
+With Library thumbnails grouped by Lineage, only lineages with at least two works matching the current search, filters, and visibility are shown, running horizontally from the root in generation order. Even a larger lineage is omitted when only one work matches. The lineage List view has no such minimum. Each group retains the height its thumbnails need; Lineages scroll vertically, and long Lineage rows scroll horizontally.
 
 Lineage browsing state is separate from the selected work. Within one rooted tree it retains expanded branches, normal and overview scroll positions, orientation, overview openness, and scale. Selecting a node in the overview does not close it. A new root or unauthorized response discards that state and does not substitute old work images or text; deleted or private nodes follow the fresh Lineage response. The Lineage header groups view controls, the displayed work, the root-to-displayed path, checked works, and colophon or root actions. The displayed work and the checked set are distinct targets.
 
@@ -1195,16 +1196,18 @@ Major UI areas:
 - App rail: compact navigation with an explicit expand/collapse toggle, user
   menu, profile, settings, language and theme controls
 - Input panel: description and batch modes
-- DDL display and editing: one read-only DDL in the drawing flow, with
-  word highlighting and `Draw from DDL`. Redraw is disabled for an absent body; editing happens
-  in a DDL editor dialog with line numbers, inline Saijiki, and a short syntax guide
+- DDL display and editing: one DDL in the drawing flow, with word highlighting
+  and `Draw from DDL`. The box is directly editable in single view with DDL and
+  a lineage target, outside generation, demo, or grid processing. Redraw is
+  disabled for an absent body. The box shares its editor with the DDL dialog,
+  which adds line numbers, inline Saijiki, and a short syntax guide
 - Canvas panel: SVG display, zoom, pan, output tabs, work-conditions header,
   and work actions and export at the bottom. Web zoom controls (buttons, wheel,
   and keyboard) keep the point on the work at the center of the visible area fixed,
   including after panning and when crossing the fitted scale. An explicit fit
   recenters the work.
 - History strip: recent works, hover metadata, star markers, pagination. **The reader chooses
-  which information is printed under each thumbnail** — up to two of generation, model, engine version
+  which information is printed under each thumbnail** — up to three of generation, model, engine version
   and file size, and **zero may also be selected** (choose nothing and only the pictures are shown)
 - History manager: larger history view, trash, restore, permanent delete, star filter,
 a shared-only filter, and
@@ -1236,11 +1239,11 @@ the current UI selections.  This setting affects only the UI selection state;
 the saved history SVG is displayed as stored and is not re-rendered.
 
 The same Display and operation category carries the choice of **which facts the history strip prints**.  Up
-to **two** of generation, model, engine version and file size are chosen, and they
+to **three** of generation, model, engine version and file size are chosen, and they
 are printed in the declared order rather than the order they were picked.
 **Choosing none is a stored answer, not a return to the default**, so **an account
 that has not answered and an empty selection are treated as different things**.  A
-third choice is refused rather than allowed to evict an existing one, and the
+fourth choice is refused rather than allowed to evict an existing one, and the
 limit is shown on screen.  **File size is a quantity the server reports about a
 stored work**, not a count of the SVG the browser received: the listing that fills
 the strip does not carry the picture, so counting what arrived would report every
@@ -1396,7 +1399,9 @@ Models carry labels. The label table (the catalog's `labels`) gives each a Japan
 
 Each model can carry its purposes, a five-level recommendation per purpose (narrowed per stage where a model was measured per stage), Japanese/English comments, a speed class and label, an approximate USD cost (`cost_usd_llm` per drawing, `cost_usd_vision` per Vision picture) and measured mean seconds (`speed_llm_seconds`, `speed_vision_seconds`). The cost and the means carry over through saving and catalog refresh; a value that is not a number, a negative value and zero seconds are dropped. A purpose the model was measured not to answer is recorded in `unsupported_purposes` (the author's decision of 2026-10-13); the server takes it out of the purposes, so an administrator cannot tick it back, and a model that answered neither purpose is offered nowhere and cannot be published. Model administration edits the recommendation per purpose in the same three tiers, stored as 5, 3 and 2, and the cost and the means; it has no speed-class field. ChatGPT plan models are edited with the same fields (§12.5). The LLM or Vision button of a purpose measured without a response cannot be pressed, and a model that answered neither cannot be ticked for publication (status "No response when measured"). A model of a kind left out of the benchmark (speech, music, video, embeddings and the like) carries the label Not supported, and a model of an older generation the provider has superseded carries Older model (the OpenAI API up to GPT-5.4, the author's decision of 2026-10-13). Publication selection files the labelled models into folds below the list in the label table's order, closed at first. A model's row and hover card show every label it carries, a label that keeps it from publication in the warning colour. Selecting or clearing the shown models acts only on the list and the folds that are open. The hover card (the author's decision of 2026-10-13) shows LLM and Vision badges, greying the purpose a model cannot be chosen for; pickers still omit a model for a purpose it lacks. It prints the recommendation in three tiers, reading stored 4–5 as ★★★, 3 as ★★☆ and 1–2 as ★☆☆; the five stored levels stay the measurement scale and still order the cards. It shows the cost per drawing and per picture, $0 for a free model, and the measured means as reference values in place of the speed label when present. Where a release shows speed in developer mode only, the means are hidden with the speed class and label.
 
-The model selection panel and model picker dialogs show recommendation stars (★★★, ★★☆, or ★☆☆) for the selected purpose at the right edge of each model button. Shared Stage 1/2 selection uses the lower stage score; a model without a rating shows “—”. Long model names wrap without overlapping the stars (the author's decision of 2026-10-14).
+The model selection panel and model picker dialogs show recommendation stars (★★★, ★★☆, or ★☆☆) at the right edge of each model button. Ordinary Web Stage 1/2 selection uses the lower available stage score, or the LLM score when there is no stage rating. Generic pickers in Demo and the Instruction editor use the purpose rating. A model without a rating shows “—”. Long model names wrap without overlapping the stars (the author's decision of 2026-10-14).
+
+Ordinary model selection's detailed hover presents measured stage ratings as supplementary information, without duplicating an end-to-end measurement into apparent stage measurements. The generic pickers show a single purpose rating. Drawing uses one model for both stages; two stage rows are not required in every picker and do not imply separate stage selections. Vision is not split by stage.
 
 Administrators can save non-negative RPM (requests per minute), TPM (input tokens per minute), and RPD (requests per day) values for each service in model settings. Zero disables that cap. Each field has a tooltip available on hover and keyboard focus. Gemini starts at the recorded allowance of 30 / 16,000 / 14,400; other services start at zero. Administrators enter their current contractual limits.
 
@@ -3842,21 +3847,24 @@ Web use this compiler and persistence path.
 
 ### Single Drawing
 
-The user writes one instruction and runs the full pipeline.  The resulting DDL
-is inspected in a read-only interpretation box and edited directly in the DDL
-editor dialog. Replaying from DDL skips description generation and sends the saved visible DDL through the shared compiler, lowerer, and renderer
-again.
+The user writes one instruction and runs the full pipeline. The resulting DDL
+is inspected in its box and edited there, when available, or in the DDL editor
+dialog. Replaying from DDL skips description generation and sends the edited
+visible DDL through the shared compiler, lowerer, and renderer again.
 
-The normalized DDL appears as a **read-only interpretation box** under the
-single drawing input.
+The normalized DDL appears in an always-visible box under the single drawing
+input. It is directly editable in single view with DDL and a lineage target,
+outside generation, demo, or grid processing; otherwise it is read-only. The
+box and dialog share highlighting, completions, numeric range folding and copying;
+only the dialog shows line numbers.
 
-- the `Saijiki` toggle, placed on the canvas toolbar since v1.98, opens the
-  side drawer as a browse-only vocabulary reference: clicking a word chip
-  shows its preview instead of inserting it
-- the `DDL editing` button opens a larger dialog with line numbers, a
-  two-column Saijiki vocabulary panel, and a short DDL syntax guide; since
-  v1.98 word insertion happens only through this dialog's inline Saijiki,
-  which also lists loaded plugin vocabulary
+- The `Saijiki` toggle opens the side drawer. When the box is editable, a word
+  chip inserts at its caret (or appends before a caret is placed) and previews
+  the word. Read-only, batch, and open-editor-dialog states preview only.
+  The read-only behavior described for v1.98 is historical.
+- The `DDL editing` button opens a larger dialog with line numbers, a Saijiki
+  vocabulary panel, and a short DDL syntax guide. Its inline Saijiki also
+  inserts words and lists loaded plugin vocabulary
 - The old `auto repair` setting is retired. The shared compiler owns semantic
   validation and recovery, diagnosing excessive placements and unsatisfied relations
   at their defined recovery units. The legacy API still accepts `auto_repair`,
@@ -3976,8 +3984,11 @@ when the dialog was opened.
 
 ### Demo Drawing
 
-Demo mode repeatedly generates an instruction from a seed phrase, renders it,
-waits for the configured interval, and repeats. Demo settings are stored per
+Demo mode repeatedly generates an instruction from a seed phrase and renders it.
+The interval runs from one instruction generation start to the next: only the
+configured interval minus elapsed generation, drawing, and saving time is waited.
+If that time meets or exceeds the interval, there is no wait. No new work starts
+after the stop deadline. Demo settings are stored per
 user. Demo results are not saved by default; the user can explicitly save a
 current render to history. Demo is in the settings modal's `Making` category,
 not an input tab. Its running status and Stop action stay available outside
@@ -4408,6 +4419,12 @@ The version history preserves past records. Current version, identity, reference
 ---
 
 ## 23. CLI
+
+`paint` and `batch` send `--limits` for DDL input too; API DDL input follows the
+same restrictions. A new request takes the element-wise minimum of current
+settings and requested values, mapping the four supported values to the
+compiler resource policy and drawing budget. A derivation from a saved managed
+work gives priority to that source's locked settings.
 
 `inku-cli` is a command-line client for controlling the inku server through the
 API.  Its initial purpose is to support automated prompt/image generation,

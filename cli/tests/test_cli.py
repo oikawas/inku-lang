@@ -216,6 +216,43 @@ def test_compose_payload_includes_canvas_aspect():
     assert payload["canvas_aspect"] == "wide"
 
 
+@pytest.mark.parametrize("command", ["paint", "batch"])
+@pytest.mark.parametrize("flag,key,value", [
+    (["--wild"], "wild", True),
+    (["--limits", "max_expanded_primitives=60"], "limits", {"max_expanded_primitives": 60}),
+], ids=["wild", "limits"])
+def test_ddl_commands_send_performance_options_only_when_requested(command, flag, key, value, monkeypatch, tmp_path, capsys):
+    """Observe both public commands at their HTTP boundary, without rendering."""
+    sent = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, *, data=None, **kwargs):
+            if (method, path) == ("GET", "/api/color-catalogs"):
+                return {"default_catalog_id": "default", "catalogs": list(CATALOG_DATA["catalogs"].values())}, None
+            assert (method, path) == ("POST", "/api/compose")
+            sent.append(data)
+            return {"svg": "<svg/>", "score": {}}, None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    monkeypatch.setattr(cli, "load_config", lambda: cli.CliConfig())
+    if command == "batch":
+        source = tmp_path / "input.ddl"
+        source.write_text("白い背景に黒い線を一本引く。\n", encoding="utf-8")
+        base = [command, "--file", str(source), "--out-dir", str(tmp_path / "outputs")]
+    else:
+        base = [command, "白い背景に黒い線を一本引く。"]
+    base += ["--input-mode", "ddl", "--no-progress"]
+
+    assert cli.main([*base, *flag]) == 0
+    assert sent[-1][key] == value
+    assert cli.main(base) == 0
+    assert key not in sent[-1]
+    capsys.readouterr()
+
+
 def test_history_payload_from_compose_result():
     parser = cli.build_parser()
     args = parser.parse_args(["paint", "白い背景に黒い線を一本引く。", "--input-mode", "ddl", "--save-history"])

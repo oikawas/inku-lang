@@ -140,7 +140,7 @@ export function createWorkState(deps: WorkStateDeps) {
 	 *  makes those a comparison of models rather than of two different texts. */
 	function sketchTextFor(text: string): string | null {
 		return sketchText && sketchSource !== null && sketchSource.trim() === text.trim()
-			? sketchText
+			? sketchDraft
 			: null;
 	}
 
@@ -636,7 +636,10 @@ export function createWorkState(deps: WorkStateDeps) {
 				...colorCatalogOverride(colorCatalogSettings.selected),
 				...wildOverride(false),
 			}),
-			paintInstruction: (prompt, paintOptions) => paintOne(prompt, paintOptions),
+			paintInstruction: (prompt, paintOptions) => {
+				const model = qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model());
+				return paintOne(prompt, { ...paintOptions, stage1Model: model, stage2Model: model });
+			},
 			onLatestResult: (painted) => {
 				ddl = painted.ddl;
 				ddlGeneratedBaseline = painted.ddl;

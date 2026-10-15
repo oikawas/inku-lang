@@ -144,3 +144,69 @@ test('a new drawing uses the changed model and clears the preceding failure with
 	assert.equal(work.pipelineView, null);
 	assert.deepEqual(models, ['chatgpt:luna', 'openai:other']);
 });
+
+test('an edited sketch reaches authoring only for its description with sketching on', async () => {
+	const requests: Array<{ text: string; options: { sketch: string; sketch_text?: string } }> = [];
+	const work = createWorkState({
+		apiFetch: async (path: string, init?: RequestInit) => {
+			assert.equal(path, '/api/pipeline/variations');
+			requests.push(JSON.parse(String(init?.body)));
+			return new Response(JSON.stringify({ detail: 'request captured' }), { status: 400 });
+		},
+		batch: {}, demo: {}, refinementSession: { gridBusy: false },
+		describeApiError: () => 'request captured', session: {}, history: () => ({}),
+		canvasViewport: {}, canvasAspectId: () => 'square',
+		models: { stage1Provider: () => 'openai', stage1Model: () => 'drawing',
+			stage2Provider: () => 'openai', stage2Model: () => 'drawing', includeThinking: () => false },
+	} as unknown as WorkStateDeps);
+	work.adoptSketch('original sketch', null, 'same description', 'generated');
+	work.sketchDraft = 'author edited sketch';
+	await assert.rejects(work.authorDescription('same description'));
+	assert.equal(requests.at(-1)?.options.sketch_text, 'author edited sketch');
+	assert.equal(work.sketchText, 'original sketch');
+
+	work.sketchMode = 'off';
+	await assert.rejects(work.authorDescription('same description'));
+	assert.equal(requests.at(-1)?.options.sketch, 'off');
+	assert.equal(requests.at(-1)?.options.sketch_text, undefined);
+	work.sketchMode = 'on';
+	await assert.rejects(work.authorDescription('another description'));
+	assert.equal(requests.at(-1)?.options.sketch_text, undefined);
+
+	work.adoptSketch('new work sketch', null, 'new description', 'generated');
+	assert.equal(work.sketchDraft, 'new work sketch');
+	assert.equal(work.sketchEditing, false);
+	await assert.rejects(work.authorDescription('new description'));
+	assert.equal(requests.at(-1)?.options.sketch_text, 'new work sketch');
+});
+
+test('demo drawing sends its shared model to both stages even with a legacy stage 2 value', async () => {
+	let body: { stage1_model: string; stage2_model: string } | null = null;
+	const work = createWorkState({
+		apiFetch: async (path: string, init?: RequestInit) => {
+			assert.equal(path, '/api/paint/stream');
+			body = JSON.parse(String(init?.body));
+			return new Response(`${JSON.stringify({
+				event: 'done', ddl: 'circle', thinking: null, svg: '<svg/>', score: { instructions: [] },
+				elapsed_stage1_ms: 1, elapsed_stage2_ms: 1, elapsed_total_ms: 2,
+				tokens_in_stage1: 1, tokens_out_stage1: 1, tokens_in_stage2: 1, tokens_out_stage2: 1,
+			})}\n`, { headers: { 'Content-Type': 'application/x-ndjson' } });
+		},
+		batch: { resuming: false }, refinementSession: { gridBusy: false },
+		demo: {
+			clearInput: () => {}, latestResult: null,
+			start: async (options: Parameters<WorkStateDeps['demo']['start']>[0]) => {
+				try { await options.paintInstruction('demo prompt', { saveHistory: false }); }
+				finally { options.onRunFinished(); }
+			},
+		},
+		describeApiError: () => '', session: { updateGenerationCount: () => {} }, history: () => ({ clearSelection: () => {} }),
+		canvasViewport: { fit: () => {} }, canvasAspectId: () => 'square', resetTargetScopedState: () => {}, showCanvas: () => {},
+		models: { stage1Provider: () => 'chatgpt', stage1Model: () => 'drawing',
+			stage2Provider: () => 'openai', stage2Model: () => 'legacy-other',
+			includeThinking: () => false, available: () => [] },
+	} as unknown as WorkStateDeps);
+	await work.startDemo();
+	assert.equal(body?.stage1_model, 'chatgpt:drawing');
+	assert.equal(body?.stage2_model, 'chatgpt:drawing');
+});

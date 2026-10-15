@@ -703,6 +703,8 @@ export const en: LangPack = {
 	savedWorkExportDdl: 'DDL (with plugin definitions)',
 	savedWorkExportAiContactSheet: 'AI contact sheet',
 	savedWorkExportUnavailable: 'No saved available works could be confirmed.',
+	savedWorkExportFolderDenied: 'Write permission for the configured folder was denied, so browser downloads were used.',
+	savedWorkExportFolderFailed: 'Saving to the configured folder failed, so browser downloads were used.',
 	workActionRefine: 'Refine',
 	workActionOpenMenu: 'Open work editing menu',
 	workActionMenuTitle: 'Edit the work',

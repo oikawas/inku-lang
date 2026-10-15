@@ -1,5 +1,5 @@
 import { composeFallbackValue } from '../../composeFallback.ts';
-import { DEFAULT_DEMO_SETTINGS, type DemoSettings } from '../../demo.ts';
+import { DEFAULT_DEMO_SETTINGS, demoInstructionModelGroups, type DemoSettings } from '../../demo.ts';
 import { qualifiedModelId, splitModelRef, type ProviderGroup } from '../../models.ts';
 import type { CanvasAspectId } from '../../plugins/system/canvas-aspect/index.ts';
 import type { ApiFetch } from '../../transport/api-fetch.ts';
@@ -144,12 +144,13 @@ export class DemoState<TResult extends CurrentWorkResult = CurrentWorkResult> {
 
 	reconcilePromptModel(groups: ProviderGroup[], catalogLoaded: boolean): void {
 		if (!catalogLoaded || !this.settingsLoaded) return;
-		const configured = groups.some((group) =>
+		const promptGroups = demoInstructionModelGroups(groups);
+		const configured = promptGroups.some((group) =>
 			group.id === this.settings.prompt_provider
 			&& group.models.some((model) => model.id === this.settings.prompt_model)
 		);
 		if (configured) return;
-		const fallbackGroup = groups.find((group) => group.models.length > 0);
+		const fallbackGroup = promptGroups.find((group) => group.models.length > 0);
 		const fallbackModel = fallbackGroup?.models[0]?.id;
 		if (!fallbackGroup || !fallbackModel) return;
 		void this.saveSettings({
@@ -178,6 +179,10 @@ export class DemoState<TResult extends CurrentWorkResult = CurrentWorkResult> {
 	}
 
 	async start(options: DemoRunOptions<TResult>): Promise<void> {
+		if (this.normalizeSettings(this.settings).prompt_provider === 'chatgpt') {
+			options.onRunFinished();
+			return;
+		}
 		const runId = ++this.runIdentity;
 		this.activeRefreshAfterRun = options.refreshAfterRun;
 		this.resetRunProjection();

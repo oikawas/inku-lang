@@ -98,6 +98,7 @@
 	import { batchSettings } from '$lib/features/batch/settings.svelte';
 	import { BatchState } from '$lib/features/batch/state.svelte';
 	import { DemoState } from '$lib/features/demo/state.svelte';
+	import { demoInstructionModelGroups } from '$lib/demo';
 	import type { BatchRunConditions, NumberedLine } from '$lib/features/batch/resume';
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import { wildOverride } from '$lib/features/wild/render';
@@ -502,6 +503,7 @@
 	// ── Settings tabs ────────────────────────────────────────
 	let pluginEntries = $state<PluginEntry[]>([]);
 	let availableModelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS.filter((group) => group.id !== 'nvidia'));
+	let demoPromptModelCatalog = $state<ProviderGroup[]>([]);
 	let availableVisionModelCatalog = $state<ProviderGroup[]>([]);
 	let availableModelsLoaded = $state(false);
 	// Teach models.ts which providers this server serves, so that a reference
@@ -509,6 +511,7 @@
 	$effect(() => {
 		registerModelCatalog(settings.modelCatalog);
 		registerModelCatalog(availableModelCatalog);
+		registerModelCatalog(demoPromptModelCatalog);
 		registerModelCatalog(availableVisionModelCatalog);
 	});
 
@@ -1132,6 +1135,7 @@
 			modelCatalogOwner = userId;
 			clearChatGPTModelCatalog();
 			availableModelCatalog = data.drawing_catalog ?? data.llm_catalog ?? data.catalog;
+			demoPromptModelCatalog = demoInstructionModelGroups(data.llm_catalog ?? data.catalog);
 			availableVisionModelCatalog = data.vision_catalog ?? data.catalog.filter((group) => group.models.some((model) => model.purposes?.includes('vision')));
 			availableModelsLoaded = true;
 			if (data.settings.model_settings) {
@@ -1161,7 +1165,7 @@
 			if (!okugakiModelAvailable) {
 				okugakiModel = qualifiedModelId(visionProvider, visionModel);
 			}
-			demo.reconcilePromptModel(data.llm_catalog ?? data.catalog, availableModelsLoaded);
+			demo.reconcilePromptModel(demoPromptModelCatalog, availableModelsLoaded);
 		} catch (e) {
 			console.warn('failed to load model catalog', e);
 		}
@@ -1272,7 +1276,7 @@
 			loadClientConfig(),
 			...(source === 'login' ? [loadColorCatalogs()] : [])
 		]);
-		demo.reconcilePromptModel(availableModelCatalog, availableModelsLoaded);
+		demo.reconcilePromptModel(demoPromptModelCatalog, availableModelsLoaded);
 		await Promise.all([history.fetchOffset(0), history.fetchTrashPage()]);
 		if (historyItems.length > 0) loadIteration(0);
 	}
@@ -1283,6 +1287,7 @@
 		userMenuOpen = false;
 		batch.clearPromptHistory();
 		demo.resetForSignedOut();
+		demoPromptModelCatalog = [];
 		exportTemplates = DEFAULT_EXPORT_TEMPLATES.map((item) => ({ ...item }));
 		exportTemplateStatus = null;
 		canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
@@ -2123,6 +2128,12 @@ $effect(() => {
 		work.displayedHistoryItem = null;
 		history.clearSelection();
 		stage2Model = v;
+	}
+	function setDrawingModel(provider: Provider, model: string) {
+		setStage1Provider(provider);
+		setStage1Model(model);
+		setStage2Provider(provider);
+		setStage2Model(model);
 	}
 	function setVisionProvider(v: Provider) {
 		visionProvider = v;
@@ -3233,7 +3244,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {#snippet demoContent()}
 	<DemoPanel
 		bind:settings={demo.settings}
-		providerGroups={availableModelCatalog}
+		providerGroups={demoPromptModelCatalog}
 		running={demoRunning}
 		timedOut={demo.timedOut}
 		liveMs={work.liveMs}
@@ -3260,18 +3271,14 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		error={demo.error}
 		onSettingsChange={(next) => demo.saveSettings(next)}
 		onSaveCurrent={saveCurrentDemoToHistory}
-		onStart={() => { void work.startDemo(); if (demo.running) settings.close(); }}
+		onStart={() => { setDrawingModel(stage1Provider, stage1Model); void work.startDemo(); if (demo.running) settings.close(); }}
 		onStop={work.stopDemo}
 	>
 		{#snippet inputSettings()}
 			<div class="demo-drawing-conditions" inert={demoRunning}>
 				<h3>{t().nextWorkConditions}</h3>
-				<div class="demo-model-pair">
-				<ModelCardPicker label={t().stage1Label} selectedModel={qualifiedModelId(stage1Provider, stage1Model)} providerGroups={availableModelCatalog}
-					onSelect={(provider, model) => { setStage1Provider(provider); setStage1Model(model); }} />
-				<ModelCardPicker label={t().stage2Label} selectedModel={qualifiedModelId(stage2Provider, stage2Model)} providerGroups={availableModelCatalog}
-					onSelect={(provider, model) => { setStage2Provider(provider); setStage2Model(model); }} />
-				</div>
+				<ModelCardPicker label="Stage 1/2" selectedModel={qualifiedModelId(stage1Provider, stage1Model)} providerGroups={availableModelCatalog}
+					onSelect={setDrawingModel} />
 				<label class="demo-catalog-field"><span>{t().colorCatalogButton}</span>
 					<select bind:value={colorCatalogSettings.selected}>
 						<option value={AUTO_CATALOG_ID}>{t().colorCatalogAuto}</option>
@@ -3583,8 +3590,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.demo-running-banner > button { justify-self: start; }
 	.demo-drawing-conditions { display: grid; gap: 12px; min-width: 0; }
 	.demo-drawing-conditions h3 { margin: 0; font-size: var(--ui-font-size-14); font-weight: 600; }
-	.demo-model-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-	@media (max-width: 600px) { .demo-model-pair { grid-template-columns: minmax(0, 1fr); } }
 	.demo-catalog-field { display: grid; gap: 6px; font-size: var(--ui-font-size-12); color: var(--fg2); }
 	.demo-catalog-field select { width: 100%; min-width: 0; min-height: 38px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; font-size: var(--ui-font-size-14); }
 	.demo-compact-conditions { position: relative; display: flex; flex-wrap: wrap; gap: 8px; }

@@ -2012,6 +2012,8 @@ def _compose_payload(
         "render_seed": getattr(args, "render_seed", None),
         "composition_seed": getattr(args, "composition_seed", None),
         "imported_plugins": getattr(args, "imported_plugins", None) or None,
+        "wild": bool(getattr(args, "wild", False)) or None,
+        "limits": _limits_argument(getattr(args, "limits", None)),
     }
     return {k: v for k, v in payload.items() if v is not None}
 
@@ -4012,15 +4014,15 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument(
         "--wild",
         action="store_true",
-        help="remove the amplitude ceiling on the stroke performance, letting the renderer swing further",
+        help="remove the amplitude ceiling on the stroke performance for prose or DDL input, letting the renderer swing further",
     )
     parser.add_argument(
         "--limits",
         metavar="KEY=VALUE",
         nargs="+",
         help=(
-            "draw under these limits instead of the server's settings, e.g. "
-            "--limits represented_count_max=60 max_expanded_primitives=200. Each "
+            "draw prose or DDL under these limits instead of the server's settings, e.g. "
+            "--limits max_expanded_primitives=200 max_instructions=32. Each "
             "value is capped at today's setting, so this can only draw less"
         ),
     )
@@ -4157,12 +4159,12 @@ def build_parser() -> argparse.ArgumentParser:
     render_score.add_argument("--file", "-f", help="read Score JSON from a file, or '-'")
     render_score.add_argument(
         "--ddl-text",
-        help="hand this DDL to coerce, so DDL-driven repairs run as they do in paint",
+        help="attach DDL provenance to the request; the saved Score is rendered as-is, without DDL-driven repair",
     )
     render_score.add_argument(
         "--ddl-file",
         metavar="PATH",
-        help="hand DDL from a file, or '-' for standard input, to coerce so DDL-driven repairs run",
+        help="read DDL provenance from a file, or '-' for standard input; does not repair the Score",
     )
     render_score.add_argument("--out-dir", "-o", help="directory for JSON/SVG/PNG outputs")
     render_score.add_argument("--prefix", help="output filename prefix")
@@ -4573,58 +4575,59 @@ def build_parser() -> argparse.ArgumentParser:
     config_update.add_argument("--log-retention-days", type=int, help="log retention days")
     config_update.add_argument("--log-retention-enabled", choices=("true", "false"), help="enable/disable log retention")
     config_update.add_argument("--log-compress", choices=("true", "false"), help="compress log files")
-    # Render limits. These change how many marks a work is drawn with, so they
-    # change the picture -- they are not performance tuning. Every value is
-    # recorded on each work drawn under it (history.render_limits).
+    # The shared pipeline maps four settings to compiler resource ceilings.
+    # Retired representation settings remain available for saved-work compatibility.
     limits_group = config_update.add_argument_group(
         "render limits",
-        "How many marks a work may carry. Raising these draws more; the effective "
-        "values are written into the Stage 1/2 prompts and recorded on every work.",
+        "Resource ceilings for the shared compiler, recorded on each work. "
+        "The current pipeline uses primitive, per-template, template and resolved-count "
+        "ceilings; the remaining settings are retained for older works. "
+        "These values are not injected into both model prompts or used to rewrite counts.",
     )
     limits_group.add_argument(
         "--limit-max-expanded-primitives",
         type=int,
-        help="marks per work; above this the whole work is scaled down to fit",
+        help="maximum primitive marks per work; a compiler resource ceiling, not a scale-down instruction",
     )
     limits_group.add_argument(
         "--limit-max-expanded-per-instruction",
         type=int,
-        help="marks one instruction may expand to; a larger group is thinned",
+        help="maximum primitive marks per template, bounded by the per-work ceiling",
     )
     limits_group.add_argument(
         "--limit-max-instructions",
         type=int,
-        help="instructions per work; the list is truncated past this",
+        help="maximum object templates per work; a compiler resource ceiling",
     )
     limits_group.add_argument(
         "--limit-literal-count-threshold",
         type=int,
-        help="below this a stated number is drawn as stated; at or above it the group is shown as a band",
+        help="legacy literal-count threshold; does not replace counts with bands in the current pipeline",
     )
     limits_group.add_argument(
         "--limit-represented-count-min",
         type=int,
-        help="low end of the band a too-large group is drawn as",
+        help="legacy lower representation bound, retained for saved-work compatibility",
     )
     limits_group.add_argument(
         "--limit-represented-count-max",
         type=int,
-        help="high end of that band; rounded down to the literal threshold",
+        help="legacy upper representation bound; normalized against the literal threshold",
     )
     limits_group.add_argument(
         "--limit-ddl-count-max",
         type=int,
-        help="ceiling on a numeral read out of the description, and the top of the density bands Stage 1 is told to use",
+        help="legacy description-count bound; not a count-rewriting rule in the current pipeline",
     )
     limits_group.add_argument(
         "--limit-ddl-count-max-grid",
         type=int,
-        help="the same ceiling for a literal grid, which may go higher than an ordinary arrangement",
+        help="legacy grid-count bound, retained for saved-work compatibility",
     )
     limits_group.add_argument(
         "--limit-schema-count-max",
         type=int,
-        help="the only bound checked on Stage 2's own output; a larger count is clamped to it",
+        help="maximum resolved count in the compiler resource policy; does not clamp authored numbers",
     )
     limits_group.add_argument(
         "--limits-reset",

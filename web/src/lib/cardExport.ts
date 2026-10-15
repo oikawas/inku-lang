@@ -1,5 +1,5 @@
 import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
-import { saveBlob } from '$lib/features/export/save-target';
+import { saveBlob, type SaveOutcome } from '$lib/features/export/save-target';
 import { cardExportRequestBody, type CardExportSettings } from '$lib/cardExportRequest';
 
 export {
@@ -54,11 +54,11 @@ export async function downloadCard(
 	apiFetch: ApiFetch,
 	id: string,
 	settings: CardExportSettings
-): Promise<void> {
+): Promise<SaveOutcome> {
 	const response = await requestCard(apiFetch, id, settings);
 	const blob = await response.blob();
 	// Same single path as every other download -- see features/export/save-target.
-	await saveBlob(blob, filenameFromResponse(response), {
+	return saveBlob(blob, filenameFromResponse(response), {
 		enabled: downloadFolderSettings.enabled,
 	});
 }

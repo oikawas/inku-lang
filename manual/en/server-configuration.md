@@ -1,6 +1,6 @@
 # Server Configuration
 
-This guide defines the administration baseline. It covers the environment template, current DB schema, Web administration UI, and reference systemd templates. Its Web UI instructions match v2.15.15 (Web Build 1091).
+This guide defines the administration baseline. It covers the environment template, current DB schema, Web administration UI, and reference systemd templates, using v2.15.147 (Web Build 1223) as the baseline.
 
 ## 1. Configuration Boundaries
 
@@ -12,7 +12,7 @@ Settings belong to three boundaries.
 
 Provider API key environment variables are initial values. A provider key saved from the admin UI is stored encrypted in the DB. Never put host-specific details or secrets in Git-tracked documentation.
 
-**Some settings are only seeded by the environment.** Painting concurrency and the limits take their initial values from environment variables at first start; after that the DB settings are canonical. Changing an environment variable does not change a setting already stored. Use the admin UI or `inku-cli config update`.
+**Some settings are only seeded by the environment.** Painting concurrency and the limits take their initial values from environment variables at first start; after that the DB settings are canonical. Changing an environment variable does not change a setting already stored. For limits, use the admin UI or `inku-cli config update`; for concurrency, use the admin UI or the API in §2.3.
 
 ## 2. Backend Environment Variables
 
@@ -75,8 +75,7 @@ An administrator who forgets the password is not shut out for good. `inku-admin 
 | `INKU_OUTPUT_PNG_SIZE` | Auto-saved PNG edge size | `2160` |
 | `INKU_OUTPUT_SAVE_WORKERS` | Artifact save workers | `2` |
 | `INKU_OUTPUT_SAVE_QUEUE_LIMIT` | Artifact queue limit | `32` |
-| `INKU_STAGE_WORKERS` | LLM pipeline workers | `4` |
-| `INKU_STAGE_QUEUE_LIMIT` | Pipeline queue limit | twice the worker count |
+| `INKU_PIPELINE_CONFIG` | Path to a pipeline manifest JSON (§2.4) | built-in defaults when unset |
 | `INKU_RENDER_CONCURRENCY` | Initial value for the concurrent renderer limit | 2 |
 | `INKU_CLIENT_FANOUT_LIMIT` | Initial value for the browser's concurrent painting requests | `4` |
 | `INKU_DB_BACKUP_SCHEDULER` | Set to `0` to leave the periodic backup scheduler unstarted | `1` |
@@ -85,7 +84,17 @@ An administrator who forgets the password is not shut out for good. `inku-admin 
 
 When the artifact queue is full, DB history remains the priority and only artifact saving is skipped. Distinguish provider queue latency from insufficient server workers.
 
-`INKU_RENDER_CONCURRENCY` and `INKU_CLIENT_FANOUT_LIMIT` **seed the first value only**. After that the DB settings are canonical; change them from `Other (server)`, which appears after switching Settings to `Detailed`, or with `inku-cli config update`. Requests beyond the server limit are refused with 503 rather than queued, and the client retries at a short interval. One account renders one picture at a time: a second render waits up to 30 seconds for the first to finish, then gets the same 503.
+`INKU_RENDER_CONCURRENCY` and `INKU_CLIENT_FANOUT_LIMIT` **seed the first value only**. After that the DB settings are canonical; change them from `Other (server)`, which appears after switching Settings to `Detailed`. The CLI's `config update` has no concurrency flags. From a CLI signed in as an administrator, use the public API:
+
+```sh
+inku-cli api GET /api/settings/render-concurrency
+inku-cli api PUT /api/settings/render-concurrency --data '{"server_limit":2,"client_limit":4}'
+inku-cli api GET /api/settings/render-concurrency
+```
+
+Requests beyond the server limit are refused with 503 rather than queued, and the client retries at a short interval. One account renders one picture at a time: a second render waits up to 30 seconds for the first to finish, then gets the same 503.
+
+The pipeline effect pool is separate. Set the manifest's `host_limits`: `max_workers` (default 4), `max_effect_steps` (effects advanced in one drain, 32), and `max_retained_runs` (retained executions, 8). The old `INKU_STAGE_WORKERS` / `INKU_STAGE_QUEUE_LIMIT` do not change this pool.
 
 The distributed Compose files put a memory ceiling on the `api` container (`INKU_API_MEM_LIMIT`, `4g` by default). One render of an extreme shape can take gigabytes, so raise this ceiling when you raise the render concurrency. Past it, only the `api` container stops, and `restart: unless-stopped` brings it back.
 
@@ -93,18 +102,30 @@ The distributed Compose files put a memory ceiling on the `api` container (`INKU
 
 | Variable | Purpose | Implementation default |
 |---|---|---|
-| `INKU_LLM_REQUEST_TIMEOUT_SECONDS` | Provider HTTP timeout | `120` |
-| `INKU_LLM_RETRY_ATTEMPTS` | Total attempts | `4` |
-| `INKU_LLM_RETRY_BASE_DELAY` | Initial delay in seconds | `2.0` |
-| `INKU_LLM_RETRY_MAX_DELAY` | Maximum delay | `20.0` |
-| `INKU_LLM_RETRY_JITTER` | Jitter | `0.25` |
-| `INKU_STAGE1_HARD_TIMEOUT_SECONDS` | Stage 1 hard timeout | `120` |
-| `INKU_STAGE2_HARD_TIMEOUT_SECONDS` | Stage 2 hard timeout | `120` |
-| `INKU_SKETCH_HARD_TIMEOUT_SECONDS` | Hard timeout for Sketch from life, Stage 0.5 | `120` |
+| `INKU_LLM_REQUEST_TIMEOUT_SECONDS` | Catalog selection / hole completion policy attempt and total seconds | `120` |
+| `INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS` | Stage 1 per-attempt ceiling in seconds | `300` |
+| `INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS` | Stage 1 total seconds (normalized to at least the attempt ceiling) | `540` |
+| `INKU_LLM_RETRY_ATTEMPTS` | Maximum policy attempts | `4` |
+| `INKU_LLM_RETRY_BASE_DELAY` | Policy delay between attempts in seconds | `2.0` |
 
 The distributed environment template explicitly sets operational example values. Be aware of the difference between template values and implementation defaults.
 
-The hard timeout also applies when a stage cannot acquire an execution slot. If Stage 1 does not answer in time, a stock set of instructions is performed and the work records that. If the sketch layer does not answer in time, the description goes to interpretation unchanged.
+Normal pipeline retries follow finite policies. The old `INKU_STAGE1_HARD_TIMEOUT_SECONDS`, `INKU_STAGE2_HARD_TIMEOUT_SECONDS`, and `INKU_SKETCH_HARD_TIMEOUT_SECONDS` do not control them. When policy permits no further attempt, an ordinary Stage 1 failure ends as `Failed` and hole completion failure stops as `NeedsUserEdit`. A non-retryable failure may stop before the budget is spent. A sketch failure proceeding without its supplement, or retaining only an already verified candidate, is a limited fallback, not a promise to replace general failures with a stock successful work.
+
+#### Changing the pipeline manifest
+
+Without a path, the server uses the same source's built-in manifest. To customize it, first install the native wheel in the server environment as in [Installation §5](application-install.md#5-prepare-the-backend), export the defaults to JSON, edit the required values, and place the file where the service user can read it.
+
+```sh
+cd /opt/inku/inku-lang/server
+sudo -u inku .venv/bin/python -c 'import json; from inku_server.pipeline_candidate import PipelineBinding; from inku_server.pipeline_defaults import default_manifest; print(json.dumps(default_manifest(PipelineBinding()), ensure_ascii=False, indent=2))' > /tmp/inku-pipeline.json
+sudo install -o root -g inku -m 0640 /tmp/inku-pipeline.json /etc/inku/pipeline.json
+sudo editor /etc/inku/pipeline.json
+```
+
+Set `INKU_PIPELINE_CONFIG=/etc/inku/pipeline.json` in the environment file and restart the API service to load it. The manifest is a complete JSON document, not a partial override. With a path set, the server uses the file's `pipeline.stage1_retry`, `pipeline.catalog_retry`, `pipeline.hole_retry` (`attempt_timeout_ms`, `total_timeout_ms`, and `retry_delay_ms` are decimal strings in milliseconds), and `host_limits`, rather than regenerating defaults from the environment variables above. Do not put credentials in it.
+
+Explicitly set the additional structural limits in both `pipeline.compiler.hard_resource_policy.budget.maximum` and `pipeline.compiler.operational_resource_budget.maximum`. The defaults are `logical_objects=4096`, `template_nodes=128`, `anchor_instances=4096`, `transform_instances=4096`, `placement_instances=64`, and `fill_instances=64`. The four existing limits in §5.1 are mapped from DB settings / requests, so changing the manifest alone does not change those values. Saved executions and derived editions retain their saved policy. On a source upgrade, export new defaults and review your changes against them.
 
 ### 2.5 Layers and Plugins
 
@@ -116,7 +137,6 @@ The hard timeout also applies when a stage cannot acquire an execution slot. If 
 | `INKU_OKUGAKI_CACHE_TTL_SECONDS` | Colophon cache lifetime | `1800` |
 | `INKU_OKUGAKI_CACHE_MAX_ENTRIES` | Colophon cache size | `256` |
 | `INKU_LEARNED_FILE` | Where learned words are stored | `/tmp/inku-learned.json` |
-| `INKU_COERCE_DISABLE` | Switch off coerce, the auto-repair pass. **Diagnostic only** | unset |
 | `INKU_DEVELOPER_MODE` | Extra developer-facing output | unset |
 
 The `Plugins` settings show vocabulary plugins: whether each is on, and its words (name, aliases, surfaces, notes, preview). Plugin documents cannot be created or edited there. Only a bundled package whose definitions the developers wrote in JSON (today `Nature.leaves`) is drawn from, and its document is marked `Used for drawing`. Any other `.inku-plugin.md` is a legacy document without definitions and is marked `Not used for drawing`: writing its words leaves them out with a diagnostic. A legacy document can be deleted; a bundled package's document cannot (switch it off instead).
@@ -124,8 +144,6 @@ The `Plugins` settings show vocabulary plugins: whether each is on, and its word
 A document counts as a bundled package only where it sits in `server/plugins/`. With `INKU_DOCUMENT_PLUGIN_DIR` pointed elsewhere, a `nature-leaves.inku-plugin.md` placed there is treated as legacy and the `Nature.leaves` words are not drawn. If the settings mark it `Not used for drawing`, check that directory.
 
 The default for `INKU_LEARNED_FILE` is under `/tmp`, so it does not survive a restart. Give it a stable path to persist it.
-
-`INKU_COERCE_DISABLE` turns off auto-repair entirely: neither invisible-color correction nor overcrowding damping applies. **Do not set it in production.** It exists for isolating a problem.
 
 ### 2.6 Providers
 
@@ -252,15 +270,15 @@ When a member hovers over a model in `Model selection`, the card shows `LLM` and
 
 | Stage | Role |
 |---|---|
-| Stage 0.5 | Restate the description as prose in the language of things. Optional, and it uses an LLM |
-| Stage 1 | Interpret the description, or the sketch, as instructions (normalized DDL) |
-| Plugin expansion | Deterministically write namespaced plugin words down into core DDL |
-| Stage 1.5 | Deterministically expand DDL and give it relations; not an LLM |
-| Stage 2 | Structure DDL as JSON Score |
-| coerce | Boundary handling that prefers dropping to inventing |
+| Stage 0.5 | Optional sketch supplement: retain the description and add place and light in prose |
+| Stage 1 | Interpret the description and optional sketch supplement as instructions (normalized DDL) |
+| Stage 2 | Complete unread portions and holes; wait for author approval when visible DDL must change |
+| compile | Deterministically resolve committed DDL and definitions of namespaced terms, producing Score and resource checks; do not add unstated relations |
 | Renderer | Perform the Score as SVG |
 
-When Stage 0.5 runs, **the sketch reaches three consumers in place of the description**: Stage 1, the decision whether plugin expansion fires, and Stage 1.5. If the layer does not answer, the description is passed on unchanged and `sketch_state` records `fallback`. A work painted with the layer off records `off`, and works predating the column hold no value at all. **No value is not `off`.**
+Old Stage 1.5 / coerce names and values may remain in saved records; that does not mean current generation performs hidden semantic repairs.
+
+The current sketch choices are `Off` / `On`, defaulting to `Off`. On adds place and light alongside the original description rather than replacing it. If sketching fails, the run proceeds without the supplement and records `sketch_state: fallback`. A work painted without it records `off`, and works predating the column hold no value at all. **No value is not `off`.** Old works' `fine` / `coarse` and grain records remain for compatibility and do not control the current sketch. See SPEC for the detailed meaning of each stage.
 
 The Web UI always sends `instruction_lang: auto` for normal generation. The server detects Japanese or English from the text and falls back to `ui_lang` only when no language signal is present. The API retains `auto`, `ja`, and `en` for compatibility and explicit comparison runs.
 
@@ -268,30 +286,24 @@ Resolved values are recorded as `instruction_lang_requested`, `instruction_lang_
 
 ### 5.1 Limits
 
-Nine numbers decide how many marks one work may hold, and one more caps the size of generated SVG. The nine are not a speed control: the number of lines actually drawn changes. Switch Settings to `Detailed` and open `Limits`, or use `inku-cli config update`. **The nine numbers are written into the Stage 1 and Stage 2 prompts and recorded on every work painted.**
+The nine existing values can be saved through Settings → `Detailed` → `Limits`, or `inku-cli config update`. In the normal pipeline, only the following four map to the compiler's hard resource policy and operational budget. The nine values are not all injected into both stages' prompts.
 
-| Group | Value | Default | Contents |
+| Group | Value | Default | Current resource dimension |
 |---|---|---|---|
-| Drawing volume | `max_expanded_primitives` | 400 | Marks per work. Beyond this the whole work is shrunk to fit |
-| | `max_expanded_per_instruction` | 240 | Marks per instruction. An instruction asking for more is thinned |
-| | `max_instructions` | 64 | Instructions per work. Any beyond this are dropped |
-| Count representation | `literal_count_threshold` | 240 | Below this a stated count is drawn as stated; at or above it the work is shown as a crowd |
-| | `represented_count_min` | 80 | Lower end when shown as a crowd |
-| | `represented_count_max` | 120 | Upper end |
-| Safety limits | `ddl_count_max` | 1000 | Numbers in the description are rounded down to this. It is also the top of the density band taught to Stage 1 |
-| | `ddl_count_max_grid` | 2000 | A literal grid alone is allowed higher than ordinary composition |
-| | `schema_count_max` | 2000 | A count returned by Stage 2 above this is trimmed |
-| SVG output | `max_generated_svg_mib` | 12 | Size ceiling for newly generated SVG (MiB, 1–32). A work above it is not saved |
+| Drawing volume | `max_expanded_primitives` | 400 | `primitive_marks` |
+| | `max_expanded_per_instruction` | 240 | `maximum_per_template_primitive_marks` |
+| | `max_instructions` | 64 | `object_templates` |
+| Resolved count | `schema_count_max` | 2000 | `maximum_resolved_count` |
 
-Mutually inconsistent values are rounded rather than rejected — if the representation ceiling exceeds the literal threshold, it is lowered to that threshold. What the admin UI shows is the rounded, effective value.
+The other five, `literal_count_threshold` (240), `represented_count_min` (80), `represented_count_max` (120), `ddl_count_max` (1000), and `ddl_count_max_grid` (2000), remain for old Score/settings compatibility. Save-time normalization continues, but these do not change the meaning of counts in the normal pipeline. Canonical counts are retained and ceilings are checked before execution. Old works' records and old-Score compatibility paths remain supported.
 
-**A raised value reaches the page** (v2.13.32). A description that names no count — "fine lines tiled across the whole sheet", say — expands as far as `max_expanded_primitives` allows, and the boundaries that decide how dense a group reads and how many clusters it is split into are held as ratios of `represented_count_max`. The cap on how many clusters a group may be split into moves by the same ratio, so raising the ceiling keeps roughly the same amount of ink in one cluster. **At the default settings all of these land on the values they had before.**
+Set the six additional structural resource ceilings in the manifest (§2.4). Together with the four mapped limits, these policies are inherited by saved executions and derived editions.
 
 **The marks-per-work row of `Drawing volume` also says roughly how many megabytes that count is** (v2.13.32). The per-mark cost is measured on the server and sent to the panel, shown as a range from a fine stroke to a thick one (about 5.2–6.5 MB at the default of 400 marks). The other rows carry no such figure: they are per-instruction bounds, legibility thresholds and typo guards, and none of them decides the size of the file.
 
 **When a work is redrawn, the values recorded on its own row are the ones that apply** (v2.13.31). Lowering the settings does not change a work already painted: it comes out at the numbers it was painted under. Today's settings are used only for an older work that recorded none, and **the answer names which of the two drew it** (`render_limits_source` = `work` / `settings` / `work_unrecorded`). **A caller may lower a value for one drawing but never raise one** — each element is taken as the smaller of the two.
 
-**When a limit takes effect and drops marks, the record says which limit did it, by name** (`render_limit_notes`, one line per limit).
+Compatibility paths that drop marks under a limit, such as old-Score rendering, name it in `render_limit_notes`. Normal pipeline resource checks do not promise to reduce marks until every request succeeds.
 
 **The `SVG limit` (`max_generated_svg_mib`) is a safety ceiling applied when newly generated SVG is saved** (2026-10-12). The default and recommended value is 12 MiB, and 1–32 MiB can be saved. Normal drawing, redrawing and streaming share it, using the server setting at the start of drawing. A work above it is neither saved nor returned, and the message reads "The SVG exceeded the configured limit (n MiB), so this work was not saved." It is not part of any prompt, is not recorded on works, and does not affect viewing saved works. `inku-cli config update` has no flag for it; change it in the admin UI.
 
@@ -341,14 +353,7 @@ A password nobody remembers is not recovered from a backup: reset it with `inku-
 
 ## 9. Logs
 
-Reference files:
-
-```text
-/var/log/inku/inku-api.log
-/var/log/inku/inku-server.log
-```
-
-The templates write to both the systemd journal and append files.
+The supplied systemd templates send stdout and stderr to the journal. No frontend append file is configured. When API file logging is enabled, it defaults to the service user's `~/.local/share/inku/logs/inku-api.log`. To use `/var/log/inku/`, set `INKU_LOG_DIR=/var/log/inku` in the environment file and provide write permission.
 
 ```sh
 journalctl -u inku-api.service -n 100 --no-pager
@@ -416,7 +421,7 @@ A 401 response for the wrong password confirms the path from Web to API. Monitor
 | DB fails after startup | Migration logs, DB backup, and concurrent mixed backend versions |
 | Painting is refused with 503 | The server concurrency setting. The DB setting is canonical, not the environment variable. Whether one account's render has run past 30 seconds |
 | No administrator can sign in | A forgotten password: `inku-admin reset-password` in 2.2. Local sign-in turned off: 13.1 |
-| A stated count comes out smaller | `literal_count_threshold` and `represented_count_*` under the limits |
+| A stated count reaches a ceiling | Resource diagnostics, the four limits in §5.1, and the manifest's structural budget; check compatibility settings only for an old Score |
 | The sketch layer seems not to run | The work's `sketch_state`. `fallback` points at the Stage 0.5 timeout and the provider |
 | Plugin words are not expanded | Rejection reasons from `plugin list`, `INKU_DOCUMENT_PLUGIN_DIR`, and `plugin reload` |
 

@@ -1,6 +1,6 @@
 # サーバー設定方法
 
-この文書は管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。Web UIの操作説明はv2.15.15（Web Build 1091）時点の画面に対応します。
+この文書は管理者向けの設定基準です。環境変数template、現行DB schema、Web管理UI、systemd参照templateを対象にします。v2.15.147（Web Build 1223）を基準にしています。
 
 ## 1. 設定の優先境界
 
@@ -12,7 +12,7 @@
 
 API keyの環境変数は初期値です。管理UIでDBへ保存したprovider keyがある場合は暗号化して利用します。ホスト固有情報と秘密をGit追跡文書へ書かないでください。
 
-**環境変数が種を与えるだけの設定があります。**描画の並列度と制限値は、初回起動時に環境変数から初期値を取り、以後はDBの設定が正本になります。環境変数を変えても、既に保存された設定は変わりません。管理UIか `inku-cli config update` で変更してください。
+**環境変数が種を与えるだけの設定があります。**描画の並列度と制限値は、初回起動時に環境変数から初期値を取り、以後はDBの設定が正本になります。環境変数を変えても、既に保存された設定は変わりません。制限値は管理UIか `inku-cli config update`、並列度は管理UIか§2.3のAPIで変更してください。
 
 ## 2. backend環境変数
 
@@ -75,8 +75,7 @@ passwordを忘れた管理者が締め出されたままになることはあり
 | `INKU_OUTPUT_PNG_SIZE` | 自動保存PNGの辺長 | `2160` |
 | `INKU_OUTPUT_SAVE_WORKERS` | artifact保存worker数 | `2` |
 | `INKU_OUTPUT_SAVE_QUEUE_LIMIT` | artifact保存queue上限 | `32` |
-| `INKU_STAGE_WORKERS` | LLM pipeline worker数 | `4` |
-| `INKU_STAGE_QUEUE_LIMIT` | pipeline queue上限 | worker数の2倍 |
+| `INKU_PIPELINE_CONFIG` | pipeline manifest JSONのpath（§2.4） | 未設定なら組込既定 |
 | `INKU_RENDER_CONCURRENCY` | 同時Renderer実行上限の初期値 | 2 |
 | `INKU_CLIENT_FANOUT_LIMIT` | ブラウザが同時に投げる描画要求の上限の初期値 | `4` |
 | `INKU_DB_BACKUP_SCHEDULER` | `0` にすると定期backupのschedulerを起動しない | `1` |
@@ -85,7 +84,17 @@ passwordを忘れた管理者が締め出されたままになることはあり
 
 queue上限時も履歴DB保存を優先し、artifact保存だけをskipします。providerの無料queueによる遅延と、server worker不足を区別してください。
 
-`INKU_RENDER_CONCURRENCY`と`INKU_CLIENT_FANOUT_LIMIT`は**初期値だけを与えます**。以後の正本はDBの設定で、設定画面を`詳細`表示にして現れる`その他（サーバー）`または `inku-cli config update` から変更します。サーバー同時描画数を超えた要求は待たずに503で拒否され、クライアントが短い間隔で再試行します。同じアカウントの描画は1件ずつ行い、2件目以降は前の描画が終わるまで最大30秒待ちます（過ぎたら同じ503）。
+`INKU_RENDER_CONCURRENCY`と`INKU_CLIENT_FANOUT_LIMIT`は**初期値だけを与えます**。以後の正本はDBの設定で、設定画面を`詳細`表示にして現れる`その他（サーバー）`から変更します。CLIの`config update`には並列度の旗がありません。管理者としてログインしたCLIからは次の公開APIを使います。
+
+```sh
+inku-cli api GET /api/settings/render-concurrency
+inku-cli api PUT /api/settings/render-concurrency --data '{"server_limit":2,"client_limit":4}'
+inku-cli api GET /api/settings/render-concurrency
+```
+
+サーバー同時描画数を超えた要求は待たずに503で拒否され、クライアントが短い間隔で再試行します。同じアカウントの描画は1件ずつ行い、2件目以降は前の描画が終わるまで最大30秒待ちます（過ぎたら同じ503）。
+
+pipelineのeffect実行poolはこれとは別です。manifestの`host_limits`に`max_workers`（既定4）、`max_effect_steps`（1回のdrainで進めるeffect数、32）、`max_retained_runs`（保持する実行数、8）を指定します。旧`INKU_STAGE_WORKERS`／`INKU_STAGE_QUEUE_LIMIT`ではこのpoolを変更できません。
 
 配布composeは`api` containerのメモリに上限を掛けます（`INKU_API_MEM_LIMIT`、既定`4g`）。極端な図形を持つ描画は1件でGB単位のメモリを使うため、同時描画数を上げるときはこの上限も上げてください。上限を超えると`api` containerだけが止まり、`restart: unless-stopped`で再起動します。
 
@@ -93,18 +102,30 @@ queue上限時も履歴DB保存を優先し、artifact保存だけをskipしま�
 
 | 変数 | 目的 | 実装既定値 |
 |---|---|---|
-| `INKU_LLM_REQUEST_TIMEOUT_SECONDS` | provider HTTP timeout | `120` |
-| `INKU_LLM_RETRY_ATTEMPTS` | 総試行回数 | `4` |
-| `INKU_LLM_RETRY_BASE_DELAY` | 初期待機秒 | `2.0` |
-| `INKU_LLM_RETRY_MAX_DELAY` | 最大待機秒 | `20.0` |
-| `INKU_LLM_RETRY_JITTER` | jitter | `0.25` |
-| `INKU_STAGE1_HARD_TIMEOUT_SECONDS` | Stage 1 hard timeout | `120` |
-| `INKU_STAGE2_HARD_TIMEOUT_SECONDS` | Stage 2 hard timeout | `120` |
-| `INKU_SKETCH_HARD_TIMEOUT_SECONDS` | 写生（Stage 0.5）のhard timeout | `120` |
+| `INKU_LLM_REQUEST_TIMEOUT_SECONDS` | catalog選択・穴補完policyのattempt／total秒 | `120` |
+| `INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS` | Stage 1の1試行の上限秒 | `300` |
+| `INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS` | Stage 1の総予算秒（attempt以上へ正規化） | `540` |
+| `INKU_LLM_RETRY_ATTEMPTS` | policyの最大試行回数 | `4` |
+| `INKU_LLM_RETRY_BASE_DELAY` | policyの試行間待機秒 | `2.0` |
 
 配布templateは運用例としてretry値を明示しています。実装既定値とtemplate値を意識して変更してください。
 
-hard timeoutは段の実行枠を取れなかった場合にも効きます。Stage 1が時間内に答えなかったときは定型の代替DDLで演奏し、その旨を作品へ記録します。写生が時間内に答えなかったときは記述をそのまま解釈へ渡します。
+通常pipelineのretryは有限のpolicyで管理します。旧`INKU_STAGE1_HARD_TIMEOUT_SECONDS`／`INKU_STAGE2_HARD_TIMEOUT_SECONDS`／`INKU_SKETCH_HARD_TIMEOUT_SECONDS`はこの制御に使いません。policyが継続を認めない一般のStage 1失敗は`Failed`、穴補完の失敗は`NeedsUserEdit`として止まります。再試行できない失敗なら予算を使い切る前にも止まります。写生失敗時に補足なしで記述を使うことや、検証して保持できた候補だけを採用する限定fallbackを、一般失敗から定型作品を作る動作と混同しないでください。
+
+#### pipeline manifestを変更する
+
+未指定時は同じsourceの組込manifestを使います。変更する場合は、[導入手順§5](application-install.md#5-backendを準備する)のnative wheel導入を済ませたserver環境で既定をJSONへ出し、必要な値だけ編集してservice userが読める場所へ配置します。
+
+```sh
+cd /opt/inku/inku-lang/server
+sudo -u inku .venv/bin/python -c 'import json; from inku_server.pipeline_candidate import PipelineBinding; from inku_server.pipeline_defaults import default_manifest; print(json.dumps(default_manifest(PipelineBinding()), ensure_ascii=False, indent=2))' > /tmp/inku-pipeline.json
+sudo install -o root -g inku -m 0640 /tmp/inku-pipeline.json /etc/inku/pipeline.json
+sudo editor /etc/inku/pipeline.json
+```
+
+環境ファイルに`INKU_PIPELINE_CONFIG=/etc/inku/pipeline.json`を設定し、API serviceを再起動すると読み込まれます。manifestは差分ではなく完全なJSONです。指定した場合、上の環境変数から既定値を再生成せず、ファイル内の`pipeline.stage1_retry`、`pipeline.catalog_retry`、`pipeline.hole_retry`（`attempt_timeout_ms`／`total_timeout_ms`／`retry_delay_ms`はミリ秒の10進文字列）と`host_limits`を使います。認証情報は書きません。
+
+追加の構造上限は`pipeline.compiler.hard_resource_policy.budget.maximum`と`pipeline.compiler.operational_resource_budget.maximum`の両方へ明示します。既定は`logical_objects=4096`、`template_nodes=128`、`anchor_instances=4096`、`transform_instances=4096`、`placement_instances=64`、`fill_instances=64`です。§5.1の四つの既存上限はDB／要求からmapされるので、manifestだけでその値を変更しません。保存済みの実行・派生は保存したpolicyを保持します。source更新時は新sourceから既定を出し直して変更点を確認してください。
 
 ### 2.5 層とプラグイン
 
@@ -116,7 +137,6 @@ hard timeoutは段の実行枠を取れなかった場合にも効きます。St
 | `INKU_OKUGAKI_CACHE_TTL_SECONDS` | 奥書cacheの保持秒数 | `1800` |
 | `INKU_OKUGAKI_CACHE_MAX_ENTRIES` | 奥書cacheの最大件数 | `256` |
 | `INKU_LEARNED_FILE` | 学習語の保存先 | `/tmp/inku-learned.json` |
-| `INKU_COERCE_DISABLE` | coerce（自動補正）を止める。**診断専用** | 未設定 |
 | `INKU_DEVELOPER_MODE` | 開発者向けの追加表示 | 未設定 |
 
 設定の`プラグイン`は、語彙プラグインの有効・無効と、語の一覧（名前・別名・表記・注釈・見本の絵）を見る画面です。プラグイン文書を作ったり編集したりはできません。絵に使われるのは、開発側がJSONで書いた定義を持つ同梱パッケージ（今は`Nature.leaves`）だけで、その文書には`描画に使う`と出ます。それ以外の`.inku-plugin.md`は定義を持たない旧形式で、`描画には使われない`と出ます。書いてもその語は省かれ、診断が出ます。旧形式の文書は削除でき、同梱パッケージの文書は削除できません（使わないときは無効にします）。
@@ -124,8 +144,6 @@ hard timeoutは段の実行枠を取れなかった場合にも効きます。St
 同梱パッケージかどうかは、文書が`server/plugins/`にあるかで見分けます。`INKU_DOCUMENT_PLUGIN_DIR`を別の場所にすると、そこに置いた`nature-leaves.inku-plugin.md`も旧形式として扱われ、`Nature.leaves`の語は描かれません。設定画面に`描画には使われない`と出たら、この置き場を確かめてください。
 
 `INKU_LEARNED_FILE`の既定は`/tmp`配下なので、再起動で消えます。永続化する場合は安定したパスを指定してください。
-
-`INKU_COERCE_DISABLE`は自動補正を丸ごと止めます。不可視色の可視化も過密の抑制も効かなくなるので、**本番では設定しないでください**。切り分けのための旗です。
 
 ### 2.6 provider
 
@@ -240,15 +258,15 @@ passwordを設定し直すと、そのアカウントのほかのsessionは終�
 
 | 段階 | 役割 |
 |---|---|
-| Stage 0.5 | 記述を物の言葉へ写した自然文にする。任意の層でLLMを使う |
-| Stage 1 | 記述または写生文を指示書（正規化DDL）へ解釈 |
-| プラグイン展開 | 名前空間付きプラグイン語をコアDDLへ決定的にwriting-down |
-| Stage 1.5 | DDLを決定的に展開し関係を与える。LLMではない |
-| Stage 2 | DDLをJSON Scoreへ構造化 |
-| coerce | drop-onlyを優先する境界処理 |
+| Stage 0.5 | 任意の写生。記述を残し、場所と光を自然文で補う |
+| Stage 1 | 記述と任意の写生補足を指示書（正規化DDL）へ解釈 |
+| Stage 2 | 未読部分・穴を補完し、可視DDLの変更が必要なら作者承認を待つ |
+| compile | 確定したDDLと名前空間付き語の定義を決定的に解決し、Scoreとresource検査へ進める。書かれていない関係は追加しない |
 | Renderer | ScoreをSVGへ演奏 |
 
-Stage 0.5が動いたとき、**写生文は記述の代わりに三つの消費者へ届きます** — Stage 1、プラグイン展開の発動判断、Stage 1.5です。層が答えなかった場合は記述をそのまま渡し、`sketch_state`へ`fallback`を記録します。層を通さなかった作品は`off`、この列より前の作品は値を持ちません。**値がないことは`off`ではありません。**
+旧Stage 1.5／coerceの名称や値が保存済み記録に残ることと、現行生成で隠れた意味補修を行うことは別です。
+
+写生の現行選択は`なし`／`あり`で、既定は`なし`です。`あり`でも元の記述を置き換えず、その横に場所と光を補います。写生が失敗した場合は補足なしで進み、`sketch_state`へ`fallback`を記録します。使わなかった作品は`off`、この列より前の作品は値を持ちません。**値がないことは`off`ではありません。**旧作品の`fine`／`coarse`と粒度の記録は互換用に保持し、現行写生には使いません。各段の詳しい意味はSPECを参照してください。
 
 通常生成の`instruction_lang`はWeb UIから常に`auto`です。serverは入力から日本語／英語を判定し、判定材料がないときだけ`ui_lang`へfallbackします。APIは互換性と比較実行のため`auto`、`ja`、`en`を受け付けます。
 
@@ -256,30 +274,24 @@ Stage 0.5が動いたとき、**写生文は記述の代わりに三つの消費
 
 ### 5.1 制限値
 
-一枚の作品が何本の墨を持てるかを決める九つの数と、生成するSVGの大きさの上限です。九つの数は速度の調整ではなく、描かれる線の数そのものが変わります。管理UIでは設定画面を`詳細`に切り替えてから`制限値`を開くか、`inku-cli config update` で変更します。**九つの数はStage 1／Stage 2のプロンプトへ書き込まれて、描いた作品ごとに記録されます。**
+管理UIの`詳細`→`制限値`または`inku-cli config update`で既存の九つの値を保存できます。通常pipelineでは次の四つだけをcompilerのhard resource policyとoperational budgetへmapします。両段のpromptへ九つ全部を注入する設定ではありません。
 
-| 群 | 値 | 既定 | 内容 |
+| 群 | 値 | 既定 | 現行resource dimension |
 |---|---|---|---|
-| 描画量 | `max_expanded_primitives` | 400 | 一枚あたりの墨の数。超えると作品全体を縮めて収める |
-| | `max_expanded_per_instruction` | 240 | 一つの指示あたりの墨の数。超えたら間引く |
-| | `max_instructions` | 64 | 一枚あたりの指示の数。超えた指示は切り捨てる |
-| 数の表現 | `literal_count_threshold` | 240 | これ未満なら述べた数をそのまま描く。これ以上は群れとして見せる |
-| | `represented_count_min` | 80 | 群れとして見せるときの下の端 |
-| | `represented_count_max` | 120 | その上の端 |
-| 安全上限 | `ddl_count_max` | 1000 | 記述の中の数字をここまでに丸める。Stage 1に教える密度の帯の上端でもある |
-| | `ddl_count_max_grid` | 2000 | 文字どおりの格子だけは、通常の配置より高いところまで許す |
-| | `schema_count_max` | 2000 | Stage 2が返した数がこれを超えていたら切り詰める |
-| SVG出力 | `max_generated_svg_mib` | 12 | 新しく生成するSVGの大きさの上限（MiB、1〜32）。超えた作品は保存しない |
+| 描画量 | `max_expanded_primitives` | 400 | `primitive_marks` |
+| | `max_expanded_per_instruction` | 240 | `maximum_per_template_primitive_marks` |
+| | `max_instructions` | 64 | `object_templates` |
+| 解決数 | `schema_count_max` | 2000 | `maximum_resolved_count` |
 
-互いに矛盾する値は拒否せず丸めます。代表化の上限がliteralの閾値を超えていれば閾値まで下げる、といった具合です。管理UIに表示されるのは丸めたあとの、実際に効いている値です。
+残る`literal_count_threshold`（240）、`represented_count_min`（80）、`represented_count_max`（120）、`ddl_count_max`（1000）、`ddl_count_max_grid`（2000）は旧Score・設定の互換用です。保存時の正規化は続きますが、通常pipelineの数の意味を変更する設定ではありません。canonical countを保持し、上限を事前検査します。旧作品・旧Score経路の記録と互換処理は保持します。
 
-**上げた値は紙まで届きます**（v2.13.32）。数を述べない記述（「細い線を紙一面に敷き詰める」など）の展開の本数は`max_expanded_primitives`に従い、群れとして見せるときの濃さと群の数の境界は`represented_count_max`に対する比で決まります。群を何個に分けるかの上端も同じ比で動くので、上限を上げても1つの群が抱える墨の数はおおよそ保たれます。**既定の設定では、これらはどれも従来と同じ値になります。**
+追加の六つのstructural resource上限は§2.4のmanifestで設定します。これらと四つのmapを合わせたpolicyは保存した実行・派生へ継承されます。
 
 **`描画量`の墨の数の欄には、その本数がおよそ何メガバイトかを添えて表示します**（v2.13.32）。1本あたりのバイトはサーバーが測った値を送っており、細い筆致と太い筆致の幅で示します（既定の400本でおよそ5.2〜6.5MB）。ほかの欄には出ません。それらは指示ごとの上限、可読性の閾値、打ち間違いの番人であって、ファイルの大きさを決めていないからです。
 
 **作品を描き直すときは、その作品の行に記録された値が使われます**（v2.13.31）。設定を下げても、既に描かれた作品は描かれたときの数のまま出ます。記録を持たない古い作品でだけ今日の設定が使われ、**どちらで描いたかは応答が名乗ります**（`render_limits_source` ＝ `work` / `settings` / `work_unrecorded`）。**注文の側は 1 枚のあいだ値を下げられますが、上げられません** —— 要素ごとに現行の設定と小さいほうが採られます。
 
-**上限が実際に効いて墨を落としたときは、どの上限が効いたかが名前つきで記録に残ります**（`render_limit_notes`。1 つの上限につき 1 行）。
+旧Scoreの描画など、上限により墨を落とす互換経路では`render_limit_notes`に上限名を記録します。通常pipelineのresource検査を、無条件に墨を減らして成功させる処理とは読まないでください。
 
 **`SVG上限`（`max_generated_svg_mib`）は、新しく生成するSVGを保存するときの安全上限です**（2026-10-12）。既定・推奨は12 MiBで、1〜32 MiBで保存できます。通常描画・再描画・ストリームに共通で、描画を始めたときのサーバー設定を使います。超えたときは、その作品を保存も返却もせず、「SVGが設定上限（n MiB）を超えたため、この作品は保存されませんでした。」と表示します。プロンプトには入らず、作品ごとにも記録されず、保存済みの作品の表示には効きません。`inku-cli config update`にはこの欄の旗がないので、管理UIで変えます。
 
@@ -329,14 +341,7 @@ SQLite backup directoryは`INKU_DB_BACKUP_DIR`で変更できます。Web管理U
 
 ## 9. log
 
-参照先:
-
-```text
-/var/log/inku/inku-api.log
-/var/log/inku/inku-server.log
-```
-
-systemd journalとappend fileの両方を使うtemplateです。
+同梱systemd templateの標準出力・標準エラーはjournalへ出ます。frontend用のappend fileは設定していません。APIのfile loggingが有効な場合、既定ではservice userの`~/.local/share/inku/logs/inku-api.log`へ書きます。`/var/log/inku/`を使う場合は`INKU_LOG_DIR=/var/log/inku`を環境ファイルへ設定し、書込み権限を用意してください。
 
 ```sh
 journalctl -u inku-api.service -n 100 --no-pager
@@ -404,7 +409,7 @@ curl -sS -i --max-time 5 \
 | 起動後にDB error | migration log、DB backup、複数version同時起動を確認 |
 | 描画が503で拒否される | サーバー同時描画数の設定。環境変数ではなくDBの設定が正本。同じアカウントの描画が30秒を超えて続いていないか |
 | 管理者が誰もログインできない | passwordを忘れた → 2.2の`inku-admin reset-password`。ローカルログインが止まっている → 13.1 |
-| 数を書いたのに減る | 制限値の`literal_count_threshold`と`represented_count_*` |
+| 数の指定が上限に達する | resource診断、§5.1の四つの上限とmanifestのstructural budget。旧Scoreの場合だけ互換設定も確認 |
 | 写生が効いていない | 作品の`sketch_state`。`fallback`ならStage 0.5のtimeoutとprovider |
 | プラグイン語が展開されない | `plugin list`の拒否理由、`INKU_DOCUMENT_PLUGIN_DIR`、`plugin reload` |
 

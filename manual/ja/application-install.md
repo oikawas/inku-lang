@@ -1,6 +1,6 @@
 # アプリケーションインストール
 
-この文書はLinuxサーバーへ新規導入または更新するための標準手順です。従来のsystemd開発構成と、production SvelteKit adapterを使うCompose構成を提供します。公衆インターネットへ公開する場合はTLS reverse proxyを前段へ配置してください。§10と§12のWeb UI操作はv2.15.15（Web Build 1091）時点の画面に対応します。
+この文書はLinuxサーバーへ新規導入または更新するための標準手順です。従来のsystemd開発構成と、production SvelteKit adapterを使うCompose構成を提供します。公衆インターネットへ公開する場合はTLS reverse proxyを前段へ配置してください。§10と§12のWeb UI操作はv2.15.147（Web Build 1223）を基準にしています。
 
 ## 1. 構成
 
@@ -28,6 +28,7 @@ inku-lang/
 - uv
 - Node.jsとnpm
 - Gitまたはrsyncなどの配置手段
+- source／systemd構成では、同じcheckoutのcoreから作った`inku-render-python` wheel。ビルドするLinux環境にはRust（`core/rust-toolchain.toml`の固定版）、Cリンカー、maturin 1.13.3が必要
 - （PNG出力に使う `resvg-py` はwheelで入るため、OSライブラリの追加導入は要らない）
 - 任意: reverse proxy、TLS証明書
 
@@ -69,6 +70,20 @@ lockfileに従って依存関係を同期します。
 cd /opt/inku/inku-lang/server
 sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv sync --locked
 ```
+
+**依存同期だけでは描画用の`inku_render`は入りません。** 同じcheckoutから、そのサーバーのOS・CPU・Pythonに合うnative wheelを別途ビルドして導入します。ビルド環境を用意したLinuxで、リポジトリの`core/`を作業ディレクトリにして固定toolchainを使います。
+
+```sh
+cd /opt/inku/inku-lang/core
+sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uvx --from maturin==1.13.3 maturin build \
+  --manifest-path crates/inku-render-python/Cargo.toml --release --locked \
+  --interpreter ../server/.venv/bin/python --out ../native-wheels
+cd /opt/inku/inku-lang/server
+sudo -u inku uv pip install --python .venv/bin/python --no-deps --force-reinstall ../native-wheels/inku_render_python-*.whl
+sudo -u inku .venv/bin/python -c 'import inku_render; from inku_server.pipeline_candidate import PipelineBinding; print(inku_render.render_engine_version()); PipelineBinding()'
+```
+
+`native-wheels`には今回の対象環境用wheelだけを置きます。既製wheelを使う場合も、そのsourceと対象環境を照合し、導入・import確認は省略しません。coreを更新したときは再ビルド・再導入が必要です。以後、lock外のwheelを残して依存を同期するときは`uv sync --locked --inexact`、起動・検証では準備済み環境をそのまま使う`uv run --no-sync`を使います。ComposeのAPI imageはDockerfileが同じcoreからwheelを作って導入するため、この手動導入は不要です。
 
 SQLite DBのschema migrationと既存データbackfillは、backend初期化時に現行コードが実行します。更新前には必ずDBをバックアップしてください。
 
@@ -123,7 +138,7 @@ backend:
 
 ```sh
 cd /opt/inku/inku-lang/server
-sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-server
+sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run --no-sync inku-server
 ```
 
 別端末:
@@ -155,7 +170,7 @@ sudo systemctl enable --now inku-api.service
 sudo systemctl enable --now inku-server.service
 ```
 
-templateの`User`、`Group`、`WorkingDirectory`、`ExecStart`、`EnvironmentFile`は実環境に合わせます。`uv`と`npm`は絶対パスを確認してください。
+templateの`User`、`Group`、`WorkingDirectory`、`ExecStart`、`EnvironmentFile`は実環境に合わせます。API templateは`uv run --no-sync`で§5の準備済み環境を起動します。`uv`と`npm`は絶対パスを確認してください。
 
 ```sh
 command -v uv
@@ -195,11 +210,11 @@ Web UIでは次を確認します。
 
 - ログインとログアウト
 - 日本語／英語記述の描画
-- 写生（Stage 0.5）を`細かく`にして描き、左側に写生文が出ること
+- 写生を`あり`にして描き、記述の横に場所と光を補う写生文が出ること
 - 色カタログ、モデル、キャンバス、暴れるの選択
 - 推敲とモデル比較
 - 生成情報の詳細／プロンプト／JSON
-- 履歴の時系列／系譜ごと表示、ハッシュ下位4桁または全長のrender hashでの検索
+- 履歴の時系列／系譜ごと表示、render hashの全長・前方一致・下4桁と作品UUIDの全長・前方一致での検索
 - `設定`の`エクスポート`から保存先を選び、SVG／PNG、コンタクトシート、animationを書き出すこと。保存先は選んだブラウザだけに保持され、未選択時はブラウザ既定のdownload先になること
 - 管理者は`標準`／`詳細`を切り替え、`詳細`で`制限値`と`その他（サーバー）`を開いて保存できること
 - `DB設定`でbackup状態を、`ログ保存`で保持設定を確認できること
@@ -213,10 +228,10 @@ Web UIでは次を確認します。
 
 ```sh
 cd /opt/inku/inku-lang/server
-sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv sync --locked
-sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run pytest
-sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv run ruff check src tests
+sudo -u inku env UV_CACHE_DIR=/tmp/inku-uv-cache uv sync --locked --inexact
 ```
+
+同じ更新sourceのnative wheelを§5の手順で再ビルド・再導入し、importとpipeline入口を確認します。今回変更した機能に対応する検査だけを、`uv run --no-sync pytest <対象nodeid>`と`uv run --no-sync ruff check <変更したPython path>`で行います。起動済みという事実だけではwheelとsourceの一致を保証しません。
 
 ```sh
 cd /opt/inku/inku-lang/web
@@ -241,7 +256,7 @@ rollback前に、更新後DBが旧コードと互換かを確認します。sche
 1. サービスを停止します。
 2. 更新前コードとDB backupを復元します。
 3. `INKU_SECRET_KEY_FILE`を同じものへ戻します。
-4. 依存関係を同期し、サービスを起動します。
+4. `uv sync --locked --inexact`で依存関係を同期し、復元したsourceと一致するnative wheelを§5に従い再導入・確認して、サービスを起動します。
 5. health checkと履歴再現を確認します。
 
 ## 15. アンインストール

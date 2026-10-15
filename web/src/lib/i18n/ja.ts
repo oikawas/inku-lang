@@ -701,6 +701,8 @@ export const ja: LangPack = {
 	savedWorkExportDdl: 'DDL（プラグイン定義付き）',
 	savedWorkExportAiContactSheet: 'AI用コンタクトシート',
 	savedWorkExportUnavailable: '保存済みの利用可能な作品を確認できませんでした。',
+	savedWorkExportFolderDenied: '設定したフォルダへの書き込みが許可されなかったため、ブラウザのダウンロードに切り替えました。',
+	savedWorkExportFolderFailed: '設定したフォルダに保存できなかったため、ブラウザのダウンロードに切り替えました。',
 	workActionRefine: '推敲する',
 	workActionOpenMenu: '作品編集メニューを開く',
 	workActionMenuTitle: '作品編集',

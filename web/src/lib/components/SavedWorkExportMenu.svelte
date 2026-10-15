@@ -7,6 +7,7 @@
 	import type { SheetVariant } from '$lib/contactSheet';
 	import { svgImage } from '$lib/svgImage';
 	import type { SvgProfile } from '$lib/features/export/download';
+	import { exportFallbackReason, exportSaveFailure, type ExportSaveActionResult, type ExportSaveResult } from '$lib/features/export/save-result';
 	import {
 		snapshotSavedWorkExport,
 		type SavedWorkExportScope,
@@ -20,12 +21,12 @@
 		variant?: 'canvas' | 'panel';
 		/** Open over the page, for a trigger inside a pane that scrolls and so clips. */
 		floating?: boolean;
-		onDownloadSVG?: (profile: SvgProfile, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
-		onDownloadPNG?: (height: number, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
-		onDownloadCard?: (historyId: string, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
-		onDownloadDdl?: (snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
-		onDownloadAnimation: (snapshot: SavedWorkExportSnapshot, settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle) => void | Promise<void>;
-		onDownloadContactSheet: (snapshot: SavedWorkExportSnapshot, variant: SheetVariant) => void | Promise<void>;
+		onDownloadSVG?: (profile: SvgProfile, snapshot: SavedWorkExportSnapshot) => ExportSaveActionResult;
+		onDownloadPNG?: (height: number, snapshot: SavedWorkExportSnapshot) => ExportSaveActionResult;
+		onDownloadCard?: (historyId: string, snapshot: SavedWorkExportSnapshot) => ExportSaveActionResult;
+		onDownloadDdl?: (snapshot: SavedWorkExportSnapshot) => ExportSaveActionResult;
+		onDownloadAnimation: (snapshot: SavedWorkExportSnapshot, settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle) => ExportSaveActionResult;
+		onDownloadContactSheet: (snapshot: SavedWorkExportSnapshot, variant: SheetVariant) => ExportSaveActionResult;
 		onValidateSnapshot: (snapshot: SavedWorkExportSnapshot) => boolean | Promise<boolean>;
 	};
 
@@ -49,6 +50,7 @@
 	let snapshot = $state<SavedWorkExportSnapshot | null>(null);
 	let busy = $state(false);
 	let error = $state<string | null>(null);
+	let fallbackReason = $state<'denied' | 'failed' | null>(null);
 	let wrapperEl = $state<HTMLDivElement | null>(null);
 	let menuEl = $state<HTMLDivElement | null>(null);
 	let triggerEl = $state<HTMLButtonElement | null>(null);
@@ -111,6 +113,7 @@
 			return;
 		}
 		error = null;
+		fallbackReason = null;
 		snapshot = next;
 		open = true;
 		void tick().then(() => menuEl?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus());
@@ -134,21 +137,42 @@
 		buttons[next]?.focus();
 	}
 
-	async function run(action: (target: SavedWorkExportSnapshot) => void | Promise<void>): Promise<boolean> {
+	function saved(result: ExportSaveResult): void {
+		showFallback(exportFallbackReason(result));
+	}
+
+	function showFallback(reason: 'denied' | 'failed' | null): void {
+		fallbackReason = reason;
+		// A fallback is a completed download, but its changed destination needs
+		// to remain visible after the action or animation dialog has finished.
+		open = fallbackReason !== null;
+		if (fallbackReason) void tick().then(() => {
+			if (menuEl) menuEl.scrollTop = 0;
+			if (floating) placeFloatingMenu();
+		});
+	}
+
+	function failed(cause: unknown): void {
+		const failure = exportSaveFailure(cause);
+		if (failure.fallbackReason) showFallback(failure.fallbackReason);
+		error = failure.error;
+	}
+
+	async function run(action: (target: SavedWorkExportSnapshot) => ExportSaveActionResult): Promise<boolean> {
 		const target = snapshot;
 		if (!target || busy) return false;
 		busy = true;
 		error = null;
+		fallbackReason = null;
 		try {
 			if (!(await onValidateSnapshot(target))) {
 				error = t().savedWorkExportUnavailable;
 				return false;
 			}
-			await action(target);
-			open = false;
+			saved(await action(target));
 			return true;
 		} catch (cause) {
-			error = cause instanceof Error ? cause.message : String(cause);
+			failed(cause);
 			return false;
 		} finally {
 			busy = false;
@@ -160,12 +184,12 @@
 		if (!target || busy) throw new Error(t().savedWorkExportUnavailable);
 		busy = true;
 		error = null;
+		fallbackReason = null;
 		try {
 			if (!(await onValidateSnapshot(target))) throw new Error(t().savedWorkExportUnavailable);
-			await onDownloadAnimation(target, settings, directory);
-			open = false;
+			saved(await onDownloadAnimation(target, settings, directory));
 		} catch (cause) {
-			error = cause instanceof Error ? cause.message : String(cause);
+			failed(cause);
 			throw cause;
 		} finally {
 			busy = false;
@@ -178,10 +202,10 @@
 		return template.description || t().pngYAxisDescription(template.y_px);
 	}
 
-	async function runCard(target: SavedWorkExportSnapshot): Promise<void> {
+	async function runCard(target: SavedWorkExportSnapshot): Promise<ExportSaveResult> {
 		cardRunning = true;
 		try {
-			await onDownloadCard?.(target.ids[0], target);
+			return await onDownloadCard?.(target.ids[0], target);
 		} finally {
 			cardRunning = false;
 		}
@@ -218,6 +242,10 @@
 				<strong>{scopeLabel(snapshot)}</strong>
 				{#if transition && snapshot.kind !== 'lineage-path'}<span>{t().savedWorkExportOldestFirst}</span>{/if}
 			</div>
+			{#if fallbackReason}
+				<p class="saved-work-export-notice" role="status">{fallbackReason === 'denied' ? t().savedWorkExportFolderDenied : t().savedWorkExportFolderFailed}</p>
+				{#if error}<p class="saved-work-export-error" role="alert">{error}</p>{/if}
+			{/if}
 			{#if single}
 				{@const target = snapshot.works[0]}
 				<div class="saved-work-export-target">
@@ -290,7 +318,7 @@
 					<button type="button" role="menuitem" disabled={busy} onclick={() => void run((target) => onDownloadContactSheet(target, 'ai'))}>{t().savedWorkExportAiContactSheet}</button>
 				{/if}
 			</div>
-			{#if error}<p class="saved-work-export-error" role="alert">{error}</p>{/if}
+			{#if error && !fallbackReason}<p class="saved-work-export-error" role="alert">{error}</p>{/if}
 		</div>
 	{/if}
 </div>
@@ -340,4 +368,5 @@
 	.saved-work-export-help-table th { background: var(--bg); color: var(--fg2); font-weight: 700; white-space: nowrap; }
 	.saved-work-export-help-table td:first-child { white-space: nowrap; font-weight: 600; }
 	.saved-work-export-error { margin: 0; padding: 8px 12px; border-top: 1px solid var(--border); color: var(--danger); font-size: var(--ui-font-size-12); }
+	.saved-work-export-notice { margin: 0; padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--fg); background: var(--bg2); font-size: var(--ui-font-size-12); line-height: 1.5; }
 </style>

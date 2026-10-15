@@ -12,7 +12,7 @@ M1のSwift／Rust基盤、M2のstandalone host／SQLite保存境界に続き、m
 
 更新したUniversal appの隔離DBで、DDL生成→編集child→libraryのcomment／star→trash／復元→restart、日英切替と系譜表示、複数選択2作品のPNG2160保存を確認しています。機能のsource接続、限定したoffline確認、native操作、作者の通常利用の受入は別に記録します。旧Server／Android物理DBのimport、実provider／OAuth、他exportのnative・性能、Intel／macOS14実機は未完了です。廃止済みhistory.json移行utilityの配列は現行Webの復元形式ではありません。iOSは共通packageと初期Rust artifactまでで、最新APIのartifact再生成、iPad／iPhone app、camera、shareと実機受入は未完了です。
 
-Personal ChatGPTは設定の専用画面で明示して有効化・接続し、提供されたmodelを描画用に選びます。通常のAPI key接続とは別で、初期状態は無効です。発行済みclient IDと本人の接続同意が必要で、実本人認証・model取得・推論は未受入です。記述、写生、自動配色、構図の読み、DDL補完に対応し、Vision推敲・奥書等の未対応用途は画面で説明します。詳細は[Swift仕様](SWIFT_SPEC.ja.md#personal-chatgpt)を参照してください。
+Personal ChatGPTは設定の専用画面で明示して有効化・接続し、提供されたmodelを用途別に選びます。通常のAPI key接続とは別で、初期状態は無効です。発行済みclient IDと本人の接続同意が必要で、実本人認証・model取得・推論は未受入です。コード上は記述、写生、自動配色、構図の読み、DDL補完に加え、Vision用途で公開したmodelによるVision推敲・奥書を接続しています。画像とテキストをResponsesへ送る実装上の対応であり、実providerでの受入済みを意味しません。デモの記述生成は対象外です。詳細は[Swift仕様](SWIFT_SPEC.ja.md#personal-chatgpt)を参照してください。
 
 今回の現行Server追随では、Score 0.19／描画エンジン73の共通core、Stage 1から構図読みへの保持fallback清掃、作品別のimmutable表示snapshotを取り込んでいます。具体差分のRust5 selector、保存／再作成／cancelのHost1 caseと最新appの型検査が成功しています。最終native操作・CLI同入力比較・実providerの確認は別の証拠を要し、iOS／Intel／macOS14実機の完成を意味しません。
 

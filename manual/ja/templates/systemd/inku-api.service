@@ -10,7 +10,7 @@ Group=inku
 WorkingDirectory=/opt/inku/inku-lang/server
 EnvironmentFile=/etc/inku/inku-api.env
 Environment=UV_CACHE_DIR=/tmp/inku-uv-cache
-ExecStart=/usr/local/bin/uv run inku-server
+ExecStart=/usr/local/bin/uv run --no-sync inku-server
 Restart=on-failure
 RestartSec=5
 # Logging: the application writes and rotates its own file under INKU_LOG_DIR,

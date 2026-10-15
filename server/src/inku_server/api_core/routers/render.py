@@ -77,6 +77,10 @@ class ComposeRequest(BaseModel):
     auto_repair: bool = Field(default=True, description="Deprecated compatibility field; ignored")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     wild: bool = Field(default=False, description="Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed")
+    limits: dict[str, int] | None = Field(
+        default=None,
+        description=_LIMITS_FIELD_DESCRIPTION + " A managed saved work keeps its locked compiler resource policy.",
+    )
     composition_seed: int | None = Field(default=None, description="Composition seed for shared-pipeline layout; omitted means the placement follows the performance seed")
     recompose_mode: Literal["principled", "chance"] | None = Field(
         default=None,
@@ -92,10 +96,9 @@ class ComposeRequest(BaseModel):
         max_length=64,
         description="DDL書き出し(inku.ddl-export.v1)が運ぶプラグイン定義。この新しい作品だけで使う",
     )
-    # Stage 0.5: this endpoint starts at Stage 2, so it never runs 0.5 itself.
-    # A caller that already has a sketch text (a candidate, a replay) passes it
-    # here and it stands in for the description everywhere the description went.
-    sketch_text: str | None = Field(default=None, max_length=100_000, description="写生層 (Stage 0.5) の出力。与えられたら記述の代わりに後段へ渡る")
+    # This endpoint does not run a sketch. Supplied text is retained as context
+    # beside the description; it does not replace the authored DDL or description.
+    sketch_text: str | None = Field(default=None, max_length=100_000, description="保存済みの写生文。記述を置換せず補足する。この入口では写生を呼ばない")
     sketch_grain: str | None = Field(default=None, pattern="^(fine|coarse)$", description="写生の区切り fine / coarse (記録・再現用。この経路では 0.5 を呼ばない)")
     work_id: str | None = Field(
         default=None,

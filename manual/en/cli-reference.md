@@ -2,7 +2,7 @@
 
 inku-cli controls the same public HTTP API as the Web UI. It uses the stored session, while the server enforces the permissions that follow from the `users`, `leaders`, and `admins` groups.
 
-It covers inku v2.13.42 (Web Build 929).
+It covers inku v2.15.147 (Web Build 1223).
 
 ## Basics
 
@@ -25,6 +25,7 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 | inspect | Inspect and compare multiple inference models in parallel |
 | review | Evaluate works with Vision and submit unread words |
 | render-score | Render Score JSON without Stage 1 or Stage 2 |
+| render-local | Render and compare Score offline with a chosen checkout's core; no server connection or DB save |
 | demo-instruction | Write a demo description |
 | history / history-export | List or export history by hash |
 | unread-words | Show the user's ledger; administrators may use --all |
@@ -46,18 +47,17 @@ paint and batch take the same flags. **A flag you omit falls back to the server 
 ### Input and output
 
 JSON artifacts record the version of the DDL layer that drew the work in `ddl_version` and `ddl_engine_version`.
-For limits they record the values used in `render_limits`, where those came from in `render_limits_source` (`work` for the work's own row, `settings` for today's settings, `work_unrecorded` for a row that recorded no limits), and the notes of the limits that took effect in `render_limit_notes`.
+For limits they record the values used in `render_limits` and their origin in `render_limits_source` (`work` for the work's own row, `settings` for today's settings, `request` for this request, and `work_unrecorded` for a row that recorded no limits). Compatibility rendering, such as old-Score rendering, records notes of limits that took effect in `render_limit_notes`.
 
 | Flag | Contents |
 |---|---|
-| `--file FILE` / `-f` | Read the description from a UTF-8 file; `-` means stdin for paint. For batch, each non-empty line is one work |
+| `--file FILE` / `-f` | Read the description or DDL from a UTF-8 file; `-` means stdin for paint. For batch, each non-empty line is one work |
 | `--out-dir DIR` / `-o` | Destination for JSON, SVG, and PNG output |
 | `--prefix P` | Output filename prefix |
 | `--png` | Also write PNG when `--out-dir` is set |
 | `--svg-profile {display,editable,compat,live}` | SVG profile for saved files |
-| `--input-mode {paint,ddl}` | `paint` sends prose through Stage 1; `ddl` sends instructions straight to Stage 2 and the performance |
-| `--fires-on PROSE` | **`--input-mode ddl` only.** The prose a plugin expansion fires on. **What fires an expansion is the description, not the instructions**, so without this a DDL that spells a plugin word expands to nothing |
-| `--ddl-text DDL` | **`render-score` only.** Hands the instructions to coerce, so the instruction-driven repairs run as they do in paint (a stated count or relation reaches the picture). **Omit it and those repairs stay off, as before** |
+| `--input-mode {paint,ddl}` | `paint` sends the description through Stage 1; `ddl` starts from visible DDL and proceeds to compilation, any required hole completion, and performance. See SPEC for each stage's meaning |
+| `--ddl-text DDL` | **`render-score` only.** Sends the instructions as provenance / hash metadata; it does not automatically repair counts or relations from DDL |
 | `--ddl-file PATH` | **`render-score` only.** Reads the instructions from a file; `-` means stdin. Cannot be combined with `--ddl-text` |
 | `--save-history` | Save to the server's history |
 | `--save-artifacts` / `--no-save-artifacts` | Whether the server stores artifacts |
@@ -68,8 +68,8 @@ For limits they record the values used in `render_limits`, where those came from
 
 | Flag | Contents |
 |---|---|
-| `--sketch` | Send the description through the sketch-from-life layer before interpretation. **The server default is off; the Web UI default is fine** |
-| `--sketch-grain {fine,coarse}` | The grain. `fine` is the server default |
+| `--sketch` | Enable a sketch that adds place and light alongside the original description for interpretation. Both server and Web UI default to off. Current choices are off/on |
+| `--sketch-grain {fine,coarse}` | Compatibility flag for old works; unused by the current sketch |
 | `--sketch-text TEXT` | Use this sketch text instead of calling Stage 0.5, replaying a saved or hand-edited sketch |
 
 Variation is retired. The old amplitude and seed flags are rejected. Saved variation metadata stays in the database and is never sent in a new drawing request.
@@ -78,7 +78,7 @@ Variation is retired. The old amplitude and seed flags are rejected. Saved varia
 
 | Flag | Contents |
 |---|---|
-| `--wild` | Remove the stroke limit |
+| `--wild` | Remove the stroke-amplitude ceiling; also effective with DDL input to `paint` / `batch` |
 | `--color-catalog ID` | Server color catalog id |
 | `--catalog-id ID` | Legacy alias for `--color-catalog` |
 | `--catalog-mode {fixed,auto,random}` | `fixed` uses `--color-catalog`, `auto` lets the server read the description and pick, `random` draws one other than `--color-catalog` |
@@ -91,7 +91,7 @@ Variation is retired. The old amplitude and seed flags are rejected. Saved varia
 |---|---|
 | `--render-seed SEED` | Performance seed. The same seed and the same score give the same picture |
 | `--composition-seed SEED` | Seed for where the marks are placed. Without it the placement follows `--render-seed` (render engine 23 onwards) |
-| `--limits KEY=VALUE ...` | On `paint` and `render-score`, set limits for this one drawing. **It can only lower them** — each element is taken as the smaller of the given value and the server's current setting, so an administrator's ceiling cannot be exceeded. Without the flag the key is not sent at all (an empty setting reads as a declaration to override, not as leaving things alone) |
+| `--limits KEY=VALUE ...` | Set request limits for `paint` / `batch` (including `--input-mode ddl`) and `render-score`. Each element is capped at the server's current setting, so an administrator's ceiling cannot be exceeded. Omitted flags are not sent. See [Server Configuration §5.1](server-configuration.md#51-limits) for the four values used by the normal pipeline and the old compatibility values |
 
 ### Models and language
 
@@ -103,6 +103,27 @@ Variation is retired. The old amplitude and seed flags are rejected. Saved varia
 | `--include-thinking` | Include the thinking output in the response |
 
 batch additionally takes `--continue-on-error`.
+
+For example, set the performance mode and request ceiling for DDL input:
+
+```sh
+uv run inku-cli paint --input-mode ddl --file work.ddl --wild --limits max_expanded_primitives=200
+```
+
+## Rendering without a server (render-local)
+
+Render SVG and optional PNG with a chosen product checkout's core, or a git-archive containing the required source, without connecting to a server. Install the pinned Rust toolchain from `core/rust-toolchain.toml` and Cargo dependencies beforehand. Every invocation checks source freshness through an offline incremental build; missing dependencies stop the command rather than being fetched automatically.
+
+```sh
+# (a) Inherit saved conditions from one history-export item JSON
+uv run inku-cli render-local --core-root /path/to/inku-lang \
+  --from-work-file exported-work.json -o replay.svg --png replay.png
+# (b) A standalone Score; supply saved colors, seeds, etc. when needed
+uv run inku-cli render-local --core-root /path/to/inku-lang \
+  --file score.json -o rendered.svg --color-map colors.json --render-seed 123
+```
+
+Both inputs require a current compiled Score with `resource_policy.hard_policy` and `resource_policy.operational_budget`; this is not a general migration command for old Scores. (a) inherits the work's color map, seeds, canvas, profile, wild setting, and limits, and compares bytes with its saved SVG when present. (b) uses core defaults for unspecified conditions. `--limits` accepts only the four replay ceilings and rejects values above the Score's saved hard policy. `--compare-svg FILE` adds another SVG byte comparison. JSON on stdout records hashes, timings, selected conditions, and checkout HEAD / dirty state, among other provenance. No DB save occurs. Equality across different source or conditions is not guaranteed.
 
 ## History and feedback
 
@@ -162,7 +183,7 @@ The colophon is neither an evaluation nor a selection command. It must not be co
 | `single-user show` | Show which account a single-user server opens as, and who else could |
 | `single-user set USER_ID` | Move it to another account, which must hold `admins` |
 
-`user` and `group` require a session in `admins` or `leaders`; `config` requires one in `admins`. `user create` takes the permission groups as `--permission-group {users,leaders,admins}`, which may be repeated. Limits, painting concurrency, the log retention policy, and DB backup settings are all `config` subjects. See `Server Configuration` for what the values mean.
+`user` and `group` require a session in `admins` or `leaders`; `config` requires one in `admins`. `user create` takes the permission groups as `--permission-group {users,leaders,admins}`, which may be repeated. Existing limits, log retention policy, and DB backup settings are `config` subjects. Painting concurrency has no dedicated flags; use `api GET/PUT /api/settings/render-concurrency` as shown in [Server Configuration §2.3](server-configuration.md#23-artifacts-and-concurrency).
 
 ## Calling any public API
 
@@ -182,6 +203,41 @@ Permissions match the GUI. A member holding only `users` reaches their own works
 When retrying a write API, passing the same Idempotency-Key prevents a work and its lineage from being saved twice.
 
     uv run inku-cli api POST /api/history --file work.json --header Idempotency-Key=import-20260715-001
+
+### Continuing after a 409 approval / author-edit response
+
+When `paint` / `batch` returns 409 with `pipeline_patch_approval_required` or `pipeline_author_action_required`, inspect `detail.current_view` instead of submitting the generation again. The response identifies the target with `pipeline_variation_id` / `pipeline_execution_id`. Replace `VARIATION_ID`, `EXECUTION_ID`, and `REVISION` below with `variation_id`, `execution_id`, and `authority.revision` from that response or the latest view. Keep the revision as a decimal string.
+
+```sh
+uv run inku-cli api GET /api/pipeline/variations/VARIATION_ID
+```
+
+Act only after `busy` becomes false. For `phase.tag=awaiting_patch_approval`, read the current `document.source` and `phase.candidate.source` / `phase.patch`. Only if you accept it, copy `phase.proposal_digest` into `DIGEST` and submit:
+
+```sh
+uv run inku-cli api POST /api/pipeline/executions/EXECUTION_ID/commands \
+  --data '{"tag":"approve_patch","expected_revision":"REVISION","proposal_digest":"DIGEST"}'
+```
+
+To decline and edit yourself, send `{"tag":"decline_patch","proposal_digest":"DIGEST"}` to the same endpoint, then read the latest view. To edit in `needs_user_edit` or a similar author-edit state, revise the full DDL from `document.source` when a document exists, or author the full DDL when it does not. Save the following as UTF-8 `author-ddl.json`:
+
+```json
+{"expected_revision":"REVISION","source":"complete revised DDL"}
+```
+
+```sh
+uv run inku-cli api POST /api/pipeline/executions/EXECUTION_ID/author-ddl --file author-ddl.json
+uv run inku-cli api GET /api/pipeline/variations/VARIATION_ID
+```
+
+If the edit response returns a new variation / execution, use those IDs from then on. Poll GET at intervals until `busy=false`, `phase.tag=score_ready`, and `delivery` is present before performing. Check the same conditions after approval too.
+
+```sh
+uv run inku-cli api POST /api/pipeline/executions/EXECUTION_ID/commands --data '{"tag":"perform"}'
+uv run inku-cli api GET /api/pipeline/variations/VARIATION_ID
+```
+
+Poll until `busy=false` and `result` is present, then inspect the completed result. Return to the relevant steps if approval or editing is required again; stop for `failed` / `cancelled`. For a 409 `authority_conflict` / `stale_result`, reread `current_view` instead of resending an old revision or digest. Approval, editing, and performance operate on an execution belonging to the same signed-in user.
 
 
 ## Commands for autonomous operation and quality improvement

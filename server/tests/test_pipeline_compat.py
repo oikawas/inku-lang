@@ -7,7 +7,8 @@ from copy import deepcopy
 
 import httpx
 import pytest
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -15,6 +16,63 @@ from inku_server import pipeline_compat
 from inku_server.api_core import common as api_common
 from inku_server.api_core.routers.render import ComposeResponse
 from inku_server.persistence.schema import Base
+
+
+def test_compose_http_forwards_requested_limits_to_the_pipeline(monkeypatch) -> None:
+    """The HTTP schema must preserve limits before the host applies its ceiling."""
+    from types import SimpleNamespace
+
+    from inku_server.api_core.deps import _current_user
+    from inku_server.api_core.routers.render import router
+    from inku_server.pipeline_defaults import ADDITIONAL_RESOURCE_LIMITS
+    from inku_server.pipeline_settings import PipelineSettings
+
+    requested = {"max_expanded_primitives": 60}
+    captured = []
+    effective = []
+    budget = {"maximum": dict(ADDITIONAL_RESOURCE_LIMITS)}
+    settings = PipelineSettings(
+        SimpleNamespace(canvas_registry={
+            "registry": {"schema": "fixture", "formats": [{"id": "square"}]},
+            "digest": "fixture",
+        }),
+        {"schema": "inku.pipeline-host.v1", "pipeline": {"catalogs": [], "compiler": {
+            "host": {}, "hard_resource_policy": {"budget": deepcopy(budget)},
+            "operational_resource_budget": deepcopy(budget),
+        }}},
+        admin_limits_for=lambda _owner: {"max_expanded_primitives": 40},
+        plugin_storage_for=lambda _owner: {},
+    )
+
+    class Service:
+        def start(self, owner, kind, source, **kwargs):
+            captured.append(kwargs["options"])
+            config = settings.config_for(owner, None, kwargs["options"].get("limits"))
+            effective.append(config["compiler"]["hard_resource_policy"]["budget"]["maximum"]["primitive_marks"])
+            return {
+                "execution_id": "execution-limits", "variation_id": "variation-limits",
+                "authority": {"revision": "0"}, "busy": False,
+                "document": {"source": source}, "phase": {"tag": "completed"},
+                "delivery": {"score": {}},
+                "result": {"ddl": source, "score": {}, "svg": "<svg/>"},
+            }
+
+    monkeypatch.setattr(pipeline_compat, "_service", lambda: Service())
+    app = FastAPI()
+    app.dependency_overrides[_current_user] = lambda: {"id": "author"}
+    app.include_router(router)
+    with TestClient(app) as client:
+        response = client.post("/api/compose", json={"ddl": "one circle", "limits": requested})
+        assert response.status_code == 200
+        assert captured[-1]["limits"] == requested
+        assert effective[-1] == 40
+        response = client.post("/api/compose", json={"ddl": "one circle", "limits": {"max_expanded_primitives": 20}})
+        assert response.status_code == 200
+        assert effective[-1] == 20
+        response = client.post("/api/compose", json={"ddl": "one circle"})
+        assert response.status_code == 200
+        assert "limits" not in captured[-1]
+        assert effective[-1] == 40
 
 
 def test_compose_projects_opaque_score_and_never_approves_a_hole(monkeypatch) -> None:

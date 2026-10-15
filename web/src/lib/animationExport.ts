@@ -1,5 +1,5 @@
 import { downloadFolderSettings } from './features/export/download-folder.svelte.ts';
-import { saveBlob } from './features/export/save-target.ts';
+import { saveBlob, type SaveOutcome } from './features/export/save-target.ts';
 export type AnimationExportFormat = 'apng' | 'gif';
 export type AnimationPattern = 'cut' | 'crossfade' | 'fade_white' | 'slide';
 export type AnimationLayerReplay = 'restart' | 'reverse' | 'once';
@@ -118,7 +118,7 @@ export async function downloadAnimation(
 	ids: string[],
 	settings: AnimationExportSettings,
 	directory?: FileSystemDirectoryHandle
-): Promise<void> {
+): Promise<SaveOutcome> {
 	const response = await apiFetch('/api/history/export-animation', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
@@ -130,7 +130,7 @@ export async function downloadAnimation(
 	}
 	const blob = await response.blob();
 	// Same single path as every other download -- see features/export/save-target.
-	await saveBlob(blob, filenameFromResponse(response, settings.format), {
+	return saveBlob(blob, filenameFromResponse(response, settings.format), {
 		enabled: downloadFolderSettings.enabled,
 		directory,
 	});

@@ -16,6 +16,7 @@
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { SheetVariant } from '$lib/contactSheet';
 	import type { SvgProfile } from '$lib/features/export/download';
+	import type { ExportSaveActionResult } from '$lib/features/export/save-result';
 	import type { SavedWorkExportScope, SavedWorkExportSnapshot } from '$lib/features/export/saved-work';
 	import type { LineageGraph, LineageNode } from '$lib/features/history/types';
 	import type { LineageBrowsingState, LineageOrientation } from '$lib/features/history/lineage-state.svelte';
@@ -60,12 +61,12 @@
 		visionProviderGroups: ProviderGroup[];
 		animationExportSettings: AnimationExportSettings;
 		pngTemplates?: ExportTemplate[];
-		onDownloadSavedWorkSVG?: (profile: SvgProfile, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
-		onDownloadSavedWorkPNG?: (height: number, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
-		onDownloadSavedWorkCard?: (historyId: string, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
-		onDownloadSavedWorkDdl?: (snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
-		onDownloadSavedWorkAnimation: (snapshot: SavedWorkExportSnapshot, settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle) => void | Promise<void>;
-		onDownloadSavedWorkContactSheet: (snapshot: SavedWorkExportSnapshot, variant: SheetVariant) => void | Promise<void>;
+		onDownloadSavedWorkSVG?: (profile: SvgProfile, snapshot: SavedWorkExportSnapshot) => ExportSaveActionResult;
+		onDownloadSavedWorkPNG?: (height: number, snapshot: SavedWorkExportSnapshot) => ExportSaveActionResult;
+		onDownloadSavedWorkCard?: (historyId: string, snapshot: SavedWorkExportSnapshot) => ExportSaveActionResult;
+		onDownloadSavedWorkDdl?: (snapshot: SavedWorkExportSnapshot) => ExportSaveActionResult;
+		onDownloadSavedWorkAnimation: (snapshot: SavedWorkExportSnapshot, settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle) => ExportSaveActionResult;
+		onDownloadSavedWorkContactSheet: (snapshot: SavedWorkExportSnapshot, variant: SheetVariant) => ExportSaveActionResult;
 		onValidateSavedWorkExport: (snapshot: SavedWorkExportSnapshot) => boolean | Promise<boolean>;
 		browsingState: LineageBrowsingState;
 	};

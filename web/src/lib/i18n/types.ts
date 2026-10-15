@@ -600,6 +600,8 @@ export interface LangPack {
 	savedWorkExportDdl: string;
 	savedWorkExportAiContactSheet: string;
 	savedWorkExportUnavailable: string;
+	savedWorkExportFolderDenied: string;
+	savedWorkExportFolderFailed: string;
 	workActionRefine: string;
 	workActionOpenMenu: string;
 	workActionMenuTitle: string;

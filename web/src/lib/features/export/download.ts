@@ -92,6 +92,7 @@ export function createExportActions(deps: ExportDeps) {
 		}
 		const outcome = await triggerDownload(new Blob([svg], { type: 'image/svg+xml' }), deps.exportFilename(profile === 'display' ? 'svg' : `${profile}.svg`));
 		deps.onSaved?.(outcome);
+		return outcome;
 	}
 
 	async function downloadPNG(size: number) {
@@ -108,6 +109,7 @@ export function createExportActions(deps: ExportDeps) {
 		// passes none, so the file never left the page.
 		const outcome = await triggerDownload(stamped, deps.exportFilename('png', size));
 		deps.onSaved?.(outcome);
+		return outcome;
 	}
 
 	return { downloadSVG, downloadPNG };

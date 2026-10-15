@@ -1,23 +1,25 @@
 # Creating Images
 
-The Web instructions in this guide apply to inku v2.15.15 (Build 1091). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+The Web instructions in this guide use inku v2.15.147 (Build 1223) as their baseline. A description becomes visible instructions, passes through any needed completion and Rust compilation, and is performed from Score.
 
 ```text
-description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
-            -> plugin expansion -> settling (Stage 1.5) -> JSON Score (Stage 2) -> SVG
+description + sketch supplement (Stage 0.5, optional) -> interpretation (Stage 1) -> visible instructions (DDL)
+            -> composition reading and settling -> completion of needed holes (Stage 2) -> Rust compile -> JSON Score -> SVG
 ```
 
 The description is the work's score; the SVG is one performance. The same description may produce a different work when its models, sketch, composition seed, or render seed change.
+
+Stage 2 completes holes remaining in the visible instructions; the shared Rust compiler produces JSON Score. Relations come only from the author's instructions or explicit definitions. The old Stage 1.5 and coerce are not layers that invent relations, and the old `Auto-repair` switch is retired. Layer and fallback names retained in older works' provenance describe their historical execution.
 
 The vocabulary used in the UI is as follows.
 
 | Term | Meaning |
 |---|---|
 | description | The poetic input the author writes. The topmost layer of a work |
-| Sketch from life | The Stage 0.5 act of restating the description as prose in the language of things |
-| interpretation | The Stage 1 act of reading the description, or the sketch, into instructions |
+| Sketch from life | The Stage 0.5 act of keeping the description and adding prose about place and light |
+| interpretation | The Stage 1 act of reading the description and, when enabled, its sketch supplement into instructions |
 | instructions (normalized DDL) | The executable specification interpretation produces |
-| score (JSON Score) | The structured intermediate form of the instructions, stored deterministically |
+| score (JSON Score) | The intermediate form the shared Rust compiler produces from instructions, saved for performance |
 | performance (SVG) | The one-time result of performing the score |
 
 ## 1. Sign In and Choose the Display Language
@@ -28,7 +30,7 @@ The vocabulary used in the UI is as follows.
 
 The left app rail provides settings, profile, theme, UI display language, the tooltip toggle, and sign-out controls. The rail can be expanded or collapsed.
 
-The UI language and the description language are separate. Ordinary painting detects the description language from the entered text, including English text in the Japanese UI and Japanese text in the English UI. Only text with no usable language signal falls back to the UI language. You may also state it with `Description language`: `Auto`, `Japanese`, or `English`.
+The UI language and the description language are separate. Ordinary painting detects the description language from the entered text, including English text in the Japanese UI and Japanese text in the English UI. Only text with no usable language signal falls back to the UI language. Ordinary Web input always uses automatic detection and has no language selector; explicit API language settings are separate.
 
 `UI mode`, under `Display and operation` in Settings, chooses how much of the screen is shown.
 
@@ -115,7 +117,7 @@ No layer adds what the description does not ask for. What is written is performe
 
 **Naming a sheet with `Ground:` changes how the mark runs** (v2.13.31). Each of the seven supports carries its own absorbency and tooth, so the same description with the same settings leaves a different mark on washi than on canvas. How much it shows depends on the tool: a pen picks up almost nothing from the sheet. **`Surface: grain` and the sway `bleeding` now stay where they are when they land on a line or an arc** (also v2.13.31; Saijiki v2 moved bleeding from the surfaces to the sways). These two say how the mark runs rather than how an inside is, so they make that one instruction work the sheet harder (up to three times). **`Surface: sweep` stays there too** (v2.13.35; Saijiki v2's word for the retired pale ink wash, which becomes `faint sweep`). A sweep is not about the sheet but about the stroke (a broad sweep of the brush), so instead of working the sheet it **draws that one mark as a broader band** (three times the width, at 0.8 of the tool's opacity); for a paler band, add the handling word `faint`. **Before v2.13.35, a wash named on a line or an arc was drawn nowhere at all.** The other surface words move to the closed shape before them as before, and are dropped where there is none.
 
-A written number is drawn as written, without having to be emphasised as "three lines only". It takes effect when the sentence points to a single group. If several groups share the same shape, colour and weight so that the sentence does not settle on one of them, the count is left alone. How far the number reaches is set by the boundary in `Stated counts` in [Server configuration](server-configuration.md) — up to 239 by default; above that the work is shown as a crowd. When the number asked for would cross the limit for one work or for one group, it is left as it is rather than drawn part of the way. **Numbers are read the same way in Japanese and in English**: a `12` written in an English description is a count even where the kanji of a plugin word stands beside it. When the phrase naming a plugin states no number, the sentence is read instead (a number in the phrase wins). **Numbers that name a direction, a kind, a degree, a row or a column are not counts, and neither are decimals** (the four of `four directions`, the thirty of `30 degrees`, `0.11`).
+An explicit count is retained in the meaning of the instructions. The current drawing budget does not silently substitute a representative count. If a single primitive exceeds the budget, the permitted prefix is drawn and diagnostics report the requested and performed counts. Older count rewriting and representation belong to saved-format compatibility. See [Server configuration](server-configuration.md) for details.
 
 A written size is treated the same way. A sentence that states a size, such as "a small circle", is drawn at that size. It takes effect when the clause stating the size settles on one group; if several clauses share the same shape so that it is not settled, the size is left alone. Where the clause states the value itself, such as `radius 0.02`, that value is used. A description that states no size is drawn at the default size, as before.
 
@@ -123,21 +125,20 @@ Leading serial numbers and bracketed annotations belong to the writer, not to th
 
 ## 4. Sketch from Life (Stage 0.5)
 
-`Sketch from life` restates the description as prose in the language of things before interpretation reads it. Choose it from `Sketch from life` in the button row of the describe tab.
+`Sketch from life` keeps the original description and adds prose about place and light for interpretation. Choose it from `Sketch from life` in the button row of the describe tab.
 
-| Grain | Contents |
+| Choice | Contents |
 |---|---|
-| Fine | Cut fine: one fact per short sentence, so more instructions come out. This is the Web UI default |
-| Coarse | Cut coarse: related facts bundled into longer sentences, each read more deeply |
-| Off | Skip the layer and send the description straight to interpretation. Not recommended |
+| Off | Skip the sketch and send the description to interpretation (default) |
+| On | Add a supplement about place and light to the description |
 
-Fine and coarse do not change how much is said, only how big the pieces are. Cut fine, the number of instructions grows; cut coarse, each instruction carries more.
+`Fine` and `Coarse` on older works record the sketch method used at the time. They are no longer current choices.
 
-The sketch reaches three consumers in place of the description: interpretation, the decision whether plugin expansion fires, and Stage 1.5. After painting, the result appears under `Sketch from life (Stage 0.5)` on the left and can be edited there. An edited sketch reaches interpretation as written.
+After painting, the result appears under `Sketch from life (Stage 0.5)` on the left and can be edited there. Drawing again with the same description and the sketch on sends the edited sketch to interpretation as a supplement. Changing the description generates a new sketch; switching the sketch off omits the supplement.
 
 If the layer does not answer, the description goes to interpretation unchanged and the work records that. A work painted with the layer off carries the same kind of record.
 
-`Sketch from life (Stage 0.5)` and the instructions (`Instructions (Japanese DDL)` and the like) each fold from the triangle in their heading. Folded, the heading, the rule, and `Edit` stay visible, and pressing `Edit` while folded opens the section. **The fold is saved on the account, not in the browser** — another machine opens it the same way. The sketch starts open and the instructions start folded.
+`Sketch from life (Stage 0.5)` folds from the triangle in its heading. This state is saved on the account and starts open. The instructions box stays visible. Folding numeric ranges within its editor is separate from collapsing the whole box.
 
 ## 5. Consult the Saijiki
 
@@ -158,7 +159,7 @@ Plugin words appear in the same row and wear the same face as built-in ones. The
 After painting, the instructions section on the left shows how Stage 1 read the input.
 
 - description: the words a human wrote
-- Sketch from life (Stage 0.5): the description restated as prose in the language of things
+- Sketch from life (Stage 0.5): prose supplementing the description with place and light (older works retain their original sketch)
 - instructions (normalized DDL): drawing instructions arranged into the core vocabulary
 - Expanded (Stage 2 input): the DDL Stage 2 actually received, after plugin expansion and the expansion layer filled in
 - JSON Score: the machine-readable score Stage 2 writes
@@ -166,7 +167,7 @@ After painting, the instructions section on the left shows how Stage 1 read the 
 
 The headings of the instructions section on the left and of the instructions editor name the language the instructions are read in: `Instructions (Japanese DDL)` or `Instructions (English DDL)`. The editor judges it again from the text being written. Numeric ranges and the like are written differently in Japanese and English, and the instructions are read with that language's grammar. A single hiragana, katakana, or kanji character makes them Japanese DDL, so one Japanese name in English instructions has them read as Japanese.
 
-`Auto-repair` enables or disables the deterministic repairs for invisible colors, overcrowding, contract violations, and the like. The repairs are: making colors that merge with the background visible; damping overcrowded lines, grains, and fills; filling in missing shape parameters; tidying duplicate instructions; removing invalid contact and positional relations; supplying colors and shapes the DDL left short; and supplying the composition's fulcrum, motion, and rhythm.
+The old `Auto-repair` switch is retired. When instruction validation or completion needs your decision, follow the displayed reason and the editing or approval controls.
 
 The instructions box on the Describe tab also lets you edit the whole text directly. The box and Instruction editor share highlighting, completions, range folding and editing, IME composition, and copying. Line numbers appear only in the Instruction editor. When the box is editable, clicking a Saijiki drawer word inserts it at the box's caret and also shows its preview. Before you place the caret, words append at the end. While the box is read-only, in batch mode, or while the editor dialog is open, the drawer only previews. Editing the box alone never draws; press `Draw from instructions` to redraw once.
 
@@ -341,7 +342,7 @@ In either form of autonomous refinement, a composition generation rebuilds its p
 
 The dialog remembers the method, number of generations, refinement elements and direction you chose last time, and opens with them next time (kept in this browser). The wild switch is not remembered; it starts from the work being refined.
 
-`Sketch from life` follows the work you start from. From a work drawn with it, each generation is drawn from that work's sketch prose and the layer is not run again; only a generation whose text gained a direction goes through the layer again, because its text has changed. From a work drawn without it, the generations are drawn without it too. The setting on the `Describe` tab is not used.
+Both methods draw the next generation from the parent's saved instructions without running the sketch again. The direction guides Vision's advice and choice of the next element to change; observations and the next direction are recorded, not appended to the drawing text. The sketch setting on the `Describe` tab is not used.
 
 ## 10. Change the Model
 
@@ -357,14 +358,14 @@ Choosing, saving, and discarding options work as in 8.2: choose the ones to keep
 
 Open the provenance drawer at the bottom of the work tab to see the record of the selected work. Its tabs are `Details`, `Prompts`, and `JSON`.
 
-`Details` is divided into six sections.
+`Details` has the following sections; sections such as Sketch and Origin depend on the work's records. The follow-selection setting in `Display and operation` is enabled by default: with the drawer open, selecting another work in the history strip switches its information to that work.
 
 | Section | Main contents |
 |---|---|
 | Sketch | The sketch record and the paper grain (**the record of the work on screen**, not the setting for the next painting) |
-| Interpretation | Stage 1 model, Stage 1 language, requested language, interpretation seed, interpretation fallback |
-| Performance | Stage 2 model, Stage 2 language, focus, Variation (retired) and its seed (old works only), composition seed, render seed, seed text, Wild, the colour words this work was drawn in, the colour catalogue, the canvas and its ratio, Score fallback, and **three rows for how heavy the drawing is** (`SVG size` / `SVG objects` / `SVG points`) |
-| Identity | render hash, description hash, render engine, DDL specification, transform layer, prompt digests, Build |
+| Interpretation | Stage 1 model, Stage 1 language, requested language, interpretation seed, interpretation fallback and Score fallback records |
+| Performance | Stage 2 model, Stage 2 language, focus, Variation (retired) and its seed (old works only), composition seed, render seed, seed text, Wild, the colour words this work was drawn in, the colour catalogue, the canvas and its ratio, and **three rows for how heavy the drawing is** (`SVG size` / `SVG objects` / `SVG points`) |
+| Identity | work ID (UUID), render hash, description hash, render engine, DDL specification, transform layer, prompt digests, Build |
 | Origin | generation, derivation, batch run ID and line number, comment, UI language |
 | Run | elapsed time, token counts |
 
@@ -374,9 +375,9 @@ Every row carries an explanation. The render seed is "the seed that fixes the sw
 
 `Prompts` shows the system prompts and input of the sketch (Stage 0.5), Stage 1, the composition reading, and Stage 2, in the order a work calls them. For the sketch and the composition reading it also shows the input actually sent. `JSON` shows the JSON Score. The system prompts are the ones actually sent when the work was drawn, and they differ from work to work with the plugins, the sketch, and retries. A stage that called no model (the sketch of a work drawn without one, Stage 1 of DDL you wrote yourself, the composition reading of a work that had none, Stage 2 when no hole needed filling) and a work drawn before the record began say so instead. The sketch and the composition reading have been kept since 2026-10-13, so an earlier work says they were not recorded. Do not confuse the JSON Score itself with the provenance.
 
-If Stage 1 does not answer in time, returns an empty answer, or fails, a stock set of instructions is performed and the reason is recorded as `Interpretation fallback`.
+Ordinary Stage 1 generation stops as a failure if its finite retries cannot succeed. Uncompleted holes in the instructions wait for the author's edits; neither case saves a stock replacement as a successful work. Limited fallbacks, such as using the original description after a sketch failure, are separate.
 
-**When Stage 2 does not answer either, the piece is performed by a stock procedure and the reason is recorded as `Score fallback`.** Both cases mark the work, and **a work where both fell back carries two marks**. In the generation details, `Score fallback` gives one of three answers: `yes` (it fell back), `no` (it did not), and `no record` (the work was drawn before this was recorded). **`No record` does not mean it did not fall back.**
+`Interpretation fallback` and `Score fallback` retained on old works describe their historical execution. `No record` does not mean no fallback occurred.
 
 **Choosing a marked work to refine asks you once before it runs.** That work's link to the words is broken, so you are asked whether to continue from it. The same work is not asked about twice.
 
@@ -403,11 +404,11 @@ The history strip at the bottom is for moving quickly back and forth in time. Op
 
 In the library, choose `Display` (`Thumbnails` or `List`) separately from `Group by` (`Timeline` or `By lineage`). Selecting a row or picture only opens its reading preview; it does not change the conditions for the next work. Use `Open work`, `Open lineage`, or `Refine` for those actions.
 
-Combine `Thumbnails` with `By lineage` to arrange works horizontally within each lineage, from the origin in generation order. Scroll vertically between lineage groups and horizontally through a long row of related works.
+Combine `Thumbnails` with `By lineage` to show only lineages with at least two works matching the current search and filters, arranged horizontally from the origin in generation order. Even a lineage with several works is omitted when only one matches. The lineage `List` view has no such two-work minimum. Scroll vertically between lineage groups and horizontally through a long row of related works.
 
-**What is printed under each thumbnail is chosen under `Display and operation` in `Settings`** (`Facts under the history thumbnails`). Choose **up to two** of generation, model, engine version and file size; **choose none and the strip shows only the pictures**. A third choice is refused rather than allowed to evict an existing one, and the limit is shown. **File size is the size the server reports for the stored work.**
+**What is printed under each thumbnail is chosen under `Display and operation` in `Settings`** (`Facts under the history thumbnails`). Choose **up to three** of generation, model, engine version and file size; **choose none and the strip shows only the pictures**. A fourth choice is refused rather than allowed to evict an existing one, and the limit is shown. **File size is the size the server reports for the stored work.**
 
-- Search by description, by the last four characters of the hash, or by **a whole render hash**
+- Search descriptions, DDL, Stage 1/2 models, color catalogs, whole hashes, hash beginnings or last four characters, and whole work IDs (UUIDs) or their beginnings. Find the UUID under `Identity` in Provenance. Searches are case-insensitive
 - Filters for starred only, for revision only, and shared only. Used together, only works matching every one of them remain
 - Switching between ordinary history and trash
 - Thumbnail view and list view. The list compares hash, timestamp, model, elapsed time, and color catalog
@@ -426,7 +427,9 @@ The share mark is a third one. Raise it with `Mark for sharing` at the bottom of
 
 Both the history strip and `Library` carry a `Shared only` filter, so the marked works can be listed on their own.
 
-`Replay` re-renders from the stored score and seed. If the engine version that painted the work differs from the current one, that fact and a comparison of the two are shown. Old history entries without a render seed cannot be replayed.
+`Replay` compares the saved SVG with a performance of the stored Score and conditions on the current engine. An engine-version difference is reported. Old works without a recorded render seed can also be compared using provisional seed 0; this does not guarantee exact recovery of their original performance.
+
+`Save this performance as a child` keeps the source and saves the replay in ordinary history as its child, without increasing the generation count. A readable saved source and matching parent are required. Saving is unavailable if the managed work's authority and policy cannot be retained or the comparison result cannot be verified. Read the displayed reason and retry after a failure; the source is never overwritten.
 
 ## 15. Export Images
 
@@ -440,7 +443,7 @@ Only a saved work is exported. A picture that is not saved (one drawn by the dem
 | Editable | Illustrator / Affinity | Regenerated from the score. Carries layer structure and stable IDs, and avoids filter and clip-path |
 | Compatibility | General SVG interchange | Regenerated from the score. Close to Editable, but favors robustness |
 | Live | Video software such as VIA2 | Drawn again from the score. Editable's structure with Display's textures and touch. Meant for software that draws one instruction at a time; for ordinary viewing Display is lighter |
-| PNG | Raster image at a chosen resolution | Standard, high resolution (2×), square, square high resolution. More templates can be added in the settings |
+| PNG | Raster image at a chosen resolution | Choose the height; width follows the work's aspect ratio. Default templates use heights of 1080 / 2160 / 4320px, and more can be added in settings |
 
 `Editable`, `Compat`, and `Live` are drawn again from the Score, and **a redraw uses the performance that was saved** (both the render seed and the composition seed the saved work carries). **The only difference from the stored SVG is how far the drawing engine has moved on** -- inku keeps no past version, so a redraw after the engine advances is never byte-identical.
 
@@ -522,41 +525,42 @@ Set `Batch retry` in the settings to one or more and the failed lines alone are 
 
 Open `Settings` → `Making` → `Demo`. It writes short descriptions from a seed phrase, then paints them repeatedly. Choose saving to DB, saving files, the description model, display interval in seconds, and timeout in minutes.
 
+Choose one drawing model for both Stage 1 and Stage 2, separately from the description model. ChatGPT plans cannot generate demo descriptions. The interval runs from the start of one description generation to the next. Generation and drawing time are subtracted: a 30-second setting with 20 seconds of work leaves about 10 seconds to wait. Work taking longer than the interval leaves no wait; no new work starts after the stop deadline.
+
 Starting Demo closes Settings so you can watch the canvas. While it runs, the making screen shows a stop control and `Demo settings and progress`, which reopens its settings. Description and Batch text are retained.
 
 Even with automatic saving disabled, the current work can be saved to history explicitly. The demo stops on its own when the configured time is reached. History actions are locked while a demo runs.
 
 ## 18. Settings
 
-Open it from `Settings` in the app rail. Settings are grouped as `Display and operation`, `Making`, `Export`, `Connections and administration`, and `Extensions and details`. The pages and controls visible depend on your role.
+Open it from `Settings` in the app rail. Settings are grouped as `Display and operation`, `Making`, `Export`, `Connections and administration`, and `Extensions and details`, with a separate `ChatGPT plan` category where personal connections are enabled. The pages and controls visible depend on your role.
 
 | Category | Pages and contents |
 |---|---|
 | Display and operation | `Display and operation`. Text size, caption position, UI mode, facts under history thumbnails, mascot, and related controls |
 | Making | `Batch retry` and `Demo` |
+| ChatGPT plan | When signed in and the feature is enabled, its dedicated page connects, reconnects, or disconnects your account. Publish models in your personal `Models` settings |
 | Export | `Export`. Save location, PNG export templates, animation, and the share card's page shape and seal |
-| Connections and administration (administrators) | `Models`, `User management`, `DB settings`, and `Log retention`. `Detailed` also shows `Other (server)` and `Limits` |
+| Connections and administration | Administrators manage shared `Models`, `User management`, `DB settings`, and `Log retention`. Leaders can also manage users within their scope. Where personal ChatGPT is enabled, members can open their own `Models` settings. Administrators' `Detailed` mode also shows `Other (server)` and `Limits` |
 | Extensions and details | `Detailed` shows `Plugins` and `Unread-word ledger` |
 
-To choose the drawing model, open `Model selection` from the making screen's conditions and select it in `Stage 1/2`. Choose the image-reading model separately in `Vision` when needed. The administrator's `Models` page manages connections and which models are published to members. Where no model is visible for a use, `Model selection` says there are no models to choose from and that an administrator can make them visible. A chosen model that has left the list is shown by its id, marked `Not in the list`. Hovering over a model shows `LLM` and `Vision` badges for its purposes (greyed where it cannot be chosen), the recommendation in three tiers (★★★, ★★☆, ★☆☆), the approximate cost (per drawing for LLM, per picture for Vision; $0 for a free model) and its speed (the measured mean seconds as a reference value when present, the speed label otherwise). Where a member's own ChatGPT plan can be connected, models published under `ChatGPT plan` in `Models` appear as "ChatGPT plan" candidates: for drawing when published for LLM, and for Vision refinement and colophons when published for Vision.
+To choose one drawing model for both stages, open `Model selection` from the making screen's conditions and select it in `Stage 1/2`. Choose the image-reading model separately in `Vision` when needed. Ordinary model selection omits providers with no candidates. If a normal provider's selected model disappears, selection moves to the first available candidate, or keeps the original ID if none exists. Personal ChatGPT does not switch to another model automatically and explains why it is unavailable. The generic pickers in Demo and the Instruction editor instead show empty-list guidance and mark an absent selected ID `Not in the list`.
+
+The stars at the edge of each drawing-model button summarize its rating. Ordinary Stage 1/2 selection uses the lower available stage rating, or the LLM rating for an end-to-end measurement. Its detailed hover can show the strengths of each measured stage. Generic pickers show a single rating for the purpose in both button and hover; they do not select models per stage. Hover also shows `LLM` and `Vision` badges (greyed where unavailable), three recommendation tiers (★★★, ★★☆, ★☆☆), approximate cost (per drawing for LLM, per picture for Vision; $0 for a free model), and speed (measured mean seconds when present, otherwise the speed label).
+
+Administrators' `Models` settings manage shared connections and publication. Where personal ChatGPT is enabled, connect through the separate `ChatGPT plan` page and publish models in your personal `Models` settings, independently of API key connections. Published ChatGPT plan models become drawing candidates for LLM use, and Vision refinement and colophon candidates for Vision use. See the [ChatGPT plan connection guide](../../docs/guide/chatgpt-plan.md).
 
 The settings dialog has `Standard` and `Detailed` modes, switched through `Display mode` at upper right. `Standard` shows everyday settings; **`Plugins`, `Limits`, `Unread-word ledger`, and `Other (server)` appear only in `Detailed`.** The choice remains in this browser.
 
 `Text size` in `Display and operation` has five values: 90%, 100%, 110%, 120%, and 130%. Moving it changes the screen immediately; confirming the control saves it on the account. `Return to standard` restores 100%. If saving fails, the current size remains visible and `Retry` saves it again. It does not change the work SVG, PNG output, or export dimensions.
 
-`User management` provides search, permission and no-group filters, then selection and editing of users. `Add user` opens the add form explicitly. Edit only the selected member, set permissions and groups, then use `Save changes`. While edits are unsaved, it does not refresh the list or select another user; a failed save keeps both input and error. It is available to administrators in the Web UI.
+`User management` provides search, permission and no-group filters, then selection and editing of users. `Add user` opens the add form explicitly. Edit only the selected member, set permissions and groups, then use `Save changes`. While edits are unsaved, it does not refresh the list or select another user; a failed save keeps both input and error. Administrators and leaders use it within their respective permission scopes in the Web UI.
 
-`Limits` is not a speed control: it changes the number of lines actually drawn. The mark and count values are written into the Stage 1 and Stage 2 prompts and recorded on every work painted. The `SVG limit` in the `SVG output` group is a safety ceiling for saving newly generated SVG: a work above it is not saved (it is not recorded on works and does not affect viewing saved works). See `Server Configuration` for the details.
+`Limits` applies to the current pipeline's resource policy and drawing budget. All nine values are not injected into both stages' prompts: the normal pipeline uses four ceilings, for marks per work, marks per instruction, resolved count, and instruction count. The `SVG limit` in the `SVG output` group is a safety ceiling for saving newly generated SVG: a work above it is not saved (it is not recorded on works and does not affect viewing saved works). See `Server Configuration` for saved conditions and the current mapping.
 
 **When a work is redrawn, the limits it was drawn under are the ones that apply** (v2.13.31). Today's settings are used only for an older work whose row recorded no limits. **When a limit actually takes effect and drops marks, it says so under the picture, named** (the same place as the plugin warnings). The same rule holds here as in the settings: a limit can be lowered for one drawing, never raised.
 
-The nine numbers fall into three families, and **each family answers to a different authority**
-(v2.13.28). `What this machine can draw` is how much the installed hardware can afford to put on one
-work, and it is the only family that should follow the machine. `Where counting by eye stops` is the
-line between a number small enough to draw as stated and one shown as a band instead — **a faster
-machine does not make an eye faster, so do not link it to the family above**. `Guards against a
-typing mistake` only stops a typo or a runaway, and moving it makes no drawing better. Hovering a
-family heading says what that family should follow.
+The nine values were introduced in v2.13.28 as three families: what the machine can draw, where counting by eye stops, and guards against typing mistakes. They remain for saved-format compatibility; the older thresholds and representative counts do not redefine the current meaning of a count.
 
 The `Unread-word ledger` collects words whose direct counterpart could not be confirmed when the description was interpreted into DDL. Nothing is promoted from this ledger into the dictionary automatically. Administrators can also see the ledger for everyone.
 
@@ -573,7 +577,7 @@ uv run inku-cli --base-url http://127.0.0.1:8100 paint "a blue line undulates lo
 The settings offered in the Web UI can be passed as flags.
 
 ```sh
-uv run inku-cli paint "night fog spreads" --sketch --sketch-grain coarse --wild \
+uv run inku-cli paint "night fog spreads" --sketch --wild \
   --catalog-mode auto --canvas-aspect byobu -o out --png --save-history
 ```
 
@@ -582,14 +586,14 @@ uv run inku-cli batch -f prompts.txt -o out --png --continue-on-error
 uv run inku-cli history --limit 20
 ```
 
-Flags you omit fall back to the server defaults, and the server defaults are not always the Web UI defaults. Sketch from life, for one, defaults to off on the server and to fine in the Web UI. See the `inku-cli Reference` for the full list of flags.
+Flags you omit fall back to the server defaults. Sketch from life defaults to off in both the server and Web UI. See the `inku-cli Reference` for all flags and compatibility with older sketch values.
 
 ## 20. When a Work Does Not Come Out
 
 | Symptom | What to do |
 |---|---|
 | Not what you meant | Read the instructions and make place, count, shape, and material concrete |
-| The description is read too coarsely | Set the sketch grain to `Fine`. If it is already fine, try `Coarse` |
+| The description is read too coarsely | Turn the sketch on to supplement place and light; review its text and edit it before drawing again if needed |
 | The picture is monotonous | Add one of touch, sway, composition, or color. Or try `Another composition` |
 | The lines are too tidy | Turn `Wild` on |
 | Too many elements | State the count explicitly, as in `three lines` or `twelve` |

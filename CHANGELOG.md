@@ -8,6 +8,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Align edited sketches, demo models, save notices, and CLI drawing options
+
+Redrawing the same description now uses the edited sketch text. Demo drawing uses one shared Stage 1/2 model selection, as ordinary creation does. Unsupported personal ChatGPT models are excluded from demo instruction generation while remaining available for drawing.
+
+When a configured export folder denies access or fails to write, the shared work, library, and lineage export menu explains the switch to browser downloads and stays open so the notice can be read. Save results are carried through SVG, PNG, instructions, cards, contact sheets, and animation. Failure of a directory chosen for only one animation remains an error.
+
+CLI DDL input now forwards both `--wild` and `--limits`; requested ceilings use the existing policy that cannot exceed current settings. Updated the specification, bilingual manuals, and help for current sketches, models, replay, export, settings, and failures, including required native-wheel installation and current pipeline configuration and author actions. The drawing core and engine version are unchanged.
+
 ### 2026-10-15 — Match macOS lineage-card ellipsis menus to Web
 
 The ellipsis now opens shared refinement actions for that card's work, instead of mixing in node navigation, marks, export, and deletion. Direct-DDL and held-description conditions follow the Web menu. Nodes without a saved work and trashed works have no ellipsis button.

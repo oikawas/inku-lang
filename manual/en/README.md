@@ -1,6 +1,6 @@
 # inku User and Operations Manual
 
-This manual explains how to use and operate inku. It is intended for first-time creators and system administrators who deploy and maintain the application. Web UI instructions reflect v2.15.15 (Web Build 1091). The canonical product specification is `SPEC.ja.md` at the repository root.
+This manual explains how to use and operate inku. It is intended for first-time creators and system administrators who deploy and maintain the application. Web UI instructions use v2.15.147 (Web Build 1223) as their baseline. The canonical product specification is `SPEC.ja.md` at the repository root.
 
 ## Audience
 

@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-15 — Align operation guidance with the Build 1223 baseline
+
+Aligned the target version to v2.15.147 / Web Build 1223 and updated sketch off/on and editing, direct instruction editing, shared-model ratings and selection, demo start intervals, and the history strip's three-field maximum. Added Library search and UUID guidance, lineage thumbnails requiring two matches after filtering, replay with a provisional seed and child saving, Provenance following history-strip selection, and height-based PNG templates. Clarified that autonomous refinement uses direction for Vision advice without adding it to drawing text. Installation, settings, and CLI guidance now describe current paths, separately from older settings and saved-work compatibility. This allocates no new version and makes no deployment claim.
+
 ## 2026-10-14 — Change the touches: the ways and the options
 
 At the author's request, section 8.6 of Creating Images names the ways Same tool

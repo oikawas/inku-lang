@@ -223,6 +223,9 @@
 						<span><small>{isJapanese ? '解釈' : 'Interpretation'}</small><span title={nextStage1Model}>{nextStage1Model}</span></span>
 						<span><small>{isJapanese ? '描画' : 'Performance'}</small><span title={nextStage2Model}>{nextStage2Model}</span></span>
 					{/if}
+					{#if chatgptPlanSelected && inputMode === 'single'}
+						<a class="chatgpt-plan-label" href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer" title={t().chatgptManageUsage}>{t().chatgptPlanLabel}</a>
+					{/if}
 				</div>
 			</div>
 			<div class="condition-row">
@@ -341,9 +344,8 @@
 					<PaintButton onclick={onSubmit} disabled={!canSubmit || generationDisabled}>{t().submitBtn}</PaintButton>
 				</Tooltip>
 			{/if}
-			{#if chatgptPlanSelected}
-				<p role="status">{chatgptModelAvailable ? t().chatgptUsingPlan : t().chatgptModelUnavailable}</p>
-				<a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer">{t().chatgptManageUsage}</a>
+			{#if chatgptPlanSelected && !chatgptModelAvailable}
+				<p role="status">{t().chatgptModelUnavailable}</p>
 			{/if}
 		{/if}
 
@@ -485,6 +487,14 @@
 		color: var(--fg3);
 		font-size: var(--ui-font-size-12);
 		font-weight: 400;
+	}
+	.chatgpt-plan-label {
+		justify-self: start;
+		color: var(--accent);
+		font-size: var(--ui-font-size-11);
+		line-height: 1.35;
+		text-decoration: underline;
+		text-underline-offset: 2px;
 	}
 	.condition-change { white-space: nowrap; }
 	.condition-compact-rows {

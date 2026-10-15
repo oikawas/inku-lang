@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Move the Description tab's ChatGPT plan link into the model field
+
+The ChatGPT plan label in the model-name field now carries the existing usage-settings link. The separate Using ChatGPT plan notice and Manage usage link below the paint button are removed. The unavailable-model warning remains.
+
 ## v2.15.144 (2026-10-15 / Build 1220)
 
 ### 2026-10-15 — Make history-strip model labels smaller and shorter

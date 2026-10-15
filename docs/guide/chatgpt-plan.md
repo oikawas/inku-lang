@@ -106,6 +106,8 @@ After connecting, follow the guide to Open Model settings. Select ChatGPT plan i
 
 Then open the drawing model picker and choose one ChatGPT plan model for Stage 1/2. Fetching alone neither publishes nor selects models. Ordinary users manage only their own ChatGPT models; administrators also retain shared provider administration.
 
+On the Description tab, the ChatGPT plan label in the model-name field opens ChatGPT usage settings in a new tab. The separate Using ChatGPT plan notice and Manage usage link below the paint button are removed. An unavailable selected model still shows a warning.
+
 After a drawing fails, select another model and draw again. Starting the new drawing clears the previous failure display without reloading the page.
 
 Settings show your registration label, state, scopes and active profile. Tokens, PKCE verifiers and ID tokens never enter screens, logs or browser storage. Limits are eight profiles, one pending authorization per owner and four overall. Storage defaults to `~/.config/ddl-server/chatgpt`, overridden by `INKU_CHATGPT_AUTH_DIR`, with a 0700 directory and 0600 files. A dedicated `credential.key` encrypts `enc:v1:` records. Plaintext compatibility and silently ignored decryption failures are unsupported. Existing API-key encryption is unchanged.

@@ -106,6 +106,8 @@ recipient/importはDBの本人とmodeを検証しますが、CLI実行をAPI起�
 
 保存後に描画の「モデル選択」を開き、ChatGPTプランからStage 1/2共通のモデルを選びます。一覧の取得だけではモデルを公開・自動選択しません。普通の利用者は本人のChatGPTモデルだけ、管理者は既存の共有providerも管理できます。
 
+記述タブでは、モデル名欄の「ChatGPTプラン」ラベルからChatGPTの利用枠画面を別タブで開けます。描画ボタン下の「ChatGPTプランを使用中」と独立した「利用枠を管理」は表示しません。選択モデルが利用不可の場合の警告は表示します。
+
 描画が失敗した後も、モデルを選び直してそのまま描画できます。新しい描画の開始時に前の失敗表示を消すため、ページの再読込みは不要です。
 
 画面は本人の登録ラベル、状態、scope、選択中profileを表示します。token、PKCE verifier、ID tokenを画面・log・browser storageへ出しません。最大8 profile、認可はownerごとに1件・全体4件です。保存先は既定`~/.config/ddl-server/chatgpt`（`INKU_CHATGPT_AUTH_DIR`で変更）、0700 directoryと0600 fileです。専用`credential.key`による`enc:v1:`暗号化を使い、平文互換や復号失敗の黙認はありません。既存APIキーの鍵は変更しません。

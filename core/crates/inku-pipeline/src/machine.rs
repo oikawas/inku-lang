@@ -1330,7 +1330,10 @@ impl PipelineSnapshot {
             composition_seed.unwrap_or(1),
             &work_id,
         );
-        let (composed, ranges, joints) = composition::composed_plan_with_joints(plan, &jointed);
+        // I-715 B2: a free line takes its direction from how the reading moves
+        // it, by the layer numbers of the plan the reading saw.
+        let plan = composition::with_free_line_angles(plan, reading);
+        let (composed, ranges, joints) = composition::composed_plan_with_joints(&plan, &jointed);
         let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
         let source = print_work_plan_composed_with_joints(
             &composed,

@@ -118,6 +118,17 @@
           "marker_surfaces_ja": null,
           "prompt": true,
           "score_value": null,
+          "surface_en": "free line",
+          "surface_ja": "自由線"
+        },
+        {
+          "default": false,
+          "display": true,
+          "marker": null,
+          "marker_surfaces_en": null,
+          "marker_surfaces_ja": null,
+          "prompt": true,
+          "score_value": null,
           "surface_en": "point",
           "surface_ja": "点"
         },
@@ -131,17 +142,6 @@
           "score_value": null,
           "surface_en": "cloudform",
           "surface_ja": "雲形"
-        },
-        {
-          "default": false,
-          "display": false,
-          "marker": true,
-          "marker_surfaces_en": null,
-          "marker_surfaces_ja": null,
-          "prompt": false,
-          "score_value": null,
-          "surface_en": "free line",
-          "surface_ja": "自由線"
         },
         {
           "default": false,

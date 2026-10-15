@@ -112,3 +112,46 @@ def test_a_description_is_composed_from_its_reading(author, sent):
     assert layers[2].startswith("下に、"), body["ddl"]
     assert body["elapsed_stage1_ms"] == 3
     assert body["elapsed_total_ms"] == 8
+
+
+FREE_LINE_PLAN = {"ground": "paper", "background": "white", "plugins": [], "layers": [
+    _layer("fill", "square", 1, "unspecified", "large", "gray"),
+    _layer("draw", "free_line", 1, "unspecified", "large", "black"),
+]}
+
+FREE_LINE_READING = {
+    "thesis": "一本の跡が場を昇っていく",
+    "roles": ["field", "focal"],
+    "relations": [{"type": "rising", "layers": [1], "side": "unspecified", "toward": "unspecified"}],
+    "tension": {"motion": "moving", "focus": "unspecified", "vertical": "unspecified",
+                "balance": "unspecified", "symmetry": "unspecified", "void": "unspecified"},
+    "stated_places": [],
+}
+
+
+def test_a_free_line_is_written_in_the_direction_its_reading_moves_it(author, monkeypatch):
+    """I-715 B2: a free line the plan gave no direction rises when its reading rises."""
+    answers = {
+        "generate_normalized_ddl": ("normalized_ddl_generated", FREE_LINE_PLAN, "3"),
+        "read_composition": ("composition_read", FREE_LINE_READING, "5"),
+    }
+
+    class Provider:
+        def __init__(self, _options, **_kwargs):
+            pass
+
+        def __call__(self, action):
+            tag, answer, elapsed = answers[action["tag"]]
+            return {"tag": tag, "identity": action["identity"],
+                    "response": json.dumps(answer, ensure_ascii=False), "elapsed_ms": elapsed}
+
+    monkeypatch.setattr(pipeline_product, "SingleAttemptProvider", Provider)
+    painted = client.post("/api/paint", json={
+        "description": "迷子の猫が夜の町を歩き回った跡", "stage1_model": "nvidia:poolside/laguna-xs-2.1",
+    }, headers=author)
+    assert painted.status_code == 200, painted.text
+    ddl = painted.json()["ddl"]
+    free_lines = [line for line in ddl.splitlines() if "自由線" in line]
+    assert len(free_lines) == 1, ddl
+    assert "右上がり" in free_lines[0], ddl
+    assert "（横" in free_lines[0], ddl

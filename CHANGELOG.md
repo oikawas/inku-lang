@@ -8,6 +8,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — The description reader may choose a free line (DDL engine 60)
+
+By the author's choice (I-715 stage B2). The free line, a DDL word since the previous stage, is listed in the saijiki and offered to the description reader.
+
+- The saijiki's forms list 自由線 / free line (after arc), and the Web and Android lists and the macOS word resources follow. The Web saijiki preview shows a free line's path drawn by the product's renderer with a rotring, scaled into the frame.
+- Item 13 of the work-plan instruction (Japanese and English): choose a free line only when the description names one, or when what the description draws is itself a line without a set shape (a track left behind, a path something took, the trace of a moving hand). A moving thing or movement and propagation, a sound or its echo, a feeling, a crowd or a texture, and an abstract mark never become a free line. Lines with a set shape and straight or curved lines are drawn with lines and arcs, many free lines are never piled or scattered into an area or a texture, and a free line never approximates what the reader is unsure of.
+- The composition writes a direction on a free line layer that has none, from the reading's motion (rising for rising, falling for falling, horizontal for flowing). The solving never reads a direction, so the placement does not move. Of the joints, only the connection joins a free line; resting on, inside, overlapping and crossing are not written. A free line weighs as a line or an arc.
+- DDL engine 60. DDL 19, render engine 81 and the Score are unchanged. A work without a free line compiles to the same Score (checked on the 69 recorded works).
+
 ## v2.15.148 (2026-10-15 / Build 1224)
 
 ### 2026-10-15 — Align edited sketches, demo models, save notices, and CLI drawing options

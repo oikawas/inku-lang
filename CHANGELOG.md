@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.143 (2026-10-15 / Build 1219)
+
 ### 2026-10-15 — Keep vertical captions clear of canvas history controls
 
 Vertical captions now sit inside the space between the Latest/Newer and Oldest/Older controls. The clearance also applies on narrow screens and grows with the text scale. Caption width stays within that space while vertical writing and scrolling remain available.

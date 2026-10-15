@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.152 (2026-10-15 / Build 1228)
+
 ### 2026-10-15 — Saijiki preview examples read as DDL fragments, with an "Example:" label
 
 By the author's choice. A Saijiki preview example is a fragment of DDL (the Web test T-92), but 75 of the 184 (in 43 words) used wording that does not read as DDL even as a fragment ("中央に", "from left to right", "Use ...", "with a silverpoint", "A waxing moon", and so on).

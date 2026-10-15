@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.153 (2026-10-15 / Build 1229)
+
 ### 2026-10-15 — On a ground that covers the background, show marks whose color is omitted, and return marks lost in the ground (DDL engine 61)
 
 A mark whose color the DDL omits was black or white by the background's lightness alone, regardless of the ground. The mezzotint and the charcoal ground cover the background, so on a white background such a mark turned black and was not seen on the mezzotint's black plate (the circle of 「メゾチント。／中心に、太筆の大きな円を1個置く。」). On a ground that covers the background, the color is now the farther of black and white from what the ground shows over the background (its body laid over the background): always white on the mezzotint, and white in most catalogs on the charcoal ground over white, whose lightness lies midway, where black and white both show. Grounds that show the background (paper, washi, the ink wash ground and the others) are unchanged.

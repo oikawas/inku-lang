@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.149 (2026-10-15 / Build 1225)
+
 ### 2026-10-15 — The description reader may choose a free line (DDL engine 60)
 
 By the author's choice (I-715 stage B2). The free line, a DDL word since the previous stage, is listed in the saijiki and offered to the description reader.

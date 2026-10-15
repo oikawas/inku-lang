@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — A sequence after a continuation sentence lines up its own shapes and no longer stops the compiler (DDL engine 62)
+
+After a sentence that continues the previous shape (「線は波打つ。」, "the line sways."), a source-unit sequence such as 「円の周囲に灰色の細筆の円を三つ、半径を順に大きくして並べる。」 named the shape one place later. At the end of a description the DDL compiler stopped (a panic); before another sentence the sequence also lined up that sentence's shape and the Score changed. Once a continuation joins the shape it continues, the sequence's members are renumbered with the same table as fill targets and groups (I-722). In the 5173 works export (2026-10-14, 4,712 works) only the work that stopped the compiler had shifted members; the other 4,711 keep their Scores and diagnostics. Saved works are unchanged. DDL engine 62; DDL 19, render engine 81 and the Score format are unchanged.
+
 ### 2026-10-15 — Preserve catalog purposes and align existing Server checks
 
 Known stored models without a purpose selection now inherit their catalog purposes instead of having them overwritten by an inferred LLM default. Explicit stored purpose selections keep their precedence.

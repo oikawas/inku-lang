@@ -281,6 +281,7 @@ fn build_semantic_document(
         }
     }
     remap_fill_targets(&mut instructions, &instruction_index_map);
+    remap_sequence_units(&mut instructions, &instruction_index_map);
     owned_continuation_occurrence_count += coordination_continuation_occurrence_count;
     let coordinated_head_groups = instruction_association
         .ast
@@ -414,6 +415,42 @@ pub(crate) fn remap_fill_targets(
 ) {
     for instruction in instructions {
         remap_fill_target(&mut instruction.fill_target, index_map);
+    }
+}
+
+/// Source-unit sequence members name instructions by their index before the
+/// renumbering, like fill targets. A unit naming an instruction that is not
+/// retained loses its sequence.
+pub(crate) fn remap_sequence_units(
+    instructions: &mut [SemanticInstruction],
+    index_map: &[Option<usize>],
+) {
+    for instruction in instructions {
+        let Some(sequence) = &mut instruction.sequence else {
+            continue;
+        };
+        if !matches!(sequence.kind, crate::SemanticSequenceKind::Units) {
+            continue;
+        }
+        let remapped = sequence
+            .units
+            .iter()
+            .map(|unit| {
+                unit.member_entity_indices
+                    .iter()
+                    .map(|index| index_map[*index])
+                    .collect::<Option<Vec<_>>>()
+                    .map(|member_entity_indices| crate::SemanticSequenceUnit {
+                        member_entity_indices,
+                        source_span: unit.source_span,
+                    })
+            })
+            .collect::<Option<Vec<_>>>();
+        if let Some(units) = remapped {
+            sequence.units = units;
+        } else {
+            instruction.sequence = None;
+        }
     }
 }
 

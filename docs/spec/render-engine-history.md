@@ -172,7 +172,7 @@ but never asserts "the output will change"**.
 | Name | Versions what | Current | Incremented when |
 |---|---|---|---|
 | `render_engine_version` | the drawing engine | `81` | **the same Score and seed perform differently, or the performable vocabulary grows** |
-| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `61` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
+| `ddl_engine_version` | deterministic transforms (expansion, coerce, validator) | `62` | the same input and seed produce different output, **or the declaration order of `Instruction`'s fields changes** |
 | `ddl_version` | the DDL language itself (grammar, keywords) | `19` | **vocabulary is added, changed or retired, or grammar is** (written down on the 2026-07-30 ruling: version 2 rose for the thinness word, version 3 for yellow, orange and purple) |
 | Score `version` | the JSON Score schema | `0.21.0` | the schema's structure changes |
 | `MODEL_CONFIG_VERSION` | the model catalog's (`model_catalog.json`) content | `3.0.0+<hash of the content>` | **changes by itself whenever the catalog file changes** (since 2026-10-13: the content's hash is added to `version`; it used to be raised by hand). A change lays the catalog's model information whole over the matching ids an installation stored (the stored model list, the publication choices, and the installation's names and paid-plan marks survive) |

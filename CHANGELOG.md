@@ -8,6 +8,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Saijiki preview examples read as DDL fragments, with an "Example:" label
+
+By the author's choice. A Saijiki preview example is a fragment of DDL (the Web test T-92), but 75 of the 184 (in 43 words) used wording that does not read as DDL even as a fragment ("中央に", "from left to right", "Use ...", "with a silverpoint", "A waxing moon", and so on).
+
+- 74 sentences now contain their word and use only DDL words and order (the English start example reads after a previous line, so it stays). Examples: "中心に黒い円を置く", "Draw a horizontal line", "Draw a thin silverpoint line", "Place a hatch square", "Washi.", "Draw a blue waxing arc". Effects and drawings are unchanged. The ten words that showed the fixed "Use ..." form have their own examples. All 184 read as fragments when compiled with the Server's resource limits (start and end after a previous line).
+- At the author's request, the example line in a preview opens with a label in the UI's language, "例文：" or "Example: " (the list under the DDL editor and the Saijiki drawer; i18n key `saijikiPreviewExampleLabel`). The macOS copy of the Web reference (`ui-reference.json`) carries the new examples and the label text; showing the label on the macOS screen is a separate change.
+- No version changes.
+
 ### 2026-10-15 — Match macOS library preview, search, and history labels to Web
 
 Reordered preview images, descriptions, actions, details, and comments; added inline search clearing and hash/work-ID prefixes. History model labels now preserve versions, sizes, and variants using Web abbreviations. Removed the native export mark, filter, and stored attribute through Swift DB v4, preserving comments, revision marks, and saved works.

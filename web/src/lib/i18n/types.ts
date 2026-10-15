@@ -344,6 +344,7 @@ export interface LangPack {
 	ddlEditBtn: string;
 	ddlDoneBtn: string;
 	saijikiPreviewPlaceholder: string;
+	saijikiPreviewExampleLabel: string;
 
 	// Canvas
 	canvasPlaceholder: string;

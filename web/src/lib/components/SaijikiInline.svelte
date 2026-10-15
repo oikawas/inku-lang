@@ -106,7 +106,7 @@
 				<div class="saijiki-preview-copy">
 					<div class="saijiki-preview-title">{activePreview.word}</div>
 					<div class="saijiki-preview-effect">{activePreview.effect}</div>
-					<div class="saijiki-preview-example">{activePreview.example}</div>
+					<div class="saijiki-preview-example"><span class="saijiki-preview-example-label">{t().saijikiPreviewExampleLabel}</span>{activePreview.example}</div>
 				</div>
 			{:else}
 				<div class="saijiki-preview-placeholder">{t().saijikiPreviewPlaceholder}</div>

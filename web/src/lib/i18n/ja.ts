@@ -277,6 +277,7 @@ export const ja: LangPack = {
 	ddlEditBtn: '編集',
 	ddlDoneBtn: '完了',
 	saijikiPreviewPlaceholder: '語彙にマウスを重ねる（またはクリックする）と、描画への効き方を表示します。',
+	saijikiPreviewExampleLabel: '例文：',
 
 	modeSingle: '記述',
 	modeBatch: 'バッチ',

@@ -279,6 +279,7 @@ export const en: LangPack = {
 	ddlEditBtn: 'Edit',
 	ddlDoneBtn: 'Done',
 	saijikiPreviewPlaceholder: 'Hover over (or tap) a word to preview how it affects the drawing.',
+	saijikiPreviewExampleLabel: 'Example: ',
 
 	modeSingle: 'Describe',
 	modeBatch: 'Batch',

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Show the latest saved work at macOS startup
+
+Fixed the empty startup canvas: as on Web, the latest normal saved work opens automatically. Trashed and lineage-only works are excluded; no normal works leaves an empty canvas. New inputs remain detached during history refreshes.
+
 ### 2026-10-15 — Match the macOS batch tab to Web
 
 Aligned input headings, line numbers, height adjustment, scrolling input history, next conditions, New, and the resume card. During a run, the left panel shows the last saved line's sketch and instructions beneath one progress and stop block. Failed line numbers, inputs, and reasons are visible without expanding a section, without a duplicate single-drawing error notice. Saved works and pinned drawing conditions keep their existing behavior.

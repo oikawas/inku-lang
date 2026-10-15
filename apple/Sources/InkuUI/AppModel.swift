@@ -313,6 +313,10 @@ public final class AppModel {
                     ? String(settings.models.stage1Model.dropFirst(provider.id.count + 1)) : settings.models.stage1Model
             }
             try await reloadWorks()
+            // Web completeAuthentication opens the first normal history item once at startup.
+            if let latest = try await database.libraryPage(limit: 1).items.first?.work, selectedWorkID == nil {
+                await selectWork(latest)
+            }
             status = "準備完了"
         } catch {
             initialized = false

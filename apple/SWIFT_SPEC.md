@@ -14,6 +14,10 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-15 Work shown at startup
+
+As on Web, startup reads normal saved works in descending save-time order and opens the first work. Trashed and lineage-only works are excluded; the previous selected work ID does not determine the choice. Its image, instructions, description, and saved information come from that work's record. If no normal work exists, the canvas stays empty. This selection happens once during initialization; New and history refreshes do not reopen a saved work automatically. Startup does not redraw, call an LLM, or save history.
+
 ## 2026-10-15 Batch tab
 
 The batch heading, hint, text font and spacing, three empty-input examples with line numbers, count, and input history follow Web. Dragging the input's bottom-right corner changes its height. History uses a scrolling list capped at half the window height and names each input by its first line. Choosing one restores only the input and closes the list. Next conditions order model, catalog, Sketch from life, Wild, canvas, and New together; native seed details sit behind the heading's ellipsis. During a run, disabled condition fields show the captured starting values without changing settings for the next batch.

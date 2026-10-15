@@ -24,9 +24,7 @@ public struct LineageBrowsingState: Sendable, Equatable {
     public init() {}
 
     public mutating func reconcile(_ graph: LineageSnapshot) {
-        let tree = graph.nodes.first(where: { $0.id == graph.focusNodeID })?.node.rootNodeID
-            ?? graph.nodes.first(where: { !Set(graph.edges.map(\.childNodeID)).contains($0.id) })?.id
-            ?? graph.focusNodeID
+        let tree = graph.rootNodeID
         if treeID != tree {
             self = Self(); treeID = tree; expandedNodeIDs = [graph.focusNodeID]
         } else {
@@ -77,18 +75,30 @@ private final class LineageScrollObserver {
     deinit { NotificationCenter.default.removeObserver(token) }
 }
 
+private final class LineagePanMonitor {
+    let token: Any
+    init(_ token: Any) { self.token = token }
+    deinit { NSEvent.removeMonitor(token) }
+}
+
 struct LineageScrollBridge: NSViewRepresentable {
     let revision: LineageViewportKey
     let position: LineageScrollPosition
+    var cards: [CGRect] = []
     let onScroll: (LineageScrollPosition) -> Void
     func makeNSView(context: Context) -> Probe { Probe() }
     func updateNSView(_ view: Probe, context: Context) {
         view.onScroll = onScroll
+        view.cards = cards
         view.request(revision: revision, position: position)
     }
 
     final class Probe: NSView {
         var onScroll: ((LineageScrollPosition) -> Void)?
+        var cards: [CGRect] = []
+        override var isFlipped: Bool { true }
+        private var panMonitor: LineagePanMonitor?
+        private var panStart: (point: CGPoint, origin: CGPoint)?
         private var appliedRevision: LineageViewportKey?
         private var pendingRevision: LineageViewportKey?
         private var pendingPosition = LineageScrollPosition()
@@ -97,7 +107,37 @@ struct LineageScrollBridge: NSViewRepresentable {
         private var restoring = false
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
+            if window == nil { panMonitor = nil; panStart = nil }
+            else if panMonitor == nil {
+                let token = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp]) { [weak self] event in
+                    let consumed = MainActor.assumeIsolated {
+                        guard let self else { return false }
+                        return self.pan(event) == nil
+                    }
+                    return consumed ? nil : event
+                }
+                if let token { panMonitor = LineagePanMonitor(token) }
+            }
             DispatchQueue.main.async { [weak self] in self?.attach() }
+        }
+        private func pan(_ event: NSEvent) -> NSEvent? {
+            guard event.window === window, let scroll else { return event }
+            let point = convert(event.locationInWindow, from: nil)
+            if event.type == .leftMouseDown {
+                guard bounds.contains(point), !cards.contains(where: { $0.contains(point) }) else { return event }
+                panStart = (event.locationInWindow, scroll.contentView.bounds.origin)
+                return nil
+            }
+            guard let start = panStart else { return event }
+            if event.type == .leftMouseUp { panStart = nil; return nil }
+            let document = scroll.documentView?.frame.size ?? .zero
+            let clip = scroll.contentView
+            let x = start.origin.x - (event.locationInWindow.x - start.point.x)
+            let y = start.origin.y + (event.locationInWindow.y - start.point.y)
+            clip.scroll(to: CGPoint(x: min(max(0, x), max(0, document.width - clip.bounds.width)),
+                                   y: min(max(0, y), max(0, document.height - clip.bounds.height))))
+            scroll.reflectScrolledClipView(clip)
+            return nil
         }
         func request(revision: LineageViewportKey, position: LineageScrollPosition) {
             pendingRevision = revision; pendingPosition = position
@@ -131,6 +171,7 @@ struct LineageScrollBridge: NSViewRepresentable {
 struct LineageScrollBridge: UIViewRepresentable {
     let revision: LineageViewportKey
     let position: LineageScrollPosition
+    var cards: [CGRect] = []
     let onScroll: (LineageScrollPosition) -> Void
     func makeUIView(context: Context) -> Probe { Probe() }
     func updateUIView(_ view: Probe, context: Context) {

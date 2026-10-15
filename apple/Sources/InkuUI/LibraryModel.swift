@@ -79,6 +79,12 @@ public final class LibraryModel {
     public var lineageDisplayGraph: LineageSnapshot? {
         lineageBrowsing.overviewOpen ? lineageOverviewGraph : lineageNormalGraph
     }
+    /// Map selections remain available after returning to a collapsed normal view of the same tree.
+    public var lineageSelectionGraph: LineageSnapshot? {
+        guard let normal = lineageNormalGraph else { return lineageOverviewGraph }
+        guard let overview = lineageOverviewGraph, overview.rootNodeID == normal.rootNodeID else { return normal }
+        return overview.merging(normal)
+    }
     @ObservationIgnored public var onMutation: (@MainActor () async -> Void)?
     @ObservationIgnored private var database: InkuDatabase?
     /// Told when works are deleted for good, to drop their thumbnails.

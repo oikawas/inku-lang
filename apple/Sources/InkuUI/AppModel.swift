@@ -1448,6 +1448,16 @@ public final class AppModel {
         return result
     }
 
+    /// Detach the next drawing without erasing the author's current text or sketch.
+    public func detachLineage() {
+        guard !isBusy else { return }
+        let description = descriptionText, mode = inputMode
+        let ddl = selectedWork.map { ddlBoxText(for: $0) } ?? ddlText
+        let sketch = sketchDraft
+        newWork()
+        descriptionText = description; ddlText = ddl; inputMode = mode; sketchDraft = sketch
+    }
+
     public func newWork() {
         guard !isBusy else { return }
         backgroundDrawing = false

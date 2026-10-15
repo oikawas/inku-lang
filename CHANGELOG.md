@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Match macOS lineage browsing and controls to Web
+
+Grouped actions by their work scope and separated lineage checks and exports from Library selection. Compact centered cards now show recorded-hash identity badges. Added Open large, a new root that preserves drafts, a separate map, and background panning. Details use a saved-facts and comments table; unsaved comments survive closing and reopening.
+
 ## v2.15.143 (2026-10-15 / Build 1219)
 
 ### 2026-10-15 — Keep vertical captions clear of canvas history controls

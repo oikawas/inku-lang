@@ -1,4 +1,20 @@
 /* Native interface text only. Artwork source, names and provider responses stay verbatim. */
+"作品の系譜" = "Lineage of the work";
+"作品の詳細" = "Work details";
+"作品へのコメント" = "Comment on the work";
+"作品を大きく見る" = "Open large";
+"新しい起点にする" = "Start a new root";
+"起点から表示中まで %ld 件" = "Origin to displayed: %ld works";
+"選択 %ld 件" = "Selected: %ld works";
+"一括操作の対象にする" = "Check for bulk actions";
+"通常履歴に保存" = "Save to regular history";
+"ゴミ箱（復元可能）" = "In trash (restorable)";
+"同じ記述" = "Same text";
+"同じ版" = "Same edition";
+"中間作品・履歴非表示" = "Intermediate · hidden from history";
+"全体を上から下へ見渡せます。" = "Review the complete tree from top to bottom.";
+"全体を左から右へ見渡せます。" = "Review the complete tree from left to right.";
+"支持体" = "Ground";
 "制作" = "Making";
 "ライブラリ" = "Library";
 "バッチ・デモ" = "Batch & Demo";

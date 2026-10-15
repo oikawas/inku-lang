@@ -32,7 +32,7 @@ struct CreationView: View {
     let onAdjustWork: (SavedWork) -> Void
     let onReplayWork: (SavedWork) -> Void
     let onWorkAction: (SavedWork, String) -> Void
-    let onLineageExport: (String) -> Void
+    let onLineageExport: (LineageExportRequest) -> Void
     var onPresentWork: () -> Void = {}
     var onWorkspaceWorkChange: (SavedWork?) -> Void = { _ in }
     private var controlsDisabled: Bool { model.isBusy || automation.isOccupied }
@@ -602,9 +602,14 @@ struct CreationView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(InkuColor.border2))
                     .padding(.vertical, 14)
             } else if ui.workspaceTab == "lineage" && display.visible("work_tools") && workspaceWork != nil {
-                LineageView(model: model, onEditWork: onEditWork, onAdjustWork: onAdjustWork, onReplayWork: onReplayWork,
-                            onWorkAction: onWorkAction, onExport: onLineageExport, initialWork: workspaceWork,
-                            writingLocked: controlsDisabled, onBrowseWork: { _ in batchWorkspace.showHistory() })
+                LineageView(model: model, onWorkAction: onWorkAction, onExport: onLineageExport, initialWork: workspaceWork,
+                            writingLocked: controlsDisabled, onBrowseWork: { _ in batchWorkspace.showHistory() },
+                            onOpenInCanvas: { work in
+                                batchWorkspace.showHistory()
+                                Task { await model.selectWork(work); ui.workspaceTab = "artwork" }
+                            }, onDetach: {
+                                batchWorkspace.showHistory(); model.detachLineage(); ui.workspaceTab = "artwork"
+                            })
                     .background(InkuColor.bg)
                     .padding(.horizontal, display.visible("history") ? 68 : 0)
             } else {

@@ -2,7 +2,7 @@
 
 This directory contains the native SwiftUI client, developed for macOS first, and the shared Apple packages. [SWIFT_SPEC.ja.md](SWIFT_SPEC.ja.md) is the canonical specification for Swift host behavior; this document is its maintained English version. The [product specification](../SPEC.md) defines shared DDL, Score, prompts, authoring authority, pipeline transitions, seeds, and rendering semantics. Server remains the primary development host, and Swift follows the same Rust core without duplicating semantic processing.
 
-Last updated: 2026-10-14.
+Last updated: 2026-10-15.
 
 Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The macOS app has its own version, defined by `apple/VERSION` and `apple/BUILD_NUMBER` and allocated separately from the Server and Web versions (the first release is 1.0.0, Build 1). The corresponding Server version is shown in the app's About inku window and in the changelog. Matching shared layer versions does not establish that host features and the native UI port are complete.
 
@@ -13,6 +13,14 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Record confirmed implementation changes and remaining scope in dated sections of this specification. Maintain product history in the shared [CHANGELOG.ja.md](../CHANGELOG.ja.md) and [CHANGELOG.md](../CHANGELOG.md). Do not create a separate Swift changelog.
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
+
+## 2026-10-15 Match lineage browsing and controls to Web
+
+Lineage uses the Web LineagePanel groups for display, the displayed work, the origin-to-work path, selection, colophons, and starting a new root. Groups wrap in a narrow work area. Refinement and Open large use the captured saved work. Exports separately capture the displayed work, ordered path, or lineage checks. Checks do not borrow Library selection; works read only in the map remain selectable after returning to the same tree. Export IDs and path order are fixed when opening export.
+
+Cards are 210 points wide with 118-point previews and two text lines, centered within each generation. Checks, stars, revision marks, and displayed/same-text/same-edition/intermediate badges sit above the operation and model row. Badges use recorded hashes and states; missing hashes never imply equality. Dates, node IDs, and parent navigation stay in details or node menus. One click browses within lineage; a double-click or Open large opens the work tab. Clicking the displayed work again does not reload it.
+
+The map opens in a large separate modal with vertical/horizontal layout and 40–140% zoom, returning to normal branches and scroll position on close. Dragging its background pans without capturing card controls. Branch and detail buttons are hidden in the map. Details show text, hash suffixes and complete digest copying, recorded engine/build/models/seeds, derivation, and comments. Current settings never fill missing historical facts. Unsaved comments survive closing and reopening each node, and the previously requested refinement menu remains. Starting a new root retains description, instructions, and sketch drafts while clearing the next drawing's saved parent.
 
 ## 2026-10-14 Open the refinement menu from lineage details
 

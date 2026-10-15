@@ -553,19 +553,20 @@ public struct ContentView: View {
         }
     }
 
-    private func openLineageExport(_ scope: String) {
-        guard canUseWork, let graph = model.library.graph else { return }
-        let focus = graph.focusNodeID
-        let center = graph.nodes.first(where: { $0.id == focus })?.work
-        let checked = model.library.selectedIDs.sorted()
+    private func openLineageExport(_ request: LineageExportRequest) {
+        guard canUseWork, !request.workIDs.isEmpty else { return }
         Task {
             do {
-                let works: [SavedWork]
-                if scope == "path" { works = try await model.library.lineagePathWorks(focusNodeID: focus) }
-                else if scope == "checked" { works = try await model.auxiliaryDatabase().exportWorks(ids: checked) }
-                else { works = center.map { [$0] } ?? [] }
+                let database = try model.auxiliaryDatabase()
+                var works: [SavedWork] = []
+                for id in request.workIDs {
+                    guard let work = try await database.work(id: id), !work.trashed else {
+                        throw PersistenceError.invalidRecord("selection is no longer exportable")
+                    }
+                    works.append(work)
+                }
                 guard canUseWork, !works.isEmpty else { return }
-                dialog = .export(ExportSession(works: works, preserveOrder: scope == "path"))
+                dialog = .export(ExportSession(works: works, preserveOrder: request.preserveOrder))
             } catch { model.errorText = error.localizedDescription }
         }
     }

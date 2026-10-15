@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Show the example label in macOS Saijiki
+
+Saijiki previews in the vocabulary list and instructions editor show "例文：" / "Example: " in the screen language. The label uses the bundled Web copy, while examples retain the word's language.
+
 ### 2026-10-15 — Reduce macOS library paging work
 
 Library pages follow Web/Server by leaving SVG text out and using persisted PNGs. SVG sizes and work information remain available; refinement, export, and other work actions read the chosen complete record on demand. Card-height notifications no longer rebuild the entire library, and paging no longer reloads the background lineage.

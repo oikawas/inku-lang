@@ -14,6 +14,10 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-15 Saijiki example label
+
+Saijiki previews in the vocabulary list and instructions editor prefix examples with the bundled Web copy's `saijikiPreviewExampleLabel`. The label follows the screen language ("例文：" / "Example: "), while the example itself follows the selected word's language. This distinguishes examples from effects without changing words or instructions.
+
 ## 2026-10-15 Library pagination
 
 Chronological and grouped library pages follow Web/Server by omitting SVG text and displaying persisted PNG thumbnails. Size labels retain the saved SVG's UTF-8 byte count. A missing or stale PNG reads only its work's SVG to rebuild it. Opening in Create or lineage, refining, and exporting read the complete saved record by the chosen work ID. Thumbnail task identity does not contain SVG text. Recording card heights alone does not rebuild the whole library. Paging leaves the background lineage alone; explicit refreshes and work mutations still update it.

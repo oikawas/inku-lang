@@ -26,7 +26,11 @@ test('T-905/T-907: DemoState uses narrow capabilities and identity, without tran
 	assert.doesNotMatch(owner, /HistoryBrowsingState|SettingsController|CanvasViewportState|Record<string, unknown>/);
 	assert.doesNotMatch(owner, /AbortController|AbortSignal/);
 	assert.match(owner, /private runIdentity = 0/);
-	assert.match(work, /paintInstruction: \(prompt, paintOptions\) => paintOne\(prompt, paintOptions\)/);
+	const paintInstruction = work.match(/paintInstruction\s*:\s*\(\s*prompt\s*,\s*paintOptions\s*\)\s*=>\s*\{([\s\S]*?)\}\s*,/);
+	assert.ok(paintInstruction, 'DemoState receives a scoped paintInstruction callback');
+	const paintInstructionBody = paintInstruction[1].replace(/\s+/g, '');
+	assert.match(paintInstructionBody, /constmodel=qualifiedModelId\(deps\.models\.stage1Provider\(\),deps\.models\.stage1Model\(\)\);/);
+	assert.match(paintInstructionBody, /returnpaintOne\(prompt,\{\.\.\.paintOptions,stage1Model:model,stage2Model:model\}\);/);
 	assert.match(work, /refreshAfterServerSave: \(\) => deps\.history\(\)\.refreshAfterServerSave\(\)/);
 	assert.match(work, /refreshAfterRun: \(\) => deps\.history\(\)\.refreshAfterRun\(\)/);
 });

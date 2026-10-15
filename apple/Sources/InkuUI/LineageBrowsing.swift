@@ -88,6 +88,7 @@ struct LineageScrollBridge: NSViewRepresentable {
     let onScroll: (LineageScrollPosition) -> Void
     func makeNSView(context: Context) -> Probe { Probe() }
     func updateNSView(_ view: Probe, context: Context) {
+        view.panEnabled = context.environment.isEnabled
         view.onScroll = onScroll
         view.cards = cards
         view.request(revision: revision, position: position)
@@ -96,6 +97,9 @@ struct LineageScrollBridge: NSViewRepresentable {
     final class Probe: NSView {
         var onScroll: ((LineageScrollPosition) -> Void)?
         var cards: [CGRect] = []
+        var panEnabled = true {
+            didSet { if panEnabled != oldValue { updatePanMonitor() } }
+        }
         override var isFlipped: Bool { true }
         private var panMonitor: LineagePanMonitor?
         private var panStart: (point: CGPoint, origin: CGPoint)?
@@ -107,7 +111,13 @@ struct LineageScrollBridge: NSViewRepresentable {
         private var restoring = false
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            if window == nil { panMonitor = nil; panStart = nil }
+            updatePanMonitor()
+            DispatchQueue.main.async { [weak self] in self?.attach() }
+        }
+        private func updatePanMonitor() {
+            // Local event monitors outlive SwiftUI hit testing and opacity. Covered or
+            // disabled lineage views must not consume clicks meant for another screen.
+            if !panEnabled || window == nil { panMonitor = nil; panStart = nil }
             else if panMonitor == nil {
                 let token = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp]) { [weak self] event in
                     let consumed = MainActor.assumeIsolated {
@@ -118,13 +128,15 @@ struct LineageScrollBridge: NSViewRepresentable {
                 }
                 if let token { panMonitor = LineagePanMonitor(token) }
             }
-            DispatchQueue.main.async { [weak self] in self?.attach() }
         }
         private func pan(_ event: NSEvent) -> NSEvent? {
-            guard event.window === window, let scroll else { return event }
+            guard panEnabled, !isHiddenOrHasHiddenAncestor, event.window === window, let scroll else {
+                panStart = nil
+                return event
+            }
             let point = convert(event.locationInWindow, from: nil)
             if event.type == .leftMouseDown {
-                guard bounds.contains(point), !cards.contains(where: { $0.contains(point) }) else { return event }
+                guard visibleRect.contains(point), !cards.contains(where: { $0.contains(point) }) else { return event }
                 panStart = (event.locationInWindow, scroll.contentView.bounds.origin)
                 return nil
             }

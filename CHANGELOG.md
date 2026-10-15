@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Fix macOS Library paging over a lineage view
+
+Opening Library over lineage could leave the hidden lineage's drag monitor consuming clicks on Older, Oldest, and other controls. Disabled lineage views now remove that monitor, and visible views do not start panning outside their clipped scroll area.
+
 ### 2026-10-15 — Show the example label in macOS Saijiki
 
 Saijiki previews in the vocabulary list and instructions editor show "例文：" / "Example: " in the screen language. The label uses the bundled Web copy, while examples retain the word's language.

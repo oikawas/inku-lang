@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.151 (2026-10-15 / Build 1227)
+
 ### 2026-10-15 — Reflect the second NVIDIA NIM measurement in the model information
 
 At the author's request, the catalog `model_catalog.json` now carries the drawing session's second measurement of NIM's 81 models at another time of day (run `provider-20261015-run-58c65cd7` and its continuation `provider-20261015-run-d7cf1be7`, an 800-second response limit), read together with the first (`provider-20261014-run-a93fb5ed`). The two ran on different builds and native bindings, so they are not a comparison of the time of day alone. By the author's choice, a model qualifies when it held in either measurement.

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Keep vertical captions clear of canvas history controls
+
+Vertical captions now sit inside the space between the Latest/Newer and Oldest/Older controls. The clearance also applies on narrow screens and grows with the text scale. Caption width stays within that space while vertical writing and scrolling remain available.
+
 ### 2026-10-15 — Keep canvas wheel zoom working after switching tabs
 
 Returning from Lineage or another tab left the wheel listener on the old canvas element, so zoom stopped responding. Wheel input and size observation now follow the current canvas element and release the old registrations. Zoom direction, increments, center anchoring, and scrolling within menus or vertical captions stay the same.

@@ -569,12 +569,14 @@
 		overflow: hidden;
 	}
 	.instruction-caption.vertical {
+		/* Reserve CanvasPanel's side-navigation space at every text scale. */
+		--caption-nav-space: max(68px, calc(68px * var(--ui-text-scale, 1)));
 		top: 58px;
 		right: auto;
 		bottom: 58px;
-		left: 12px;
+		left: var(--caption-nav-space);
 		width: fit-content;
-		max-width: min(40%, 13em);
+		max-width: min(40%, 13em, calc(100% - 2 * var(--caption-nav-space)));
 		max-height: none;
 		overflow: auto;
 		white-space: pre-wrap;
@@ -583,7 +585,7 @@
 		text-align: start;
 	}
 	.instruction-caption.caption-right:not(.vertical) { text-align: right; }
-	.instruction-caption.vertical.caption-right { right: 12px; left: auto; }
+	.instruction-caption.vertical.caption-right { right: var(--caption-nav-space); left: auto; }
 	.caption-writing-mode { display: inline-flex; align-items: center; gap: 4px; color: var(--fg2); font-size: var(--btn-sm-font-size); white-space: nowrap; }
 	.caption-writing-mode select { max-width: 88px; border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); padding: var(--btn-sm-padding); background: var(--panel); color: var(--fg); font: inherit; }
 	.zoom-controls {
@@ -647,8 +649,8 @@
 			bottom: 58px;
 			font-size: var(--ui-font-size-13);
 		}
-		.instruction-caption.vertical { top: 50px; right: auto; bottom: 56px; left: 8px; max-width: min(46%, 12em); }
-		.instruction-caption.vertical.caption-right { right: 8px; left: auto; }
+		.instruction-caption.vertical { top: 50px; right: auto; bottom: 56px; left: var(--caption-nav-space); max-width: min(46%, 12em, calc(100% - 2 * var(--caption-nav-space))); }
+		.instruction-caption.vertical.caption-right { right: var(--caption-nav-space); left: auto; }
 		.caption-writing-mode span { display: none; }
 	}
 </style>

@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.144 (2026-10-15 / Build 1220)
+
 ### 2026-10-15 — Make history-strip model labels smaller and shorter
 
 Model labels could occupy several lines and make the strip taller. They now use the existing size-9 token instead of size 11, with tighter line spacing and compact names such as `Ch GPT6.1So`, `Cl So5.5`, and `Ge 3.5FlL`. Company names, extra separators, and download sizes are omitted. Versions, families, parameter sizes, and quantization remain distinguishable; Ol/Oc distinguish local Ollama from Cloud. Full-name tooltips and thumbnail dimensions are preserved.

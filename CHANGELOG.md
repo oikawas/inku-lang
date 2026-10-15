@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.148 (2026-10-15 / Build 1224)
+
 ### 2026-10-15 — Align edited sketches, demo models, save notices, and CLI drawing options
 
 Redrawing the same description now uses the edited sketch text. Demo drawing uses one shared Stage 1/2 model selection, as ordinary creation does. Unsupported personal ChatGPT models are excluded from demo instruction generation while remaining available for drawing.

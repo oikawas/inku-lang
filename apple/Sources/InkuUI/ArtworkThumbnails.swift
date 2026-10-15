@@ -27,26 +27,17 @@ public actor ArtworkThumbnails {
         public var pruned = 0
     }
 
-    private struct Entry {
-        let image: CGImage
-        let bytes: Int
-        var use: UInt64
-    }
-
     private var store: ThumbnailStore?
     private var database: InkuDatabase?
-    private var images: [String: Entry] = [:]
-    private var retainedBytes = 0
-    private var clock: UInt64 = 0
+    private nonisolated let memory: ThumbnailMemoryCache
     private var inFlight: [String: Task<CGImage, Error>] = [:]
     private var pass: Task<Void, Never>?
     private var statistics = Statistics()
-    private let byteLimit: Int
     private let display = DispatchQueue(label: "app.inku.thumbnails", qos: .userInitiated, attributes: .concurrent)
     private let background = DispatchQueue(label: "app.inku.thumbnails.bake", qos: .utility, attributes: .concurrent)
 
     public init(byteLimit: Int = 96 * 1024 * 1024) {
-        self.byteLimit = max(0, byteLimit)
+        memory = ThumbnailMemoryCache(byteLimit: max(0, byteLimit))
     }
 
     /// Without a store, thumbnails are drawn and kept in memory only.
@@ -57,11 +48,9 @@ public actor ArtworkThumbnails {
 
     public func image(for work: SavedWork) async throws -> CGImage {
         let key = Self.key(work.id, work.renderHash)
-        clock &+= 1
-        if var entry = images[key] {
-            entry.use = clock; images[key] = entry
+        if let image = memory.image(for: key) {
             statistics.memoryHits += 1
-            return entry.image
+            return image
         }
         if let running = inFlight[key] { return try await running.value }
         let (id, svg, renderHash) = (work.id, work.svg, work.renderHash)
@@ -69,8 +58,14 @@ public actor ArtworkThumbnails {
         inFlight[key] = task
         defer { inFlight[key] = nil }
         let image = try await task.value
-        remember(image, key: key)
+        memory.insert(image, for: key)
         return image
+    }
+
+    /// Like Web's cached PNG, a decoded image is available at presentation time without an
+    /// actor/task round trip. This only reads memory; a miss does no I/O or rasterization.
+    public nonisolated func cachedImage(for work: SavedWork) -> CGImage? {
+        memory.image(for: Self.key(work.id, work.renderHash))
     }
 
     /// Bakes a work just saved, off the caller's path.
@@ -102,9 +97,7 @@ public actor ArtworkThumbnails {
             let live = Set(try await database.thumbnailSources().map(\.id))
             let orphans = stored.subtracting(live).sorted()
             let count = try await store.delete(historyIDs: orphans)
-            for key in images.keys where orphans.contains(where: { key.hasPrefix($0 + "\u{0}") }) {
-                if let entry = images.removeValue(forKey: key) { retainedBytes -= entry.bytes }
-            }
+            memory.remove(historyIDs: Set(orphans))
             statistics.pruned += count
             return count
         } catch { return 0 }
@@ -175,18 +168,7 @@ public actor ArtworkThumbnails {
         }
     }
 
-    private func remember(_ image: CGImage, key: String) {
-        let bytes = image.bytesPerRow * image.height
-        guard bytes <= byteLimit else { return }
-        while retainedBytes + bytes > byteLimit, let oldest = images.min(by: { $0.value.use < $1.value.use }) {
-            retainedBytes -= oldest.value.bytes
-            images.removeValue(forKey: oldest.key)
-        }
-        images[key] = Entry(image: image, bytes: bytes, use: clock)
-        retainedBytes += bytes
-    }
-
-    private static func key(_ id: String, _ renderHash: String?) -> String { id + "\u{0}" + (renderHash ?? "") }
+    private nonisolated static func key(_ id: String, _ renderHash: String?) -> String { id + "\u{0}" + (renderHash ?? "") }
 
     /// Rasterizing is a synchronous Rust call, so it runs on a dispatch queue, not on Swift's shared pool.
     private static func bake(svg: String, on queue: DispatchQueue) async throws -> (CGImage, Data) {
@@ -215,6 +197,54 @@ public actor ArtworkThumbnails {
                 let options = [kCGImageSourceShouldCacheImmediately: true] as CFDictionary
                 continuation.resume(returning: source.flatMap { CGImageSourceCreateImageAtIndex($0, 0, options) })
             }
+        }
+    }
+}
+
+/// One bounded cache shared by the loading actor and synchronous view lookups. All dictionary,
+/// cost and LRU state is protected by the lock; CGImages are immutable once inserted. No I/O,
+/// decoding or actor work is performed while holding the lock.
+private final class ThumbnailMemoryCache: @unchecked Sendable {
+    private struct Entry {
+        let image: CGImage
+        let bytes: Int
+        var use: UInt64
+    }
+    private let lock = NSLock()
+    private let byteLimit: Int
+    private var images: [String: Entry] = [:]
+    private var retainedBytes = 0
+    private var clock: UInt64 = 0
+
+    init(byteLimit: Int) { self.byteLimit = byteLimit }
+
+    func image(for key: String) -> CGImage? {
+        lock.lock(); defer { lock.unlock() }
+        guard var entry = images[key] else { return nil }
+        clock &+= 1
+        entry.use = clock
+        images[key] = entry
+        return entry.image
+    }
+
+    func insert(_ image: CGImage, for key: String) {
+        let bytes = image.bytesPerRow * image.height
+        guard bytes <= byteLimit else { return }
+        lock.lock(); defer { lock.unlock() }
+        if let previous = images.removeValue(forKey: key) { retainedBytes -= previous.bytes }
+        while retainedBytes + bytes > byteLimit, let oldest = images.min(by: { $0.value.use < $1.value.use }) {
+            retainedBytes -= oldest.value.bytes
+            images.removeValue(forKey: oldest.key)
+        }
+        clock &+= 1
+        images[key] = Entry(image: image, bytes: bytes, use: clock)
+        retainedBytes += bytes
+    }
+
+    func remove(historyIDs: Set<String>) {
+        lock.lock(); defer { lock.unlock() }
+        for key in images.keys where historyIDs.contains(String(key.prefix(while: { $0 != "\u{0}" }))) {
+            if let entry = images.removeValue(forKey: key) { retainedBytes -= entry.bytes }
         }
     }
 }

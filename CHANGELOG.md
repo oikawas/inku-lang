@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Remove macOS thumbnail loading animations
+
+Match Web's list presentation by removing per-image loading animations. Decoded PNGs already in memory appear synchronously, avoiding a blank image and task wait whenever a page is revisited. Work/render-hash identity, bounded cache memory, and 512px image quality are preserved.
+
 ### 2026-10-15 — Fix macOS Library paging over a lineage view
 
 Opening Library over lineage could leave the hidden lineage's drag monitor consuming clicks on Older, Oldest, and other controls. Disabled lineage views now remove that monitor, and visible views do not start panning outside their clipped scroll area.

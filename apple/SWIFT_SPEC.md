@@ -26,6 +26,8 @@ Menu eligibility reads only saved origin and authority for the page and publishe
 
 Card slots, buttons, and menus are reused within a page. An image appears only when its rendered work ID and hash match the current work; expanded descriptions reset by work ID. Checks and action targets follow saved work IDs rather than carrying the previous page's state.
 
+As in Web's `HistoryThumbnail.svelte`, individual images show no loading animation. Presentation reads the existing 96 MiB bounded decoded-PNG cache synchronously, keeping visited images visible without waiting for a task. Unread images show a quiet background while loading asynchronously. Synchronous lookup performs no SQLite read, PNG decoding, or rendering; 512px images, work/hash identity, LRU limits, and orphan removal remain in effect. Focused check: AppCheck `--thumbnail-memory-only`.
+
 ## 2026-10-15 Library preview, search, and history strip
 
 The work preview follows the order of image, opening hint, full description, lineage/refinement/export actions, work-information table, and comment. Double-clicking the image or activating it from the keyboard opens that work in Create; inspection alone does not replace the Create draft. Closing and reopening the same preview retains an unsaved comment without mixing another work's information. Details show save time, stage models (one row when equal), catalog, canvas, seconds, SVG size, render version, generation, and a short hash with full-hash copy. Export first selects a format, then opens settings for that work.

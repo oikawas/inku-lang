@@ -8,6 +8,9 @@ import InkuHost
 struct AppCheck {
     @MainActor
     static func main() async throws {
+        if CommandLine.arguments.contains("--thumbnail-memory-only") {
+            try await runThumbnailMemoryChecks(); return
+        }
         if CommandLine.arguments.contains("--library-pagination-only") {
             try await runLibraryPaginationChecks(); return
         }

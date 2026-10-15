@@ -488,6 +488,10 @@ struct ArtworkThumbnail: View {
         let renderHash: String?
     }
     private var identity: Identity { Identity(id: work.id, renderHash: work.renderHash) }
+    private var currentImage: CGImage? {
+        if displayedIdentity == identity, let image { return image }
+        return thumbnails.cachedImage(for: work)
+    }
 
     /// HistoryThumbnail.svelte:51-62: one dot for both layers, its title naming the layer that fell.
     private var fallbackMarkLabel: String? {
@@ -501,12 +505,10 @@ struct ArtworkThumbnail: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.3))
-            if let image, displayedIdentity == identity {
+            if let image = currentImage {
                 Image(decorative: image, scale: 1).resizable().scaledToFit().padding(4)
             } else if failed, displayedIdentity == identity {
                 Image(systemName: "exclamationmark.triangle").foregroundStyle(.secondary)
-            } else {
-                ProgressView().controlSize(.small)
             }
         }
         .overlay(alignment: .topTrailing) {
@@ -520,15 +522,19 @@ struct ArtworkThumbnail: View {
             }
         }
         .task(id: identity) {
-            image = nil; failed = false; displayedIdentity = nil
+            let requestedIdentity = identity
+            displayedIdentity = requestedIdentity
+            failed = false
+            image = thumbnails.cachedImage(for: work)
+            if image != nil { return }
             do {
                 let rendered = try await thumbnails.image(for: work)
                 guard !Task.isCancelled else { return }
-                displayedIdentity = identity
+                displayedIdentity = requestedIdentity
                 image = rendered
             } catch {
                 guard !Task.isCancelled else { return }
-                displayedIdentity = identity
+                displayedIdentity = requestedIdentity
                 failed = true
             }
         }

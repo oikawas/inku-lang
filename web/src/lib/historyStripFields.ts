@@ -27,15 +27,38 @@ export function formatHistoryStripEngineVersion(value: string | null | undefined
 	return `Ver.${version.replace(/^Ver\.\s*/i, '')}`;
 }
 
-/**
- * Only the provider is abbreviated. The model keeps every family, version,
- * size and variant token; the strip wraps it rather than hiding its tail.
- */
+const STRIP_MODEL_WORDS: Readonly<Record<string, string>> = {
+	gpt: 'GPT', oss: 'oss', sol: 'So', luna: 'Lu', astra: 'As', terra: 'Te',
+	claude: 'Cl', sonnet: 'So', opus: 'Op', haiku: 'Ha', fable: 'Fa',
+	gemini: 'Ge', gemma: 'Gm', flash: 'Fl', lite: 'L', pro: 'Pr', mini: 'Mi', nano: 'Na', turbo: 'T',
+	llama: 'Ll', qwen: 'Qw', deepseek: 'DS', minimax: 'MM', kimi: 'Ki',
+	mistral: 'Mi', ministral: 'Min', mixtral: 'Mx', nemotron: 'Nem', granite: 'Gr',
+	large: 'Lg', medium: 'Md', small: 'Sm', super: 'Su', ultra: 'Ul',
+	instruct: 'I', it: 'I', vision: 'V', reasoning: 'R', thinking: 'Th',
+	preview: 'Pv', latest: 'Lt', code: 'Cd', coder: 'Cdr',
+	a: 'A', b: 'B', e: 'E'
+};
+
+/** Compact recognizable tokens, keeping numeric versions, sizes and variants. */
 export function abbreviateStripModel(owner: string, name: string): string {
-	return [owner.trim().slice(0, 2), name.trim()].filter(Boolean).join(' / ');
+	const provider = /ollama.*cloud/i.test(owner) ? 'Oc' : owner.trim().slice(0, 2);
+	let model = name.trim().replace(/^.*\//, '')
+		.replace(/^(?:anthropic|google|meta|mistral\s+ai)\s+/i, '')
+		.replace(/\s*\([\d.]+\s*[GM]B\)\s*$/i, '')
+		.replace(/\bdeepseek[-\s]+v(?=\d)/i, 'deepseek-')
+		.replace(/\bq(\d+)[_-]k[_-]([a-z])\b/gi, (_, bits, suffix) => `Q${bits}K${suffix.toUpperCase()}`);
+	// The provider already identifies these brands; Gemma still needs its name.
+	if (/^claude\b/i.test(owner)) model = model.replace(/^claude[\s-]+/i, '');
+	if (/^gemini\b/i.test(owner)) model = model.replace(/^gemini[\s-]+/i, '');
+	const tokens = model.split(/[\s:_-]+/).filter(Boolean)
+		.map((token) => token.replace(/[a-z]+/gi, (word) => STRIP_MODEL_WORDS[word.toLowerCase()] ?? word));
+	// Without a separator, version 4 + size 31B would read as version 431B.
+	const compact = tokens.reduce((text, token, index) =>
+		text + (index > 0 && /\d$/.test(tokens[index - 1]) && /^\d/.test(token) ? '·' : '') + token, '');
+	return [provider, compact].filter(Boolean).join(' ');
 }
 
-/** At most three facts at once; a model name may wrap across several lines. */
+/** At most three facts at once; unusually long model names can still wrap. */
 export const HISTORY_STRIP_FIELD_LIMIT = 3;
 
 /** What the strip printed before it could be asked, so nobody's strip moves. */

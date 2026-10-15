@@ -137,7 +137,17 @@ test('the strip keeps model versions, families, sizes and variants distinct', ()
 		const a = abbreviateStripModel(owner, first);
 		const b = abbreviateStripModel(owner, second);
 		assert.notEqual(a, b, `${first} and ${second} must be readable as different models`);
-		assert.ok(a.includes(first), first);
-		assert.ok(b.includes(second), second);
 	}
+	assert.equal(abbreviateStripModel('ChatGPT plan', 'GPT-6.1-Sol'), 'Ch GPT6.1So');
+	assert.equal(abbreviateStripModel('ChatGPT plan', 'GPT-6-Luna'), 'Ch GPT6Lu');
+	assert.equal(abbreviateStripModel('Claude API (Cloud)', 'Anthropic Claude Sonnet 5.5'), 'Cl So5.5');
+	assert.equal(abbreviateStripModel('Claude API (Cloud)', 'Claude Opus 4.7'), 'Cl Op4.7');
+	assert.equal(abbreviateStripModel('Gemini API (Cloud)', 'Gemini 3.5 Flash-Lite'), 'Ge 3.5FlL');
+	assert.equal(abbreviateStripModel('NVIDIA NIM', 'Google Gemma 4 31B Instruct'), 'NV Gm4·31BI');
+	assert.equal(abbreviateStripModel('NVIDIA NIM', 'meta/llama-3.3-70b-instruct'), 'NV Ll3.3·70BI');
+	assert.equal(abbreviateStripModel('Ollama', 'qwen3.5:4b-q4_K_M (3.4GB)'), 'Ol Qw3.5·4BQ4KM');
+	assert.equal(abbreviateStripModel('Ollama Cloud (ollama.com)', 'deepseek-v4.1-flash'), 'Oc DS4.1Fl');
+	assert.notEqual(abbreviateStripModel('Ollama', 'gemma4:31b'), abbreviateStripModel('Ollama Cloud', 'gemma4:31b'));
+	assert.notEqual(abbreviateStripModel('Ollama', 'qwen3.5:4b-q4_K_M'), abbreviateStripModel('Ollama', 'qwen3.5:4b-q8_0'));
+	assert.equal(abbreviateStripModel('', 'unknown-model-v2'), 'unknownmodelv2');
 });

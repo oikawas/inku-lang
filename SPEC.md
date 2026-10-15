@@ -953,9 +953,12 @@ work through derivation metadata and presentation; a programmer's diff is not
 the center of the making surface.
 
 The Library search field has an × button that clears the query and returns
-focus to the input. The history strip abbreviates the provider while wrapping
-model names without dropping versions, families, sizes or variants. The full
-provider and model names are also available in the tooltip.
+focus to the input. The history strip uses small text and recognizable compact
+provider/model names, such as `Ch GPT6.1So`, `Cl So5.5`, and `Ge 3.5FlL`.
+Company names, separators, and download sizes are omitted while versions,
+families, parameter sizes, and quantization remain distinguishable. Adjacent
+numbers retain a separator; unfamiliar long names wrap rather than losing
+their suffixes. Tooltips retain the full provider and model names.
 
 **How much is shown is the writer's choice (v2.9.8).** The number of tools on
 screen is too many for someone opening inku for the first time and too few for

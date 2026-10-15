@@ -132,7 +132,7 @@
 
 	/** What one chosen field says about one work, and what the hover shows.
 	 *
-	 *  The model keeps its name on the tile; the hover adds the full provider. */
+	 *  The tile uses compact model tokens; the hover keeps the full name. */
 	function stripFieldText(field: HistoryStripField, item: HistoryItem): { short: string; full: string } {
 		if (field === 'generation') {
 			const label = lineageGenerationLabel(item);
@@ -526,13 +526,15 @@
 		flex-direction: column;
 		gap: 1px;
 	}
-	/* Weight follows the field's position. A model may take several lines to
-	   keep the version and variant readable on an 82px tile. */
+	/* Compact model tokens leave the 82px picture its space. Unknown names
+	   can still wrap so a distinguishing suffix is never silently clipped. */
 	.thumb-meta-first { font-size: var(--ui-font-size-10); line-height: 1.3; font-weight: 650; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.thumb-meta-rest { font-size: var(--ui-font-size-10); line-height: 1.3; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.thumb-meta-model {
-		font-size: var(--ui-font-size-11);
-		line-height: 1.4;
+		font-size: var(--ui-font-size-9);
+		line-height: 1.1;
+		font-weight: 500;
+		letter-spacing: -0.02em;
 		color: var(--fg);
 		white-space: normal;
 		overflow: visible;

@@ -8,6 +8,13 @@ import InkuHost
 struct AppCheck {
     @MainActor
     static func main() async throws {
+        if CommandLine.arguments.contains("--library-pagination-only") {
+            try await runLibraryPaginationChecks(); return
+        }
+        if let index = CommandLine.arguments.firstIndex(of: "--library-pagination-benchmark"),
+           CommandLine.arguments.indices.contains(index + 1) {
+            try await runLibraryPaginationBenchmark(url: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
+        }
         if let index = CommandLine.arguments.firstIndex(of: "--model-catalog-only") {
             guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Missing shared model catalog cases") }
             try await runModelCatalogChecks(casesURL: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return

@@ -321,7 +321,12 @@ public struct ContentView: View {
     private var canUseWork: Bool { !model.isBusy && !automation.isOccupied && !importing && dialog == nil && !presentation }
     private var workTarget: SavedWork? {
         if ui.settingsOpen { return nil }
-        return ui.libraryOpen ? libraryPreview.work : workspaceWork
+        if ui.libraryOpen {
+            // A list preview first carries metadata; global commands wait for its full record.
+            guard let work = libraryPreview.work, !work.svg.isEmpty else { return nil }
+            return work
+        }
+        return workspaceWork
     }
     private var hasSavedWork: Bool { (ui.libraryOpen || workTarget?.id != model.previewWork?.id) && workTarget?.trashed == false }
     private var canCopyImage: Bool { canUseWork && workTarget?.svg.isEmpty == false }

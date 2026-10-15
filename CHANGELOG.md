@@ -8,6 +8,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-15 — Reduce macOS library paging work
+
+Library pages follow Web/Server by leaving SVG text out and using persisted PNGs. SVG sizes and work information remain available; refinement, export, and other work actions read the chosen complete record on demand. Card-height notifications no longer rebuild the entire library, and paging no longer reloads the background lineage.
+
+Menu eligibility projects only the required saved fields and publishes one page of results together, reducing full-context JSON reads for every card and repeated updates of all menus.
+
+Page card slots, buttons, and menus are reused while images, expanded descriptions, and action targets follow work IDs.
+
 ## v2.15.152 (2026-10-15 / Build 1228)
 
 ### 2026-10-15 — Saijiki preview examples read as DDL fragments, with an "Example:" label

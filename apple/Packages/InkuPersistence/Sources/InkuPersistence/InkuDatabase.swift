@@ -140,7 +140,7 @@ public actor InkuDatabase {
 
     /// Count and select the same database predicate in one consistent read.
     public func libraryPage(query: LibraryQuery = LibraryQuery(), limit: Int = 24,
-                            offset: Int = 0, rootNodeID: String? = nil) throws -> LibraryPage {
+                            offset: Int = 0, rootNodeID: String? = nil, includeSVG: Bool = true) throws -> LibraryPage {
         try Self.validatePage(limit: limit, offset: offset)
         return try queue.read { db in
             var filter = Self.libraryFilter(query)
@@ -155,7 +155,7 @@ public actor InkuDatabase {
             let total = try Int.fetchOne(db, sql: "SELECT count(*) \(Self.libraryJoin) WHERE \(filter.sql)",
                                          arguments: filter.arguments) ?? 0
             let rows = try Row.fetchAll(db, sql: """
-                SELECT h.*, a.note AS library_note,
+                SELECT \(Self.libraryProjection(includeSVG: includeSVG)), a.note AS library_note,
                        coalesce(a.for_revision, 0) AS library_revision
                 \(Self.libraryJoin) WHERE \(filter.sql)
                 ORDER BY h.at \(query.order == .newest ? "DESC" : "ASC"), h.id ASC LIMIT ? OFFSET ?
@@ -213,7 +213,7 @@ public actor InkuDatabase {
 
     /// Group filtering and pagination happen before fetching representative SVGs.
     public func libraryGroups(query: LibraryQuery = LibraryQuery(), limit: Int = 12,
-                              offset: Int = 0, minimumItemCount: Int = 1) throws -> LibraryGroupPage {
+                              offset: Int = 0, minimumItemCount: Int = 1, includeSVG: Bool = true) throws -> LibraryGroupPage {
         try Self.validatePage(limit: limit, offset: offset)
         guard minimumItemCount >= 1 else { throw PersistenceError.invalidRecord("invalid group size") }
         return try queue.read { db in
@@ -234,7 +234,7 @@ public actor InkuDatabase {
             let groups = try rows.map { row -> LibraryGroup in
                 let root: String = row["root_id"]
                 guard let representative = try Row.fetchOne(db, sql: """
-                    SELECT h.*, a.note AS library_note, coalesce(a.for_revision, 0) AS library_revision
+                    SELECT \(Self.libraryProjection(includeSVG: includeSVG)), a.note AS library_note, coalesce(a.for_revision, 0) AS library_revision
                     \(Self.libraryJoin) WHERE \(filter.sql) AND coalesce(n.root_node_id, n.id) = ?
                     ORDER BY h.at DESC, h.id ASC LIMIT 1
                     """, arguments: filter.arguments + [root]) else {
@@ -281,7 +281,7 @@ public actor InkuDatabase {
 
     public func libraryAnnotation(id: String) throws -> LibraryAnnotation {
         try queue.read { db in
-            guard try SavedWork.fetchOne(db, key: id) != nil else {
+            guard try Bool.fetchOne(db, sql: "SELECT EXISTS(SELECT 1 FROM history WHERE id = ?)", arguments: [id]) == true else {
                 throw PersistenceError.invalidRecord("work no longer exists")
             }
             return try Self.annotation(id: id, in: db)
@@ -556,9 +556,17 @@ public actor InkuDatabase {
         return (clauses.joined(separator: " AND "), arguments)
     }
 
+    /// Server `include_svg=false`: keep list metadata and byte size without copying SVG text.
+    private static func libraryProjection(includeSVG: Bool) -> String {
+        let columns = includeSVG ? "h.*" : SavedWork.CodingKeys.allCases.map {
+            $0 == .svg ? "'' AS svg" : "h.\($0.rawValue)"
+        }.joined(separator: ", ")
+        return columns + ", length(CAST(h.svg AS BLOB)) AS library_svg_bytes"
+    }
+
     private static func libraryItem(_ row: Row) throws -> LibraryItem {
         LibraryItem(work: try SavedWork(row: row), annotation: LibraryAnnotation(
-            note: row["library_note"], forRevision: row["library_revision"]))
+            note: row["library_note"], forRevision: row["library_revision"]), svgBytes: row["library_svg_bytes"])
     }
 
     private static func annotation(id: String, in db: Database) throws -> LibraryAnnotation {
@@ -658,6 +666,44 @@ public actor InkuDatabase {
                 SELECT acknowledgement FROM effect_acknowledgements
                 WHERE execution_id = ? AND effect_id = ?
                 """, arguments: [executionID, effectID])
+        }
+    }
+
+    /// Project menu eligibility without transferring/parsing/serializing every saved document.
+    /// The object/string guards mirror PipelineHost.savedAuthoringContext's required fields.
+    public func savedAuthoringSummaries(locations: [(workID: String, executionID: String, effectID: String)]) throws -> [String: SavedAuthoringSummary] {
+        guard !locations.isEmpty else { return [:] }
+        return try queue.read { db in
+            var result: [String: SavedAuthoringSummary] = [:]
+            for start in stride(from: 0, to: locations.count, by: 250) {
+                let chunk = locations[start..<min(locations.count, start + 250)]
+                let values = chunk.map { _ in "(?, ?, ?)" }.joined(separator: ",")
+                let arguments = chunk.flatMap { [$0.workID, $0.executionID, $0.effectID] }
+                let rows = try Row.fetchAll(db, sql: """
+                    WITH wanted(work_id, execution_id, effect_id) AS (VALUES \(values)),
+                    records AS (
+                        SELECT wanted.work_id, CASE WHEN json_valid(CAST(a.acknowledgement AS TEXT))
+                            THEN CAST(a.acknowledgement AS TEXT) ELSE '{}' END AS document
+                        FROM wanted JOIN effect_acknowledgements a
+                        ON a.execution_id = wanted.execution_id AND a.effect_id = wanted.effect_id
+                    )
+                    SELECT work_id, json_extract(document, '$.performance.authority.authority') AS authority,
+                           json_extract(document, '$.performance.authority.origin') AS origin
+                    FROM records
+                    WHERE json_extract(document, '$.work_id') = work_id
+                    AND json_type(document, '$.performance.configuration') = 'object'
+                    AND json_type(document, '$.performance.options') = 'object'
+                    AND json_type(document, '$.performance.clip') = 'object'
+                    AND json_type(document, '$.performance.authority') = 'object'
+                    AND json_type(document, '$.performance.authority.authority') = 'text'
+                    AND json_type(document, '$.performance.authority.origin') = 'text'
+                    AND json_type(document, '$.performance.authority.revision') = 'text'
+                    """, arguments: StatementArguments(arguments))
+                for row in rows {
+                    result[row["work_id"]] = SavedAuthoringSummary(authority: row["authority"], origin: row["origin"])
+                }
+            }
+            return result
         }
     }
 

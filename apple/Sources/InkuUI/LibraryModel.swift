@@ -50,6 +50,7 @@ public final class LibraryModel {
     public var selectedIDs: Set<String> = []
     public private(set) var works: [SavedWork] = []
     public private(set) var annotations: [String: LibraryAnnotation] = [:]
+    public private(set) var svgSizes: [String: Int64] = [:]
     public private(set) var selectedAnnotationID: String?
     public private(set) var selectedAnnotation: LibraryAnnotation?
     public private(set) var selectedAnnotationLoading = false
@@ -86,6 +87,7 @@ public final class LibraryModel {
     }
     @ObservationIgnored public var onMutation: (@MainActor () async -> Void)?
     @ObservationIgnored private var database: InkuDatabase?
+    @ObservationIgnored private let includeListSVG: Bool
     /// Told when works are deleted for good, to drop their thumbnails.
     @ObservationIgnored public var thumbnails: ArtworkThumbnails?
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
@@ -98,7 +100,10 @@ public final class LibraryModel {
     private var lineageNormalGraph: LineageSnapshot?
     private var lineageOverviewGraph: LineageSnapshot?
 
-    public init(lineageReader: (any LineageReading)? = nil) { self.lineageReader = lineageReader }
+    public init(lineageReader: (any LineageReading)? = nil, includeListSVG: Bool = true) {
+        self.lineageReader = lineageReader
+        self.includeListSVG = includeListSVG
+    }
 
     public func connect(database: InkuDatabase) async {
         refreshTask?.cancel()
@@ -118,6 +123,7 @@ public final class LibraryModel {
         selectedIDs.removeAll()
         works.removeAll()
         annotations.removeAll()
+        svgSizes.removeAll()
         groups.removeAll()
         groupMembers.removeAll()
         groupMemberTotals.removeAll()
@@ -172,10 +178,10 @@ public final class LibraryModel {
     public func setPage(_ value: Int) async {
         refreshTask?.cancel()
         page = min(max(0, value), pageCount - 1)
-        await refresh()
+        await refresh(refreshLineage: false)
     }
 
-    public func refresh() async {
+    public func refresh(refreshLineage: Bool = true) async {
         guard let database else { return }
         let token = UUID()
         refreshToken = token
@@ -190,35 +196,45 @@ public final class LibraryModel {
             let count = try await database.trashCount()
             if requestedGrouping {
                 let result = try await database.libraryGroups(query: requestedFilter, limit: requestedSize,
-                                                               offset: requestedPage * requestedSize, minimumItemCount: requestedMinimum)
+                                                               offset: requestedPage * requestedSize, minimumItemCount: requestedMinimum, includeSVG: includeListSVG)
                 guard refreshToken == token, !Task.isCancelled else { return }
                 groups = result.groups; total = result.total
                 works = result.groups.map(\.representative.work)
                 annotations = Dictionary(uniqueKeysWithValues: result.groups.map { ($0.representative.id, $0.representative.annotation) })
+                svgSizes = Dictionary(uniqueKeysWithValues: result.groups.map { ($0.representative.id, $0.representative.svgBytes) })
             } else {
                 let result = try await database.libraryPage(query: requestedFilter, limit: requestedSize,
-                                                             offset: requestedPage * requestedSize)
+                                                             offset: requestedPage * requestedSize, includeSVG: includeListSVG)
                 guard refreshToken == token, !Task.isCancelled else { return }
                 let listed = try await database.lineageGenerations(nodeIDs: result.items.compactMap { $0.work.lineageNodeID })
                 guard refreshToken == token, !Task.isCancelled else { return }
                 groups = []; total = result.total
                 works = result.items.map(\.work)
                 annotations = Dictionary(uniqueKeysWithValues: result.items.map { ($0.id, $0.annotation) })
+                svgSizes = Dictionary(uniqueKeysWithValues: result.items.map { ($0.id, $0.svgBytes) })
                 generations.merge(listed) { $1 }
             }
             trashTotal = count
             loading = false
-            if page >= pageCount { page = pageCount - 1; await refresh(); return }
+            if page >= pageCount { page = pageCount - 1; await refresh(refreshLineage: refreshLineage); return }
             let visibleRoots = requestedGrouping && layout == .grid ? groups.map(\.id) : Array(expandedGroups)
             for root in visibleRoots {
                 guard refreshToken == token, !Task.isCancelled else { return }
                 await loadGroup(root: root, append: false)
             }
-            if lineageFocusID != nil { await reloadLineage() }
+            if refreshLineage, lineageFocusID != nil { await reloadLineage() }
         } catch {
             guard refreshToken == token, !Task.isCancelled else { return }
             loading = false; errorText = error.localizedDescription
         }
+    }
+
+    /// List snapshots omit SVG. Only an explicit work action reads the complete saved record.
+    public func fullWork(id: String) async throws -> SavedWork {
+        guard let database, let work = try await database.work(id: id) else {
+            throw PersistenceError.invalidRecord("work no longer exists")
+        }
+        return work
     }
 
     public func loadedAnnotation(for id: String) -> LibraryAnnotation? {
@@ -370,7 +386,7 @@ public final class LibraryModel {
         let token = refreshToken
         let offset = append ? (groupMembers[root]?.count ?? 0) : 0
         do {
-            let result = try await database.libraryPage(query: filter, limit: 100, offset: offset, rootNodeID: root)
+            let result = try await database.libraryPage(query: filter, limit: 100, offset: offset, rootNodeID: root, includeSVG: includeListSVG)
             guard token == refreshToken, !Task.isCancelled else { return }
             let existing = append ? (groupMembers[root] ?? []) : []
             let members = existing + result.items
@@ -385,7 +401,10 @@ public final class LibraryModel {
             }
             groupMemberTotals[root] = result.total
             self.generations.merge(generations) { $1 }
-            for item in result.items { annotations[item.id] = item.annotation }
+            for item in result.items {
+                annotations[item.id] = item.annotation
+                svgSizes[item.id] = item.svgBytes
+            }
         } catch { if token == refreshToken, !Task.isCancelled { errorText = error.localizedDescription } }
     }
 

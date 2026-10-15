@@ -482,6 +482,12 @@ struct ArtworkThumbnail: View {
     @Environment(DisplaySettings.self) private var display: DisplaySettings?
     @State private var image: CGImage?
     @State private var failed = false
+    @State private var displayedIdentity: Identity?
+    private struct Identity: Equatable {
+        let id: String
+        let renderHash: String?
+    }
+    private var identity: Identity { Identity(id: work.id, renderHash: work.renderHash) }
 
     /// HistoryThumbnail.svelte:51-62: one dot for both layers, its title naming the layer that fell.
     private var fallbackMarkLabel: String? {
@@ -495,9 +501,9 @@ struct ArtworkThumbnail: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.3))
-            if let image {
+            if let image, displayedIdentity == identity {
                 Image(decorative: image, scale: 1).resizable().scaledToFit().padding(4)
-            } else if failed {
+            } else if failed, displayedIdentity == identity {
                 Image(systemName: "exclamationmark.triangle").foregroundStyle(.secondary)
             } else {
                 ProgressView().controlSize(.small)
@@ -513,14 +519,16 @@ struct ArtworkThumbnail: View {
                     .inkuTooltip(display.tooltipValue(label))
             }
         }
-        .task(id: work.svg) {
-            image = nil; failed = false
+        .task(id: identity) {
+            image = nil; failed = false; displayedIdentity = nil
             do {
                 let rendered = try await thumbnails.image(for: work)
                 guard !Task.isCancelled else { return }
+                displayedIdentity = identity
                 image = rendered
             } catch {
                 guard !Task.isCancelled else { return }
+                displayedIdentity = identity
                 failed = true
             }
         }

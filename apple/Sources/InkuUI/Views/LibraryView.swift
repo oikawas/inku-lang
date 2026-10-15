@@ -19,9 +19,9 @@ struct LibraryView: View {
     @State private var deletion: LibraryDeletion?
     @State private var loadingGroups: Set<String> = []
     @State private var providers: [ProviderSettings] = []
-    @State private var gridViewport: CGSize = .zero
-    @State private var pageSizeCeiling = LibraryGridPaging.maximumPageSize
-    @State private var cardHeights: [String: CGFloat] = [:]
+    // Measurement bookkeeping is not view state. A height notification for every new card
+    // used to invalidate the whole library; only an actual page-size change needs a redraw.
+    @State private var measurements = LibraryGridMeasurements()
     @FocusState private var focusedWorkID: String?
     @FocusState private var searchFocused: Bool
     @State private var previewComment = LibraryNoteEditorModel()
@@ -65,6 +65,7 @@ struct LibraryView: View {
             }, readWork: { id in try await model.auxiliaryDatabase().work(id: id) })
         }
         .task(id: model.providerSettingsRevision) { providers = await model.hostSettings().providers }
+        .task(id: visibleIDs) { await model.loadWorkActionStates(workIDs: visibleIDs) }
         .onAppear { applyGroupedPageSize() }
         .onChange(of: library.isGrouped) { _, _ in applyGroupedPageSize() }
         #if os(macOS)
@@ -349,7 +350,9 @@ struct LibraryView: View {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: LibraryGridPaging.minCardWidth), spacing: LibraryGridPaging.gap, alignment: .top)],
                           alignment: .leading, spacing: LibraryGridPaging.gap) {
-                    ForEach(library.works, id: \.id) { work in gridCard(work) }
+                    // Reuse the finite page's native card slots instead of destroying every
+                    // button/menu on each turn. Work-specific state has its own identity below.
+                    ForEach(Array(library.works.enumerated()), id: \.offset) { _, work in gridCard(work) }
                 }
                 .padding(.top, 8).padding(.horizontal, 10).padding(.bottom, 6)
             }
@@ -365,31 +368,31 @@ struct LibraryView: View {
     /// from 100; within one viewport the size only shrinks, so different cards cannot make two sizes alternate.
     private func reportPageSize(viewport size: CGSize) {
         let viewport = CGSize(width: (size.width * 2).rounded() / 2, height: (size.height * 2).rounded() / 2)
-        if viewport != gridViewport {
-            gridViewport = viewport
-            pageSizeCeiling = LibraryGridPaging.maximumPageSize
+        if viewport != measurements.viewport {
+            measurements.viewport = viewport
+            measurements.ceiling = LibraryGridPaging.maximumPageSize
         }
         guard !library.isGrouped, library.layout != .list, viewport.width > 0, viewport.height > 0 else { return }
         let shown = Set(library.works.map(\.id))
-        let heights = cardHeights.filter { shown.contains($0.key) }.map { Double($0.value) }
+        let heights = measurements.cardHeights.filter { shown.contains($0.key) }.map { Double($0.value) }
         let fitted = LibraryGridPaging.pageSize(width: viewport.width - 20, height: viewport.height - 14, cardHeights: heights)
-        pageSizeCeiling = min(pageSizeCeiling, fitted)
-        if library.pageSize != pageSizeCeiling { library.pageSize = pageSizeCeiling }
+        measurements.ceiling = min(measurements.ceiling, fitted)
+        if library.pageSize != measurements.ceiling { library.pageSize = measurements.ceiling }
     }
 
     private func recordCardHeight(_ height: CGFloat, for id: String) {
-        guard abs((cardHeights[id] ?? 0) - height) > 0.5 else { return }
-        cardHeights[id] = height
-        reportPageSize(viewport: gridViewport)
+        guard abs((measurements.cardHeights[id] ?? 0) - height) > 0.5 else { return }
+        measurements.cardHeights[id] = height
+        reportPageSize(viewport: measurements.viewport)
     }
 
     /// Lineage groups page by eight (Web); leaving them hands the size back to the measured grid.
     private func applyGroupedPageSize() {
         if library.isGrouped {
             if library.pageSize != Self.lineageGroupPageSize { library.pageSize = Self.lineageGroupPageSize }
-        } else if gridViewport != .zero {
-            pageSizeCeiling = LibraryGridPaging.maximumPageSize
-            reportPageSize(viewport: gridViewport)
+        } else if measurements.viewport != .zero {
+            measurements.ceiling = LibraryGridPaging.maximumPageSize
+            reportPageSize(viewport: measurements.viewport)
         }
     }
 
@@ -415,6 +418,7 @@ struct LibraryView: View {
                     Text("DDL").inkuFont(12, weight: .semibold).foregroundStyle(.tertiary)
                 }
                 LibraryExpandableTitle(work: work, display: display, size: 14)
+                    .id(work.id)
                     .foregroundStyle(.secondary)
                 if let note = library.annotation(for: work.id).note, !note.isEmpty {
                     (Text(display.webCopy("historyPreviewCommentLabel", fallback: "作品へのコメント") + " ").fontWeight(.semibold) + Text(note))
@@ -432,11 +436,11 @@ struct LibraryView: View {
             GeometryReader { proxy in
                 Color.clear
                     .onAppear { recordCardHeight(proxy.size.height, for: work.id) }
+                    .onChange(of: work.id) { _, _ in recordCardHeight(proxy.size.height, for: work.id) }
                     .onChange(of: proxy.size.height) { _, height in recordCardHeight(height, for: work.id) }
             }
         }
         .contextMenu { workMenu(work) }
-        .task(id: work.id) { await model.loadWorkActionState(work) }
         .focusable().focused($focusedWorkID, equals: work.id)
         .onKeyPress(.return) {
             guard focusedWorkID == work.id, !model.isBrowsingLocked else { return .ignored }
@@ -451,7 +455,7 @@ struct LibraryView: View {
     /// Native facts the Web card does not print: saved time and SVG size, with the colour catalog on hover.
     private func savedFacts(_ work: SavedWork) -> some View {
         (Text(Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(date: .numeric, time: .shortened))
-            + Text(" · " + ByteCountFormatter.string(fromByteCount: SavedWorkFacts.svgBytes(work), countStyle: .file)))
+            + Text(" · " + ByteCountFormatter.string(fromByteCount: svgBytes(work), countStyle: .file)))
             .inkuFont(10).monospacedDigit().foregroundStyle(.tertiary).lineLimit(1)
             .inkuTooltip(display.tooltipValue(display.localized("色") + ": " + (work.renderColorCatalogName ?? work.catalogID ?? display.localized("未記録"))))
     }
@@ -534,7 +538,7 @@ struct LibraryView: View {
                     .inkuFont(12).lineLimit(1)
             }.width(min: 70, ideal: 100)
             TableColumn(display.webCopy("historySvgSizeHeader", fallback: "SVGサイズ")) { row in
-                Text(ByteCountFormatter.string(fromByteCount: SavedWorkFacts.svgBytes(row.work), countStyle: .file))
+                Text(ByteCountFormatter.string(fromByteCount: svgBytes(row.work), countStyle: .file))
                     .inkuFont(12).monospacedDigit()
             }.width(74)
             TableColumn(display.webCopy("historyHashHeader", fallback: "ハッシュ")) { row in
@@ -734,7 +738,6 @@ struct LibraryView: View {
         .padding(5)
         .modifier(LibraryCardSurface(current: selected || model.selectedWorkID == work.id, focused: focusedWorkID == work.id, cornerRadius: 4))
         .contextMenu { workMenu(work) }
-        .task(id: work.id) { await model.loadWorkActionState(work) }
     }
 
     /// Web list-mode `.lineage-member`: check, 48px picture, description, actions on one row.
@@ -762,7 +765,6 @@ struct LibraryView: View {
         .padding(5)
         .modifier(LibraryCardSurface(current: library.selectedIDs.contains(work.id) || model.selectedWorkID == work.id, cornerRadius: 4))
         .contextMenu { workMenu(work) }
-        .task(id: work.id) { await model.loadWorkActionState(work) }
     }
 
     // MARK: Actions
@@ -787,21 +789,39 @@ struct LibraryView: View {
     private func openLineage(_ work: SavedWork) {
         guard !model.isBrowsingLocked else { return }
         Task {
-            await model.selectWork(work); await library.loadLineage(work: work)
-            onClose?()
-            NotificationCenter.default.post(name: .inkuOpenSection, object: "lineage", userInfo: ["workID": work.id])
+            do {
+                let saved = try await library.fullWork(id: work.id)
+                guard !model.isBrowsingLocked, !Task.isCancelled else { return }
+                await model.selectWork(saved); await library.loadLineage(work: saved)
+                onClose?()
+                NotificationCenter.default.post(name: .inkuOpenSection, object: "lineage", userInfo: ["workID": saved.id])
+            } catch { model.errorText = error.localizedDescription }
+        }
+    }
+
+    private func svgBytes(_ work: SavedWork) -> Int64 {
+        library.svgSizes[work.id] ?? SavedWorkFacts.svgBytes(work)
+    }
+
+    private func performWorkAction(_ work: SavedWork, _ action: String) {
+        Task {
+            do {
+                let saved = try await library.fullWork(id: work.id)
+                guard !Task.isCancelled else { return }
+                onWorkAction(saved, action)
+            } catch { model.errorText = error.localizedDescription }
         }
     }
 
     @ViewBuilder
     private func workMenu(_ work: SavedWork) -> some View {
         Button(display.localized("作品プレビュー"), systemImage: "eye") { openWork(work) }.disabled(model.isBrowsingLocked)
-        Button(display.localized("生成情報"), systemImage: "info.circle") { onWorkAction(work, "info") }.disabled(model.isBrowsingLocked || work.trashed)
+        Button(display.localized("生成情報"), systemImage: "info.circle") { performWorkAction(work, "info") }.disabled(model.isBrowsingLocked || work.trashed)
         Button(display.localized("制作で開く"), systemImage: "pencil") {
             openWork(work); openInCreate(work)
         }.disabled(model.isBrowsingLocked || work.trashed)
-        SavedWorkRefinementActions(model: model, work: work, onAction: onWorkAction, writingLocked: writingDisabled)
-        Button(display.localized("書き出す"), systemImage: "square.and.arrow.up") { onWorkAction(work, "export") }.disabled(writingDisabled || work.trashed)
+        SavedWorkRefinementActions(model: model, work: work, onAction: performWorkAction, writingLocked: writingDisabled)
+        Button(display.localized("書き出す"), systemImage: "square.and.arrow.up") { performWorkAction(work, "export") }.disabled(writingDisabled || work.trashed)
         if work.lineageNodeID != nil { Button(display.localized("系譜"), systemImage: "point.3.connected.trianglepath.dotted") { openLineage(work) }.disabled(model.isBrowsingLocked) }
         Divider()
         Button(display.localized(library.selectedIDs.contains(work.id) ? "チェックを外す" : "複数選択に追加"), systemImage: "checkmark.square") { library.toggleSelection(work.id) }
@@ -853,7 +873,7 @@ struct LibraryView: View {
                     }
                     LibraryPreviewPanel(model: model, preview: preview, comment: previewComment, work: work,
                                         naming: naming, onOpen: openInCreate, onLineage: openLineage,
-                                        onWorkAction: onWorkAction, writingLocked: writingDisabled)
+                                        onWorkAction: performWorkAction, writingLocked: writingDisabled, storedSVGBytes: svgBytes(work))
                         .id(work.id)
                     if let error = preview.errorText {
                         Text(error).inkuFont(12).foregroundStyle(.red).textSelection(.enabled)
@@ -894,6 +914,13 @@ struct LibraryView: View {
         let workID: String?
         let mutating: Bool
     }
+}
+
+@MainActor
+private final class LibraryGridMeasurements {
+    var viewport: CGSize = .zero
+    var ceiling = LibraryGridPaging.maximumPageSize
+    var cardHeights: [String: CGFloat] = [:]
 }
 
 

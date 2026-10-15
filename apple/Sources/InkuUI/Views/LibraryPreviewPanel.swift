@@ -13,6 +13,7 @@ struct LibraryPreviewPanel: View {
     let onLineage: (SavedWork) -> Void
     let onWorkAction: (SavedWork, String) -> Void
     var writingLocked = false
+    var storedSVGBytes: Int64? = nil
     @State private var generation: Int?
     private var display: DisplaySettings { model.display }
     private var disabled: Bool { model.isBrowsingLocked || work.trashed }
@@ -87,7 +88,7 @@ struct LibraryPreviewPanel: View {
     }
 
     private var byteSize: String {
-        let bytes = Double(SavedWorkFacts.svgBytes(work))
+        let bytes = Double(storedSVGBytes ?? SavedWorkFacts.svgBytes(work))
         if bytes < 1024 { return "\(Int(bytes)) B" }
         if bytes < 1024 * 1024 { return String(format: "%.1f KB", bytes / 1024) }
         return String(format: "%.1f MB", bytes / (1024 * 1024))

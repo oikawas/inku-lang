@@ -1,7 +1,7 @@
 {
  "schema": "inku.model-catalog.v2",
  "version": "3.0.0",
- "updated": "2026-10-13T23:49:00Z",
+ "updated": "2026-10-15T19:30:00+09:00",
  "labels": [
   {
    "id": "unmeasured",
@@ -3415,9 +3415,9 @@
       "vision"
      ],
      "recommendation_llm": 3,
-     "speed_llm_seconds": 122.5,
-     "comment_ja": "描画はとても遅い。画像は提供元のエラー（500）で読めない。",
-     "comment_en": "Draws very slowly; pictures fail with a provider error (500)."
+     "speed_llm_seconds": 147.4,
+     "comment_ja": "描画はとても遅い。2回の測定で6件中6件と2件を描けた（残りは提供元のエラー 503・504）。画像は提供元のエラー（500）で読めない。",
+     "comment_en": "Draws very slowly; drew 6 and 2 of 6 in the two measurements (the rest failed at the provider, 503/504). Pictures fail with a provider error (500)."
     },
     {
      "id": "nvidia/ising-calibration-1-35b-a3b",
@@ -3472,13 +3472,15 @@
     {
      "id": "google/gemma-4-31b-it",
      "label": "Google Gemma 4 31B Instruct",
-     "purposes": [],
-     "unsupported_purposes": [
-      "llm",
+     "purposes": [
       "vision"
      ],
-     "comment_ja": "描画は6件中3件だけ（残りは提供元の時間切れ 504）。画像の読み取りも時間切れ（504）。",
-     "comment_en": "Drew 3 of 6 (the rest timed out at the provider, 504). Picture reading timed out too (504)."
+     "unsupported_purposes": [
+      "llm"
+     ],
+     "speed_vision_seconds": 224.5,
+     "comment_ja": "描画は2回の測定で6件中3件と1件（残りは提供元の時間切れ 504）。画像は1件正しく読めたが、ほかは時間切れ（504）。",
+     "comment_en": "Drew 3 and 1 of 6 in the two measurements (the rest timed out at the provider, 504). Read one picture right; the others timed out (504)."
     },
     {
      "id": "meta/llama-3.3-70b-instruct",
@@ -3548,14 +3550,14 @@
      "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
      "label": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
      "purposes": [
+      "llm",
       "vision"
      ],
-     "unsupported_purposes": [
-      "llm"
-     ],
-     "speed_vision_seconds": 18.8,
-     "comment_ja": "描画は6件中1件だけ（残りは提供元のエラー 503・500）。画像の形と色は読めるが、詳しい説明では文が崩れる。",
-     "comment_en": "Drew 1 of 6 (the rest failed at the provider, 503/500). Reads shapes and colours, but longer descriptions of a picture break down."
+     "recommendation_llm": 3,
+     "speed_llm_seconds": 365.3,
+     "speed_vision_seconds": 54.2,
+     "comment_ja": "描画はとても遅い。2回の測定で6件中1件と6件を描けた（失敗は提供元のエラー 503・500）。画像の形と色は読めるが、詳しい説明では文が崩れる。",
+     "comment_en": "Draws very slowly; drew 1 and 6 of 6 in the two measurements (the failures were provider errors, 503/500). Reads shapes and colours, but longer descriptions of a picture break down."
     },
     {
      "id": "deepseek-ai/deepseek-v4-flash",
@@ -3679,8 +3681,8 @@
       "llm",
       "vision"
      ],
-     "comment_ja": "描画は6件中1件だけ（残りは出力の上限で途中で切れた）。画像は読めない（NIM で画像入力が無効）。",
-     "comment_en": "Drew 1 of 6 (the rest stopped at the output limit). Cannot read pictures (image input is disabled on NIM)."
+     "comment_ja": "描画は2回の測定で6件中1件と0件（残りは出力の上限で途中で切れた）。画像は読めない（NIM で画像入力が無効）。",
+     "comment_en": "Drew 1 and 0 of 6 in the two measurements (the rest stopped at the output limit). Cannot read pictures (image input is disabled on NIM)."
     },
     {
      "id": "bytedance/seed-oss-36b-instruct",
@@ -3774,8 +3776,8 @@
       "llm",
       "vision"
      ],
-     "comment_ja": "描画は6件中2件だけ（残りは出力の上限で途中で切れた、500）。画像は読めない（NIM で画像入力が無効）。",
-     "comment_en": "Drew 2 of 6 (the rest stopped at the output limit, or 500). Cannot read pictures (image input is disabled on NIM)."
+     "comment_ja": "描画は2回の測定で6件中2件と1件（残りは出力の上限で途中で切れた、500）。画像は読めない（NIM で画像入力が無効）。",
+     "comment_en": "Drew 2 and 1 of 6 in the two measurements (the rest stopped at the output limit, or 500). Cannot read pictures (image input is disabled on NIM)."
     },
     {
      "id": "mistralai/mixtral-8x7b-instruct-v0.1",
@@ -3801,8 +3803,8 @@
       "llm",
       "vision"
      ],
-     "comment_ja": "描画は6件中2件だけ（残りは出力の上限で途中で切れた）。画像は読めない。",
-     "comment_en": "Drew 2 of 6 (the rest stopped at the output limit). Cannot read pictures."
+     "comment_ja": "描画は2回の測定で6件中2件と1件（残りは出力の上限で途中で切れた）。画像は読めない（画像が無いと答える）。",
+     "comment_en": "Drew 2 and 1 of 6 in the two measurements (the rest stopped at the output limit). Cannot read pictures (answers that there is no image)."
     },
     {
      "id": "stepfun-ai/step-3.7-flash",
@@ -3861,9 +3863,9 @@
      "unsupported_purposes": [
       "llm"
      ],
-     "speed_vision_seconds": 2.3,
-     "comment_ja": "描画は型に合わない応答で6件とも描けない。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
-     "comment_en": "Could not draw: all six answers broke the schema. Picture reading can mistake the number or shape of figures placed together."
+     "speed_vision_seconds": 11.9,
+     "comment_ja": "描画は型に合わない応答で、2回の測定とも6件すべて描けない。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
+     "comment_en": "Could not draw: every answer broke the schema in both measurements. Picture reading can mistake the number or shape of figures placed together."
     },
     {
      "id": "nvidia/nemotron-3-nano-30b-a3b",
@@ -3906,8 +3908,8 @@
       "llm"
      ],
      "speed_vision_seconds": 47.7,
-     "comment_ja": "描画は6件中5件だけ（1件は提供元の時間切れ 504）。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
-     "comment_en": "Drew 5 of 6 (one timed out at the provider, 504). Picture reading can mistake the number or shape of figures placed together."
+     "comment_ja": "描画は2回の測定で6件中5件と0件（失敗は提供元の時間切れ 504）。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
+     "comment_en": "Drew 5 and 0 of 6 in the two measurements (the failures timed out at the provider, 504). Picture reading can mistake the number or shape of figures placed together."
     },
     {
      "id": "meta/llama-4-maverick-17b-128e-instruct",
@@ -4264,8 +4266,8 @@
       "llm",
       "vision"
      ],
-     "comment_ja": "描画は6件中3件だけ（残りは出力の上限で途中で切れた）。画像の読み取りは助言の形にならない。",
-     "comment_en": "Drew 3 of 6 (the rest stopped at the output limit). Picture reading does not come back as advice."
+     "comment_ja": "描画は2回の測定で6件中3件と2件（残りは出力の上限で途中で切れた）。画像の読み取りも出力の上限で切れて助言にならない。",
+     "comment_en": "Drew 3 and 2 of 6 in the two measurements (the rest stopped at the output limit). Picture reading stops at the limit too and gives no advice."
     },
     {
      "id": "google/codegemma-1.1-7b",
@@ -4309,9 +4311,9 @@
       "llm"
      ],
      "recommendation_vision": 3,
-     "speed_vision_seconds": 1.0,
-     "comment_ja": "描画は応答の形が崩れて6件とも描けない。画像の読み取りはおおむね正確。",
-     "comment_en": "Could not draw: all six answers were malformed. Reads pictures mostly accurately."
+     "speed_vision_seconds": 0.9,
+     "comment_ja": "描画は応答の形が崩れて、2回の測定とも6件すべて描けない。画像の読み取りはおおむね正確。",
+     "comment_en": "Could not draw: every answer was malformed in both measurements. Reads pictures mostly accurately."
     },
     {
      "id": "google/gemma-2b",
@@ -4441,8 +4443,8 @@
       "llm",
       "vision"
      ],
-     "comment_ja": "描画は6件とも描けない（出力の上限で途中で切れる、404、500）。画像は使えない（404）。",
-     "comment_en": "Could not draw (answers stopped at the output limit, 404, 500). Pictures unavailable (404)."
+     "comment_ja": "描画は2回の測定とも6件すべて描けない（出力の上限で途中で切れる、404・500・504）。画像の読み取りも上限で切れるか、使えない（404）。",
+     "comment_en": "Could not draw in either measurement (answers stopped at the output limit, or 404/500/504). Picture reading stops at the limit or is unavailable (404)."
     },
     {
      "id": "microsoft/kosmos-2",
@@ -4543,8 +4545,12 @@
      ],
      "recommendation_vision": 2,
      "speed_vision_seconds": 242.2,
-     "comment_ja": "描画は6件中3件だけ（残りは提供元の時間切れ 504）。画像の読み取りは要点の一部を落とし、とても遅い。",
-     "comment_en": "Drew 3 of 6 (the rest timed out at the provider, 504). Picture reading misses some points and is very slow."
+     "comment_ja": "NIM での提供は 2026-10-15 に終了した（410）。それまでの描画は2回の測定で6件中3件と1件（残りは提供元の時間切れ 504）。画像の読み取りは要点の一部を落とし、とても遅い。",
+     "comment_en": "NIM ended this model on 2026-10-15 (410). Before that it drew 3 and 1 of 6 in the two measurements (the rest timed out at the provider, 504). Picture reading misses some points and is very slow.",
+     "labels": [
+      "eol"
+     ],
+     "eol_date": "2026-10-15"
     },
     {
      "id": "nv-mistralai/mistral-nemo-12b-instruct",
@@ -4596,10 +4602,11 @@
       "vision"
      ],
      "recommendation_llm": 3,
-     "speed_llm_seconds": 41.4,
-     "speed_vision_seconds": 278.4,
-     "comment_ja": "描画は遅い。画像の読み取りは1件正しく、もう1件は提供元の時間切れ（504）。",
-     "comment_en": "Draws slowly; read one picture right, the other timed out at the provider (504)."
+     "speed_llm_seconds": 42.0,
+     "recommendation_vision": 2,
+     "speed_vision_seconds": 95.6,
+     "comment_ja": "描画は遅い。2回の測定で6件中6件と5件を描けた（1件は出力の上限で途中で切れた）。画像の読み取りは要点の一部を落とし、とても遅い。",
+     "comment_en": "Draws slowly; drew 6 and 5 of 6 in the two measurements (one stopped at the output limit). Picture reading misses some points and is very slow."
     },
     {
      "id": "nvidia/llama-3.1-nemoguard-8b-content-safety",
@@ -4744,8 +4751,8 @@
       "llm",
       "vision"
      ],
-     "comment_ja": "描画は出力の上限で途中で切れて6件とも描けない。画像は読めない（NIM で画像入力が無効）。",
-     "comment_en": "Could not draw: all six answers stopped at the output limit. Cannot read pictures (image input is disabled on NIM)."
+     "comment_ja": "描画は2回の測定で6件中0件と2件（残りは出力の上限で途中で切れた）。画像は読めない（NIM で画像入力が無効）。",
+     "comment_en": "Drew 0 and 2 of 6 in the two measurements (the rest stopped at the output limit). Cannot read pictures (image input is disabled on NIM)."
     },
     {
      "id": "nvidia/nemotron-4-340b-instruct",
@@ -4923,8 +4930,8 @@
       "llm",
       "vision"
      ],
-     "comment_ja": "描画は6件とも描けない（提供元の時間切れ 504、出力の上限）。画像は使えない（400）。",
-     "comment_en": "Could not draw (timed out at the provider, 504, or stopped at the output limit). Pictures refused (400)."
+     "comment_ja": "描画は2回の測定とも6件すべて描けない（提供元の時間切れ 504、出力の上限）。画像は使えない（400）。",
+     "comment_en": "Could not draw in either measurement (timed out at the provider, 504, or stopped at the output limit). Pictures refused (400)."
     },
     {
      "id": "z-ai/glm-5.3-flash",
@@ -4934,8 +4941,8 @@
       "llm",
       "vision"
      ],
-     "comment_ja": "描画は出力の上限で途中で切れて6件とも描けない。画像の読み取りも上限で切れる。",
-     "comment_en": "Could not draw: all six answers stopped at the output limit. Picture reading stops at the limit too."
+     "comment_ja": "描画は出力の上限で途中で切れて、2回の測定とも6件すべて描けない。画像の読み取りも上限で切れる。",
+     "comment_en": "Could not draw: every answer stopped at the output limit in both measurements. Picture reading stops at the limit too."
     },
     {
      "id": "zyphra/zamba2-7b-instruct",
@@ -4947,6 +4954,17 @@
      ],
      "comment_ja": "この API キーでは使えない（404）。",
      "comment_en": "Not available with this API key (404)."
+    },
+    {
+     "id": "stepfun-ai/step-5-preview",
+     "label": "stepfun-ai/step-5-preview",
+     "purposes": [],
+     "unsupported_purposes": [
+      "llm",
+      "vision"
+     ],
+     "comment_ja": "描画は出力の上限で途中で切れて6件とも描けない。画像の読み取りも上限で切れる。",
+     "comment_en": "Could not draw: all six answers stopped at the output limit. Picture reading stops at the limit too."
     }
    ]
   },

@@ -1,5 +1,5 @@
 //! The flat brush (平筆): the band a sweep (刷き) of the thin and thick brushes
-//! lays, with a square entry, a dry end that parts into bristle bundles, and
+//! lays, with a square entry, a dry end that narrows without parting, and faint
 //! bristle streaks along it.
 //!
 //! The band follows the same performed centerline the round stroke did; only
@@ -29,44 +29,44 @@ const PRESSURE: f64 = 0.10;
 /// whole response would swell the band by up to 70% where the paper bleeds.
 const SUPPORT_SHARE: f64 = 0.25;
 
-/// How a brush's dry end parts: bundles per square root of the band's width in
-/// 1,000-unit short-side units, the dry end's length in brush sizes (the
-/// shortest, and the seeded span above it), and a bundle's width at its tip as
-/// a share of its width where it parts. The thin brush parts into fewer and
-/// wider bundles than the thick one, so its end does not read as loose hairs.
+/// How a brush's band dries and how many streaks it carries: the dry end's
+/// length in brush sizes (the shortest, and the seeded span above it), and the
+/// streak count's root, so that two fewer streaks than the rounded root of the
+/// band's width (in 1,000-unit short-side units) times it run along the band.
 struct DryEnd {
-    bundles: f64,
+    streak_root: f64,
     shortest: f64,
     span: f64,
-    tip: f64,
 }
 
 const fn dry_end(weight: Weight) -> DryEnd {
     match weight {
         Weight::BrushThin => DryEnd {
-            bundles: 0.9,
+            streak_root: 0.9,
             shortest: 1.0,
             span: 1.0,
-            tip: 0.70,
         },
         _ => DryEnd {
-            bundles: 1.3,
+            streak_root: 1.3,
             shortest: 1.0,
             span: 1.0,
-            tip: 0.45,
         },
     }
 }
 
-/// The shortest bundle, as a share of the dry end.
-const SHORTEST_BUNDLE: f64 = 0.3;
+/// The band's width where it ends, as a share of its width where it starts to
+/// dry: the narrowest, and the seeded span above it. A band that parted into
+/// bundles read as a fringe or a fork rather than a brush (the author, 2026-10-16).
+const DRY_NARROWEST: f64 = 0.55;
+const DRY_NARROW_SPAN: f64 = 0.10;
 const DARK_SHARE: f64 = 0.6;
-/// The streaks' OKLCH lightness steps; hue and chroma are kept.
-const DARK_STEP: f64 = -0.07;
-const LIGHT_STEP: f64 = 0.06;
+/// The streaks' OKLCH lightness steps, a quarter of the first flat brush's;
+/// hue and chroma are kept.
+const DARK_STEP: f64 = -0.0175;
+const LIGHT_STEP: f64 = 0.015;
 /// The streaks' widths, as shares of the band's.
-const DARK_WIDTH: f64 = 0.08;
-const LIGHT_WIDTH: f64 = 0.06;
+const DARK_WIDTH: f64 = 0.025;
+const LIGHT_WIDTH: f64 = 0.02;
 
 const fn flat_weight(weight: Weight) -> bool {
     matches!(weight, Weight::BrushThin | Weight::BrushThick)
@@ -99,7 +99,7 @@ pub(crate) struct FlatBandRequest<'a> {
 }
 
 pub(crate) struct FlatBand {
-    /// The band and its bristle bundles, one closed subpath each.
+    /// The band, one closed path.
     pub body: String,
     pub dark: String,
     pub light: String,
@@ -269,22 +269,37 @@ pub(crate) fn flat_band(request: FlatBandRequest<'_>) -> Option<FlatBand> {
         right: &right,
     };
 
-    let parting = dry_end(weight);
-    let dry = brush_size * (parting.shortest + parting.span * hash01(0, seed, "flat-dry"));
+    let drying = dry_end(weight);
+    let dry = brush_size * (drying.shortest + drying.span * hash01(0, seed, "flat-dry"));
     // A mark shorter than twice its dry end lifts before the brush runs dry:
-    // it ends square, without parting.
-    let parts = 2.0 * dry <= total;
-    let dry_from = if parts { 1.0 - dry / total } else { 1.0 };
+    // it ends square at its full width.
+    let dries = 2.0 * dry <= total;
+    let dry_from = if dries { 1.0 - dry / total } else { 1.0 };
 
-    // The band: a square entry, both banks, and a straight edge where it parts.
+    // The band: a square entry and both banks. Over its dry end it narrows,
+    // evenly about its centerline, to a little over half its width, and ends
+    // square without parting.
     let mut body = String::new();
-    let (dry_left, dry_right) = banks.at(dry_from);
+    let end_share = DRY_NARROWEST + DRY_NARROW_SPAN * hash01(0, seed, "flat-dry-narrow");
     let mut outline = (0..count)
         .filter(|index| parameters[*index] < dry_from - 1.0e-9)
         .map(|index| left[index])
         .collect::<Vec<_>>();
-    outline.push(dry_left);
-    outline.push(dry_right);
+    let mut far = Vec::new();
+    if dries {
+        for t in banks.span(dry_from, 1.0) {
+            let along = (t - dry_from) / (1.0 - dry_from);
+            let half = 0.5 * (1.0 - (1.0 - end_share) * along);
+            let (l, r) = banks.at(t);
+            outline.push(hundredths(across(l, r, 0.5 - half)));
+            far.push(hundredths(across(l, r, 0.5 + half)));
+        }
+    } else {
+        let (end_left, end_right) = banks.at(1.0);
+        outline.push(end_left);
+        far.push(end_right);
+    }
+    outline.extend(far.into_iter().rev());
     outline.extend(
         (0..count)
             .rev()
@@ -293,53 +308,13 @@ pub(crate) fn flat_band(request: FlatBandRequest<'_>) -> Option<FlatBand> {
     );
     push_polygon(&mut body, &outline);
 
-    // The dry end: bundles of bristles that part where the band ends and run
-    // on to different lengths, each thinning towards its tip. A band and its
-    // bundles wind the same way, so their shared edge leaves no seam.
-    let unit_width = base_width / scale.max(1.0e-9);
-    let bundles = ((parting.bundles * unit_width.sqrt()).round() as usize).clamp(3, 8);
-    if parts {
-        let mut bounds = vec![0.0; bundles + 1];
-        bounds[bundles] = 1.0;
-        for (index, bound) in bounds.iter_mut().enumerate().take(bundles).skip(1) {
-            *bound = (index as f64 + (hash01(index as i64, seed, "flat-bundle-bound") - 0.5) * 0.5)
-                / bundles as f64;
-        }
-        let mut reaches = (0..bundles)
-            .map(|index| {
-                SHORTEST_BUNDLE
-                    + (1.0 - SHORTEST_BUNDLE) * hash01(index as i64, seed, "flat-bundle-reach")
-            })
-            .collect::<Vec<_>>();
-        let longest = (0..bundles)
-            .max_by(|a, b| reaches[*a].total_cmp(&reaches[*b]))
-            .expect("at least three bundles");
-        reaches[longest] = 1.0;
-        for bundle in 0..bundles {
-            let end = dry_from + (1.0 - dry_from) * reaches[bundle];
-            let middle = (bounds[bundle] + bounds[bundle + 1]) / 2.0;
-            let half = (bounds[bundle + 1] - bounds[bundle]) / 2.0;
-            let mut near = Vec::new();
-            let mut far = Vec::new();
-            for t in banks.span(dry_from, end) {
-                let along = if end - dry_from <= 1.0e-12 {
-                    0.0
-                } else {
-                    (t - dry_from) / (end - dry_from)
-                };
-                let reach = half * (1.0 - (1.0 - parting.tip) * along);
-                let (l, r) = banks.at(t);
-                near.push(hundredths(across(l, r, middle - reach)));
-                far.push(hundredths(across(l, r, middle + reach)));
-            }
-            near.extend(far.into_iter().rev());
-            push_polygon(&mut body, &near);
-        }
-    }
-
     // Bristle streaks: dark ones carry the loaded entry, light ones start a
-    // little later; both end before the band parts.
-    let streaks = bundles.saturating_sub(2).clamp(2, 5);
+    // little later; both end before the band starts to dry.
+    let unit_width = base_width / scale.max(1.0e-9);
+    let streaks = ((drying.streak_root * unit_width.sqrt()).round() as usize)
+        .clamp(3, 8)
+        .saturating_sub(2)
+        .clamp(2, 5);
     let mut dark = String::new();
     let mut light = String::new();
     for streak in 0..streaks {
@@ -479,11 +454,31 @@ mod tests {
             .collect()
     }
 
-    /// How far from the line's end the band parts: from the middle of its last bank pair.
-    fn dry_run(band: &FlatBand, length: f64) -> f64 {
-        let body = &polygons(&band.body)[0];
-        let half = body.len() / 2;
-        length - (body[half - 1].x + body[half].x) / 2.0
+    /// The band's pairs across it, from the entry to its end: its one closed
+    /// path read from both ends.
+    fn pairs(band: &FlatBand) -> Vec<(Point, Point)> {
+        let parts = polygons(&band.body);
+        assert_eq!(parts.len(), 1, "the band ends without parting");
+        let body = &parts[0];
+        (0..body.len() / 2)
+            .map(|index| (body[index], body[body.len() - 1 - index]))
+            .collect()
+    }
+
+    fn width((left, right): &(Point, Point)) -> f64 {
+        (left.x - right.x).hypot(left.y - right.y)
+    }
+
+    /// How far from a straight line's end the band starts to dry: from its last
+    /// pair at full width. The drying pairs keep hundredths of a pixel, so a
+    /// sample just past the start may still read as full, hundredths further on.
+    fn dry_run(band: &FlatBand, length: f64, full: f64) -> f64 {
+        let pairs = pairs(band);
+        let last_full = pairs
+            .iter()
+            .rposition(|pair| width(pair) >= full - 1e-9)
+            .expect("a band starts at its full width");
+        length - pairs[last_full].0.x
     }
 
     #[test]
@@ -511,15 +506,19 @@ mod tests {
             24.0,
             FlatHold::Fixed,
         );
-        let body = &polygons(&band.body)[0];
-        for index in 0..body.len() / 2 {
-            let (left, right) = (body[index], body[body.len() - 1 - index]);
-            // Without pressure or paper the band keeps the base width, square
-            // across the line, from the entry to where it parts.
+        let pairs = pairs(&band);
+        // Without pressure or paper the band keeps the base width up to where it
+        // starts to dry (at most two brush sizes, 48 px, from the end). Every
+        // pair lies square across the line and is never wider than the base.
+        for (left, right) in &pairs {
             assert!((left.x - right.x).abs() < 1e-9);
-            assert!(((left.y - right.y).abs() - 24.0).abs() < 1e-9);
+            let across = (left.y - right.y).abs();
+            assert!(across <= 24.0 + 1e-9, "{across}");
+            if left.x <= 400.0 - 48.0 {
+                assert!((across - 24.0).abs() < 1e-9, "{across} at {}", left.x);
+            }
         }
-        assert!(body[0].x.abs() < 1e-9 && body[body.len() - 1].x.abs() < 1e-9);
+        assert!(pairs[0].0.x.abs() < 1e-9 && pairs[0].1.x.abs() < 1e-9);
     }
 
     #[test]
@@ -527,13 +526,19 @@ mod tests {
         for (weight, size) in [(Weight::BrushThin, 9.0), (Weight::BrushThick, 24.0)] {
             let short = lay(&straight(300.0, 61), weight, size, size, FlatHold::Fixed);
             let long = lay(&straight(900.0, 61), weight, size, size, FlatHold::Fixed);
-            assert!(polygons(&short.body).len() > 1 && polygons(&long.body).len() > 1);
-            let (short_run, long_run) = (dry_run(&short, 300.0), dry_run(&long, 900.0));
+            let (short_run, long_run) = (dry_run(&short, 300.0, size), dry_run(&long, 900.0, size));
+            assert!((short_run - long_run).abs() < 0.1, "{short_run} {long_run}");
             assert!(
-                (short_run - long_run).abs() < 1e-6,
-                "{short_run} {long_run}"
+                (size - 0.1..=2.0 * size + 0.1).contains(&short_run),
+                "{short_run}"
             );
-            assert!((size..=2.0 * size).contains(&short_run), "{short_run}");
+            // It narrows to a little over half its width and ends square.
+            for band in [&short, &long] {
+                let end = *pairs(band).last().unwrap();
+                assert!((end.0.x - end.1.x).abs() < 1e-9);
+                let share = width(&end) / size;
+                assert!((0.54..=0.66).contains(&share), "{share}");
+            }
         }
     }
 
@@ -556,8 +561,9 @@ mod tests {
 
     #[test]
     fn a_closed_shapes_pass_dries_by_its_brush_not_its_band() {
-        // A thin brush's 50 px pass parts into more bundles than its 9 px line,
-        // over the brush's own dry end rather than one sized by the band.
+        // A thin brush's 50 px pass dries over the brush's own 9-18 px rather
+        // than over a run sized by the band, and narrows to a little over half
+        // the band's width.
         let band = lay(
             &straight(300.0, 17),
             Weight::BrushThin,
@@ -565,9 +571,10 @@ mod tests {
             9.0,
             FlatHold::Fixed,
         );
-        assert_eq!(polygons(&band.body).len() - 1, 6);
-        let run = dry_run(&band, 300.0);
-        assert!((9.0..=18.0).contains(&run), "{run}");
+        let run = dry_run(&band, 300.0, 50.0);
+        assert!((8.9..=18.1).contains(&run), "{run}");
+        let share = width(pairs(&band).last().unwrap()) / 50.0;
+        assert!((0.54..=0.66).contains(&share), "{share}");
     }
 
     #[test]
@@ -586,14 +593,20 @@ mod tests {
             24.0,
             FlatHold::Turning,
         );
-        let body = &polygons(&band.body)[0];
-        // The last pair is interpolated where the band parts. The path keeps
-        // six decimals, so the read-back points carry that rounding.
-        for index in 0..body.len() / 2 - 1 {
-            let (left, right) = (body[index], body[body.len() - 1 - index]);
+        let pairs = pairs(&band);
+        // The thick brush dries over at most 48 px of the 314 px arc, so the
+        // first 34 pairs (to 82% of the way) are its banks at full width. The
+        // path keeps six decimals, so the read-back points carry that rounding.
+        for (index, (left, right)) in pairs.iter().enumerate().take(34) {
             let across = Point::new(left.x - right.x, left.y - right.y);
             assert!((across.x * normals[index].y - across.y * normals[index].x).abs() < 1e-5);
             assert!((across.x.hypot(across.y) - 24.0).abs() < 1e-5);
         }
+        // Narrowed where it ends, its tip is still square to the travel there.
+        // The drying pairs keep hundredths of a pixel.
+        let (left, right) = *pairs.last().unwrap();
+        let across = Point::new(left.x - right.x, left.y - right.y);
+        let normal = normals[normals.len() - 1];
+        assert!((across.x * normal.y - across.y * normal.x).abs() < 0.02);
     }
 }

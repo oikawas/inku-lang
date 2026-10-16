@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-16 — A brush sweep's end narrows without parting, and its streaks are fainter
+
+The flat-brush mark of a fine or thick brush's sweep (render engine 77) parted at its end into three to eight bundles of bristles, and streaks of darker and lighter tone ran along the whole band. The author pointed out that the brushwork stood out so much that it read as a medium other than a brush (a thick brush's large line ended in a fringe, a fine brush's arc in a fork). From prototype sheets (three ends, three kinds of streak, their combination and steps of the streaks), the author chose an end that narrows without parting and streaks a quarter as far in lightness from the band as before. Over its dry end (one to two brush sizes, as before) the mark narrows in a straight taper to 55–65% of its width, and its end edge stays square. The streaks keep their number, places and lengths; their lightness steps become −0.0175 and +0.015 and their widths 0.025 and 0.02 of the mark's. The centerline, width, entry, opacity and the other tools are unchanged. On the six pictures used for the prototypes the SVG became 0.73–0.97 times as large. Render engine 82; DDL, the DDL engine and the Score format are unchanged. Saved works keep their SVG; drawn again, they take the new end and streaks.
+
 ## v2.15.157 (2026-10-16 / Build 1233)
 
 ### 2026-10-16 — Save checked refinement options before drawing the next four

@@ -391,7 +391,7 @@ raster, JNI, and Android-host changes; it checks Rust 1.95, NDK 29, the `arm64-v
 and focused host-JVM boundary tests.
 
 **⚠ Some surfaces are still outside it.**
-**(1) paths that need a key** — the thirty tests that call NVIDIA NIM skip without one;
+**(1) real-provider acceptance** — passing pytest does not prove drawing or Vision works through a person's connection and allowance;
 **(2) local-only material** — nine tests that use `cli/bench/leaf`, and one that wants `cairosvg`;
 **(3) device instrumentation** — canonical SVG-byte and raw-pixel comparisons use the packaged JNI
 on an accepted Pixel 9 and are not replaced by host CI;
@@ -399,6 +399,8 @@ on an accepted Pixel 9 and are not replaced by host CI;
 the complete suite remains a local gate;
 **(5) internal operational scripts**, which are maintained outside the product repository and are not CI inputs.
 **The population is not the same as a full local run.**
+
+Future real-provider tests and comparisons use ChatGPT plan / GPT-6-Luna (`chatgpt:gpt-6-luna`) as Primary and Gemini API (Cloud) / Gemma 4 31B IT (`gemini:gemma-4-31b-it`) as Secondary. Exclude NVIDIA NIM from candidates, defaults, fallbacks, and Vision evaluation. Select the model explicitly and stop on connection failure. See the [AI CLI testing procedure](manual/en/cli-reference-for-ai.md). Keep the product's NIM connection features and regression tests that check its wire format with mocks.
 
 ### On open issues
 

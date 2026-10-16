@@ -4,6 +4,15 @@
 
 対象はinku v2.13.42（Web Build 929）です。旗の全一覧は`inku-cli リファレンス`が持ちます。
 
+今後の実providerテスト・比較では、次の2系統を使います。NVIDIA NIMは候補・既定・fallback・Vision評価から外します。
+
+| 用途 | 接続とモデル | 明示するモデル参照 |
+|---|---|---|
+| Primary | ChatGPTプラン / GPT-6-Luna | `chatgpt:gpt-6-luna` |
+| Secondary | Gemini API（Cloud）/ Gemma 4 31B IT | `gemini:gemma-4-31b-it` |
+
+実行前に本人の接続・公開モデル・利用枠を確認します。ChatGPTプランの接続条件は[接続ガイド](../../docs/guide/chatgpt-plan.ja.md)に従います。SecondaryはGemini APIの接続であり、NIMの`google/`付きIDやローカルGemmaへ読み替えません。モデルを明示できない入口や接続失敗では実行を止め、NIMへ切り替えません。比較では同じ記述とseed等の条件を固定し、実際のprovider・モデル・結果を記録します。
+
 ---
 
 ## AI自律・品質向上ワークフロー（テスト手順）
@@ -23,8 +32,10 @@ uv run inku-cli me
 指示文（詞書）をもとに最初の作品を生成し、サーバーの履歴に保存します。
 
 ```sh
-uv run inku-cli paint "白い余白に、黒い太筆の波線を一本引く。" -o ./test_output --png --save-history
+uv run inku-cli paint "白い余白に、黒い太筆の波線を一本引く。" --stage1-model chatgpt:gpt-6-luna -o ./test_output --png --save-history
 ```
+`--stage1-model`はStage 1/2共通のモデルを指定します。Secondaryを試すときは`gemini:gemma-4-31b-it`を明示します。省略してサーバーや保存済みCLI設定の既定へ委ねません。
+
 * **期待される出力 (JSON)**:
   生成された作品のメタデータを含む JSON オブジェクト。
   * `history_id`: `"d5989732-9f3a-4dd2-82df-c49c50761119"` (例)
@@ -60,21 +71,10 @@ uv run inku-cli lineage show PARENT_ID
   ```
 * **AIの判断ロジック**: 親ノード（`dfced380`）の配下に、指定した `derivation_kind`（例: `layout_change`）のエッジで子ノード（`b91ae625`）がネストされていることをパースし、系譜が正しく成長していることを検証します。
 
-### ステップ 5: 視覚的評価（review）による選定
-生成された派生作品の画像（PNG）を Vision LLM に送信し、画の出来栄えや美的整合性を評価させます。
+### ステップ 5: 出力画像の確認と選定
+書き出したPNGを同じ表示条件で見比べ、入力記述、構図、色、欠落や回帰を確認し、選定理由を記録します。Visionを併用する場合も、本人が公開したPrimaryまたはSecondaryのモデルを明示できるWeb/APIの入口を使い、実際の接続とモデルを確認します。
 
-```sh
-uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvidia/neva-22b
-```
-* **期待される出力 (JSON)**:
-  ```json
-  {
-    "image": "refine-layout-xxxx.png",
-    "model": "nvidia/neva-22b",
-    "evaluation": "The drawing exhibits high color resonance... (評価文)"
-  }
-  ```
-* **AIの判断ロジック**: 評価テキストをパースし、美的スコアが向上しているかを判定します。品質が不十分な場合、ステップ 3 に戻り、別の `--kind` を試すか、過去の祖先ノード（親やルート）まで遡って別のブランチを成長させます（系譜のフォーク）。
+`review evaluate`と`vision-review`はNIM専用の製品機能です。このテスト・比較手順では実行しません。`--model`だけを上記のモデル参照へ替えても送信先は変わりません。必要なモデルを選べる入口が無ければ、画像の確認結果だけを記録して止めます。
 
 ---
 
@@ -105,7 +105,7 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
 | `--catalog-mode` | `fixed` | ユーザー設定 |
 
 ```sh
-uv run inku-cli paint "TEXT" --sketch --catalog-mode auto -o ./out --png
+uv run inku-cli paint "TEXT" --stage1-model chatgpt:gpt-6-luna --sketch --catalog-mode auto -o ./out --png
 ```
 
 変奏は廃止しました。旧強度・seedの旗を使わないでください。推敲は配置・色カタログの2操作です（タッチと読み取りは2026-10-14に削除）。保存済みの変奏情報は旧作品の記録として保持し、新規要求や保存には渡しません。pipelineの作品IDとScoreの揺らぎは別の契約で、変更しません。
@@ -134,9 +134,10 @@ uv run inku-cli paint "TEXT" --sketch --catalog-mode auto -o ./out --png
 * **`inspect <TEXT> --models <MODEL_A,MODEL_B,...> -o DIR [--png]`**
   * 同一の入力テキストに対して、複数の LLM モデルを並行して実行し、それぞれの DDL 解釈と描画ファイルをローカルに一括保存します。各モデルをStage 1とStage 2の両方に使います。
   * どの LLM モデルが最も表現力に富む出力を生み出せるかを AI が検証・比較する際に使用します。
+  * 今後の比較対象は`--models chatgpt:gpt-6-luna,gemini:gemma-4-31b-it`です。NIMは含めません。
 
 ### 4. `review`
 * **`review evaluate <PNG_FILE> [--model M] [--prompt P]`**
-  * Vision NIM モデルを使い、画像の視覚的評価（美的スコアやコメント）を行います。
+  * NIM専用の製品機能を説明する項目です。今後のテスト・比較・Vision評価には使いません。
 * **`review unread <WORD> --context <CONTEXT>`**
   * Stage 1 (解釈) で AI が自信を持って読み取れなかった語彙（未読語）を、サーバーの未読語フィードバック台帳へ直接登録します。

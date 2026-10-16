@@ -4,6 +4,15 @@ This document serves as a guideline for AI agents to operate the `inku-server` v
 
 It covers inku v2.13.42 (Web Build 929). The full flag list lives in the `inku-cli Reference`.
 
+Future tests and comparisons that call a real provider use these two routes. Exclude NVIDIA NIM from candidates, defaults, fallbacks, and Vision evaluation.
+
+| Role | Connection and model | Explicit model reference |
+|---|---|---|
+| Primary | ChatGPT plan / GPT-6-Luna | `chatgpt:gpt-6-luna` |
+| Secondary | Gemini API (Cloud) / Gemma 4 31B IT | `gemini:gemma-4-31b-it` |
+
+Before running, confirm the person's connection, published models, and available allowance. Follow the [connection guide](../../docs/guide/chatgpt-plan.md) for ChatGPT plan requirements. Secondary uses the Gemini API connection; do not substitute NIM's `google/`-prefixed ID or a local Gemma. Stop if an entry point cannot select the model explicitly or its connection fails; do not switch to NIM. Keep the description, seeds, and other comparison conditions fixed, and record the actual provider, model, and result.
+
 ---
 
 ## AI Autonomous & Quality Improvement Workflow (Testing Procedure)
@@ -23,8 +32,10 @@ uv run inku-cli me
 Paint the first work from a description (Shikishi text) and save it to the server history.
 
 ```sh
-uv run inku-cli paint "Draw one wave line with a thick black brush on white space." -o ./test_output --png --save-history
+uv run inku-cli paint "Draw one wave line with a thick black brush on white space." --stage1-model chatgpt:gpt-6-luna -o ./test_output --png --save-history
 ```
+`--stage1-model` selects the shared Stage 1/2 model. Explicitly use `gemini:gemma-4-31b-it` when testing Secondary. Do not omit the selector and inherit a server or saved CLI default.
+
 * **Expected Output (JSON)**:
   A JSON object representing the generated work's metadata.
   * `history_id`: `"d5989732-9f3a-4dd2-82df-c49c50761119"` (example)
@@ -60,21 +71,10 @@ uv run inku-cli lineage show PARENT_ID
   ```
 * **AI Decision Logic**: Parse the output to verify that a child node (e.g., `b91ae625`) is nested under the parent (e.g., `dfced380`) with the expected `derivation_kind` edge label.
 
-### Step 5: Visual Evaluation (review) and Decision making
-Send the exported child PNG to a Vision LLM to analyze the composition quality and aesthetic appeal.
+### Step 5: Inspect the exported pictures and select a work
+Compare the exported PNGs under the same viewing conditions. Check the description, composition, colours, omissions, and regressions, and record the selection reason. If Vision is also used, choose a Web/API entry point that explicitly selects a published Primary or Secondary model, and confirm the actual connection and model.
 
-```sh
-uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvidia/neva-22b
-```
-* **Expected Output (JSON)**:
-  ```json
-  {
-    "image": "refine-layout-xxxx.png",
-    "model": "nvidia/neva-22b",
-    "evaluation": "The drawing exhibits high color resonance... (evaluation review text)"
-  }
-  ```
-* **AI Decision Logic**: Parse the feedback text. If the aesthetic score has improved, keep the node. If not, fallback to Step 3 and try another `--kind`, or backtrack to an older ancestor node in the tree (Lineage Fork).
+`review evaluate` and `vision-review` are NIM-only product features. Do not run them in this testing and comparison procedure. Changing only `--model` to one of the references above does not change the destination. If no entry point can select the required model, record the visual inspection and stop.
 
 ---
 
@@ -105,7 +105,7 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
 | `--catalog-mode` | `fixed` | user setting |
 
 ```sh
-uv run inku-cli paint "TEXT" --sketch --catalog-mode auto -o ./out --png
+uv run inku-cli paint "TEXT" --stage1-model chatgpt:gpt-6-luna --sketch --catalog-mode auto -o ./out --png
 ```
 
 Variation is retired. Do not use the old amplitude or seed flags. Refinement has two operations: placement and color catalog (touch and reading were removed on 2026-10-14). Saved variation metadata remains a historical record and is never sent in new requests or saves. Pipeline work IDs and Score variation are separate contracts and are unchanged.
@@ -134,9 +134,10 @@ Variation is retired. Do not use the old amplitude or seed flags. Refinement has
 * **`inspect <TEXT> --models <MODEL_A,MODEL_B,...> -o DIR [--png]`**
   * Runs multiple LLM backends in parallel to inspect and compare DDL interpretations and drawings for the same input text. Each model serves both Stage 1 and Stage 2.
   * Use it to compare which LLM model produces the most expressive output.
+  * Future comparisons use `--models chatgpt:gpt-6-luna,gemini:gemma-4-31b-it`. Do not include NIM.
 
 ### 4. `review`
 * **`review evaluate <PNG_FILE> [--model M] [--prompt P]`**
-  * Scores and reviews drawing composition aesthetics via Vision NIM.
+  * This entry describes a NIM-only product feature. Do not use it for future tests, comparisons, or Vision evaluation.
 * **`review unread <WORD> --context <CONTEXT>`**
   * Reports a failed vocabulary interpretation word to the server.

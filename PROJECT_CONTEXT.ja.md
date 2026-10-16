@@ -297,13 +297,15 @@ UI、provider通信、Room、履歴、`rh3`の計算はAndroid hostが所有す�
 変更だけで起動し、Rust 1.95、NDK 29、`arm64-v8a` native library、境界のhost JVM testを検査する。
 
 **⚠ CI が見ていないものは残っている。**
-**① 鍵の要る経路**（NVIDIA NIM を叩く 30 件は鍵が無いので skip する）、
+**① 実providerの受入**（通常のpytest成功は、本人の接続・利用枠を使った描画やVisionの成功を証明しない）、
 **② ローカル専用の材料**（`cli/bench/leaf` を使う 9 件と `cairosvg` の 1 件）、
 **③端末instrumentation**（canonical SVG byte / raw pixel照合は、同梱JNIを使うPixel 9受入であり、
 host CIでは代替しない）、
 **④Androidの全JVM suite**（CIは共有native境界に関係するfocused testだけを回す。全走はlocal gateである）、
 **⑤ internal repository の運用スクリプト**（製品 repository 外で管理し、CI の入力にしない）。
 **手元の全走とは母集団が違う。**
+
+今後の実providerテスト・比較はPrimaryをChatGPTプラン / GPT-6-Luna（`chatgpt:gpt-6-luna`）、SecondaryをGemini API（Cloud）/ Gemma 4 31B IT（`gemini:gemma-4-31b-it`）とし、NVIDIA NIMを候補・既定・fallback・Vision評価に使わない。モデルを明示し、接続失敗時は止める。[AI向けCLIテスト手順](manual/ja/cli-reference-for-ai.md)を参照。製品のNIM接続機能や、その通信形式をmockで検査する回帰テストは保持する。
 
 ### 残っている課題について
 

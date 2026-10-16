@@ -6,12 +6,15 @@ use serde_json::{Value, json};
 use crate::geometry::{
     SEGMENT_COUNT_MAX, SEGMENT_COUNT_MIN, SEGMENT_TARGET_RATIO, frequency_cycles,
 };
-use crate::mark_paths::{amplitude_width, line_path_share};
+use crate::mark_paths::{
+    COMPUTER_CELL_OPACITY, COMPUTER_CELL_OPACITY_FLOOR, amplitude_width, line_path_share,
+};
 use crate::marks::{
     MIN_STROKE_WIDTH, extra_thick_width, style_dash, thick_width, thinness_scale, weight_linecap,
     weight_opacity, weight_width,
 };
 use crate::materials::texture_filter_id;
+use crate::stroke::grammar;
 use crate::types::{Amplitude, Frequency, LineStyle, Thinness, Weight};
 
 const WEIGHTS: [Weight; 12] = [
@@ -78,6 +81,11 @@ pub fn renderer_reference() -> Value {
             },
             "min_stroke_width": MIN_STROKE_WIDTH,
             "canvas_px": 1000,
+            "computer_cells": {
+                "lattice_ratio": grammar(Weight::Computer).quantize,
+                "opacity": COMPUTER_CELL_OPACITY,
+                "opacity_floor": COMPUTER_CELL_OPACITY_FLOOR,
+            },
         },
         "performance": {
             "amplitude_widths": {
@@ -136,5 +144,9 @@ mod tests {
             0.054
         );
         assert_eq!(reference["performance"]["blur_ratio"]["broad"], 0.07);
+        assert_eq!(
+            reference["weight_properties"]["computer_cells"]["opacity_floor"],
+            0.15
+        );
     }
 }

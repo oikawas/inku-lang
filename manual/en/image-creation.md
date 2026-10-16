@@ -280,6 +280,8 @@ A refinement changes exactly one element at a time, chosen from the work-editing
 
 In `Another composition` you may choose `Make one option` or `Make four options`.
 
+Check the options you want to keep, then press `Make four options` to save those checked at that moment before drawing the next four. Unchecked options are not saved. If saving fails, no new round starts; the options and unsaved selections remain.
+
 `Another performance` (changing the touch with words) and `Another reading` were removed on 2026-10-14: the touch's words were never read for their meaning and only made the drawing's seed. `Edit drawing parameters` in the work-editing menu, which drew them, and the `Touch` and `Reading` elements of autonomous refinement were removed with them. Works made by a touch or a reading before then keep their `Touch` or `Reading` edge in the lineage, and redraw from their saved instructions and seed.
 
 The color catalog is changed from the work-editing menu instead (8.3).
@@ -323,7 +325,7 @@ Choose `Change the touches` in the work-editing menu to open a dialog that repla
 - `Same tool for every sentence` (the default): each option gives every sentence one tool, and is named after it.
 - `A different tool for each sentence`: each sentence draws a tool other than its own, and the option lists which sentence took which tool.
 
-Pressing `Make four options` again discards the options shown and draws four new ones. Save an option you want to keep before pressing it again. Placement, color, and ground stay the same, and no LLM is called. A saved option's instructions name the new touches; a sentence that named none (drawn with the pen) has the new word written before the shape's name.
+Pressing `Make four options` again first saves the options checked at that moment, then draws four new ones. Unchecked options are not saved. If saving fails, no new round starts; the options and unsaved selections remain. Placement, color, and ground stay the same, and no LLM is called. A saved option's instructions name the new touches; a sentence that named none (drawn with the pen) has the new word written before the shape's name.
 
 Choosing, saving, and discarding options work as in 8.2.
 

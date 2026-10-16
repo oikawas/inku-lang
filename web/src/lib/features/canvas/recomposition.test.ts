@@ -23,6 +23,96 @@ function installOwnerRuneShim(): void {
 	(globalThis as unknown as Record<string, unknown>).$state = <T>(value: T) => value;
 }
 
+for (const kind of ['layout', 'tool'] as const) {
+	test(`four-option redraw saves the clicked selection before replacing ${kind} candidates`, async () => {
+		installOwnerRuneShim();
+		const host = globalThis as unknown as Record<string, unknown>;
+		const previousWindow = host.window;
+		host.window = { setTimeout: () => 0, clearTimeout: () => {} };
+		try {
+			const { RefinementSessionState } = await import('./refinement-session.svelte.ts');
+			const { createRefinementCoordinator } = await import('./refinement-coordinator.svelte.ts');
+			for (let failSecond of [false, true]) {
+				const session = new RefinementSessionState({ ms: 0, start() {}, stop() {} });
+				session.candidates = Array.from({ length: 4 }, (_, index) => ({
+					id: `old-${index}`, label: `Old ${index}`, selected: index !== 1, saved: index === 3,
+					result: {
+						svg: '<svg/>', score: { instructions: [] }, ddl: `instructions-${index}`, thinking: null,
+						lineage_parent_node_id: 'parent-node', derivation_kind: kind === 'layout' ? 'layout_change' : 'tool_change',
+						derivation_metadata: { original_index: index }
+					}
+				}));
+				let releaseSave!: () => void;
+				const saveGate = new Promise<void>((resolve) => { releaseSave = resolve; });
+				const saved: string[] = [];
+				const events: string[] = [];
+				let seed = 10;
+				const coordinator = createRefinementCoordinator({
+					session,
+					work: {
+						input: 'parent words', ddl: 'parent instructions', loading: false, thinking: null, displayedHistoryItem: null,
+						result: { svg: '<svg/>', score: { instructions: [] }, history_id: 'parent-work', composition_seed: 7 },
+						instructionLang: 'auto', sketchTextFor: () => null,
+						confirmFallbackRefine: async () => true, currentRefineParent: () => null,
+						paintTokensIn: () => null, paintTokensOut: () => null,
+						pipelineCompatibilityError: async () => new Error('unexpected error')
+					},
+					models: { stage1: () => 'reader', stage2: () => 'performer' },
+					seeds: { composition: () => ++seed },
+					render: { canvasAspectId: () => 'square', wild: () => false, fanoutLimit: () => 1 },
+					catalog: { defaultId: () => 'catalog', effectiveId: () => 'catalog', available: () => [], name: (id: string) => id },
+					lineageParentId: () => 'parent-node', ensureVisibleLineageParentId: async () => 'parent-node',
+					apiFetch: async (path: string) => {
+						events.push(path);
+						return new Response(JSON.stringify(path === '/api/tool-variants/plan' ? {
+							tools: { chalk: { ja: 'チョーク', en: 'chalk' } },
+							entries: Array.from({ length: 4 }, () => ({ tools: { '0': 'chalk' }, changes: [{ index: 0, from: 'pen', to: 'chalk' }] }))
+						} : { ddl: 'new instructions', svg: '<svg/>', score: { instructions: [] } }));
+					},
+					pushHistory: async (item: HistoryItem, options: SaveHistoryOptions) => {
+						saved.push(item.ddl!);
+						events.push(`save:${item.ddl}`);
+						assert.equal(options.lineageParentNodeId, 'parent-node');
+						assert.equal(options.derivationKind, kind === 'layout' ? 'layout_change' : 'tool_change');
+						if (saved.length === 1) await saveGate;
+						if (failSecond && saved.length === 2) return null;
+						return { ...item, id: `saved-${saved.length}` };
+					}
+				} as unknown as RefinementCoordinatorDeps);
+				const redraw = () => kind === 'layout' ? coordinator.generateVariationCandidates('layout', 4) : coordinator.generateToolCandidates();
+				const pending = redraw();
+				assert.deepEqual(events, ['save:instructions-0']);
+				assert.equal(session.gridBusy, true);
+				assert.equal(session.candidates.length, 4);
+				// Selection after the click belongs to neither the saved snapshot nor the next round.
+				session.toggleCandidate('old-1');
+				await redraw();
+				assert.deepEqual(events, ['save:instructions-0']);
+				releaseSave();
+				await pending;
+				assert.deepEqual(saved, ['instructions-0', 'instructions-2']);
+				if (failSecond) {
+					assert.deepEqual(events, ['save:instructions-0', 'save:instructions-2']);
+					assert.equal(session.candidates[0].saved, true);
+					assert.equal(session.candidates[2].selected, true);
+					assert.equal(session.candidates[2].saved, false);
+					assert.ok(session.status);
+					session.toggleCandidate('old-1');
+					failSecond = false;
+					await redraw();
+					assert.deepEqual(saved, ['instructions-0', 'instructions-2', 'instructions-2']);
+				}
+				assert.equal(session.candidates.length, 4);
+				assert.ok(session.candidates.every((candidate) => !candidate.id.startsWith('old-') && !candidate.selected && !candidate.saved));
+				assert.equal(session.gridBusy, false);
+				assert.equal(events.filter((event) => event.startsWith('/api/')).length, kind === 'layout' ? 4 : 5);
+			}
+		} finally {
+			host.window = previousWindow;
+		}
+	});
+}
+
 test('recomposition carries the requested mode and saves the DDL drawn with its seed and mode', async () => {
 	const calls: Record<string, unknown>[] = [];
 	const recomposition: Recomposition = {

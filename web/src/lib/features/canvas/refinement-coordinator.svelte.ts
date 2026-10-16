@@ -254,6 +254,9 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		}
 		const mode = refinementSession.toolMode;
 		const contextVersion = targetIdentityVersion;
+		if (refinementSession.candidates.some((candidate) => candidate.selected && !candidate.saved)) {
+			if (!(await saveSelectedVariationCandidates()) || contextVersion !== targetIdentityVersion) return;
+		}
 		await deps.ensureVisibleLineageParentId();
 		if (contextVersion !== targetIdentityVersion || work.result !== parent || refinementSession.gridBusy) return;
 		const parentNodeId = deps.lineageParentId();
@@ -500,6 +503,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		if (!work.result || refinementSession.gridBusy || work.loading) return;
 		// Every option in this round uses the choice made before any await.
 		const recomposeMode = refinementSession.recomposeMode;
+		const contextVersion = targetIdentityVersion;
 		const { source, ddl } = refinementTarget();
 		// A layout draws the saved DDL, and a catalog change draws the saved
 		// Score. Neither needs a description; the other kinds keep their guard.
@@ -511,11 +515,13 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 			refinementSession.setStatus(t().refineNeedsDdl);
 			return;
 		}
+		if (kind === 'layout' && count === 4 && refinementSession.candidates.some((candidate) => candidate.selected && !candidate.saved)) {
+			if (!(await saveSelectedVariationCandidates()) || contextVersion !== targetIdentityVersion) return;
+		}
 		// Ask before the words are carried into a child (contract § stage 4).
 		if (!(await work.confirmFallbackRefine(work.currentRefineParent()))) return;
-		const contextVersion = targetIdentityVersion;
 		await deps.ensureVisibleLineageParentId();
-		if (contextVersion !== targetIdentityVersion) return;
+		if (contextVersion !== targetIdentityVersion || refinementSession.gridBusy) return;
 		const taskLabel = kind === "layout" ? t().canvasVaryComposition : t().canvasVaryColor;
 		const abortController = refinementSession.beginGrid({
 			includesReading: false,

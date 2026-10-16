@@ -110,9 +110,11 @@ fn group_for_closed_contour(
         return group;
     }
     if instruction.weight == Weight::Rotring {
+        // A faint face is see-through behind its edge, which is drawn outside
+        // this group (render engine 83).
         return group.attr(
             "opacity",
-            format_number(level(instruction, [0.9, 1.0, 0.55])),
+            format_number(level(instruction, [0.9, 1.0, 0.30])),
         );
     }
     if context.profile == SvgProfile::Compat {

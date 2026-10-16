@@ -5,8 +5,8 @@ use std::collections::BTreeSet;
 use crate::determinism::{needs_contour_variation, needs_path_variation};
 use crate::flat_brush::{FlatBandRequest, FlatHold, flat_band, flat_band_element, sweeps_flat};
 use crate::geometry::{
-    ArcGeometry, arc_points, arc_points_with_variation, open_line_with_variation, point_to_pixels,
-    size_to_pixels, stroke_sample_count,
+    ArcGeometry, arc_points, arc_points_with_variation, frequency_cycles, open_line_with_variation,
+    point_to_pixels, size_to_pixels, stroke_sample_count,
 };
 use crate::marks::{MarkContext, MarkStyle, apply_style, is_closed, mark_width, sweep_band_width};
 use crate::materials::{OilPaintStyle, oil_paint_stroke, with_texture_filter};
@@ -17,7 +17,9 @@ use crate::stroke::{
 };
 use crate::support::{Support, support_with_mark_word};
 use crate::svg::{Element, closed_polyline_path, format_number, points_list, write_number};
-use crate::types::{Amplitude, CanvasSize, Instruction, LineStyle, Point, Primitive, Weight};
+use crate::types::{
+    Amplitude, CanvasSize, Instruction, LineStyle, Point, Primitive, Quality, Weight,
+};
 
 pub(crate) fn rotate(
     mut element: Element,
@@ -183,7 +185,31 @@ pub(crate) fn amplitude(instruction: &Instruction, canvas: CanvasSize) -> f64 {
             ),
         }
         .max(canvas.unit() * 0.02);
-    (widths * mark_width(instruction, canvas)).min(0.40 * representative)
+    let trace = widths * mark_width(instruction, canvas);
+    // A line's variation also shapes its path: a wave, a noise or a jitter
+    // strays by a share of its wavelength, so a stated wave stays one on a long
+    // line, and the tool's width stays the floor (render engine 83).
+    let path = if instruction.primitive == Primitive::Line
+        && matches!(
+            variation.quality,
+            Quality::Wave | Quality::Perlin | Quality::White
+        ) {
+        line_path_share(variation.amplitude) * representative
+            / frequency_cycles(variation.frequency)
+    } else {
+        0.0
+    };
+    trace.max(path).min(0.40 * representative)
+}
+
+/// How far a Line's varied path strays, as a share of its wavelength: the
+/// line's length over the frequency's cycles (render engine 83).
+pub(crate) const fn line_path_share(amplitude: Amplitude) -> f64 {
+    match amplitude {
+        Amplitude::Fine => 0.032,
+        Amplitude::Medium => 0.054,
+        Amplitude::Broad => 0.135,
+    }
 }
 
 pub(crate) const fn amplitude_width(amplitude: Amplitude) -> f64 {
@@ -198,7 +224,8 @@ pub(crate) const fn amplitude_width(amplitude: Amplitude) -> f64 {
 ///
 /// The result is in physical short-side units. Its variation is resolved before
 /// later affine transforms so relation execution and final rendering can share
-/// one curve and transform it together with dependents.
+/// one curve and transform it together with dependents. A rotring line, drawn
+/// along its varied centerline too, shares it the same way (render engine 83).
 pub(crate) fn connected_line_centerline(
     instruction: &Instruction,
     seed: crate::types::Seed,
@@ -209,7 +236,7 @@ pub(crate) fn connected_line_centerline(
         .variation
         .as_ref()
         .filter(|variation| needs_path_variation(variation))?;
-    if instruction.primitive != Primitive::Line || !uses_hand_stroke(instruction.weight) {
+    if instruction.primitive != Primitive::Line {
         return None;
     }
     let unit = canvas.unit();
@@ -642,4 +669,47 @@ pub(crate) fn cloudform_path(points: &[Point]) -> String {
     }
     path.push_str(" Z");
     path
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn instruction(fields: &str, variation: &str) -> Instruction {
+        serde_json::from_str(&format!(
+            r#"{{{fields},"variation":{{{variation},"dimensions":["position_x","position_y"]}}}}"#
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn a_line_variation_strays_by_a_share_of_its_wavelength_above_the_tool_width() {
+        let canvas = CanvasSize::new(1000.0, 1000.0);
+        let pen_line = r#""primitive":"line","from":[0.1,0.5],"to":[0.9,0.5],"weight":"pen""#;
+        // An 800px slow medium wave: 0.054 of its 400px wavelength.
+        let wave = instruction(
+            pen_line,
+            r#""quality":"wave","frequency":"slow","amplitude":"medium""#,
+        );
+        assert!((amplitude(&wave, canvas) - 21.6).abs() < 1.0e-9);
+        // A high fine noise: 0.032 of 800 / 14, above the pen's 0.35 widths.
+        let noise = instruction(
+            pen_line,
+            r#""quality":"perlin","frequency":"high","amplitude":"fine""#,
+        );
+        assert!((amplitude(&noise, canvas) - 0.032 * 800.0 / 14.0).abs() < 1.0e-9);
+        assert!(amplitude(&noise, canvas) > 0.35 * mark_width(&noise, canvas));
+        // An arc keeps the tool's widths.
+        let arc = instruction(
+            r#""primitive":"arc","center":[0.5,0.5],"radius":0.3,"angle_start":0,"angle_end":180,"weight":"pen""#,
+            r#""quality":"wave","frequency":"slow","amplitude":"medium""#,
+        );
+        assert_eq!(amplitude(&arc, canvas), 0.6 * mark_width(&arc, canvas));
+        // A short thick brush line keeps its width-based value as the floor.
+        let short = instruction(
+            r#""primitive":"line","from":[0.45,0.5],"to":[0.55,0.5],"weight":"brush_thick""#,
+            r#""quality":"wave","frequency":"slow","amplitude":"fine""#,
+        );
+        assert_eq!(amplitude(&short, canvas), 0.35 * mark_width(&short, canvas));
+    }
 }

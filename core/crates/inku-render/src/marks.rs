@@ -14,7 +14,8 @@ use crate::geometry::{
     ArcGeometry, SEGMENT_TARGET_RATIO, STROKE_SAMPLE_TARGET_RATIO, arc_points,
     arc_points_with_variation, circle_points, closed_contour_with_variation,
     crescent_contour_points, edge_contour_with_anchors, ellipse_perimeter,
-    open_path_with_variation, point_to_pixels, polygon_points, size_to_pixels, stroke_sample_count,
+    open_line_with_variation, open_path_with_variation, point_to_pixels, polygon_points,
+    size_to_pixels, stroke_sample_count,
 };
 use crate::mark_geometry::{ArcSpan, MarkGeometry};
 use crate::mark_paths::{
@@ -452,6 +453,49 @@ pub(crate) fn apply_style(mut element: Element, style: &MarkStyle, allow_fill: b
     element
 }
 
+/// Whether a closed mark draws its edge apart from its face (render engine 83).
+///
+/// A faint flat fill of a closed shape keeps its tool's density (the rotring's
+/// opacity, the grain filter or the mask) on its face only, and its edge is
+/// drawn after the face, outside that density, so the face is see-through
+/// behind a clear edge. Points, oil paint and the computer keep their edge
+/// inside the face.
+fn faint_fill_edge(instruction: &Instruction) -> bool {
+    instruction.surface_intensity == SurfaceIntensity::Faint
+        && instruction.primitive != Primitive::Point
+        && instruction.weight != Weight::Computer
+        && accepted_fills::active(instruction)
+}
+
+/// The style of a closed mark's edge. An edge drawn apart from a faint fill
+/// takes the tool's own opacity again, at the faint factor, as the edge of the
+/// same tool's faint empty shape.
+fn closed_edge_style(instruction: &Instruction, style: &MarkStyle) -> MarkStyle {
+    let mut edge = style.clone();
+    if faint_fill_edge(instruction) {
+        edge.stroke_opacity = scaled_opacity(
+            style.stroke_opacity * weight_opacity(instruction.weight),
+            intensity_factor(SurfaceIntensity::Faint),
+        );
+    }
+    edge
+}
+
+/// A closed mark. Its edge goes inside its face, the fill's density group,
+/// except for a faint fill, whose face and edge sit side by side in a plain
+/// group.
+fn closed_mark_group(instruction: &Instruction, mut face: Element, edge: Element) -> Element {
+    if faint_fill_edge(instruction) {
+        let mut mark = Element::new("g");
+        mark.push(face);
+        mark.push(edge);
+        mark
+    } else {
+        face.push(edge);
+        face
+    }
+}
+
 fn mechanical_closed_mark(
     instruction: &Instruction,
     contour: &[Point],
@@ -466,8 +510,8 @@ fn mechanical_closed_mark(
     if let Some(fill) = render_interior_fill(instruction, contour, style, context) {
         group.push(fill);
     }
-    group.push(apply_style(geometry, style, false));
-    group
+    let edge = apply_style(geometry, &closed_edge_style(instruction, style), false);
+    closed_mark_group(instruction, group, edge)
 }
 
 fn crescent_path(center: Point, size: Point) -> String {
@@ -516,14 +560,15 @@ fn render_crescent(
         if let Some(fill) = render_interior_fill(instruction, &contour, style, context) {
             group.push(fill);
         }
-        group.push(hand_contour(
+        let edge = hand_contour(
             instruction,
             &contour,
             &BTreeSet::new(),
-            style,
+            &closed_edge_style(instruction, style),
             context,
             true,
-        ));
+        );
+        group = closed_mark_group(instruction, group, edge);
         rotate(group, instruction, context.canvas)
     } else {
         rotate(
@@ -601,14 +646,15 @@ fn render_affine_closed(
         if let Some(fill) = render_interior_fill(instruction, &contour, style, context) {
             group.push(fill);
         }
-        group.push(hand_contour(
+        let edge = hand_contour(
             instruction,
             &contour,
             anchors,
-            style,
+            &closed_edge_style(instruction, style),
             context,
             true,
-        ));
+        );
+        group = closed_mark_group(instruction, group, edge);
         group
     } else {
         mechanical_closed_mark(instruction, &contour, geometry, style, context)
@@ -821,6 +867,59 @@ fn centerline_in_pixels(centerline: &[Point], canvas: CanvasSize) -> Vec<Point> 
         .collect()
 }
 
+/// A rotring Line, which has no hand stroke (render engine 83).
+///
+/// A variation that moves its path draws it as a `<polyline>` along the
+/// centerline a hand line of the same seed and variation follows, or along
+/// the centerline a path connection fixed, which already carries the
+/// rotation; without one the line stays a straight `<line>`. `start` and
+/// `end` are in pixels, already transformed when the context carries a
+/// group transform.
+fn rotring_line(
+    instruction: &Instruction,
+    start: Point,
+    end: Point,
+    connected_centerline: Option<&[Point]>,
+    style: &MarkStyle,
+    context: MarkContext<'_>,
+) -> Element {
+    let canvas = context.canvas;
+    if let Some(centerline) = connected_centerline {
+        return apply_style(
+            Element::new("polyline").attr(
+                "points",
+                points_attribute(&centerline_in_pixels(centerline, canvas)),
+            ),
+            style,
+            false,
+        );
+    }
+    let element = instruction
+        .variation
+        .as_ref()
+        .filter(|variation| needs_path_variation(variation))
+        .map_or_else(
+            || line_element(start, end),
+            |variation| {
+                let centerline = open_line_with_variation(
+                    start,
+                    end,
+                    variation,
+                    context.seed_for(instruction),
+                    amplitude(instruction, canvas),
+                    canvas,
+                );
+                Element::new("polyline").attr("points", points_attribute(&centerline))
+            },
+        );
+    let element = apply_style(element, style, false);
+    if context.geometry_transform.is_identity() {
+        rotate(element, instruction, canvas)
+    } else {
+        element
+    }
+}
+
 fn render_affine_round(
     instruction: &Instruction,
     center: Point,
@@ -907,7 +1006,14 @@ fn render_affine_instruction(
                     )
                 }
             } else {
-                apply_style(line_element(start, end), style, false)
+                rotring_line(
+                    instruction,
+                    start,
+                    end,
+                    connected_centerline,
+                    style,
+                    context,
+                )
             }
         }
         MarkGeometry::Circle { center, radius } => render_affine_round(
@@ -1065,14 +1171,15 @@ fn render_round(
         if let Some(fill) = render_interior_fill(instruction, &contour, style, context) {
             group.push(fill);
         }
-        group.push(hand_contour(
+        let edge = hand_contour(
             instruction,
             &contour,
             &BTreeSet::new(),
-            style,
+            &closed_edge_style(instruction, style),
             context,
             true,
-        ));
+        );
+        group = closed_mark_group(instruction, group, edge);
         rotate(group, instruction, context.canvas)
     } else {
         rotate(
@@ -1165,14 +1272,15 @@ fn render_cloudform(
         if let Some(fill) = render_interior_fill(instruction, &sampled, style, context) {
             group.push(fill);
         }
-        group.push(hand_contour(
+        let edge = hand_contour(
             instruction,
             &sampled,
             &BTreeSet::new(),
-            style,
+            &closed_edge_style(instruction, style),
             context,
             true,
-        ));
+        );
+        group = closed_mark_group(instruction, group, edge);
         rotate(group, instruction, context.canvas)
     } else {
         rotate(
@@ -1223,10 +1331,13 @@ pub(crate) fn render_instruction_with_line_centerline(
                     context,
                 )
             } else {
-                rotate(
-                    apply_style(line_element(start, end), &style, false),
+                rotring_line(
                     instruction,
-                    canvas,
+                    start,
+                    end,
+                    connected_centerline,
+                    &style,
+                    context,
                 )
             }
         }
@@ -1508,14 +1619,15 @@ fn render_corner_shape(
         if let Some(fill) = render_interior_fill(instruction, &contour.points, style, context) {
             group.push(fill);
         }
-        group.push(hand_contour(
+        let edge = hand_contour(
             instruction,
             &contour.points,
             &contour.anchors,
-            style,
+            &closed_edge_style(instruction, style),
             context,
             true,
-        ));
+        );
+        group = closed_mark_group(instruction, group, edge);
         rotate(group, instruction, context.canvas)
     } else {
         rotate(
@@ -1702,5 +1814,88 @@ mod tests {
         )
         .unwrap();
         assert_eq!(mark_style(&circle, context).width, plain.width);
+    }
+
+    #[test]
+    fn a_rotring_line_follows_its_varied_path_or_stays_straight() {
+        let colors = BTreeMap::new();
+        let context = MarkContext {
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            color_map: &colors,
+            work_assignment: &colors,
+            render_seed: Some(7),
+            instruction_seed_override: None,
+            instruction_index: 0,
+            mark_index: 0,
+            wild: false,
+            use_filters: false,
+            profile: SvgProfile::Display,
+            support: crate::support::DEFAULT_SUPPORT,
+            geometry_transform: crate::affine::AffineTransform::identity(),
+            oil_fill_pass_limit: crate::fills::MAX_OIL_FILL_PASSES,
+            effects: crate::effects::MarkEffects::default(),
+        };
+        let line = |variation: &str| {
+            serde_json::from_str::<Instruction>(&format!(
+                r#"{{"primitive":"line","from":[0.1,0.5],"to":[0.9,0.5],"weight":"rotring"{variation}}}"#
+            ))
+            .unwrap()
+        };
+        let draw = |instruction: &Instruction, centerline: Option<&[Point]>| {
+            render_instruction_with_line_centerline(
+                instruction,
+                MarkGeometry::of(instruction).unwrap(),
+                context,
+                centerline,
+                &[],
+            )
+        };
+        let points = |element: &Element| {
+            element
+                .attribute("points")
+                .unwrap()
+                .split(' ')
+                .map(|pair| {
+                    let (x, y) = pair.split_once(',').unwrap();
+                    Point::new(x.parse().unwrap(), y.parse().unwrap())
+                })
+                .collect::<Vec<_>>()
+        };
+        let plain = draw(&line(""), None);
+        assert_eq!(plain.name(), "line");
+        let varied = line(
+            r#","variation":{"quality":"wave","frequency":"slow","amplitude":"medium","dimensions":["position_x","position_y"]}"#,
+        );
+        let waved = draw(&varied, None);
+        assert_eq!(waved.name(), "polyline");
+        let path = points(&waved);
+        assert_eq!(path[0], Point::new(100.0, 500.0));
+        assert_eq!(path[path.len() - 1], Point::new(900.0, 500.0));
+        assert!(path.iter().any(|point| (point.y - 500.0).abs() > 1.0));
+        for name in [
+            "stroke",
+            "stroke-width",
+            "stroke-linecap",
+            "stroke-opacity",
+            "fill",
+        ] {
+            assert_eq!(waved.attribute(name), plain.attribute(name), "{name}");
+        }
+        // A path connection fixes the same centerline, and the line follows it.
+        let centerline = crate::mark_paths::connected_line_centerline(
+            &varied,
+            context.seed_for(&varied),
+            context.canvas,
+            crate::affine::AffineTransform::identity(),
+        )
+        .unwrap();
+        let connected = points(&draw(&varied, Some(&centerline)));
+        assert_eq!(connected.len(), path.len());
+        for (point, expected) in connected.iter().zip(&path) {
+            assert!(
+                (point.x - expected.x).abs() <= 1.0e-5 && (point.y - expected.y).abs() <= 1.0e-5,
+                "{point:?} {expected:?}"
+            );
+        }
     }
 }

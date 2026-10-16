@@ -190,7 +190,8 @@ How much of the paper a group uses along its own line (`margin` and `span`) is n
 It carries closed-shape outlines and fills, arcs, the material layer, ground resistance, and master
 grid quantization of coordinates.
 Each member of a group holds a size (±35%) and a turn (±27°) of its own.
-The wander's amplitude is a multiple of **that tool's stroke width** (0.35 / 0.6 / 2.0) rather than of
+The wander's amplitude is a multiple of **that tool's stroke width** (0.35 / 0.6 / 2.0; a line's path
+wave takes the larger of that and a share of its wavelength, 0.032 / 0.054 / 0.135) rather than of
 the figure's size, the tool's tone takes its offset from the **performed ink** rather than the intended
 geometry, and the fray comes from a contact field standing for the paper's tooth rather than a dash table.
 **The lengths that contact reads sit on the same six-decimal grid the SVG writes, so the same Score

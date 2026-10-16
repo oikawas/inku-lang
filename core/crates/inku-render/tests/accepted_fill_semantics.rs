@@ -100,3 +100,90 @@ fn brush_fills_share_one_band_tile_and_rotate_it_per_mark() {
     compat.options.svg_profile = SvgProfile::Compat;
     assert!(!render(compat).unwrap().svg.contains("brush-tile-"));
 }
+
+/// The text of the element that opens at `start`, through its matching end.
+fn element_at(svg: &str, start: usize) -> &str {
+    let mut depth = 0usize;
+    let mut index = start;
+    loop {
+        let open = index + svg[index..].find('<').unwrap();
+        let close = open + svg[open..].find('>').unwrap();
+        let tag = &svg[open..=close];
+        if tag.starts_with("</") {
+            depth -= 1;
+        } else if !tag.ends_with("/>") {
+            depth += 1;
+        }
+        index = close + 1;
+        if depth == 0 {
+            return &svg[start..index];
+        }
+    }
+}
+
+#[test]
+fn a_faint_fill_keeps_its_density_on_the_face_and_draws_its_edge_after_it() {
+    // Render engine 83: a faint flat fill is see-through behind a clear edge.
+    let mut request = RenderRequest {
+        score: serde_json::from_str(r#"{"instructions":[
+          {"primitive":"circle","center":[0.2,0.3],"radius":0.12,"weight":"rotring","color":"blue","filled":true},
+          {"primitive":"circle","center":[0.5,0.3],"radius":0.12,"weight":"pen","color":"blue","filled":true},
+          {"primitive":"circle","center":[0.8,0.3],"radius":0.12,"weight":"brush_thin","color":"blue","filled":true}
+        ]}"#).unwrap(),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::from([("blue".to_owned(), "#2468ac".to_owned())]),
+            catalog_id: None, canvas: CanvasSize::new(1000.0, 1000.0), canvas_aspect_id: "square".to_owned(),
+            svg_profile: SvgProfile::Display, render_seed: Some(431), composition_seed: None,
+            wild: false, error_policy: Default::default(),
+        },
+    };
+    let normal = render(request.clone()).unwrap().svg;
+    for instruction in &mut request.score.instructions {
+        instruction.surface_intensity = SurfaceIntensity::Faint;
+    }
+    let faint = render(request).unwrap().svg;
+    // The rotring's face holds its opacity, the pen's its grain filter and the
+    // thin brush's its mask; each edge is the tool's faint line opacity.
+    for (normal_face, faint_face, edge, opacity) in [
+        (
+            r#"<g opacity="0.9">"#,
+            r#"<g opacity="0.3">"#,
+            "<circle ",
+            r#"stroke-opacity="0.5225""#,
+        ),
+        (
+            r#"<g filter="url(#tool-fill-1-0)">"#,
+            r#"<g filter="url(#tool-fill-1-0)">"#,
+            r#"<g class="contour-stroke-v1"#,
+            r#"fill-opacity="0.55""#,
+        ),
+        (
+            r#"<g mask="url(#tool-fill-2-0-mask)">"#,
+            r#"<g mask="url(#tool-fill-2-0-mask)">"#,
+            r#"<g class="contour-stroke-v1"#,
+            r#"fill-opacity="0.495""#,
+        ),
+    ] {
+        let start = faint.find(faint_face).unwrap();
+        let face = element_at(&faint, start);
+        assert!(
+            !face.contains(edge),
+            "{faint_face}: the edge is outside the face"
+        );
+        let after = start + face.len();
+        assert!(
+            faint[after..].starts_with(edge),
+            "{faint_face}: the edge follows the face"
+        );
+        assert!(
+            element_at(&faint, after).contains(opacity),
+            "{faint_face}: {opacity}"
+        );
+        // A fill at its usual intensity keeps the edge inside its face.
+        let face = element_at(&normal, normal.find(normal_face).unwrap());
+        assert!(
+            face.contains(edge),
+            "{normal_face}: the edge is inside the face"
+        );
+    }
+}

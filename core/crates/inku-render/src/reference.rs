@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use crate::geometry::{
     SEGMENT_COUNT_MAX, SEGMENT_COUNT_MIN, SEGMENT_TARGET_RATIO, frequency_cycles,
 };
-use crate::mark_paths::amplitude_width;
+use crate::mark_paths::{amplitude_width, line_path_share};
 use crate::marks::{
     MIN_STROKE_WIDTH, extra_thick_width, style_dash, thick_width, thinness_scale, weight_linecap,
     weight_opacity, weight_width,
@@ -85,6 +85,11 @@ pub fn renderer_reference() -> Value {
                 "medium": amplitude_width(Amplitude::Medium),
                 "broad": amplitude_width(Amplitude::Broad),
             },
+            "line_path_shares": {
+                "fine": line_path_share(Amplitude::Fine),
+                "medium": line_path_share(Amplitude::Medium),
+                "broad": line_path_share(Amplitude::Broad),
+            },
             "amplitude_clamp_ratio": 0.40,
             "representative_min_ratio": 0.02,
             "frequency_cycles": {
@@ -126,6 +131,10 @@ mod tests {
         assert_eq!(weights[0]["weight"], "silverpoint");
         assert_eq!(weights[0]["stroke_width"], 0.5);
         assert_eq!(reference["performance"]["frequency_cycles"]["high"], 14.0);
+        assert_eq!(
+            reference["performance"]["line_path_shares"]["medium"],
+            0.054
+        );
         assert_eq!(reference["performance"]["blur_ratio"]["broad"], 0.07);
     }
 }

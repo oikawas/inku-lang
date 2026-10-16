@@ -21,6 +21,7 @@ struct PluginSettingsView: View {
                             Text(package.id).inkuFont(14, weight: .semibold).fixedSize()
                             ForEach(package.versions, id: \.self) { version in
                                 Text("v" + version).inkuFont(11).monospacedDigit()
+                                    .fixedSize()
                                     .padding(.horizontal, 6).padding(.vertical, 2)
                                     .background(InkuColor.bg, in: Capsule())
                                     .overlay(Capsule().stroke(InkuColor.border2))

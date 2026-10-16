@@ -20,6 +20,8 @@ The transparency setting follows the PNG templates. Animation format, transition
 
 The Library list puts the star beside the image and the revision mark and move-to-trash action in the actions column. The additional macOS actions menu remains.
 
+The canvas header shows the displayed work's generation from its saved lineage, even when a search leaves the history empty. Loading or unknown values are not assumed to be generation one. Plugin version badges also stay on one line.
+
 ## v2.15.159 (2026-10-16 / Build 1235)
 
 ### 2026-10-16 — Search works from the canvas header

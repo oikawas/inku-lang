@@ -46,6 +46,7 @@ struct CreationView: View {
     @State private var showNewDDL = false
     @State private var rightPanelWidth: CGFloat = 0
     @State private var savedProviders: [InkuHost.ProviderSettings] = []
+    @State private var workspaceGeneration: (nodeID: String, value: Int)?
     @Environment(\.inkuWindowSize) private var windowSize
     private var isBatch: Bool { automation.workspaceInputMode == "batch" }
     private var batchWork: SavedWork? { batchWorkspace.pinnedWork ?? (batchWorkspace.followsLatest ? automation.observedWork : nil) }
@@ -110,6 +111,14 @@ struct CreationView: View {
         }
         .onDisappear { batchWorkspace.invalidateReads() }
         .task(id: model.providerSettingsRevision) { savedProviders = await model.hostSettings().providers }
+        .task(id: workspaceWork?.lineageNodeID) {
+            workspaceGeneration = nil
+            guard let nodeID = workspaceWork?.lineageNodeID else { return }
+            let generations = try? await model.auxiliaryDatabase().lineageGenerations(nodeIDs: [nodeID])
+            guard !Task.isCancelled, workspaceWork?.lineageNodeID == nodeID,
+                  let generation = generations?[nodeID] else { return }
+            workspaceGeneration = (nodeID, generation)
+        }
         .onChange(of: workspaceWork?.id) { _, _ in
             onWorkspaceWorkChange(workspaceWork)
             // CanvasGenerationInfo follows the chosen work only when the setting says so.
@@ -541,10 +550,21 @@ struct CreationView: View {
         let canvas = model.canvases.first { $0.id == canvasID }?.label ?? work.renderCanvasAspect ?? (canvasID.isEmpty ? "—" : canvasID)
         let size = ByteCountFormatter.string(fromByteCount: Int64(work.svg.utf8.count), countStyle: .file)
         let created = Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(.dateTime.year().month(.twoDigits).day(.twoDigits).hour().minute())
+        let generation = workspaceGeneration?.nodeID == work.lineageNodeID ? workspaceGeneration?.value : nil
         return HStack(spacing: 0) {
-            Text(display.webCopy("displayedWorkConditions", "表示中作品の描画条件")).inkuFont(12, weight: .medium)
-                .foregroundStyle(.secondary).lineLimit(1).fixedSize()
-                .padding(.trailing, 12)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(display.webCopy("displayedWorkConditions", "表示中作品の描画条件"))
+                    .inkuFont(12, weight: .medium).foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    if let generation {
+                        Text(display.label("系譜", "Lineage")).inkuFont(12).foregroundStyle(.tertiary)
+                        Text(display.label("第\(generation)世代", "Gen. \(generation)")).inkuFont(13).foregroundStyle(.secondary)
+                    } else {
+                        Text(work.lineageNodeID == nil ? display.label("独立作品", "Standalone") : "—")
+                            .inkuFont(13).foregroundStyle(.secondary)
+                    }
+                }
+            }.lineLimit(1).fixedSize().padding(.trailing, 12)
             // CanvasPanel.svelte:707,726,730: each value carries its own title, the models as "解釈 / 描画".
             metaItem(display.localized("モデル"), maxWidth: 280, title: stage1 + " / " + stage2) {
                 if stage1 == stage2 {

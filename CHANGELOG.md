@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.157 (2026-10-16 / Build 1233)
+
 ### 2026-10-16 — Save checked refinement options before drawing the next four
 
 In Another composition and Change the touches, Make four options first saves the unsaved options checked when pressed, then draws four new ones. Unchecked options are not saved. If saving fails, the existing options and unsaved selections remain and no new round starts. Options already saved are not saved again after a partial failure.

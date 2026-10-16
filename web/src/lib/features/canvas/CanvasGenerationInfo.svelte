@@ -87,6 +87,7 @@
 		scoreJsonHighlighted: string;
 		scoreJsonSeparatorLine: number | null;
 		onClose: () => void;
+		onCopyWorkId: (workId: string) => void | Promise<void>;
 		onCopyStatusHash: () => void | Promise<void>;
 		onCopyPromptText: (kind: 'sketch' | 'stage1' | 'composition' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
 	};
@@ -124,9 +125,25 @@
 		scoreJsonHighlighted,
 		scoreJsonSeparatorLine,
 		onClose,
+		onCopyWorkId,
 		onCopyStatusHash,
 		onCopyPromptText
 	}: Props = $props();
+
+	let copiedWorkId = $state<string | null>(null);
+	async function copyWorkId(): Promise<void> {
+		const value = workId;
+		if (!value) return;
+		try {
+			await onCopyWorkId(value);
+			copiedWorkId = value;
+			window.setTimeout(() => {
+				if (copiedWorkId === value) copiedWorkId = null;
+			}, 1200);
+		} catch {
+			copiedWorkId = null;
+		}
+	}
 
 	// The system prompts are the ones this work sent, read from its execution
 	// when the tab is first shown for it. A later revision of the same
@@ -310,7 +327,7 @@
 				<section class="detail-group">
 					<h4>{t().provenanceSectionIdentity}</h4>
 					<dl>
-						{@render term(t().provenanceLabelWorkId, t().provenanceHintWorkId)}<dd><code>{workId ?? (hasSketchDetails ? t().provenanceWorkNotSaved : '-')}</code></dd>
+						{@render term(t().provenanceLabelWorkId, t().provenanceHintWorkId)}<dd class="detail-copy-row"><code>{workId ?? (hasSketchDetails ? t().provenanceWorkNotSaved : '-')}</code><button type="button" disabled={!workId} onclick={copyWorkId} aria-label={`${t().provenanceLabelWorkId}: ${t().promptCopy}`}>{workId && copiedWorkId === workId ? t().promptCopied : t().promptCopy}</button></dd>
 						{@render term(detailRenderHashLabel, t().provenanceHintRenderHash)}<dd class="detail-copy-row"><code>{detailRenderHash || '-'}</code><button type="button" disabled={!statusHashLabel} onclick={onCopyStatusHash}>{statusHashCopied ? t().promptCopied : t().promptCopy}</button></dd>
 						{@render term(detailDescriptionHashLabel, t().provenanceHintDescriptionHash)}<dd><code>{detailDescriptionHash || '-'}</code></dd>
 						{@render term('Render engine version', t().provenanceHintRenderEngine)}<dd>{detailEngineVersion || '-'}</dd>

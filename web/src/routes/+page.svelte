@@ -3104,6 +3104,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onGotoOldest={gotoOldest}
 				onCopyPromptText={copyPromptText}
 				onCopyStatusHash={copyStatusHash}
+				onCopyWorkId={copyTextToClipboard}
 				onToggleStar={toggleHistoryStar}
 				onToggleForRevision={toggleHistoryForRevision}
 				onToggleForShare={async (item, event) => { await toggleHistoryForShare(item, event); }}

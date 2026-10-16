@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-16 — Copy a work's UUID from the details drawer
+
+Added a copy button beside the UUID in the details drawer. It copies the displayed work's UUID and briefly confirms success. The button is disabled for unsaved works and an empty canvas.
+
 ## v2.15.155 (2026-10-15 / Build 1231)
 
 ### 2026-10-15 — Reflect the Mac local LLM measurement in the model information

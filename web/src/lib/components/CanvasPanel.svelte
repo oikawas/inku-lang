@@ -108,6 +108,7 @@
 		onGotoOldest: () => void | Promise<void>;
 		onCopyPromptText: (kind: 'sketch' | 'stage1' | 'composition' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
 		onCopyStatusHash: () => void | Promise<void>;
+		onCopyWorkId: (workId: string) => void | Promise<void>;
 		onToggleStar: (item: HistoryItem | null | undefined, event?: Event) => void | Promise<void>;
 		/** The revision mark of the work on screen, the same flag the history
 		    manager's pencil toggles. */
@@ -247,6 +248,7 @@
 		onGotoOldest,
 		onCopyPromptText,
 		onCopyStatusHash,
+		onCopyWorkId,
 		onToggleStar,
 		onToggleForRevision,
 		onToggleForShare = null,
@@ -942,6 +944,7 @@
 		{scoreJsonHighlighted}
 		{scoreJsonSeparatorLine}
 		onClose={closeGenerationInfo}
+		{onCopyWorkId}
 		{onCopyStatusHash}
 		{onCopyPromptText}
 	/>

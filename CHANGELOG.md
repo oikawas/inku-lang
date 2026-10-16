@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.161 (2026-10-16 / Build 1237)
+
 ### 2026-10-16 — Align Swift single-user features and settings with Server
 
 Swift's single-work PNG UI now has an independent transparency flag and a one-time migration preserving old choices. Saved export options stay unchanged; clipboard images use white. Saved PNG templates, a configurable candidate fanout limit, demo editing bounds, and row-height-based library capacity follow the common behavior. Layout and tool change save checked candidates before the next four, preserving unsaved options after partial failure.

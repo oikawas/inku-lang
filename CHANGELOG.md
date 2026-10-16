@@ -22,6 +22,10 @@ The Library list puts the star beside the image and the revision mark and move-t
 
 The canvas header shows the displayed work's generation from its saved lineage, even when a search leaves the history empty. Loading or unknown values are not assumed to be generation one. Plugin version badges and the drawing-use label also stay on one line.
 
+### 2026-10-16 — The computer touch is drawn by translucent lattice cells alone
+
+Over the drawing-engine revisions, the computer touch of the early works (render engine 14) was lost. The computer's material, the remainder of sampling (render engine 13), laid a translucent 18px cell (on 1000px) under the line for each point the rounding onto the lattice moved, toned in proportion to how far it moved. Render engine 41, which moved the drawing core to Rust, did not carry the step that lays the cells (the rounding remainder was still computed, but nothing read it). The author chose to keep the square dot halo, to drop the central line, and to keep the translucency in a dot-CG taste, and picked the following from two prototype sheets. A computer line, arc, free line, closed-shape contour or point draws no body and is drawn by its cells alone. The cells follow the drawn path (the centerline of a varied or connected line), toned from 0.15 to 0.45 in proportion to how far the rounding moved each point. The ends and corners, which the rounding does not move, get cells too, and where consecutive cells leave a cell or more between them, the gap is filled at the mean of the two tones. The thin line of a dotted or dashed style stays. The cells do not take the stroke's opacity, so neither intensity nor an arrangement's fade reaches a computer line, arc or contour. The computer's fill (the CRT bands) and the other tools are unchanged. The implementation reference adds `computer_cells` (lattice ratio 0.018, opacity 0.45, floor 0.15) to `weight_properties`. Render engine 84.
+
 ## v2.15.160 (2026-10-16 / Build 1236)
 
 ### 2026-10-16 — Faint closed fills show through, and a line's sway is also read as its path's wave

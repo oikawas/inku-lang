@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.160 (2026-10-16 / Build 1236)
+
 ### 2026-10-16 — Faint closed fills show through, and a line's sway is also read as its path's wave
 
 Over the render engine revisions, an early work's (render engine 3) glass-like, see-through circles and soft, undulating lines were lost. The see-through look was a by-product of an arrangement's fade dimming every member of a group alike (corrected in render engine 24), and measuring sway in the mark's width (render engine 28) left a long line nearly straight. The author chose to recover transparency through a combination of *omote* and *sabaki* and soft lines through a revised reading of sway, and picked from prototype sheets: a faint flat fill of a closed shape applies its intensity to the face only and draws its edge outside that density, at the opacity of the same tool's faint empty shape (the tool's line opacity × 0.55); a faint rotring face becomes 0.30 (0.55 before). A sway that moves a line's path (wave, perlin, white) takes the larger of today's amplitude and a share of its wavelength (the line's length over its cycles): narrowly 0.032, medium 0.054, broadly 0.135. A rotring line with such a sway is drawn as a `<polyline>` along the path a hand line follows; without one it stays a `<line>`. Arcs, closed shapes, free lines and points keep their amplitude, and normal and dense fills and the other surfaces are unchanged. The implementation reference lists the shares as `performance.line_path_shares`. Render engine 83; DDL, the DDL engine and the Score format are unchanged. Saved works keep their SVG; drawn again, they take the new edges and waves.

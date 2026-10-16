@@ -28,7 +28,7 @@ struct PluginSettingsView: View {
                             }
                             Text(model.display.webCopy(package.versions.isEmpty ? "settingsPluginNotDrawn" : "settingsPluginDrawn",
                                                        package.versions.isEmpty ? "描画には使われない" : "描画に使う"))
-                                .inkuFont(11).foregroundStyle(.secondary)
+                                .inkuFont(11).foregroundStyle(.secondary).fixedSize()
                             Spacer()
                             Toggle(model.display.webCopy(settings.preferences.isEnabled(package.id) ? "settingsPluginEnabled" : "settingsPluginDisabled",
                                                          settings.preferences.isEnabled(package.id) ? "有効" : "無効"), isOn: Binding(get: { settings.preferences.isEnabled(package.id) }, set: { value in

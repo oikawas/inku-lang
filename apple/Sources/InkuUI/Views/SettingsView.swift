@@ -431,6 +431,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                         .accessibilityLabel(model.display.label("同時処理数を減らす", "Decrease parallel candidates"))
                     TextField(model.display.label("同時処理数", "Parallel candidates"), text: $fanoutDraft)
                         .labelsHidden().textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing).frame(width: 80)
+                        .onChange(of: fanoutDraft) { _, _ in fanoutError = nil }
                     Button { stepFanout(by: 1) } label: { Image(systemName: "plus") }
                         .accessibilityLabel(model.display.label("同時処理数を増やす", "Increase parallel candidates"))
                     Spacer()

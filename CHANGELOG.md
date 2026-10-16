@@ -14,6 +14,8 @@ Swift's single-work PNG UI now has an independent transparency flag and a one-ti
 
 Added saved-provenance labels, independent canvas search, UUID copying, format menus, and selected-work export. Refreshed bundled catalog/copy and aligned model metadata and confirmation, creation dialogs, Saijiki, and extension settings. Automatic backups accept calendar days, a local time, and up to 100 generations, while old hourly schedules remain until the new schedule is saved. Native storage/OS integration and author-requested additional actions remain. These source changes do not certify final UI comparison, author acceptance, or deployment.
 
+Also corrected issues found in the native UI: a parallel-limit error left visible after editing the value, duplicate accessibility names on export tabs, a plugin name wrapping mid-word, and untranslated size/created headings in English.
+
 ## v2.15.159 (2026-10-16 / Build 1235)
 
 ### 2026-10-16 — Search works from the canvas header

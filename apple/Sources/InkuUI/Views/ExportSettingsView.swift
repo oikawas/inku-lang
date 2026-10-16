@@ -48,7 +48,6 @@ struct ExportSettingsView: View {
                 InkuSegmentedButtons(options: [("destination", model.display.localized("保存先")), ("png", model.display.localized("PNGテンプレート")),
                                                ("animation", model.display.localized("アニメーション")), ("card", model.display.localized("共有カード"))],
                                      selection: $page)
-                    .accessibilityLabel(model.display.localized("エクスポート"))
             }
             if page == "destination" {
             #if os(macOS)

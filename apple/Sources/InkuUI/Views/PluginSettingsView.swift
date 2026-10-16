@@ -18,7 +18,7 @@ struct PluginSettingsView: View {
                 ForEach(settings.packages) { package in
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
-                            Text(package.id).inkuFont(14, weight: .semibold)
+                            Text(package.id).inkuFont(14, weight: .semibold).fixedSize()
                             ForEach(package.versions, id: \.self) { version in
                                 Text("v" + version).inkuFont(11).monospacedDigit()
                                     .padding(.horizontal, 6).padding(.vertical, 2)

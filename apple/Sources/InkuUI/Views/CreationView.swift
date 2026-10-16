@@ -558,8 +558,8 @@ struct CreationView: View {
             }
             metaItem(display.localized("色カタログ"), maxWidth: 130, title: catalog) { Text(catalog) }
             metaItem(display.localized("キャンバス"), maxWidth: 100, title: canvas) { Text(canvas) }
-            metaItem(display.localized("サイズ"), maxWidth: nil) { Text(size).monospacedDigit() }
-            metaItem(display.localized("作成"), maxWidth: nil) { Text(created).monospacedDigit() }
+            metaItem(display.label("サイズ", "Size"), maxWidth: nil) { Text(size).monospacedDigit() }
+            metaItem(display.label("作成", "Created"), maxWidth: nil) { Text(created).monospacedDigit() }
         }
         .padding(.vertical, 7)
         .accessibilityElement(children: .combine)

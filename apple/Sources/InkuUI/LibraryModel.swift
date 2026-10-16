@@ -28,6 +28,8 @@ private enum LineageRetryRequest {
 @Observable
 public final class LibraryModel {
     public var query = "" { didSet { if query != oldValue { changedFilter() } } }
+    /// Canvas history uses its own search contract and never changes the library's query.
+    public var canvasSearch = false
     public var starredOnly = false { didSet { if starredOnly != oldValue { changedFilter() } } }
     public var revisionOnly = false { didSet { if revisionOnly != oldValue { changedFilter() } } }
     public var isTrash = false { didSet { if isTrash != oldValue { changedFilter() } } }
@@ -150,7 +152,7 @@ public final class LibraryModel {
     public var isGrouped: Bool { grouped || layout == .lineage }
     public var filter: LibraryQuery {
         LibraryQuery(text: query, trashed: isTrash, starred: starredOnly,
-                     forRevision: revisionOnly, order: order)
+                     forRevision: revisionOnly, order: order, canvasSearch: canvasSearch)
     }
 
     private func changedFilter() {

@@ -12,6 +12,26 @@ This file records changes chronologically. If a historical note conflicts with t
 
 Added an opt-in 2D/3D toggle switch at the upper left of the canvas, below the Work label. A separate experimental WASM adapter and Three.js viewer preserve saved Score placement, aspect, colors and seeds while displaying spheres, boxes, pyramids and curved tubes. Includes orbit/pan/zoom, views, projection, guides, selection and PNG/GLB export. Core geometry reading is off by default. No database or work-saving path changes; disabling the setting or removing the bridge restores a 2D-only application.
 
+## v2.15.161 (2026-10-16 / Build 1237)
+
+### 2026-10-16 — Align Swift single-user features and settings with Server
+
+Swift's single-work PNG UI now has an independent transparency flag and a one-time migration preserving old choices. Saved export options stay unchanged; clipboard images use white. Saved PNG templates, a configurable candidate fanout limit, demo editing bounds, and row-height-based library capacity follow the common behavior. Layout and tool change save checked candidates before the next four, preserving unsaved options after partial failure.
+
+Added saved-provenance labels, independent canvas search, UUID copying, format menus, and selected-work export. Refreshed bundled catalog/copy and aligned model metadata and confirmation, creation dialogs, Saijiki, and extension settings. Automatic backups accept calendar days, a local time, and up to 100 generations, while old hourly schedules remain until the new schedule is saved. Native storage/OS integration and author-requested additional actions remain. These source changes do not certify final UI comparison, author acceptance, or deployment.
+
+Also corrected issues found in the native UI: a parallel-limit error left visible after editing the value, duplicate accessibility names on export tabs, a plugin name wrapping mid-word, and untranslated size/created headings in English.
+
+The transparency setting follows the PNG templates. Animation format, transition, replay and resolution labels, and common share-card wording now use the bundled Web copy. Local storage scope and aspect-ratio labels for resizable native cards remain.
+
+The Library list puts the star beside the image and the revision mark and move-to-trash action in the actions column. The additional macOS actions menu remains.
+
+The canvas header shows the displayed work's generation from its saved lineage, even when a search leaves the history empty. Loading or unknown values are not assumed to be generation one. Plugin version badges and the drawing-use label also stay on one line.
+
+### 2026-10-16 — The computer touch is drawn by translucent lattice cells alone
+
+Over the drawing-engine revisions, the computer touch of the early works (render engine 14) was lost. The computer's material, the remainder of sampling (render engine 13), laid a translucent 18px cell (on 1000px) under the line for each point the rounding onto the lattice moved, toned in proportion to how far it moved. Render engine 41, which moved the drawing core to Rust, did not carry the step that lays the cells (the rounding remainder was still computed, but nothing read it). The author chose to keep the square dot halo, to drop the central line, and to keep the translucency in a dot-CG taste, and picked the following from two prototype sheets. A computer line, arc, free line, closed-shape contour or point draws no body and is drawn by its cells alone. The cells follow the drawn path (the centerline of a varied or connected line), toned from 0.15 to 0.45 in proportion to how far the rounding moved each point. The ends and corners, which the rounding does not move, get cells too, and where consecutive cells leave a cell or more between them, the gap is filled at the mean of the two tones. The thin line of a dotted or dashed style stays. The cells do not take the stroke's opacity, so neither intensity nor an arrangement's fade reaches a computer line, arc or contour. The computer's fill (the CRT bands) and the other tools are unchanged. The implementation reference adds `computer_cells` (lattice ratio 0.018, opacity 0.45, floor 0.15) to `weight_properties`. Render engine 84.
+
 ## v2.15.160 (2026-10-16 / Build 1236)
 
 ### 2026-10-16 — Faint closed fills show through, and a line's sway is also read as its path's wave

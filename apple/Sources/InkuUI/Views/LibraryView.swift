@@ -16,6 +16,7 @@ struct LibraryView: View {
     var writingLocked = false
     /// Web `onClose` ("制作に戻る"). The button is shown only when the owner can close the library.
     var onClose: (() -> Void)? = nil
+    var onSelectionExport: ([String], String) -> Void = { _, _ in }
     @State private var deletion: LibraryDeletion?
     @State private var loadingGroups: Set<String> = []
     @State private var providers: [ProviderSettings] = []
@@ -257,6 +258,11 @@ struct LibraryView: View {
                 .accessibilityLabel(display.localized("ごみ箱の操作"))
                 .disabled(writingDisabled)
         } else {
+            let exportIDs = library.selectedIDs.sorted()
+            SavedWorkExportMenu(model: model, count: exportIDs.count,
+                                title: display.webCopy("historyExportSelected", "選択作品を書き出す")) { action in
+                onSelectionExport(exportIDs, action)
+            }.disabled(exportIDs.isEmpty || writingDisabled)
             Button { deletion = LibraryDeletion(ids: library.selectedIDs.sorted(), movesToTrash: true) } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "trash")
@@ -373,15 +379,14 @@ struct LibraryView: View {
             measurements.ceiling = LibraryGridPaging.maximumPageSize
         }
         guard !library.isGrouped, library.layout != .list, viewport.width > 0, viewport.height > 0 else { return }
-        let shown = Set(library.works.map(\.id))
-        let heights = measurements.cardHeights.filter { shown.contains($0.key) }.map { Double($0.value) }
-        let fitted = LibraryGridPaging.pageSize(width: viewport.width - 20, height: viewport.height - 14, cardHeights: heights)
+        let heights = library.works.map { Double(measurements.cardHeights[$0.id] ?? 0) }
+        let fitted = LibraryGridPaging.pageSize(width: size.width - 20, height: size.height - 14, cardHeights: heights)
         measurements.ceiling = min(measurements.ceiling, fitted)
         if library.pageSize != measurements.ceiling { library.pageSize = measurements.ceiling }
     }
 
     private func recordCardHeight(_ height: CGFloat, for id: String) {
-        guard abs((measurements.cardHeights[id] ?? 0) - height) > 0.5 else { return }
+        guard height.isFinite, height > 0, measurements.cardHeights[id] != height else { return }
         measurements.cardHeights[id] = height
         reportPageSize(viewport: measurements.viewport)
     }
@@ -414,8 +419,8 @@ struct LibraryView: View {
             .overlay(alignment: .topLeading) { generationBadge(work, plate: true).padding(.top, 30).padding(.leading, 6) }
             .overlay(alignment: .bottomTrailing) { if model.selectedWorkID == work.id { currentBadge.padding(3) } }
             VStack(alignment: .leading, spacing: 4) {
-                if LibraryWorkPresentation.usesDDLTitle(work) {
-                    Text("DDL").inkuFont(12, weight: .semibold).foregroundStyle(.tertiary)
+                if let label = model.savedDisplayLabels[work.id] {
+                    Text(label).inkuFont(12, weight: .semibold).foregroundStyle(.tertiary)
                 }
                 LibraryExpandableTitle(work: work, display: display, size: 14)
                     .id(work.id)
@@ -424,7 +429,6 @@ struct LibraryView: View {
                     (Text(display.webCopy("historyPreviewCommentLabel", fallback: "作品へのコメント") + " ").fontWeight(.semibold) + Text(note))
                         .inkuFont(10).foregroundStyle(.tertiary).lineLimit(1)
                 }
-                savedFacts(work)
                 LibraryModelLinesView(work: work, display: display, naming: naming)
                 cardActions(work)
             }
@@ -512,14 +516,17 @@ struct LibraryView: View {
         )) {
             TableColumn("") { row in selectionCheck(row.work) }.width(32)
             TableColumn(display.webCopy("historyImageHeader", fallback: "画像")) { row in
-                ArtworkThumbnail(work: row.work, thumbnails: model.thumbnails).frame(width: 48, height: 36)
-                    .overlay(alignment: .topTrailing) {
-                        if row.work.starred { Image(systemName: "star.fill").font(.system(size: 9)).foregroundStyle(.yellow).padding(2) }
-                    }
-                    .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
-            }.width(62)
+                HStack(spacing: 6) {
+                    ArtworkThumbnail(work: row.work, thumbnails: model.thumbnails).frame(width: 48, height: 36)
+                        .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
+                    LibraryWorkMarks(model: model, work: row.work, showRevision: false).disabled(writingDisabled)
+                }
+            }.width(88)
             TableColumn(display.webCopy("historyDescriptionHeader", fallback: "記述")) { row in
                 VStack(alignment: .leading, spacing: 3) {
+                    if let label = model.savedDisplayLabels[row.work.id] {
+                        Text(label).inkuFont(11, weight: .semibold).foregroundStyle(.secondary)
+                    }
                     LibraryExpandableTitle(work: row.work, display: display, size: 14)
                     if let note = library.loadedAnnotation(for: row.id)?.note, !note.isEmpty {
                         Text(note).inkuFont(10).foregroundStyle(.secondary).lineLimit(1)
@@ -534,7 +541,8 @@ struct LibraryView: View {
                 LibraryModelLinesView(work: row.work, display: display, naming: naming)
             }.width(min: 130, ideal: 190)
             TableColumn(display.webCopy("historyCatalogHeader", fallback: "色カタログ")) { row in
-                Text(row.work.renderColorCatalogName ?? row.work.catalogID ?? display.localized("未記録"))
+                Text(row.work.renderColorCatalogName ?? model.catalogs.first { $0.id == (row.work.renderColorCatalogID ?? row.work.catalogID) }?.name
+                     ?? row.work.renderColorCatalogID ?? row.work.catalogID ?? display.localized("未記録"))
                     .inkuFont(12).lineLimit(1)
             }.width(min: 70, ideal: 100)
             TableColumn(display.webCopy("historySvgSizeHeader", fallback: "SVGサイズ")) { row in
@@ -550,7 +558,13 @@ struct LibraryView: View {
             }.width(72)
             TableColumn(display.webCopy("historyActionHeader", fallback: "操作")) { row in
                 HStack(spacing: 4) {
-                    LibraryWorkMarks(model: model, work: row.work, spacing: 4).disabled(writingDisabled)
+                    LibraryWorkMarks(model: model, work: row.work, spacing: 4, showStar: false).disabled(writingDisabled)
+                    if !library.isTrash {
+                        Button { deletion = LibraryDeletion(ids: [row.work.id], movesToTrash: true) } label: { Image(systemName: "trash") }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel(display.localized("ごみ箱に移動"))
+                            .disabled(library.mutating || writingDisabled)
+                    }
                     Menu { workMenu(row.work) } label: { Image(systemName: "ellipsis") }
                         .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                         .inkuTooltip(tip("作品の操作"))

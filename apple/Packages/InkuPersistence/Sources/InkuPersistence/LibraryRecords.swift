@@ -25,11 +25,13 @@ public struct LibraryQuery: Sendable, Equatable {
     public var starred: Bool
     public var forRevision: Bool
     public var order: LibraryOrder
+    public var canvasSearch: Bool
 
     public init(text: String = "", trashed: Bool = false, starred: Bool = false,
-                forRevision: Bool = false, order: LibraryOrder = .newest) {
+                forRevision: Bool = false, order: LibraryOrder = .newest, canvasSearch: Bool = false) {
         self.text = text; self.trashed = trashed; self.starred = starred
         self.forRevision = forRevision; self.order = order
+        self.canvasSearch = canvasSearch
     }
 }
 

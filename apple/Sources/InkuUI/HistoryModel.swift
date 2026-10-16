@@ -13,7 +13,7 @@ public final class HistoryModel {
     @ObservationIgnored private var generationToken = UUID()
     @ObservationIgnored private var locationToken = UUID()
     @ObservationIgnored private var navigationToken = UUID()
-    public init() { library.pageSize = 20 }
+    public init() { library.pageSize = 20; library.canvasSearch = true }
 
     public var canMoveNewer: Bool { (selectedIndex ?? 0) > 0 }
     public var canMoveOlder: Bool { library.total > 0 && (selectedIndex ?? 0) < library.total - 1 }

@@ -38,10 +38,8 @@ struct LibraryPreviewPanel: View {
                 Button(display.webCopy("historyPreviewOpenLineage", "系譜で開く")) { onLineage(work) }
                     .disabled(disabled || work.lineageNodeID == nil)
                     .buttonStyle(LibraryGhostButtonStyle())
-                Menu {
-                    SavedWorkRefinementActions(model: model, work: work, onAction: onWorkAction, writingLocked: writingLocked)
-                } label: { menuLabel(display.webCopy("historyPreviewRefine", "推敲する")) }
-                .menuStyle(.borderlessButton).fixedSize().disabled(disabled || writingLocked)
+                Button(display.webCopy("historyPreviewRefine", "推敲する")) { onWorkAction(work, "refine-menu") }
+                    .buttonStyle(LibraryGhostButtonStyle()).disabled(disabled || writingLocked)
                 exportMenu
             }
             VStack(alignment: .leading, spacing: 0) {
@@ -106,8 +104,9 @@ struct LibraryPreviewPanel: View {
                 }
             }
             Section("PNG") {
-                ForEach([1080, 2160, 4320, 512, 768], id: \.self) { pixels in
-                    Button("PNG \(pixels)px") { onWorkAction(work, "export-png:\(pixels)") }
+                ForEach(model.display.preferences.savedPNGTemplates) { template in
+                    Button(template.name + "　\(template.pixelHeight)px") { onWorkAction(work, "export-png:\(template.pixelHeight)") }
+                        .help(template.description)
                 }
             }
             Button(display.localized("共有カード")) { onWorkAction(work, "export-format:shareCard") }

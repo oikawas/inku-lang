@@ -77,6 +77,11 @@ public struct ModelGuidanceCatalog: Decodable, Sendable {
         providers[providerID]?.models.first { $0.id == modelID }?.settings.label
     }
 
+    /// Display resolution includes retired catalog rows without publishing or registering them.
+    func savedModelOwners(modelID: String) -> Set<String> {
+        Set(providers.filter { $0.key != "chatgpt" && $0.value.models.contains { $0.id == modelID } }.map(\.key))
+    }
+
     public func guidance(for reference: String, providers configured: [ProviderSettings]) -> ModelGuidance? {
         guard let separator = reference.firstIndex(of: ":") else { return nil }
         let providerID = String(reference[..<separator])
@@ -151,8 +156,14 @@ public struct ModelGuidance: Sendable {
     }
 
     public static func recommendation(_ level: Int?) -> String {
-        guard let level = Self.level(level) else { return "—" }
-        return String(repeating: "★", count: level) + String(repeating: "☆", count: 5 - level) + " (\(level)/5)"
+        let tier = recommendationTier(level)
+        guard tier > 0 else { return "—" }
+        return String(repeating: "★", count: tier) + String(repeating: "☆", count: 3 - tier) + " (\(tier)/3)"
+    }
+
+    public static func recommendationTier(_ level: Int?) -> Int {
+        guard let level = Self.level(level) else { return 0 }
+        return level >= 4 ? 3 : level >= 3 ? 2 : 1
     }
 
     private static func level(_ value: Int?) -> Int? {

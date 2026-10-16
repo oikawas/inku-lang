@@ -48,11 +48,12 @@ struct ModelCatalogGroupsView<Row: View>: View {
 struct ModelLabelsView: View {
     let labels: [ModelCatalogLabelDefinition]
     @Bindable var display: DisplaySettings
+    var endOfLifeDate: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             ForEach(labels) { label in
-                Text(label.name(language: display.preferences.language))
+                Text(label.name(language: display.preferences.language) + (label.id == "eol" ? endOfLifeDate.map { " (\($0))" } ?? "" : ""))
                     .inkuFont(12)
                     .foregroundStyle(label.publishable ? Color.secondary : Color.orange)
                     .fixedSize(horizontal: false, vertical: true)

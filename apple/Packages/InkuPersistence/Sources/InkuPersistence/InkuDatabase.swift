@@ -532,7 +532,26 @@ public actor InkuDatabase {
         if query.starred { clauses.append("h.starred = 1") }
         if query.forRevision { clauses.append("coalesce(a.for_revision, 0) = 1") }
         let search = query.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !search.isEmpty {
+        if !search.isEmpty && query.canvasSearch {
+            let uuid = search.range(of: "^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$", options: [.regularExpression, .caseInsensitive]) != nil
+            let nativeID = search.range(of: "^(?:[0-9a-f]{32}|[0-9a-f]{64})_[0-9]+$", options: [.regularExpression, .caseInsensitive]) != nil
+            if uuid || nativeID {
+                clauses.append("lower(h.id) = lower(?)"); arguments += [search]
+            } else {
+                let literal = search.replacingOccurrences(of: "/", with: "//")
+                    .replacingOccurrences(of: "%", with: "/%").replacingOccurrences(of: "_", with: "/_")
+                var fields = ["coalesce(h.source_text, h.input) LIKE ? ESCAPE '/'"]
+                arguments += ["%\(literal)%"]
+                for column in ["h.render_hash", "h.description_hash"] {
+                    fields += ["\(column) LIKE ? ESCAPE '/'", "\(column) LIKE ? ESCAPE '/'"]
+                    arguments += ["\(literal)%", "%\(literal)"]
+                    if !search.contains(":") {
+                        fields.append("\(column) LIKE ? ESCAPE '/'"); arguments += ["%:\(literal)%"]
+                    }
+                }
+                clauses.append("(" + fields.joined(separator: " OR ") + ")")
+            }
+        } else if !search.isEmpty {
             var searchClauses = ["h.input LIKE ?", "h.ddl LIKE ?", "h.stage1_model LIKE ?", "h.stage2_model LIKE ?", "h.catalog_id LIKE ?"]
             for _ in searchClauses { arguments += ["%\(search)%"] }
             let shortHash = search.utf8.count == 4 && search.utf8.allSatisfy {
@@ -704,6 +723,46 @@ public actor InkuDatabase {
                 }
             }
             return result
+        }
+    }
+
+    /// Project only saved labels/line numbers; malformed or mismatched journals supply no label.
+    public func savedDisplayLabels(locations: [(workID: String, executionID: String, effectID: String)]) throws -> [String: String] {
+        guard !locations.isEmpty else { return [:] }
+        return try queue.read { db in
+            var labels: [String: String] = [:]
+            for start in stride(from: 0, to: locations.count, by: 250) {
+                let chunk = locations[start..<min(locations.count, start + 250)]
+                let values = chunk.map { _ in "(?, ?, ?)" }.joined(separator: ",")
+                let arguments = chunk.flatMap { [$0.workID, $0.executionID, $0.effectID] }
+                let rows = try Row.fetchAll(db, sql: """
+                    WITH wanted(work_id, execution_id, effect_id) AS (VALUES \(values)),
+                    records AS (
+                        SELECT wanted.work_id, CASE WHEN json_valid(CAST(a.acknowledgement AS TEXT))
+                            THEN CAST(a.acknowledgement AS TEXT) ELSE '{}' END AS document
+                        FROM wanted JOIN effect_acknowledgements a
+                        ON a.execution_id = wanted.execution_id AND a.effect_id = wanted.effect_id
+                    )
+                    SELECT work_id,
+                        json_extract(document, '$.performance.presentation.provenance.displayLabel') AS label,
+                        json_type(document, '$.performance.presentation.provenance.displayLabel') AS label_type,
+                        json_extract(document, '$.performance.presentation.provenance.batchLineNumber') AS line,
+                        json_type(document, '$.performance.presentation.provenance.batchLineNumber') AS line_type,
+                        json_extract(document, '$.performance.authority.origin') AS origin
+                    FROM records WHERE json_extract(document, '$.work_id') = work_id
+                    """, arguments: StatementArguments(arguments))
+                for row in rows {
+                    let id: String = row["work_id"]
+                    if row["label_type"] as String? == "text", let label: String = row["label"], !label.isEmpty {
+                        labels[id] = label
+                    } else if row["line_type"] as String? == "integer", let line: Int = row["line"], line > 0 {
+                        labels[id] = "#\(line)"
+                    } else if let origin: String = row["origin"], ["direct_ddl", "user_authored_ddl"].contains(origin) {
+                        labels[id] = "DDL"
+                    }
+                }
+            }
+            return labels
         }
     }
 

@@ -5,6 +5,7 @@ import Observation
 struct PluginPackageInfo: Identifiable, Sendable {
     let id: String
     let versions: [String]
+    let sourceFiles: [String]
     let words: [PluginWord]
     let drawnNames: Set<String>
 }
@@ -32,6 +33,7 @@ final class PluginSettingsModel {
                 let definitions = entries.filter { $0["source_id"] as? String == "bundled:" + packageID }
                 return PluginPackageInfo(id: packageID,
                     versions: Set(definitions.compactMap { $0["version"] as? String }).sorted(),
+                    sourceFiles: Set((grouped[packageID] ?? []).compactMap(\.sourceFile).filter { !$0.isEmpty }).sorted(),
                     words: grouped[packageID] ?? [],
                     drawnNames: Set(definitions.compactMap { $0["qualified_name"] as? String }))
             }

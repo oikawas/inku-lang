@@ -126,18 +126,22 @@ struct LibraryWorkMarks: View {
     @Bindable var model: AppModel
     let work: SavedWork
     var spacing: CGFloat = 12
+    var showStar = true
+    var showRevision = true
     private var library: LibraryModel { model.library }
 
     var body: some View {
         HStack(spacing: spacing) {
-            Button { Task { await library.toggleStar(work) } } label: {
-                Image(systemName: work.starred ? "star.fill" : "star")
-                    .foregroundStyle(work.starred ? Color.accentColor : Color.secondary)
+            if showStar {
+                Button { Task { await library.toggleStar(work) } } label: {
+                    Image(systemName: work.starred ? "star.fill" : "star")
+                        .foregroundStyle(work.starred ? Color.accentColor : Color.secondary)
+                }
+                .accessibilityLabel(model.display.localized(work.starred ? "お気に入りを解除" : "お気に入り"))
+                .inkuTooltip(model.display.tooltip(work.starred ? "スターを外す" : "スターを付ける",
+                                                  serverKey: work.starred ? "starOn" : "starOff"))
             }
-            .accessibilityLabel(model.display.localized(work.starred ? "お気に入りを解除" : "お気に入り"))
-            .inkuTooltip(model.display.tooltip(work.starred ? "スターを外す" : "スターを付ける",
-                                        serverKey: work.starred ? "starOn" : "starOff"))
-            LibraryAnnotationMarkButton(model: model, work: work, mark: .revision)
+            if showRevision { LibraryAnnotationMarkButton(model: model, work: work, mark: .revision) }
         }
         .buttonStyle(.borderless)
         .disabled(library.mutating || model.isBusy)
@@ -237,8 +241,20 @@ public enum LibraryGridPaging {
         let measured = cardHeights.reduce(0) { $1.isFinite && $1 > 0 ? max($0, $1) : $0 }
         let cardWidth = max(minCardWidth, (width - gap * Double(columns - 1)) / Double(columns))
         let cardHeight = measured > 0 ? measured : max(1, cardWidth - 12) * 58 / 82 + 75
-        let rows = max(1, Int(((height + gap) / (cardHeight + gap)).rounded(.down)))
-        return columns * rows
+        var rows = 0
+        var usedHeight = 0.0
+        for start in stride(from: 0, to: cardHeights.count, by: columns) {
+            let end = min(start + columns, cardHeights.count)
+            let measuredRow = cardHeights[start..<end].reduce(0) { $1.isFinite && $1 > 0 ? max($0, $1) : $0 }
+            let rowHeight = measuredRow > 0 ? measuredRow : cardHeight
+            let completeRowHeight = end - start < columns ? max(rowHeight, cardHeight) : rowHeight
+            let nextHeight = usedHeight + (rows > 0 ? gap : 0) + completeRowHeight
+            if nextHeight > height { return columns * max(1, rows) }
+            usedHeight = nextHeight
+            rows += 1
+        }
+        let extraRows = max(0, Int(((height - usedHeight + (rows == 0 ? gap : 0)) / (cardHeight + gap)).rounded(.down)))
+        return columns * max(1, rows + extraRows)
     }
 }
 

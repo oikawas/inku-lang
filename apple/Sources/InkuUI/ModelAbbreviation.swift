@@ -50,7 +50,7 @@ public struct ModelNaming: Sendable {
         Set(connections.filter { connection in
             connection.id != "chatgpt"
                 && (ModelGuidanceCatalog.bundled?.registeredModelSettings(for: connection) ?? connection.models ?? []).contains { $0.id == model }
-        }.map(\.id))
+        }.map(\.id)).union(ModelGuidanceCatalog.bundled?.savedModelOwners(modelID: model) ?? [])
     }
 
     /// Web `resolveModelRefForDisplay`: explicit qualification, sole ownership, retired ownership, then the stage default.

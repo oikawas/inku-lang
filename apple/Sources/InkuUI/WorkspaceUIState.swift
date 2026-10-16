@@ -25,6 +25,7 @@ final class WorkspaceUIState {
     var settingsSection = SettingsSection.display
     /// CanvasGenerationInfo drawer over the canvas.
     var generationInfoOpen = false
+    var refinementMenuWorkID: String?
     /// SaijikiDrawer at the window's right edge.
     var saijikiOpen = false
     /// Kept for the session only, as the Web keeps them: zoom, the batch panel's sections and tab, the drawer's tab.

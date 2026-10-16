@@ -89,7 +89,13 @@ private enum DemoModelPicker: String, Identifiable {
                             }
                         }.padding(6)
                     }
-                    Stepper(model.display.localizedFormat("描画間隔: %ld秒", automation.demoInterval), value: $automation.demoInterval, in: 1...3600)
+                    Stepper(value: Binding(get: { automation.demoInterval },
+                        set: { _ = automation.setDemoIntervalFromUI($0) }), in: 1...999) {
+                        HStack {
+                            Text(model.display.localizedFormat("描画間隔: %ld秒", automation.demoInterval))
+                            if automation.demoInterval > 999 { Text(model.display.localized("保存済み")).foregroundStyle(.secondary) }
+                        }
+                    }
                     Stepper(model.display.localizedFormat("実行時間: %ld分", automation.demoDuration / 60), value: Binding(
                         get: { automation.demoDuration / 60 }, set: { automation.demoDuration = $0 * 60 }), in: 1...1440)
                     Toggle(model.display.localized("生成作品をライブラリへ保存"), isOn: $automation.demoSaveWorks)

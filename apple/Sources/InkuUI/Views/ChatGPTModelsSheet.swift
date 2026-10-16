@@ -94,7 +94,7 @@ struct ChatGPTModelsSheet: View {
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(display.localizedFormat("%@ の使用モデル選択", display.webCopy("chatgptPlanLabel", "ChatGPTプラン")))
+                Text(display.webCopyFormat("settingsModelSelectModelsTitle", "%@ の公開モデル選択", display.webCopy("chatgptPlanLabel", "ChatGPTプラン")))
                     .inkuFont(16, weight: .semibold)
                 Text(display.localizedFormat("サービスID: %@", "chatgpt")).inkuFont(12).foregroundStyle(.secondary)
             }
@@ -117,8 +117,8 @@ struct ChatGPTModelsSheet: View {
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(.secondary.opacity(0.25)))
                 Picker(display.localized("絞り込み"), selection: $filter) {
                     Text(display.localized("すべて")).tag(ProviderModelFilter.all)
-                    Text(display.localized("使用中")).tag(ProviderModelFilter.enabled)
-                    Text(display.localized("不使用")).tag(ProviderModelFilter.disabled)
+                    Text(display.webCopy("settingsModelFilterPublished", "公開中")).tag(ProviderModelFilter.enabled)
+                    Text(display.webCopy("settingsModelFilterUnpublished", "非公開")).tag(ProviderModelFilter.disabled)
                     Text(display.localized("LLM 用")).tag(ProviderModelFilter.llm)
                     Text(display.localized("Vision 用")).tag(ProviderModelFilter.vision)
                 }.frame(width: 200)
@@ -146,7 +146,7 @@ struct ChatGPTModelsSheet: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.label).inkuFont(14, weight: .semibold)
                     Text(item.id).inkuFont(12, design: .monospaced).foregroundStyle(.secondary).textSelection(.enabled)
-                    ModelLabelsView(labels: item.resolvedLabels, display: display)
+                    ModelLabelsView(labels: item.resolvedLabels, display: display, endOfLifeDate: item.eolDate)
                     if selected.contains(item.id), purposes(of: item.id).isEmpty {
                         Text(display.localized("LLM か Vision の用途を選んでください。")).inkuFont(12).foregroundStyle(.orange)
                     }
@@ -203,12 +203,12 @@ struct ChatGPTModelsSheet: View {
                 Text(statusMessage).inkuFont(12).foregroundStyle(.secondary).lineLimit(3)
             }
             HStack(spacing: 12) {
-                Text(display.localizedFormat("%ld モデルを使用中", publication.models.filter { selected.contains($0.id) }.count))
+                Text(display.webCopyFormat("settingsModelPublishedCount", "%@ モデルを公開中", publication.models.filter { selected.contains($0.id) }.count))
                     .inkuFont(13).foregroundStyle(.secondary)
                 if dirty { Text(display.localized("未保存の変更")).inkuFont(12, weight: .semibold) }
                 Spacer()
                 if working { ProgressView().controlSize(.small) }
-                Button(display.localized("取消")) { dismiss() }
+                Button(display.localized("キャンセル")) { dismiss() }
                     .keyboardShortcut(.cancelAction).disabled(working)
                 Button(display.localized("保存")) { Task { await save() } }
                     .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)

@@ -252,7 +252,8 @@ public struct ContentView: View {
     private var libraryOverlay: some View {
         LibraryView(model: model, preview: libraryPreview, onEditWork: openWorkEdit, onAdjustWork: { openRefinement($0) },
                     onReplayWork: openReplay, onWorkAction: openWorkAction,
-                    writingLocked: model.isBusy || automation.isOccupied, onClose: closeLibrary)
+                    writingLocked: model.isBusy || automation.isOccupied, onClose: closeLibrary,
+                    onSelectionExport: openSelectionExport)
             .disabled(importing)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(InkuColor.bg)
@@ -552,11 +553,19 @@ public struct ContentView: View {
             guard ["display", "editable", "compat", "live"].contains(profile) else { return }
             dialog = .export(ExportSession(works: [work], preserveOrder: false, initialFormat: .svg, initialSVGProfile: profile))
         case let requested where requested.hasPrefix("export-png:"):
-            guard let height = Int(requested.dropFirst("export-png:".count)), [1080, 2160, 4320, 512, 768].contains(height) else { return }
+            guard let height = Int(requested.dropFirst("export-png:".count)), (64...12000).contains(height) else { return }
             dialog = .export(ExportSession(works: [work], preserveOrder: false, initialFormat: .png, initialPixelHeight: height))
         case let requested where requested.hasPrefix("export-format:"):
             guard let format = SavedExportFormat(rawValue: String(requested.dropFirst("export-format:".count))) else { return }
             dialog = .export(ExportSession(works: [work], preserveOrder: false, initialFormat: format))
+        case "refine-menu":
+            batchWorkspace.showHistory()
+            Task {
+                await model.selectWork(work)
+                guard model.selectedWorkID == work.id, !model.isBrowsingLocked else { return }
+                showCreation(tab: "artwork")
+                ui.refinementMenuWorkID = work.id
+            }
         case "layout": openRefinement(work)
         case "description": openWorkEdit(work, .description)
         case "sketch": openWorkEdit(work, .sketch)
@@ -605,6 +614,39 @@ public struct ContentView: View {
             guard canExport, ui.libraryOpen == fromLibrary else { return }
             if !works.isEmpty { dialog = .export(ExportSession(works: works, preserveOrder: false)) }
         } catch { model.errorText = error.localizedDescription }
+    }
+
+    private func openSelectionExport(_ ids: [String], action: String) {
+        guard !ids.isEmpty, !model.isBrowsingLocked else { return }
+        let format: SavedExportFormat
+        var profile: String?
+        var height: Int?
+        if ids.count == 1, action.hasPrefix("export-svg:") {
+            let requested = String(action.dropFirst("export-svg:".count))
+            guard ["display", "editable", "compat", "live"].contains(requested) else { return }
+            format = .svg; profile = requested
+        } else if ids.count == 1, action.hasPrefix("export-png:") {
+            guard let requested = Int(action.dropFirst("export-png:".count)), (64...12000).contains(requested) else { return }
+            format = .png; height = requested
+        } else {
+            guard action.hasPrefix("export-format:"),
+                  let requested = SavedExportFormat(rawValue: String(action.dropFirst("export-format:".count))),
+                  (ids.count == 1 ? [.apng, .gif, .shareCard, .ddl] : [.apng, .gif, .reviewSheet, .aiSheet]).contains(requested) else { return }
+            format = requested
+        }
+        Task {
+            do {
+                var works: [SavedWork] = []
+                for id in ids {
+                    let work = try await model.library.fullWork(id: id)
+                    guard !work.trashed else { throw HostError("saved_work_unavailable") }
+                    works.append(work)
+                }
+                guard !Task.isCancelled, !model.isBrowsingLocked else { return }
+                dialog = .export(ExportSession(works: works, preserveOrder: false, initialFormat: format,
+                                               initialSVGProfile: profile, initialPixelHeight: height))
+            } catch { model.errorText = error.localizedDescription }
+        }
     }
 
     private var presentationView: some View {

@@ -12,6 +12,7 @@ struct ExportView: View {
     @State private var candidates: [SavedWork]
     @State private var selectedIDs: Set<String>
     @State private var options = ExportOptions()
+    @State private var singleWorkPNGTransparent = false
     @State private var resolution = 1080
     @State private var customHeight = 720
     @State private var isBusy = false
@@ -20,8 +21,10 @@ struct ExportView: View {
     @State private var operation: Task<Void, Never>?
     @State private var exportedURLs: [URL] = []
     @State private var svgHelpOpen = false
+    @State private var directExportStarted = false
     private let preserveOrder: Bool
     private let directCard: Bool
+    private let directFormat: Bool
 
     init(model: AppModel, works: [SavedWork]? = nil, preserveOrder: Bool = false, directCard: Bool = false, initialFormat: SavedExportFormat? = nil,
          initialSVGProfile: String? = nil, initialPixelHeight: Int? = nil) {
@@ -29,16 +32,21 @@ struct ExportView: View {
         let candidates = works ?? model.works.filter { !$0.trashed }
         _candidates = State(initialValue: candidates)
         _selectedIDs = State(initialValue: works == nil ? Set(model.selectedWorkID.map { [$0] } ?? []) : Set(candidates.map(\.id)))
-        let defaults = model.display.preferences.exportDefaults
+        let requestedFormat = directCard ? SavedExportFormat.shareCard : initialFormat ?? model.display.preferences.exportDefaults.options.format
+        let defaults = requestedFormat == .apng || requestedFormat == .gif
+            ? model.display.preferences.animationDefaults : model.display.preferences.exportDefaults
         var initialOptions = defaults.options
+        initialOptions.format = requestedFormat
         if directCard { initialOptions.format = .shareCard }
         if let initialFormat { initialOptions.format = initialFormat }
         if let initialSVGProfile { initialOptions.svgProfile = initialSVGProfile }
         _options = State(initialValue: initialOptions)
+        _singleWorkPNGTransparent = State(initialValue: model.display.preferences.singleWorkPNGTransparent)
         _resolution = State(initialValue: initialPixelHeight ?? defaults.resolution)
         _customHeight = State(initialValue: defaults.customHeight)
         self.preserveOrder = preserveOrder
         self.directCard = directCard
+        self.directFormat = !directCard && initialFormat != nil && works != nil
     }
 
     private var selection: [SavedWork] {
@@ -54,7 +62,7 @@ struct ExportView: View {
                 Spacer()
                 Text(model.display.localizedFormat("%ld作品", selectedIDs.count)).foregroundStyle(.secondary)
             }
-            if !directCard {
+            if !directCard && !directFormat {
               HStack(alignment: .top, spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
@@ -116,11 +124,15 @@ struct ExportView: View {
                     }
                     if options.format == .png {
                         Menu(model.display.localized("PNGテンプレート")) {
-                            ForEach(ExportTemplate.normalized(model.display.preferences.exportTemplates)) { template in
+                            ForEach(model.display.preferences.savedPNGTemplates) { template in
                                 Button("\(template.name)（\(template.pixelHeight)px）") { resolution = template.pixelHeight }
                             }
                         }
-                        Toggle(model.display.localized("透明部分を白にする"), isOn: $options.pngAlphaWhite)
+                        if selection.count == 1 {
+                            Toggle(model.display.label("白背景時アルファチャンネルを有効にする", "Enable alpha channel on white background"), isOn: $singleWorkPNGTransparent)
+                        } else {
+                            Toggle(model.display.label("複数作品PNGの透明部分を白にする", "Paint transparent areas white in multiple-work PNGs"), isOn: $options.pngAlphaWhite)
+                        }
                     }
                     if options.format == .shareCard {
                         if selection.count != 1 { Text(model.display.localized("共有カードは1作品を選択してください。")).foregroundStyle(.red) }
@@ -165,16 +177,26 @@ struct ExportView: View {
                 }
                 Spacer()
                 Button(model.display.localized("閉じる")) { dismiss() }.disabled(isBusy).keyboardShortcut(.cancelAction)
-                Button(model.display.localized("書き出す")) { begin() }.disabled(isBusy || model.isBusy || selection.isEmpty || (options.format == .shareCard && selection.count != 1)).keyboardShortcut(.defaultAction)
+                if !directFormat {
+                    Button(model.display.localized("書き出す")) { begin() }.disabled(isBusy || model.isBusy || selection.isEmpty || (options.format == .shareCard && selection.count != 1)).keyboardShortcut(.defaultAction)
+                }
             }
         }
-        .padding(24).frame(minWidth: directCard ? 440 : 760, minHeight: directCard ? 220 : 520)
+        .padding(24).frame(minWidth: directCard || directFormat ? 440 : 760, minHeight: directCard || directFormat ? 220 : 520)
         .interactiveDismissDisabled(isBusy)
-        .onChange(of: options.format) { _, _ in
+        .onChange(of: options.format) { previous, next in
+            let wasAnimation = previous == .apng || previous == .gif
+            if animation != wasAnimation {
+                let defaults = animation ? model.display.preferences.animationDefaults : model.display.preferences.exportDefaults
+                options = defaults.options
+                options.format = next
+                resolution = defaults.resolution
+                customHeight = defaults.customHeight
+            }
             if !animation, [150, 300, 500].contains(resolution) { resolution = 1080 }
         }
         .onDisappear { operation?.cancel() }
-        .task { if directCard { begin() } }
+        .task { if directCard || directFormat { begin() } }
     }
 
     private func copy(_ key: String, _ fallback: String) -> String {
@@ -202,10 +224,17 @@ struct ExportView: View {
     }
 
     private func begin() {
-        guard !selection.isEmpty, options.format != .shareCard || selection.count == 1 else { return }
+        guard !isBusy, !selection.isEmpty, options.format != .shareCard || selection.count == 1 else { return }
+        if directFormat {
+            guard !directExportStarted else { return }
+            directExportStarted = true
+        }
         let capturedWorks = selection
         var capturedOptions = options
         capturedOptions.pixelHeight = resolution == 0 ? customHeight : resolution
+        if capturedOptions.format == .png, capturedWorks.count == 1 {
+            capturedOptions.pngAlphaWhite = !singleWorkPNGTransparent
+        }
         let capturedDestination = model.display.preferences.exportDefaults
         isBusy = true; error = nil; status = "保存作品の書き出し条件を確認しています…"
         operation = Task { @MainActor in
@@ -217,16 +246,25 @@ struct ExportView: View {
                 status = "\(capturedWorks.count)作品を描画・エンコードしています…"
                 let artifacts = try await ExportService.prepare(sources: sources, options: capturedOptions)
                 try Task.checkCancellation()
-                guard let destination = try destination(artifacts: artifacts, format: capturedOptions.format, configuration: capturedDestination) else { status = "保存を取り消しました。"; return }
+                guard let destination = try destination(artifacts: artifacts, format: capturedOptions.format, configuration: capturedDestination) else {
+                    status = "保存を取り消しました。"
+                    // Preparing artifacts only used memory; cancellation reaches no file-writing operation.
+                    if directFormat { model.reportExportStatus(status); dismiss() }
+                    return
+                }
                 let urls = try await save(artifacts: artifacts, destination: destination)
                 exportedURLs = urls; status = "\(urls.count)ファイルを書き出しました。"
-            } catch is CancellationError { status = "書き出しを中止しました。" }
+                if directFormat { model.reportExportStatus(status); dismiss() }
+            } catch is CancellationError {
+                status = "書き出しを中止しました。"
+                if directFormat { model.reportExportStatus(status); dismiss() }
+            }
             catch { self.error = error.localizedDescription; status = "" }
         }
     }
 
     private func destination(artifacts: [ExportArtifact], format: SavedExportFormat, configuration: ExportConfiguration) throws -> URL? {
-        if let bookmark = configuration.destinationBookmark {
+        if !directFormat, let bookmark = configuration.destinationBookmark {
             var stale = false
             let folder = try URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale)
             guard !stale else { throw ExportFailure("保存先のアクセス権を更新するため、設定でフォルダーを選び直してください。") }

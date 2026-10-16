@@ -2,7 +2,7 @@
 
 このディレクトリは、macOS先行のnative SwiftUIクライアントとApple向け共通packageのworkspaceである。本書をSwift host固有の仕様正本とし、[SWIFT_SPEC.md](SWIFT_SPEC.md)を対応英語版とする。共有DDL、Score、prompt、authoring authority、pipeline状態遷移、seed、描画の意味は[製品仕様](../SPEC.ja.md)を正本とし、Serverを開発上のprimaryとして同じRust coreへ追随する。Swift側に意味処理を複製しない。
 
-最終更新: 2026-10-15。
+最終更新: 2026-10-16。
 
 binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。macOSアプリの版は`apple/VERSION`と`apple/BUILD_NUMBER`を正本とする独自の版で、Server／Webの版とは別に採番する（初回は1.0.0／Build 1）。対応するServerの版はアプリの「inkuについて」と変更履歴に併記する。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
 
@@ -13,6 +13,20 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 確定した実装変更と残る範囲は本書の日付付き節へ記し、製品の変更履歴は共通の[CHANGELOG.ja.md](../CHANGELOG.ja.md)／[CHANGELOG.md](../CHANGELOG.md)へ同期して記す。Swift専用CHANGELOGを分けない。
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
+
+## 2026-10-16 Serverとのシングルユーザー整合
+
+単作品PNGのUI設定はWebと同じく有効時に透明、無効時に白背景とする。旧UI設定はraw fieldの有無を確認して一度だけ移行し、旧fileのfield欠落と新規環境を区別する。保存作品・保存済みexport options・execution journalは変換しない。clipboard画像は白背景固定とし、共有カード・animation・複数作品PNGの既存背景契約へ同じflagを流用しない。PNG候補は保存templateから列挙する。
+
+候補並列数はローカルのclient上限として既定4、1〜16の整数を保存し、範囲外を拒否する。開始時に値を固定し、実行途中の設定変更は次回に適用する。Server全体のworker上限は追加しない。デモの新規UI編集は1〜999秒とし、保存済み1000〜3600秒は読取り・起動・無変更保存で保持する。
+
+ライブラリのpage件数は各行の実測最大高をfractional値のまま積算する。保存表示ラベルはbatch元行番号等のprovenanceからページ単位で投影し、欠落時は番号を捏造しない。別runで同じ番号があっても作品の操作・選択・コピーはUUIDを使う。キャンバスの系譜タブ横の検索はライブラリ検索から独立し、UUID完全一致、記述部分一致、hashの先頭・末尾・全体を大文字小文字によらず照合する。検索だけでは表示作品を切り替えず、履歴帯の選択時に開く。
+
+配置の4案とてざわりの次の4案は、選択済み未保存候補の全保存に成功してから候補を置換する。途中失敗では残る候補と選択を保持し、成功済み候補を再保存しない。保存して閉じる処理とは分離し、配置1案へ先行保存を広げない。保存作品の生成情報にはその作品UUIDのコピーと短時間の成功表示を置き、対象変更後に古い成功を表示しない。
+
+自動backupの新方式は1〜365日・1〜100世代とローカル時刻で指定し、最終自動backupのローカル日付＋日数の指定時刻を期限とする。初回は即時対象、手動backupは自動期限を進めない。旧時間周期は利用者が新方式を保存するまで保持し、閲覧・移行だけで世代を削除しない。自動保存成功後だけ所有する自動世代を整理する。アプリ終了中は実行しない。作品・実行JSONへServer application logの削除・rotation・圧縮方針を適用しない。
+
+Webと共通の内容・順序・文言を先に示し、system theme・初期出力形式/profile等はmacOS補助項目として保持する。local DB、Keychain、native保存panel/bookmark、Finder/OS共有、OSメニューとshortcut、系譜詳細の推敲メニュー、全batch行と結果不明の明示確認を保持する。同梱catalog/UI参照は確定したcleanなsource SHAから生成し、利用者のモデル名・用途・使用可否overrideを保持する。これらは改修の要求であり、build・実機確認・作者受入の完了を示さない。
 
 ## 2026-10-15 歳時記の例文ラベル
 

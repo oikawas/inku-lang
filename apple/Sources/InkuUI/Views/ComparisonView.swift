@@ -6,8 +6,7 @@ import SwiftUI
 public struct ComparisonView: View {
     @Bindable var model: AppModel
     @State private var comparison: ComparisonModel
-    @State private var modelDetailsReference: String?
-    @Environment(\.inkuWindowSize) private var windowSize
+    @State private var namingProviders: [ProviderSettings] = []
     @Environment(\.dismiss) private var dismiss
     private let onCommitted: (SavedWork) -> Void
 
@@ -22,6 +21,8 @@ public struct ComparisonView: View {
             if let work = comparison.original {
                 RefinementDialog(model: model, title: comparison.kind == .catalog ? "色カタログを変える" : "モデルを変える", work: work,
                     closeDisabled: comparison.running || comparison.hasUnsaved || model.isBusy, onClose: { dismiss() },
+                    targetTitle: comparison.kind == .model ? model.display.webCopy("modelCompareTargetTitle", "対象作品") : "推敲対象",
+                    targetModelName: comparison.kind == .model ? ModelNaming(providers: namingProviders).displayName(work.stage1Model ?? work.stage2Model) : nil,
                     topControls: comparison.kind == .model ? AnyView(modelChoices) : nil) {
                     VStack(alignment: .leading, spacing: 12) {
                         if comparison.kind == .catalog { catalogControls }
@@ -32,7 +33,8 @@ public struct ComparisonView: View {
                                 .inkuTooltip(comparison.kind == .model
                                     ? model.display.tooltip("選んだモデルで記述から描き直し、候補を並べます。記述、色カタログ、キャンバスは保ちます。", serverKey: "tooltipModelCompare") : "", placement: .bottom)
                         }
-                        Text(model.display.localized(comparison.kind == .catalog ? "超高速（LLM不要）" : "低速（LLM・API使用）")).inkuFont(12).foregroundStyle(.secondary)
+                        Label(model.display.localized(comparison.kind == .catalog ? "超高速（LLM不要）" : "低速（LLM・API使用）"), systemImage: "clock")
+                            .inkuFont(11).foregroundStyle(.secondary)
                         if comparison.running {
                             RunStatusView(display: model.display, label: comparison.status, stopping: comparison.stopping,
                                 onStop: { Task { await comparison.stop(app: model) } }) { ProviderProgressView(model: model) }
@@ -77,6 +79,7 @@ public struct ComparisonView: View {
             }
             if comparison.kind == .catalog, comparison.canGenerate { await comparison.generate(app: model) }
         }
+        .task(id: model.providerSettingsRevision) { namingProviders = (await model.hostSettings()).providers }
         .interactiveDismissDisabled(comparison.running || comparison.hasUnsaved || model.isBusy)
         .onDisappear { Task { await comparison.stop(app: model); comparison.discardCandidates() } }
     }
@@ -94,22 +97,22 @@ public struct ComparisonView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(model.display.localized(comparison.inheritWild ? "筆致制限（継承）" : "筆致制限")).inkuFont(12).foregroundStyle(.secondary)
-                Button(model.display.localized("暴れる") + " " + model.display.localized(effectiveWild ? "入" : "切")) {
+                Button(model.display.localized("暴れる")) {
                     comparison.wildOverride = !effectiveWild; comparison.inheritWild = false
                 }.disabled(comparison.running || model.isBusy)
+                    .buttonStyle(.bordered).tint(effectiveWild ? Color.accentColor : Color.secondary)
+                    .accessibilityValue(model.display.localized(effectiveWild ? "入" : "切"))
                 Spacer()
                 Button(model.display.webCopy("modelCompareButton", "選んだモデルで描く"), systemImage: "play.fill") {
                     Task { await comparison.generate(app: model) }
                 }.buttonStyle(.borderedProminent).disabled(!comparison.canGenerate || model.isBusy)
                     .inkuTooltip(model.display.tooltip("選んだモデルで記述から描き直し、候補を並べます。記述、色カタログ、キャンバスは保ちます。", serverKey: "tooltipModelCompare"))
             }
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 8)], alignment: .leading, spacing: 8) {
-                    ForEach(comparison.modelProviders) { provider in
-                        ForEach(SettingsModel.batchModels(for: provider)) { entry in comparisonModelCard(entry, provider: provider) }
-                    }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 210), spacing: 8)], alignment: .leading, spacing: 8) {
+                ForEach(comparison.modelProviders) { provider in
+                    ForEach(SettingsModel.batchModels(for: provider)) { entry in comparisonModelCard(entry, provider: provider) }
                 }
-            }.frame(height: modelGridHeight)
+            }
             Text(model.display.localizedFormat("選択中: %ld / 4", comparison.modelReferences.count)).inkuFont(12).monospacedDigit()
             if comparison.modelProviders.isEmpty {
                 Text(model.display.localized("選べるモデルがありません。設定 → モデル設定 で使用するモデルを選択してください。"))
@@ -123,12 +126,6 @@ public struct ComparisonView: View {
     }
 
     private var effectiveWild: Bool { comparison.inheritWild ? comparison.original?.renderWild ?? false : comparison.wildOverride }
-    private var modelGridHeight: CGFloat {
-        let choices = comparison.modelProviders.reduce(0) { $0 + SettingsModel.batchModels(for: $1).count }
-        let columns = max(1, Int(((windowSize?.width ?? 1280) - 80) / 188))
-        return min(250, CGFloat(max(1, (choices + columns - 1) / columns)) * 76)
-    }
-
     private func comparisonModelCard(_ entry: ProviderModelSettings, provider: ProviderSettings) -> some View {
         let reference = provider.id + ":" + entry.id
         let selected = comparison.selectedModelReferences.contains(reference)
@@ -144,11 +141,6 @@ public struct ComparisonView: View {
                     .disabled(comparison.running || model.isBusy || comparison.sourceIsLocked || target || full || !entry.isSelectable)
                     .strikethrough(entry.modelFold == "eol")
                 Spacer(minLength: 0)
-                Button { modelDetailsReference = reference } label: { Image(systemName: "info.circle") }
-                    .buttonStyle(.plain).accessibilityLabel(model.display.localized("モデルの適性・用途") + ": " + entry.id)
-                    .popover(isPresented: Binding(get: { modelDetailsReference == reference }, set: { if !$0 { modelDetailsReference = nil } })) {
-                        RegisteredModelMetadataView(entry: entry, provider: provider, display: model.display).padding(16).frame(width: 320)
-                    }
             }
             Text(model.display.providerName(provider)).inkuFont(10).foregroundStyle(.secondary)
             if target { Text(model.display.localized("元の作品のモデル")).inkuFont(10).foregroundStyle(.secondary) }
@@ -156,5 +148,29 @@ public struct ComparisonView: View {
         }.padding(8).frame(maxWidth: .infinity, minHeight: 50, alignment: .topLeading)
             .background(selected ? Color.accentColor.opacity(0.12) : InkuColor.bg2)
             .overlay(Rectangle().stroke(selected || target ? Color.accentColor : InkuColor.border))
+            .inkuTooltip(model.display.preferences.showTooltips ? modelMetadata(entry, provider: provider) : "")
+            .accessibilityHint(modelMetadata(entry, provider: provider))
+    }
+
+    private func modelMetadata(_ entry: ProviderModelSettings, provider: ProviderSettings) -> String {
+        let language = model.display.preferences.language
+        let guidance = ModelGuidanceCatalog.bundled?.guidance(for: provider.id + ":" + entry.id, providers: comparison.modelProviders)
+        let purpose = ["llm", "vision"].map { purpose in
+            let label = purpose == "llm" ? "LLM" : "Vision"
+            return label + (ModelMetadataPresentation.supports(entry, purpose: purpose) ? ""
+                : language == "en" ? " (not selectable)" : "（選べません）")
+        }.joined(separator: " / ")
+        let comments = language == "en" ? [entry.commentEN, entry.commentJA] : [entry.commentJA, entry.commentEN]
+        let recommendation = entry.recommendationLLM ?? entry.recommendationLevel
+        let recommendations = entry.recommendationStage1 != nil || entry.recommendationStage2 != nil
+            ? [("オススメ度 / Stage 1", ModelGuidance.recommendation(entry.recommendationStage1 ?? recommendation)),
+               ("オススメ度 / Stage 2", ModelGuidance.recommendation(entry.recommendationStage2 ?? recommendation))]
+            : [("オススメ度", ModelGuidance.recommendation(recommendation))]
+        let rows = [("用途", purpose)] + recommendations
+            + [("概算コスト", ModelMetadataPresentation.cost(entry, language: language)),
+               ("速度", ModelMetadataPresentation.speed(entry, hidden: guidance?.speedHidden == true, language: language)),
+               ("評価コメント", comments.compactMap { $0 }.first { !$0.isEmpty } ?? "—")]
+        return (entry.resolvedLabels.map { $0.name(language: language) }
+            + rows.map { model.display.localized($0.0) + ": " + $0.1 }).joined(separator: "\n")
     }
 }

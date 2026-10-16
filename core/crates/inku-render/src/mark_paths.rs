@@ -12,7 +12,7 @@ use crate::marks::{MarkContext, MarkStyle, apply_style, is_closed, mark_width, s
 use crate::materials::{OilPaintStyle, oil_paint_stroke, with_texture_filter};
 use crate::planning::instruction_anchor_on_canvas;
 use crate::stroke::{
-    ContourStrokeRequest, ContourStrokeResult, StrokeRequest, StrokeTerminal,
+    ContourStrokeRequest, ContourStrokeResult, StrokeRequest, StrokeSample, StrokeTerminal,
     outline_for_centerline, stroke_event_count, synthesize_contour, synthesize_stroke,
 };
 use crate::support::{Support, support_with_mark_word};
@@ -356,6 +356,131 @@ pub(crate) fn connected_arc_centerline(
         .collect()
 }
 
+/// The computer's material, the remainder of sampling (render engines 13 to 40,
+/// restored in 84). A computer mark draws no body: each point of its drawn path
+/// is rounded onto the one lattice of the canvas, and the cell it is rounded
+/// into is laid in the mark's color, toned by how far the rounding moved it
+/// (`COMPUTER_CELL_OPACITY` at half a cell, never below
+/// `COMPUTER_CELL_OPACITY_FLOOR`). The tone does not take the mark's stroke
+/// opacity, so neither intensity nor an arrangement's fade reaches the cells.
+pub(crate) const COMPUTER_CELL_OPACITY: f64 = 0.45;
+pub(crate) const COMPUTER_CELL_OPACITY_FLOOR: f64 = 0.15;
+
+fn lattice(value: f64, step: f64) -> f64 {
+    if step <= 0.0 {
+        value
+    } else {
+        (value / step).round_ties_even() * step
+    }
+}
+
+/// A stroke's points, each with how far the rounding onto the lattice moved it.
+fn sample_cells(samples: &[StrokeSample]) -> Vec<(Point, f64)> {
+    samples
+        .iter()
+        .map(|sample| (sample.point, sample.residual))
+        .collect()
+}
+
+/// The drawn centerline at `count` points spaced evenly along its length, each
+/// rounded onto the lattice like a stroke sample; both ends stay pinned.
+fn centerline_cells(points: &[Point], count: usize, step: f64) -> Vec<(Point, f64)> {
+    if points.len() < 2 || count < 2 {
+        return Vec::new();
+    }
+    let mut lengths = vec![0.0];
+    let mut total = 0.0;
+    for pair in points.windows(2) {
+        total += (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y);
+        lengths.push(total);
+    }
+    let mut segment = 0;
+    (0..count)
+        .map(|index| {
+            let target = total * index as f64 / (count - 1) as f64;
+            while segment + 2 < points.len() && lengths[segment + 1] < target {
+                segment += 1;
+            }
+            let span = lengths[segment + 1] - lengths[segment];
+            let t = if span > 0.0 {
+                ((target - lengths[segment]) / span).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            let (a, b) = (points[segment], points[segment + 1]);
+            let point = Point::new(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+            if index == 0 || index == count - 1 {
+                return (point, 0.0);
+            }
+            let rounded = Point::new(lattice(point.x, step), lattice(point.y, step));
+            (rounded, (point.x - rounded.x).hypot(point.y - rounded.y))
+        })
+        .collect()
+}
+
+/// The cells of a computer mark, in the order of its path. A point the stroke
+/// pins to the intention (an end or a corner) is not moved by the rounding, so
+/// it is toned by its own distance from the lattice. Every point is re-snapped
+/// onto the lattice, as engine 40's cells were, because a closed contour's seam
+/// correction moves its samples. Where two consecutive cells are a cell or more
+/// apart, the cells on the straight run between them are laid at the mean of
+/// the two tones; a closed mark also joins its last cell to its first.
+fn computer_cells(points: &[(Point, f64)], step: f64, color: &str, closed: bool) -> Vec<Element> {
+    if step <= 0.0 {
+        return Vec::new();
+    }
+    let half = step / 2.0;
+    let mut cells = points
+        .iter()
+        .map(|&(point, residual)| {
+            let rounded = Point::new(lattice(point.x, step), lattice(point.y, step));
+            let moved = if residual > 0.0 {
+                residual
+            } else {
+                (point.x - rounded.x).hypot(point.y - rounded.y)
+            };
+            let tone =
+                (COMPUTER_CELL_OPACITY * (moved / half).min(1.0)).max(COMPUTER_CELL_OPACITY_FLOOR);
+            ((rounded.x / step).round(), (rounded.y / step).round(), tone)
+        })
+        .collect::<Vec<_>>();
+    if cells.len() >= 2 {
+        let pairs = if closed { cells.len() } else { cells.len() - 1 };
+        let mut joined = Vec::with_capacity(cells.len() * 2);
+        for (index, &cell) in cells.iter().enumerate() {
+            joined.push(cell);
+            if index >= pairs {
+                continue;
+            }
+            let next = cells[(index + 1) % cells.len()];
+            let gap = (next.0 - cell.0).abs().max((next.1 - cell.1).abs());
+            for part in 1..(gap as usize) {
+                let t = part as f64 / gap;
+                joined.push((
+                    (cell.0 + (next.0 - cell.0) * t).round(),
+                    (cell.1 + (next.1 - cell.1) * t).round(),
+                    (cell.2 + next.2) / 2.0,
+                ));
+            }
+        }
+        cells = joined;
+    }
+    cells
+        .into_iter()
+        .map(|(x, y, tone)| {
+            Element::new("rect")
+                .attr("class", "raster-bleed")
+                .attr("x", format_number(x * step - half))
+                .attr("y", format_number(y * step - half))
+                .attr("width", format_number(step))
+                .attr("height", format_number(step))
+                .attr("fill", color)
+                .attr("fill-opacity", format_number(tone))
+                .attr("stroke", "none")
+        })
+        .collect()
+}
+
 pub(crate) fn hand_line(
     instruction: &Instruction,
     start: Point,
@@ -419,7 +544,9 @@ pub(crate) fn hand_line(
             brush_size: sweep_band_width(instruction, context.canvas),
         })
     };
-    let (outline, event_count, band) = if let Some(centerline) = centerline {
+    // Only the computer rounds onto a lattice; its cells follow the path drawn.
+    let step = grid_step(instruction.weight, context.canvas);
+    let (outline, event_count, band, cells) = if let Some(centerline) = centerline {
         let varied = synthesize_stroke(StrokeRequest {
             start,
             end,
@@ -442,8 +569,13 @@ pub(crate) fn hand_line(
         } else {
             None
         };
+        let cells = if step > 0.0 {
+            centerline_cells(&centerline, sample_count, step)
+        } else {
+            Vec::new()
+        };
         if band.is_some() {
-            (Vec::new(), event_count, band)
+            (Vec::new(), event_count, band, cells)
         } else {
             let widths = varied
                 .samples
@@ -454,6 +586,7 @@ pub(crate) fn hand_line(
                 outline_for_centerline(&centerline, &widths, &varied.cuts),
                 event_count,
                 None,
+                cells,
             )
         }
     } else {
@@ -483,12 +616,20 @@ pub(crate) fn hand_line(
         } else {
             None
         };
-        (stroke.outline, stroke.event_count, band)
+        let cells = if step > 0.0 {
+            sample_cells(&stroke.samples)
+        } else {
+            Vec::new()
+        };
+        (stroke.outline, stroke.event_count, band, cells)
     };
     let mut group = Element::new("g").attr(
         "class",
         format!("stroke-engine-v1 controls-{sample_count} events-{event_count}"),
     );
+    for cell in computer_cells(&cells, step, &style.color, false) {
+        group.push(cell);
+    }
     if let Some(band) = band {
         group.set_attr("opacity", format_number(style.stroke_opacity));
         group.push(flat_band_element(&band, &style.color, "flat-brush-v1"));
@@ -503,7 +644,8 @@ pub(crate) fn hand_line(
             seed,
             false,
         ));
-    } else {
+    } else if instruction.weight != Weight::Computer {
+        // A computer line is drawn by its lattice cells alone (render engine 84).
         group.push(
             Element::new("path")
                 .attr("d", polygon_path(&outline))
@@ -619,14 +761,27 @@ pub(crate) fn hand_contour(
                 ),
             )
             .tap(|group| {
-                group.push(
-                    Element::new("path")
-                        .attr("d", contour_stroke_path(&stroke))
-                        .attr("fill", &style.color)
-                        .attr("fill-opacity", format_number(style.stroke_opacity))
-                        .attr("fill-rule", if closed { "evenodd" } else { "nonzero" })
-                        .attr("stroke", "none"),
-                );
+                if instruction.weight == Weight::Computer {
+                    // A computer contour is drawn by its lattice cells alone
+                    // (render engine 84).
+                    for cell in computer_cells(
+                        &sample_cells(&stroke.samples),
+                        grid_step(instruction.weight, context.canvas),
+                        &style.color,
+                        closed,
+                    ) {
+                        group.push(cell);
+                    }
+                } else {
+                    group.push(
+                        Element::new("path")
+                            .attr("d", contour_stroke_path(&stroke))
+                            .attr("fill", &style.color)
+                            .attr("fill-opacity", format_number(style.stroke_opacity))
+                            .attr("fill-rule", if closed { "evenodd" } else { "nonzero" })
+                            .attr("stroke", "none"),
+                    );
+                }
             }),
         instruction.weight,
         context.use_filters,
@@ -711,5 +866,41 @@ mod tests {
             r#""quality":"wave","frequency":"slow","amplitude":"fine""#,
         );
         assert_eq!(amplitude(&short, canvas), 0.35 * mark_width(&short, canvas));
+    }
+
+    #[test]
+    fn a_computer_centerline_lays_its_cells_within_a_cell_of_the_path() {
+        let step = 18.0;
+        // Two periods of a 40px sine over 600px, as a varied centerline is drawn.
+        let wave = (0..=120)
+            .map(|index| {
+                let x = 100.0 + 5.0 * f64::from(index);
+                let phase = std::f64::consts::TAU * (x - 100.0) / 300.0;
+                Point::new(x, 500.0 + 40.0 * phase.sin())
+            })
+            .collect::<Vec<_>>();
+        let distance = |point: Point| {
+            wave.windows(2)
+                .map(|pair| {
+                    let (a, b) = (pair[0], pair[1]);
+                    let (dx, dy) = (b.x - a.x, b.y - a.y);
+                    let t = (((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy))
+                        .clamp(0.0, 1.0);
+                    (point.x - a.x - t * dx).hypot(point.y - a.y - t * dy)
+                })
+                .fold(f64::INFINITY, f64::min)
+        };
+        let cells = centerline_cells(&wave, 31, step);
+        assert_eq!(cells.len(), 31);
+        assert_eq!(cells[0], (wave[0], 0.0));
+        assert_eq!(cells[30], (wave[120], 0.0));
+        for &(cell, moved) in &cells[1..30] {
+            assert_eq!(
+                cell,
+                Point::new(lattice(cell.x, step), lattice(cell.y, step))
+            );
+            assert!(moved > 0.0 && moved <= step / 2.0 * std::f64::consts::SQRT_2 + 1.0e-9);
+            assert!(distance(cell) <= moved + 1.0e-9);
+        }
     }
 }

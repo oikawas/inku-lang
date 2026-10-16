@@ -23,6 +23,8 @@ struct CreationWorkInfoView: View {
     }
     @State private var expandedPrompts: Set<String> = []
     @State private var copied: String?
+    @State private var copyToken = UUID()
+    @State private var loadToken = UUID()
 
     /// Set when the view is the drawer over the canvas rather than a sheet.
     private let onClose: (() -> Void)?
@@ -85,7 +87,7 @@ struct CreationWorkInfoView: View {
         .padding(onClose == nil ? 20 : 16)
         .frame(minWidth: onClose == nil ? 660 : nil, idealWidth: onClose == nil ? 760 : nil,
                minHeight: onClose == nil ? 520 : nil, idealHeight: onClose == nil ? 740 : nil)
-        .task { await load() }
+        .task(id: work?.id) { copied = nil; copyToken = UUID(); await load() }
     }
 
     private var absent: String { copy("historyVersionNotRecorded", "記録なし") }
@@ -129,6 +131,12 @@ struct CreationWorkInfoView: View {
                     row(model.display.localized("SVG 点数"), weight.points.formatted(), hint: "provenanceHintSvgPoints")
                 }
                 group(copy("provenanceSectionIdentity", "同一性")) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(copy("provenanceLabelWorkId", "作品UUID")).foregroundStyle(.secondary)
+                        Text(work.id).textSelection(.enabled)
+                        Spacer(minLength: 0)
+                        copyButton(work.id, id: "work-uuid:" + work.id)
+                    }.inkuFont(12)
                     hashRow("rh", work.renderHash, hint: "provenanceHintRenderHash", copyable: true)
                     hashRow("dh", work.descriptionHash, hint: "provenanceHintDescriptionHash", copyable: false)
                     row("Render engine version", work.renderEngineVersion, hint: "provenanceHintRenderEngine")
@@ -284,13 +292,18 @@ struct CreationWorkInfoView: View {
     private func copyButton(_ text: String, id: String) -> some View {
         Button {
             #if os(macOS)
-            NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string)
+            NSPasteboard.general.clearContents()
+            guard NSPasteboard.general.setString(text, forType: .string) else { return }
+            #else
+            return
             #endif
+            let token = UUID()
+            copyToken = token
             copied = id
             // OutputTabsContent.svelte:62,94,130 with `+page.svelte` copyPrompt: "copied" for 1.2 s.
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(1200))
-                if copied == id { copied = nil }
+                if copyToken == token, copied == id { copied = nil }
             }
         } label: { Label(copy(copied == id ? "promptCopied" : "promptCopy", copied == id ? "コピーしました" : "コピー"), systemImage: "doc.on.doc") }
             .buttonStyle(.borderless).inkuFont(12)
@@ -327,10 +340,15 @@ struct CreationWorkInfoView: View {
     }
     private func load() async {
         guard let work else { loading = false; return }
-        loading = true; loadError = nil
-        defer { loading = false }
-        do { information = try await model.savedGenerationInformation(work: work) }
+        let token = UUID(); loadToken = token
+        loading = true; loadError = nil; information = nil
+        defer { if loadToken == token { loading = false } }
+        do {
+            let result = try await model.savedGenerationInformation(work: work)
+            guard loadToken == token, !Task.isCancelled else { return }
+            information = result
+        }
         catch is CancellationError { }
-        catch { loadError = error.localizedDescription }
+        catch { if loadToken == token, !Task.isCancelled { loadError = error.localizedDescription } }
     }
 }

@@ -90,16 +90,16 @@ func runToolChangeChecks(folder: URL) async throws {
             }
         }
     }
-    guard try await db.list().count == 1, try await db.work(id: parent.id) == parent,
+    guard try await db.list().count == 2, try await db.work(id: parent.id) == parent,
           try await app.savedConfiguration(workID: parent.id).document == parentContext.document,
           await transport.calls == 0, app.selectedWorkID == parent.id,
           app.descriptionText == "DRAFT_MUST_NOT_REACH_TOUCH_OPTIONS" else {
-        throw CheckFailure.message("Private touch options saved, changed the parent/draft or called an LLM")
+        throw CheckFailure.message("Next-four did not save exactly its checked prior option, changed the parent/draft or called an LLM")
     }
     let chosen = change.candidates[0]
     change.selectCandidate(chosen.id, selected: true)
     guard await change.saveSelected(app: app), let saved = try await db.work(id: chosen.work.id),
-          try await db.list().count == 2, let edge = try await db.edge(childNodeID: saved.lineageNodeID!),
+          try await db.list().count == 3, let edge = try await db.edge(childNodeID: saved.lineageNodeID!),
           edge.parentNodeID == parent.lineageNodeID, edge.derivationKind == "tool_change" else {
         throw CheckFailure.message("Touch adoption lost its saved target or lineage")
     }
@@ -130,7 +130,7 @@ func runToolChangeChecks(folder: URL) async throws {
           await transport.calls == 0 else { throw CheckFailure.message("Unchangeable work offered touch options") }
     try metadata.data.write(to: folder.appendingPathComponent("saved-metadata.json"))
     try Data(saved.ddl!.utf8).write(to: folder.appendingPathComponent("saved.ddl"))
-    print("Touch changes PASS: opening=0 with execution/history unchanged; button uniform=4; second press replaces with per_sentence=4, new IDs, prior selection=0 and numbers=1...4; 12 core tools; only owned Score weights change; DDL reads back; parent seeds/colors/ground/options/model/input preserved; draft ignored; preview history=1; selected adoption=2 with tool_change metadata; saved child replay/retouch works; all-pen skips pen; no shape offers no options; provider=0. Isolated SQLite only.")
+    print("Touch changes PASS: opening=0 with execution/history unchanged; button uniform=4; second press saves its checked prior option then replaces with per_sentence=4, new IDs, prior selection=0 and numbers=1...4; 12 core tools; only owned Score weights change; DDL reads back; parent seeds/colors/ground/options/model/input preserved; draft ignored; next-four history=2; selected adoption=3 with tool_change metadata; saved child replay/retouch works; all-pen skips pen; no shape offers no options; provider=0. Isolated SQLite only.")
 }
 
 private actor ToolChangeNoProvider: ProviderTransport {

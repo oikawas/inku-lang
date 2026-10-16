@@ -132,20 +132,25 @@ public final class RefinementModel {
 
     public func generate(app: AppModel, count: Int) async {
         guard canGenerate(count: count), !app.isBusy, !app.isPreview, operation == nil else { return }
+        let fanoutLimit: Int
+        do { fanoutLimit = try RefinementFanout.validatedLimit(app.display.preferences.refinementFanoutLimit) }
+        catch { errorText = error.localizedDescription; return }
+        let parent = work
+        let selection = count == 4 ? candidates.filter { $0.selected && $0.savedWork == nil } : []
         let selectedKind = kind
         let selectedMode = recomposeMode
         let selectedWild: Bool? = inheritWild ? nil : wildOverride
         let selectedModel: String? = !modelReference.isEmpty ? modelReference : nil
         let run = UUID()
-        runID = run; running = true; saving = false; stopping = false
-        candidates = []; previewID = nil; errorText = nil
-        slots = (1...count).map { RefinementSlot(id: $0) }
+        runID = run; running = true; saving = !selection.isEmpty; stopping = false
+        errorText = nil
         capturedStage1Model = work.stage1Model
         capturedStage2Model = selectedModel ?? app.nextDrawingModelReference
         status = "候補の準備中"
         let pending = Task { @MainActor [weak self] in
             guard let self else { return false }
             defer { self.finishOperation() }
+            var replacedCandidates = false
             do {
                 try Task.checkCancellation()
                 guard self.runID == run, !self.closed, !app.isBusy else { throw CancellationError() }
@@ -153,16 +158,33 @@ public final class RefinementModel {
                 defer { self.ownsAppOperation = false }
                 let succeeded = await app.performComparison(status: "調整候補を用意中", restoreDisplayStatus: true) { token in
                     try Task.checkCancellation()
-                    let plans = try await app.makeDrawingAdjustmentPlans(work: self.work, kind: selectedKind.rawValue,
+                    try await app.validateSavedAdjustmentParent(parent)
+                    // Advancing a four-option page commits checked options without the close action's cleanup.
+                    for candidate in selection {
+                        try Task.checkCancellation()
+                        try await app.validateSavedAdjustmentParent(parent)
+                        guard self.runID == run, !self.closed, !self.stopping else { throw CancellationError() }
+                        let saved = try await app.saveComparisonCandidate(executionID: candidate.prepared.executionID, token: token)
+                        self.recordSaved(candidateID: candidate.id, work: saved)
+                    }
+                    try Task.checkCancellation()
+                    try await app.validateSavedAdjustmentParent(parent)
+                    guard self.runID == run, !self.closed, !self.stopping else { throw CancellationError() }
+                    let plans = try await app.makeDrawingAdjustmentPlans(work: parent, kind: selectedKind.rawValue,
                         count: count,
                         wildOverride: selectedWild, modelReference: selectedModel, recomposeMode: selectedMode)
                     try Task.checkCancellation()
+                    try await app.validateSavedAdjustmentParent(parent)
                     guard self.runID == run, !self.closed, !self.stopping else { throw CancellationError() }
                     guard plans.count == count else { throw HostError("invalid_adjustment_plan_count") }
+                    self.saving = false
+                    self.candidates = []; self.previewID = nil
+                    self.slots = (1...count).map { RefinementSlot(id: $0) }
+                    replacedCandidates = true
                     self.capturedStage1Model = plans.first?.stage1Model
                     self.capturedStage2Model = plans.first?.stage2Model
                     // Web generateRefinementCandidates: the options are drawn at once, within the fan-out limit.
-                    try await RefinementFanout.run(count: plans.count, onStart: { index in self.slots[index].state = .running }) { index in
+                    try await RefinementFanout.run(count: plans.count, limit: fanoutLimit, onStart: { index in self.slots[index].state = .running }) { index in
                         try Task.checkCancellation()
                         guard self.runID == run, !self.closed, !self.stopping else { throw CancellationError() }
                         do {
@@ -186,13 +208,13 @@ public final class RefinementModel {
                 guard self.runID == run, !self.closed else { throw CancellationError() }
                 if succeeded && !self.candidates.isEmpty { self.status = "候補を選んで採用してください。" }
                 else {
-                    if !succeeded { self.candidates = []; self.previewID = nil }
-                    self.status = "候補を用意できませんでした。"
-                    self.errorText = app.errorText ?? "候補を用意できませんでした。"
+                    if !succeeded && replacedCandidates { self.candidates = []; self.previewID = nil }
+                    self.status = replacedCandidates ? "候補を用意できませんでした。" : "候補を保存できませんでした。未保存の候補を確認してください。"
+                    self.errorText = app.errorText ?? self.status
                 }
                 return succeeded
             } catch is CancellationError {
-                self.candidates = []; self.slots = []; self.previewID = nil
+                if replacedCandidates { self.candidates = []; self.slots = []; self.previewID = nil }
                 self.status = "候補の準備を停止しました。"
                 return false
             } catch {
@@ -225,11 +247,7 @@ public final class RefinementModel {
                         guard self.runID == run, !self.closed, !self.stopping else { throw CancellationError() }
                         let saved = try await app.adoptDrawingAdjustmentCandidate(candidate: candidate.prepared, token: token)
                         // The transaction result survives cancellation after its commit.
-                        if let index = self.candidates.firstIndex(where: { $0.id == candidate.id }) {
-                            self.candidates[index].savedWork = saved
-                            self.candidates[index].selected = false
-                        }
-                        if !self.committedWorks.contains(where: { $0.id == saved.id }) { self.committedWorks.append(saved) }
+                        self.recordSaved(candidateID: candidate.id, work: saved)
                         try Task.checkCancellation()
                     }
                 }
@@ -272,5 +290,12 @@ public final class RefinementModel {
     private func finishOperation() {
         operation = nil; runID = nil
         running = false; saving = false; stopping = false
+    }
+
+    private func recordSaved(candidateID: String, work: SavedWork) {
+        if let index = candidates.firstIndex(where: { $0.id == candidateID }) {
+            candidates[index].savedWork = work; candidates[index].selected = false
+        }
+        if !committedWorks.contains(where: { $0.id == work.id }) { committedWorks.append(work) }
     }
 }

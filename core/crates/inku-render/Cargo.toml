@@ -10,6 +10,9 @@ publish = false
 [lib]
 path = "src/lib.rs"
 
+[features]
+geometry-export = []
+
 [dependencies]
 inku-score.workspace = true
 kurbo = "=0.13.1"

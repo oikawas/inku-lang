@@ -23,6 +23,8 @@ pub mod fills;
 mod flat_brush;
 pub(crate) mod free_line;
 pub mod geometry;
+#[cfg(feature = "geometry-export")]
+pub mod geometry_export;
 pub mod ground;
 mod ground_patterns;
 pub mod group;

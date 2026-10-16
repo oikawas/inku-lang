@@ -3802,6 +3802,12 @@ files, PNG files, and other artifacts are derived outputs.
 
 ## 19. Canvas Model
 
+### Optional 3D viewing experiment
+
+When `VITE_DDL_3D_VIEWER_URL` names a same-origin `/experimental/ddl-3d/<build>/index.html`, the Web Work tab offers a `2D / 3D` toggle switch, initially 2D, at the upper left of the canvas below the Work label. The viewer reads the current Score and saved aspect, colors and seeds, replacing circles with spheres, squares with cubes/boxes, and lines with tubes. It provides orbit/pan/zoom, views, projection, full screen, guides, selection and PNG/GLB export. Material approximations are disclosed; unsupported input, unknown editions and excessive demand allow returning to 2D. The 2D viewport and 3D camera remain independent.
+
+The experiment uses a separate package, iframe, Worker and Rust WASM adapter; shared core exposes only a default-off geometry-reading feature. It adds no database, saving/generation API or backup change. Without the setting, Web remains 2D; the experiment and its bridge can be removed. See [DDL 3D experiment](experiments/ddl-3d/README.md) for mapping, limits, installation and removal. The normal 2D canvas specification below remains in effect.
+
 Canvas selection is not visible-DDL or macro meaning. It is a host option resolved from the shared-core `inku.canvas-format-registry.v1`. The same DDL can be used on different canvases, and its coordinates, words, and canonical meaning do not change. The registry's canonical eleven formats and positive integer width / height ratios are:
 
 | ID | Ratio (width / height) |

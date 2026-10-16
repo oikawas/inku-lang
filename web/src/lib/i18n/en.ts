@@ -439,6 +439,13 @@ export const en: LangPack = {
 	renderLimitNotesTitle: 'Limits that took effect',
 
 	tabCanvas: 'Work',
+	ddl3dMode: '2D / 3D view',
+	ddl3dTitle: '3D view (experiment)',
+	ddl3dPreparing: 'Preparing 3D…',
+	ddl3dFailed: '3D is unavailable for this work. You can continue in 2D.',
+	ddl3dDetails: 'Details',
+	ddl3dRetry: 'Retry',
+	ddl3dReturn: 'Return to 2D',
 	tabRefine: 'Refine',
 	tabCompare: 'Compare',
 	tabPrompts: 'Prompts',

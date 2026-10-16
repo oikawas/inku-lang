@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-16 — Optional 3D viewer replaces Score shapes with solids
+
+Added an opt-in 2D/3D toggle switch at the upper left of the canvas, below the Work label. A separate experimental WASM adapter and Three.js viewer preserve saved Score placement, aspect, colors and seeds while displaying spheres, boxes, pyramids and curved tubes. Includes orbit/pan/zoom, views, projection, guides, selection and PNG/GLB export. Core geometry reading is off by default. No database or work-saving path changes; disabling the setting or removing the bridge restores a 2D-only application.
+
 ## v2.15.160 (2026-10-16 / Build 1236)
 
 ### 2026-10-16 — Faint closed fills show through, and a line's sway is also read as its path's wave

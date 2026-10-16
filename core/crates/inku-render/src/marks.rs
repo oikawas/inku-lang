@@ -705,6 +705,15 @@ fn arc_centerline_points(
     }
 }
 
+#[cfg(feature = "geometry-export")]
+pub(crate) fn export_arc_centerline(
+    instruction: &Instruction,
+    arc: ArcSpan,
+    context: MarkContext<'_>,
+) -> Vec<Point> {
+    performed_arc_centerline(instruction, arc, context)
+}
+
 fn performed_arc_centerline(
     instruction: &Instruction,
     arc: ArcSpan,

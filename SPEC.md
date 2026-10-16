@@ -2505,7 +2505,7 @@ A computer line, arc, free line, closed-shape contour or point draws no body: it
 
 #### Tool-specific fills and intensity
 
-Closed fills carry the selected tool's texture. From Score 0.3.0 onward, `surface_intensity` is `normal` (the default), `dense`, or `faint`; the normal value is omitted from serialized output. Saved Score 0.1.0 / 0.2.0 / 0.3.0 keep their original version when read and written. Intensity does not reach a computer line, arc or contour, which is drawn by lattice cells alone that do not take the tool's opacity (render engine 84). Direct DDL and Macro use the same lowerer, and repeated plans retain intensity in their appearance before materialization. Changing intensity does not change the selected color identity or the seed that determines shape and stroke geometry.
+Closed fills carry the selected tool's texture. From Score 0.3.0 onward, `surface_intensity` is `normal` (the default), `dense`, or `faint`; the normal value is omitted from serialized output. Intensity also reaches marks other than flat fills (lines, arcs and textured surfaces): `faint` multiplies the tool's opacity by 0.55 and `dense` by 1.35 (up to opaque). A Score carrying intensity on a mark other than a flat fill is 0.17.0 (render engine 72). Intensity does not reach a computer line, arc or contour, which is drawn by lattice cells alone that do not take the tool's opacity (render engine 84). Saved Score 0.1.0 / 0.2.0 / 0.3.0 keep their original version when read and written. Direct DDL and Macro use the same lowerer, and repeated plans retain intensity in their appearance before materialization. Changing intensity does not change the selected color identity or the seed that determines shape and stroke geometry.
 
 | Tool | Fill appearance |
 |---|---|

@@ -140,7 +140,7 @@ the Server's `schema.py` and the saijiki table (`saijiki.py`) are projections of
 
 - 10 primitives — `line` / `circle` / `ellipse` / `triangle` / `square` / `polygon` / `arc` / `point` / `cloudform` / `free_line`
 - 4 line styles — `solid` / `dashed` / `dotted` / `dash_dot`
-- 11 tools — `silverpoint` / `pencil` / `pen` / `rotring` / `crayon` / `chalk` / `brush_thin` / `brush_thick` / `burin` / `drypoint` / `computer`
+- 12 tools — `silverpoint` / `pencil` / `pen` / `rotring` / `crayon` / `chalk` / `brush_thin` / `brush_thick` / `oil_paint` / `burin` / `drypoint` / `computer`
 - 2 thinness values — `fine` / `extra_fine` (an axis independent of the tool)
 - 9 colors — `white` / `black` / `blue` / `red` / `green` / `gray` / `yellow` / `orange` / `purple`
 - 9 surface textures, 5 surface directions, 7 ground materials

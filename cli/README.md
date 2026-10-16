@@ -16,15 +16,23 @@ to log in first, and say so.
 Use `--save-history` with `paint` or `batch` when benchmark outputs should be
 available later through the regular server history UI/API:
 
+For future real-provider tests and comparisons, explicitly select Primary,
+ChatGPT plan / GPT-6-Luna (`chatgpt:gpt-6-luna`), or Secondary, Gemini API
+(Cloud) / Gemma 4 31B IT (`gemini:gemma-4-31b-it`). Exclude NVIDIA NIM from
+targets, controls, fallbacks, and Vision evaluation. Stop if the chosen
+connection fails. The [AI testing reference](../manual/en/cli-reference-for-ai.md)
+describes the procedure. The NIM-only `vision-review` and `review evaluate`
+commands remain product features; do not use them in these tests or comparisons.
+
 ```sh
-inku-cli paint "緑の弧を右上に置く" --save-history
+inku-cli paint "緑の弧を右上に置く" --stage1-model chatgpt:gpt-6-luna --save-history
 ```
 
 To render from already-normalized DDL, bypass Stage 1 and send the text directly
 through Stage 2/rendering:
 
 ```sh
-inku-cli paint "白い背景に黒い線を一本引く。" --input-mode ddl --save-history
+inku-cli paint "白い背景に黒い線を一本引く。" --input-mode ddl --stage1-model chatgpt:gpt-6-luna --save-history
 ```
 
 ## List history, with or without the drawings

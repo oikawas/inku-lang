@@ -107,7 +107,7 @@ batch additionally takes `--continue-on-error`.
 For example, set the performance mode and request ceiling for DDL input:
 
 ```sh
-uv run inku-cli paint --input-mode ddl --file work.ddl --wild --limits max_expanded_primitives=200
+uv run inku-cli paint --input-mode ddl --file work.ddl --stage1-model chatgpt:gpt-6-luna --wild --limits max_expanded_primitives=200
 ```
 
 ## Rendering without a server (render-local)
@@ -278,8 +278,10 @@ Attach an existing work as the parent node and produce a local option, saved int
 
 Runs several models on the same description in parallel and compares how each interprets it as DDL and performs it.
 
+Future real-provider tests and comparisons use ChatGPT plan / GPT-6-Luna as Primary and Gemini API (Cloud) / Gemma 4 31B IT as Secondary. Exclude NVIDIA NIM from targets, controls, fallbacks, and Vision evaluation. Follow the [AI testing procedure](cli-reference-for-ai.md) and stop on connection failure.
+
 ```sh
-uv run inku-cli inspect "draw a blue line" --models "MODEL_A,MODEL_B" -o ./inspection --png
+uv run inku-cli inspect "draw a blue line" --models "chatgpt:gpt-6-luna,gemini:gemma-4-31b-it" -o ./inspection --png
 ```
 
 ### 4. Visual evaluation and feedback (review)
@@ -287,6 +289,7 @@ uv run inku-cli inspect "draw a blue line" --models "MODEL_A,MODEL_B" -o ./inspe
 Autonomous assessment by a Vision model, and reporting of words the interpreter could not read confidently.
 
 * **Assess a work with Vision**:
+  `review evaluate` and `vision-review` are NIM-only product features. The following example describes that feature; do not use it for future tests, comparisons, or Vision evaluation. Changing only `--model` to another provider's reference does not change the destination.
   ```sh
   uv run inku-cli review evaluate drawing.png --model VISION_MODEL
   ```

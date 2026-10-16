@@ -107,7 +107,7 @@ batchはさらに `--continue-on-error` を持ちます。
 DDL入力へ筆致と今回の上限を指定する例です。
 
 ```sh
-uv run inku-cli paint --input-mode ddl --file work.ddl --wild --limits max_expanded_primitives=200
+uv run inku-cli paint --input-mode ddl --file work.ddl --stage1-model chatgpt:gpt-6-luna --wild --limits max_expanded_primitives=200
 ```
 
 ## サーバーなしで描画する（render-local）
@@ -274,14 +274,17 @@ AIエージェントによる自動生成、評価、および系譜ツリーを
 ### 3. 多モデル並列比較 (inspect)
 同一の記述に対して、複数のモデルがどのように解釈（DDL）および描画するかを並列で実行し、比較します。
 
+今後の実providerテスト・比較はPrimaryをChatGPTプラン / GPT-6-Luna、SecondaryをGemini API（Cloud）/ Gemma 4 31B ITとし、NVIDIA NIMを対象・対照・fallback・Vision評価へ含めません。[AI向けテスト手順](cli-reference-for-ai.md)に従い、接続失敗時は止めます。
+
 ```sh
-uv run inku-cli inspect "青い線を引く" --models "MODEL_A,MODEL_B" -o ./inspection --png
+uv run inku-cli inspect "青い線を引く" --models "chatgpt:gpt-6-luna,gemini:gemma-4-31b-it" -o ./inspection --png
 ```
 
 ### 4. 視覚的評価とフィードバック (review)
 Visionモデルによる自律的な出来栄え評価、および解釈に自信のなかった語彙のサーバー通知を行います。
 
 * **Vision による画の評価**:
+  `review evaluate`と`vision-review`はNIM専用の製品機能です。次の例はその機能の説明であり、今後のテスト・比較・Vision評価には使いません。`--model`だけを別providerの参照へ替えても送信先は変わりません。
   ```sh
   uv run inku-cli review evaluate drawing.png --model VISION_MODEL
   ```

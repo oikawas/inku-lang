@@ -66,12 +66,14 @@ public struct GenerationProvenance: Codable, Sendable {
     public var uiLanguage: String?
     public var batchRunID: String?
     public var batchLineNumber: Int?
+    public var displayLabel: String?
     public init(ddlVersion: String? = nil, ddlEngineVersion: String? = nil, build: String? = nil,
                 referenceBuild: String? = nil, uiLanguage: String? = nil, batchRunID: String? = nil,
-                batchLineNumber: Int? = nil) {
+                batchLineNumber: Int? = nil, displayLabel: String? = nil) {
         self.ddlVersion = ddlVersion; self.ddlEngineVersion = ddlEngineVersion
         self.build = build; self.referenceBuild = referenceBuild; self.uiLanguage = uiLanguage
         self.batchRunID = batchRunID; self.batchLineNumber = batchLineNumber
+        self.displayLabel = displayLabel
     }
 }
 

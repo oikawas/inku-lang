@@ -27,6 +27,7 @@ public final class ToolChangeModel {
     public private(set) var failures: [String] = []
     public private(set) var lanes: [ComparisonLaneState] = []
     public private(set) var previewID: String?
+    public private(set) var committedWorks: [SavedWork] = []
     @ObservationIgnored private var runID: UUID?
     @ObservationIgnored private var completionWaiters: [CheckedContinuation<Void, Never>] = []
 
@@ -36,18 +37,36 @@ public final class ToolChangeModel {
 
     public func generate(app: AppModel) async {
         guard !running, !app.isBusy else { return }
+        let fanoutLimit: Int
+        do { fanoutLimit = try RefinementFanout.validatedLimit(app.display.preferences.refinementFanoutLimit) }
+        catch { errorText = error.localizedDescription; return }
+        let parent = work
         let chosenMode = mode
+        let selection = candidates.filter { $0.selected && $0.savedWork == nil }
         let run = UUID(); runID = run
-        running = true; stopping = false; errorText = nil; failures = []
-        candidates = []; lanes = []; noChangeableSentences = false; previewID = nil
+        running = true; saving = !selection.isEmpty; stopping = false; errorText = nil
         defer { finish() }
         let succeeded = await app.performComparison(status: "てざわりの候補を用意中", restoreDisplayStatus: true) { token in
-            let plans = try await app.makeToolVariantPlans(work: self.work, mode: chosenMode)
+            try await app.validateSavedAdjustmentParent(parent)
+            for candidate in selection {
+                try Task.checkCancellation()
+                try await app.validateSavedAdjustmentParent(parent)
+                guard self.runID == run, !self.stopping else { throw CancellationError() }
+                let saved = try await app.saveComparisonCandidate(executionID: candidate.prepared.executionID, token: token)
+                self.recordSaved(candidateID: candidate.id, work: saved)
+            }
             try Task.checkCancellation()
-            guard self.runID == run else { throw CancellationError() }
+            try await app.validateSavedAdjustmentParent(parent)
+            guard self.runID == run, !self.stopping else { throw CancellationError() }
+            let plans = try await app.makeToolVariantPlans(work: parent, mode: chosenMode)
+            try Task.checkCancellation()
+            try await app.validateSavedAdjustmentParent(parent)
+            guard self.runID == run, !self.stopping else { throw CancellationError() }
+            self.saving = false
+            self.candidates = []; self.lanes = []; self.failures = []; self.noChangeableSentences = false; self.previewID = nil
             self.noChangeableSentences = plans.isEmpty
             self.lanes = plans.map { _ in .waiting }
-            try await RefinementFanout.run(count: plans.count, onStart: { index in self.lanes[index] = .running }) { index in
+            try await RefinementFanout.run(count: plans.count, limit: fanoutLimit, onStart: { index in self.lanes[index] = .running }) { index in
                 try Task.checkCancellation()
                 guard self.runID == run, !self.stopping else { throw CancellationError() }
                 do {
@@ -92,10 +111,7 @@ public final class ToolChangeModel {
                 try Task.checkCancellation()
                 guard self.runID == run, !self.stopping else { throw CancellationError() }
                 let saved = try await app.saveComparisonCandidate(executionID: candidate.id, token: token)
-                if let index = self.candidates.firstIndex(where: { $0.id == candidate.id }) {
-                    self.candidates[index].savedWork = saved
-                    self.candidates[index].selected = false
-                }
+                self.recordSaved(candidateID: candidate.id, work: saved)
                 savedCount += 1
             }
         }
@@ -115,5 +131,12 @@ public final class ToolChangeModel {
         running = false; saving = false; stopping = false; lanes = []
         let waiters = completionWaiters; completionWaiters = []
         waiters.forEach { $0.resume() }
+    }
+
+    private func recordSaved(candidateID: String, work: SavedWork) {
+        if let index = candidates.firstIndex(where: { $0.id == candidateID }) {
+            candidates[index].savedWork = work; candidates[index].selected = false
+        }
+        if !committedWorks.contains(where: { $0.id == work.id }) { committedWorks.append(work) }
     }
 }

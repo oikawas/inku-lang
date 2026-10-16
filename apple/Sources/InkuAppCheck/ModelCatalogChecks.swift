@@ -112,5 +112,37 @@ import InkuUI
           draft.model(modelID: unsupported.id)?.purposes == ["llm"] else {
         throw CheckFailure.message("Purpose editing trapped a local empty model or reopened a canonical blocked purpose")
     }
-    print("Model catalog passed: shared 15 cases; exact v2 export and Host label table; measurement key presence; ChatGPT evaluations and author purposes; stale labels refreshed; account/re-offer corrections; custom/wrong-kind boundaries; old settings compatibility. Zero provider calls.")
+    // The Web displays three tiers while retaining the measured five-step ordering.
+    guard [1, 2, 3, 4, 5].map({ ModelGuidance.recommendationTier($0) }) == [1, 1, 2, 3, 3],
+          ModelGuidance.recommendation(4) == "★★★ (3/3)",
+          ModelGuidance.recommendation(nil) == "—" else {
+        throw CheckFailure.message("Model recommendations diverged from the Web three-tier presentation")
+    }
+    let measured = ProviderModelSettings(id: "measured", purposes: ["llm"], unsupportedPurposes: ["vision"],
+        speedLLMSeconds: 12.34, costUSDLLM: 0, costUSDVision: 0.00001)
+    guard ModelMetadataPresentation.speed(measured, language: "ja") == "LLM 平均 12.3秒（参考値）",
+          ModelMetadataPresentation.speed(measured, language: "en") == "LLM mean 12.3 s (reference)",
+          ModelMetadataPresentation.speed(measured, hidden: true, language: "en") == "—",
+          ModelMetadataPresentation.cost(measured, language: "en") == "LLM $0 per drawing / Vision <$0.0001 per picture",
+          ModelMetadataPresentation.cost(.init(id: "unknown"), language: "en") == "—",
+          ModelMetadataPresentation.supports(measured, purpose: "llm"),
+          !ModelMetadataPresentation.supports(measured, purpose: "vision") else {
+        throw CheckFailure.message("Model metadata lost purpose availability, free cost, missing values or mean/reference units")
+    }
+    let inconsistent = ProviderModelSettings(id: "blocked-purpose", purposes: ["llm"], unsupportedPurposes: ["llm"])
+    let inconsistentProvider = ProviderSettings(id: "custom", baseURL: endpoint, models: [inconsistent])
+    guard SettingsModel.registeredModels(for: inconsistentProvider, purpose: "llm").isEmpty,
+          !SettingsModel.isBatchModelAvailable("custom:blocked-purpose", settings: HostSettings(providers: [inconsistentProvider])) else {
+        throw CheckFailure.message("A purpose explicitly marked unsupported was offered for a new request")
+    }
+    let noRegisteredModels = ProviderSettings(id: "anthropic", kind: .anthropic, baseURL: endpoint, models: [])
+    let historicalNaming = ModelNaming(providers: [noRegisteredModels])
+    guard historicalNaming.resolve("claude-haiku-5-5").provider == "anthropic",
+          historicalNaming.modelShortName("claude-haiku-5-5") == "Claude Haiku 5.5",
+          historicalNaming.modelShortName("chatgpt:gpt-6-astra") == "GPT-6-Astra",
+          SettingsModel.batchModels(for: noRegisteredModels).isEmpty,
+          ModelNaming(providers: [plan]).modelShortName("chatgpt:\(saved.id)") == saved.label else {
+        throw CheckFailure.message("Historical naming lost canonical/local labels or registered a removed model")
+    }
+    print("Model catalog passed: shared 15 cases; exact v2 export and Host label table; measurement key presence; ChatGPT evaluations and author purposes; stale labels refreshed; account/re-offer corrections; custom/wrong-kind boundaries; old settings compatibility; three-tier presentation; measured units and absent values; unsupported purposes; historical naming without registration. Zero provider calls.")
 }

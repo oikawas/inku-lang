@@ -60,6 +60,7 @@ public struct ExportOptions: Codable, Sendable, Equatable {
     public var format: SavedExportFormat = .png
     public var svgProfile = "display"
     public var pixelHeight = 1080
+    /// Stable saved-option polarity: true paints white. UI transparency switches adapt at the host boundary.
     public var pngAlphaWhite = false
     public var cardLayout = "square"
     public var cardSeal = true

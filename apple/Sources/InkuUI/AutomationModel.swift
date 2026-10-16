@@ -97,6 +97,11 @@ private struct DemoPreferences: Codable {
     var saveFiles = false
 }
 
+public enum DemoIntervalPolicy {
+    public static func acceptsUIEdit(_ value: Int) -> Bool { (1...999).contains(value) }
+    public static func acceptsStoredValue(_ value: Int) -> Bool { (1...3600).contains(value) }
+}
+
 /// Requests are pinned before the first row. A restart never resends an ambiguous row.
 @MainActor @Observable
 public final class AutomationModel {
@@ -167,9 +172,15 @@ public final class AutomationModel {
     /// Web `canRetryFailures`: a stopped batch with failed rows can draw those rows alone again.
     public var canRetryFailures: Bool { !running && !preparing && failedCount > 0 }
     public var canSaveDemoCurrent: Bool { demoWork != nil && !demoCurrentSaved && !savingDemo && !preparing }
+    @discardableResult public func setDemoIntervalFromUI(_ value: Int) -> Bool {
+        guard DemoIntervalPolicy.acceptsUIEdit(value) else { return false }
+        demoInterval = value
+        return true
+    }
     public func canStartDemo(app: AppModel) -> Bool {
         !isOccupied && !savingDemo && !app.isBusy && !demoSeedPhrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !demoModel.isEmpty && !demoStage1Model.isEmpty && !demoStage2Model.isEmpty
+            && DemoIntervalPolicy.acceptsStoredValue(demoInterval)
     }
 
     public func refreshDemoModels(app: AppModel) async {
@@ -188,7 +199,8 @@ public final class AutomationModel {
                 let saved = try TolerantPreferences.decode(DemoPreferences.self, from: Data(contentsOf: preferencesURL),
                                                            defaults: DemoPreferences())
                 demoSeedPhrase = saved.seedPhrase; demoSavedModel = saved.model
-                demoInterval = min(3600, max(1, saved.interval)); demoDuration = min(86400, max(60, saved.duration))
+                guard DemoIntervalPolicy.acceptsStoredValue(saved.interval) else { throw HostError("invalid_demo_interval") }
+                demoInterval = saved.interval; demoDuration = min(86400, max(60, saved.duration))
                 demoSaveWorks = saved.saveWorks; demoSaveFiles = saved.saveFiles
             }
         } catch {
@@ -295,6 +307,7 @@ public final class AutomationModel {
                 var request = try app.requestForBatchDescription(input, sketchMode: sketchMode)
                 var provenance = request.provenance ?? GenerationProvenance()
                 provenance.batchRunID = batchRunID; provenance.batchLineNumber = line
+                provenance.displayLabel = "#\(line)"
                 request.provenance = provenance
                 return BatchRow(line: line, input: input, request: request)
             }
@@ -422,7 +435,8 @@ public final class AutomationModel {
             let reference = demoModel
             let language = app.instructionLanguage(for: seedPhrase)
             // Web demo state.svelte.ts normalizeSettings: 1...3600 seconds.
-            let interval = min(3600, max(1, demoInterval))
+            guard DemoIntervalPolicy.acceptsStoredValue(demoInterval) else { throw HostError("invalid_demo_interval") }
+            let interval = demoInterval
             let duration = min(86400, max(60, demoDuration))
             let saveWorks = demoSaveWorks
             let saveFiles = demoSaveFiles
@@ -458,6 +472,9 @@ public final class AutomationModel {
                         guard read, let instruction else { throw HostError(app.errorText ?? "demo_instruction_failed") }
                         self.demoGeneratingPrompt = instruction
                         var request = try app.makeDemoRequest(template: template, description: instruction, randomizeSeed: randomizeSeed)
+                        var provenance = request.provenance ?? GenerationProvenance()
+                        provenance.displayLabel = "[demo]"
+                        request.provenance = provenance
                         request.saveHistory = saveWorks
                         self.status = "デモの作品を生成中"
                         guard let work = await app.runAutomation(request: request) else {
@@ -522,6 +539,7 @@ public final class AutomationModel {
     private func persistDemoPreferences() {
         guard let demoPreferencesURL else { return }
         do {
+            guard DemoIntervalPolicy.acceptsStoredValue(demoInterval) else { throw HostError("invalid_demo_interval") }
             let saved = DemoPreferences(seedPhrase: demoSeedPhrase, model: demoSavedModel, interval: demoInterval,
                 duration: demoDuration, saveWorks: demoSaveWorks, saveFiles: demoSaveFiles)
             try JSONEncoder().encode(saved).write(to: demoPreferencesURL, options: .atomic)

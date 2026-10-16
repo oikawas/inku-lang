@@ -13,7 +13,8 @@ import InkuUI
     guard app.errorText == nil, !app.catalogs.isEmpty, !app.canvases.isEmpty else {
         throw CheckFailure.message("Model selection fixture did not load its bundled Bootstrap: \(app.errorText ?? app.status)")
     }
-    let provider = ProviderSettings(id: "selection-check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false)
+    let provider = ProviderSettings(id: "selection-check", baseURL: URL(string: "http://127.0.0.1:1/v1")!, requiresAPIKey: false,
+        models: ["settings-default", "next-drawing", "later-drawing"].map { ProviderModelSettings(id: $0, purposes: ["llm"]) })
     let configured = "selection-check:settings-default"
     let chosen = "selection-check:next-drawing"
     let subsequent = "selection-check:later-drawing"
@@ -49,6 +50,7 @@ import InkuUI
     }
 
     app.selectNextDrawingModel("unconfigured-provider:rejected")
+    app.selectNextDrawingModel("selection-check:unregistered")
     let afterInvalidChoice = try app.requestForCurrentInput()
     let persisted = try JSONDecoder().decode(HostSettings.self, from: Data(contentsOf: directory.appendingPathComponent("providers.json")))
     guard app.nextDrawingModelReference == subsequent,

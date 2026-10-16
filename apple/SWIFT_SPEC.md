@@ -2,7 +2,7 @@
 
 This directory contains the native SwiftUI client, developed for macOS first, and the shared Apple packages. [SWIFT_SPEC.ja.md](SWIFT_SPEC.ja.md) is the canonical specification for Swift host behavior; this document is its maintained English version. The [product specification](../SPEC.md) defines shared DDL, Score, prompts, authoring authority, pipeline transitions, seeds, and rendering semantics. Server remains the primary development host, and Swift follows the same Rust core without duplicating semantic processing.
 
-Last updated: 2026-10-15.
+Last updated: 2026-10-16.
 
 Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The macOS app has its own version, defined by `apple/VERSION` and `apple/BUILD_NUMBER` and allocated separately from the Server and Web versions (the first release is 1.0.0, Build 1). The corresponding Server version is shown in the app's About inku window and in the changelog. Matching shared layer versions does not establish that host features and the native UI port are complete.
 
@@ -13,6 +13,20 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Record confirmed implementation changes and remaining scope in dated sections of this specification. Maintain product history in the shared [CHANGELOG.ja.md](../CHANGELOG.ja.md) and [CHANGELOG.md](../CHANGELOG.md). Do not create a separate Swift changelog.
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
+
+## 2026-10-16 Single-user alignment with Server
+
+The single-work PNG UI flag follows Web: enabled preserves transparency; disabled composites white. Migrate old UI preferences once, inspecting raw field presence before filling defaults and distinguishing an existing file with an omitted field from a new installation. Do not convert saved works, saved export options, or execution journals. Clipboard images have a white background. Do not propagate this flag into cards, animation, or native multi-work PNG contracts. Enumerate PNG choices from saved templates.
+
+Persist a local client fanout limit, default 4 and integer range 1–16, rejecting invalid values. Capture it at run start; changes affect the next run. Do not add a Server-wide worker limit. New demo UI edits accept 1–999 seconds while previously saved 1000–3600-second values survive reading, starting, and unchanged saving.
+
+Calculate library page capacity by summing each row's measured maximum height without rounding fractional geometry. Project display labels from saved provenance, including original batch line numbers, once per page. Do not invent missing labels. Different runs may share a label; selection, actions, and copying use UUIDs. Canvas search beside Lineage is independent of library search: case-insensitive exact UUID, description substring, and hash prefix/suffix/full matching. Searching updates the history strip without switching the displayed work; selecting a result opens it.
+
+Layout's next four and tool change's next four save every checked unsaved candidate before replacing the set. Partial failure preserves remaining candidates and selection and does not save successes twice. Separate this operation from save-and-close, and do not add preliminary saving to layout's single option. Generation information copies the saved work's UUID with brief success feedback, invalidated when its target changes.
+
+The new automatic backup schedule accepts 1–365 days, 1–100 generations, and a local time. Its deadline is the last automatic backup's local date plus the interval at that time. A first run is immediately due; manual backups do not advance the automatic deadline. Preserve the legacy hourly schedule until the user saves the new schedule. Reading or migrating settings never prunes generations. Prune only owned automatic generations after a successful automatic backup. The app cannot run backups while closed. Do not apply Server application-log deletion, rotation, or compression to work/execution JSON.
+
+Show common Web content, order, and copy first, retaining system theme and native default format/profile as macOS supplements. Preserve the local database, Keychain, native panels/bookmarks, Finder/OS sharing, OS menus/shortcuts, lineage detail refinement menu, all batch rows, and explicit unknown-outcome handling. Generate bundled catalog/UI references from a fixed clean source SHA and preserve user model names, purposes, and availability overrides. These are implementation requirements, not evidence of completed builds, device verification, or author acceptance.
 
 ## 2026-10-15 Saijiki example label
 

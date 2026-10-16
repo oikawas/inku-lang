@@ -31,10 +31,11 @@ struct ModelGuidanceView: View {
                     } else {
                         row("速度", guidance.speedLabel == "未計測" ? display.localized("未計測") : guidance.speedLabel ?? "—")
                     }
-                    ModelLabelsView(labels: guidance.resolvedLabels, display: display)
+                    ModelLabelsView(labels: guidance.resolvedLabels, display: display, endOfLifeDate: guidance.endOfLifeDate)
                     ModelMeasurementView(llmSeconds: guidance.speedHidden ? nil : guidance.speedLLMSeconds,
                                          visionSeconds: guidance.speedHidden ? nil : guidance.speedVisionSeconds,
-                                         llmCost: guidance.costUSDLLM, visionCost: guidance.costUSDVision)
+                                         llmCost: guidance.costUSDLLM, visionCost: guidance.costUSDVision,
+                                         language: display.preferences.language)
                     if let comment = guidance.comment(language: display.preferences.language) {
                         row("評価コメント", comment)
                     }

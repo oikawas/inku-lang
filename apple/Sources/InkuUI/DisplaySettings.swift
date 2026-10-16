@@ -20,6 +20,8 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
     public var showTooltips = true
     public var mascot = "incu"
     public var batchRetries = 0
+    /// Local equivalent of Server client_limit; validated before a refinement starts.
+    public var refinementFanoutLimit = 4
     public var clipboardHeight = 1080
     public var clipboardBackground = "original"
     public var clipboardFormat: String?
@@ -28,10 +30,17 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
     public var automaticBackup = false
     public var backupIntervalHours = 24
     public var backupGenerations = 7
+    public var backupSchedule = BackupSchedule()
+    public var backupScheduleMode = "calendar"
+    public var backupPreferencesVersion = 1
     public var exportHeight = 2160
     public var exportProfile = "display"
     public var exportConfiguration: ExportConfiguration?
     public var exportTemplates: [ExportTemplate]?
+    /// Web's single-work PNG switch: true keeps transparency; false paints white.
+    public var singleWorkPNGTransparent = false
+    public var pngPreferencesVersion = 1
+    public var animationExportConfiguration: ExportConfiguration?
     public var saveResultLog = false
     /// Older preference files omit this field. Capture always starts disabled.
     public var captureProviderIO: Bool?
@@ -61,6 +70,45 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
     }
 
     public var textScale: Double { [0.9, 1, 1.1, 1.2, 1.3][min(4, max(0, textSizeStep))] }
+
+    /// Inspect the raw keys before tolerant decoding supplies new defaults.
+    public static func decodeInterfaceFile(_ data: Data) throws -> Self {
+        guard let raw = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw CocoaError(.coderReadCorrupt)
+        }
+        var value = try TolerantPreferences.decode(Self.self, from: data, defaults: Self())
+        if (raw["pngPreferencesVersion"] as? Int ?? 0) < 1 {
+            let configuration = raw["exportConfiguration"] as? [String: Any]
+            let options = configuration?["options"] as? [String: Any]
+            // A missing field in an existing file used the old transparent default.
+            value.singleWorkPNGTransparent = !(options?["pngAlphaWhite"] as? Bool ?? false)
+            value.pngPreferencesVersion = 1
+        }
+        if (raw["backupPreferencesVersion"] as? Int ?? 0) < 1 {
+            // An existing file without the new schedule keeps its exact old hourly cycle.
+            value.backupScheduleMode = raw["backupSchedule"] == nil ? "legacyHours" : "calendar"
+            value.backupPreferencesVersion = 1
+        }
+        return value
+    }
+
+    public var savedPNGTemplates: [ExportTemplate] { ExportTemplate.normalized(exportTemplates) }
+
+    public func singleWorkPNGOptions(height: Int) -> ExportOptions {
+        var options = exportDefaults.options
+        options.format = .png
+        options.pixelHeight = height
+        options.pngAlphaWhite = !singleWorkPNGTransparent
+        return options
+    }
+
+    public func clipboardExportOptions(height: Int) -> ExportOptions {
+        var options = exportDefaults.options
+        options.format = clipboardFormat == "card" ? .shareCard : .png
+        options.pixelHeight = height
+        if options.format == .png { options.pngAlphaWhite = true }
+        return options
+    }
 }
 
 /// Web `ai-refine-settings.ts`: the autonomous refinement dialog opens with the last choices. Wild is not kept.
@@ -88,8 +136,7 @@ public final class DisplaySettings {
         let url = directory.appendingPathComponent("interface.json")
         do {
             if FileManager.default.fileExists(atPath: url.path) {
-                preferences = try TolerantPreferences.decode(DisplayPreferences.self, from: Data(contentsOf: url),
-                                                             defaults: DisplayPreferences())
+                preferences = try DisplayPreferences.decodeInterfaceFile(Data(contentsOf: url))
             }
             saveError = nil
         } catch {

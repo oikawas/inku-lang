@@ -6,15 +6,17 @@ public struct SaijikiView: View {
     private let onInsertWord: ((String) -> Void)?
     private let wordLanguage: String?
     private let inline: Bool
-    @State private var search = ""
+    private let onClose: (() -> Void)?
     @State private var selection: Selection?
     @FocusState private var focusedSelection: Selection?
 
-    public init(model: AppModel, onInsertWord: ((String) -> Void)? = nil, wordLanguage: String? = nil, inline: Bool = false) {
+    public init(model: AppModel, onInsertWord: ((String) -> Void)? = nil, wordLanguage: String? = nil, inline: Bool = false,
+                onClose: (() -> Void)? = nil) {
         self.model = model
         self.onInsertWord = onInsertWord
         self.wordLanguage = wordLanguage
         self.inline = inline
+        self.onClose = onClose
     }
 
     public var body: some View {
@@ -27,31 +29,53 @@ public struct SaijikiView: View {
     }
 
     private var fullBody: some View {
-        GeometryReader { geometry in
-            VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(copy?.text("saijikiTitle") ?? model.display.localized("歳時記"))
-                        .inkuFont(16, weight: .semibold)
-                    if let copy {
-                        Text(copy.text("saijikiHint")).inkuFont(12).foregroundStyle(.secondary)
-                    }
+                        .inkuFont(17, weight: .light)
+                    Text(model.display.webCopy("saijikiHint", "語彙を選ぶと、描画への効き方と作例を表示します。"))
+                        .inkuFont(10).foregroundStyle(.secondary)
                 }
-                TextField(model.display.localized("語を探す"), text: $search)
-                    .textFieldStyle(.roundedBorder)
-                    .inkuTooltip(tip("語を探す"))
-                if geometry.size.width >= 660 {
-                    HStack(alignment: .top, spacing: 12) {
-                        wordList.frame(maxWidth: .infinity, maxHeight: .infinity)
-                        previewPane.frame(width: 280).frame(maxHeight: .infinity)
-                    }
-                } else {
-                    VStack(spacing: 12) {
-                        wordList.frame(maxWidth: .infinity, maxHeight: .infinity)
-                        previewPane.frame(height: min(250, max(180, geometry.size.height * 0.4)))
-                    }
+                Spacer(minLength: 0)
+                if let onClose {
+                    Button(action: onClose) { Image(systemName: "xmark").inkuFont(16).frame(width: 24, height: 24) }
+                        .buttonStyle(.plain).foregroundStyle(.secondary)
+                        .accessibilityLabel(model.display.localized("閉じる"))
                 }
-            }.padding(16)
+            }.padding(.horizontal, 18).padding(.top, 16).padding(.bottom, 12)
+            Divider()
+            drawerPreview.padding(.horizontal, 12).padding(.top, 8).padding(.bottom, 8)
+            wordList.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    /// The drawer keeps the paper example above its vocabulary; the editor retains its own layout.
+    private var drawerPreview: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let preview = selectedPreview {
+                SaijikiPreviewView(svg: preview.svg, imageURL: preview.imageURL, renderer: model.renderer)
+                    .frame(width: 216, height: 92).frame(maxWidth: .infinity).id(preview.id)
+                Text(preview.title).inkuFont(13, weight: .semibold)
+                if !preview.effect.isEmpty { Text(preview.effect).inkuFont(11).foregroundStyle(.secondary) }
+                if !preview.example.isEmpty {
+                    Text(model.display.webCopy("saijikiPreviewExampleLabel", "例文：") + preview.example)
+                        .inkuFont(10).foregroundStyle(.secondary)
+                }
+                if !preview.insertable {
+                    Text(model.display.localized("この語は参照のみです。DDLに挿入する定義が同梱されていません。"))
+                        .inkuFont(10).foregroundStyle(.secondary)
+                }
+            } else {
+                Text(model.display.webCopy("saijikiPreviewPlaceholder", "語を選ぶと、描画への効き方と作例を表示します。"))
+                    .inkuFont(11).foregroundStyle(.secondary)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+        .padding(10).frame(maxWidth: .infinity, alignment: .leading)
+        .background(.background, in: RoundedRectangle(cornerRadius: 4))
+        .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border))
+        .environment(\.colorScheme, .light)
     }
 
     /// SaijikiInline.svelte: grouped words and a nearby example, inside the editor rather than another window.
@@ -119,36 +143,39 @@ public struct SaijikiView: View {
 
     private var wordList: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 16) {
+            LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(model.saijiki) { category in
-                    let words = category.words.filter {
-                        matches($0.japanese + " " + ($0.english ?? "") + " " + $0.detail + " " + ($0.englishDetail ?? ""))
-                    }
+                    let words = category.words
                     if !words.isEmpty {
                         VStack(alignment: .leading, spacing: 7) {
-                            Text(uiLanguage == "ja" ? category.name : category.englishName ?? category.name)
-                                .inkuFont(12, weight: .semibold).foregroundStyle(.secondary)
+                            HStack(alignment: .firstTextBaseline, spacing: 7) {
+                                Text(category.name).inkuFont(13)
+                                if let english = category.englishName, !english.isEmpty {
+                                    Text(english).inkuFont(9, weight: .medium).foregroundStyle(.secondary)
+                                }
+                            }
                             SaijikiFlowLayout {
                                 ForEach(words) { word in
                                     wordChip(name(word), selection: .builtin(word.id))
                                 }
                             }
-                        }
+                        }.padding(.horizontal, 18).padding(.vertical, 10)
+                        Divider()
                     }
                 }
-                let plugins = model.pluginWords.filter {
-                    matches(($0.japanese + $0.english + $0.aliases + [$0.id, $0.note, $0.englishNote ?? ""]).joined(separator: " "))
-                }
+                let plugins = model.pluginWords
                 if !plugins.isEmpty {
                     VStack(alignment: .leading, spacing: 7) {
-                        Text(model.display.localized("プラグインの語"))
-                            .inkuFont(12, weight: .semibold).foregroundStyle(.secondary)
+                        HStack(alignment: .firstTextBaseline, spacing: 7) {
+                            Text("Plugin").inkuFont(13)
+                            Text("namespaced vocabulary").inkuFont(9, weight: .medium).foregroundStyle(.secondary)
+                        }
                         SaijikiFlowLayout {
                             ForEach(plugins) { word in
                                 wordChip(word.displayName(language: offeredLanguage), selection: .plugin(word.id))
                             }
                         }
-                    }
+                    }.padding(.horizontal, 18).padding(.vertical, 10)
                 }
             }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 4)
         }
@@ -237,7 +264,6 @@ public struct SaijikiView: View {
     private func name(_ word: SaijikiWord) -> String {
         offeredLanguage == "ja" ? word.japanese : word.english ?? word.japanese
     }
-    private func matches(_ text: String) -> Bool { search.isEmpty || text.localizedCaseInsensitiveContains(search) }
     private func tip(_ key: String) -> String {
         model.display.tooltip(key)
     }

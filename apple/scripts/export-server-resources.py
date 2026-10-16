@@ -214,7 +214,7 @@ def main() -> None:
                                  "aliases": entry.alias_qualified_names(document.manifest.namespace),
                                  "surfaces": entry.surfaces, "notes": entry.notes,
                                  "fires_on": entry.fires_on, "preview": preview_name,
-                                 "package_id": package, "source_id": source_id})
+                                 "package_id": package, "source_id": source_id, "source_file": path.name})
     macro_sources = {"maximum_entries": manifest["pipeline"]["prompt_limits"]["max_catalog_entries"],
                      "canonical": [], "legacy": legacy, "bundled_packages": sorted(set(bundled))}
     saijiki = json.loads((ROOT / "core/crates/inku-ddl/assets/saijiki-v2.json").read_text(encoding="utf-8"))

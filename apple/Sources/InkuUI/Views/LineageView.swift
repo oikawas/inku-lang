@@ -110,6 +110,9 @@ struct LineageView: View {
             checkedIDs.formIntersection(graph?.nodes.compactMap(\.work).filter { !$0.trashed }.map(\.id) ?? [])
         }
         .task(id: model.providerSettingsRevision) { providers = await model.hostSettings().providers }
+        .task(id: library.lineageDisplayGraph?.nodes.compactMap(\.work).map(\.id) ?? []) {
+            await model.loadWorkActionStates(workIDs: library.lineageDisplayGraph?.nodes.compactMap(\.work).map(\.id) ?? [])
+        }
         .alert(item: $trashConfirmation) { request in
             Alert(title: Text(model.display.localizedFormat("%ld件をごみ箱に移動しますか？", request.ids.count)),
                   primaryButton: .default(Text(model.display.localized("実行"))) {
@@ -387,6 +390,9 @@ struct LineageView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         operationRow(item, graph: graph)
                         ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(height: 118)
+                        if let label = model.savedDisplayLabels[work.id] {
+                            Text(label).inkuFont(12, weight: .semibold).foregroundStyle(.secondary)
+                        }
                         if work.trashed { Text(model.display.localized("ゴミ箱（復元可能）")).inkuFont(12).foregroundStyle(.secondary) }
                         LibraryWorkTitle(work: work, untitled: model.display.localized("無題"), lineLimit: 2, size: 14)
                             .inkuTooltip(model.display.tooltipValue(work.effectiveSourceText.isEmpty ? (work.descriptionHash ?? "") : work.effectiveSourceText))

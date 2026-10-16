@@ -1,4 +1,5 @@
 import InkuPersistence
+import InkuHost
 import SwiftUI
 
 struct BatchWorkspaceSelection {
@@ -44,6 +45,8 @@ struct CreationView: View {
     @State private var showSketchMenu = false
     @State private var showNewDDL = false
     @State private var rightPanelWidth: CGFloat = 0
+    @State private var savedProviders: [InkuHost.ProviderSettings] = []
+    @State private var workspaceGeneration: (nodeID: String, value: Int)?
     @Environment(\.inkuWindowSize) private var windowSize
     private var isBatch: Bool { automation.workspaceInputMode == "batch" }
     private var batchWork: SavedWork? { batchWorkspace.pinnedWork ?? (batchWorkspace.followsLatest ? automation.observedWork : nil) }
@@ -107,6 +110,15 @@ struct CreationView: View {
             }
         }
         .onDisappear { batchWorkspace.invalidateReads() }
+        .task(id: model.providerSettingsRevision) { savedProviders = await model.hostSettings().providers }
+        .task(id: workspaceWork?.lineageNodeID) {
+            workspaceGeneration = nil
+            guard let nodeID = workspaceWork?.lineageNodeID else { return }
+            let generations = try? await model.auxiliaryDatabase().lineageGenerations(nodeIDs: [nodeID])
+            guard !Task.isCancelled, workspaceWork?.lineageNodeID == nodeID,
+                  let generation = generations?[nodeID] else { return }
+            workspaceGeneration = (nodeID, generation)
+        }
         .onChange(of: workspaceWork?.id) { _, _ in
             onWorkspaceWorkChange(workspaceWork)
             // CanvasGenerationInfo follows the chosen work only when the setting says so.
@@ -509,6 +521,8 @@ struct CreationView: View {
                 }
                 .disabled(workspaceWork == nil || browsingDisabled)
                 .inkuTooltip(display.tooltip("作品の派生関係を表示"), placement: .bottom)
+                CanvasWorkSearchView(library: history.library, display: display)
+                    .frame(minWidth: 100, idealWidth: 180, maxWidth: 286).padding(.horizontal, 8)
                 if wide && showsMeta, let work = workspaceWork {
                     Spacer(minLength: 12)
                     metaStrip(work)
@@ -527,17 +541,30 @@ struct CreationView: View {
     }
 
     private func metaStrip(_ work: SavedWork) -> some View {
-        let stage1 = work.stage1Model ?? "DDL"
-        let stage2 = work.stage2Model ?? stage1
-        let catalog = work.renderColorCatalogName ?? work.renderColorCatalogID ?? work.catalogID ?? "—"
+        let naming = ModelNaming(providers: savedProviders)
+        let stage1 = work.stage1Model.map { naming.displayName($0) } ?? "DDL"
+        let stage2 = work.stage2Model.map { naming.displayName($0) } ?? stage1
+        let catalogID = work.renderColorCatalogID ?? work.catalogID
+        let catalog = work.renderColorCatalogName ?? model.catalogs.first { $0.id == catalogID }?.name ?? catalogID ?? "—"
         let canvasID = work.renderCanvasAspectID ?? ""
         let canvas = model.canvases.first { $0.id == canvasID }?.label ?? work.renderCanvasAspect ?? (canvasID.isEmpty ? "—" : canvasID)
         let size = ByteCountFormatter.string(fromByteCount: Int64(work.svg.utf8.count), countStyle: .file)
         let created = Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(.dateTime.year().month(.twoDigits).day(.twoDigits).hour().minute())
+        let generation = workspaceGeneration?.nodeID == work.lineageNodeID ? workspaceGeneration?.value : nil
         return HStack(spacing: 0) {
-            Text(display.webCopy("displayedWorkConditions", "表示中作品の描画条件")).inkuFont(12, weight: .medium)
-                .foregroundStyle(.secondary).lineLimit(1).fixedSize()
-                .padding(.trailing, 12)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(display.webCopy("displayedWorkConditions", "表示中作品の描画条件"))
+                    .inkuFont(12, weight: .medium).foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    if let generation {
+                        Text(display.label("系譜", "Lineage")).inkuFont(12).foregroundStyle(.tertiary)
+                        Text(display.label("第\(generation)世代", "Gen. \(generation)")).inkuFont(13).foregroundStyle(.secondary)
+                    } else {
+                        Text(work.lineageNodeID == nil ? display.label("独立作品", "Standalone") : "—")
+                            .inkuFont(13).foregroundStyle(.secondary)
+                    }
+                }
+            }.lineLimit(1).fixedSize().padding(.trailing, 12)
             // CanvasPanel.svelte:707,726,730: each value carries its own title, the models as "解釈 / 描画".
             metaItem(display.localized("モデル"), maxWidth: 280, title: stage1 + " / " + stage2) {
                 if stage1 == stage2 {
@@ -551,8 +578,8 @@ struct CreationView: View {
             }
             metaItem(display.localized("色カタログ"), maxWidth: 130, title: catalog) { Text(catalog) }
             metaItem(display.localized("キャンバス"), maxWidth: 100, title: canvas) { Text(canvas) }
-            metaItem(display.localized("サイズ"), maxWidth: nil) { Text(size).monospacedDigit() }
-            metaItem(display.localized("作成"), maxWidth: nil) { Text(created).monospacedDigit() }
+            metaItem(display.label("サイズ", "Size"), maxWidth: nil) { Text(size).monospacedDigit() }
+            metaItem(display.label("作成", "Created"), maxWidth: nil) { Text(created).monospacedDigit() }
         }
         .padding(.vertical, 7)
         .accessibilityElement(children: .combine)
@@ -580,6 +607,14 @@ struct CreationView: View {
                 Label(display.localized("作品の操作"), systemImage: "ellipsis.circle").inkuFont(12)
             }
             .menuStyle(.borderlessButton)
+            .popover(isPresented: Binding(get: { ui.refinementMenuWorkID == work.id }, set: { if !$0 { ui.refinementMenuWorkID = nil } })) {
+                VStack(alignment: .leading, spacing: 8) {
+                    SavedWorkRefinementActions(model: model, work: work, onAction: { target, action in
+                        ui.refinementMenuWorkID = nil
+                        onWorkAction(target, action)
+                    }, writingLocked: automation.isOccupied)
+                }.padding(16).frame(width: 300)
+            }
             .fixedSize()
             .disabled(browsingDisabled)
             // WorkActionMenu.svelte:107: a locked trigger says why (CanvasPanel passes `workActionGenerationLocked`).
@@ -726,16 +761,10 @@ struct CreationView: View {
     /// SaijikiDrawer.svelte:163-170: a 460pt drawer on the right edge.
     private var saijikiDrawer: some View {
         VStack(spacing: 0) {
-            HStack {
-                Spacer()
-                Button { ui.saijikiOpen = false } label: { Image(systemName: "xmark").inkuFont(15).frame(width: 30, height: 30).contentShape(Rectangle()) }
-                    .buttonStyle(.plain).foregroundStyle(.secondary)
-                    .accessibilityLabel(display.localized("閉じる"))
-                    .inkuTooltip(display.tooltip("閉じる"))
-            }.padding(.horizontal, 8).padding(.top, 6)
             // SaijikiDrawer: a chosen word goes into the instruction box when it can be edited; otherwise only the sample.
             SaijikiView(model: model, onInsertWord: canInsertIntoBox
-                        ? { model.ddlBoxInsertion = InkuEditorInsertion(text: $0, atEndUnlessUsed: true) } : nil)
+                        ? { model.ddlBoxInsertion = InkuEditorInsertion(text: $0, atEndUnlessUsed: true) } : nil,
+                        onClose: { ui.saijikiOpen = false })
         }
         .frame(width: 460)
         .frame(maxHeight: .infinity)

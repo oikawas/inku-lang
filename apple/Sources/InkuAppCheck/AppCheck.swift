@@ -8,6 +8,21 @@ import InkuHost
 struct AppCheck {
     @MainActor
     static func main() async throws {
+        if CommandLine.arguments.contains("--core-version-only") {
+            print(InkuCore.versionReport); return
+        }
+        if CommandLine.arguments.contains("--png-preferences-parity-only") {
+            try runPNGPreferencesParityChecks(); return
+        }
+        if CommandLine.arguments.contains("--fanout-demo-parity-only") {
+            try await runFanoutDemoParityChecks(); return
+        }
+        if CommandLine.arguments.contains("--library-parity-only") {
+            try await runLibraryParityChecks(); return
+        }
+        if CommandLine.arguments.contains("--backup-schedule-parity-only") {
+            try await runBackupScheduleParityChecks(); return
+        }
         if CommandLine.arguments.contains("--thumbnail-memory-only") {
             try await runThumbnailMemoryChecks(); return
         }

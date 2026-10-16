@@ -8,6 +8,20 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-16 — Align Swift single-user features and settings with Server
+
+Swift's single-work PNG UI now has an independent transparency flag and a one-time migration preserving old choices. Saved export options stay unchanged; clipboard images use white. Saved PNG templates, a configurable candidate fanout limit, demo editing bounds, and row-height-based library capacity follow the common behavior. Layout and tool change save checked candidates before the next four, preserving unsaved options after partial failure.
+
+Added saved-provenance labels, independent canvas search, UUID copying, format menus, and selected-work export. Refreshed bundled catalog/copy and aligned model metadata and confirmation, creation dialogs, Saijiki, and extension settings. Automatic backups accept calendar days, a local time, and up to 100 generations, while old hourly schedules remain until the new schedule is saved. Native storage/OS integration and author-requested additional actions remain. These source changes do not certify final UI comparison, author acceptance, or deployment.
+
+Also corrected issues found in the native UI: a parallel-limit error left visible after editing the value, duplicate accessibility names on export tabs, a plugin name wrapping mid-word, and untranslated size/created headings in English.
+
+The transparency setting follows the PNG templates. Animation format, transition, replay and resolution labels, and common share-card wording now use the bundled Web copy. Local storage scope and aspect-ratio labels for resizable native cards remain.
+
+The Library list puts the star beside the image and the revision mark and move-to-trash action in the actions column. The additional macOS actions menu remains.
+
+The canvas header shows the displayed work's generation from its saved lineage, even when a search leaves the history empty. Loading or unknown values are not assumed to be generation one. Plugin version badges and the drawing-use label also stay on one line.
+
 ## v2.15.160 (2026-10-16 / Build 1236)
 
 ### 2026-10-16 — Faint closed fills show through, and a line's sway is also read as its path's wave

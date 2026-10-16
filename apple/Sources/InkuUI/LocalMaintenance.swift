@@ -30,10 +30,10 @@ private actor LocalMaintenanceStore {
         guard FileManager.default.fileExists(atPath: manifestURL.path) else { return BackupManifest() }
         return try JSONDecoder().decode(BackupManifest.self, from: Data(contentsOf: manifestURL))
     }
-    func nextBackupURL() throws -> URL {
+    func nextBackupURL(now: Date) throws -> URL {
         let folder = directory.appendingPathComponent("automatic-backups", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        return folder.appendingPathComponent("inku-auto-\(Int64(Date().timeIntervalSince1970 * 1000))-\(UUID().uuidString).sqlite")
+        return folder.appendingPathComponent("inku-auto-\(Int64(now.timeIntervalSince1970 * 1000))-\(UUID().uuidString).sqlite")
     }
     func snapshot() throws -> BackupSnapshot {
         let record = try manifest()
@@ -45,7 +45,8 @@ private actor LocalMaintenanceStore {
         let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: Array(keys), options: [.skipsHiddenFiles])
         var generations: [LocalBackupGeneration] = []
         var totalBytes: Int64 = 0
-        for file in files where file.lastPathComponent.hasPrefix("inku-auto-") && file.pathExtension == "sqlite" {
+        let owned = Set(record.files)
+        for file in files where owned.contains(file.lastPathComponent) && file.lastPathComponent.hasPrefix("inku-auto-") && file.pathExtension == "sqlite" {
             let metadata = try file.resourceValues(forKeys: keys)
             guard metadata.isRegularFile == true, metadata.isSymbolicLink != true else { continue }
             let bytes = Int64(max(0, metadata.fileSize ?? 0))
@@ -57,18 +58,24 @@ private actor LocalMaintenanceStore {
         generations.sort { $0.name > $1.name }
         return BackupSnapshot(lastSuccess: record.lastSuccess, generations: generations, totalBytes: totalBytes)
     }
-    func completed(url: URL, retention: Int) throws {
+    func completed(url: URL, retention: Int, at: Date) throws {
+        let metadata = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+        guard (1...100).contains(retention), metadata.isRegularFile == true, metadata.isSymbolicLink != true,
+              (metadata.fileSize ?? 0) > 0 else { throw HostError("backup_output_unavailable") }
         var record = try manifest()
-        record.lastSuccess = Date()
+        record.lastSuccess = at
         record.files.append(url.lastPathComponent)
-        let excess = max(0, record.files.count - min(30, max(1, retention)))
+        let excess = max(0, record.files.count - retention)
         let removed = Array(record.files.prefix(excess))
         record.files.removeFirst(excess)
         // Record the verified replacement before deleting any previous owned backup.
         try JSONEncoder().encode(record).write(to: manifestURL, options: .atomic)
         for name in removed where name.hasPrefix("inku-auto-") && name.hasSuffix(".sqlite") && !name.contains("/") {
             let old = url.deletingLastPathComponent().appendingPathComponent(name)
-            try FileManager.default.removeItem(at: old)
+            if FileManager.default.fileExists(atPath: old.path) {
+                let metadata = try old.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+                if metadata.isRegularFile == true, metadata.isSymbolicLink != true { try FileManager.default.removeItem(at: old) }
+            }
         }
     }
     func log(work: SavedWork) throws {
@@ -111,7 +118,19 @@ public final class LocalMaintenance {
     public private(set) var backupInfoError: String?
     public private(set) var backupError: String?
     @ObservationIgnored private var store: LocalMaintenanceStore?
-    public init() {}
+    @ObservationIgnored private var checkingBackup = false
+    @ObservationIgnored private var backupRunning = false
+    @ObservationIgnored private var clock: @Sendable () -> Date
+    @ObservationIgnored private var calendar: @Sendable () -> Calendar
+    public init(directory: URL? = nil, now: @escaping @Sendable () -> Date = { Date() },
+                calendar: @escaping @Sendable () -> Calendar = { .current }) {
+        clock = now
+        self.calendar = calendar
+        if let directory {
+            store = LocalMaintenanceStore(directory: directory)
+            backupDirectory = directory.appendingPathComponent("automatic-backups", isDirectory: true)
+        }
+    }
 
     public func connect(app: AppModel) {
         guard store == nil, let directory = app.localDataDirectory() else { return }
@@ -120,10 +139,16 @@ public final class LocalMaintenance {
     }
     public func nextBackupDate(preferences: DisplayPreferences) -> Date? {
         guard preferences.automaticBackup, backupInfoLoaded else { return nil }
-        return backupLastSuccess.map { $0.addingTimeInterval(TimeInterval(min(168, max(1, preferences.backupIntervalHours)) * 3600)) } ?? Date()
+        return try? preferences.nextAutomaticBackupDate(lastSuccess: backupLastSuccess, now: clock(), calendar: calendar())
     }
     public func refreshBackupInfo(app: AppModel) async {
         connect(app: app)
+        await refreshBackupInfo()
+        databaseBytes = app.databaseFileURL.flatMap {
+            (try? FileManager.default.attributesOfItem(atPath: $0.path)[.size] as? NSNumber)?.int64Value
+        }
+    }
+    public func refreshBackupInfo() async {
         guard let store else { backupInfoError = "バックアップの保存先を利用できません。"; return }
         do {
             let snapshot = try await store.snapshot()
@@ -131,33 +156,44 @@ public final class LocalMaintenance {
             backupLastSuccess = snapshot.lastSuccess
             backupGenerations = snapshot.generations
             backupTotalBytes = snapshot.totalBytes
-            databaseBytes = app.databaseFileURL.flatMap {
-                (try? FileManager.default.attributesOfItem(atPath: $0.path)[.size] as? NSNumber)?.int64Value
-            }
             backupInfoLoaded = true
             backupInfoError = nil
         } catch is CancellationError { }
         catch { backupInfoError = "バックアップの状態を読み込めませんでした: \(error.localizedDescription)" }
     }
     public func checkBackup(app: AppModel, automationRunning: Bool) async {
+        guard !checkingBackup else { return }
+        checkingBackup = true
+        defer { checkingBackup = false }
         await refreshBackupInfo(app: app)
-        guard let store, app.display.preferences.automaticBackup, !app.isBusy, !automationRunning else { return }
+        guard !app.isBusy, !automationRunning else { return }
+        await checkAutomaticBackup(preferences: app.display.preferences) { url in
+            guard !app.isBusy else { return false }
+            return await app.backup(to: url)
+        }
+    }
+
+    /// The database owner supplies a verified snapshot operation; the schedule and retention own only automatic files.
+    public func checkAutomaticBackup(preferences: DisplayPreferences, create: @MainActor (URL) async throws -> Bool) async {
+        guard !backupRunning, let store, preferences.automaticBackup else { return }
+        backupRunning = true
+        defer { backupRunning = false }
         do {
-            let preferences = app.display.preferences
             let manifest = try await store.manifest()
-            let interval = TimeInterval(min(168, max(1, preferences.backupIntervalHours)) * 3600)
-            guard manifest.lastSuccess.map({ Date().timeIntervalSince($0) >= interval }) ?? true else { return }
+            let now = clock()
+            let due = try preferences.nextAutomaticBackupDate(lastSuccess: manifest.lastSuccess, now: now, calendar: calendar())
+            guard due <= now else { return }
             try Task.checkCancellation()
-            let url = try await store.nextBackupURL()
-            guard await app.backup(to: url) else {
-                backupError = app.errorText ?? "自動バックアップを保存できませんでした。"
+            let url = try await store.nextBackupURL(now: now)
+            guard try await create(url) else {
+                backupError = "自動バックアップを保存できませんでした。"
                 backupStatus = "自動バックアップを保存できませんでした。"
                 return
             }
-            try await store.completed(url: url, retention: preferences.backupGenerations)
+            try await store.completed(url: url, retention: preferences.automaticBackupRetention, at: clock())
             backupStatus = "自動バックアップを保存しました。"
             backupError = nil
-            await refreshBackupInfo(app: app)
+            await refreshBackupInfo()
         } catch is CancellationError {} catch {
             backupError = error.localizedDescription
             backupStatus = "自動バックアップ: \(error.localizedDescription)"

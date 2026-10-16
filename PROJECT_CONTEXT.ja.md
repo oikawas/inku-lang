@@ -122,7 +122,7 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 - 図形 10 — `line` / `circle` / `ellipse` / `triangle` / `square` / `polygon` / `arc` / `point` / `cloudform` / `free_line`
 - 線種 4 — `solid` / `dashed` / `dotted` / `dash_dot`
 - 道具 12 — `silverpoint` / `pencil` / `pen` / `rotring` / `crayon` / `chalk` / `brush_thin` / `brush_thick` / `oil_paint` / `burin` / `drypoint` / `computer`
-- 細さ 2 — `fine` / `extra_fine`（道具から独立した太さの軸）
+- 細さ 4 — `fine` / `extra_fine` / `thick` / `extra_thick`（道具から独立した太さの軸。太い側は Score 0.16.0 以上）
 - 色 9 — `white` / `black` / `blue` / `red` / `green` / `gray` / `yellow` / `orange` / `purple`
 - 面の質感 9・面の向き 5・地の素材 7
 

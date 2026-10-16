@@ -16,6 +16,10 @@ Added saved-provenance labels, independent canvas search, UUID copying, format m
 
 Also corrected issues found in the native UI: a parallel-limit error left visible after editing the value, duplicate accessibility names on export tabs, a plugin name wrapping mid-word, and untranslated size/created headings in English.
 
+The transparency setting follows the PNG templates. Animation format, transition, replay and resolution labels, and common share-card wording now use the bundled Web copy. Local storage scope and aspect-ratio labels for resizable native cards remain.
+
+The Library list puts the star beside the image and the revision mark and move-to-trash action in the actions column. The additional macOS actions menu remains.
+
 ## v2.15.159 (2026-10-16 / Build 1235)
 
 ### 2026-10-16 — Search works from the canvas header

@@ -126,18 +126,22 @@ struct LibraryWorkMarks: View {
     @Bindable var model: AppModel
     let work: SavedWork
     var spacing: CGFloat = 12
+    var showStar = true
+    var showRevision = true
     private var library: LibraryModel { model.library }
 
     var body: some View {
         HStack(spacing: spacing) {
-            Button { Task { await library.toggleStar(work) } } label: {
-                Image(systemName: work.starred ? "star.fill" : "star")
-                    .foregroundStyle(work.starred ? Color.accentColor : Color.secondary)
+            if showStar {
+                Button { Task { await library.toggleStar(work) } } label: {
+                    Image(systemName: work.starred ? "star.fill" : "star")
+                        .foregroundStyle(work.starred ? Color.accentColor : Color.secondary)
+                }
+                .accessibilityLabel(model.display.localized(work.starred ? "お気に入りを解除" : "お気に入り"))
+                .inkuTooltip(model.display.tooltip(work.starred ? "スターを外す" : "スターを付ける",
+                                                  serverKey: work.starred ? "starOn" : "starOff"))
             }
-            .accessibilityLabel(model.display.localized(work.starred ? "お気に入りを解除" : "お気に入り"))
-            .inkuTooltip(model.display.tooltip(work.starred ? "スターを外す" : "スターを付ける",
-                                        serverKey: work.starred ? "starOn" : "starOff"))
-            LibraryAnnotationMarkButton(model: model, work: work, mark: .revision)
+            if showRevision { LibraryAnnotationMarkButton(model: model, work: work, mark: .revision) }
         }
         .buttonStyle(.borderless)
         .disabled(library.mutating || model.isBusy)

@@ -12,7 +12,8 @@ func runWorkEditChecks(nativeFixtureURL: URL? = nil) async throws {
     let transport = WorkEditProvider()
     let app = AppModel(databaseURL: databaseURL, transport: transport)
     await app.initialize()
-    let provider = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false)
+    let provider = ProviderSettings(id: "check", baseURL: URL(string: "http://localhost:1/v1")!, requiresAPIKey: false,
+                                   models: ["original", "pinned-drawing"].map { ProviderModelSettings(id: $0, purposes: ["llm"]) })
     let settings = HostSettings(providers: [provider], models: ModelSelection(stage1Model: "check:original", stage2Model: "check:original"))
     try await app.updateHostSettings(settings)
     app.inputMode = "description"

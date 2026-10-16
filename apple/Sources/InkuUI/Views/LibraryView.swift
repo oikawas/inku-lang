@@ -516,12 +516,12 @@ struct LibraryView: View {
         )) {
             TableColumn("") { row in selectionCheck(row.work) }.width(32)
             TableColumn(display.webCopy("historyImageHeader", fallback: "画像")) { row in
-                ArtworkThumbnail(work: row.work, thumbnails: model.thumbnails).frame(width: 48, height: 36)
-                    .overlay(alignment: .topTrailing) {
-                        if row.work.starred { Image(systemName: "star.fill").font(.system(size: 9)).foregroundStyle(.yellow).padding(2) }
-                    }
-                    .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
-            }.width(62)
+                HStack(spacing: 6) {
+                    ArtworkThumbnail(work: row.work, thumbnails: model.thumbnails).frame(width: 48, height: 36)
+                        .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
+                    LibraryWorkMarks(model: model, work: row.work, showRevision: false).disabled(writingDisabled)
+                }
+            }.width(88)
             TableColumn(display.webCopy("historyDescriptionHeader", fallback: "記述")) { row in
                 VStack(alignment: .leading, spacing: 3) {
                     if let label = model.savedDisplayLabels[row.work.id] {
@@ -558,7 +558,13 @@ struct LibraryView: View {
             }.width(72)
             TableColumn(display.webCopy("historyActionHeader", fallback: "操作")) { row in
                 HStack(spacing: 4) {
-                    LibraryWorkMarks(model: model, work: row.work, spacing: 4).disabled(writingDisabled)
+                    LibraryWorkMarks(model: model, work: row.work, spacing: 4, showStar: false).disabled(writingDisabled)
+                    if !library.isTrash {
+                        Button { deletion = LibraryDeletion(ids: [row.work.id], movesToTrash: true) } label: { Image(systemName: "trash") }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel(display.localized("ごみ箱に移動"))
+                            .disabled(library.mutating || writingDisabled)
+                    }
                     Menu { workMenu(row.work) } label: { Image(systemName: "ellipsis") }
                         .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                         .inkuTooltip(tip("作品の操作"))

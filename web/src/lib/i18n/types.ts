@@ -1163,6 +1163,11 @@ export interface LangPack {
 	historySearchLabel: string;
 	historySearchHint: string;
 	historySearchClear: string;
+	canvasSearchLabel: string;
+	canvasSearchPlaceholder: string;
+	canvasSearchHint: string;
+	canvasSearchEmpty: string;
+	canvasSearchFailed: string;
 	historyNewer: string;
 	historyOlder: string;
 	historyOldest: string;

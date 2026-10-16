@@ -78,6 +78,9 @@ export class HistoryBrowsingState {
 	starredOnly = $state(false);
 	forRevisionOnly = $state(false);
 	forShareOnly = $state(false);
+	search = $state('');
+	searchFailed = $state(false);
+	private appliedSearch = $state('');
 	trashItems = $state<HistoryItem[]>([]);
 	trashTotal = $state(0);
 
@@ -101,7 +104,7 @@ export class HistoryBrowsingState {
 	}
 
 	get filtered(): boolean {
-		return this.starredOnly || this.forRevisionOnly || this.forShareOnly;
+		return !!this.appliedSearch || this.starredOnly || this.forRevisionOnly || this.forShareOnly;
 	}
 
 	get page(): number {
@@ -150,6 +153,9 @@ export class HistoryBrowsingState {
 		this.starredOnly = false;
 		this.forRevisionOnly = false;
 		this.forShareOnly = false;
+		this.search = '';
+		this.appliedSearch = '';
+		this.searchFailed = false;
 		this.trashItems = [];
 		this.trashTotal = 0;
 		this.externalRefreshInFlight = false;
@@ -169,6 +175,21 @@ export class HistoryBrowsingState {
 		if (index < 0 || index >= this.items.length) return null;
 		this.cursor = index;
 		return this.items[index] ?? null;
+	}
+
+	async setSearch(value: string): Promise<boolean> {
+		this.search = value;
+		this.appliedSearch = value.trim();
+		this.searchFailed = false;
+		this.selectionRequest += 1;
+		this.offset = 0;
+		this.cursor = -1;
+		this.items = [];
+		this.total = 0;
+		const request = this.fetchRequest + 1;
+		const loaded = await this.fetchOffset(0, { preserveSelection: true });
+		if (request === this.fetchRequest) this.searchFailed = !loaded;
+		return loaded;
 	}
 
 	async fetchOffset(offset: number, options: FetchHistoryOptions = {}): Promise<boolean> {
@@ -213,7 +234,10 @@ export class HistoryBrowsingState {
 			if (this.starredOnly) params.set('starred', 'true');
 			if (this.forRevisionOnly) params.set('for_revision', 'true');
 			if (this.forShareOnly) params.set('for_share', 'true');
-			if (options.anchorId) params.set('anchor_id', options.anchorId);
+			if (this.appliedSearch) {
+				params.set('q', this.appliedSearch);
+				params.set('canvas_search', 'true');
+			} else if (options.anchorId) params.set('anchor_id', options.anchorId);
 			const response = await this.deps.apiFetch(`/api/history?${params.toString()}`, {
 				signal: controller.signal
 			});
@@ -279,6 +303,10 @@ export class HistoryBrowsingState {
 			this.cursor = localIndex;
 			return;
 		}
+		if (this.appliedSearch) {
+			this.cursor = -1;
+			return;
+		}
 		this.cursor = -1;
 		let found = await this.fetchOffset(0, { anchorId: item.id });
 		if (requestId !== this.selectionRequest) {
@@ -327,7 +355,11 @@ export class HistoryBrowsingState {
 	}
 
 	openManager(): void {
-		this.manager.openWith(this.items, this.total, this.trashTotal);
+		this.manager.openWith(
+			this.appliedSearch ? this.manager.activeItems : this.items,
+			this.appliedSearch ? this.manager.activeTotal : this.total,
+			this.trashTotal
+		);
 	}
 
 	setStarredOnly(value: boolean): void {
@@ -367,6 +399,9 @@ export class HistoryBrowsingState {
 		this.starredOnly = false;
 		this.forRevisionOnly = false;
 		this.forShareOnly = false;
+		this.search = '';
+		this.appliedSearch = '';
+		this.searchFailed = false;
 	}
 
 	async move(button: HistoryNavButton): Promise<HistoryItem | null> {
@@ -427,6 +462,7 @@ export class HistoryBrowsingState {
 	}
 
 	async refreshExternal(): Promise<void> {
+		if (this.appliedSearch) return;
 		const now = (this.deps.now ?? Date.now)();
 		if (historyRefreshBlockedBy({
 			signedIn: this.deps.signedIn(),

@@ -76,6 +76,21 @@ def _history_search_clause(search: str):
     return or_(*clauses)
 
 
+def _canvas_history_search_clause(search: str):
+    if re.fullmatch(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", search, re.IGNORECASE):
+        return func.lower(HistoryRow.id) == search.lower()
+    literal = search.replace("/", "//").replace("%", "/%").replace("_", "/_")
+    clauses = [func.coalesce(HistoryRow.source_text, HistoryRow.input).ilike(f"%{literal}%", escape="/")]
+    for column in (HistoryRow.render_hash, HistoryRow.description_hash):
+        clauses.extend([
+            column.ilike(f"{literal}%", escape="/"),
+            column.ilike(f"%{literal}", escape="/"),
+        ])
+        if ":" not in search:
+            clauses.append(column.ilike(f"%:{literal}%", escape="/"))
+    return or_(*clauses)
+
+
 def _use_history_fts(search: str, *, fts_enabled: bool, dialect_name: str) -> bool:
     return (
         fts_enabled
@@ -211,6 +226,7 @@ class HistorySearchService:
         for_revision: bool = False,
         for_share: bool = False,
         include_svg: bool = True,
+        canvas_search: bool = False,
     ) -> tuple[list[dict], int]:
         actor = self.actor_of(user_id)
         with self.session_factory() as session:
@@ -226,7 +242,7 @@ class HistorySearchService:
             if for_share:
                 query = query.filter(HistoryRow.for_share == 1)
             search = query_text.strip()
-            if search and self.use_history_fts(search):
+            if search and not canvas_search and self.use_history_fts(search):
                 arguments = (
                     session,
                     actor,
@@ -242,7 +258,7 @@ class HistorySearchService:
                     return self.list_items_with_fts(*arguments)
                 return self.list_items_with_fts(*arguments, include_svg=False)
             if search:
-                query = query.filter(_history_search_clause(search))
+                query = query.filter(_canvas_history_search_clause(search) if canvas_search else _history_search_clause(search))
             total: int = query.with_entities(func.count(HistoryRow.id)).scalar() or 0
             # Choose the page by id first, then read only its rows. Sorting whole
             # rows made SQLite carry every readable work's columns (and the SVG

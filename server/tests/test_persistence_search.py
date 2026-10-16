@@ -55,6 +55,7 @@ def _expected_list_items(
     for_revision: bool = False,
     for_share: bool = False,
     include_svg: bool = True,
+    canvas_search: bool = False,
 ) -> tuple[list[dict], int]:
     raise NotImplementedError
 
@@ -379,6 +380,50 @@ def test_identifier_prefixes_find_sqlite_history_without_losing_text_or_visibili
             assert total == len(expected), query
         assert service.list_items("reader", query_text="abcde", offset=1, limit=1) == ([{"id": ids[1]}], 3)
         assert service.list_items("other", query_text="abcde") == ([{"id": ids[3]}], 1)
+    finally:
+        engine.dispose()
+
+
+def test_canvas_search_matches_exact_uuid_description_substrings_and_hash_edges(tmp_path) -> None:
+    engine = create_engine(f"sqlite:///{tmp_path / 'canvas-search.sqlite3'}")
+    HistoryRow.__table__.create(engine)
+    sessions = sessionmaker(bind=engine)
+    wanted = "12345678-1234-4123-8123-123456789abc"
+    digest = "abcde" + "0" * 50 + "fedcba123"
+    description_digest = "beef1" + "3" * 50 + "12abcdef9"
+    shadow = "87654321-4321-4321-8321-123456789abc"
+    literal_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    with sessions() as session:
+        session.add_all([
+            HistoryRow(id=wanted, user_id="reader", at=1, input="窓辺の青い円をひとつ", score="{}", svg="<svg/>",
+                render_hash="rh3:" + digest, description_hash="dh1:" + description_digest),
+            HistoryRow(id=shadow, user_id="reader", at=2, input=wanted, score="{}", svg="<svg/>",
+                render_hash="rh3:" + "1" * 20 + "abcde" + "2" * 39),
+            HistoryRow(id=literal_id, user_id="reader", at=3, input="100% scale_/value", score="{}", svg="<svg/>"),
+            HistoryRow(id="metadata-only", user_id="reader", at=4, input="unrelated words", ddl="窓辺の青い円", score="{}", svg="<svg/>"),
+            HistoryRow(id="source-text", user_id="reader", at=4, input="display label", source_text="川辺の赤い線", score="{}", svg="<svg/>"),
+            HistoryRow(id="other-owner", user_id="other", at=5, input="窓辺の青い円", render_hash="rh3:" + digest, score="{}", svg="<svg/>"),
+            HistoryRow(id="trashed", user_id="reader", at=6, input="窓辺の青い円", render_hash="rh3:" + digest, trashed=1, score="{}", svg="<svg/>"),
+            HistoryRow(id="lineage-only", user_id="reader", at=7, input="窓辺の青い円", render_hash="rh3:" + digest, history_visibility="lineage_only", score="{}", svg="<svg/>"),
+        ])
+        session.commit()
+    # No FTS table exists: canvas description substrings must use the literal clause.
+    service = _service(session_factory=sessions,
+        rows_to_dicts_with_lineage=lambda session, rows, actor, **kwargs: [{"id": row.id} for row in rows])
+    try:
+        for query, expected in (
+            (wanted, {wanted}), (wanted.upper(), {wanted}),
+            (wanted[:8], {shadow}), ("青い円", {wanted}),
+            ("ABCDE", {wanted}), ("rh3:abcde", {wanted}), ("cba123", {wanted}),
+            (digest, {wanted}), ("rh3:" + digest, {wanted}), ("000000", set()),
+            ("beef1", {wanted}), ("abcdef9", {wanted}), (description_digest, {wanted}),
+            ("dh1:" + description_digest, {wanted}), ("%", {literal_id}),
+            ("_", {literal_id}), ("/", {literal_id}),
+            ("赤い線", {"source-text"}), ("display label", set()),
+        ):
+            items, total = service.list_items("reader", query_text=query, canvas_search=True, include_svg=False)
+            assert {item["id"] for item in items} == expected, query
+            assert total == len(expected), query
     finally:
         engine.dispose()
 

@@ -73,6 +73,57 @@ function makeState(apiFetch: (path: string, init?: RequestInit) => Promise<Respo
 	return { state, controls };
 }
 
+test('canvas search carries its query through strip paging and clears back to ordinary history', async () => {
+	const calls: string[] = [];
+	const { state, controls } = makeState(async (path) => {
+		calls.push(path);
+		const params = new URL(path, 'https://inku.invalid').searchParams;
+		const offset = Number(params.get('offset'));
+		return jsonResponse({ items: [work(params.has('q') ? `match-${offset}` : 'ordinary')], total: 6, offset });
+	});
+	await state.fetchOffset(0);
+	controls.currentId = 'ordinary';
+	assert.deepEqual(state.manager.activeItems.map((item) => item.id), ['ordinary']);
+	await state.setSearch(' 青い円 ');
+	assert.equal(state.filtered, true);
+	assert.equal(state.cursor, -1, 'search does not highlight a different work from the one still on the canvas');
+	assert.equal(new URL(calls.at(-1)!, 'https://inku.invalid').searchParams.get('q'), '青い円');
+	assert.match(calls.at(-1)!, /canvas_search=true/);
+	assert.deepEqual(state.manager.activeItems.map((item) => item.id), ['ordinary']);
+	await state.movePage('older');
+	const page = new URL(calls.at(-1)!, 'https://inku.invalid').searchParams;
+	assert.equal(page.get('q'), '青い円');
+	assert.equal(page.get('canvas_search'), 'true');
+	assert.equal(page.get('offset'), '3');
+	await state.setSearch('');
+	assert.equal(state.filtered, false);
+	assert.equal(state.search, '');
+	assert.equal(state.offset, 0);
+	assert.equal(new URL(calls.at(-1)!, 'https://inku.invalid').searchParams.has('q'), false);
+	assert.deepEqual(state.items.map((item) => item.id), ['ordinary']);
+});
+
+test('canvas search clearing rejects late matches and a failed search never presents old works as matches', async () => {
+	const { apiFetch, requests } = deferredTransport();
+	const { state } = makeState(apiFetch);
+	const first = state.setSearch('abcde');
+	const clear = state.setSearch('');
+	assert.equal(requests[0].init?.signal?.aborted, true);
+	requests[1].resolve(jsonResponse({ items: [work('ordinary')], total: 1, offset: 0 }));
+	await clear;
+	requests[0].resolve(jsonResponse({ items: [work('late-match')], total: 1, offset: 0 }));
+	await first;
+	assert.deepEqual(state.items.map((item) => item.id), ['ordinary']);
+	assert.equal(state.searchFailed, false);
+	const failed = state.setSearch('missing');
+	assert.deepEqual(state.items, []);
+	requests[2].resolve(jsonResponse({}, 500));
+	assert.equal(await failed, false);
+	assert.equal(state.searchFailed, true);
+	assert.equal(state.search, 'missing');
+	assert.deepEqual(state.items, []);
+});
+
 test('T-275: only the latest strip request settles items, offset, and busy state', async () => {
 	const { apiFetch, requests } = deferredTransport();
 	const { state, controls } = makeState(apiFetch);

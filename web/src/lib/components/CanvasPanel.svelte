@@ -7,6 +7,7 @@
 	import type { Provider, ProviderGroup } from '$lib/models';
 	import CanvasArtworkWorkspace from '$lib/features/canvas/CanvasArtworkWorkspace.svelte';
 	import CanvasGenerationInfo from '$lib/features/canvas/CanvasGenerationInfo.svelte';
+	import CanvasWorkSearch from '$lib/features/canvas/CanvasWorkSearch.svelte';
 	import { pressChoosesWork } from '$lib/features/canvas/generation-info-follow';
 	import { generationInfoSettings } from '$lib/features/canvas/generation-info-settings.svelte';
 	import { ClipboardCopyRefused } from '$lib/clipboardExport';
@@ -42,6 +43,11 @@
 	type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
 	type Props = {
 		outputTab: OutputTab;
+		canvasSearch: string;
+		canvasSearchBusy: boolean;
+		canvasSearchFailed: boolean;
+		canvasSearchTotal: number;
+		onCanvasSearch: (value: string) => void;
 		result: PaintResult | null;
 		rangePreview?: RangePreview | null;
 		unsavedRefinementPreview: boolean;
@@ -194,6 +200,11 @@
 
 	let {
 		outputTab = $bindable('canvas'),
+		canvasSearch = $bindable(''),
+		canvasSearchBusy,
+		canvasSearchFailed,
+		canvasSearchTotal,
+		onCanvasSearch,
 		result,
 		rangePreview = null,
 		unsavedRefinementPreview = false,
@@ -690,6 +701,7 @@
 		<Tooltip placement="bottom" text={isJapanese ? '作品の派生関係を表示' : 'Show how this work was derived'}>
 			<button class="rtab" class:active={outputTab === 'lineage'} onclick={() => (outputTab = 'lineage')} disabled={!result}>{isJapanese ? '系譜' : 'Lineage'}</button>
 		</Tooltip>
+		<CanvasWorkSearch bind:value={canvasSearch} busy={canvasSearchBusy} failed={canvasSearchFailed} total={canvasSearchTotal} onSearch={onCanvasSearch} />
 		<div class="rtab-spacer"></div>
 		{#if result}
 			<div class="render-meta-strip" class:english={!isJapanese} aria-label={t().displayedWorkConditions}>

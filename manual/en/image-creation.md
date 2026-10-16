@@ -408,6 +408,8 @@ The `Lineage` tab shows which explicit action a work was derived from. Performan
 
 The history strip at the bottom is for moving quickly back and forth in time. Opening history leads to the separate `Library`, which keeps the making screen's input and unsaved refinement state. `Return to making` also keeps the library's query, filters, display, page, selection, scroll position and reading preview.
 
+The search field immediately after the `Lineage` tab in the canvas header filters the history thumbnails below. It matches a whole UUID, part of a description, or the beginning, end or whole of a render or description hash. Hashes work with or without a prefix such as `rh3:`, and matching is case-insensitive. Search after typing or press Enter, then choose a thumbnail to open the work. The × button clears the query and restores ordinary history. The Library keeps its own separate query.
+
 In the library, choose `Display` (`Thumbnails` or `List`) separately from `Group by` (`Timeline` or `By lineage`). Selecting a row or picture only opens its reading preview; it does not change the conditions for the next work. Use `Open work`, `Open lineage`, or `Refine` for those actions.
 
 Combine `Thumbnails` with `By lineage` to show only lineages with at least two works matching the current search and filters, arranged horizontally from the origin in generation order. Even a lineage with several works is omitted when only one matches. The lineage `List` view has no such two-work minimum. Scroll vertically between lineage groups and horizontally through a long row of related works.

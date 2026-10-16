@@ -3113,6 +3113,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				}}
 				replayDisabled={!replayableStatusHistoryItem || work.reloading}
 				currentHistoryId={work.displayedHistoryItem?.id ?? work.result?.history_id ?? null}
+				bind:canvasSearch={history.search}
+				canvasSearchBusy={history.fetchInFlight > 0}
+				canvasSearchFailed={history.searchFailed}
+				canvasSearchTotal={history.total}
+				onCanvasSearch={(value) => { void history.setSearch(value); }}
 				onDownloadCard={downloadCurrentCard}
 				onCopyToClipboard={copyCurrentWorkToClipboard}
 				bind:instructionCaptionVisible

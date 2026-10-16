@@ -1462,6 +1462,7 @@ def list_items(
     for_revision: bool = False,
     for_share: bool = False,
     include_svg: bool = True,
+    canvas_search: bool = False,
 ) -> tuple[list[dict], int]:
     arguments = (
         user_id,
@@ -1473,6 +1474,8 @@ def list_items(
         for_revision,
         for_share,
     )
+    if canvas_search:
+        return _history_search_service().list_items(*arguments, include_svg=include_svg, canvas_search=True)
     if include_svg:
         return _history_search_service().list_items(*arguments)
     return _history_search_service().list_items(*arguments, include_svg=False)

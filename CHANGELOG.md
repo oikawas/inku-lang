@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-16 — Search works from the canvas header
+
+Added a search field with an × clear button immediately after the Lineage tab. It filters the history thumbnails by whole UUID, description substring, or the beginning, end or whole of a render or description hash. Results support paging, and late responses cannot restore an older query after clearing. Existing mark filters and read permissions still apply; the Library keeps its own search.
+
 ## v2.15.158 (2026-10-16 / Build 1234)
 
 ### 2026-10-16 — A brush sweep's end narrows without parting, and its streaks are fainter

@@ -119,6 +119,7 @@ def api_history_get(
     for_revision: bool = Query(default=False),
     for_share: bool = Query(default=False),
     q: str = Query(default="", max_length=200),
+    canvas_search: bool = Query(default=False),
     anchor_id: str | None = Query(default=None, max_length=100),
     include_svg: bool = Query(
         default=True,
@@ -126,7 +127,7 @@ def api_history_get(
     ),
     actor: dict = Depends(_current_user),
 ) -> HistoryListResponse:
-    if anchor_id:
+    if anchor_id and not (canvas_search and q.strip()):
         position = _db.item_position(
             actor["id"], anchor_id, trashed=trashed, starred=starred,
             for_revision=for_revision, for_share=for_share,
@@ -143,6 +144,7 @@ def api_history_get(
         for_revision=for_revision,
         for_share=for_share,
         include_svg=include_svg,
+        **({"canvas_search": True} if canvas_search else {}),
     )
     # When the picture is present, count it here. When it is withheld,
     # persistence already measured its UTF-8 byte length in SQLite without

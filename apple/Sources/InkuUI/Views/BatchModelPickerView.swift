@@ -5,7 +5,8 @@ import SwiftUI
 struct BatchModelPickerView: View {
     @Bindable var model: AppModel
     private let initialReference: String?
-    private let immediateSelection: Bool
+    private let singlePurposeSelection: Bool
+    private let allowVisionSelection: Bool
     private let title: String
     private let purpose: String
     private let onSelection: (@MainActor (String) async throws -> Void)?
@@ -26,17 +27,19 @@ struct BatchModelPickerView: View {
         (settings?.providers ?? []).filter { !SettingsModel.registeredModels(for: $0, purpose: selectedPurpose).isEmpty }
     }
     private var hasVisionTab: Bool {
-        !immediateSelection && purpose == "llm" && onSelection == nil
-            && (settings?.providers.contains { !SettingsModel.registeredModels(for: $0, purpose: "vision").isEmpty } ?? false)
+        allowVisionSelection && !singlePurposeSelection && purpose == "llm" && onSelection == nil
     }
     private var selectedPurpose: String { hasVisionTab && selectionTab == "vision" ? "vision" : purpose }
     private var selectedReference: String { selectedPurpose == "vision" && hasVisionTab ? draftVisionReference : draftReference }
     private var inspectedReference: String? { hoveredReference ?? focusedReference }
     init(model: AppModel, initialReference: String? = nil, immediateSelection: Bool = false,
-         title: String = "モデル選択", purpose: String = "llm", onSelection: (@MainActor (String) async throws -> Void)? = nil) {
+         title: String = "モデル選択", purpose: String = "llm", allowVisionSelection: Bool = false,
+         onSelection: (@MainActor (String) async throws -> Void)? = nil) {
         self.model = model
         self.initialReference = initialReference
-        self.immediateSelection = immediateSelection
+        // Preserve existing caller syntax while every entry now confirms its local draft.
+        self.singlePurposeSelection = immediateSelection
+        self.allowVisionSelection = allowVisionSelection
         self.title = title
         self.purpose = purpose
         self.onSelection = onSelection
@@ -67,7 +70,7 @@ struct BatchModelPickerView: View {
             }.padding(16)
             Divider()
             HStack {
-                selectionTabButton("shared", title: immediateSelection ? model.display.localized(title) : "Stage 1/2")
+                selectionTabButton("shared", title: singlePurposeSelection ? model.display.localized(title) : "Stage 1/2")
                 if hasVisionTab { selectionTabButton("vision", title: "Vision") }
             }.padding(.horizontal, 24).padding(.vertical, 12)
             Divider()
@@ -95,13 +98,14 @@ struct BatchModelPickerView: View {
                         ForEach(groups) { provider in
                             VStack(alignment: .leading, spacing: 7) {
                                 Text(model.display.providerName(provider)).inkuFont(12, weight: .medium).foregroundStyle(.secondary)
-                                ModelCatalogGroupsView(models: sortedModels(for: provider), display: model.display,
-                                    columns: [GridItem(.adaptive(minimum: 190), spacing: 7)]) { entry in
-                                    modelCard(entry, provider: provider)
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 7)], alignment: .leading, spacing: 7) {
+                                    ForEach(sortedModels(for: provider)) { entry in
+                                        modelCard(entry, provider: provider)
+                                    }
                                 }
                             }
                         }
-                        if !immediateSelection, selectedPurpose == "llm", draftReference.contains("qwen3") {
+                        if !singlePurposeSelection, selectedPurpose == "llm", draftReference.contains("qwen3") {
                             Toggle(model.display.localized("思考を表示"), isOn: $draftThinking).disabled(cannotSelect)
                         }
                     }.padding(16)
@@ -111,14 +115,12 @@ struct BatchModelPickerView: View {
             Divider()
             HStack(spacing: 8) {
                 Spacer()
-                Button(model.display.localized(immediateSelection ? "閉じる" : "キャンセル")) { dismiss() }
+                Button(model.display.localized("キャンセル")) { dismiss() }
                     .keyboardShortcut(.cancelAction).environment(\.isEnabled, true)
                     .disabled(committing)
-                if !immediateSelection {
-                    Button(model.display.localized("決定")) { Task { await confirmSelection() } }
-                        .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
-                        .disabled(!canConfirm)
-                }
+                Button(model.display.localized("決定")) { Task { await confirmSelection() } }
+                    .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+                    .disabled(!canConfirm)
             }.padding(.horizontal, 18).padding(.vertical, 14)
         }
         #if os(macOS)
@@ -182,7 +184,7 @@ struct BatchModelPickerView: View {
 
     private var selectionSummary: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(immediateSelection ? model.display.localized(title) : "Stage 1/2").inkuFont(11, weight: .semibold).foregroundStyle(.secondary)
+            Text(singlePurposeSelection ? model.display.localized(title) : "Stage 1/2").inkuFont(11, weight: .semibold).foregroundStyle(.secondary)
             Text(entry(for: draftReference, purpose: purpose).map { $0.model.label.isEmpty ? $0.model.id : $0.model.label }
                  ?? model.display.localized("未設定"))
                 .inkuFont(13).fixedSize(horizontal: false, vertical: true)
@@ -198,9 +200,9 @@ struct BatchModelPickerView: View {
     }
 
     private var sharedModelHint: some View {
-        Text(model.display.localized(immediateSelection ? "モデルを選ぶと変更を適用して閉じます。" : selectedPurpose == "vision"
-            ? "画像を読むVision処理に使うモデルを選択します。"
-            : "選んだモデルを Stage 1 と Stage 2 の両方に使います（段ごとに別のモデルは選べません）。段ごとに測ってあるモデルは、低いほうの段の順に並べます。"))
+        Text(selectedPurpose == "vision"
+             ? model.display.webCopy("modelSelectionVisionHint", "画像を読むVision処理に使うモデルを選択します。")
+             : model.display.webCopy("modelSelectionSharedHint", "選んだモデルを Stage 1 と Stage 2 の両方に使います（段ごとに別のモデルは選べません）。段ごとに測ってあるモデルは、低いほうの段の順に並べます。"))
             .inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
     }
 
@@ -230,7 +232,6 @@ struct BatchModelPickerView: View {
             if hasVisionTab && selectedPurpose == "vision" { draftVisionReference = reference }
             else { draftReference = reference }
             selectionError = nil
-            if immediateSelection { Task { await confirmSelection() } }
         } label: {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .top, spacing: 8) {
@@ -240,7 +241,13 @@ struct BatchModelPickerView: View {
                     Spacer(minLength: 0)
                     if selected { Image(systemName: "checkmark").foregroundStyle(Color.accentColor) }
                 }
-                ModelLabelsView(labels: entry.resolvedLabels, display: model.display)
+                ModelLabelsView(labels: entry.resolvedLabels, display: model.display, endOfLifeDate: entry.eolDate)
+                HStack {
+                    ModelPurposeBadgesView(entry: entry, language: model.display.preferences.language)
+                    Spacer(minLength: 0)
+                    Text(ModelGuidance.recommendation(sharedRecommendationLevel(entry)))
+                        .inkuFont(11).foregroundStyle(.secondary)
+                }
             }
             .frame(maxWidth: .infinity, minHeight: 20, alignment: .topLeading)
             .padding(10)
@@ -289,29 +296,12 @@ struct BatchModelPickerView: View {
     }
 
     private func metadata(_ entry: ProviderModelSettings, provider: ProviderSettings) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ModelLabelsView(labels: entry.resolvedLabels, display: model.display)
-            let guidance = ModelGuidanceCatalog.bundled?.guidance(for: provider.id + ":" + entry.id, providers: [provider])
-            ModelMeasurementView(llmSeconds: guidance?.speedHidden == true ? nil : entry.speedLLMSeconds,
-                                 visionSeconds: guidance?.speedHidden == true ? nil : entry.speedVisionSeconds,
-                                 llmCost: entry.costUSDLLM, visionCost: entry.costUSDVision)
-            metadataRow("用途", purposes(entry))
-            ForEach(recommendationRows(entry), id: \.0) { row in metadataRow(row.0, row.1) }
-            metadataRow("速度", speed(entry, provider: provider))
-            metadataRow("評価コメント", comment(entry))
-        }
+        RegisteredModelMetadataView(entry: entry, provider: provider, display: model.display, purpose: selectedPurpose)
         .padding(12)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(.quaternary))
         .shadow(color: .black.opacity(0.18), radius: 12, y: 5)
         .accessibilityHidden(true)
-    }
-
-    private func metadataRow(_ key: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(model.display.localized(key)).inkuFont(11).foregroundStyle(.secondary)
-            Text(value).inkuFont(12).fixedSize(horizontal: false, vertical: true)
-        }
     }
 
     private func sharedRecommendationLevel(_ entry: ProviderModelSettings) -> Int {
@@ -331,14 +321,16 @@ struct BatchModelPickerView: View {
     }
 
     private func purposes(_ entry: ProviderModelSettings) -> String {
-        entry.purposes.map { $0 == "vision" ? "Vision" : "LLM" }.joined(separator: " / ")
+        ["llm", "vision"].map { purpose in
+            let label = purpose == "llm" ? "LLM" : "Vision"
+            return label + (ModelMetadataPresentation.supports(entry, purpose: purpose) ? "" : model.display.preferences.language == "en" ? " (not selectable)" : "（選べません）")
+        }.joined(separator: " / ")
     }
 
     private func speed(_ entry: ProviderModelSettings, provider: ProviderSettings) -> String {
         let guidance = ModelGuidanceCatalog.bundled?.guidance(for: provider.id + ":" + entry.id,
                                                            providers: settings?.providers ?? [])
-        guard guidance?.speedHidden != true, let speed = entry.speedLabel, !speed.isEmpty else { return "—" }
-        return speed
+        return ModelMetadataPresentation.speed(entry, hidden: guidance?.speedHidden == true, language: model.display.preferences.language)
     }
 
     private func comment(_ entry: ProviderModelSettings) -> String {
@@ -349,7 +341,8 @@ struct BatchModelPickerView: View {
 
     private func metadataText(_ entry: ProviderModelSettings, provider: ProviderSettings) -> String {
         let rows = [("用途", purposes(entry))] + recommendationRows(entry)
-            + [("速度", speed(entry, provider: provider)), ("評価コメント", comment(entry))]
+            + [("概算コスト", ModelMetadataPresentation.cost(entry, language: model.display.preferences.language)),
+               ("速度", speed(entry, provider: provider)), ("評価コメント", comment(entry))]
         return (entry.resolvedLabels.map { $0.name(language: model.display.preferences.language) }
                 + rows.map { model.display.localized($0.0) + ": " + $0.1 }).joined(separator: ". ")
     }

@@ -58,6 +58,9 @@ public final class SavedScoreVariantModel {
 
     public func generate(app: AppModel) async {
         guard !running, !app.isBusy, !exhausted else { return }
+        let fanoutLimit: Int
+        do { fanoutLimit = try RefinementFanout.validatedLimit(app.display.preferences.refinementFanoutLimit) }
+        catch { errorText = error.localizedDescription; return }
         let run = UUID(); runID = run
         running = true; saving = false; stopping = false; errorText = nil; failures = []
         defer { finish() }
@@ -70,7 +73,7 @@ public final class SavedScoreVariantModel {
                 } else { plans = []; self.exhausted = true }
             } else { plans = try await app.makeGroundVariantPlans(work: self.work) }
             self.lanes = plans.map { _ in .waiting }
-            try await RefinementFanout.run(count: plans.count, onStart: { index in self.lanes[index] = .running }) { index in
+            try await RefinementFanout.run(count: plans.count, limit: fanoutLimit, onStart: { index in self.lanes[index] = .running }) { index in
                 try Task.checkCancellation()
                 guard self.runID == run, !self.stopping else { throw CancellationError() }
                 do {

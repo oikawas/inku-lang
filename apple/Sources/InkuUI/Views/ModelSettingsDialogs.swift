@@ -304,7 +304,7 @@ struct ProviderModelsSheet: View {
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(model.display.localizedFormat("%@ の使用モデル選択", provider?.displayName ?? providerID))
+                Text(model.display.webCopyFormat("settingsModelSelectModelsTitle", "%@ の公開モデル選択", provider?.displayName ?? providerID))
                     .inkuFont(16, weight: .semibold)
                 Text(model.display.localizedFormat("サービスID: %@", providerID)).inkuFont(12).foregroundStyle(.secondary)
             }
@@ -327,8 +327,8 @@ struct ProviderModelsSheet: View {
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(.secondary.opacity(0.25)))
                 Picker(model.display.localized("絞り込み"), selection: $filter) {
                     Text(model.display.localized("すべて")).tag(ProviderModelFilter.all)
-                    Text(model.display.localized("使用中")).tag(ProviderModelFilter.enabled)
-                    Text(model.display.localized("不使用")).tag(ProviderModelFilter.disabled)
+                    Text(model.display.webCopy("settingsModelFilterPublished", "公開中")).tag(ProviderModelFilter.enabled)
+                    Text(model.display.webCopy("settingsModelFilterUnpublished", "非公開")).tag(ProviderModelFilter.disabled)
                     Text(model.display.localized("LLM 用")).tag(ProviderModelFilter.llm)
                     Text(model.display.localized("Vision 用")).tag(ProviderModelFilter.vision)
                 }.frame(width: 200)
@@ -356,7 +356,7 @@ struct ProviderModelsSheet: View {
                     Text(item.label).inkuFont(14, weight: .semibold)
                     Text(item.id).inkuFont(12, design: .monospaced).foregroundStyle(.secondary)
                         .textSelection(.enabled)
-                    ModelLabelsView(labels: item.resolvedLabels, display: model.display)
+                    ModelLabelsView(labels: item.resolvedLabels, display: model.display, endOfLifeDate: item.eolDate)
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 6) {
                     purposeButton("LLM", purpose: "llm", item: item)
@@ -372,7 +372,7 @@ struct ProviderModelsSheet: View {
 
     @ViewBuilder
     private func enabledToggle(_ item: ProviderModelSettings) -> some View {
-        let toggle = Toggle(model.display.localizedFormat("使用: %@", item.label), isOn: Binding(
+        let toggle = Toggle(model.display.webCopy("settingsModelPublishedModels", "ユーザーに公開するモデル") + ": " + item.label, isOn: Binding(
             get: { draft.isEnabled(modelID: item.id) },
             set: { draft.setEnabled(modelID: item.id, enabled: $0) }))
             .labelsHidden().disabled(!item.isSelectable)
@@ -407,7 +407,9 @@ struct ProviderModelsSheet: View {
                 metadataField("オススメ度") {
                     Picker(model.display.localized("オススメ度"), selection: recommendationBinding(item.id)) {
                         Text("—").tag(0)
-                        ForEach(1...5, id: \.self) { level in Text("\(level) / 5").tag(level) }
+                        ForEach([3, 2, 1], id: \.self) { tier in
+                            Text(ModelGuidance.recommendation(tier == 3 ? 5 : tier == 2 ? 3 : 2)).tag(tier)
+                        }
                     }.labelsHidden()
                 }
                 metadataField("速度区分") {
@@ -445,9 +447,9 @@ struct ProviderModelsSheet: View {
     }
 
     private func recommendationBinding(_ modelID: String) -> Binding<Int> {
-        Binding(get: { draft.model(modelID: modelID)?.recommendationLevel ?? 0 }, set: { level in
+        Binding(get: { ModelGuidance.recommendationTier(draft.model(modelID: modelID)?.recommendationLevel) }, set: { tier in
             guard var item = draft.model(modelID: modelID) else { return }
-            item.recommendationLevel = level == 0 ? nil : level
+            item.recommendationLevel = tier == 0 ? nil : tier == 3 ? 5 : tier == 2 ? 3 : 2
             draft.updateModel(item)
         })
     }
@@ -468,12 +470,12 @@ struct ProviderModelsSheet: View {
                 Text(model.display.message(statusMessage)).inkuFont(12).foregroundStyle(.secondary).lineLimit(3)
             }
             HStack(spacing: 12) {
-                Text(model.display.localizedFormat("%ld モデルを使用中", draft.enabledCount))
+                Text(model.display.webCopyFormat("settingsModelPublishedCount", "%@ モデルを公開中", draft.enabledCount))
                     .inkuFont(13).foregroundStyle(.secondary)
                 if draft.isDirty { Text(model.display.localized("未保存の変更")).inkuFont(12, weight: .semibold) }
                 Spacer()
                 if isWorking { ProgressView().controlSize(.small) }
-                Button(model.display.localized("取消")) { cancel() }
+                Button(model.display.localized("キャンセル")) { cancel() }
                     .keyboardShortcut(.cancelAction).disabled(isWorking)
                 Button(model.display.localized("保存")) { Task { await save() } }
                     .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)

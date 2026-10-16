@@ -63,6 +63,7 @@ public struct PluginWord: Identifiable, Sendable {
     public let note: String
     public let previewURL: URL?
     public let packageID: String?
+    public let sourceFile: String?
     public let englishNote: String?
     public let firesOnJapanese: [String]
     public let firesOnEnglish: [String]
@@ -128,6 +129,7 @@ struct Bootstrap {
             }
             return PluginWord(id: id, aliases: item["aliases"] as? [String] ?? [], japanese: surfaces["ja"] ?? [],
                 english: surfaces["en"] ?? [], note: notes["ja"] ?? "", previewURL: preview, packageID: item["package_id"] as? String,
+                sourceFile: item["source_file"] as? String,
                 englishNote: notes["en"], firesOnJapanese: (item["fires_on"] as? [String: [String]])?["ja"] ?? [],
                 firesOnEnglish: (item["fires_on"] as? [String: [String]])?["en"] ?? [])
         }

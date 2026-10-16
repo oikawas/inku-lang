@@ -38,7 +38,7 @@ struct ModelSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text(model.display.localized("AIサービス接続")).inkuFont(16, weight: .semibold)
+                Text(model.display.webCopy("settingsModelConnectionsTitle", "AIサービス接続")).inkuFont(16, weight: .semibold)
                 serviceCards
                 if chatGPTSelected, let chatGPT {
                     chatGPTEditor(chatGPT)
@@ -133,7 +133,7 @@ struct ModelSettingsView: View {
                 Text(provider.id).inkuFont(12).foregroundStyle(.secondary).lineLimit(1)
                 Text(status)
                     .inkuFont(12).foregroundStyle(.secondary)
-                Text(model.display.localizedFormat("使用モデル: %ld個", settings.publishedModels(for: provider).count))
+                Text(model.display.webCopyFormat("settingsModelPublishedCount", "%@ モデルを公開中", settings.publishedModels(for: provider).count))
                     .inkuFont(12).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, minHeight: 90, alignment: .topLeading)
@@ -210,15 +210,15 @@ struct ModelSettingsView: View {
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(model.display.localized("使用するモデル")).inkuFont(13).foregroundStyle(.secondary)
-                    Text(model.display.localizedFormat("使用モデル: %ld個", selectedModels.count))
+                    Text(model.display.webCopy("settingsModelPublishedModels", "ユーザーに公開するモデル")).inkuFont(13).foregroundStyle(.secondary)
+                    Text(model.display.webCopyFormat("settingsModelPublishedCount", "%@ モデルを公開中", selectedModels.count))
                         .inkuFont(13, weight: .semibold)
                 }
                 Spacer(minLength: 8)
                 Button(model.display.localized("モデル選択"), action: select)
             }
             if selectedModels.isEmpty {
-                Text(model.display.localized("使用するモデルはありません。"))
+                Text(model.display.webCopy("settingsModelNoPublishedModels", "公開モデルは未選択です。"))
                     .inkuFont(13).foregroundStyle(.secondary)
             } else {
                 ViewThatFits(in: .vertical) {

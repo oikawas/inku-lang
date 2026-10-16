@@ -130,6 +130,9 @@ public final class ComparisonModel {
 
     public func generate(app: AppModel) async {
         guard canGenerate, !app.isBusy, let work = original else { return }
+        let fanoutLimit: Int
+        do { fanoutLimit = try RefinementFanout.validatedLimit(app.display.preferences.refinementFanoutLimit) }
+        catch { errorText = error.localizedDescription; return }
         let comparisonKind = kind
         let wild: Bool? = inheritWild ? nil : wildOverride
         let labels = comparisonKind == .catalog
@@ -169,7 +172,7 @@ public final class ComparisonModel {
             }
             // Web generateModelCandidates / color catalog plans: the candidates are drawn at once, within the fan-out limit.
             let pinned = requests
-            try await RefinementFanout.run(count: labels.count, onStart: { index in
+            try await RefinementFanout.run(count: labels.count, limit: fanoutLimit, onStart: { index in
                 self.laneStates[index] = .running
                 self.status = "候補 \(index + 1)/\(labels.count): \(labels[index].1)"
             }) { index in

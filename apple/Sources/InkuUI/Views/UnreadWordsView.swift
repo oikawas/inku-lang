@@ -1,3 +1,4 @@
+import Foundation
 import InkuPersistence
 import SwiftUI
 
@@ -21,46 +22,58 @@ public struct UnreadWordsView: View {
                 Spacer()
                 Button(model.display.localized("再読込")) { Task { await reload() } }.disabled(loading)
             }
-            Text(model.display.localized("記述からDDLへの解釈で直接対応を確認できなかった語の集計です。この台帳から辞書へ自動昇格することはありません。"))
+            Text(model.display.webCopy("settingsUnreadWordsDescription", "記述からDDLへの解釈で直接対応を確認できなかった語の集計です。この台帳から辞書へ自動昇格することはありません。"))
                 .inkuFont(12).foregroundStyle(.secondary)
+            Text(model.display.preferences.language == "en" ? "Unread words recorded on this device" : "この端末に記録された未読語")
+                .inkuFont(11).foregroundStyle(.secondary)
             if loading { ProgressView(model.display.localized("読み込み中")) }
             if let error { Text(model.display.localized("未読語台帳を読み込めませんでした: ") + error).foregroundStyle(.red).textSelection(.enabled) }
             if items.isEmpty, !loading, error == nil { Text(model.display.localized("記録された未読語はありません。")).foregroundStyle(.secondary) }
             if !items.isEmpty {
-                Text(model.display.localizedFormat("%ld語（最大500語）", items.count)).inkuFont(12).foregroundStyle(.secondary)
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 14) {
-                        ForEach(items) { item in
-                            VStack(alignment: .leading, spacing: 5) {
-                                HStack {
-                                    Text(item.word).fontWeight(.semibold).textSelection(.enabled)
-                                    Text(model.display.localizedFormat("%ld回記録", item.frequency)).monospacedDigit()
-                                    Spacer()
-                                    Text(date(item.lastAt), style: .date).inkuFont(12)
-                                    Text(date(item.lastAt), style: .time).inkuFont(12)
-                                }.inkuTooltip(model.display.tooltipValue(model.display.webCopy("settingsUnreadWordsFirstSeen", "初回記録") + ": " + date(item.firstAt).formatted(date: .abbreviated, time: .standard)))
-                                ForEach(item.contexts, id: \.self) { context in
-                                    Text(context).inkuFont(12).foregroundStyle(.secondary).textSelection(.enabled)
-                                        .inkuTooltip(model.display.tooltipValue(context))
-                                }
+                Text(model.display.webCopyFormat("settingsUnreadWordsCount", "%@語", items.count))
+                    .inkuFont(11).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .trailing)
+                Table(items) {
+                    TableColumn(model.display.webCopy("settingsUnreadWordsWord", "語")) { item in
+                        Text(item.word).fontWeight(.semibold).textSelection(.enabled)
+                    }.width(min: 90, ideal: 140, max: 180)
+                    TableColumn(model.display.webCopy("settingsUnreadWordsFrequency", "頻度")) { item in
+                        Text(String(item.frequency)).monospacedDigit().frame(maxWidth: .infinity, alignment: .trailing)
+                    }.width(60)
+                    TableColumn(model.display.webCopy("settingsUnreadWordsLastSeen", "最終記録")) { item in
+                        Text(timestamp(item.lastAt)).foregroundStyle(.secondary)
+                            .inkuTooltip(model.display.tooltipValue(model.display.webCopy("settingsUnreadWordsFirstSeen", "初回記録") + ": " + timestamp(item.firstAt)))
+                    }.width(min: 130, ideal: 160, max: 200)
+                    TableColumn(model.display.webCopy("settingsUnreadWordsContexts", "文脈（最大3件）")) { item in
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(item.contexts, id: \.self) { context in
+                                Text(context).foregroundStyle(.secondary).lineLimit(1).textSelection(.enabled)
+                                    .inkuTooltip(model.display.tooltipValue(context))
                             }
-                            Divider()
                         }
-                    }
-                }.frame(maxHeight: 440)
+                    }.width(min: 260, ideal: 360)
+                }
+                .inkuFont(12).frame(minHeight: 260, maxHeight: 440)
             }
         }.task { await reload() }
     }
 
     private func date(_ milliseconds: Int64) -> Date { Date(timeIntervalSince1970: Double(milliseconds) / 1000) }
+    private func timestamp(_ milliseconds: Int64) -> String {
+        guard milliseconds > 0 else { return "—" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: model.display.preferences.language)
+        formatter.dateStyle = .short; formatter.timeStyle = .medium
+        return formatter.string(from: date(milliseconds))
+    }
     private func reload() async {
-        let current = UUID(); requestID = current; loading = true
+        let current = UUID(); requestID = current; loading = true; error = nil
         do {
             let result = try await model.auxiliaryDatabase().unreadWords()
             guard requestID == current, !Task.isCancelled else { return }
             items = result; error = nil
         } catch {
             guard requestID == current, !Task.isCancelled else { return }
+            items = []
             self.error = error.localizedDescription
         }
         if requestID == current { loading = false }

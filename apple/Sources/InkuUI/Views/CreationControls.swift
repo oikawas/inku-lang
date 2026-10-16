@@ -130,14 +130,18 @@ struct CreationCanvasControls: View {
                     .accessibilityLabel(model.display.localized("歳時記を開く"))
                     .inkuTooltip(model.display.tooltip("歳時記の語と説明を参照します。", serverKey: "tooltipSaijikiToggle"))
             }
-            Button { perform(model.display.visible("work_tools") ? "export" : "export-card") } label: {
-                Image(systemName: "square.and.arrow.down")
-            }
-            .accessibilityLabel(model.display.localized(model.display.visible("work_tools") ? "書き出す" : "共有カード"))
-            .disabled(!saved || disabled)
+            if model.display.visible("work_tools") {
+                SavedWorkExportMenu(model: model, count: saved ? 1 : 0, symbolOnly: true, onAction: perform)
+                    .disabled(!saved || disabled)
+                    .inkuTooltip(exportTooltip)
+            } else {
+                Button { perform("export-card") } label: { Image(systemName: "square.and.arrow.down") }
+                    .accessibilityLabel(model.display.localized("共有カード"))
+                    .disabled(!saved || disabled)
             // CanvasArtworkWorkspace.svelte:340,359 and SavedWorkExportMenu.svelte:173: the share card in a simple UI,
             // the export menu for a saved work, and why an unsaved one cannot leave yet.
             .inkuTooltip(exportTooltip)
+            }
             Button {
                 guard let work, !disabled else { return }
                 Task { await model.copyImage(work: work) }

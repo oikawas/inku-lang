@@ -19,23 +19,45 @@ struct PluginSettingsView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
                             Text(package.id).inkuFont(14, weight: .semibold)
-                            Text(package.versions.isEmpty ? model.display.localized("描画定義なし") : package.versions.map { "v" + $0 }.joined(separator: ", "))
-                                .inkuFont(12).foregroundStyle(.secondary)
+                            ForEach(package.versions, id: \.self) { version in
+                                Text("v" + version).inkuFont(11).monospacedDigit()
+                                    .padding(.horizontal, 6).padding(.vertical, 2)
+                                    .background(InkuColor.bg, in: Capsule())
+                                    .overlay(Capsule().stroke(InkuColor.border2))
+                            }
+                            Text(model.display.webCopy(package.versions.isEmpty ? "settingsPluginNotDrawn" : "settingsPluginDrawn",
+                                                       package.versions.isEmpty ? "描画には使われない" : "描画に使う"))
+                                .inkuFont(11).foregroundStyle(.secondary)
                             Spacer()
-                            Toggle(model.display.localized("有効"), isOn: Binding(get: { settings.preferences.isEnabled(package.id) }, set: { value in
+                            Toggle(model.display.webCopy(settings.preferences.isEnabled(package.id) ? "settingsPluginEnabled" : "settingsPluginDisabled",
+                                                         settings.preferences.isEnabled(package.id) ? "有効" : "無効"), isOn: Binding(get: { settings.preferences.isEnabled(package.id) }, set: { value in
                                 Task { await settings.setEnabled(value, packageID: package.id, model: model) }
                             })).fixedSize().disabled(package.versions.isEmpty)
                         }
-                        DisclosureGroup(model.display.localizedFormat("収録語（%ld）", package.words.count)) {
+                        ForEach(package.sourceFiles, id: \.self) { source in
+                            Text(source).inkuFont(12).foregroundStyle(.secondary).textSelection(.enabled)
+                        }
+                        Text(model.display.webCopy(package.versions.isEmpty ? "settingsPluginNotDrawnHint" : "settingsPluginDrawnHint",
+                                                   "定義を持つプラグインの語を、次に作る作品で使います。"))
+                            .inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        DisclosureGroup(model.display.webCopy("settingsPluginWords", "語の一覧") + "（\(package.words.count)）") {
                             ForEach(package.words) { word in
-                                HStack(alignment: .top, spacing: 12) {
-                                    if let url = word.previewURL { preview(url).frame(width: 64, height: 64) }
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        HStack { Text(word.id).inkuFont(13, weight: .semibold); Text(model.display.localized(package.drawnNames.contains(word.id) ? "描画に使用" : "描画定義なし")).inkuFont(12).foregroundStyle(.secondary) }
-                                        if !word.aliases.isEmpty { Text(word.aliases.joined(separator: ", ")).inkuFont(12) }
-                                        Text((model.display.preferences.language == "en" ? word.english : word.japanese).joined(separator: " | ")).inkuFont(13)
-                                        Text(word.note).inkuFont(12).foregroundStyle(.secondary)
+                                HStack(alignment: .top, spacing: 10) {
+                                    Group {
+                                        if let url = word.previewURL { preview(url) }
+                                        else { Color.clear }
                                     }
+                                    .frame(width: 96, height: 44)
+                                    .background(InkuColor.bg, in: RoundedRectangle(cornerRadius: 4))
+                                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(InkuColor.border))
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(word.id).inkuFont(12, weight: .semibold)
+                                        if !word.aliases.isEmpty { Text(word.aliases.joined(separator: ", ")).inkuFont(12) }
+                                        Text((model.display.preferences.language == "en" ? word.english : word.japanese).joined(separator: " | ")).inkuFont(12)
+                                        let note = model.display.preferences.language == "en" ? word.englishNote ?? "" : word.note
+                                        if !note.isEmpty { Text(note).inkuFont(12).foregroundStyle(.secondary) }
+                                    }.frame(maxWidth: .infinity, alignment: .leading)
+                                        .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
                                 }.padding(.vertical, 4)
                             }
                         }

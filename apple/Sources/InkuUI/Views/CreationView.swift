@@ -1,4 +1,5 @@
 import InkuPersistence
+import InkuHost
 import SwiftUI
 
 struct BatchWorkspaceSelection {
@@ -44,6 +45,7 @@ struct CreationView: View {
     @State private var showSketchMenu = false
     @State private var showNewDDL = false
     @State private var rightPanelWidth: CGFloat = 0
+    @State private var savedProviders: [InkuHost.ProviderSettings] = []
     @Environment(\.inkuWindowSize) private var windowSize
     private var isBatch: Bool { automation.workspaceInputMode == "batch" }
     private var batchWork: SavedWork? { batchWorkspace.pinnedWork ?? (batchWorkspace.followsLatest ? automation.observedWork : nil) }
@@ -107,6 +109,7 @@ struct CreationView: View {
             }
         }
         .onDisappear { batchWorkspace.invalidateReads() }
+        .task(id: model.providerSettingsRevision) { savedProviders = await model.hostSettings().providers }
         .onChange(of: workspaceWork?.id) { _, _ in
             onWorkspaceWorkChange(workspaceWork)
             // CanvasGenerationInfo follows the chosen work only when the setting says so.
@@ -509,6 +512,8 @@ struct CreationView: View {
                 }
                 .disabled(workspaceWork == nil || browsingDisabled)
                 .inkuTooltip(display.tooltip("作品の派生関係を表示"), placement: .bottom)
+                CanvasWorkSearchView(library: history.library, display: display)
+                    .frame(minWidth: 100, idealWidth: 180, maxWidth: 286).padding(.horizontal, 8)
                 if wide && showsMeta, let work = workspaceWork {
                     Spacer(minLength: 12)
                     metaStrip(work)
@@ -527,9 +532,11 @@ struct CreationView: View {
     }
 
     private func metaStrip(_ work: SavedWork) -> some View {
-        let stage1 = work.stage1Model ?? "DDL"
-        let stage2 = work.stage2Model ?? stage1
-        let catalog = work.renderColorCatalogName ?? work.renderColorCatalogID ?? work.catalogID ?? "—"
+        let naming = ModelNaming(providers: savedProviders)
+        let stage1 = work.stage1Model.map { naming.displayName($0) } ?? "DDL"
+        let stage2 = work.stage2Model.map { naming.displayName($0) } ?? stage1
+        let catalogID = work.renderColorCatalogID ?? work.catalogID
+        let catalog = work.renderColorCatalogName ?? model.catalogs.first { $0.id == catalogID }?.name ?? catalogID ?? "—"
         let canvasID = work.renderCanvasAspectID ?? ""
         let canvas = model.canvases.first { $0.id == canvasID }?.label ?? work.renderCanvasAspect ?? (canvasID.isEmpty ? "—" : canvasID)
         let size = ByteCountFormatter.string(fromByteCount: Int64(work.svg.utf8.count), countStyle: .file)
@@ -580,6 +587,14 @@ struct CreationView: View {
                 Label(display.localized("作品の操作"), systemImage: "ellipsis.circle").inkuFont(12)
             }
             .menuStyle(.borderlessButton)
+            .popover(isPresented: Binding(get: { ui.refinementMenuWorkID == work.id }, set: { if !$0 { ui.refinementMenuWorkID = nil } })) {
+                VStack(alignment: .leading, spacing: 8) {
+                    SavedWorkRefinementActions(model: model, work: work, onAction: { target, action in
+                        ui.refinementMenuWorkID = nil
+                        onWorkAction(target, action)
+                    }, writingLocked: automation.isOccupied)
+                }.padding(16).frame(width: 300)
+            }
             .fixedSize()
             .disabled(browsingDisabled)
             // WorkActionMenu.svelte:107: a locked trigger says why (CanvasPanel passes `workActionGenerationLocked`).
@@ -726,16 +741,10 @@ struct CreationView: View {
     /// SaijikiDrawer.svelte:163-170: a 460pt drawer on the right edge.
     private var saijikiDrawer: some View {
         VStack(spacing: 0) {
-            HStack {
-                Spacer()
-                Button { ui.saijikiOpen = false } label: { Image(systemName: "xmark").inkuFont(15).frame(width: 30, height: 30).contentShape(Rectangle()) }
-                    .buttonStyle(.plain).foregroundStyle(.secondary)
-                    .accessibilityLabel(display.localized("閉じる"))
-                    .inkuTooltip(display.tooltip("閉じる"))
-            }.padding(.horizontal, 8).padding(.top, 6)
             // SaijikiDrawer: a chosen word goes into the instruction box when it can be edited; otherwise only the sample.
             SaijikiView(model: model, onInsertWord: canInsertIntoBox
-                        ? { model.ddlBoxInsertion = InkuEditorInsertion(text: $0, atEndUnlessUsed: true) } : nil)
+                        ? { model.ddlBoxInsertion = InkuEditorInsertion(text: $0, atEndUnlessUsed: true) } : nil,
+                        onClose: { ui.saijikiOpen = false })
         }
         .frame(width: 460)
         .frame(maxHeight: .infinity)

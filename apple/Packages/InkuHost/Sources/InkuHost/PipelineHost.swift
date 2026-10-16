@@ -168,6 +168,15 @@ public actor PipelineHost {
         return try await database.savedAuthoringSummaries(locations: locations)
     }
 
+    /// Read only persisted display provenance, without decoding each complete performance.
+    public func savedDisplayLabels(workIDs: [String]) async throws -> [String: String] {
+        let locations = Set(workIDs).compactMap { id -> (workID: String, executionID: String, effectID: String)? in
+            guard let location = try? WorkIdentity.location(id) else { return nil }
+            return (id, location.executionID, location.effectID)
+        }
+        return try await database.savedDisplayLabels(locations: locations)
+    }
+
     public func exportSVG(workID: String, profile: String) async throws -> String {
         guard ["display", "editable", "compat", "live"].contains(profile) else { throw HostError("invalid_svg_profile") }
         let work = try await restoreSavedWork(workID: workID)

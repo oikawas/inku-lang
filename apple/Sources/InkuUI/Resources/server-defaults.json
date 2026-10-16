@@ -1429,6 +1429,79 @@
           }
         ]
       },
+      "local-mlx": {
+        "defaults": [],
+        "models": [
+          {
+            "comment_en": "Draws very slowly; drew all six descriptions. Reads pictures accurately, down to the details.",
+            "comment_ja": "描画はとても遅い。6記述すべて描けた。画像の読み取りは詳しい説明まで正確。",
+            "id": "lmstudio-community/Qwen3.8-27B-MLX-4bit",
+            "label": "lmstudio-community/Qwen3.8-27B-MLX-4bit",
+            "purposes": [
+              "llm",
+              "vision"
+            ],
+            "recommendation_llm": 3,
+            "recommendation_vision": 5,
+            "speed_llm_seconds": 63.8,
+            "speed_vision_seconds": 37.9
+          },
+          {
+            "comment_en": "Draws slowly; drew all six descriptions. Reads pictures mostly accurately; some details stay vague.",
+            "comment_ja": "描画は遅い。6記述すべて描けた。画像の読み取りはおおむね正確で、細部の一部はあいまい。",
+            "id": "mlx-community/gemma-4-12B-it-4bit",
+            "label": "mlx-community/gemma-4-12B-it-4bit",
+            "purposes": [
+              "llm",
+              "vision"
+            ],
+            "recommendation_llm": 3,
+            "recommendation_vision": 3,
+            "speed_llm_seconds": 33.2,
+            "speed_vision_seconds": 5.2
+          },
+          {
+            "comment_en": "Draws very slowly; drew all six descriptions. Picture reading gets the main points but misreads a small pale shape as another colour.",
+            "comment_ja": "描画はとても遅い。6記述すべて描けた。画像の読み取りは要点を押さえるが、小さな淡い形を別の色と読み違える。",
+            "id": "mlx-community/gemma-4-31b-it-4bit",
+            "label": "mlx-community/gemma-4-31b-it-4bit",
+            "purposes": [
+              "llm",
+              "vision"
+            ],
+            "recommendation_llm": 3,
+            "recommendation_vision": 2,
+            "speed_llm_seconds": 63.8,
+            "speed_vision_seconds": 10.9
+          },
+          {
+            "comment_en": "Draws fast; drew all six descriptions. Reads pictures, but takes the squares placed together for rectangles.",
+            "comment_ja": "描画は速い。6記述すべて描けた。画像は読めるが、並んだ正方形を長方形と読み違える。",
+            "id": "mlx-community/gemma-4-e2b-it-4bit",
+            "label": "mlx-community/gemma-4-e2b-it-4bit",
+            "purposes": [
+              "llm",
+              "vision"
+            ],
+            "recommendation_llm": 3,
+            "speed_llm_seconds": 6.5,
+            "speed_vision_seconds": 1.7
+          },
+          {
+            "comment_en": "Draws somewhat slowly; drew all six descriptions. Reads colours, counts and sides, but takes squares for rectangles.",
+            "comment_ja": "描画は遅め。6記述すべて描けた。画像の色・数・左右は読めるが、正方形を長方形と読み違える。",
+            "id": "mlx-community/Qwen3.6-35B-A3B-4bit",
+            "label": "mlx-community/Qwen3.6-35B-A3B-4bit",
+            "purposes": [
+              "llm",
+              "vision"
+            ],
+            "recommendation_llm": 3,
+            "speed_llm_seconds": 14.3,
+            "speed_vision_seconds": 11.1
+          }
+        ]
+      },
       "nvidia": {
         "defaults": [
           "mistralai/mistral-nemotron",
@@ -1542,16 +1615,18 @@
             "speed_label": "昼 7s / 夕 7s / 深夜 8s"
           },
           {
-            "comment_en": "9 of 9 attempts succeeded; no schema violations; 7.2 corrections on average; median response midday 4s / evening 4s / late night 4s.",
-            "comment_ja": "実測 9/9 成功。スキーマ違反なし。補正発火 平均 7.2。応答中央値 昼 4s / 夕 4s / 深夜 4s。",
+            "comment_en": "Draws very slowly; drew 6 and 2 of 6 in the two measurements (the rest failed at the provider, 503/504). Pictures fail with a provider error (500).",
+            "comment_ja": "描画はとても遅い。2回の測定で6件中6件と2件を描けた（残りは提供元のエラー 503・504）。画像は提供元のエラー（500）で読めない。",
             "id": "poolside/laguna-xs-2.1",
             "label": "poolside/laguna-xs-2.1",
             "purposes": [
               "llm"
             ],
-            "recommendation_llm": 4,
-            "speed_class": "ultra-fast",
-            "speed_label": "昼 4s / 夕 4s / 深夜 4s"
+            "recommendation_llm": 3,
+            "speed_llm_seconds": 147.4,
+            "unsupported_purposes": [
+              "vision"
+            ]
           },
           {
             "comment_en": "9 of 9 attempts succeeded; no schema violations; 14.4 corrections on average; median response midday 12s / evening 22s / late night 13s.",
@@ -1604,18 +1679,17 @@
             "speed_label": "昼 19s / 夕 29s / 深夜 16s"
           },
           {
-            "comment_en": "7 of 7 attempts succeeded; no schema violations; 5.9 corrections on average; Stage 1 silent once under load; median response midday 221s / evening 114s / late night 199s; Vision recall 1.00.",
-            "comment_ja": "実測 7/7 成功。スキーマ違反なし。補正発火 平均 5.9。混雑時の Stage 1 無応答 1 回。応答中央値 昼 221s / 夕 114s / 深夜 199s。Vision 再現率 1.00。",
+            "comment_en": "Drew 3 and 1 of 6 in the two measurements (the rest timed out at the provider, 504). Read one picture right; the others timed out (504).",
+            "comment_ja": "描画は2回の測定で6件中3件と1件（残りは提供元の時間切れ 504）。画像は1件正しく読めたが、ほかは時間切れ（504）。",
             "id": "google/gemma-4-31b-it",
             "label": "Google Gemma 4 31B Instruct",
             "purposes": [
-              "llm",
               "vision"
             ],
-            "recommendation_llm": 4,
-            "recommendation_vision": 5,
-            "speed_class": "medium",
-            "speed_label": "昼 221s / 夕 114s / 深夜 199s"
+            "speed_vision_seconds": 224.5,
+            "unsupported_purposes": [
+              "llm"
+            ]
           },
           {
             "comment_en": "6 of 6 attempts succeeded; no schema violations; 6.7 corrections on average; Stage 1 silent 2 times under load; median response midday 174s / evening 149s / late night 180s.",
@@ -1682,8 +1756,8 @@
             "speed_label": "夕 148s / 深夜 110s"
           },
           {
-            "comment_en": "4 of 4 attempts succeeded; no schema violations; 7.8 corrections on average; median response midday 119s / evening 70s / late night 153s; Vision recall 0.89.",
-            "comment_ja": "実測 4/4 成功。スキーマ違反なし。補正発火 平均 7.8。応答中央値 昼 119s / 夕 70s / 深夜 153s。Vision 再現率 0.89。",
+            "comment_en": "Draws very slowly; drew 1 and 6 of 6 in the two measurements (the failures were provider errors, 503/500). Reads shapes and colours, but longer descriptions of a picture break down.",
+            "comment_ja": "描画はとても遅い。2回の測定で6件中1件と6件を描けた（失敗は提供元のエラー 503・500）。画像の形と色は読めるが、詳しい説明では文が崩れる。",
             "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
             "label": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
             "purposes": [
@@ -1691,9 +1765,8 @@
               "vision"
             ],
             "recommendation_llm": 3,
-            "recommendation_vision": 4,
-            "speed_class": "medium",
-            "speed_label": "昼 119s / 夕 70s / 深夜 153s"
+            "speed_llm_seconds": 365.3,
+            "speed_vision_seconds": 54.2
           },
           {
             "comment_en": "3 of 3 attempts succeeded; no schema violations; 9.3 corrections on average; median response midday 16s / late night 101s.",
@@ -1810,16 +1883,15 @@
             "speed_label": "昼 22s / 夕 74s / 深夜 33s"
           },
           {
-            "comment_en": "5 of 9 attempts succeeded; 4 score schema violations; 10.4 corrections on average; median response midday 21s / evening 35s / late night 23s.",
-            "comment_ja": "実測 5/9 成功。スキーマ違反 4 回。補正発火 平均 10.4。応答中央値 昼 21s / 夕 35s / 深夜 23s。",
+            "comment_en": "Drew 1 and 0 of 6 in the two measurements (the rest stopped at the output limit). Cannot read pictures (image input is disabled on NIM).",
+            "comment_ja": "描画は2回の測定で6件中1件と0件（残りは出力の上限で途中で切れた）。画像は読めない（NIM で画像入力が無効）。",
             "id": "nvidia/nemotron-3-super-120b-a12b",
             "label": "nvidia/nemotron-3-super-120b-a12b",
-            "purposes": [
-              "llm"
-            ],
-            "recommendation_llm": 2,
-            "speed_class": "fast",
-            "speed_label": "昼 21s / 夕 35s / 深夜 23s"
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
           },
           {
             "comment_en": "1 of 2 attempts succeeded; 1 malformed tool calls; 10.0 corrections on average; Stage 1 silent 5 times under load; median response midday 95s.",
@@ -1906,16 +1978,15 @@
             "speed_label": "昼 3s / 夕 6s / 深夜 4s"
           },
           {
-            "comment_en": "3 of 7 attempts succeeded; 4 score schema violations; 10.3 corrections on average; median response midday 40s / evening 95s / late night 38s.",
-            "comment_ja": "実測 3/7 成功。スキーマ違反 4 回。補正発火 平均 10.3。応答中央値 昼 40s / 夕 95s / 深夜 38s。",
+            "comment_en": "Drew 2 and 1 of 6 in the two measurements (the rest stopped at the output limit, or 500). Cannot read pictures (image input is disabled on NIM).",
+            "comment_ja": "描画は2回の測定で6件中2件と1件（残りは出力の上限で途中で切れた、500）。画像は読めない（NIM で画像入力が無効）。",
             "id": "nvidia/nemotron-3-ultra-550b-a55b",
             "label": "nvidia/nemotron-3-ultra-550b-a55b",
-            "purposes": [
-              "llm"
-            ],
-            "recommendation_llm": 2,
-            "speed_class": "fast",
-            "speed_label": "昼 40s / 夕 95s / 深夜 38s"
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
           },
           {
             "comment_en": "3 of 9 attempts succeeded; 6 score schema violations; 1.0 corrections on average; median response midday 125s / evening 236s / late night 125s.",
@@ -1934,16 +2005,15 @@
             "speed_label": "昼 125s / 夕 236s / 深夜 125s"
           },
           {
-            "comment_en": "1 of 5 attempts succeeded; 4 score schema violations; 1.0 corrections on average; Stage 1 silent 4 times under load; median response late night 14s.",
-            "comment_ja": "実測 1/5 成功。スキーマ違反 4 回。補正発火 平均 1.0。混雑時の Stage 1 無応答 4 回。応答中央値 深夜 14s。",
+            "comment_en": "Drew 2 and 1 of 6 in the two measurements (the rest stopped at the output limit). Cannot read pictures (answers that there is no image).",
+            "comment_ja": "描画は2回の測定で6件中2件と1件（残りは出力の上限で途中で切れた）。画像は読めない（画像が無いと答える）。",
             "id": "openai/gpt-oss-20b",
             "label": "openai/gpt-oss-20b",
-            "purposes": [
-              "llm"
-            ],
-            "recommendation_llm": 2,
-            "speed_class": "fast",
-            "speed_label": "深夜 14s"
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
           },
           {
             "comment_en": "1 of 6 attempts succeeded; 5 score schema violations; 3.0 corrections on average; Stage 1 silent 3 times under load; median response evening 43s.",
@@ -1994,16 +2064,17 @@
             "speed_label": "Vision 15s"
           },
           {
-            "comment_en": "0 of 9 attempts succeeded; 9 score schema violations; median response Vision 9s; Vision recall 0.94.",
-            "comment_ja": "実測 0/9 成功。スキーマ違反 9 回。応答中央値 Vision 9s。Vision 再現率 0.94。",
+            "comment_en": "Could not draw: every answer broke the schema in both measurements. Picture reading can mistake the number or shape of figures placed together.",
+            "comment_ja": "描画は型に合わない応答で、2回の測定とも6件すべて描けない。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
             "id": "meta/llama-3.2-11b-vision-instruct",
             "label": "meta/llama-3.2-11b-vision-instruct",
             "purposes": [
               "vision"
             ],
-            "recommendation_vision": 4,
-            "speed_class": "unknown",
-            "speed_label": "Vision 9s"
+            "speed_vision_seconds": 11.9,
+            "unsupported_purposes": [
+              "llm"
+            ]
           },
           {
             "comment_en": "0 of 9 attempts succeeded; 9 score schema violations.",
@@ -2037,15 +2108,17 @@
             "speed_label": "未計測"
           },
           {
-            "comment_en": "Still offered. In both 2026-07-20 runs Stage 1 did not answer within 120 seconds, so nothing about its quality was measured. Consistent with provider load.",
-            "comment_ja": "提供は継続中。2026-07-20 の 2 回の計測では 9 回とも Stage 1 が 120 秒以内に応答せず、品質を測定できなかった。混雑の影響とみられる。",
+            "comment_en": "Drew 5 and 0 of 6 in the two measurements (the failures timed out at the provider, 504). Picture reading can mistake the number or shape of figures placed together.",
+            "comment_ja": "描画は2回の測定で6件中5件と0件（失敗は提供元の時間切れ 504）。画像の読み取りは、並んだ形の数や形を取り違えることがある。",
             "id": "meta/llama-3.2-90b-vision-instruct",
             "label": "Llama 3.2 90B Vision Instruct",
             "purposes": [
               "vision"
             ],
-            "speed_class": "unknown",
-            "speed_label": "未計測"
+            "speed_vision_seconds": 47.7,
+            "unsupported_purposes": [
+              "llm"
+            ]
           },
           {
             "comment_en": "Still offered. In both 2026-07-20 runs Stage 1 did not answer within 120 seconds, so nothing about its quality was measured. Consistent with provider load.",
@@ -2153,9 +2226,13 @@
             "speed_label": "提供終了"
           },
           {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
             "id": "microsoft/phi-3-vision-128k-instruct",
             "label": "microsoft/phi-3-vision-128k-instruct",
-            "purposes": [
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
               "vision"
             ]
           },
@@ -2311,6 +2388,791 @@
             ],
             "purposes": [
               "llm"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "01-ai/yi-large",
+            "label": "01-ai/yi-large",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "adept/fuyu-8b",
+            "label": "adept/fuyu-8b",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "ai21labs/jamba-1.5-large-instruct",
+            "label": "ai21labs/jamba-1.5-large-instruct",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "aisingapore/sea-lion-7b-instruct",
+            "label": "aisingapore/sea-lion-7b-instruct",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "bigcode/starcoder2-15b",
+            "label": "bigcode/starcoder2-15b",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "databricks/dbrx-instruct",
+            "label": "databricks/dbrx-instruct",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "deepseek-ai/deepseek-coder-6.7b-instruct",
+            "label": "deepseek-ai/deepseek-coder-6.7b-instruct",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Drew 3 and 2 of 6 in the two measurements (the rest stopped at the output limit). Picture reading stops at the limit too and gives no advice.",
+            "comment_ja": "描画は2回の測定で6件中3件と2件（残りは出力の上限で途中で切れた）。画像の読み取りも出力の上限で切れて助言にならない。",
+            "id": "deepseek-ai/deepseek-v4.1-flash",
+            "label": "deepseek-ai/deepseek-v4.1-flash",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "google/codegemma-1.1-7b",
+            "label": "google/codegemma-1.1-7b",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "google/codegemma-7b",
+            "label": "google/codegemma-7b",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "id": "google/deplot",
+            "label": "google/deplot",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "comment_en": "Could not draw: every answer was malformed in both measurements. Reads pictures mostly accurately.",
+            "comment_ja": "描画は応答の形が崩れて、2回の測定とも6件すべて描けない。画像の読み取りはおおむね正確。",
+            "id": "google/diffusiongemma-26b-a4b-it",
+            "label": "google/diffusiongemma-26b-a4b-it",
+            "purposes": [
+              "vision"
+            ],
+            "recommendation_vision": 3,
+            "speed_vision_seconds": 0.9,
+            "unsupported_purposes": [
+              "llm"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "google/gemma-2b",
+            "label": "google/gemma-2b",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "google/gemma-3-12b-it",
+            "label": "google/gemma-3-12b-it",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "google/gemma-3-4b-it",
+            "label": "google/gemma-3-4b-it",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "google/recurrentgemma-2b",
+            "label": "google/recurrentgemma-2b",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "ibm/granite-3.0-3b-a800m-instruct",
+            "label": "ibm/granite-3.0-3b-a800m-instruct",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "ibm/granite-3.0-8b-instruct",
+            "label": "ibm/granite-3.0-8b-instruct",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "ibm/granite-34b-code-instruct",
+            "label": "ibm/granite-34b-code-instruct",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "ibm/granite-8b-code-instruct",
+            "label": "ibm/granite-8b-code-instruct",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "meta/codellama-70b",
+            "label": "meta/codellama-70b",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "id": "meta/llama-guard-4-12b",
+            "label": "meta/llama-guard-4-12b",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "meta/llama2-70b",
+            "label": "meta/llama2-70b",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Could not draw in either measurement (answers stopped at the output limit, or 404/500/504). Picture reading stops at the limit or is unavailable (404).",
+            "comment_ja": "描画は2回の測定とも6件すべて描けない（出力の上限で途中で切れる、404・500・504）。画像の読み取りも上限で切れるか、使えない（404）。",
+            "id": "meta/muse-glimmer-30b",
+            "label": "meta/muse-glimmer-30b",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "microsoft/kosmos-2",
+            "label": "microsoft/kosmos-2",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "microsoft/phi-3.5-moe-instruct",
+            "label": "microsoft/phi-3.5-moe-instruct",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "mistralai/codestral-22b-instruct-v0.1",
+            "label": "mistralai/codestral-22b-instruct-v0.1",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "mistralai/mistral-7b-instruct-v0.3",
+            "label": "mistralai/mistral-7b-instruct-v0.3",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "mistralai/mistral-large",
+            "label": "mistralai/mistral-large",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "mistralai/mistral-large-2-instruct",
+            "label": "mistralai/mistral-large-2-instruct",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "mistralai/mixtral-8x22b-v0.1",
+            "label": "mistralai/mixtral-8x22b-v0.1",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "moonshotai/kimi-k2.6",
+            "label": "moonshotai/kimi-k2.6",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "NIM ended this model on 2026-10-15 (410). Before that it drew 3 and 1 of 6 in the two measurements (the rest timed out at the provider, 504). Picture reading misses some points and is very slow.",
+            "comment_ja": "NIM での提供は 2026-10-15 に終了した（410）。それまでの描画は2回の測定で6件中3件と1件（残りは提供元の時間切れ 504）。画像の読み取りは要点の一部を落とし、とても遅い。",
+            "eol_date": "2026-10-15",
+            "id": "moonshotai/kimi-k3",
+            "label": "moonshotai/kimi-k3",
+            "labels": [
+              "eol"
+            ],
+            "purposes": [
+              "vision"
+            ],
+            "recommendation_vision": 2,
+            "speed_vision_seconds": 242.2,
+            "unsupported_purposes": [
+              "llm"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "nv-mistralai/mistral-nemo-12b-instruct",
+            "label": "nv-mistralai/mistral-nemo-12b-instruct",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "id": "nvidia/ai-synthetic-video-detector",
+            "label": "nvidia/ai-synthetic-video-detector",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "nvidia/cosmos-reason2-8b",
+            "label": "nvidia/cosmos-reason2-8b",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "id": "nvidia/embed-qa-4",
+            "label": "nvidia/embed-qa-4",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "comment_en": "Draws slowly; drew 6 and 5 of 6 in the two measurements (one stopped at the output limit). Picture reading misses some points and is very slow.",
+            "comment_ja": "描画は遅い。2回の測定で6件中6件と5件を描けた（1件は出力の上限で途中で切れた）。画像の読み取りは要点の一部を落とし、とても遅い。",
+            "id": "nvidia/ising-calibration-1.5-31b",
+            "label": "nvidia/ising-calibration-1.5-31b",
+            "purposes": [
+              "llm",
+              "vision"
+            ],
+            "recommendation_llm": 3,
+            "recommendation_vision": 2,
+            "speed_llm_seconds": 42.0,
+            "speed_vision_seconds": 95.6
+          },
+          {
+            "id": "nvidia/llama-3.1-nemoguard-8b-content-safety",
+            "label": "nvidia/llama-3.1-nemoguard-8b-content-safety",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "id": "nvidia/llama-3.1-nemoguard-8b-topic-control",
+            "label": "nvidia/llama-3.1-nemoguard-8b-topic-control",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "nvidia/llama-3.1-nemotron-51b-instruct",
+            "label": "nvidia/llama-3.1-nemotron-51b-instruct",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "nvidia/llama-3.1-nemotron-70b-instruct",
+            "label": "nvidia/llama-3.1-nemotron-70b-instruct",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "id": "nvidia/llama-3.1-nemotron-safety-guard-8b-v3",
+            "label": "nvidia/llama-3.1-nemotron-safety-guard-8b-v3",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+            "label": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "id": "nvidia/llama-3.2-nemoretriever-1b-vlm-embed-v1",
+            "label": "nvidia/llama-3.2-nemoretriever-1b-vlm-embed-v1",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "id": "nvidia/llama-3.2-nv-embedqa-1b-v1",
+            "label": "nvidia/llama-3.2-nv-embedqa-1b-v1",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "id": "nvidia/llama-nemotron-embed-vl-1b-v2",
+            "label": "nvidia/llama-nemotron-embed-vl-1b-v2",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "nvidia/llama3-chatqa-1.5-70b",
+            "label": "nvidia/llama3-chatqa-1.5-70b",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "nvidia/mistral-nemo-minitron-8b-8k-instruct",
+            "label": "nvidia/mistral-nemo-minitron-8b-8k-instruct",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "id": "nvidia/nemotron-3-embed-1b",
+            "label": "nvidia/nemotron-3-embed-1b",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "id": "nvidia/nemotron-3.5-content-safety",
+            "label": "nvidia/nemotron-3.5-content-safety",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "comment_en": "Drew 0 and 2 of 6 in the two measurements (the rest stopped at the output limit). Cannot read pictures (image input is disabled on NIM).",
+            "comment_ja": "描画は2回の測定で6件中0件と2件（残りは出力の上限で途中で切れた）。画像は読めない（NIM で画像入力が無効）。",
+            "id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "label": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "nvidia/nemotron-4-340b-instruct",
+            "label": "nvidia/nemotron-4-340b-instruct",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "id": "nvidia/nemotron-4-340b-reward",
+            "label": "nvidia/nemotron-4-340b-reward",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "nvidia/nemotron-nano-3-30b-a3b",
+            "label": "nvidia/nemotron-nano-3-30b-a3b",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "id": "nvidia/nemotron-parse",
+            "label": "nvidia/nemotron-parse",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "id": "nvidia/nemotron-parse-2.0",
+            "label": "nvidia/nemotron-parse-2.0",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "nvidia/neva-22b",
+            "label": "nvidia/neva-22b",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "id": "nvidia/nv-embedqa-mistral-7b-v2",
+            "label": "nvidia/nv-embedqa-mistral-7b-v2",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "id": "nvidia/nvclip",
+            "label": "nvidia/nvclip",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "id": "nvidia/riva-translate-4b-instruct",
+            "label": "nvidia/riva-translate-4b-instruct",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "id": "nvidia/riva-translate-4b-instruct-v2",
+            "label": "nvidia/riva-translate-4b-instruct-v2",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "nvidia/vila",
+            "label": "nvidia/vila",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "id": "snowflake/arctic-embed-l",
+            "label": "snowflake/arctic-embed-l",
+            "labels": [
+              "not_supported"
+            ],
+            "purposes": [
+              "llm"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "writer/palmyra-creative-122b",
+            "label": "writer/palmyra-creative-122b",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "writer/palmyra-fin-70b-32k",
+            "label": "writer/palmyra-fin-70b-32k",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "writer/palmyra-med-70b",
+            "label": "writer/palmyra-med-70b",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "writer/palmyra-med-70b-32k",
+            "label": "writer/palmyra-med-70b-32k",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Could not draw in either measurement (timed out at the provider, 504, or stopped at the output limit). Pictures refused (400).",
+            "comment_ja": "描画は2回の測定とも6件すべて描けない（提供元の時間切れ 504、出力の上限）。画像は使えない（400）。",
+            "id": "z-ai/glm-5.3",
+            "label": "z-ai/glm-5.3",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Could not draw: every answer stopped at the output limit in both measurements. Picture reading stops at the limit too.",
+            "comment_ja": "描画は出力の上限で途中で切れて、2回の測定とも6件すべて描けない。画像の読み取りも上限で切れる。",
+            "id": "z-ai/glm-5.3-flash",
+            "label": "z-ai/glm-5.3-flash",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Not available with this API key (404).",
+            "comment_ja": "この API キーでは使えない（404）。",
+            "id": "zyphra/zamba2-7b-instruct",
+            "label": "zyphra/zamba2-7b-instruct",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
+            ]
+          },
+          {
+            "comment_en": "Could not draw: all six answers stopped at the output limit. Picture reading stops at the limit too.",
+            "comment_ja": "描画は出力の上限で途中で切れて6件とも描けない。画像の読み取りも上限で切れる。",
+            "id": "stepfun-ai/step-5-preview",
+            "label": "stepfun-ai/step-5-preview",
+            "purposes": [],
+            "unsupported_purposes": [
+              "llm",
+              "vision"
             ]
           }
         ]
@@ -4827,7 +5689,7 @@
       }
     },
     "schema": "inku.model-catalog.v2",
-    "updated": "2026-10-13T14:19:00Z",
+    "updated": "2026-10-15T23:00:00+09:00",
     "version": "3.0.0"
   },
   "pipeline": {

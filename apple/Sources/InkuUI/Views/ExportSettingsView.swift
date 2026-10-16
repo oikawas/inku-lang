@@ -11,27 +11,39 @@ extension DisplayPreferences {
         options.pixelHeight = exportHeight; options.svgProfile = exportProfile
         return ExportConfiguration(options: options, resolution: exportHeight).normalized()
     }
+
+    public var animationDefaults: ExportConfiguration {
+        if let animationExportConfiguration { return animationExportConfiguration.normalized() }
+        var value = exportDefaults
+        if value.options.format != .apng && value.options.format != .gif { value.options.format = .apng }
+        if exportConfiguration == nil { value.resolution = 1080 }
+        return value.normalized()
+    }
 }
 
 @MainActor
 struct ExportSettingsView: View {
     @Bindable var model: AppModel
     @State private var configuration: ExportConfiguration
+    @State private var animationConfiguration: ExportConfiguration
     @State private var templates: [ExportTemplate]
     @State private var savedTemplates: [ExportTemplate]
     @State private var page = "destination"
+    @State private var animationMode = "layer"
     @State private var templateError: String?
     @State private var pendingSavedTemplateID: String?
 
     init(model: AppModel) {
         self.model = model
         _configuration = State(initialValue: model.display.preferences.exportDefaults)
+        _animationConfiguration = State(initialValue: model.display.preferences.animationDefaults)
         _templates = State(initialValue: ExportTemplate.normalized(model.display.preferences.exportTemplates))
         _savedTemplates = State(initialValue: ExportTemplate.normalized(model.display.preferences.exportTemplates))
     }
 
     var body: some View {
-        Group {
+        @Bindable var display = model.display
+        return Group {
             Section {
                 InkuSegmentedButtons(options: [("destination", model.display.localized("保存先")), ("png", model.display.localized("PNGテンプレート")),
                                                ("animation", model.display.localized("アニメーション")), ("card", model.display.localized("共有カード"))],
@@ -60,19 +72,8 @@ struct ExportSettingsView: View {
             Section(model.display.localized("書き出しの初期設定")) {
                 Text(model.display.localized("この端末で使う書き出し条件です。作品の保存内容は変わりません。"))
                     .inkuFont(13).foregroundStyle(.secondary)
-                Picker(model.display.localized("形式"), selection: $configuration.options.format) {
-                    ForEach(SavedExportFormat.allCases, id: \.self) { Text(model.display.localized($0.title)).tag($0) }
-                }
-                Picker(model.display.localized("SVGプロファイル"), selection: $configuration.options.svgProfile) {
-                    Text(model.display.localized("表示用")).tag("display"); Text(model.display.localized("編集用")).tag("editable"); Text(model.display.localized("互換用")).tag("compat"); Text(model.display.localized("ライブ用")).tag("live")
-                }
-                Picker(model.display.localized("Y軸"), selection: $configuration.resolution) {
-                    ForEach([150, 300, 500, 1080, 2160, 4320], id: \.self) { Text("\($0)px").tag($0) }
-                    if configuration.resolution != 0, ![150, 300, 500, 1080, 2160, 4320].contains(configuration.resolution) { Text("\(configuration.resolution)px").tag(configuration.resolution) }
-                    Text(model.display.localized("カスタム")).tag(0)
-                }
-                if configuration.resolution == 0 { TextField(model.display.localized("カスタムY軸（64〜12000px）"), value: $configuration.customHeight, format: .number) }
-                Toggle(model.display.localized("PNGの透明部分を白にする"), isOn: $configuration.options.pngAlphaWhite)
+                Toggle(model.display.label("白背景時アルファチャンネルを有効にする", "Enable alpha channel on white background"),
+                       isOn: $display.preferences.singleWorkPNGTransparent)
             }
             Section(model.display.localized("PNGテンプレート")) {
                 ForEach($templates) { $template in
@@ -96,18 +97,39 @@ struct ExportSettingsView: View {
                 }
                 Button(model.display.localized("テンプレートを追加")) { addTemplate() }.disabled(templates.count >= 20)
             }
+            Section {
+                DisclosureGroup(model.display.label("macOSの補助設定", "Additional macOS settings")) {
+                    Picker(model.display.localized("形式"), selection: $configuration.options.format) {
+                        ForEach(SavedExportFormat.allCases, id: \.self) { Text(model.display.localized($0.title)).tag($0) }
+                    }
+                    Picker(model.display.localized("SVGプロファイル"), selection: $configuration.options.svgProfile) {
+                        Text(model.display.localized("表示用")).tag("display"); Text(model.display.localized("編集用")).tag("editable"); Text(model.display.localized("互換用")).tag("compat"); Text(model.display.localized("ライブ用")).tag("live")
+                    }
+                    resolutionFields($configuration)
+                    Toggle(model.display.label("複数作品PNGの透明部分を白にする", "Paint transparent areas white in multiple-work PNGs"), isOn: $configuration.options.pngAlphaWhite)
+                }
+            }
             }
             if page == "animation" {
             Section(model.display.localized("アニメーション")) {
-                Picker(model.display.localized("作品の切り替え"), selection: $configuration.options.transition) {
+                InkuSegmentedButtons(options: [("layer", model.display.label("単作品（描画）", "Single work (drawing)")),
+                                               ("transition", model.display.label("複数作品（切り替え）", "Multiple works (transitions)"))], selection: $animationMode)
+                Picker(model.display.localized("形式"), selection: $animationConfiguration.options.format) {
+                    Text("APNG").tag(SavedExportFormat.apng); Text("GIF").tag(SavedExportFormat.gif)
+                }
+                if animationMode == "transition" {
+                Picker(model.display.localized("作品の切り替え"), selection: $animationConfiguration.options.transition) {
                     Text(model.display.localized("カット")).tag("cut"); Text(model.display.localized("クロスフェード")).tag("crossfade"); Text(model.display.localized("白へフェード")).tag("fade_white"); Text(model.display.localized("スライド")).tag("slide")
                 }
-                TextField(model.display.localized("作品の表示時間（0.1〜30秒）"), value: $configuration.options.holdSeconds, format: .number)
-                Stepper(model.display.localizedFormat("1作品のフレーム数: %ld", configuration.options.layerFrameCount), value: $configuration.options.layerFrameCount, in: 2...120)
-                TextField(model.display.localized("描画間隔（0.1〜30秒）"), value: $configuration.options.layerIntervalSeconds, format: .number)
-                Picker(model.display.localized("1作品の再生"), selection: $configuration.options.layerReplay) {
+                TextField(model.display.localized("作品の表示時間（0.1〜30秒）"), value: $animationConfiguration.options.holdSeconds, format: .number)
+                } else {
+                Stepper(model.display.localizedFormat("1作品のフレーム数: %ld", animationConfiguration.options.layerFrameCount), value: $animationConfiguration.options.layerFrameCount, in: 2...120)
+                TextField(model.display.localized("描画間隔（0.1〜30秒）"), value: $animationConfiguration.options.layerIntervalSeconds, format: .number)
+                Picker(model.display.localized("1作品の再生"), selection: $animationConfiguration.options.layerReplay) {
                     Text(model.display.localized("最初から繰り返し")).tag("restart"); Text(model.display.localized("往復")).tag("reverse"); Text(model.display.localized("1回のみ")).tag("once")
                 }
+                }
+                resolutionFields($animationConfiguration)
             }
             }
             if page == "card" {
@@ -130,6 +152,24 @@ struct ExportSettingsView: View {
             model.display.preferences.exportConfiguration = defaults
             model.display.preferences.exportHeight = defaults.options.pixelHeight
             model.display.preferences.exportProfile = defaults.options.svgProfile
+        }
+        .onChange(of: animationConfiguration) { _, _ in
+            model.display.preferences.animationExportConfiguration = animationConfiguration.normalized()
+        }
+    }
+
+    private func resolutionFields(_ configuration: Binding<ExportConfiguration>) -> some View {
+        Group {
+            Picker(model.display.localized("Y軸"), selection: configuration.resolution) {
+                ForEach([150, 300, 500, 1080, 2160, 4320], id: \.self) { Text("\($0)px").tag($0) }
+                if configuration.wrappedValue.resolution != 0, ![150, 300, 500, 1080, 2160, 4320].contains(configuration.wrappedValue.resolution) {
+                    Text("\(configuration.wrappedValue.resolution)px").tag(configuration.wrappedValue.resolution)
+                }
+                Text(model.display.localized("カスタム")).tag(0)
+            }
+            if configuration.wrappedValue.resolution == 0 {
+                TextField(model.display.localized("カスタムY軸（64〜12000px）"), value: configuration.customHeight, format: .number)
+            }
         }
     }
 

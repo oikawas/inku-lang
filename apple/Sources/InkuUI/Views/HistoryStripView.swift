@@ -20,7 +20,7 @@ import SwiftUI
     private var display: DisplaySettings { model.display }
     private var selectionID: String? { displayedWorkID ?? model.selectedWorkID }
     private var locked: Bool { model.isBrowsingLocked }
-    private var hasFilters: Bool { library.starredOnly || library.revisionOnly }
+    private var hasFilters: Bool { library.starredOnly || library.revisionOnly || !library.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     /// Web `visibleThumbCount` (+page.svelte:1246).
     private var capacity: Int? {
         let width = windowWidth ?? measuredWindowWidth
@@ -61,6 +61,7 @@ import SwiftUI
             await history.refreshGenerations()
         }
         .task(id: selectionID) { await history.locate(app: model, workID: selectionID) }
+        .task(id: library.filter) { await history.locate(app: model, workID: selectionID) }
         .task(id: model.providerSettingsRevision) { providers = await model.hostSettings().providers }
     }
 

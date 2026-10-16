@@ -51,6 +51,7 @@ import InkuHost
                         Text(model.display.localized("上限（MiB）"))
                         Spacer()
                         TextField(model.display.localized("上限（MiB）"), text: $svgDraft)
+                            .labelsHidden()
                             .textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing).frame(width: 100)
                             .onChange(of: svgDraft) { _, _ in message = "" }
                     }.disabled(saving || model.isBrowsingLocked)
@@ -105,6 +106,7 @@ import InkuHost
                 HStack(spacing: 5) {
                     Button { step(key, by: -1, definition: definition) } label: { Image(systemName: "minus") }
                     TextField(copy.limitLabels[key] ?? key, text: Binding(get: { draft[key] ?? "" }, set: { draft[key] = $0; message = "" }))
+                        .labelsHidden()
                         .textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing).frame(width: 100)
                         .accessibilityLabel(copy.limitLabels[key] ?? key)
                         .inkuTooltip(model.display.preferences.showTooltips ? copy.limitHints[key] ?? "" : "")

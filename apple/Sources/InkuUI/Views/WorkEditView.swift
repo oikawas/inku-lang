@@ -16,7 +16,7 @@ public struct WorkEditView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack {
                 Text(model.display.localized(editor.mode == .description ? "記述を変える" : "写生なし／ありで描き直す"))
                     .inkuFont(16, weight: .semibold)
@@ -27,58 +27,39 @@ public struct WorkEditView: View {
                 Text(model.display.localized(editor.mode == .description
                     ? "変更した記述から、選択した作品の子を描画します。"
                     : "写生を外すか付けるかを選んで描き直し、選択した作品の子として系譜へ保存します。"))
-                    .inkuFont(13).foregroundStyle(.secondary)
+                    .inkuFont(12).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-            }.frame(maxWidth: .infinity, alignment: .leading).padding(20)
+            }.frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 14)
             Divider()
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    parentCard
-                    editControls.workEditPanel()
-                }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
+                editControls.padding(.horizontal, 20).padding(.vertical, 18)
             }
             Divider()
-            footer.padding(20).background(.bar)
+            footer.padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 16)
         }
         #if os(macOS)
-        .frame(minWidth: 640, idealWidth: 680, minHeight: 550, idealHeight: 680)
+        .frame(minWidth: 560, idealWidth: 780,
+               minHeight: editor.mode == .description ? 380 : 260,
+               idealHeight: editor.mode == .description ? 450 : 360)
         #endif
         .task { await editor.initialize(app: model) }
         .interactiveDismissDisabled(editor.running || model.isBusy)
         .onDisappear { Task { await editor.stop(app: model) } }
     }
 
-    private var parentCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(model.display.localized("元の作品")).inkuFont(14, weight: .semibold)
-            HStack(alignment: .top, spacing: 14) {
-                ArtworkThumbnail(work: editor.work, thumbnails: model.thumbnails)
-                    .frame(width: 120, height: 120).clipped()
-                    .accessibilityLabel(model.display.localized("元の作品"))
-                Text(editor.work.effectiveSourceText).inkuFont(13).lineLimit(4)
-                    .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
-                    .inkuTooltip(model.display.preferences.showTooltips ? editor.work.effectiveSourceText : "")
-                    .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
-            }.frame(minHeight: 120, alignment: .top)
-        }.workEditPanel()
-    }
-
     private var editControls: some View {
         @Bindable var editor = editor
-        return VStack(alignment: .leading, spacing: 14) {
+        return VStack(alignment: .leading, spacing: 8) {
             if editor.mode == .description {
-                Text(model.display.localized("記述")).inkuFont(14, weight: .semibold)
-                TextEditor(text: $editor.draftText).frame(minHeight: 190).border(Color.secondary.opacity(0.25))
+                Text(model.display.webCopy("inputSectionLabel", "記述")).inkuFont(12, weight: .semibold).foregroundStyle(.secondary)
+                TextEditor(text: $editor.draftText).padding(.horizontal, 10).padding(.vertical, 8).frame(height: 200)
+                    .scrollContentBackground(.hidden)
+                    .background(InkuColor.bg, in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(InkuColor.border2))
                     .accessibilityLabel(model.display.localized("記述"))
                     .disabled(editor.running)
                 DescriptionMeterView(model: model, text: editor.draftText)
-                HStack {
-                    Text(model.display.localized(editor.inheritWild ? "筆致制限（継承）" : "筆致制限")).inkuFont(12).foregroundStyle(.secondary)
-                    Button(model.display.localized("暴れる") + " " + model.display.localized((editor.inheritWild ? editor.work.renderWild ?? false : editor.wildOverride) ? "入" : "切")) {
-                        editor.wildOverride = !(editor.inheritWild ? editor.work.renderWild ?? false : editor.wildOverride)
-                        editor.inheritWild = false
-                    }.buttonStyle(.bordered).tint((editor.inheritWild ? editor.work.renderWild ?? false : editor.wildOverride) ? Color.accentColor : Color.secondary)
-                }.disabled(editor.running || model.isBusy)
             } else {
                 HStack(spacing: 8) {
                     Text(model.display.localized("写生")).inkuFont(12).foregroundStyle(.secondary)
@@ -88,11 +69,12 @@ public struct WorkEditView: View {
                                          tooltips: [model.display.tooltip("写生を通さず、記述だけで描く"),
                                                     model.display.tooltip("記述の横に、場所の広がりや季節・時刻の光を補って描く")])
                 }.disabled(editor.running)
-                Text(model.display.localized("親の写生")).inkuFont(14, weight: .semibold)
                 if let prose = editor.work.sketchText, !prose.isEmpty {
-                    Text(prose).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+                    Text(prose).inkuFont(12).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
                 } else {
-                    Text(model.display.localized(sketchStateNote)).foregroundStyle(.secondary)
+                    Text(model.display.webCopy("workEditNoSketch", "この作品は写生を通していません。"))
+                        .inkuFont(12).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -112,15 +94,35 @@ public struct WorkEditView: View {
                 RunStatusView(display: model.display, label: model.isBusy ? model.status : "生成の準備中", variant: .inline,
                               stopping: editor.stopping, onStop: { Task { await editor.stop(app: model) } })
             } else {
+                if editor.mode == .description {
+                    wildControl
+                } else {
+                    Text(model.display.webCopy("workEditParentGrain", "親の写生") + ": "
+                        + model.display.localized(editor.work.sketchText?.isEmpty == false ? "あり" : sketchStateNote))
+                        .inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
                 Spacer()
-                Button(model.display.localized("描く")) {
+                Button(model.display.webCopy("pipelineCancel", "キャンセル")) { dismiss() }
+                    .disabled(model.isBusy).keyboardShortcut(.cancelAction)
+                Button(model.display.webCopy(editor.mode == .description ? "submitBtn" : "pipelinePerform",
+                                             editor.mode == .description ? "描画する" : "演奏する")) {
                     Task { if await editor.draw(app: model) { onCommitted(); dismiss() } }
                 }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
                     .disabled(!editor.canDraw || model.isBusy || model.isPreview || !model.hasNextDrawingModel)
             }
-            Button(model.display.localized("取消")) { dismiss() }
-                .disabled(editor.running || model.isBusy).keyboardShortcut(.cancelAction)
         }
+    }
+
+    private var wildControl: some View {
+        let wild = editor.inheritWild ? editor.work.renderWild ?? false : editor.wildOverride
+        return HStack(spacing: 4) {
+            Text(model.display.localized(editor.inheritWild ? "筆致制限（継承）" : "筆致制限") + ":")
+                .inkuFont(11).foregroundStyle(.secondary)
+            Button(model.display.localized("暴れる")) {
+                editor.wildOverride = !wild; editor.inheritWild = false
+            }.buttonStyle(.bordered).tint(wild ? Color.accentColor : Color.secondary)
+                .accessibilityValue(model.display.localized(wild ? "入" : "切"))
+        }.disabled(model.isBusy)
     }
 
     private var sketchStateNote: String {
@@ -135,13 +137,5 @@ public struct WorkEditView: View {
         case "coarse": "過去の写生: 大きく"
         default: "この作品には保存された写生がありません。"
         }
-    }
-}
-
-private extension View {
-    func workEditPanel() -> some View {
-        padding(16).frame(maxWidth: .infinity, alignment: .leading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(.quaternary))
     }
 }

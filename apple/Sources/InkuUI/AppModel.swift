@@ -130,6 +130,8 @@ public final class AppModel {
     }
     public private(set) var unreadOutputs: Set<String> = []
     private var workActionStates: [String: SavedWorkActionState] = [:]
+    public private(set) var savedDisplayLabels: [String: String] = [:]
+    @ObservationIgnored private var displayLabelReads: Set<String> = []
     @ObservationIgnored private var workActionReadToken = UUID()
     public let library = LibraryModel(includeListSVG: false)
     public let display = DisplaySettings()
@@ -791,18 +793,28 @@ public final class AppModel {
         await loadWorkActionStates(workIDs: [work.id])
     }
 
+    /// Export feedback must not replace a drawing operation's live progress.
+    public func reportExportStatus(_ message: String) {
+        guard !isBusy else { return }
+        status = message
+    }
+
     public func loadWorkActionStates(workIDs: [String]) async {
         let missing = Set(workIDs).filter { workActionStates[$0] == nil }
-        guard !missing.isEmpty, let host else { return }
+        let labelIDs = Set(workIDs).subtracting(displayLabelReads)
+        guard !missing.isEmpty || !labelIDs.isEmpty, let host else { return }
         let token = workActionReadToken
         do {
             let summaries = try await host.savedAuthoringSummaries(workIDs: Array(missing))
+            let labels = try await host.savedDisplayLabels(workIDs: Array(labelIDs))
             guard token == workActionReadToken, !Task.isCancelled else { return }
             let states = Dictionary(uniqueKeysWithValues: missing.map { id in
                 (id, summaries[id].map { SavedWorkActionState(origin: $0.origin, authority: $0.authority) } ?? .unavailable)
             })
             // Every menu observes this dictionary. Publish the page once, not once per card.
             workActionStates.merge(states) { _, new in new }
+            savedDisplayLabels.merge(labels) { _, new in new }
+            displayLabelReads.formUnion(labelIDs)
         } catch {
             guard token == workActionReadToken, !Task.isCancelled else { return }
             errorText = error.localizedDescription
@@ -1093,6 +1105,13 @@ public final class AppModel {
             status = "選択した候補を保存しました"
         } catch { report(error) }
         return saved
+    }
+
+    /// Validate the pinned parent before an option page saves or replaces any candidates.
+    public func validateSavedAdjustmentParent(_ work: SavedWork) async throws {
+        try Task.checkCancellation()
+        _ = try await checkedSavedAdjustmentParent(work)
+        try Task.checkCancellation()
     }
 
     private func checkedSavedAdjustmentParent(_ work: SavedWork) async throws -> SavedWork {
@@ -1787,6 +1806,8 @@ public final class AppModel {
             selectedContext = nil
             currentView = nil
             workActionStates = [:]
+            savedDisplayLabels = [:]
+            displayLabelReads = []
             workActionReadToken = UUID()
             await library.resetAfterRestore()
             await thumbnails.synchronize()
@@ -1806,18 +1827,14 @@ public final class AppModel {
 
     public func exportPNG(to url: URL, height: UInt32) async {
         guard let work = selectedWork else { return }
+        let options = display.preferences.singleWorkPNGOptions(height: Int(height))
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         do {
-            let raster = try await Task.detached {
-                try InkuCore.rasterize(svg: work.svg, targetHeight: height)
-            }.value
-            guard let image = raster.makeCGImage() else { throw ArtworkError.imageUnavailable }
-            guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else {
-                throw HostError("png_destination_unavailable")
-            }
-            CGImageDestinationAddImage(destination, image, nil)
-            guard CGImageDestinationFinalize(destination) else { throw HostError("png_encode_failed") }
+            let artifacts = try await ExportService.prepare(sources: [ExportSource(work: work)], options: options)
+            try Task.checkCancellation()
+            guard let artifact = artifacts.first else { throw HostError("png_encode_failed") }
+            try artifact.data.write(to: url, options: .atomic)
             status = "PNGを書き出しました"
         } catch { report(error) }
     }
@@ -1831,9 +1848,7 @@ public final class AppModel {
         let copied = await performSerialized(status: "コピー画像を準備中") { [weak self] _ in
             guard let self else { return }
             defer { self.currentExecutionID = executionID }
-            var options = self.display.preferences.exportDefaults.options
-            options.format = self.display.preferences.clipboardFormat == "card" ? .shareCard : .png
-            options.pixelHeight = height
+            let options = self.display.preferences.clipboardExportOptions(height: height)
             let artifacts = try await ExportService.prepare(sources: [ExportSource(work: work)], options: options)
             try Task.checkCancellation()
             guard let data = artifacts.first?.data, let nativeImage = NSImage(data: data) else {

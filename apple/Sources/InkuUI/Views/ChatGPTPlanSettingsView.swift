@@ -10,7 +10,7 @@ public struct ChatGPTPlanSettingsView: View {
     public init(model: AppModel, onOpenModelSettings: @escaping () -> Void) { app = model; self.onOpenModelSettings = onOpenModelSettings }
     public var body: some View {
         Group {
-            Section(app.display.localized("個人ChatGPTプラン")) {
+            Section(app.display.webCopy("chatgptPlanLabel", "ChatGPTプラン")) {
                 Text(app.display.localized("本人のChatGPTプランで描画できます。APIキー接続とは別に、使うアカウントを接続します。描画に使うモデルはモデル設定で選びます。保存作品はこのMacの同じライブラリに残ります。"))
                     .foregroundStyle(.secondary)
                 Toggle(app.display.localized("個人ChatGPTプラン接続を有効にする"), isOn: Binding(

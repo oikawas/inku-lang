@@ -50,7 +50,7 @@ struct ThirdPartyNoticesView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(display.localized("第三者ライセンス")).inkuFont(14, weight: .semibold)
+                Text(display.webCopy("noticesTitle", "第三者ライセンス")).inkuFont(14, weight: .medium)
                 Spacer()
                 Button(display.localized("閉じる")) { dismiss() }.keyboardShortcut(.cancelAction)
             }
@@ -59,7 +59,7 @@ struct ThirdPartyNoticesView: View {
             if let notices {
                 HStack(spacing: 0) {
                     List(selection: $selection) {
-                        ForEach(Self.groups, id: \.self) { group in
+                        ForEach(Self.groups.filter { group in notices.components.contains { $0.group == group } }, id: \.self) { group in
                             Section(groupTitle(group)) {
                                 ForEach(notices.components.filter { $0.group == group }) { component in
                                     VStack(alignment: .leading, spacing: 1) {
@@ -68,10 +68,13 @@ struct ThirdPartyNoticesView: View {
                                             .inkuFont(10).foregroundStyle(.secondary)
                                     }
                                     .tag(component.id)
+                                    .listRowSeparator(.hidden)
                                 }
                             }
                         }
                     }
+                    .listStyle(.plain)
+                    .accessibilityLabel(display.webCopy("noticesList", "ライセンスの一覧"))
                     .frame(width: 260)
                     Divider()
                     if let component = notices.components.first(where: { $0.id == selection }) {
@@ -90,7 +93,7 @@ struct ThirdPartyNoticesView: View {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .frame(minWidth: 760, idealWidth: 860, minHeight: 520, idealHeight: 640)
+        .frame(minWidth: 760, idealWidth: 960, minHeight: 520, idealHeight: 640)
         .task {
             guard !loaded else { return }
             notices = await Task.detached(priority: .userInitiated) { ThirdPartyNotices.bundled() }.value
@@ -103,8 +106,14 @@ struct ThirdPartyNoticesView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text([component.name, component.version].filter { !$0.isEmpty }.joined(separator: " "))
                 .inkuFont(14, weight: .semibold)
-            LabeledContent(display.localized("ライセンス"), value: component.license).inkuFont(12)
-            LabeledContent(display.localized("入手先")) {
+            if !component.license.isEmpty {
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text(display.webCopy("appInfoLicenseTitle", "ライセンス")).foregroundStyle(.secondary)
+                    Text(component.license)
+                }.inkuFont(12)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(display.webCopy("noticesSource", "入手先")).foregroundStyle(.secondary)
                 if let url = URL(string: component.source) { Link(component.source, destination: url) }
                 else { Text(component.source) }
             }.inkuFont(12)
@@ -113,6 +122,7 @@ struct ThirdPartyNoticesView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             NoticeTextView(text: body).frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityLabel(display.webCopy("noticesText", "通知とライセンスの全文"))
         }
         .textSelection(.enabled)
         .padding(16)
@@ -140,7 +150,10 @@ private struct NoticeTextView: NSViewRepresentable {
         textView.isEditable = false
         textView.isSelectable = true
         textView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-        textView.textContainerInset = NSSize(width: 6, height: 6)
+        textView.textContainerInset = NSSize(width: 10, height: 10)
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineSpacing = 4
+        textView.defaultParagraphStyle = paragraph
         view.borderType = .lineBorder
         return view
     }

@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-17 — 使われていないServerの`llm_retry.py`を削除
+
+どこからも使われていなかったServerの`llm_retry.py`とその試験を削除した。provider応答の再試行は共有coreの`RetryPolicy`が持つ。
+
 ### 2026-10-17 — Androidの作品識別と指示言語を共有coreへ統一
 
 Androidの記述ハッシュ`dh1`、描画ハッシュ`rh3`、正準JSON、指示言語の正規化・判定をJNIから共有coreへ委譲した。Kotlinの規則の写しを削除し、系譜の正準JSONも同じ実装を使う。JSON転送時は小数・整数の型を保持する。保存済みの識別値を書き換える移行は行わない。Serverと同じ試験データをKotlinからJNI経由で照合する。

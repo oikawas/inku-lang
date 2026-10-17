@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Remove Server's unused `llm_retry.py`
+
+Server's `llm_retry.py`, which nothing imported, and its tests were removed. Retries of provider responses belong to the shared core's `RetryPolicy`.
+
 ### 2026-10-17 — Android work identities and instruction language use the shared core
 
 Android now delegates description identity `dh1`, render identity `rh3`, canonical JSON, and instruction-language normalization/detection to the shared core through JNI. The Kotlin rule copies are removed, including lineage canonical JSON. JSON transport preserves floating-point and integer types. No migration rewrites stored identities. Kotlin checks the same fixtures as Server through JNI.

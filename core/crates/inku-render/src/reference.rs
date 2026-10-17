@@ -3,6 +3,10 @@
 use serde::Serialize;
 use serde_json::{Value, json};
 
+use crate::accepted_fills::{
+    CHALK_FILMS, CHALK_INTERCEPTS, CHALK_PASS_FREQUENCY, CHALK_PRESS_WEIGHT, CHALK_SLOPE,
+    CHALK_TOOTH_FREQUENCY, CHALK_TOOTH_WEIGHT,
+};
 use crate::geometry::{
     SEGMENT_COUNT_MAX, SEGMENT_COUNT_MIN, SEGMENT_TARGET_RATIO, frequency_cycles,
 };
@@ -86,6 +90,23 @@ pub fn renderer_reference() -> Value {
                 "opacity": COMPUTER_CELL_OPACITY,
                 "opacity_floor": COMPUTER_CELL_OPACITY_FLOOR,
             },
+            "chalk_fill": {
+                "tooth_weight": CHALK_TOOTH_WEIGHT,
+                "tooth_frequency": CHALK_TOOTH_FREQUENCY,
+                "press_weight": CHALK_PRESS_WEIGHT,
+                "pass_frequency": [CHALK_PASS_FREQUENCY.0, CHALK_PASS_FREQUENCY.1],
+                "slope": CHALK_SLOPE,
+                "intercept": {
+                    "normal": CHALK_INTERCEPTS[0],
+                    "dense": CHALK_INTERCEPTS[1],
+                    "faint": CHALK_INTERCEPTS[2],
+                },
+                "film": {
+                    "normal": CHALK_FILMS[0],
+                    "dense": CHALK_FILMS[1],
+                    "faint": CHALK_FILMS[2],
+                },
+            },
         },
         "performance": {
             "amplitude_widths": {
@@ -147,6 +168,10 @@ mod tests {
         assert_eq!(
             reference["weight_properties"]["computer_cells"]["opacity_floor"],
             0.15
+        );
+        assert_eq!(
+            reference["weight_properties"]["chalk_fill"]["film"]["normal"],
+            0.35
         );
     }
 }

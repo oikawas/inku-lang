@@ -96,6 +96,10 @@ Fixed the 3D viewer rejecting an entire work when shared execution removed a fai
 
 Added a 2D/3D toggle switch at the upper left of the canvas, below the Work label. A separate experimental WASM adapter and Three.js viewer preserve saved Score placement, aspect, colors and seeds while displaying spheres, boxes, pyramids and curved tubes. Includes orbit/pan/zoom, views, projection, guides, selection and PNG/GLB export. The October 17 integration bundles an independent distribution that loads only when 3D is selected. Core geometry reading is off by default. No database or work-saving path changes; `VITE_DDL_3D_VIEWER_URL=off` or removing the bridge and distribution restores a 2D-only application.
 
+### 2026-10-17 — Chalk fills are drawn as powder on the paper's tooth
+
+Chalk fills skipped too much (the moon of work d93f8814 was fully covered over a third of its face, with about half of the colour laid on average). The threshold of the grain's straight line sat at the middle of the grain values, so much of the ground showed through bare. The author chose, from four prototypes, to combine a powder film with the medium's physics, and from a second round, the version with weaker bands. A chalk fill (closed shapes and points) is drawn as powder on the peaks of the paper's tooth. A work has one tooth (set by its render seed alone), weighted 0.6 times the support's roughness. The hand lays the fill in two crossing passes whose pressure runs in bands (weight 0.2). The powder of the two passes piles up over a thin film of powder (0.35 normal, 0.45 dense, 0.20 faint), so the ground never shows through bare. The moon now lays about 0.7 of the colour on average, and chalk still covers less than crayon. Chalk lines and contours and the other tools are unchanged. The implementation reference adds `chalk_fill` to `weight_properties`. Render engine 85.
+
 ## v2.15.162 (2026-10-17 / Build 1238)
 
 ### 2026-10-17 — Bring the public tool, thinness and intensity descriptions up to date

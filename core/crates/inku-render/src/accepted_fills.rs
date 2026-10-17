@@ -250,14 +250,6 @@ struct Grain {
 
 fn grain(instruction: &Instruction) -> Grain {
     let (fine, coarse, seed, mix, slope, intercepts) = match instruction.weight {
-        Weight::Chalk => (
-            (0.22, 0.30),
-            (0.026, 0.036),
-            23,
-            0.78,
-            9.0,
-            [-4.0, -3.37, -4.63],
-        ),
         Weight::Crayon => (
             (0.18, 0.42),
             (0.010, 0.055),
@@ -297,6 +289,145 @@ fn grain(instruction: &Instruction) -> Grain {
         slope,
         intercept: level(instruction, intercepts),
     }
+}
+
+/// Weight of the paper's tooth in a chalk fill, on a support of tooth 1.0.
+pub(crate) const CHALK_TOOTH_WEIGHT: f64 = 0.6;
+/// Frequency of the paper's tooth per px at 1000px.
+pub(crate) const CHALK_TOOTH_FREQUENCY: f64 = 0.26;
+/// Weight of the hand's pressure in each pass.
+pub(crate) const CHALK_PRESS_WEIGHT: f64 = 0.2;
+/// Frequencies of the first pass's pressure bands per px at 1000px, along and
+/// across the stroke; the second pass crosses it.
+pub(crate) const CHALK_PASS_FREQUENCY: (f64, f64) = (0.006, 0.05);
+pub(crate) const CHALK_SLOPE: f64 = 9.0;
+/// Normal, dense and faint.
+pub(crate) const CHALK_INTERCEPTS: [f64; 3] = [-4.05, -3.6, -4.6];
+/// The powder film under the piled powder: normal, dense and faint.
+pub(crate) const CHALK_FILMS: [f64; 3] = [0.35, 0.45, 0.2];
+const ALPHA_FROM_RED: &str = "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0";
+
+/// Chalk powder catches on the paper's tooth and skips its valleys (render
+/// engine 85). The tooth belongs to the paper, so every chalk fill of the work
+/// reads the same field (seeded by the work, not the mark), deepened by the
+/// support's tooth. The hand lays a fill with two crossing passes whose
+/// pressure runs in bands, and powder piles up: a valley stays bare only where
+/// both passes skipped it. A thin film of powder lies under it, so the ground
+/// never shows through bare.
+fn chalk_filter(instruction: &Instruction, context: MarkContext<'_>) -> Element {
+    let unit = context.canvas.unit() / 1000.0;
+    let tooth_seed =
+        29u32.wrapping_add((context.render_seed.unwrap_or(0) as u32).wrapping_sub(666_010));
+    let tooth_weight = CHALK_TOOTH_WEIGHT * context.support.tooth;
+    let mut filter = Element::new("filter")
+        .attr("id", identifier(context))
+        .attr("x", "-2%")
+        .attr("y", "-2%")
+        .attr("width", "104%")
+        .attr("height", "104%")
+        .attr("color-interpolation-filters", "sRGB");
+    filter.push(
+        Element::new("feTurbulence")
+            .attr("type", "fractalNoise")
+            .attr("baseFrequency", format_number(CHALK_TOOTH_FREQUENCY / unit))
+            .attr("numOctaves", "2")
+            .attr("seed", tooth_seed.to_string())
+            .attr("result", "tooth"),
+    );
+    // Weigh the fields as alpha-only images: feComposite's arithmetic works on
+    // premultiplied colour, so a constant added to a colour channel would not
+    // stay linear in the field.
+    filter.push(
+        Element::new("feColorMatrix")
+            .attr("in", "tooth")
+            .attr("type", "matrix")
+            .attr("values", ALPHA_FROM_RED)
+            .attr("result", "toothAlpha"),
+    );
+    let (along, across) = CHALK_PASS_FREQUENCY;
+    for (pass, (frequency, field_seed)) in [((along, across), 23), ((across, along), 7792)]
+        .into_iter()
+        .enumerate()
+    {
+        filter.push(
+            Element::new("feTurbulence")
+                .attr("type", "fractalNoise")
+                .attr(
+                    "baseFrequency",
+                    format!(
+                        "{} {}",
+                        format_number(frequency.0 / unit),
+                        format_number(frequency.1 / unit)
+                    ),
+                )
+                .attr("numOctaves", "2")
+                .attr("seed", seed(field_seed, context).to_string())
+                .attr("result", format!("press{pass}")),
+        );
+        filter.push(
+            Element::new("feColorMatrix")
+                .attr("in", format!("press{pass}"))
+                .attr("type", "matrix")
+                .attr("values", ALPHA_FROM_RED)
+                .attr("result", format!("pressAlpha{pass}")),
+        );
+        filter.push(
+            Element::new("feComposite")
+                .attr("in", "toothAlpha")
+                .attr("in2", format!("pressAlpha{pass}"))
+                .attr("operator", "arithmetic")
+                .attr("k1", "0")
+                .attr("k2", format_number(tooth_weight))
+                .attr("k3", format_number(CHALK_PRESS_WEIGHT))
+                .attr(
+                    "k4",
+                    format_number(0.5 * (1.0 - tooth_weight - CHALK_PRESS_WEIGHT)),
+                )
+                .attr("result", format!("catchAlpha{pass}")),
+        );
+        let mut transfer = Element::new("feComponentTransfer")
+            .attr("in", format!("catchAlpha{pass}"))
+            .attr("result", format!("powder{pass}"));
+        transfer.push(
+            Element::new("feFuncA")
+                .attr("type", "linear")
+                .attr("slope", format_number(CHALK_SLOPE))
+                .attr(
+                    "intercept",
+                    format_number(level(instruction, CHALK_INTERCEPTS)),
+                ),
+        );
+        filter.push(transfer);
+    }
+    filter.push(
+        Element::new("feComposite")
+            .attr("in", "powder0")
+            .attr("in2", "powder1")
+            .attr("operator", "arithmetic")
+            .attr("k1", "-1")
+            .attr("k2", "1")
+            .attr("k3", "1")
+            .attr("k4", "0")
+            .attr("result", "deposit"),
+    );
+    let film = level(instruction, CHALK_FILMS);
+    let mut film_transfer = Element::new("feComponentTransfer")
+        .attr("in", "deposit")
+        .attr("result", "filmDeposit");
+    film_transfer.push(
+        Element::new("feFuncA")
+            .attr("type", "linear")
+            .attr("slope", format_number(1.0 - film))
+            .attr("intercept", format_number(film)),
+    );
+    filter.push(film_transfer);
+    filter.push(
+        Element::new("feComposite")
+            .attr("in", "SourceGraphic")
+            .attr("in2", "filmDeposit")
+            .attr("operator", "in"),
+    );
+    filter
 }
 
 fn grain_filter(instruction: &Instruction, context: MarkContext<'_>) -> Element {
@@ -968,6 +1099,7 @@ fn definitions_for_closed_contour(
     match instruction.weight {
         Weight::Burin | Weight::Drypoint => engraving(instruction, geometry, context),
         Weight::BrushThin | Weight::BrushThick => brush_mask(instruction, geometry, context),
+        Weight::Chalk => vec![chalk_filter(instruction, context)],
         _ => vec![grain_filter(instruction, context)],
     }
 }
@@ -1015,6 +1147,7 @@ mod tests {
                     | Weight::Computer
                     | Weight::BrushThin
                     | Weight::BrushThick
+                    | Weight::Chalk
             ) {
                 continue;
             }
@@ -1034,6 +1167,20 @@ mod tests {
                 assert_eq!(faint.slope, 0.6);
                 assert_eq!(normal.slope, 6.0);
             }
+        }
+        // Chalk presses harder and lays a thicker film as it grows dense.
+        instruction.weight = Weight::Chalk;
+        for values in [CHALK_INTERCEPTS, CHALK_FILMS] {
+            let [faint, normal, dense] = [
+                SurfaceIntensity::Faint,
+                SurfaceIntensity::Normal,
+                SurfaceIntensity::Dense,
+            ]
+            .map(|intensity| {
+                instruction.surface_intensity = intensity;
+                level(&instruction, values)
+            });
+            assert!(dense > normal && normal > faint);
         }
         for color in ["#111111", "#a56de2", "#2468ac", "#ffffff"] {
             let tones = [

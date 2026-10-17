@@ -5,7 +5,7 @@ export interface ViewState {
   position: [number, number, number]; target: [number, number, number]; zoom: number;
   projection: 'perspective' | 'orthographic'; depth: number; orthoHeight: number;
   layerSpacing?: number;
-  background?: 'none' | 'support' | 'sky' | 'stars';
+  background?: 'none' | 'support' | 'sky' | 'stars' | 'paint' | 'white' | 'black';
   referenceHeight?: number;
   displayZoom?: number;
 }
@@ -21,7 +21,7 @@ export function validState(value: unknown): value is ViewState {
   return vector(v.position) && vector(v.target) && Number.isFinite(v.zoom) && v.zoom >= 0.001 && v.zoom <= 1000
     && (v.projection === 'perspective' || v.projection === 'orthographic') && v.depth >= 0.1 && v.depth <= 3
     && (v.layerSpacing === undefined || (Number.isFinite(v.layerSpacing) && v.layerSpacing >= 0 && v.layerSpacing <= 3))
-    && (v.background === undefined || ['none', 'support', 'sky', 'stars'].includes(v.background))
+    && (v.background === undefined || ['none', 'support', 'sky', 'stars', 'paint', 'white', 'black'].includes(v.background))
     && (v.referenceHeight === undefined || (Number.isFinite(v.referenceHeight) && v.referenceHeight > 0 && v.referenceHeight < 1000))
     && (v.displayZoom === undefined || (Number.isFinite(v.displayZoom) && v.displayZoom > 0 && v.displayZoom <= 10000))
     && Number.isFinite(v.orthoHeight) && v.orthoHeight > 0 && v.orthoHeight < 1000;

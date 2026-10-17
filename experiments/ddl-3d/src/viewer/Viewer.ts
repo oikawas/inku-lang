@@ -220,7 +220,10 @@ export class Viewer {
     this.backgroundTexture?.dispose(); this.backgroundTexture = null;
     this.background = value; this.support.visible = value === 'support';
     if (value === 'sky' || value === 'stars') this.backgroundTexture = skyTexture(value);
-    this.scene.background = this.backgroundTexture;
+    this.scene.background = value === 'paint' ? new THREE.Color(this.packet.background)
+      : value === 'white' ? new THREE.Color(0xffffff)
+      : value === 'black' ? new THREE.Color(0x000000)
+      : this.backgroundTexture;
     this.controlChanged();
   }
 

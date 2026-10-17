@@ -1,6 +1,6 @@
 import { CanvasTexture, SRGBColorSpace } from 'three';
 
-export type Background = 'none' | 'support' | 'sky' | 'stars';
+export type Background = 'none' | 'support' | 'sky' | 'stars' | 'paint' | 'white' | 'black';
 
 /** Local procedural skies: no network images, credentials, or saved-work changes. */
 export function skyTexture(mode: 'sky' | 'stars'): CanvasTexture {

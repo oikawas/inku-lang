@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Add saved fill color, white and black 3D backgrounds
+
+Added Background fill color, White background and Black background to the 3D background choices. They fill the entire view with the resolved work background or fixed white or black. The choice survives a 2D round trip without changing the saved work's background setting.
+
 ## v2.15.169 (2026-10-17 / Build 1245)
 
 ### 2026-10-17 — Keep 3D details clear of the artwork caption

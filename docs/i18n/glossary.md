@@ -159,6 +159,7 @@ composition / color catalog と食い違って見える（→ §8）。
 ## 7. 本表の運用
 
 3D表示の背景選択（2026-10-17、作者指定）では、なし = None、支持面 = Support、青空 = Blue sky、星空 = Starry sky とする。青空を天候全般へ広げる Weather、星空を宇宙空間全般へ広げる Space は使わない。3D専用の開閉パネルは「3D操作」= 3D controls とする。
+同日の追加指定は、背景の塗色 = Background fill color、白背景 = White background、黒背景 = Black background とする。背景の塗色は保存作品から解決した背景色を指し、任意色を選ぶ Color picker とは区別する。
 
 1. **日本語を先に書く。** 概念を本表で引き、あれば必ずその英語を使う。
 2. 表に無い概念は、方針（美術の慣用・一語一義・工房の語・ローマ字を増やさない・静かな文体）で決め、

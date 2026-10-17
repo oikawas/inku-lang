@@ -86,7 +86,8 @@ function ui() {
   let spin: HTMLInputElement;
   const backgroundLabel = element('label', options, words.background), background = element('select', backgroundLabel);
   background.dataset.option = 'background'; background.setAttribute('aria-label', words.background);
-  for (const [value, label] of [['none', words.none], ['support', words.support], ['sky', words.sky], ['stars', words.stars]]) {
+  for (const [value, label] of [['none', words.none], ['support', words.support], ['sky', words.sky], ['stars', words.stars],
+    ['paint', words.backgroundFill], ['white', words.whiteBackground], ['black', words.blackBackground]]) {
     const option = element('option', background, label); option.value = value;
   }
   background.addEventListener('change', () => viewer?.setBackground(background.value as Background)); sceneControls.push(background);

@@ -41,6 +41,7 @@
 			} else if (data.type === 'return-2d') onReturn();
 		};
 		window.addEventListener('message', listener);
+		send('request-ready');
 		return () => { send('dispose'); clearTimeout(timer); window.removeEventListener('message', listener); };
 	});
 	$effect(() => {
@@ -55,7 +56,7 @@
 
 <div class="ddl3d-host" aria-busy={preparing}>
 	{#key attempt}
-		<iframe bind:this={frame} {src} title={t().ddl3dTitle} allow="fullscreen" allowfullscreen referrerpolicy="no-referrer" inert={!!failure}></iframe>
+		<iframe bind:this={frame} {src} onload={() => send('request-ready')} title={t().ddl3dTitle} allow="fullscreen" allowfullscreen referrerpolicy="no-referrer" inert={!!failure}></iframe>
 	{/key}
 	{#if failure}
 		<div class="message" role="status">

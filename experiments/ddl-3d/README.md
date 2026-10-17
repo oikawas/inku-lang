@@ -38,6 +38,8 @@ For a distribution update, build from a clean, committed core source, install un
 
 The bridge projects only the current Score and saved color/aspect/seed/version metadata into an immutable JSON string. It supports a saved work, a newly created work, and an unsaved candidate without requiring a history ID. Decimal seed strings never pass through `Number`. Unsafe numeric seeds are rejected rather than silently rounded.
 
+The host requests the viewer's ready state after mounting and after iframe load, so startup does not depend on a single unsolicited notification. Both sides validate the same origin, window and mount identity before exchanging work data.
+
 ## Viewing and exports
 
 - Drag / one finger: orbit. Right drag or Shift-drag: pan. Wheel or two fingers: zoom. Arrow keys pan, `+`/`-` zoom while the canvas has focus. `F` fits, `R` resets, and `Esc` returns to 2D when embedded.

@@ -205,6 +205,7 @@ async function save(format: 'png' | 'glb') {
 
 window.addEventListener('message', event => {
   if (!embedded || event.origin !== location.origin || event.source !== parent) return;
+  if (event.data?.protocol === PROTOCOL && event.data.type === 'request-ready' && event.data.mountId === mountId) { post('ready'); return; }
   if (validLoad(event.data) && event.data.mountId === mountId && event.data.requestId > (current?.requestId ?? 0)) load(event.data);
   else if (event.data?.protocol === PROTOCOL && event.data.type === 'dispose' && event.data.mountId === mountId) stop();
   else if (event.data?.protocol === PROTOCOL && event.data.type === 'viewer-command' && event.data.mountId === mountId && event.data.requestId === current?.requestId) {

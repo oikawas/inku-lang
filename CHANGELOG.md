@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+The host also requests the 3D viewer's ready state, avoiding a startup wait when iframe load ordering loses the initial notification.
+
 ## v2.15.172 (2026-10-17 / Build 1248)
 
 ### 2026-10-17 — Fix 3D viewing for many rounds and abstract presence

@@ -40,13 +40,9 @@ class ChatGptException(
     val failure: String = chatGptFailureFor(code),
 ) : IllegalArgumentException(code)
 
-/** The server's temporary ChatGPT failures; every other code is `provider_rejected`. */
-internal fun chatGptFailureFor(code: String): String = when (code) {
-    "chatgpt_transport_unavailable", "chatgpt_auth_unavailable", "chatgpt_response_incomplete",
-    "subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable", "chatgpt_refresh_not_ready",
-    -> "transport_unavailable"
-    else -> "provider_rejected"
-}
+/** The shared core's failure table (`chatgpt_failure`); a code it does not know is `provider_rejected`. */
+internal fun chatGptFailureFor(code: String): String =
+    SharedProviderWire.call(JSONObject().put("action", "chatgpt_failure").put("code", code)).getString("failure")
 
 internal const val CHATGPT_PROVIDER = "chatgpt"
 internal const val CHATGPT_ISSUER = "https://auth.openai.com"

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Take Android ChatGPT plan failure classes and model-list guards from the shared core
+
+Android now takes the failure class of the ChatGPT-plan codes it raises from the shared core's `chatgpt_failure` table, with the same classes as before. The model list is no longer refused whole for an empty or overlong name or de-duplicated in the host; the core drops those rows.
+
 ### 2026-10-17 — Fix the macOS Library comment field stalling when the shown work is clicked again
 
 Clicking the thumbnail of the work already shown in the Library preview left its comment field loading, greyed out and unable to take input (reported by the author). Every click now reads the comment again.

@@ -271,14 +271,14 @@ class ChatGptPlanManager internal constructor(
             val response = http.request("$CHATGPT_RESOURCE/models", token = token, check = { checkSession(ref); Unit })
             val json = JSONObject(response.body)
             if (response.status !in 200..299) throw chatGptResponseError(json, response.status)
-            // The shared core reads which models are listed (provider_wire).
+            // The shared core reads which models are listed (provider_wire): it
+            // drops an empty, overlong or repeated row rather than the whole list.
             val listed = SharedProviderWire.call(JSONObject().put("action", "chatgpt_catalog").put("value", json))
             if (listed.getString("outcome") != "ok") throw JSONException("chatgpt model list is malformed")
             val raw = listed.getJSONArray("models")
             val models = (0 until raw.length()).map { raw.getJSONObject(it) }
                 .map { ChatGptModel(it.getString("id"), it.getString("label")) }
-            if (models.any { it.id.isBlank() || it.id.length > 256 || it.label.length > 512 }) throw ChatGptException("chatgpt_response_invalid")
-            val result = modelArray(models.distinctBy { it.id })
+            val result = modelArray(models)
             synchronized(store) {
                 val current = checkSession(ref)
                 current.put("catalog", JSONObject().put("expires_at", now() + 300_000).put("models", result))

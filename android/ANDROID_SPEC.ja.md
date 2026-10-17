@@ -5,11 +5,15 @@
 
 最終更新: 2026-10-17。
 
+## 2026-10-17 ChatGPTプランの失敗の分類とモデル一覧を共有coreへ
+
+Androidが自分で出すChatGPTプランの失敗の印の分類を、共有coreの失敗の表（`chatgpt_failure`）から引くようにした。coreが読む失敗も同じ表を使う。Androidでの分類は変わらない。モデル一覧は、空の名前や長すぎる名前があっても一覧全体を断らず、重複するslugもhostでは除かない。coreがその行だけを落とし（`slug`はUTF-8で256バイト、`display_name`は512バイトまで）、Androidはcoreが返した行をそのまま保存する。流れのresponseと呼び出しのIDもcoreが確かめる。表の次の行動はAndroidの画面には出さない。
+
 ## 2026-10-17 ChatGPTプランの本文と流れを共有coreへ
 
 ChatGPTプランの描画と推敲のVision助言の本文、SSEの流れの読み、失敗の分類、本人のモデル一覧の読みを、JNI経由の共有core `inku.provider-wire.v1`（`chatgpt_request`・`chatgpt_vision_request`・`chatgpt_stream`・`chatgpt_error`・`chatgpt_catalog`）へ移した。Serverと同じバイト列を書き、同じように読む。作者の決定により、Androidは流れを最後まで受け（受けている間に守るのはcoreが返す`wire_limit`だけ）、coreが全体を1回で読む。1つのeventと答えの上限はcoreが読むときに確かめる。UTF-8でないバイトは断り、形の違うeventと引数は`malformed_payload`とする。道具の形の診断は、本文と引数を含めずにLogcat（tag `InkuProvider`）へ`chatgpt_tool_shape`の1行で書く。`OrderedSchemaJson.kt`は消した。
 
-送る前の確かめ（`chatgpt:`の名前、描画の効果、推敲の助言の768×768 PNG）、OAuthとtoken、sessionの世代、取消、使用量の上限での一時停止、HTTP、一覧を保存する前の長さの上限と重複の除去はhostに残す。host JNIの試験は`server/tests/data/provider-wire-cases.json`の`chatgpt`の69行も読む。
+送る前の確かめ（`chatgpt:`の名前、描画の効果、推敲の助言の768×768 PNG）、OAuthとtoken、sessionの世代、取消、使用量の上限での一時停止、HTTPはhostに残す（一覧の長さの上限と重複の除去は、上の失敗の表の節からcoreが行う）。host JNIの試験は`server/tests/data/provider-wire-cases.json`の`chatgpt`の69行も読む。
 
 ## 2026-10-17 provider本文・応答の共有core化
 

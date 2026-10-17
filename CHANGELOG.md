@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Keep the library's first work when toggling a preview
+
+Opening or closing a preview on later chronological thumbnail pages no longer jumps to a different set of works. The page capacity still follows the available width while keeping the same first work.
+
 ## v2.15.172 (2026-10-17 / Build 1248)
 
 ### 2026-10-17 — Fix 3D viewing for many rounds and abstract presence

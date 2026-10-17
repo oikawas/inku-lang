@@ -18,6 +18,19 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-17 ChatGPTプランの本文と流れの読みを共有coreへ移す
+
+ChatGPTプランの描画とVisionの要求本文、SSEの流れの読み、HTTPの失敗の分類、モデル一覧の読みは、UniFFIの`provider_wire`（`inku.provider-wire.v1`）の`chatgpt_request`・`chatgpt_vision_request`・`chatgpt_limits`・`chatgpt_stream`・`chatgpt_error`・`chatgpt_catalog`を呼ぶ。正本は共有coreの[`provider_wire/chatgpt.rs`](../core/crates/inku-pipeline/src/provider_wire/chatgpt.rs)で、ServerとAndroidも同じ規則で読む。Serverセッションの依頼（共通Rustの段4）による。
+
+- Swiftの`ChatGPTResponseDecoder`を消し、受け手を[`ChatGPTWire.swift`](Packages/InkuHost/Sources/InkuHost/ChatGPTWire.swift)にした。描画の本文はeffectのpromptを元のJSONのまま渡し、coreの本文の文字列をそのまま送って観測記録にも書く。
+- 流れはこれまでどおり最後まで受けてから1回で読む。受けている間に守るのは、coreが返す流れ全体の上限（`wire_limit`）だけで、1つのeventと答えの上限はcoreが読むときに確かめる。最後の`response`は観測記録に渡す。道具の形の診断はcoreが返す形だけをログに書き、本文と引数は書かない。
+- 一時的な失敗かどうか（再試行するか）はcoreの分類に従う（作者の決定）。画面に出す次の行動はSwiftの表のまま決める。項目が未完了の応答と、完了の印が`completed`でない要約は、これまでの再試行から断りに変わる（Serverと同じ）。流れが完了の前に終わった場合と`response.incomplete`は、これまでどおり再試行。
+- 形の崩れた流れ（JSONでないevent、UTF-8でないバイト列など）は`chatgpt_response_invalid`にする。これまでJSONでないeventは内部の印`invalid_json`で止まっていた。
+- これまでSwiftだけが断っていた形のうち、`response`を持たない`response.created`と、`response.created`と`response.completed`の応答IDの食い違いは、Serverと同じく断らない。Visionの画像はcoreのdata URLの判定に従い、型の無い`data:;base64,…`も送る。
+- モデル一覧はcoreの答えをそのまま使う（作者の決定）。同じslugの重複や空の名前を落とさず、オブジェクトでない行があれば一覧全体を読めないものとして`chatgpt_response_invalid`にする。HTTPの失敗の本文は、`response.error`の`param`と、`type: "error"`の形の本文の印も読む。
+- token・登録の保存・ロック・取消・時間切れ・使用量の上限での一時停止・観測記録は変えない。
+- 確認：共通の試験データの`chatgpt`の節69行（要求8、Vision 8、流れ42、失敗9、一覧2）を、core自身とSwiftの受け手の両方で読む試験を足した。旧い読み手を直に試していた試験は、流れ全体を読む形に直した。旧いSwiftとの差は69行中23行で、内訳は段4のRESULTに残す。
+
 ## 2026-10-17 照合表にstroke-dashoffsetを足す（I-723）
 
 カンバス地は2026-10-15の描き直しから、糸目の破線に`stroke-dasharray`と`stroke-dashoffset`を書く。照合表に`stroke-dashoffset`が無かったため、カンバス地の作品はすべて照合表の外になり、macOSの作品の画面では「Skiaで描けませんでした（attribute）」となって描かれなかった。作者の指示（I-723に対応）による。
@@ -191,7 +204,7 @@ AI自動推敲プロセスは、記述ロック・DDL直接入力の作品もVis
 
 ## 2026-10-17 providerの要求本文と応答を共有coreへ移す
 
-APIキーを使うproviderの描画・Vision（推敲助言・奥書）・デモの本文と応答は、UniFFIの`provider_wire`（`inku.provider-wire.v1`）を呼ぶ。正本は共有coreの[`provider_wire.rs`](../core/crates/inku-pipeline/src/provider_wire.rs)。以下のprovider別の説明もこの実装に従い、Swiftにモデル判定・出力枠・schema変形・応答抽出の規則を複製しない。ChatGPTプランの要求とSSEは次段の対象であり、今回変更しない。
+APIキーを使うproviderの描画・Vision（推敲助言・奥書）・デモの本文と応答は、UniFFIの`provider_wire`（`inku.provider-wire.v1`）を呼ぶ。正本は共有coreの[`provider_wire.rs`](../core/crates/inku-pipeline/src/provider_wire.rs)。以下のprovider別の説明もこの実装に従い、Swiftにモデル判定・出力枠・schema変形・応答抽出の規則を複製しない。ChatGPTプランの要求とSSEは、この時点では変えず、同じ日の次の段で移した（「ChatGPTプランの本文と流れの読みを共有coreへ移す」）。
 
 - `pipeline_request`へ接続の公開条件・モデル・effectのprompt・出力上限を渡し、`text_request`へsystem・text・画像data URL・temperature・上限を渡す。schemaのキー順序を保つため、promptは元のeffectのJSONバイト列のまま渡す。
 - 本文はcoreが返す文字列をUTF-8へ変換してそのまま送る。名前順への書き直しはしない。URL・秘密でないheader・応答format・出力予算・Gemini countTokensのURL/本文もcoreの答えを使う。鍵はcoreへ渡さず、指定されたheader/prefixへhostが足す。
@@ -671,7 +684,7 @@ ChatGPTプランのmodelはVisionにも使う（作者裁定、2026-10-12。契�
 
 本人認証は127.0.0.1の一時listenerと`/auth/callback`、state／nonce／PKCE、発行済みclient ID、検証したidentityと許可scopeを使用する。資格情報は最大1MiBのAES-GCM暗号化vaultへ原子的に保存し、device-localの32byte keyをKeychainへ置く。平文token fallbackを持たず、SQLite backupに資格情報を含めない。初期無効状態で認証や推論を開始しない。
 
-開始時にprofile ID／generationを固定し、queued要求やbatch／demoの再開で接続を付け替えない。接続解除・切替・quota後は古いrefreshや遅延応答を採用せず、別providerへ暗黙に切り替えない。共有Rustの記述解釈、写生、自動配色、構図の読み、DDL補完と、Vision推敲・奥書をResponses／SSEへ接続する。demo用記述とmodel検査はこの接続では未対応として表示する。実本人OAuth、model取得、推論の受入はoffline確認と分ける。
+開始時にprofile ID／generationを固定し、queued要求やbatch／demoの再開で接続を付け替えない。接続解除・切替・quota後は古いrefreshや遅延応答を採用せず、別providerへ暗黙に切り替えない。共有Rustの記述解釈、写生、自動配色、構図の読み、DDL補完と、Vision推敲・奥書をResponses／SSEへ接続する。要求本文、SSEの読み、失敗の分類、モデル一覧の読みは共有coreの`provider_wire`が行う（2026-10-17）。demo用記述とmodel検査はこの接続では未対応として表示する。実本人OAuth、model取得、推論の受入はoffline確認と分ける。
 
 ### 保存作品の書出しとnative raster
 

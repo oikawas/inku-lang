@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-17 — SwiftのChatGPTプランの本文と流れの読みを共有coreへ移行
+
+SwiftのChatGPTプランの要求本文、SSEの流れの読み、失敗の分類、モデル一覧の読みを、UniFFIの`provider_wire`へ移した。ServerとAndroidと同じ規則で読む。項目が未完了の応答は、再試行せずに断るようになった（Serverと同じ）。形の崩れた流れは`chatgpt_response_invalid`になり、内部の印は出なくなった。token・取消・使用量の上限での一時停止・観測記録は変えていない。
+
 ### 2026-10-17 — AndroidのGeminiのモデル名をServerと同じに送る
 
 Androidは描画・Vision・デモの要求で、Geminiのモデル名の先頭の`models/`を外さずに共有coreへ渡すようにした。Serverと同じく名前全体をURLへpercent encodeするので、`models/gemini-3.6-flash`は`models/models%2Fgemini-3.6-flash:generateContent`へ送る。モデル一覧の取得では、Serverと同じく引き続き外す。目録に`models/`で始まるモデルは無いので、ふつうの要求の送り先は変わらない。

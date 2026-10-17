@@ -14,10 +14,11 @@ public struct ChatGPTPlanDiagnostic: Sendable, Equatable {
     public let requestID: String?
     public let parameter: String?
     public let status: Int?
-    public init(code: String, status: Int? = nil, requestID: String? = nil, parameter: String? = nil) {
+    /// `temporary` is the shared core's classification of a backend failure; the next action stays this table.
+    public init(code: String, status: Int? = nil, requestID: String? = nil, parameter: String? = nil, temporary: Bool? = nil) {
         self.code = code; self.status = status
-        let temporary = ["subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable", "chatgpt_transport_unavailable", "chatgpt_auth_unavailable",
-                         "chatgpt_response_incomplete", "chatgpt_refresh_not_ready", "chatgpt_transport_timeout"].contains(code) || (status ?? 0) >= 500
+        let temporary = temporary ?? (["subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable", "chatgpt_transport_unavailable", "chatgpt_auth_unavailable",
+                         "chatgpt_response_incomplete", "chatgpt_refresh_not_ready", "chatgpt_transport_timeout"].contains(code) || (status ?? 0) >= 500)
         if ["subscription_sharing_usage_limit_exceeded", "chatgpt_quota"].contains(code) { action = "usage" }
         else if temporary { action = "retry" }
         else if code == "chatgpt_scope_required" { action = "consent" }
@@ -38,7 +39,7 @@ public struct ChatGPTPlanDiagnostic: Sendable, Equatable {
     }
 }
 
-private struct ChatGPTHTTPFailure: Error { let diagnostic: ChatGPTPlanDiagnostic }
+struct ChatGPTPlanFailure: Error { let diagnostic: ChatGPTPlanDiagnostic }
 
 /// One native local user owns this vault. Personal profiles never select a different artwork database.
 public actor ChatGPTPlanRuntime {
@@ -322,11 +323,11 @@ public actor ChatGPTPlanRuntime {
         do {
             // The body does not depend on authentication. Durably save it before any
             // model-discovery or token-refresh HTTP, as well as before the paid request.
-            let body: Data?
+            let body: ChatGPTWire.Request?
             if let recorder {
                 let profile = try checkedProfile(session)
-                let prepared = try Self.requestData(model: model, prompt: effect.requiredObject("payload").requiredObject("prompt"))
-                recorder.prepare(body: prepared, providerID: providerID, model: model,
+                let prepared = try Self.request(action: action, model: model, argumentLimit: argumentLimit)
+                recorder.prepare(body: prepared.body, providerID: providerID, model: model,
                     secrets: [profile.accessToken, profile.refreshToken, profile.idToken].compactMap { $0 })
                 try await recorder.saveRequest(willSend)
                 body = prepared
@@ -337,8 +338,8 @@ public actor ChatGPTPlanRuntime {
                 let profile = try checkedProfile(session)
                 recorder.addSecrets([token, profile.refreshToken, profile.idToken].compactMap { $0 })
             }
-            let sentBody = try body ?? Self.requestData(model: model, prompt: effect.requiredObject("payload").requiredObject("prompt"))
-            var request = URLRequest(url: ChatGPTEndpoints.responses); request.httpMethod = "POST"; request.httpBody = sentBody
+            let sent = try body ?? Self.request(action: action, model: model, argumentLimit: argumentLimit)
+            var request = URLRequest(url: ChatGPTEndpoints.responses); request.httpMethod = "POST"; request.httpBody = sent.body
             request.timeoutInterval = max(0.001, deadline.timeIntervalSinceNow)
             request.setValue("application/json", forHTTPHeaderField: "Content-Type"); request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
             request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
@@ -347,21 +348,21 @@ public actor ChatGPTPlanRuntime {
                 if let recorder {
                     recorder.receive(ProviderHTTPRead(status: nil, data: nil, sent: true, complete: false, truncated: false))
                     if let observed = self.http as? any ObservedChatGPTHTTPClient {
-                        return try await observed.sendObserved(boundedRequest, maximumBytes: max(1_048_576, argumentLimit * 6 + 524_288),
+                        return try await observed.sendObserved(boundedRequest, maximumBytes: sent.wireLimit,
                             onBytes: onBytes, onResponse: { recorder.receive($0) })
                     }
-                    let response = try await self.http.send(boundedRequest, maximumBytes: max(1_048_576, argumentLimit * 6 + 524_288), onBytes: onBytes)
+                    let response = try await self.http.send(boundedRequest, maximumBytes: sent.wireLimit, onBytes: onBytes)
                     recorder.receive(ProviderHTTPRead(status: response.status, data: response.data, sent: true, complete: true, truncated: false))
                     return response
                 }
-                return try await self.http.send(boundedRequest, maximumBytes: max(1_048_576, argumentLimit * 6 + 524_288), onBytes: onBytes)
+                return try await self.http.send(boundedRequest, maximumBytes: sent.wireLimit, onBytes: onBytes)
             }
-            if !(200...299).contains(result.status) { throw Self.responseFailure(result) }
-            var decoder = ChatGPTResponseDecoder(argumentLimit: argumentLimit)
-            defer { if let terminal = decoder.terminalResponse { recorder?.report(terminal) } }
-            // EOF is required: a failure following a completed frame invalidates that frame.
-            try decoder.feed(result.data)
-            let answer = try decoder.finish(); try validate(session, operationEpoch: operationEpoch); return answer
+            if !(200...299).contains(result.status) { throw try ChatGPTWire.httpFailure(result) }
+            // The core reads the whole stream: a failure following a completed frame invalidates that frame.
+            let stream = try ChatGPTWire.read(text: false, answerLimit: argumentLimit, wire: result.data)
+            if let terminal = stream.terminal { recorder?.report(terminal) }
+            try Task.checkCancellation()
+            let answer = try stream.result.get(); try validate(session, operationEpoch: operationEpoch); return answer
         } catch {
             let diagnostic = Self.diagnostic(error)
             if diagnostic.code == "subscription_sharing_usage_limit_exceeded" { try await pauseQuota(session) }
@@ -375,7 +376,7 @@ public actor ChatGPTPlanRuntime {
     public func visionText(session: ChatGPTPlanSession, model: String, system: String, message: String, images: [String],
                            timeoutSeconds: Double, onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
         guard timeoutSeconds.isFinite, timeoutSeconds > 0 else { throw HostError("chatgpt_transport_timeout") }
-        let body = try Self.visionBody(model: model, system: system, message: message, images: images)
+        let prepared = try ChatGPTWire.visionRequest(model: model, system: system, text: message, images: images, answerLimit: Self.visionTextLimit)
         let deadline = Date().addingTimeInterval(timeoutSeconds)
         let operationEpoch = epoch
         try validate(session)
@@ -384,18 +385,18 @@ public actor ChatGPTPlanRuntime {
         do {
             try await checkOffered(model, purpose: "vision", session: session, deadline: deadline, operationEpoch: operationEpoch)
             let token = try await accessToken(session, deadline: deadline, operationEpoch: operationEpoch)
-            var request = URLRequest(url: ChatGPTEndpoints.responses); request.httpMethod = "POST"; request.httpBody = body.data
+            var request = URLRequest(url: ChatGPTEndpoints.responses); request.httpMethod = "POST"; request.httpBody = prepared.body
             request.timeoutInterval = max(0.001, deadline.timeIntervalSinceNow)
             request.setValue("application/json", forHTTPHeaderField: "Content-Type"); request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
             request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
             let boundedRequest = request
             let result = try await guarded(deadline: deadline, check: { try await self.validate(session, operationEpoch: operationEpoch) }) {
-                try await self.http.send(boundedRequest, maximumBytes: max(1_048_576, Self.visionTextLimit * 6 + 524_288), onBytes: onBytes)
+                try await self.http.send(boundedRequest, maximumBytes: prepared.wireLimit, onBytes: onBytes)
             }
-            if !(200...299).contains(result.status) { throw Self.responseFailure(result) }
-            var decoder = ChatGPTResponseDecoder(textLimit: Self.visionTextLimit)
-            try decoder.feed(result.data)
-            let answer = try decoder.finish(); try validate(session, operationEpoch: operationEpoch); return answer
+            if !(200...299).contains(result.status) { throw try ChatGPTWire.httpFailure(result) }
+            let stream = try ChatGPTWire.read(text: true, answerLimit: Self.visionTextLimit, wire: result.data)
+            try Task.checkCancellation()
+            let answer = try stream.result.get(); try validate(session, operationEpoch: operationEpoch); return answer
         } catch {
             if Self.diagnostic(error).code == "subscription_sharing_usage_limit_exceeded" { try await pauseQuota(session) }
             throw error
@@ -404,29 +405,9 @@ public actor ChatGPTPlanRuntime {
     /// Server request_vision: the answer may be up to 512 KiB of UTF-8.
     static let visionTextLimit = 512 * 1024
 
-    static func visionBody(model: String, system: String, message: String, images: [String]) throws -> ExactJSON {
-        var content: [ExactJSON] = [.object(["type": .string("input_text"), "text": .string(message)])]
-        for image in images {
-            guard image.hasPrefix("data:image/") else { throw HostError("pipeline_schema_violation") }
-            content.append(.object(["type": .string("input_image"), "image_url": .string(image)]))
-        }
-        return .object(["model": .string(model), "store": .bool(false), "stream": .bool(true), "instructions": .string(system),
-            "input": .array([.object(["role": .string("user"), "content": .array(content)])])])
-    }
-
-    /// The bytes recorded and sent: schema properties in their propertyOrdering, as every dialect writes them.
-    static func requestData(model: String, prompt: ExactJSON) throws -> Data {
-        Data(try requestBody(model: model, prompt: prompt).orderedText.utf8)
-    }
-
-    static func requestBody(model: String, prompt: ExactJSON) throws -> ExactJSON {
-        .object(["model": .string(model), "store": .bool(false), "stream": .bool(true),
-            "instructions": .string(try prompt.requiredString("system")),
-            "input": .array([.object(["role": .string("user"), "content": .string(try prompt.requiredString("message"))])]),
-            "tools": .array([.object(["type": .string("namespace"), "name": .string("inku"), "description": .string("Return data for the inku drawing pipeline."),
-                "tools": .array([.object(["type": .string("function"), "name": .string("submit_pipeline_response"),
-                    "description": .string("Return the requested drawing data."), "parameters": try prompt.requiredObject("response_schema"), "strict": .bool(false)])])])]),
-            "tool_choice": .string("required"), "parallel_tool_calls": .bool(false)])
+    /// The bytes recorded and sent: the effect's prompt as written, so the schema keeps its member order.
+    static func request(action: Data, model: String, argumentLimit: Int) throws -> ChatGPTWire.Request {
+        try ChatGPTWire.request(model: model, prompt: ExactJSON.rawMember("prompt", in: ExactJSON.rawMember("payload", in: action)), answerLimit: argumentLimit)
     }
 
     private func offeredModels(session: ChatGPTPlanSession, force: Bool, deadline: Date, operationEpoch: UInt64) async throws -> [ChatGPTPlanModel] {
@@ -441,19 +422,12 @@ public actor ChatGPTPlanRuntime {
             try await self.http.send(boundedRequest, maximumBytes: 1_048_576, onBytes: { _ in })
         }
         if !(200...299).contains(result.status) {
-            let error = Self.responseFailure(result)
+            let error = try ChatGPTWire.httpFailure(result)
             if error.diagnostic.code == "subscription_sharing_usage_limit_exceeded" { try await pauseQuota(session) }
             throw error
         }
-        let value = try ExactJSON(data: result.data)
-        guard let rows = value["models"].array else { throw HostError("chatgpt_response_invalid") }
-        // Server skips a listed row without a string slug and display name instead of refusing the catalog.
-        var seen = Set<String>()
-        let models = rows.filter { $0["visibility"].string == "list" }.compactMap { row -> ChatGPTPlanModel? in
-            guard let id = row["slug"].string, let label = row["display_name"].string, !id.isEmpty, !label.isEmpty,
-                  seen.insert(id).inserted else { return nil }
-            return ChatGPTPlanModel(id: id, label: label)
-        }
+        guard let value = try? ExactJSON(data: result.data) else { throw HostError("chatgpt_response_invalid") }
+        let models = try ChatGPTWire.catalog(value)
         try await mutate { value in
             try self.validate(session, operationEpoch: operationEpoch)
             _ = try self.checkedProfile(session, value: value)
@@ -613,18 +587,8 @@ public actor ChatGPTPlanRuntime {
     private static func nextGeneration(_ generation: Int64) throws -> Int64 {
         guard generation >= 0, generation < Int64.max else { throw HostError("chatgpt_session_changed") }; return generation + 1
     }
-    private static func responseFailure(_ response: ChatGPTHTTPResponse) -> ChatGPTHTTPFailure {
-        let value = (try? ExactJSON(data: response.data)) ?? .null
-        let publicCodes: Set<String> = ["subscription_sharing_usage_limit_exceeded", "subscription_sharing_user_not_eligible", "subscription_sharing_unsupported_capability",
-            "subscription_sharing_route_not_supported", "subscription_sharing_invalid_user", "chatpass_v2_scope_not_authorized", "chatpass_v2_invalid_authorization_context",
-            "subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable"]
-        let rawCode = value["error"]["code"].string ?? value["response"]["error"]["code"].string
-        let code = rawCode.flatMap { publicCodes.contains($0) ? $0 : nil }
-            ?? ([401, 403].contains(response.status) ? "chatgpt_admission_rejected" : response.status >= 500 ? "chatgpt_transport_unavailable" : "chatgpt_response_failed")
-        return ChatGPTHTTPFailure(diagnostic: .init(code: code, status: response.status, requestID: response.requestID, parameter: value["error"]["param"].string))
-    }
     public static func diagnostic(_ error: Error) -> ChatGPTPlanDiagnostic {
-        if let failure = error as? ChatGPTHTTPFailure { return failure.diagnostic }
+        if let failure = error as? ChatGPTPlanFailure { return failure.diagnostic }
         if let error = error as? HostError { return .init(code: error.code) }
         if let error = error as? URLError { return .init(code: error.code == .timedOut ? "chatgpt_transport_timeout" : "chatgpt_transport_unavailable") }
         return .init(code: "chatgpt_transport_unavailable")

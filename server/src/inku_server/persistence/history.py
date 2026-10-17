@@ -208,6 +208,54 @@ class HistoryLineageGroupReader:
     rows_to_dicts_with_lineage_fn: Callable[[object, list[HistoryRow], dict], list[dict]]
     history_search_clause_fn: Callable[[str], object]
 
+    def _visible_query(self, session, actor, trashed, query_text, starred, for_revision, for_share):
+        listed = select(HistoryRow.id).where(
+            HistoryRow.trashed == (1 if trashed else 0),
+            HistoryRow.history_visibility == "normal",
+        )
+        query = session.query(HistoryRow).join(
+            LineageNodeRow, LineageNodeRow.history_id == HistoryRow.id
+        ).filter(
+            access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
+            access._readable_node(actor),
+            HistoryRow.id.in_(listed),
+        )
+        if starred:
+            query = query.filter(HistoryRow.starred == 1)
+        if for_revision:
+            query = query.filter(HistoryRow.for_revision == 1)
+        if for_share:
+            query = query.filter(HistoryRow.for_share == 1)
+        search = query_text.strip()
+        if search:
+            query = query.filter(self.history_search_clause_fn(search))
+        return query
+
+    def group_position(
+        self, user_id: str, item_id: str, trashed: bool = False,
+        query_text: str = "", starred: bool = False, for_revision: bool = False,
+        for_share: bool = False, min_item_count: int = 1,
+    ) -> int | None:
+        actor = self.actor_of_fn(user_id)
+        with self.session_factory() as session:
+            query = self._visible_query(session, actor, trashed, query_text, starred, for_revision, for_share)
+            root_id = func.coalesce(LineageNodeRow.root_node_id, LineageNodeRow.id)
+            target = query.with_entities(root_id).filter(HistoryRow.id == item_id).first()
+            if target is None:
+                return None
+            grouped = query.with_entities(
+                root_id.label("root_node_id"), func.max(HistoryRow.at).label("latest_at")
+            ).group_by(root_id).having(or_(
+                func.count(HistoryRow.id) >= min_item_count, root_id == target[0],
+            )).subquery()
+            anchor = session.query(grouped).filter(grouped.c.root_node_id == target[0]).first()
+            if anchor is None:
+                return None
+            return int(session.query(func.count()).select_from(grouped).filter(or_(
+                grouped.c.latest_at > anchor.latest_at,
+                and_(grouped.c.latest_at == anchor.latest_at, grouped.c.root_node_id < anchor.root_node_id),
+            )).scalar() or 0)
+
     def list_lineage_groups(
         self,
         user_id: str,
@@ -220,6 +268,7 @@ class HistoryLineageGroupReader:
         for_share: bool = False,
         min_item_count: int = 1,
         include_svg: bool = True,
+        include_item_id: str | None = None,
     ) -> tuple[list[dict], int]:
         """List deterministic history groups, paginated by lineage rather than artwork.
 
@@ -236,28 +285,7 @@ class HistoryLineageGroupReader:
             # pages: reading lineage_node_id or history_visibility from every
             # work walked each chain, about 0.2 s per statement (three of them)
             # on production, against 17 ms this way for the same aggregates.
-            listed = select(HistoryRow.id).where(
-                HistoryRow.trashed == (1 if trashed else 0),
-                HistoryRow.history_visibility == "normal",
-            )
-            query = (
-                session.query(HistoryRow)
-                .join(LineageNodeRow, LineageNodeRow.history_id == HistoryRow.id)
-                .filter(
-                    access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
-                    access._readable_node(actor),
-                    HistoryRow.id.in_(listed),
-                )
-            )
-            if starred:
-                query = query.filter(HistoryRow.starred == 1)
-            if for_revision:
-                query = query.filter(HistoryRow.for_revision == 1)
-            if for_share:
-                query = query.filter(HistoryRow.for_share == 1)
-            search = query_text.strip()
-            if search:
-                query = query.filter(self.history_search_clause_fn(search))
+            query = self._visible_query(session, actor, trashed, query_text, starred, for_revision, for_share)
             root_id = func.coalesce(LineageNodeRow.root_node_id, LineageNodeRow.id)
             grouped = query.with_entities(
                 root_id.label("root_node_id"),
@@ -267,7 +295,11 @@ class HistoryLineageGroupReader:
                 func.max(HistoryRow.at).label("latest_at"),
             ).group_by(root_id)
             if min_item_count > 1:
-                grouped = grouped.having(func.count(HistoryRow.id) >= min_item_count)
+                enough_members = func.count(HistoryRow.id) >= min_item_count
+                if include_item_id:
+                    selected_root = query.with_entities(root_id).filter(HistoryRow.id == include_item_id).scalar_subquery()
+                    enough_members = or_(enough_members, root_id == selected_root)
+                grouped = grouped.having(enough_members)
             aggregates = grouped.subquery()
             # total counts the same subquery, so the page and the count cannot disagree.
             total = int(session.query(func.count()).select_from(aggregates).scalar() or 0)
@@ -863,6 +895,7 @@ class HistoryListStateReader:
 class HistoryItemPositionReader:
     session_factory: Callable[[], object]
     actor_of_fn: Callable[[str], dict]
+    history_search_clause_fn: Callable[[str], object] | None = None
 
     def item_position(
         self,
@@ -872,25 +905,27 @@ class HistoryItemPositionReader:
         starred: bool = False,
         for_revision: bool = False,
         for_share: bool = False,
+        query_text: str = "",
     ) -> int | None:
         actor = self.actor_of_fn(user_id)
         with self.session_factory() as session:
-            target = session.query(HistoryRow).filter(
-                access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
-                HistoryRow.id == item_id,
-                HistoryRow.trashed == (1 if trashed else 0),
-                HistoryRow.history_visibility == "normal",
-            ).first()
-            if target is None or (starred and not target.starred):
-                return None
-            if for_revision and not target.for_revision:
-                return None
-            if for_share and not target.for_share:
-                return None
-            query = session.query(func.count(HistoryRow.id)).filter(
+            visible = session.query(HistoryRow.id, HistoryRow.at).filter(
                 access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
                 HistoryRow.trashed == (1 if trashed else 0),
                 HistoryRow.history_visibility == "normal",
+            )
+            if starred:
+                visible = visible.filter(HistoryRow.starred == 1)
+            if for_revision:
+                visible = visible.filter(HistoryRow.for_revision == 1)
+            if for_share:
+                visible = visible.filter(HistoryRow.for_share == 1)
+            if query_text.strip():
+                visible = visible.filter(self.history_search_clause_fn(query_text.strip()))
+            target = visible.filter(HistoryRow.id == item_id).first()
+            if target is None:
+                return None
+            query = visible.with_entities(func.count(HistoryRow.id)).filter(
                 # `at + 0`, the same comparison, so the `at` index is not taken:
                 # with statistics SQLite 3.37 walked its range and read every
                 # newer row, 0.2 s for a work 3,000 back on production.
@@ -899,12 +934,6 @@ class HistoryItemPositionReader:
                     and_(HistoryRow.at + 0 == target.at, HistoryRow.id < target.id),
                 ),
             )
-            if starred:
-                query = query.filter(HistoryRow.starred == 1)
-            if for_revision:
-                query = query.filter(HistoryRow.for_revision == 1)
-            if for_share:
-                query = query.filter(HistoryRow.for_share == 1)
             return int(query.scalar() or 0)
 
 

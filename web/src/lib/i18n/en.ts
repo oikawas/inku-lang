@@ -1319,7 +1319,7 @@ export const en: LangPack = {
 	historyChronologicalMode: 'Timeline',
 	historyLineageMode: 'By lineage',
 	historyLineageGroups: 'Lineages',
-	historyLineageGroupsDerivedOnly: '(with derivations only)',
+	historyLineageGroupsDerivedOnly: '(with derivations, plus the selected work’s lineage)',
 	historyLineageEmpty: 'No matching lineages.',
 	historyLineageWorkCount: (n) => `${groupDigits(n)} work${n === 1 ? '' : 's'}`,
 	historyLineageStarCount: (n) => `${groupDigits(n)} starred`,

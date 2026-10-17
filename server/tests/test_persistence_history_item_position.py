@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 
-from inku_server import api as api_module, db
+from inku_server import db
 from inku_server.api_core.routers import history as history_router
 from inku_server.persistence import history
 from inku_server.persistence.schema import Base, HistoryAclRow, HistoryRow
@@ -25,6 +25,7 @@ def test_history_item_position_reader_owns_the_exact_query_and_db_is_thin_facade
             inspect.Parameter("starred", inspect.Parameter.POSITIONAL_OR_KEYWORD, default=False, annotation="bool"),
             inspect.Parameter("for_revision", inspect.Parameter.POSITIONAL_OR_KEYWORD, default=False, annotation="bool"),
             inspect.Parameter("for_share", inspect.Parameter.POSITIONAL_OR_KEYWORD, default=False, annotation="bool"),
+            inspect.Parameter("query_text", inspect.Parameter.POSITIONAL_OR_KEYWORD, default="", annotation="str"),
         ],
         return_annotation="int | None",
     )
@@ -46,9 +47,9 @@ def test_history_item_position_reader_owns_the_exact_query_and_db_is_thin_facade
         and isinstance(node.func.value, ast.Name) and node.func.value.id == "access"
         and node.func.attr == "_readable_by"
     ]
-    assert len(readable_calls) == 2
+    assert len(readable_calls) == 1
     assert all([ast.unparse(arg) for arg in call.args] == ["actor", "HistoryRow.user_id", "HistoryRow.id"] for call in readable_calls)
-    assert "query_text" not in ast.unparse(method)
+    assert "history_search_clause_fn" in ast.unparse(method)
 
 
 def test_db_item_position_resolves_owner_dependencies_at_each_call(monkeypatch) -> None:
@@ -56,8 +57,9 @@ def test_db_item_position_resolves_owner_dependencies_at_each_call(monkeypatch) 
     downstream_calls = []
 
     class Reader:
-        def __init__(self, session_factory, actor_of_fn) -> None:
+        def __init__(self, session_factory, actor_of_fn, search_clause_fn) -> None:
             calls.append((session_factory, actor_of_fn))
+            assert callable(search_clause_fn)
 
         def item_position(self, *args):
             downstream_calls.append(args)
@@ -74,8 +76,8 @@ def test_db_item_position_resolves_owner_dependencies_at_each_call(monkeypatch) 
     assert db.item_position("second", "b", True, True, True, True) == 2
     assert calls == [(first_session_factory, first_actor_of), (second_session_factory, second_actor_of)]
     assert downstream_calls == [
-        ("first", "a", False, False, False, False),
-        ("second", "b", True, True, True, True),
+        ("first", "a", False, False, False, False, ""),
+        ("second", "b", True, True, True, True, ""),
     ]
 
 
@@ -132,6 +134,8 @@ def test_history_router_keeps_anchor_page_delegation(monkeypatch) -> None:
         starred=False,
         for_revision=False,
         for_share=False,
+        q="",
+        canvas_search=False,
         actor={"id": "actor"},
     )
     assert calls == [(("actor", "anchor"), {"trashed": False, "starred": False, "for_revision": False, "for_share": False})]
@@ -139,6 +143,8 @@ def test_history_router_keeps_anchor_page_delegation(monkeypatch) -> None:
 
 
 def test_history_anchor_get_uses_the_anchor_page_without_disclosing_an_inaccessible_anchor(monkeypatch) -> None:
+    from inku_server import api as api_module
+
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(engine)
     sessions = sessionmaker(bind=engine)

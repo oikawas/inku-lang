@@ -72,8 +72,8 @@ export function refreshDerived(manager: Manager) {
 	const trash = manager.view === 'trash';
 	const held = trash ? manager.trashItems : manager.activeItems;
 	manager.total = trash ? manager.trashTotal : manager.activeTotal;
-	manager.totalPages = Math.max(1, Math.ceil(manager.total / manager.pageSize));
-	manager.offset = manager.page * manager.pageSize;
+	manager.totalPages = Math.max(1, Math.ceil((manager.total - manager.startOffset) / manager.pageSize));
+	manager.offset = manager.startOffset + manager.page * manager.pageSize;
 	manager.items = manager.pageOf(held);
 	manager.shownTo = Math.min(manager.offset + manager.items.length, manager.total);
 }

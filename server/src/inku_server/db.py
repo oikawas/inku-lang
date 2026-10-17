@@ -1505,6 +1505,7 @@ def list_lineage_groups(
     for_share: bool = False,
     min_item_count: int = 1,
     include_svg: bool = True,
+    include_item_id: str | None = None,
 ) -> tuple[list[dict], int]:
     return _history_lineage_group_reader().list_lineage_groups(
         user_id,
@@ -1517,6 +1518,17 @@ def list_lineage_groups(
         for_share,
         min_item_count,
         include_svg,
+        **({"include_item_id": include_item_id} if include_item_id else {}),
+    )
+
+
+def lineage_group_position(
+    user_id: str, item_id: str, trashed: bool = False, query_text: str = "",
+    starred: bool = False, for_revision: bool = False, for_share: bool = False,
+    min_item_count: int = 1,
+) -> int | None:
+    return _history_lineage_group_reader().group_position(
+        user_id, item_id, trashed, query_text, starred, for_revision, for_share, min_item_count
     )
 
 
@@ -1553,9 +1565,10 @@ def item_position(
     starred: bool = False,
     for_revision: bool = False,
     for_share: bool = False,
+    query_text: str = "",
 ) -> int | None:
-    return _history.HistoryItemPositionReader(SessionLocal, _actor_of).item_position(
-        user_id, item_id, trashed, starred, for_revision, for_share
+    return _history.HistoryItemPositionReader(SessionLocal, _actor_of, _history_search_service().position_search_clause).item_position(
+        user_id, item_id, trashed, starred, for_revision, for_share, query_text
     )
 
 

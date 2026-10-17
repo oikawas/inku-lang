@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Tooltip from './Tooltip.svelte';
-	import { onMount, untrack } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
 	import SavedWorkExportMenu from '$lib/components/SavedWorkExportMenu.svelte';
@@ -74,6 +74,8 @@
 		historyManagerView: 'active' | 'trash';
 		historyManagerTab: 'thumbs' | 'list';
 		historyManagerPage: number;
+		historyManagerAnchored?: boolean;
+		focusRequest?: { id: string; visit: number; rootId?: string | null } | null;
 		historyManagerLoading: boolean;
 		historyManagerLoadFailed: boolean;
 		historyManagerTotalPages: number;
@@ -142,6 +144,8 @@
 		historyManagerView,
 		historyManagerTab = $bindable('thumbs'),
 		historyManagerPage,
+		historyManagerAnchored = false,
+		focusRequest = null,
 		historyManagerLoading,
 		historyManagerLoadFailed,
 		historyManagerTotalPages,
@@ -217,6 +221,11 @@
 	let lineageGroups = $state<LineageHistoryGroup[]>([]);
 	let lineageGroupTotal = $state(0);
 	let lineageGroupPage = $state(0);
+	let lineageStartOffset = $state(0);
+	let lineageAnchorVisit = -1;
+	let lineageIncludeId: string | null = null;
+	let focusedVisit = -1;
+	let lineageQueryKey = '';
 	let lineageGroupLoading = $state(false);
 	let lineageLoadFailed = $state(false);
 	let expandedRootIds = $state<string[]>([]);
@@ -328,7 +337,24 @@
 	});
 	let copiedHistoryHashTimer: number | null = null;
 	const lineageGroupPageSize = 8;
-	const lineageGroupTotalPages = $derived(Math.max(1, Math.ceil(lineageGroupTotal / lineageGroupPageSize)));
+	const lineageGroupTotalPages = $derived(Math.max(1, Math.ceil((lineageGroupTotal - lineageStartOffset) / lineageGroupPageSize)));
+
+	function focusWork(element: HTMLElement, id: string | undefined) {
+		$effect(() => {
+			const request = focusRequest;
+			if (!active || historyManagerLoading || (historyDisplayMode === 'lineage' && lineageGroupLoading) || !request || id !== request.id || focusedVisit === request.visit) return;
+			void tick().then(() => {
+				if (!active || historyManagerLoading || (historyDisplayMode === 'lineage' && lineageGroupLoading) || !element.isConnected || focusRequest !== request || focusedVisit === request.visit) return;
+				focusedVisit = request.visit;
+				element.focus({ preventScroll: true });
+				element.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+				if (previewItem && previewItem.id !== id) {
+					const item = [...managedHistoryItems, ...Object.values(lineageGroupItems).flat()].find((item) => item.id === id);
+					if (item) void openPreview(item);
+				}
+			});
+		});
+	}
 
 	onMount(() => {
 		try {
@@ -343,8 +369,11 @@
 	});
 
 	function setHistoryDisplayMode(mode: 'chronological' | 'lineage') {
+		focusedVisit = -1;
 		historyDisplayMode = mode;
 		lineageGroupPage = 0;
+		lineageStartOffset = 0;
+		lineageAnchorVisit = -1;
 		expandedRootIds = [];
 		try { localStorage.setItem('inku-history-display-mode', mode); } catch {}
 	}
@@ -354,9 +383,12 @@
 	// switch would land on a page that does not exist in the other set.
 	function selectHistoryManagerTab(tab: 'thumbs' | 'list') {
 		if (tab === historyManagerTab) return;
+		focusedVisit = -1;
 		historyManagerTab = tab;
 		if (historyDisplayMode === 'lineage') {
 			lineageGroupPage = 0;
+			lineageStartOffset = 0;
+			lineageAnchorVisit = -1;
 			expandedRootIds = [];
 		}
 	}
@@ -410,7 +442,11 @@
 		lineageGroupLoading = true;
 		lineageLoadFailed = false;
 		// A card draws from its thumbnail and a preview reads its one SVG when opened.
-		const params = new URLSearchParams({ offset: String(lineageGroupPage * lineageGroupPageSize), limit: String(lineageGroupPageSize), q: historySearch.trim(), include_svg: 'false' });
+		const params = new URLSearchParams({ offset: String(lineageStartOffset + lineageGroupPage * lineageGroupPageSize), limit: String(lineageGroupPageSize), q: historySearch.trim(), include_svg: 'false' });
+		const anchor = focusRequest && focusRequest.visit !== lineageAnchorVisit ? focusRequest : null;
+		const anchorRootId = focusRequest?.rootId ?? currentLineageRootId;
+		if (anchor) params.set('anchor_id', anchor.id);
+		if (anchor?.id ?? lineageIncludeId) params.set('include_id', (anchor?.id ?? lineageIncludeId)!);
 		if (historyManagerView === 'trash') params.set('trashed', 'true');
 		if (historyManagerStarredOnly) params.set('starred', 'true');
 		if (historyManagerForRevisionOnly) params.set('for_revision', 'true');
@@ -422,8 +458,16 @@
 		try {
 			const response = await apiFetch('/api/history/lineage-groups?' + params.toString(), { cache: 'no-store', signal: controller.signal });
 			if (!response.ok) throw new Error('HTTP ' + response.status);
-			const data = await response.json() as { groups: LineageHistoryGroup[]; total: number };
+			const data = await response.json() as { groups: LineageHistoryGroup[]; total: number; offset: number };
 			if (!active || requestId !== lineageRequestId) return;
+			if (anchor) {
+				lineageAnchorVisit = anchor.visit;
+				lineageIncludeId = anchor.id;
+				if (data.groups[0]?.root_node_id === anchorRootId) {
+					lineageStartOffset = data.offset;
+					lineageGroupPage = 0;
+				}
+			}
 			lineageGroups = data.groups;
 			lineageGroupTotal = data.total;
 			lineageGroupItems = {};
@@ -433,6 +477,9 @@
 				// instead of waiting for a click on every group.
 				expandedRootIds = data.groups.map((group) => group.root_node_id);
 				await Promise.all(data.groups.map((group) => loadLineageMembers(group.root_node_id)));
+			} else if (focusRequest && anchorRootId && data.groups.some((group) => group.root_node_id === anchorRootId)) {
+				expandedRootIds = [anchorRootId];
+				await loadLineageMembers(anchorRootId);
 			}
 		} catch (error) {
 			if (!(error instanceof DOMException && error.name === 'AbortError') && requestId === lineageRequestId) {
@@ -465,6 +512,7 @@
 		lineageMemberLoadingIds = [...lineageMemberLoadingIds, rootNodeId];
 		lineageMemberControllers.get(rootNodeId)?.abort();
 		const controller = new AbortController();
+		const requestId = lineageRequestId;
 		lineageMemberControllers.set(rootNodeId, controller);
 		// Thumbnails, like the listing: a whole lineage with every SVG in it could
 		// run to hundreds of megabytes. A preview reads its one SVG when opened.
@@ -477,9 +525,9 @@
 			const response = await apiFetch('/api/history/lineage-groups/' + encodeURIComponent(rootNodeId) + '/items?' + params.toString(), { cache: 'no-store', signal: controller.signal });
 			if (!response.ok) throw new Error('HTTP ' + response.status);
 			const data = await response.json() as { items: HistoryItem[] };
-			if (active) lineageGroupItems = { ...lineageGroupItems, [rootNodeId]: data.items };
+			if (active && requestId === lineageRequestId && !controller.signal.aborted) lineageGroupItems = { ...lineageGroupItems, [rootNodeId]: data.items };
 		} catch (error) {
-			if (!(error instanceof DOMException && error.name === 'AbortError')) {
+			if (requestId === lineageRequestId && !(error instanceof DOMException && error.name === 'AbortError')) {
 				lineageLoadFailed = true;
 				lineageGroups = [];
 				lineageGroupTotal = 0;
@@ -521,6 +569,12 @@
 
 	function setLineageGroupPage(page: number): void {
 		lineageGroupPage = Math.max(0, Math.min(page, lineageGroupTotalPages - 1));
+	}
+
+	function latestLineagePage(): void {
+		lineageStartOffset = 0;
+		lineageGroupPage = 0;
+		void fetchLineageGroups();
 	}
 
 	function selectLineageGroup(rootNodeId: string): void {
@@ -573,6 +627,12 @@
 
 	function previewArtwork(): void {
 		if (previewReady && previewItem) onOpenArtwork(previewItem);
+	}
+
+	function openThumbnail(item: HistoryItem): void {
+		if (!active || historyManagerView !== 'active' || item.trashed) return;
+		if (historyDisplayMode === 'lineage') onOpenLineage(item);
+		else onOpenArtwork(item);
 	}
 
 	function activatePreviewArtwork(event: MouseEvent): void {
@@ -667,10 +727,17 @@
 
 	$effect(() => {
 		if (!active || historyDisplayMode !== 'lineage') return;
+		const queryKey = JSON.stringify([historyManagerView, historySearch, historyManagerStarredOnly, historyManagerForRevisionOnly, historyManagerForShareOnly]);
+		if (lineageQueryKey && lineageQueryKey !== queryKey) {
+			lineageStartOffset = 0;
+			lineageIncludeId = null;
+			lineageGroupPage = 0;
+		}
+		lineageQueryKey = queryKey;
 		// historyManagerTab is a dependency because the thumbnail tab asks the
 		// server for a different set (min_items=2) than the list tab does.
-		historyManagerView; historySearch; historyManagerStarredOnly; historyManagerForRevisionOnly; historyManagerForShareOnly; lineageGroupPage; managedHistoryTotal; trashTotal; historyManagerTab;
-		void fetchLineageGroups();
+		historyManagerView; historySearch; historyManagerStarredOnly; historyManagerForRevisionOnly; historyManagerForShareOnly; lineageGroupPage; managedHistoryTotal; trashTotal; historyManagerTab; focusRequest;
+		void untrack(fetchLineageGroups);
 	});
 
 	$effect(() => {
@@ -795,7 +862,7 @@
 			<div class="history-manager-pager">
 				{#if historyDisplayMode === 'lineage'}
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryLatestPage}>
-						<button class="ghost-btn history-latest-btn" onclick={() => setLineageGroupPage(0)} disabled={lineageGroupPage <= 0 || lineageGroupLoading}>{t().historyLatest}</button>
+						<button class="ghost-btn history-latest-btn" onclick={latestLineagePage} disabled={(lineageGroupPage <= 0 && lineageStartOffset === 0) || lineageGroupLoading}>{t().historyLatest}</button>
 					</Tooltip>
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryNewerPage}>
 						<button class="ghost-btn history-nav-btn" onclick={() => setLineageGroupPage(lineageGroupPage - 1)} disabled={lineageGroupPage <= 0 || lineageGroupLoading}>{t().historyNewer}</button>
@@ -809,7 +876,7 @@
 					</Tooltip>
 				{:else}
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryLatestPage}>
-						<button class="ghost-btn history-latest-btn" onclick={onSetLatestPage} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyLatest}</button>
+						<button class="ghost-btn history-latest-btn" onclick={onSetLatestPage} disabled={(historyManagerPage <= 0 && !historyManagerAnchored) || historyManagerLoading}>{t().historyLatest}</button>
 					</Tooltip>
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryNewerPage}>
 						<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage - 1)} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyNewer}</button>
@@ -1045,7 +1112,7 @@
 					<article class="lineage-history-group" class:current-lineage={currentLineageRootId === group.root_node_id}>
 						<div class="lineage-group-head">
 							{#if !lineageThumbsMode}
-								<button class="lineage-representative" type="button" title={t().historyPreviewTitle} onclick={() => void openPreview(group.representative)}>
+								<button class="lineage-representative" type="button" title={t().historyPreviewTitle} onclick={() => void openPreview(group.representative)} ondblclick={() => openThumbnail(group.representative)}>
 									<HistoryThumbnail item={group.representative} scope={'lineage-group-' + group.root_node_id} size="mini" />
 								</button>
 							{/if}
@@ -1073,7 +1140,7 @@
 											<button type="button" class="selection-checkbox" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={() => toggleSelection(it)}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
 											{#if lineageThumbsMode && it.lineage_generation != null}<span class="lineage-generation-badge" title={t().historyGenerationTitle}>{it.lineage_generation}</span>{/if}
 											<div class="lineage-member-content">
-												<button class="lineage-member-main" type="button" title={t().historyPreviewTitle} onclick={() => void openPreview(it)}>
+												<button use:focusWork={it.id} data-library-work-id={it.id} class="lineage-member-main" type="button" title={t().historyPreviewTitle} onclick={() => void openPreview(it)} ondblclick={() => openThumbnail(it)}>
 													<HistoryThumbnail item={it} scope={'lineage-member-' + it.id} size={historyManagerTab === 'list' ? 'mini' : 'manager'} />
 													<span>{thumbnailPromptText(it.source_text ?? it.input)}</span>
 												</button>
@@ -1106,7 +1173,7 @@
 		<div class="history-thumb-grid-wrap" bind:this={thumbGridWrapEl}>
 			<div class="history-thumb-grid">
 				{#each managedHistoryItems as it (it.id ?? it.at)}
-					<div class="manager-thumb-wrap" class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
+					<div class="manager-thumb-wrap" class:current-work={currentHistoryId === it.id} class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
 <button
 	type="button"
 	class="manager-check selection-checkbox"
@@ -1121,9 +1188,12 @@
 							<span class="manager-generation" title={t().historyGenerationTitle}>{it.lineage_generation}</span>
 						{/if}
 						<div
+							use:focusWork={it.id}
+							data-library-work-id={it.id}
 							class="thumb manager-thumb"
 							title={t().historyPreviewTitle}
 							onclick={() => void openPreview(it)}
+							ondblclick={() => openThumbnail(it)}
 							onkeydown={(event) => handleThumbKeydown(event, it)}
 							role="button"
 							tabindex={historyManagerView === 'active' ? 0 : -1}
@@ -1181,12 +1251,15 @@
 				</thead>
 				<tbody>
 					{#each managedHistoryItems as it (it.id ?? it.at)}
-						<tr>
+						<tr class:current-work={currentHistoryId === it.id}>
 							<td><button type="button" class="selection-checkbox table-check" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} role="checkbox" aria-checked={!!it.id && selectedHistoryIds.includes(it.id)} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={(event) => { event.stopPropagation(); toggleSelection(it); }}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button></td>
 							<td class="table-thumb-cell">
 								<button
+									use:focusWork={it.id}
+									data-library-work-id={it.id}
 									class="table-thumb-select"
 								onclick={() => void openPreview(it)}
+									ondblclick={() => openThumbnail(it)}
 									disabled={historyManagerView !== 'active'}
 									title={t().historyPreviewTitle}
 									aria-label={t().historyPreviewTitle}
@@ -1256,6 +1329,7 @@
 </section>
 
 <style>
+	[data-library-work-id]:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 	.share-statuses { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
 	.share-status {
 		display: inline-block;

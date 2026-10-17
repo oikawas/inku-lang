@@ -1317,7 +1317,7 @@ export const ja: LangPack = {
 	historyChronologicalMode: '時系列',
 	historyLineageMode: '系譜ごと',
 	historyLineageGroups: '系譜',
-	historyLineageGroupsDerivedOnly: '（派生のある系譜のみ）',
+	historyLineageGroupsDerivedOnly: '（派生のある系譜と選択作品の系譜）',
 	historyLineageEmpty: '該当する系譜はありません。',
 	historyLineageWorkCount: (n) => `作品 ${groupDigits(n)}件`,
 	historyLineageStarCount: (n) => `スター ${groupDigits(n)}件`,

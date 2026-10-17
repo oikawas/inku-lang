@@ -28,6 +28,7 @@
 	type Props = {
 		graph: LineageGraph | null;
 		loading: boolean;
+		focusRequest?: number;
 		error: string | null;
 		isJapanese: boolean;
 		onOpenNode: (node: LineageNode) => void | Promise<void>;
@@ -82,7 +83,22 @@
 	}
 
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
-	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, runAttempt = null, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintDdl, onComposeLayout, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
+	let { graph, loading, focusRequest = 0, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, runAttempt = null, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintDdl, onComposeLayout, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
+
+	let handledFocusRequest = 0;
+	$effect(() => {
+		const request = focusRequest;
+		const id = graph?.focus_node_id;
+		if (!request || handledFocusRequest === request || loading || !id) return;
+		void tick().then(() => {
+			if (focusRequest !== request || graph?.focus_node_id !== id || loading) return;
+			const card = cardElements.get(id);
+			if (!card) return;
+			handledFocusRequest = request;
+			card.scrollIntoView({ block: 'center', inline: 'center' });
+			card.querySelector<HTMLButtonElement>('.card-main')?.focus({ preventScroll: true });
+		});
+	});
 
 	let lineageColumnsEl = $state<HTMLDivElement | null>(null);
 	let lineageScrollEl = $state<HTMLDivElement | null>(null);

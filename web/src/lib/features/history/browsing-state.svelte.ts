@@ -358,7 +358,8 @@ export class HistoryBrowsingState {
 		this.manager.openWith(
 			this.appliedSearch ? this.manager.activeItems : this.items,
 			this.appliedSearch ? this.manager.activeTotal : this.total,
-			this.trashTotal
+			this.trashTotal,
+			this.deps.currentHistoryId()
 		);
 	}
 

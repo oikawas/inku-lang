@@ -71,7 +71,7 @@ def test_group_reader_keeps_query_and_projection_invariants() -> None:
         "access._readable_node(actor)",
         'HistoryRow.history_visibility == "normal"',
         "func.coalesce(LineageNodeRow.root_node_id, LineageNodeRow.id)",
-        "grouped.having(func.count(HistoryRow.id) >= min_item_count)",
+        "grouped.having(enough_members)",
         "session.query(func.count()).select_from(aggregates)",
         "HistoryRow.at.desc(), HistoryRow.id.asc()",
         "self.history_search_clause_fn(search)",

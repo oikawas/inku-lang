@@ -131,6 +131,7 @@ def api_history_get(
         position = _db.item_position(
             actor["id"], anchor_id, trashed=trashed, starred=starred,
             for_revision=for_revision, for_share=for_share,
+            **({"query_text": q} if q.strip() else {}),
         )
         if position is not None:
             offset = (position // limit) * limit

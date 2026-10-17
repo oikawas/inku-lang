@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Open the Library at the selected work and double-click into Work or Lineage
+
+When the saved work selected in Work or Refine matches the Library search and filters, it starts the page with that work, or its lineage when grouped, and focuses the work. An excluded work leaves the previous page intact. Single-clicking an image previews it; double-clicking opens it in Work for chronological grouping or in Lineage for lineage grouping. Display form and bulk selection are retained, and a measured page-size change keeps the same starting work.
+
 ### 2026-10-17 — Save checked refinement options before making one option too
 
 Another composition's Make one option now saves the unsaved options checked at the time of the click before drawing, matching Make four options. A failed save keeps the existing options and unsaved selections without starting a new round; saved works are not duplicated. Updated the Japanese and English descriptions and the one-option tooltip.

@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.166 (2026-10-17 / Build 1242)
+
 ### 2026-10-17 — Open the Library at the selected work and double-click into Work or Lineage
 
 When the saved work selected in Work or Refine matches the Library search and filters, it starts the page with that work, or its lineage when grouped, and focuses the work. An excluded work leaves the previous page intact. Single-clicking an image previews it; double-clicking opens it in Work for chronological grouping or in Lineage for lineage grouping. Display form and bulk selection are retained, and a measured page-size change keeps the same starting work.

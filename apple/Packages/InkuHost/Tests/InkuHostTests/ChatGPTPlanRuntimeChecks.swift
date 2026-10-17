@@ -208,9 +208,9 @@ final class ChatGPTPlanRuntimeChecks: XCTestCase {
     }
     // Failure: a tool call passed as a Vision answer, or a usage-limit failure did not pause the profile.
     func testVisionRefusesToolsAndPausesOnQuota() async throws {
-        var decoder = ChatGPTResponseDecoder(textLimit: 4096)
         let call = #"data: {"type":"response.output_item.added","item":{"type":"function_call","id":"c","namespace":"inku","name":"submit_pipeline_response","arguments":"{}"}}"# + "\n\n"
-        XCTAssertThrowsError(try decoder.feed(Data(call.utf8))) { XCTAssertEqual(($0 as? HostError)?.code, "chatgpt_unexpected_tool") }
+        guard case .failure(let failure) = try ChatGPTWire.read(text: true, answerLimit: 4096, wire: Data(call.utf8)).result else { return XCTFail("A tool call answered Vision") }
+        XCTAssertEqual(failure.diagnostic.code, "chatgpt_unexpected_tool")
         let fixture = try RuntimeFixture(expired: false)
         defer { fixture.remove() }
         let runtime = ChatGPTPlanRuntime(store: fixture.store, http: VisionHTTP(answer: nil))
@@ -237,11 +237,10 @@ final class ChatGPTPlanRuntimeChecks: XCTestCase {
             frame(.object(["type": .string("response.completed"), "response": .object(["status": .string("completed"), "output": .array(output)])]))
         }
         func read(_ wire: String, limit: Int = 4096) throws -> String {
-            var decoder = ChatGPTResponseDecoder(textLimit: limit)
-            try decoder.feed(Data(wire.utf8)); return try decoder.finish()
+            try ChatGPTWire.read(text: true, answerLimit: limit, wire: Data(wire.utf8)).result.get()
         }
         func code(_ wire: String, limit: Int = 4096) -> String? {
-            do { _ = try read(wire, limit: limit); return nil } catch { return (error as? HostError)?.code }
+            do { _ = try read(wire, limit: limit); return nil } catch { return ChatGPTPlanRuntime.diagnostic(error).code }
         }
         let delta = frame(.object(["type": .string("response.output_text.delta"), "delta": .string("断片")]))
         XCTAssertEqual(code(delta + completed([])), "chatgpt_response_invalid")
@@ -307,7 +306,7 @@ final class ChatGPTPlanRuntimeChecks: XCTestCase {
         XCTAssertEqual(refused, reconnected)
     }
 
-    // Failure: the plan sent the reading schema's properties in name order, or changed the bytes of other schemas.
+    // Failure: the plan sent the reading schema's properties in name order, or changed the contents of other schemas.
     func testSchemaPropertyOrderOnThePlan() async throws {
         for (schema, ordered) in [(SchemaOrderFixture.ordered, true), (SchemaOrderFixture.unordered, false)] {
             let fixture = try RuntimeFixture(expired: false)
@@ -322,7 +321,7 @@ final class ChatGPTPlanRuntimeChecks: XCTestCase {
             let text = String(decoding: body, as: UTF8.self)
             if ordered {
                 XCTAssertTrue(text.contains(SchemaOrderFixture.top)); XCTAssertTrue(text.contains(SchemaOrderFixture.nested))
-            } else { XCTAssertEqual(body, try ExactJSON(data: body).data) }
+            } else { XCTAssertEqual(try ExactJSON(data: body)["tools"].array?.first?["tools"].array?.first?["parameters"], schema) }
         }
     }
 

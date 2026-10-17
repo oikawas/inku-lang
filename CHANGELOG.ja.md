@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-17 — SwiftのChatGPTプランの本文と流れの読みを共有coreへ移行
+
+SwiftのChatGPTプランの要求本文、SSEの流れの読み、失敗の分類、モデル一覧の読みを、UniFFIの`provider_wire`へ移した。ServerとAndroidと同じ規則で読む。項目が未完了の応答は、再試行せずに断るようになった（Serverと同じ）。形の崩れた流れは`chatgpt_response_invalid`になり、内部の印は出なくなった。token・取消・使用量の上限での一時停止・観測記録は変えていない。
+
 ### 2026-10-17 — AndroidのChatGPTプランの本文と流れの読みを共有coreへ移行
 
 Androidは、ChatGPTプランの描画と推敲のVision助言の本文、SSEの流れの読み、失敗の分類、本人のモデル一覧の読みを、JNI経由の`inku.provider-wire.v1`から受けるようにした。Serverと同じバイト列である。作者の決定どおり、流れはcoreが返す上限の中で最後まで受け、coreが1回で読む。token・session・取消・使用量の上限での一時停止・HTTPはhostに残し、`OrderedSchemaJson.kt`は消した。

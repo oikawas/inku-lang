@@ -18,6 +18,19 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-17 Move ChatGPT plan bodies and stream reading to the shared core
+
+The ChatGPT plan's drawing and Vision request bodies, the reading of its SSE stream, HTTP failure classification and the model list call UniFFI's `provider_wire` (`inku.provider-wire.v1`) actions `chatgpt_request`, `chatgpt_vision_request`, `chatgpt_limits`, `chatgpt_stream`, `chatgpt_error` and `chatgpt_catalog`. The shared core's [`provider_wire/chatgpt.rs`](../core/crates/inku-pipeline/src/provider_wire/chatgpt.rs) is authoritative, and Server and Android read with the same rules. Requested by the Server session (shared Rust, step 4).
+
+- Swift's `ChatGPTResponseDecoder` is gone; the receiver is [`ChatGPTWire.swift`](Packages/InkuHost/Sources/InkuHost/ChatGPTWire.swift). The drawing body passes the effect's prompt as its original JSON, and the core's body string is sent unchanged and written to the observation record.
+- The stream is still received whole and read once. While receiving, the host holds only the whole-stream limit the core returns (`wire_limit`); the core checks the per-event and answer limits as it reads. The last `response` goes to the observation record. Tool-shape diagnostics log only the shapes the core returns, never text or arguments.
+- Whether a failure is temporary (retried) follows the core's classification (author's decision). The next action shown still comes from Swift's table. An item that did not complete, and a summary whose status is not `completed`, are now refused instead of retried (as on Server). A stream that ends before completion and `response.incomplete` are still retried.
+- A malformed stream (an event that is not JSON, bytes that are not UTF-8 and so on) is `chatgpt_response_invalid`. An event that was not JSON used to stop with the internal code `invalid_json`.
+- Two shapes only Swift refused are no longer refused, as on Server: `response.created` without a `response`, and response IDs that differ between `response.created` and `response.completed`. Vision images follow the core's data URL check, so an untyped `data:;base64,…` is sent.
+- The model list uses the core's answer as is (author's decision). Duplicate slugs and empty names are kept, and a row that is not an object makes the whole list unreadable (`chatgpt_response_invalid`). HTTP failure bodies also read `param` under `response.error` and the code of a body shaped `type: "error"`.
+- Tokens, the registration store, locks, cancellation, timeouts, the pause on a usage limit and the observation record are unchanged.
+- Checks: a new test reads all 69 rows of the shared fixture's `chatgpt` section (8 requests, 8 Vision, 42 streams, 9 failures, 2 lists) through the core itself and through the Swift receivers. Tests that drove the old decoder directly now read whole streams. The old Swift differed on 23 of the 69 rows; the step 4 RESULT keeps the breakdown.
+
 ## 2026-10-17 Add stroke-dashoffset to the support table (I-723)
 
 Since the redraw of 2026-10-15, the canvas ground writes `stroke-dasharray` and `stroke-dashoffset` on its dashed threads. The support table had no `stroke-dashoffset`, so every work on the canvas ground fell outside it, and the macOS work area showed "Skia could not draw it (attribute)" instead of the work. At the author's instruction (handle I-723).
@@ -191,7 +204,7 @@ At the author's instruction (bringing in the differences from Server Build 1190,
 
 ## 2026-10-17 Move provider request bodies and response reading to the shared core
 
-Drawing, Vision (refinement advice and colophons), and demo requests to key-based providers call UniFFI's `provider_wire` (`inku.provider-wire.v1`). The shared core's [`provider_wire.rs`](../core/crates/inku-pipeline/src/provider_wire.rs) is authoritative. The provider descriptions below follow it; Swift keeps no copies of model matching, output-budget, schema-transformation or answer-extraction rules. ChatGPT plan requests and SSE belong to the next stage and are unchanged here.
+Drawing, Vision (refinement advice and colophons), and demo requests to key-based providers call UniFFI's `provider_wire` (`inku.provider-wire.v1`). The shared core's [`provider_wire.rs`](../core/crates/inku-pipeline/src/provider_wire.rs) is authoritative. The provider descriptions below follow it; Swift keeps no copies of model matching, output-budget, schema-transformation or answer-extraction rules. ChatGPT plan requests and SSE were left unchanged here and moved in the next step the same day ("Move ChatGPT plan bodies and stream reading to the shared core").
 
 - `pipeline_request` receives public connection settings, the model, effect prompt and output limit; `text_request` receives system, text, image data URLs, temperature and the limit. The prompt retains its original effect JSON bytes so schema member order survives transport.
 - Swift sends the core's body string as UTF-8 without sorting or re-encoding it. URL, nonsecret headers, response format, output budget, and Gemini countTokens URL/body also come from core. The key stays in the host, which adds it under the returned header and prefix.
@@ -671,7 +684,7 @@ ChatGPT plan models also serve Vision (author's ruling, 2026-10-12; the contract
 
 Sign-in uses a temporary listener on 127.0.0.1 with `/auth/callback`, state/nonce/PKCE, an issued client ID, verified identity and granted scopes. Credentials occupy an atomically committed AES-GCM vault capped at 1MiB, with a device-local 32-byte key in Keychain. There is no plaintext token fallback, and SQLite backups exclude credentials. The initial disabled state starts neither authentication nor inference.
 
-Requests pin profile ID and generation at startup and never switch connections while queued or resuming batch/demo work. Disconnects, connection changes and quota failures invalidate old refreshes and late responses without implicit fallback to another provider. Responses/SSE carries the shared Rust description, sketch, automatic-color, composition-reading and DDL-hole effects, and Vision refinement and colophons. Demo-description generation and model inspection explicitly remain unsupported for this connection. Actual sign-in, model discovery and inference acceptance are separate from offline checks.
+Requests pin profile ID and generation at startup and never switch connections while queued or resuming batch/demo work. Disconnects, connection changes and quota failures invalidate old refreshes and late responses without implicit fallback to another provider. Responses/SSE carries the shared Rust description, sketch, automatic-color, composition-reading and DDL-hole effects, and Vision refinement and colophons. Request bodies, SSE reading, failure classification and the model list are done by the shared core's `provider_wire` (2026-10-17). Demo-description generation and model inspection explicitly remain unsupported for this connection. Actual sign-in, model discovery and inference acceptance are separate from offline checks.
 
 ### Export and native raster
 

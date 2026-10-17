@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Move Swift ChatGPT plan bodies and stream reading to the shared core
+
+Swift's ChatGPT plan request bodies, SSE stream reading, failure classification and model list reading moved to UniFFI's `provider_wire`, so Swift reads with the same rules as Server and Android. An item that did not complete is now refused instead of retried (as on Server). A malformed stream is `chatgpt_response_invalid` and no internal code leaks. Tokens, cancellation, the usage-limit pause and the observation record are unchanged.
+
 ### 2026-10-17 — Move Android ChatGPT plan bodies and stream reading to the shared core
 
 Android now takes ChatGPT-plan drawing and refinement Vision bodies, the reading of their SSE streams, the failure classes and the personal model list from `inku.provider-wire.v1` through JNI, byte for byte as Server. The whole stream is received within the core's wire limit and read once by the core, as the author decided. Tokens, sessions, cancellation, the usage-limit pause and HTTP stay in the host; `OrderedSchemaJson.kt` is removed.

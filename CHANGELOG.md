@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Move Android provider bodies and responses to the shared core
+
+OpenAI-compatible, Anthropic and Gemini drawing, Vision and demo requests and response reading now call `inku.provider-wire.v1` through JNI. Body bytes and original schema order are preserved; thinking, output budgets, cut-off detection and refusal redaction use the same core rules as Server. Refinement Vision advice sends no tool and reads JSON from text. Keys, HTTP, rate control, observations and on-device models stay in the host; ChatGPT-plan requests and SSE remain for the next stage.
+
 ### 2026-10-17 — Restore Android's composition policy for on-device Vision models
 
 At the author's decision, on-device Vision models skip composition reading again. Pixel acceptance on E2B spent about 114 seconds on four attempts before using the default reading, so this remains an intentional difference from Server. External-provider composition reading, stage-specific provider resolution and 768×768 PNG Vision advice are retained.

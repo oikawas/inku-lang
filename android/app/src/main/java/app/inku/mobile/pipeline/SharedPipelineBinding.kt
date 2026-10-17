@@ -28,6 +28,10 @@ interface SharedPipelineBinding {
     fun savedVariants(inputBytes: ByteArray): ByteArray =
         """{"error":"unavailable"}""".encodeToByteArray()
 
+    /** Provider request and response semantics are owned by the shared core. */
+    fun providerWire(inputBytes: ByteArray): ByteArray =
+        """{"error":"unavailable"}""".encodeToByteArray()
+
     /** The shared record's three states; an older binding reports no recorded ranges. */
     fun completionRangeStates(inputBytes: ByteArray): ByteArray =
         """{"schema":"inku.completion-range-states.v1","ranges":[]}""".encodeToByteArray()

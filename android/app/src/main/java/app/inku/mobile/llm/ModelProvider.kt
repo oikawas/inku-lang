@@ -1,6 +1,6 @@
 package app.inku.mobile.llm
 
-import app.inku.mobile.security.DisplaySanitizer
+import android.util.Log
 import java.io.InputStream
 import java.net.HttpURLConnection
 import org.json.JSONObject
@@ -60,6 +60,8 @@ class ModelProviderHttpException(
     val retryAfter: String? = null,
     /** Gemini's `google.rpc.RetryInfo.retryDelay` in the refusal body, in seconds. */
     val retryDelaySeconds: Double? = null,
+    /** The shared core's failure class, when this answer crossed provider_wire. */
+    val failure: String? = null,
 ) : IllegalStateException(message)
 
 /**
@@ -96,30 +98,57 @@ internal const val MAX_PROVIDER_RESPONSE_BYTES = 1024 * 1024
 /** The server reads a refusal's first 16 KiB to say why (`pipeline_provider.py`). */
 internal const val MAX_PROVIDER_ERROR_BYTES = 16_384
 
-/**
- * The body of one provider answer, bounded in bytes as the server bounds it.
- * A non-2xx answer becomes a [ModelProviderHttpException] carrying its first
- * [MAX_PROVIDER_ERROR_BYTES]; a 2xx answer over [MAX_PROVIDER_RESPONSE_BYTES]
- * is an IllegalArgumentException (`provider_rejected`).
- */
-internal fun readProviderBody(connection: HttpURLConnection): String {
+internal data class ProviderHttpBody(
+    val status: Int,
+    val body: String,
+    val retryAfter: String?,
+    val retryDelaySeconds: Double?,
+)
+
+/** HTTP framing and bounded I/O stay in the host; the core judges the response. */
+internal fun readProviderHttpBody(connection: HttpURLConnection): ProviderHttpBody {
     val status = connection.responseCode
     val success = status in 200..299
     val limit = if (success) MAX_PROVIDER_RESPONSE_BYTES else MAX_PROVIDER_ERROR_BYTES
     val (bytes, over) = readBounded(if (success) connection.inputStream else connection.errorStream, limit)
-    val body = String(bytes, Charsets.UTF_8)
-    if (!success) {
-        val suffix = if (over) " [truncated]" else ""
-        throw ModelProviderHttpException(
-            status,
-            "HTTP $status from ${connection.url.host.orEmpty()}: ${DisplaySanitizer.redact(body).take(180)}$suffix",
-            providerRefusal(body),
-            retryAfter = connection.getHeaderField("Retry-After"),
-            retryDelaySeconds = retryInfoDelaySeconds(body),
-        )
+    require(!success || !over) { "Remote response was too large." }
+    val body = try {
+        Charsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString().removePrefix("\uFEFF")
+    } catch (error: java.nio.charset.CharacterCodingException) {
+        if (success) throw MalformedProviderResponseException("Provider response was not UTF-8.")
+        ""
     }
-    require(!over) { "Remote response was too large." }
-    return body
+    return ProviderHttpBody(status, body, connection.getHeaderField("Retry-After"), retryInfoDelaySeconds(body))
+}
+
+/** Map the core's decision to the host's existing effect and observation types. */
+internal fun providerWireModelResponse(
+    answer: JSONObject,
+    request: ModelRequest,
+    http: ProviderHttpBody,
+    elapsedMs: Long,
+    host: String,
+): ModelResponse = when (answer.getString("outcome")) {
+    "answer" -> ModelResponse(
+        text = answer.getString("text"), modelId = request.modelId,
+        promptTokens = (answer.opt("input_tokens") as? Number)?.toInt(),
+        outputTruncated = answer.optJSONObject("cut") != null,
+        elapsedMs = elapsedMs,
+    )
+    "cut" -> {
+        Log.w("InkuProvider", "provider_output_limit " + JSONObject()
+            .put("action", request.pipelineAction).put("model", request.modelId)
+            .put("cut", answer.getJSONObject("cut")))
+        throw ProviderOutputLimitException()
+    }
+    "malformed" -> throw MalformedProviderResponseException(answer.getString("detail"))
+    "http_error" -> throw ModelProviderHttpException(
+        http.status, "HTTP ${http.status} from $host: ${answer.getString("failure")}",
+        answer.getJSONObject("refusal"), http.retryAfter, http.retryDelaySeconds,
+        failure = answer.getString("failure"),
+    )
+    "refused" -> throw IllegalArgumentException(answer.getString("detail"))
+    else -> error("unknown provider wire outcome")
 }
 
 /** At most [limit] bytes, and whether the stream held more. */
@@ -137,26 +166,10 @@ private fun readBounded(stream: InputStream?, limit: Int): Pair<ByteArray, Boole
     }
 }
 
-/**
- * What a refusal says, without anything that could carry a key -- the server's
- * `_provider_error` (`pipeline_provider.py`). OpenAI, Anthropic and Gemini all
- * answer `{"error": {...}}`; its code, type, param and status name the reason.
- * The message is kept short and redacted, since a 401 echoes part of the key.
- */
-internal fun providerRefusal(body: String): JSONObject {
-    val found = JSONObject()
-    val error = runCatching { JSONObject(body).optJSONObject("error") }.getOrNull() ?: return found
-    for (key in listOf("code", "type", "param", "status")) {
-        when (val value = error.opt(key)) {
-            is String -> if (value.isNotEmpty()) found.put(key, value)
-            is Int, is Long -> found.put(key, value)
-        }
-    }
-    error.optString("message").takeIf { it.isNotEmpty() }?.let {
-        found.put("message", DisplaySanitizer.redact(it).take(240))
-    }
-    return found
-}
+/** Diagnostics use the same redacted refusal as the core's HTTP-response action. */
+internal fun providerRefusal(body: String): JSONObject = SharedProviderWire.call(JSONObject()
+    .put("action", "pipeline_response").put("format", "openai_chat")
+    .put("status", 400).put("body", body)).getJSONObject("refusal")
 
 data class ModelResponse(
     val text: String,

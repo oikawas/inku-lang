@@ -4,6 +4,7 @@ import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -28,7 +29,7 @@ class RefinementVisionAdviserTest {
     )
 
     @Test
-    fun adviceRequestCarriesBoundedObservationContextImageAndAnswerTool() = runBlocking {
+    fun adviceRequestCarriesBoundedObservationContextImageWithoutATool() = runBlocking {
         val provider = AnsweringProvider("""Here is the advice:
             ```json
             {"observation":"A circle sits low.","next_direction":"Move it upward.","suggested_kind":"other"}
@@ -42,7 +43,7 @@ class RefinementVisionAdviserTest {
 
         val sent = provider.requests.single()
         assertEquals(REFINEMENT_VISION_ACTION, sent.pipelineAction)
-        assertEquals(REFINEMENT_ADVICE_TOOL, sent.tool?.name)
+        assertNull(sent.tool)
         assertEquals(320, sent.maxTokens)
         assertEquals(0.35, sent.temperature, 0.0)
         assertEquals(120_000L, sent.timeoutMs)

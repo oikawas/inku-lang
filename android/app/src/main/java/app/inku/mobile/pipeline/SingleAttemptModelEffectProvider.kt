@@ -121,7 +121,7 @@ class SingleAttemptModelEffectProvider(
         is ProviderOutputLimitException -> "malformed_payload"
         is ProviderRateLimitWaitException -> "rate_limited"
         is app.inku.mobile.llm.ChatGptException -> error.failure
-        is ModelProviderHttpException -> when {
+        is ModelProviderHttpException -> error.failure ?: when {
             error.statusCode == 429 -> "rate_limited"
             error.statusCode >= 500 -> "transport_unavailable"
             else -> "provider_rejected"

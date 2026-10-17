@@ -114,7 +114,7 @@ function ui() {
   cancel = button(overlay, words.cancel, () => fail('cancelled'), false);
   retry = button(overlay, words.retry, () => { if (current) load({ ...current }); }, false);
   if (embedded) button(overlay, words.back, () => { stop(); post('return-2d'); }, false);
-  const footer = element('footer', root); status = element('span', footer); status.setAttribute('role', 'status');
+  const footer = element('footer', toolbar); status = element('span', footer); status.setAttribute('role', 'status');
   selection = element('span', footer, `${words.selected}: ${words.none}`);
   const info = element('details', footer); element('summary', info, words.details); details = element('div', info); details.className = 'diagnostics';
   message(words.ready);

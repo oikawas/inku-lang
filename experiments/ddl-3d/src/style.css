@@ -24,6 +24,6 @@ p { margin: 7px 0; }.toolbar details p { max-width: 850px; }
 canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .overlay { position: absolute; inset: 0; display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 9px; padding: 20px; background: var(--bg); z-index: 1; }
 .overlay[hidden], button[hidden] { display: none; }.overlay p { flex-basis: 100%; text-align: center; }
-footer { position: absolute; bottom: 58px; left: 48px; right: 48px; width: fit-content; max-width: calc(100% - 96px); z-index: 2; padding: 5px 9px; border-radius: 5px; background: color-mix(in srgb, var(--bg) 85%, transparent); display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; font-size: 11px; pointer-events: auto; }
-footer details { margin: 0 0 0 auto; }.diagnostics { position: absolute; bottom: 38px; right: 10px; max-width: min(540px, 90vw); max-height: 35vh; overflow: auto; padding: 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); overflow-wrap: anywhere; z-index: 3; }
+footer { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; font-size: 11px; }
+footer details { margin: 0 0 0 auto; }.diagnostics { max-width: min(540px, 90vw); max-height: 35vh; overflow: auto; padding: 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); overflow-wrap: anywhere; }
 @media (max-width: 600px) { .toolbar { padding: 6px; }.controls { gap: 5px; } button, select { padding: 4px 6px; }.heading strong { font-size: 12px; } }

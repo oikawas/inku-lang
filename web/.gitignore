@@ -30,3 +30,4 @@ vite.config.ts.timestamp-*
 !/static/experimental/ddl-3d/layers-v1-c8b910f9/
 !/static/experimental/ddl-3d/parity-v1-08ff4165/
 !/static/experimental/ddl-3d/parity-v1-1f15fb00/
+!/static/experimental/ddl-3d/backgrounds-v1-c2a7d95f/

@@ -18,9 +18,9 @@ from ... import db as _db
 from ... import pipeline_compat as _pipeline_compat
 from ...autonomous_refine import ALLOWED_KINDS as AUTONOMOUS_REFINE_KINDS, vision_refine_advice
 from ...limits import limits_as_dict
-from ...color_arrangements import ColorArrangements
-from ... import ground_variants as _ground
-from ... import tool_variants as _tools
+import secrets
+
+from ...saved_variants import SavedVariantRefused, ask as _variants
 from ...color_catalogs import get_color_catalog, render_color_map_for_catalog
 from ...saved_score_compat import coerce_saved_score
 from ...schema import Score
@@ -422,7 +422,7 @@ class ColorArrangementRenderRequest(BaseModel):
     index: int = Field(ge=0, strict=True)
 
 
-def _saved_color_arrangements(work: dict) -> tuple[ColorArrangements, dict[str, str], str]:
+def _saved_color_map(work: dict) -> tuple[dict[str, str], str]:
     catalog_id = work.get("render_color_catalog_id") or work.get("catalog_id")
     color_map = work.get("render_color_map")
     if not isinstance(color_map, dict) or not color_map:
@@ -434,26 +434,31 @@ def _saved_color_arrangements(work: dict) -> tuple[ColorArrangements, dict[str, 
         color_map = render_color_map_for_catalog(catalog_id)
     if not catalog_id:
         raise HTTPException(status_code=422, detail="saved color catalog is unknown")
-    try:
-        return ColorArrangements.from_saved(work.get("svg") or "", color_map, str(work.get("id") or "")), color_map, str(catalog_id)
-    except ValueError as error:
-        raise HTTPException(status_code=422, detail=str(error)) from error
+    return color_map, str(catalog_id)
+
+
+def _color_request(work: dict, color_map: dict[str, str]) -> dict:
+    return {"svg": work.get("svg") or "", "color_map": color_map, "work_id": str(work.get("id") or "")}
 
 
 @router.post("/api/color-arrangements/plan")
 def api_color_arrangement_plan(req: ColorArrangementPlanRequest, actor: dict = Depends(_current_user)) -> dict:
     work = _work_for_color_snapshot(actor, req.work_id)
-    arrangements, _, _ = _saved_color_arrangements(work)
-    return arrangements.page(req.cursor)
+    color_map, _ = _saved_color_map(work)
+    try:
+        page = _variants("color_plan", **_color_request(work, color_map), cursor=req.cursor)
+    except SavedVariantRefused as error:
+        raise HTTPException(status_code=422, detail=error.detail) from error
+    return {key: page[key] for key in ("entries", "next_cursor", "total")}
 
 
 def _render_color_arrangement_for_work(actor: dict, work: dict, index: int) -> RenderScoreResponse:
-    arrangements, color_map, catalog_id = _saved_color_arrangements(work)
+    color_map, catalog_id = _saved_color_map(work)
     try:
-        recolored = arrangements.color_map(color_map, index)
-    except ValueError as error:
-        raise HTTPException(status_code=422, detail=str(error)) from error
-    snapshot = {**work, "render_color_map": recolored, "render_color_catalog_id": catalog_id}
+        recolored = _variants("color_render", **_color_request(work, color_map), index=index, catalog_id=catalog_id)
+    except SavedVariantRefused as error:
+        raise HTTPException(status_code=422, detail=error.detail) from error
+    snapshot = {**work, "render_color_map": recolored["color_map"], "render_color_catalog_id": catalog_id}
     render_seed = work.get("render_seed")
     if render_seed is None:
         raise HTTPException(status_code=422, detail="saved work has no performance seed to preserve its drawing")
@@ -464,7 +469,7 @@ def _render_color_arrangement_for_work(actor: dict, work: dict, index: int) -> R
         wild=bool(work.get("render_wild")),
     ), actor, snapshot)
     result.render_color_source = "color_arrangement"
-    result.derivation_metadata = {"color_arrangement_index": index}
+    result.derivation_metadata = recolored["derivation_metadata"]
     return result
 
 
@@ -492,35 +497,29 @@ def api_ground_variant_plan(req: GroundVariantPlanRequest, actor: dict = Depends
     """Every named support the work is not on, in the saijiki's order."""
     work = _work_for_color_snapshot(actor, req.work_id)
     score = work.get("score") if isinstance(work.get("score"), dict) else {}
-    current = _ground.current_material(score)
-
-    def labels(material: str, key: str) -> dict:
-        named = material in _ground.GROUND_MATERIALS
-        return {f"{key}_ja": _ground.ground_label(material, "ja") if named else None,
-                f"{key}_en": _ground.ground_label(material, "en") if named else None}
-
-    return {"current": current, **labels(current, "current_label"),
-            "entries": [{"material": material, **labels(material, "label")} for material in _ground.unused_materials(score)]}
+    plan = _variants("ground_plan", score=score)
+    return {key: plan[key] for key in ("current", "current_label_ja", "current_label_en", "entries")}
 
 
 def _render_ground_variant_for_work(actor: dict, work: dict, material: str) -> GroundVariantResponse:
     score = work.get("score")
-    if not isinstance(score, dict):
-        raise HTTPException(status_code=422, detail="saved work has no Score to redraw")
-    if material not in _ground.unused_materials(score):
-        raise HTTPException(status_code=422, detail="ground must be a named support the work is not on")
+    try:
+        changed = _variants("ground_render", score=score, source=work.get("ddl") or "", material=material,
+                            language=work.get("instruction_lang_resolved"))
+    except SavedVariantRefused as error:
+        raise HTTPException(status_code=422, detail=error.detail) from error
     render_seed = work.get("render_seed")
     if render_seed is None:
         raise HTTPException(status_code=422, detail="saved work has no performance seed to preserve its drawing")
-    ddl = _ground.ddl_with_ground(work.get("ddl") or "", material, work.get("instruction_lang_resolved"))
+    ddl = changed["ddl"]
     result = _render_authorized_score(RenderScoreRequest(
-        score=_ground.score_with_ground(score, material), input=work.get("input") or "", ddl=ddl,
+        score=changed["score"], input=work.get("input") or "", ddl=ddl,
         catalog_id=work.get("render_color_catalog_id") or work.get("catalog_id"),
         canvas_aspect=work.get("render_canvas_aspect_id") or work.get("render_canvas_aspect"),
         render_seed=render_seed, composition_seed=work.get("composition_seed"),
         wild=bool(work.get("render_wild")),
     ), actor, work)
-    result.derivation_metadata = {"ground_material": material, "parent_ground_material": _ground.current_material(score)}
+    result.derivation_metadata = changed["derivation_metadata"]
     return GroundVariantResponse(**result.model_dump(), ddl=ddl)
 
 
@@ -546,72 +545,46 @@ class ToolVariantResponse(RenderScoreResponse):
     ddl: str
 
 
-def _retouch(actor: dict, work: dict, tools: dict[int, str]) -> dict:
+def _touch_request(actor: dict, work: dict) -> dict:
+    """The saved work as the core's touch change reads it: its config, source and Score."""
     from ...pipeline_runtime import get_service
 
-    return get_service().retouch(actor["id"], work["id"], work.get("ddl") or "", tools)
-
-
-def _tool_sentences(actor: dict, work: dict) -> tuple[dict, dict[int, str]]:
-    """The work's Score and the tool each changeable sentence was drawn with."""
-    score = work.get("score")
-    if not isinstance(score, dict):
-        raise HTTPException(status_code=422, detail="saved work has no Score to redraw")
-    read = _retouch(actor, work, {})
-    if read.get("outcome") != "read":
-        raise HTTPException(status_code=422, detail=f"touch cannot change: {read.get('reason') or read.get('error') or 'unknown'}")
-    return score, _tools.drawn_tools(score, [sentence["index"] for sentence in read.get("sentences") or []])
-
-
-def _tool_entry(drawn: dict[int, str], tools: dict[int, str], ddl: str) -> dict:
-    return {
-        "tools": {str(index): tool for index, tool in tools.items()},
-        "changes": [{"index": index, "from": drawn[index], "to": tool} for index, tool in tools.items() if drawn[index] != tool],
-        "ddl": ddl,
-    }
+    config = get_service().retouch_config(actor["id"], work["id"], work.get("ddl") or "")
+    if config is None:
+        raise HTTPException(status_code=422, detail="touch cannot change: binding_unavailable")
+    return {"config": config, "source": work.get("ddl") or "", "score": work.get("score")}
 
 
 @router.post("/api/tool-variants/plan")
 def api_tool_variant_plan(req: ToolVariantPlanRequest, actor: dict = Depends(_current_user)) -> dict:
     """Four touch changes of a saved work: one tool for every sentence, or a tool drawn for each."""
     work = _work_for_color_snapshot(actor, req.work_id)
-    _score, drawn = _tool_sentences(actor, work)
-    entries = []
-    for tools in _tools.options(drawn, req.mode):
-        written = _retouch(actor, work, tools)
-        if written.get("outcome") == "retouched":
-            entries.append(_tool_entry(drawn, tools, written["source"]))
-    labels = {tool: {"ja": _tools.tool_label(tool, "ja"), "en": _tools.tool_label(tool, "en")} for tool in _tools.TOOLS}
-    return {"mode": req.mode, "tools": labels,
-            "sentences": [{"index": index, "tool": tool} for index, tool in drawn.items()], "entries": entries}
+    try:
+        # A new seed each time, so another press offers other options.
+        plan = _variants("tool_plan", **_touch_request(actor, work), mode=req.mode, seed=secrets.randbits(64))
+    except SavedVariantRefused as error:
+        raise HTTPException(status_code=422, detail=error.detail) from error
+    labels = {tool["value"]: {"ja": tool["ja"], "en": tool["en"]} for tool in plan["tool_labels"]}
+    return {"mode": plan["mode"], "tools": labels, "sentences": plan["sentences"], "entries": plan["entries"]}
 
 
 def _render_tool_variant_for_work(actor: dict, work: dict, mode: str, asked: dict[str, str]) -> ToolVariantResponse:
     render_seed = work.get("render_seed")
     if render_seed is None:
         raise HTTPException(status_code=422, detail="saved work has no performance seed to preserve its drawing")
-    score, drawn = _tool_sentences(actor, work)
     try:
-        tools = {int(index): tool for index, tool in asked.items()}
-    except ValueError:
-        raise HTTPException(status_code=422, detail="tools are keyed by sentence index") from None
-    if not tools or any(index not in drawn or tool not in _tools.TOOLS for index, tool in tools.items()):
-        raise HTTPException(status_code=422, detail="tools must name changeable sentences and known tools")
-    if all(drawn[index] == tool for index, tool in tools.items()):
-        raise HTTPException(status_code=422, detail="tools must change at least one sentence")
-    written = _retouch(actor, work, tools)
-    if written.get("outcome") != "retouched":
-        raise HTTPException(status_code=422, detail=f"touch cannot change: {written.get('reason') or written.get('error') or 'unknown'}")
-    ddl = written["source"]
+        changed = _variants("tool_render", **_touch_request(actor, work), mode=mode, tools=asked)
+    except SavedVariantRefused as error:
+        raise HTTPException(status_code=422, detail=error.detail) from error
+    ddl = changed["ddl"]
     result = _render_authorized_score(RenderScoreRequest(
-        score=_tools.score_with_tools(score, tools), input=work.get("input") or "", ddl=ddl,
+        score=changed["score"], input=work.get("input") or "", ddl=ddl,
         catalog_id=work.get("render_color_catalog_id") or work.get("catalog_id"),
         canvas_aspect=work.get("render_canvas_aspect_id") or work.get("render_canvas_aspect"),
         render_seed=render_seed, composition_seed=work.get("composition_seed"),
         wild=bool(work.get("render_wild")),
     ), actor, work)
-    entry = _tool_entry(drawn, tools, ddl)
-    result.derivation_metadata = {"tool_mode": mode, "tools": entry["tools"], "changes": entry["changes"]}
+    result.derivation_metadata = changed["derivation_metadata"]
     return ToolVariantResponse(**result.model_dump(), ddl=ddl)
 
 

@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from inku_server import db
 from inku_server.api import app
-from inku_server.color_arrangements import ColorArrangements, normalized_hex
+from inku_server.saved_variants import ask as saved_variants
 from inku_server.color_catalogs import render_color_map_for_catalog
 from inku_server.persistence.variation_authority import VariationAuthorityStore
 from inku_server.pipeline_candidate import CandidateExecution, PipelineBinding
@@ -95,7 +95,17 @@ def test_retired_catalog_arrangement_render_save_and_replay(monkeypatch):
         assert selected["render_seed"] == "77" and selected["composition_seed"] == "17"
         assert selected["render_wild"] is True
         assert selected["render_canvas_aspect_id"] == "hd_monitor"
-        substitution = ColorArrangements.from_saved(parent["svg"], colors, parent["id"]).substitution(index)
+        # The shared core's assignment for this index: each recolored original names its new color.
+        recolored = saved_variants("color_render", svg=parent["svg"], color_map=colors, work_id=parent["id"],
+                                   index=index, catalog_id=retired)["color_map"]
+        substitution = {key.removeprefix("recolor:"): value for key, value in recolored.items() if key.startswith("recolor:")}
+
+        def normalized_hex(value):
+            value = value.strip().lower()
+            if len(value) == 4 and value.startswith("#"):
+                return "#" + "".join(character * 2 for character in value[1:])
+            return value
+
         before, after = ElementTree.fromstring(parent["svg"]), ElementTree.fromstring(selected["svg"])
         assert len(list(before.iter())) == len(list(after.iter()))
         changed = False
@@ -120,6 +130,8 @@ def test_retired_catalog_arrangement_render_save_and_replay(monkeypatch):
         assert child["svg"] == selected["svg"]
         assert child["render_color_map"] == selected["render_color_map"]
         assert child["render_limits"] == selected["render_limits"]
+        # The record is rebuilt from the parent by the shared core (2026-10-17), not taken as sent.
+        assert child["derivation_metadata"] == {"color_arrangement_index": index, "catalog_id": retired}
         replay = client.post("/api/render-score", json={"work_id": child["id"], "score": child["score"],
             "render_seed": child["render_seed"], "composition_seed": child["composition_seed"], "wild": child["render_wild"]}, headers=headers)
         assert replay.status_code == 200, replay.text

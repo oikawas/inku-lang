@@ -540,7 +540,8 @@ def api_history_post(
         if body.derivation_kind in ("ground_change", "tool_change"):
             # The child's instructions name the ground or the tools it is drawn with.
             inherited["ddl"] = replayed["ddl"]
-            inherited["derivation_metadata"] = replayed["derivation_metadata"]
+        # The record is the shared core's, rebuilt from the parent (2026-10-17).
+        inherited["derivation_metadata"] = replayed["derivation_metadata"]
         body = body.model_copy(update=inherited)
         score = replayed["score"]
         svg = replayed["svg"]

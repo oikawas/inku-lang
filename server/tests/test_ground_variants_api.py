@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 from inku_server import db
 from inku_server.api import app
 from inku_server.color_catalogs import render_color_map_for_catalog
-from inku_server.ground_variants import GROUND_MATERIALS
 from inku_server.persistence.variation_authority import VariationAuthorityStore
 from inku_server.pipeline_candidate import CandidateExecution, PipelineBinding
 from inku_server.pipeline_defaults import default_manifest
@@ -54,7 +53,8 @@ def test_ground_variant_render_save_and_replay(monkeypatch):
         plan = client.post("/api/ground-variants/plan", json={"work_id": parent["id"]}, headers=headers)
         assert plan.status_code == 200, plan.text
         assert plan.json()["current"] == "plain"
-        assert [entry["material"] for entry in plan.json()["entries"]] == list(GROUND_MATERIALS)
+        assert [entry["material"] for entry in plan.json()["entries"]] == [
+            "paper", "washi", "ink_wash", "charcoal_ground", "canvas", "drawing_paper", "mezzotint"]
         selected = client.post("/api/render-ground-variant", json={"work_id": parent["id"], "material": "washi"}, headers=headers)
         assert selected.status_code == 200, selected.text
         selected = selected.json()

@@ -14,4 +14,5 @@ inku-score.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+roxmltree = "=0.21.1"
 unicode-normalization = "=0.1.25"

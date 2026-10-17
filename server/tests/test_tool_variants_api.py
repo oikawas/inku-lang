@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 from inku_server import db
 from inku_server.api import app
 from inku_server.color_catalogs import render_color_map_for_catalog
-from inku_server.tool_variants import TOOLS
 from inku_server.persistence.variation_authority import VariationAuthorityStore
 from inku_server.pipeline_candidate import CandidateExecution, PipelineBinding
 from inku_server.pipeline_defaults import default_manifest
@@ -64,7 +63,9 @@ def test_tool_variant_render_save_and_replay(monkeypatch):
         assert plan.status_code == 200, plan.text
         plan = plan.json()
         assert plan["mode"] == "uniform" and plan["sentences"] == [{"index": 0, "tool": "brush_thin"}, {"index": 1, "tool": "pen"}]
-        assert len(plan["entries"]) == 4 and set(plan["tools"]) == set(TOOLS)
+        assert len(plan["entries"]) == 4 and set(plan["tools"]) == {
+            "silverpoint", "pencil", "pen", "rotring", "crayon", "chalk", "brush_thin",
+            "brush_thick", "oil_paint", "burin", "drypoint", "computer"}
         for entry in plan["entries"]:
             tool = entry["tools"]["0"]
             assert entry["tools"] == {"0": tool, "1": tool}

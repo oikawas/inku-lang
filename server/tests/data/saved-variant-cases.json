@@ -1,0 +1,1383 @@
+{
+ "note": "Generated from server/src/inku_server/{tool,ground}_variants.py and color_arrangements.py (with the 2026-10-17 ruling on an added ground sentence's language) and read by core/crates/inku-pipeline/src/saved_variants.rs, server/tests/test_saved_variants_core.py and the host checks.",
+ "conditions": {
+  "count": 4,
+  "tools": [
+   "silverpoint",
+   "pencil",
+   "pen",
+   "rotring",
+   "crayon",
+   "chalk",
+   "brush_thin",
+   "brush_thick",
+   "oil_paint",
+   "burin",
+   "drypoint",
+   "computer"
+  ],
+  "default_tool": "pen",
+  "ground_materials": [
+   "paper",
+   "washi",
+   "ink_wash",
+   "charcoal_ground",
+   "canvas",
+   "drawing_paper",
+   "mezzotint"
+  ]
+ },
+ "tools": [
+  {
+   "why": "a ground with texture",
+   "score": {
+    "canvas": {
+     "aspect": "square",
+     "ground": {
+      "material": "washi",
+      "texture": "fine"
+     }
+    },
+    "instructions": [
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 0
+        }
+       }
+      },
+      "weight": "pen"
+     },
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 1
+        }
+       }
+      },
+      "weight": "chalk"
+     }
+    ]
+   },
+   "sentences": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "drawn": {
+    "0": "pen",
+    "1": "chalk",
+    "2": "pen",
+    "3": "pen"
+   },
+   "asked": {
+    "0": "silverpoint",
+    "2": "oil_paint"
+   },
+   "score_with_tools": {
+    "canvas": {
+     "aspect": "square",
+     "ground": {
+      "material": "washi",
+      "texture": "fine"
+     }
+    },
+    "instructions": [
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 0
+        }
+       }
+      },
+      "weight": "silverpoint"
+     },
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 1
+        }
+       }
+      },
+      "weight": "chalk"
+     }
+    ]
+   }
+  },
+  {
+   "why": "a canvas named by its aspect",
+   "score": {
+    "canvas": "golden",
+    "instructions": [
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 0
+        }
+       }
+      }
+     }
+    ]
+   },
+   "sentences": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "drawn": {
+    "0": "pen",
+    "1": "pen",
+    "2": "pen",
+    "3": "pen"
+   },
+   "asked": {
+    "0": "silverpoint",
+    "2": "oil_paint"
+   },
+   "score_with_tools": {
+    "canvas": "golden",
+    "instructions": [
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 0
+        }
+       }
+      },
+      "weight": "silverpoint"
+     }
+    ]
+   }
+  },
+  {
+   "why": "no canvas",
+   "score": {
+    "instructions": []
+   },
+   "sentences": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "drawn": {
+    "0": "pen",
+    "1": "pen",
+    "2": "pen",
+    "3": "pen"
+   },
+   "asked": {
+    "0": "silverpoint",
+    "2": "oil_paint"
+   },
+   "score_with_tools": {
+    "instructions": []
+   }
+  },
+  {
+   "why": "a canvas without a ground",
+   "score": {
+    "canvas": {
+     "aspect": "square"
+    },
+    "instructions": [
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 2
+        }
+       }
+      },
+      "weight": "crayon"
+     }
+    ]
+   },
+   "sentences": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "drawn": {
+    "0": "pen",
+    "1": "pen",
+    "2": "crayon",
+    "3": "pen"
+   },
+   "asked": {
+    "0": "silverpoint",
+    "2": "oil_paint"
+   },
+   "score_with_tools": {
+    "canvas": {
+     "aspect": "square"
+    },
+    "instructions": [
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 2
+        }
+       }
+      },
+      "weight": "oil_paint"
+     }
+    ]
+   }
+  },
+  {
+   "why": "odd owners and weights",
+   "score": {
+    "canvas": {
+     "aspect": "square",
+     "ground": {
+      "material": "paper"
+     }
+    },
+    "instructions": [
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 0
+        }
+       }
+      },
+      "weight": "pencil"
+     },
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 0
+        }
+       }
+      },
+      "weight": "chalk"
+     },
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 1
+        }
+       }
+      },
+      "weight": "crayons"
+     },
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 2.0
+        }
+       }
+      },
+      "weight": "pen"
+     },
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "macro",
+         "instruction_index": 3
+        }
+       }
+      },
+      "weight": "pen"
+     },
+     "not an object",
+     {
+      "weight": "pen"
+     }
+    ]
+   },
+   "sentences": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "drawn": {
+    "0": "pencil",
+    "1": "pen",
+    "2": "pen",
+    "3": "pen"
+   },
+   "asked": {
+    "0": "silverpoint",
+    "2": "oil_paint"
+   },
+   "score_with_tools": {
+    "canvas": {
+     "aspect": "square",
+     "ground": {
+      "material": "paper"
+     }
+    },
+    "instructions": [
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 0
+        }
+       }
+      },
+      "weight": "silverpoint"
+     },
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 0
+        }
+       }
+      },
+      "weight": "silverpoint"
+     },
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 1
+        }
+       }
+      },
+      "weight": "crayons"
+     },
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 2.0
+        }
+       }
+      },
+      "weight": "pen"
+     },
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "macro",
+         "instruction_index": 3
+        }
+       }
+      },
+      "weight": "pen"
+     },
+     "not an object",
+     {
+      "weight": "pen"
+     }
+    ]
+   }
+  }
+ ],
+ "grounds": [
+  {
+   "why": "a ground with texture",
+   "score": {
+    "canvas": {
+     "aspect": "square",
+     "ground": {
+      "material": "washi",
+      "texture": "fine"
+     }
+    },
+    "instructions": [
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 0
+        }
+       }
+      },
+      "weight": "pen"
+     },
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 1
+        }
+       }
+      },
+      "weight": "chalk"
+     }
+    ]
+   },
+   "current": "washi",
+   "entries": [
+    "paper",
+    "ink_wash",
+    "charcoal_ground",
+    "canvas",
+    "drawing_paper",
+    "mezzotint"
+   ],
+   "score_with_ground": {
+    "paper": {
+     "canvas": {
+      "aspect": "square",
+      "ground": {
+       "material": "paper",
+       "texture": "fine"
+      }
+     },
+     "instructions": [
+      {
+       "arrangement": {
+        "resolved": {
+         "owner": {
+          "kind": "source_instruction",
+          "instruction_index": 0
+         }
+        }
+       },
+       "weight": "pen"
+      },
+      {
+       "arrangement": {
+        "resolved": {
+         "owner": {
+          "kind": "source_instruction",
+          "instruction_index": 1
+         }
+        }
+       },
+       "weight": "chalk"
+      }
+     ]
+    },
+    "ink_wash": {
+     "canvas": {
+      "aspect": "square",
+      "ground": {
+       "material": "ink_wash",
+       "texture": "fine"
+      }
+     },
+     "instructions": [
+      {
+       "arrangement": {
+        "resolved": {
+         "owner": {
+          "kind": "source_instruction",
+          "instruction_index": 0
+         }
+        }
+       },
+       "weight": "pen"
+      },
+      {
+       "arrangement": {
+        "resolved": {
+         "owner": {
+          "kind": "source_instruction",
+          "instruction_index": 1
+         }
+        }
+       },
+       "weight": "chalk"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "why": "a canvas named by its aspect",
+   "score": {
+    "canvas": "golden",
+    "instructions": [
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 0
+        }
+       }
+      }
+     }
+    ]
+   },
+   "current": "plain",
+   "entries": [
+    "paper",
+    "washi",
+    "ink_wash",
+    "charcoal_ground",
+    "canvas",
+    "drawing_paper",
+    "mezzotint"
+   ],
+   "score_with_ground": {
+    "paper": {
+     "canvas": {
+      "aspect": "golden",
+      "ground": {
+       "material": "paper"
+      }
+     },
+     "instructions": [
+      {
+       "arrangement": {
+        "resolved": {
+         "owner": {
+          "kind": "source_instruction",
+          "instruction_index": 0
+         }
+        }
+       }
+      }
+     ]
+    },
+    "washi": {
+     "canvas": {
+      "aspect": "golden",
+      "ground": {
+       "material": "washi"
+      }
+     },
+     "instructions": [
+      {
+       "arrangement": {
+        "resolved": {
+         "owner": {
+          "kind": "source_instruction",
+          "instruction_index": 0
+         }
+        }
+       }
+      }
+     ]
+    }
+   }
+  },
+  {
+   "why": "no canvas",
+   "score": {
+    "instructions": []
+   },
+   "current": "plain",
+   "entries": [
+    "paper",
+    "washi",
+    "ink_wash",
+    "charcoal_ground",
+    "canvas",
+    "drawing_paper",
+    "mezzotint"
+   ],
+   "score_with_ground": {
+    "paper": {
+     "instructions": [],
+     "canvas": {
+      "aspect": "square",
+      "ground": {
+       "material": "paper"
+      }
+     }
+    },
+    "washi": {
+     "instructions": [],
+     "canvas": {
+      "aspect": "square",
+      "ground": {
+       "material": "washi"
+      }
+     }
+    }
+   }
+  },
+  {
+   "why": "a canvas without a ground",
+   "score": {
+    "canvas": {
+     "aspect": "square"
+    },
+    "instructions": [
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 2
+        }
+       }
+      },
+      "weight": "crayon"
+     }
+    ]
+   },
+   "current": "plain",
+   "entries": [
+    "paper",
+    "washi",
+    "ink_wash",
+    "charcoal_ground",
+    "canvas",
+    "drawing_paper",
+    "mezzotint"
+   ],
+   "score_with_ground": {
+    "paper": {
+     "canvas": {
+      "aspect": "square",
+      "ground": {
+       "material": "paper"
+      }
+     },
+     "instructions": [
+      {
+       "arrangement": {
+        "resolved": {
+         "owner": {
+          "kind": "source_instruction",
+          "instruction_index": 2
+         }
+        }
+       },
+       "weight": "crayon"
+      }
+     ]
+    },
+    "washi": {
+     "canvas": {
+      "aspect": "square",
+      "ground": {
+       "material": "washi"
+      }
+     },
+     "instructions": [
+      {
+       "arrangement": {
+        "resolved": {
+         "owner": {
+          "kind": "source_instruction",
+          "instruction_index": 2
+         }
+        }
+       },
+       "weight": "crayon"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "why": "odd owners and weights",
+   "score": {
+    "canvas": {
+     "aspect": "square",
+     "ground": {
+      "material": "paper"
+     }
+    },
+    "instructions": [
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 0
+        }
+       }
+      },
+      "weight": "pencil"
+     },
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 0
+        }
+       }
+      },
+      "weight": "chalk"
+     },
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 1
+        }
+       }
+      },
+      "weight": "crayons"
+     },
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "source_instruction",
+         "instruction_index": 2.0
+        }
+       }
+      },
+      "weight": "pen"
+     },
+     {
+      "arrangement": {
+       "resolved": {
+        "owner": {
+         "kind": "macro",
+         "instruction_index": 3
+        }
+       }
+      },
+      "weight": "pen"
+     },
+     "not an object",
+     {
+      "weight": "pen"
+     }
+    ]
+   },
+   "current": "paper",
+   "entries": [
+    "washi",
+    "ink_wash",
+    "charcoal_ground",
+    "canvas",
+    "drawing_paper",
+    "mezzotint"
+   ],
+   "score_with_ground": {
+    "washi": {
+     "canvas": {
+      "aspect": "square",
+      "ground": {
+       "material": "washi"
+      }
+     },
+     "instructions": [
+      {
+       "arrangement": {
+        "resolved": {
+         "owner": {
+          "kind": "source_instruction",
+          "instruction_index": 0
+         }
+        }
+       },
+       "weight": "pencil"
+      },
+      {
+       "arrangement": {
+        "resolved": {
+         "owner": {
+          "kind": "source_instruction",
+          "instruction_index": 0
+         }
+        }
+       },
+       "weight": "chalk"
+      },
+      {
+       "arrangement": {
+        "resolved": {
+         "owner": {
+          "kind": "source_instruction",
+          "instruction_index": 1
+         }
+        }
+       },
+       "weight": "crayons"
+      },
+      {
+       "arrangement": {
+        "resolved": {
+         "owner": {
+          "kind": "source_instruction",
+          "instruction_index": 2.0
+         }
+        }
+       },
+       "weight": "pen"
+      },
+      {
+       "arrangement": {
+        "resolved": {
+         "owner": {
+          "kind": "macro",
+          "instruction_index": 3
+         }
+        }
+       },
+       "weight": "pen"
+      },
+      "not an object",
+      {
+       "weight": "pen"
+      }
+     ]
+    },
+    "ink_wash": {
+     "canvas": {
+      "aspect": "square",
+      "ground": {
+       "material": "ink_wash"
+      }
+     },
+     "instructions": [
+      {
+       "arrangement": {
+        "resolved": {
+         "owner": {
+          "kind": "source_instruction",
+          "instruction_index": 0
+         }
+        }
+       },
+       "weight": "pencil"
+      },
+      {
+       "arrangement": {
+        "resolved": {
+         "owner": {
+          "kind": "source_instruction",
+          "instruction_index": 0
+         }
+        }
+       },
+       "weight": "chalk"
+      },
+      {
+       "arrangement": {
+        "resolved": {
+         "owner": {
+          "kind": "source_instruction",
+          "instruction_index": 1
+         }
+        }
+       },
+       "weight": "crayons"
+      },
+      {
+       "arrangement": {
+        "resolved": {
+         "owner": {
+          "kind": "source_instruction",
+          "instruction_index": 2.0
+         }
+        }
+       },
+       "weight": "pen"
+      },
+      {
+       "arrangement": {
+        "resolved": {
+         "owner": {
+          "kind": "macro",
+          "instruction_index": 3
+         }
+        }
+       },
+       "weight": "pen"
+      },
+      "not an object",
+      {
+       "weight": "pen"
+      }
+     ]
+    }
+   }
+  }
+ ],
+ "ground_sentences": [
+  {
+   "why": "a Japanese ground line is replaced",
+   "ddl": "紙。\n赤い円を1個置く。",
+   "language": null,
+   "results": {
+    "paper": "紙。\n赤い円を1個置く。",
+    "mezzotint": "メゾチント。\n赤い円を1個置く。"
+   }
+  },
+  {
+   "why": "an English ground line is matched without case",
+   "ddl": "Draw one red circle.\n  WASHI.  ",
+   "language": null,
+   "results": {
+    "paper": "Draw one red circle.\nPaper.",
+    "mezzotint": "Draw one red circle.\nMezzotint."
+   }
+  },
+  {
+   "why": "a saved language decides the added sentence",
+   "ddl": "赤い円を1個置く。",
+   "language": "en",
+   "results": {
+    "paper": "Paper.\n赤い円を1個置く。",
+    "mezzotint": "Mezzotint.\n赤い円を1個置く。"
+   }
+  },
+  {
+   "why": "Japanese text without a language",
+   "ddl": "赤い円を1個置く。",
+   "language": null,
+   "results": {
+    "paper": "紙。\n赤い円を1個置く。",
+    "mezzotint": "メゾチント。\n赤い円を1個置く。"
+   }
+  },
+  {
+   "why": "English text without a language",
+   "ddl": "Place one red circle.",
+   "language": null,
+   "results": {
+    "paper": "Paper.\nPlace one red circle.",
+    "mezzotint": "Mezzotint.\nPlace one red circle."
+   }
+  },
+  {
+   "why": "digits only: the shared rule falls back to Japanese",
+   "ddl": "123",
+   "language": null,
+   "results": {
+    "paper": "紙。\n123",
+    "mezzotint": "メゾチント。\n123"
+   }
+  },
+  {
+   "why": "a squared katakana sign with Latin letters: the shared rule reads English",
+   "ddl": "㌀ abc",
+   "language": null,
+   "results": {
+    "paper": "Paper.\n㌀ abc",
+    "mezzotint": "Mezzotint.\n㌀ abc"
+   }
+  },
+  {
+   "why": "an empty text",
+   "ddl": "",
+   "language": null,
+   "results": {
+    "paper": "紙。",
+    "mezzotint": "メゾチント。"
+   }
+  }
+ ],
+ "colors": [
+  {
+   "why": "three of nine colors used, with a parent recolor",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 10 10\"><rect fill=\"#111111\"/><circle stroke=\"#222222\" style=\"fill: #333 ; opacity:1\"/><path xlink:fill=\"#444444\" fill=\"none\"/><g color=\"#ABCDEF\"><stop stop-color=\"#555555\"/></g></svg>",
+   "color_map": {
+    "palette:0": "#111111",
+    "palette:1": "#222",
+    "palette:2": "#333333",
+    "palette:3": "#444444",
+    "palette:4": "#555555",
+    "palette:5": "#666666",
+    "palette:6": "#777777",
+    "palette:7": "#888888",
+    "palette:8": "#999999",
+    "background": "#111111",
+    "recolor:#111111": "#999999"
+   },
+   "work_id": "work-a",
+   "total": 3023,
+   "pages": {
+    "0": {
+     "entries": [
+      {
+       "index": 0
+      },
+      {
+       "index": 1
+      },
+      {
+       "index": 2
+      },
+      {
+       "index": 3
+      },
+      {
+       "index": 4
+      },
+      {
+       "index": 5
+      },
+      {
+       "index": 6
+      },
+      {
+       "index": 7
+      }
+     ],
+     "next_cursor": 8,
+     "total": 3023
+    },
+    "8": {
+     "entries": [
+      {
+       "index": 8
+      },
+      {
+       "index": 9
+      },
+      {
+       "index": 10
+      },
+      {
+       "index": 11
+      },
+      {
+       "index": 12
+      },
+      {
+       "index": 13
+      },
+      {
+       "index": 14
+      },
+      {
+       "index": 15
+      }
+     ],
+     "next_cursor": 16,
+     "total": 3023
+    },
+    "3026": {
+     "entries": [],
+     "next_cursor": null,
+     "total": 3023
+    }
+   },
+   "color_maps": {
+    "0": {
+     "palette:0": "#111111",
+     "palette:1": "#222",
+     "palette:2": "#333333",
+     "palette:3": "#444444",
+     "palette:4": "#555555",
+     "palette:5": "#666666",
+     "palette:6": "#777777",
+     "palette:7": "#888888",
+     "palette:8": "#999999",
+     "background": "#111111",
+     "recolor:#333333": "#666666",
+     "recolor:#222222": "#444444",
+     "recolor:#111111": "#999999",
+     "recolor:#555555": "#333333"
+    },
+    "1": {
+     "palette:0": "#111111",
+     "palette:1": "#222",
+     "palette:2": "#333333",
+     "palette:3": "#444444",
+     "palette:4": "#555555",
+     "palette:5": "#666666",
+     "palette:6": "#777777",
+     "palette:7": "#888888",
+     "palette:8": "#999999",
+     "background": "#111111",
+     "recolor:#333333": "#888888",
+     "recolor:#222222": "#999999",
+     "recolor:#111111": "#999999",
+     "recolor:#555555": "#777777"
+    },
+    "3022": {
+     "palette:0": "#111111",
+     "palette:1": "#222",
+     "palette:2": "#333333",
+     "palette:3": "#444444",
+     "palette:4": "#555555",
+     "palette:5": "#666666",
+     "palette:6": "#777777",
+     "palette:7": "#888888",
+     "palette:8": "#999999",
+     "background": "#111111",
+     "recolor:#333333": "#999999",
+     "recolor:#222222": "#777777",
+     "recolor:#111111": "#999999",
+     "recolor:#555555": "#666666"
+    }
+   }
+  },
+  {
+   "why": "all thirteen colors used: the count passes 2^31",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 10 10\"><rect fill=\"#000000\"/><rect fill=\"#010101\"/><rect fill=\"#020202\"/><rect fill=\"#030303\"/><rect fill=\"#040404\"/><rect fill=\"#050505\"/><rect fill=\"#060606\"/><rect fill=\"#070707\"/><rect fill=\"#080808\"/><rect fill=\"#090909\"/><rect fill=\"#0a0a0a\"/><rect fill=\"#0b0b0b\"/><rect fill=\"#0c0c0c\"/></svg>",
+   "color_map": {
+    "palette:0": "#000000",
+    "palette:1": "#010101",
+    "palette:2": "#020202",
+    "palette:3": "#030303",
+    "palette:4": "#040404",
+    "palette:5": "#050505",
+    "palette:6": "#060606",
+    "palette:7": "#070707",
+    "palette:8": "#080808",
+    "palette:9": "#090909",
+    "palette:10": "#0a0a0a",
+    "palette:11": "#0b0b0b",
+    "palette:12": "#0c0c0c"
+   },
+   "work_id": "work-b",
+   "total": 6227020799,
+   "pages": {
+    "0": {
+     "entries": [
+      {
+       "index": 0
+      },
+      {
+       "index": 1
+      },
+      {
+       "index": 2
+      },
+      {
+       "index": 3
+      },
+      {
+       "index": 4
+      },
+      {
+       "index": 5
+      },
+      {
+       "index": 6
+      },
+      {
+       "index": 7
+      }
+     ],
+     "next_cursor": 8,
+     "total": 6227020799
+    },
+    "8": {
+     "entries": [
+      {
+       "index": 8
+      },
+      {
+       "index": 9
+      },
+      {
+       "index": 10
+      },
+      {
+       "index": 11
+      },
+      {
+       "index": 12
+      },
+      {
+       "index": 13
+      },
+      {
+       "index": 14
+      },
+      {
+       "index": 15
+      }
+     ],
+     "next_cursor": 16,
+     "total": 6227020799
+    },
+    "6227020802": {
+     "entries": [],
+     "next_cursor": null,
+     "total": 6227020799
+    }
+   },
+   "color_maps": {
+    "0": {
+     "palette:0": "#000000",
+     "palette:1": "#010101",
+     "palette:2": "#020202",
+     "palette:3": "#030303",
+     "palette:4": "#040404",
+     "palette:5": "#050505",
+     "palette:6": "#060606",
+     "palette:7": "#070707",
+     "palette:8": "#080808",
+     "palette:9": "#090909",
+     "palette:10": "#0a0a0a",
+     "palette:11": "#0b0b0b",
+     "palette:12": "#0c0c0c",
+     "recolor:#090909": "#050505",
+     "recolor:#070707": "#030303",
+     "recolor:#080808": "#040404",
+     "recolor:#0a0a0a": "#070707",
+     "recolor:#0b0b0b": "#0a0a0a",
+     "recolor:#010101": "#080808",
+     "recolor:#030303": "#020202",
+     "recolor:#060606": "#010101",
+     "recolor:#050505": "#090909",
+     "recolor:#000000": "#060606",
+     "recolor:#040404": "#000000",
+     "recolor:#020202": "#0b0b0b"
+    },
+    "1": {
+     "palette:0": "#000000",
+     "palette:1": "#010101",
+     "palette:2": "#020202",
+     "palette:3": "#030303",
+     "palette:4": "#040404",
+     "palette:5": "#050505",
+     "palette:6": "#060606",
+     "palette:7": "#070707",
+     "palette:8": "#080808",
+     "palette:9": "#090909",
+     "palette:10": "#0a0a0a",
+     "palette:11": "#0b0b0b",
+     "palette:12": "#0c0c0c",
+     "recolor:#090909": "#020202",
+     "recolor:#070707": "#050505",
+     "recolor:#080808": "#0c0c0c",
+     "recolor:#0a0a0a": "#000000",
+     "recolor:#0b0b0b": "#080808",
+     "recolor:#0c0c0c": "#070707",
+     "recolor:#010101": "#090909",
+     "recolor:#030303": "#0a0a0a",
+     "recolor:#060606": "#040404",
+     "recolor:#050505": "#0b0b0b",
+     "recolor:#000000": "#010101",
+     "recolor:#040404": "#060606",
+     "recolor:#020202": "#030303"
+    },
+    "6227020798": {
+     "palette:0": "#000000",
+     "palette:1": "#010101",
+     "palette:2": "#020202",
+     "palette:3": "#030303",
+     "palette:4": "#040404",
+     "palette:5": "#050505",
+     "palette:6": "#060606",
+     "palette:7": "#070707",
+     "palette:8": "#080808",
+     "palette:9": "#090909",
+     "palette:10": "#0a0a0a",
+     "palette:11": "#0b0b0b",
+     "palette:12": "#0c0c0c",
+     "recolor:#090909": "#0a0a0a",
+     "recolor:#070707": "#050505",
+     "recolor:#080808": "#000000",
+     "recolor:#0a0a0a": "#0c0c0c",
+     "recolor:#0b0b0b": "#020202",
+     "recolor:#0c0c0c": "#010101",
+     "recolor:#010101": "#070707",
+     "recolor:#030303": "#080808",
+     "recolor:#060606": "#090909",
+     "recolor:#050505": "#030303",
+     "recolor:#000000": "#0b0b0b",
+     "recolor:#040404": "#060606",
+     "recolor:#020202": "#040404"
+    }
+   }
+  }
+ ],
+ "color_refusals": [
+  {
+   "why": "no palette",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 10 10\"><rect fill=\"#111111\"/><circle stroke=\"#222222\" style=\"fill: #333 ; opacity:1\"/><path xlink:fill=\"#444444\" fill=\"none\"/><g color=\"#ABCDEF\"><stop stop-color=\"#555555\"/></g></svg>",
+   "color_map": {
+    "background": "#111111"
+   },
+   "work_id": "x",
+   "index": 0,
+   "detail": "saved color catalog has no usable palette"
+  },
+  {
+   "why": "a palette color that is not a color",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 10 10\"><rect fill=\"#111111\"/><circle stroke=\"#222222\" style=\"fill: #333 ; opacity:1\"/><path xlink:fill=\"#444444\" fill=\"none\"/><g color=\"#ABCDEF\"><stop stop-color=\"#555555\"/></g></svg>",
+   "color_map": {
+    "palette:0": "red"
+   },
+   "work_id": "x",
+   "index": 0,
+   "detail": "saved color catalog has no usable palette"
+  },
+  {
+   "why": "an SVG that does not parse",
+   "svg": "<svg",
+   "color_map": {
+    "palette:0": "#111111",
+    "palette:1": "#222",
+    "palette:2": "#333333",
+    "palette:3": "#444444",
+    "palette:4": "#555555",
+    "palette:5": "#666666",
+    "palette:6": "#777777",
+    "palette:7": "#888888",
+    "palette:8": "#999999"
+   },
+   "work_id": "x",
+   "index": 0,
+   "detail": "saved work has no usable SVG"
+  },
+  {
+   "why": "an index past the count",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 10 10\"><rect fill=\"#111111\"/><circle stroke=\"#222222\" style=\"fill: #333 ; opacity:1\"/><path xlink:fill=\"#444444\" fill=\"none\"/><g color=\"#ABCDEF\"><stop stop-color=\"#555555\"/></g></svg>",
+   "color_map": {
+    "palette:0": "#111111",
+    "palette:1": "#222",
+    "palette:2": "#333333",
+    "palette:3": "#444444",
+    "palette:4": "#555555",
+    "palette:5": "#666666",
+    "palette:6": "#777777",
+    "palette:7": "#888888",
+    "palette:8": "#999999"
+   },
+   "work_id": "x",
+   "index": 1000000,
+   "detail": "color arrangement index is exhausted or invalid"
+  },
+  {
+   "why": "a parent recolor that is not a color",
+   "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 10 10\"><rect fill=\"#111111\"/><circle stroke=\"#222222\" style=\"fill: #333 ; opacity:1\"/><path xlink:fill=\"#444444\" fill=\"none\"/><g color=\"#ABCDEF\"><stop stop-color=\"#555555\"/></g></svg>",
+   "color_map": {
+    "palette:0": "#111111",
+    "palette:1": "#222",
+    "palette:2": "#333333",
+    "palette:3": "#444444",
+    "palette:4": "#555555",
+    "palette:5": "#666666",
+    "palette:6": "#777777",
+    "palette:7": "#888888",
+    "palette:8": "#999999",
+    "recolor:#111111": "blue"
+   },
+   "work_id": "x",
+   "index": 0,
+   "detail": "saved work has an invalid color arrangement"
+  }
+ ]
+}

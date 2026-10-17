@@ -47,10 +47,10 @@ test('the work search sits right of the history filters, and while it waits or f
 	assert.ok(head.indexOf('history-filter-group') < head.indexOf('<CanvasWorkSearch'));
 	assert.ok(head.indexOf('<CanvasWorkSearch') < head.indexOf('history-page-nav'));
 	assert.doesNotMatch(PANEL, /CanvasWorkSearch|canvasSearch/);
-	assert.match(HISTORY, /\{#if historyTotal > 0 \|\| filtered\}/);
 	assert.match(HISTORY, /const noCandidates = \$derived\(filtered && historyTotal === 0 && !searchBusy && !searchFailed\);/);
-	assert.match(HISTORY, /\{#if noCandidates \|\| searching\}[\s\S]*?class="thumb thumb-empty"[\s\S]*?\{searching \? t\(\)\.historySearching : t\(\)\.historyNoCandidates\}/);
-	assert.match(HISTORY, /const searching = \$derived\(filtered && historyItems\.length === 0 && searchBusy\);/);
+	assert.match(HISTORY, /\{#if noCandidates \|\| searching\}[\s\S]*?class="thumb thumb-empty"[\s\S]*?\{searching \? \(filtered \? t\(\)\.historySearching : t\(\)\.historyLoading\) : t\(\)\.historyNoCandidates\}/);
+	assert.match(HISTORY, /const searching = \$derived\(\(filtered \|\| heldWorks\) && historyItems\.length === 0 && searchBusy\);/);
+	assert.match(HISTORY, /\{#if historyTotal > 0 \|\| filtered \|\| searching\}/);
 	assert.match(HISTORY, /<div class="thumb-strip" bind:clientHeight=\{stripHeight\} style:min-height=\{keptHeight \? `\$\{keptHeight\}px` : null\}>/);
 	assert.equal(ja.historyNoCandidates, '候補無し');
 	assert.equal(en.historyNoCandidates, 'No matches');

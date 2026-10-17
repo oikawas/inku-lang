@@ -130,8 +130,13 @@
 	// Kept on screen while it finds nothing, so the search and the filters that
 	// emptied it are still there to be changed.
 	const noCandidates = $derived(filtered && historyTotal === 0 && !searchBusy && !searchFailed);
-	// A search empties the strip before it asks; the tile holds the place until the answer.
-	const searching = $derived(filtered && historyItems.length === 0 && searchBusy);
+	// A search, and clearing one, empties the strip before it asks; once the
+	// strip has held works, the tile holds the place until the answer.
+	let heldWorks = $state(false);
+	$effect(() => {
+		if (historyTotal > 0) heldWorks = true;
+	});
+	const searching = $derived((filtered || heldWorks) && historyItems.length === 0 && searchBusy);
 	// The row never gets lower than it has been for the chosen fields, so a
 	// search or a page with shorter tiles does not move the canvas above it.
 	let stripHeight = $state(0);
@@ -198,7 +203,7 @@
 	}
 </script>
 
-{#if historyTotal > 0 || filtered}
+{#if historyTotal > 0 || filtered || searching}
 	<div class="history-strip" class:collapsed={historyCollapsed} class:locked={interactionLocked}>
 		<div class="history-head">
 			<div class="history-head-left">
@@ -321,7 +326,7 @@
 				{/each}
 				{#if noCandidates || searching}
 					<div class="thumb thumb-empty" role="status">
-						<div class="thumb-empty-picture">{searching ? t().historySearching : t().historyNoCandidates}</div>
+						<div class="thumb-empty-picture">{searching ? (filtered ? t().historySearching : t().historyLoading) : t().historyNoCandidates}</div>
 					</div>
 				{/if}
 			</div>

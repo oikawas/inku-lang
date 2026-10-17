@@ -410,7 +410,7 @@ The history strip at the bottom is for moving quickly back and forth in time. Op
 
 If the saved work selected in Work or Refine matches the Library search and filters, it starts the page at the upper left in thumbnails or the top in a list, followed by older works. `By lineage` starts with its lineage, followed by older lineages, and expands and focuses the selected work. If the search or filters exclude it, the previous page remains. Unsaved options are not saved automatically. An open preview follows the focused work; a closed preview stays closed.
 
-From that starting point, use `← newer` to browse newer works or lineages. The query, filters, bulk selection and preview remain. The button becomes unavailable when you reach the latest position.
+From that starting point, use `← newer` to browse newer works or lineages. The query, filters, bulk selection and preview remain. The button becomes unavailable when you reach the latest position. Page numbers count from the newest, so a Library opened at the selected work shows which page it is.
 
 The search field right of the filter buttons in the history strip filters its thumbnails. It matches a whole UUID, part of a description, or the beginning, end or whole of a render or description hash. Hashes work with or without a prefix such as `rh3:`, and matching is case-insensitive. Search after typing or press Enter, then choose a thumbnail to open the work. When nothing matches, an empty `No matches` tile appears. While the answer is awaited the tile reads `Searching…`, and the strip keeps its height. The × button clears the query and restores ordinary history. The Library keeps its own separate query.
 

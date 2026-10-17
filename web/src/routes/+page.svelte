@@ -3525,6 +3525,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			historyManagerPage={historyManager.page}
 			historyManagerLoading={historyManager.loading}
 			historyManagerTotalPages={historyManager.totalPages}
+			historyManagerStartOffset={historyManager.startOffset}
+			historyManagerPageSize={historyManager.pageSize}
 			historyManagerOffset={historyManager.offset}
 			historyManagerShownTo={historyManager.shownTo}
 			managedHistoryItems={historyManager.items}

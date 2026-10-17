@@ -3,6 +3,7 @@
 	import { onMount, tick, untrack } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
+	import { libraryPagePosition } from '$lib/libraryPagePosition';
 	import SavedWorkExportMenu from '$lib/components/SavedWorkExportMenu.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { AnimationExportSettings } from '$lib/animationExport';
@@ -79,6 +80,9 @@
 		historyManagerLoading: boolean;
 		historyManagerLoadFailed: boolean;
 		historyManagerTotalPages: number;
+		/** Where the pages start: the selected work's place, or 0 at the newest. */
+		historyManagerStartOffset: number;
+		historyManagerPageSize: number;
 		historyManagerOffset: number;
 		historyManagerShownTo: number;
 		managedHistoryItems: HistoryItem[];
@@ -149,6 +153,8 @@
 		historyManagerLoading,
 		historyManagerLoadFailed,
 		historyManagerTotalPages,
+		historyManagerStartOffset,
+		historyManagerPageSize,
 		historyManagerOffset,
 		historyManagerShownTo,
 		managedHistoryItems,
@@ -338,6 +344,9 @@
 	let copiedHistoryHashTimer: number | null = null;
 	const lineageGroupPageSize = 8;
 	const lineageGroupTotalPages = $derived(Math.max(1, Math.ceil((lineageGroupTotal - lineageStartOffset) / lineageGroupPageSize)));
+	// The pagers print pages counted from the newest; `page` and the start offset still count from the start.
+	const lineagePosition = $derived(libraryPagePosition(lineageStartOffset, lineageGroupPage, lineageGroupPageSize, lineageGroupTotal));
+	const managerPosition = $derived(libraryPagePosition(historyManagerStartOffset, historyManagerPage, historyManagerPageSize, managedHistoryTotal));
 
 	function focusWork(element: HTMLElement, id: string | undefined) {
 		$effect(() => {
@@ -873,7 +882,7 @@
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryNewerPage}>
 						<button class="ghost-btn history-nav-btn" onclick={() => setLineageGroupPage(lineageGroupPage - 1)} disabled={(lineageGroupPage <= 0 && lineageStartOffset === 0) || lineageGroupLoading}>{t().historyNewer}</button>
 					</Tooltip>
-					<span>{lineageGroupLoading ? t().historyLoading : (lineageGroupPage + 1) + ' / ' + lineageGroupTotalPages}</span>
+					<span>{lineageGroupLoading ? t().historyLoading : lineagePosition.current + ' / ' + lineagePosition.total}</span>
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryOlderPage}>
 						<button class="ghost-btn history-nav-btn" onclick={() => setLineageGroupPage(lineageGroupPage + 1)} disabled={lineageGroupPage >= lineageGroupTotalPages - 1 || lineageGroupLoading}>{t().historyOlder}</button>
 					</Tooltip>
@@ -887,7 +896,7 @@
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryNewerPage}>
 						<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage - 1)} disabled={historyManagerOffset === 0 || historyManagerLoading}>{t().historyNewer}</button>
 					</Tooltip>
-					<span>{historyManagerLoading ? t().historyLoading : (historyManagerPage + 1) + ' / ' + historyManagerTotalPages}</span>
+					<span>{historyManagerLoading ? t().historyLoading : managerPosition.current + ' / ' + managerPosition.total}</span>
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryOlderPage}>
 						<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage + 1)} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyOlder}</button>
 					</Tooltip>

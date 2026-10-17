@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-18 — Number Library pages from the newest
+
+A Library opened at the selected work always started at page 1, and `← newer` kept it at 1 while the total grew. Pages are now numbered from the newest, so the selected work's page includes the pages in front of it, in both the timeline and by-lineage views. Also, clearing the search no longer hides the history strip until ordinary history arrives; a loading tile holds its place.
+
 ### 2026-10-17 — Move Swift's ChatGPT plan next-action table to the shared core
 
 Swift now takes the next action shown for a ChatGPT plan failure, and whether to retry automatically, from the shared core's table (`chatgpt_failure`), the same table Server and Android use. Seven codes Swift raises change their next action (for example `chatgpt_cancelled` goes from "diagnose" to "retry"). No code changes whether the pipeline retries automatically.

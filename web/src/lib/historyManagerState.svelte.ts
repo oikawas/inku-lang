@@ -119,7 +119,8 @@ type Request = {
 	page: number;
 	pageSize: number;
 	/**
-	 * Where in the listing the request starts, which is `page * pageSize`.
+	 * Where in the listing the request starts: the retained starting position
+	 * plus `page * pageSize`.
 	 *
 	 * Carried rather than recomputed because this is what two requests have to
 	 * agree on to be the same question. `page` alone is not that: the same page
@@ -151,6 +152,8 @@ export class HistoryManagerState {
 	view = $state<HistoryManagerView>('active');
 	tab = $state<HistoryManagerTab>('thumbs');
 	page = $state(0);
+	startOffset = $state(0);
+	focusRequest = $state<{ id: string; visit: number; rootId?: string | null } | null>(null);
 	pageSize = $state(HISTORY_MANAGER_DEFAULT_PAGE_SIZE);
 	loading = $state(false);
 	loadFailed = $state(false);
@@ -171,6 +174,8 @@ export class HistoryManagerState {
 	private awaitingInitialPageSize = false;
 	private selectionResetTimer: number | null = null;
 	private appliedSearch = '';
+	private positioning = false;
+	private focusVisit = 0;
 	// Requests that have been sent and not yet come back. One page of history is
 	// tens of megabytes here, so asking again for something already on its way is
 	// not a harmless duplicate.
@@ -184,8 +189,8 @@ export class HistoryManagerState {
 	// that is drawn and the quantity that `offset` steps by the same one.
 	items = $derived(this.pageOf(this.view === 'trash' ? this.trashItems : this.activeItems));
 	total = $derived(this.view === 'trash' ? this.trashTotal : this.activeTotal);
-	totalPages = $derived(Math.max(1, Math.ceil(this.total / this.pageSize)));
-	offset = $derived(this.page * this.pageSize);
+	totalPages = $derived(Math.max(1, Math.ceil((this.total - this.startOffset) / this.pageSize)));
+	offset = $derived(this.startOffset + this.page * this.pageSize);
 	shownTo = $derived(Math.min(this.offset + this.items.length, this.total));
 
 	// Written out rather than declared as constructor parameter properties: node's
@@ -217,6 +222,9 @@ export class HistoryManagerState {
 		this.view = 'active';
 		this.tab = 'thumbs';
 		this.page = 0;
+		this.startOffset = 0;
+		this.focusRequest = null;
+		this.positioning = false;
 		this.pageSize = HISTORY_MANAGER_DEFAULT_PAGE_SIZE;
 		this.loading = false;
 		this.loadFailed = false;
@@ -240,7 +248,15 @@ export class HistoryManagerState {
 		this.clearSelectionResetNotice();
 	}
 
-	openWith(activeItems: HistoryItem[], activeTotal: number, trashTotal: number) {
+	openWith(activeItems: HistoryItem[], activeTotal: number, trashTotal: number, anchorId: string | null = null) {
+		if (anchorId && this.view === 'active') {
+			this.open = true;
+			this.libraryInitialized = true;
+			this.awaitingInitialPageSize = false;
+			this.focusRequest = null;
+			void this.openAt(anchorId);
+			return;
+		}
 		if (this.libraryInitialized) {
 			this.open = true;
 			// Reopening is a new permission-sensitive view of the same retained
@@ -296,6 +312,40 @@ export class HistoryManagerState {
 		}
 	}
 
+	private async openAt(anchorId: string): Promise<void> {
+		const requestId = ++this.requestId;
+		this.inFlight = [];
+		this.positioning = true;
+		this.loading = true;
+		const params = new URLSearchParams({ anchor_id: anchorId, offset: String(this.offset), limit: '1', q: this.search.trim(), include_svg: 'false' });
+		if (this.starredOnly) params.set('starred', 'true');
+		if (this.forRevisionOnly) params.set('for_revision', 'true');
+		if (this.forShareOnly) params.set('for_share', 'true');
+		try {
+			// A one-item anchor page gives the exact filtered position, rather than
+			// the beginning of an ordinary page containing that work.
+			const response = await this.apiFetch(`/api/history?${params}`);
+			if (!this.open || requestId !== this.requestId) return;
+			if (!response.ok) throw new Error('History position unavailable');
+			const data = await response.json() as { items: HistoryItem[]; offset: number };
+			if (!this.open || requestId !== this.requestId) return;
+			if (data.items[0]?.id === anchorId) {
+				this.startOffset = data.offset;
+				this.page = 0;
+				this.focusRequest = { id: anchorId, visit: ++this.focusVisit, rootId: data.items[0].lineage_root_node_id };
+			}
+			this.positioning = false;
+			await this.fetch();
+		} catch {
+			if (requestId === this.requestId) this.markLoadFailed(this.view);
+		} finally {
+			if (requestId === this.requestId) {
+				this.positioning = false;
+				this.loading = false;
+			}
+		}
+	}
+
 	fetch = async (options: FetchOptions = {}): Promise<void> => {
 		const view = options.view ?? this.view;
 		const page = options.page ?? this.page;
@@ -315,7 +365,7 @@ export class HistoryManagerState {
 		// every earlier request as superseded, so a question dropped after taking
 		// one would throw away the answer it was riding on: the works arrive, all
 		// of them, and are discarded on the doorstep.
-		const offset = page * pageSize;
+		const offset = this.startOffset + page * pageSize;
 		const request: Request = { view, page, pageSize, offset, search, starredOnly, forRevisionOnly, forShareOnly };
 		if (this.requestInFlight(request, pageSize)) return;
 		const requestId = ++this.requestId;
@@ -358,8 +408,9 @@ export class HistoryManagerState {
 			// Written where the works are taken in, so the list identity and its
 			// starting offset always move together.
 			this.preloadKey = this.cacheKey(view, offset, search, starredOnly, forRevisionOnly, forShareOnly, data.total);
-			if (data.items.length === 0 && data.total > 0 && page > 0) {
-				const fallbackPage = page - 1;
+			if (data.items.length === 0 && data.total > 0 && offset > 0) {
+				const fallbackPage = Math.max(0, page - 1);
+				if (page === 0) this.resetStart();
 				this.page = fallbackPage;
 				if (
 					this.view === view &&
@@ -434,6 +485,7 @@ export class HistoryManagerState {
 	}
 
 	setView = (view: HistoryManagerView) => {
+		this.resetStart();
 		this.awaitingInitialPageSize = false;
 		this.view = view;
 		this.page = 0;
@@ -442,6 +494,7 @@ export class HistoryManagerState {
 	};
 
 	setStarredOnly = (value: boolean) => {
+		this.resetStart();
 		this.awaitingInitialPageSize = false;
 		this.starredOnly = value;
 		this.page = 0;
@@ -450,6 +503,7 @@ export class HistoryManagerState {
 	};
 
 	setForRevisionOnly = (value: boolean) => {
+		this.resetStart();
 		this.awaitingInitialPageSize = false;
 		this.forRevisionOnly = value;
 		this.page = 0;
@@ -458,6 +512,7 @@ export class HistoryManagerState {
 	};
 
 	setForShareOnly = (value: boolean) => {
+		this.resetStart();
 		this.awaitingInitialPageSize = false;
 		this.forShareOnly = value;
 		this.page = 0;
@@ -469,9 +524,22 @@ export class HistoryManagerState {
 		const nextPage = Math.max(0, Math.min(page, this.totalPages - 1));
 		if (nextPage === this.page) return;
 		this.awaitingInitialPageSize = false;
+		this.focusRequest = null;
 		this.page = nextPage;
 		void this.fetch({ page: nextPage });
 	};
+
+	setLatestPage = () => {
+		this.resetStart();
+		this.page = 0;
+		void this.fetch({ page: 0 });
+	};
+
+	private resetStart(): void {
+		this.startOffset = 0;
+		this.focusRequest = null;
+		this.positioning = false;
+	}
 
 	setPageSize = (pageSize: number) => {
 		this.awaitingInitialPageSize = false;
@@ -480,10 +548,11 @@ export class HistoryManagerState {
 		const nextPageSize = Math.max(1, Math.min(100, Math.floor(pageSize)));
 		this.pageSize = nextPageSize;
 		this.pageSizeMeasured = true;
+		if (this.positioning) return;
 		// Both quantities are computed here rather than read off the derived
 		// fields: those are recomputed after this method returns, so reading them
 		// now would clamp the page against the size that is being replaced.
-		const nextTotalPages = Math.max(1, Math.ceil(this.total / nextPageSize));
+		const nextTotalPages = Math.max(1, Math.ceil((this.total - this.startOffset) / nextPageSize));
 		this.page = Math.max(0, Math.min(this.page, nextTotalPages - 1));
 		// The grid's first measurement can be smaller than the page predicted
 		// from the viewport. Its fresh strip page already answers that smaller
@@ -513,6 +582,7 @@ export class HistoryManagerState {
 		if (!next && this.awaitingInitialPageSize) return;
 		this.awaitingInitialPageSize = false;
 		if (next === this.appliedSearch) return;
+		this.resetStart();
 		this.appliedSearch = next;
 		this.page = 0;
 		this.resetSelection('query');
@@ -623,7 +693,7 @@ export class HistoryManagerState {
 	 */
 	preloadMatches(view: HistoryManagerView, page: number, pageSize: number, search: string, starredOnly: boolean, forRevisionOnly: boolean, forShareOnly: boolean, total: number): boolean {
 		const held = view === 'trash' ? this.trashItems : this.activeItems;
-		const offset = page * pageSize;
+		const offset = this.startOffset + page * pageSize;
 		const expectedItems = Math.max(0, Math.min(pageSize, total - offset));
 		return (
 			this.preloadKey === this.cacheKey(view, offset, search, starredOnly, forRevisionOnly, forShareOnly, total) &&

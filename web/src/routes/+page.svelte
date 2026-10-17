@@ -1352,7 +1352,8 @@
 	});
 	const historyManager = history.manager;
 	let libraryMounted = $state(false);
-	let canvasPanelHandle = $state<{ openDirectActionMenu: () => Promise<void> } | null>(null);
+	let canvasPanelHandle = $state<{ openDirectActionMenu: () => Promise<void>; focusCurrentWork: () => Promise<void> } | null>(null);
+	let libraryFocusRequest = $state(0);
 	$effect(() => {
 		if (historyManager.open) libraryMounted = true;
 	});
@@ -2518,6 +2519,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		loadIterationItem(item, { preserveAuthoring: destination === 'refine' });
 		outputTab = destination === 'lineage' ? 'lineage' : 'canvas';
 		historyManager.open = false;
+		if (destination === 'lineage' && item.lineage_node_id) {
+			libraryFocusRequest += 1;
+			await lineageState.load(item.lineage_node_id, true);
+		} else if (destination === 'canvas') {
+			await canvasPanelHandle?.focusCurrentWork();
+		}
 		if (destination === 'refine') {
 			await tick();
 			await canvasPanelHandle?.openDirectActionMenu();
@@ -3140,6 +3147,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onGenerateModelCandidates={generateModelCandidates}
 				onSaveSelectedVariationCandidates={refinement.saveSelectedVariationCandidates}
 				lineageGraph={lineageState.graph}
+				{libraryFocusRequest}
 				{lineageBrowsingState}
 				lineageLoading={lineageState.loading}
 				lineageError={lineageState.error}
@@ -3530,7 +3538,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onClose={() => (historyManager.open = false)}
 			onSetView={historyManager.setView}
 			onSetPage={historyManager.setPage}
-			onSetLatestPage={() => historyManager.setPage(0)}
+			onSetLatestPage={historyManager.setLatestPage}
+			historyManagerAnchored={historyManager.startOffset > 0}
+			focusRequest={historyManager.focusRequest}
 			onSetFirstPage={() => historyManager.setPage(historyManager.totalPages - 1)}
 			onSetPageSize={historyManager.setPageSize}
 			onSetStarredOnly={historyManager.setStarredOnly}

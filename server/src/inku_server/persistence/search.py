@@ -141,6 +141,15 @@ class HistorySearchService:
             dialect_name=self.dialect_name,
         )
 
+    def position_search_clause(self, search: str):
+        """Use the listing's search policy when locating a work within it."""
+        if self.use_history_fts(search):
+            return HistoryRow.id.in_(text(
+                "SELECT h.id FROM history h JOIN history_fts ON history_fts.rowid = h.rowid "
+                "WHERE history_fts MATCH :anchor_match"
+            ).bindparams(anchor_match=_fts_match_query(search)))
+        return _history_search_clause(search)
+
     def list_items_with_fts(
         self,
         session,

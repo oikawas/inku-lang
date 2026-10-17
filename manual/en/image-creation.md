@@ -280,7 +280,7 @@ A refinement changes exactly one element at a time, chosen from the work-editing
 
 In `Another composition` you may choose `Make one option` or `Make four options`.
 
-Check the options you want to keep, then press `Make four options` to save those checked at that moment before drawing the next four. Unchecked options are not saved. If saving fails, no new round starts; the options and unsaved selections remain.
+Check the options you want to keep, then press `Make one option` or `Make four options` to save the unsaved options checked at that moment before drawing the requested number of new options. Unchecked options are not saved. If saving fails, no new round starts; the options and unsaved selections remain. Options already saved are not saved again.
 
 `Another performance` (changing the touch with words) and `Another reading` were removed on 2026-10-14: the touch's words were never read for their meaning and only made the drawing's seed. `Edit drawing parameters` in the work-editing menu, which drew them, and the `Touch` and `Reading` elements of autonomous refinement were removed with them. Works made by a touch or a reading before then keep their `Touch` or `Reading` edge in the lineage, and redraw from their saved instructions and seed.
 
@@ -408,11 +408,13 @@ The `Lineage` tab shows which explicit action a work was derived from. Performan
 
 The history strip at the bottom is for moving quickly back and forth in time. Opening history leads to the separate `Library`, which keeps the making screen's input and unsaved refinement state. `Return to making` also keeps the library's query, filters, display, page, selection, scroll position and reading preview.
 
+If the saved work selected in Work or Refine matches the Library search and filters, it starts the page at the upper left in thumbnails or the top in a list, followed by older works. `By lineage` starts with its lineage, followed by older lineages, and expands and focuses the selected work. If the search or filters exclude it, the previous page remains. Unsaved options are not saved automatically. An open preview follows the focused work; a closed preview stays closed.
+
 The search field immediately after the `Lineage` tab in the canvas header filters the history thumbnails below. It matches a whole UUID, part of a description, or the beginning, end or whole of a render or description hash. Hashes work with or without a prefix such as `rh3:`, and matching is case-insensitive. Search after typing or press Enter, then choose a thumbnail to open the work. The × button clears the query and restores ordinary history. The Library keeps its own separate query.
 
-In the library, choose `Display` (`Thumbnails` or `List`) separately from `Group by` (`Timeline` or `By lineage`). Selecting a row or picture only opens its reading preview; it does not change the conditions for the next work. Use `Open work`, `Open lineage`, or `Refine` for those actions.
+In the library, choose `Display` (`Thumbnails` or `List`) separately from `Group by` (`Timeline` or `By lineage`). A single click on an image opens its reading preview without changing the next-work conditions. Double-clicking opens and focuses that work in Work for `Timeline` or in Lineage for `By lineage`. You can also use `Open work`, `Open lineage`, or `Refine`.
 
-Combine `Thumbnails` with `By lineage` to show only lineages with at least two works matching the current search and filters, arranged horizontally from the origin in generation order. Even a lineage with several works is omitted when only one matches. The lineage `List` view has no such two-work minimum. Scroll vertically between lineage groups and horizontally through a long row of related works.
+Combine `Thumbnails` with `By lineage` to show lineages with at least two works matching the current search and filters, arranged horizontally from the origin in generation order. A lineage with only one matching work is omitted, except for the work selected when opening the Library if it matches the conditions. The lineage `List` view has no such two-work minimum. Scroll vertically between lineage groups and horizontally through a long row of related works.
 
 **What is printed under each thumbnail is chosen under `Display and operation` in `Settings`** (`Facts under the history thumbnails`). Choose **up to three** of generation, model, engine version and file size; **choose none and the strip shows only the pictures**. A fourth choice is refused rather than allowed to evict an existing one, and the limit is shown. **File size is the size the server reports for the stored work.**
 

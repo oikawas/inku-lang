@@ -46,6 +46,7 @@
 	type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
 	type Props = {
 		outputTab: OutputTab;
+		libraryFocusRequest?: number;
 		viewMode?: '2d' | '3d';
 		canvasSearch: string;
 		canvasSearchBusy: boolean;
@@ -293,6 +294,7 @@
 		onGenerateModelCandidates,
 		onSaveSelectedVariationCandidates,
 		lineageGraph = null,
+		libraryFocusRequest = 0,
 		lineageBrowsingState,
 		lineageLoading = false,
 		lineageError = null,
@@ -465,6 +467,13 @@
 		if (view === 'color') void onGenerateColorCatalogCandidates();
 		if (view === 'color-arrangement') void onGenerateColorArrangementCandidates();
 		if (view === 'ground') void onGenerateGroundCandidates();
+	}
+
+	let canvasAreaEl: HTMLDivElement | null = null;
+
+	export async function focusCurrentWork(): Promise<void> {
+		await tick();
+		canvasAreaEl?.focus({ preventScroll: true });
 	}
 
 	export async function openDirectActionMenu(): Promise<void> {
@@ -780,7 +789,7 @@
 		<Ddl3DModeSwitch bind:viewMode />
 	{/if}
 
-	<div class="canvas-area">
+	<div class="canvas-area" bind:this={canvasAreaEl} tabindex="-1">
 		<div class="nav-left">
 			<Tooltip placement="right" text={t().tooltipCanvasNavLatest}>
 				<button class="nav-latest" onclick={onGotoLatest} disabled={interactionLocked || navLatestDisabled}>{t().historyLatest}</button>
@@ -897,7 +906,7 @@
 				/>
 			{:else if outputTab === 'lineage'}
 				{#await import('./LineagePanel.svelte') then { default: LineagePanel }}
-					<LineagePanel browsingState={lineageBrowsingState} graph={lineageGraph} loading={lineageLoading} error={lineageError}
+					<LineagePanel browsingState={lineageBrowsingState} graph={lineageGraph} loading={lineageLoading} error={lineageError} focusRequest={libraryFocusRequest}
 						{isJapanese} onOpenNode={onOpenLineageNode}
 						onOpenNodeInCanvas={onOpenLineageNodeInCanvas} onToggleStar={onToggleLineageStar}
 						onToggleForRevision={onToggleLineageForRevision} onOpenRefinement={openLineageRefinement}

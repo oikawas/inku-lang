@@ -61,16 +61,26 @@ def api_history_lineage_groups(
     for_share: bool = Query(default=False),
     q: str = Query(default="", max_length=200),
     min_items: int = Query(default=1, ge=1, le=1000),
+    anchor_id: str | None = Query(default=None, max_length=100),
+    include_id: str | None = Query(default=None, max_length=100),
     include_svg: bool = Query(
         default=True,
         description="Send each representative work's whole SVG. Clients that draw from thumbnails send false.",
     ),
     actor: dict = Depends(_current_user),
 ) -> HistoryLineageGroupListResponse:
+    if anchor_id:
+        position = _db.lineage_group_position(
+            actor["id"], anchor_id, trashed=trashed, query_text=q, starred=starred,
+            for_revision=for_revision, for_share=for_share, min_item_count=min_items,
+        )
+        if position is not None:
+            offset = position
     # Emptied, not removed, as the listing does: svg_bytes says how large it is.
     groups, total = _db.list_lineage_groups(
         actor["id"], offset=offset, limit=limit, trashed=trashed, query_text=q, starred=starred,
         for_revision=for_revision, for_share=for_share, min_item_count=min_items, include_svg=include_svg,
+        **({"include_item_id": anchor_id or include_id} if include_id or anchor_id else {}),
     )
     return HistoryLineageGroupListResponse(groups=groups, total=total, offset=offset, limit=limit)
 

@@ -515,7 +515,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 			refinementSession.setStatus(t().refineNeedsDdl);
 			return;
 		}
-		if (kind === 'layout' && count === 4 && refinementSession.candidates.some((candidate) => candidate.selected && !candidate.saved)) {
+		if (kind === 'layout' && refinementSession.candidates.some((candidate) => candidate.selected && !candidate.saved)) {
 			if (!(await saveSelectedVariationCandidates()) || contextVersion !== targetIdentityVersion) return;
 		}
 		// Ask before the words are carried into a child (contract § stage 4).

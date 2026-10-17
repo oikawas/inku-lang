@@ -57,7 +57,7 @@ export class Viewer {
     const key = new THREE.DirectionalLight(0xffffff, 2.4); key.position.set(-2, 3, 4); this.scene.add(key);
     this.model.name = 'DDL solids';
     this.model.userData = { inputDigest: packet.inputDigest, mappingVersion: packet.mappingVersion,
-      schemaDigest: packet.schemaDigest, engineVersion: packet.engineVersion, diagnostics: packet.diagnostics };
+      schemaDigest: packet.schemaDigest, engineVersion: packet.engineVersion, diagnostics: packet.diagnostics, recoveries: packet.recoveries };
     const groups = new Map<number, THREE.Group>();
     for (const data of packet.meshes) {
       const mesh = new THREE.Mesh(unpackMesh(data), this.material(data.color, data.opacity));

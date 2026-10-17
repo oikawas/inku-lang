@@ -16,7 +16,10 @@ use crate::performance::PerformanceRequest;
 use crate::planning::instruction_anchor_on_canvas;
 use crate::support::{DEFAULT_SUPPORT, support_for_ground};
 use crate::types::*;
-use inku_score::{HardResourcePolicy, OperationalResourceBudget};
+use inku_score::{
+    HardResourcePolicy, OperationalResourceBudget, SavedScoreRelationDiagnostic,
+    SavedScoreResourceOwner, ScoreExecutionDiagnostic,
+};
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -63,6 +66,27 @@ pub struct GeometryScene {
     pub ground: bool,
     pub marks: Vec<GeometryMark>,
     pub diagnostics: Vec<String>,
+    pub recoveries: Vec<GeometryRecovery>,
+}
+
+/// Keep the shared performance's recovery decisions alongside the visible marks.
+/// A recovered relation does not imply that its source geometry was omitted.
+#[derive(Clone, Debug, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum GeometryRecovery {
+    ResourceOmitted {
+        owner: SavedScoreResourceOwner,
+        cause_owner: SavedScoreResourceOwner,
+        reason: String,
+    },
+    RelationOmitted {
+        #[serde(flatten)]
+        diagnostic: SavedScoreRelationDiagnostic,
+    },
+    Execution {
+        #[serde(flatten)]
+        diagnostic: ScoreExecutionDiagnostic,
+    },
 }
 
 fn xy(point: Point, unit: f64) -> [f64; 2] {
@@ -81,7 +105,7 @@ fn matrix(transform: AffineTransform) -> [f64; 6] {
 }
 
 /// Resolve the existing performance and expose its geometry in short-side units.
-/// Refuse partial execution rather than presenting an incomplete scene as whole.
+/// Retain independently drawable content, with the same recovery decisions as 2D.
 pub fn export_geometry(
     request: &RenderRequest,
     hard: &HardResourcePolicy,
@@ -109,15 +133,6 @@ pub fn export_geometry(
         budget,
     )
     .map_err(|e| format!("score_execution: {e:?}"))?;
-    if !plan.resource_diagnostics.is_empty()
-        || !plan.relation_diagnostics.is_empty()
-        || plan
-            .execution
-            .as_ref()
-            .is_some_and(|e| !e.diagnostics.is_empty())
-    {
-        return Err("score_execution_omitted_content".into());
-    }
     if plan.score.presence.is_some() {
         return Err("unsupported_presence_layer".into());
     }
@@ -144,12 +159,31 @@ pub fn export_geometry(
     let support = ground
         .as_ref()
         .map_or(DEFAULT_SUPPORT, |g| support_for_ground(g.material));
+    let mut recoveries = Vec::new();
+    for diagnostic in &plan.resource_diagnostics {
+        recoveries.push(GeometryRecovery::ResourceOmitted {
+            owner: diagnostic.owner.clone(),
+            cause_owner: diagnostic.cause_owner.clone(),
+            reason: format!("{:?}", diagnostic.failure),
+        });
+    }
+    for diagnostic in &plan.relation_diagnostics {
+        recoveries.push(GeometryRecovery::RelationOmitted {
+            diagnostic: diagnostic.clone(),
+        });
+    }
+    if let Some(execution) = &plan.execution {
+        recoveries.extend(execution.diagnostics.iter().cloned().map(|diagnostic| {
+            GeometryRecovery::Execution { diagnostic }
+        }));
+    }
     let mut scene = GeometryScene {
         canvas: [canvas.width / unit, canvas.height / unit],
         background,
         ground: ground.is_some(),
         marks: Vec::new(),
         diagnostics: Vec::new(),
+        recoveries,
     };
     if !invalid_colors.is_empty() {
         scene.diagnostics.push("invalid_color_defaulted".into());

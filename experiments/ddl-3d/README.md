@@ -9,7 +9,7 @@ The experiment has its own npm and Cargo locks. The main Web package imports no 
 Run from a product checkout. Use the repository's pinned Rust toolchain, including its `wasm32-unknown-unknown` target, Node 22.12+ and npm. The wasm-bindgen CLI must match `0.2.129` in the adapter lock.
 
 ```sh
-scripts/rust-toolchain.sh install wasm-bindgen-cli --version 0.2.129 --locked --root experiments/ddl-3d/.tools
+scripts/rust-toolchain.sh install wasm-bindgen-cli --version 0.2.129 --locked --root "$PWD/experiments/ddl-3d/.tools"
 npm ci --prefix experiments/ddl-3d
 WASM_BINDGEN="$PWD/experiments/ddl-3d/.tools/bin/wasm-bindgen" npm run build:wasm --prefix experiments/ddl-3d
 npm run build --prefix experiments/ddl-3d
@@ -50,7 +50,9 @@ The WASM adapter uses the core's saved-Score reader, resource-aware checked perf
 
 Ellipsoid Z radius is the smaller planar radius. Prism/box depth is the shorter planar extent. The triangle's three front vertices and rear apex form a closed pyramid. Cloud contours shrink into rings toward two poles. Unfilled objects use tube outlines; unfilled rounds use organized latitude/longitude curves. Dashes partition tubes. Filled closed arc pairs add an interior solid while retaining both source strokes. Source instruction groups organize the exported nodes; overlapping DDL scopes are not converted into a new 3D hierarchy.
 
-Fill scopes intersect the actual mesh with extruded clip contours, including nested scopes, so GLB carries the clipped geometry. Completely clipped objects are counted explicitly. Presence layers are refused. Invalid/unknown Scores, partial core execution, degenerate geometry, unsupported contours and resource overruns produce a failure with 2D recovery, not a partial success.
+Fill scopes intersect the actual mesh with extruded clip contours, including nested scopes, so GLB carries the clipped geometry. Completely clipped objects are counted explicitly. Recoverable Score diagnostics use the same shared performance rules as 2D: a failed relation can be removed while retaining its shape, and an unavailable source unit can be omitted while keeping independent shapes. A visible notice lists these decisions with original source IDs, and GLB model metadata retains them. A recovered diagnostic does not reject the whole work. The saved Score is never rewritten.
+
+Presence layers, invalid/unknown Scores, integrity failures, degenerate geometry, unsupported contours and the viewer's own resource overruns still produce a failure with 2D recovery. Recovery from the saved Score's limits does not enlarge the viewer's limits.
 
 Tool grain, paper texture, ink spread and some organic surface variation are approximated and listed in Details. Lighting changes apparent color. Missing saved seeds/colors use core defaults with a note. Existing 2D SVGs are the reference for the original appearance; this is a solid interpretation, not reproduction of historical raster appearance.
 
@@ -61,7 +63,7 @@ Default limits: 16 MiB input, 4,096 objects, 500,000 triangles, 128 MiB mesh-buf
 Each check covers a specific boundary: depth/aspect/handedness, clipping in exported geometry, long seeds, one-time placement, free-line curves, invalid input, or excessive mesh demand.
 
 ```sh
-scripts/rust-toolchain.sh test --manifest-path experiments/ddl-3d/score-adapter/Cargo.toml --locked
+scripts/rust-toolchain.sh test --manifest-path "$PWD/experiments/ddl-3d/score-adapter/Cargo.toml" --locked
 npm test --prefix experiments/ddl-3d
 npm run check --prefix experiments/ddl-3d
 npm run check --prefix web

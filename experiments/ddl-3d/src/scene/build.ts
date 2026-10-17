@@ -271,7 +271,7 @@ function clip(geometry: BufferGeometry, contours: XY[][], canvas: XY): BufferGeo
 export function buildScene(input: PreparedScene): ScenePacket {
   const { scene } = input;
   if (scene.marks.length > 4096 || !validPoint(scene.canvas) || scene.canvas.some(v => v <= 0)) throw new Error('object_budget_exceeded');
-  const output: ScenePacket = { ...input, meshes: [], canvas: scene.canvas, background: scene.background, ground: scene.ground, diagnostics: [...scene.diagnostics],
+  const output: ScenePacket = { ...input, meshes: [], canvas: scene.canvas, background: scene.background, ground: scene.ground, diagnostics: [...scene.diagnostics], recoveries: [...scene.recoveries],
     objectCount: scene.marks.length, triangles: 0, bytes: 0, clippedObjects: 0 };
   // Do not retain the expanded DTO in the worker reply.
   delete (output as ScenePacket & { scene?: unknown }).scene;

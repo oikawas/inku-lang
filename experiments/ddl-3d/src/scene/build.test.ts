@@ -8,6 +8,7 @@ import init, { prepare_scene } from '../../public/wasm/score_adapter.js';
 
 await init({ module_or_path: readFileSync(new URL('../../public/wasm/score_adapter_bg.wasm', import.meta.url)) });
 const solidsJson = readFileSync(new URL('../../fixtures/solids.json', import.meta.url), 'utf8');
+const recoveredJson = readFileSync(new URL('../../fixtures/recovered-score.json', import.meta.url), 'utf8');
 function prepare(json = solidsJson): PreparedScene {
   const result = JSON.parse(prepare_scene(json));
   assert.equal(result.ok, true, result.error);
@@ -18,6 +19,16 @@ function bounds(packet: ReturnType<typeof buildScene>['meshes'][number]) {
   const box = geometry.boundingBox!.clone(); geometry.dispose(); return box;
 }
 const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-6, `${actual} != ${expected}`);
+
+// Failure: the WASM recovery survives conversion but is dropped by the Worker packet.
+test('recovered Score renders all retained geometry and carries diagnostics to the viewer', () => {
+  const input = prepare(recoveredJson), packet = buildScene(input);
+  assert.equal(packet.objectCount, 3);
+  assert.deepEqual(packet.meshes.map(m => m.sourceIndex), [0, 0, 1]);
+  assert.ok(packet.triangles > 0);
+  assert.deepEqual(packet.recoveries, input.scene.recoveries);
+  assert.equal(packet.recoveries[0].disposition, 'relation_omitted');
+});
 
 // Failure: round/rectangle become flat planes or stretch with the canvas aspect.
 test('WASM to solids preserves aspect, source identities, volume and deterministic buffers', () => {

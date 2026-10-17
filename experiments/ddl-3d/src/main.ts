@@ -10,7 +10,7 @@ const mountId = new URLSearchParams(location.hash.slice(1)).get('mount') || 'sta
 let current: LoadMessage | null = null, viewer: Viewer | null = null, worker: Worker | null = null;
 let generation = 0, timeout = 0, locale: 'ja' | 'en' = 'ja';
 let words = labels(locale);
-let stage: HTMLElement, status: HTMLElement, details: HTMLElement, selection: HTMLElement, overlay: HTMLElement;
+let stage: HTMLElement, status: HTMLElement, details: HTMLElement, selection: HTMLElement, overlay: HTMLElement, recoveryNotice: HTMLElement;
 let cancel: HTMLButtonElement, retry: HTMLButtonElement;
 const sceneControls: (HTMLButtonElement | HTMLInputElement | HTMLSelectElement)[] = [];
 const urls = new Set<string>();
@@ -90,6 +90,7 @@ function ui() {
   button(options, words.focus, () => viewer?.focus());
   for (const format of ['png', 'glb'] as const) button(options, words[format], () => { void save(format); });
   const help = element('details', toolbar); element('summary', help, words.help); element('p', help, words.helpText);
+  recoveryNotice = element('details', toolbar); recoveryNotice.className = 'recovery-notice'; recoveryNotice.hidden = true;
   stage = element('section', root); stage.className = 'stage'; stage.setAttribute('aria-label', '3D');
   overlay = element('div', stage); overlay.className = 'overlay'; overlay.setAttribute('role', 'status'); element('p', overlay);
   cancel = button(overlay, words.cancel, () => fail('cancelled'), false);
@@ -131,6 +132,19 @@ function load(value: LoadMessage) {
       root.querySelector<HTMLInputElement>('input[data-option=support]')!.checked = viewer.support.visible;
       overlay.hidden = true; sceneControls.forEach(control => control.disabled = false);
       status.textContent = `${words.objects}: ${packet.objectCount} · ${words.triangles}: ${packet.triangles.toLocaleString(locale)}`;
+      if (packet.recoveries.length) {
+        recoveryNotice.hidden = false;
+        element('summary', recoveryNotice, `${words.recovered} (${packet.recoveries.length})`);
+        element('p', recoveryNotice, words.recoveredText);
+        for (const recovery of packet.recoveries) {
+          const source = recovery.anchor_index !== undefined ? `${words.anchor} #${recovery.anchor_index + 1}`
+            : recovery.instruction_index !== undefined ? `${words.instruction} #${recovery.instruction_index + 1}` : words.resourceGroup;
+          const action = recovery.kind === 'relation_omitted' || recovery.disposition === 'relation_omitted' ? words.relationRecovered : words.contentOmitted;
+          element('p', recoveryNotice, `${source}: ${action}`);
+          const info = element('details', recoveryNotice); element('summary', info, words.details);
+          element('pre', info, JSON.stringify(recovery, null, 2));
+        }
+      }
       details.replaceChildren();
       if (packet.diagnostics.length) element('strong', details, words.approximations);
       for (const note of packet.diagnostics) element('p', details, words[note as keyof Labels] ?? note);

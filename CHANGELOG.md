@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Keep 3D viewing available after recoverable Score diagnostics
+
+Fixed the 3D viewer rejecting an entire work when shared execution removed a failed relation but retained its shape. The viewer now builds the geometry retained by the same recovery rules as 2D and reports diagnostics with original instruction IDs on screen and in GLB. Saved works and the database remain unchanged; the independent viewer distribution can be updated separately.
+
 ## v2.15.163 (2026-10-17 / Build 1239)
 
 ### 2026-10-16 — Optional 3D viewer replaces Score shapes with solids

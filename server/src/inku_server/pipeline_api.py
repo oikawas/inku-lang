@@ -430,20 +430,27 @@ class PipelineService:
         Nothing is started. An empty `tools` reads the sentences whose tool can change.
         """
         native = getattr(self.binding, "retouch", None)
-        if native is None:
+        config = self.retouch_config(owner, history_id, source) if native is not None else None
+        if config is None:
             return {"outcome": "unchanged", "reason": "binding_unavailable"}
-        linked = self.store.read_linked_history(owner, history_id)
-        if linked is not None:
-            config = linked.saved_config
-        else:
-            work = self.store.read_legacy_history(owner, history_id)
-            if work is None:
-                raise HTTPException(404, "history_not_found")
-            if self.reading_config_for is None:
-                return {"outcome": "unchanged", "reason": "binding_unavailable"}
-            config = self.reading_config_for(owner, source, asdict(work))
         request = {"config": config, "source": source, "tools": {str(index): tool for index, tool in tools.items()}}
         return json.loads(native(json.dumps(request, ensure_ascii=False, allow_nan=False).encode("utf-8")))
+
+    def retouch_config(self, owner: str, history_id: str, source: str) -> dict | None:
+        """The config a saved work's instructions are read with for a touch change.
+
+        A work the shared pipeline drew reads with its saved config; an older work
+        with the config a drawing of it would take. ``None`` when no config can be made.
+        """
+        linked = self.store.read_linked_history(owner, history_id)
+        if linked is not None:
+            return linked.saved_config
+        work = self.store.read_legacy_history(owner, history_id)
+        if work is None:
+            raise HTTPException(404, "history_not_found")
+        if self.reading_config_for is None:
+            return None
+        return self.reading_config_for(owner, source, asdict(work))
 
     def provider_capture_status(self, owner: str, execution_id: str) -> dict:
         """Read saved state only; transcript inspection must not resume work."""

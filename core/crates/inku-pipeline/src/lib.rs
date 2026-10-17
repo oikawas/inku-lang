@@ -16,6 +16,7 @@ pub mod protocol;
 pub mod recompose;
 pub mod replay;
 pub mod retouch;
+pub mod saved_variants;
 
 #[cfg(test)]
 mod focused_flow;

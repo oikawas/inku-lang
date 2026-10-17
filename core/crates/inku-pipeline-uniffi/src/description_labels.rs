@@ -11,30 +11,51 @@ fn regex(pattern: &str) -> Regex {
     Regex::new(pattern).expect("static description label pattern")
 }
 
-/// The description with its labels removed, as every layer reads it.
-pub fn pipeline_description(text: &str) -> String {
+/// The labels' byte ranges in `text`, each with its kind, in order.
+fn byte_spans(text: &str) -> Vec<(usize, usize, &'static str)> {
     let number = regex(r"^[ \t]*[0-9０-９]+[.．、)）:：　][ \t　]*");
     let comment = regex(r"\[[^\[\]\n]*\]|［[^［］\n]*］");
     let mut spans = Vec::new();
     let mut offset = 0;
     for line in text.split_inclusive('\n') {
         if let Some(found) = number.find(line) {
-            spans.push((offset + found.start(), offset + found.end()));
+            spans.push((offset + found.start(), offset + found.end(), "number"));
         }
         spans.extend(
             comment
                 .find_iter(line)
-                .map(|m| (offset + m.start(), offset + m.end())),
+                .map(|m| (offset + m.start(), offset + m.end(), "comment")),
         );
         offset += line.len();
     }
+    spans.sort_unstable();
+    spans
+}
+
+/// Every range the drawing does not read, as `[[start, end, kind], ...]` JSON.
+///
+/// Offsets count Unicode scalar values, as Server's `excluded_spans` counts
+/// Python characters, so an editor can paint exactly what is dropped.
+pub fn description_label_spans(text: &str) -> String {
+    let scalar_offset = |byte: usize| text[..byte].chars().count();
+    let spans: Vec<serde_json::Value> = byte_spans(text)
+        .into_iter()
+        .map(|(start, end, kind)| {
+            serde_json::json!([scalar_offset(start), scalar_offset(end), kind])
+        })
+        .collect();
+    serde_json::Value::Array(spans).to_string()
+}
+
+/// The description with its labels removed, as every layer reads it.
+pub fn pipeline_description(text: &str) -> String {
+    let spans = byte_spans(text);
     if spans.is_empty() {
         return text.to_owned();
     }
-    spans.sort_unstable();
     let mut kept = String::new();
     let mut at = 0;
-    for (start, end) in spans {
+    for (start, end, _kind) in spans {
         kept.push_str(&text[at..start]);
         at = end;
     }
@@ -53,7 +74,7 @@ pub fn pipeline_description(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::pipeline_description;
+    use super::{description_label_spans, pipeline_description};
 
     #[test]
     fn every_shared_case_cuts_what_server_cuts() {
@@ -69,6 +90,14 @@ mod tests {
             assert_eq!(
                 pipeline_description(text),
                 expected,
+                "{}",
+                case["why"].as_str().unwrap_or(text)
+            );
+            let spans: serde_json::Value =
+                serde_json::from_str(&description_label_spans(text)).expect("spans json");
+            assert_eq!(
+                spans,
+                case["spans"],
                 "{}",
                 case["why"].as_str().unwrap_or(text)
             );

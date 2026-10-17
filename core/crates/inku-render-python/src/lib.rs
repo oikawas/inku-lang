@@ -308,6 +308,55 @@ fn pipeline_completion_range_states<'py>(
     PyBytes::new(py, &output)
 }
 
+/// A description's identity `dh1` (`identity.description_hash`), from the shared core.
+#[pyfunction]
+fn pipeline_description_hash(text: &str) -> String {
+    inku_pipeline_uniffi::description_hash(text.to_owned())
+}
+
+/// A history item's render identity `rh3`, or `None` when the item JSON is not an object.
+#[pyfunction]
+fn pipeline_render_hash(item_json: &str) -> Option<String> {
+    inku_pipeline_uniffi::render_hash(item_json.to_owned())
+}
+
+/// The canonical JSON Server hashes, or `None` when the text is not JSON.
+#[pyfunction]
+fn pipeline_canonical_json(value_json: &str) -> Option<String> {
+    inku_pipeline_uniffi::canonical_json(value_json.to_owned())
+}
+
+/// The instruction language for `text`, or `None` for an unsupported request or fallback.
+#[pyfunction]
+#[pyo3(signature = (text, requested, fallback))]
+fn pipeline_resolve_instruction_language(
+    text: &str,
+    requested: Option<&str>,
+    fallback: &str,
+) -> Option<String> {
+    inku_pipeline_uniffi::resolve_instruction_language(
+        text.to_owned(),
+        requested.map(str::to_owned),
+        fallback.to_owned(),
+    )
+}
+
+/// A requested language code normalized as Python's `(value or default).strip().lower()`.
+#[pyfunction]
+#[pyo3(signature = (value, default))]
+fn pipeline_normalize_instruction_language(value: Option<&str>, default: &str) -> Option<String> {
+    inku_pipeline_uniffi::normalize_instruction_language(
+        value.map(str::to_owned),
+        default.to_owned(),
+    )
+}
+
+/// The description with its labels removed, as every layer reads it.
+#[pyfunction]
+fn pipeline_description_without_labels(text: &str) -> String {
+    inku_pipeline_uniffi::description_without_labels(text.to_owned())
+}
+
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(core_api_version, module)?)?;
@@ -341,5 +390,20 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pipeline_retouch, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_composition_ranges, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_completion_range_states, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_canonical_json, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_description_hash, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        pipeline_description_without_labels,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        pipeline_normalize_instruction_language,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(pipeline_render_hash, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        pipeline_resolve_instruction_language,
+        module
+    )?)?;
     Ok(())
 }

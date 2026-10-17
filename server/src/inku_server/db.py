@@ -13,7 +13,7 @@ from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from .color_catalogs import RENAMED_COLOR_CATALOG_IDS
-from .identity import description_hash
+from .identity import description_hash, render_hash
 from .limits import normalize_render_limit_settings
 from .plugins import canvas_aspect_ratio_for_aspect, normalize_canvas_aspect_id
 from .persistence import accounts as _accounts
@@ -243,11 +243,11 @@ def _canvas_aspect_metadata(item: dict) -> tuple[str | None, float | None]:
 
 
 def _legacy_render_hash_for_item(item: dict) -> str:
-    return _history.HistoryRenderHashService(_canonical_json).legacy_render_hash_for_item(item)
+    return _history.HistoryRenderHashService(_canonical_json, render_hash).legacy_render_hash_for_item(item)
 
 
 def render_hash_for_item(item: dict) -> str:
-    return _history.HistoryRenderHashService(_canonical_json).render_hash_for_item(item)
+    return _history.HistoryRenderHashService(_canonical_json, render_hash).render_hash_for_item(item)
 
 
 def render_hash_short(render_hash: str | None) -> str | None:

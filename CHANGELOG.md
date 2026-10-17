@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.167 (2026-10-17 / Build 1243)
+
 ### 2026-10-17 — 3D layer depth and a bottom-right mode button
 
 Resolved JSON Score drawing order becomes layers, with later layers toward the front. Copies of an instruction and arc pairs forming a closed fill stay together. Layer depth at zero restores coplanar centers and can be adjusted independently of Solid thickness. An optional view-state field retains the setting across a 2D round trip. The independent bundled viewer is updated. A button showing the current 2D or 3D mode now sits immediately left of `#` at the bottom right of the canvas. Each click changes modes, and the button remains available in 3D.

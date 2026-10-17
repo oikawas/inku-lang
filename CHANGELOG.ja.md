@@ -8,10 +8,6 @@
 
 ## 未リリース
 
-### 2026-10-17 — ChatGPTプランの要求本文とSSEの読み方を共有coreへ移す
-
-ChatGPTプランの描画とVisionの要求本文、SSEの読み方（関数引数・文字の答えの組み立て、未完了・拒否・未知toolの判定）、失敗の分類、本人のモデル一覧の読みを共有coreの`inku.provider-wire.v1`へ移した。本文と観測記録の正準の形は以前のServerとバイト単位で同じ。Serverは流れを最後まで受けてからcoreが1回で読むため、途中の`error`イベントの後も流れが閉じるまで受けるが、答えと失敗の印は変わらない。token・登録・ロック・取消・使用量の上限での一時停止はServerに残し、`schema_order.py`を削除した。
-
 ### 2026-10-17 — AndroidのGeminiのモデル名をServerと同じに送る
 
 Androidは描画・Vision・デモの要求で、Geminiのモデル名の先頭の`models/`を外さずに共有coreへ渡すようにした。Serverと同じく名前全体をURLへpercent encodeするので、`models/gemini-3.6-flash`は`models/models%2Fgemini-3.6-flash:generateContent`へ送る。モデル一覧の取得では、Serverと同じく引き続き外す。目録に`models/`で始まるモデルは無いので、ふつうの要求の送り先は変わらない。
@@ -69,6 +65,12 @@ macOSの`dh1`・`rh3`と正準JSON、指示言語の判定、記述ラベルの�
 Anthropicの対象Claudeモデルは通常描画とVisionでも思考用8,192 tokenを出力枠に加え、pipeline応答が `max_tokens` で切れたときは内容が読めても拒否して診断を残す。
 
 保存作品からランダムまたはVisionの自律推敲を開始できる。世代数、色・配置の対象、Wildを指定し、直前の作品を親として各世代を保存する。途中の世代は系譜専用、最終世代は通常の作品一覧にも表示する。Visionは作品画像への限定された助言を使い、観察と次の方向を表示する。画像の送信はこの専用助言requestに限り、既存の接続・ChatGPTプランのsession pinを保つ。
+
+## v2.15.183（2026-10-17 / Build 1259）
+
+### 2026-10-17 — ChatGPTプランの要求本文とSSEの読み方を共有coreへ移す
+
+ChatGPTプランの描画とVisionの要求本文、SSEの読み方（関数引数・文字の答えの組み立て、未完了・拒否・未知toolの判定）、失敗の分類、本人のモデル一覧の読みを共有coreの`inku.provider-wire.v1`へ移した。本文と観測記録の正準の形は以前のServerとバイト単位で同じ。Serverは流れを最後まで受けてからcoreが1回で読むため、途中の`error`イベントの後も流れが閉じるまで受けるが、答えと失敗の印は変わらない。token・登録・ロック・取消・使用量の上限での一時停止はServerに残し、`schema_order.py`を削除した。
 
 ## v2.15.182（2026-10-17 / Build 1258）
 

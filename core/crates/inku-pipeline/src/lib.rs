@@ -9,6 +9,7 @@ pub mod composition;
 pub mod composition_reading;
 pub mod core_boundary;
 mod hole_completion;
+pub mod identity;
 pub mod machine;
 pub mod prompts;
 pub mod protocol;

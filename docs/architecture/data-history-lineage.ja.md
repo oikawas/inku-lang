@@ -129,8 +129,8 @@ Android Room v14は同じ論理契約v2を別の物理schemaで満たす。v10�
 | ID | 何を識別するか | 同じでも別になりうるもの | 実装 |
 |---|---|---|---|
 | history ID | 1件のDB履歴row | 同じ記述・同じeditionの別保存 | `HistoryRow.id` |
-| `dh1` | NFC・改行・外側空白を正規化した記述 | history、render、lineage node | `identity.py:description_hash` |
-| `rh3` | Score + render seed + wild + engine ID/version + catalog ID | 記述、SVG文字列、build、composition seed | `db.py:render_hash_for_item` |
+| `dh1` | NFC・改行・外側空白を正規化した記述 | history、render、lineage node | 共有core `inku-pipeline/src/identity.rs`（Serverは`identity.py:description_hash`から呼ぶ） |
+| `rh3` | Score + render seed + wild + engine ID/version + catalog ID | 記述、SVG文字列、build、composition seed | 共有core `identity.rs`（Serverは`db.py:render_hash_for_item`から呼ぶ） |
 | legacy `rh2` | 旧payload規則のedition ID | `rh3`とは再計算規則が異なる | `db.py:_legacy_render_hash_for_item` |
 | lineage node ID | 系譜graphの1 node | history ID、`dh1`、`rh3` | `LineageNodeRow.id` |
 | variation ID / revision | 共有pipelineの編集可能な作品単位と、そのsourceの版 | 同じvariationの複数の演奏（history） | `VariationAuthorityRow` |

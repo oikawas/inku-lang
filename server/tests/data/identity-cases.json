@@ -1,0 +1,225 @@
+{
+  "note": "Generated from Server's Python rules (identity.py and HistoryRenderHashService) and read by core/crates/inku-pipeline/src/identity.rs, server/tests/test_identity_core.py, and the Android and Swift host checks. A stored identity must not change, so every host must agree with these rows.",
+  "python_space": [
+    9,
+    10,
+    11,
+    12,
+    13,
+    28,
+    29,
+    30,
+    31,
+    32,
+    133,
+    160,
+    5760,
+    8192,
+    8193,
+    8194,
+    8195,
+    8196,
+    8197,
+    8198,
+    8199,
+    8200,
+    8201,
+    8202,
+    8232,
+    8233,
+    8239,
+    8287,
+    12288
+  ],
+  "description_hash": [
+    {
+      "why": "a plain description",
+      "text": "花の色はうつりにけりな",
+      "dh1": "dh1:8d007661f232d29c5637173213b9ce8b81de7135ba51959c673962b985a98115"
+    },
+    {
+      "why": "an empty description",
+      "text": "",
+      "dh1": "dh1:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "why": "Windows and old Mac line breaks become one kind",
+      "text": "一行目\r\n二行目\r三行目",
+      "dh1": "dh1:85dab52ea103d246591863d1150d3c812f67ba3f9d7be2180f471d7c62b98d4c"
+    },
+    {
+      "why": "surrounding spaces of every width are stripped",
+      "text": " \t　花　\n ",
+      "dh1": "dh1:b0a1eab5f902df03059fe7385071b377e577e3ef962d3257663af0dcbbe85449"
+    },
+    {
+      "why": "U+0085 is a space to Python's strip, not to Kotlin's trim",
+      "text": "花の色",
+      "dh1": "dh1:bd7047b26f1bd7621f777be30166e2664e60e776fca021a32498e666d26528f7"
+    },
+    {
+      "why": "the information separators U+001C..U+001F are spaces to Python",
+      "text": "\u001c花\u001f",
+      "dh1": "dh1:b0a1eab5f902df03059fe7385071b377e577e3ef962d3257663af0dcbbe85449"
+    },
+    {
+      "why": "a no-break space is stripped",
+      "text": " 花 ",
+      "dh1": "dh1:b0a1eab5f902df03059fe7385071b377e577e3ef962d3257663af0dcbbe85449"
+    },
+    {
+      "why": "a decomposed kana is composed (NFC)",
+      "text": "がぎ",
+      "dh1": "dh1:4bdb0470b1308b0c4810d7415d5e1512028ac7f9383dc7881b3059ff9cd84d55"
+    },
+    {
+      "why": "a line separator inside stays",
+      "text": "花 色",
+      "dh1": "dh1:5b16695e31d087dd2b99902db1f41250f124e6f7d9540742a9bad2fc1704550d"
+    },
+    {
+      "why": "a character outside the BMP",
+      "text": "𠮷野家の𩸽",
+      "dh1": "dh1:e6cca7e5473a06f2841b752160d9c51aa2b26c2ac24999d4bb11703660c03752"
+    }
+  ],
+  "canonical_json": [
+    {
+      "why": "members are sorted by code point, outside-BMP names last",
+      "input": "{\"ｚ\": 1, \"a\": 2, \"𠮷\": 3, \"B\": 4, \"é\": 5}",
+      "canonical": "{\"B\":4,\"a\":2,\"é\":5,\"ｚ\":1,\"𠮷\":3}"
+    },
+    {
+      "why": "nested objects and arrays",
+      "input": "{\"b\": [3, {\"y\": null, \"x\": true}], \"a\": {\"d\": false, \"c\": []}}",
+      "canonical": "{\"a\":{\"c\":[],\"d\":false},\"b\":[3,{\"x\":true,\"y\":null}]}"
+    },
+    {
+      "why": "floats Python writes positionally",
+      "input": "[0.1, 0.0001, 1000000000000000.0, 3.0, 123456.789, 9999999999999998.0]",
+      "canonical": "[0.1,0.0001,1000000000000000.0,3.0,123456.789,9999999999999998.0]"
+    },
+    {
+      "why": "floats Python writes with an exponent",
+      "input": "[1e-05, 1e+16, 1.5e+300, 5e-324, 2.5e-07, 1.7976931348623157e+308]",
+      "canonical": "[1e-05,1e+16,1.5e+300,5e-324,2.5e-07,1.7976931348623157e+308]"
+    },
+    {
+      "why": "signed zeros and negative floats",
+      "input": "[-0.0, 0.0, -1.5, -1e-05]",
+      "canonical": "[-0.0,0.0,-1.5,-1e-05]"
+    },
+    {
+      "why": "integers keep every digit",
+      "input": "[1180591620717411303424, -36893488147419103232, 0, -7]",
+      "canonical": "[1180591620717411303424,-36893488147419103232,0,-7]"
+    },
+    {
+      "why": "control characters, DEL and separators",
+      "input": "\"a\\u0001b\\u001fcd e\\\"f\\\\g\\n\\t\\b\\f\\r\"",
+      "canonical": "\"a\\u0001b\\u001fcd e\\\"f\\\\g\\n\\t\\b\\f\\r\""
+    },
+    {
+      "why": "non-ASCII text is written as it is",
+      "input": "\"日本語 Ελληνικά 🎨\"",
+      "canonical": "\"日本語 Ελληνικά 🎨\""
+    },
+    {
+      "why": "a duplicate name keeps the last value",
+      "input": "{\"a\": 1, \"a\": 2}",
+      "canonical": "{\"a\":2}"
+    },
+    {
+      "why": "an escaped slash and a surrogate pair are read",
+      "input": "[\"\\/\", \"\\ud842\\udfb7\", \"\\u00e9\"]",
+      "canonical": "[\"/\",\"𠮷\",\"é\"]"
+    },
+    {
+      "why": "negative zero integer is zero",
+      "input": "[-0, 1E2, 1e-2, 2.50]",
+      "canonical": "[0,100.0,0.01,2.5]"
+    },
+    {
+      "why": "NaN and the infinities",
+      "input": "[NaN, Infinity, -Infinity, 1e400]",
+      "canonical": "[NaN,Infinity,-Infinity,Infinity]"
+    },
+    {
+      "why": "JSON whitespace around tokens",
+      "input": " \n{ \"b\" : [ 1 , 2 ] ,\t\"a\" : \"x\" }\r\n",
+      "canonical": "{\"a\":\"x\",\"b\":[1,2]}"
+    }
+  ],
+  "render_hash": [
+    {
+      "why": "a typical saved work",
+      "item": "{\"score\": {\"version\": \"0.4\", \"canvas\": {\"ground\": {\"material\": \"washi\"}}, \"layers\": [{\"w\": 0.35, \"x\": 1e-05}]}, \"render_seed\": 1234567890123, \"render_wild\": false, \"render_engine_id\": \"default\", \"render_engine_version\": \"84\", \"render_color_catalog_id\": \"ink_season\"}",
+      "rh3": "rh3:61dfe431443b8f21fb7dba1bc8442087d67313688c1e2772f0af998984a29dec"
+    },
+    {
+      "why": "a seed stored as text with zeros",
+      "item": "{\"score\": {\"version\": \"0.4\", \"canvas\": {\"ground\": {\"material\": \"washi\"}}, \"layers\": [{\"w\": 0.35, \"x\": 1e-05}]}, \"render_seed\": \"0012\", \"render_engine_id\": \"default\"}",
+      "rh3": "rh3:2b1a05492c0c77f44a457c9f597e2ae5990046b08aa54c196701ceead52cda53"
+    },
+    {
+      "why": "a seed with spaces, a sign and an underscore",
+      "item": "{\"score\": {\"version\": \"0.4\", \"canvas\": {\"ground\": {\"material\": \"washi\"}}, \"layers\": [{\"w\": 0.35, \"x\": 1e-05}]}, \"render_seed\": \" +1_000 \"}",
+      "rh3": "rh3:e6d79ba28203c470197ef27e6cfa9127b6a97b0d350dd8f190c12031355d589d"
+    },
+    {
+      "why": "a full-width seed",
+      "item": "{\"score\": {\"version\": \"0.4\", \"canvas\": {\"ground\": {\"material\": \"washi\"}}, \"layers\": [{\"w\": 0.35, \"x\": 1e-05}]}, \"render_seed\": \"１２\"}",
+      "rh3": "rh3:9cf0c35d1e575497e93879159ca7b2fd8a7523ec4093e2e10559513db116224a"
+    },
+    {
+      "why": "a seed that is not a number stays text",
+      "item": "{\"score\": {\"version\": \"0.4\", \"canvas\": {\"ground\": {\"material\": \"washi\"}}, \"layers\": [{\"w\": 0.35, \"x\": 1e-05}]}, \"render_seed\": \"abc\"}",
+      "rh3": "rh3:cb7bfcf8b91000bad3932449d3be3bd93cb8746ae2324994f80ff7dd9b3490b5"
+    },
+    {
+      "why": "a float seed is truncated",
+      "item": "{\"score\": {\"version\": \"0.4\", \"canvas\": {\"ground\": {\"material\": \"washi\"}}, \"layers\": [{\"w\": 0.35, \"x\": 1e-05}]}, \"render_seed\": 3.9}",
+      "rh3": "rh3:deb73d93558261f6df604c4256e882ae54c6e93ba5b942deb6e1faf1ec431851"
+    },
+    {
+      "why": "a negative float seed truncates toward zero",
+      "item": "{\"score\": {\"version\": \"0.4\", \"canvas\": {\"ground\": {\"material\": \"washi\"}}, \"layers\": [{\"w\": 0.35, \"x\": 1e-05}]}, \"render_seed\": -3.9}",
+      "rh3": "rh3:3223a68a09edc0841038f39b2211bc0fe6ca8d63fde1009c41e49c968bdab95e"
+    },
+    {
+      "why": "a seed beyond 64 bits",
+      "item": "{\"score\": {\"version\": \"0.4\", \"canvas\": {\"ground\": {\"material\": \"washi\"}}, \"layers\": [{\"w\": 0.35, \"x\": 1e-05}]}, \"render_seed\": 1267650600228229401496703205376}",
+      "rh3": "rh3:ca0dc4590b9afcba8becd9ea0faa2b3418f20cd69f710a26ed09acff8252f0a6"
+    },
+    {
+      "why": "a boolean seed is an integer to Python",
+      "item": "{\"score\": {\"version\": \"0.4\", \"canvas\": {\"ground\": {\"material\": \"washi\"}}, \"layers\": [{\"w\": 0.35, \"x\": 1e-05}]}, \"render_seed\": true}",
+      "rh3": "rh3:783afef2b5ec8979b5c04fede4b239b65cfd5264455afb8627774168a7647fc3"
+    },
+    {
+      "why": "wild is Python's truth value",
+      "item": "{\"score\": {\"version\": \"0.4\", \"canvas\": {\"ground\": {\"material\": \"washi\"}}, \"layers\": [{\"w\": 0.35, \"x\": 1e-05}]}, \"render_wild\": \"yes\"}",
+      "rh3": "rh3:77cf3888ecca8c0913ba59db6a0d39cd27aae788f9aa368881eedce193136ca6"
+    },
+    {
+      "why": "an empty catalog id falls back to catalog_id",
+      "item": "{\"score\": {\"version\": \"0.4\", \"canvas\": {\"ground\": {\"material\": \"washi\"}}, \"layers\": [{\"w\": 0.35, \"x\": 1e-05}]}, \"render_color_catalog_id\": \"\", \"catalog_id\": \"default\"}",
+      "rh3": "rh3:2ca73debd29618e24c7c2f033c29c968456cf5c86b3aa90b1279e3a8586c9a72"
+    },
+    {
+      "why": "a missing score is an empty object",
+      "item": "{\"render_seed\": null}",
+      "rh3": "rh3:35e7a92162cb2172e98f4d38411d3f299fcb16f2ffc563cb71cb01f8a8b49722"
+    },
+    {
+      "why": "an empty list score is an empty object",
+      "item": "{\"score\": [], \"render_seed\": 7}",
+      "rh3": "rh3:30911ef3125eef8f7f630e8932177f6160f4608c416bbfb955b511ae2bb84d03"
+    },
+    {
+      "why": "other members are ignored",
+      "item": "{\"score\": {\"version\": \"0.4\", \"canvas\": {\"ground\": {\"material\": \"washi\"}}, \"layers\": [{\"w\": 0.35, \"x\": 1e-05}]}, \"render_seed\": 7, \"description\": \"花\", \"id\": \"x\"}",
+      "rh3": "rh3:59a0dc6b07be06df68783844f2fd11e6d7c3d8267ccec12d644d1716ecfe4137"
+    }
+  ]
+}

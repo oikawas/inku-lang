@@ -91,7 +91,12 @@ pub fn normalize_instruction_language(
         Some(value) if !value.is_empty() => value,
         Some(_) | None => default,
     };
-    let normalized = source.trim().to_lowercase();
+    // Python's `strip()` also treats U+001C..U+001F as space; Rust's `trim()` does not.
+    let normalized = source
+        .trim_matches(|character: char| {
+            character.is_whitespace() || ('\u{1c}'..='\u{1f}').contains(&character)
+        })
+        .to_lowercase();
     match normalized.as_str() {
         "auto" => Ok(RequestedInstructionLanguage::Auto),
         "ja" => Ok(RequestedInstructionLanguage::Ja),

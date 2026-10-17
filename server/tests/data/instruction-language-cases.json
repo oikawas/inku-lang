@@ -1,0 +1,166 @@
+{
+  "note": "Generated from server/src/inku_server/language_support/registry.py and read by core/crates/inku-ddl/tests/language_resolution.rs and the host checks. null means the call raises.",
+  "normalize": [
+    {
+      "why": "a code as written",
+      "value": "ja",
+      "default": "ja",
+      "language": "ja"
+    },
+    {
+      "why": "upper case and spaces",
+      "value": "  EN ",
+      "default": "ja",
+      "language": "en"
+    },
+    {
+      "why": "auto",
+      "value": "Auto",
+      "default": "ja",
+      "language": "auto"
+    },
+    {
+      "why": "an empty request takes the default",
+      "value": "",
+      "default": "en",
+      "language": "en"
+    },
+    {
+      "why": "no request takes the default",
+      "value": null,
+      "default": "auto",
+      "language": "auto"
+    },
+    {
+      "why": "an information separator is a space to Python",
+      "value": "\u001cja\u001f",
+      "default": "ja",
+      "language": "ja"
+    },
+    {
+      "why": "U+0085 is a space",
+      "value": "en",
+      "default": "ja",
+      "language": "en"
+    },
+    {
+      "why": "an unsupported code",
+      "value": "fr",
+      "default": "ja",
+      "language": null
+    },
+    {
+      "why": "a full-width code is not a code",
+      "value": "ｊａ",
+      "default": "ja",
+      "language": null
+    }
+  ],
+  "resolve": [
+    {
+      "why": "hiragana means Japanese",
+      "text": "あかい円",
+      "requested": "auto",
+      "fallback": "en",
+      "language": "ja"
+    },
+    {
+      "why": "katakana means Japanese",
+      "text": "ペン",
+      "requested": "auto",
+      "fallback": "en",
+      "language": "ja"
+    },
+    {
+      "why": "kanji means Japanese",
+      "text": "円",
+      "requested": "auto",
+      "fallback": "en",
+      "language": "ja"
+    },
+    {
+      "why": "Latin letters mean English",
+      "text": "a red circle",
+      "requested": "auto",
+      "fallback": "ja",
+      "language": "en"
+    },
+    {
+      "why": "Japanese wins over Latin",
+      "text": "red の円",
+      "requested": "auto",
+      "fallback": "en",
+      "language": "ja"
+    },
+    {
+      "why": "digits only fall back",
+      "text": "123",
+      "requested": "auto",
+      "fallback": "en",
+      "language": "en"
+    },
+    {
+      "why": "an empty text falls back",
+      "text": "",
+      "requested": "auto",
+      "fallback": "en",
+      "language": "en"
+    },
+    {
+      "why": "an auto fallback is Japanese",
+      "text": "123",
+      "requested": "auto",
+      "fallback": "auto",
+      "language": "ja"
+    },
+    {
+      "why": "an explicit request is kept",
+      "text": "a red circle",
+      "requested": "ja",
+      "fallback": "en",
+      "language": "ja"
+    },
+    {
+      "why": "a full-width Latin letter is not Latin",
+      "text": "ＡＢＣ",
+      "requested": "auto",
+      "fallback": "en",
+      "language": "en"
+    },
+    {
+      "why": "a CJK compatibility ideograph is outside the Japanese ranges",
+      "text": "豈",
+      "requested": "auto",
+      "fallback": "en",
+      "language": "en"
+    },
+    {
+      "why": "half-width katakana is outside the Japanese ranges",
+      "text": "ｱｲｳ",
+      "requested": "auto",
+      "fallback": "en",
+      "language": "en"
+    },
+    {
+      "why": "hangul is neither",
+      "text": "한글",
+      "requested": "auto",
+      "fallback": "en",
+      "language": "en"
+    },
+    {
+      "why": "an unsupported request is refused",
+      "text": "円",
+      "requested": "fr",
+      "fallback": "ja",
+      "language": null
+    },
+    {
+      "why": "an unsupported fallback is refused when used",
+      "text": "123",
+      "requested": "auto",
+      "fallback": "fr",
+      "language": null
+    }
+  ]
+}

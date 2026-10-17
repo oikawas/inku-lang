@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 
 from inku_server import db
-from inku_server.identity import canonicalize_description, description_hash
+from inku_server.identity import description_hash
 
 
 def _user() -> dict:
@@ -38,7 +38,7 @@ def _item(user_id: str, text: str, at: int, **extra) -> dict:
 
 
 def test_description_hash_uses_conservative_canonicalization():
-    assert canonicalize_description("  cafe\u0301\r\n墨  ") == "café\n墨"
+    assert description_hash("  cafe\u0301\r\n墨  ") == description_hash("café\n墨")
     assert description_hash(" cafe\u0301\r\n墨 ") == description_hash("café\n墨")
     assert description_hash("赤い 円") != description_hash("赤い円")
     assert description_hash("赤い円。") != description_hash("赤い円")

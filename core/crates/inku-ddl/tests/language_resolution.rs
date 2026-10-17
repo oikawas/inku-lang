@@ -134,3 +134,35 @@ fn assert_expected(
         _ => panic!("invalid expected result or error for {case_id}"),
     }
 }
+
+/// The table Server's registry wrote (`server/tests/data/instruction-language-cases.json`).
+/// Every host reads the same rows, so the copies cannot drift from Server again.
+#[test]
+fn every_shared_language_case_resolves_as_server_does() {
+    let table: Value = serde_json::from_str(include_str!(
+        "../../../../server/tests/data/instruction-language-cases.json"
+    ))
+    .expect("shared language cases");
+    let normalize = table["normalize"].as_array().expect("normalize rows");
+    let resolve = table["resolve"].as_array().expect("resolve rows");
+    assert!(!normalize.is_empty() && !resolve.is_empty());
+    for row in normalize {
+        let got = normalize_instruction_language(
+            row["value"].as_str(),
+            row["default"].as_str().expect("default"),
+        )
+        .ok()
+        .map(|language| language.as_str().to_owned());
+        assert_eq!(got.as_deref(), row["language"].as_str(), "{}", row["why"]);
+    }
+    for row in resolve {
+        let got = resolve_instruction_language(
+            row["text"].as_str().expect("text"),
+            row["requested"].as_str(),
+            row["fallback"].as_str().expect("fallback"),
+        )
+        .ok()
+        .map(|language| language.as_str().to_owned());
+        assert_eq!(got.as_deref(), row["language"].as_str(), "{}", row["why"]);
+    }
+}

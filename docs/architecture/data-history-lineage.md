@@ -129,8 +129,8 @@ Android Room v14 satisfies the same logical contract v2 with a different physica
 | ID | Identifies | May differ even when related | Implementation |
 |---|---|---|---|
 | History ID | One DB history row | Separate saves of the same description or edition | `HistoryRow.id` |
-| `dh1` | Description after NFC, line-ending, and outer-whitespace normalization | History, render, lineage node | `identity.py:description_hash` |
-| `rh3` | Score + render seed + wild + engine ID/version + catalog ID | Description, SVG string, build, composition seed | `db.py:render_hash_for_item` |
+| `dh1` | Description after NFC, line-ending, and outer-whitespace normalization | History, render, lineage node | Shared core `inku-pipeline/src/identity.rs` (Server calls it from `identity.py:description_hash`) |
+| `rh3` | Score + render seed + wild + engine ID/version + catalog ID | Description, SVG string, build, composition seed | Shared core `identity.rs` (Server calls it from `db.py:render_hash_for_item`) |
 | Legacy `rh2` | Older edition payload | Recalculated differently from `rh3` | `db.py:_legacy_render_hash_for_item` |
 | Lineage node ID | One node in the lineage graph | History ID, `dh1`, `rh3` | `LineageNodeRow.id` |
 | Variation ID / revision | The editable unit of work in the shared pipeline and the version of its source | Several performances (histories) of the same variation | `VariationAuthorityRow` |

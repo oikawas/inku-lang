@@ -168,6 +168,61 @@ pub fn composition_ranges() -> String {
     inku_pipeline::recompose::composition_ranges_json()
 }
 
+/// A description's identity `dh1`, as Server's `identity.description_hash`
+/// computes it. Every host asks this one copy so stored identities agree.
+#[uniffi::export]
+pub fn description_hash(text: String) -> String {
+    inku_pipeline::identity::description_hash(&text)
+}
+
+/// A history item's render identity `rh3`, or `None` when the item is not a
+/// JSON object Python's `json.loads` would read.
+#[uniffi::export]
+pub fn render_hash(item_json: String) -> Option<String> {
+    inku_pipeline::identity::render_hash(&item_json).ok()
+}
+
+/// The canonical JSON Server hashes (`json.dumps(sort_keys=True,
+/// separators=(",", ":"), ensure_ascii=False)`), or `None` for invalid JSON.
+#[uniffi::export]
+pub fn canonical_json(value_json: String) -> Option<String> {
+    inku_pipeline::identity::canonical_json(&value_json).ok()
+}
+
+/// The instruction language (`"ja"` or `"en"`) for `text`, or `None` when the
+/// request or the fallback is not a supported code.
+#[uniffi::export]
+pub fn resolve_instruction_language(
+    text: String,
+    requested: Option<String>,
+    fallback: String,
+) -> Option<String> {
+    inku_ddl::resolve_instruction_language(&text, requested.as_deref(), &fallback)
+        .ok()
+        .map(|language| language.as_str().to_owned())
+}
+
+/// A requested language code (`"auto"`, `"ja"` or `"en"`) normalized as
+/// Python's `(value or default).strip().lower()`, or `None` when unsupported.
+#[uniffi::export]
+pub fn normalize_instruction_language(value: Option<String>, default: String) -> Option<String> {
+    inku_ddl::normalize_instruction_language(value.as_deref(), &default)
+        .ok()
+        .map(|language| language.as_str().to_owned())
+}
+
+/// The description with its labels removed, as every layer reads it.
+#[uniffi::export]
+pub fn description_without_labels(text: String) -> String {
+    description_labels::pipeline_description(&text)
+}
+
+/// The labels' ranges as `[[start, end, kind], ...]` JSON, in Unicode scalar offsets.
+#[uniffi::export]
+pub fn description_label_spans(text: String) -> String {
+    description_labels::description_label_spans(&text)
+}
+
 /// Report the fixed binding and byte-protocol versions as stable JSON.
 #[uniffi::export]
 pub fn version_report() -> String {

@@ -10,51 +10,14 @@ and both are cut before the text reaches any layer, Stage 0.5 included.  The cut
 happens here, once, so that every client gets the same rule: the web editor
 greys these ranges out, but the web is not what enforces them.
 
-The functions return spans as well as text so the editor can paint exactly what
-the server will drop.
+The rule (which numbers and brackets are labels, and the ranges they cover) is
+the shared core's ``description_labels.rs``; the editor paints the same ranges
+from ``server/tests/data/description-label-cases.json``.
 """
 
 from __future__ import annotations
 
-import re
-from typing import NamedTuple
-
-# A numbering has to be a numbering, not a measurement: "3本の線" and "2026年"
-# are description.  Digits (either width) followed by one of the separators an
-# author actually types, and the ideographic space counts as one because "１　花"
-# is how a numbered line is written in Japanese.
-_LEADING_NUMBER = re.compile(r"^[ \t]*[0-9０-９]+[.．、)）:：　][ \t　]*")
-
-# Brackets of both widths, closed on the line they were opened on.  An unclosed
-# "[" is description: it would otherwise swallow the rest of the text.
-_COMMENT = re.compile(r"\[[^\[\]\n]*\]|［[^［］\n]*］")
-
-
-class Span(NamedTuple):
-    """A half-open range of the original text that the drawing does not read."""
-
-    start: int
-    end: int
-    kind: str  # "number" | "comment"
-
-
-def excluded_spans(text: str) -> list[Span]:
-    """Every range the drawing does not read, in order of appearance."""
-    if not text:
-        return []
-    spans: list[Span] = []
-    offset = 0
-    # Only "\n" starts a line, as in the web editor, Swift and the shared core;
-    # splitlines() would also break at "\r", U+2028 and the other separators.
-    for line in text.split("\n"):
-        number = _LEADING_NUMBER.match(line)
-        if number:
-            spans.append(Span(offset + number.start(), offset + number.end(), "number"))
-        for comment in _COMMENT.finditer(line):
-            spans.append(Span(offset + comment.start(), offset + comment.end(), "comment"))
-        offset += len(line) + 1  # + the "\n" that split() removed
-    spans.sort()
-    return spans
+import importlib
 
 
 def pipeline_description(text: str | None) -> str:
@@ -62,20 +25,9 @@ def pipeline_description(text: str | None) -> str:
 
     Whitespace left behind by a removal is collapsed so that a comment taken out
     of the middle of a sentence does not leave a double space; line breaks are
-    kept, because they are the author's.
+    kept, because they are the author's.  The shared core does the cut, so
+    Server and every app read a description alike.
     """
     if not text:
         return text or ""
-    spans = excluded_spans(text)
-    if not spans:
-        return text
-    kept: list[str] = []
-    at = 0
-    for start, end, _kind in spans:
-        kept.append(text[at:start])
-        at = end
-    kept.append(text[at:])
-    stripped = "".join(kept)
-    # Collapse the gap a removal leaves, per line, without touching the breaks.
-    lines = [re.sub(r"[ \t　]{2,}", " ", line).strip(" \t　") for line in stripped.split("\n")]
-    return "\n".join(lines)
+    return importlib.import_module("inku_render").pipeline_description_without_labels(text)

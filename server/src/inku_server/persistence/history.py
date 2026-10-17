@@ -64,6 +64,9 @@ class HistoryRenderHashService:
     """Calculate the persisted legacy and current render identities."""
 
     canonical_json_fn: Callable[[Any], str]
+    # rh3 is shared with Android and Swift, so the shared core computes it
+    # (identity.render_hash, server/tests/data/identity-cases.json); rh2 stays Server's.
+    render_hash_fn: Callable[[dict], str]
 
     @staticmethod
     def _canonical_seed(value):
@@ -91,16 +94,7 @@ class HistoryRenderHashService:
         return "rh2:" + sha256(self.canonical_json_fn(payload).encode("utf-8")).hexdigest()
 
     def render_hash_for_item(self, item: dict) -> str:
-        payload = {
-            "version": "rh3",
-            "score": item.get("score") or {},
-            "render_seed": self._canonical_seed(item.get("render_seed")),
-            "render_wild": bool(item.get("render_wild")),
-            "render_engine_id": item.get("render_engine_id"),
-            "render_engine_version": item.get("render_engine_version"),
-            "render_color_catalog_id": item.get("render_color_catalog_id") or item.get("catalog_id"),
-        }
-        return "rh3:" + sha256(self.canonical_json_fn(payload).encode("utf-8")).hexdigest()
+        return self.render_hash_fn(item)
 
 
 @dataclass(frozen=True)

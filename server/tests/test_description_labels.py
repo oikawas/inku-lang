@@ -12,7 +12,7 @@ import pathlib
 
 import pytest
 
-from inku_server.description_labels import excluded_spans, pipeline_description
+from inku_server.description_labels import pipeline_description
 
 CASES = json.loads(
     (pathlib.Path(__file__).parent / "data" / "description-label-cases.json").read_text(encoding="utf-8")
@@ -22,12 +22,6 @@ CASES = json.loads(
 @pytest.mark.parametrize("case", CASES, ids=[c["why"] for c in CASES])
 def test_the_pipeline_reads_the_description_without_its_labels(case):
     assert pipeline_description(case["text"]) == case["pipeline"]
-
-
-@pytest.mark.parametrize("case", CASES, ids=[c["why"] for c in CASES])
-def test_the_spans_name_exactly_what_was_removed(case):
-    spans = [[s.start, s.end, s.kind] for s in excluded_spans(case["text"])]
-    assert spans == [list(s) for s in case["spans"]]
 
 
 @pytest.mark.parametrize("case", CASES, ids=[c["why"] for c in CASES])

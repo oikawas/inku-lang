@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Provider request bodies and the reading of their answers move into the shared core
+
+For the drawing pipeline's provider effects, the colophon and Vision refinement advice, and the demo instruction, building each provider's request body (thinking level, room added to the output limit, whether a temperature is sent, the function tool's shape, schema property order and the Gemini projection) and reading its answer (function call arguments, a text answer, the record of an answer cut at the output limit, the refusal summary) moved to the shared core's `inku.provider-wire.v1`. The core writes each body byte for byte as the Server did, so observation records do not change. The Server only adds the key and sends; `openai_request.py`, `anthropic_request.py`, `gemini_request.py` and `provider_refusal.py` are removed. Demo instructions also send the same body without an SDK, and the `anthropic` and `openai` SDKs are no longer dependencies. ChatGPT plan requests and SSE reading move in the next step.
+
 ### 2026-10-17 — Restore Android's composition policy for on-device Vision models
 
 At the author's decision, on-device Vision models skip composition reading again. Pixel acceptance on E2B spent about 114 seconds on four attempts before using the default reading, so this remains an intentional difference from Server. External-provider composition reading, stage-specific provider resolution and 768×768 PNG Vision advice are retained.

@@ -185,7 +185,7 @@ Stage 10では行数ではなく変更理由に沿って5つの高変更面を�
 
 - `InkuRepository` → `AndroidWorkPipeline` → `SharedAuthoringPipeline` / `SharedPipelineHost` → `NativePipelineBridge`（JNI）→ 共有`inku-pipeline` / `inku-ddl` / `inku-render` → Roomという端末内flow。
 - `SharedPipelineHost`は1 executionのcallを直列化し、coreが返したeffectを実行する。provider effectは`SingleAttemptModelEffectProvider`が1回だけ送り、再試行・fallback・応答の判定はRustに残す。可視DDLとauthorityのCAS保存、action ACK、実行snapshotは`RoomSharedPipelineStore`が持つ。
-- `RoutingModelProvider` はlocal LiteRT-LM、Gemini、OpenAI-compatible remote providerを選ぶ。providerへの要求条件（temperature、thinking量、schema変換、出力上限）はServerに合わせる。
+- `RoutingModelProvider` はlocal LiteRT-LM、Gemini、OpenAI-compatible remote providerを選ぶ。providerへの要求本文と応答の読み方（temperature、thinking量、schema変換、出力上限）は共有coreの`provider_wire`（`inku.provider-wire.v1`）が正本で、hostは鍵を足して送り、受けた本文をcoreへ返す。Kotlinの組み立ては、coreへ移すまで同じ規則に合わせる。
 - 端末内のVisionモデルでは構図を読まない（作者の決定 2026-10-17）。`composition.read`は`!isLocalVisionModel(modelId)`で、外部providerではtrueを保つ。Serverの常にtrueという設定との意図的な差であり、provider解決とVision助言の768×768 PNGはServerに揃えたままとする。
 - 保存済みScoreの再演は復元した資源policyの下で`renderSaved`を使う。端末専用の旧9:5形式だけ`AndroidRenderHost`（JNIの`render`）を使う。
 - engine identityとrenderer referenceは同梱Rust coreから取得し、Kotlinに版literalを持たない。

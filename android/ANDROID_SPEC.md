@@ -880,7 +880,7 @@ checked in the same change unit. The host duties correspond as follows.
 | --- | --- | --- |
 | Driving a run, performing effects, saving snapshots | `pipeline_api.py` / `pipeline_candidate.py` / `pipeline_product.py` | `SharedPipelineHost.kt` / `AndroidWorkPipeline.kt` / `RoomSharedPipelineStore.kt` |
 | Configuration and input handed to the core | `pipeline_product.py` (`prepare`) / `pipeline_settings.py` / `pipeline_defaults.py` | `AndroidWorkPipeline.kt` (`prepare`) / `SharedPipelineConfigBuilder.kt` |
-| Provider transport | `pipeline_provider.py` / `openai_request.py` / `chatgpt_provider.py` | `RoutingModelProvider.kt` and the providers / `SingleAttemptModelEffectProvider.kt` |
+| Provider transport | `pipeline_provider.py` / the shared core's `provider_wire.rs` / `chatgpt_provider.py` | `RoutingModelProvider.kt` and the providers / `SingleAttemptModelEffectProvider.kt` |
 | Drawing | `render_engines/default/adapter.py` | `AndroidRenderHost` → `NativeRenderBridge` (legacy 9:5 paper), the shared pipeline's `Render` and `renderSaved` |
 | Rasterization | `shared/src/inku_analysis/rasterizer.py` | `RustArtworkRasterizer` (`inku-svg-raster`) |
 | `rh3` / `dh1` / seed normalization / canonical JSON | `inku-pipeline::identity` (Server also calls its binding) | `AndroidWorkPipeline` / `CoreIdentityJson` → `NativePipelineBridge` → shared core |

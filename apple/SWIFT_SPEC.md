@@ -192,7 +192,7 @@ At the author's instruction (bringing in the differences from Server Build 1190,
 
 ## 2026-10-13 Move OpenAI API drawing to Responses and match Server reasoning settings
 
-Only OpenAI-compatible connections whose host is `api.openai.com` use the request and response handling in Server's [`openai_request.py`](../server/src/inku_server/openai_request.py). See the official [reasoning model guide](https://developers.openai.com/api/docs/guides/reasoning) and [GPT-6 guide](https://developers.openai.com/api/docs/guides/latest-model).
+Only OpenAI-compatible connections whose host is `api.openai.com` use the request and response handling in the shared core's [`provider_wire.rs`](../core/crates/inku-pipeline/src/provider_wire.rs). See the official [reasoning model guide](https://developers.openai.com/api/docs/guides/reasoning) and [GPT-6 guide](https://developers.openai.com/api/docs/guides/latest-model).
 
 - Drawing uses nonstreaming `POST /v1/responses`. The body carries `model`, `store: false`, the system prompt as `instructions`, the user's message as `input`, the `submit_pipeline_response` function tool (the unchanged core schema as `parameters`, `strict: false`), `tool_choice: required`, `parallel_tool_calls: false`, and `max_output_tokens`. When applicable, it adds `reasoning: {effort}` or `temperature`.
 - Reasoning families `^(gpt-5|gpt-6|o\d)` receive no temperature. Within them, `^(gpt-5\.\d|gpt-6-(sol|luna)(-|$))` receives `none`; others, including GPT-6 Astra, GPT-6.1 Sol, GPT-5 without a suffix, and o-series models, receive `low` and 25,000 extra output tokens. Nonreasoning models retain the existing temperature without a reasoning field.
@@ -203,7 +203,7 @@ Only OpenAI-compatible connections whose host is `api.openai.com` use the reques
 
 ## 2026-10-13 Disable NVIDIA NIM Gemma 4 thinking
 
-Drawing, Vision (refinement advice and colophons), and demo instruction requests to NVIDIA NIM disable Gemma 4 thinking, following Server's [`openai_request.py`](../server/src/inku_server/openai_request.py) and the [NIM API specification](https://docs.api.nvidia.com/nim/reference/google-gemma-4-31b-it-infer).
+Drawing, Vision (refinement advice and colophons), and demo instruction requests to NVIDIA NIM disable Gemma 4 thinking, following the shared core's [`provider_wire.rs`](../core/crates/inku-pipeline/src/provider_wire.rs) and the [NIM API specification](https://docs.api.nvidia.com/nim/reference/google-gemma-4-31b-it-infer).
 
 - Only OpenAI-compatible connection ID `nvidia` with a model's final `/` segment matching `^gemma[-_]?4([-_]|$)`, case-insensitively, receives `chat_template_kwargs: {"enable_thinking": false}`. All three paths share this matching.
 - Other NIM models and providers receive no such field. Existing `max_tokens` and `temperature` values are preserved. Official OpenAI URLs retain the existing official API settings.
@@ -212,7 +212,7 @@ Drawing, Vision (refinement advice and colophons), and demo instruction requests
 
 ## 2026-10-13 Match Server's Ollama reasoning controls and output budgets
 
-Drawing, Vision (refinement advice and colophons), and demo instruction requests to local and Cloud Ollama use the reasoning controls in Server's [`openai_request.py`](../server/src/inku_server/openai_request.py).
+Drawing, Vision (refinement advice and colophons), and demo instruction requests to local and Cloud Ollama use the reasoning controls in the shared core's [`provider_wire.rs`](../core/crates/inku-pipeline/src/provider_wire.rs).
 
 - For OpenAI-compatible connection IDs `ollama` and `ollama-cloud`, model names matching `^gpt-oss(:|-|$)` receive `reasoning_effort: low` and 8,192 extra `max_tokens` (drawing 2,048→10,240, advice 320→8,512, demo 180→8,372). Other models receive `none` without extra tokens. All three paths share the matching.
 - These Ollama settings are not added to other providers. Official OpenAI URLs retain the existing official API settings, as on Server. The provider specifications are [OpenAI compatibility](https://docs.ollama.com/api/openai-compatibility) and [thinking](https://docs.ollama.com/capabilities/thinking).
@@ -221,13 +221,13 @@ Drawing, Vision (refinement advice and colophons), and demo instruction requests
 
 ## 2026-10-13 Match Server's Gemini requests and Claude demo requests
 
-Gemini drawing pipeline, Vision, and demo instruction requests use the model matching and output budgets in Server's [`gemini_request.py`](../server/src/inku_server/gemini_request.py). This updates the matching introduced on 2026-10-12.
+Gemini drawing pipeline, Vision, and demo instruction requests use the model matching and output budgets in the shared core's [`provider_wire.rs`](../core/crates/inku-pipeline/src/provider_wire.rs). This updates the matching introduced on 2026-10-12.
 
 - Matching strips the leading `models/`. Names matching `^gemini-2\.5-flash-(lite|image)(-|$)` or `^antigravity-` receive no `thinkingConfig`.
 - `minimal` is sent only to names starting with `gemma-` and these 13 exact names: `gemini-3.6-flash`, `gemini-3.5-flash`, `gemini-3.5-flash-lite`, `gemini-flash-lite-latest`, `gemini-3-flash-preview`, `gemini-3.1-flash-lite`, `gemini-3.1-flash-lite-preview`, `gemini-3.1-flash-image`, `gemini-3.1-flash-image-preview`, `gemini-3.1-flash-lite-image`, `gemini-robotics-er-2-preview`, `nano-banana-pro-preview`, and `gemini-nano-banana-2.1`. Others receive `low`, including new models and the latest Flash/Pro aliases.
 - Models sent a thinking level receive 8,192 extra `maxOutputTokens`; models sent none keep the answer's budget. Drawing, Vision, and demo requests omit Gemini's `temperature` and use the provider's default ([Google's Gemini 3 guide](https://ai.google.dev/gemini-api/docs/gemini-3#temperature)).
 - If the first drawing candidate has `finishReason: MAX_TOKENS`, reject it with `provider_output_limit` even if its function call looks complete. Vision and demo text excludes parts marked `thought: true`.
-- Claude demo requests omit `temperature`. Only models matching Server's [`anthropic_request.py`](../server/src/inku_server/anthropic_request.py) rule (`^claude-((opus|sonnet|haiku|fable|mythos)-5(-|$)|mythos-preview(-|$))`) receive 8,192 extra `max_tokens`. This change does not adjust Claude's drawing or Vision budgets.
+- Claude demo requests omit `temperature`. Only models matching the shared core's [`provider_wire.rs`](../core/crates/inku-pipeline/src/provider_wire.rs) rule (`^claude-((opus|sonnet|haiku|fable|mythos)-5(-|$)|mythos-preview(-|$))`) receive 8,192 extra `max_tokens`. This change does not adjust Claude's drawing or Vision budgets.
 - Checks: InkuHost's `GeminiThinkingLevelTests` verifies outgoing JSON for all three Gemini paths, omitted configuration and output budgets, rejection of cut-off drawing responses, and Claude demo sampling and budgets. `AuxiliaryServerParityChecks.testAnswerTextFollowsServerReaders` prevents thought text from leaking into demo instructions.
 
 ## 2026-10-12 Always show the version and build at the bottom left

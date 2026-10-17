@@ -1034,7 +1034,7 @@ MLXの`mlx-vlm`サーバーはサービス種別`mlx`（管理画面の「MLX (m
 
 MLXのGemma 4は、[モデルの推奨生成設定](https://ai.google.dev/gemma/docs/core/model_card_4)である`temperature: 1.0`、`top_p: 0.95`、`top_k: 64`を明示する。低いtemperatureで同じ層を繰り返し、JSONが出力上限で途中終了する現象への対処であり、prompt・応答Schema・出力上限はそのまま使う。
 
-**提供元への要求の推論・温度・出力枠（2026-10-13 作者）。** 思考や推論のトークンは提供元の出力上限に数えられるため、Serverは提供元ごとに次の指定を送る。
+**提供元への要求の推論・温度・出力枠（2026-10-13 作者）。** 思考や推論のトークンは提供元の出力上限に数えられるため、Serverは提供元ごとに次の指定を送る。要求本文の組み立てと応答の読み方は、共有coreの`provider_wire`（`inku.provider-wire.v1`）が持つ（2026-10-17）。coreは本文を以前のServerとバイト単位で同じに書き、鍵を入れるheaderの名前を返す。Serverは鍵を足して送り、受けたstatusと本文をcoreへ返す。デモの指示文もSDKを使わず、同じ本文を送る。
 
 - OpenAI API（`api.openai.com`）の描画は、Chat CompletionsでなくResponses API（`/v1/responses`）で送る。関数1つを`tool_choice: "required"`で求め、`store: false`・`max_output_tokens`・`reasoning.effort`を送り、応答は`function_call`の`arguments`を読む。ほかのOpenAI互換の提供元の描画と、関数を使わないVision・奥書・デモの指示文は、Chat Completionsのまま。
 - OpenAIの推論の指定は描画・Vision・奥書・デモで共通にする。GPT-5系・GPT-6系・o系には温度を送らない。推論を切れるモデル（gpt-5.1以降、GPT-6 Sol・Luna）には`none`を送る。切れないモデル（GPT-6 Astra・GPT-6.1 Sol、gpt-5、o系）には`low`を送り、出力枠に25,000を足す。gpt-4.1などは変えない。

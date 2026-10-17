@@ -12,174 +12,18 @@ import logging
 import time
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import quote
 
 import httpx
 
 from .api_core.common import _is_qualified_model_id
 from .model_settings import connection_for, provider_for_model
 from .provider_limits import provider_slot
-from .anthropic_request import anthropic_max_tokens, output_limit_record
-from .gemini_request import gemini_max_output_tokens, gemini_output_limit_record, gemini_thinking
-from .openai_request import (
-    is_openai_api, openai_output_limit_record, openai_responses_answer, openai_responses_body,
-    openai_responses_output_limit_record, openai_sampling,
-)
-from .provider_refusal import provider_error as _provider_error
-from .schema_order import ordered_schema
+from . import provider_wire
 from .provider_observation import ProviderObservationError, ProviderObservationStore
 from .provider_rate_limits import ProviderRateBudget, RateAccountingUnavailable, RateLimitUnavailable, retry_after_seconds
 from .chatgpt_store import ChatGPTError
 
 _logger = logging.getLogger(__name__)
-
-def _json_object_in(text: str) -> dict[str, Any]:
-    """The object an answer given as text carries, fenced or not; the core checks its shape."""
-    start, end = text.find("{"), text.rfind("}")
-    if start == -1 or end <= start:
-        raise TypeError("provider answered without the response object")
-    value = json.loads(text[start:end + 1])
-    if not isinstance(value, dict):
-        raise TypeError("provider answered without the response object")
-    return value
-
-
-
-
-_GEMINI_JSON_SCHEMA_KEYS = {
-    "$anchor",
-    "$defs",
-    "$id",
-    "$ref",
-    "additionalProperties",
-    "anyOf",
-    "description",
-    "enum",
-    "format",
-    "items",
-    "maxItems",
-    "maximum",
-    "minItems",
-    "minimum",
-    "oneOf",
-    "prefixItems",
-    "properties",
-    "propertyOrdering",
-    "required",
-    "title",
-    "type",
-}
-
-
-def _merge_gemini_variant_values(values: list[Any]) -> Any | None:
-    first = values[0]
-    if all(value == first for value in values[1:]):
-        return first
-    if not all(isinstance(value, dict) for value in values):
-        return None
-    keys = list(first)
-    if not all(list(value) == keys for value in values[1:]):
-        return None
-    if keys == ["enum"] and all(
-        isinstance(value["enum"], list) and len(value["enum"]) == 1
-        for value in values
-    ):
-        return {"enum": [value["enum"][0] for value in values]}
-    merged = {}
-    for key in keys:
-        value = _merge_gemini_variant_values([item[key] for item in values])
-        if value is None:
-            return None
-        merged[key] = value
-    return merged
-
-
-def _compact_gemini_hole_variants(schema: dict[str, Any]) -> None:
-    properties = schema.get("properties") or {}
-    collection = properties.get("results") or properties.get("edits") or {}
-    items = collection.get("items") or {}
-    variants = items.get("oneOf")
-    if not isinstance(variants, list) or not variants:
-        return
-    merged = _merge_gemini_variant_values(variants)
-    if isinstance(merged, dict) and merged.get("type") == "object":
-        # Gemini receives a bounded, flat enum schema. The shared core still
-        # validates each returned hole/range/digest tuple against the full
-        # response schema and compiler lock before accepting a patch.
-        collection["items"] = merged
-        return
-
-    # The v3 result variants require either `replacement` or `reason`. Gemini's
-    # function schema cannot express that disjunction compactly, so the
-    # transport permits both optional fields while Rust retains the exact
-    # one-of validation after the response returns.
-    if not all(isinstance(variant, dict) for variant in variants):
-        return
-    variant_properties = [variant.get("properties") for variant in variants]
-    if not all(isinstance(value, dict) for value in variant_properties):
-        return
-    shared_required = set(variants[0].get("required") or [])
-    for variant in variants[1:]:
-        shared_required.intersection_update(variant.get("required") or [])
-    merged_properties = {}
-    for name in sorted(set().union(*(value.keys() for value in variant_properties))):
-        candidates = [value[name] for value in variant_properties if name in value]
-        merged_value = _merge_gemini_variant_values(candidates)
-        if merged_value is None:
-            return
-        merged_properties[name] = merged_value
-    collection["items"] = {
-        "type": "object",
-        "additionalProperties": False,
-        "required": sorted(shared_required),
-        "properties": merged_properties,
-    }
-
-
-def _gemini_json_schema(
-    schema: dict[str, Any], *, compact_hole_edits: bool = False
-) -> dict[str, Any]:
-    """Project core JSON Schema into Gemini's supported transport subset.
-
-    The core's JSON keeps no key order, so a schema whose order matters names it
-    in `propertyOrdering`; its properties are written in that order.
-    """
-
-    def project(value: Any, *, named_schemas: bool = False) -> Any:
-        if isinstance(value, list):
-            return [project(item) for item in value]
-        if not isinstance(value, dict):
-            return value
-        if named_schemas:
-            return {name: project(item) for name, item in value.items()}
-        projected = {}
-        for key, item in value.items():
-            if key == "const":
-                projected["enum"] = [item]
-            elif key in _GEMINI_JSON_SCHEMA_KEYS:
-                projected[key] = project(item, named_schemas=key in {"$defs", "properties"})
-        ordering = projected.get("propertyOrdering")
-        properties = projected.get("properties")
-        if isinstance(ordering, list) and isinstance(properties, dict):
-            named = [name for name in ordering if name in properties]
-            projected["properties"] = {
-                **{name: properties[name] for name in named},
-                **{name: item for name, item in properties.items() if name not in named},
-            }
-        return projected
-
-    result = project(schema)
-    if not isinstance(result, dict) or result.get("type") != "object":
-        raise ValueError("Gemini function schema must describe an object")
-    if compact_hole_edits:
-        _compact_gemini_hole_variants(result)
-    return result
-
-
-# The composition reading is sent as the prototype measured it: with Stage 1's
-# model, limits and sampling (COMPOSITION-PRODUCT-DESIGN section 12).
-_STAGE1_SAMPLED_ACTIONS = {"generate_normalized_ddl", "read_composition"}
-
 
 def provider_stage_record(tag: str) -> str:
     """The stage a provider action is timed and recorded under.
@@ -333,84 +177,14 @@ class SingleAttemptProvider:
         return {"tag": tags[action["tag"]], "identity": identity, "response": response, "elapsed_ms": elapsed}
 
     async def _request(self, connection: dict, model: str, action: dict, prompt: dict, timeout: float) -> str:
-        base = connection["base_url"].rstrip("/")
-        key = connection.get("api_key") or ""
-        headers = {"Content-Type": "application/json"}
+        # The shared core writes the body for the connection's dialect, byte for
+        # byte as this transport wrote it (provider_wire), and names the header
+        # the key goes under; a request it cannot build is a ValueError.
+        built = provider_wire.pipeline_request(connection, model, prompt, self.options.max_tokens)
+        url = built["url"]
+        headers = provider_wire.headers(built, connection.get("api_key") or "")
         kind = connection["kind"]
-        response_name = "submit_pipeline_response"
-        # OpenAI's own API draws through Responses, the only route that takes
-        # function tools from every current model (openai_responses_body).
-        responses = kind == "openai_compatible" and is_openai_api(connection)
-        temperature = 0.3 if prompt["action_name"] in _STAGE1_SAMPLED_ACTIONS else 0.0
-        if responses:
-            url = base + "/responses"
-            headers["Authorization"] = "Bearer " + (key or "none")
-            body = openai_responses_body(connection, model, prompt, response_name=response_name,
-                                         max_tokens=self.options.max_tokens, temperature=temperature)
-        elif kind == "openai_compatible":
-            url = base + "/chat/completions"
-            headers["Authorization"] = "Bearer " + (key or "none")
-            body = {"model": model, "stream": False,
-                    **openai_sampling(connection, model, max_tokens=self.options.max_tokens, temperature=temperature),
-                    "messages": [{"role": "system", "content": prompt["system"]},
-                                 {"role": "user", "content": prompt["message"]}]}
-            # Preserve the established provider-specific structured-output
-            # transport, using the schema owned by the shared core verbatim.
-            # Gemma 4 on mlx-vlm loops on thought-channel markers when given
-            # the forced function tool (2026-10-02). Its grammar-constrained
-            # JSON output accepts the same core schema without a tool template.
-            if connection["id"] == "ollama" or connection.get("api_profile") == "mlx":
-                body["response_format"] = {
-                    "type": "json_schema",
-                    "json_schema": {"name": response_name, "schema": ordered_schema(prompt["response_schema"]), "strict": True},
-                }
-            else:
-                body["tools"] = [{"type": "function", "function": {
-                    "name": response_name, "description": "Submit the requested pipeline response.",
-                    "parameters": ordered_schema(prompt["response_schema"]),
-                }}]
-                body["tool_choice"] = {"type": "function", "function": {"name": response_name}}
-        elif kind == "anthropic":
-            url = base + "/v1/messages"
-            headers.update({"x-api-key": key, "anthropic-version": "2023-06-01"})
-            body = {"model": model, "max_tokens": anthropic_max_tokens(model, self.options.max_tokens),
-                    "system": prompt["system"],
-                    "messages": [{"role": "user", "content": prompt["message"]}],
-                    "tools": [{
-                        "name": response_name,
-                        "description": "Submit the requested pipeline response.",
-                        "input_schema": ordered_schema(prompt["response_schema"]),
-                    }],
-                    # Left to the model: claude-opus-5-5 refuses a forced tool
-                    # ("tool_choice: type \"tool\" and \"any\" are not supported
-                    # for this model", Pentala 2026-09-28). With one tool the
-                    # models call it; an answer given as text is read below.
-                    "tool_choice": {"type": "auto"}}
-        elif kind == "gemini":
-            url = base + "/v1beta/models/" + quote(model, safe="") + ":generateContent"
-            headers["x-goog-api-key"] = key
-            body = {"systemInstruction": {"parts": [{"text": prompt["system"]}]},
-                    "contents": [{"role": "user", "parts": [{"text": prompt["message"]}]}],
-                    "generationConfig": {
-                        "maxOutputTokens": gemini_max_output_tokens(model, self.options.max_tokens),
-                        **gemini_thinking(model),
-                    },
-                    "tools": [{"functionDeclarations": [{
-                        "name": response_name,
-                        "description": "Submit the requested pipeline response.",
-                        "parametersJsonSchema": _gemini_json_schema(
-                            prompt["response_schema"],
-                            compact_hole_edits=(
-                                prompt["action_name"] == "complete_visible_ddl_holes"
-                            ),
-                        ),
-                    }]}],
-                    "toolConfig": {"functionCallingConfig": {
-                        "mode": "ANY", "allowedFunctionNames": [response_name],
-                    }}}
-        else:
-            raise ValueError("unsupported provider kind")
-        body_bytes = json.dumps(body, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
+        body_bytes = built["body"].encode("utf-8")
         if self.observation is not None:
             store, owner_id, execution_id = self.observation
             # The durable request record is the send authorization: a failed
@@ -443,17 +217,15 @@ class SingleAttemptProvider:
                             # Count the exact system, content and function schema,
                             # rather than guessing Japanese tokens from characters.
                             count_raw = bytearray()
-                            async with client.stream("POST", url.removesuffix(":generateContent") + ":countTokens",
-                                                     headers=headers, json={"generateContentRequest": {
-                                                         "model": "models/" + model, **body,
-                                                     }}) as counted:
+                            async with client.stream("POST", built["count_tokens"]["url"], headers=headers,
+                                                     content=built["count_tokens"]["body"].encode("utf-8")) as counted:
                                 async for chunk in counted.aiter_bytes():
                                     if len(count_raw) + len(chunk) > min(16384, self.options.max_response_bytes):
                                         raise ValueError("token count response limit exceeded")
                                     count_raw.extend(chunk)
                                 if counted.status_code >= 400:
                                     refused_raw = bytes(count_raw)
-                                    self._refusal = {**_provider_error(refused_raw), "operation": "count_tokens"}
+                                    self._refusal = {**provider_wire.refusal(refused_raw), "operation": "count_tokens"}
                                     counted.raise_for_status()
                             count_data = json.loads(count_raw)
                             if not isinstance(count_data, dict):
@@ -473,7 +245,7 @@ class SingleAttemptProvider:
                             if result.status_code >= 400:
                                 # Read a bounded refusal so the log can say why.
                                 refused_raw = bytes((await result.aread())[:16384])
-                                self._refusal = _provider_error(refused_raw)
+                                self._refusal = provider_wire.refusal(refused_raw)
                             result.raise_for_status()
                         async for chunk in result.aiter_bytes():
                             if len(raw) + len(chunk) > self.options.max_response_bytes:
@@ -489,18 +261,11 @@ class SingleAttemptProvider:
                             store.response(owner_id, execution_id, action, status=result.status_code, raw=bytes(raw))
                             if result.status_code >= 400:
                                 refused_raw = bytes(raw[:16384])
-                                self._refusal = _provider_error(refused_raw)
+                                self._refusal = provider_wire.refusal(refused_raw)
                             result.raise_for_status()
-            data = json.loads(raw)
-            if not isinstance(data, dict):
-                raise TypeError("provider response is not an object")
-            usage = data.get("usageMetadata", {}) if kind == "gemini" else data.get("usage", {})
-            if not isinstance(usage, dict):
-                usage = {}
-            used = usage.get("promptTokenCount") if kind == "gemini" else usage.get(
-                "input_tokens" if kind == "anthropic" or responses else "prompt_tokens")
-            if isinstance(used, int) and not isinstance(used, bool) and used >= 0:
-                input_used = used
+            read = provider_wire.read_pipeline(built["format"], response_status, bytes(raw))
+            if read.get("input_tokens") is not None:
+                input_used = read["input_tokens"]
         except httpx.HTTPStatusError as error:
             if budget is not None and error.response.status_code == 429:
                 budget.cool_down(str(connection["id"]), retry_after_seconds(
@@ -519,53 +284,13 @@ class SingleAttemptProvider:
                               else (None if limits["tpm"] else 0))
         # A response stopped at the output limit is cut off whatever it holds:
         # a tool input or JSON text that ends there is not the whole answer.
-        cut = (output_limit_record(data) if kind == "anthropic"
-               else gemini_output_limit_record(data) if kind == "gemini"
-               else openai_responses_output_limit_record(data) if responses
-               else openai_output_limit_record(data) if kind == "openai_compatible" else None)
-        if cut is not None:
+        if read["outcome"] == "cut":
             self.failure_detail = "output_limit_reached"
             _logger.warning("provider_output_limit %s", json.dumps({
                 "action": action["tag"], "provider": connection["id"], "model": model,
-                "max_tokens": (body["generationConfig"]["maxOutputTokens"] if kind == "gemini"
-                               else body.get("max_tokens", body.get("max_completion_tokens", body.get("max_output_tokens")))),
-                **cut,
+                "max_tokens": built["output_budget"], **read["cut"],
             }, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
             raise TypeError("provider output reached its token limit")
-        if responses:
-            text = openai_responses_answer(data, response_name)
-        elif kind == "openai_compatible":
-            message = data["choices"][0]["message"]
-            calls = message.get("tool_calls") or []
-            if calls:
-                if len(calls) != 1 or calls[0]["function"]["name"] != response_name:
-                    raise TypeError("provider returned an unexpected tool call")
-                text = calls[0]["function"]["arguments"]
-            else:
-                text = message.get("content")
-        elif kind == "anthropic":
-            calls = [block for block in data["content"] if block.get("type") == "tool_use"]
-            if calls:
-                if len(calls) != 1 or calls[0].get("name") != response_name:
-                    raise TypeError("provider returned an unexpected tool call")
-                arguments = calls[0].get("input")
-                if not isinstance(arguments, dict):
-                    raise TypeError("provider returned invalid tool input")
-            else:
-                arguments = _json_object_in("\n".join(
-                    str(block.get("text", "")) for block in data["content"] if block.get("type") == "text"
-                ))
-            text = json.dumps(arguments, ensure_ascii=False, separators=(",", ":"))
-        elif kind == "gemini":
-            calls = [part["functionCall"] for part in data["candidates"][0]["content"]["parts"] if "functionCall" in part]
-            if len(calls) != 1 or calls[0]["name"] != response_name:
-                raise TypeError("provider returned an unexpected function call")
-            arguments = calls[0].get("args")
-            if not isinstance(arguments, dict):
-                raise TypeError("provider returned invalid function arguments")
-            text = json.dumps(arguments, ensure_ascii=False, separators=(",", ":"))
-        else:
-            text = "\n".join(part["text"] for part in data["candidates"][0]["content"]["parts"] if "text" in part)
-        if not isinstance(text, str) or not text:
-            raise TypeError("provider returned no text")
-        return text
+        if read["outcome"] != "answer":
+            raise TypeError(read.get("detail") or "provider returned no text")
+        return read["text"]

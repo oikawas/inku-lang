@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-17 — providerへの要求本文と応答の読み方を共有coreへ移す
+
+描画のprovider effect、奥書とVision推敲の助言、デモの指示文について、提供元ごとの要求本文の組み立て（思考の段、出力枠に足す余白、temperatureの有無、関数ツールの形、schemaの項目の順とGemini向けの変形）と、応答の読み方（関数呼び出しの引数、文字の答え、出力上限で切れた記録、拒否の要約）を共有coreの`inku.provider-wire.v1`へ移した。coreは本文を以前のServerとバイト単位で同じに書くので、観測記録は変わらない。Serverは鍵を足して送るだけになり、`openai_request.py`・`anthropic_request.py`・`gemini_request.py`・`provider_refusal.py`を削除した。デモの指示文もSDKでなく同じ本文を送り、`anthropic`と`openai`のSDKを依存から外した。ChatGPTプランの要求とSSEの読み方は次の段で移す。
+
 ### 2026-10-17 — Androidの端末内Visionモデルの構図読みを元に戻す
 
 作者の決定により、端末内Visionモデルでは構図を読まない動作へ戻した。E2Bの実機受入で構図読みを4回試みて約114秒後に既定の読みに切り替わったため、この点はServerとの意図的な差として残す。外部providerの構図読み、段ごとのprovider解決、Vision助言の768×768 PNGは維持する。

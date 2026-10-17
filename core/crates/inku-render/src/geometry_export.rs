@@ -242,6 +242,8 @@ pub struct GeometryScene {
     pub canvas: [f64; 2],
     pub background: String,
     pub ground: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub presence_svg: Option<String>,
     pub marks: Vec<GeometryMark>,
     pub diagnostics: Vec<String>,
     pub recoveries: Vec<GeometryRecovery>,
@@ -311,9 +313,6 @@ pub fn export_geometry(
         budget,
     )
     .map_err(|e| format!("score_execution: {e:?}"))?;
-    if plan.score.presence.is_some() {
-        return Err("unsupported_presence_layer".into());
-    }
     let mut colors = request.options.resolved_color_map.clone();
     let invalid_colors = crate::palette::sanitize_color_map(&mut colors);
     let assignment = crate::palette::work_color_assignment(
@@ -363,10 +362,22 @@ pub fn export_geometry(
         canvas: [canvas.width / unit, canvas.height / unit],
         background,
         ground: ground.is_some(),
+        presence_svg: crate::layers::render_presence_layer(&plan.score, canvas, &assignment)
+            .map(|layer| {
+                let mut document = crate::svg::Document::new(canvas);
+                document.push(layer);
+                document.serialize()
+            }),
         marks: Vec::new(),
         diagnostics: Vec::new(),
         recoveries,
     };
+    if let Some(svg) = &scene.presence_svg {
+        if svg.len() > 256 * 1024 {
+            return Err("presence_budget_exceeded".into());
+        }
+        scene.diagnostics.push("presence_layer_as_plane".into());
+    }
     if !invalid_colors.is_empty() {
         scene.diagnostics.push("invalid_color_defaulted".into());
     }
@@ -698,7 +709,7 @@ pub fn export_geometry(
         };
         scene.marks[first_index].pair_fill = Some(fill);
     }
-    if scene.marks.is_empty() && !scene.ground {
+    if scene.marks.is_empty() && !scene.ground && scene.presence_svg.is_none() {
         return Err("no_drawable_content".into());
     }
     scene.diagnostics.sort();

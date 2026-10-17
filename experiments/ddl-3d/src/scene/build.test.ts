@@ -104,8 +104,23 @@ test('group transforms preserve solid volume and facing', () => {
 test('invalid geometry and excessive mesh demand are explicit failures', () => {
   const input = prepare(); input.scene.marks[0].transform[0] = NaN;
   assert.throws(() => buildScene(input), /invalid_transform/);
-  const big = prepare(); big.scene.marks = Array.from({ length: 1000 }, () => big.scene.marks[0]);
+  const big = prepare(); big.scene.marks = Array.from({ length: 4096 }, () => big.scene.marks[0]);
   assert.throws(() => buildScene(big), /mesh_budget_exceeded/);
+});
+
+// Failure: a few dozen painted rounds exceed the budget despite a small Score.
+test('many painted rounds retain every source and appearance within the mesh limit', () => {
+  const input = prepare();
+  const mark = input.scene.marks.find(m => m.appearance)!;
+  input.scene.marks = Array.from({ length: 120 }, (_, i) => ({ ...mark, sourceIndex: i, performedIndex: i }));
+  input.scene.presenceSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>';
+  const original = structuredClone(input), packet = buildScene(input);
+  assert.equal(packet.objectCount, 120); assert.equal(packet.meshes.length, 120);
+  assert.ok(packet.triangles > 0 && packet.triangles <= 500_000);
+  assert.deepEqual(packet.meshes.map(m => m.sourceIndex), Array.from({ length: 120 }, (_, i) => i));
+  assert.ok(packet.meshes.every(m => m.appearance === mark.appearance));
+  assert.equal(packet.presenceSvg, input.scene.presenceSvg);
+  assert.deepEqual(input, original);
 });
 
 // Failure: the core's free line is flattened into its two endpoints.

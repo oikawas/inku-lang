@@ -3806,6 +3806,8 @@ files, PNG files, and other artifacts are derived outputs.
 
 ### Optional 3D viewing experiment
 
+Circle and ellipse surface subdivisions follow their painted bounds and count. Shapes are retained while triangle and memory limits remain enforced. The saved Score's abstract presence layer uses a transparent SVG from the shared 2D painter, placed on a plane behind the solids and in front of the support. PNG and GLB include this plane, and the display notes disclose the approximation.
+
 Recoverable saved-Score diagnostics preserve the geometry retained by the same shared-core performance rules as 2D. Removing an unavailable relation keeps its shape; omitting an unavailable drawing unit keeps independent shapes. The viewer visibly reports these decisions with original instruction IDs and records them in GLB metadata. A diagnostic alone does not reject the whole work. The saved Score remains unchanged; invalid input, integrity errors and the viewer's own resource overruns still stop preparation.
 
 Web bundles an independent 3D viewer distribution. Work starts in 2D. The button immediately left of `#` at the bottom right names its destination: `3D` while viewing 2D, and `2D` while viewing 3D. Both modes overlay the same hash, replay, provenance, Saijiki, export, copy, full-screen, caption, mark and central zoom controls on the work. Zoom and full screen act on the active view; other work actions retain their saved-work behavior. The viewer's own controls and diagnostics also overlay the scene without reducing its area.

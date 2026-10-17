@@ -7,6 +7,7 @@ import type { InitialView, ViewState } from '../input/protocol';
 import { skyTexture, type Background } from './background';
 import { frontView } from './frontView';
 import { prepareCircleAppearance, type CircleAppearanceResources } from './circleAppearance';
+import { preparePresence } from './presence';
 
 type Projection = ViewState['projection'];
 export class Viewer {
@@ -26,6 +27,7 @@ export class Viewer {
   private backgroundTexture: THREE.Texture | null = null;
   private referenceHeight = 2;
   private appearances = new Map<THREE.Mesh, CircleAppearanceResources>();
+  private presence: Awaited<ReturnType<typeof preparePresence>> | null = null;
   private meshPackets = new Map<THREE.Mesh, MeshPacket>();
   private selection = new THREE.BoxHelper(new THREE.Object3D(), 0x338bff);
   private resize: ResizeObserver;
@@ -116,6 +118,11 @@ export class Viewer {
   }
 
   async prepareAppearance() {
+    if (this.packet.presenceSvg) {
+      const presence = await preparePresence(this.packet.presenceSvg, this.packet.canvas);
+      if (this.disposed) { presence.dispose(); return; }
+      this.presence = presence; this.scene.add(presence.mesh);
+    }
     const painted = this.packet.meshes.filter(packet => packet.appearance).length;
     const maxSide = Math.min(1024, Math.floor(Math.sqrt(16 * 1024 * 1024 / Math.max(1, painted))));
     await Promise.all([...this.meshPackets].map(async ([mesh, packet]) => {
@@ -265,6 +272,7 @@ export class Viewer {
   private placeSupport() {
     const box = new THREE.Box3().setFromObject(this.model);
     const z = (box.isEmpty() ? 0 : box.min.z) - 0.02;
+    if (this.presence) this.presence.mesh.position.z = z + 0.01;
     this.support.position.z = z; this.grid.position.z = z - 0.001; this.axes.position.z = z;
   }
 
@@ -318,6 +326,7 @@ export class Viewer {
   async glb(): Promise<Blob> {
     // Geometry, current depth, source IDs and color/opacity; guides and selection stay in the viewer.
     const group = new THREE.Group(); group.add(this.model.clone(true));
+    if (this.presence) group.add(this.presence.mesh.clone());
     if (this.support.visible) group.add(this.support.clone());
     const bytes = await new GLTFExporter().parseAsync(group, { binary: true, onlyVisible: true });
     if (!(bytes instanceof ArrayBuffer)) throw new Error('invalid_glb');
@@ -337,6 +346,7 @@ export class Viewer {
     });
     geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); this.scene.clear();
     this.backgroundTexture?.dispose();
+    this.presence?.dispose(); this.presence = null;
     this.appearances.forEach(resource => resource.dispose()); this.appearances.clear();
     this.meshPackets.clear();
     this.renderer.renderLists.dispose(); this.renderer.dispose(); this.renderer.forceContextLoss(); this.renderer.domElement.remove();

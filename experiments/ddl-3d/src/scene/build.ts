@@ -205,13 +205,23 @@ function roundOutline(center: XY, radii: XY, width: number, dash: number[]): Buf
   return combine(parts);
 }
 
-function localGeometry(mark: GeometryMark): BufferGeometry {
+function roundSegments(mark: GeometryMark, count: number): number {
+  // Match detail to the painted footprint, reserving half the scene budget for
+  // paths, non-round solids and clipping. Keep large, sparse rounds at 96.
+  const diameter = mark.appearance ? Math.max(...mark.appearance.bounds.slice(2)) : 0;
+  const visual = Math.ceil(2 * Math.PI * Math.sqrt(diameter * 1024 / 2));
+  const share = Math.floor(Math.sqrt(MAX_TRIANGLES / 2 / Math.max(1, count)));
+  return Math.max(16, Math.floor(Math.min(96, visual, share) / 4) * 4);
+}
+
+function localGeometry(mark: GeometryMark, roundCount: number): BufferGeometry {
   const { shape, width } = mark;
   if (!(width > 0 && finite(width))) throw new Error('invalid_width');
   if (shape.kind === 'round') {
     if (!validPoint(shape.center) || !validPoint(shape.radii) || shape.radii.some(v => v <= 0)) throw new Error('invalid_round');
     if (!mark.filled && !mark.appearance) return roundOutline(shape.center, shape.radii, width, mark.dash);
-    return attributes(new SphereGeometry(1, mark.appearance ? 96 : 24, mark.appearance ? 48 : 16).scale(...shape.radii, Math.min(...shape.radii)).translate(...shape.center, 0));
+    const segments = mark.appearance ? roundSegments(mark, roundCount) : 24;
+    return attributes(new SphereGeometry(1, segments, mark.appearance ? segments / 2 : 16).scale(...shape.radii, Math.min(...shape.radii)).translate(...shape.center, 0));
   }
   const points = clean(shape.points, shape.kind === 'contour');
   if (shape.kind === 'path') {
@@ -276,6 +286,13 @@ export function buildScene(input: PreparedScene): ScenePacket {
     objectCount: scene.marks.length, triangles: 0, bytes: 0, clippedObjects: 0, layerCount: 0 };
   // Do not retain the expanded DTO in the worker reply.
   delete (output as ScenePacket & { scene?: unknown }).scene;
+  if (scene.presenceSvg !== undefined) {
+    if (typeof scene.presenceSvg !== 'string' || scene.presenceSvg.length > 256 * 1024) throw new Error('presence_budget_exceeded');
+    output.presenceSvg = scene.presenceSvg;
+    output.bytes += scene.presenceSvg.length * 2;
+  }
+  const roundCount = scene.marks.filter(m => m.appearance && m.shape.kind === 'round').length;
+  if (scene.marks.some(m => m.appearance && roundSegments(m, roundCount) < 96)) output.diagnostics.push('round_detail_adapted');
   const append = (geometry: BufferGeometry, mark: GeometryMark, role: MeshPacket['role']) => {
     try {
       if (mark.clips.length) geometry = clip(geometry, mark.clips, scene.canvas);
@@ -302,11 +319,11 @@ export function buildScene(input: PreparedScene): ScenePacket {
   };
   for (const mark of scene.marks) {
     if (!/^#[0-9a-f]{6}$/i.test(mark.color) || !Number.isFinite(mark.opacity) || mark.opacity < 0 || mark.opacity > 1) throw new Error('invalid_material');
-    append(world(localGeometry(mark), mark.transform, scene.canvas), mark, 'object');
+    append(world(localGeometry(mark, roundCount), mark.transform, scene.canvas), mark, 'object');
     if (mark.pairFill) append(world(prism(mark.pairFill.points), [1, 0, 0, 1, 0, 0], scene.canvas),
       { ...mark, color: mark.pairFill.color, opacity: mark.pairFill.opacity }, 'pair-fill');
   }
-  if (!output.meshes.length && !scene.ground) throw new Error('no_visible_geometry');
+  if (!output.meshes.length && !scene.ground && !output.presenceSvg) throw new Error('no_visible_geometry');
   output.layerCount = assignLayers(output.meshes, scene.canvas);
   return output;
 }

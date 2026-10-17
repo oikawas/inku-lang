@@ -18,7 +18,7 @@ export interface GeometryRecovery {
   disposition?: 'stopped' | 'omitted' | 'relation_omitted';
   reason?: string;
 }
-export interface GeometryScene { canvas: XY; background: string; ground: boolean; marks: GeometryMark[]; diagnostics: string[]; recoveries: GeometryRecovery[] }
+export interface GeometryScene { canvas: XY; background: string; ground: boolean; presenceSvg?: string; marks: GeometryMark[]; diagnostics: string[]; recoveries: GeometryRecovery[] }
 export interface PreparedScene {
   ok: true; scene: GeometryScene; inputDigest: string; schemaDigest: string; mappingVersion: string; engineVersion: number;
 }
@@ -30,6 +30,7 @@ export interface MeshPacket {
   appearance?: CircleAppearance;
 }
 export interface ScenePacket {
+  presenceSvg?: string;
   meshes: MeshPacket[]; canvas: XY; background: string; ground: boolean; diagnostics: string[];
   recoveries: GeometryRecovery[];
   objectCount: number; triangles: number; bytes: number; clippedObjects: number; layerCount: number;

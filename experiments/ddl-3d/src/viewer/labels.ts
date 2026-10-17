@@ -23,6 +23,8 @@ const en = {
   tool_material_approximated: 'Tool texture, grain and spread use a uniform material.',
   variation_approximated: 'Organic variation is simplified on solid surfaces; line centerlines remain resolved.',
   ground_material_approximated: 'The support uses a plain surface.',
+  presence_layer_as_plane: 'The saved abstract presence is retained on a transparent plane behind the solids.',
+  round_detail_adapted: 'Round surface detail follows the size and number of shapes; all objects are retained.',
   invalid_color_defaulted: 'Invalid saved colors use core defaults.', missing_saved_seed: 'No saved performance seed; core defaults are used.',
   missing_saved_colors: 'No saved concrete colors; core defaults are used.',
 };
@@ -51,6 +53,8 @@ const ja: typeof en = {
   tool_material_approximated: '道具の質感・粒子・にじみは均一な材質で近似します。',
   variation_approximated: '立体表面の有機的な揺れは簡略化します。線の中心線は解決済みの曲線を使います。',
   ground_material_approximated: '支持体の材質は平らな面で近似します。',
+  presence_layer_as_plane: '保存された気配を、立体の後ろに置いた透明な面に保持しています。',
+  round_detail_adapted: '円・楕円の大きさと数に合わせて球面の細かさを調整し、すべての図形を保持しています。',
   invalid_color_defaulted: '無効な保存色をcoreの既定色で補いました。', missing_saved_seed: '保存seedが無いためcoreの既定値を使います。',
   missing_saved_colors: '保存された具体色が無いためcoreの既定色を使います。',
 };

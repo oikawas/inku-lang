@@ -186,7 +186,7 @@ function load(value: LoadMessage) {
       if (packet.diagnostics.length) post('diagnostic', { diagnostics: packet.diagnostics });
     } catch (error) {
       if (localGeneration !== generation) return;
-      fail(error instanceof Error && error.message.startsWith('circle_') ? error.message : 'webgl_unavailable');
+      fail(error instanceof Error && /^(circle_|presence_)/.test(error.message) ? error.message : 'webgl_unavailable');
     }
   };
   worker.postMessage({ inputJson: value.inputJson, wasmUrl: new URL('wasm/score_adapter.js', document.baseURI).href });

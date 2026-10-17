@@ -151,6 +151,25 @@ mod tests {
     const SOLIDS: &str = include_str!("../../fixtures/solids.json");
     const RECOVERED: &str = include_str!("../../fixtures/recovered-score.json");
 
+    // Failure: any presence field rejects the whole saved work, even kind:none.
+    #[test]
+    fn presence_retains_shared_paint_and_all_instruction_marks() {
+        let mut value: Value = serde_json::from_str(SOLIDS).unwrap();
+        let baseline = convert(&value.to_string()).unwrap();
+        value["score"]["presence"] = json!({"kind":"figure_like", "intensity":"low",
+            "symmetry":"none", "gaze_pressure":"none", "contour_density":"low"});
+        let painted = convert(&value.to_string()).unwrap();
+        assert_eq!(painted["scene"]["marks"], baseline["scene"]["marks"]);
+        let svg = painted["scene"]["presenceSvg"].as_str().unwrap();
+        assert!(svg.contains("presence_layer") && svg.contains("<path"));
+        assert!(!svg.contains("<rect"));
+        assert_eq!(painted, convert(&value.to_string()).unwrap());
+        value["score"]["presence"]["kind"] = json!("none");
+        let none = convert(&value.to_string()).unwrap();
+        assert!(none["scene"]["presenceSvg"].is_null());
+        assert_eq!(none["scene"]["marks"], baseline["scene"]["marks"]);
+    }
+
     // Failure: a relation-only recovery rejects all otherwise drawable shapes;
     // actual resource omissions must retain the remaining original source IDs.
     #[test]

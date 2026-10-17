@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Fix 3D viewing for many rounds and abstract presence
+
+Circle and ellipse subdivisions now follow shape size and count, keeping every shape without unnecessarily exceeding the mesh limit. Abstract presence uses a transparent plane from the shared 2D painter instead of rejecting the entire work.
+
 ## v2.15.171 (2026-10-17 / Build 1247)
 
 ### 2026-10-17 — Default the 3D background to the work's fill color

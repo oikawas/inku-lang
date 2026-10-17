@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — ChatGPT plan request bodies and SSE reading move into the shared core
+
+The ChatGPT plan's drawing and Vision request bodies, the reading of its SSE stream (assembling function arguments and text answers, judging unfinished, refused and unknown-tool streams), the failure classification and the reading of the personal model list moved to the shared core's `inku.provider-wire.v1`. Bodies and the canonical form in observation records are byte for byte what the Server wrote. The Server now receives the whole stream before the core reads it once, so after an `error` event mid-stream it keeps receiving until the stream closes; the answers and failure codes are unchanged. The token, registration, locks, cancellation and the pause on a usage limit stay in the Server, and `schema_order.py` is removed.
+
 ### 2026-10-17 — Send Android Gemini model names as Server does
 
 Android no longer removes a leading `models/` from a Gemini model name before handing it to the shared core for drawing, Vision and demo requests. As on Server the whole name is percent-encoded into the URL, so `models/gemini-3.6-flash` is sent to `models/models%2Fgemini-3.6-flash:generateContent`. Model-list fetching still removes the prefix, as Server does. No catalog model starts with `models/`, so the usual requests are unchanged.

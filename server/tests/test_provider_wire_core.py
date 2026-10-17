@@ -3,7 +3,8 @@
 The rows in data/provider-wire-cases.json were written by the transport Server
 used to hold (pipeline_provider.py with openai_request.py, anthropic_request.py,
 gemini_request.py, schema_order.py and provider_refusal.py, and vision_client.py),
-each body as it was sent. Android and Swift read the same file. Each check
+each body as it was sent, and the ChatGPT plan rows by chatgpt_provider.py.
+Android and Swift read the same file. Each check
 below goes through every row and says how many it compared.
 """
 
@@ -11,6 +12,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+from collections import Counter
 
 import httpx
 import pytest
@@ -96,3 +98,51 @@ def test_every_shared_response_is_read_as_server_read_it():
         compared += 1
     assert compared == 97
 
+
+
+def test_every_shared_chatgpt_row_goes_through_servers_transport_as_it_did():
+    """The ChatGPT plan rows, written by chatgpt_provider.py at product fedfdbc7, read here as the transport reads them."""
+    import base64
+
+    from inku_server.chatgpt_provider import ResponseFailure, SSEDecoder, TextSSEDecoder, response_error
+    from inku_server.chatgpt_store import ChatGPTError
+
+    compared = Counter()
+    for row in CASES["chatgpt"]:
+        request, expect = row["request"], row["expect"]
+        action = request["action"]
+        if action in {"chatgpt_request", "chatgpt_vision_request"}:
+            if expect["outcome"] == "refused":
+                with pytest.raises(provider_wire.ProviderWireRefused, match=expect["detail"]):
+                    provider_wire.chatgpt_vision_request(request["model"], system=request["system"], text=request["text"],
+                                                         images=request["images"], answer_limit=request["answer_limit"])
+            else:
+                built = (provider_wire.chatgpt_request(request["model"], request["prompt"], request["answer_limit"])
+                         if action == "chatgpt_request" else
+                         provider_wire.chatgpt_vision_request(request["model"], system=request["system"], text=request["text"],
+                                                              images=request["images"], answer_limit=request["answer_limit"]))
+                assert (built["body"], built["canonical"]) == (expect["body"], expect["canonical"]), row["why"]
+        elif action == "chatgpt_stream":
+            decoder = (TextSSEDecoder if request["mode"] == "text" else SSEDecoder)(request["answer_limit"])
+            decoder.feed(base64.b64decode(request["wire_base64"]))
+            if expect["outcome"] == "answer":
+                assert decoder.finish() == expect["text"], row["why"]
+            elif expect["outcome"] == "malformed":
+                with pytest.raises(ValueError if expect["kind"] == "utf8" else TypeError):
+                    decoder.finish()
+            else:
+                with pytest.raises(ChatGPTError) as raised:
+                    decoder.finish()
+                assert (raised.value.code, raised.value.failure, raised.value.action) == (
+                    expect["code"], expect["failure"], expect["action"]), row["why"]
+                assert isinstance(raised.value, ResponseFailure) is bool(expect.get("reported")), row["why"]
+            assert (decoder.completed, decoder.terminal) == (expect["completed"], expect["terminal"]), row["why"]
+        elif action == "chatgpt_error":
+            failure = response_error(request["value"], request["status"], request["request_id"])
+            assert (failure.code, failure.failure, failure.action, failure.status, failure.request_id, failure.param) == (
+                expect["code"], expect["failure"], expect["action"], expect["status"], expect["request_id"], expect["param"]), row["why"]
+        else:
+            assert provider_wire.chatgpt_catalog(request["value"])["models"] == expect["models"], row["why"]
+        compared[action] += 1
+    assert dict(compared) == {"chatgpt_request": 8, "chatgpt_vision_request": 8, "chatgpt_stream": 42,
+                              "chatgpt_error": 9, "chatgpt_catalog": 2}

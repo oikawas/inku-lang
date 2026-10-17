@@ -1,4 +1,10 @@
-"""Responses/SSE adapter for shared-pipeline effects; no retries."""
+"""Responses/SSE adapter for shared-pipeline effects; no retries.
+
+The bodies, the reading of the stream, the failure codes and the model list are
+the shared core's (provider_wire). This module holds the token, the
+registration's locks, cancellation, the pause on a usage limit and the
+observation records.
+"""
 
 from __future__ import annotations
 
@@ -12,13 +18,15 @@ import httpx
 
 from .chatgpt_auth import RESOURCE, access_token, read_limited
 from .chatgpt_runtime import check_session, guarded
-from .chatgpt_store import ChatGPTError, CredentialStore, canonical
+from .chatgpt_store import ChatGPTError, CredentialStore
 from .chatgpt_models import publication
-from .schema_order import ordered_schema
+from . import provider_wire
 
 logger = logging.getLogger(__name__)
 
 EFFECTS = {"generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition", "complete_visible_ddl_holes"}
+# The codes a stored diagnostic may keep (pipeline_candidate). The shared core
+# classifies failures with the same list.
 PUBLIC_CODES = {
     "subscription_sharing_usage_limit_exceeded", "subscription_sharing_user_not_eligible",
     "subscription_sharing_unsupported_capability", "subscription_sharing_route_not_supported",
@@ -29,32 +37,24 @@ PUBLIC_CODES = {
 
 
 class ResponseFailure(ChatGPTError):
-    def __init__(self, code: str, *, status: int | None = None, request_id: str | None = None, param: str | None = None):
-        temporary = code in {"subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable"} or (status is not None and status >= 500)
-        super().__init__(code, failure="transport_unavailable" if temporary else "provider_rejected",
-                         action="usage" if code == "subscription_sharing_usage_limit_exceeded" else "retry" if temporary else "diagnose")
-        self.status = status
-        self.request_id = safe_identifier(request_id)
-        self.param = safe_identifier(param)
+    """A failure the ChatGPT backend reported, as the shared core classified it."""
+
+    def __init__(self, answer: dict):
+        super().__init__(answer["code"], failure=answer["failure"], action=answer["action"])
+        self.status = answer.get("status")
+        self.request_id = answer.get("request_id")
+        self.param = answer.get("param")
 
 
 def safe_identifier(value) -> str | None:
     return value if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_.:\[\]-]{1,160}", value) else None
 
 
-def response_error(value: dict, status: int | None = None, request_id: str | None = None) -> ResponseFailure:
-    # An HTTP error body nests the error under "error" and response.failed
-    # under "response"; a stream's `error` event carries code and param itself
-    # (ResponseErrorEvent), so a usage limit sent that way still pauses the plan.
-    value = value if isinstance(value, dict) else {}
-    response = value.get("response") if isinstance(value.get("response"), dict) else {}
-    error = value.get("error") or response.get("error") or (value if value.get("type") == "error" else {})
-    if not isinstance(error, dict):
-        error = {}
-    code = error.get("code")
-    if code not in PUBLIC_CODES:
-        code = "chatgpt_admission_rejected" if status in {401, 403} else "chatgpt_transport_unavailable" if status and status >= 500 else "chatgpt_response_failed"
-    return ResponseFailure(code, status=status, request_id=request_id, param=error.get("param"))
+def response_error(value, status: int | None = None, request_id: str | None = None) -> ResponseFailure:
+    # The shared core reads an HTTP error body, a response.failed event and a
+    # stream's `error` event alike (provider_wire), so a usage limit sent any
+    # of those ways still pauses the plan.
+    return ResponseFailure(provider_wire.chatgpt_error(value, status, request_id))
 
 
 def pause_quota(owner: str, profile_id: str, generation: int, deadline: float) -> None:
@@ -68,224 +68,52 @@ def pause_quota(owner: str, profile_id: str, generation: int, deadline: float) -
             store.write(owner, saved)
 
 
-def request_body(model: str, prompt: dict) -> dict:
-    return {"model": model, "store": False, "stream": True, "instructions": prompt["system"],
-            "input": [{"role": "user", "content": prompt["message"]}],
-            "tools": [{"type": "namespace", "name": "inku", "description": "Return data for the inku drawing pipeline.",
-                       "tools": [{"type": "function", "name": "submit_pipeline_response", "description": "Return the requested drawing data.",
-                                  "parameters": ordered_schema(prompt["response_schema"]), "strict": False}]}],
-            "tool_choice": "required", "parallel_tool_calls": False}
-
-
 class SSEDecoder:
-    """Parse byte boundaries before UTF-8/JSON; cap wire, events and arguments separately."""
+    """The stream, received whole and read once by the shared core (provider_wire).
+
+    Only the wire as a whole is bounded here, as it arrives; the core holds each
+    event and the arguments to their limits and reads the events in order, so
+    the answer is the one an incremental reader gave however the bytes came.
+    """
+
+    mode = "pipeline"
 
     def __init__(self, argument_limit: int):
         self.argument_limit = argument_limit
-        self.event_limit = max(64 * 1024, argument_limit * 2 + 64 * 1024)
-        self.wire_limit = max(1024 * 1024, argument_limit * 6 + 512 * 1024)
-        self.wire_size = 0
-        self.buffer = bytearray()
-        self.items: dict[str, dict] = {}
-        self.finalized_items: dict[str, dict] = {}
-        self.arguments: dict[str, str] = {}
-        self.completed: str | None = None
+        limits = provider_wire.chatgpt_limits(argument_limit)
+        self.wire_limit, self.event_limit = limits["wire_limit"], limits["event_limit"]
+        self.wire = bytearray()
+        self.completed = False
         self.terminal = None
 
     def feed(self, chunk: bytes) -> None:
-        self.wire_size += len(chunk)
-        if self.wire_size > self.wire_limit:
+        self.wire.extend(chunk)
+        if len(self.wire) > self.wire_limit:
             raise ChatGPTError("chatgpt_response_too_large")
-        self.buffer.extend(chunk)
-        while True:
-            # CRLF and LF are both SSE line separators; a CR at the end of a
-            # chunk remains untouched until the following byte arrives.
-            match = re.search(rb"\r?\n\r?\n", self.buffer)
-            if match is None:
-                if len(self.buffer) > self.event_limit:
-                    raise ChatGPTError("chatgpt_response_too_large")
-                break
-            raw = bytes(self.buffer[:match.start()])
-            del self.buffer[:match.end()]
-            if len(raw) > self.event_limit:
-                raise ChatGPTError("chatgpt_response_too_large")
-            data = b"\n".join(line[5:].lstrip(b" ") for line in raw.splitlines() if line.startswith(b"data:"))
-            if data and data != b"[DONE]":
-                self.event(json.loads(data.decode("utf-8")))
-
-    def _function(self, item: dict) -> None:
-        if item.get("type") != "function_call" or item.get("name") != "submit_pipeline_response" or item.get("namespace") != "inku":
-            self._unexpected([item])
-
-    def _unexpected(self, items: list[dict]) -> None:
-        # Tool metadata explains protocol failures without logging text or arguments.
-        shapes = [{key: safe_identifier(item.get(key)) for key in ("type", "name", "namespace")}
-                  for item in items[:4]]
-        logger.warning("chatgpt_tool_shape %s streamed_calls=%d finalized_calls=%d",
-                       json.dumps(shapes, separators=(",", ":")), len(self.items), len(self.finalized_items))
-        raise ChatGPTError("chatgpt_unexpected_tool", action="diagnose")
-
-    def _auxiliary(self, item: dict) -> None:
-        if item.get("type") == "reasoning":
-            return
-        if item.get("type") != "message" or item.get("role") != "assistant":
-            self._unexpected([item])
-        # Assistant text can accompany a required call, but is never the result.
-        for part in item.get("content", []):
-            if part.get("type") == "refusal":
-                raise ChatGPTError("chatgpt_refused", action="edit")
-            if part.get("type") != "output_text":
-                self._unexpected([part])
-
-    def event(self, event: dict) -> None:
-        tag = event.get("type")
-        if tag in {"error", "response.failed"}:
-            self.terminal = event.get("response")
-            raise response_error(event)
-        if tag == "response.incomplete":
-            raise ChatGPTError("chatgpt_response_incomplete", failure="transport_unavailable", action="retry")
-        if "refusal" in str(tag):
-            raise ChatGPTError("chatgpt_refused", action="edit")
-        if self.terminal:
-            raise ChatGPTError("chatgpt_response_invalid")
-        if tag in {"response.output_item.added", "response.output_item.done"}:
-            item = event["item"]
-            if item.get("type") == "function_call":
-                self._function(item)
-                key = item["id"]
-                if key not in self.items and self.items:
-                    self._unexpected([*self.items.values(), item])
-                self.items[key] = item
-                if tag == "response.output_item.done":
-                    if item.get("status") not in {None, "completed"}:
-                        raise ChatGPTError("chatgpt_response_incomplete")
-                    arguments = item.get("arguments")
-                    if not isinstance(arguments, str) or self.arguments.get(key, arguments) != arguments:
-                        raise ChatGPTError("chatgpt_response_invalid")
-                    if len(arguments.encode()) > self.argument_limit:
-                        raise ChatGPTError("chatgpt_response_too_large")
-                    self.finalized_items[key] = item
-            else:
-                self._auxiliary(item)
-        elif tag == "response.function_call_arguments.delta":
-            key = event["item_id"]
-            if key not in self.items:
-                raise ChatGPTError("chatgpt_response_invalid")
-            value = self.arguments.get(key, "") + event["delta"]
-            if len(value.encode()) > self.argument_limit:
-                raise ChatGPTError("chatgpt_response_too_large")
-            self.arguments[key] = value
-        elif tag == "response.function_call_arguments.done":
-            key = event["item_id"]
-            if key not in self.items or (key in self.arguments and self.arguments[key] != event["arguments"]):
-                raise ChatGPTError("chatgpt_response_invalid")
-            if len(event["arguments"].encode()) > self.argument_limit:
-                raise ChatGPTError("chatgpt_response_too_large")
-            self.arguments[key] = event["arguments"]
-        elif tag == "response.completed":
-            response = event["response"]
-            if response.get("status") != "completed":
-                raise ChatGPTError("chatgpt_response_incomplete")
-            output = response.get("output")
-            # Some streams finish with an empty summary. The finalized item
-            # events contain the result; deltas alone never count as completion.
-            if output is None or output == []:
-                output = list(self.finalized_items.values())
-            if not isinstance(output, list):
-                raise ChatGPTError("chatgpt_response_invalid")
-            calls = []
-            for item in output:
-                if item.get("type") == "function_call":
-                    calls.append(item)
-                else:
-                    self._auxiliary(item)
-            if len(calls) != 1:
-                self._unexpected(output)
-            item = calls[0]
-            self._function(item)
-            arguments = item["arguments"]
-            finalized = self.finalized_items.get(item["id"])
-            if (item["id"] not in self.items or self.arguments.get(item["id"], arguments) != arguments
-                    or (finalized is not None and finalized["arguments"] != arguments)):
-                raise ChatGPTError("chatgpt_response_invalid")
-            if len(arguments.encode()) > self.argument_limit:
-                raise ChatGPTError("chatgpt_response_too_large")
-            if not isinstance(json.loads(arguments), dict):
-                raise ChatGPTError("chatgpt_response_invalid")
-            self.completed, self.terminal = arguments, response
 
     def finish(self) -> str:
-        if self.buffer.strip() or self.completed is None:
-            raise ChatGPTError("chatgpt_response_incomplete", failure="transport_unavailable", action="retry")
-        return self.completed
+        answer = provider_wire.chatgpt_stream(self.mode, self.argument_limit, bytes(self.wire))
+        self.completed, self.terminal = answer["completed"], answer["terminal"]
+        if answer["outcome"] == "answer":
+            return answer["text"]
+        if answer["outcome"] == "malformed":
+            # As the stream's own decoding failed: bytes that were not UTF-8
+            # raised a ValueError, other shapes a TypeError or KeyError.
+            raise (ValueError if answer["kind"] == "utf8" else TypeError)(f"chatgpt stream is malformed: {answer['kind']}")
+        if answer.get("reported"):
+            raise ResponseFailure(answer)
+        if answer.get("tool_shapes") is not None:
+            # Tool metadata explains protocol failures without logging text or arguments.
+            logger.warning("chatgpt_tool_shape %s streamed_calls=%d finalized_calls=%d",
+                           json.dumps(answer["tool_shapes"], separators=(",", ":")),
+                           answer["streamed_calls"], answer["finalized_calls"])
+        raise ChatGPTError(answer["code"], failure=answer["failure"], action=answer["action"])
 
 
 class TextSSEDecoder(SSEDecoder):
     """Vision accepts completed assistant text, never partial text or tool calls."""
 
-    def _text(self, item: dict) -> str:
-        if item.get("type") == "reasoning":
-            return ""
-        if item.get("type") != "message" or item.get("role") != "assistant":
-            self._unexpected([item])
-        if item.get("status") not in {None, "completed"}:
-            raise ChatGPTError("chatgpt_response_incomplete")
-        parts = []
-        for part in item.get("content", []):
-            if part.get("type") == "refusal":
-                raise ChatGPTError("chatgpt_refused", action="edit")
-            if part.get("type") != "output_text" or not isinstance(part.get("text"), str):
-                raise ChatGPTError("chatgpt_response_invalid")
-            parts.append(part["text"])
-        text = "".join(parts)
-        if len(text.encode("utf-8")) > self.argument_limit:
-            raise ChatGPTError("chatgpt_response_too_large")
-        return text
-
-    def event(self, event: dict) -> None:
-        tag = event.get("type")
-        if tag in {"error", "response.failed", "response.incomplete"} or "refusal" in str(tag):
-            super().event(event)
-            return
-        if self.terminal is not None:
-            raise ChatGPTError("chatgpt_response_invalid")
-        if tag in {"response.output_item.added", "response.output_item.done"}:
-            item = event["item"]
-            if item.get("type") not in {"message", "reasoning"}:
-                self._unexpected([item])
-            if tag == "response.output_item.done":
-                self._text(item)
-                self.finalized_items[item["id"]] = item
-        elif tag == "response.completed":
-            response = event["response"]
-            if response.get("status") != "completed":
-                raise ChatGPTError("chatgpt_response_incomplete")
-            output = response.get("output")
-            if output is None or output == []:
-                output = list(self.finalized_items.values())
-            if not isinstance(output, list):
-                raise ChatGPTError("chatgpt_response_invalid")
-            text = "".join(self._text(item) for item in output)
-            if len(text.encode("utf-8")) > self.argument_limit:
-                raise ChatGPTError("chatgpt_response_too_large")
-            if not text:
-                raise ChatGPTError("chatgpt_response_invalid")
-            self.completed, self.terminal = text, response
-        elif str(tag).startswith("response.function_call"):
-            raise ChatGPTError("chatgpt_unexpected_tool", action="diagnose")
-        elif tag in {"response.output_text.delta", "response.output_text.done"}:
-            text = event.get("delta" if tag.endswith("delta") else "text")
-            if not isinstance(text, str):
-                raise ChatGPTError("chatgpt_response_invalid")
-            if len(text.encode("utf-8")) > self.argument_limit:
-                raise ChatGPTError("chatgpt_response_too_large")
-
-
-def vision_request_body(model: str, *, system: str, text: str, images: list[str]) -> dict:
-    content = [{"type": "input_text", "text": text}]
-    content.extend({"type": "input_image", "image_url": image} for image in images)
-    return {"model": model, "store": False, "stream": True, "instructions": system,
-            "input": [{"role": "user", "content": content}]}
+    mode = "text"
 
 
 async def catalog(owner: str, profile_id: str, generation: int, deadline: float, cancel=None, *, force: bool = False, _wire_held: bool = False) -> list[dict]:
@@ -313,9 +141,10 @@ async def catalog(owner: str, profile_id: str, generation: int, deadline: float,
         if error.code == "subscription_sharing_usage_limit_exceeded":
             pause_quota(owner, profile_id, generation, deadline)
         raise error
-    models = [{"id": entry["slug"], "label": entry["display_name"], "purposes": ["llm", "vision"]}
-              for entry in value["models"] if entry.get("visibility") == "list"
-              and isinstance(entry.get("slug"), str) and isinstance(entry.get("display_name"), str)]
+    listed = provider_wire.chatgpt_catalog(value)
+    if listed["outcome"] != "ok":
+        raise KeyError("models")
+    models = listed["models"]
     store = CredentialStore()
     with store.lock("edit:" + owner, deadline, check):
         profile = check()
@@ -342,11 +171,15 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
                 raise ChatGPTError("chatgpt_model_not_offered", action="models")
             token = await access_token(owner, profile_id, generation, deadline, cancel)
             prompt = action["payload"]["prompt"]
-            body = vision_request_body(model, **prompt) if purpose == "vision" else request_body(model, prompt)
+            # The shared core writes the body (provider_wire); the observation
+            # keeps its canonical form, as it did.
+            built = (provider_wire.chatgpt_vision_request(model, **prompt, answer_limit=limit) if purpose == "vision"
+                     else provider_wire.chatgpt_request(model, prompt, limit))
             if observation:
                 from .pipeline_provider import provider_stage_record
                 capture, execution = observation
-                truncated = capture.request(owner, execution, action, provider_stage_record(action["tag"]), "chatgpt", model, canonical(body))
+                truncated = capture.request(owner, execution, action, provider_stage_record(action["tag"]), "chatgpt", model,
+                                            built["canonical"].encode())
                 if truncated:
                     raise ChatGPTError("chatgpt_observation_incomplete")
             decoder = TextSSEDecoder(limit) if purpose == "vision" else SSEDecoder(limit)
@@ -358,7 +191,8 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
                     client_options["transport"] = transport
                 async with httpx.AsyncClient(**client_options) as client:
                     check()
-                    stream = client.stream("POST", RESOURCE + "/responses", json=body, headers={"Authorization": "Bearer " + token},
+                    stream = client.stream("POST", RESOURCE + "/responses", content=built["body"].encode("utf-8"),
+                                           headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
                                            timeout=max(0.001, deadline - time.monotonic()))
                     response = await guarded(stream.__aenter__(), check, deadline)
                     status = response.status_code
@@ -381,7 +215,7 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
                         await stream.__aexit__(None, None, None)
             finally:
                 if observation and status:
-                    capture.response(owner, execution, action, status=status, raw=bytes(raw), truncated=decoder.completed is None,
+                    capture.response(owner, execution, action, status=status, raw=bytes(raw), truncated=not decoder.completed,
                                      decoded=decoder.terminal)
         except ResponseFailure as error:
             if error.code == "subscription_sharing_usage_limit_exceeded":

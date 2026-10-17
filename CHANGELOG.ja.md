@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-17 — ChatGPTプランの要求本文とSSEの読み方を共有coreへ移す
+
+ChatGPTプランの描画とVisionの要求本文、SSEの読み方（関数引数・文字の答えの組み立て、未完了・拒否・未知toolの判定）、失敗の分類、本人のモデル一覧の読みを共有coreの`inku.provider-wire.v1`へ移した。本文と観測記録の正準の形は以前のServerとバイト単位で同じ。Serverは流れを最後まで受けてからcoreが1回で読むため、途中の`error`イベントの後も流れが閉じるまで受けるが、答えと失敗の印は変わらない。token・登録・ロック・取消・使用量の上限での一時停止はServerに残し、`schema_order.py`を削除した。
+
 ### 2026-10-17 — AndroidのGeminiのモデル名をServerと同じに送る
 
 Androidは描画・Vision・デモの要求で、Geminiのモデル名の先頭の`models/`を外さずに共有coreへ渡すようにした。Serverと同じく名前全体をURLへpercent encodeするので、`models/gemini-3.6-flash`は`models/models%2Fgemini-3.6-flash:generateContent`へ送る。モデル一覧の取得では、Serverと同じく引き続き外す。目録に`models/`で始まるモデルは無いので、ふつうの要求の送り先は変わらない。

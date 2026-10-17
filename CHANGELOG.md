@@ -20,10 +20,6 @@ Android now delegates description identity `dh1`, render identity `rh3`, canonic
 
 macOS now calls the shared Rust implementation through UniFFI for `dh1`, `rh3` and canonical JSON, instruction-language resolution and description-label removal. Label spans convert the core's Unicode scalar offsets to the editor's UTF-16 offsets, retaining correct positions around emoji and combining characters. Existing stored identities and the prompt JSON format remain unchanged.
 
-### 2026-10-17 — Browse Library pages preceding the selected work
-
-The selected work or its lineage still starts the initial page. `← newer` now also reaches earlier positions in the listing, in both thumbnail and list views with chronological or lineage grouping. The query, filters, bulk selection and preview remain.
-
 ### 2026-10-17 — Name Android color-arrangement and ground changes in lineage
 
 Lineage edges for color-arrangement and ground changes now show Color arrangement and Ground instead of Unknown, matching the Web labels in both languages.
@@ -37,6 +33,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.179 (2026-10-17 / Build 1255)
+
+### 2026-10-17 — Browse Library pages preceding the selected work
+
+The selected work or its lineage still starts the initial page. `← newer` now also reaches earlier positions in the listing, in both thumbnail and list views with chronological or lineage grouping. The query, filters, bulk selection and preview remain.
 
 ## v2.15.178 (2026-10-17 / Build 1254)
 

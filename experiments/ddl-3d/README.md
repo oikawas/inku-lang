@@ -1,6 +1,6 @@
 # DDL 3D experiment
 
-An optional, independent browser viewer for an existing Score JSON. Circles become spheres, squares become cubes or rectangular solids, triangles become pyramids, polygons become prisms, and lines become closed tubes. The canvas's Work tab can opt into the viewer without changing saved works. A button immediately left of the hash button at the bottom right names the destination: 3D in 2D mode, and 2D in 3D mode. Both modes keep the same overlaid work controls; zoom and full screen target the active view. Other work actions keep their saved-work meaning. The 3D controls are in a collapsible overlay, and diagnostics float above the bottom controls.
+An optional, independent browser viewer for an existing Score JSON. Circles become spheres, squares become cubes or rectangular solids, triangles become pyramids, polygons become prisms, and lines become closed tubes. The canvas's Work tab can opt into the viewer without changing saved works. A button immediately left of the hash button at the bottom right names the destination: 3D in 2D mode, and 2D in 3D mode. Both modes keep the same overlaid work controls; zoom and full screen target the active view. Other work actions keep their saved-work meaning. The 3D controls, object counts and diagnostics are grouped in a collapsible overlay above the artwork, clear of its caption and bottom controls.
 
 The first camera is front-facing and orthographic. Its world-to-pixel scale and pan come from the host's current 2D canvas, preserving frontmost-object size. Camera changes then remain independent; returning to the same work recalls them. Background choices are None (transparent), Support, Blue sky and Starry sky; skies are local procedural textures without network requests. The view state remembers the background. Reset restores the initial front view and thickness/layer depth while keeping the background.
 
@@ -44,7 +44,7 @@ The bridge projects only the current Score and saved color/aspect/seed/version m
 - Front, back, left, right, top, bottom and oblique views; perspective/orthographic projection; fit/reset; full screen; grid/axes/support; wireframe/flat color; automatic rotation; separate solid thickness and layer depth controls.
 - Click selects a performed object and displays its original instruction number. Double-click or Focus selection fits it. GLB nodes retain zero-based source/performed/instance IDs and pair-fill provenance.
 - PNG saves the current canvas view. GLB saves geometry, the current depth, colors/opacity and the visible support. Viewer guides, selection, camera, lights, automatic rotation, and wireframe inspection are not baked into GLB. A GLB consumer supplies its own lighting.
-- Only the most recent snapshot's camera/projection/thickness/layer depth survives a 2D round trip, in memory. Other display controls reset. Nothing persists across a page reload.
+- Only the most recent snapshot's camera/projection/thickness/layer depth/background survives a 2D round trip, in memory. Other display controls reset. Nothing persists across a page reload.
 
 ## Mapping and compatibility
 

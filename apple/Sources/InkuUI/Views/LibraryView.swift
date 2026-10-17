@@ -59,7 +59,7 @@ struct LibraryView: View {
             }
         }
         .background(LibraryChrome.panel2)
-        .task(id: PreviewReadKey(workID: preview.work?.id, mutating: library.mutating)) {
+        .task(id: PreviewReadKey(workID: preview.work?.id, shows: preview.shows, mutating: library.mutating)) {
             guard !library.mutating else { return }
             await preview.loadAnnotation(using: { id in
                 try await model.auxiliaryDatabase().libraryAnnotation(id: id)
@@ -926,6 +926,7 @@ struct LibraryView: View {
 
     private struct PreviewReadKey: Equatable {
         let workID: String?
+        let shows: Int
         let mutating: Bool
     }
 }

@@ -63,11 +63,11 @@ def check_owner(owner: str, *, cli: bool = False) -> None:
     from . import db
     if cli:
         if not enabled() or not mode_allowed(cli=True):
-            raise ChatGPTError("chatgpt_mode_not_allowed", action="settings")
+            raise ChatGPTError("chatgpt_mode_not_allowed")
     else:
         available, reason = availability()
         if not available:
-            raise ChatGPTError(reason or "chatgpt_disabled", action="settings")
+            raise ChatGPTError(reason or "chatgpt_disabled")
     account = db.get_user(owner)
     if not account:
         raise ChatGPTError("chatgpt_owner_not_allowed")
@@ -120,15 +120,14 @@ def stop() -> None:
 def check_session(owner: str, profile_id: str, generation: int, cancel: threading.Event | None = None) -> dict:
     check_owner(owner)
     if cancel is not None and cancel.is_set():
-        raise ChatGPTError("chatgpt_cancelled", action="retry")
+        raise ChatGPTError("chatgpt_cancelled")
     profile = CredentialStore().profile(owner, profile_id)
     if profile["generation"] != generation:
         raise ChatGPTError("chatgpt_session_changed")
     if profile["state"] != "connected":
-        action = "usage" if profile["state"] == "quota" else "reconnect"
-        raise ChatGPTError("chatgpt_" + profile["state"], action=action)
+        raise ChatGPTError("chatgpt_" + profile["state"])
     if "chatgpt.tokens.use.direct" not in profile["scopes"]:
-        raise ChatGPTError("chatgpt_scope_required", action="consent")
+        raise ChatGPTError("chatgpt_scope_required")
     return profile
 
 

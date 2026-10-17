@@ -18,10 +18,20 @@ from cryptography.fernet import Fernet, InvalidToken
 
 
 class ChatGPTError(Exception):
-    """Only this fixed diagnostic, never a transport exception, is public."""
+    """Only this fixed diagnostic, never a transport exception, is public.
 
-    def __init__(self, code: str, *, failure: str = "provider_rejected", action: str = "reconnect"):
+    The pipeline failure and the next action come from the shared core's one
+    table for the code (``provider_wire.chatgpt_failure``); a failure the core
+    has already classified passes both.
+    """
+
+    def __init__(self, code: str, *, failure: str | None = None, action: str | None = None):
         super().__init__(code)
+        if failure is None or action is None:
+            from .provider_wire import chatgpt_failure
+
+            named = chatgpt_failure(code)
+            failure, action = failure or named["failure"], action or named["action"]
         self.code, self.failure, self.action = code, failure, action
 
 

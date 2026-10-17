@@ -61,7 +61,7 @@ def saved_publication(owner: str, profile_id: str, generation: int) -> dict:
     with store.lock("edit:" + owner, time.monotonic() + 5):
         profile = check_session(owner, profile_id, generation)
         if store.read(owner)["active"] != profile_id:
-            raise ChatGPTError("chatgpt_session_changed", action="models")
+            raise ChatGPTError("chatgpt_session_changed")
         return publication(profile)
 
 
@@ -72,17 +72,17 @@ def save_publication(owner: str, profile_id: str, generation: int, selected: lis
         profile = check_session(owner, profile_id, generation)
         saved = store.read(owner)
         if saved["active"] != profile_id:
-            raise ChatGPTError("chatgpt_session_changed", action="models")
+            raise ChatGPTError("chatgpt_session_changed")
         offered = {model["id"] for model in profile.get("catalog", {}).get("models", [])}
         if selected is not None and any(model not in offered for model in selected):
-            raise ChatGPTError("chatgpt_model_not_offered", action="models")
+            raise ChatGPTError("chatgpt_model_not_offered")
         if model_purposes is not None:
             if not isinstance(model_purposes, dict) or any(
                 model not in offered or not isinstance(purposes, list)
                 or any(purpose not in ("llm", "vision") for purpose in purposes)
                 for model, purposes in model_purposes.items()
             ):
-                raise ChatGPTError("chatgpt_model_not_offered", action="models")
+                raise ChatGPTError("chatgpt_model_not_offered")
             profile["model_purposes"] = {
                 **profile.get("model_purposes", {}),
                 **{model: [purpose for purpose in ("llm", "vision") if purpose in purposes]
@@ -90,7 +90,7 @@ def save_publication(owner: str, profile_id: str, generation: int, selected: lis
             }
         selected_models = selected if selected is not None else profile.get("published_models", [])
         if any(model in offered and not purposes_for_model(profile, model) for model in selected_models):
-            raise ChatGPTError("chatgpt_model_not_offered", action="models")
+            raise ChatGPTError("chatgpt_model_not_offered")
         if selected is not None:
             # A newly published model must have a purpose left after the shared
             # assessment; an older choice it has since emptied is simply not offered.
@@ -98,7 +98,7 @@ def save_publication(owner: str, profile_id: str, generation: int, selected: lis
             if any(model in offered and (not usable_purposes(profile, model, assessments.get(model, {}))
                                          or assessments.get(model, {}).get("not_supported"))
                    for model in selected):
-                raise ChatGPTError("chatgpt_model_not_offered", action="models")
+                raise ChatGPTError("chatgpt_model_not_offered")
             profile["published_models"] = list(dict.fromkeys(selected))
         saved["profiles"][profile_id] = profile
         store.write(owner, saved)

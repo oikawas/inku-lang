@@ -32,10 +32,104 @@ const PUBLIC_CODES: [&str; 9] = [
     "subscription_sharing_usage_unavailable",
     "subscription_sharing_user_unavailable",
 ];
-const TEMPORARY_CODES: [&str; 2] = [
+
+/// The codes whose failure is temporary however they arrive.
+const TEMPORARY_CODES: [&str; 5] = [
     "subscription_sharing_usage_unavailable",
     "subscription_sharing_user_unavailable",
+    "chatgpt_transport_unavailable",
+    "chatgpt_auth_unavailable",
+    "chatgpt_refresh_not_ready",
 ];
+
+/// The next action, by code. A code in none of these lists is diagnosed.
+const USAGE_CODES: [&str; 2] = ["subscription_sharing_usage_limit_exceeded", "chatgpt_quota"];
+/// Asking again is enough; the pipeline does not ask again by itself.
+const RETRY_CODES: [&str; 3] = [
+    "chatgpt_cancelled",
+    "chatgpt_attempt_busy",
+    "chatgpt_session_changed",
+];
+const CONSENT_CODES: [&str; 3] = [
+    "chatgpt_scope_required",
+    "chatgpt_consent_declined",
+    "chatpass_v2_scope_not_authorized",
+];
+const SETTINGS_CODES: [&str; 4] = [
+    "chatgpt_disabled",
+    "chatgpt_mode_not_allowed",
+    "chatgpt_startup_unverified",
+    "chatgpt_owner_not_allowed",
+];
+const MODELS_CODES: [&str; 3] = [
+    "chatgpt_model_not_offered",
+    "chatgpt_model_unavailable",
+    "chatgpt_catalog_required",
+];
+/// Signing in again mends these. `chatgpt_exported` is a registration's
+/// state, raised as `chatgpt_<state>`, once it moved to another device.
+const RECONNECT_CODES: [&str; 14] = [
+    "chatgpt_not_connected",
+    "chatgpt_exported",
+    "chatgpt_signed_out",
+    "chatgpt_reauthentication_required",
+    "chatgpt_identity_invalid",
+    "chatgpt_identity_mismatch",
+    "chatgpt_credentials_unavailable",
+    "chatgpt_auth_rejected",
+    "chatgpt_session_transferred",
+    "chatgpt_session_stale",
+    "chatgpt_session_required",
+    "chatgpt_profile_required",
+    "chatgpt_registration_incomplete",
+    "chatpass_v2_invalid_authorization_context",
+];
+
+/// The pipeline failure and the next action for a code, the one table every
+/// host reads. `temporary` says the failure was temporary as it arrived: a 5xx,
+/// or an answer that never finished; a code in `TEMPORARY_CODES` always is.
+pub(super) fn classify(code: &str, temporary: bool) -> (&'static str, &'static str) {
+    let temporary = temporary || TEMPORARY_CODES.contains(&code);
+    let failure = if code == "chatgpt_transport_timeout" {
+        "transport_timeout"
+    } else if temporary {
+        "transport_unavailable"
+    } else {
+        "provider_rejected"
+    };
+    let action = if USAGE_CODES.contains(&code) {
+        "usage"
+    } else if temporary || code == "chatgpt_transport_timeout" || RETRY_CODES.contains(&code) {
+        "retry"
+    } else if CONSENT_CODES.contains(&code) {
+        "consent"
+    } else if SETTINGS_CODES.contains(&code) {
+        "settings"
+    } else if MODELS_CODES.contains(&code) {
+        "models"
+    } else if code == "chatgpt_refused" {
+        "edit"
+    } else if RECONNECT_CODES.contains(&code) {
+        "reconnect"
+    } else {
+        "diagnose"
+    };
+    (failure, action)
+}
+
+/// The answer to `chatgpt_failure`: what a host raises for a code of its own.
+/// Without `temporary`, only an answer that never finished is temporary.
+pub(super) fn failure_answer(code: &str, temporary: Option<bool>) -> Value {
+    let (failure, action) = classify(
+        code,
+        temporary.unwrap_or(code == "chatgpt_response_incomplete"),
+    );
+    object(vec![
+        ("code", string(code)),
+        ("failure", string(failure)),
+        ("action", string(action)),
+    ])
+}
 
 /// The stream as a whole, one event, and one answer are each bounded.
 struct Limits {
@@ -198,12 +292,13 @@ struct Failure {
 }
 
 impl Failure {
-    /// `ChatGPTError(code)`: rejected, and the subscriber reconnects.
+    /// A failure that is not temporary, classified by its code.
     fn plain(code: &str) -> Self {
-        Self::with(code, "provider_rejected", "reconnect")
+        Self::of(code, false)
     }
 
-    fn with(code: &str, failure: &'static str, action: &'static str) -> Self {
+    fn of(code: &str, temporary: bool) -> Self {
+        let (failure, action) = classify(code, temporary);
         Self {
             code: code.to_owned(),
             failure,
@@ -214,11 +309,7 @@ impl Failure {
     }
 
     fn incomplete_retry() -> Self {
-        Self::with(
-            "chatgpt_response_incomplete",
-            "transport_unavailable",
-            "retry",
-        )
+        Self::of("chatgpt_response_incomplete", true)
     }
 
     fn answer(&self) -> Vec<(String, Value)> {
@@ -275,23 +366,7 @@ fn response_error(value: &Value, status: Option<i64>, request_id: Option<&Value>
         None if status.is_some_and(|status| status >= 500) => "chatgpt_transport_unavailable",
         None => "chatgpt_response_failed",
     };
-    let temporary = TEMPORARY_CODES.contains(&code) || status.is_some_and(|status| status >= 500);
-    let action = if code == "subscription_sharing_usage_limit_exceeded" {
-        "usage"
-    } else if temporary {
-        "retry"
-    } else {
-        "diagnose"
-    };
-    let mut failure = Failure::with(
-        code,
-        if temporary {
-            "transport_unavailable"
-        } else {
-            "provider_rejected"
-        },
-        action,
-    );
+    let mut failure = Failure::of(code, status.is_some_and(|status| status >= 500));
     failure.reported = Some((
         status.map_or(Value::Null, super::integer),
         safe_identifier(request_id),
@@ -436,9 +511,24 @@ fn utf8_len(value: &Value) -> Step<usize> {
     }
 }
 
+/// An identifier the stream carries: a non-empty string of at most 160 bytes.
+fn short_id(value: Option<&Value>) -> bool {
+    matches!(value, Some(Value::String(text)) if !text.is_empty() && text.len() <= 160)
+}
+
+/// Two sightings of one call name the same `call_id`, when both name one.
+fn same_call(seen: &Value, item: &Value) -> bool {
+    match (get(seen, "call_id"), get(item, "call_id")) {
+        (None | Some(Value::Null), _) | (_, None | Some(Value::Null)) => true,
+        (Some(left), Some(right)) => python_eq(left, right),
+    }
+}
+
 struct Decoder {
     text: bool,
     limits: Limits,
+    /// The response every event names, once one has named it.
+    response_id: Option<String>,
     items: Ordered<Value>,
     finalized: Ordered<Value>,
     arguments: Ordered<Value>,
@@ -454,6 +544,7 @@ impl Decoder {
             items: Ordered::default(),
             finalized: Ordered::default(),
             arguments: Ordered::default(),
+            response_id: None,
             completed: None,
             terminal: None,
         }
@@ -503,7 +594,7 @@ impl Decoder {
             }
             shapes.push(Value::Object(members));
         }
-        let mut failure = Failure::with("chatgpt_unexpected_tool", "provider_rejected", "diagnose");
+        let mut failure = Failure::plain("chatgpt_unexpected_tool");
         failure.shapes = Some((shapes, self.items.len(), self.finalized.len()));
         Err(failure.into())
     }
@@ -515,7 +606,33 @@ impl Decoder {
         {
             return self.unexpected(&[item]);
         }
+        if !short_id(get(item, "id")) {
+            return fail("chatgpt_response_invalid");
+        }
         Ok(())
+    }
+
+    /// A stream answers for one response: an id it names is short, and the same
+    /// in every event that names one.
+    fn same_response(&mut self, event: &Value) -> Step<()> {
+        let Some(response @ Value::Object(_)) = get(event, "response") else {
+            return Ok(());
+        };
+        let id = get(response, "id");
+        if matches!(id, None | Some(Value::Null)) {
+            return Ok(());
+        }
+        let Some(id) = as_str(id).filter(|_| short_id(id)) else {
+            return fail("chatgpt_response_invalid");
+        };
+        match &self.response_id {
+            Some(seen) if seen != id => fail("chatgpt_response_invalid"),
+            Some(_) => Ok(()),
+            None => {
+                self.response_id = Some(id.to_owned());
+                Ok(())
+            }
+        }
     }
 
     /// Assistant text can accompany the required call, but is never the result.
@@ -528,7 +645,7 @@ impl Decoder {
         }
         for part in content_parts(item)? {
             if is(field(part, "type")?, "refusal") {
-                return Err(Failure::with("chatgpt_refused", "provider_rejected", "edit").into());
+                return fail("chatgpt_refused");
             }
             if !is(field(part, "type")?, "output_text") {
                 return self.unexpected(&[part]);
@@ -550,11 +667,12 @@ impl Decoder {
             return Err(Failure::incomplete_retry().into());
         }
         if names_refusal(tag) {
-            return Err(Failure::with("chatgpt_refused", "provider_rejected", "edit").into());
+            return fail("chatgpt_refused");
         }
         if truthy(self.terminal.as_ref()) {
             return fail("chatgpt_response_invalid");
         }
+        self.same_response(event)?;
         let tag = str_of(tag);
         match tag.as_str() {
             "response.output_item.added" | "response.output_item.done" => {
@@ -566,6 +684,13 @@ impl Decoder {
                         let mut seen: Vec<&Value> = self.items.values().collect();
                         seen.push(item);
                         return self.unexpected(&seen);
+                    }
+                    if self
+                        .items
+                        .get(&key)
+                        .is_some_and(|seen| !same_call(seen, item))
+                    {
+                        return fail("chatgpt_response_invalid");
                     }
                     self.items.insert(key.clone(), item.clone());
                     if tag == "response.output_item.done" {
@@ -659,7 +784,10 @@ impl Decoder {
                 let arguments = index(item, "arguments")?;
                 let key = key_of(get(item, "id"))?;
                 let finalized = self.finalized.get(&key);
-                if !self.items.contains(&key)
+                if self
+                    .items
+                    .get(&key)
+                    .is_none_or(|seen| !same_call(seen, item))
                     || self
                         .arguments
                         .get(&key)
@@ -704,7 +832,7 @@ impl Decoder {
         let mut text = String::new();
         for part in content_parts(item)? {
             if is(field(part, "type")?, "refusal") {
-                return Err(Failure::with("chatgpt_refused", "provider_rejected", "edit").into());
+                return fail("chatgpt_refused");
             }
             match (is(field(part, "type")?, "output_text"), get(part, "text")) {
                 (true, Some(Value::String(piece))) => text.push_str(piece),
@@ -731,6 +859,7 @@ impl Decoder {
         if self.terminal.is_some() {
             return fail("chatgpt_response_invalid");
         }
+        self.same_response(event)?;
         let tag = str_of(tag);
         match tag.as_str() {
             "response.output_item.added" | "response.output_item.done" => {
@@ -771,12 +900,7 @@ impl Decoder {
                 self.terminal = Some(response.clone());
             }
             _ if tag.starts_with("response.function_call") => {
-                return Err(Failure::with(
-                    "chatgpt_unexpected_tool",
-                    "provider_rejected",
-                    "diagnose",
-                )
-                .into());
+                return fail("chatgpt_unexpected_tool");
             }
             "response.output_text.delta" | "response.output_text.done" => {
                 let name = if tag.ends_with("delta") {
@@ -905,25 +1029,44 @@ pub(super) fn stream_answer(text: bool, answer_limit: usize, wire: &[u8]) -> Val
 // ---------------------------------------------------------------------------
 // The model list.
 
+/// The longest slug and display name a listed model may have, in UTF-8 bytes.
+const SLUG_BYTES: usize = 256;
+const LABEL_BYTES: usize = 512;
+
 /// The models the backend lists for the subscriber: `visibility == "list"`,
-/// with a slug and a display name.
+/// with a slug and a display name. A row that cannot be published is dropped
+/// rather than losing the list, and a slug listed twice keeps its first row;
+/// `dropped` counts the listed rows left out.
 pub(super) fn catalog_answer(value: &Value) -> Value {
     let Some(Value::Array(entries)) = get(value, "models") else {
         return object(vec![("outcome", string("malformed"))]);
     };
     let mut models = Vec::new();
+    let mut slugs: Vec<&str> = Vec::new();
+    let mut dropped = 0;
     for entry in entries {
-        if !matches!(entry, Value::Object(_)) {
-            return object(vec![("outcome", string("malformed"))]);
+        if matches!(entry, Value::Object(_)) && !is(get(entry, "visibility"), "list") {
+            continue;
         }
-        if let (true, Some(Value::String(slug)), Some(Value::String(label))) = (
-            is(get(entry, "visibility"), "list"),
-            get(entry, "slug"),
-            get(entry, "display_name"),
-        ) {
+        let named = |name: &str, limit: usize| {
+            as_str(get(entry, name)).filter(|text| !text.is_empty() && text.len() <= limit)
+        };
+        let (Some(slug), Some(label)) = (
+            named("slug", SLUG_BYTES),
+            named("display_name", LABEL_BYTES),
+        ) else {
+            dropped += 1;
+            continue;
+        };
+        if slugs.contains(&slug) {
+            dropped += 1;
+            continue;
+        }
+        slugs.push(slug);
+        {
             let mut model = Vec::new();
-            set(&mut model, "id", Value::String(slug.clone()));
-            set(&mut model, "label", Value::String(label.clone()));
+            set(&mut model, "id", string(slug));
+            set(&mut model, "label", string(label));
             set(
                 &mut model,
                 "purposes",
@@ -935,6 +1078,7 @@ pub(super) fn catalog_answer(value: &Value) -> Value {
     object(vec![
         ("outcome", string("ok")),
         ("models", Value::Array(models)),
+        ("dropped", super::integer(dropped)),
     ])
 }
 

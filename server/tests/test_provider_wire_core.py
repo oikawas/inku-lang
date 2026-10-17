@@ -101,7 +101,11 @@ def test_every_shared_response_is_read_as_server_read_it():
 
 
 def test_every_shared_chatgpt_row_goes_through_servers_transport_as_it_did():
-    """The ChatGPT plan rows, written by chatgpt_provider.py at product fedfdbc7, read here as the transport reads them."""
+    """The ChatGPT plan rows, read here as the transport reads them.
+
+    The rows are chatgpt_provider.py at product fedfdbc7 with step 5's identifier
+    checks; their failures and model lists follow step 5's one table and rule.
+    """
     import base64
 
     from inku_server.chatgpt_provider import ResponseFailure, SSEDecoder, TextSSEDecoder, response_error
@@ -141,8 +145,16 @@ def test_every_shared_chatgpt_row_goes_through_servers_transport_as_it_did():
             failure = response_error(request["value"], request["status"], request["request_id"])
             assert (failure.code, failure.failure, failure.action, failure.status, failure.request_id, failure.param) == (
                 expect["code"], expect["failure"], expect["action"], expect["status"], expect["request_id"], expect["param"]), row["why"]
+        elif action == "chatgpt_failure":
+            # A code Server raises itself takes the same table.
+            error = ChatGPTError(request["code"]) if "temporary" not in request else None
+            named = provider_wire.chatgpt_failure(request["code"], request.get("temporary"))
+            assert (named["failure"], named["action"]) == (expect["failure"], expect["action"]), row["why"]
+            if error is not None:
+                assert (error.failure, error.action) == (expect["failure"], expect["action"]), row["why"]
         else:
-            assert provider_wire.chatgpt_catalog(request["value"])["models"] == expect["models"], row["why"]
+            assert {key: value for key, value in provider_wire.chatgpt_catalog(request["value"]).items()
+                    if key != "schema"} == expect, row["why"]
         compared[action] += 1
-    assert dict(compared) == {"chatgpt_request": 8, "chatgpt_vision_request": 8, "chatgpt_stream": 42,
-                              "chatgpt_error": 9, "chatgpt_catalog": 2}
+    assert dict(compared) == {"chatgpt_request": 8, "chatgpt_vision_request": 8, "chatgpt_stream": 57,
+                              "chatgpt_error": 9, "chatgpt_catalog": 5, "chatgpt_failure": 75}

@@ -1943,6 +1943,16 @@ fn answer(request: &Value) -> Result<Value, Refusal> {
                 get(request, "request_id"),
             ))
         }
+        "chatgpt_failure" => {
+            let code = as_str(get(request, "code"))
+                .ok_or_else(|| Refusal::invalid("code must be a string"))?;
+            let temporary = match get(request, "temporary") {
+                None | Some(Value::Null) => None,
+                Some(Value::Bool(flag)) => Some(*flag),
+                Some(_) => return Err(Refusal::invalid("temporary must be a boolean")),
+            };
+            Ok(chatgpt::failure_answer(code, temporary))
+        }
         "chatgpt_catalog" => {
             let empty = Value::Null;
             Ok(chatgpt::catalog_answer(
@@ -2079,7 +2089,7 @@ mod tests {
             }
             compared += 1;
         }
-        assert_eq!(compared, 69);
+        assert_eq!(compared, 162);
     }
 
     #[test]

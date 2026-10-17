@@ -27,12 +27,12 @@ def prepare_vision_settings(actor: dict, model: str, settings: dict) -> dict:
         profile_id, generation = pin(actor["id"])
         models = asyncio.run(catalog(actor["id"], profile_id, generation, time.monotonic() + 15))
         if not any(entry["id"] == model_id and entry["enabled"] and "vision" in entry["purposes"] for entry in models):
-            raise ChatGPTError("chatgpt_model_not_offered", action="models")
+            raise ChatGPTError("chatgpt_model_not_offered")
         return {**settings, "chatgpt_owner_id": actor["id"], "chatgpt_profile_id": profile_id,
                 "chatgpt_generation": generation}
     except ChatGPTError as error:
         raise chatgpt_vision_error(error) from None
     except (httpx.HTTPError, TimeoutError):
-        raise chatgpt_vision_error(ChatGPTError("chatgpt_transport_unavailable", failure="transport_unavailable", action="retry")) from None
+        raise chatgpt_vision_error(ChatGPTError("chatgpt_transport_unavailable")) from None
     except (ValueError, KeyError, TypeError):
-        raise chatgpt_vision_error(ChatGPTError("chatgpt_response_invalid", action="diagnose")) from None
+        raise chatgpt_vision_error(ChatGPTError("chatgpt_response_invalid")) from None

@@ -47,7 +47,7 @@ def check_vision_access(connection: dict[str, Any], model_id: str) -> None:
     profile = check_session(connection["owner_id"], connection["profile_id"], connection["generation"])
     if not any(model["id"] == model_id and model["enabled"] and "vision" in model["purposes"]
                for model in publication(profile)["models"]):
-        raise ChatGPTError("chatgpt_model_not_offered", action="models")
+        raise ChatGPTError("chatgpt_model_not_offered")
 
 
 def vision_text(connection: dict[str, Any], model_id: str, *, system: str, text: str, images: list[str],
@@ -68,9 +68,9 @@ def vision_text(connection: dict[str, Any], model_id: str, *, system: str, text:
         except ChatGPTError:
             raise
         except (httpx.HTTPError, TimeoutError):
-            raise ChatGPTError("chatgpt_transport_unavailable", failure="transport_unavailable", action="retry") from None
+            raise ChatGPTError("chatgpt_transport_unavailable") from None
         except (ValueError, KeyError, TypeError):
-            raise ChatGPTError("chatgpt_response_invalid", action="diagnose") from None
+            raise ChatGPTError("chatgpt_response_invalid") from None
     if connection.get("requires_api_key") and not connection.get("api_key"):
         raise ValueError(f"{connection.get('id')} API key is not configured")
     built = provider_wire.text_request(connection, model_id, system=system, text=text, images=images,

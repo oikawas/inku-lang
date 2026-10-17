@@ -74,7 +74,7 @@ async def auth_json(client: httpx.AsyncClient, method: str, url: str, check, dea
     try:
         value = json.loads(content)
     except ValueError as error:
-        raise ChatGPTError("chatgpt_auth_unavailable", failure="transport_unavailable") from error
+        raise ChatGPTError("chatgpt_auth_unavailable") from error
     if not response.is_success:
         code = value.get("error") if isinstance(value, dict) else None
         if isinstance(code, dict):
@@ -83,7 +83,7 @@ async def auth_json(client: httpx.AsyncClient, method: str, url: str, check, dea
         if code in terminal:
             raise ChatGPTError("chatgpt_reauthentication_required")
         if response.status_code >= 500:
-            raise ChatGPTError("chatgpt_auth_unavailable", failure="transport_unavailable", action="retry")
+            raise ChatGPTError("chatgpt_auth_unavailable")
         raise ChatGPTError("chatgpt_auth_rejected")
     if not isinstance(value, dict):
         raise ChatGPTError("chatgpt_identity_invalid")
@@ -156,7 +156,7 @@ async def access_token(owner: str, profile_id: str, generation: int, deadline: f
         if time.time() < profile.get("earliest_refresh_at", 0):
             if profile["expires_at"] > time.time():
                 return profile["access_token"]
-            raise ChatGPTError("chatgpt_refresh_not_ready", failure="transport_unavailable", action="retry")
+            raise ChatGPTError("chatgpt_refresh_not_ready")
         try:
             async with httpx.AsyncClient(follow_redirects=False) as client:
                 result = await auth_json(client, "POST", TOKEN, check, deadline, data={

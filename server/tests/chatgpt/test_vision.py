@@ -192,7 +192,7 @@ def test_vision_routes_carry_owner_pin_and_preserve_chatgpt_error(personal, monk
         else:
             lineage.api_okugaki_generate("fixture", lineage.OkugakiGenerateBody(model="chatgpt:sight", save=False), None, {"id": "owner"})
     assert refused.value.status_code == 403
-    assert refused.value.detail == {"code": "chatgpt_session_changed", "action": "reconnect"}
+    assert refused.value.detail == {"code": "chatgpt_session_changed", "action": "retry"}
 
 
 def test_colophon_cache_is_profile_bound_and_cannot_bypass_withdrawal(personal, monkeypatch):

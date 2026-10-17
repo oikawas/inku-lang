@@ -98,6 +98,12 @@ def chatgpt_error(value: Any, status: int | None, request_id: str | None) -> dic
     return _ask("chatgpt_error", value=value, status=status, request_id=request_id)
 
 
+@lru_cache(maxsize=256)
+def chatgpt_failure(code: str, temporary: bool | None = None) -> dict:
+    """The pipeline failure and next action the core's table gives a code."""
+    return _ask("chatgpt_failure", code=code, temporary=temporary)
+
+
 def chatgpt_catalog(value: Any) -> dict:
     """The models the backend lists for the subscriber: ``ok`` with ``models``, or ``malformed``."""
     return _ask("chatgpt_catalog", value=value)

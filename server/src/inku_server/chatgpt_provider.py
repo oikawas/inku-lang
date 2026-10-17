@@ -168,7 +168,7 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
         try:
             models = await catalog(owner, profile_id, generation, deadline, cancel, _wire_held=True)
             if not any(entry["id"] == model and entry["enabled"] and purpose in entry["purposes"] for entry in models):
-                raise ChatGPTError("chatgpt_model_not_offered", action="models")
+                raise ChatGPTError("chatgpt_model_not_offered")
             token = await access_token(owner, profile_id, generation, deadline, cancel)
             prompt = action["payload"]["prompt"]
             # The shared core writes the body (provider_wire); the observation

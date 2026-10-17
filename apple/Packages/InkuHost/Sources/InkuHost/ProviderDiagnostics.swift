@@ -37,7 +37,6 @@ public struct ProviderAttemptDiagnostic: Codable, Sendable, Equatable {
 
 enum ProviderDiagnosticSanitizer {
     private static let secretLike = try! NSRegularExpression(pattern: "\\b(?:sk|key|AIza)[-_A-Za-z0-9*]{6,}")
-    private static let maximumErrorBytes = 65_536
     private static let knownHostCodes: Set<String> = ["provider_selection_required", "credentials_unavailable",
         "provider_base_url_invalid", "invalid_provider_rate_limits", "duplicate_provider_model", "provider_model_settings_invalid",
         "pipeline_schema_violation", "malformed_payload", "provider_response_too_large", "invalid_json", "duplicate_json_key",
@@ -48,19 +47,18 @@ enum ProviderDiagnosticSanitizer {
                            operation: ProviderAttemptDiagnosticOperation? = nil) -> ProviderAttemptDiagnostic {
         let origin = endpoint.flatMap { Self.origin($0, secrets: secrets) }
         if let httpStatus {
-            let refusal: ExactJSON?
-            if let httpBody, httpBody.count <= maximumErrorBytes,
-               let value = try? ExactJSON(data: httpBody), value["error"].object != nil { refusal = value["error"] }
-            else { refusal = nil }
+            // Known credentials belong to the host; refusal fields and key-like masking belong to core.
+            let safeBody = ProviderSecretRedactor.redact(String(decoding: httpBody ?? Data(), as: UTF8.self), secrets: secrets)
+            let refusal = try? ProviderWire.readResponse(Data(safeBody.utf8), format: "openai_chat", status: httpStatus)["refusal"]
             func field(_ name: String) -> String? {
                 guard let value = refusal?[name] else { return nil }
-                let text = value.string ?? value.number.flatMap(Int64.init).map(String.init)
-                return text.flatMap { bounded($0, secrets: secrets) }
+                if let text = value.string { return text }
+                return value.number ?? value.bool.map { $0 ? "true" : "false" }
             }
             return ProviderAttemptDiagnostic(kind: .http, reason: "The provider returned an HTTP error.", endpoint: origin,
                 httpStatus: httpStatus, providerCode: field("code"), providerType: field("type"),
                 providerParameter: field("param"), providerStatus: field("status"),
-                providerMessage: refusal?["message"].string.flatMap { bounded($0, secrets: secrets) }, operation: operation)
+                providerMessage: field("message"), operation: operation)
         }
         if let error = error as? URLError {
             return ProviderAttemptDiagnostic(kind: .network, reason: networkReason(error.code), endpoint: origin,

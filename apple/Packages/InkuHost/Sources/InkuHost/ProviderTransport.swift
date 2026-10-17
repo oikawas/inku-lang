@@ -81,9 +81,13 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
             recorder?.setEndpoint(provider.baseURL)
             let key = try await credentials.key(for: provider.credentialID)
             recorder?.addSecrets(key.map { [$0] } ?? [])
-            var request = try ProviderWire.request(action: action, provider: provider, model: model, maxTokens: maxTokens, key: key)
+            let wire = try ProviderWire.prepare(action: action, provider: provider, model: model, maxTokens: maxTokens, key: key)
+            var request = wire.request
             request.timeoutInterval = Double(timeoutMS) / 1000
             let boundedRequest = request
+            var tokenRequest = wire.countTokens
+            tokenRequest?.timeoutInterval = request.timeoutInterval
+            let boundedTokenRequest = tokenRequest
             if let recorder {
                 recorder.prepare(body: boundedRequest.httpBody ?? Data(), providerID: provider.id, model: model, secrets: key.map { [$0] } ?? [])
                 // This gate precedes inference and Gemini's optional token-count HTTP call.
@@ -105,7 +109,10 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                         recorder?.setOperation(.admission)
                         try await self.budget.prepare(provider: provider)
                         recorder?.setOperation(.tokenCount)
-                        do { inputTokens = try await self.countGeminiTokens(boundedRequest, session: attemptSession) }
+                        do {
+                            guard let boundedTokenRequest else { throw HostError("pipeline_schema_violation") }
+                            inputTokens = try await self.countGeminiTokens(boundedTokenRequest, session: attemptSession)
+                        }
                         catch {
                             if let status = error as? HTTPFailure, status.status == 429 {
                                 recorder?.setOperation(.admission)
@@ -127,11 +134,9 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                         bytes = try await self.readObserved(boundedRequest, session: attemptSession,
                             maximum: self.maximumResponseBytes, onBytes: onBytes,
                             onResponse: { recorder?.receive($0) })
-                        let value = try ExactJSON(data: bytes!)
-                        recorder?.report(value)
-                        let usage = provider.kind == .gemini ? value["usageMetadata"] : value["usage"]
-                        let tokenKey = provider.kind == .gemini ? "promptTokenCount" : (provider.kind == .anthropic || ProviderWire.isOpenAIAPI(provider) ? "input_tokens" : "prompt_tokens")
-                        used = usage[tokenKey].number.flatMap(Int.init).flatMap { $0 >= 0 ? $0 : nil }
+                        if let value = try? ExactJSON(data: bytes!) { recorder?.report(value) }
+                        let read = try ProviderWire.readResponse(bytes!, format: wire.format)
+                        used = read["input_tokens"].number.flatMap(Int.init)
                     } catch { attemptError = error }
                     recorder?.setOperation(.admission)
                     if let status = attemptError as? HTTPFailure, status.status == 429 {
@@ -153,9 +158,9 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                 return result
             }
             // Server pipeline_provider logs what a cut-off answer spent before refusing it.
-            ProviderOutputLimit.log(raw, request: boundedRequest, provider: provider, model: model, action: tag,
-                                    responses: ProviderWire.isOpenAIAPI(provider))
-            response = try ProviderWire.responseText(raw, provider: provider)
+            let read = try ProviderWire.readResponse(raw, format: wire.format)
+            ProviderOutputLimit.log(read, outputBudget: wire.outputBudget, provider: provider.id, model: model, action: tag)
+            response = try ProviderWire.answer(read)
         } catch let error as ProviderObservationFailure { throw error }
         catch is CancellationError {
             try await recorder?.finish(failure: nil, cancelled: true, callback: didFinish)
@@ -172,7 +177,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         }
         catch let error as HTTPFailure {
             recorder?.recordFailure(error, httpStatus: error.status, httpBody: error.body)
-            failure = error.status == 429 ? "rate_limited" : (error.status >= 500 ? "transport_unavailable" : "provider_rejected")
+            failure = try ProviderWire.readResponse(error.body ?? Data(), format: "openai_chat", status: error.status).requiredString("failure")
         } catch let error as URLError {
             if error.code == .cancelled && Task.isCancelled {
                 try await recorder?.finish(failure: nil, cancelled: true, callback: didFinish)
@@ -264,46 +269,27 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
         let (provider, model) = try resolve(modelReference, providers: settings.providers)
         let key = try await credentials.key(for: provider.credentialID)
-        let request = try AuxiliaryWire.request(prompt: prompt, provider: provider, model: model, key: key)
-        // Server's demo calls the Anthropic and OpenAI SDKs (two retries by default) and Gemini through urllib
-        // (none); Vision uses one httpx request.
-        let retries = prompt.purpose == .demo && provider.kind != .gemini ? 2 : 0
+        let wire = try ProviderWire.prepareText(prompt: prompt, provider: provider, model: model, key: key)
+        var request = wire.request; request.timeoutInterval = prompt.timeoutSeconds
         do {
-            var attempt = 0
-            while true {
-                do {
-                    let raw = try await auxiliaryAttempt(request, timeout: prompt.timeoutSeconds, onBytes: onBytes)
-                    try Task.checkCancellation()
-                    // Server vision_client returns a cut-off answer as it is and logs that the budget ran out.
-                    if prompt.purpose == .vision {
-                        ProviderOutputLimit.log(raw, request: request, provider: provider, model: model, action: "vision", responses: false)
-                    }
-                    return try AuxiliaryWire.responseText(raw, kind: provider.kind, purpose: prompt.purpose)
-                } catch {
-                    guard attempt < retries, let delay = Self.sdkRetryDelay(error, retry: attempt, kind: provider.kind) else { throw error }
-                    attempt += 1
-                    try await Task.sleep(for: .seconds(delay))
-                }
+            let raw = try await auxiliaryAttempt(request, timeout: prompt.timeoutSeconds, onBytes: onBytes)
+            try Task.checkCancellation()
+            let read = try ProviderWire.readResponse(raw, format: wire.format, text: true)
+            if prompt.purpose == .vision {
+                ProviderOutputLimit.log(read, outputBudget: wire.outputBudget, provider: provider.id, model: model, action: "vision")
             }
+            return try ProviderWire.answer(read)
         } catch is CancellationError { throw CancellationError() }
         catch let error as HTTPFailure {
-            throw HostError(error.status == 429 ? "rate_limited" : error.status >= 500 ? "transport_unavailable" : "provider_rejected")
+            let read = try ProviderWire.readResponse(error.body ?? Data(), format: wire.format, status: error.status, text: true)
+            throw HostError(try read.requiredString("failure"))
         } catch let error as URLError {
             if error.code == .cancelled && Task.isCancelled { throw CancellationError() }
             throw HostError(error.code == .timedOut ? "transport_timeout" : "transport_unavailable")
         }
     }
 
-    private func countGeminiTokens(_ original: URLRequest, session: URLSession?) async throws -> Int {
-        guard let originalURL = original.url,
-              let originalBody = original.httpBody,
-              let url = URL(string: originalURL.absoluteString.replacingOccurrences(of: ":generateContent", with: ":countTokens")) else { throw HostError("rate_limited") }
-        let requestBody = try ExactJSON(data: originalBody)
-        var inner = requestBody
-        let modelPath = originalURL.path.components(separatedBy: "/models/").last?.replacingOccurrences(of: ":generateContent", with: "") ?? ""
-        inner["model"] = .string("models/" + modelPath)
-        var request = original; request.url = url
-        request.httpBody = Data(ExactJSON.object(["generateContentRequest": inner]).orderedText.utf8)
+    private func countGeminiTokens(_ request: URLRequest, session: URLSession?) async throws -> Int {
         let value = try ExactJSON(data: await readObserved(request, session: session, maximum: min(16384, maximumResponseBytes),
             onBytes: { _ in }, onResponse: { _ in }))
         guard value.object != nil else { throw HostError("malformed_payload") }
@@ -326,32 +312,6 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         }
     }
 
-    /// The Anthropic (0.120) and OpenAI (2.52) Python SDK policy: 408, 409, 429, 5xx and connection or timeout
-    /// failures, `x-should-retry` first, a short server-directed delay, else 0.5 s doubling to 8 s with jitter.
-    static func sdkRetryDelay(_ error: any Error, retry: Int, kind: ProviderKind, random: Double = .random(in: 0..<1)) -> Double? {
-        if let failure = error as? HTTPFailure {
-            // OpenAI gives up on a Retry-After beyond two minutes; Anthropic falls back to its own backoff.
-            let ceiling: Double = kind == .anthropic ? 60 : 120
-            if kind != .anthropic, let after = failure.serverDelay, after.isFinite, after > ceiling { return nil }
-            if let header = failure.shouldRetry { guard header else { return nil } }
-            else { guard [408, 409, 429].contains(failure.status) || failure.status >= 500 else { return nil } }
-            if let after = failure.serverDelay, after.isFinite, after > 0, after <= ceiling { return after }
-        } else if let error = error as? URLError {
-            guard error.code != .cancelled else { return nil }
-        } else if (error as? HostError)?.code != "transport_timeout" { return nil }
-        return min(0.5 * pow(2, Double(retry)), 8) * (1 - 0.25 * random)
-    }
-
-    /// `retry-after-ms`, then `retry-after` as seconds or an HTTP date, as both SDKs read them.
-    static func sdkRetryAfter(_ response: HTTPURLResponse, now: Date = Date()) -> Double? {
-        if let value = response.value(forHTTPHeaderField: "retry-after-ms").flatMap(Double.init) { return value / 1000 }
-        guard let header = response.value(forHTTPHeaderField: "retry-after") else { return nil }
-        if let seconds = Double(header) { return seconds }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
-        return formatter.date(from: header).map { $0.timeIntervalSince(now) }
-    }
-
     private func read(_ request: URLRequest, maximum: Int, onBytes: @Sendable (Int) -> Void) async throws -> Data {
         // One HTTP client per request, as Server opens one for each auxiliary call.
         let session = Self.makeSession()
@@ -359,21 +319,32 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         let (bytes, response) = try await session.bytes(for: request)
         defer { bytes.task.cancel() }
         guard let response = response as? HTTPURLResponse else { throw HostError("transport_unavailable") }
-        guard (200...299).contains(response.statusCode) else {
-            let retry = response.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init) ?? 60
-            throw HTTPFailure(status: response.statusCode, retryAfter: max(0, retry),
-                              shouldRetry: response.value(forHTTPHeaderField: "x-should-retry").flatMap { ["true": true, "false": false][$0] },
-                              serverDelay: Self.sdkRetryAfter(response))
-        }
-        if response.expectedContentLength > Int64(maximum) { throw HostError("malformed_payload") }
+        let success = (200...299).contains(response.statusCode)
+        if success && response.expectedContentLength > Int64(maximum) { throw HostError("malformed_payload") }
+        let limit = success ? maximum : min(maximum, 65_536)
         var raw = Data(); raw.reserveCapacity(min(maximum, 65536))
-        for try await byte in bytes {
-            try Task.checkCancellation()
-            guard raw.count < maximum else { throw HostError("malformed_payload") }
-            raw.append(byte)
-            if raw.count % 4096 == 0 { onBytes(raw.count) }
+        do {
+            for try await byte in bytes {
+                try Task.checkCancellation()
+                guard raw.count < limit else {
+                    if success { throw HostError("malformed_payload") }
+                    break
+                }
+                raw.append(byte)
+                if raw.count % 4096 == 0 { onBytes(raw.count) }
+            }
+        } catch {
+            if !success && !Task.isCancelled {
+                throw HTTPFailure(status: response.statusCode,
+                    retryAfter: ProviderRateBudget.retryAfter(response.value(forHTTPHeaderField: "Retry-After"), raw: raw, now: budget.now()), body: raw)
+            }
+            throw error
         }
         onBytes(raw.count)
+        if !success {
+            throw HTTPFailure(status: response.statusCode,
+                retryAfter: ProviderRateBudget.retryAfter(response.value(forHTTPHeaderField: "Retry-After"), raw: raw, now: budget.now()), body: raw)
+        }
         return raw
     }
 }
@@ -431,7 +402,6 @@ private final class ProviderRateWait: @unchecked Sendable {
 }
 struct HTTPFailure: Error {
     let status: Int; let retryAfter: Double; var body: Data? = nil
-    var shouldRetry: Bool? = nil; var serverDelay: Double? = nil
 }
 private final class RejectRedirects: NSObject, URLSessionTaskDelegate, Sendable {
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,

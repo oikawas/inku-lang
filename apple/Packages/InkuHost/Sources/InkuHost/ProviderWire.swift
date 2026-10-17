@@ -1,252 +1,102 @@
 import Foundation
-import OSLog
+import InkuCore
 
-/// This adapter changes HTTP shape only. The core owns prompt, schema and response validation.
+struct PreparedProviderRequest: Sendable {
+    let request: URLRequest
+    let format: String
+    let outputBudget: ExactJSON
+    let countTokens: URLRequest?
+}
+
+/// The core owns wire rules; the host attaches credentials and sends its unchanged bytes.
 public enum ProviderWire {
     public static let responseName = "submit_pipeline_response"
 
-    public static func request(action: Data, provider: ProviderSettings, model: String, maxTokens: Int, key: String?) throws -> URLRequest {
+    public static func evaluate(_ input: Data) throws -> ExactJSON {
+        let value = try ExactJSON(data: InkuCore.providerWire(input))
+        guard value["schema"].string == "inku.provider-wire.v1" else { throw HostError("pipeline_schema_violation") }
+        return value
+    }
+
+    static func connection(_ provider: ProviderSettings) -> ExactJSON {
+        .object(["id": .string(provider.id), "kind": .string(provider.kind.rawValue),
+            "api_profile": .string(provider.apiProfile ?? ""), "base_url": .string(provider.baseURL.absoluteString)])
+    }
+
+    static func prepare(action: Data, provider: ProviderSettings, model: String, maxTokens: Int, key: String?) throws -> PreparedProviderRequest {
         try provider.validate()
+        guard provider.kind != .chatGPTPlan else { throw HostError("chatgpt_session_pin_required") }
         guard !model.isEmpty, maxTokens > 0 else { throw HostError("provider_selection_required") }
+        let payload = try ExactJSON.rawMember("payload", in: action)
+        let prompt = try ExactJSON.rawMember("prompt", in: payload)
+        let envelope: ExactJSON = .object(["action": .string("pipeline_request"), "connection": connection(provider),
+            "model": .string(model), "max_tokens": .integer(maxTokens)])
+        // Passing the original prompt preserves variant member order as well as propertyOrdering.
+        let input = Data((String(envelope.text.dropLast()) + ",\"prompt\":" + String(decoding: prompt, as: UTF8.self) + "}").utf8)
+        return try prepared(evaluate(input), provider: provider, key: key)
+    }
+
+    static func prepareText(prompt: AuxiliaryPrompt, provider: ProviderSettings, model: String, key: String?) throws -> PreparedProviderRequest {
+        try provider.validate()
+        guard provider.kind != .chatGPTPlan else { throw HostError("chatgpt_operation_not_supported") }
+        guard !model.isEmpty, prompt.maximumTokens > 0, prompt.temperature.isFinite,
+              prompt.timeoutSeconds > 0, prompt.timeoutSeconds.isFinite else { throw HostError("invalid_auxiliary_request") }
+        let input: ExactJSON = .object(["action": .string("text_request"), "connection": connection(provider),
+            "model": .string(model), "system": .string(prompt.system), "text": .string(prompt.message),
+            "images": .array(prompt.images.map(ExactJSON.string)),
+            "temperature": try ExactJSON(data: JSONEncoder().encode(prompt.temperature)),
+            "max_tokens": .integer(prompt.maximumTokens)])
+        return try prepared(evaluate(input.data), provider: provider, key: key)
+    }
+
+    private static func prepared(_ result: ExactJSON, provider: ProviderSettings, key: String?) throws -> PreparedProviderRequest {
+        guard result["outcome"].string == "ok" else { throw HostError(result["reason"].string ?? "provider_rejected") }
         if provider.requiresAPIKey && (key ?? "").isEmpty { throw HostError("credentials_unavailable") }
-        let effect = try ExactJSON(data: action)
-        let prompt = try effect.requiredObject("payload").requiredObject("prompt")
-        let system = try prompt.requiredString("system")
-        let message = try prompt.requiredString("message")
-        let schema = try prompt.requiredObject("response_schema")
-        let actionName = try prompt.requiredString("action_name")
-        let base = provider.baseURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let function: ExactJSON = .object(["name": .string(responseName), "description": .string("Submit the requested pipeline response."), "parameters": schema])
-        var body: ExactJSON
-        var endpoint: String
-        var headers = ["Content-Type": "application/json"]
-        switch provider.kind {
-        case .chatGPTPlan: throw HostError("chatgpt_session_pin_required")
-        case .openAICompatible:
-            headers["Authorization"] = "Bearer " + ((key ?? "").isEmpty ? "none" : key!)
-            let temperature = ["generate_normalized_ddl", "read_composition"].contains(actionName) ? "0.3" : "0.0"
-            if isOpenAIAPI(provider) {
-                endpoint = base + "/responses"
-                let sampling = openAISampling(model, maxTokens: maxTokens, temperature: temperature)
-                body = .object(["model": .string(model), "store": .bool(false), "instructions": .string(system),
-                    "input": .array([.object(["role": .string("user"), "content": .string(message)])]),
-                    "tools": .array([.object(["type": .string("function"), "name": .string(responseName),
-                        "description": function["description"], "parameters": schema, "strict": .bool(false)])]),
-                    "tool_choice": .string("required"), "parallel_tool_calls": .bool(false),
-                    "max_output_tokens": sampling["max_completion_tokens"]])
-                if sampling["temperature"] != .null { body["temperature"] = sampling["temperature"] }
-                if let effort = sampling["reasoning_effort"].string { body["reasoning"] = .object(["effort": .string(effort)]) }
-            } else {
-                endpoint = base + "/chat/completions"
-                body = .object(["model": .string(model), "stream": .bool(false),
-                    "messages": .array([.object(["role": .string("system"), "content": .string(system)]),
-                                         .object(["role": .string("user"), "content": .string(message)])])])
-                body["max_tokens"] = .integer(maxTokens); body["temperature"] = .number(temperature)
-                if provider.apiProfile == "mlx" {
-                    body["enable_thinking"] = .bool(false)
-                    let name = model.split(separator: "/").last.map(String.init) ?? model
-                    if name.range(of: "^gemma[-_]?4(?:[-_]|$)", options: [.regularExpression, .caseInsensitive]) != nil {
-                        body["temperature"] = .number("1.0"); body["top_p"] = .number("0.95"); body["top_k"] = .integer(64)
-                    }
-                }
-                applyNIMSampling(to: &body, providerID: provider.id, model: model)
-                applyOllamaSampling(to: &body, providerID: provider.id, model: model, maxTokens: maxTokens)
-                if provider.id == "ollama" || provider.apiProfile == "mlx" {
-                    body["response_format"] = .object(["type": .string("json_schema"), "json_schema": .object(["name": .string(responseName), "schema": schema, "strict": .bool(true)])])
-                } else {
-                    body["tools"] = .array([.object(["type": .string("function"), "function": function])])
-                    body["tool_choice"] = .object(["type": .string("function"), "function": .object(["name": .string(responseName)])])
-                }
-            }
-        case .anthropic:
-            endpoint = base + "/v1/messages"
-            headers["x-api-key"] = key ?? ""; headers["anthropic-version"] = "2023-06-01"
-            body = .object(["model": .string(model), "max_tokens": .integer(ProviderOutputLimit.anthropicMaxTokens(model, answerTokens: maxTokens)), "system": .string(system),
-                            "messages": .array([.object(["role": .string("user"), "content": .string(message)])]),
-                            "tools": .array([.object(["name": .string(responseName), "description": function["description"], "input_schema": schema])]),
-                            "tool_choice": .object(["type": .string("auto")])])
-        case .gemini:
-            let encoded = model.addingPercentEncoding(withAllowedCharacters: CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~"))!
-            endpoint = base + "/v1beta/models/" + encoded + ":generateContent"
-            headers["x-goog-api-key"] = key ?? ""
-            let configuration = geminiGenerationConfig(model, answerTokens: maxTokens)
-            body = .object(["systemInstruction": .object(["parts": .array([.object(["text": .string(system)])])]),
-                            "contents": .array([.object(["role": .string("user"), "parts": .array([.object(["text": .string(message)])])])]),
-                            "generationConfig": configuration,
-                            "tools": .array([.object(["functionDeclarations": .array([.object(["name": .string(responseName), "description": function["description"], "parametersJsonSchema": try geminiSchema(schema, compactHoleEdits: actionName == "complete_visible_ddl_holes")])])])]),
-                            "toolConfig": .object(["functionCallingConfig": .object(["mode": .string("ANY"), "allowedFunctionNames": .array([.string(responseName)])])])])
+        var headers = try JSONDecoder().decode([String: String].self, from: result["headers"].data)
+        let auth = try result.requiredObject("auth")
+        headers[try auth.requiredString("header")] = try auth.requiredString("prefix") +
+            ((key ?? "").isEmpty ? auth.requiredString("missing") : key!)
+        func request(_ value: ExactJSON) throws -> URLRequest {
+            guard let url = URL(string: try value.requiredString("url")) else { throw HostError("provider_base_url_invalid") }
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"; request.allHTTPHeaderFields = headers
+            request.httpBody = Data(try value.requiredString("body").utf8)
+            return request
         }
-        guard let url = URL(string: endpoint) else { throw HostError("provider_base_url_invalid") }
-        var request = URLRequest(url: url)
-        // The core writes schema keys in name order; every dialect receives properties in their propertyOrdering.
-        request.httpMethod = "POST"; request.httpBody = Data(body.orderedText.utf8)
-        request.allHTTPHeaderFields = headers
-        return request
+        return PreparedProviderRequest(request: try request(result), format: try result.requiredString("format"),
+            outputBudget: result["output_budget"], countTokens: result["count_tokens"] == .null ? nil : try request(result["count_tokens"]))
     }
 
-    static func isOpenAIAPI(_ provider: ProviderSettings) -> Bool {
-        provider.kind == .openAICompatible && provider.baseURL.host?.lowercased() == "api.openai.com"
+    public static func request(action: Data, provider: ProviderSettings, model: String, maxTokens: Int, key: String?) throws -> URLRequest {
+        try prepare(action: action, provider: provider, model: model, maxTokens: maxTokens, key: key).request
     }
 
-    // Shared by Responses drawing and Chat Completions auxiliary requests.
-    static func openAISampling(_ model: String, maxTokens: Int, temperature: String) -> ExactJSON {
-        var sampling: ExactJSON = .object(["max_completion_tokens": .integer(maxTokens)])
-        if model.range(of: "^(gpt-5|gpt-6|o\\d)", options: .regularExpression) == nil {
-            sampling["temperature"] = .number(temperature)
-        } else if model.range(of: "^(gpt-5\\.\\d|gpt-6-(?:sol|luna)(?:-|$))", options: .regularExpression) != nil {
-            sampling["reasoning_effort"] = .string("none")
-        } else {
-            sampling["reasoning_effort"] = .string("low")
-            sampling["max_completion_tokens"] = .integer(maxTokens + 25000)
+    static func readResponse(_ data: Data, format: String, status: Int = 200, text: Bool = false) throws -> ExactJSON {
+        try evaluate(ExactJSON.object(["action": .string(text ? "text_response" : "pipeline_response"),
+            "format": .string(format), "status": .integer(status), "body": .string(String(decoding: data, as: UTF8.self))]).data)
+    }
+
+    static func answer(_ result: ExactJSON) throws -> String {
+        guard result["outcome"].string == "answer" else {
+            throw HostError(result["outcome"].string == "http_error" ? result["failure"].string ?? "provider_rejected" : "malformed_payload")
         }
-        return sampling
+        return try result.requiredString("text")
     }
 
-    // NIM's hosted Gemma 4 must have thinking disabled in its chat template.
-    static func applyNIMSampling(to body: inout ExactJSON, providerID: String, model: String) {
-        let name = model.components(separatedBy: "/").last ?? model
-        guard providerID == "nvidia", name.range(of: "^gemma[-_]?4(?:[-_]|$)", options: [.regularExpression, .caseInsensitive]) != nil else { return }
-        body["chat_template_kwargs"] = .object(["enable_thinking": .bool(false)])
-    }
-
-    // Mirrors Server openai_sampling for both local and Cloud Ollama.
-    static func applyOllamaSampling(to body: inout ExactJSON, providerID: String, model: String, maxTokens: Int) {
-        guard ["ollama", "ollama-cloud"].contains(providerID) else { return }
-        let levelsOnly = model.range(of: "^gpt-oss(?:[:-]|$)", options: .regularExpression) != nil
-        body["reasoning_effort"] = .string(levelsOnly ? "low" : "none")
-        if levelsOnly { body["max_tokens"] = .integer(maxTokens + 8192) }
-    }
-
-    private static let geminiMinimalModels: Set<String> = [
-        "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest",
-        "gemini-3-flash-preview", "gemini-3.1-flash-lite", "gemini-3.1-flash-lite-preview",
-        "gemini-3.1-flash-image", "gemini-3.1-flash-image-preview", "gemini-3.1-flash-lite-image",
-        "gemini-robotics-er-2-preview", "nano-banana-pro-preview", "gemini-nano-banana-2.1",
-    ]
-
-    // Mirrors Server gemini_request: only known models get minimal; moving
-    // aliases and unknown models get low, and models without thinking get no level.
-    static func geminiThinkingConfig(_ model: String) -> ExactJSON? {
-        let name = model.hasPrefix("models/") ? String(model.dropFirst("models/".count)) : model
-        if name.range(of: "^(?:gemini-2\\.5-flash-(?:lite|image)(?:-|$)|antigravity-)", options: .regularExpression) != nil { return nil }
-        let minimal = geminiMinimalModels.contains(name) || name.hasPrefix("gemma-")
-        return .object(["thinkingLevel": .string(minimal ? "minimal" : "low")])
-    }
-
-    static func geminiGenerationConfig(_ model: String, answerTokens: Int) -> ExactJSON {
-        let thinking = geminiThinkingConfig(model)
-        // Gemini's maxOutputTokens includes thoughts as well as the answer.
-        var configuration: ExactJSON = .object(["maxOutputTokens": .integer(answerTokens + (thinking == nil ? 0 : 8192))])
-        if let thinking { configuration["thinkingConfig"] = thinking }
-        return configuration
-    }
-
-    public static func responseText(_ data: Data, provider: ProviderSettings) throws -> String {
-        guard isOpenAIAPI(provider) else { return try responseText(data, kind: provider.kind) }
-        let value = try ExactJSON(data: data)
-        let output = value["output"].array ?? []
-        // A cut-off answer is not completed; the transport logs what it spent.
-        guard value["status"].string == "completed", value["output"].array != nil else { throw HostError("malformed_payload") }
-        let calls = output.filter { $0["type"].string == "function_call" }
-        let text: String
-        if !calls.isEmpty {
-            guard calls.count == 1, calls[0]["name"].string == responseName,
-                  let arguments = calls[0]["arguments"].string else { throw HostError("malformed_payload") }
-            text = arguments
-        } else {
-            text = output.filter { $0["type"].string == "message" }
-                .flatMap { $0["content"].array ?? [] }
-                .filter { $0["type"].string == "output_text" }
-                .compactMap { $0["text"].string }.joined()
-        }
-        guard !text.isEmpty else { throw HostError("malformed_payload") }
-        return text
+    public static func responseText(_ data: Data, format: String) throws -> String {
+        try answer(readResponse(data, format: format))
     }
 
     public static func responseText(_ data: Data, kind: ProviderKind) throws -> String {
-        let value = try ExactJSON(data: data)
-        // Server pipeline_provider: an answer stopped at its output limit is cut off whatever it holds,
-        // so a tool input or JSON text that ends there is not the whole answer (malformed_payload).
-        if ProviderOutputLimit.record(value, kind: kind, responses: false) != nil { throw HostError("malformed_payload") }
-        var text: String?
-        switch kind {
-        case .chatGPTPlan: throw HostError("chatgpt_operation_not_supported")
-        case .openAICompatible:
-            guard let message = value["choices"].array?.first?["message"] else { throw HostError("malformed_payload") }
-            let calls = message["tool_calls"].array ?? []
-            if calls.isEmpty { text = message["content"].string }
-            else {
-                guard calls.count == 1, calls[0]["function"]["name"].string == responseName else { throw HostError("malformed_payload") }
-                text = calls[0]["function"]["arguments"].string
-            }
-        case .anthropic:
-            guard let content = value["content"].array else { throw HostError("malformed_payload") }
-            let calls = content.filter { $0["type"].string == "tool_use" }
-            if !calls.isEmpty {
-                guard calls.count == 1, calls[0]["name"].string == responseName, calls[0]["input"].object != nil else { throw HostError("malformed_payload") }
-                text = calls[0]["input"].text
-            } else {
-                let answer = content.filter { $0["type"].string == "text" }.compactMap { $0["text"].string }.joined(separator: "\n")
-                guard let first = answer.firstIndex(of: "{"), let last = answer.lastIndex(of: "}"), first < last else { throw HostError("malformed_payload") }
-                let parsed = try ExactJSON(data: Data(answer[first...last].utf8))
-                guard parsed.object != nil else { throw HostError("malformed_payload") }
-                text = parsed.text
-            }
-        case .gemini:
-            guard let parts = value["candidates"].array?.first?["content"]["parts"].array else { throw HostError("malformed_payload") }
-            let calls = parts.map { $0["functionCall"] }.filter { $0.object != nil }
-            guard calls.count == 1, calls[0]["name"].string == responseName, calls[0]["args"].object != nil else { throw HostError("malformed_payload") }
-            text = calls[0]["args"].text
-        }
-        guard let text, !text.isEmpty else { throw HostError("malformed_payload") }
-        return text
+        try responseText(data, format: format(kind))
     }
 
-    public static func geminiSchema(_ schema: ExactJSON, compactHoleEdits: Bool = false) throws -> ExactJSON {
-        let keys: Set<String> = ["$anchor", "$defs", "$id", "$ref", "additionalProperties", "anyOf", "description", "enum", "format", "items", "maxItems", "maximum", "minItems", "minimum", "oneOf", "prefixItems", "properties", "propertyOrdering", "required", "title", "type"]
-        func project(_ value: ExactJSON, named: Bool = false) -> ExactJSON {
-            if let values = value.array { return .array(values.map { project($0) }) }
-            guard let fields = value.object else { return value }
-            var output: [String: ExactJSON] = [:]
-            for (key, item) in fields {
-                if named { output[key] = project(item) }
-                else if key == "const" { output["enum"] = .array([item]) }
-                else if keys.contains(key) { output[key] = project(item, named: key == "$defs" || key == "properties") }
-            }
-            return .object(output)
+    static func format(_ kind: ProviderKind) throws -> String {
+        switch kind {
+        case .openAICompatible: "openai_chat"
+        case .anthropic: "anthropic"
+        case .gemini: "gemini"
+        case .chatGPTPlan: throw HostError("chatgpt_operation_not_supported")
         }
-        func merge(_ values: [ExactJSON]) -> ExactJSON? {
-            guard let first = values.first else { return nil }
-            if values.allSatisfy({ $0 == first }) { return first }
-            guard let fields = first.object, values.allSatisfy({ $0.object.map { Set($0.keys) } == Set(fields.keys) }) else { return nil }
-            if Set(fields.keys) == ["enum"], values.allSatisfy({ $0["enum"].array?.count == 1 }) { return .object(["enum": .array(values.map { $0["enum"].array![0] })]) }
-            var merged: [String: ExactJSON] = [:]
-            for key in fields.keys { guard let item = merge(values.map { $0[key] }) else { return nil }; merged[key] = item }
-            return .object(merged)
-        }
-        var result = project(schema)
-        guard result["type"].string == "object" else { throw HostError("malformed_payload") }
-        if compactHoleEdits {
-            var properties = result["properties"]
-            let name = properties["results"].object != nil ? "results" : "edits"
-            var collection = properties[name]
-            if let variants = collection["items"]["oneOf"].array, !variants.isEmpty {
-                if let merged = merge(variants), merged["type"].string == "object" { collection["items"] = merged }
-                else if variants.allSatisfy({ $0["properties"].object != nil }) {
-                    var required = Set(variants[0]["required"].array?.compactMap(\.string) ?? [])
-                    for variant in variants.dropFirst() { required.formIntersection(variant["required"].array?.compactMap(\.string) ?? []) }
-                    let allNames = Set(variants.flatMap { Array($0["properties"].object!.keys) })
-                    var mergedProperties: [String: ExactJSON] = [:]
-                    for key in allNames {
-                        let candidates = variants.compactMap { $0["properties"].object?[key] }
-                        guard let value = merge(candidates) else { return result }
-                        mergedProperties[key] = value
-                    }
-                    collection["items"] = .object(["type": .string("object"), "additionalProperties": .bool(false), "required": .array(required.sorted().map(ExactJSON.string)), "properties": .object(mergedProperties)])
-                }
-                properties[name] = collection; result["properties"] = properties
-            }
-        }
-        return result
     }
 }

@@ -16,7 +16,7 @@ final class ProviderRateLimitChecks: XCTestCase, @unchecked Sendable {
         let databaseURL = folder.appendingPathComponent("works.sqlite")
         try Self.makeV2(databaseURL)
         let firstDB = try InkuDatabase(url: databaseURL)
-        XCTAssertEqual(try Self.integerSQL(databaseURL, "PRAGMA user_version"), 3)
+        XCTAssertEqual(try Self.integerSQL(databaseURL, "PRAGMA user_version"), 4)
         let retained = try await firstDB.work(id: "fixture-work")
         XCTAssertEqual(retained?.svg, "<svg/>")
         let secondDB = try InkuDatabase(url: databaseURL)

@@ -57,7 +57,7 @@ final class ProviderOutputLimitTests: XCTestCase {
         XCTAssertNil(ProviderOutputLimit.record(.object(["stop_reason": .string("end_turn")]), kind: .anthropic, responses: false))
         // pipeline_provider: json.dumps(..., sort_keys=True, separators=(",", ":")).
         XCTAssertEqual(ProviderOutputLimit.line(action: "generate_normalized_ddl", provider: "custom", model: "m",
-                                                body: .object(["max_tokens": .integer(2048)]), kind: .openAICompatible, cut: record),
+                                                outputBudget: .integer(2048), cut: record),
             #"provider_output_limit {"action":"generate_normalized_ddl","finish_reason":"length","has_reasoning":true,"has_text":false,"has_tool_call":false,"max_tokens":2048,"model":"m","output_tokens":2048,"provider":"custom","reasoning_tokens":null}"#)
     }
 }

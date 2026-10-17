@@ -36,12 +36,12 @@ final class AuxiliaryServerParityChecks: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(control.connections, 1)
     }
 
-    // Failure: the demo gives up on a transient 503 that Server's SDK retries, or retries what the SDK does not.
-    func testDemoRetriesLikeTheSDKAndVisionDoesNot() async throws {
+    // Failure: the demo retains the retired SDK's extra retries after Server moved to one core request.
+    func testDemoAndVisionEachSendOnce() async throws {
         let demo = try await LoopbackHTTP([(503, "{}"), (200, Self.answer)])
-        let text = try await run(demo, purpose: .demo)
-        XCTAssertEqual(text, "a quiet pond")
-        XCTAssertEqual(demo.requests, 2)
+        do { _ = try await run(demo, purpose: .demo); XCTFail("Demo has no SDK retries") }
+        catch { XCTAssertEqual((error as? HostError)?.code, "transport_unavailable") }
+        XCTAssertEqual(demo.requests, 1)
         let rejected = try await LoopbackHTTP([(400, "{}"), (200, Self.answer)])
         do { _ = try await run(rejected, purpose: .demo); XCTFail("400 must not be retried") }
         catch { XCTAssertEqual((error as? HostError)?.code, "provider_rejected") }
@@ -51,14 +51,6 @@ final class AuxiliaryServerParityChecks: XCTestCase, @unchecked Sendable {
         catch { XCTAssertEqual((error as? HostError)?.code, "transport_unavailable") }
         XCTAssertEqual(vision.requests, 1)
 
-        let failure = { (status: Int, header: Bool?, after: Double?) in HTTPFailure(status: status, retryAfter: 60, shouldRetry: header, serverDelay: after) }
-        XCTAssertEqual(URLSessionProviderTransport.sdkRetryDelay(failure(409, nil, nil), retry: 1, kind: .openAICompatible, random: 0), 1.0)
-        XCTAssertNil(URLSessionProviderTransport.sdkRetryDelay(failure(500, false, nil), retry: 0, kind: .anthropic))
-        XCTAssertEqual(URLSessionProviderTransport.sdkRetryDelay(failure(400, true, 3), retry: 0, kind: .anthropic), 3)
-        XCTAssertEqual(URLSessionProviderTransport.sdkRetryDelay(failure(429, nil, 90), retry: 0, kind: .anthropic, random: 0), 0.5)
-        XCTAssertEqual(URLSessionProviderTransport.sdkRetryDelay(failure(429, nil, 90), retry: 0, kind: .openAICompatible), 90)
-        XCTAssertNil(URLSessionProviderTransport.sdkRetryDelay(failure(429, true, 130), retry: 0, kind: .openAICompatible))
-        XCTAssertEqual(URLSessionProviderTransport.sdkRetryDelay(URLError(.networkConnectionLost), retry: 0, kind: .anthropic, random: 0), 0.5)
     }
 
     // Failure: a null or absent answer fails as malformed where Server reads empty text,

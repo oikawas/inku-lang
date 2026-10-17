@@ -404,105 +404,14 @@ public actor AuxiliaryProvider {
     }
 }
 
-/// Mirrors Server vision_client.py and public.py, including provider-specific sampling.
+/// Vision and demo text use the same core wire boundary as the pipeline.
 public enum AuxiliaryWire {
     public static func request(prompt: AuxiliaryPrompt, provider: ProviderSettings, model: String, key: String?) throws -> URLRequest {
-        try provider.validate()
-        guard !model.isEmpty, prompt.maximumTokens > 0, prompt.timeoutSeconds > 0, prompt.timeoutSeconds.isFinite else {
-            throw HostError("invalid_auxiliary_request")
-        }
-        if provider.requiresAPIKey && (key ?? "").isEmpty { throw HostError("credentials_unavailable") }
-        let base = provider.baseURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        var endpoint: String
-        var headers = ["Content-Type": "application/json"]
-        var body: ExactJSON
-        switch provider.kind {
-        case .chatGPTPlan: throw HostError("chatgpt_operation_not_supported")
-        case .openAICompatible:
-            endpoint = base + "/chat/completions"
-            headers["Authorization"] = "Bearer " + ((key ?? "").isEmpty ? "none" : key!)
-            let content: ExactJSON = prompt.purpose == .demo ? .string(prompt.message) : .array(
-                [.object(["type": .string("text"), "text": .string(prompt.message)])]
-                + prompt.images.map { .object(["type": .string("image_url"), "image_url": .object(["url": .string($0)])]) })
-            body = .object(["model": .string(model), "stream": .bool(false),
-                "messages": .array([.object(["role": .string("system"), "content": .string(prompt.system)]),
-                                     .object(["role": .string("user"), "content": content])])])
-            if ProviderWire.isOpenAIAPI(provider) {
-                let sampling = ProviderWire.openAISampling(model, maxTokens: prompt.maximumTokens, temperature: String(prompt.temperature))
-                for (key, value) in sampling.object! { body[key] = value }
-            } else {
-                body["max_tokens"] = .integer(prompt.maximumTokens); body["temperature"] = .number(String(prompt.temperature))
-                if provider.apiProfile == "mlx" {
-                    body["enable_thinking"] = .bool(false)
-                    let name = model.split(separator: "/").last.map(String.init) ?? model
-                    if name.range(of: "^gemma[-_]?4(?:[-_]|$)", options: [.regularExpression, .caseInsensitive]) != nil {
-                        body["temperature"] = .number("1.0"); body["top_p"] = .number("0.95"); body["top_k"] = .integer(64)
-                    }
-                }
-                ProviderWire.applyNIMSampling(to: &body, providerID: provider.id, model: model)
-                ProviderWire.applyOllamaSampling(to: &body, providerID: provider.id, model: model, maxTokens: prompt.maximumTokens)
-            }
-        case .anthropic:
-            endpoint = base + "/v1/messages"
-            headers["x-api-key"] = key ?? ""; headers["anthropic-version"] = "2023-06-01"
-            var blocks: [ExactJSON] = try prompt.images.map { image in
-                let (type, data) = try imageParts(image)
-                return .object(["type": .string("image"), "source": .object([
-                    "type": .string("base64"), "media_type": .string(type), "data": .string(data)])])
-            }
-            blocks.append(.object(["type": .string("text"), "text": .string(prompt.message)]))
-            // Server's Vision and demo reserve room for the models that think by default.
-            body = .object(["model": .string(model), "max_tokens": .integer(ProviderOutputLimit.anthropicMaxTokens(model, answerTokens: prompt.maximumTokens)), "system": .string(prompt.system),
-                "messages": .array([.object(["role": .string("user"), "content": .array(blocks)])])])
-        case .gemini:
-            let segment = model.addingPercentEncoding(withAllowedCharacters: CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~"))!
-            endpoint = base + "/v1beta/models/" + segment + ":generateContent"
-            headers["x-goog-api-key"] = key ?? ""
-            var parts: [ExactJSON] = [.object(["text": .string(prompt.message)])]
-            for image in prompt.images {
-                let (type, data) = try imageParts(image)
-                parts.append(.object(["inlineData": .object(["mimeType": .string(type), "data": .string(data)])]))
-            }
-            // Keep Gemini's default sampling for both Vision and demo instructions.
-            let configuration = ProviderWire.geminiGenerationConfig(model, answerTokens: prompt.maximumTokens)
-            body = .object(["systemInstruction": .object(["parts": .array([.object(["text": .string(prompt.system)])])]),
-                "contents": .array([.object(["role": .string("user"), "parts": .array(parts)])]), "generationConfig": configuration])
-        }
-        guard let url = URL(string: endpoint) else { throw HostError("provider_base_url_invalid") }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"; request.httpBody = body.data; request.allHTTPHeaderFields = headers
+        var request = try ProviderWire.prepareText(prompt: prompt, provider: provider, model: model, key: key).request
         request.timeoutInterval = prompt.timeoutSeconds
         return request
     }
-
-    private static func imageParts(_ image: String) throws -> (String, String) {
-        guard let comma = image.firstIndex(of: ",") else { throw HostError("invalid_auxiliary_image") }
-        let header = String(image[..<comma]), data = String(image[image.index(after: comma)...])
-        guard header.hasPrefix("data:image/"), header.hasSuffix(";base64"), !data.isEmpty,
-              Data(base64Encoded: data) != nil else { throw HostError("invalid_auxiliary_image") }
-        return (String(header.dropFirst(5).dropLast(7)), data)
-    }
-
-    /// Server reads a missing answer as empty text (vision_client._answer, public.py), so an empty
-    /// reply reaches the caller's own empty handling instead of failing as a malformed payload.
     public static func responseText(_ data: Data, kind: ProviderKind, purpose: AuxiliaryPrompt.Purpose = .vision) throws -> String {
-        let value = try ExactJSON(data: data)
-        let text: String
-        switch kind {
-        case .chatGPTPlan: throw HostError("chatgpt_operation_not_supported")
-        case .openAICompatible:
-            guard let message = value["choices"].array?.first?["message"], message.object != nil else { throw HostError("malformed_payload") }
-            text = message["content"].string ?? ""
-        case .anthropic:
-            guard let blocks = value["content"] == .null ? [] : value["content"].array else { throw HostError("malformed_payload") }
-            text = blocks.filter { $0["type"].string == "text" }.map { $0["text"].string ?? "" }.joined(separator: "\n")
-        case .gemini:
-            let candidates = value["candidates"] == .null ? [.object([:])] : value["candidates"].array
-            guard let candidate = candidates?.first else { throw HostError("malformed_payload") }
-            guard let parts = candidate["content"]["parts"] == .null ? [] : candidate["content"]["parts"].array else { throw HostError("malformed_payload") }
-            // Neither Vision nor a demo instruction includes the provider's thoughts.
-            text = parts.filter { $0["thought"].bool != true }.compactMap { $0["text"].string }.joined(separator: "\n")
-        }
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        try ProviderWire.answer(ProviderWire.readResponse(data, format: ProviderWire.format(kind), text: true))
     }
 }

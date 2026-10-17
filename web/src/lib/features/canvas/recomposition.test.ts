@@ -23,8 +23,8 @@ function installOwnerRuneShim(): void {
 	(globalThis as unknown as Record<string, unknown>).$state = <T>(value: T) => value;
 }
 
-for (const kind of ['layout', 'tool'] as const) {
-	test(`four-option redraw saves the clicked selection before replacing ${kind} candidates`, async () => {
+for (const { kind, count } of [{ kind: 'layout', count: 1 }, { kind: 'layout', count: 4 }, { kind: 'tool', count: 4 }] as const) {
+	test(`${count}-option redraw saves the clicked selection before replacing ${kind} candidates`, async () => {
 		installOwnerRuneShim();
 		const host = globalThis as unknown as Record<string, unknown>;
 		const previousWindow = host.window;
@@ -79,7 +79,7 @@ for (const kind of ['layout', 'tool'] as const) {
 						return { ...item, id: `saved-${saved.length}` };
 					}
 				} as unknown as RefinementCoordinatorDeps);
-				const redraw = () => kind === 'layout' ? coordinator.generateVariationCandidates('layout', 4) : coordinator.generateToolCandidates();
+				const redraw = () => kind === 'layout' ? coordinator.generateVariationCandidates('layout', count) : coordinator.generateToolCandidates();
 				const pending = redraw();
 				assert.deepEqual(events, ['save:instructions-0']);
 				assert.equal(session.gridBusy, true);
@@ -102,10 +102,10 @@ for (const kind of ['layout', 'tool'] as const) {
 					await redraw();
 					assert.deepEqual(saved, ['instructions-0', 'instructions-2', 'instructions-2']);
 				}
-				assert.equal(session.candidates.length, 4);
+				assert.equal(session.candidates.length, count);
 				assert.ok(session.candidates.every((candidate) => !candidate.id.startsWith('old-') && !candidate.selected && !candidate.saved));
 				assert.equal(session.gridBusy, false);
-				assert.equal(events.filter((event) => event.startsWith('/api/')).length, kind === 'layout' ? 4 : 5);
+				assert.equal(events.filter((event) => event.startsWith('/api/')).length, kind === 'layout' ? count : 5);
 			}
 		} finally {
 			host.window = previousWindow;

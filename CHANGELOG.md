@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Save checked refinement options before making one option too
+
+Another composition's Make one option now saves the unsaved options checked at the time of the click before drawing, matching Make four options. A failed save keeps the existing options and unsaved selections without starting a new round; saved works are not duplicated. Updated the Japanese and English descriptions and the one-option tooltip.
+
 ## v2.15.163 (2026-10-17 / Build 1239)
 
 ### 2026-10-16 — Optional 3D viewer replaces Score shapes with solids

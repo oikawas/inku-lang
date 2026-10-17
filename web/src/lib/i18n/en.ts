@@ -476,7 +476,7 @@ export const en: LangPack = {
 	refineCloseNeedsDecision: 'Save the chosen options, or discard them all, before closing.',
 	refinePreviewBack: 'Back to all options',
 	refineSingleButton: 'Make one option',
-	tooltipRefineSingle: 'Varies only the one chosen element to make a candidate. Chosen candidates can be saved to history',
+	tooltipRefineSingle: 'Saves the checked unsaved options first, then makes one alternative by varying only the one chosen element.',
 	refineCostLayout: 'Fast (LLM only for gaps to fill)',
 	refineCostReading: 'Slow (LLM and API)',
 	refineCostColor: 'Very fast (no LLM)',

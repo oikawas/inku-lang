@@ -280,7 +280,7 @@ A refinement changes exactly one element at a time, chosen from the work-editing
 
 In `Another composition` you may choose `Make one option` or `Make four options`.
 
-Check the options you want to keep, then press `Make four options` to save those checked at that moment before drawing the next four. Unchecked options are not saved. If saving fails, no new round starts; the options and unsaved selections remain.
+Check the options you want to keep, then press `Make one option` or `Make four options` to save the unsaved options checked at that moment before drawing the requested number of new options. Unchecked options are not saved. If saving fails, no new round starts; the options and unsaved selections remain. Options already saved are not saved again.
 
 `Another performance` (changing the touch with words) and `Another reading` were removed on 2026-10-14: the touch's words were never read for their meaning and only made the drawing's seed. `Edit drawing parameters` in the work-editing menu, which drew them, and the `Touch` and `Reading` elements of autonomous refinement were removed with them. Works made by a touch or a reading before then keep their `Touch` or `Reading` edge in the lineage, and redraw from their saved instructions and seed.
 

@@ -474,7 +474,7 @@ export const ja: LangPack = {
 	refineCloseNeedsDecision: '候補を保存するか、すべて破棄してから閉じてください。',
 	refinePreviewBack: '一覧へ戻る',
 	refineSingleButton: '1案を作る',
-	tooltipRefineSingle: '選択した1種類の要素だけを変更した1案を作ります。選んだ候補は履歴に保存できます',
+	tooltipRefineSingle: 'チェックした未保存の候補を先に保存してから、選択した1種類の要素だけを変えて1案を作ります。',
 	refineCostLayout: '高速（補完の穴があるときだけLLM）',
 	refineCostReading: '低速（LLM・API使用）',
 	refineCostColor: '超高速（LLM不要）',

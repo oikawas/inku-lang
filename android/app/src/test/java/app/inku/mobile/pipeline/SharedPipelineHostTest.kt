@@ -580,7 +580,7 @@ class SharedPipelineHostTest {
         val binding = object : SharedPipelineBinding by delegate {
             override fun renderSaved(inputBytes: ByteArray): ByteArray {
                 renderInputs += JSONObject(inputBytes.toString(Charsets.UTF_8))
-                return """{"svg":"<svg/>","metadata":{}}""".encodeToByteArray()
+                return """{"svg":"<svg/>","metadata":{"render_engine_id":"","render_engine_version":""}}""".encodeToByteArray()
             }
             override fun renderSavedSvgLimited(inputBytes: ByteArray, maxSvgBytes: Long) =
                 NativeSvgOutput(renderSaved(inputBytes), null)
@@ -607,6 +607,8 @@ class SharedPipelineHostTest {
         assertEquals(parent.seedText, replay.seedText)
         assertEquals(parent.interpretationSeed, replay.interpretationSeed)
         assertEquals(parent.seedText, JSONObject(replay.renderMetadataJson).getString("seed_text"))
+        // Frozen Server identity for this Score and unsigned stored seed.
+        assertEquals("rh3:1bcca60a82d7d52e23d01d7bba1ca0a8f908fda2c2df078a39c8b57be1117392", replay.renderHash)
     }
 
     @Test
@@ -668,7 +670,8 @@ class SharedPipelineHostTest {
 
     @Test
     fun aSavedWorkRecordsTheServersProfileLimitsAndOutcome() = runBlocking {
-        val result = androidPipeline(ScriptedBinding()).composeFromDdl("place one red circle.", describe("").copy(uiLang = "en"))
+        val pipeline = androidPipeline(ScriptedBinding())
+        val result = pipeline.composeFromDdl("place one red circle.", describe("").copy(uiLang = "en", renderSeed = 9L))
 
         val metadata = JSONObject(result.renderMetadataJson)
         assertEquals("srgb", metadata.getJSONObject("render_color_profile").getString("id"))
@@ -676,6 +679,9 @@ class SharedPipelineHostTest {
         assertEquals("settings", metadata.getString("render_limits_source"))
         assertEquals("complete", metadata.getString("compiler_outcome"))
         assertEquals("en", metadata.getString("ui_lang"))
+        assertEquals("rh3:f5d92055bd74eaaa8a1e09ae43ece8fc421926b22370c97abd29a0979d9445af", result.renderHash)
+        assertEquals("dh1:bd7047b26f1bd7621f777be30166e2664e60e776fca021a32498e666d26528f7",
+            pipeline.descriptionHash("\u0085花の色\u0085"))
     }
 
     @Test

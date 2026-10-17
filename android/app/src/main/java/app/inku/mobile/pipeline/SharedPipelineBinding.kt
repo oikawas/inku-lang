@@ -47,6 +47,14 @@ interface SharedPipelineBinding {
     fun pipelineDescription(text: String): String =
         throw PipelineHostException("binding_description_labels_unavailable")
 
+    fun descriptionHash(text: String): String = NativePipelineBridge.descriptionHash(text)
+    fun renderHash(itemJson: String): String? = NativePipelineBridge.renderHash(itemJson)
+    fun canonicalJson(valueJson: String): String? = NativePipelineBridge.canonicalJson(valueJson)
+    fun resolveInstructionLanguage(text: String, requested: String?, fallback: String): String? =
+        NativePipelineBridge.resolveInstructionLanguage(text, requested, fallback)
+    fun normalizeInstructionLanguage(value: String?, default: String): String? =
+        NativePipelineBridge.normalizeInstructionLanguage(value, default)
+
     /**
      * A word-touch seed as `{"render_seed": "<decimal>", "seed_text": "<normalized>"}`,
      * or null when the words carry no seed. A binding without it refuses rather

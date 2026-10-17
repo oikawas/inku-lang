@@ -5,6 +5,12 @@
 
 最終更新: 2026-10-17。
 
+## 2026-10-17 作品識別・正準JSON・指示言語の共有core化
+
+`dh1`、`rh3`、正準JSON、指示言語の正規化と判定は`NativePipelineBridge`（JNI）から共有coreの関数を呼ぶ。`PythonJson.kt`とKotlin側のハッシュ・言語判定規則を削除し、系譜の正準JSONもcoreへ委譲する。KotlinはJSON転送時の小数・整数の型と保存フィールドの対応だけを保つ。保存済みハッシュの書換えやRoom移行は行わない。
+
+JVM試験はhost用のJNIライブラリを作り、`server/tests/data/identity-cases.json`と`instruction-language-cases.json`をそのまま読む。端末用APKの作成・採番・インストールは伴わない。
+
 ## 2026-10-17 保存作品の推敲・検索・実行表示
 
 保存作品の操作に「色の配置を変える」「下地を変える」「保存Scoreを再演して比較」を加える。色の配置は、保存SVGで実際に使われた色と保存カラーマップから、同じカタログ内で元と異なる割当を重複なく作り、8案ずつ次へ進む。下地は現在のものを除く名前付きの支持体を候補にし、保存ScoreとDDLの下地を替える。どちらも候補を作るだけでは保存せず、選んだ案をそれぞれ `color_arrangement_change`、`ground_change` の子作品として保存する。保存した描画seedなど親の描画条件を引き継ぐ。
@@ -768,7 +774,8 @@ hostの責務の対応は次のとおり。
 | provider transport | `pipeline_provider.py`／`openai_request.py`／`chatgpt_provider.py` | `RoutingModelProvider.kt`と各provider／`SingleAttemptModelEffectProvider.kt` |
 | 描画 | `render_engines/default/adapter.py` | `AndroidRenderHost` → `NativeRenderBridge`（旧9:5形式）、共有pipelineの`Render`と`renderSaved` |
 | 画像化 | `shared/src/inku_analysis/rasterizer.py` | `RustArtworkRasterizer`（`inku-svg-raster`） |
-| `rh3`／`dh1`／seed | `db.py::render_hash_for_item`／`identity.py::description_hash` | `AndroidWorkPipeline.kt`の`renderHash`／`descriptionHash`／`canonicalSeed`、`PythonJson.kt` |
+| `rh3`／`dh1`／seed正規化／正準JSON | `inku-pipeline::identity`（Serverもbinding経由） | `AndroidWorkPipeline`／`CoreIdentityJson` → `NativePipelineBridge` → 共有core |
+| 指示言語の正規化・判定 | `inku-ddl`（Serverもbinding経由） | `InstructionLanguages` → `NativePipelineBridge` → 共有core |
 | 履歴保存 | `pipeline_product.py`（`save_result`）／`api_core/rendering.py` | `InkuRepository.kt::saveResult`／Room entities |
 | 記述の固定 | `persistence/description_lock.py` | `data/lineage/DescriptionLock.kt` |
 | headless | `inku-cli paint --save-history` | `HeadlessRenderActivity.kt` |

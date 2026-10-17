@@ -24,6 +24,11 @@ object NativePipelineBridge : SharedPipelineBinding {
     external override fun completionRangeStates(inputBytes: ByteArray): ByteArray
     external override fun providerAttempt(snapshotBytes: ByteArray): ByteArray
     external override fun pipelineDescription(text: String): String
+    external override fun descriptionHash(text: String): String
+    external override fun renderHash(itemJson: String): String?
+    external override fun canonicalJson(valueJson: String): String?
+    external override fun resolveInstructionLanguage(text: String, requested: String?, fallback: String): String?
+    external override fun normalizeInstructionLanguage(value: String?, default: String): String?
     external override fun renderSeedFromText(seedText: String): String?
 
     /** One saved Saijiki v1 unit in, the same unit in the current edition out (SPEC §3.3). */

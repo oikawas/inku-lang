@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Android work identities and instruction language use the shared core
+
+Android now delegates description identity `dh1`, render identity `rh3`, canonical JSON, and instruction-language normalization/detection to the shared core through JNI. The Kotlin rule copies are removed, including lineage canonical JSON. JSON transport preserves floating-point and integer types. No migration rewrites stored identities. Kotlin checks the same fixtures as Server through JNI.
+
 ### 2026-10-17 — Name Android color-arrangement and ground changes in lineage
 
 Lineage edges for color-arrangement and ground changes now show Color arrangement and Ground instead of Unknown, matching the Web labels in both languages.

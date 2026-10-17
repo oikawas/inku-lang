@@ -189,7 +189,8 @@ The Settings aggregate in `features/settings/state.svelte.ts` constructs navigat
 - Replay of a saved Score uses `renderSaved` under the restored resource policy. Only the device-only legacy 9:5 format uses `AndroidRenderHost` (the JNI `render`).
 - Engine identity and renderer reference come from the packaged Rust core; Kotlin keeps no version literal.
 - Preview, thumbnails, refinement, and PNG export rasterize saved/current SVG through `inku-svg-raster`. There is no AndroidSVG or Kotlin renderer fallback.
-- Kotlin owns the UI, provider settings and transport, camera image preparation and the on-device local LLM, host options, Room/history, and the `rh3` computation. The old Kotlin Stage 1 / 1.5 / 2 and Score coerce are retired, with no runtime fallback.
+- Description identity `dh1`, render identity `rh3`, canonical JSON, and instruction-language normalization/detection call the shared core through `NativePipelineBridge` (JNI). Kotlin holds no copy of these rules; lineage canonical JSON uses the same entry point.
+- Kotlin owns the UI, provider settings and transport, camera image preparation and the on-device local LLM, host options, Room/history, and JSON transport to the core. No migration rewrites stored hashes. The old Kotlin Stage 1 / 1.5 / 2 and Score coerce are retired, with no runtime fallback.
 
 ## Language and UI sources
 

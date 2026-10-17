@@ -6,6 +6,12 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-10-17.
 
+## 2026-10-17 Work identities, canonical JSON and instruction language in the shared core
+
+`dh1`, `rh3`, canonical JSON, and instruction-language normalization/detection call shared-core functions through `NativePipelineBridge` (JNI). `PythonJson.kt` and the Kotlin hash/language rule copies are removed; lineage canonical JSON also delegates to the core. Kotlin retains only JSON transport that preserves floating-point/integer types and maps saved fields. No stored hash rewrite or Room migration is performed.
+
+JVM tests build the host JNI library and read `server/tests/data/identity-cases.json` and `instruction-language-cases.json` in place. They do not package, number, or install an Android APK.
+
 ## 2026-10-17 Saved-work refinement, search and execution details
 
 The saved-work menu adds Change color arrangement, Change ground, and Replay and compare saved Score. Color arrangement uses colors actually visible in the saved SVG and its saved color map to make distinct assignments within the same catalog, excluding the original, eight options at a time. Ground offers named supports other than the current one and changes the saved Score and DDL ground. Generating either kind of option does not save it; a chosen option is saved as a `color_arrangement_change` or `ground_change` child. The parent's saved render seeds and other drawing conditions are retained.
@@ -861,7 +867,8 @@ checked in the same change unit. The host duties correspond as follows.
 | Provider transport | `pipeline_provider.py` / `openai_request.py` / `chatgpt_provider.py` | `RoutingModelProvider.kt` and the providers / `SingleAttemptModelEffectProvider.kt` |
 | Drawing | `render_engines/default/adapter.py` | `AndroidRenderHost` → `NativeRenderBridge` (legacy 9:5 paper), the shared pipeline's `Render` and `renderSaved` |
 | Rasterization | `shared/src/inku_analysis/rasterizer.py` | `RustArtworkRasterizer` (`inku-svg-raster`) |
-| `rh3` / `dh1` / seeds | `db.py::render_hash_for_item` / `identity.py::description_hash` | `renderHash` / `descriptionHash` / `canonicalSeed` in `AndroidWorkPipeline.kt`, `PythonJson.kt` |
+| `rh3` / `dh1` / seed normalization / canonical JSON | `inku-pipeline::identity` (Server also calls its binding) | `AndroidWorkPipeline` / `CoreIdentityJson` → `NativePipelineBridge` → shared core |
+| Instruction-language normalization/detection | `inku-ddl` (Server also calls its binding) | `InstructionLanguages` → `NativePipelineBridge` → shared core |
 | History persistence | `pipeline_product.py` (`save_result`) / `api_core/rendering.py` | `InkuRepository.kt::saveResult` / Room entities |
 | Description lock | `persistence/description_lock.py` | `data/lineage/DescriptionLock.kt` |
 | Headless | `inku-cli paint --save-history` | `HeadlessRenderActivity.kt` |

@@ -1,5 +1,7 @@
 package app.inku.mobile.pipeline
 
+import java.io.File
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -15,6 +17,45 @@ import org.junit.Test
  * one that reaches different answers cannot.
  */
 class InstructionLanguageTest {
+
+    private val sharedCases: JSONObject
+        get() = JSONObject(File(requireNotNull(System.getProperty("inku.instructionLanguageCases"))).readText())
+
+    @Test
+    fun everySharedNormalizationCaseUsesTheCore() {
+        val rows = sharedCases.getJSONArray("normalize")
+        for (index in 0 until rows.length()) {
+            val row = rows.getJSONObject(index)
+            val value = if (row.isNull("value")) null else row.getString("value")
+            val expected = if (row.isNull("language")) null else row.getString("language")
+            if (expected == null) {
+                assertThrows(row.getString("why"), IllegalArgumentException::class.java) {
+                    InstructionLanguages.normalize(value, row.getString("default"))
+                }
+            } else {
+                assertEquals(row.getString("why"), expected,
+                    InstructionLanguages.normalize(value, row.getString("default")))
+            }
+        }
+    }
+
+    @Test
+    fun everySharedResolutionCaseUsesTheCore() {
+        val rows = sharedCases.getJSONArray("resolve")
+        for (index in 0 until rows.length()) {
+            val row = rows.getJSONObject(index)
+            val requested = if (row.isNull("requested")) null else row.getString("requested")
+            val expected = if (row.isNull("language")) null else row.getString("language")
+            if (expected == null) {
+                assertThrows(row.getString("why"), IllegalArgumentException::class.java) {
+                    InstructionLanguages.resolve(row.getString("text"), requested, row.getString("fallback"))
+                }
+            } else {
+                assertEquals(row.getString("why"), expected,
+                    InstructionLanguages.resolve(row.getString("text"), requested, row.getString("fallback")))
+            }
+        }
+    }
 
     // ── T-1: normalize ────────────────────────────────────────
 

@@ -20,7 +20,6 @@ import app.inku.mobile.render.srgbColorProfile
 import app.inku.mobile.ui.i18n.InkuFailure
 import java.math.BigInteger
 import java.security.MessageDigest
-import java.text.Normalizer
 import java.util.UUID
 import org.json.JSONArray
 import org.json.JSONObject
@@ -552,14 +551,8 @@ class AndroidWorkPipeline(
         )
     }
 
-    /** The server's `description_hash` (`identity.py`): an identity, not a secret. */
-    fun descriptionHash(input: String): String {
-        val normalized = Normalizer.normalize(input, Normalizer.Form.NFC)
-            .replace("\r\n", "\n")
-            .replace("\r", "\n")
-            .trim()
-        return "dh1:" + sha256(normalized)
-    }
+    /** A work's description identity comes from the shared core. */
+    fun descriptionHash(input: String): String = binding.descriptionHash(input)
 
     fun newHistoryId(): String = UUID.randomUUID().toString()
 
@@ -1134,30 +1127,18 @@ class AndroidWorkPipeline(
         .digest(value.encodeToByteArray())
         .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
 
-    /** The server's `render_hash_for_item` (`persistence/history.py`), so a work has one hash on both. */
+    /** Adapt the host's saved fields; the shared core owns the render identity. */
     private fun renderHash(score: JSONObject, metadata: JSONObject, fallbackCatalogId: String): String {
-        val payload = JSONObject()
-            .put(
-                "render_color_catalog_id",
-                metadata.optString("render_color_catalog_id", fallbackCatalogId).ifBlank { fallbackCatalogId },
-            )
+        val item = JSONObject()
+            .put("catalog_id", fallbackCatalogId)
+            .put("render_color_catalog_id", metadata.optString("render_color_catalog_id", fallbackCatalogId).ifBlank { fallbackCatalogId })
             .put("render_engine_id", metadata.optionalString("render_engine_id") ?: JSONObject.NULL)
             .put("render_engine_version", metadata.optionalString("render_engine_version") ?: JSONObject.NULL)
-            .put("render_seed", canonicalSeed(metadata.opt("render_seed")) ?: JSONObject.NULL)
+            .put("render_seed", metadata.opt("render_seed") ?: JSONObject.NULL)
             .put("render_wild", metadata.optBoolean("render_wild", metadata.optBoolean("wild", false)))
             .put("score", score)
-            .put("version", "rh3")
-        return "rh3:" + sha256(PythonJson.canonical(payload))
-    }
-
-    private fun canonicalSeed(value: Any?): Any? = when (value) {
-        null, JSONObject.NULL -> null
-        is BigInteger -> value
-        is Long -> if (value >= 0L) value else BigInteger(java.lang.Long.toUnsignedString(value))
-        is Int, is Short, is Byte -> (value as Number).toLong()
-        is Number -> value
-        is String -> value.toBigIntegerOrNull() ?: value
-        else -> value
+        return binding.renderHash(CoreIdentityJson.encode(item))
+            ?: throw PipelineHostException("invalid_render_identity_input")
     }
 
     private fun JSONObject.optionalString(name: String): String? =

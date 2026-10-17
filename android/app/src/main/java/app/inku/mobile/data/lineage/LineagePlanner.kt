@@ -3,6 +3,7 @@ package app.inku.mobile.data.lineage
 import app.inku.mobile.data.db.LineageEdgeEntity
 import app.inku.mobile.data.db.LineageNodeEntity
 import app.inku.mobile.data.model.DerivationKindRegistry
+import app.inku.mobile.pipeline.CoreIdentityJson
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -138,83 +139,6 @@ object LineagePlanner {
     /** Python's `isinstance(value, dict)`. */
     private fun isObject(value: Any?): Boolean = value is Map<*, *> || value is JSONObject
 
-    /**
-     * The server's `_canonical_json`: `json.dumps(value, ensure_ascii=False,
-     * sort_keys=True, separators=(",", ":"))`. Written out rather than handed
-     * to `JSONObject.toString()`, which keeps insertion order and inserts no
-     * separators of its own -- the baked expectation is `{"a":2,"b":1}` for
-     * metadata that was passed as `{"b": 1, "a": 2}`.
-     */
-    fun canonicalJson(value: Any?): String {
-        val out = StringBuilder()
-        writeJson(out, value)
-        return out.toString()
-    }
-
-    private fun writeJson(out: StringBuilder, value: Any?) {
-        when {
-            value == null || value === JSONObject.NULL -> out.append("null")
-            value is Boolean -> out.append(if (value) "true" else "false")
-            value is Number -> out.append(value.toString())
-            value is CharSequence -> writeJsonString(out, value.toString())
-            value is Map<*, *> -> writeJsonObject(out, value.entries.associate { it.key.toString() to it.value })
-            value is JSONObject -> writeJsonObject(out, value.keys().asSequence().associateWith { value.get(it) })
-            value is Collection<*> -> writeJsonArray(out, value.toList())
-            value is JSONArray -> writeJsonArray(out, (0 until value.length()).map { value.get(it) })
-            else -> writeJsonString(out, value.toString())
-        }
-    }
-
-    private fun writeJsonObject(out: StringBuilder, entries: Map<String, Any?>) {
-        out.append('{')
-        entries.keys.sortedWith(CODE_POINT_ORDER).forEachIndexed { index, key ->
-            if (index > 0) out.append(',')
-            writeJsonString(out, key)
-            out.append(':')
-            writeJson(out, entries[key])
-        }
-        out.append('}')
-    }
-
-    private fun writeJsonArray(out: StringBuilder, items: List<Any?>) {
-        out.append('[')
-        items.forEachIndexed { index, item ->
-            if (index > 0) out.append(',')
-            writeJson(out, item)
-        }
-        out.append(']')
-    }
-
-    /** `ensure_ascii=False`: only the structural escapes, non-ASCII stays raw. */
-    private fun writeJsonString(out: StringBuilder, value: String) {
-        out.append('"')
-        for (ch in value) {
-            when (ch) {
-                '"' -> out.append("\\\"")
-                '\\' -> out.append("\\\\")
-                '\n' -> out.append("\\n")
-                '\r' -> out.append("\\r")
-                '\t' -> out.append("\\t")
-                '\b' -> out.append("\\b")
-                '\u000C' -> out.append("\\f")
-                else -> if (ch < ' ') out.append("\\u%04x".format(ch.code)) else out.append(ch)
-            }
-        }
-        out.append('"')
-    }
-
-    /**
-     * Python sorts keys by code point; Kotlin's natural String order is by
-     * UTF-16 code unit, which puts astral-plane keys before U+E000..U+FFFF.
-     */
-    private val CODE_POINT_ORDER = Comparator<String> { a, b ->
-        val left = a.codePoints().toArray()
-        val right = b.codePoints().toArray()
-        var i = 0
-        while (i < left.size && i < right.size) {
-            if (left[i] != right[i]) return@Comparator left[i].compareTo(right[i])
-            i++
-        }
-        left.size.compareTo(right.size)
-    }
+    /** Canonical JSON is shared with Server; Kotlin only transports the values. */
+    fun canonicalJson(value: Any?): String = CoreIdentityJson.canonical(value)
 }

@@ -5,10 +5,10 @@ import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class PythonJsonTest {
-    /** The expected text is `json.dumps(..., ensure_ascii=False, sort_keys=True, separators=(",", ":"))`. */
+class CoreIdentityJsonTest {
+    /** The host preserves number types; the shared core writes the canonical identity text. */
     @Test
-    fun aHashedScoreIsWrittenAsPythonWritesIt() {
+    fun aFloatAndHugeIntegerReachTheCoreWithoutLoss() {
         val value = JSONObject()
             .put("s", "a/b あ\n\"q\"\\\u0001")
             .put("w", 0.5)
@@ -26,7 +26,7 @@ class PythonJsonTest {
         assertEquals(
             """{"a":[1.0,2,"/"],"big":18446744073709551615,"f":123456.789,"i":7,"n":null,"neg":-2.5e-07,""" +
                 """"s":"a/b あ\n\"q\"\\\u0001","t":true,"w":0.5,"x":1e-05,"y":1e+16,"z":0.0001}""",
-            PythonJson.canonical(value),
+            CoreIdentityJson.canonical(value),
         )
     }
 }

@@ -19,6 +19,24 @@ fn write_bytes(env: &JNIEnv<'_>, value: &[u8]) -> Result<jbyteArray, BindingErro
         .map_err(|error| BindingError::state(format!("pipeline byte allocation failed: {error}")))
 }
 
+fn optional_java_string(
+    env: &mut JNIEnv<'_>,
+    value: JString<'_>,
+) -> Result<Option<String>, BindingError> {
+    if value.is_null() {
+        Ok(None)
+    } else {
+        java_string(env, value).map(Some)
+    }
+}
+
+fn optional_jstring(env: &mut JNIEnv<'_>, value: Option<String>) -> Result<jstring, BindingError> {
+    match value {
+        Some(value) => new_java_string(env, &value),
+        None => Ok(null_mut()),
+    }
+}
+
 fn native_svg_output(
     env: &mut JNIEnv<'_>,
     output: inku_pipeline_uniffi::NativeSvgOutput,
@@ -239,6 +257,83 @@ pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_pipeli
     jni_boundary(env, null_mut(), |env| {
         let text = java_string(env, text)?;
         new_java_string(env, &inku_pipeline_uniffi::pipeline_description(&text))
+    })
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_descriptionHash(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    text: JString<'_>,
+) -> jstring {
+    jni_boundary(env, null_mut(), |env| {
+        let text = java_string(env, text)?;
+        new_java_string(env, &inku_pipeline_uniffi::description_hash(text))
+    })
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_renderHash(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    item_json: JString<'_>,
+) -> jstring {
+    jni_boundary(env, null_mut(), |env| {
+        let item_json = java_string(env, item_json)?;
+        optional_jstring(env, inku_pipeline_uniffi::render_hash(item_json))
+    })
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_canonicalJson(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    value_json: JString<'_>,
+) -> jstring {
+    jni_boundary(env, null_mut(), |env| {
+        let value_json = java_string(env, value_json)?;
+        optional_jstring(env, inku_pipeline_uniffi::canonical_json(value_json))
+    })
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_resolveInstructionLanguage(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    text: JString<'_>,
+    requested: JString<'_>,
+    fallback: JString<'_>,
+) -> jstring {
+    jni_boundary(env, null_mut(), |env| {
+        let text = java_string(env, text)?;
+        let requested = optional_java_string(env, requested)?;
+        let fallback = java_string(env, fallback)?;
+        optional_jstring(
+            env,
+            inku_pipeline_uniffi::resolve_instruction_language(text, requested, fallback),
+        )
+    })
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_normalizeInstructionLanguage(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    value: JString<'_>,
+    default: JString<'_>,
+) -> jstring {
+    jni_boundary(env, null_mut(), |env| {
+        let value = optional_java_string(env, value)?;
+        let default = java_string(env, default)?;
+        optional_jstring(
+            env,
+            inku_pipeline_uniffi::normalize_instruction_language(value, default),
+        )
     })
 }
 

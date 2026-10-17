@@ -189,7 +189,8 @@ Stage 10では行数ではなく変更理由に沿って5つの高変更面を�
 - 保存済みScoreの再演は復元した資源policyの下で`renderSaved`を使う。端末専用の旧9:5形式だけ`AndroidRenderHost`（JNIの`render`）を使う。
 - engine identityとrenderer referenceは同梱Rust coreから取得し、Kotlinに版literalを持たない。
 - preview、thumbnail、refinement、PNG exportは保存済み／現行SVGを`inku-svg-raster`でpixel化する。AndroidSVGとKotlin renderer fallbackは無い。
-- Kotlinが所有するのはUI、provider設定と通信、カメラ画像の前処理と端末内local LLM、host option、Room／history、`rh3`の計算である。旧KotlinのStage 1 / 1.5 / 2とScore coerceはretire済みで、runtime fallbackは無い。
+- 記述ハッシュ`dh1`、描画ハッシュ`rh3`、正準JSON、指示言語の正規化・判定は`NativePipelineBridge`（JNI）から共有coreを呼ぶ。Kotlinに同じ規則の写しは持たず、系譜の正準JSONも同じ入口を使う。
+- Kotlinが所有するのはUI、provider設定と通信、カメラ画像の前処理と端末内local LLM、host option、Room／history、coreへ渡すJSONの転送である。保存済みのハッシュを書き換える移行は行わない。旧KotlinのStage 1 / 1.5 / 2とScore coerceはretire済みで、runtime fallbackは無い。
 
 ## i18nとUI token
 

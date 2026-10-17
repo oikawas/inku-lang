@@ -74,6 +74,10 @@ val syncModelCatalog = tasks.register<Sync>("syncModelCatalog") {
 tasks.withType<Test>().configureEach {
     systemProperty("inku.modelCatalogSource", rootProject.file("../server/src/inku_server/model_catalog.json").absolutePath)
     systemProperty("inku.modelCatalogCases", rootProject.file("../server/tests/data/model-catalog-cases.json").absolutePath)
+    systemProperty("inku.identityCases", rootProject.file("../server/tests/data/identity-cases.json").absolutePath)
+    systemProperty("inku.instructionLanguageCases", rootProject.file("../server/tests/data/instruction-language-cases.json").absolutePath)
+    inputs.files(rootProject.file("../server/tests/data/identity-cases.json"),
+        rootProject.file("../server/tests/data/instruction-language-cases.json"))
 }
 val androidVersionCode = nextAndroidBuildNumber()
 val androidMinSdk = 35
@@ -89,6 +93,9 @@ val rustParityExpectedDirectory = layout.buildDirectory.dir("generated/rustParit
 val importedRustParityExpectedDirectory = providers.gradleProperty("inkuRustParityExpectedDir")
     .map { file(it) }
 val rustHostTargetDirectory = layout.buildDirectory.dir("rust-host-target")
+val rustHostJniLibrary = rustHostTargetDirectory.map {
+    it.file("debug/${System.mapLibraryName("inku_render_android")}")
+}
 val rustNdkHostTag = when {
     System.getProperty("os.name").startsWith("Mac") -> "darwin-x86_64"
     System.getProperty("os.name").startsWith("Linux") -> "linux-x86_64"
@@ -248,6 +255,29 @@ val buildRustAndroidArm64 = tasks.register<Exec>("buildRustAndroidArm64") {
         "--target-dir",
         rustTargetDirectory.get().asFile.absolutePath,
     )
+}
+
+val buildRustHostJni = tasks.register<Exec>("buildRustHostJni") {
+    group = "verification"
+    description = "Build the host JNI library for JVM unit tests without packaging an APK."
+    workingDir(rootProject.file("../core"))
+    inputs.files(rootProject.fileTree("../core") {
+        include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml",
+            "crates/**/src/**/*.rs", "crates/**/assets/**", "vendor/resvg/Cargo.toml",
+            "vendor/resvg/src/**/*.rs")
+        exclude("target/**")
+    })
+    outputs.file(rustHostJniLibrary)
+    commandLine("rustup", "run", "1.95.0", "cargo", "build", "--locked", "--package",
+        "inku-render-android", "--lib", "--target-dir", rustHostTargetDirectory.get().asFile.absolutePath)
+}
+
+// JVM tests may reach identity and language JNI through production callers.
+// The dependency stays lazy: a native host library is built only for Test tasks.
+tasks.withType<Test>().configureEach {
+    dependsOn(buildRustHostJni)
+    inputs.file(rustHostJniLibrary)
+    systemProperty("java.library.path", rustHostJniLibrary.get().asFile.parentFile.absolutePath)
 }
 
 val syncRustAndroidArm64 = tasks.register<Sync>("syncRustAndroidArm64") {

@@ -633,6 +633,7 @@ export const ja: LangPack = {
 	selectionNotePrompt: '選んだ理由（任意）',
 	historyFilterLabel: '絞り込み',
 	historyNoCandidates: '候補無し',
+	historySearching: '検索中…',
 	starOn: 'スターを外す',
 	starOff: 'スターを付ける',
 	historyStarredOnly: 'スターのみ',

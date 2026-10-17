@@ -635,6 +635,7 @@ export const en: LangPack = {
 	selectionNotePrompt: 'Why this one? (optional)',
 	historyFilterLabel: 'Filters',
 	historyNoCandidates: 'No matches',
+	historySearching: 'Searching…',
 	starOn: 'Remove star',
 	starOff: 'Add star',
 	historyStarredOnly: 'Starred only',

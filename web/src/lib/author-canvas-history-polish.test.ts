@@ -42,16 +42,20 @@ test('the three history filters follow the history button with one-em spacing', 
 	assert.match(HISTORY, /\.history-filter-group \{[^}]*margin-left: 1em;/);
 });
 
-test('the work search sits right of the history filters and none found leaves an empty tile', () => {
+test('the work search sits right of the history filters, and while it waits or finds none an empty tile holds the row at its height', () => {
 	const head = HISTORY.slice(HISTORY.indexOf('<div class="history-head">'), HISTORY.indexOf('{#if starredFilterClearedNotice}'));
 	assert.ok(head.indexOf('history-filter-group') < head.indexOf('<CanvasWorkSearch'));
 	assert.ok(head.indexOf('<CanvasWorkSearch') < head.indexOf('history-page-nav'));
 	assert.doesNotMatch(PANEL, /CanvasWorkSearch|canvasSearch/);
 	assert.match(HISTORY, /\{#if historyTotal > 0 \|\| filtered\}/);
 	assert.match(HISTORY, /const noCandidates = \$derived\(filtered && historyTotal === 0 && !searchBusy && !searchFailed\);/);
-	assert.match(HISTORY, /\{#if noCandidates\}[\s\S]*?class="thumb thumb-empty"[\s\S]*?t\(\)\.historyNoCandidates/);
+	assert.match(HISTORY, /\{#if noCandidates \|\| searching\}[\s\S]*?class="thumb thumb-empty"[\s\S]*?\{searching \? t\(\)\.historySearching : t\(\)\.historyNoCandidates\}/);
+	assert.match(HISTORY, /const searching = \$derived\(filtered && historyItems\.length === 0 && searchBusy\);/);
+	assert.match(HISTORY, /<div class="thumb-strip" bind:clientHeight=\{stripHeight\} style:min-height=\{keptHeight \? `\$\{keptHeight\}px` : null\}>/);
 	assert.equal(ja.historyNoCandidates, '候補無し');
 	assert.equal(en.historyNoCandidates, 'No matches');
+	assert.equal(ja.historySearching, '検索中…');
+	assert.equal(en.historySearching, 'Searching…');
 });
 
 test('the comment hint shares the row below the input with the character meter', () => {

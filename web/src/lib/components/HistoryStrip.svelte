@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
 	import CanvasWorkSearch from '$lib/features/canvas/CanvasWorkSearch.svelte';
@@ -129,6 +130,20 @@
 	// Kept on screen while it finds nothing, so the search and the filters that
 	// emptied it are still there to be changed.
 	const noCandidates = $derived(filtered && historyTotal === 0 && !searchBusy && !searchFailed);
+	// A search empties the strip before it asks; the tile holds the place until the answer.
+	const searching = $derived(filtered && historyItems.length === 0 && searchBusy);
+	// The row never gets lower than it has been for the chosen fields, so a
+	// search or a page with shorter tiles does not move the canvas above it.
+	let stripHeight = $state(0);
+	let keptHeights = $state<Record<string, number>>({});
+	const fieldsKey = $derived(historyStripFields.join(','));
+	const keptHeight = $derived(keptHeights[fieldsKey] ?? 0);
+	$effect(() => {
+		const height = stripHeight;
+		untrack(() => {
+			if (height > (keptHeights[fieldsKey] ?? 0)) keptHeights[fieldsKey] = height;
+		});
+	});
 
 	function lineageGenerationLabel(item: HistoryItem): string {
 		if (!item.lineage_generation) return isJapanese ? '独立作品' : 'Standalone';
@@ -247,7 +262,7 @@
 			<div class="history-filter-notice" role="status" aria-live="polite">{starredFilterClearedNotice}</div>
 		{/if}
 		{#if !historyCollapsed}
-			<div class="thumb-strip">
+			<div class="thumb-strip" bind:clientHeight={stripHeight} style:min-height={keptHeight ? `${keptHeight}px` : null}>
 				{#each historyItems as it, i (it.id ?? it.at)}
 					<div
 						class="thumb"
@@ -304,9 +319,9 @@
 						{/if}
 					</div>
 				{/each}
-				{#if noCandidates}
+				{#if noCandidates || searching}
 					<div class="thumb thumb-empty" role="status">
-						<div class="thumb-empty-picture">{t().historyNoCandidates}</div>
+						<div class="thumb-empty-picture">{searching ? t().historySearching : t().historyNoCandidates}</div>
 					</div>
 				{/if}
 			</div>
@@ -579,6 +594,8 @@
 	}
 	.thumb-picture { position: relative; }
 	.thumb-empty {
+		display: grid;
+		place-items: center;
 		border: 1px dashed var(--border2);
 		background: transparent;
 		cursor: default;
@@ -586,7 +603,7 @@
 	.thumb-empty-picture {
 		display: grid;
 		place-items: center;
-		height: 58px;
+		min-height: 58px;
 		color: var(--fg3);
 		font-size: var(--ui-font-size-11);
 	}

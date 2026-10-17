@@ -530,6 +530,7 @@ export interface LangPack {
 	selectionNotePrompt: string;
 	historyFilterLabel: string;
 	historyNoCandidates: string;
+	historySearching: string;
 	historyStarredOnly: string;
 	historyForRevisionOnly: string;
 	tooltipHistoryForRevisionOnly: string;

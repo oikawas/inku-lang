@@ -529,6 +529,7 @@ export interface LangPack {
 	starOff: string;
 	selectionNotePrompt: string;
 	historyFilterLabel: string;
+	historyNoCandidates: string;
 	historyStarredOnly: string;
 	historyForRevisionOnly: string;
 	tooltipHistoryForRevisionOnly: string;
@@ -1173,7 +1174,6 @@ export interface LangPack {
 	canvasSearchLabel: string;
 	canvasSearchPlaceholder: string;
 	canvasSearchHint: string;
-	canvasSearchEmpty: string;
 	canvasSearchFailed: string;
 	historyNewer: string;
 	historyOlder: string;

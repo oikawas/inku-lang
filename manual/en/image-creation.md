@@ -412,7 +412,7 @@ If the saved work selected in Work or Refine matches the Library search and filt
 
 From that starting point, use `← newer` to browse newer works or lineages. The query, filters, bulk selection and preview remain. The button becomes unavailable when you reach the latest position.
 
-The search field immediately after the `Lineage` tab in the canvas header filters the history thumbnails below. It matches a whole UUID, part of a description, or the beginning, end or whole of a render or description hash. Hashes work with or without a prefix such as `rh3:`, and matching is case-insensitive. Search after typing or press Enter, then choose a thumbnail to open the work. The × button clears the query and restores ordinary history. The Library keeps its own separate query.
+The search field right of the filter buttons in the history strip filters its thumbnails. It matches a whole UUID, part of a description, or the beginning, end or whole of a render or description hash. Hashes work with or without a prefix such as `rh3:`, and matching is case-insensitive. Search after typing or press Enter, then choose a thumbnail to open the work. When nothing matches, an empty `No matches` tile appears. The × button clears the query and restores ordinary history. The Library keeps its own separate query.
 
 In the library, choose `Display` (`Thumbnails` or `List`) separately from `Group by` (`Timeline` or `By lineage`). A single click on an image opens its reading preview without changing the next-work conditions. Double-clicking opens and focuses that work in Work for `Timeline` or in Lineage for `By lineage`. You can also use `Open work`, `Open lineage`, or `Refine`.
 

@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-17 — Gather the ChatGPT plan's next actions and its stream and list guards in the shared core
-
-Each failure code's next action is no longer written where it is raised; it comes from one table in the shared core (`chatgpt_failure`). A malformed stream or an answer that is too large now asks for diagnosis rather than reconnection. Codes that took different actions in different places (cancellation, a changed registration generation, a temporary sign-in failure) now take the table's one, and a changed registration generation asks to try again. The stream checks the response id and the function call's id and `call_id`, and the model list drops rows that cannot be published and repeated slugs instead of losing the whole list. The pipeline's automatic retries are unchanged.
-
 ### 2026-10-17 — Move Swift ChatGPT plan bodies and stream reading to the shared core
 
 Swift's ChatGPT plan request bodies, SSE stream reading, failure classification and model list reading moved to UniFFI's `provider_wire`, so Swift reads with the same rules as Server and Android. An item that did not complete is now refused instead of retried (as on Server). A malformed stream is `chatgpt_response_invalid` and no internal code leaks. Tokens, cancellation, the usage-limit pause and the observation record are unchanged.
@@ -77,6 +73,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.184 (2026-10-17 / Build 1260)
+
+### 2026-10-17 — Gather the ChatGPT plan's next actions and its stream and list guards in the shared core
+
+Each failure code's next action is no longer written where it is raised; it comes from one table in the shared core (`chatgpt_failure`). A malformed stream or an answer that is too large now asks for diagnosis rather than reconnection. Codes that took different actions in different places (cancellation, a changed registration generation, a temporary sign-in failure) now take the table's one, and a changed registration generation asks to try again. The stream checks the response id and the function call's id and `call_id`, and the model list drops rows that cannot be published and repeated slugs instead of losing the whole list. The pipeline's automatic retries are unchanged.
 
 ## v2.15.183 (2026-10-17 / Build 1259)
 

@@ -215,6 +215,16 @@ Approval uses the existing execution, revision, and proposal digest, with A3's e
 record, and completion tags. Displaying the section does not approve or decline anything.
 Installation and acceptance of proposals waiting on the device remain separate checks.
 
+## 2026-10-12 Display linear gradients
+
+The shared display support table accepts `linearGradient` and `color-interpolation="sRGB"`.
+Android's normal display also uses Skia for the ink-wash ground's bands and computer fills.
+Other color-interpolation values stay outside the table with code `attribute` and use resvg as before.
+Exports and thumbnails still use resvg. This does not introduce Graphite on Android.
+The focused Pixel 9 check draws the shared core's two synthetic fixtures through the production
+AndroidDisplayRenderer and observes Skia use and comparison with Chrome references.
+Saved author works are not fixtures.
+
 ## 2026-10-11 Completion range records (A3)
 
 Keep the shared SPEC §12.7.1 record as opaque snapshot JSON in each drawn work's

@@ -191,6 +191,15 @@ ServerのClaude5系・Mythos Previewの規則に当たる場合はmax_tokensに8
 承認は既存の実行・revision・案のdigestを渡す入口を使い、保存と控え・補完の札も既存A3を使う。
 承認・辞退を画面表示だけで自動実行しない。実機で待つ案の受入と導入は別の確認とする。
 
+## 2026-10-12 linearGradientの表示
+
+共有の表示の照合表は `linearGradient` と `color-interpolation="sRGB"` を受ける。
+地の墨のにじみの帯とcomputerの塗りも、Androidの通常表示でSkiaを使う。
+ほかのcolor-interpolation値は符号 `attribute` で照合表の外となり、従来どおりresvgへ回す。
+出力とthumbnailは引き続きresvgを使う。AndroidのGraphite導入ではない。
+Pixel 9の最小確認は、共有coreの合成2件を通常のAndroidDisplayRendererで描き、
+Skiaの使用とChrome基準との画像比較を観測する。作者の保存作品はfixtureにしない。
+
 ## 2026-10-11 補完が書いた範囲の控え（A3）
 
 共通SPEC §12.7.1の控えを、描いた作品の `render_metadata_json.completion_ranges` に

@@ -289,6 +289,12 @@ val prepareDisplayCheckAssets = tasks.register<Sync>("prepareDisplayCheckAssets"
         }
         into("display")
     }
+    from(rootProject.file("../core/crates/inku-display/tests/data/compat")) {
+        listOf("linear-gradient-wash", "linear-gradient-field").forEach {
+            include("$it.svg", "$it-chrome.png")
+        }
+        into("display")
+    }
     into(displayCheckAssetsDirectory)
 }
 

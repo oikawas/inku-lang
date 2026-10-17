@@ -1,11 +1,13 @@
 package app.inku.mobile.render
 
 import android.graphics.Color
+import android.graphics.Bitmap
 import android.os.Debug
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.nio.ByteBuffer
+import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -31,6 +33,37 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class NativeDisplayDeviceTest {
     private val assets get() = InstrumentationRegistry.getInstrumentation().context.assets
+
+    /** The two gradient forms the core writes, through the production display host on the device. */
+    @Test
+    fun linearGradientsUseSkiaAndMatchChrome() = runBlocking {
+        val handlesBefore = NativeDisplayBridge.liveHandles()
+        val renderer = AndroidDisplayRenderer()
+        val directory = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir,
+            "lineargradient-check-20261012")
+        check(directory.mkdirs() || directory.isDirectory)
+        try {
+            listOf("linear-gradient-wash", "linear-gradient-field").forEach { name ->
+                val reference = assets.open("display/$name-chrome.png").use { it.readBytes() }
+                val dimensions = ByteBuffer.wrap(reference, 16, 8)
+                val width = dimensions.int
+                val height = dimensions.int
+                val final = renderer.whole(svg(name), width, height).filter { it.complete && !it.coarse }.last()
+                assertEquals(name, AndroidDisplayRenderer.Painter.Skia, final.painter)
+                val difference = NativeDisplayChecks.comparePng(width, height, final.bitmap.rowBytes,
+                    NativeDisplayChecks.pixels(final.bitmap), reference)
+                File(directory, "$name-pixel9.png").outputStream().use {
+                    check(final.bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+                }
+                assertTrue("$name: $difference", difference.passes)
+                Log.i(TAG, "$name painter=${final.painter} comparison=$difference")
+            }
+            assertEquals(2, renderer.diagnostics().skiaWholes)
+            assertTrue(renderer.diagnostics().fallbacks.isEmpty())
+            Log.i(TAG, "lineargradient checked=2 diagnostics=${renderer.diagnostics()}")
+        } finally { renderer.purgeScenes() }
+        assertEquals(handlesBefore, NativeDisplayBridge.liveHandles())
+    }
 
     @Test
     fun publicWholesAndZoomedWindowsUseTheSharedComparison() = runBlocking {
@@ -141,8 +174,8 @@ class NativeDisplayDeviceTest {
                 NativeDisplayChecks.pixels(newest.bitmap).copyOfRange(4, 8))
 
             val unsupported = """<svg xmlns="http://www.w3.org/2000/svg" width="3" height="2"><defs>
-                <linearGradient id="g"><stop stop-color="red"/><stop offset="1" stop-color="blue"/></linearGradient>
-                </defs><rect width="3" height="2" fill="url(#g)"/></svg>""".trimIndent()
+                <symbol id="g"><rect width="3" height="2" fill="red"/></symbol>
+                </defs><use href="#g"/></svg>""".trimIndent()
             assertEquals(AndroidDisplayRenderer.Painter.Resvg,
                 renderer.whole(unsupported, 3, 2).last().painter)
             assertEquals(1, renderer.diagnostics().fallbacks.values.sum())

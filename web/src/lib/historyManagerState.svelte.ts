@@ -543,12 +543,18 @@ export class HistoryManagerState {
 
 	setPageSize = (pageSize: number) => {
 		this.awaitingInitialPageSize = false;
+		const offset = this.startOffset + this.page * this.pageSize;
 		// `/api/history` accepts at most 100 rows. Keep the UI request valid even
 		// when a very large grid has room for more cards than one server page.
 		const nextPageSize = Math.max(1, Math.min(100, Math.floor(pageSize)));
 		this.pageSize = nextPageSize;
 		this.pageSizeMeasured = true;
 		if (this.positioning) return;
+		// Opening a preview changes the grid width and its measured capacity.
+		// Keep the first work, rather than multiplying the old page number by
+		// the new capacity and silently moving to a different part of history.
+		this.page = Math.min(this.page, Math.floor(offset / nextPageSize));
+		this.startOffset = offset - this.page * nextPageSize;
 		// Both quantities are computed here rather than read off the derived
 		// fields: those are recomputed after this method returns, so reading them
 		// now would clamp the page against the size that is being replaced.

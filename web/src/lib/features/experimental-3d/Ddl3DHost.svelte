@@ -64,7 +64,7 @@
 </div>
 
 <style>
-	.ddl3d-host { position: relative; flex: 1; min-width: 0; align-self: stretch; margin: 0 48px; background: var(--bg); }
+	.ddl3d-host { position: relative; flex: 1; min-width: 0; align-self: stretch; margin: 0 48px 58px; background: var(--bg); }
 	iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 	.message { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; background: var(--bg); color: var(--fg); }
 	.message p { margin: 0; }.message code { display: block; overflow-wrap: anywhere; max-width: 30em; }

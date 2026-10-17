@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { placeholderMotifTransform } from '$lib/canvas-placeholder';
 	import { shareTargetOf } from '$lib/shareTarget';
@@ -12,6 +13,7 @@
 	import type { CaptionPosition, CaptionWritingMode } from '$lib/captionWritingMode';
 
 	type Props = {
+		leadingCornerControls?: Snippet;
 		result: PaintResult | null;
 		rangePreview?: RangePreview | null;
 		artworkUrl: string | null;
@@ -63,6 +65,7 @@
 	};
 
 	let {
+		leadingCornerControls,
 		result,
 		rangePreview = null,
 		artworkUrl,
@@ -283,6 +286,7 @@
 				     work being looked at; the fullscreen button stays last, at the
 				     corner, so it keeps the position it has always had. -->
 				<div class="canvas-corner-controls canvas-corner-right" onpointerdown={(event) => event.stopPropagation()}>
+					{@render leadingCornerControls?.()}
 					{#if statusHashLabel}
 						<Tooltip placement="top-left" text={statusHashCopied ? (isJapanese ? 'コピーしました' : 'Copied') : (isJapanese ? 'クリックでfull hashをコピーします' : 'Click to copy the full hash')}>
 							<button

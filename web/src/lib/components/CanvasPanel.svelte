@@ -785,9 +785,11 @@
 		{/if}
 	</div>
 
-	{#if ddl3dViewer && result && outputTab === 'canvas'}
-		<Ddl3DModeSwitch bind:viewMode />
-	{/if}
+	{#snippet modeControl()}
+		{#if ddl3dViewer && result}
+			<Ddl3DModeSwitch bind:viewMode />
+		{/if}
+	{/snippet}
 
 	<div class="canvas-area" bind:this={canvasAreaEl} tabindex="-1">
 		<div class="nav-left">
@@ -801,8 +803,18 @@
 
 		{#if outputTab === 'canvas' && viewMode === '3d' && ddl3dViewer && result}
 			<Ddl3DHost {result} viewerUrl={ddl3dViewer} {isJapanese} onReturn={() => (viewMode = '2d')} />
+			<div class="ddl3d-corner-controls">
+				{@render modeControl()}
+				{#if statusHashLabel}
+					<Tooltip placement="top-left" text={statusHashCopied ? (isJapanese ? 'コピーしました' : 'Copied') : (isJapanese ? 'クリックでfull hashをコピーします' : 'Click to copy the full hash')}>
+						<button type="button" class="ddl3d-hash-button" class:marked={statusHashCopied}
+							aria-label={isJapanese ? 'full hash をコピー' : 'Copy the full hash'} onclick={onCopyStatusHash}>#</button>
+					</Tooltip>
+				{/if}
+			</div>
 		{:else if outputTab === 'canvas'}
 			<CanvasArtworkWorkspace
+				leadingCornerControls={modeControl}
 				savedWorkExport={currentHistoryId && !statusHistoryItem?.trashed ? {
 					scope: { kind: 'current', works: [{
 						id: currentHistoryId,
@@ -1048,6 +1060,10 @@
 {/if}
 
 <style>
+	.ddl3d-corner-controls { position: absolute; right: 18px; bottom: 14px; z-index: 13; display: flex; align-items: center; gap: 6px; }
+	.ddl3d-hash-button { width: 34px; height: 34px; border: 1px solid var(--border2); border-radius: 999px; background: var(--floating-control-bg); color: var(--floating-control-fg); box-shadow: 0 1px 6px rgba(0,0,0,0.1); cursor: pointer; font: inherit; font-weight: 600; }
+	.ddl3d-hash-button:hover { background: var(--floating-control-hover); }
+	.ddl3d-hash-button.marked { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
 	.right-panel {
 		position: relative;
 		flex: 1;

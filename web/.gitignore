@@ -23,6 +23,7 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .build-number
 
-# Keep local viewer builds out; ship only the registered standalone distribution.
+# Keep local builds out; retain registered distributions for already open pages.
 /static/experimental/ddl-3d/*
 !/static/experimental/ddl-3d/solid-v1-c257fc78/
+!/static/experimental/ddl-3d/solid-v1-6cfd2b38/

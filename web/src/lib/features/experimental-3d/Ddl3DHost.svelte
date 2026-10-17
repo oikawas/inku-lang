@@ -22,6 +22,9 @@
 		timer = setTimeout(() => { failure = 'viewer_timeout'; preparing = false; }, 15_000);
 	}
 	function retry() { ready = false; failure = ''; preparing = true; attempt += 1; waitForViewer(); }
+	// Navigate after the iframe is attached. A src set on a detached template
+	// can leave its first browsing context at about:blank.
+	$effect(() => { if (frame) frame.src = src; });
 	onMount(() => {
 		waitForViewer();
 		const listener = (event: MessageEvent) => {
@@ -56,7 +59,7 @@
 
 <div class="ddl3d-host" aria-busy={preparing}>
 	{#key attempt}
-		<iframe bind:this={frame} {src} onload={() => send('request-ready')} title={t().ddl3dTitle} allow="fullscreen" allowfullscreen referrerpolicy="no-referrer" inert={!!failure}></iframe>
+		<iframe bind:this={frame} onload={() => send('request-ready')} title={t().ddl3dTitle} allow="fullscreen" allowfullscreen referrerpolicy="no-referrer" inert={!!failure}></iframe>
 	{/key}
 	{#if failure}
 		<div class="message" role="status">

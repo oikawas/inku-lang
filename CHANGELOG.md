@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+Navigate the 3D iframe after DOM attachment to prevent its initial document from remaining at about:blank.
+
 ## v2.15.173 (2026-10-17 / Build 1249)
 
 The host also requests the 3D viewer's ready state, avoiding a startup wait when iframe load ordering loses the initial notification.

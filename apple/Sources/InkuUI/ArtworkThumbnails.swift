@@ -25,6 +25,11 @@ public actor ArtworkThumbnails {
         public var bakedInBackground = 0
         public var failed = 0
         public var pruned = 0
+        /// Display reads waiting for the store or a decode.
+        public var loadsInFlight = 0
+        public var decodesInFlight = 0
+        /// The most stored PNGs decoded at the same time.
+        public var maxDecodesInFlight = 0
     }
 
     private var store: ThumbnailStore?
@@ -56,7 +61,8 @@ public actor ArtworkThumbnails {
         let (id, svg, renderHash) = (work.id, work.svg, work.renderHash)
         let task = Task { try await self.load(id: id, svg: svg, renderHash: renderHash) }
         inFlight[key] = task
-        defer { inFlight[key] = nil }
+        statistics.loadsInFlight = inFlight.count
+        defer { inFlight[key] = nil; statistics.loadsInFlight = inFlight.count }
         let image = try await task.value
         memory.insert(image, for: key)
         return image
@@ -105,6 +111,9 @@ public actor ArtworkThumbnails {
 
     public func currentStatistics() -> Statistics { statistics }
 
+    /// Starts the decode peak again from what is running now. For checks.
+    public func resetPeaks() { statistics.maxDecodesInFlight = statistics.decodesInFlight }
+
     private func runPass() async {
         guard let store, let database else { return }
         await pruneOrphans()
@@ -147,7 +156,7 @@ public actor ArtworkThumbnails {
 
     private func load(id: String, svg: String, renderHash: String?) async throws -> CGImage {
         if let store, let stored = try? await store.thumbnail(historyID: id, scale: Self.scale),
-           stored.sourceRenderHash == renderHash, let image = await Self.decode(stored.png, on: display) {
+           stored.sourceRenderHash == renderHash, let image = await countedDecode(stored.png) {
             statistics.storeHits += 1
             return image
         }
@@ -166,6 +175,13 @@ public actor ArtworkThumbnails {
             statistics.failed += 1
             throw error
         }
+    }
+
+    private func countedDecode(_ png: Data) async -> CGImage? {
+        statistics.decodesInFlight += 1
+        statistics.maxDecodesInFlight = max(statistics.maxDecodesInFlight, statistics.decodesInFlight)
+        defer { statistics.decodesInFlight -= 1 }
+        return await Self.decode(png, on: display)
     }
 
     private nonisolated static func key(_ id: String, _ renderHash: String?) -> String { id + "\u{0}" + (renderHash ?? "") }

@@ -185,6 +185,8 @@ public final class LibraryModel {
 
     public func refresh(refreshLineage: Bool = true) async {
         guard let database else { return }
+        LibraryPerformanceProbe.refreshStarted()
+        defer { LibraryPerformanceProbe.refreshFinished() }
         let token = UUID()
         refreshToken = token
         let requestedFilter = filter
@@ -446,6 +448,7 @@ public final class LibraryModel {
 
     private func loadLineage(request: LineageGraphRequest, retrying: Bool = false) async {
         guard let lineageReader else { return }
+        LibraryPerformanceProbe.lineageRead()
         let token = UUID()
         lineageToken = token; lineageFocusID = request.nodeID
         lineageLoading = true

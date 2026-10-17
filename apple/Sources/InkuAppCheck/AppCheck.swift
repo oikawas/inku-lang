@@ -55,6 +55,9 @@ struct AppCheck {
         if CommandLine.arguments.contains("--library-pagination-only") {
             try await runLibraryPaginationChecks(); return
         }
+        if CommandLine.arguments.contains("--library-paging-perf-only") {
+            try await runLibraryPagingPerformance(arguments: CommandLine.arguments); return
+        }
         if let index = CommandLine.arguments.firstIndex(of: "--library-pagination-benchmark"),
            CommandLine.arguments.indices.contains(index + 1) {
             try await runLibraryPaginationBenchmark(url: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return

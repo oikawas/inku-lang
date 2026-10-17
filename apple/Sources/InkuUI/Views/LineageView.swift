@@ -346,7 +346,8 @@ struct LineageView: View {
     }
 
     private func nodeCard(_ item: LineageItem, graph: LineageSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        LibraryPerformanceProbe.lineageNodeBody()
+        return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top, spacing: 5) {
                 if let work = item.work {
                     if !work.trashed {

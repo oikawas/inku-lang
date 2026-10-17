@@ -404,6 +404,7 @@ struct LibraryView: View {
     // MARK: Cards (Web .manager-thumb-wrap)
 
     private func gridCard(_ work: SavedWork) -> some View {
+        LibraryPerformanceProbe.cardBody()
         let selected = library.selectedIDs.contains(work.id)
         return VStack(alignment: .leading, spacing: 5) {
             Button { openWork(work) } label: {

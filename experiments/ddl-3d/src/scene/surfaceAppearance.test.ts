@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BoxGeometry } from 'three';
+import { BoxGeometry, SphereGeometry } from 'three';
 import { mapPaintSurfaces, sidePaintPixels } from '../viewer/circleAppearance.ts';
 import { assignLayers } from './layers.ts';
 import type { MeshPacket } from './types.ts';
@@ -18,6 +18,20 @@ test('box walls unfold their thickness through the filtered paint', () => {
   assert.ok(Math.max(...values) - Math.min(...values) > 0.5);
   assert.ok(Array.from(uv.array).every(Number.isFinite));
   source.dispose(); geometry.dispose();
+});
+
+// Failure: the sphere's equator samples transparent SVG fringe, splitting it.
+test('a filled sphere retains pigment around its equator', () => {
+  const source = new SphereGeometry(0.12, 32, 16);
+  const geometry = mapPaintSurfaces(source, [0.35, 0.35, 0.3, 0.3], [1, 1], true);
+  const positions = geometry.getAttribute('position');
+  const wallVertices = geometry.groups.filter(g => g.materialIndex === 1)
+    .flatMap(g => Array.from({ length: g.count }, (_, i) => g.start + i));
+  assert.ok(wallVertices.length > 0);
+  assert.ok(wallVertices.some(i => Math.abs(positions.getZ(i)) < 1e-6));
+  const outline = mapPaintSurfaces(source, [0.35, 0.35, 0.3, 0.3], [1, 1], false);
+  assert.ok(outline.groups.every(g => g.materialIndex === 0));
+  source.dispose(); geometry.dispose(); outline.dispose();
 });
 
 // Failure: transparent SVG padding becomes a white band instead of pigment.

@@ -147,7 +147,8 @@ export async function preparePaintAppearance(mesh: Mesh, packet: MeshPacket, can
   positions.needsUpdate = true;
   mesh.geometry.computeVertexNormals(); mesh.geometry.computeBoundingBox(); mesh.geometry.computeBoundingSphere();
   const previous = mesh.geometry;
-  mesh.geometry = mapPaintSurfaces(previous, bounds, canvas, !round && (packet.filled === true || ['line', 'free_line', 'arc'].includes(packet.primitive)));
+  mesh.geometry = mapPaintSurfaces(previous, bounds, canvas,
+    packet.filled === true || (!round && ['line', 'free_line', 'arc'].includes(packet.primitive)));
   if (mesh.geometry !== previous) previous.dispose();
   const sideRaster = document.createElement('canvas');
   sideRaster.width = width; sideRaster.height = height;

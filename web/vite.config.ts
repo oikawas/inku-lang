@@ -59,6 +59,23 @@ function startupBannerPlugin(): Plugin {
 	};
 }
 
+// A browser can request virtual CSS before its component after a dev-server
+// restart. The Svelte plugin otherwise falls through to the raw .svelte file
+// when its compiled CSS metadata is still empty, poisoning Vite's CSS cache.
+function prepareSvelteStylePlugin(): Plugin {
+	return {
+		name: 'inku-prepare-svelte-style',
+		apply: 'serve',
+		enforce: 'pre',
+		async load(id) {
+			if (/[?&]svelte&type=style&lang\.css$/.test(id) && this.environment.mode === 'dev') {
+				await this.environment.transformRequest(id.slice(0, id.indexOf('?')));
+			}
+			return null;
+		}
+	};
+}
+
 export default defineConfig({
 	define: {
 		__APP_VERSION__: JSON.stringify(appVersion),
@@ -67,7 +84,7 @@ export default defineConfig({
 		// banner reads (api.py:_build_date). A fresh clone stamps its own mtime.
 		__BUILD_DATE__: JSON.stringify(buildDate)
 	},
-	plugins: [startupBannerPlugin(), sveltekit()],
+	plugins: [startupBannerPlugin(), prepareSvelteStylePlugin(), sveltekit()],
 	server: {
 		host: '0.0.0.0',
 		port: 5173,

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Restore the 3D viewport when styles arrive before their component
+
+After a web development server restart, a style request could arrive before its Svelte component and cache raw component source as CSS. Complete the component transform before serving its virtual styles, preventing the work panel and 3D viewport from collapsing to zero height. Saved works, the database, viewer distribution and its independent integration remain unchanged.
+
 ## v2.15.164 (2026-10-17 / Build 1240)
 
 ### 2026-10-17 — Keep 3D viewing available after recoverable Score diagnostics

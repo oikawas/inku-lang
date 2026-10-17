@@ -3,13 +3,13 @@ package app.inku.mobile.pipeline
 import app.inku.mobile.data.model.CatalogSelection
 import app.inku.mobile.data.model.ColorCatalog
 import app.inku.mobile.data.model.ColorCatalogs
+import app.inku.mobile.llm.isLocalVisionModel
 import java.security.MessageDigest
 import org.json.JSONArray
 import org.json.JSONObject
 
-@Suppress("UNUSED_PARAMETER")
 internal fun compositionForModel(modelId: String): JSONObject =
-    JSONObject().put("read", true)
+    JSONObject().put("read", !isLocalVisionModel(modelId))
 
 /** One definition carried by an `inku.ddl-export.v1` file, offered to a new work only. */
 data class ImportedPluginDefinition(

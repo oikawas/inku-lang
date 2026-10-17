@@ -16,7 +16,7 @@ Host-JNI JVM tests read the shared `server/tests/data/saved-variant-cases.json`.
 
 ## 2026-10-17 Align composition reading, provider resolution and refinement Vision images with Server
 
-`composition.read` is always true, matching Server. On-device Vision models also receive `read_composition` after Stage 1. The existing shared pipeline owns model selection, retries, answer validation and fallback to the default reading.
+**On-device Vision models do not read composition (the author's decision, 2026-10-17).** `composition.read` is `!isLocalVisionModel(modelId)` and remains true for external-provider models. Acceptance on E2B spent about 114 seconds on four composition attempts before falling back to the default reading, so the on-device models return to their former behavior. This is an intentional difference from Server's always-true setting. New runs and forks from saved works use the same rule. The existing shared pipeline retains external-provider retries, answer validation and fallback.
 
 Provider resolution uses an explicit `provider:model`, then a sole enabled provider publishing the model, then the user's stage default. `complete_visible_ddl_holes` uses Stage 2; other requests use Stage 1. Confirming a model selection also saves `stage1_provider` and `stage2_provider` in `model_selection`. Older settings derive each provider from its qualified stage model without a Room migration. First-run defaults retain the existing on-device model. An unresolved setting or disabled default never silently switches to the device. ChatGPT-plan routing follows the same order and uses the session reference pinned at run start.
 

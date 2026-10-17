@@ -1,0 +1,164 @@
+import './style.css';
+import { Viewer } from './viewer/Viewer';
+import { labels, type Labels } from './viewer/labels';
+import { PROTOCOL, MAX_INPUT_BYTES, validLoad, type LoadMessage } from './input/protocol';
+import type { ScenePacket } from './scene/types';
+
+const root = document.querySelector<HTMLElement>('#app')!;
+const embedded = window.parent !== window;
+const mountId = new URLSearchParams(location.hash.slice(1)).get('mount') || 'standalone';
+let current: LoadMessage | null = null, viewer: Viewer | null = null, worker: Worker | null = null;
+let generation = 0, timeout = 0, locale: 'ja' | 'en' = 'ja';
+let words = labels(locale);
+let stage: HTMLElement, status: HTMLElement, details: HTMLElement, selection: HTMLElement, overlay: HTMLElement;
+let cancel: HTMLButtonElement, retry: HTMLButtonElement;
+const sceneControls: (HTMLButtonElement | HTMLInputElement | HTMLSelectElement)[] = [];
+const urls = new Set<string>();
+
+function post(type: string, extra: Record<string, unknown> = {}) {
+  if (embedded) parent.postMessage({ protocol: PROTOCOL, type, mountId, requestId: current?.requestId ?? 0, ...extra }, location.origin);
+}
+function element<K extends keyof HTMLElementTagNameMap>(tag: K, parent: HTMLElement, text?: string) {
+  const el = document.createElement(tag); if (text) el.textContent = text; parent.append(el); return el;
+}
+function button(parent: HTMLElement, label: string, action: () => void, needsScene = true) {
+  const el = element('button', parent, label); el.type = 'button'; el.addEventListener('click', action);
+  if (needsScene) sceneControls.push(el); return el;
+}
+function message(text: string, busy = false) {
+  overlay.hidden = false; overlay.querySelector('p')!.textContent = text;
+  cancel.hidden = !busy; retry.hidden = busy || !current; status.textContent = text;
+  sceneControls.forEach(control => control.disabled = true);
+}
+function stop() {
+  generation++; clearTimeout(timeout); worker?.terminate(); worker = null;
+  viewer?.dispose(); viewer = null;
+}
+function fail(reason: string) {
+  stop();
+  const text = reason === 'context_lost' ? words.lost : reason === 'webgl_unavailable' ? words.noGpu : reason === 'timeout' ? words.timeout : reason === 'cancelled' ? words.cancelled : words.failed;
+  message(text); details.textContent = reason.slice(0, 500); post('failed', { reason: reason.slice(0, 500) });
+}
+
+function ui() {
+  root.replaceChildren(); sceneControls.length = 0;
+  const toolbar = element('header', root); toolbar.className = 'toolbar';
+  const heading = element('div', toolbar); heading.className = 'heading'; element('strong', heading, words.title);
+  if (!embedded) {
+    const label = element('label', heading, words.open); label.className = 'file';
+    const input = element('input', label); input.type = 'file'; input.accept = '.json,application/json';
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0]; if (!file) return;
+      if (file.size > MAX_INPUT_BYTES) { message(words.fileTooLarge); return; }
+      try {
+        let json = await file.text();
+        const value = JSON.parse(json); if (!value.score) json = JSON.stringify({ score: value });
+        load({ protocol: PROTOCOL, type: 'load-work', mountId, requestId: (current?.requestId ?? 0) + 1, inputJson: json, locale, theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light' });
+      } catch { fail('invalid_json'); }
+    });
+  }
+  if (embedded) button(heading, words.back, () => { stop(); post('return-2d'); }, false);
+  const controls = element('div', toolbar); controls.className = 'controls';
+  button(controls, words.fit, () => viewer?.fit());
+  button(controls, words.reset, () => {
+    viewer?.reset(); depth.value = '1'; projection.value = 'perspective'; spin.checked = false;
+  });
+  for (const [symbol, label, action] of [
+    ['＋', words.zoomIn, () => viewer?.zoom(true)], ['−', words.zoomOut, () => viewer?.zoom(false)],
+    ['←', words.panLeft, () => viewer?.pan(25, 0)], ['→', words.panRight, () => viewer?.pan(-25, 0)],
+    ['↑', words.panUp, () => viewer?.pan(0, 25)], ['↓', words.panDown, () => viewer?.pan(0, -25)],
+  ] as const) {
+    const control = button(controls, symbol, action); control.title = label; control.setAttribute('aria-label', label);
+  }
+  for (const [name, label] of [['front', words.front], ['back', words.backView], ['left', words.left], ['right', words.right], ['top', words.top], ['bottom', words.bottom], ['iso', words.iso]]) {
+    button(controls, label, () => viewer?.preset(name));
+  }
+  const projection = element('select', controls); projection.setAttribute('aria-label', words.projection);
+  for (const [value, label] of [['perspective', words.perspective], ['orthographic', words.orthographic]]) { const option = element('option', projection, label); option.value = value; }
+  projection.addEventListener('change', () => viewer?.setProjection(projection.value as 'perspective' | 'orthographic')); sceneControls.push(projection);
+  button(controls, words.full, () => { void (document.fullscreenElement ? document.exitFullscreen() : root.requestFullscreen()).catch(error => {
+    status.textContent = words.fullFailed; element('p', details, error instanceof Error ? error.message : String(error));
+  }); }, false);
+  const options = element('div', toolbar); options.className = 'controls';
+  let spin: HTMLInputElement;
+  for (const key of ['grid', 'axes', 'support', 'wire', 'unlit', 'spin'] as const) {
+    const label = element('label', options), input = element('input', label); input.type = 'checkbox'; input.dataset.option = key; label.append(words[key]);
+    input.addEventListener('change', () => viewer?.setOption(key, input.checked)); sceneControls.push(input); if (key === 'spin') spin = input;
+  }
+  const depthLabel = element('label', options, words.depth), depth = element('input', depthLabel); depth.type = 'range'; depth.min = '0.1'; depth.max = '3'; depth.step = '0.1'; depth.value = '1';
+  depth.setAttribute('aria-label', words.depth); depth.addEventListener('input', () => viewer?.setDepth(Number(depth.value))); sceneControls.push(depth);
+  button(options, words.focus, () => viewer?.focus());
+  for (const format of ['png', 'glb'] as const) button(options, words[format], () => { void save(format); });
+  const help = element('details', toolbar); element('summary', help, words.help); element('p', help, words.helpText);
+  stage = element('section', root); stage.className = 'stage'; stage.setAttribute('aria-label', '3D');
+  overlay = element('div', stage); overlay.className = 'overlay'; overlay.setAttribute('role', 'status'); element('p', overlay);
+  cancel = button(overlay, words.cancel, () => fail('cancelled'), false);
+  retry = button(overlay, words.retry, () => { if (current) load({ ...current }); }, false);
+  if (embedded) button(overlay, words.back, () => { stop(); post('return-2d'); }, false);
+  const footer = element('footer', root); status = element('span', footer); status.setAttribute('role', 'status');
+  selection = element('span', footer, `${words.selected}: ${words.none}`);
+  const info = element('details', footer); element('summary', info, words.details); details = element('div', info); details.className = 'diagnostics';
+  message(words.ready);
+}
+
+function load(value: LoadMessage) {
+  stop(); current = value; locale = value.locale; words = labels(locale); document.documentElement.lang = locale;
+  document.documentElement.dataset.theme = value.theme; ui(); message(words.preparing, true);
+  const localGeneration = generation;
+  const started = performance.now();
+  worker = new Worker(new URL('./worker/prepare.ts', import.meta.url), { type: 'module' });
+  timeout = window.setTimeout(() => { if (localGeneration === generation) fail('timeout'); }, 10_000);
+  worker.onerror = () => { if (localGeneration === generation) fail('worker_failed'); };
+  worker.onmessage = (event: MessageEvent<{ ok: boolean; packet?: ScenePacket; error?: string }>) => {
+    if (localGeneration !== generation) return;
+    clearTimeout(timeout); worker?.terminate(); worker = null;
+    if (!event.data.ok || !event.data.packet) { fail(event.data.error ?? 'preparation_failed'); return; }
+    const packet = event.data.packet;
+    try {
+      viewer = new Viewer(stage, packet, viewState => {
+        root.querySelector<HTMLSelectElement>('select')!.value = viewState.projection;
+        root.querySelector<HTMLInputElement>('input[type=range]')!.value = String(viewState.depth);
+        if (viewer) root.querySelector<HTMLInputElement>('input[data-option=spin]')!.checked = viewer.controls.autoRotate;
+        post('view-state', { viewState });
+      }, data => {
+        selection.textContent = data ? `${words.selected}: ${data.primitive} · #${Number(data.sourceIndex) + 1} (${Number(data.performedIndex) + 1})` : `${words.selected}: ${words.none}`;
+      }, fail);
+      if (value.viewState) {
+        viewer.restore(value.viewState);
+        root.querySelector<HTMLSelectElement>('select')!.value = value.viewState.projection;
+        root.querySelector<HTMLInputElement>('input[type=range]')!.value = String(value.viewState.depth);
+      }
+      root.querySelector<HTMLInputElement>('input[data-option=support]')!.checked = viewer.support.visible;
+      overlay.hidden = true; sceneControls.forEach(control => control.disabled = false);
+      status.textContent = `${words.objects}: ${packet.objectCount} · ${words.triangles}: ${packet.triangles.toLocaleString(locale)}`;
+      details.replaceChildren();
+      if (packet.diagnostics.length) element('strong', details, words.approximations);
+      for (const note of packet.diagnostics) element('p', details, words[note as keyof Labels] ?? note);
+      if (packet.clippedObjects) element('p', details, `${words.clipped}: ${packet.clippedObjects}`);
+      element('p', details, `${packet.mappingVersion} · Engine ${packet.engineVersion} · ${packet.inputDigest}`);
+      post('rendered', { inputDigest: packet.inputDigest, objectCount: packet.objectCount, triangles: packet.triangles, bytes: packet.bytes, preparationMs: Math.round(performance.now() - started) });
+      if (packet.diagnostics.length) post('diagnostic', { diagnostics: packet.diagnostics });
+    } catch { fail('webgl_unavailable'); }
+  };
+  worker.postMessage({ inputJson: value.inputJson, wasmUrl: new URL('wasm/score_adapter.js', document.baseURI).href });
+}
+
+async function save(format: 'png' | 'glb') {
+  const source = viewer; if (!source) return;
+  try {
+    const blob = await source[format]();
+    if (source !== viewer) return;
+    const url = URL.createObjectURL(blob); urls.add(url);
+    const link = document.createElement('a'); link.href = url; link.download = `inku-3d-${source.packet.inputDigest.slice(0, 12)}.${format}`;
+    link.click(); setTimeout(() => { URL.revokeObjectURL(url); urls.delete(url); }, 1000);
+  } catch { status.textContent = words.exportFailed; }
+}
+
+window.addEventListener('message', event => {
+  if (!embedded || event.origin !== location.origin || event.source !== parent) return;
+  if (validLoad(event.data) && event.data.mountId === mountId && event.data.requestId > (current?.requestId ?? 0)) load(event.data);
+  else if (event.data?.protocol === PROTOCOL && event.data.type === 'dispose' && event.data.mountId === mountId) stop();
+});
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && embedded && !document.fullscreenElement) { stop(); post('return-2d'); } });
+window.addEventListener('pagehide', () => { stop(); urls.forEach(url => URL.revokeObjectURL(url)); urls.clear(); });
+ui(); post('ready');

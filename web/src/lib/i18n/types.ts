@@ -317,6 +317,13 @@ export interface LangPack {
 
 	// Output tabs
 	tabCanvas: string;
+	ddl3dMode: string;
+	ddl3dTitle: string;
+	ddl3dPreparing: string;
+	ddl3dFailed: string;
+	ddl3dDetails: string;
+	ddl3dRetry: string;
+	ddl3dReturn: string;
 	tabRefine: string;
 	tabCompare: string;
 	tabPrompts: string;

@@ -237,6 +237,7 @@
 	let catalogSelectionSnapshot = $state<string | null>(null);
 	let instructionCaptionVisible = $state(true);
 	let outputTab    = $state<'canvas' | 'refine' | 'lineage'>('canvas');
+	let canvasViewMode = $state<'2d' | '3d'>('2d');
 	const canvasViewport = new CanvasViewportState();
 	type ModelSelectionSnapshot = {
 		stage1Provider: Provider;
@@ -2633,7 +2634,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 
 	function handleCanvasKeydown(event: KeyboardEvent) {
-		canvasViewport.handleKeydown(event, outputTab === 'canvas');
+		canvasViewport.handleKeydown(event, outputTab === 'canvas' && canvasViewMode === '2d');
 	}
 
 	const historyNavSpan = $derived(history.windowSize);
@@ -3056,6 +3057,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{formatHistoryDate}
 				{historyPreviewText}
 				bind:outputTab
+				bind:viewMode={canvasViewMode}
 				exportCardOnly={!session.uiVisibility.work_tools}
 				result={work.result}
 				rangePreview={ddlRangePreview}

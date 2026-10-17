@@ -1,0 +1,20 @@
+{
+  "render_seed": "9007199254740993",
+  "composition_seed": "9007199254740995",
+  "render_canvas_aspect_ratio": 1.4,
+  "render_color_map": { "white": "#f5f2eb", "black": "#333333", "red": "#bd6053", "blue": "#427e94", "yellow": "#d5a842", "green": "#527d60" },
+  "score": {
+    "version": "0.1.0", "canvas": "square", "background": "white",
+    "instructions": [
+      { "primitive": "circle", "center": [0.2, 0.25], "radius": 0.12, "filled": true, "color": "red", "weight": "rotring" },
+      { "primitive": "square", "position": [0.43, 0.15], "size": [0.2, 0.2], "filled": true, "color": "blue", "weight": "rotring" },
+      { "primitive": "triangle", "position": [0.71, 0.14], "size": [0.2, 0.24], "filled": true, "color": "yellow", "weight": "rotring" },
+      { "primitive": "ellipse", "center": [0.2, 0.6], "size": [0.28, 0.16], "filled": false, "color": "blue", "weight": "rotring" },
+      { "primitive": "polygon", "center": [0.5, 0.6], "radius": 0.13, "sides": 6, "filled": true, "color": "green", "weight": "rotring" },
+      { "primitive": "cloudform", "center": [0.8, 0.6], "size": [0.3, 0.2], "filled": true, "color": "red", "weight": "rotring" },
+      { "primitive": "line", "from": [0.1, 0.88], "to": [0.33, 0.88], "color": "black", "weight": "rotring", "style": "dashed" },
+      { "primitive": "arc", "center": [0.5, 0.92], "radius": 0.12, "angle_start": 190, "angle_end": 350, "color": "red", "weight": "rotring" },
+      { "primitive": "point", "center": [0.8, 0.88], "radius": 0.025, "filled": true, "color": "blue", "weight": "rotring" }
+    ]
+  }
+}

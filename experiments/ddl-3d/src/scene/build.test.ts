@@ -1,0 +1,89 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { Box3, Vector3 } from 'three';
+import { buildScene, unpackMesh } from './build.ts';
+import type { PreparedScene } from './types.ts';
+import init, { prepare_scene } from '../../public/wasm/score_adapter.js';
+
+await init({ module_or_path: readFileSync(new URL('../../public/wasm/score_adapter_bg.wasm', import.meta.url)) });
+const solidsJson = readFileSync(new URL('../../fixtures/solids.json', import.meta.url), 'utf8');
+function prepare(json = solidsJson): PreparedScene {
+  const result = JSON.parse(prepare_scene(json));
+  assert.equal(result.ok, true, result.error);
+  return result;
+}
+function bounds(packet: ReturnType<typeof buildScene>['meshes'][number]) {
+  const geometry = unpackMesh(packet); geometry.computeBoundingBox();
+  const box = geometry.boundingBox!.clone(); geometry.dispose(); return box;
+}
+const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-6, `${actual} != ${expected}`);
+
+// Failure: round/rectangle become flat planes or stretch with the canvas aspect.
+test('WASM to solids preserves aspect, source identities, volume and deterministic buffers', () => {
+  const input = prepare(), first = buildScene(input), second = buildScene(prepare());
+  assert.equal(first.objectCount, 9); assert.equal(first.meshes.length, 9);
+  assert.deepEqual(first, second);
+  const sphere = bounds(first.meshes[0]), cube = bounds(first.meshes[1]);
+  const size = sphere.getSize(new Vector3());
+  close(size.x, 0.24); close(size.y, 0.24); close(size.z, 0.24);
+  close(sphere.getCenter(new Vector3()).x, -0.42); close(sphere.getCenter(new Vector3()).y, 0.25);
+  const cubeSize = cube.getSize(new Vector3());
+  close(cubeSize.x, 0.2); close(cubeSize.y, 0.2); close(cubeSize.z, 0.2);
+  assert.ok(first.meshes.every(m => bounds(m).getSize(new Vector3()).z > 0));
+  assert.deepEqual(first.meshes.map(m => m.sourceIndex), [0, 1, 2, 3, 4, 5, 6, 7, 8]);
+});
+
+// Failure: clipping is only visual and exported vertices still extend outside it.
+test('fill clipping modifies the actual solid vertices', () => {
+  const input = prepare(); input.scene.marks = [input.scene.marks[0]];
+  input.scene.marks[0].clips = [[[0.28, 0], [1.4, 0], [1.4, 1], [0.28, 1]]];
+  const packet = buildScene(input), box = bounds(packet.meshes[0]);
+  close(box.min.x, -0.42); close(box.max.x, -0.30);
+  assert.ok(packet.triangles > 0);
+});
+
+// Failure: affine reflection reverses faces or uniform group scale leaves Z behind.
+test('group transforms preserve solid volume and facing', () => {
+  const input = prepare(); input.scene.marks = [input.scene.marks[1]];
+  input.scene.marks[0].transform = [-2, 0, 0, 2, 1.4, 0];
+  const mesh = buildScene(input).meshes[0], size = bounds(mesh).getSize(new Vector3());
+  close(size.x, 0.4); close(size.y, 0.4); close(size.z, 0.4);
+  const vertices = mesh.positions, index = mesh.indices ?? Array.from({ length: vertices.length / 3 }, (_, i) => i);
+  let volume = 0;
+  for (let i = 0; i < index.length; i += 3) {
+    const a = new Vector3().fromArray(vertices, index[i] * 3), b = new Vector3().fromArray(vertices, index[i + 1] * 3), c = new Vector3().fromArray(vertices, index[i + 2] * 3);
+    volume += a.dot(b.cross(c)) / 6;
+  }
+  close(volume, 0.064);
+});
+
+// Failure: malformed data reaches GPU buffers or a larger scene silently loses objects.
+test('invalid geometry and excessive mesh demand are explicit failures', () => {
+  const input = prepare(); input.scene.marks[0].transform[0] = NaN;
+  assert.throws(() => buildScene(input), /invalid_transform/);
+  const big = prepare(); big.scene.marks = Array.from({ length: 1000 }, () => big.scene.marks[0]);
+  assert.throws(() => buildScene(big), /mesh_budget_exceeded/);
+});
+
+// Failure: the core's free line is flattened into its two endpoints.
+test('free line keeps a curved centerline and a solid tube', () => {
+  const value = JSON.parse(solidsJson);
+  value.score.version = '0.21.0';
+  value.score.instructions = [{ primitive: 'free_line', from: [0.1, 0.5], to: [0.9, 0.5], color: 'blue', weight: 'rotring' }];
+  const input = prepare(JSON.stringify(value));
+  const shape = input.scene.marks[0].shape;
+  assert.equal(shape.kind, 'path');
+  if (shape.kind === 'path') { assert.ok(shape.points.length > 2); assert.ok(shape.points.some(p => Math.abs(p[1] - 0.5) > 0.001)); }
+  const box = bounds(buildScene(input).meshes[0]);
+  assert.ok(box.getSize(new Vector3()).z > 0);
+});
+
+// Failure: placement/arc closure is lost between WASM and the mesh adapter.
+test('saved maple fixture creates all three placed leaves with closed interiors', () => {
+  const score = JSON.parse(readFileSync(new URL('../../../../server/tests/data/score-0.19-maple-leaves-in-cells.json', import.meta.url), 'utf8'));
+  const input = prepare(JSON.stringify({ score, render_seed: '9007199254740993' }));
+  const packet = buildScene(input);
+  assert.equal(packet.objectCount, 33); assert.equal(packet.meshes.filter(m => m.role === 'pair-fill').length, 15);
+  assert.ok(packet.meshes.every(m => !bounds(m).isEmpty()));
+});

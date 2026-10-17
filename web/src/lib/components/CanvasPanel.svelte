@@ -6,6 +6,9 @@
 	import type { AnimationExportSettings } from '$lib/animationExport';
 	import type { Provider, ProviderGroup } from '$lib/models';
 	import CanvasArtworkWorkspace from '$lib/features/canvas/CanvasArtworkWorkspace.svelte';
+	import Ddl3DHost from '$lib/features/experimental-3d/Ddl3DHost.svelte';
+	import Ddl3DModeSwitch from '$lib/features/experimental-3d/Ddl3DModeSwitch.svelte';
+	import { configuredViewer } from '$lib/features/experimental-3d/input';
 	import CanvasGenerationInfo from '$lib/features/canvas/CanvasGenerationInfo.svelte';
 	import CanvasWorkSearch from '$lib/features/canvas/CanvasWorkSearch.svelte';
 	import { pressChoosesWork } from '$lib/features/canvas/generation-info-follow';
@@ -43,6 +46,7 @@
 	type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
 	type Props = {
 		outputTab: OutputTab;
+		viewMode?: '2d' | '3d';
 		canvasSearch: string;
 		canvasSearchBusy: boolean;
 		canvasSearchFailed: boolean;
@@ -200,6 +204,7 @@
 
 	let {
 		outputTab = $bindable('canvas'),
+		viewMode = $bindable('2d'),
 		canvasSearch = $bindable(''),
 		canvasSearchBusy,
 		canvasSearchFailed,
@@ -593,8 +598,9 @@
 		void onInstructionCaptionWritingModeChange(mode);
 	}
 
+	const ddl3dViewer = configuredViewer(import.meta.env.VITE_DDL_3D_VIEWER_URL);
 	function updateFitZoom() {
-		if (!canvasContentEl) return;
+		if (!canvasContentEl || viewMode === '3d') return;
 		const rect = canvasContentEl.getBoundingClientRect();
 		const availableWidth = Math.max(120, rect.width - 120);
 		const availableHeight = Math.max(120, rect.height - 96);
@@ -604,12 +610,12 @@
 
 	$effect(() => {
 		const wheelTarget = canvasContentEl;
-		if (!wheelTarget) return;
+		if (!wheelTarget || viewMode === '3d') return;
 		updateFitZoom();
 		const observer = new ResizeObserver(updateFitZoom);
 		observer.observe(wheelTarget);
 		const onWheel = (event: WheelEvent) => {
-			if (outputTab !== 'canvas' || !result) return;
+			if (outputTab !== 'canvas' || viewMode === '3d' || !result) return;
 			// A menu over the canvas (the export menu) scrolls itself; the wheel is not a zoom there.
 			if (event.target instanceof Element && event.target.closest('.instruction-caption.vertical, .canvas-caption-writing-mode, [role="menu"]')) return;
 			event.preventDefault();
@@ -770,6 +776,10 @@
 		{/if}
 	</div>
 
+	{#if ddl3dViewer && result && outputTab === 'canvas'}
+		<Ddl3DModeSwitch bind:viewMode />
+	{/if}
+
 	<div class="canvas-area">
 		<div class="nav-left">
 			<Tooltip placement="right" text={t().tooltipCanvasNavLatest}>
@@ -780,7 +790,9 @@
 			</Tooltip>
 		</div>
 
-		{#if outputTab === 'canvas'}
+		{#if outputTab === 'canvas' && viewMode === '3d' && ddl3dViewer && result}
+			<Ddl3DHost {result} viewerUrl={ddl3dViewer} {isJapanese} onReturn={() => (viewMode = '2d')} />
+		{:else if outputTab === 'canvas'}
 			<CanvasArtworkWorkspace
 				savedWorkExport={currentHistoryId && !statusHistoryItem?.trashed ? {
 					scope: { kind: 'current', works: [{

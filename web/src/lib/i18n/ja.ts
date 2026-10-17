@@ -437,6 +437,13 @@ export const ja: LangPack = {
 	renderLimitNotesTitle: '効いた上限',
 
 	tabCanvas: '作品',
+	ddl3dMode: '2D / 3D表示',
+	ddl3dTitle: '3D表示（実験）',
+	ddl3dPreparing: '3Dを準備中…',
+	ddl3dFailed: 'この作品を3Dで表示できません。2Dで閲覧を続けられます。',
+	ddl3dDetails: '詳細',
+	ddl3dRetry: '再試行',
+	ddl3dReturn: '2Dに戻る',
 	tabRefine: '推敲',
 	tabCompare: '比較',
 	tabPrompts: 'プロンプト',

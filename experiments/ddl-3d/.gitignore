@@ -1,0 +1,6 @@
+node_modules/
+dist/
+public/wasm/
+public/THIRD_PARTY_NOTICES.txt
+score-adapter/target/
+.tools/

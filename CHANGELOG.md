@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Trial of paint-order depth in the independent 3D viewer
+
+Resolved JSON Score drawing order becomes layers, with later layers toward the front. Copies of an instruction and arc pairs forming a closed fill stay together. Layer depth at zero restores coplanar centers and can be adjusted independently of Solid thickness. An optional view-state field retains the setting across a 2D round trip. The bundled viewer registration and distribution remain unchanged; using the trial requires a separate viewer build.
+
 ## v2.15.166 (2026-10-17 / Build 1242)
 
 ### 2026-10-17 — Open the Library at the selected work and double-click into Work or Lineage

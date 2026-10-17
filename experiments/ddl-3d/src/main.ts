@@ -61,7 +61,7 @@ function ui() {
   const controls = element('div', toolbar); controls.className = 'controls';
   button(controls, words.fit, () => viewer?.fit());
   button(controls, words.reset, () => {
-    viewer?.reset(); depth.value = '1'; projection.value = 'perspective'; spin.checked = false;
+    viewer?.reset(); updateDepthControls(1, 1); projection.value = 'perspective'; spin.checked = false;
   });
   for (const [symbol, label, action] of [
     ['＋', words.zoomIn, () => viewer?.zoom(true)], ['−', words.zoomOut, () => viewer?.zoom(false)],
@@ -85,11 +85,20 @@ function ui() {
     const label = element('label', options), input = element('input', label); input.type = 'checkbox'; input.dataset.option = key; label.append(words[key]);
     input.addEventListener('change', () => viewer?.setOption(key, input.checked)); sceneControls.push(input); if (key === 'spin') spin = input;
   }
-  const depthLabel = element('label', options, words.depth), depth = element('input', depthLabel); depth.type = 'range'; depth.min = '0.1'; depth.max = '3'; depth.step = '0.1'; depth.value = '1';
-  depth.setAttribute('aria-label', words.depth); depth.addEventListener('input', () => viewer?.setDepth(Number(depth.value))); sceneControls.push(depth);
+  for (const [key, label, minimum, action] of [
+    ['depth', words.depth, '0.1', (value: number) => viewer?.setDepth(value)],
+    ['layerSpacing', words.layerDepth, '0', (value: number) => viewer?.setLayerSpacing(value)],
+  ] as const) {
+    const controlLabel = element('label', options, label), input = element('input', controlLabel);
+    input.type = 'range'; input.min = minimum; input.max = '3'; input.step = '0.1'; input.value = '1'; input.dataset.option = key;
+    const output = element('output', controlLabel, '1.0'); output.dataset.value = key;
+    input.setAttribute('aria-label', label);
+    input.addEventListener('input', () => { output.value = Number(input.value).toFixed(1); action(Number(input.value)); });
+    sceneControls.push(input);
+  }
   button(options, words.focus, () => viewer?.focus());
   for (const format of ['png', 'glb'] as const) button(options, words[format], () => { void save(format); });
-  const help = element('details', toolbar); element('summary', help, words.help); element('p', help, words.helpText);
+  const help = element('details', toolbar); element('summary', help, words.help); element('p', help, words.helpText); element('p', help, words.layerHelp);
   recoveryNotice = element('details', toolbar); recoveryNotice.className = 'recovery-notice'; recoveryNotice.hidden = true;
   stage = element('section', root); stage.className = 'stage'; stage.setAttribute('aria-label', '3D');
   overlay = element('div', stage); overlay.className = 'overlay'; overlay.setAttribute('role', 'status'); element('p', overlay);
@@ -100,6 +109,13 @@ function ui() {
   selection = element('span', footer, `${words.selected}: ${words.none}`);
   const info = element('details', footer); element('summary', info, words.details); details = element('div', info); details.className = 'diagnostics';
   message(words.ready);
+}
+
+function updateDepthControls(depth: number, layerSpacing: number) {
+  for (const [key, value] of [['depth', depth], ['layerSpacing', layerSpacing]] as const) {
+    root.querySelector<HTMLInputElement>(`input[data-option=${key}]`)!.value = String(value);
+    root.querySelector<HTMLOutputElement>(`output[data-value=${key}]`)!.value = value.toFixed(1);
+  }
 }
 
 function load(value: LoadMessage) {
@@ -118,20 +134,20 @@ function load(value: LoadMessage) {
     try {
       viewer = new Viewer(stage, packet, viewState => {
         root.querySelector<HTMLSelectElement>('select')!.value = viewState.projection;
-        root.querySelector<HTMLInputElement>('input[type=range]')!.value = String(viewState.depth);
+        updateDepthControls(viewState.depth, viewState.layerSpacing ?? 1);
         if (viewer) root.querySelector<HTMLInputElement>('input[data-option=spin]')!.checked = viewer.controls.autoRotate;
         post('view-state', { viewState });
       }, data => {
-        selection.textContent = data ? `${words.selected}: ${data.primitive} · #${Number(data.sourceIndex) + 1} (${Number(data.performedIndex) + 1})` : `${words.selected}: ${words.none}`;
+        selection.textContent = data ? `${words.selected}: ${data.primitive} · #${Number(data.sourceIndex) + 1} (${Number(data.performedIndex) + 1}) · ${words.layer} ${Number(data.layerIndex) + 1}` : `${words.selected}: ${words.none}`;
       }, fail);
       if (value.viewState) {
         viewer.restore(value.viewState);
         root.querySelector<HTMLSelectElement>('select')!.value = value.viewState.projection;
-        root.querySelector<HTMLInputElement>('input[type=range]')!.value = String(value.viewState.depth);
+        updateDepthControls(value.viewState.depth, value.viewState.layerSpacing ?? 1);
       }
       root.querySelector<HTMLInputElement>('input[data-option=support]')!.checked = viewer.support.visible;
       overlay.hidden = true; sceneControls.forEach(control => control.disabled = false);
-      status.textContent = `${words.objects}: ${packet.objectCount} · ${words.triangles}: ${packet.triangles.toLocaleString(locale)}`;
+      status.textContent = `${words.objects}: ${packet.objectCount} · ${words.triangles}: ${packet.triangles.toLocaleString(locale)} · ${words.layer}: ${packet.layerCount}`;
       if (packet.recoveries.length) {
         recoveryNotice.hidden = false;
         element('summary', recoveryNotice, `${words.recovered} (${packet.recoveries.length})`);
@@ -146,6 +162,7 @@ function load(value: LoadMessage) {
         }
       }
       details.replaceChildren();
+      element('p', details, words.layerHelp);
       if (packet.diagnostics.length) element('strong', details, words.approximations);
       for (const note of packet.diagnostics) element('p', details, words[note as keyof Labels] ?? note);
       if (packet.clippedObjects) element('p', details, `${words.clipped}: ${packet.clippedObjects}`);

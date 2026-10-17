@@ -3,6 +3,7 @@ export const MAX_INPUT_BYTES = 16 * 1024 * 1024;
 export interface ViewState {
   position: [number, number, number]; target: [number, number, number]; zoom: number;
   projection: 'perspective' | 'orthographic'; depth: number; orthoHeight: number;
+  layerSpacing?: number;
 }
 export interface LoadMessage {
   protocol: typeof PROTOCOL; type: 'load-work'; requestId: number; mountId: string;
@@ -14,6 +15,7 @@ export function validState(value: unknown): value is ViewState {
   const vector = (a: number[]) => Array.isArray(a) && a.length === 3 && a.every(n => Number.isFinite(n) && Math.abs(n) < 10000);
   return vector(v.position) && vector(v.target) && Number.isFinite(v.zoom) && v.zoom >= 0.001 && v.zoom <= 1000
     && (v.projection === 'perspective' || v.projection === 'orthographic') && v.depth >= 0.1 && v.depth <= 3
+    && (v.layerSpacing === undefined || (Number.isFinite(v.layerSpacing) && v.layerSpacing >= 0 && v.layerSpacing <= 3))
     && Number.isFinite(v.orthoHeight) && v.orthoHeight > 0 && v.orthoHeight < 1000;
 }
 export function validLoad(value: unknown): value is LoadMessage {

@@ -18,6 +18,7 @@ export class Viewer {
   selected: THREE.Object3D | null = null;
   projection: Projection = 'perspective';
   depth = 1;
+  layerSpacing = 1;
   private selection = new THREE.BoxHelper(new THREE.Object3D(), 0x338bff);
   private resize: ResizeObserver;
   private events = new AbortController();
@@ -57,13 +58,16 @@ export class Viewer {
     const key = new THREE.DirectionalLight(0xffffff, 2.4); key.position.set(-2, 3, 4); this.scene.add(key);
     this.model.name = 'DDL solids';
     this.model.userData = { inputDigest: packet.inputDigest, mappingVersion: packet.mappingVersion,
-      schemaDigest: packet.schemaDigest, engineVersion: packet.engineVersion, diagnostics: packet.diagnostics, recoveries: packet.recoveries };
+      schemaDigest: packet.schemaDigest, engineVersion: packet.engineVersion, diagnostics: packet.diagnostics, recoveries: packet.recoveries,
+      layerMapping: 'paint-order-v1', layerCount: packet.layerCount, layerSpacing: this.layerSpacing };
     const groups = new Map<number, THREE.Group>();
     for (const data of packet.meshes) {
       const mesh = new THREE.Mesh(unpackMesh(data), this.material(data.color, data.opacity));
       mesh.name = `${data.primitive}-${data.sourceIndex}-${data.performedIndex}-${data.instanceIndex}-${data.role}`;
       mesh.userData = { sourceIndex: data.sourceIndex, performedIndex: data.performedIndex, instanceIndex: data.instanceIndex,
-        primitive: data.primitive, role: data.role, relatedSourceIndex: data.relatedSourceIndex };
+        primitive: data.primitive, role: data.role, relatedSourceIndex: data.relatedSourceIndex,
+        layerIndex: data.layerIndex, layerZ: data.layerZ };
+      mesh.position.z = data.layerZ;
       let group = groups.get(data.sourceIndex);
       if (!group) { group = new THREE.Group(); group.name = `instruction-${data.sourceIndex}`; groups.set(data.sourceIndex, group); this.model.add(group); }
       group.add(mesh);
@@ -128,10 +132,10 @@ export class Viewer {
 
   private rememberNow = () => { if (!this.disposed) this.changed(this.state()); };
   state(): ViewState { return { position: this.camera.position.toArray(), target: this.controls.target.toArray(), zoom: this.camera.zoom, projection: this.projection, depth: this.depth,
-    orthoHeight: this.camera instanceof THREE.OrthographicCamera ? this.camera.top - this.camera.bottom : 2 }; }
+    layerSpacing: this.layerSpacing, orthoHeight: this.camera instanceof THREE.OrthographicCamera ? this.camera.top - this.camera.bottom : 2 }; }
 
   restore(state: ViewState) {
-    this.setProjection(state.projection); this.setDepth(state.depth);
+    this.setProjection(state.projection); this.setDepth(state.depth); this.setLayerSpacing(state.layerSpacing ?? 1);
     this.camera.position.fromArray(state.position); this.controls.target.fromArray(state.target); this.camera.zoom = state.zoom;
     if (this.camera instanceof THREE.OrthographicCamera) {
       this.camera.top = state.orthoHeight / 2; this.camera.bottom = -state.orthoHeight / 2; this.resizeView();
@@ -167,7 +171,7 @@ export class Viewer {
     this.fit();
   }
 
-  reset() { this.controls.autoRotate = false; this.setDepth(1); this.setProjection('perspective'); this.preset('iso'); }
+  reset() { this.controls.autoRotate = false; this.setDepth(1); this.setLayerSpacing(1); this.setProjection('perspective'); this.preset('iso'); }
 
   setProjection(projection: Projection) {
     if (projection === this.projection) return;
@@ -194,7 +198,14 @@ export class Viewer {
   }
 
   setDepth(depth: number) {
-    this.depth = Math.max(0.1, Math.min(3, depth)); this.model.scale.z = this.depth;
+    this.depth = Math.max(0.1, Math.min(3, depth));
+    this.model.traverse(object => { if (object instanceof THREE.Mesh) object.scale.z = this.depth; });
+    this.placeSupport(); if (this.selected) this.selection.setFromObject(this.selected); this.controlChanged();
+  }
+  setLayerSpacing(spacing: number) {
+    this.layerSpacing = Math.max(0, Math.min(3, spacing));
+    this.model.userData.layerSpacing = this.layerSpacing;
+    this.model.traverse(object => { if (object instanceof THREE.Mesh) object.position.z = object.userData.layerZ * this.layerSpacing; });
     this.placeSupport(); if (this.selected) this.selection.setFromObject(this.selected); this.controlChanged();
   }
   private placeSupport() {

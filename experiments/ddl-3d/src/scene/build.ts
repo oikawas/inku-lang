@@ -5,6 +5,7 @@ import {
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Brush, Evaluator, INTERSECTION } from 'three-bvh-csg';
 import type { XY, GeometryMark, PreparedScene, MeshPacket, ScenePacket } from './types.ts';
+import { assignLayers } from './layers.ts';
 
 const MAX_TRIANGLES = 500_000;
 const MAX_BYTES = 128 * 1024 * 1024;
@@ -272,7 +273,7 @@ export function buildScene(input: PreparedScene): ScenePacket {
   const { scene } = input;
   if (scene.marks.length > 4096 || !validPoint(scene.canvas) || scene.canvas.some(v => v <= 0)) throw new Error('object_budget_exceeded');
   const output: ScenePacket = { ...input, meshes: [], canvas: scene.canvas, background: scene.background, ground: scene.ground, diagnostics: [...scene.diagnostics], recoveries: [...scene.recoveries],
-    objectCount: scene.marks.length, triangles: 0, bytes: 0, clippedObjects: 0 };
+    objectCount: scene.marks.length, triangles: 0, bytes: 0, clippedObjects: 0, layerCount: 0 };
   // Do not retain the expanded DTO in the worker reply.
   delete (output as ScenePacket & { scene?: unknown }).scene;
   const append = (geometry: BufferGeometry, mark: GeometryMark, role: MeshPacket['role']) => {
@@ -289,7 +290,7 @@ export function buildScene(input: PreparedScene): ScenePacket {
       if (output.triangles > MAX_TRIANGLES || output.bytes > MAX_BYTES) throw new Error('mesh_budget_exceeded');
       output.meshes.push({ positions, normals, indices, color: mark.color, opacity: mark.opacity,
         sourceIndex: mark.sourceIndex, performedIndex: mark.performedIndex, instanceIndex: mark.instanceIndex, primitive: mark.primitive,
-        role, ...(role === 'pair-fill' ? { relatedSourceIndex: mark.pairFill?.sourceIndex } : {}) });
+        role, layerIndex: 0, layerZ: 0, ...(role === 'pair-fill' ? { relatedSourceIndex: mark.pairFill?.sourceIndex } : {}) });
     } finally { geometry.dispose(); }
   };
   for (const mark of scene.marks) {
@@ -299,6 +300,7 @@ export function buildScene(input: PreparedScene): ScenePacket {
       { ...mark, color: mark.pairFill.color, opacity: mark.pairFill.opacity }, 'pair-fill');
   }
   if (!output.meshes.length && !scene.ground) throw new Error('no_visible_geometry');
+  output.layerCount = assignLayers(output.meshes, scene.canvas);
   return output;
 }
 

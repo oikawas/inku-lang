@@ -22,10 +22,11 @@ export interface MeshPacket {
   positions: Float32Array; normals: Float32Array; indices: Uint32Array | null;
   color: string; opacity: number; sourceIndex: number; performedIndex: number; instanceIndex: number;
   primitive: string; role: 'object' | 'pair-fill'; relatedSourceIndex?: number;
+  layerIndex: number; layerZ: number;
 }
 export interface ScenePacket {
   meshes: MeshPacket[]; canvas: XY; background: string; ground: boolean; diagnostics: string[];
   recoveries: GeometryRecovery[];
-  objectCount: number; triangles: number; bytes: number; clippedObjects: number;
+  objectCount: number; triangles: number; bytes: number; clippedObjects: number; layerCount: number;
   inputDigest: string; schemaDigest: string; mappingVersion: string; engineVersion: number;
 }

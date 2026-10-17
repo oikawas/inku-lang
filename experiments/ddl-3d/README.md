@@ -39,14 +39,16 @@ The bridge projects only the current Score and saved color/aspect/seed/version m
 ## Viewing and exports
 
 - Drag / one finger: orbit. Right drag or Shift-drag: pan. Wheel or two fingers: zoom. Arrow keys pan, `+`/`-` zoom while the canvas has focus. `F` fits, `R` resets, and `Esc` returns to 2D when embedded.
-- Front, back, left, right, top, bottom and oblique views; perspective/orthographic projection; fit/reset; full screen; grid/axes/support; wireframe/flat color; automatic rotation; depth multiplier.
+- Front, back, left, right, top, bottom and oblique views; perspective/orthographic projection; fit/reset; full screen; grid/axes/support; wireframe/flat color; automatic rotation; separate solid thickness and layer depth controls.
 - Click selects a performed object and displays its original instruction number. Double-click or Focus selection fits it. GLB nodes retain zero-based source/performed/instance IDs and pair-fill provenance.
 - PNG saves the current canvas view. GLB saves geometry, the current depth, colors/opacity and the visible support. Viewer guides, selection, camera, lights, automatic rotation, and wireframe inspection are not baked into GLB. A GLB consumer supplies its own lighting.
-- Only the most recent snapshot's camera/projection/depth survives a 2D round trip, in memory. Other display controls reset. Nothing persists across a page reload.
+- Only the most recent snapshot's camera/projection/thickness/layer depth survives a 2D round trip, in memory. Other display controls reset. Nothing persists across a page reload.
 
 ## Mapping and compatibility
 
-The WASM adapter uses the core's saved-Score reader, resource-aware checked performance, actual free-line/arc centerlines, palette resolution and tool width/opacity. It expands placement once, converts normalized positions to short-side units, and applies each affine once. X is centered; canvas Y is inverted; initial centers share Z=0. Group scaling also scales depth by the smaller planar singular value. It does not infer front/back placement from text or color.
+The WASM adapter uses the core's saved-Score reader, resource-aware checked performance, actual free-line/arc centerlines, palette resolution and tool width/opacity. It expands placement once, converts normalized positions to short-side units, and applies each affine once. X is centered; canvas Y is inverted. Group scaling also scales solid thickness by the smaller planar singular value. It does not infer front/back placement from text or color.
+
+The layer-depth trial (`paint-order-v1`) derives layers from the resolved geometry's paint order and original instruction IDs. Score has no explicit object Z coordinate. Copies of one instruction share a layer; arc pairs forming one closed fill share a layer so their contours and interior stay together. Only sources with visible meshes count. The first visible layer sits at negative Z, the last at positive Z, over a total span of 0.8 canvas short sides at the default setting. The slider scales this span from 0 to 3; 0 restores all centers to Z=0, and a single layer stays at Z=0. Solid thickness changes independently. This is an interpretation of drawing order, not a distance estimate or a guarantee against intersections. GLB retains node translations and layer metadata. The existing bundled viewer remains registered until a separate distribution update.
 
 Ellipsoid Z radius is the smaller planar radius. Prism/box depth is the shorter planar extent. The triangle's three front vertices and rear apex form a closed pyramid. Cloud contours shrink into rings toward two poles. Unfilled objects use tube outlines; unfilled rounds use organized latitude/longitude curves. Dashes partition tubes. Filled closed arc pairs add an interior solid while retaining both source strokes. Source instruction groups organize the exported nodes; overlapping DDL scopes are not converted into a new 3D hierarchy.
 

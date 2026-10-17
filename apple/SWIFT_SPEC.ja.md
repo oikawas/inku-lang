@@ -18,6 +18,16 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-17 照合表にstroke-dashoffsetを足す（I-723）
+
+カンバス地は2026-10-15の描き直しから、糸目の破線に`stroke-dasharray`と`stroke-dashoffset`を書く。照合表に`stroke-dashoffset`が無かったため、カンバス地の作品はすべて照合表の外になり、macOSの作品の画面では「Skiaで描けませんでした（attribute）」となって描かれなかった。作者の指示（I-723に対応）による。
+
+- 照合表（共有coreの[`inku-display`の`check.rs`](../core/crates/inku-display/src/check.rs)）に属性`stroke-dashoffset`を足した。値の制限は置かない。
+- Skiaの`SkSVGNode`は`stroke-dashoffset`を読み、`SkDashPathEffect`の位相として破線をずらす（Chromeと同じ）。今のcoreで7つの地を描くと、照合表の外はカンバスのこの属性だけだった。
+- 描き比べ（2026-10-17）：カンバスの糸目は薄く、物差しに見えないので、同じ形の破線を濃く太く描いた合成の作品で、SkiaがChrome 155と一致することと、ずれを消すと一致しないことを確かめた。拡大の窓（Graphite）もCPUと一致した。
+- 照合表は共有なので、Androidでもカンバス地の作品はresvgではなくSkiaで描かれる。
+- 確認：共有coreの`inku-display`のSkiaの試験（ずれがChromeと一致し、消すと一致しない試験を足した）、今のcoreが7つの地をすべて照合表の中で描く試験（新規）、照合表の外の判定の試験（属性の見本を`stroke-miterlimit`に替えた）、`inku-display-gpu`の試験（G2に1件を足した）。
+
 ## 2026-10-16 Serverとのシングルユーザー整合
 
 単作品PNGのUI設定はWebと同じく有効時に透明、無効時に白背景とする。旧UI設定はraw fieldの有無を確認して一度だけ移行し、旧fileのfield欠落と新規環境を区別する。保存作品・保存済みexport options・execution journalは変換しない。clipboard画像は白背景固定とし、共有カード・animation・複数作品PNGの既存背景契約へ同じflagを流用しない。PNG候補は保存templateから列挙する。

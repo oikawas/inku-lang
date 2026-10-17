@@ -8,6 +8,10 @@
 //! `linearGradient` and `color-interpolation` were added on 2026-10-12, from 38 works
 //! with linear gradients (the ink-wash ground's bands, and the computer fill, which also
 //! writes `color-interpolation="sRGB"`): Skia drew each one inside the table as Chrome did.
+//!
+//! `stroke-dashoffset` was added on 2026-10-17 (I-723): the canvas ground's dashed threads
+//! write it since 2026-10-15, and Skia reads it as the dash phase, shifting the dashes
+//! as Chrome does.
 
 use std::collections::HashMap;
 
@@ -106,6 +110,7 @@ const ATTRIBUTES: &[&str] = &[
     "stop-opacity",
     "stroke",
     "stroke-dasharray",
+    "stroke-dashoffset",
     "stroke-linecap",
     "stroke-opacity",
     "stroke-width",

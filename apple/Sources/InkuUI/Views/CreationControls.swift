@@ -1,3 +1,4 @@
+import InkuCore
 import InkuHost
 import InkuPersistence
 import SwiftUI
@@ -386,14 +387,9 @@ struct CreationDisplayedProcess: View {
     @State private var confirmingDiscard = false
     private var canEditSketch: Bool { saved && model.workActionState(for: work)?.canReadDescription == true }
     private var ddlHeading: String {
-        let language: String
-        if let recorded = work.instructionLangResolved, ["ja", "en"].contains(recorded) {
-            language = recorded
-        } else if ddl.unicodeScalars.contains(where: { (0x3040...0x30ff).contains($0.value) || (0x3400...0x9fff).contains($0.value) }) {
-            language = "ja"
-        } else if ddl.unicodeScalars.contains(where: { (0x41...0x5a).contains($0.value) || (0x61...0x7a).contains($0.value) }) {
-            language = "en"
-        } else { language = model.display.preferences.language == "en" ? "en" : "ja" }
+        let requested = InkuCore.normalizeInstructionLanguage(value: work.instructionLangResolved, defaultLanguage: "auto") ?? "auto"
+        let language = InkuCore.resolveInstructionLanguage(text: ddl, requested: requested,
+            fallback: model.display.preferences.language) ?? "ja"
         return language == "ja" ? "指示書（日本語DDL）" : "指示書（英語DDL）"
     }
 

@@ -61,7 +61,7 @@ public enum CanvasInteraction {
     }
 
     public static func supportsVerticalCaption(_ text: String) -> Bool {
-        text.unicodeScalars.contains { (0x3040...0x30FF).contains($0.value) || (0x3400...0x9FFF).contains($0.value) }
+        InkuCore.resolveInstructionLanguage(text: text, requested: "auto", fallback: "en") == "ja"
     }
 }
 

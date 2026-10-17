@@ -2,9 +2,11 @@
 
 This directory contains the native SwiftUI client, developed for macOS first, and the shared Apple packages. [SWIFT_SPEC.ja.md](SWIFT_SPEC.ja.md) is the canonical specification for Swift host behavior; this document is its maintained English version. The [product specification](../SPEC.md) defines shared DDL, Score, prompts, authoring authority, pipeline transitions, seeds, and rendering semantics. Server remains the primary development host, and Swift follows the same Rust core without duplicating semantic processing.
 
-Last updated: 2026-10-16.
+Last updated: 2026-10-17.
 
 Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The macOS app has its own version, defined by `apple/VERSION` and `apple/BUILD_NUMBER` and allocated separately from the Server and Web versions (the first release is 1.0.0, Build 1). The corresponding Server version is shown in the app's About inku window and in the changelog. Matching shared layer versions does not establish that host features and the native UI port are complete.
+
+Work identities `dh1`/`rh3`, canonical JSON, instruction-language normalization and resolution, and description-label text and excluded spans call the shared core through UniFFI. Swift keeps no copies of these rules and only converts the core's Unicode scalar offsets to the macOS editor's UTF-16 offsets. Existing stored identities are not rewritten. `ExactJSON.text` preserves number lexemes for transport, `canonicalText` exposes the core's canonical form, and the space-separated prompt format `pythonText` remains separate.
 
 ## Specification Update Workflow
 

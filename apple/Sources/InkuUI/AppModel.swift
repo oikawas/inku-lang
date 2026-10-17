@@ -2123,14 +2123,9 @@ public final class AppModel {
 }
 
 extension AppModel {
-    /// Server `_resolve_instruction_lang`: an explicit language wins; `auto` reads Japanese, then Latin
-    /// letters, and otherwise falls back to the UI language.
+    /// The shared core resolves the requested instruction language against the UI fallback.
     public func instructionLanguage(for text: String) -> String {
-        if ["ja", "en"].contains(language) { return language }
-        let scalars = text.unicodeScalars
-        if scalars.contains(where: { (0x3040...0x30ff).contains($0.value) || (0x3400...0x9fff).contains($0.value) }) { return "ja" }
-        if scalars.contains(where: { (0x41...0x5a).contains($0.value) || (0x61...0x7a).contains($0.value) }) { return "en" }
-        return display.preferences.language == "en" ? "en" : "ja"
+        InkuCore.resolveInstructionLanguage(text: text, requested: language, fallback: display.preferences.language) ?? "ja"
     }
 
     var currentInputText: String { inputMode == "ddl" ? ddlText : descriptionText }

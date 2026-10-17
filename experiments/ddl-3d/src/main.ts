@@ -144,7 +144,7 @@ function load(value: LoadMessage) {
     try {
       viewer = new Viewer(stage, packet, viewState => {
         root.querySelector<HTMLSelectElement>('select[data-option=projection]')!.value = viewState.projection;
-        root.querySelector<HTMLSelectElement>('select[data-option=background]')!.value = viewState.background ?? 'none';
+        root.querySelector<HTMLSelectElement>('select[data-option=background]')!.value = viewState.background ?? 'paint';
         updateDepthControls(viewState.depth, viewState.layerSpacing ?? 1);
         if (viewer) root.querySelector<HTMLInputElement>('input[data-option=spin]')!.checked = viewer.controls.autoRotate;
         post('view-state', { viewState });

@@ -22,7 +22,7 @@ export class Viewer {
   projection: Projection = 'orthographic';
   depth = 1;
   layerSpacing = 1;
-  background: Background = 'none';
+  background: Background = 'paint';
   private backgroundTexture: THREE.Texture | null = null;
   private referenceHeight = 2;
   private appearances = new Map<THREE.Mesh, CircleAppearanceResources>();
@@ -107,7 +107,7 @@ export class Viewer {
       if (document.hidden) { cancelAnimationFrame(this.frame); this.frame = 0; }
       else this.requestDraw();
     }, { signal: this.events.signal });
-    this.resizeView(); this.match2D();
+    this.resizeView(); this.match2D(); this.setBackground(this.background);
   }
 
   private material(color: string | number | THREE.Color, opacity: number): THREE.Material {
@@ -160,7 +160,7 @@ export class Viewer {
 
   restore(state: ViewState) {
     this.setProjection(state.projection); this.setDepth(state.depth); this.setLayerSpacing(state.layerSpacing ?? 1);
-    this.setBackground(state.background ?? 'none'); this.referenceHeight = state.referenceHeight ?? this.referenceHeight;
+    this.setBackground(state.background ?? 'paint'); this.referenceHeight = state.referenceHeight ?? this.referenceHeight;
     this.camera.position.fromArray(state.position); this.controls.target.fromArray(state.target); this.camera.zoom = state.zoom;
     if (this.camera instanceof THREE.OrthographicCamera) {
       this.camera.top = state.orthoHeight / 2; this.camera.bottom = -state.orthoHeight / 2; this.resizeView();

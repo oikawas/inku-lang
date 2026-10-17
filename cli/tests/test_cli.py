@@ -3437,3 +3437,102 @@ def test_a_ddl_export_file_gives_its_ddl_and_plugins_and_plain_text_stays_ddl():
         module._read_ddl_export(json.dumps({"schema": "inku.ddl-export.v1", "ddl": "x", "plugins": [{}]}))
     parsed = module.build_parser().parse_args(["ddl-export", "work-1", "-o", "out.json"])
     assert (parsed.work_id, parsed.output) == ("work-1", "out.json")
+
+
+REPLAY_WORK = {
+    "id": "work-1",
+    "lineage_node_id": "node-1",
+    "render_engine_version": "81",
+    "render_seed": "4242",
+    "input": "a moon",
+    "score": {"version": "0.17.0", "instructions": [{"primitive": "circle"}]},
+    "svg": "<svg>saved</svg>",
+}
+
+
+def _replay_client(work=REPLAY_WORK, replayed_svg="<svg>replayed</svg>"):
+    """A client for `replay`: the work's lineage, the replay and the child save."""
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, **kwargs):
+            FakeClient.sent.append((method, path, kwargs))
+            if path == f"/api/history/{work['id']}/lineage":
+                return {"nodes": [{"id": work["lineage_node_id"], "history": dict(work)}]}, None
+            if path == "/api/render-score":
+                return {
+                    "score": work["score"],
+                    "svg": replayed_svg,
+                    "render_hash": "rh3:" + "a" * 64,
+                    "svg_sha256": hashlib.sha256(replayed_svg.encode("utf-8")).hexdigest(),
+                    "render_engine_version": "85",
+                }, None
+            if path == "/api/history":
+                return {"id": "child-1", "lineage_node_id": "node-2"}, None
+            raise AssertionError(f"unexpected request: {method} {path}")
+
+        def request_raw(self, method, path, **kwargs):
+            raise AssertionError(f"unexpected raw request: {method} {path}")
+
+    FakeClient.sent = []
+    return FakeClient
+
+
+def _run_replay(monkeypatch, capsys, client, *extra_argv):
+    monkeypatch.setattr(cli, "ApiClient", client)
+    args = cli.build_parser().parse_args(["replay", REPLAY_WORK["id"], *extra_argv])
+    assert cli.command_replay(args) == 0
+    return json.loads(capsys.readouterr().out)
+
+
+def test_replay_lets_the_server_draw_from_the_saved_work(monkeypatch, capsys):
+    """The web's Replay draws the work's own Score and recorded conditions.
+
+    The CLI names the work and asks for the saved replay; a seed, catalog or
+    canvas of its own would only be ignored or, worse, believed.
+    """
+    client = _replay_client()
+    _run_replay(monkeypatch, capsys, client)
+
+    [render] = [kwargs["data"] for method, path, kwargs in client.sent if path == "/api/render-score"]
+    assert render["work_id"] == "work-1"
+    assert render["replay_saved_work"] is True
+    assert not {"render_seed", "composition_seed", "catalog_id", "canvas_aspect"} & set(render)
+
+
+def test_replay_saves_nothing_unless_asked(monkeypatch, capsys):
+    client = _replay_client()
+    result = _run_replay(monkeypatch, capsys, client)
+
+    assert [path for _, path, _ in client.sent if path == "/api/history"] == []
+    assert "child_id" not in result
+
+
+def test_replay_saves_the_child_the_way_the_web_does(monkeypatch, capsys):
+    client = _replay_client()
+    result = _run_replay(monkeypatch, capsys, client, "--save-child")
+
+    [(_, _, save)] = [entry for entry in client.sent if entry[1] == "/api/history"]
+    body = save["data"]
+    assert body["derivation_kind"] == "replay"
+    assert body["lineage_parent_node_id"] == "node-1"
+    assert body["replay_work_id"] == "work-1"
+    assert body["replay_render_hash"] == "rh3:" + "a" * 64
+    assert body["replay_svg_sha256"] == hashlib.sha256(b"<svg>replayed</svg>").hexdigest()
+    assert body["count_generation"] is False
+    assert save["headers"]["Idempotency-Key"]
+    assert (result["child_id"], result["child_lineage_node_id"]) == ("child-1", "node-2")
+
+
+def test_replay_reports_the_versions_and_whether_the_picture_moved(monkeypatch, capsys):
+    moved = _run_replay(monkeypatch, capsys, _replay_client())
+    assert (moved["recorded_render_engine_version"], moved["render_engine_version"]) == ("81", "85")
+    assert moved["version_changed"] is True
+    assert moved["svg_equal"] is False
+    assert moved["provisional_render_seed"] is False
+
+    same = _run_replay(monkeypatch, capsys, _replay_client(replayed_svg=REPLAY_WORK["svg"]))
+    assert same["svg_equal"] is True
+    assert same["saved_svg_sha256"] == hashlib.sha256(REPLAY_WORK["svg"].encode("utf-8")).hexdigest()

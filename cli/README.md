@@ -208,13 +208,13 @@ no value at all, which is not the same as carrying the defaults.
 
 ```
 usage: inku-cli [-h]
-                {login,logout,me,models,paint,batch,contact-sheet,rasterize,measure-raster,analyze,ddl-compare,vision-review,ddl-export,render-score,render-local,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
+                {login,logout,me,models,paint,batch,contact-sheet,rasterize,measure-raster,analyze,ddl-compare,vision-review,ddl-export,render-score,replay,render-local,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
                 ...
 
 Control an inku API server from the command line
 
 positional arguments:
-  {login,logout,me,models,paint,batch,contact-sheet,rasterize,measure-raster,analyze,ddl-compare,vision-review,ddl-export,render-score,render-local,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
+  {login,logout,me,models,paint,batch,contact-sheet,rasterize,measure-raster,analyze,ddl-compare,vision-review,ddl-export,render-score,replay,render-local,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
     login               log in and store an API session
     logout              log out and clear the stored session
     me                  show the current logged-in user
@@ -233,6 +233,9 @@ positional arguments:
                         it names (read back with paint --input-mode ddl
                         --file)
     render-score        render a Score JSON object without Stage 1 or Stage 2
+    replay              draw a saved work again with today's engine and
+                        compare it with the saved picture, as the web's Replay
+                        does
     render-local        test a checkout's core by rendering Score locally,
                         without a server
     demo-instruction    generate one demo prompt from a seed phrase
@@ -750,6 +753,34 @@ options:
                         today's setting, so this can only draw less; with
                         --from-work it overrides the work's own recorded
                         limits
+  --full-json           print SVG and Score as well
+
+```
+
+### `inku-cli replay`
+
+```
+usage: inku-cli replay [-h] [--base-url BASE_URL]
+                       [--timeout-seconds TIMEOUT_SECONDS] [--out-dir OUT_DIR]
+                       [--prefix PREFIX] [--png] [--save-child] [--full-json]
+                       work_id
+
+positional arguments:
+  work_id               the saved work (history id)
+
+options:
+  -h, --help            show this help message and exit
+  --base-url BASE_URL   inku API base URL (default: http://127.0.0.1:8100)
+  --timeout-seconds TIMEOUT_SECONDS
+                        HTTP timeout in seconds (default: 600)
+  --out-dir OUT_DIR, -o OUT_DIR
+                        directory for <prefix>-saved.svg and the
+                        <prefix>-replay JSON/SVG/PNG
+  --prefix PREFIX       output filename prefix (default: replay)
+  --png                 also render the replay as PNG when --out-dir is set
+  --save-child          save the replay as the work's child, as the web's
+                        "save the redraw as a child" does; it does not count
+                        as a generation
   --full-json           print SVG and Score as well
 
 ```

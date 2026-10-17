@@ -6,6 +6,7 @@ import argparse
 import base64
 import io
 import getpass
+import hashlib
 import json
 import math
 import os
@@ -16,6 +17,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -3059,6 +3061,134 @@ def command_render_score(args: argparse.Namespace) -> int:
     _print_json(result if args.full_json else {key: value for key, value in result.items() if key not in {"svg", "score"}})
     return 0
 
+
+def _saved_work(client: ApiClient, work_id: str) -> dict[str, Any]:
+    """The saved work's own row, read through its lineage.
+
+    There is no route that returns one work by id; the lineage route answers
+    with the work's node, whose history carries its Score, lineage node and the
+    engine version it was drawn with.
+    """
+    lineage, _ = client.request(
+        "GET",
+        f"/api/history/{urllib.parse.quote(work_id, safe='')}/lineage",
+        query={"descendant_depth": 0, "node_limit": 1},
+    )
+    nodes = lineage.get("nodes") if isinstance(lineage, dict) else None
+    for node in nodes or []:
+        history = node.get("history") if isinstance(node, dict) else None
+        if isinstance(history, dict) and history.get("id") == work_id:
+            return history
+    raise CliError(f"the server did not return the saved work {work_id}")
+
+
+def command_replay(args: argparse.Namespace) -> int:
+    """Draw a saved work again with today's engine, as the web's Replay does.
+
+    The server draws from the work's own saved Score and recorded conditions
+    (`replay_saved_work`), so nothing the CLI holds decides the picture. With
+    --save-child the drawing is saved as the work's child the way the web's
+    "save the redraw as a child" does; the server draws it once more and
+    refuses if it no longer matches the hashes reported here.
+    """
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    work = _saved_work(client, args.work_id)
+    if not isinstance(work.get("score"), dict):
+        raise CliError("the saved work has no Score to replay")
+    try:
+        rendered, _ = client.request(
+            "POST",
+            "/api/render-score",
+            data={
+                # The server replaces this with the work's own Score; the
+                # request model still requires one.
+                "score": work["score"],
+                "work_id": work["id"],
+                "replay_saved_work": True,
+            },
+        )
+    except CliError as exc:
+        raise CliError("the server must answer POST /api/render-score") from exc
+    if not isinstance(rendered, dict):
+        raise CliError("/api/render-score did not return an object")
+    required = ("score", "svg", "render_hash", "svg_sha256", "render_engine_version")
+    missing = [key for key in required if rendered.get(key) is None]
+    if missing:
+        raise CliError(f"/api/render-score did not report {', '.join(missing)}")
+    saved_svg = work.get("svg")
+    if not saved_svg:
+        raw, _ = client.request_raw("GET", f"/api/history/{urllib.parse.quote(work['id'], safe='')}/svg")
+        saved_svg = raw.decode("utf-8")
+    saved_svg_sha256 = hashlib.sha256(saved_svg.encode("utf-8")).hexdigest()
+    recorded_version = work.get("render_engine_version")
+    result: dict[str, Any] = {
+        "status": "ok",
+        "work_id": work["id"],
+        "recorded_render_engine_version": recorded_version,
+        "render_engine_version": rendered["render_engine_version"],
+        "version_changed": recorded_version != rendered["render_engine_version"],
+        # A work that recorded no seed is drawn with the provisional zero; it
+        # does not reproduce the performance it was saved with.
+        "provisional_render_seed": work.get("render_seed") is None,
+        "render_hash": rendered["render_hash"],
+        "svg_sha256": rendered["svg_sha256"],
+        "saved_svg_sha256": saved_svg_sha256,
+        "svg_equal": rendered["svg_sha256"] == saved_svg_sha256,
+        "score": rendered["score"],
+        "svg": rendered["svg"],
+    }
+    paths: dict[str, Any] = {}
+    if args.out_dir:
+        out_dir = Path(args.out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        prefix = args.prefix or "replay"
+        saved_path = out_dir / f"{prefix}-saved.svg"
+        saved_path.write_text(saved_svg, encoding="utf-8")
+        paths["saved_svg"] = str(saved_path)
+        replay_paths = _write_paint_outputs(
+            {key: value for key, value in result.items() if key != "paths"},
+            out_dir=out_dir,
+            prefix=f"{prefix}-replay",
+            png=args.png,
+        )
+        paths.update({f"replay_{key}": value for key, value in replay_paths.items()})
+    result["paths"] = paths
+    if args.save_child:
+        if not work.get("lineage_node_id"):
+            raise CliError("the saved work has no lineage node to hang a child on")
+        saved, _ = client.request(
+            "POST",
+            "/api/history",
+            data={
+                # The server draws the child again from the work and keeps its
+                # own Score and SVG; these only satisfy the request model.
+                "score": rendered["score"],
+                "svg": rendered["svg"],
+                "at": int(time.time() * 1000),
+                "input": work.get("input") or "",
+                "count_generation": False,
+                "history_visibility": "normal",
+                "lineage_parent_node_id": work["lineage_node_id"],
+                "derivation_kind": "replay",
+                "replay_work_id": work["id"],
+                "replay_render_hash": rendered["render_hash"],
+                "replay_svg_sha256": rendered["svg_sha256"],
+            },
+            headers={"Idempotency-Key": str(uuid.uuid4())},
+        )
+        if not isinstance(saved, dict) or not saved.get("id"):
+            raise CliError("/api/history did not return the saved child")
+        result["child_id"] = saved["id"]
+        result["child_lineage_node_id"] = saved.get("lineage_node_id")
+    _print_json(result if args.full_json else {key: value for key, value in result.items() if key not in {"svg", "score"}})
+    return 0
+
+
 def command_demo_instruction(args: argparse.Namespace) -> int:
     config = load_config()
     client = ApiClient(
@@ -4193,6 +4323,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     render_score.add_argument("--full-json", action="store_true", help="print SVG and Score as well")
     render_score.set_defaults(func=command_render_score)
+
+    replay = subparsers.add_parser(
+        "replay",
+        help="draw a saved work again with today's engine and compare it with the saved picture, as the web's Replay does",
+    )
+    _add_common_server_args(replay)
+    replay.add_argument("work_id", help="the saved work (history id)")
+    replay.add_argument("--out-dir", "-o", help="directory for <prefix>-saved.svg and the <prefix>-replay JSON/SVG/PNG")
+    replay.add_argument("--prefix", help="output filename prefix (default: replay)")
+    replay.add_argument("--png", action="store_true", help="also render the replay as PNG when --out-dir is set")
+    replay.add_argument(
+        "--save-child",
+        action="store_true",
+        help="save the replay as the work's child, as the web's \"save the redraw as a child\" does; it does not count as a generation",
+    )
+    replay.add_argument("--full-json", action="store_true", help="print SVG and Score as well")
+    replay.set_defaults(func=command_replay)
 
     render_local = subparsers.add_parser(
         "render-local",

@@ -8,6 +8,13 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-18 — macOS: save before one refinement option, restart the zoom drawing process, identify the binary in the failure log
+
+- Making one layout option now saves the checked unsaved candidates first, as Server does since 2026-10-17. Before this, macOS dropped the checked candidates without saving them.
+- If the zoom window process (`inku-display-gpu`) had ended while no request was running, the next work zoomed was treated as one that ended it and could not be zoomed until the app quit. It is now started again without marking any work.
+- Each display failure log line now carries the executable's SHA-256 (`app_executable_sha256`). The display API version and the Build stay the same across rebuilds, so a failure could not be matched to a build record.
+- The Library's export button for checked works now reads "Export", as on the Web.
+
 ### 2026-10-17 — Move Swift's ChatGPT plan next-action table to the shared core
 
 Swift now takes the next action shown for a ChatGPT plan failure, and whether to retry automatically, from the shared core's table (`chatgpt_failure`), the same table Server and Android use. Seven codes Swift raises change their next action (for example `chatgpt_cancelled` goes from "diagnose" to "retry"). No code changes whether the pipeline retries automatically.

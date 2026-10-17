@@ -260,7 +260,7 @@ struct LibraryView: View {
         } else {
             let exportIDs = library.selectedIDs.sorted()
             SavedWorkExportMenu(model: model, count: exportIDs.count,
-                                title: display.webCopy("historyExportSelected", "選択作品を書き出す")) { action in
+                                title: display.webCopy("exportLabel", "書き出す")) { action in
                 onSelectionExport(exportIDs, action)
             }.disabled(exportIDs.isEmpty || writingDisabled)
             Button { deletion = LibraryDeletion(ids: library.selectedIDs.sorted(), movesToTrash: true) } label: {

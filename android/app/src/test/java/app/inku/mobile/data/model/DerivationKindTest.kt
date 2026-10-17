@@ -45,12 +45,16 @@ class DerivationKindTest {
                 )
             }
         }
-        assertEquals(17, DerivationKindRegistry.ALL_INFOS.size)
+        assertEquals(20, DerivationKindRegistry.ALL_INFOS.size)
 
         // Active kinds keep their wording; the retired kind remains readable.
         assertEquals("タッチ", InkuStringsJa.derivationLabel("touch_change"))
         assertEquals("構図", InkuStringsJa.derivationLabel("layout_change"))
         assertEquals("色", InkuStringsJa.derivationLabel("catalog_change"))
+        assertEquals("配色", InkuStringsJa.derivationLabel("color_arrangement_change"))
+        assertEquals("Color arrangement", InkuStringsEn.derivationLabel("color_arrangement_change"))
+        assertEquals("支持体", InkuStringsJa.derivationLabel("ground_change"))
+        assertEquals("Ground", InkuStringsEn.derivationLabel("ground_change"))
         assertEquals("解釈", InkuStringsJa.derivationLabel("reinterpretation"))
         assertEquals("モデル", InkuStringsJa.derivationLabel("model_comparison"))
         assertEquals("言語", InkuStringsJa.derivationLabel("language_comparison"))

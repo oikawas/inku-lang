@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Name Android color-arrangement and ground changes in lineage
+
+Lineage edges for color-arrangement and ground changes now show Color arrangement and Ground instead of Unknown, matching the Web labels in both languages.
+
 ### 2026-10-17 — Expand Android saved-work actions and execution details
 
 Saved works now offer color-arrangement changes within the same catalog, ground changes, saved-Score replay comparison and saving the replay as a child. Checked unsaved layout options are saved before drawing the next four, and catalog options are generated on opening. Model inspection appends to existing options, skips models already drawn and continues after individual model failures. Published ChatGPT-plan models are eligible for inspection while the camera's Vision choices still exclude them. Refinement also offers inherited or explicit Wild settings.

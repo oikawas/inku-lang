@@ -281,17 +281,19 @@ object InkuStringsEn : InkuStrings {
     override val derivationOrigin = "Origin"
     override val derivationUnknown = "Unknown"
     override val derivationLabel: (String) -> String = { kind ->
-        // The twelve web already names come from `web/src/lib/derivation.ts:34-47`
-        // verbatim. The five below it are kinds the server knows (`db.py:62`) and
+        // Labels shared with web come from `web/src/lib/derivation.ts` verbatim.
+        // The remaining entries are kinds the server knows and
         // web has no label for; `hacho` and `renga` keep their romaji, which
         // GLOSSARY.md §6 states is the correct English for both.
         when (kind) {
             "age_change" -> "Age"
             "canvas_aspect_change" -> "Canvas change"
             "catalog_change" -> "Color"
+            "color_arrangement_change" -> "Color arrangement"
             "ddl_edit" -> "DDL edit"
             "description_edit" -> "Description edit"
             "external_seed_change" -> "External seed"
+            "ground_change" -> "Ground"
             "hacho_change" -> "Hacho"
             "language_comparison" -> "Language"
             "layout_change" -> "Layout"

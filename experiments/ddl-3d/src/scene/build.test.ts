@@ -44,6 +44,7 @@ test('paint layers retain closed arc pairs in one plane', () => {
   const pairs = packet.meshes.filter(m => m.role === 'pair-fill');
   assert.equal(pairs.length, 15);
   for (const pair of pairs) {
+    assert.ok(pair.appearance?.svg.includes('closed-arc-pair-fill-v1'));
     for (const mesh of packet.meshes.filter(m =>
       m.performedIndex === pair.performedIndex && m.instanceIndex === pair.instanceIndex
       || m.performedIndex === pair.relatedPerformedIndex && m.instanceIndex === pair.relatedInstanceIndex)) {

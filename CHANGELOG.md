@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Fix 3D pigment, SVG texture and depth within a layer
+
+Untextured 3D materials no longer add white specular highlights. Squares and lines also receive the shared 2D painter's SVG filters as textures. Front and back faces retain the painted alpha; solid walls use the object's pigment beneath the filter's tonal texture. Individual objects in a layer recede slightly in paint order, while a closed arc pair and its fill move together. Changes stay in the independent viewer and default-off geometry feature; normal 2D rendering, saved works and the database are unchanged.
+
 ### 2026-10-17 — Remove Server's unused `llm_retry.py`
 
 Server's `llm_retry.py`, which nothing imported, and its tests were removed. Retries of provider responses belong to the shared core's `RetryPolicy`.

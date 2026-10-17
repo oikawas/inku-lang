@@ -12,6 +12,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 Server's `llm_retry.py`, which nothing imported, and its tests were removed. Retries of provider responses belong to the shared core's `RetryPolicy`.
 
+### 2026-10-17 — inku-cli gains replay
+
+inku-cli had nothing like the web's `Replay` (`render-score --from-work` only borrows the work's colors and limits; the CLI still supplies the Score and seeds). `inku-cli replay WORK_ID` sends `work_id` and `replay_saved_work` to `POST /api/render-score` as the web does, so the server draws the saved Score under its recorded conditions with the current engine. It reports the engine versions at saving and now, the render hash, and whether the replay is byte-identical to the saved SVG, and `--out-dir` writes both SVGs. `--save-child` saves the replay as the work's child with the same request as the web's "save the redraw as a child" (no generation is counted). The server is unchanged.
+
 ### 2026-10-17 — Android work identities and instruction language use the shared core
 
 Android now delegates description identity `dh1`, render identity `rh3`, canonical JSON, and instruction-language normalization/detection to the shared core through JNI. The Kotlin rule copies are removed, including lineage canonical JSON. JSON transport preserves floating-point and integer types. No migration rewrites stored identities. Kotlin checks the same fixtures as Server through JNI.

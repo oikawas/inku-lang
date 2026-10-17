@@ -25,6 +25,7 @@ inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです�
 | inspect | 同一記述に対する複数モデルの解釈・描画の並列比較 |
 | review | Vision による視覚的評価、および未読語フィードバック |
 | render-score | Stage 1 / 2を通さずScore JSONを描画 |
+| replay | 保存済み作品を現行engineで描き直して保存済みSVGと比較し、必要なら子として保存（Webの`再演`） |
 | render-local | 指定checkoutのcoreでScoreをoffline描画・比較。サーバー接続・DB保存なし |
 | demo-instruction | デモ用記述の生成 |
 | history / history-export | 履歴一覧とhash指定の書き出し |
@@ -124,6 +125,19 @@ uv run inku-cli render-local --core-root /path/to/inku-lang \
 ```
 
 どちらの入力も、`resource_policy.hard_policy`と`resource_policy.operational_budget`を持つ現行のcompile済みScoreが必要です。旧Score一般を自動移行するコマンドではありません。(a)は作品の色map・seed・canvas・profile・wild・制限値を継承し、保存SVGがあればbyte比較します。(b)は指定しなかった条件にcoreの既定を使います。`--limits`は四つのreplay上限だけを受け、Scoreの保存hard policyを越える指定は拒否します。`--compare-svg FILE`で別のSVGとも比較できます。標準出力のJSONにhash、時間、採用条件、checkoutのHEAD／dirty状態等を記録します。DBへは保存しません。異なるsource／条件での一致は保証しません。
+
+## 保存済み作品を再演する（replay）
+
+Webの`再演`と同じく、保存済み作品の保存済みScoreと記録された条件（render seed、配置seed、色、キャンバス、wild、制限値）を、サーバーの現行engineで描き直します。CLI側のseed・色・キャンバスは送りません。render seedの記録が無い古い作品は仮seed 0で描き、出力の`provisional_render_seed`が`true`になります。
+
+```sh
+# 比較だけ（保存しない）。保存済みSVGと描き直しを書き出す
+uv run inku-cli replay WORK_ID --out-dir replay-out --png
+# 描き直しを元作品の子として保存する（Webの「描き直しを子として保存」と同じ。生成回数は増えない）
+uv run inku-cli replay WORK_ID --save-child
+```
+
+標準出力のJSONに、保存時と現行のengineの版（`recorded_render_engine_version`・`render_engine_version`・`version_changed`）、`render_hash`、描き直しと保存済みSVGのSHA-256と、両者がbyte一致したか（`svg_equal`）を記録します。`--save-child`では、サーバーが元作品からもう一度描き、表示した描き直しと一致したときだけ子として保存し、子の`child_id`を返します。一致しなければ409で保存しません。
 
 ## 履歴とフィードバック
 

@@ -25,6 +25,7 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 | inspect | Inspect and compare multiple inference models in parallel |
 | review | Evaluate works with Vision and submit unread words |
 | render-score | Render Score JSON without Stage 1 or Stage 2 |
+| replay | Draw a saved work again with the current engine, compare it with the saved SVG, and optionally save it as a child (the web's `Replay`) |
 | render-local | Render and compare Score offline with a chosen checkout's core; no server connection or DB save |
 | demo-instruction | Write a demo description |
 | history / history-export | List or export history by hash |
@@ -124,6 +125,19 @@ uv run inku-cli render-local --core-root /path/to/inku-lang \
 ```
 
 Both inputs require a current compiled Score with `resource_policy.hard_policy` and `resource_policy.operational_budget`; this is not a general migration command for old Scores. (a) inherits the work's color map, seeds, canvas, profile, wild setting, and limits, and compares bytes with its saved SVG when present. (b) uses core defaults for unspecified conditions. `--limits` accepts only the four replay ceilings and rejects values above the Score's saved hard policy. `--compare-svg FILE` adds another SVG byte comparison. JSON on stdout records hashes, timings, selected conditions, and checkout HEAD / dirty state, among other provenance. No DB save occurs. Equality across different source or conditions is not guaranteed.
+
+## Replaying a saved work (replay)
+
+Like the web's `Replay`, this draws a saved work's saved Score under its recorded conditions (render seed, placement seed, colors, canvas, wild, limits) with the server's current engine. The CLI sends no seed, colors or canvas of its own. An old work that recorded no render seed is drawn with the provisional seed 0, and the output's `provisional_render_seed` is `true`.
+
+```sh
+# Compare only (nothing is saved); write the saved SVG and the replay
+uv run inku-cli replay WORK_ID --out-dir replay-out --png
+# Save the replay as the work's child (the web's "save the redraw as a child"; no generation is counted)
+uv run inku-cli replay WORK_ID --save-child
+```
+
+The JSON on standard output records the engine versions at saving and now (`recorded_render_engine_version`, `render_engine_version`, `version_changed`), the `render_hash`, the SHA-256 of the replay and of the saved SVG, and whether the two are byte-identical (`svg_equal`). With `--save-child` the server draws the work once more and saves the child only when that matches the replay shown, returning its `child_id`; otherwise it answers 409 and saves nothing.
 
 ## History and feedback
 

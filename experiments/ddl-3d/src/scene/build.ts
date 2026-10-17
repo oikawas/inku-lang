@@ -210,8 +210,8 @@ function localGeometry(mark: GeometryMark): BufferGeometry {
   if (!(width > 0 && finite(width))) throw new Error('invalid_width');
   if (shape.kind === 'round') {
     if (!validPoint(shape.center) || !validPoint(shape.radii) || shape.radii.some(v => v <= 0)) throw new Error('invalid_round');
-    if (!mark.filled) return roundOutline(shape.center, shape.radii, width, mark.dash);
-    return attributes(new SphereGeometry(1, 24, 16).scale(...shape.radii, Math.min(...shape.radii)).translate(...shape.center, 0));
+    if (!mark.filled && !mark.appearance) return roundOutline(shape.center, shape.radii, width, mark.dash);
+    return attributes(new SphereGeometry(1, mark.appearance ? 96 : 24, mark.appearance ? 48 : 16).scale(...shape.radii, Math.min(...shape.radii)).translate(...shape.center, 0));
   }
   const points = clean(shape.points, shape.kind === 'contour');
   if (shape.kind === 'path') {
@@ -287,10 +287,17 @@ export function buildScene(input: PreparedScene): ScenePacket {
       const indices = geometry.index ? new Uint32Array(geometry.index.array) : null;
       output.triangles += (indices?.length ?? positions.length / 3) / 3;
       output.bytes += positions.byteLength + normals.byteLength + (indices?.byteLength ?? 0);
+      const appearance = role === 'object' ? mark.appearance : undefined;
+      if (appearance) {
+        if (appearance.svg.length > 2 * 1024 * 1024 || appearance.bounds.length !== 4
+          || !appearance.bounds.every(finite) || appearance.bounds[2] <= 0 || appearance.bounds[3] <= 0
+          || !validPoint(appearance.center)) throw new Error('invalid_circle_appearance');
+        output.bytes += appearance.svg.length * 2;
+      }
       if (output.triangles > MAX_TRIANGLES || output.bytes > MAX_BYTES) throw new Error('mesh_budget_exceeded');
       output.meshes.push({ positions, normals, indices, color: mark.color, opacity: mark.opacity,
         sourceIndex: mark.sourceIndex, performedIndex: mark.performedIndex, instanceIndex: mark.instanceIndex, primitive: mark.primitive,
-        role, layerIndex: 0, layerZ: 0, ...(role === 'pair-fill' ? { relatedSourceIndex: mark.pairFill?.sourceIndex } : {}) });
+        role, layerIndex: 0, layerZ: 0, ...(appearance ? { appearance } : {}), ...(role === 'pair-fill' ? { relatedSourceIndex: mark.pairFill?.sourceIndex } : {}) });
     } finally { geometry.dispose(); }
   };
   for (const mark of scene.marks) {

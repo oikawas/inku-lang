@@ -47,6 +47,184 @@ pub struct GeometryMark {
     pub weight: Weight,
     pub clips: Vec<Vec<[f64; 2]>>,
     pub pair_fill: Option<GeometryPairFill>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub appearance: Option<GeometryAppearance>,
+}
+
+/// An isolated mark rendered by the existing 2D painter. Bounds use canvas units.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeometryAppearance {
+    pub svg: String,
+    pub bounds: [f64; 4],
+    pub center: [f64; 2],
+}
+
+fn round_appearance(
+    instruction: &Instruction,
+    geometry: MarkGeometry,
+    context: MarkContext<'_>,
+    transform: AffineTransform,
+    clips: &[Vec<[f64; 2]>],
+) -> Result<GeometryAppearance, String> {
+    use crate::svg::{Document, Element, format_number};
+    let unit = context.canvas.unit();
+    let (x, y, width, height) = crate::surface_geometry::mark_bbox(
+        geometry,
+        instruction,
+        MarkContext {
+            geometry_transform: AffineTransform::identity(),
+            ..context
+        },
+    )
+    .ok_or("invalid_round_appearance")?;
+    let corners = [
+        (x, y),
+        (x + width, y),
+        (x + width, y + height),
+        (x, y + height),
+    ]
+    .map(|(x, y)| transform.apply(Point::new(x / unit, y / unit)));
+    let x = corners
+        .iter()
+        .map(|p| p.x * unit)
+        .fold(f64::INFINITY, f64::min);
+    let y = corners
+        .iter()
+        .map(|p| p.y * unit)
+        .fold(f64::INFINITY, f64::min);
+    let width = corners
+        .iter()
+        .map(|p| p.x * unit)
+        .fold(f64::NEG_INFINITY, f64::max)
+        - x;
+    let height = corners
+        .iter()
+        .map(|p| p.y * unit)
+        .fold(f64::NEG_INFINITY, f64::max)
+        - y;
+    // Keep the brush fringe and contour variation outside the nominal ellipse.
+    let padding = (crate::marks::mark_style(instruction, context).width * 8.0)
+        .max(crate::mark_paths::amplitude(instruction, context.canvas) * 2.0)
+        .max(width.max(height) * 0.15)
+        .max(unit * 0.01);
+    let bounds = [
+        x - padding,
+        y - padding,
+        width + padding * 2.0,
+        height + padding * 2.0,
+    ];
+    if bounds.iter().any(|v| !v.is_finite()) || bounds[2] <= 0.0 || bounds[3] <= 0.0 {
+        return Err("invalid_round_appearance_bounds".into());
+    }
+    let mut document = Document::new(CanvasSize {
+        width: bounds[2],
+        height: bounds[3],
+    });
+    if context.use_filters {
+        if let Some(filter) = crate::materials::texture_filter(instruction.weight, context.canvas) {
+            document.push_definition(filter);
+        }
+    }
+    if context.profile != SvgProfile::Compat
+        && crate::fills::is_noncomputer_solid_fill(instruction)
+        && instruction.weight != Weight::OilPaint
+        && !crate::accepted_fills::active(instruction)
+    {
+        let (id, seed) = crate::fills::solid_mottle_filter_id(instruction, context);
+        document.push_definition(crate::fills::solid_mottle_filter(&id, seed));
+    }
+    for definition in crate::accepted_fills::definitions(instruction, geometry, context) {
+        document.push_definition(definition);
+    }
+    let mut mark =
+        crate::marks::render_instruction(instruction, context).map_err(|e| e.to_string())?;
+    if let Some(surface) = crate::surfaces::render_surface(instruction, geometry, context) {
+        let mut group = Element::new("g");
+        group.push(mark);
+        group.push(surface.group);
+        mark = group;
+        for definition in surface.definitions {
+            document.push_definition(definition);
+        }
+    }
+    mark = crate::ink_spread::wrap(mark, instruction, context);
+    if context.use_filters {
+        if let Some(seed) = context.render_seed {
+            let (id, filter) = crate::materials::performance_touch_filter(seed, context.canvas);
+            document.push_definition(filter);
+            mark = Element::new("g")
+                .attr("filter", format!("url(#{id})"))
+                .with_children(vec![mark.into()]);
+        }
+    }
+    // Each fill scope and the canvas crop operate in final canvas coordinates.
+    for (index, contour) in clips.iter().enumerate() {
+        let id = format!("appearance-clip-{index}");
+        let mut definition = Element::new("clipPath")
+            .attr("id", &id)
+            .attr("clipPathUnits", "userSpaceOnUse");
+        definition.push(
+            Element::new("polygon").attr(
+                "points",
+                contour
+                    .iter()
+                    .map(|p| {
+                        format!(
+                            "{},{}",
+                            format_number(p[0] * unit),
+                            format_number(p[1] * unit)
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            ),
+        );
+        document.push_definition(definition);
+        mark = Element::new("g")
+            .attr("clip-path", format!("url(#{id})"))
+            .with_children(vec![mark.into()]);
+    }
+    let mut crop = Element::new("clipPath")
+        .attr("id", "appearance-canvas")
+        .attr("clipPathUnits", "userSpaceOnUse");
+    crop.push(
+        Element::new("rect")
+            .attr("width", format_number(context.canvas.width))
+            .attr("height", format_number(context.canvas.height)),
+    );
+    document.push_definition(crop);
+    mark = Element::new("g")
+        .attr("clip-path", "url(#appearance-canvas)")
+        .with_children(vec![mark.into()]);
+    document.push(
+        Element::new("g")
+            .attr(
+                "transform",
+                format!(
+                    "translate({} {})",
+                    format_number(-bounds[0]),
+                    format_number(-bounds[1])
+                ),
+            )
+            .with_children(vec![mark.into()]),
+    );
+    let svg = document.serialize();
+    if svg.len() > 2 * 1024 * 1024 {
+        return Err("appearance_budget_exceeded".into());
+    }
+    let center = match geometry {
+        MarkGeometry::Circle { center, .. } | MarkGeometry::Ellipse { center, .. } => {
+            let center = point_to_pixels(center, context.canvas);
+            transform.apply(Point::new(center.x / unit, center.y / unit))
+        }
+        _ => return Err("invalid_round_appearance".into()),
+    };
+    Ok(GeometryAppearance {
+        svg,
+        bounds: bounds.map(|v| v / unit),
+        center: [center.x, center.y],
+    })
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -173,9 +351,13 @@ pub fn export_geometry(
         });
     }
     if let Some(execution) = &plan.execution {
-        recoveries.extend(execution.diagnostics.iter().cloned().map(|diagnostic| {
-            GeometryRecovery::Execution { diagnostic }
-        }));
+        recoveries.extend(
+            execution
+                .diagnostics
+                .iter()
+                .cloned()
+                .map(|diagnostic| GeometryRecovery::Execution { diagnostic }),
+        );
     }
     let mut scene = GeometryScene {
         canvas: [canvas.width / unit, canvas.height / unit],
@@ -200,6 +382,8 @@ pub fn export_geometry(
     ordered.sort_by_key(|(_, (i, _))| i.mode_ == InstructionMode::Carve);
     let mut obstacles = Vec::new();
     let mut point_count = 0;
+    let mut appearance_bytes = 0usize;
+    let oil_fill_pass_limit = crate::fills::oil_fill_pass_limit(&plan.score.instructions);
     for (performed_index, (instruction, performed)) in ordered {
         let copies = if instruction.arrangement.is_some() {
             expand_arrangement(ArrangementRequest {
@@ -399,12 +583,40 @@ pub fn export_geometry(
             if point_count > 524_288 {
                 return Err("geometry_budget_exceeded".into());
             }
-            if instruction.variation.is_some() {
+            let appearance = if matches!(
+                instruction.primitive,
+                Primitive::Circle | Primitive::Ellipse
+            ) {
+                // Geometry requests use Editable, but this isolated raster is
+                // the normal on-screen painter, including its material filters.
+                let profile = SvgProfile::Display;
+                let appearance = round_appearance(
+                    instruction,
+                    geometry,
+                    MarkContext {
+                        profile,
+                        use_filters: matches!(profile, SvgProfile::Display | SvgProfile::Live),
+                        oil_fill_pass_limit,
+                        ..context
+                    },
+                    transform,
+                    &clips,
+                )?;
+                appearance_bytes = appearance_bytes.saturating_add(appearance.svg.len());
+                if appearance_bytes > 16 * 1024 * 1024 {
+                    return Err("appearance_budget_exceeded".into());
+                }
+                Some(appearance)
+            } else {
+                None
+            };
+            if instruction.variation.is_some() && appearance.is_none() {
                 scene.diagnostics.push("variation_approximated".into());
             }
-            if instruction.surface.is_some()
-                || instruction.ink_spread.is_some()
-                || instruction.weight != Weight::Rotring
+            if appearance.is_none()
+                && (instruction.surface.is_some()
+                    || instruction.ink_spread.is_some()
+                    || instruction.weight != Weight::Rotring)
             {
                 scene.diagnostics.push("tool_material_approximated".into());
             }
@@ -435,6 +647,7 @@ pub fn export_geometry(
                 weight: instruction.weight,
                 clips,
                 pair_fill: None,
+                appearance,
             });
         }
     }
@@ -491,4 +704,133 @@ pub fn export_geometry(
     scene.diagnostics.sort();
     scene.diagnostics.dedup();
     Ok(scene)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    // Failure: outlined rounds receive extra latitude/longitude bands in 3D.
+    #[test]
+    fn outlined_rounds_export_the_single_painted_outline() {
+        let score: Score = serde_json::from_str(r#"{
+            "version":"0.1.0","canvas":"square","background":"white","instructions":[
+                {"primitive":"circle","center":[0.3,0.5],"radius":0.12,"filled":false,"weight":"rotring"},
+                {"primitive":"ellipse","center":[0.7,0.5],"size":[0.2,0.1],"filled":false,"weight":"rotring"},
+                {"primitive":"point","center":[0.5,0.8],"radius":0.002,"filled":true,"weight":"rotring"}
+            ]}"#).unwrap();
+        let request = RenderRequest {
+            score,
+            options: RenderOptions {
+                resolved_color_map: BTreeMap::new(),
+                catalog_id: None,
+                canvas: CanvasSize::new(1000.0, 1000.0),
+                canvas_aspect_id: "square".into(),
+                svg_profile: SvgProfile::Editable,
+                render_seed: Some(163717),
+                composition_seed: None,
+                wild: false,
+                error_policy: ScoreErrorPolicy::Stop,
+            },
+        };
+        let budget = inku_score::ResourceBudget {
+            maximum: inku_score::ResourceDemand {
+                logical_objects: 16,
+                primitive_marks: 16,
+                object_templates: 16,
+                maximum_per_template_primitive_marks: 16,
+                maximum_resolved_count: 16,
+                template_nodes: 16,
+                anchor_instances: 16,
+                transform_instances: 16,
+                placement_instances: 16,
+                fill_instances: 16,
+            },
+        };
+        let hard = HardResourcePolicy {
+            identity: "round-appearance-test".into(),
+            budget,
+        };
+        let scene =
+            export_geometry(&request, &hard, OperationalResourceBudget(budget), 16).unwrap();
+        assert_eq!(scene.marks.len(), 3);
+        assert!(!scene.marks[0].filled && !scene.marks[1].filled);
+        assert_eq!(
+            scene.marks[0]
+                .appearance
+                .as_ref()
+                .unwrap()
+                .svg
+                .matches("<circle")
+                .count(),
+            1
+        );
+        assert_eq!(
+            scene.marks[1]
+                .appearance
+                .as_ref()
+                .unwrap()
+                .svg
+                .matches("<ellipse")
+                .count(),
+            1
+        );
+        assert!(scene.marks[2].appearance.is_none());
+    }
+
+    // Failure: the saved work's dense oil circle becomes an ideal, uniform ball.
+    #[test]
+    fn round_appearance_keeps_isolated_dense_oil_passes() {
+        let instruction: Instruction = serde_json::from_str(
+            r#"{"primitive":"circle","center":[0.5,0.5],"radius":0.12,"color":"red","filled":true,"style":"solid","weight":"oil_paint","surface_intensity":"dense"}"#,
+        ).unwrap();
+        let colors = BTreeMap::from([("red".into(), "#bf3221".into())]);
+        let assignment = BTreeMap::new();
+        let context = MarkContext {
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            color_map: &colors,
+            work_assignment: &assignment,
+            render_seed: Some(163717),
+            instruction_seed_override: None,
+            instruction_index: 4,
+            mark_index: 0,
+            wild: false,
+            use_filters: true,
+            profile: SvgProfile::Display,
+            support: DEFAULT_SUPPORT,
+            geometry_transform: AffineTransform::identity(),
+            oil_fill_pass_limit: crate::fills::oil_fill_pass_limit(std::slice::from_ref(
+                &instruction,
+            )),
+            effects: Default::default(),
+        };
+        let geometry = MarkGeometry::of(&instruction).unwrap();
+        let first = round_appearance(
+            &instruction,
+            geometry,
+            context,
+            AffineTransform::identity(),
+            &[],
+        )
+        .unwrap();
+        let second = round_appearance(
+            &instruction,
+            geometry,
+            context,
+            AffineTransform::identity(),
+            &[],
+        )
+        .unwrap();
+        assert_eq!(first.svg, second.svg);
+        assert_eq!(first.center, [0.5, 0.5]);
+        assert!(first.bounds[0] < 0.38 && first.bounds[0] + first.bounds[2] > 0.62);
+        assert!(first.svg.matches("oil-paint-body-v1").count() > 10);
+        assert!(first.svg.contains("#bf3221"));
+        assert!(!first.svg.contains("<circle"));
+        assert!(!first.svg.contains("href="));
+        assert!(!first.svg.contains("<image"));
+        assert!(!first.svg.contains("layer_00_background"));
+        assert!(first.svg.len() < 2 * 1024 * 1024);
+    }
 }

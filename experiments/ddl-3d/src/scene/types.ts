@@ -1,12 +1,16 @@
 export type XY = [number, number];
 export type Shape = { kind: 'round'; center: XY; radii: XY }
   | { kind: 'contour' | 'path'; points: XY[] };
+export interface CircleAppearance {
+  svg: string; bounds: [number, number, number, number]; center: XY;
+}
 export interface GeometryMark {
   sourceIndex: number; performedIndex: number; instanceIndex: number;
   primitive: string; shape: Shape; transform: [number, number, number, number, number, number];
   color: string; width: number; filled: boolean; opacity: number; dash: number[]; weight: string;
   clips: XY[][];
   pairFill?: { points: XY[]; sourceIndex: number; color: string; opacity: number } | null;
+  appearance?: CircleAppearance;
 }
 export interface GeometryRecovery {
   kind: 'resource_omitted' | 'relation_omitted' | 'execution';
@@ -23,6 +27,7 @@ export interface MeshPacket {
   color: string; opacity: number; sourceIndex: number; performedIndex: number; instanceIndex: number;
   primitive: string; role: 'object' | 'pair-fill'; relatedSourceIndex?: number;
   layerIndex: number; layerZ: number;
+  appearance?: CircleAppearance;
 }
 export interface ScenePacket {
   meshes: MeshPacket[]; canvas: XY; background: string; ground: boolean; diagnostics: string[];

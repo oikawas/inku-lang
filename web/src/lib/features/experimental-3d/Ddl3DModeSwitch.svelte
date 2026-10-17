@@ -14,7 +14,7 @@
 		aria-pressed={viewMode === '3d'}
 		onclick={() => (viewMode = viewMode === '2d' ? '3d' : '2d')}
 	>
-		{viewMode === '2d' ? '2D' : '3D'}
+		{viewMode === '2d' ? '3D' : '2D'}
 	</button>
 </Tooltip>
 

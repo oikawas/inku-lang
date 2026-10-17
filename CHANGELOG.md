@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Front-facing 3D, circle brushwork and shared overlay controls
+
+The 2D/3D button names its destination. The first 3D camera is front-facing and orthographic, preserving the 2D view's pixel scale and position. Both modes overlay the same work controls and zoom; backgrounds offer None, Support, Blue sky and Starry sky. Circles and ellipses project their shared 2D painter's silhouette, color and brushwork onto spheres, replacing uniform balls and extra globe bands. The independent viewer and default-off geometry feature contain the change; saved Scores, databases and normal 2D drawing are unchanged.
+
 ## v2.15.167 (2026-10-17 / Build 1243)
 
 ### 2026-10-17 — 3D layer depth and a bottom-right mode button

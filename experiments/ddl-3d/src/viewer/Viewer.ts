@@ -2,8 +2,11 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { unpackMesh } from '../scene/build';
-import type { ScenePacket } from '../scene/types';
-import type { ViewState } from '../input/protocol';
+import type { MeshPacket, ScenePacket } from '../scene/types';
+import type { InitialView, ViewState } from '../input/protocol';
+import { skyTexture, type Background } from './background';
+import { frontView } from './frontView';
+import { prepareCircleAppearance, type CircleAppearanceResources } from './circleAppearance';
 
 type Projection = ViewState['projection'];
 export class Viewer {
@@ -16,9 +19,14 @@ export class Viewer {
   readonly support: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial>;
   camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
   selected: THREE.Object3D | null = null;
-  projection: Projection = 'perspective';
+  projection: Projection = 'orthographic';
   depth = 1;
   layerSpacing = 1;
+  background: Background = 'none';
+  private backgroundTexture: THREE.Texture | null = null;
+  private referenceHeight = 2;
+  private appearances = new Map<THREE.Mesh, CircleAppearanceResources>();
+  private meshPackets = new Map<THREE.Mesh, MeshPacket>();
   private selection = new THREE.BoxHelper(new THREE.Object3D(), 0x338bff);
   private resize: ResizeObserver;
   private events = new AbortController();
@@ -34,8 +42,9 @@ export class Viewer {
   constructor(private host: HTMLElement, readonly packet: ScenePacket,
     private changed: (state: ViewState) => void,
     private selectedChanged: (data: Record<string, unknown> | null) => void,
-    private failed: (reason: string) => void) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: false });
+    private failed: (reason: string) => void, private initialView?: InitialView) {
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: false });
+    this.renderer.setClearColor(0x000000, 0);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
@@ -44,9 +53,8 @@ export class Viewer {
     canvas.setAttribute('aria-label', '3D');
     canvas.addEventListener('webglcontextlost', event => { event.preventDefault(); this.failed('context_lost'); }, { signal: this.events.signal });
     this.host.append(canvas);
-    this.scene.background = new THREE.Color(packet.background);
-    this.camera = new THREE.PerspectiveCamera(45, 1, 0.001, 1000);
-    this.camera.position.set(1, 0.8, 1.8);
+    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.001, 1000);
+    this.camera.position.set(0, 0, 10);
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = false;
     this.controls.minDistance = 0.01; this.controls.maxDistance = 1000;
@@ -63,6 +71,7 @@ export class Viewer {
     const groups = new Map<number, THREE.Group>();
     for (const data of packet.meshes) {
       const mesh = new THREE.Mesh(unpackMesh(data), this.material(data.color, data.opacity));
+      this.meshPackets.set(mesh, data);
       mesh.name = `${data.primitive}-${data.sourceIndex}-${data.performedIndex}-${data.instanceIndex}-${data.role}`;
       mesh.userData = { sourceIndex: data.sourceIndex, performedIndex: data.performedIndex, instanceIndex: data.instanceIndex,
         primitive: data.primitive, role: data.role, relatedSourceIndex: data.relatedSourceIndex,
@@ -81,7 +90,7 @@ export class Viewer {
       color: packet.background, roughness: 1, side: THREE.DoubleSide,
     }));
     this.support.name = 'Canvas support';
-    this.support.visible = packet.ground && packet.objectCount === 0;
+    this.support.visible = false;
     this.scene.add(this.grid, this.axes, this.support, this.selection);
     this.selection.visible = false;
     this.placeSupport();
@@ -98,12 +107,26 @@ export class Viewer {
       if (document.hidden) { cancelAnimationFrame(this.frame); this.frame = 0; }
       else this.requestDraw();
     }, { signal: this.events.signal });
-    this.resizeView(); this.fit();
+    this.resizeView(); this.match2D();
   }
 
   private material(color: string | number | THREE.Color, opacity: number): THREE.Material {
     const options = { color, opacity, transparent: opacity < 1, depthWrite: opacity >= 1, wireframe: this.wire, side: THREE.FrontSide };
     return this.flat ? new THREE.MeshBasicMaterial(options) : new THREE.MeshStandardMaterial({ ...options, metalness: 0, roughness: 0.7 });
+  }
+
+  async prepareAppearance() {
+    const painted = this.packet.meshes.filter(packet => packet.appearance).length;
+    const maxSide = Math.min(1024, Math.floor(Math.sqrt(16 * 1024 * 1024 / Math.max(1, painted))));
+    await Promise.all([...this.meshPackets].map(async ([mesh, packet]) => {
+      const old = mesh.material as THREE.Material;
+      const resource = await prepareCircleAppearance(mesh, packet, this.packet.canvas, maxSide);
+      if (resource) {
+        old.dispose();
+        if (this.disposed) resource.dispose(); else this.appearances.set(mesh, resource);
+      }
+    }));
+    if (!this.disposed) { this.placeSupport(); this.requestDraw(); }
   }
 
   private controlChanged = () => {
@@ -132,10 +155,12 @@ export class Viewer {
 
   private rememberNow = () => { if (!this.disposed) this.changed(this.state()); };
   state(): ViewState { return { position: this.camera.position.toArray(), target: this.controls.target.toArray(), zoom: this.camera.zoom, projection: this.projection, depth: this.depth,
-    layerSpacing: this.layerSpacing, orthoHeight: this.camera instanceof THREE.OrthographicCamera ? this.camera.top - this.camera.bottom : 2 }; }
+    layerSpacing: this.layerSpacing, background: this.background, referenceHeight: this.referenceHeight, displayZoom: this.displayZoom(),
+    orthoHeight: this.camera instanceof THREE.OrthographicCamera ? this.camera.top - this.camera.bottom : 2 }; }
 
   restore(state: ViewState) {
     this.setProjection(state.projection); this.setDepth(state.depth); this.setLayerSpacing(state.layerSpacing ?? 1);
+    this.setBackground(state.background ?? 'none'); this.referenceHeight = state.referenceHeight ?? this.referenceHeight;
     this.camera.position.fromArray(state.position); this.controls.target.fromArray(state.target); this.camera.zoom = state.zoom;
     if (this.camera instanceof THREE.OrthographicCamera) {
       this.camera.top = state.orthoHeight / 2; this.camera.bottom = -state.orthoHeight / 2; this.resizeView();
@@ -171,7 +196,33 @@ export class Viewer {
     this.fit();
   }
 
-  reset() { this.controls.autoRotate = false; this.setDepth(1); this.setLayerSpacing(1); this.setProjection('perspective'); this.preset('iso'); }
+  match2D() {
+    this.setProjection('orthographic');
+    const view = frontView(this.packet.canvas, this.host.clientWidth, this.host.clientHeight, this.initialView);
+    this.referenceHeight = view.referenceHeight;
+    const camera = this.camera as THREE.OrthographicCamera;
+    camera.top = view.height / 2; camera.bottom = -view.height / 2; camera.zoom = 1;
+    this.controls.target.fromArray(view.target);
+    camera.position.copy(this.controls.target).add(new THREE.Vector3(0, 0, this.sceneExtent * 4 + 1));
+    camera.up.set(0, 1, 0); this.resizeView(); this.controls.update(); this.controlChanged();
+  }
+  reset() { this.controls.autoRotate = false; this.setDepth(1); this.setLayerSpacing(1); this.match2D(); }
+  private displayZoom(): number {
+    const height = this.camera instanceof THREE.OrthographicCamera ? this.camera.top - this.camera.bottom
+      : 2 * this.camera.position.distanceTo(this.controls.target) * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    return this.referenceHeight * this.camera.zoom / height;
+  }
+  setZoom(value: number) {
+    this.camera.zoom *= Math.max(0.25, Math.min(10, value)) / this.displayZoom();
+    this.camera.updateProjectionMatrix(); this.controls.update(); this.controlChanged();
+  }
+  setBackground(value: Background) {
+    this.backgroundTexture?.dispose(); this.backgroundTexture = null;
+    this.background = value; this.support.visible = value === 'support';
+    if (value === 'sky' || value === 'stars') this.backgroundTexture = skyTexture(value);
+    this.scene.background = this.backgroundTexture;
+    this.controlChanged();
+  }
 
   setProjection(projection: Projection) {
     if (projection === this.projection) return;
@@ -217,14 +268,17 @@ export class Viewer {
   setOption(option: string, checked: boolean) {
     if (option === 'grid') this.grid.visible = checked;
     if (option === 'axes') this.axes.visible = checked;
-    if (option === 'support') this.support.visible = checked;
     if (option === 'spin') this.controls.autoRotate = checked;
     if (option === 'wire' || option === 'unlit') {
       if (option === 'wire') this.wire = checked; else this.flat = checked;
       this.model.traverse(object => {
         if (object instanceof THREE.Mesh) {
           const old = object.material as THREE.MeshStandardMaterial;
-          object.material = this.material(old.color, old.opacity); old.dispose();
+          const appearance = this.appearances.get(object);
+          object.material = appearance ? new THREE.MeshBasicMaterial({ map: appearance.texture, color: 0xffffff, opacity: 1,
+            transparent: true, alphaTest: 1 / 255, side: THREE.FrontSide, toneMapped: false, wireframe: this.wire })
+            : this.material(old.color, old.opacity);
+          old.dispose();
         }
       });
     }
@@ -279,6 +333,9 @@ export class Viewer {
       if (drawable.material) (Array.isArray(drawable.material) ? drawable.material : [drawable.material]).forEach(m => materials.add(m));
     });
     geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); this.scene.clear();
+    this.backgroundTexture?.dispose();
+    this.appearances.forEach(resource => resource.dispose()); this.appearances.clear();
+    this.meshPackets.clear();
     this.renderer.renderLists.dispose(); this.renderer.dispose(); this.renderer.forceContextLoss(); this.renderer.domElement.remove();
   }
 }

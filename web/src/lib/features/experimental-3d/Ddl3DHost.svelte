@@ -1,10 +1,13 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import type { PaintResult } from '$lib/features/run/current-work';
 	import { snapshot } from './input';
-	import { PROTOCOL, recall, remember, validViewState } from './protocol';
-	let { result, viewerUrl, isJapanese, onReturn }: { result: PaintResult; viewerUrl: string; isJapanese: boolean; onReturn: () => void } = $props();
+	import { PROTOCOL, recall, remember, validViewState, type InitialView, type ViewerCommand, type ViewState } from './protocol';
+	let { result, viewerUrl, isJapanese, onReturn, initialView, command, onViewState }: {
+		result: PaintResult; viewerUrl: string; isJapanese: boolean; onReturn: () => void;
+		initialView?: InitialView; command?: ViewerCommand; onViewState?: (state: ViewState) => void;
+	} = $props();
 	let frame = $state<HTMLIFrameElement>();
 	let ready = $state(false), failure = $state(''), preparing = $state(true), attempt = $state(0);
 	const mountId = `ddl3d-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
@@ -34,6 +37,7 @@
 				failure = data.reason.slice(0, 500); preparing = false; clearTimeout(timer);
 			} else if (data.type === 'view-state' && validViewState(data.viewState)) {
 				remember(activeInput, data.viewState);
+				onViewState?.(data.viewState);
 			} else if (data.type === 'return-2d') onReturn();
 		};
 		window.addEventListener('message', listener);
@@ -44,8 +48,9 @@
 		if (!ready) return;
 		activeInput = input.json; requestId += 1; failure = ''; preparing = true; waitForViewer();
 		send('load-work', { inputJson: activeInput, locale: isJapanese ? 'ja' : 'en',
-			theme: document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light', viewState: recall(activeInput) });
+			theme: document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light', viewState: recall(activeInput), initialView: untrack(() => initialView) });
 	});
+	$effect(() => { if (ready && command) send('viewer-command', { action: command.action, value: command.value }); });
 </script>
 
 <div class="ddl3d-host" aria-busy={preparing}>
@@ -64,7 +69,7 @@
 </div>
 
 <style>
-	.ddl3d-host { position: relative; flex: 1; min-width: 0; align-self: stretch; margin: 0 48px 58px; background: var(--bg); }
+	.ddl3d-host { position: absolute; inset: 0; background: var(--bg); }
 	iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 	.message { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; background: var(--bg); color: var(--fg); }
 	.message p { margin: 0; }.message code { display: block; overflow-wrap: anywhere; max-width: 30em; }

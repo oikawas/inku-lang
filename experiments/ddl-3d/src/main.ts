@@ -3,6 +3,7 @@ import { Viewer } from './viewer/Viewer';
 import { labels, type Labels } from './viewer/labels';
 import { PROTOCOL, MAX_INPUT_BYTES, validLoad, type LoadMessage } from './input/protocol';
 import type { ScenePacket } from './scene/types';
+import type { Background } from './viewer/background';
 
 const root = document.querySelector<HTMLElement>('#app')!;
 const embedded = window.parent !== window;
@@ -42,7 +43,8 @@ function fail(reason: string) {
 
 function ui() {
   root.replaceChildren(); sceneControls.length = 0;
-  const toolbar = element('header', root); toolbar.className = 'toolbar';
+  const toolbar = element('details', root); toolbar.className = 'toolbar';
+  element('summary', toolbar, words.controls);
   const heading = element('div', toolbar); heading.className = 'heading'; element('strong', heading, words.title);
   if (!embedded) {
     const label = element('label', heading, words.open); label.className = 'file';
@@ -61,7 +63,7 @@ function ui() {
   const controls = element('div', toolbar); controls.className = 'controls';
   button(controls, words.fit, () => viewer?.fit());
   button(controls, words.reset, () => {
-    viewer?.reset(); updateDepthControls(1, 1); projection.value = 'perspective'; spin.checked = false;
+    viewer?.reset(); updateDepthControls(1, 1); projection.value = 'orthographic'; spin.checked = false;
   });
   for (const [symbol, label, action] of [
     ['＋', words.zoomIn, () => viewer?.zoom(true)], ['−', words.zoomOut, () => viewer?.zoom(false)],
@@ -73,15 +75,22 @@ function ui() {
   for (const [name, label] of [['front', words.front], ['back', words.backView], ['left', words.left], ['right', words.right], ['top', words.top], ['bottom', words.bottom], ['iso', words.iso]]) {
     button(controls, label, () => viewer?.preset(name));
   }
-  const projection = element('select', controls); projection.setAttribute('aria-label', words.projection);
+  const projection = element('select', controls); projection.dataset.option = 'projection'; projection.setAttribute('aria-label', words.projection);
   for (const [value, label] of [['perspective', words.perspective], ['orthographic', words.orthographic]]) { const option = element('option', projection, label); option.value = value; }
   projection.addEventListener('change', () => viewer?.setProjection(projection.value as 'perspective' | 'orthographic')); sceneControls.push(projection);
+  projection.value = 'orthographic';
   button(controls, words.full, () => { void (document.fullscreenElement ? document.exitFullscreen() : root.requestFullscreen()).catch(error => {
     status.textContent = words.fullFailed; element('p', details, error instanceof Error ? error.message : String(error));
   }); }, false);
   const options = element('div', toolbar); options.className = 'controls';
   let spin: HTMLInputElement;
-  for (const key of ['grid', 'axes', 'support', 'wire', 'unlit', 'spin'] as const) {
+  const backgroundLabel = element('label', options, words.background), background = element('select', backgroundLabel);
+  background.dataset.option = 'background'; background.setAttribute('aria-label', words.background);
+  for (const [value, label] of [['none', words.none], ['support', words.support], ['sky', words.sky], ['stars', words.stars]]) {
+    const option = element('option', background, label); option.value = value;
+  }
+  background.addEventListener('change', () => viewer?.setBackground(background.value as Background)); sceneControls.push(background);
+  for (const key of ['grid', 'axes', 'wire', 'unlit', 'spin'] as const) {
     const label = element('label', options), input = element('input', label); input.type = 'checkbox'; input.dataset.option = key; label.append(words[key]);
     input.addEventListener('change', () => viewer?.setOption(key, input.checked)); sceneControls.push(input); if (key === 'spin') spin = input;
   }
@@ -126,26 +135,30 @@ function load(value: LoadMessage) {
   worker = new Worker(new URL('./worker/prepare.ts', import.meta.url), { type: 'module' });
   timeout = window.setTimeout(() => { if (localGeneration === generation) fail('timeout'); }, 10_000);
   worker.onerror = () => { if (localGeneration === generation) fail('worker_failed'); };
-  worker.onmessage = (event: MessageEvent<{ ok: boolean; packet?: ScenePacket; error?: string }>) => {
+  worker.onmessage = async (event: MessageEvent<{ ok: boolean; packet?: ScenePacket; error?: string }>) => {
     if (localGeneration !== generation) return;
     clearTimeout(timeout); worker?.terminate(); worker = null;
     if (!event.data.ok || !event.data.packet) { fail(event.data.error ?? 'preparation_failed'); return; }
     const packet = event.data.packet;
     try {
       viewer = new Viewer(stage, packet, viewState => {
-        root.querySelector<HTMLSelectElement>('select')!.value = viewState.projection;
+        root.querySelector<HTMLSelectElement>('select[data-option=projection]')!.value = viewState.projection;
+        root.querySelector<HTMLSelectElement>('select[data-option=background]')!.value = viewState.background ?? 'none';
         updateDepthControls(viewState.depth, viewState.layerSpacing ?? 1);
         if (viewer) root.querySelector<HTMLInputElement>('input[data-option=spin]')!.checked = viewer.controls.autoRotate;
         post('view-state', { viewState });
       }, data => {
         selection.textContent = data ? `${words.selected}: ${data.primitive} · #${Number(data.sourceIndex) + 1} (${Number(data.performedIndex) + 1}) · ${words.layer} ${Number(data.layerIndex) + 1}` : `${words.selected}: ${words.none}`;
-      }, fail);
+      }, fail, value.initialView);
+      const preparedViewer = viewer;
+      await preparedViewer.prepareAppearance();
+      if (localGeneration !== generation || viewer !== preparedViewer) return;
       if (value.viewState) {
         viewer.restore(value.viewState);
-        root.querySelector<HTMLSelectElement>('select')!.value = value.viewState.projection;
+        root.querySelector<HTMLSelectElement>('select[data-option=projection]')!.value = value.viewState.projection;
         updateDepthControls(value.viewState.depth, value.viewState.layerSpacing ?? 1);
       }
-      root.querySelector<HTMLInputElement>('input[data-option=support]')!.checked = viewer.support.visible;
+      root.querySelector<HTMLSelectElement>('select[data-option=background]')!.value = viewer.background;
       overlay.hidden = true; sceneControls.forEach(control => control.disabled = false);
       status.textContent = `${words.objects}: ${packet.objectCount} · ${words.triangles}: ${packet.triangles.toLocaleString(locale)} · ${words.layer}: ${packet.layerCount}`;
       if (packet.recoveries.length) {
@@ -168,8 +181,12 @@ function load(value: LoadMessage) {
       if (packet.clippedObjects) element('p', details, `${words.clipped}: ${packet.clippedObjects}`);
       element('p', details, `${packet.mappingVersion} · Engine ${packet.engineVersion} · ${packet.inputDigest}`);
       post('rendered', { inputDigest: packet.inputDigest, objectCount: packet.objectCount, triangles: packet.triangles, bytes: packet.bytes, preparationMs: Math.round(performance.now() - started) });
+      post('view-state', { viewState: viewer.state() });
       if (packet.diagnostics.length) post('diagnostic', { diagnostics: packet.diagnostics });
-    } catch { fail('webgl_unavailable'); }
+    } catch (error) {
+      if (localGeneration !== generation) return;
+      fail(error instanceof Error && error.message.startsWith('circle_') ? error.message : 'webgl_unavailable');
+    }
   };
   worker.postMessage({ inputJson: value.inputJson, wasmUrl: new URL('wasm/score_adapter.js', document.baseURI).href });
 }
@@ -189,6 +206,10 @@ window.addEventListener('message', event => {
   if (!embedded || event.origin !== location.origin || event.source !== parent) return;
   if (validLoad(event.data) && event.data.mountId === mountId && event.data.requestId > (current?.requestId ?? 0)) load(event.data);
   else if (event.data?.protocol === PROTOCOL && event.data.type === 'dispose' && event.data.mountId === mountId) stop();
+  else if (event.data?.protocol === PROTOCOL && event.data.type === 'viewer-command' && event.data.mountId === mountId && event.data.requestId === current?.requestId) {
+    if (event.data.action === 'zoom' && Number.isFinite(event.data.value)) viewer?.setZoom(event.data.value);
+    if (event.data.action === 'reset') viewer?.match2D();
+  }
 });
 document.addEventListener('keydown', event => { if (event.key === 'Escape' && embedded && !document.fullscreenElement) { stop(); post('return-2d'); } });
 window.addEventListener('pagehide', () => { stop(); urls.forEach(url => URL.revokeObjectURL(url)); urls.clear(); });

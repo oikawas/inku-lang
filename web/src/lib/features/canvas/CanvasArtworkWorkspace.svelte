@@ -14,6 +14,8 @@
 
 	type Props = {
 		leadingCornerControls?: Snippet;
+		artworkContent?: Snippet;
+		zoomControls?: Pick<CanvasViewport, 'zoom' | 'setZoom' | 'fit'>;
 		result: PaintResult | null;
 		rangePreview?: RangePreview | null;
 		artworkUrl: string | null;
@@ -66,6 +68,8 @@
 
 	let {
 		leadingCornerControls,
+		artworkContent,
+		zoomControls,
 		result,
 		rangePreview = null,
 		artworkUrl,
@@ -122,25 +126,30 @@
 	// keeps circles and angles intact on every canvas proportion.
 	const placeholderTransform = $derived(placeholderMotifTransform(placeholderWidth, placeholderHeight));
 	const shareTarget = $derived(shareTargetOf(statusHistoryItem));
+	const activeZoom = $derived(zoomControls ?? viewport);
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	bind:this={canvasContentEl}
 	class="canvas-content"
-	class:can-pan={viewport.canPan}
-	class:dragging={viewport.dragging}
+	class:can-pan={!artworkContent && viewport.canPan}
+	class:dragging={!artworkContent && viewport.dragging}
 	onpointerdown={(event) => {
+		if (artworkContent) return;
 		if (event.target instanceof Element && event.target.closest('.instruction-caption.vertical, .canvas-caption-writing-mode')) {
 			event.stopPropagation();
 			return;
 		}
 		viewport.startDrag(event, true);
 	}}
-	onpointermove={(event) => viewport.moveDrag(event)}
-	onpointerup={(event) => viewport.endDrag(event)}
-	onpointercancel={(event) => viewport.endDrag(event)}
+	onpointermove={(event) => { if (!artworkContent) viewport.moveDrag(event); }}
+	onpointerup={(event) => { if (!artworkContent) viewport.endDrag(event); }}
+	onpointercancel={(event) => { if (!artworkContent) viewport.endDrag(event); }}
 >
+				{#if artworkContent}
+					{@render artworkContent()}
+				{:else}
 				<div class="canvas-pan" style="transform: translate3d({viewport.panX}px, {viewport.panY}px, 0) scale({viewport.actualZoom}); transform-origin: center center; transition: transform {viewport.dragging ? '0s' : '0.15s'};">
 					<div
 						class="canvas-box"
@@ -174,6 +183,7 @@
 						{/if}
 					</div>
 				</div>
+				{/if}
 {#if unsavedRefinementPreview}
 	<div class="unsaved-refinement-badge" role="status">{t().unsavedRefinementPreviewLabel}</div>
 {/if}
@@ -416,14 +426,14 @@
 </div>
 			<div class="zoom-controls">
 				<Tooltip text={t().tooltipCanvasZoomOut}>
-					<button onclick={() => viewport.setZoom(viewport.zoom - 0.25)}>−</button>
+					<button onclick={() => activeZoom.setZoom(activeZoom.zoom - 0.25)}>−</button>
 				</Tooltip>
-				<span class="zoom-pct">{Math.round(viewport.zoom * 100)}%</span>
+				<span class="zoom-pct">{Math.round(activeZoom.zoom * 100)}%</span>
 				<Tooltip text={t().tooltipCanvasZoomIn}>
-					<button onclick={() => viewport.setZoom(viewport.zoom + 0.25)}>＋</button>
+					<button onclick={() => activeZoom.setZoom(activeZoom.zoom + 0.25)}>＋</button>
 				</Tooltip>
 				<Tooltip text={t().tooltipCanvasZoomReset}>
-					<button class="zoom-reset" onclick={() => viewport.fit()}>⊙</button>
+					<button class="zoom-reset" onclick={() => activeZoom.fit()}>⊙</button>
 				</Tooltip>
 			</div>
 

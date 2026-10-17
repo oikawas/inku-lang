@@ -8,6 +8,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.169 (2026-10-17 / Build 1245)
+
+### 2026-10-17 — Keep 3D details clear of the artwork caption
+
+Moved 3D shape counts, selection and details into the collapsible controls at the top, keeping them clear of the shared caption and bottom buttons.
+
 ## v2.15.168 (2026-10-17 / Build 1244)
 
 ### 2026-10-17 — Front-facing 3D, circle brushwork and shared overlay controls

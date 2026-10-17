@@ -153,8 +153,10 @@ def test_text_decoder_requires_completion_and_refuses_partial_refusal_tool_and_b
         (event({"type": "response.output_item.added", "item": {"type": "function_call"}}), "chatgpt_unexpected_tool"),
         (completed("墨", "墨"), "chatgpt_response_too_large"),
     ]:
+        decoder = TextSSEDecoder(3)
+        decoder.feed(wire)
         with pytest.raises(ChatGPTError, match=code):
-            TextSSEDecoder(3).feed(wire)
+            decoder.finish()
     final = TextSSEDecoder(3)
     wire = completed("墨", "")
     for byte in wire:

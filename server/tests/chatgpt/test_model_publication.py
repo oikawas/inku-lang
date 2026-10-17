@@ -14,6 +14,13 @@ from inku_server.chatgpt_provider import SSEDecoder
 from inku_server.chatgpt_store import ChatGPTError, canonical
 
 
+def _read(*events, limit=4096):
+    """The stream of `events`, received whole and read once, as the transport reads it."""
+    decoder = SSEDecoder(limit)
+    decoder.feed(b"".join(b"data: " + canonical(event) + b"\n\n" for event in events))
+    return decoder.finish()
+
+
 def test_personal_publication_routes_offer_only_saved_models_and_reject_stale_or_other_owner(tmp_path, monkeypatch):
     from inku_server import chatgpt_auth as auth, chatgpt_runtime as runtime, db
     from inku_server.api_core.deps import _current_user
@@ -185,14 +192,14 @@ def test_completed_function_with_assistant_message_is_accepted_without_using_tex
         decoder.feed(b"data: " + canonical(event) + b"\n\n")
     assert decoder.finish() == arguments
     with pytest.raises(ChatGPTError, match="unexpected_tool") as rejected:
-        SSEDecoder(4096).event({"type": "response.completed", "response": {"status": "completed", "output": [message]}})
+        _read({"type": "response.completed", "response": {"status": "completed", "output": [message]}})
     assert rejected.value.action == "diagnose"
     with pytest.raises(ChatGPTError, match="refused"):
-        SSEDecoder(4096).event({"type": "response.completed", "response": {"status": "completed", "output": [
+        _read({"type": "response.completed", "response": {"status": "completed", "output": [
             {**message, "content": [{"type": "refusal", "refusal": "Not pipeline data."}]}, call,
         ]}})
     with pytest.raises(ChatGPTError, match="unexpected_tool"):
-        SSEDecoder(4096).event({"type": "response.output_item.added", "item": {**call, "namespace": "other"}})
+        _read({"type": "response.output_item.added", "item": {**call, "namespace": "other"}})
 
 
 def test_finalized_streamed_call_survives_an_empty_terminal_output_but_not_an_unfinished_or_failed_response():
@@ -210,20 +217,11 @@ def test_finalized_streamed_call_survives_an_empty_terminal_output_but_not_an_un
         for event in [*events, {"type": "response.completed", "response": response}]:
             decoder.feed(b"data: " + canonical(event) + b"\n\n")
         assert decoder.finish() == arguments
-    unfinished = SSEDecoder(4096)
-    for event in events[:-1]:
-        unfinished.event(event)
     with pytest.raises(ChatGPTError, match="unexpected_tool"):
-        unfinished.event({"type": "response.completed", "response": {"status": "completed", "output": []}})
-    failed = SSEDecoder(4096)
-    for event in events:
-        failed.event(event)
+        _read(*events[:-1], {"type": "response.completed", "response": {"status": "completed", "output": []}})
     with pytest.raises(ChatGPTError, match="response_failed"):
-        failed.event({"type": "response.failed", "response": {"status": "failed", "error": {"code": "unknown"}}})
-    mismatched = SSEDecoder(4096)
-    for event in events:
-        mismatched.event(event)
+        _read(*events, {"type": "response.failed", "response": {"status": "failed", "error": {"code": "unknown"}}})
     with pytest.raises(ChatGPTError, match="response_invalid"):
-        mismatched.event({"type": "response.completed", "response": {"status": "completed", "output": [
+        _read(*events, {"type": "response.completed", "response": {"status": "completed", "output": [
             {**call, "arguments": "{}"},
         ]}})

@@ -18,6 +18,8 @@
 
 use crate::identity::{Value, python_dumps, python_float_repr, python_loads, python_strip};
 
+mod chatgpt;
+
 pub const PROVIDER_WIRE_SCHEMA_ID: &str = "inku.provider-wire.v1";
 
 const RESPONSE_NAME: &str = "submit_pipeline_response";
@@ -1802,6 +1804,18 @@ fn tokens_of(request: &Value, name: &str) -> Result<i64, Refusal> {
     }
 }
 
+/// A positive byte count the host reads an answer up to.
+fn limit_of(request: &Value) -> Result<usize, Refusal> {
+    match get(request, "answer_limit") {
+        Some(Value::Integer(digits)) => digits
+            .parse::<usize>()
+            .ok()
+            .filter(|limit| *limit > 0 && *limit < usize::MAX / 8)
+            .ok_or_else(|| Refusal::invalid("answer_limit must be a positive integer")),
+        _ => Err(Refusal::invalid("answer_limit must be a positive integer")),
+    }
+}
+
 fn answer(request: &Value) -> Result<Value, Refusal> {
     let action = as_str(get(request, "action"))
         .ok_or_else(|| Refusal::invalid("action must be a string"))?;
@@ -1871,6 +1885,68 @@ fn answer(request: &Value) -> Result<Value, Refusal> {
                 status,
                 body,
                 action == "text_response",
+            ))
+        }
+        "chatgpt_request" => {
+            let model = model()?;
+            let prompt = get(request, "prompt")
+                .filter(|prompt| matches!(prompt, Value::Object(_)))
+                .ok_or_else(|| Refusal::invalid("prompt must be an object"))?;
+            chatgpt::pipeline_request(model, prompt, limit_of(request)?)
+        }
+        "chatgpt_vision_request" => {
+            let model = model()?;
+            let field = |name: &str| {
+                as_str(get(request, name))
+                    .ok_or_else(|| Refusal::invalid(&format!("{name} must be a string")))
+            };
+            let images = as_array(get(request, "images"))
+                .ok_or_else(|| Refusal::invalid("images must be a list"))?
+                .iter()
+                .map(|item| as_str(Some(item)).map(str::to_owned))
+                .collect::<Option<Vec<_>>>()
+                .ok_or_else(|| Refusal::invalid("images must be strings"))?;
+            chatgpt::vision_request(
+                model,
+                field("system")?,
+                field("text")?,
+                &images,
+                limit_of(request)?,
+            )
+        }
+        "chatgpt_limits" => Ok(chatgpt::limits_answer(limit_of(request)?)),
+        "chatgpt_stream" => {
+            let text = match as_str(get(request, "mode")) {
+                Some("pipeline") => false,
+                Some("text") => true,
+                _ => return Err(Refusal::invalid("mode must be pipeline or text")),
+            };
+            let wire = as_str(get(request, "wire_base64"))
+                .and_then(chatgpt::base64_decode)
+                .ok_or_else(|| Refusal::invalid("wire_base64 must be base64"))?;
+            Ok(chatgpt::stream_answer(text, limit_of(request)?, &wire))
+        }
+        "chatgpt_error" => {
+            let status = match get(request, "status") {
+                None | Some(Value::Null) => None,
+                Some(Value::Integer(digits)) => Some(
+                    digits
+                        .parse::<i64>()
+                        .map_err(|_| Refusal::invalid("status must be an integer"))?,
+                ),
+                Some(_) => return Err(Refusal::invalid("status must be an integer")),
+            };
+            let empty = Value::Null;
+            Ok(chatgpt::error_answer(
+                get(request, "value").unwrap_or(&empty),
+                status,
+                get(request, "request_id"),
+            ))
+        }
+        "chatgpt_catalog" => {
+            let empty = Value::Null;
+            Ok(chatgpt::catalog_answer(
+                get(request, "value").unwrap_or(&empty),
             ))
         }
         _ => Err(Refusal::invalid("action is unknown")),
@@ -1989,6 +2065,21 @@ mod tests {
             compared += 1;
         }
         assert_eq!(compared, 97);
+    }
+
+    #[test]
+    fn every_shared_chatgpt_row_is_written_and_read_as_server_did() {
+        let cases = cases();
+        let mut compared = 0;
+        for case in cases["chatgpt"].as_array().unwrap() {
+            let (why, expect) = (&case["why"], &case["expect"]);
+            let answer = ask(&case["request"]);
+            for (name, item) in expect.as_object().unwrap() {
+                assert_eq!(&answer[name], item, "{why}: {name} in {answer}");
+            }
+            compared += 1;
+        }
+        assert_eq!(compared, 69);
     }
 
     #[test]

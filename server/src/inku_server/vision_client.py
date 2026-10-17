@@ -50,21 +50,14 @@ def check_vision_access(connection: dict[str, Any], model_id: str) -> None:
         raise ChatGPTError("chatgpt_model_not_offered", action="models")
 
 
-def _image_parts(image: str) -> tuple[str, str]:
-    """(media type, base64 data) of a `data:` URL; ChatGPT's Vision is checked here."""
-    head, _, data = image.partition(",")
-    if not head.startswith("data:") or ";base64" not in head or not data:
-        raise ValueError("Vision images must be base64 data URLs")
-    return head[len("data:"):].split(";", 1)[0] or "image/png", data
-
-
 def vision_text(connection: dict[str, Any], model_id: str, *, system: str, text: str, images: list[str],
                 temperature: float, max_tokens: int, transport: httpx.BaseTransport | None = None) -> str:
     """Ask once and return the answer's text, stripped. A timeout is a TimeoutError."""
     if connection.get("kind") == "chatgpt_responses":
         from .chatgpt_provider import request_vision
-        for image in images:
-            _image_parts(image)
+        # Every image must be a base64 data URL; the core refuses any other
+        # before a token or the model list is asked for.
+        provider_wire.chatgpt_vision_request(model_id, system=system, text=text, images=images, answer_limit=512 * 1024)
         try:
             return asyncio.run(request_vision(
                 connection["owner_id"], connection["profile_id"], connection["generation"], model_id,

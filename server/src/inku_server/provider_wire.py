@@ -15,6 +15,7 @@ the core names.
 
 from __future__ import annotations
 
+import base64
 import importlib
 import json
 from functools import lru_cache
@@ -40,7 +41,8 @@ def _native() -> ModuleType:
 
 
 def _ask(action: str, **fields: Any) -> dict:
-    request = json.dumps({"action": action, **fields}, ensure_ascii=False, allow_nan=False).encode("utf-8")
+    # NaN passes: an error body json.loads read may hold one, and the core reads it as Python does.
+    request = json.dumps({"action": action, **fields}, ensure_ascii=False).encode("utf-8")
     answer = json.loads(_native().pipeline_provider_wire(request))
     if "error" in answer:
         raise RuntimeError(f"provider wire request failed: {answer['error']}")
@@ -66,6 +68,39 @@ def text_request(connection: dict, model: str, *, system: str, text: str, images
     """The request for one text answer, with images when there are any."""
     return _ask("text_request", connection=_connection(connection), model=model, system=system, text=text,
                 images=list(images), temperature=temperature, max_tokens=max_tokens)
+
+
+def chatgpt_request(model: str, prompt: dict, answer_limit: int) -> dict:
+    """The ChatGPT plan's body for one pipeline effect: body, canonical, wire_limit, event_limit."""
+    return _ask("chatgpt_request", model=model, answer_limit=answer_limit,
+                prompt={key: prompt[key] for key in ("system", "message", "response_schema", "action_name") if key in prompt})
+
+
+def chatgpt_vision_request(model: str, *, system: str, text: str, images: list[str], answer_limit: int) -> dict:
+    """The ChatGPT plan's Vision body; an image that is not a base64 data URL is refused."""
+    return _ask("chatgpt_vision_request", model=model, system=system, text=text, images=list(images),
+                answer_limit=answer_limit)
+
+
+def chatgpt_limits(answer_limit: int) -> dict:
+    """The stream and event limits for an answer limit."""
+    return _ask("chatgpt_limits", answer_limit=answer_limit)
+
+
+def chatgpt_stream(mode: str, answer_limit: int, wire: bytes) -> dict:
+    """The whole stream read once: ``answer`` with ``text``, ``failed`` or ``malformed``, with ``terminal``."""
+    return _ask("chatgpt_stream", mode=mode, answer_limit=answer_limit,
+                wire_base64=base64.b64encode(wire).decode("ascii"))
+
+
+def chatgpt_error(value: Any, status: int | None, request_id: str | None) -> dict:
+    """What an HTTP error from the ChatGPT backend says: code, failure, action, status, request_id, param."""
+    return _ask("chatgpt_error", value=value, status=status, request_id=request_id)
+
+
+def chatgpt_catalog(value: Any) -> dict:
+    """The models the backend lists for the subscriber: ``ok`` with ``models``, or ``malformed``."""
+    return _ask("chatgpt_catalog", value=value)
 
 
 def headers(request: dict, key: str) -> dict[str, str]:

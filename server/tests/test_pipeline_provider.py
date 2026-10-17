@@ -683,17 +683,20 @@ def test_every_sender_but_gemini_writes_the_reading_in_its_property_order(monkey
 
 
 def test_the_chatgpt_plan_writes_the_reading_in_its_property_order_and_other_schemas_as_they_came():
-    from inku_server.chatgpt_provider import request_body
-    from inku_server.schema_order import ordered_schema
+    from inku_server import provider_wire
 
-    prompt = _reading_action()["payload"]["prompt"]
-    parameters = request_body("gpt-6.1-sol", prompt)["tools"][0]["tools"][0]["parameters"]
-    assert list(parameters["properties"]) == ["thesis", "roles", "relations"]
-    assert list(parameters["properties"]["relations"]["items"]["properties"]) == ["type", "layers"]
+    def parameters(prompt):
+        body = json.loads(provider_wire.chatgpt_request("gpt-6.1-sol", prompt, 8192)["body"])
+        return body["tools"][0]["tools"][0]["parameters"]
+
+    reading = parameters(_reading_action()["payload"]["prompt"])
+    assert list(reading["properties"]) == ["thesis", "roles", "relations"]
+    assert list(reading["properties"]["relations"]["items"]["properties"]) == ["type", "layers"]
     # A schema that names no order -- Stage 1's and the rest -- goes out byte for byte as it came.
     for schema in (_action()["payload"]["prompt"]["response_schema"],
                    {"type": "object", "properties": {"b": {"type": "object", "properties": {"z": {}, "a": {}}}, "a": {}}}):
-        assert json.dumps(ordered_schema(schema)) == json.dumps(schema)
+        prompt = {**_action()["payload"]["prompt"], "response_schema": schema}
+        assert json.dumps(parameters(prompt)) == json.dumps(schema)
 
 
 def test_each_provider_action_is_recorded_under_its_stage():

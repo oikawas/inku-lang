@@ -44,7 +44,7 @@ struct SavedScoreVariantView: View {
             RefinementOptionsGrid(model: model, options: change.candidates.map { candidate in
                 RefinementOption(id: candidate.id, work: candidate.work,
                     label: candidate.plan.ground?.name(language: model.display.preferences.language) ??
-                        model.display.localizedFormat("配色 %@", String((candidate.plan.index ?? 0) + 1)),
+                        model.display.localizedFormat("配色 %@", candidate.plan.index?.displayNumber ?? "1"),
                     selected: candidate.selected, saved: candidate.savedWork != nil)
             }, previewID: change.previewID, maxColumns: 4, busy: change.running || model.isBusy,
                 placeholder: change.kind == .ground ? "この作品が使っていない支持体に差し替えた候補を並べます（支持体を指定した作品は6案、指定のない作品は7案）。" : "同じ色カタログの中で、重複しない配色の候補を8案ずつ並べます。",

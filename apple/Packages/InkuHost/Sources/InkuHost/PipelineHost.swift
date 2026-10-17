@@ -279,27 +279,23 @@ public actor PipelineHost {
         guard base.work.renderSeed != nil, let source = base.work.ddl else { throw HostError("saved_refinement_options_unavailable") }
         let context = try ExactJSON(data: base.context)
         let configuration = try context.requiredObject("configuration")
-        let read = try ToolVariants.read(configuration: configuration, source: source)
-        guard read["outcome"].string == "read" else { throw HostError("touch_change_unavailable") }
-        let labels = try (read["tools"].array ?? []).map { value in
-            TouchTool(value: try value.requiredString("value"), ja: try value.requiredString("ja"), en: try value.requiredString("en"))
-        }
-        let sentences = (read["sentences"].array ?? []).compactMap { $0["index"].number.flatMap(Int.init) }
         let score = try ExactJSON(data: Data(base.work.score.utf8))
-        let drawn = ToolVariants.drawnTools(score: score, sentences: sentences, known: Set(labels.map(\.value)))
+        let arguments: [String: ExactJSON] = ["config": configuration, "source": .string(source),
+            "score": score, "mode": .string(mode.rawValue)]
+        let offered = try SavedVariants.response(.object(arguments.merging([
+            "action": .string("tool_plan"), "seed": .integer(UInt64.random(in: .min ... .max))]) { _, new in new }))
+        let labels = try JSONDecoder().decode([TouchTool].self, from: offered["tool_labels"].data)
         var plans: [ToolVariantPlan] = []
-        for tools in ToolVariants.options(drawn: drawn, mode: mode, tools: labels.map(\.value)) {
+        for entry in offered["entries"].array ?? [] {
             try Task.checkCancellation()
-            let written = try ToolVariants.read(configuration: configuration, source: source, tools: tools)
-            guard written["outcome"].string == "retouched", let ddl = written["source"].string else { continue }
-            let changes = drawn.keys.sorted().compactMap { index -> ToolChange? in
-                guard let to = tools[String(index)], let from = drawn[index], from != to else { return nil }
-                return ToolChange(index: index, from: from, to: to)
-            }
-            let metadata: ExactJSON = .object(["tool_mode": .string(mode.rawValue), "tools": .object(tools.mapValues(ExactJSON.string)),
-                "changes": .array(changes.map { .object(["index": .number(String($0.index)), "from": .string($0.from), "to": .string($0.to)]) })])
+            let written = try SavedVariants.response(.object(arguments.merging([
+                "action": .string("tool_render"), "tools": entry["tools"]]) { _, new in new }))
+            let metadata = try written.requiredObject("derivation_metadata")
+            let tools = try JSONDecoder().decode([String: String].self, from: metadata["tools"].data)
+            let changes = try JSONDecoder().decode([ToolChange].self, from: metadata["changes"].data)
+            let ddl = try written.requiredString("ddl")
             var render = try ExactJSON(data: base.renderRequest)
-            render["request"]["score"] = ToolVariants.scoreWithTools(score, tools: tools)
+            render["request"]["score"] = try written.requiredObject("score")
             var replay = SavedScoreReplayPlan(work: base.work, parentNode: base.parentNode, context: base.context,
                 renderRequest: render.data, derivationKind: "tool_change", derivationMetadata: metadata.data,
                 variationAmplitude: nil, variationSeed: nil)

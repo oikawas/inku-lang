@@ -8,6 +8,8 @@ Binding and protocol identities come from the bundled Rust core's version report
 
 Work identities `dh1`/`rh3`, canonical JSON, instruction-language normalization and resolution, and description-label text and excluded spans call the shared core through UniFFI. Swift keeps no copies of these rules and only converts the core's Unicode scalar offsets to the macOS editor's UTF-16 offsets. Existing stored identities are not rewritten. `ExactJSON.text` preserves number lexemes for transport, `canonicalText` exposes the core's canonical form, and the space-separated prompt format `pythonText` remains separate.
 
+Options and replacements for Change the touches, Change the ground and Change the color arrangement also call UniFFI's `saved_variants` (`inku.saved-variants.v1`). Swift supplies the saved parent's conditions and a fresh random UInt64 each time the touches button is pressed. Ground sentences use the saved instruction language, or the core's shared language rule when absent. Child metadata keeps the core's answer; color metadata contains only `color_arrangement_index` and `catalog_id`. Color indices and totals retain the core's decimal representation without truncation to UInt64. Refusals display the core's `detail` unchanged. No migration rewrites existing works or their saved metadata (2026-10-17).
+
 ## Specification Update Workflow
 
 - `SWIFT_SPEC.ja.md` is the canonical Swift specification.

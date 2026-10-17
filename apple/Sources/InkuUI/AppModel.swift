@@ -1383,7 +1383,7 @@ public final class AppModel {
     public func nextColorArrangementPage(work: SavedWork) async throws -> ColorArrangementPage? {
         guard !isPreview, !stopping, let host else { throw HostError("authoring_busy_or_unavailable") }
         _ = try await checkedSavedAdjustmentParent(work)
-        let cursor: UInt64
+        let cursor: SavedVariantOrdinal
         switch colorArrangementCursors[work.id] ?? .next(0) {
         case .exhausted: return nil
         case .next(let value): cursor = value
@@ -1397,7 +1397,7 @@ public final class AppModel {
     public func makeGroundVariantPlans(work: SavedWork) async throws -> [SavedScoreVariantPlan] {
         guard !isPreview, !stopping, let host else { throw HostError("authoring_busy_or_unavailable") }
         _ = try await checkedSavedAdjustmentParent(work)
-        return try await host.makeGroundVariantPlans(workID: work.id, vocabulary: RefinementResources.grounds())
+        return try await host.makeGroundVariantPlans(workID: work.id)
     }
 
     public func prepareSavedScoreVariant(_ plan: SavedScoreVariantPlan, token: UUID) async throws -> PreparedCandidate {

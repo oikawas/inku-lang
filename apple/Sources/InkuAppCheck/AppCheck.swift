@@ -11,6 +11,17 @@ struct AppCheck {
         if CommandLine.arguments.contains("--core-version-only") {
             print(InkuCore.versionReport); return
         }
+        if let index = CommandLine.arguments.firstIndex(of: "--shared-saved-variants-only") {
+            guard CommandLine.arguments.indices.contains(index + 2) else { throw CheckFailure.message("Expected shared corpus and fresh fixture folder") }
+            try await runSharedSavedVariantChecks(casesURL: URL(fileURLWithPath: CommandLine.arguments[index + 1]),
+                folder: URL(fileURLWithPath: CommandLine.arguments[index + 2])); return
+        }
+        if let index = CommandLine.arguments.firstIndex(of: "--saved-variants-inventory") {
+            guard CommandLine.arguments.indices.contains(index + 3) else { throw CheckFailure.message("Expected disposable database, product root and fresh output") }
+            try await runSavedVariantsInventory(databaseURL: URL(fileURLWithPath: CommandLine.arguments[index + 1]),
+                productURL: URL(fileURLWithPath: CommandLine.arguments[index + 2]),
+                outputURL: URL(fileURLWithPath: CommandLine.arguments[index + 3])); return
+        }
         if let index = CommandLine.arguments.firstIndex(of: "--shared-core-step1-only") {
             guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Missing shared case directory") }
             try await runSharedCoreStep1Checks(casesDirectory: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return

@@ -6,11 +6,15 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-10-17.
 
+## 2026-10-17 ChatGPT plan failure classes and model list in the shared core
+
+The failure class of a ChatGPT-plan code Android raises itself now comes from the shared core's failure table (`chatgpt_failure`), the same table the core uses for the failures it reads; Android's classes are unchanged. A model list is no longer refused whole for an empty or overlong name, and repeated slugs are not removed in the host: the core drops each such row (`slug` over 256 UTF-8 bytes, `display_name` over 512) and Android stores the rest as the core returns them. The core also checks the stream's response and call ids. The table's next actions are not shown on Android screens.
+
 ## 2026-10-17 ChatGPT plan bodies and streams in the shared core
 
 ChatGPT-plan drawing and refinement Vision bodies, the reading of their SSE streams, the failure classes and the personal model list now come from shared-core `inku.provider-wire.v1` through JNI (`chatgpt_request`, `chatgpt_vision_request`, `chatgpt_stream`, `chatgpt_error`, `chatgpt_catalog`), byte for byte as Server writes and reads them. At the author's decision, Android receives the whole stream, bounded only by the core's `wire_limit` while it arrives, and the core reads it once; each event and the answer are bounded as the core reads them. Bytes that are not UTF-8 are refused; events and arguments of the wrong shape are `malformed_payload`. A tool-shape diagnosis is logged to Logcat (tag `InkuProvider`) as one `chatgpt_tool_shape` line without text or arguments. `OrderedSchemaJson.kt` is removed.
 
-The host keeps the operation checks before sending (the `chatgpt:` name, the drawing effects, the 768×768 PNG of refinement advice), OAuth and tokens, the session generation, cancellation, the usage-limit pause, HTTP, and the length bound and de-duplication before a model list is stored. Host-JNI tests read the 69 `chatgpt` rows of `server/tests/data/provider-wire-cases.json` too.
+The host keeps the operation checks before sending (the `chatgpt:` name, the drawing effects, the 768×768 PNG of refinement advice), OAuth and tokens, the session generation, cancellation, the usage-limit pause, HTTP. (Since the failure-table section above, the model list's length bound and de-duplication are the core's.) Host-JNI tests read the 69 `chatgpt` rows of `server/tests/data/provider-wire-cases.json` too.
 
 ## 2026-10-17 Provider bodies and responses in the shared core
 

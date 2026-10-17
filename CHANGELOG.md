@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Take Android ChatGPT plan failure classes and model-list guards from the shared core
+
+Android now takes the failure class of the ChatGPT-plan codes it raises from the shared core's `chatgpt_failure` table, with the same classes as before. The model list is no longer refused whole for an empty or overlong name or de-duplicated in the host; the core drops those rows.
+
 ### 2026-10-17 — Move Swift ChatGPT plan bodies and stream reading to the shared core
 
 Swift's ChatGPT plan request bodies, SSE stream reading, failure classification and model list reading moved to UniFFI's `provider_wire`, so Swift reads with the same rules as Server and Android. An item that did not complete is now refused instead of retried (as on Server). A malformed stream is `chatgpt_response_invalid` and no internal code leaks. Tokens, cancellation, the usage-limit pause and the observation record are unchanged.

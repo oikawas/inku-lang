@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-17 — AndroidのChatGPTプランの失敗の分類と一覧の守りを共有coreから引く
+
+Androidが出すChatGPTプランの失敗の印の分類を、共有coreの`chatgpt_failure`の表から引くようにした。分類は前と変わらない。モデル一覧は、空や長すぎる名前で一覧全体を断ることも、hostで重複を除くこともやめ、coreがその行を落とす。
+
 ### 2026-10-17 — SwiftのChatGPTプランの本文と流れの読みを共有coreへ移行
 
 SwiftのChatGPTプランの要求本文、SSEの流れの読み、失敗の分類、モデル一覧の読みを、UniFFIの`provider_wire`へ移した。ServerとAndroidと同じ規則で読む。項目が未完了の応答は、再試行せずに断るようになった（Serverと同じ）。形の崩れた流れは`chatgpt_response_invalid`になり、内部の印は出なくなった。token・取消・使用量の上限での一時停止・観測記録は変えていない。

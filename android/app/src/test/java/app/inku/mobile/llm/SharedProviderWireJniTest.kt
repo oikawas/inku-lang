@@ -164,7 +164,7 @@ class SharedProviderWireJniTest {
     @Test
     fun allChatGptRowsMatchServer() {
         val rows = requireNotNull(cases["chatgpt"])
-        assertEquals(69, rows.size)
+        assertEquals(162, rows.size)
         val actions = mutableMapOf<String, Int>()
         for ((index, item) in rows.withIndex()) {
             val row = item.row
@@ -179,8 +179,31 @@ class SharedProviderWireJniTest {
                 sameJson("$why $key", expected.get(key), answer.get(key))
             }
         }
-        assertEquals(mapOf("chatgpt_request" to 8, "chatgpt_vision_request" to 8, "chatgpt_stream" to 42,
-            "chatgpt_error" to 9, "chatgpt_catalog" to 2), actions)
+        assertEquals(mapOf("chatgpt_request" to 8, "chatgpt_vision_request" to 8, "chatgpt_stream" to 57,
+            "chatgpt_error" to 9, "chatgpt_catalog" to 5, "chatgpt_failure" to 75), actions)
+    }
+
+    /** The core's failure table gives every code Android raises the class the old Kotlin table gave it. */
+    @Test
+    fun theCoreFailureTableKeepsAndroidsFailureClasses() {
+        val temporary = setOf("chatgpt_transport_unavailable", "chatgpt_auth_unavailable", "chatgpt_response_incomplete",
+            "subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable", "chatgpt_refresh_not_ready")
+        // Every `ChatGptException("…")` code in the app, with the codes the auth error picks and the core's own.
+        val raised = listOf("chatgpt_attempt_busy", "chatgpt_auth_rejected", "chatgpt_auth_unavailable",
+            "chatgpt_callback_invalid", "chatgpt_cancelled", "chatgpt_catalog_required", "chatgpt_consent_declined",
+            "chatgpt_identity_invalid", "chatgpt_identity_mismatch", "chatgpt_model_unavailable", "chatgpt_not_connected",
+            "chatgpt_operation_not_supported", "chatgpt_plan_not_authorized", "chatgpt_profile_limit",
+            "chatgpt_reauthentication_required", "chatgpt_refresh_not_ready", "chatgpt_registration_incomplete",
+            "chatgpt_reserved_provider", "chatgpt_response_incomplete", "chatgpt_response_invalid",
+            "chatgpt_response_too_large", "chatgpt_session_changed", "chatgpt_session_required",
+            "chatgpt_storage_unavailable", "chatgpt_transport_unavailable", "subscription_sharing_usage_limit_exceeded",
+            "subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable", "not_a_chatgpt_code")
+        for (code in raised) {
+            val expected = if (code in temporary) "transport_unavailable" else "provider_rejected"
+            assertEquals(code, expected, chatGptFailureFor(code))
+            assertEquals(code, expected, ChatGptException(code).failure)
+        }
+        assertEquals(29, raised.size)
     }
 
     @Test

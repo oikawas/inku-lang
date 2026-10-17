@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-17 — Androidの保存作品の推敲3種を共有coreへ移行
+
+てざわり・支持体・配色の候補生成と差し替えをJNI経由の`inku.saved-variants.v1`へ委譲し、Kotlinの規則の写しを削除した。支持体の地の文は保存した指示言語、無ければ共有coreの判定を使う。配色の番号・ページ位置・総数は大きな整数を保ち、子作品にはcoreが返した`{color_arrangement_index, catalog_id}`を保存する。Roomの保存時のてざわり・支持体の検証も同じcoreの答えを使い、保存済み作品を一括で書き換えない。
+
 ### 2026-10-17 — 使われていないServerの`llm_retry.py`を削除
 
 どこからも使われていなかったServerの`llm_retry.py`とその試験を削除した。provider応答の再試行は共有coreの`RetryPolicy`が持つ。

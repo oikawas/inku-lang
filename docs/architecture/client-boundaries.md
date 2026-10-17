@@ -190,6 +190,7 @@ The Settings aggregate in `features/settings/state.svelte.ts` constructs navigat
 - Engine identity and renderer reference come from the packaged Rust core; Kotlin keeps no version literal.
 - Preview, thumbnails, refinement, and PNG export rasterize saved/current SVG through `inku-svg-raster`. There is no AndroidSVG or Kotlin renderer fallback.
 - Description identity `dh1`, render identity `rh3`, canonical JSON, and instruction-language normalization/detection call the shared core through `NativePipelineBridge` (JNI). Kotlin holds no copy of these rules; lineage canonical JSON uses the same entry point.
+- Saved-work touch, ground and color-arrangement options and replacements delegate to shared-core `inku.saved-variants.v1` through JNI `savedVariants`. Kotlin transports and saves JSON with large integers intact and holds no rule copy. A color child saves the core's `{color_arrangement_index, catalog_id}`.
 - Kotlin owns the UI, provider settings and transport, camera image preparation and the on-device local LLM, host options, Room/history, and JSON transport to the core. No migration rewrites stored hashes. The old Kotlin Stage 1 / 1.5 / 2 and Score coerce are retired, with no runtime fallback.
 
 ## Language and UI sources

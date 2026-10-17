@@ -79,6 +79,7 @@ import app.inku.mobile.render.RustArtworkRasterizer
 import app.inku.mobile.render.SvgOutputLimit
 import java.io.File
 import java.io.FileOutputStream
+import java.math.BigInteger
 import java.security.MessageDigest
 import java.util.UUID
 import kotlin.coroutines.AbstractCoroutineContextElement
@@ -970,7 +971,7 @@ class InkuRepository(
     }
 
     /** Eight distinct assignments per page, excluding the saved SVG's visible assignment. */
-    suspend fun colorArrangementPage(parent: RefinementParent, cursor: Int = 0): ColorArrangementPage {
+    suspend fun colorArrangementPage(parent: RefinementParent, cursor: BigInteger = BigInteger.ZERO): ColorArrangementPage {
         val item = savedVariantParent(parent.historyId)
         val colors = savedColorSnapshot(item)
         return SavedColorArrangements.fromSaved(item.displaySvg, colors.colorMap, item.id).page(cursor)
@@ -978,7 +979,7 @@ class InkuRepository(
 
     suspend fun renderColorArrangementCandidate(
         parent: RefinementParent,
-        index: Int,
+        index: BigInteger,
         renderWildOverride: Boolean? = null,
     ): Pair<RefinementPlan, PaintResult> {
         val item = savedVariantParent(parent.historyId)
@@ -986,7 +987,7 @@ class InkuRepository(
         require(savedParent.seeds.renderSeed != null) { "saved work has no performance seed to preserve its drawing" }
         val colors = savedColorSnapshot(item)
         val arranged = SavedColorArrangements.fromSaved(item.displaySvg, colors.colorMap, item.id)
-            .colorMap(colors.colorMap, index)
+            .render(index, colors.catalogId)
         val plan = RefinementPlan(
             element = null,
             route = RefinementRoute.RenderFromScore,
@@ -994,8 +995,8 @@ class InkuRepository(
             canvasAspect = savedParent.canvasAspect,
             seeds = savedParent.seeds,
             derivationKind = "color_arrangement_change",
-            derivationMetadata = mapOf("color_arrangement_index" to index),
-            workColorSnapshotOverride = colors.copy(colorMap = arranged),
+            derivationMetadata = arranged.derivationMetadata,
+            workColorSnapshotOverride = colors.copy(colorMap = arranged.colorMap),
             renderWildOverride = renderWildOverride,
         )
         return plan to renderRefinementCandidate(savedParent, plan)
@@ -1011,8 +1012,7 @@ class InkuRepository(
         val item = savedVariantParent(parent.historyId)
         val savedParent = RefinementParent.of(item, (item.sourceText ?: item.originalInput).trim())
         require(savedParent.seeds.renderSeed != null) { "saved work has no performance seed to preserve its drawing" }
-        val current = GroundVariants.plan(savedParent.scoreJson)
-        require(current.entries.any { it.material == material }) { "ground must differ from the saved work" }
+        val changed = GroundVariants.render(savedParent.scoreJson, savedParent.ddl, material, item.instructionLangResolved)
         val plan = RefinementPlan(
             element = null,
             route = RefinementRoute.RenderFromScore,
@@ -1020,9 +1020,9 @@ class InkuRepository(
             canvasAspect = savedParent.canvasAspect,
             seeds = savedParent.seeds,
             derivationKind = "ground_change",
-            derivationMetadata = mapOf("ground_material" to material, "parent_ground_material" to current.current),
-            scoreOverrideJson = GroundVariants.scoreWithGround(savedParent.scoreJson, material),
-            ddlOverride = GroundVariants.ddlWithGround(savedParent.ddl, material, item.instructionLangResolved),
+            derivationMetadata = changed.derivationMetadata,
+            scoreOverrideJson = changed.scoreJson,
+            ddlOverride = changed.ddl,
             renderWildOverride = renderWildOverride,
         )
         return plan to renderRefinementCandidate(savedParent, plan)

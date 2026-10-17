@@ -1,6 +1,7 @@
 package app.inku.mobile.data.refinement
 
-import org.json.JSONObject
+import app.inku.mobile.pipeline.NativePipelineBridge
+import app.inku.mobile.pipeline.SharedPipelineBinding
 
 data class GroundVariantEntry(val material: String, val labelJa: String, val labelEn: String)
 
@@ -11,65 +12,28 @@ data class GroundVariantPlan(
     val entries: List<GroundVariantEntry>,
 )
 
-/** The seven named supports from the じ vocabulary, in its authored order. */
+/** Plan and redraw through the shared saved-variant rules. */
 object GroundVariants {
-    private val materials = listOf(
-        GroundVariantEntry("paper", "紙", "paper"),
-        GroundVariantEntry("washi", "和紙", "washi"),
-        GroundVariantEntry("ink_wash", "薄墨地", "ink wash ground"),
-        GroundVariantEntry("charcoal_ground", "木炭地", "charcoal ground"),
-        GroundVariantEntry("canvas", "カンバス", "canvas"),
-        GroundVariantEntry("drawing_paper", "画用紙", "drawing paper"),
-        GroundVariantEntry("mezzotint", "メゾチント", "mezzotint"),
-    )
-
-    fun plan(scoreJson: String): GroundVariantPlan {
-        val current = currentMaterial(scoreJson)
-        val named = materials.firstOrNull { it.material == current }
-        return GroundVariantPlan(current, named?.labelJa, named?.labelEn, materials.filter { it.material != current })
-    }
-
-    fun currentMaterial(scoreJson: String): String {
-        val score = JSONObject(scoreJson)
-        return score.optJSONObject("canvas")?.optJSONObject("ground")?.optString("material")
-            ?.takeIf(String::isNotBlank) ?: "plain"
-    }
-
-    fun scoreWithGround(scoreJson: String, material: String): String {
-        require(materials.any { it.material == material }) { "unknown ground material: $material" }
-        val changed = JSONObject(scoreJson)
-        val current = changed.opt("canvas")
-        val canvas = if (current is JSONObject) current else JSONObject().put("aspect", current ?: "square")
-        val ground = canvas.optJSONObject("ground") ?: JSONObject()
-        canvas.put("ground", ground.put("material", material))
-        changed.put("canvas", canvas)
-        return changed.toString()
-    }
-
-    fun ddlWithGround(ddl: String, material: String, language: String?): String {
-        val surface = materials.firstOrNull { it.material == material }
-            ?: throw IllegalArgumentException("unknown ground material: $material")
-        val lines = ddl.split("\n").toMutableList()
-        for ((index, line) in lines.withIndex()) {
-            val lineLanguage = materials.firstNotNullOfOrNull { known ->
-                when {
-                    line.trim() == sentence(known, "ja") -> "ja"
-                    line.trim().equals(sentence(known, "en"), ignoreCase = true) -> "en"
-                    else -> null
-                }
-            }
-            if (lineLanguage != null) {
-                lines[index] = sentence(surface, lineLanguage)
-                return lines.joinToString("\n")
+    fun plan(scoreJson: String, binding: SharedPipelineBinding = NativePipelineBridge): GroundVariantPlan {
+        val answer = SharedSavedVariants.call("ground_plan", "\"score\":$scoreJson", binding).value
+        val entries = answer.getJSONArray("entries").let { rows ->
+            (0 until rows.length()).map { index ->
+                val row = rows.getJSONObject(index)
+                GroundVariantEntry(row.getString("material"), row.getString("label_ja"), row.getString("label_en"))
             }
         }
-        val resolved = if (language in setOf("ja", "en")) language!! else {
-            if (ddl.any { it in '\u3040'..'\u9fff' }) "ja" else "en"
-        }
-        val heading = sentence(surface, resolved)
-        return if (ddl.isEmpty()) heading else "$heading\n$ddl"
+        return GroundVariantPlan(answer.getString("current"),
+            if (answer.isNull("current_label_ja")) null else answer.getString("current_label_ja"),
+            if (answer.isNull("current_label_en")) null else answer.getString("current_label_en"), entries)
     }
 
-    private fun sentence(entry: GroundVariantEntry, language: String): String =
-        if (language == "ja") "${entry.labelJa}。" else entry.labelEn.replaceFirstChar(Char::uppercaseChar) + "."
+    fun render(scoreJson: String, source: String, material: String, language: String?,
+               binding: SharedPipelineBinding = NativePipelineBridge): SavedVariantRender {
+        val answer = SharedSavedVariants.call("ground_render",
+            "\"score\":$scoreJson,\"source\":${SharedSavedVariants.q(source)}," +
+                "\"material\":${SharedSavedVariants.q(material)}," +
+                "\"language\":${language?.let(SharedSavedVariants::q) ?: "null"}", binding)
+        return SavedVariantRender(answer.rawScore(), answer.value.getString("ddl"),
+            SharedSavedVariants.metadata(answer.value.getJSONObject("derivation_metadata")))
+    }
 }

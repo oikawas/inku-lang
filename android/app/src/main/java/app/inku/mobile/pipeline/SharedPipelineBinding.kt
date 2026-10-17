@@ -24,6 +24,10 @@ interface SharedPipelineBinding {
     fun retouch(inputBytes: ByteArray): ByteArray =
         """{"error":"unavailable"}""".encodeToByteArray()
 
+    /** Saved-work changes are owned by the shared core. */
+    fun savedVariants(inputBytes: ByteArray): ByteArray =
+        """{"error":"unavailable"}""".encodeToByteArray()
+
     /** The shared record's three states; an older binding reports no recorded ranges. */
     fun completionRangeStates(inputBytes: ByteArray): ByteArray =
         """{"schema":"inku.completion-range-states.v1","ranges":[]}""".encodeToByteArray()

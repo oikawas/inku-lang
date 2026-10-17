@@ -38,6 +38,7 @@ data class ManagedToolChangeInput(
     val parentSource: String,
     val tools: Map<Int, String>,
     val verifiedSource: String,
+    val mode: app.inku.mobile.data.refinement.ToolChangeMode,
 )
 
 /** A support change keeps the parent's rendering policy while authorizing edited DDL. */
@@ -336,13 +337,20 @@ class RoomSharedPipelineStore(
                 ?: throw SharedPipelinePersistenceException("tool parent is not managed")
             val context = decodeForkContextObject(parent, parentLink)
             require(parent.normalizedDdl == input.parentSource && history.normalizedDdl == input.verifiedSource)
+            val verified = app.inku.mobile.data.refinement.ToolChangePlanner.render(
+                app.inku.mobile.data.refinement.ToolChangePlanner.source(
+                    input.parentSource, parent.scoreJson, context.objectField("config").toString(),
+                ), input.mode, input.tools,
+            )
+            require(history.normalizedDdl == verified.ddl) { "tool DDL differs from the core result" }
             val edge = requireNotNull(lineage.edge)
             require(edge.parentNodeId == parent.lineageNodeId && edge.derivationKind == "tool_change")
+            require(edge.metadataJson == LineagePlanner.canonicalJson(verified.derivationMetadata)) {
+                "tool derivation differs from the core result"
+            }
             require(
                 LineagePlanner.canonicalJson(JSONObject(history.scoreJson)) ==
-                    LineagePlanner.canonicalJson(JSONObject(
-                        app.inku.mobile.data.refinement.ToolChangePlanner.scoreWithTools(parent.scoreJson, input.tools),
-                    )),
+                    LineagePlanner.canonicalJson(JSONObject(verified.scoreJson)),
             ) { "tool Score must differ only in the requested source owners' weights" }
             val variationId = java.util.UUID.randomUUID().toString()
             val revision = "1"
@@ -396,19 +404,18 @@ class RoomSharedPipelineStore(
             val parentLink = dao.getHistoryLink(replay.ownerId, parent.id)
                 ?: throw SharedPipelinePersistenceException("ground parent is not managed")
             val context = decodeForkContextObject(parent, parentLink)
-            val expectedScore = app.inku.mobile.data.refinement.GroundVariants.scoreWithGround(parent.scoreJson, input.material)
-            require(LineagePlanner.canonicalJson(JSONObject(history.scoreJson)) ==
-                LineagePlanner.canonicalJson(JSONObject(expectedScore))) { "ground Score changed beyond its material" }
-            val expectedDdl = app.inku.mobile.data.refinement.GroundVariants.ddlWithGround(
-                parent.normalizedDdl.orEmpty(), input.material, parent.instructionLangResolved,
+            val verified = app.inku.mobile.data.refinement.GroundVariants.render(
+                parent.scoreJson, parent.normalizedDdl.orEmpty(), input.material, parent.instructionLangResolved,
             )
+            require(LineagePlanner.canonicalJson(JSONObject(history.scoreJson)) ==
+                LineagePlanner.canonicalJson(JSONObject(verified.scoreJson))) { "ground Score changed beyond its material" }
+            val expectedDdl = verified.ddl
             require(history.normalizedDdl == expectedDdl) { "ground DDL changed beyond its material" }
             val edge = requireNotNull(lineage.edge)
             require(edge.parentNodeId == parent.lineageNodeId && edge.derivationKind == "ground_change")
-            require(edge.metadataJson == LineagePlanner.canonicalJson(mapOf(
-                "ground_material" to input.material,
-                "parent_ground_material" to app.inku.mobile.data.refinement.GroundVariants.currentMaterial(parent.scoreJson),
-            ))) { "ground derivation does not match its material" }
+            require(edge.metadataJson == LineagePlanner.canonicalJson(verified.derivationMetadata)) {
+                "ground derivation does not match the core result"
+            }
             val parentColors = JSONObject(parent.renderMetadataJson).optJSONObject("render_color_map")
                 ?: context.objectField("color_maps").optJSONObject(parent.colorCatalogId)
             require(parentColors != null && LineagePlanner.canonicalJson(parentColors) ==

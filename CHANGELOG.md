@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Move Android's three saved-work refinements to the shared core
+
+Touch, ground and color-arrangement options and replacements now call `inku.saved-variants.v1` through JNI, removing the Kotlin rule copies. An added ground sentence uses the saved instruction language or the shared core's resolution. Color indices, cursors and totals retain large integers; saved children use the core's `{color_arrangement_index, catalog_id}` metadata. Room also verifies touch and ground changes with the same core responses, without rewriting existing works in bulk.
+
 ### 2026-10-17 — Remove Server's unused `llm_retry.py`
 
 Server's `llm_retry.py`, which nothing imported, and its tests were removed. Retries of provider responses belong to the shared core's `RetryPolicy`.

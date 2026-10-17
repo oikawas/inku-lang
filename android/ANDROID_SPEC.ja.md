@@ -5,6 +5,14 @@
 
 最終更新: 2026-10-17。
 
+## 2026-10-17 保存作品の推敲3種の共有core化
+
+てざわり・支持体・配色の候補と差し替えは、JNIの`savedVariants`から共有coreの`inku.saved-variants.v1`を呼ぶ。Kotlinは入力の転送と応答の表示・保存だけを持ち、道具・支持体の一覧、既定値、候補の抽選、Scoreの書換え、配色の列挙を複製しない。てざわりの候補を求めるたびにhostが新しい64bit乱数seedを渡す。断りはcoreの`detail`をそのまま伝える。
+
+支持体の地の文を新しく足すときは、保存した指示言語があれば使い、無ければ共通の指示言語判定に従う。配色のindex・cursor・totalは`BigInteger`で保持し、coreが返すu64数値とそれを超える文字列の整数を丸めない。配色の子の付記はcore応答の`{color_arrangement_index, catalog_id}`を使う。てざわり・支持体の保存時の検証もcoreで再計算する。Room schema・migrationと既存作品の保存値は変更しない。
+
+共通の`server/tests/data/saved-variant-cases.json`をhost JNIのJVM試験で読む。APK作成・採番・端末への反映と画面受入は別の作業とする。
+
 ## 2026-10-17 構図読み・provider解決・Vision助言画像のServer追随
 
 `composition.read`はServerと同じく常にtrueとする。端末内VisionモデルにもStage 1の後で`read_composition`を要求し、実行するモデル・再試行・応答の判定・既定の読みによるfallbackは既存の共有pipelineを使う。
@@ -39,7 +47,7 @@ Anthropicの対象Claudeモデルは、通常描画とVisionを含むrequestで�
 
 この追加時点の保存作品の編集メニューでは、色カタログを変えるの次に「てざわりを変える」を置いた。独立したダイアログに既定の「すべての文を同じ筆記具にする」と「文ごとに違う筆記具にする」のラジオを置く。開くだけでは描かず、「4案を作る」で選んだ方式の4案を描く。もう一度押すと、並んでいる案を捨てて新しい4案に替える。すべての文を同じ筆記具にした案は筆記具名、文ごとの案は番号と各文の変更行を表示する。候補を保存または破棄するまで閉じず、保存済みの作品は破棄しない。
 
-JNIは共有coreの`retouch`（`inku.touch-change.v1`）を転送する。替えられる文と12の筆記具はcoreから読み、実際の筆記具は保存Scoreの`source_instruction` ownerから読む。Scoreの該当文の`weight`だけ替え、親の配置・色・支持体・キャンバス・seed・wild・描画条件を保つ。プラグイン所有の命令は替えない。指示書はcoreが書いて読み直したものだけを使い、LLMは呼ばない。
+候補と差し替えは共有coreの`saved_variants`（`inku.saved-variants.v1`）を呼び、その中で`retouch`を使う。替えられる文と12の筆記具、保存Scoreの`source_instruction` ownerが実際に描いた筆記具はcoreから読む。Scoreの該当文の`weight`だけ替え、親の配置・色・支持体・キャンバス・seed・wild・描画条件を保つ。プラグイン所有の命令は替えない。指示書はcoreが書いて読み直したものだけを使い、LLMは呼ばない。
 
 保存時も親と選んだ筆記具から描き直し、`tool_change`と`{tool_mode, tools, changes}`を記録する。managed作品の子は、書き換えた指示書の独立したDDL権威と親のfork contextを専用transactionで保持する。従来の同一DDL/Scoreのreplay guardを緩めない。Room schema/migrationは変えない。削除済みの「タッチ」や語によるseed変更とは別の操作で、調整の色カタログ・配置の2要素は保つ。
 

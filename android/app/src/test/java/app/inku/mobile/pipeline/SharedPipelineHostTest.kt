@@ -1146,7 +1146,8 @@ class SharedPipelineHostTest {
     }
 
     @Test
-    fun compositionReadUsesStageOneTransportAndReachesTheVisibleCommit() = runBlocking {
+    fun compositionReadUsesLocalStageOneTransportAndReachesTheVisibleCommit() = runBlocking {
+        val localModelId = "local-litert-lm:gemma-4-e2b"
         val binding = ScriptedBinding()
         val requests = mutableListOf<ModelRequest>()
         val adapter = SingleAttemptModelEffectProvider(object : ModelProvider {
@@ -1158,15 +1159,19 @@ class SharedPipelineHostTest {
         })
         val commits = RecordingCommitStore()
         val host = host(binding, adapter, commits, MemoryExecutionStore())
-        val config = JSONObject(CONFIG.toString()).put("composition", compositionForModel("gemini:model"))
+        val config = JSONObject(CONFIG.toString()).put("composition", compositionForModel(localModelId))
         val pending = host.start(
-            startRequest(PipelineAuthoring.Description("mist", false)).copy(configJson = config.toString()),
+            startRequest(PipelineAuthoring.Description("mist", false)).copy(
+                configJson = config.toString(),
+                models = MODELS.copy(stage1ModelId = localModelId, stage2ModelId = localModelId),
+            ),
         )
 
         assertEquals("awaiting_patch_approval", pending.phaseTag)
         assertEquals(listOf("generate_normalized_ddl", "read_composition", "complete_visible_ddl_holes"), requests.map { it.pipelineAction })
+        assertEquals(listOf(localModelId, localModelId, localModelId), requests.map { it.modelId })
         val reading = requests[1]
-        assertEquals(MODELS.stage1ModelId, reading.modelId)
+        assertEquals(localModelId, reading.modelId)
         assertEquals(MODELS.stage1MaxTokens, reading.maxTokens)
         assertEquals(0.0, reading.temperature, 0.0)
         assertEquals(1_000L, reading.timeoutMs)
@@ -1179,9 +1184,9 @@ class SharedPipelineHostTest {
     }
 
     @Test
-    fun compositionIsReadOnTheCloudAndUsesTheDefaultReadingOnTheDevice() {
+    fun compositionIsReadForCloudAndLocalModels() {
         assertTrue(compositionForModel("gemini:gemma-4-31b-it").getBoolean("read"))
-        assertFalse(compositionForModel("local-litert-lm:gemma-4-e2b").getBoolean("read"))
+        assertTrue(compositionForModel("local-litert-lm:gemma-4-e2b").getBoolean("read"))
     }
 
     @Test

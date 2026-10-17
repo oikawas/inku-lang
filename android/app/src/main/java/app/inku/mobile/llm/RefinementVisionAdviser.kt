@@ -13,7 +13,7 @@ data class RefinementVisionRequest(
     val direction: String,
     val enabledKinds: List<String>,
     val languageCode: String,
-    val imageJpeg: ByteArray,
+    val imagePng: ByteArray,
     val timeoutMs: Long = 120_000L,
 )
 
@@ -32,7 +32,7 @@ class RefinementVisionAdviser(
     suspend fun advise(request: RefinementVisionRequest): RefinementVisionAdvice {
         val kinds = request.enabledKinds.filter { it in ALLOWED_KINDS }
         require(kinds.isNotEmpty()) { "At least one refinement kind is required" }
-        require(request.imageJpeg.isNotEmpty()) { "Refinement image is empty" }
+        RefinementVisionImage.requirePng768(request.imagePng)
         require(request.timeoutMs > 0) { "Positive refinement timeout required" }
         val context = JSONObject()
             .put("allowed_suggested_kinds", JSONArray(kinds))
@@ -58,7 +58,7 @@ class RefinementVisionAdviser(
             tool = ModelTool(REFINEMENT_ADVICE_TOOL, "Submit bounded visual refinement advice.", ADVICE_SCHEMA),
             timeoutMs = request.timeoutMs,
             pipelineAction = REFINEMENT_VISION_ACTION,
-            imageJpeg = request.imageJpeg,
+            imagePng = request.imagePng,
             chatGptSession = chatGptSession,
         ))
         return parseAdvice(response.text, request.modelId, kinds)

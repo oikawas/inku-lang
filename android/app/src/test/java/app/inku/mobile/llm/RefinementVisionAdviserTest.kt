@@ -24,7 +24,7 @@ class RefinementVisionAdviserTest {
         direction = "leave more space",
         enabledKinds = kinds,
         languageCode = "en",
-        imageJpeg = byteArrayOf(1, 2, 3),
+        imagePng = refinementPngHeader(),
     )
 
     @Test
@@ -47,7 +47,7 @@ class RefinementVisionAdviserTest {
         assertEquals(0.35, sent.temperature, 0.0)
         assertEquals(120_000L, sent.timeoutMs)
         assertEquals(session, sent.chatGptSession)
-        assertTrue(sent.imageJpeg!!.contentEquals(byteArrayOf(1, 2, 3)))
+        assertTrue(sent.imagePng!!.contentEquals(refinementPngHeader()))
         assertTrue(sent.systemInstruction!!.contains("Never score, rank, accept, reject"))
         val context = JSONObject(sent.prompt.substringAfter("Context:\n"))
         assertEquals("a quiet circle", context.getString("instruction"))
@@ -88,5 +88,17 @@ class RefinementVisionAdviserTest {
         assertEquals(2000, advice.observation.codePointCount(0, advice.observation.length))
         assertEquals(2000, advice.nextDirection.codePointCount(0, advice.nextDirection.length))
         assertFalse(advice.observation.endsWith("\uD83D"))
+    }
+
+    @Test
+    fun refinementRequiresSquarePngBeforeProviderCall() {
+        val provider = AnsweringProvider("{}")
+        val adviser = RefinementVisionAdviser(provider)
+        for (bad in listOf(refinementPngHeader(width = 767), refinementPngHeader(height = 767), byteArrayOf(1, 2, 3))) {
+            assertThrows(IllegalArgumentException::class.java) {
+                runBlocking { adviser.advise(request().copy(imagePng = bad)) }
+            }
+        }
+        assertTrue(provider.requests.isEmpty())
     }
 }

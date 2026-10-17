@@ -57,7 +57,7 @@ class GeminiModelProvider(
         thinkingLevel?.let { generation.put("thinkingConfig", JSONObject().put("thinkingLevel", it)) }
         if (request.stopSequences.isNotEmpty()) generation.put("stopSequences", JSONArray(request.stopSequences))
         val user = textContent(request.prompt).put("role", "user")
-        request.imageJpeg?.let { image ->
+        request.imagePayload()?.let { image ->
             // The server sends Gemini the instruction followed by inline images.
             val parts = JSONArray()
                 .put(JSONObject().put("text", request.prompt))
@@ -65,8 +65,8 @@ class GeminiModelProvider(
                     JSONObject().put(
                         "inlineData",
                         JSONObject()
-                            .put("mimeType", "image/jpeg")
-                            .put("data", Base64.getEncoder().encodeToString(image)),
+                            .put("mimeType", image.mimeType)
+                            .put("data", Base64.getEncoder().encodeToString(image.bytes)),
                     ),
                 )
             user.put("parts", parts)

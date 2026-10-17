@@ -62,7 +62,7 @@ internal fun modelReadinessIssue(
             ModelReadinessIssue.LocalModelNotReady
         }
     }
-    val provider = RoutingModelProvider.resolveProviderForRouting(providers, modelId)
+    val provider = RoutingModelProvider.resolveProviderForRouting(providers, modelId, null)
         ?.takeIf { it.isEnabled && !it.isDefaultLocal }
         ?: return ModelReadinessIssue.ProviderMissingOrDisabled
     if (provider.baseUrl.isNullOrBlank()) return ModelReadinessIssue.BaseUrlMissing

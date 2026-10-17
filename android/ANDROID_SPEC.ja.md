@@ -5,6 +5,14 @@
 
 最終更新: 2026-10-17。
 
+## 2026-10-17 構図読み・provider解決・Vision助言画像のServer追随
+
+`composition.read`はServerと同じく常にtrueとする。端末内VisionモデルにもStage 1の後で`read_composition`を要求し、実行するモデル・再試行・応答の判定・既定の読みによるfallbackは既存の共有pipelineを使う。
+
+providerは、明示した`provider:model`、そのモデルを公開する有効なproviderが1つ、利用者の段の既定provider、の順で選ぶ。Stage 2は`complete_visible_ddl_holes`、それ以外はStage 1の既定を使う。モデル選択の確定時に`model_selection`へ`stage1_provider`・`stage2_provider`も保存する。旧設定は各段の修飾付きモデルからproviderを読めるためRoom移行は不要。初回の既定は従来の端末内モデルを引き継ぎ、解決できない設定や無効な既定から端末内へ勝手に切り替えない。ChatGPTプランも同じ解決順で選び、開始時に固定したsession参照を使う。
+
+自律推敲のVision助言は保存SVGを縦横比を保って768×768に収まるよう画像化し、透明な正方形の中央へ置いてPNGで送る。本文のMIMEは`image/png`、IHDRは768×768である。カメラ画像のJPEG前処理と端末内モデルへの写真経路は変えない。
+
 ## 2026-10-17 作品識別・正準JSON・指示言語の共有core化
 
 `dh1`、`rh3`、正準JSON、指示言語の正規化と判定は`NativePipelineBridge`（JNI）から共有coreの関数を呼ぶ。`PythonJson.kt`とKotlin側のハッシュ・言語判定規則を削除し、系譜の正準JSONもcoreへ委譲する。KotlinはJSON転送時の小数・整数の型と保存フィールドの対応だけを保つ。保存済みハッシュの書換えやRoom移行は行わない。
@@ -25,7 +33,7 @@ JVM試験はhost用のJNIライブラリを作り、`server/tests/data/identity-
 
 Anthropicの対象Claudeモデルは、通常描画とVisionを含むrequestで回答枠へ思考用の8,192 tokenを加える。pipelineの応答が `max_tokens` で終わった場合は、tool inputやJSONが完成して見えても成功として採用せず、出力上限の診断を残す。
 
-保存作品の「AIに自律推敲させる」は、ランダムまたはVision、1〜10世代、色カタログ・配置の許可要素、Wildの継承・上書きを実行前に選ぶ。開くだけでは描かない。各世代は直前の保存作品のDDLから進め、途中の世代は系譜専用、最後の世代は通常の作品一覧にも見える子として保存する。ランダム方式は許可要素から選び、Vision方式は現在の作品画像をJPEGにして選択したVisionモデルへ送り、観察・次の方向・許可要素からの提案を受ける。空の助言は失敗とし、許可外の要素は許可先頭へ戻す。進行、観察、次の方向、停止と失敗をダイアログに示す。Vision助言だけの画像付きrequestでは既存の接続とChatGPTプランのsession pinを使い、通常のpipeline画像要求やカメラのモデル選択へ経路を広げない。
+保存作品の「AIに自律推敲させる」は、ランダムまたはVision、1〜10世代、色カタログ・配置の許可要素、Wildの継承・上書きを実行前に選ぶ。開くだけでは描かない。各世代は直前の保存作品のDDLから進め、途中の世代は系譜専用、最後の世代は通常の作品一覧にも見える子として保存する。ランダム方式は許可要素から選び、Vision方式は現在の作品画像を768×768のPNGにして選択したVisionモデルへ送り、観察・次の方向・許可要素からの提案を受ける。空の助言は失敗とし、許可外の要素は許可先頭へ戻す。進行、観察、次の方向、停止と失敗をダイアログに示す。Vision助言だけの画像付きrequestでは既存の接続とChatGPTプランのsession pinを使い、通常のpipeline画像要求やカメラのモデル選択へ経路を広げない。
 
 ## 2026-10-14 てざわりを変える
 

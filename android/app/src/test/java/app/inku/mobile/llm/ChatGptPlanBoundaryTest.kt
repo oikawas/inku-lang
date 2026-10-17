@@ -228,7 +228,7 @@ class ChatGptPlanBoundaryTest {
             }
             val visionRequest = RefinementVisionRequest(
                 modelId = "chatgpt:personal-model", instruction = "a circle", direction = "leave space",
-                enabledKinds = listOf("layout_change"), languageCode = "en", imageJpeg = byteArrayOf(1, 2, 3),
+                enabledKinds = listOf("layout_change"), languageCode = "en", imagePng = refinementPngHeader(),
             )
             val advice = RefinementVisionAdviser(manager, ref).advise(visionRequest)
             assertEquals("A circle sits low.", advice.observation)
@@ -242,7 +242,10 @@ class ChatGptPlanBoundaryTest {
             val content = sent.getJSONArray("input").getJSONObject(0).getJSONArray("content")
             assertEquals("input_text", content.getJSONObject(0).getString("type"))
             assertEquals("input_image", content.getJSONObject(1).getString("type"))
-            assertEquals("data:image/jpeg;base64,AQID", content.getJSONObject(1).getString("image_url"))
+            assertEquals("data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(refinementPngHeader()),
+                content.getJSONObject(1).getString("image_url"))
+            RefinementVisionImage.requirePng768(java.util.Base64.getDecoder().decode(
+                content.getJSONObject(1).getString("image_url").substringAfter("base64,")))
             val calls = http.calls.size
             rejected("chatgpt_operation_not_supported") {
                 chatGptRequestBody(request(ref).copy(imageJpeg = byteArrayOf(1, 2, 3)))

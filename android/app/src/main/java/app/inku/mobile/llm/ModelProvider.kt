@@ -27,13 +27,29 @@ data class ModelRequest(
      * instead of the generic [temperature].
      */
     val pipelineAction: String? = null,
-    /** One normalized JPEG sent with [prompt]; only camera analysis sets it. */
+    /** One normalized JPEG sent with [prompt] for camera/local Vision. */
     val imageJpeg: ByteArray? = null,
     /** Non-secret registration pinned when this shared-pipeline run began. */
     val chatGptSession: ChatGptSessionRef? = null,
     /** The demo's free-text instruction, whose Claude budget follows Server's demo route. */
     val demoInstruction: Boolean = false,
+    /** A square PNG for autonomous refinement Vision only. */
+    val imagePng: ByteArray? = null,
 )
+
+internal data class ModelImage(val bytes: ByteArray, val mimeType: String)
+
+/** Select one image with its actual wire type; camera JPEG remains unchanged. */
+internal fun ModelRequest.imagePayload(): ModelImage? {
+    require(imageJpeg == null || imagePng == null) { "Only one model image is allowed" }
+    if (pipelineAction == REFINEMENT_VISION_ACTION) {
+        val png = requireNotNull(imagePng) { "Refinement advice needs a PNG." }
+        RefinementVisionImage.requirePng768(png)
+        return ModelImage(png, "image/png")
+    }
+    require(imagePng == null) { "PNG images are reserved for refinement advice" }
+    return imageJpeg?.let { ModelImage(it, "image/jpeg") }
+}
 
 class ModelProviderHttpException(
     val statusCode: Int,

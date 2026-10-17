@@ -1,4 +1,4 @@
-import { CanvasTexture, EquirectangularReflectionMapping, SRGBColorSpace } from 'three';
+import { CanvasTexture, SRGBColorSpace } from 'three';
 
 export type Background = 'none' | 'support' | 'sky' | 'stars';
 
@@ -23,6 +23,6 @@ export function skyTexture(mode: 'sky' | 'stars'): CanvasTexture {
       ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill();
     }
   }
-  const texture = new CanvasTexture(canvas); texture.mapping = EquirectangularReflectionMapping; texture.colorSpace = SRGBColorSpace;
+  const texture = new CanvasTexture(canvas); texture.colorSpace = SRGBColorSpace;
   return texture;
 }

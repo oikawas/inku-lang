@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-18 — Move the work search into the history strip
-
-The search field beside the Lineage tab in the canvas header now sits right of the filter buttons in the history strip. When the search or a mark filter matches no work, the strip stays and shows an empty "No matches" thumbnail tile; it used to disappear, taking the filter buttons with it. The tile replaces the "No matching works." note under the field.
-
 ### 2026-10-17 — Move Swift's ChatGPT plan next-action table to the shared core
 
 Swift now takes the next action shown for a ChatGPT plan failure, and whether to retry automatically, from the shared core's table (`chatgpt_failure`), the same table Server and Android use. Seven codes Swift raises change their next action (for example `chatgpt_cancelled` goes from "diagnose" to "retry"). No code changes whether the pipeline retries automatically.
@@ -89,6 +85,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.185 (2026-10-18 / Build 1261)
+
+### 2026-10-18 — Move the work search into the history strip
+
+The search field beside the Lineage tab in the canvas header now sits right of the filter buttons in the history strip. When the search or a mark filter matches no work, the strip stays and shows an empty "No matches" thumbnail tile; it used to disappear, taking the filter buttons with it. The tile replaces the "No matching works." note under the field.
 
 ## v2.15.184 (2026-10-17 / Build 1260)
 

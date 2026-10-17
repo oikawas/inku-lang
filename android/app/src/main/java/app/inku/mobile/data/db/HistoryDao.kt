@@ -9,16 +9,19 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface HistoryDao {
-    @Query("SELECT * FROM history_items WHERE trashed = 0 ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
+    @Query("SELECT * FROM history_items WHERE trashed = 0 AND NOT EXISTS (SELECT 1 FROM lineage_nodes WHERE lineage_nodes.id = history_items.lineage_node_id AND lineage_nodes.state = 'lineage_only') ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
     fun listActive(limit: Int, offset: Int): Flow<List<HistoryItemEntity>>
 
     @Query(
         "SELECT id, created_at, updated_at, original_input, normalized_ddl, ddl_source_origin, stage1_model, stage2_model, " +
             "render_hash, render_hash_short, color_catalog_id, canvas_aspect, starred, trashed, " +
             "thumbnail_path, thumbnail_width, thumbnail_height " +
-            "FROM history_items WHERE trashed = 0 ORDER BY created_at DESC LIMIT :limit OFFSET :offset",
+            "FROM history_items WHERE trashed = 0 AND NOT EXISTS (SELECT 1 FROM lineage_nodes WHERE lineage_nodes.id = history_items.lineage_node_id AND lineage_nodes.state = 'lineage_only') ORDER BY created_at DESC LIMIT :limit OFFSET :offset",
     )
     fun listActiveSummaries(limit: Int, offset: Int): Flow<List<HistoryListItem>>
+
+    @Query("SELECT id, original_input, source_text, render_hash, render_metadata_json FROM history_items WHERE trashed = 0 AND NOT EXISTS (SELECT 1 FROM lineage_nodes WHERE lineage_nodes.id = history_items.lineage_node_id AND lineage_nodes.state = 'lineage_only') ORDER BY created_at DESC, id ASC")
+    suspend fun canvasSearchEntries(): List<CanvasSearchEntry>
 
     @Query("SELECT * FROM history_items WHERE trashed = 1 ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
     fun listTrashed(limit: Int, offset: Int): Flow<List<HistoryItemEntity>>
@@ -31,7 +34,7 @@ interface HistoryDao {
     )
     fun listTrashedSummaries(limit: Int, offset: Int): Flow<List<HistoryListItem>>
 
-    @Query("SELECT * FROM history_items WHERE starred = 1 AND trashed = 0 ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
+    @Query("SELECT * FROM history_items WHERE starred = 1 AND trashed = 0 AND NOT EXISTS (SELECT 1 FROM lineage_nodes WHERE lineage_nodes.id = history_items.lineage_node_id AND lineage_nodes.state = 'lineage_only') ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
     fun listStarred(limit: Int, offset: Int): Flow<List<HistoryItemEntity>>
 
     @Query("SELECT * FROM history_items WHERE id = :id LIMIT 1")

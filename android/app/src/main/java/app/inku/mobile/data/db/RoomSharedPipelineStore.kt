@@ -40,6 +40,12 @@ data class ManagedToolChangeInput(
     val verifiedSource: String,
 )
 
+/** A support change keeps the parent's rendering policy while authorizing edited DDL. */
+data class ManagedGroundVariantInput(
+    val replay: ManagedHistoryReplayInput,
+    val material: String,
+)
+
 data class ManagedHistoryRead(
     val history: HistoryItemEntity,
     val authority: String?,
@@ -360,6 +366,79 @@ class RoomSharedPipelineStore(
                 parentLegacyHistoryId = null, parentVariationId = parentLink.variationId, updatedAt = now(),
             ))
             val options = JSONObject(replay.hostOptionsJson)
+            val maps = JSONObject(context.objectField("color_maps").toString())
+                .put(options.stringField("catalog_id"), JSONObject(replay.resolvedColorMapJson))
+            val diagnostics = JSONObject(replay.pipelineDiagnosticsJson)
+            validateDiagnostics(diagnostics)
+            context.put("variation_id", variationId).put("revision", revision).put("ddl_digest", digest)
+                .put("authority", frozen).put("host_options", options).put("color_maps", maps)
+                .put("pipeline_diagnostics", diagnostics)
+            val bytes = LineagePlanner.canonicalJson(context).toByteArray(Charsets.UTF_8)
+            database.historyDao().insert(history)
+            database.lineageDao().insertNode(lineage.node)
+            dao.insertHistoryLink(PipelineHistoryLinkEntity(
+                ownerId = replay.ownerId, historyId = history.id, variationId = variationId, revision = revision,
+                ddlDigest = digest, forkContextBytes = bytes, forkContextDigest = sha256(bytes),
+            ))
+            database.lineageDao().insertEdge(edge)
+        }
+    }
+
+    suspend fun saveManagedGroundVariantHistory(
+        history: HistoryItemEntity,
+        lineage: LineageWrite,
+        input: ManagedGroundVariantInput,
+    ) {
+        database.withTransaction {
+            val replay = input.replay
+            val parent = database.historyDao().getById(replay.sourceHistoryId)?.takeUnless { it.trashed }
+                ?: throw SharedPipelinePersistenceException("ground parent was not found")
+            val parentLink = dao.getHistoryLink(replay.ownerId, parent.id)
+                ?: throw SharedPipelinePersistenceException("ground parent is not managed")
+            val context = decodeForkContextObject(parent, parentLink)
+            val expectedScore = app.inku.mobile.data.refinement.GroundVariants.scoreWithGround(parent.scoreJson, input.material)
+            require(LineagePlanner.canonicalJson(JSONObject(history.scoreJson)) ==
+                LineagePlanner.canonicalJson(JSONObject(expectedScore))) { "ground Score changed beyond its material" }
+            val expectedDdl = app.inku.mobile.data.refinement.GroundVariants.ddlWithGround(
+                parent.normalizedDdl.orEmpty(), input.material, parent.instructionLangResolved,
+            )
+            require(history.normalizedDdl == expectedDdl) { "ground DDL changed beyond its material" }
+            val edge = requireNotNull(lineage.edge)
+            require(edge.parentNodeId == parent.lineageNodeId && edge.derivationKind == "ground_change")
+            require(edge.metadataJson == LineagePlanner.canonicalJson(mapOf(
+                "ground_material" to input.material,
+                "parent_ground_material" to app.inku.mobile.data.refinement.GroundVariants.currentMaterial(parent.scoreJson),
+            ))) { "ground derivation does not match its material" }
+            val parentColors = JSONObject(parent.renderMetadataJson).optJSONObject("render_color_map")
+                ?: context.objectField("color_maps").optJSONObject(parent.colorCatalogId)
+            require(parentColors != null && LineagePlanner.canonicalJson(parentColors) ==
+                LineagePlanner.canonicalJson(JSONObject(replay.resolvedColorMapJson))) { "ground colors changed" }
+            val variationId = java.util.UUID.randomUUID().toString()
+            val revision = "1"
+            val digest = expectedDdl.sha256()
+            val frozen = JSONObject().put("protocol_version", AUTHORITY_PROTOCOL).put("revision", revision)
+                .put("origin", "user_authored_ddl").put("authority", "ddl_authoritative")
+            val parentAuthority = dao.getAuthority(replay.ownerId, parentLink.variationId)
+                ?: throw SharedPipelinePersistenceException("ground parent's authority was not found")
+            val document = JSONObject(parentAuthority.documentJson).put("source", expectedDdl)
+                .put("language", context.objectField("config").stringField("language"))
+                .put("macro_locks", context.objectField("macro_catalog").getJSONArray("definition_locks"))
+            dao.insertAuthority(VariationAuthorityEntity(
+                ownerId = replay.ownerId, variationId = variationId, protocolVersion = AUTHORITY_PROTOCOL,
+                revision = revision, origin = "user_authored_ddl", authority = "ddl_authoritative",
+                source = expectedDdl, documentJson = document.toString(), ddlDigest = digest,
+                authorityDigest = LineagePlanner.canonicalJson(frozen).sha256(),
+                description = history.sourceText ?: history.originalInput, derivationKind = "variation_ddl_fork",
+                parentLegacyHistoryId = null, parentVariationId = parentLink.variationId, updatedAt = now(),
+            ))
+            val options = JSONObject(replay.hostOptionsJson)
+            require(options.stringField("catalog_id") == parent.colorCatalogId) { "ground catalog changed" }
+            require(options.optString("canvas_aspect") == parent.canvasAspect &&
+                options.optString("render_seed") == parent.renderSeed &&
+                (if (parent.compositionSeed == null) options.isNull("composition_seed")
+                else options.optString("composition_seed") == parent.compositionSeed)) {
+                "ground canvas or seeds changed"
+            }
             val maps = JSONObject(context.objectField("color_maps").toString())
                 .put(options.stringField("catalog_id"), JSONObject(replay.resolvedColorMapJson))
             val diagnostics = JSONObject(replay.pipelineDiagnosticsJson)

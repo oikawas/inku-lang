@@ -913,6 +913,92 @@ class SharedPipelineHostTest {
     }
 
     @Test
+    fun savedPromptRecordIsFrozenBeforeLaterStageTwoSend() = runBlocking {
+        val binding = ScriptedBinding().apply { holeDelivers = true }
+        val executions = MemoryExecutionStore()
+        val safeResults = mutableListOf<PaintResult>()
+        val sent = mutableListOf<ModelRequest>()
+        val pipeline = AndroidWorkPipeline(
+            binding = binding,
+            modelProvider = object : ModelProvider {
+                override val providerId = "fixture"
+                override suspend fun generate(request: ModelRequest): ModelResponse {
+                    sent += request
+                    return ModelResponse("{}", request.modelId)
+                }
+            },
+            commitStore = RecordingCommitStore(), executionStore = executions, readHistory = { null },
+            legacyRenderer = object : SvgRenderer {
+                override fun render(request: RenderRequest): RenderResult = error("shared pipeline must render")
+            },
+            bundledPluginsEnabled = { false },
+            saveSafePerformance = { safeResults += it },
+        )
+        val pending = runCatching {
+            pipeline.paint(PaintRequest(
+                description = "mist", originalText = "mist", stage1Model = "fixture:model", stage2Model = "fixture:model",
+                colorCatalogId = "default", canvasAspect = "square", autoRepair = true,
+                renderSeed = 7, instructionLang = "en",
+            ))
+        }.exceptionOrNull() as PipelineInteractionRequired
+
+        assertEquals("awaiting_patch_approval", pending.view.phaseTag)
+        assertEquals(listOf("generate_normalized_ddl", "read_composition", "complete_visible_ddl_holes"),
+            sent.map { it.pipelineAction })
+        assertTrue(safeResults.isNotEmpty())
+        // The first save is the immutable history row. A later safe-save retry
+        // may offer richer sidecar data, but the row's identity keeps these bytes.
+        val savedMetadata = JSONObject(safeResults.first().renderMetadataJson)
+        val savedPrompts = savedMetadata.getJSONObject("sent_system_prompts")
+        assertEquals("system", savedPrompts.getJSONObject("stage1").getString("system"))
+        assertEquals("prompt-provider-1", savedPrompts.getJSONObject("stage1").getString("prompt_id"))
+        assertEquals("prompt-provider-composition", savedPrompts.getJSONObject("composition").getString("prompt_id"))
+        assertEquals("message", savedPrompts.getJSONObject("composition").getString("message"))
+        assertFalse("Stage 2 had not been sent when the first work was saved", savedPrompts.has("stage2"))
+
+        val persisted = JSONObject(executions.load(AndroidWorkPipeline.OWNER_ID, pending.view.executionId)!!.toString(Charsets.UTF_8))
+            .getJSONObject("host_context").getJSONObject("system_prompts")
+        assertEquals("prompt-provider-2", persisted.getJSONObject("stage2").getString("prompt_id"))
+        assertFalse("the saved history metadata must not become the latest sidecar", savedMetadata.getJSONObject("sent_system_prompts").has("stage2"))
+        val completed = pipeline.approvePatch(pending.view.executionId, pending.view.revision, pending.view.patchProposal!!.proposalDigest)
+        assertEquals("prompt-provider-2", JSONObject(completed.renderMetadataJson)
+            .getJSONObject("sent_system_prompts").getJSONObject("stage2").getString("prompt_id"))
+        assertFalse(savedMetadata.getJSONObject("sent_system_prompts").has("stage2"))
+    }
+
+    @Test
+    fun resentStageOnePromptReplacesItsFirstAttemptInPersistedSidecar() = runBlocking {
+        val binding = ScriptedBinding().apply { retryStage1Once = true }
+        val executions = MemoryExecutionStore()
+        val sentSystems = mutableListOf<String>()
+        var stage1Calls = 0
+        val provider = PipelineProviderEffect { actionJson, models ->
+            val action = JSONObject(actionJson)
+            if (action.getString("tag") == "generate_normalized_ddl") {
+                sentSystems += action.getJSONObject("payload").getJSONObject("prompt").getString("system")
+                if (++stage1Calls == 1) {
+                    JSONObject().put("tag", "provider_failed").put("identity", action.getJSONObject("identity"))
+                        .put("failure", "provider_rejected").put("elapsed_ms", "1").toString()
+                } else {
+                    effectResult(action, "normalized_ddl_generated", "{}")
+                }
+            } else {
+                RecordingEffectProvider().perform(actionJson, models)
+            }
+        }
+        val host = host(binding, provider, RecordingCommitStore(), executions)
+        val pending = host.start(startRequest(PipelineAuthoring.Description("mist", false)))
+
+        assertEquals("awaiting_patch_approval", pending.phaseTag)
+        assertEquals(listOf("system", "system retry"), sentSystems)
+        val record = JSONObject(executions.load(OWNER, pending.executionId)!!.toString(Charsets.UTF_8))
+            .getJSONObject("host_context").getJSONObject("system_prompts").getJSONObject("stage1")
+        assertEquals("system retry", record.getString("system"))
+        assertEquals("digest-retry", record.getString("prompt_digest"))
+        assertEquals(2, record.getInt("attempt"))
+    }
+
+    @Test
     fun sketchResultsWithoutTextPreserveTheCoreOutcome() {
         assertEquals("off", PipelineSketchResult.from(null).state)
         assertEquals("off", PipelineSketchResult.from(JSONObject().put("state", "off")).state)
@@ -1224,6 +1310,7 @@ class SharedPipelineHostTest {
         }
         /** A known-hole run whose Score is delivered while it waits, as the core delivers one. */
         var holeDelivers = false
+        var retryStage1Once = false
         var holeCompletionCheck: JSONObject? = null
         var completionRecord: JSONObject? = null
         val completionStatesRequests = mutableListOf<JSONObject>()
@@ -1277,6 +1364,8 @@ class SharedPipelineHostTest {
                 payload.optString("tag") == "generate_from_description" -> State.Stage1
                 payload.optString("tag") == "start" -> State.Stage1
                 resultTag == "sketch_generated" -> State.Stage1
+                resultTag == "provider_failed" && retryStage1Once && previousActionId == "provider-1" &&
+                    previous?.optJSONObject("action")?.optJSONObject("identity")?.optInt("attempt") == 1 -> State.Stage1
                 resultTag == "normalized_ddl_generated" -> if (config.optJSONObject("composition")?.optBoolean("read") == true) State.Composition else State.FirstCommit
                 resultTag == "composition_read" -> State.FirstCommit
                 resultTag == "visible_ddl_hole_patch_generated" -> State.AwaitingPatch
@@ -1293,7 +1382,9 @@ class SharedPipelineHostTest {
             val origin = if (direct || previous?.optString("origin_fixture") == "direct") "direct" else "description"
             val directSource = if (direct) payload.getJSONObject("authoring").getString("source") else
                 previous?.optJSONObject("document")?.optString("source") ?: "place one circle."
-            val snapshot = snapshot(state, input.getString("sequence"), variationId, executionId, config, origin, directSource, holeDelivers)
+            val retryStage1 = resultTag == "provider_failed" && retryStage1Once && previousActionId == "provider-1"
+            val snapshot = snapshot(state, input.getString("sequence"), variationId, executionId, config, origin, directSource,
+                holeDelivers, retryStage1)
             val sketch = when {
                 sketchRequest?.optString("mode") == "supplied" -> JSONObject()
                     .put("state", "supplied").put("text", sketchRequest.getString("text"))
@@ -1345,6 +1436,7 @@ class SharedPipelineHostTest {
             originFixture: String,
             directSource: String,
             holeDelivers: Boolean = false,
+            retryStage1: Boolean = false,
         ): JSONObject {
             val direct = originFixture == "direct"
             val revision = when (state) {
@@ -1360,7 +1452,13 @@ class SharedPipelineHostTest {
             }
             val action = when (state) {
                 State.Sketch -> providerAction("generate_sketch", "provider-sketch")
-                State.Stage1 -> providerAction("generate_normalized_ddl", "provider-1")
+                State.Stage1 -> providerAction("generate_normalized_ddl", "provider-1").also { action ->
+                    if (retryStage1) {
+                        action.getJSONObject("identity").put("attempt", 2).put("request_digest", "digest-retry")
+                        action.getJSONObject("payload").getJSONObject("prompt")
+                            .put("system", "system retry").put("prompt_digest", "digest-retry")
+                    }
+                }
                 State.Composition -> providerAction("read_composition", "provider-composition")
                 State.FirstCommit -> commitAction("commit-1", document!!, revision)
                 State.Hole -> providerAction("complete_visible_ddl_holes", "provider-2")
@@ -1467,6 +1565,9 @@ class SharedPipelineHostTest {
                         .put("action_name", tag)
                         .put("system", "system")
                         .put("message", "message")
+                        .put("prompt_id", "prompt-$id")
+                        .put("prompt_digest", "digest-$id")
+                        .put("instruction_language", "en")
                         .put("response_schema", JSONObject().put("type", "object").put("properties", JSONObject())),
                 ),
             )

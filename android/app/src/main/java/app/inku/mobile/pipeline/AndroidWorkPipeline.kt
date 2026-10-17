@@ -5,11 +5,13 @@ import app.inku.mobile.data.DdlSource
 import app.inku.mobile.data.db.ManagedHistoryLinkInput
 import app.inku.mobile.data.db.ManagedHistoryRead
 import app.inku.mobile.data.db.ManagedHistoryReplayInput
+import app.inku.mobile.data.db.ManagedGroundVariantInput
 import app.inku.mobile.data.lineage.LineagePlanner
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.cameraInputProvenance
 import app.inku.mobile.data.refinement.SeedFactory
+import app.inku.mobile.data.refinement.GroundVariants
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.render.AndroidRenderHost
 import app.inku.mobile.render.SvgRenderer
@@ -288,6 +290,28 @@ class AndroidWorkPipeline(
         return renderScoreWithSource(scoreJson, request, replaySource)
     }
 
+    /** Change only the support of the saved Score, keeping its colors and render options. */
+    suspend fun renderGroundVariant(
+        parentScoreJson: String,
+        material: String,
+        request: PaintRequest,
+    ): PaintResult {
+        val parent = replaySource(request.parentHistoryId, parentScoreJson)
+        val source = parent?.history ?: throw PipelineHostException("ground_parent_not_found")
+        require(GroundVariants.plan(source.scoreJson).entries.any { it.material == material }) {
+            "ground must differ from the saved work"
+        }
+        val changedScore = GroundVariants.scoreWithGround(source.scoreJson, material)
+        val changedDdl = GroundVariants.ddlWithGround(source.normalizedDdl.orEmpty(), material,
+            source.instructionLangResolved)
+        val result = renderScoreWithSource(changedScore, request, parent)
+        return result.copy(
+            normalizedDdl = changedDdl,
+            managedHistoryReplay = null,
+            managedGroundVariant = result.managedHistoryReplay?.let { ManagedGroundVariantInput(it, material) },
+        )
+    }
+
     /** A touch change reads the parent's policy, not the editor or today's model choices. */
     suspend fun toolChangeSource(
         ddl: String,
@@ -555,6 +579,7 @@ class AndroidWorkPipeline(
         val hostOptions = hostContext.requiredObject("host_options")
         val colorMaps = hostContext.requiredObject("color_maps")
         val snapshot = JSONObject(execution.snapshotJson)
+        require(snapshot.optString("sequence") == view.sequence) { "pipeline view changed before its prompt record was saved" }
         val document = snapshot.requiredObject("document")
         val delivery = snapshot.requiredObject("delivery")
         val compiler = delivery.requiredObject("compiler_options")
@@ -582,6 +607,13 @@ class AndroidWorkPipeline(
             .put("pipeline_execution_id", view.executionId)
             .put("pipeline_variation_id", view.variationId)
             .put("pipeline_revision", view.revision)
+            // Freeze the sent record at this work's save boundary. This execution
+            // can continue after a safe performance without changing its DDL revision.
+            .put("sent_system_prompts", hostContext.optJSONObject("system_prompts") ?: JSONObject.NULL)
+            .put("sent_system_prompt_stages", hostContext.optJSONArray("system_prompt_stages") ?: JSONObject.NULL)
+            .put("sent_prompt_execution_id", view.executionId)
+            .put("sent_prompt_variation_id", view.variationId)
+            .put("sent_prompt_revision", view.revision)
             .put("stage1_model", execution.models.stage1ModelId)
             .put("stage2_model", execution.models.stage2ModelId)
             .put("parent_history_id", resultOptions.optionalString("parent_history_id"))

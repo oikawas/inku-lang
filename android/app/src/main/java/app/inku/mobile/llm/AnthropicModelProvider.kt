@@ -1,5 +1,6 @@
 package app.inku.mobile.llm
 
+import android.util.Log
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Base64
@@ -30,6 +31,7 @@ class AnthropicModelProvider(
         val started = System.currentTimeMillis()
         ProviderUrlValidator.validateRemoteBaseUrl(baseUrl)
         val url = URL("${baseUrl.trimEnd('/')}/v1/messages")
+        val body = payload(request)
         val connection = openConnection(url)
         val response = try {
             configureRemoteConnection(connection, "POST", apiKey = null, timeoutMs = request.timeoutMs)
@@ -37,10 +39,15 @@ class AnthropicModelProvider(
             connection.setRequestProperty("anthropic-version", ANTHROPIC_VERSION)
             connection.setRequestProperty("Content-Type", "application/json")
             connection.doOutput = true
-            connection.outputStream.writer(Charsets.UTF_8).use { it.write(OrderedSchemaJson.encode(payload(request))) }
+            connection.outputStream.writer(Charsets.UTF_8).use { it.write(OrderedSchemaJson.encode(body)) }
             JSONObject(readProviderBody(connection))
         } finally {
             connection.disconnect()
+        }
+        val outputTruncated = response.optString("stop_reason") == "max_tokens"
+        if (request.pipelineAction != null && outputTruncated) {
+            Log.w("InkuProvider", outputLimitLine(providerId, request, body, response))
+            throw ProviderOutputLimitException()
         }
         val blocks = response.optJSONArray("content")
             ?: throw MalformedProviderResponseException("Claude response did not contain content.")
@@ -50,7 +57,7 @@ class AnthropicModelProvider(
             modelId = request.modelId,
             promptTokens = usage?.optInt("input_tokens")?.takeIf { it > 0 },
             completionTokens = usage?.optInt("output_tokens")?.takeIf { it > 0 },
-            outputTruncated = response.optString("stop_reason") == "max_tokens",
+            outputTruncated = outputTruncated,
             elapsedMs = System.currentTimeMillis() - started,
         )
     }
@@ -59,8 +66,9 @@ class AnthropicModelProvider(
         val model = request.modelId.removePrefix("$providerId:")
         val payload = JSONObject()
             .put("model", model)
+            // Server uses this budget for normal pipeline, Vision and demo requests.
             .put("max_tokens", request.maxTokens.toLong() +
-                if (request.demoInstruction && DEMO_THINKS_BY_DEFAULT.containsMatchIn(model)) THINKING_ROOM_TOKENS else 0)
+                if (THINKS_BY_DEFAULT.containsMatchIn(model)) THINKING_ROOM_TOKENS else 0)
             .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", userContent(request))))
         // Both server transports (pipeline_provider.py and vision_client.py)
         // omit temperature for this kind. Sonnet 5.5 refuses it on photo
@@ -88,8 +96,27 @@ class AnthropicModelProvider(
 
     internal companion object {
         const val ANTHROPIC_VERSION = "2023-06-01"
-        private val DEMO_THINKS_BY_DEFAULT =
+        private val THINKS_BY_DEFAULT =
             Regex("^claude-(?:(?:opus|sonnet|haiku|fable|mythos)-5(?:-|$)|mythos-preview(?:-|$))")
+
+        /** Bounded output-limit diagnostics; neither prompts nor answer contents are logged. */
+        internal fun outputLimitLine(providerId: String, request: ModelRequest, body: JSONObject, response: JSONObject): String {
+            val content = response.optJSONArray("content")
+            val blocks = (0 until (content?.length() ?: 0)).mapNotNull { content?.optJSONObject(it) }
+            val fields = JSONObject()
+                .put("action", request.pipelineAction)
+                .put("provider", providerId)
+                .put("model", body.optString("model"))
+                .put("max_tokens", body.opt("max_tokens") ?: JSONObject.NULL)
+                .put("stop_reason", "max_tokens")
+                .put("output_tokens", response.optJSONObject("usage")?.opt("output_tokens") ?: JSONObject.NULL)
+                .put("thinking_blocks", blocks.count {
+                    it.optString("type") == "thinking" || it.optString("type") == "redacted_thinking"
+                })
+                .put("has_text", blocks.any { it.optString("type") == "text" && it.optString("text").isNotEmpty() })
+                .put("has_tool_use", blocks.any { it.optString("type") == "tool_use" })
+            return "provider_output_limit $fields"
+        }
 
         /** Plain text, or one base64 JPEG ahead of the instruction, as the server sends Anthropic. */
         internal fun userContent(request: ModelRequest): Any {

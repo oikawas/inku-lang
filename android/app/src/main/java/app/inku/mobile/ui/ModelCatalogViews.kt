@@ -26,6 +26,44 @@ import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.theme.Dimens
 import java.util.Locale
 
+/** Matches the Web picker: purpose first, then the legacy score for old catalog rows. */
+internal fun modelRecommendationStars(model: CatalogModel, purpose: String? = null, stage: String? = null): String {
+    val record = model.record
+    fun score(key: String): Double? = if (record.has(key) && !record.isNull(key))
+        record.optDouble(key).takeIf(Double::isFinite) else null
+    val llm = score("recommendation_llm") ?: score("recommendation_level") ?: 0.0
+    val vision = score("recommendation_vision") ?: score("recommendation_level") ?: 0.0
+    val stageScores = listOfNotNull(score("recommendation_stage1"), score("recommendation_stage2"))
+    val stagedLlm = when (stage) {
+        "stage1" -> score("recommendation_stage1") ?: llm
+        "stage2" -> score("recommendation_stage2") ?: llm
+        "both" -> stageScores.minOrNull() ?: llm
+        else -> llm
+    }
+    val purposes = record.optJSONArray("purposes")?.let { array ->
+        (0 until array.length()).map(array::optString)
+    } ?: listOf("llm")
+    val raw = when (purpose) {
+        "llm" -> stagedLlm
+        "vision" -> vision
+        else -> maxOf(if ("llm" in purposes) stagedLlm else 0.0, if ("vision" in purposes) vision else 0.0)
+    }.coerceIn(0.0, 5.0)
+    val tier = when {
+        raw >= 4.0 -> 3
+        raw >= 3.0 -> 2
+        raw >= 1.0 -> 1
+        else -> 0
+    }
+    return if (tier == 0) "—" else "★".repeat(tier) + "☆".repeat(3 - tier)
+}
+
+/** Place beside ModelLabelWithSupportMark in a model choice heading. */
+@Composable
+internal fun ModelRecommendationStars(model: CatalogModel, purpose: String, modifier: Modifier = Modifier) {
+    Text(modelRecommendationStars(model, purpose), modifier = modifier.testTag("ModelRecommendation:${model.id}"),
+        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+}
+
 /** Used by both the publication picker and the drawing model chooser. */
 @Composable
 internal fun ModelCatalogDetails(model: CatalogModel, strings: InkuStrings) {

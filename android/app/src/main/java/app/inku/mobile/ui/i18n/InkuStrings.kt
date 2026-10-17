@@ -102,6 +102,9 @@ interface InkuStrings {
     val toolChangeDiscard: String
     val toolChangeDiscardAndClose: String
     val toolChangeSaveOrDiscard: String
+    val colorArrangementEditAction: String
+    val modelFailed: String
+    val refinementNoneToGenerate: String
     val modelEditAction: String
     val editingWorkLabel: (String) -> String
     val nextDrawingConditions: String

@@ -38,6 +38,7 @@ data class HistoryListItem(
 ) {
     @Ignore
     val searchText: String = listOf(
+        id,
         originalInput,
         normalizedDdl.orEmpty(),
         renderHash,

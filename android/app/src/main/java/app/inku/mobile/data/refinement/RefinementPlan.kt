@@ -107,7 +107,7 @@ data class RefinementParent(
  * one thing this round varies. There is no second place where a seed is decided.
  */
 data class RefinementPlan(
-    /** `null` for a comparison candidate: it varies the model, which is not one of the two elements. */
+    /** Null for a model comparison or a saved-Score action outside the two ordinary elements. */
     val element: RefinementElement?,
     val route: RefinementRoute,
     val catalogId: String,
@@ -123,6 +123,12 @@ data class RefinementPlan(
     val stage2Model: String? = null,
     val recomposeMode: RecomposeMode? = null,
     val toolChange: ToolChangeOption? = null,
+    /** A saved-Score variant changes these bytes without recompiling its DDL. */
+    val scoreOverrideJson: String? = null,
+    val ddlOverride: String? = null,
+    val workColorSnapshotOverride: WorkColorSnapshot? = null,
+    /** Null keeps the saved parent's Wild setting. */
+    val renderWildOverride: Boolean? = null,
 )
 
 /**

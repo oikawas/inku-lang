@@ -7,6 +7,9 @@ package app.inku.mobile.ui.i18n
  * first and [InkuStringsEn] follows; the reverse never happens.
  */
 object InkuStringsJa : InkuStrings {
+    override val colorArrangementEditAction = "色の配置を変える"
+    override val modelFailed = "描画失敗"
+    override val refinementNoneToGenerate = "推敲の要素・指示書・Visionモデルを確認してください。"
     override val modelRecommendation = "推奨度"
     override val modelAverageSeconds = "平均秒数"
     override val modelEstimatedCost = "概算コスト"

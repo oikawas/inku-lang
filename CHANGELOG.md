@@ -8,6 +8,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.162 (2026-10-17 / Build 1238)
+
+### 2026-10-17 — Bring the public tool, thinness and intensity descriptions up to date
+
+Corrected PROJECT_CONTEXT to list all 12 tools, including oil paint, and the four thinness values. The English SPEC now describes intensity on marks other than flat fills, introduced in render engine 72. Rendering behavior and the DDL and Score formats are unchanged.
+
 ## v2.15.161 (2026-10-16 / Build 1237)
 
 ### 2026-10-16 — Align Swift single-user features and settings with Server

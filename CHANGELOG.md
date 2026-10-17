@@ -16,10 +16,6 @@ At the author's decision, on-device Vision models skip composition reading again
 
 Touch, ground and color-arrangement options and replacements now call `inku.saved-variants.v1` through JNI, removing the Kotlin rule copies. An added ground sentence uses the saved instruction language or the shared core's resolution. Color indices, cursors and totals retain large integers; saved children use the core's `{color_arrangement_index, catalog_id}` metadata. Room also verifies touch and ground changes with the same core responses, without rewriting existing works in bulk.
 
-### 2026-10-17 — Fix 3D pigment, SVG texture and depth within a layer
-
-Untextured 3D materials no longer add white specular highlights. Squares and lines also receive the shared 2D painter's SVG filters as textures. Front and back faces retain the painted alpha; solid walls use the object's pigment beneath the filter's tonal texture. Individual objects in a layer recede slightly in paint order, while a closed arc pair and its fill move together. Changes stay in the independent viewer and default-off geometry feature; normal 2D rendering, saved works and the database are unchanged.
-
 ### 2026-10-17 — Remove Server's unused `llm_retry.py`
 
 Server's `llm_retry.py`, which nothing imported, and its tests were removed. Retries of provider responses belong to the shared core's `RetryPolicy`.
@@ -49,6 +45,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.181 (2026-10-17 / Build 1257)
+
+### 2026-10-17 — Fix 3D pigment, SVG texture and depth within a layer
+
+Untextured 3D materials no longer add white specular highlights. Squares and lines also receive the shared 2D painter's SVG filters as textures. Front and back faces retain the painted alpha; solid walls use the object's pigment beneath the filter's tonal texture. Individual objects in a layer recede slightly in paint order, while a closed arc pair and its fill move together. Changes stay in the independent viewer and default-off geometry feature; normal 2D rendering, saved works and the database are unchanged.
 
 ## v2.15.180 (2026-10-17 / Build 1256)
 

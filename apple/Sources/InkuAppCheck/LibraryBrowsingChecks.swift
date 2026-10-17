@@ -42,6 +42,20 @@ func runLibraryBrowsingChecks() async throws {
     let preview = LibraryPreviewModel()
     preview.show(inspected)
     await preview.loadAnnotation(using: { id in try await database.libraryAnnotation(id: id) })
+    // Clicking the thumbnail of the work already shown resets the note to loading; the read key must
+    // change so the view reads again, or the comment field stays disabled.
+    let shownOnce = preview.shows
+    guard preview.annotationState.annotation?.note == "Saved B note" else {
+        throw CheckFailure.message("The Library preview did not read B's saved note")
+    }
+    preview.show(inspected)
+    guard preview.annotationState == .loading, preview.shows != shownOnce else {
+        throw CheckFailure.message("Showing the shown work again left its note loading without a new read")
+    }
+    await preview.loadAnnotation(using: { id in try await database.libraryAnnotation(id: id) })
+    guard preview.annotationState.annotation?.note == "Saved B note" else {
+        throw CheckFailure.message("The repeated read of the shown work did not make its note available")
+    }
     let export = try await preview.exportWorks(app: app)
     preview.close()
     guard preview.work == nil, export.map(\.id) == [inspected.id],

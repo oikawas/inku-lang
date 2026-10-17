@@ -17,12 +17,16 @@ public final class LibraryPreviewModel {
     public private(set) var work: SavedWork?
     public private(set) var annotationState: LibraryAnnotationState = .unavailable
     public private(set) var errorText: String?
+    /// Changes on every `show`, even of the work already shown: `show` resets the note to loading, so the
+    /// view's read must start again (2026-10-17: clicking the shown thumbnail left the comment field disabled).
+    public private(set) var shows = 0
     @ObservationIgnored private var selectionToken = UUID()
     @ObservationIgnored private var readToken = UUID()
 
     public init() {}
 
     public func show(_ work: SavedWork) {
+        shows &+= 1
         selectionToken = UUID()
         readToken = UUID()
         self.work = work

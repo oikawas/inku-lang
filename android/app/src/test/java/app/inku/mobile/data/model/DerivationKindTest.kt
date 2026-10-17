@@ -20,13 +20,18 @@ class DerivationKindTest {
      * T-6. The list is the server's `LINEAGE_DERIVATION_KINDS`, read out of the
      * baked fixture rather than retyped, so a kind added on the server shows up
      * here as a failure instead of as silence.
+     *
+     * The registry also keeps `variation` readable: the server stopped accepting
+     * it on 2026-10-04, and the edges saved before still have to show a label.
+     * The fixture's `derivation_kinds` was rebaked from
+     * `persistence/history.py` on 2026-10-18; its cases were not.
      */
     @Test
-    fun derivationKindRegistry_matchesTheServersSeventeenKinds() {
+    fun derivationKindRegistry_isTheServersNineteenKindsAndTheRetiredVariation() {
         val kinds = serverKinds()
 
-        assertEquals(17, kinds.size)
-        assertEquals(kinds, DerivationKindRegistry.KINDS)
+        assertEquals(19, kinds.size)
+        assertEquals((kinds + "variation").sorted(), DerivationKindRegistry.KINDS)
     }
 
     @Test

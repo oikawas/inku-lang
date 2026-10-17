@@ -39,19 +39,31 @@ class RefinementColorContractTest {
         assertNull(refinementColorSnapshot(parent, plan))
     }
 
-    @Test
-    fun nonColorRefinementKeepsTheParentSnapshot() {
-        val parent = parent()
-        val plan = RefinementPlanner.plan(RefinementElement.Layout, parent)
+    // A replay of the saved Score in the parent's catalogue, the shape of the
+    // tool change (`InkuRepository.toolChangePlan`). The touch refinement that
+    // used to stand here was retired on 2026-10-14; a layout composes a new
+    // Score from the DDL, so it is not one of these.
+    private fun scoreOnlyPlan(parent: RefinementParent) = RefinementPlan(
+        element = null,
+        route = RefinementRoute.RenderFromScore,
+        catalogId = parent.catalogId,
+        canvasAspect = parent.canvasAspect,
+        seeds = parent.seeds,
+        derivationKind = "tool_change",
+        derivationMetadata = emptyMap(),
+    )
 
-        assertEquals(snapshot, refinementColorSnapshot(parent, plan))
+    @Test
+    fun scoreOnlyRefinementKeepsTheParentSnapshot() {
+        val parent = parent()
+
+        assertEquals(snapshot, refinementColorSnapshot(parent, scoreOnlyPlan(parent)))
     }
 
     @Test
     fun missingParentSnapshotStaysMissing() {
         val parent = parent(null)
-        val plan = RefinementPlanner.plan(RefinementElement.Layout, parent)
 
-        assertNull(refinementColorSnapshot(parent, plan))
+        assertNull(refinementColorSnapshot(parent, scoreOnlyPlan(parent)))
     }
 }

@@ -327,6 +327,8 @@ class SharedPipelineHostTest {
         val replayBinding = object : SharedPipelineBinding by binding {
             override fun renderSaved(inputBytes: ByteArray) =
                 """{"svg":"<svg/>","metadata":{}}""".encodeToByteArray()
+            override fun renderSavedSvgLimited(inputBytes: ByteArray, maxSvgBytes: Long) =
+                NativeSvgOutput(renderSaved(inputBytes), null)
         }
         val replayContext = JSONObject(savedContext.toString()).put("pipeline_diagnostics", JSONObject()
             .put("upstream_diagnostics", JSONArray()).put("downstream_diagnostics", JSONArray())

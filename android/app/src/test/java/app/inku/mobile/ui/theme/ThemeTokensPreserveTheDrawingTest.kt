@@ -46,6 +46,8 @@ class ThemeTokensPreserveTheDrawingTest {
         "CameraSavingOutlineWidth",
         "CameraSignalLine",
         "CameraPlotterStroke",
+        "LineageArrowWidth",
+        "RangeFrameStroke",
     )
 
     // --- T-3 ---------------------------------------------------------------

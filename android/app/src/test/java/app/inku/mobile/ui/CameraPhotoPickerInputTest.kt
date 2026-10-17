@@ -11,18 +11,17 @@ class CameraPhotoPickerInputTest {
         return candidates.firstOrNull(File::isFile) ?: candidates.first()
     }
 
+    // SPEC 2026-09-30: the only image input is a camera capture; neither the
+    // Photo Picker nor the dialog that chose between the two is shown.
     @Test
-    fun cameraEntryOffersOnePhotoOrOneExistingImageWithoutStoragePermission() {
+    fun cameraEntryTakesAPhotoWithoutASourceChooserOrStoragePermission() {
         val app = projectFile("app/src/main/java/app/inku/mobile/ui/InkuApp.kt").readText()
         val manifest = projectFile("app/src/main/AndroidManifest.xml").readText()
 
-        assertTrue(app.contains("CameraInputSourceDialog"))
         assertTrue(app.contains("ActivityResultContracts.TakePicture"))
-        assertTrue(app.contains("ActivityResultContracts.PickVisualMedia"))
-        assertTrue(app.contains("PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)"))
-        assertTrue(app.contains("S.cameraTakePhoto"))
-        assertTrue(app.contains("S.cameraChoosePhoto"))
-        assertTrue(app.contains("Modifier.fillMaxWidth().heightIn(min = Dimens.cameraControlMinHeight)"))
+        assertFalse(app.contains("CameraInputSourceDialog"))
+        assertFalse(app.contains("ActivityResultContracts.PickVisualMedia"))
+        assertFalse(app.contains("photoPickerRequests"))
         assertFalse(manifest.contains("READ_MEDIA_IMAGES"))
         assertFalse(manifest.contains("READ_EXTERNAL_STORAGE"))
         assertFalse(manifest.contains("WRITE_EXTERNAL_STORAGE"))
@@ -82,16 +81,17 @@ class CameraPhotoPickerInputTest {
         assertFalse(lockBoundary.contains("CameraCaptureState.PickingPhoto,"))
     }
 
+    // SPEC: the camera button goes to the camera without asking for an input
+    // source or confirming the overwrite of what is on the studio.
     @Test
-    fun cancellingBeforeChoosingASourceRestoresThePriorCameraState() {
+    fun cameraRequestGoesStraightToTheCapture() {
         val viewModel = projectFile("app/src/main/java/app/inku/mobile/ui/InkuViewModel.kt").readText()
         val request = viewModel.substring(
             viewModel.indexOf("fun requestCameraCapture()"),
-            viewModel.indexOf("fun chooseCameraInputSource"),
+            viewModel.indexOf("private fun canRequestCameraInput"),
         )
 
-        assertTrue(request.contains("cameraStateBeforeSourceChooser = captureState"))
-        assertTrue(request.contains("cameraCaptureState = cameraStateBeforeSourceChooser ?: CameraCaptureState.Idle"))
-        assertTrue(request.contains("cameraStateBeforeSourceChooser = null"))
+        assertTrue(request.contains("beginCameraInput(CameraInputSource.Camera, confirmOverwrite = false)"))
+        assertFalse(request.contains("CameraCaptureState.ChoosingSource"))
     }
 }

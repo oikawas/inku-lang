@@ -21,7 +21,10 @@ class ColorCatalogAutoWiringTest {
         val batch = viewModelSection("fun runBatch()", "private fun rememberBatchPrompt")
 
         assertTrue("the catalogue is read inside the per-line loop", batch.contains("lines.forEachIndexed"))
-        assertTrue("a batch line draws in the setting", batch.contains("val catalogId = current.selectedCatalogId"))
+        // The batch holds the conditions it started with, so a retry draws in
+        // the same setting even after the screen has changed it.
+        assertTrue("the batch holds the setting", batch.contains("BatchConditions(current.selectedCatalogId"))
+        assertTrue("a batch line draws in the setting", batch.contains("val catalogId = conditions.catalogId"))
         assertEquals("no batch line chooses a catalogue of its own", 0, selectorCalls(batch))
     }
 

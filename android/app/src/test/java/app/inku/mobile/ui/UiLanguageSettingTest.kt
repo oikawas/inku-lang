@@ -130,11 +130,12 @@ class UiLanguageSettingTest {
 
         val viewModel = source("main/java/app/inku/mobile/ui/InkuViewModel.kt")
         val uiLanguageCalls = Regex(
-            """uiLang = (?:(?:current|cycle)\.uiLanguage\.code|input\.uiLanguageCode)""",
+            """uiLang = (?:(?:current|cycle)\.uiLanguage\.code|input\.uiLanguageCode|conditions\.languageCode)""",
         ).findAll(viewModel).count()
         // Six: the single draw, the DDL draw, the batch, the demo, and the
         // camera's Stage 1 and compose. The camera's direct-DDL call went with
-        // that mode (2026-09-25).
+        // that mode (2026-09-25). The batch sends the language its held
+        // conditions took from the screen when it started.
         assertEquals(
             "every screen call that starts a drawing must send the ui language",
             6,

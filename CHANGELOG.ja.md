@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-18 — Androidのカメラから、届かなくなった写真選択・入力元の選択・上書き確認を削除
+
+2026-09-30の仕様で画像入力はカメラ撮影だけになり、Photo Pickerと入力元を選ぶダイアログは画面から外れていた。そのとき残った処理を消した。`InkuViewModel`の写真選択の結果の受け取り・起動の要求・起動失敗、入力元の選択と取消、撮影前の上書き確認とそのダイアログ、撮影状態の`ChoosingSource`・`PickingPhoto`・`AwaitingOverwriteConfirmation`、失敗の`PhotoPickerUnavailable`、選んだ画像の一時置き場`SelectedImageFileStore`、使われなくなった文言7個である。どれも画面から呼ばれていなかったので、操作は変わらない。カメラは今までどおり、押すとすぐ撮影へ進む。過去に写真選択で作った作品の由来（`photo_picker`、「既存の写真」の表示）は読めるまま残す。
+
 ### 2026-10-17 — SwiftのChatGPTプランの次の行動の表を共有coreへ移行
 
 SwiftのChatGPTプランの失敗で出す次の行動と、自動で再試行するかを、共有coreの表（`chatgpt_failure`）から引くようにした。ServerとAndroidと同じ表になる。Swiftが出す印のうち7個で次の行動が変わる（たとえば`chatgpt_cancelled`は「調べる」から「再試行」）。自動で再試行するかが変わる印は無い。

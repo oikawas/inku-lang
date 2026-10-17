@@ -72,12 +72,12 @@ class CameraDevelopmentPresentationTest {
         assertFalse(local.showRetry)
         assertTrue(local.showCancel)
 
-        val picker = cameraDevelopmentPresentation(
-            CameraCaptureState.Failed(CameraFailure.PhotoPickerUnavailable),
+        val decode = cameraDevelopmentPresentation(
+            CameraCaptureState.Failed(CameraFailure.DecodeFailed),
             isJapanese = false,
             animationsEnabled = false,
-        ) ?: error("Photo Picker failure presentation missing")
-        assertEquals("Image processing failed", picker.message)
-        assertFalse(picker.showRetry)
+        ) ?: error("decode failure presentation missing")
+        assertEquals("Image processing failed", decode.message)
+        assertFalse(decode.showRetry)
     }
 }

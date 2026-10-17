@@ -14,10 +14,7 @@ class CameraCaptureStateTest {
 
         val text = source.readText()
         listOf(
-            "ChoosingSource",
-            "AwaitingOverwriteConfirmation",
             "Capturing",
-            "PickingPhoto",
             "PreparingImage",
             "LoadingLocalModel",
             "AnalyzingLocally",

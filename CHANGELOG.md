@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-18 — Keep the history strip's height while searching
-
-Each keystroke in the search emptied the history thumbnails until the answer came, changing the canvas's proportions. While the answer is awaited the strip now shows a "Searching…" tile in place of "No matches", and the thumbnail row never becomes lower than it has been for the chosen fields.
-
 ### 2026-10-17 — Move Swift's ChatGPT plan next-action table to the shared core
 
 Swift now takes the next action shown for a ChatGPT plan failure, and whether to retry automatically, from the shared core's table (`chatgpt_failure`), the same table Server and Android use. Seven codes Swift raises change their next action (for example `chatgpt_cancelled` goes from "diagnose" to "retry"). No code changes whether the pipeline retries automatically.
@@ -89,6 +85,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.186 (2026-10-18 / Build 1262)
+
+### 2026-10-18 — Keep the history strip's height while searching
+
+Each keystroke in the search emptied the history thumbnails until the answer came, changing the canvas's proportions. While the answer is awaited the strip now shows a "Searching…" tile in place of "No matches", and the thumbnail row never becomes lower than it has been for the chosen fields.
 
 ## v2.15.185 (2026-10-18 / Build 1261)
 

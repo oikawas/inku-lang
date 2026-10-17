@@ -179,6 +179,19 @@ pub fn saved_variants(input_bytes: Vec<u8>) -> Vec<u8> {
     .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
 }
 
+/// A provider request's bytes and what its answer says: one JSON request with
+/// an `action` (`pipeline_request`, `pipeline_response`, `text_request`,
+/// `text_response`), one JSON answer (`inku.provider-wire.v1`). The host adds
+/// the key under the header the answer names, sends, and passes the status and
+/// body back. A panic answers `{"error": "internal_invariant"}`.
+#[uniffi::export]
+pub fn provider_wire(input_bytes: Vec<u8>) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::provider_wire::provider_wire_json(&input_bytes)
+    }))
+    .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
+}
+
 /// A description's identity `dh1`, as Server's `identity.description_hash`
 /// computes it. Every host asks this one copy so stored identities agree.
 #[uniffi::export]

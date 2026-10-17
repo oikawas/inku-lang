@@ -1,6 +1,6 @@
-import io
 import json
-import types
+
+import httpx
 
 from inku_server.api_core.routers import public
 
@@ -13,30 +13,33 @@ def _route(monkeypatch, provider, model):
     })
 
 
+def _answering(sent: list, answer: dict) -> httpx.MockTransport:
+    def respond(request):
+        sent.append(request)
+        return httpx.Response(200, json=answer)
+
+    return httpx.MockTransport(respond)
+
+
 def test_gemini_demo_takes_the_answer_not_gemmas_thoughts(monkeypatch):
     _route(monkeypatch, "gemini", "gemma-4-31b-it")
     sent = []
-
-    def urlopen(request, timeout):
-        sent.append(json.loads(request.data))
-        return io.BytesIO(json.dumps({"candidates": [{"content": {"parts": [
-            {"text": "The user wants a pond scene...", "thought": True}, {"text": "a pond at dusk"},
-        ]}}]}).encode())
-
-    monkeypatch.setattr(public.urllib.request, "urlopen", urlopen)
-    assert public._generate_demo_instruction("pond", model=None, lang="en") == "a pond at dusk"
-    assert sent[0]["generationConfig"] == {"maxOutputTokens": 180 + 8192, "thinkingConfig": {"thinkingLevel": "minimal"}}
+    transport = _answering(sent, {"candidates": [{"content": {"parts": [
+        {"text": "The user wants a pond scene...", "thought": True}, {"text": "a pond at dusk"},
+    ]}}]})
+    assert public._generate_demo_instruction("pond", model=None, lang="en", transport=transport) == "a pond at dusk"
+    assert json.loads(sent[0].content)["generationConfig"] == {
+        "maxOutputTokens": 180 + 8192, "thinkingConfig": {"thinkingLevel": "minimal"}}
+    # The key travels in a header, the model id as one quoted path segment.
+    assert sent[0].headers["x-goog-api-key"] == "test-only"
+    assert str(sent[0].url) == "https://provider.invalid/v1beta/models/gemma-4-31b-it:generateContent"
 
 
 def test_claude_demo_sends_no_temperature_and_room_to_think(monkeypatch):
     _route(monkeypatch, "anthropic", "claude-sonnet-5")
     sent = []
-
-    class Messages:
-        def create(self, **kwargs):
-            sent.append(kwargs)
-            return types.SimpleNamespace(content=[types.SimpleNamespace(type="text", text="a pond at dusk")])
-
-    monkeypatch.setattr("anthropic.Anthropic", lambda **kwargs: types.SimpleNamespace(messages=Messages()))
-    assert public._generate_demo_instruction("pond", model=None, lang="en") == "a pond at dusk"
-    assert "temperature" not in sent[0] and sent[0]["max_tokens"] == 180 + 8192
+    transport = _answering(sent, {"content": [{"type": "text", "text": "a pond at dusk"}]})
+    assert public._generate_demo_instruction("pond", model=None, lang="en", transport=transport) == "a pond at dusk"
+    body = json.loads(sent[0].content)
+    assert "temperature" not in body and body["max_tokens"] == 180 + 8192
+    assert body["messages"] == [{"role": "user", "content": "pond"}]

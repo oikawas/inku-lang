@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 import os
 import urllib.parse
-import urllib.request
+
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
@@ -17,8 +18,7 @@ from ...reference import build_reference, render_markdown
 from ...saijiki import display_categories
 from ...render_engines import current_render_engine
 from ...distribution_notices import NoticesResponse, notice_bytes, notice_catalog
-from ...anthropic_request import anthropic_max_tokens
-from ...gemini_request import gemini_max_output_tokens, gemini_thinking
+from ... import provider_wire
 from ...model_settings import connection_for, model_provider_catalog, provider_for_model
 from ... import db as _db
 from ..common import MODEL_NOT_OFFERED_DETAIL, _APP_VERSION, _RELEASE_VERSION, _build_number, _env_flag, _model_offered_to, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _unexpected_http_error
@@ -263,88 +263,34 @@ def _demo_instruction_system(lang: str) -> str:
     )
 
 
-def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str) -> str:
+def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str,
+                               transport: httpx.BaseTransport | None = None) -> str:
     # No env fallback and no literal: both named ovms models, so an unconfigured
     # demo asked a withdrawn provider for its instruction. provider_for_model
     # reads the Stage 1 default when the model is None, which is the same answer
     # every other caller gets.
     settings = _db.get_model_settings()
     provider, model_id = provider_for_model(model or None, stage="stage1", settings=settings)
-    # One deadline for all three transports. The SDK clients default to ten
-    # minutes, which held a request worker that long for a one-line demo prompt
-    # whenever a provider stopped answering.
+    # One deadline for every provider: a request worker is not held for minutes
+    # over a one-line demo prompt when a provider stops answering.
     timeout = float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "120"))
-    if provider == "anthropic":
-        import anthropic
-
-        connection = connection_for("anthropic", settings)
-        kwargs = {"api_key": connection["api_key"]} if connection.get("api_key") else {}
-        if connection.get("base_url"):
-            kwargs["base_url"] = connection["base_url"]
-        client = anthropic.Anthropic(timeout=timeout, **kwargs)
-        # As vision_client asks Claude: no temperature, which claude-sonnet-5
-        # refuses with a 400, and room for the thinking Claude 5 does unasked.
-        resp = client.messages.create(
-            model=model_id,
-            max_tokens=anthropic_max_tokens(model_id, 180),
-            system=_demo_instruction_system(lang),
-            messages=[{"role": "user", "content": seed_phrase}],
-        )
-        parts = [getattr(block, "text", "") for block in resp.content if getattr(block, "type", "") == "text"]
-        text = "\n".join(parts).strip()
-    elif provider == "gemini":
-        connection = connection_for("gemini", settings)
-        api_key = connection.get("api_key") or ""
-        if not api_key:
-            raise RuntimeError("Gemini API key is not configured")
-        base_url = str(connection.get("base_url") or "https://generativelanguage.googleapis.com").rstrip("/")
-        # Same shape as the pipeline transport (pipeline_provider.py): the model
-        # id is one quoted path segment, so a name holding "/", "?" or "#"
-        # cannot move the request elsewhere, and the key travels in a header
-        # instead of the query string, where proxies and access logs keep it.
-        url = f"{base_url}/v1beta/models/{urllib.parse.quote(model_id, safe='')}:generateContent"
-        body = {
-            "systemInstruction": {"parts": [{"text": _demo_instruction_system(lang)}]},
-            "contents": [{"role": "user", "parts": [{"text": seed_phrase}]}],
-            # As vision_client asks Gemini: the lowest thinking level a model
-            # takes, room for thinking within maxOutputTokens, and the default
-            # temperature Gemini 3 is tuned for.
-            "generationConfig": {"maxOutputTokens": gemini_max_output_tokens(model_id, 180),
-                                 **gemini_thinking(model_id)},
-        }
-        request = urllib.request.Request(
-            url,
-            data=json.dumps(body).encode("utf-8"),
-            headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
-            method="POST",
-        )
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-        parts = payload.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-        # Gemma returns its thoughts as parts beside the answer.
-        text = "\n".join(str(part["text"]) for part in parts if "text" in part and not part.get("thought")).strip()
-    else:
-        from openai import OpenAI
-
-        from ...openai_request import openai_sampling
-
-        connection = connection_for(provider, settings)
-        client = OpenAI(base_url=connection["base_url"], api_key=connection.get("api_key") or "none", timeout=timeout)
-        # The SDK names only OpenAI's own fields; a server's own (NIM's
-        # chat_template_kwargs, MLX's top_k and enable_thinking) travel in the body.
-        sampling = openai_sampling(connection, model_id, max_tokens=180, temperature=0.9)
-        named = {key: sampling.pop(key) for key in ("max_tokens", "max_completion_tokens", "temperature", "top_p",
-                                                      "reasoning_effort") if key in sampling}
-        resp = client.chat.completions.create(
-            model=model_id,
-            messages=[
-                {"role": "system", "content": _demo_instruction_system(lang)},
-                {"role": "user", "content": seed_phrase},
-            ],
-            **named,
-            extra_body=sampling or None,
-        )
-        text = (resp.choices[0].message.content or "").strip()
+    connection = connection_for(provider, settings)
+    if connection.get("requires_api_key") and not connection.get("api_key"):
+        raise RuntimeError(f"{provider} API key is not configured")
+    # Asked as the colophon is (provider_wire): no temperature for Claude, which
+    # claude-sonnet-5 refuses with a 400, nor for Gemini, which is tuned for its
+    # default; room for the thinking Claude 5 does unasked and Gemini counts.
+    built = provider_wire.text_request(connection, model_id, system=_demo_instruction_system(lang), text=seed_phrase,
+                                       images=[], temperature=0.9, max_tokens=180)
+    with httpx.Client(timeout=timeout, transport=transport, follow_redirects=False) as client:
+        response = client.post(built["url"], headers=provider_wire.headers(built, str(connection.get("api_key") or "")),
+                               content=built["body"].encode("utf-8"))
+    response.raise_for_status()
+    read = provider_wire.read_text(built["format"], response.status_code, response.content)
+    if read["outcome"] != "answer":
+        raise ValueError(read.get("detail") or "demo instruction answer is malformed")
+    # Gemma returns its thoughts as parts beside the answer; they are not read.
+    text = read["text"]
     text = text.strip().strip("\"'“”‘’")
     if not text:
         raise ValueError("empty demo instruction")

@@ -10,7 +10,7 @@ This appendix gives one place to survey the languages, frameworks, main runtime 
 | Web process | JavaScript (build output) | SvelteKit adapter-node, Node.js 22 | Static/UI serving and same-origin `/api` proxy | `web/Dockerfile`; `web/src/hooks.server.ts` |
 | Server API | Python 3.12 | FastAPI, Pydantic, Uvicorn | HTTP API, authentication, the shared-pipeline host, and operational status | `server/pyproject.toml`; `server/src/inku_server/api.py` |
 | Server persistence | Python, SQL | SQLAlchemy 2, SQLite | Canonical schema, domain stores, variation authority, versioned migration, and backup | `server/src/inku_server/persistence/`; `persistence/` |
-| Model access | Python / Kotlin | `httpx` (shared-pipeline provider effects; the colophon and Vision advice reach OpenAI-compatible, Anthropic, and Gemini through `vision_client.py`), OpenAI SDK (demo), OpenAI-compatible / Gemini HTTP, LiteRT-LM | The sketch, color catalog selection, the Stage 1 underdrawing, known-hole completion, and on-device inference | `server/pyproject.toml`; `server/src/inku_server/pipeline_provider.py`; `server/src/inku_server/vision_client.py`; `android/app/build.gradle.kts` |
+| Model access | Python / Kotlin | `httpx` (shared-pipeline provider effects; the colophon and Vision advice reach OpenAI-compatible, Anthropic, and Gemini through `vision_client.py`; the demo instruction; the shared core's `provider_wire` writes the bodies), OpenAI-compatible / Gemini HTTP, LiteRT-LM | The sketch, color catalog selection, the Stage 1 underdrawing, known-hole completion, and on-device inference | `server/pyproject.toml`; `server/src/inku_server/pipeline_provider.py`; `server/src/inku_server/vision_client.py`; `android/app/build.gradle.kts` |
 | Authoring pipeline core | Rust 2024 | `serde` / `serde_json`, `sha2` | Authoring state machine, effect protocol, authority transitions, prompt construction, compile/render boundary | `core/crates/inku-pipeline/` |
 | DDL compiler core | Rust 2024 | `serde` / `serde_json`, `sha2` | Typed compiler, Macros, Stage 1.5, Plan, resource selection, materialization, the underdrawing, and the saijiki asset | `core/crates/inku-ddl/` |
 | Score core | Rust 2024 | `serde` / `serde_json`, `sha2` | Score types, canonical digest, compatibility reader, canvas registry, resource authority | `core/crates/inku-score/` |
@@ -46,7 +46,7 @@ This appendix gives one place to survey the languages, frameworks, main runtime 
 
 - FastAPI `>=0.141.1`, Pydantic `>=2.13.4`, and Uvicorn `>=0.52.1`.
 - SQLAlchemy `>=2.0.51`. The Server backend is SQLite only; a PostgreSQL adapter is not part of the current support surface.
-- `httpx` `>=0.28.1` (provider transport for the shared pipeline), OpenAI `>=2.52.0`, Anthropic `>=0.120.2`, `cryptography` `>=50.0.0`, `python-dotenv` `>=1.2.2`, and Pillow `>=12.3.0`.
+- `httpx` `>=0.28.1` (provider transport for the shared pipeline), `cryptography` `>=50.0.0`, `python-dotenv` `>=1.2.2`, and Pillow `>=12.3.0`.
 - The native wheel (`inku-render-python`) stays out of the Server package's dependency graph and is injected only for image builds and checks.
 - `uv_build` builds Python packages; `uv` manages lock and sync.
 

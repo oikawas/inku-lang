@@ -787,7 +787,7 @@ hostの責務の対応は次のとおり。
 | --- | --- | --- |
 | 実行の駆動・effectの実行・snapshot保存 | `pipeline_api.py`／`pipeline_candidate.py`／`pipeline_product.py` | `SharedPipelineHost.kt`／`AndroidWorkPipeline.kt`／`RoomSharedPipelineStore.kt` |
 | coreへ渡す設定と入力 | `pipeline_product.py`（`prepare`）／`pipeline_settings.py`／`pipeline_defaults.py` | `AndroidWorkPipeline.kt`（`prepare`）／`SharedPipelineConfigBuilder.kt` |
-| provider transport | `pipeline_provider.py`／`openai_request.py`／`chatgpt_provider.py` | `RoutingModelProvider.kt`と各provider／`SingleAttemptModelEffectProvider.kt` |
+| provider transport | `pipeline_provider.py`／共有coreの`provider_wire.rs`／`chatgpt_provider.py` | `RoutingModelProvider.kt`と各provider／`SingleAttemptModelEffectProvider.kt` |
 | 描画 | `render_engines/default/adapter.py` | `AndroidRenderHost` → `NativeRenderBridge`（旧9:5形式）、共有pipelineの`Render`と`renderSaved` |
 | 画像化 | `shared/src/inku_analysis/rasterizer.py` | `RustArtworkRasterizer`（`inku-svg-raster`） |
 | `rh3`／`dh1`／seed正規化／正準JSON | `inku-pipeline::identity`（Serverもbinding経由） | `AndroidWorkPipeline`／`CoreIdentityJson` → `NativePipelineBridge` → 共有core |

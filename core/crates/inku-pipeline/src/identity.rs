@@ -201,7 +201,7 @@ fn canonical_integer(negative: bool, digits: &str) -> String {
 /// A JSON value as Python's `json.loads` holds it: integers keep every digit,
 /// and an object keeps its members in order, the last duplicate winning.
 #[derive(Debug, Clone, PartialEq)]
-enum Value {
+pub(crate) enum Value {
     Null,
     Bool(bool),
     Integer(String),
@@ -223,6 +223,61 @@ impl Value {
             Self::Array(items) => !items.is_empty(),
             Self::Object(members) => !members.is_empty(),
         }
+    }
+}
+
+/// The value Python's `json.loads` returns for `json_text`: as [`Value`], with
+/// each object holding one member per name, at the place the name first
+/// appeared and with the value it last had, as a `dict` holds it.
+pub(crate) fn python_loads(json_text: &str) -> Result<Value, IdentityError> {
+    fn collapse(value: Value) -> Value {
+        match value {
+            Value::Array(items) => Value::Array(items.into_iter().map(collapse).collect()),
+            Value::Object(members) => {
+                let mut kept: Vec<(String, Value)> = Vec::with_capacity(members.len());
+                for (name, item) in members {
+                    let item = collapse(item);
+                    if let Some(slot) = kept.iter_mut().find(|existing| existing.0 == name) {
+                        slot.1 = item;
+                    } else {
+                        kept.push((name, item));
+                    }
+                }
+                Value::Object(kept)
+            }
+            other => other,
+        }
+    }
+    Parser::new(json_text).parse_document().map(collapse)
+}
+
+/// `json.dumps(value, ensure_ascii=False, separators=(",", ":"))`: members in
+/// the order they are held, as a `dict` writes them.
+pub(crate) fn python_dumps(value: &Value, out: &mut String) {
+    match value {
+        Value::Array(items) => {
+            out.push('[');
+            for (index, item) in items.iter().enumerate() {
+                if index > 0 {
+                    out.push(',');
+                }
+                python_dumps(item, out);
+            }
+            out.push(']');
+        }
+        Value::Object(members) => {
+            out.push('{');
+            for (index, (name, item)) in members.iter().enumerate() {
+                if index > 0 {
+                    out.push(',');
+                }
+                write_string(name, out);
+                out.push(':');
+                python_dumps(item, out);
+            }
+            out.push('}');
+        }
+        scalar => write_value(scalar, out),
     }
 }
 
@@ -294,7 +349,7 @@ fn write_string(text: &str, out: &mut String) {
 /// The digits are the shortest that read back to the same float. They are
 /// written in positional form when the decimal point falls within
 /// (-4, 16] of the first digit, and otherwise as `d.ddde±XX`.
-fn python_float_repr(number: f64) -> String {
+pub(crate) fn python_float_repr(number: f64) -> String {
     if number.is_nan() {
         return "NaN".to_owned();
     }

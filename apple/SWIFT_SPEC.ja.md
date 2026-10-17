@@ -192,7 +192,7 @@ AI自動推敲プロセスは、記述ロック・DDL直接入力の作品もVis
 
 ## 2026-10-13 OpenAI APIの描画をResponsesへ移し、推論設定をServerに揃える
 
-OpenAI互換の接続先ホストが`api.openai.com`のときだけ、Serverの[`openai_request.py`](../server/src/inku_server/openai_request.py)と同じ要求・応答処理を使う。公式仕様は[推論モデル](https://developers.openai.com/api/docs/guides/reasoning)と[GPT-6案内](https://developers.openai.com/api/docs/guides/latest-model)を参照する。
+OpenAI互換の接続先ホストが`api.openai.com`のときだけ、共有coreの[`provider_wire.rs`](../core/crates/inku-pipeline/src/provider_wire.rs)と同じ要求・応答処理を使う。公式仕様は[推論モデル](https://developers.openai.com/api/docs/guides/reasoning)と[GPT-6案内](https://developers.openai.com/api/docs/guides/latest-model)を参照する。
 
 - 描画pipelineは非streamの`POST /v1/responses`を使う。本文は`model`、`store: false`、システムプロンプトの`instructions`、ユーザー本文の`input`、`submit_pipeline_response`のfunction tool（coreのschemaをそのまま`parameters`へ、`strict: false`）、`tool_choice: required`、`parallel_tool_calls: false`、`max_output_tokens`。推論指定があるときは`reasoning: {effort}`、温度を送るときは`temperature`を加える。
 - 推論系`^(gpt-5|gpt-6|o\d)`には温度を送らない。そのうち`^(gpt-5\.\d|gpt-6-(sol|luna)(-|$))`は推論を`none`、それ以外（GPT-6 Astra・GPT-6.1 Sol・GPT-5無印・o系など）は`low`とし、答えの上限に25,000を足す。推論系でないモデルには従来の温度を送り、推論指定を付けない。
@@ -203,7 +203,7 @@ OpenAI互換の接続先ホストが`api.openai.com`のときだけ、Serverの[
 
 ## 2026-10-13 NVIDIA NIMのGemma 4の思考を切る
 
-NVIDIA NIMへの描画・Vision（推敲の助言・奥書）・デモの指示文は、Serverの[`openai_request.py`](../server/src/inku_server/openai_request.py)と同じくGemma 4の思考を切る（[NIM API仕様](https://docs.api.nvidia.com/nim/reference/google-gemma-4-31b-it-infer)）。
+NVIDIA NIMへの描画・Vision（推敲の助言・奥書）・デモの指示文は、共有coreの[`provider_wire.rs`](../core/crates/inku-pipeline/src/provider_wire.rs)と同じくGemma 4の思考を切る（[NIM API仕様](https://docs.api.nvidia.com/nim/reference/google-gemma-4-31b-it-infer)）。
 
 - OpenAI互換の接続IDが`nvidia`で、モデル名の最後の`/`より後ろが`^gemma[-_]?4([-_]|$)`に一致するときだけ、大文字小文字を問わず`chat_template_kwargs: {"enable_thinking": false}`を送る。3経路で同じ判定を使う。
 - 他のNIMモデルや他providerにはこの指定を付けない。`max_tokens`と`temperature`は既存の値を保持する。公式OpenAIのURLでは既存の公式API指定を使う。
@@ -212,7 +212,7 @@ NVIDIA NIMへの描画・Vision（推敲の助言・奥書）・デモの指示�
 
 ## 2026-10-13 Ollamaの推論指定と出力枠をServerに揃える
 
-Ollamaローカル・Cloudへの描画・Vision（推敲の助言・奥書）・デモの指示文は、Serverの[`openai_request.py`](../server/src/inku_server/openai_request.py)と同じ推論指定を使う。
+Ollamaローカル・Cloudへの描画・Vision（推敲の助言・奥書）・デモの指示文は、共有coreの[`provider_wire.rs`](../core/crates/inku-pipeline/src/provider_wire.rs)と同じ推論指定を使う。
 
 - OpenAI互換の接続IDが`ollama`または`ollama-cloud`のとき、モデル名が`^gpt-oss(:|-|$)`に一致すれば`reasoning_effort: low`を送り、`max_tokens`に8,192を足す（描画2,048→10,240、助言320→8,512、デモ180→8,372）。ほかのモデルは`none`を送り、出力枠を増やさない。判定は3経路で共通とする。
 - このOllama向けの指定は、他providerへ付けない。公式OpenAIのURLでは、Serverと同じく公式API用の既存指定を使う。根拠となるproviderの仕様は[OpenAI互換API](https://docs.ollama.com/api/openai-compatibility)と[thinking](https://docs.ollama.com/capabilities/thinking)を参照する。
@@ -221,13 +221,13 @@ Ollamaローカル・Cloudへの描画・Vision（推敲の助言・奥書）・
 
 ## 2026-10-13 Geminiの要求とデモのClaude要求をServerに揃える
 
-Geminiへの描画pipeline・Vision・デモの指示文は、Serverの[`gemini_request.py`](../server/src/inku_server/gemini_request.py)と同じモデル判定・出力枠を使う。2026-10-12の判定を更新する。
+Geminiへの描画pipeline・Vision・デモの指示文は、共有coreの[`provider_wire.rs`](../core/crates/inku-pipeline/src/provider_wire.rs)と同じモデル判定・出力枠を使う。2026-10-12の判定を更新する。
 
 - 判定前に先頭の`models/`を外す。`^gemini-2\.5-flash-(lite|image)(-|$)`と`^antigravity-`は`thinkingConfig`を送らない。
 - `minimal`を送るのは`gemma-`で始まるものと、次の13名の完全一致だけ：`gemini-3.6-flash`、`gemini-3.5-flash`、`gemini-3.5-flash-lite`、`gemini-flash-lite-latest`、`gemini-3-flash-preview`、`gemini-3.1-flash-lite`、`gemini-3.1-flash-lite-preview`、`gemini-3.1-flash-image`、`gemini-3.1-flash-image-preview`、`gemini-3.1-flash-lite-image`、`gemini-robotics-er-2-preview`、`nano-banana-pro-preview`、`gemini-nano-banana-2.1`。ほかは`low`を送る（新モデルとFlash／Proのlatest別名を含む）。
 - 思考レベルを送るモデルは`maxOutputTokens`に8,192を足す。送らないモデルは答えの枠のまま。描画・Vision・デモはいずれもGeminiへ`temperature`を送らず、提供元の既定を使う（[GoogleのGemini 3案内](https://ai.google.dev/gemini-api/docs/gemini-3#temperature)）。
 - 描画の応答の先頭候補が`finishReason: MAX_TOKENS`なら、関数呼び出しが揃っていても答えとして使わず`provider_output_limit`で拒否する。Vision・デモは`thought: true`の部分を本文に混ぜない。
-- デモのClaude要求は`temperature`を送らない。Serverの[`anthropic_request.py`](../server/src/inku_server/anthropic_request.py)と同じ判定（`^claude-((opus|sonnet|haiku|fable|mythos)-5(-|$)|mythos-preview(-|$))`）に該当するモデルだけ、`max_tokens`へ8,192を足す。Claudeの描画・Visionの枠はこの変更の対象に含めない。
+- デモのClaude要求は`temperature`を送らない。共有coreの[`provider_wire.rs`](../core/crates/inku-pipeline/src/provider_wire.rs)と同じ判定（`^claude-((opus|sonnet|haiku|fable|mythos)-5(-|$)|mythos-preview(-|$))`）に該当するモデルだけ、`max_tokens`へ8,192を足す。Claudeの描画・Visionの枠はこの変更の対象に含めない。
 - 確認：InkuHostの`GeminiThinkingLevelTests`で3経路の送信JSON、設定の省略と出力枠、打切り応答の拒否、Claudeデモの温度省略と出力枠を確認。`AuxiliaryServerParityChecks.testAnswerTextFollowsServerReaders`でデモへの思考文の混入を拒ぐ。
 
 ## 2026-10-12 左下に版とBuildを常に出す

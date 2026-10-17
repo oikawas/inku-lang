@@ -12,10 +12,6 @@
 
 配色変更と支持体変更の系譜の辺が「不明」になる表示漏れを修正した。Webと同じ「配色」「支持体」を日英で表示する。
 
-### 2026-10-17 — 作品の識別・指示言語・記述ラベルの規則を共有coreへ
-
-記述ハッシュ`dh1`・描画ハッシュ`rh3`とその正準JSON、指示言語の判定、記述ラベルの除去を、共有coreの1つの実装にまとめた。Serverは自前のPython実装をやめてcoreを呼び、UniFFI（Swift）とPython bindingにも同じ関数を公開した。規則はServerがPythonで定めたものを文字単位で再現し、保存済みの識別は変わらない（5173の4,712作品で旧Python実装とcoreの`dh1`・`rh3`・楽譜の正準JSONの不一致0件）。言語コードの前後の空白はPythonの`strip()`と同じくU+001C〜U+001Fも除く。共通の試験データ`server/tests/data/identity-cases.json`・`instruction-language-cases.json`をRustとServerの試験が読む。Android・Swiftの写しの置き換えは各アプリの作業で行う。
-
 ### 2026-10-17 — Androidの保存作品操作と実行表示を拡充
 
 保存作品から同一カタログ内の色の配置変更、下地変更、保存Scoreの再演比較と子作品保存を行えるようにした。配置の次の4案を作る前にはチェック済み未保存候補を保存し、色カタログ候補は画面を開いた時に生成する。モデル検分は既存候補へ追加し、描画済みモデルを飛ばしてモデルごとの失敗後も続ける。公開条件を満たすChatGPTプランのモデルを検分候補へ加え、カメラのVision候補からは引き続き除外する。推敲ごとのWild継承・上書きも選べる。
@@ -25,6 +21,12 @@
 Anthropicの対象Claudeモデルは通常描画とVisionでも思考用8,192 tokenを出力枠に加え、pipeline応答が `max_tokens` で切れたときは内容が読めても拒否して診断を残す。
 
 保存作品からランダムまたはVisionの自律推敲を開始できる。世代数、色・配置の対象、Wildを指定し、直前の作品を親として各世代を保存する。途中の世代は系譜専用、最終世代は通常の作品一覧にも表示する。Visionは作品画像への限定された助言を使い、観察と次の方向を表示する。画像の送信はこの専用助言requestに限り、既存の接続・ChatGPTプランのsession pinを保つ。
+
+## v2.15.177（2026-10-17 / Build 1253）
+
+### 2026-10-17 — 作品の識別・指示言語・記述ラベルの規則を共有coreへ
+
+記述ハッシュ`dh1`・描画ハッシュ`rh3`とその正準JSON、指示言語の判定、記述ラベルの除去を、共有coreの1つの実装にまとめた。Serverは自前のPython実装をやめてcoreを呼び、UniFFI（Swift）とPython bindingにも同じ関数を公開した。規則はServerがPythonで定めたものを文字単位で再現し、保存済みの識別は変わらない（5173の4,712作品で旧Python実装とcoreの`dh1`・`rh3`・楽譜の正準JSONの不一致0件）。言語コードの前後の空白はPythonの`strip()`と同じくU+001C〜U+001Fも除く。共通の試験データ`server/tests/data/identity-cases.json`・`instruction-language-cases.json`をRustとServerの試験が読む。Android・Swiftの写しの置き換えは各アプリの作業で行う。
 
 ## v2.15.176（2026-10-17 / Build 1252）
 

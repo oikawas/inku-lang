@@ -12,10 +12,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 Lineage edges for color-arrangement and ground changes now show Color arrangement and Ground instead of Unknown, matching the Web labels in both languages.
 
-### 2026-10-17 — Move work identity, instruction language and description label rules into the shared core
-
-The description hash `dh1`, the render hash `rh3` with its canonical JSON, instruction-language resolution and description-label removal now have one implementation in the shared core. Server calls it instead of its own Python copies, and the same functions are exposed through UniFFI (Swift) and the Python binding. The rules reproduce Server's Python definitions character for character, so stored identities do not change (0 mismatches in `dh1`, `rh3` and Score canonical JSON between the old Python rules and the core over 4,712 works on 5173). Language codes are stripped of U+001C–U+001F as Python's `strip()` does. Rust and Server tests read the shared tables `server/tests/data/identity-cases.json` and `instruction-language-cases.json`. Android and Swift replace their copies in their own work.
-
 ### 2026-10-17 — Expand Android saved-work actions and execution details
 
 Saved works now offer color-arrangement changes within the same catalog, ground changes, saved-Score replay comparison and saving the replay as a child. Checked unsaved layout options are saved before drawing the next four, and catalog options are generated on opening. Model inspection appends to existing options, skips models already drawn and continues after individual model failures. Published ChatGPT-plan models are eligible for inspection while the camera's Vision choices still exclude them. Refinement also offers inherited or explicit Wild settings.
@@ -25,6 +21,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.177 (2026-10-17 / Build 1253)
+
+### 2026-10-17 — Move work identity, instruction language and description label rules into the shared core
+
+The description hash `dh1`, the render hash `rh3` with its canonical JSON, instruction-language resolution and description-label removal now have one implementation in the shared core. Server calls it instead of its own Python copies, and the same functions are exposed through UniFFI (Swift) and the Python binding. The rules reproduce Server's Python definitions character for character, so stored identities do not change (0 mismatches in `dh1`, `rh3` and Score canonical JSON between the old Python rules and the core over 4,712 works on 5173). Language codes are stripped of U+001C–U+001F as Python's `strip()` does. Rust and Server tests read the shared tables `server/tests/data/identity-cases.json` and `instruction-language-cases.json`. Android and Swift replace their copies in their own work.
 
 ## v2.15.176 (2026-10-17 / Build 1252)
 

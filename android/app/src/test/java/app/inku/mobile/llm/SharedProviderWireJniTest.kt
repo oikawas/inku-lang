@@ -108,6 +108,40 @@ class SharedProviderWireJniTest {
     @Test
     fun allTextRequestsMatchServerWireBytes() = requests("text_requests", 81)
 
+    /** Server passes a `models/` Gemini name to the core unchanged; Android's send path must too. */
+    @Test
+    fun androidSendsModelsPrefixedGeminiNamesUnchanged() {
+        val rows = requireNotNull(cases["requests"]).filter { item ->
+            val request = item.row.getJSONObject("request")
+            request.getJSONObject("connection").getString("kind") == "gemini" &&
+                request.getString("model").startsWith("models/")
+        }
+        assertEquals(2, rows.size)
+        for (item in rows) {
+            val request = item.row.getJSONObject("request")
+            val prompt = request.getJSONObject("prompt")
+            val expected = item.row.getJSONObject("expect")
+            val why = item.row.getString("why")
+            val start = item.requestJson.indexOf("\"response_schema\":") + "\"response_schema\":".length
+            val end = item.requestJson.indexOf(",\"system\":", start)
+            require(start >= "\"response_schema\":".length && end > start) { "fixture prompt shape changed" }
+            val modelRequest = ModelRequest(
+                modelId = "gemini:${request.getString("model")}",
+                prompt = prompt.getString("message"),
+                temperature = 0.0,
+                maxTokens = request.getInt("max_tokens"),
+                systemInstruction = prompt.getString("system"),
+                tool = ModelTool("submit_pipeline_response", "Submit the requested pipeline response.",
+                    item.requestJson.substring(start, end)),
+                pipelineAction = prompt.getString("action_name"),
+            )
+            val built = ProviderWireTransport.build("gemini", "gemini",
+                request.getJSONObject("connection").getString("base_url"), modelRequest)
+            assertEquals("$why url", expected.getString("url"), built.getString("url"))
+            assertEquals("$why exact body bytes", expected.getString("body"), built.getString("body"))
+        }
+    }
+
     @Test
     fun allResponsesMatchServerOutcomes() {
         val rows = requireNotNull(cases["responses"])

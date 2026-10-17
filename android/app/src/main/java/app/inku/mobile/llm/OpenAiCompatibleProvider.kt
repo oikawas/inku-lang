@@ -58,7 +58,6 @@ internal object ProviderWireTransport {
         ProviderUrlValidator.validateRemoteBaseUrl(baseUrl)
         val textRequest = request.pipelineAction == null || request.pipelineAction == REFINEMENT_VISION_ACTION
         val model = OpenAiCompatibleProvider.modelForRequest(providerId, request.modelId)
-            .let { if (kind == "gemini") it.removePrefix("models/") else it }
         val connection = JSONObject()
             .put("id", providerId)
             .put("kind", kind)

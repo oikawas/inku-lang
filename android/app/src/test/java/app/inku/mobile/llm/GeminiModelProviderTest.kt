@@ -133,7 +133,7 @@ class GeminiModelProviderTest {
         }
     }
 
-    /** Server `quote(model, safe="")`: only A-Z a-z 0-9 _ . - ~ stay as they are. */
+    /** Server `quote(model, safe="")`: only A-Z a-z 0-9 _ . - ~ stay as they are; a `models/` name is sent whole. */
     @Test
     fun aModelIdIsPercentEncodedAsThePythonServerQuotesIt() = runBlocking {
         val urls = mutableListOf<String>()
@@ -155,7 +155,7 @@ class GeminiModelProviderTest {
         }
         assertEquals(
             listOf(
-                "https://generativelanguage.googleapis.com/v1beta/models/gemma~4%2Fit:generateContent",
+                "https://generativelanguage.googleapis.com/v1beta/models/models%2Fgemma~4%2Fit:generateContent",
                 "https://generativelanguage.googleapis.com/v1beta/models/a%20b%2Bc%3Ad:generateContent",
             ),
             urls,

@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-17 — AndroidのGeminiのモデル名をServerと同じに送る
+
+Androidは描画・Vision・デモの要求で、Geminiのモデル名の先頭の`models/`を外さずに共有coreへ渡すようにした。Serverと同じく名前全体をURLへpercent encodeするので、`models/gemini-3.6-flash`は`models/models%2Fgemini-3.6-flash:generateContent`へ送る。モデル一覧の取得では、Serverと同じく引き続き外す。目録に`models/`で始まるモデルは無いので、ふつうの要求の送り先は変わらない。
+
 ### 2026-10-17 — カンバス地の作品をSkiaで表示する（I-723）
 
 カンバス地の糸目の破線が書く`stroke-dashoffset`を、共有coreの表示の照合表に足した。これまでカンバス地の作品は照合表の外になり、macOSの作品の画面では「Skiaで描けませんでした（attribute）」となって表示されず、AndroidではSkiaでなくresvgで描かれていた。SkiaはChromeと同じに破線をずらすことを、Chromeの絵との比較で確かめた。

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Send Android Gemini model names as Server does
+
+Android no longer removes a leading `models/` from a Gemini model name before handing it to the shared core for drawing, Vision and demo requests. As on Server the whole name is percent-encoded into the URL, so `models/gemini-3.6-flash` is sent to `models/models%2Fgemini-3.6-flash:generateContent`. Model-list fetching still removes the prefix, as Server does. No catalog model starts with `models/`, so the usual requests are unchanged.
+
 ### 2026-10-17 — Show works on the canvas ground with Skia (I-723)
 
 The shared core's display support table gains `stroke-dashoffset`, which the canvas ground's dashed threads write. Until now every work on the canvas ground fell outside the table: the macOS work area showed "Skia could not draw it (attribute)" instead of the work, and Android drew it with resvg instead of Skia. A comparison with Chrome's picture showed that Skia shifts the dashes as Chrome does.

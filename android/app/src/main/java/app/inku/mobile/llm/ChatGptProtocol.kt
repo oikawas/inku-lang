@@ -1,11 +1,11 @@
 package app.inku.mobile.llm
 
+import android.util.Log
+import java.io.ByteArrayOutputStream
 import java.math.BigInteger
 import java.net.URI
 import java.net.URLDecoder
 import java.net.URLEncoder
-import java.nio.ByteBuffer
-import java.nio.charset.CodingErrorAction
 import java.security.AlgorithmParameters
 import java.security.KeyFactory
 import java.security.MessageDigest
@@ -20,7 +20,6 @@ import java.util.Base64
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
-import org.json.JSONTokener
 
 internal fun base64Url(bytes: ByteArray): String = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
 internal fun randomOAuthValue(): String = base64Url(ByteArray(32).also(SecureRandom()::nextBytes))
@@ -140,37 +139,30 @@ private fun ecdsaDer(raw: ByteArray): ByteArray {
 }
 
 internal val CHATGPT_EFFECTS = setOf("generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition", "complete_visible_ddl_holes")
-private val PUBLIC_CHATGPT_CODES = setOf(
-    "subscription_sharing_usage_limit_exceeded", "subscription_sharing_user_not_eligible",
-    "subscription_sharing_unsupported_capability", "subscription_sharing_route_not_supported",
-    "subscription_sharing_invalid_user", "chatpass_v2_scope_not_authorized",
-    "chatpass_v2_invalid_authorization_context", "subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable",
-)
 
-internal fun chatGptResponseError(value: Any?, status: Int? = null): ChatGptException {
-    val body = value as? JSONObject
-    // HTTP errors and response.failed are nested; a stream error carries its own code.
-    val error = body?.optJSONObject("error") ?: body?.optJSONObject("response")?.optJSONObject("error")
-        ?: body?.takeIf { it.optString("type") == "error" }
-    val code = error?.optString("code")
-    val public = if (code in PUBLIC_CHATGPT_CODES) code!! else when {
-        status == 401 || status == 403 -> "chatgpt_admission_rejected"
-        status != null && status >= 500 -> "chatgpt_transport_unavailable"
-        else -> "chatgpt_response_failed"
-    }
-    // Server `ResponseFailure`: a 5xx is temporary whatever code it carries.
-    val temporary = public in TEMPORARY_CHATGPT_CODES || (status != null && status >= 500)
-    return ChatGptException(public, if (temporary) "transport_unavailable" else "provider_rejected")
-}
+/** Server `request_vision`: the assistant text read up to 512 KiB. */
+private const val CHATGPT_VISION_ANSWER_LIMIT = 512 * 1024
 
-private val TEMPORARY_CHATGPT_CODES = setOf("subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable")
+/** What the shared core wrote for one request, and the bounds its stream is read to. */
+internal class ChatGptRequest(val body: String, val mode: String, val answerLimit: Int, val wireLimit: Long)
 
-internal fun chatGptRequestText(request: ModelRequest): String = OrderedSchemaJson.encode(chatGptRequestBody(request))
+/**
+ * The shared core reads an HTTP error body, a `response.failed` event and a
+ * stream's `error` event alike, so a usage limit sent any of those ways is the same code.
+ */
+internal fun chatGptResponseError(value: Any?, status: Int? = null): ChatGptException =
+    chatGptFailure(SharedProviderWire.call(JSONObject().put("action", "chatgpt_error")
+        .put("value", value ?: JSONObject.NULL).put("status", status ?: JSONObject.NULL).put("request_id", JSONObject.NULL)))
 
-internal fun chatGptRequestBody(request: ModelRequest): JSONObject {
+private fun chatGptFailure(answer: JSONObject): ChatGptException =
+    ChatGptException(answer.getString("code"), answer.getString("failure"))
+
+/** The operation is checked here; the body is the shared core's (`provider_wire`). */
+internal fun chatGptRequest(request: ModelRequest): ChatGptRequest {
     if (!request.modelId.startsWith("chatgpt:")) {
         throw ChatGptException("chatgpt_operation_not_supported")
     }
+    val model = request.modelId.removePrefix("chatgpt:")
     if (request.pipelineAction == REFINEMENT_VISION_ACTION) {
         val image = request.imagePng
         if (image == null || image.isEmpty() || request.imageJpeg != null || request.tool != null) {
@@ -179,300 +171,69 @@ internal fun chatGptRequestBody(request: ModelRequest): JSONObject {
         RefinementVisionImage.requirePng768(image)
         // Server request_vision: bounded assistant text with one input_image,
         // never a pipeline function call or the generic camera route.
-        val content = JSONArray()
-            .put(JSONObject().put("type", "input_text").put("text", request.prompt))
-            .put(JSONObject().put("type", "input_image")
-                .put("image_url", "data:image/png;base64," + Base64.getEncoder().encodeToString(image)))
-        return JSONObject().put("model", request.modelId.removePrefix("chatgpt:"))
-            .put("store", false).put("stream", true)
-            .put("instructions", request.systemInstruction.orEmpty())
-            .put("input", JSONArray().put(JSONObject().put("role", "user").put("content", content)))
+        val built = SharedProviderWire.call(JSONObject().put("action", "chatgpt_vision_request").put("model", model)
+            .put("system", request.systemInstruction.orEmpty()).put("text", request.prompt)
+            .put("images", JSONArray().put("data:image/png;base64," + Base64.getEncoder().encodeToString(image)))
+            .put("answer_limit", CHATGPT_VISION_ANSWER_LIMIT))
+        return built(built, "text", CHATGPT_VISION_ANSWER_LIMIT)
     }
-    if (request.pipelineAction !in CHATGPT_EFFECTS || request.imageJpeg != null || request.imagePng != null || request.tool == null) {
+    val tool = request.tool
+    if (request.pipelineAction !in CHATGPT_EFFECTS || request.imageJpeg != null || request.imagePng != null || tool == null) {
         throw ChatGptException("chatgpt_operation_not_supported")
     }
-    return JSONObject().put("model", request.modelId.removePrefix("chatgpt:")).put("store", false).put("stream", true)
-        .put("instructions", request.systemInstruction.orEmpty())
-        .put("input", JSONArray().put(JSONObject().put("role", "user").put("content", request.prompt)))
-        .put("tools", JSONArray().put(JSONObject().put("type", "namespace").put("name", "inku")
-            .put("description", "Return data for the inku drawing pipeline.")
-            .put("tools", JSONArray().put(JSONObject().put("type", "function").put("name", "submit_pipeline_response")
-                .put("description", "Return the requested drawing data.").put("parameters", JSONObject(request.tool.parametersJson)).put("strict", false)))))
-        .put("tool_choice", "required").put("parallel_tool_calls", false)
+    // The schema's original member order matters when it has no propertyOrdering.
+    // Keep that object raw on the trip to the core.
+    val raw = "{\"action\":\"chatgpt_request\",\"model\":${JSONObject.quote(model)}," +
+        "\"answer_limit\":$MAX_PROVIDER_RESPONSE_BYTES," +
+        "\"prompt\":{\"system\":${JSONObject.quote(request.systemInstruction.orEmpty())}," +
+        "\"message\":${JSONObject.quote(request.prompt)}," +
+        "\"action_name\":${JSONObject.quote(request.pipelineAction)}," +
+        "\"response_schema\":${tool.parametersJson}}}"
+    return built(SharedProviderWire.call(raw), "pipeline", MAX_PROVIDER_RESPONSE_BYTES)
 }
 
-internal interface ChatGptStreamDecoder {
-    val usage: JSONObject?
-    fun feed(chunk: ByteArray)
-    fun finish(): String
+private fun built(answer: JSONObject, mode: String, answerLimit: Int): ChatGptRequest {
+    if (answer.optString("outcome") == "refused") throw IllegalArgumentException(answer.getString("detail"))
+    check(answer.optString("outcome") == "ok") { "chatgpt request outcome missing" }
+    return ChatGptRequest(answer.getString("body"), mode, answerLimit, answer.getLong("wire_limit"))
 }
 
-/** Byte-framed SSE; only a completed, sole namespace function can become drawing data. */
-internal class ChatGptSseDecoder(private val argumentLimit: Int = 512 * 1024) : ChatGptStreamDecoder {
-    private var buffer = ByteArray(0)
-    private var wireBytes = 0
-    private val items = linkedMapOf<String, JSONObject>()
-    private val finalized = linkedMapOf<String, JSONObject>()
-    private val arguments = mutableMapOf<String, String>()
-    private var completed: String? = null
-    private var terminal: JSONObject? = null
-    override val usage: JSONObject? get() = terminal?.optJSONObject("usage")
+/**
+ * The stream, received whole and read once by the shared core (`provider_wire`).
+ * Only the wire as a whole is bounded here, as it arrives; the core holds each
+ * event and the answer to their limits and reads the events in order, so the
+ * answer is the one an incremental reader gave however the bytes came.
+ */
+internal class ChatGptStream(private val request: ChatGptRequest) {
+    private val wire = ByteArrayOutputStream()
+    var usage: JSONObject? = null
+        private set
 
-    override fun feed(chunk: ByteArray) {
-        wireBytes += chunk.size
-        if (wireBytes > maxOf(1024 * 1024, argumentLimit * 6 + 512 * 1024)) fail("chatgpt_response_too_large")
-        buffer += chunk
-        while (true) {
-            var end = -1; var separator = 0
-            for (i in buffer.indices) {
-                val length = blankLineAt(i)
-                if (length > 0) { end = i; separator = length; break }
-            }
-            if ((if (end < 0) buffer.size else end) > maxOf(64 * 1024, argumentLimit * 2 + 64 * 1024)) fail("chatgpt_response_too_large")
-            if (end < 0) break
-            val text = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(buffer.copyOfRange(0, end))).toString()
-            buffer = buffer.copyOfRange(end + separator, buffer.size)
-            val data = text.lines().filter { it.startsWith("data:") }.joinToString("\n") { it.substring(5).trimStart(' ') }
-            if (data.isNotEmpty() && data != "[DONE]") event(JSONObject(data))
-        }
+    fun feed(chunk: ByteArray) {
+        if (wire.size().toLong() + chunk.size > request.wireLimit) throw ChatGptException("chatgpt_response_too_large")
+        wire.write(chunk)
     }
 
-    /**
-     * The length of the server's `\r?\n\r?\n` match starting at [start], or 0.
-     * CRLF and LF are both line ends, so LF then CRLF ends an event too; a CR
-     * at the end of the buffer waits for the byte after it.
-     */
-    private fun blankLineAt(start: Int): Int {
-        fun lineEnd(at: Int): Int = when {
-            at < buffer.size && buffer[at] == LF -> 1
-            at + 1 < buffer.size && buffer[at] == CR && buffer[at + 1] == LF -> 2
-            else -> 0
-        }
-        val first = lineEnd(start)
-        if (first == 0) return 0
-        val second = lineEnd(start + first)
-        return if (second == 0) 0 else first + second
-    }
-
-    private fun function(item: JSONObject) {
-        if (item.optString("type") != "function_call" || item.optString("name") != "submit_pipeline_response" || item.optString("namespace") != "inku") fail("chatgpt_unexpected_tool")
-    }
-
-    private fun auxiliary(item: JSONObject) {
-        if (item.optString("type") == "reasoning") return
-        if (item.optString("type") != "message" || item.optString("role") != "assistant") fail("chatgpt_unexpected_tool")
-        val content = item.optJSONArray("content") ?: JSONArray()
-        for (i in 0 until content.length()) {
-            val type = content.getJSONObject(i).optString("type")
-            if (type == "refusal") fail("chatgpt_refused")
-            if (type != "output_text") fail("chatgpt_unexpected_tool")
-        }
-    }
-
-    private fun checkArguments(text: String): String {
-        if (text.toByteArray(Charsets.UTF_8).size > argumentLimit) fail("chatgpt_response_too_large")
-        return text
-    }
-
-    private fun event(event: JSONObject) {
-        val type = event.optString("type")
-        if (type == "error" || type == "response.failed") throw chatGptResponseError(event)
-        if (type == "response.incomplete") fail("chatgpt_response_incomplete")
-        if (type.contains("refusal")) fail("chatgpt_refused")
-        if (terminal != null) fail("chatgpt_response_invalid")
-        when (type) {
-            "response.output_item.added", "response.output_item.done" -> {
-                val item = event.getJSONObject("item")
-                if (item.optString("type") != "function_call") { auxiliary(item); return }
-                function(item)
-                val id = item.getString("id")
-                if (id !in items && items.isNotEmpty()) fail("chatgpt_unexpected_tool")
-                items[id] = item
-                if (type.endsWith(".done")) {
-                    if (item.has("status") && !item.isNull("status") && item.getString("status") != "completed") {
-                        // Server: an item that did not complete is refused, not retried.
-                        throw ChatGptException("chatgpt_response_incomplete", "provider_rejected")
-                    }
-                    val text = checkArguments(item.getString("arguments"))
-                    if (arguments[id]?.let { it != text } == true) fail("chatgpt_response_invalid")
-                    finalized[id] = item
-                }
-            }
-            "response.function_call_arguments.delta", "response.function_call_arguments.done" -> {
-                val id = event.getString("item_id")
-                if (id !in items) fail("chatgpt_response_invalid")
-                if (type.endsWith(".delta")) arguments[id] = checkArguments(arguments[id].orEmpty() + event.getString("delta"))
-                else {
-                    val text = checkArguments(event.getString("arguments"))
-                    if (arguments[id]?.let { it != text } == true) fail("chatgpt_response_invalid")
-                    arguments[id] = text
-                }
-            }
-            "response.completed" -> {
-                val response = event.getJSONObject("response")
-                if (response.optString("status") != "completed") {
-                    throw ChatGptException("chatgpt_response_incomplete", "provider_rejected")
-                }
-                val output = if (!response.has("output") || response.isNull("output") || response.optJSONArray("output")?.length() == 0) {
-                    finalized.values.toList()
-                } else {
-                    val array = response.getJSONArray("output")
-                    (0 until array.length()).map { array.getJSONObject(it) }
-                }
-                val calls = output.filter { it.optString("type") == "function_call" }
-                output.filter { it.optString("type") != "function_call" }.forEach(::auxiliary)
-                if (calls.size != 1) fail("chatgpt_unexpected_tool")
-                val item = calls.single(); function(item)
-                val id = item.getString("id"); val text = checkArguments(item.getString("arguments"))
-                if (id !in items || arguments[id]?.let { it != text } == true || finalized[id]?.getString("arguments")?.let { it != text } == true) fail("chatgpt_response_invalid")
-                requireObject(text)
-                completed = text; terminal = response
+    fun finish(): String {
+        val answer = SharedProviderWire.call(JSONObject().put("action", "chatgpt_stream").put("mode", request.mode)
+            .put("answer_limit", request.answerLimit)
+            .put("wire_base64", Base64.getEncoder().encodeToString(wire.toByteArray())))
+        usage = answer.optJSONObject("terminal")?.optJSONObject("usage")
+        when (answer.getString("outcome")) {
+            "answer" -> return answer.getString("text")
+            "malformed" -> {
+                // As Server reads it: bytes that are not UTF-8 are refused;
+                // events and arguments of the wrong shape are malformed_payload.
+                val kind = answer.getString("kind")
+                if (kind == "utf8") throw ChatGptException("chatgpt_response_invalid", "provider_rejected")
+                throw JSONException("chatgpt stream is malformed: $kind")
             }
         }
-    }
-
-    /**
-     * Server `json.loads(arguments)` then `isinstance(..., dict)`: text that is
-     * not JSON stays a JSONException (`malformed_payload`); JSON that is not
-     * an object is `chatgpt_response_invalid` (`provider_rejected`).
-     */
-    private fun requireObject(text: String) {
-        try {
-            JSONObject(text)
-        } catch (notObject: JSONException) {
-            val value = text.trim()
-            val otherJson = runCatching { JSONArray(value) }.isSuccess ||
-                value.matches(JSON_SCALAR) ||
-                (value.startsWith('"') && runCatching { JSONTokener(value).nextValue() is String }.getOrDefault(false))
-            if (otherJson) fail("chatgpt_response_invalid")
-            throw notObject
+        answer.optJSONArray("tool_shapes")?.let { shapes ->
+            // Tool metadata explains protocol failures without logging text or arguments.
+            Log.w("InkuProvider", "chatgpt_tool_shape $shapes streamed_calls=${answer.optInt("streamed_calls")} " +
+                "finalized_calls=${answer.optInt("finalized_calls")}")
         }
-    }
-
-    override fun finish(): String {
-        if (buffer.any { !it.toInt().toChar().isWhitespace() } || completed == null) fail("chatgpt_response_incomplete")
-        return completed!!
-    }
-
-    private fun fail(code: String): Nothing = throw ChatGptException(code)
-
-    private companion object {
-        const val LF: Byte = 10
-        const val CR: Byte = 13
-        val JSON_SCALAR = Regex("true|false|null|-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?")
-    }
-}
-
-/** Server's Vision TextSSEDecoder: only finalized assistant text can advise. */
-internal class ChatGptVisionSseDecoder(private val textLimit: Int = 512 * 1024) : ChatGptStreamDecoder {
-    private var buffer = ByteArray(0)
-    private var wireBytes = 0
-    private val finalized = linkedMapOf<String, JSONObject>()
-    private var completed: String? = null
-    private var terminal: JSONObject? = null
-    override val usage: JSONObject? get() = terminal?.optJSONObject("usage")
-
-    override fun feed(chunk: ByteArray) {
-        wireBytes += chunk.size
-        if (wireBytes > maxOf(1024 * 1024, textLimit * 6 + 512 * 1024)) fail("chatgpt_response_too_large")
-        buffer += chunk
-        while (true) {
-            var end = -1; var separator = 0
-            for (i in buffer.indices) {
-                val length = blankLineAt(i)
-                if (length > 0) { end = i; separator = length; break }
-            }
-            if ((if (end < 0) buffer.size else end) > maxOf(64 * 1024, textLimit * 2 + 64 * 1024)) {
-                fail("chatgpt_response_too_large")
-            }
-            if (end < 0) break
-            val text = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
-                .decode(ByteBuffer.wrap(buffer.copyOfRange(0, end))).toString()
-            buffer = buffer.copyOfRange(end + separator, buffer.size)
-            val data = text.lines().filter { it.startsWith("data:") }.joinToString("\n") { it.substring(5).trimStart(' ') }
-            if (data.isNotEmpty() && data != "[DONE]") event(JSONObject(data))
-        }
-    }
-
-    private fun blankLineAt(start: Int): Int {
-        fun lineEnd(at: Int): Int = when {
-            at < buffer.size && buffer[at] == LF -> 1
-            at + 1 < buffer.size && buffer[at] == CR && buffer[at + 1] == LF -> 2
-            else -> 0
-        }
-        val first = lineEnd(start)
-        if (first == 0) return 0
-        val second = lineEnd(start + first)
-        return if (second == 0) 0 else first + second
-    }
-
-    private fun textOf(item: JSONObject): String {
-        if (item.optString("type") == "reasoning") return ""
-        if (item.optString("type") != "message" || item.optString("role") != "assistant") fail("chatgpt_unexpected_tool")
-        if (item.has("status") && !item.isNull("status") && item.optString("status") != "completed") {
-            throw ChatGptException("chatgpt_response_incomplete", "provider_rejected")
-        }
-        val content = item.optJSONArray("content") ?: JSONArray()
-        val parts = buildString {
-            for (index in 0 until content.length()) {
-                val part = content.optJSONObject(index) ?: fail("chatgpt_response_invalid")
-                if (part.optString("type") == "refusal") fail("chatgpt_refused")
-                if (part.optString("type") != "output_text") fail("chatgpt_response_invalid")
-                append(part.opt("text") as? String ?: fail("chatgpt_response_invalid"))
-            }
-        }
-        if (parts.toByteArray(Charsets.UTF_8).size > textLimit) fail("chatgpt_response_too_large")
-        return parts
-    }
-
-    private fun event(event: JSONObject) {
-        val type = event.optString("type")
-        if (type == "error" || type == "response.failed") throw chatGptResponseError(event)
-        if (type == "response.incomplete") fail("chatgpt_response_incomplete")
-        if (type.contains("refusal")) fail("chatgpt_refused")
-        if (terminal != null) fail("chatgpt_response_invalid")
-        when (type) {
-            "response.output_item.added", "response.output_item.done" -> {
-                val item = event.getJSONObject("item")
-                if (item.optString("type") !in setOf("message", "reasoning")) fail("chatgpt_unexpected_tool")
-                if (type.endsWith(".done")) {
-                    textOf(item)
-                    finalized[item.getString("id")] = item
-                }
-            }
-            "response.completed" -> {
-                val response = event.getJSONObject("response")
-                if (response.optString("status") != "completed") {
-                    throw ChatGptException("chatgpt_response_incomplete", "provider_rejected")
-                }
-                val output = response.optJSONArray("output")
-                if (response.has("output") && !response.isNull("output") && output == null) fail("chatgpt_response_invalid")
-                val items = if (output == null || output.length() == 0) finalized.values.toList() else
-                    (0 until output.length()).map { output.optJSONObject(it) ?: fail("chatgpt_response_invalid") }
-                val text = items.joinToString("") { textOf(it) }
-                if (text.toByteArray(Charsets.UTF_8).size > textLimit) fail("chatgpt_response_too_large")
-                if (text.isEmpty()) fail("chatgpt_response_invalid")
-                completed = text
-                terminal = response
-            }
-            "response.output_text.delta", "response.output_text.done" -> {
-                val field = if (type.endsWith(".delta")) "delta" else "text"
-                val value = event.opt(field) as? String ?: fail("chatgpt_response_invalid")
-                if (value.toByteArray(Charsets.UTF_8).size > textLimit) fail("chatgpt_response_too_large")
-            }
-            else -> if (type.startsWith("response.function_call")) fail("chatgpt_unexpected_tool")
-        }
-    }
-
-    override fun finish(): String {
-        if (buffer.any { !it.toInt().toChar().isWhitespace() } || completed == null) fail("chatgpt_response_incomplete")
-        return completed!!
-    }
-
-    private fun fail(code: String): Nothing = throw ChatGptException(code)
-
-    private companion object {
-        const val LF: Byte = 10
-        const val CR: Byte = 13
+        throw chatGptFailure(answer)
     }
 }

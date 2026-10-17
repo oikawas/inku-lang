@@ -5,13 +5,19 @@
 
 最終更新: 2026-10-17。
 
+## 2026-10-17 ChatGPTプランの本文と流れを共有coreへ
+
+ChatGPTプランの描画と推敲のVision助言の本文、SSEの流れの読み、失敗の分類、本人のモデル一覧の読みを、JNI経由の共有core `inku.provider-wire.v1`（`chatgpt_request`・`chatgpt_vision_request`・`chatgpt_stream`・`chatgpt_error`・`chatgpt_catalog`）へ移した。Serverと同じバイト列を書き、同じように読む。作者の決定により、Androidは流れを最後まで受け（受けている間に守るのはcoreが返す`wire_limit`だけ）、coreが全体を1回で読む。1つのeventと答えの上限はcoreが読むときに確かめる。UTF-8でないバイトは断り、形の違うeventと引数は`malformed_payload`とする。道具の形の診断は、本文と引数を含めずにLogcat（tag `InkuProvider`）へ`chatgpt_tool_shape`の1行で書く。`OrderedSchemaJson.kt`は消した。
+
+送る前の確かめ（`chatgpt:`の名前、描画の効果、推敲の助言の768×768 PNG）、OAuthとtoken、sessionの世代、取消、使用量の上限での一時停止、HTTP、一覧を保存する前の長さの上限と重複の除去はhostに残す。host JNIの試験は`server/tests/data/provider-wire-cases.json`の`chatgpt`の69行も読む。
+
 ## 2026-10-17 provider本文・応答の共有core化
 
 OpenAI互換・Anthropic・Geminiの要求本文と応答の読み方は、JNIの`providerWire`から共有coreの`inku.provider-wire.v1`を呼ぶ。描画は`pipeline_request`/`pipeline_response`、Visionとデモの指示文は`text_request`/`text_response`を使う。URL、鍵を含まないheader、認証headerの名前と前置き、出力予算、思考・sampling、schema変換と順序、本文の文字列、答え・切れ・malformed・HTTP拒否の分類をcoreが決める。hostは返った本文のUTF-8 bytesを再書式化せずに送り、鍵を指定headerへ足す。
 
 推敲のVision助言は作者の決定によりtoolを付けず、文字の答えからJSONを切り出す。画像は従来の768×768 PNGを保つ。カメラのremote Visionもcoreのtext応答を使い、LiteRTのstream整形をremote応答へ適用しない。鍵・HTTP・timeout・流量・観測記録と端末内LiteRT-LMはhostに残す。Geminiの`count_tokens` descriptorはcoreが返すが、従来Androidに無かった事前HTTP要求は加えない。
 
-ChatGPTプランの要求とSSEは次の段へ残し、`OrderedSchemaJson.kt`と必要な順序参照を保持する。専用Vision助言の受付だけをtoolなしに合わせ、ChatGPTの本文とSSEの形式は変えない。共通fixture `server/tests/data/provider-wire-cases.json`の要求246行・text要求81行・応答97行をhost JNIの試験で読む。
+ChatGPTプランの要求とSSEは次の段（上の節）で移した。専用Vision助言の受付だけをtoolなしに合わせ、ChatGPTの本文とSSEの形式は変えない。共通fixture `server/tests/data/provider-wire-cases.json`の要求246行・text要求81行・応答97行をhost JNIの試験で読む。
 
 ## 2026-10-17 保存作品の推敲3種の共有core化
 
@@ -129,7 +135,7 @@ Anthropicのinput_schema、ChatGPTプランのnamespace関数parametersも、送
 propertyOrderingの順でpropertiesを書き出す。items・配列・入れ子も同じ規則を使い、
 指定に無い欄は元の順で後に続ける。他の鍵と値、propertyOrderingそのものは保持し、語を選別しない。
 構図の読みはthesisが先になり、全欄が指定されたC5の型ではjointsが最後になる。
-OpenAI互換・Anthropic・Geminiの順の計算・投影・圧縮は共有coreが行う。ChatGPTプランだけは移行前の`OrderedSchemaJson`と順序参照を使う。
+OpenAI互換・Anthropic・Geminiの順の計算・投影・圧縮は共有coreが行う。ChatGPTプランも2026-10-17のChatGPTの節から同じ処理を使う。
 JSONObjectへ入れ直すだけで済ませず、送信文字列の順を指定して書く。
 順序の変更が無いJSONは従来のtoStringをそのまま使うため、propertyOrderingの無い
 Stage 1・Stage 2等の本文は同じバイトになる。

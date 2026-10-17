@@ -271,9 +271,12 @@ class ChatGptPlanManager internal constructor(
             val response = http.request("$CHATGPT_RESOURCE/models", token = token, check = { checkSession(ref); Unit })
             val json = JSONObject(response.body)
             if (response.status !in 200..299) throw chatGptResponseError(json, response.status)
-            val raw = json.getJSONArray("models")
-            val models = (0 until raw.length()).map { raw.getJSONObject(it) }.filter { it.optString("visibility") == "list" }
-                .map { ChatGptModel(it.getString("slug"), it.getString("display_name")) }
+            // The shared core reads which models are listed (provider_wire).
+            val listed = SharedProviderWire.call(JSONObject().put("action", "chatgpt_catalog").put("value", json))
+            if (listed.getString("outcome") != "ok") throw JSONException("chatgpt model list is malformed")
+            val raw = listed.getJSONArray("models")
+            val models = (0 until raw.length()).map { raw.getJSONObject(it) }
+                .map { ChatGptModel(it.getString("id"), it.getString("label")) }
             if (models.any { it.id.isBlank() || it.id.length > 256 || it.label.length > 512 }) throw ChatGptException("chatgpt_response_invalid")
             val result = modelArray(models.distinctBy { it.id })
             synchronized(store) {
@@ -316,7 +319,7 @@ class ChatGptPlanManager internal constructor(
 
     override suspend fun generate(request: ModelRequest): ModelResponse {
         // Validate the operation before opening any connection, including catalog retrieval.
-        val body = chatGptRequestText(request)
+        val built = chatGptRequest(request)
         val ref = request.chatGptSession ?: throw ChatGptException("chatgpt_session_required")
         val started = System.nanoTime()
         try {
@@ -329,19 +332,15 @@ class ChatGptPlanManager internal constructor(
                 }
                 check()
                 val token = accessToken(ref)
-                // Refinement advice uses Server's Vision text stream; drawing
+                // Refinement advice reads Server's Vision text stream; drawing
                 // effects still require their completed namespace function.
-                val decoder: ChatGptStreamDecoder = if (request.pipelineAction == REFINEMENT_VISION_ACTION) {
-                    ChatGptVisionSseDecoder()
-                } else {
-                    ChatGptSseDecoder(argumentLimit = MAX_PROVIDER_RESPONSE_BYTES)
-                }
-                val response = http.request("$CHATGPT_RESOURCE/responses", "POST", token, body, timeoutMs = request.timeoutMs ?: 60_000,
-                    check = ::check, onChunk = decoder::feed)
+                val stream = ChatGptStream(built)
+                val response = http.request("$CHATGPT_RESOURCE/responses", "POST", token, built.body, timeoutMs = request.timeoutMs ?: 60_000,
+                    check = ::check, onChunk = stream::feed)
                 if (response.status !in 200..299) throw chatGptResponseError(runCatching { JSONObject(response.body) }.getOrDefault(JSONObject()), response.status)
-                val text = decoder.finish(); check()
-                ModelResponse(text, request.modelId, decoder.usage?.optInt("input_tokens")?.takeIf { it > 0 },
-                    decoder.usage?.optInt("output_tokens")?.takeIf { it > 0 }, (System.nanoTime() - started) / 1_000_000)
+                val text = stream.finish(); check()
+                ModelResponse(text, request.modelId, stream.usage?.optInt("input_tokens")?.takeIf { it > 0 },
+                    stream.usage?.optInt("output_tokens")?.takeIf { it > 0 }, (System.nanoTime() - started) / 1_000_000)
             } }
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (error: Exception) {

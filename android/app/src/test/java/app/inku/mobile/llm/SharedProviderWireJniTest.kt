@@ -27,6 +27,7 @@ class SharedProviderWireJniTest {
             if (text.startsWith("\"requests\": [")) section = "requests"
             if (text.startsWith("\"text_requests\": [")) section = "text_requests"
             if (text.startsWith("\"responses\": [")) section = "responses"
+            if (text.startsWith("\"chatgpt\": [")) section = "chatgpt"
             if (!text.startsWith("{\"why\":")) continue
             val start = text.indexOf(",\"request\":") + ",\"request\":".length
             val end = text.lastIndexOf(",\"expect\":")
@@ -157,6 +158,29 @@ class SharedProviderWireJniTest {
                 sameJson("$why $key", expected.get(key), answer.get(key))
             }
         }
+    }
+
+    /** ChatGPT plan bodies, streams, failures and model lists, as Server writes and reads them. */
+    @Test
+    fun allChatGptRowsMatchServer() {
+        val rows = requireNotNull(cases["chatgpt"])
+        assertEquals(69, rows.size)
+        val actions = mutableMapOf<String, Int>()
+        for ((index, item) in rows.withIndex()) {
+            val row = item.row
+            val why = "chatgpt[$index] ${row.getString("why")}"
+            val action = row.getJSONObject("request").getString("action")
+            actions[action] = (actions[action] ?: 0) + 1
+            val expected = row.getJSONObject("expect")
+            val answer = SharedProviderWire.call(item.requestJson)
+            assertEquals(why, SharedProviderWire.SCHEMA, answer.getString("schema"))
+            for (key in expected.keys().asSequence()) {
+                assertTrue("$why missing $key", answer.has(key))
+                sameJson("$why $key", expected.get(key), answer.get(key))
+            }
+        }
+        assertEquals(mapOf("chatgpt_request" to 8, "chatgpt_vision_request" to 8, "chatgpt_stream" to 42,
+            "chatgpt_error" to 9, "chatgpt_catalog" to 2), actions)
     }
 
     @Test

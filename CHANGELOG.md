@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Move Android ChatGPT plan bodies and stream reading to the shared core
+
+Android now takes ChatGPT-plan drawing and refinement Vision bodies, the reading of their SSE streams, the failure classes and the personal model list from `inku.provider-wire.v1` through JNI, byte for byte as Server. The whole stream is received within the core's wire limit and read once by the core, as the author decided. Tokens, sessions, cancellation, the usage-limit pause and HTTP stay in the host; `OrderedSchemaJson.kt` is removed.
+
 ### 2026-10-17 — Send Android Gemini model names as Server does
 
 Android no longer removes a leading `models/` from a Gemini model name before handing it to the shared core for drawing, Vision and demo requests. As on Server the whole name is percent-encoded into the URL, so `models/gemini-3.6-flash` is sent to `models/models%2Fgemini-3.6-flash:generateContent`. Model-list fetching still removes the prefix, as Server does. No catalog model starts with `models/`, so the usual requests are unchanged.

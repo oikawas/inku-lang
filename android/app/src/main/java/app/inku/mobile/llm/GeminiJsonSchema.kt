@@ -13,7 +13,7 @@ internal object GeminiJsonSchema {
             .getJSONArray("functionDeclarations").getJSONObject(0).getJSONObject("parametersJsonSchema")
     }
 
-    /** ChatGPT's ordered schema writer still needs to inspect declared names. */
+    /** Tests read the declared property order of a schema the core projected. */
     internal fun orderedPropertyNames(schema: JSONObject): List<String> {
         val properties = schema.optJSONObject("properties") ?: return emptyList()
         val named = schema.optJSONArray("propertyOrdering")?.let { order ->

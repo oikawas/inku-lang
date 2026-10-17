@@ -6,13 +6,19 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-10-17.
 
+## 2026-10-17 ChatGPT plan bodies and streams in the shared core
+
+ChatGPT-plan drawing and refinement Vision bodies, the reading of their SSE streams, the failure classes and the personal model list now come from shared-core `inku.provider-wire.v1` through JNI (`chatgpt_request`, `chatgpt_vision_request`, `chatgpt_stream`, `chatgpt_error`, `chatgpt_catalog`), byte for byte as Server writes and reads them. At the author's decision, Android receives the whole stream, bounded only by the core's `wire_limit` while it arrives, and the core reads it once; each event and the answer are bounded as the core reads them. Bytes that are not UTF-8 are refused; events and arguments of the wrong shape are `malformed_payload`. A tool-shape diagnosis is logged to Logcat (tag `InkuProvider`) as one `chatgpt_tool_shape` line without text or arguments. `OrderedSchemaJson.kt` is removed.
+
+The host keeps the operation checks before sending (the `chatgpt:` name, the drawing effects, the 768×768 PNG of refinement advice), OAuth and tokens, the session generation, cancellation, the usage-limit pause, HTTP, and the length bound and de-duplication before a model list is stored. Host-JNI tests read the 69 `chatgpt` rows of `server/tests/data/provider-wire-cases.json` too.
+
 ## 2026-10-17 Provider bodies and responses in the shared core
 
 OpenAI-compatible, Anthropic and Gemini request bodies and response interpretation call shared-core `inku.provider-wire.v1` through JNI `providerWire`. Drawing uses `pipeline_request`/`pipeline_response`; Vision and demo instructions use `text_request`/`text_response`. The core decides URLs, non-secret headers, authentication header names and prefixes, output budgets, thinking and sampling, schema projection and order, body strings, and answer/cut/malformed/HTTP-refusal outcomes. The host sends the returned UTF-8 body bytes without reformatting and adds its key under the named header.
 
 At the author's decision, refinement Vision advice has no tool and extracts JSON from the text answer. Its image remains a 768×768 PNG. Remote camera Vision also uses core text responses without applying LiteRT stream cleanup. Keys, HTTP, timeouts, rate control, observations and on-device LiteRT-LM remain in the host. Gemini returns a `count_tokens` descriptor; Android does not add a preflight HTTP request it did not previously make.
 
-ChatGPT-plan requests and SSE remain for the next stage, retaining `OrderedSchemaJson.kt` and its ordering lookup. Only the dedicated Vision-advice admission changes to accept no tool; ChatGPT body and SSE formats stay the same. Host-JNI tests read all 246 pipeline requests, 81 text requests and 97 responses in `server/tests/data/provider-wire-cases.json`.
+ChatGPT-plan requests and SSE moved in the next stage (the section above). Only the dedicated Vision-advice admission changes to accept no tool; ChatGPT body and SSE formats stay the same. Host-JNI tests read all 246 pipeline requests, 81 text requests and 97 responses in `server/tests/data/provider-wire-cases.json`.
 
 ## 2026-10-17 Three saved-work refinements in the shared core
 
@@ -149,7 +155,7 @@ in propertyOrdering order. Apply the same rule inside items, arrays and nested o
 unlisted properties follow in their previous order. Preserve every other key and value,
 propertyOrdering itself and all keywords. Composition readings put thesis first;
 the C5 schema puts joints last when all its fields are listed.
-The shared core performs ordering, projection and compaction for OpenAI-compatible, Anthropic and Gemini requests. Only ChatGPT plans retain `OrderedSchemaJson` and its ordering lookup until their migration.
+The shared core performs ordering, projection and compaction for OpenAI-compatible, Anthropic and Gemini requests. ChatGPT plans have used it too since the 2026-10-17 ChatGPT section.
 Write the order explicitly in the sent text rather than relying only on reinsertion into JSONObject.
 JSON whose order does not change uses its original toString, so Stage 1, Stage 2 and other requests
 without propertyOrdering keep the same bytes.

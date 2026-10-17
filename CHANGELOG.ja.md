@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-17 — AndroidのChatGPTプランの本文と流れの読みを共有coreへ移行
+
+Androidは、ChatGPTプランの描画と推敲のVision助言の本文、SSEの流れの読み、失敗の分類、本人のモデル一覧の読みを、JNI経由の`inku.provider-wire.v1`から受けるようにした。Serverと同じバイト列である。作者の決定どおり、流れはcoreが返す上限の中で最後まで受け、coreが1回で読む。token・session・取消・使用量の上限での一時停止・HTTPはhostに残し、`OrderedSchemaJson.kt`は消した。
+
 ### 2026-10-17 — AndroidのGeminiのモデル名をServerと同じに送る
 
 Androidは描画・Vision・デモの要求で、Geminiのモデル名の先頭の`models/`を外さずに共有coreへ渡すようにした。Serverと同じく名前全体をURLへpercent encodeするので、`models/gemini-3.6-flash`は`models/models%2Fgemini-3.6-flash:generateContent`へ送る。モデル一覧の取得では、Serverと同じく引き続き外す。目録に`models/`で始まるモデルは無いので、ふつうの要求の送り先は変わらない。

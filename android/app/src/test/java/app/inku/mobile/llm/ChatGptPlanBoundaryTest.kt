@@ -90,6 +90,13 @@ class ChatGptPlanBoundaryTest {
                 .put("usage", JSONObject().put("input_tokens", 15).put("output_tokens", 28)))
     }
 
+    /** A stream read as the plan manager reads it: received in pieces, then read once by the core. */
+    private fun stream(mode: String = "pipeline"): ChatGptStream {
+        val limit = if (mode == "text") 512 * 1024 else MAX_PROVIDER_RESPONSE_BYTES
+        val wire = SharedProviderWire.call(JSONObject().put("action", "chatgpt_limits").put("answer_limit", limit)).getLong("wire_limit")
+        return ChatGptStream(ChatGptRequest("", mode, limit, wire))
+    }
+
     private fun rejected(code: String, block: () -> Unit) {
         try { block(); fail("Expected $code") } catch (error: ChatGptException) { assertEquals(code, error.code) }
     }
@@ -157,15 +164,19 @@ class ChatGptPlanBoundaryTest {
     fun splitUtf8AndAuxiliaryMessagesNeedACompletedFunctionAndNeverBecomeDrawingData() {
         val auxiliary = JSONObject().put("type", "message").put("role", "assistant").put("id", "message")
             .put("content", JSONArray().put(JSONObject().put("type", "output_text").put("text", "Do not draw this text")))
-        val decoder = ChatGptSseDecoder()
+        val decoder = stream()
         (event("response.output_item.done", "item", auxiliary) + completedStream()).toByteArray().forEach { decoder.feed(byteArrayOf(it)) }
         assertEquals("赤い円。", JSONObject(decoder.finish()).getString("ddl"))
         assertEquals(12, decoder.usage?.getInt("output_tokens"))
-        val partial = ChatGptSseDecoder()
-        partial.feed(event("response.output_item.added", "item", function().put("arguments", "")).toByteArray())
+        val added = event("response.output_item.added", "item", function().put("arguments", "")).toByteArray()
+        val partial = stream()
+        partial.feed(added)
         rejected("chatgpt_response_incomplete") { partial.finish() }
-        rejected("chatgpt_unexpected_tool") { partial.feed(event("response.completed", "response", JSONObject().put("status", "completed").put("output", JSONArray())).toByteArray()) }
-        rejected("chatgpt_unexpected_tool") { ChatGptSseDecoder().feed(event("response.output_item.done", "item", function().put("namespace", "other")).toByteArray()) }
+        val summary = stream()
+        summary.feed(added)
+        summary.feed(event("response.completed", "response", JSONObject().put("status", "completed").put("output", JSONArray())).toByteArray())
+        rejected("chatgpt_unexpected_tool") { summary.finish() }
+        rejected("chatgpt_unexpected_tool") { stream().apply { feed(event("response.output_item.done", "item", function().put("namespace", "other")).toByteArray()) }.finish() }
     }
 
     @Test
@@ -248,13 +259,13 @@ class ChatGptPlanBoundaryTest {
                 content.getJSONObject(1).getString("image_url").substringAfter("base64,")))
             val calls = http.calls.size
             rejected("chatgpt_operation_not_supported") {
-                chatGptRequestBody(request(ref).copy(imageJpeg = byteArrayOf(1, 2, 3)))
+                chatGptRequest(request(ref).copy(imageJpeg = byteArrayOf(1, 2, 3)))
             }
             rejected("chatgpt_operation_not_supported") {
-                chatGptRequestBody(request(ref).copy(pipelineAction = null, imageJpeg = byteArrayOf(1, 2, 3)))
+                chatGptRequest(request(ref).copy(pipelineAction = null, imageJpeg = byteArrayOf(1, 2, 3)))
             }
             rejected("chatgpt_operation_not_supported") {
-                chatGptRequestBody(request(ref).copy(pipelineAction = REFINEMENT_VISION_ACTION, imageJpeg = byteArrayOf(1)))
+                chatGptRequest(request(ref).copy(pipelineAction = REFINEMENT_VISION_ACTION, imageJpeg = byteArrayOf(1)))
             }
             try {
                 RefinementVisionAdviser(manager, ref.copy(generation = ref.generation - 1)).advise(visionRequest)
@@ -268,14 +279,13 @@ class ChatGptPlanBoundaryTest {
 
     @Test
     fun visionStreamRejectsPartialTextAndFunctionCalls() {
-        val partial = ChatGptVisionSseDecoder()
+        val partial = stream("text")
         partial.feed(("data: " + JSONObject().put("type", "response.output_text.delta")
             .put("delta", "partial") + "\r\n\r\n").toByteArray())
         rejected("chatgpt_response_incomplete") { partial.finish() }
-        val tool = ChatGptVisionSseDecoder()
-        rejected("chatgpt_unexpected_tool") {
-            tool.feed(event("response.output_item.done", "item", function()).toByteArray())
-        }
+        val tool = stream("text")
+        tool.feed(event("response.output_item.done", "item", function()).toByteArray())
+        rejected("chatgpt_unexpected_tool") { tool.finish() }
     }
 
     @Test
@@ -322,7 +332,7 @@ class ChatGptPlanBoundaryTest {
     /** Server `SSEDecoder`: `\r?\n\r?\n` ends an event, so LF followed by CRLF does too. */
     @Test
     fun aLineFeedThenCrlfBlankLineEndsAnEvent() {
-        val decoder = ChatGptSseDecoder()
+        val decoder = stream()
         decoder.feed(completedStream().replace("\r\n\r\n", "\n\r\n").toByteArray())
         assertEquals("赤い円。", JSONObject(decoder.finish()).getString("ddl"))
     }
@@ -342,7 +352,7 @@ class ChatGptPlanBoundaryTest {
     @Test
     fun streamFailuresAreClassedAsTheServerClassesThem() {
         fun decoded(vararg events: String) = runCatching {
-            ChatGptSseDecoder().apply { events.forEach { feed(it.toByteArray()) } }.finish()
+            stream().apply { events.forEach { feed(it.toByteArray()) } }.finish()
         }.exceptionOrNull()!!
         val added = event("response.output_item.added", "item", function().put("arguments", ""))
         // An unfinished item or response is a refusal; a stream that stops is temporary.
@@ -444,13 +454,16 @@ class ChatGptPlanBoundaryTest {
             val cases = listOf("read_composition" to SchemaOrderFixtures.reading) + SchemaOrderFixtures.plain
             for ((action, schema) in cases) {
                 val request = SchemaOrderFixtures.request("chatgpt:personal-model", action, schema).copy(chatGptSession = ref)
-                val before = chatGptRequestBody(request).toString()
+                val before = chatGptRequest(request).body
                 manager.generate(request)
                 if (action == "read_composition") {
                     val sentSchema = JSONObject(wire).getJSONArray("tools").getJSONObject(0)
                         .getJSONArray("tools").getJSONObject(0).getJSONObject("parameters")
                     SchemaOrderFixtures.assertOrdered(wire, sentSchema)
-                } else SchemaOrderFixtures.assertBytes(before, wire)
+                } else {
+                    SchemaOrderFixtures.assertBytes(before, wire)
+                    assertTrue("$action keeps its schema byte for byte", wire.contains("\"parameters\":$schema,"))
+                }
             }
         }
     }

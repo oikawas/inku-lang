@@ -297,15 +297,11 @@ class AndroidWorkPipeline(
     ): PaintResult {
         val parent = replaySource(request.parentHistoryId, parentScoreJson)
         val source = parent?.history ?: throw PipelineHostException("ground_parent_not_found")
-        require(GroundVariants.plan(source.scoreJson).entries.any { it.material == material }) {
-            "ground must differ from the saved work"
-        }
-        val changedScore = GroundVariants.scoreWithGround(source.scoreJson, material)
-        val changedDdl = GroundVariants.ddlWithGround(source.normalizedDdl.orEmpty(), material,
-            source.instructionLangResolved)
-        val result = renderScoreWithSource(changedScore, request, parent)
+        val changed = GroundVariants.render(source.scoreJson, source.normalizedDdl.orEmpty(), material,
+            source.instructionLangResolved, binding)
+        val result = renderScoreWithSource(changed.scoreJson, request, parent)
         return result.copy(
-            normalizedDdl = changedDdl,
+            normalizedDdl = changed.ddl,
             managedHistoryReplay = null,
             managedGroundVariant = result.managedHistoryReplay?.let { ManagedGroundVariantInput(it, material) },
         )
@@ -317,11 +313,10 @@ class AndroidWorkPipeline(
         scoreJson: String,
         request: PaintRequest,
     ): app.inku.mobile.data.refinement.ToolChangeSource {
-        replaySource(request.parentHistoryId, scoreJson)
-        val config = prepare(request, descriptionFlow = false, text = ddl).request.config.configJson
-        val input = JSONObject().put("config", JSONObject(config)).put("source", ddl).put("tools", JSONObject())
-        val answer = JSONObject(binding.retouch(input.toString().encodeToByteArray()).toString(Charsets.UTF_8))
-        return app.inku.mobile.data.refinement.ToolChangePlanner.read(ddl, scoreJson, config, answer)
+        val parent = replaySource(request.parentHistoryId, scoreJson)
+        val config = parent?.forkContextJson?.let(::JSONObject)?.getJSONObject("config")?.toString()
+            ?: prepare(request, descriptionFlow = false, text = ddl).request.config.configJson
+        return app.inku.mobile.data.refinement.ToolChangePlanner.source(ddl, scoreJson, config, binding)
     }
 
     suspend fun renderToolChange(
@@ -329,10 +324,6 @@ class AndroidWorkPipeline(
         request: PaintRequest,
     ): PaintResult? {
         val source = option.source
-        require(option.tools.isNotEmpty() && option.changes.isNotEmpty())
-        require(option.tools.all { (index, tool) ->
-            index in source.drawn && source.tools.any { it.value == tool }
-        })
         val parent = replaySource(request.parentHistoryId, source.scoreJson)
         require(parent?.history?.normalizedDdl == source.source) { "tool source changed" }
         val savedOptions = parent?.forkContextJson?.let(::JSONObject)?.optJSONObject("host_options")
@@ -348,19 +339,13 @@ class AndroidWorkPipeline(
                 ?: JSONObject(source.configJson).optJSONObject("compiler")?.optionalUnsignedLong("composition_seed")
                 ?: metadata?.optionalUnsignedLong("composition_seed"),
         )
-        val input = JSONObject().put("config", JSONObject(source.configJson)).put("source", source.source)
-            .put("tools", JSONObject(option.tools.mapKeys { it.key.toString() }))
-        val answer = JSONObject(binding.retouch(input.toString().encodeToByteArray()).toString(Charsets.UTF_8))
-        require(answer.optString("schema") == "inku.touch-change.v1") { "retouch schema mismatch" }
-        if (answer.optString("outcome") != "retouched") return null
-        val changedSource = answer.getString("source")
-        val changedScore = app.inku.mobile.data.refinement.ToolChangePlanner.scoreWithTools(source.scoreJson, option.tools)
-        val result = renderScoreWithSource(changedScore, fixedRequest, parent)
+        val changed = app.inku.mobile.data.refinement.ToolChangePlanner.render(source, option.mode, option.tools)
+        val result = renderScoreWithSource(changed.scoreJson, fixedRequest, parent)
         return result.copy(
-            normalizedDdl = changedSource,
+            normalizedDdl = changed.ddl,
             managedHistoryReplay = null,
             managedToolChange = result.managedHistoryReplay?.let {
-                app.inku.mobile.data.db.ManagedToolChangeInput(it, source.source, option.tools, changedSource)
+                app.inku.mobile.data.db.ManagedToolChangeInput(it, source.source, option.tools, changed.ddl, option.mode)
             },
         )
     }

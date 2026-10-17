@@ -511,7 +511,7 @@ class InkuViewModel @JvmOverloads constructor(
     private var canvasSearchSerial = 0L
     private var lastBatchSnapshot: BatchSnapshot? = null
     private var lastBatchSavedWork: HistoryItemEntity? = null
-    private val colorArrangementCursors = mutableMapOf<String, Int?>()
+    private val colorArrangementCursors = mutableMapOf<String, java.math.BigInteger?>()
     private var toolChangeNextNumber = 1
     private var litertWarmupJob: Job? = null
     private var cameraJob: Job? = null
@@ -3403,7 +3403,7 @@ class InkuViewModel @JvmOverloads constructor(
         val id: String, val label: String, val plan: RefinementPlan,
         val render: (suspend () -> Pair<RefinementPlan, PaintResult>)? = null,
         val colorArrangement: Boolean = false,
-        val nextColorCursor: Int? = null,
+        val nextColorCursor: java.math.BigInteger? = null,
     )
 
     /** A refusal the author has to read, not a failure: it carries the sentence. */
@@ -3424,20 +3424,23 @@ class InkuViewModel @JvmOverloads constructor(
             RefinementSubview.Model -> modelJobs(current, parent)
             RefinementSubview.ColorArrangement -> {
                 if (colorArrangementCursors.containsKey(parent.historyId) && colorArrangementCursors[parent.historyId] == null) return emptyList()
-                val page = withContext(Dispatchers.IO) { repository.colorArrangementPage(parent, colorArrangementCursors[parent.historyId] ?: 0) }
+                val page = withContext(Dispatchers.IO) {
+                    repository.colorArrangementPage(parent, colorArrangementCursors[parent.historyId] ?: java.math.BigInteger.ZERO)
+                }
                 if (page.entries.isEmpty()) {
                     colorArrangementCursors[parent.historyId] = null
                     localState.value = localState.value.copy(colorArrangementExhausted = true)
                 }
                 page.entries.map { index ->
-                    CandidateJob("arrangement-$index", "${strings().colorArrangementEditAction} ${index + 1}",
+                    val next = index + java.math.BigInteger.ONE
+                    CandidateJob("arrangement-$index", "${strings().colorArrangementEditAction} $next",
                         RefinementPlanner.plan(RefinementElement.Layout, parent),
                         render = { repository.renderColorArrangementCandidate(parent, index, current.refinementWildOverride) },
-                        colorArrangement = true, nextColorCursor = (index + 1).takeIf { it < page.total })
+                        colorArrangement = true, nextColorCursor = next.takeIf { it < page.total })
                 }
             }
             RefinementSubview.Ground -> {
-                val plan = repository.groundVariantPlan(parent)
+                val plan = withContext(Dispatchers.IO) { repository.groundVariantPlan(parent) }
                 localState.value = localState.value.copy(groundCurrentLabel =
                     (if (current.uiLanguage == UiLanguage.Ja) plan.currentLabelJa else plan.currentLabelEn) ?: plan.current)
                 plan.entries.map { entry ->

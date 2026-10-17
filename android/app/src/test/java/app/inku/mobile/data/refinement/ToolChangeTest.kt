@@ -1,53 +1,66 @@
 package app.inku.mobile.data.refinement
 
-import app.inku.mobile.data.lineage.LineagePlanner
-import org.json.JSONObject
-import org.junit.Assert.*
+import app.inku.mobile.pipeline.SharedPipelineBinding
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.random.Random
 
 class ToolChangeTest {
     @Test
-    fun optionsChangeOnlyEligibleSourceOwnersAndKeepTheParentScore() {
-        val score = """{"canvas":{"ground":{"material":"washi"}},"instructions":[
-          {"weight":"pen","color":"red","arrangement":{"resolved":{"owner":{"kind":"source_instruction","instruction_index":0},"bounds":[1,2,3,4]}}},
-          {"weight":"pen","color":"blue","arrangement":{"resolved":{"owner":{"kind":"source_instruction","instruction_index":0},"bounds":[5,6,7,8]}}},
-          {"weight":"pencil","arrangement":{"resolved":{"owner":{"kind":"source_instruction","instruction_index":2}}}},
-          {"weight":"pen","arrangement":{"resolved":{"owner":{"kind":"plugin","instruction_index":0}}}},
-          {"weight":"pen","arrangement":{"resolved":{"owner":{"kind":"source_instruction","instruction_index":"0"}}}}
-        ]}"""
-        val answer = JSONObject("""{"schema":"inku.touch-change.v1","outcome":"read","sentences":[{"index":0},{"index":2}],
-          "tools":[{"value":"pen","ja":"ペン","en":"pen"},{"value":"pencil","ja":"鉛筆","en":"pencil"},
-          {"value":"chalk","ja":"チョーク","en":"chalk"},{"value":"crayon","ja":"クレヨン","en":"crayon"},
-          {"value":"brush_thin","ja":"細筆","en":"fine brush"},{"value":"brush_thick","ja":"太筆","en":"thick brush"}]}""")
-        val parent = ToolChangePlanner.read("parent instructions", score, "{}", answer)
-        assertEquals(mapOf(0 to "pen", 2 to "pencil"), parent.drawn)
-        val uniform = ToolChangePlanner.options(parent.copy(drawn = mapOf(0 to "pen", 2 to "pen")), ToolChangeMode.Uniform, Random(7))
-        assertEquals(4, uniform.size)
-        assertEquals(4, uniform.map { it.tools.values.first() }.toSet().size)
-        assertTrue(uniform.none { "pen" in it.tools.values })
-        assertTrue(uniform.all { it.tools.values.toSet().size == 1 })
-        val individual = ToolChangePlanner.options(parent, ToolChangeMode.PerSentence, Random(9))
-        assertEquals(4, individual.size)
-        assertTrue(individual.all { option -> option.tools.all { (index, tool) -> tool != parent.drawn[index] } })
-        assertEquals("per_sentence", individual.first().metadata()["tool_mode"])
-        val changed = JSONObject(ToolChangePlanner.scoreWithTools(score, mapOf(0 to "chalk")))
-        val before = JSONObject(score)
-        assertEquals("pen", before.getJSONArray("instructions").getJSONObject(0).getString("weight"))
-        val commands = changed.getJSONArray("instructions")
-        assertEquals("chalk", commands.getJSONObject(0).getString("weight"))
-        assertEquals("chalk", commands.getJSONObject(1).getString("weight"))
-        for (index in 2..4) assertEquals(
-            LineagePlanner.canonicalJson(before.getJSONArray("instructions").getJSONObject(index)),
-            LineagePlanner.canonicalJson(commands.getJSONObject(index)),
-        )
-        assertEquals(before.getJSONObject("canvas").toString(), changed.getJSONObject("canvas").toString())
-        for (index in 0..1) {
-            val original = before.getJSONArray("instructions").getJSONObject(index)
-            val actual = commands.getJSONObject(index)
-            original.remove("weight"); actual.remove("weight")
-            assertEquals(LineagePlanner.canonicalJson(original), LineagePlanner.canonicalJson(actual))
+    fun planAndRenderMapCoreAnswersAndPreserveUnsignedSeedAndRawScore() {
+        val score = """{"large":18446744073709551615,"instructions":[]}"""
+        val binding = RecordingVariantsBinding { request ->
+            when {
+                request.contains("\"action\":\"tool_plan\"") -> """{"schema":"inku.saved-variants.v1","outcome":"ok",
+                    "mode":"uniform","tool_labels":[{"value":"pen","ja":"ペン","en":"pen"}],
+                    "sentences":[{"index":0,"tool":"pen"}],
+                    "entries":[{"tools":{"0":"chalk"},"changes":[{"index":0,"from":"pen","to":"chalk"}],"ddl":"chalk DDL"}]}"""
+                else -> """{"schema":"inku.saved-variants.v1","outcome":"ok","score":$score,
+                    "ddl":"chalk DDL","derivation_metadata":{"tool_mode":"uniform","tools":{"0":"chalk"},
+                    "changes":[{"index":0,"from":"pen","to":"chalk"}]}}"""
+            }
         }
-        assertTrue(ToolChangePlanner.options(parent.copy(drawn = emptyMap()), ToolChangeMode.Uniform).isEmpty())
+        val source = ToolChangePlanner.source("source DDL", score, "{}", binding)
+        val option = ToolChangePlanner.options(source, ToolChangeMode.Uniform, Long.MIN_VALUE).single()
+        assertTrue(binding.requests.first().contains("\"seed\":9223372036854775808"))
+        assertTrue(binding.requests.first().contains("\"score\":$score"))
+        assertEquals(mapOf(0 to "pen"), option.source.drawn)
+        assertEquals(listOf(TouchTool("pen", "ペン", "pen")), option.source.tools)
+        assertEquals(mapOf(0 to "chalk"), option.tools)
+        assertEquals(listOf(ToolChange(0, "pen", "chalk")), option.changes)
+        assertEquals("chalk DDL", option.ddl)
+        val rendered = ToolChangePlanner.render(option)
+        assertEquals(score, rendered.scoreJson)
+        assertEquals("chalk DDL", rendered.ddl)
+        assertEquals("uniform", rendered.derivationMetadata["tool_mode"])
+        assertEquals(rendered.derivationMetadata, option.metadata())
     }
+
+    @Test
+    fun refusalDetailComesFromCoreWithoutHostRewrite() {
+        val binding = RecordingVariantsBinding {
+            """{"schema":"inku.saved-variants.v1","outcome":"refused","reason":"no_change","detail":"core says: no change"}"""
+        }
+        val source = ToolChangePlanner.source("DDL", "{}", "{}", binding)
+        val error = assertThrows(IllegalArgumentException::class.java) {
+            ToolChangePlanner.render(source, ToolChangeMode.Uniform, mapOf(0 to "pen"))
+        }
+        assertEquals("core says: no change", error.message)
+    }
+}
+
+internal class RecordingVariantsBinding(private val answer: (String) -> String) : SharedPipelineBinding {
+    val requests = mutableListOf<String>()
+    override fun savedVariants(inputBytes: ByteArray): ByteArray {
+        val request = inputBytes.toString(Charsets.UTF_8)
+        requests += request
+        return answer(request).encodeToByteArray()
+    }
+    override fun versionReport(): String = error("unexpected")
+    override fun step(snapshotBytes: ByteArray, inputEnvelopeBytes: ByteArray): ByteArray = error("unexpected")
+    override fun canvasRegistry(): String = error("unexpected")
+    override fun resolvePalette(inputBytes: ByteArray): ByteArray = error("unexpected")
+    override fun resolveMacroCatalog(inputBytes: ByteArray): ByteArray = error("unexpected")
+    override fun renderSaved(inputBytes: ByteArray): ByteArray = error("unexpected")
 }

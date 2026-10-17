@@ -190,6 +190,7 @@ Stage 10では行数ではなく変更理由に沿って5つの高変更面を�
 - engine identityとrenderer referenceは同梱Rust coreから取得し、Kotlinに版literalを持たない。
 - preview、thumbnail、refinement、PNG exportは保存済み／現行SVGを`inku-svg-raster`でpixel化する。AndroidSVGとKotlin renderer fallbackは無い。
 - 記述ハッシュ`dh1`、描画ハッシュ`rh3`、正準JSON、指示言語の正規化・判定は`NativePipelineBridge`（JNI）から共有coreを呼ぶ。Kotlinに同じ規則の写しは持たず、系譜の正準JSONも同じ入口を使う。
+- 保存作品のてざわり・支持体・配色の候補と差し替えは、JNIの`savedVariants`から共有coreの`inku.saved-variants.v1`へ委譲する。KotlinはJSONと大きな整数を保つ転送・保存を担い、規則の写しを持たない。配色の子はcoreの`{color_arrangement_index, catalog_id}`を保存する。
 - Kotlinが所有するのはUI、provider設定と通信、カメラ画像の前処理と端末内local LLM、host option、Room／history、coreへ渡すJSONの転送である。保存済みのハッシュを書き換える移行は行わない。旧KotlinのStage 1 / 1.5 / 2とScore coerceはretire済みで、runtime fallbackは無い。
 
 ## i18nとUI token

@@ -6,6 +6,14 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-10-17.
 
+## 2026-10-17 Three saved-work refinements in the shared core
+
+Touch, ground and color-arrangement options and replacements call shared-core `inku.saved-variants.v1` through JNI `savedVariants`. Kotlin only transports inputs and displays or saves responses; it does not copy the tool/ground lists, defaults, sampling, Score replacement or color enumeration. The host supplies a new random 64-bit seed whenever touch options are requested. Refusals retain the core's `detail` unchanged.
+
+An added ground sentence uses the saved instruction language when present, otherwise the shared instruction-language rule. Color indices, cursors and totals use `BigInteger`, preserving both core u64 numbers and larger string integers without rounding. A color child's metadata is the core response's `{color_arrangement_index, catalog_id}`. Touch and ground save-time checks also recalculate through the core. Room schema, migrations and existing saved values remain unchanged.
+
+Host-JNI JVM tests read the shared `server/tests/data/saved-variant-cases.json`. APK packaging, numbering, installation and device UI acceptance are separate work.
+
 ## 2026-10-17 Align composition reading, provider resolution and refinement Vision images with Server
 
 `composition.read` is always true, matching Server. On-device Vision models also receive `read_composition` after Stage 1. The existing shared pipeline owns model selection, retries, answer validation and fallback to the default reading.
@@ -40,7 +48,7 @@ Autonomous refinement on a saved work lets the author choose Random or Vision, 1
 
 At the time of this addition, the saved-work menu placed Change the touches after Another catalog. Its separate dialog offers Same tool for every sentence by default and A different tool for each sentence. Opening draws nothing; Make four options draws four in the chosen mode. Pressing it again discards the options shown and draws four new ones. Uniform options use the drawing tool's name; per-sentence options show a number and each sentence's change. Unsaved options must be saved or discarded before closing; discarding keeps works already saved.
 
-JNI forwards shared-core retouch (`inku.touch-change.v1`). The core supplies eligible sentences and twelve tools; the saved Score's source_instruction owners supply the tools actually drawn. Only the corresponding instructions' weight changes. Placement, color, ground, canvas, seeds, Wild and drawing policy remain the parent's, and plugin-owned instructions stay intact. Only the core's rewritten and verified instructions are used. No model is called.
+Options and replacements call shared-core `saved_variants` (`inku.saved-variants.v1`), which uses `retouch` internally. The core supplies eligible sentences, twelve tools and the tools actually drawn by the saved Score's source_instruction owners. Only the corresponding instructions' weight changes. Placement, color, ground, canvas, seeds, Wild and drawing policy remain the parent's, and plugin-owned instructions stay intact. Only the core's rewritten and verified instructions are used. No model is called.
 
 Saving redraws from the parent and the chosen tools, recording `tool_change` and `{tool_mode, tools, changes}`. A managed child keeps its own DDL authority and the parent's fork context in a dedicated transaction. The existing same-source/Score replay guard stays strict. Room schema and migrations stay unchanged. This operation is separate from retired Touch and word-derived seeds; adjustment still has the two color catalog and layout elements.
 

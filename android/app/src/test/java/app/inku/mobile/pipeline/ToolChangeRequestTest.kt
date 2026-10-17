@@ -19,8 +19,11 @@ class ToolChangeRequestTest {
             .apply { isAccessible = true }.newInstance(false) as SharedPipelineBinding
         val rendered = mutableListOf<JSONObject>()
         val binding = object : SharedPipelineBinding by delegate {
-            override fun retouch(inputBytes: ByteArray) =
-                """{"schema":"inku.touch-change.v1","outcome":"retouched","source":"place one chalk circle."}""".encodeToByteArray()
+            override fun savedVariants(inputBytes: ByteArray): ByteArray {
+                val asked = JSONObject(inputBytes.toString(Charsets.UTF_8))
+                assertEquals("tool_render", asked.getString("action"))
+                return """{"schema":"inku.saved-variants.v1","outcome":"ok","ddl":"place one chalk circle.","score":{"instructions":[{"weight":"chalk","arrangement":{"resolved":{"owner":{"kind":"source_instruction","instruction_index":0}}}}]},"derivation_metadata":{"tool_mode":"uniform","tools":{"0":"chalk"},"changes":[{"index":0,"from":"pen","to":"chalk"}]}}""".encodeToByteArray()
+            }
             override fun renderSaved(inputBytes: ByteArray): ByteArray {
                 rendered += JSONObject(inputBytes.toString(Charsets.UTF_8))
                 return """{"svg":"<svg/>","metadata":{}}""".encodeToByteArray()
@@ -67,7 +70,7 @@ class ToolChangeRequestTest {
             bundledPluginsEnabled={false},
         )
         val source = ToolChangeSource(parent.normalizedDdl!!,score,config.configJson,
-            listOf(TouchTool("pen","ペン","pen"),TouchTool("chalk","チョーク","chalk")),mapOf(0 to "pen"))
+            listOf(TouchTool("pen","ペン","pen"),TouchTool("chalk","チョーク","chalk")),mapOf(0 to "pen"), binding)
         val option=ToolChangeOption(source,ToolChangeMode.Uniform,mapOf(0 to "chalk"))
         val request=PaintRequest("parent",stage1Model="fixture",stage2Model="fixture",colorCatalogId="default",
             canvasAspect="square",autoRepair=false,parentHistoryId=parent.id,saveHistory=false)

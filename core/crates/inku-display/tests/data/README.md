@@ -33,6 +33,11 @@ core writes (the ink-wash ground's bands, and the computer fill with
 154.0.8037.99 made their pictures the same way. Without their gradient fills they do
 not match Chrome, so the test sees the gradients.
 
+`dash-offset` is the dashes the canvas ground writes (`stroke-dasharray` with
+`stroke-dashoffset`, I-723), drawn large and dark (2026-10-17). Chrome 155.0.8059.80
+made its picture the same way. Without its offsets it does not match Chrome, so the
+test sees them.
+
 ## `public-requests.json` (C6)
 
 The 17 public DDL texts of stage 1 (with where each was taken from) and the exact

@@ -102,7 +102,7 @@ fn what_the_table_does_not_hold_is_left_to_resvg() {
     for (body, code) in [
         ("<text>a</text>", "element"),
         (
-            r#"<rect width="1" height="1" stroke-dashoffset="1"/>"#,
+            r#"<rect width="1" height="1" stroke-miterlimit="1"/>"#,
             "attribute",
         ),
         (r#"<rect width="1" height="1" style="fill:red"/>"#, "style"),
@@ -151,26 +151,13 @@ fn the_current_core_draws_the_public_ddl_inside_the_table() {
     let mut written = BTreeMap::<&str, usize>::new();
     for work in fixture["works"].as_array().expect("works") {
         let id = work["id"].as_str().unwrap();
-        let mut compiler = shared["compiler"].clone();
-        compiler["host"] = work["host"].clone();
-        let compiler: CompilerOptions = serde_json::from_value(compiler).expect("compiler options");
-        let document: VisibleDocument = serde_json::from_value(serde_json::json!({
-            "source": work["ddl"],
-            "language": work["language"],
-            "macro_locks": shared["macro_locks"],
-            "saijiki": shared["saijiki"],
-        }))
-        .expect("visible document");
-        let delivery = compile_committed(
-            document.document().expect("current document"),
+        let svg = draw(
+            shared,
             &definitions,
-            &compiler,
-        )
-        .unwrap_or_else(|error| panic!("{id}: {error}"));
-        let options: PipelineRenderOptions =
-            serde_json::from_value(work["render_options"].clone()).expect("render options");
-        let output = render_delivery(&delivery, options.into(), &compiler, clip)
-            .unwrap_or_else(|error| panic!("{id}: {error}"));
+            clip,
+            work,
+            work["ddl"].as_str().unwrap(),
+        );
         for (case, needle) in [
             ("pattern href", "<pattern "),
             ("use href", "<use href="),
@@ -178,11 +165,11 @@ fn the_current_core_draws_the_public_ddl_inside_the_table() {
             ("stitchTiles", "stitchTiles=\"stitch\""),
             ("ellipse", "<ellipse "),
         ] {
-            if output.svg.contains(needle) {
+            if svg.contains(needle) {
                 *written.entry(case).or_default() += 1;
             }
         }
-        let display = display_svg(&output.svg).unwrap_or_else(|error| panic!("{id}: {error}"));
+        let display = display_svg(&svg).unwrap_or_else(|error| panic!("{id}: {error}"));
         totals.href += display.rewrites.href;
         totals.ellipse += display.rewrites.ellipse;
         totals.seed += display.rewrites.seed;
@@ -206,4 +193,77 @@ fn the_current_core_draws_the_public_ddl_inside_the_table() {
         totals.href > 0 && totals.ellipse > 0 && totals.seed > 0,
         "{totals:?}"
     );
+}
+
+/// The ground under every material, drawn by the current core over `p00` (its first
+/// sentence, 紙。, names the paper ground). A ground the core redraws must stay inside
+/// the table: the canvas ground's dashed threads wrote `stroke-dashoffset`, outside it,
+/// from 2026-10-15 until 2026-10-17 (I-723).
+#[test]
+fn the_current_core_draws_every_ground_inside_the_table() {
+    let fixture: Value = serde_json::from_str(include_str!("data/public-requests.json"))
+        .expect("the fixture is JSON");
+    let shared = &fixture["shared"];
+    let definitions: Vec<MacroDefinition> =
+        serde_json::from_value(shared["definitions"].clone()).expect("macro definitions");
+    let clip: ClipPolicy = serde_json::from_value(shared["clip"].clone()).expect("clip policy");
+    let work = &fixture["works"][0];
+    let source = work["ddl"].as_str().unwrap();
+    assert!(
+        source.starts_with("紙。"),
+        "p00 names the paper ground first"
+    );
+    let mut compared = 0;
+    let mut dash_offsets = 0;
+    for ground in [
+        "紙",
+        "和紙",
+        "薄墨地",
+        "木炭地",
+        "カンバス",
+        "画用紙",
+        "メゾチント",
+    ] {
+        let ddl = source.replacen("紙。", &format!("{ground}。"), 1);
+        let svg = draw(shared, &definitions, clip, work, &ddl);
+        dash_offsets += svg.matches("stroke-dashoffset=").count();
+        display_svg(&svg).unwrap_or_else(|error| panic!("{ground}: {error}"));
+        compared += 1;
+    }
+    assert_eq!(compared, 7);
+    // The canvas ground still writes the case the table holds it for.
+    assert!(dash_offsets > 0, "no ground writes stroke-dashoffset");
+}
+
+/// One public work's DDL `source` drawn through the compile and render boundary the
+/// macOS app uses, with the inputs it built.
+fn draw(
+    shared: &Value,
+    definitions: &[MacroDefinition],
+    clip: ClipPolicy,
+    work: &Value,
+    source: &str,
+) -> String {
+    let id = work["id"].as_str().unwrap();
+    let mut compiler = shared["compiler"].clone();
+    compiler["host"] = work["host"].clone();
+    let compiler: CompilerOptions = serde_json::from_value(compiler).expect("compiler options");
+    let document: VisibleDocument = serde_json::from_value(serde_json::json!({
+        "source": source,
+        "language": work["language"],
+        "macro_locks": shared["macro_locks"],
+        "saijiki": shared["saijiki"],
+    }))
+    .expect("visible document");
+    let delivery = compile_committed(
+        document.document().expect("current document"),
+        definitions,
+        &compiler,
+    )
+    .unwrap_or_else(|error| panic!("{id}: {error}"));
+    let options: PipelineRenderOptions =
+        serde_json::from_value(work["render_options"].clone()).expect("render options");
+    render_delivery(&delivery, options.into(), &compiler, clip)
+        .unwrap_or_else(|error| panic!("{id}: {error}"))
+        .svg
 }

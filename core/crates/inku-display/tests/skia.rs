@@ -205,6 +205,40 @@ fn linear_gradients_match_chrome() {
     }
 }
 
+/// The canvas ground's dashed threads write `stroke-dashoffset` (2026-10-17, I-723),
+/// here drawn large and dark. Skia shifts the dashes as Chrome (155.0.8059.80, drawn as
+/// for C1) does, and the control, the same SVG without its offsets, does not match:
+/// the yardstick sees the offset.
+#[test]
+fn dash_offsets_match_chrome() {
+    let svg = String::from_utf8(data("compat/dash-offset.svg")).unwrap();
+    let (width, height, reference) = chrome("compat/dash-offset-chrome.png");
+    let drawn = difference(
+        width,
+        height,
+        &over_white(&whole(&svg, width, height)),
+        &reference,
+    );
+    let offsets = ["75", "190", "125"];
+    let without = offsets.iter().fold(svg.clone(), |svg, offset| {
+        let attribute = format!(r#" stroke-dashoffset="{offset}""#);
+        assert!(svg.contains(&attribute), "{attribute}");
+        svg.replace(&attribute, "")
+    });
+    let control = difference(
+        width,
+        height,
+        &over_white(&whole(&without, width, height)),
+        &reference,
+    );
+    eprintln!("dash-offset: {drawn:?}, without the offsets {control:?}");
+    assert!(drawn.passes(), "{drawn:?}");
+    assert!(
+        !control.passes(),
+        "matches Chrome without its offsets: {control:?}"
+    );
+}
+
 /// C4. 512px tiles drawn on eight threads from one scene, stitched, against one piece
 /// (stage 1: the window's position changes filter results slightly, so not identical).
 #[test]

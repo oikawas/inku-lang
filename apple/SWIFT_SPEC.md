@@ -18,6 +18,16 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-17 Add stroke-dashoffset to the support table (I-723)
+
+Since the redraw of 2026-10-15, the canvas ground writes `stroke-dasharray` and `stroke-dashoffset` on its dashed threads. The support table had no `stroke-dashoffset`, so every work on the canvas ground fell outside it, and the macOS work area showed "Skia could not draw it (attribute)" instead of the work. At the author's instruction (handle I-723).
+
+- The support table (the shared core's [`inku-display` `check.rs`](../core/crates/inku-display/src/check.rs)) gains the attribute `stroke-dashoffset`, with no limit on its value.
+- Skia's `SkSVGNode` reads `stroke-dashoffset` and shifts the dashes by it as the phase of `SkDashPathEffect`, as Chrome does. Of the seven grounds drawn by the current core, this attribute on the canvas ground was the only thing outside the table.
+- Comparison (2026-10-17): the canvas threads are faint and the yardstick cannot see them, so a synthetic work with the same dashes drawn dark and wide showed that Skia matches Chrome 155, and that it does not once the offsets are removed. Zoomed windows (Graphite) also matched the CPU.
+- The table is shared, so on Android too works on the canvas ground are drawn with Skia instead of resvg.
+- Checks: the shared core's `inku-display` Skia tests (with a test that the offsets match Chrome and do not once removed), a new test that the current core draws all seven grounds inside the table, the tests of what the table does not hold (the attribute example is now `stroke-miterlimit`), and the `inku-display-gpu` tests (G2 with one added).
+
 ## 2026-10-16 Single-user alignment with Server
 
 The single-work PNG UI flag follows Web: enabled preserves transparency; disabled composites white. Migrate old UI preferences once, inspecting raw field presence before filling defaults and distinguishing an existing file with an omitted field from a new installation. Do not convert saved works, saved export options, or execution journals. Clipboard images have a white background. Do not propagate this flag into cards, animation, or native multi-work PNG contracts. Enumerate PNG choices from saved templates.

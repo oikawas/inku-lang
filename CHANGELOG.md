@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Show works on the canvas ground with Skia (I-723)
+
+The shared core's display support table gains `stroke-dashoffset`, which the canvas ground's dashed threads write. Until now every work on the canvas ground fell outside the table: the macOS work area showed "Skia could not draw it (attribute)" instead of the work, and Android drew it with resvg instead of Skia. A comparison with Chrome's picture showed that Skia shifts the dashes as Chrome does.
+
 ### 2026-10-17 — Restore Android's composition policy for on-device Vision models
 
 At the author's decision, on-device Vision models skip composition reading again. Pixel acceptance on E2B spent about 114 seconds on four attempts before using the default reading, so this remains an intentional difference from Server. External-provider composition reading, stage-specific provider resolution and 768×768 PNG Vision advice are retained.

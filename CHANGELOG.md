@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.171 (2026-10-17 / Build 1247)
+
 ### 2026-10-17 — Default the 3D background to the work's fill color
 
 The first 3D view now uses Background fill color. View states without a background choice use the same default, while existing choices remain intact.

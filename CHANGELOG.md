@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-18 — Number Library pages from the newest
-
-A Library opened at the selected work always started at page 1, and `← newer` kept it at 1 while the total grew. Pages are now numbered from the newest, so the selected work's page includes the pages in front of it, in both the timeline and by-lineage views. Also, clearing the search no longer hides the history strip until ordinary history arrives; a loading tile holds its place.
-
 ### 2026-10-17 — Move Swift's ChatGPT plan next-action table to the shared core
 
 Swift now takes the next action shown for a ChatGPT plan failure, and whether to retry automatically, from the shared core's table (`chatgpt_failure`), the same table Server and Android use. Seven codes Swift raises change their next action (for example `chatgpt_cancelled` goes from "diagnose" to "retry"). No code changes whether the pipeline retries automatically.
@@ -89,6 +85,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.187 (2026-10-18 / Build 1263)
+
+### 2026-10-18 — Number Library pages from the newest
+
+A Library opened at the selected work always started at page 1, and `← newer` kept it at 1 while the total grew. Pages are now numbered from the newest, so the selected work's page includes the pages in front of it, in both the timeline and by-lineage views. Also, clearing the search no longer hides the history strip until ordinary history arrives; a loading tile holds its place.
 
 ## v2.15.186 (2026-10-18 / Build 1262)
 

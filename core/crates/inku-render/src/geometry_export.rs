@@ -60,12 +60,14 @@ pub struct GeometryAppearance {
     pub center: [f64; 2],
 }
 
-fn round_appearance(
+fn mark_appearance(
     instruction: &Instruction,
     geometry: MarkGeometry,
     context: MarkContext<'_>,
     transform: AffineTransform,
     clips: &[Vec<[f64; 2]>],
+    shape: Option<&GeometryShape>,
+    paint_override: Option<crate::svg::Element>,
 ) -> Result<GeometryAppearance, String> {
     use crate::svg::{Document, Element, format_number};
     let unit = context.canvas.unit();
@@ -77,7 +79,32 @@ fn round_appearance(
             ..context
         },
     )
-    .ok_or("invalid_round_appearance")?;
+    .or_else(|| {
+        let points = match shape? {
+            GeometryShape::Path { points } | GeometryShape::Contour { points } => points,
+            GeometryShape::Round { .. } => return None,
+        };
+        let x = points
+            .iter()
+            .map(|p| p[0] * unit)
+            .fold(f64::INFINITY, f64::min);
+        let y = points
+            .iter()
+            .map(|p| p[1] * unit)
+            .fold(f64::INFINITY, f64::min);
+        let width = points
+            .iter()
+            .map(|p| p[0] * unit)
+            .fold(f64::NEG_INFINITY, f64::max)
+            - x;
+        let height = points
+            .iter()
+            .map(|p| p[1] * unit)
+            .fold(f64::NEG_INFINITY, f64::max)
+            - y;
+        Some((x, y, width, height))
+    })
+    .ok_or("invalid_mark_appearance")?;
     let corners = [
         (x, y),
         (x + width, y),
@@ -115,7 +142,7 @@ fn round_appearance(
         height + padding * 2.0,
     ];
     if bounds.iter().any(|v| !v.is_finite()) || bounds[2] <= 0.0 || bounds[3] <= 0.0 {
-        return Err("invalid_round_appearance_bounds".into());
+        return Err("invalid_mark_appearance_bounds".into());
     }
     let mut document = Document::new(CanvasSize {
         width: bounds[2],
@@ -137,9 +164,16 @@ fn round_appearance(
     for definition in crate::accepted_fills::definitions(instruction, geometry, context) {
         document.push_definition(definition);
     }
-    let mut mark =
-        crate::marks::render_instruction(instruction, context).map_err(|e| e.to_string())?;
-    if let Some(surface) = crate::surfaces::render_surface(instruction, geometry, context) {
+    let overridden = paint_override.is_some();
+    let mut mark = match paint_override {
+        Some(mark) => mark,
+        None => {
+            crate::marks::render_instruction(instruction, context).map_err(|e| e.to_string())?
+        }
+    };
+    if !overridden
+        && let Some(surface) = crate::surfaces::render_surface(instruction, geometry, context)
+    {
         let mut group = Element::new("g");
         group.push(mark);
         group.push(surface.group);
@@ -148,7 +182,9 @@ fn round_appearance(
             document.push_definition(definition);
         }
     }
-    mark = crate::ink_spread::wrap(mark, instruction, context);
+    if !overridden {
+        mark = crate::ink_spread::wrap(mark, instruction, context);
+    }
     if context.use_filters {
         if let Some(seed) = context.render_seed {
             let (id, filter) = crate::materials::performance_touch_filter(seed, context.canvas);
@@ -218,7 +254,7 @@ fn round_appearance(
             let center = point_to_pixels(center, context.canvas);
             transform.apply(Point::new(center.x / unit, center.y / unit))
         }
-        _ => return Err("invalid_round_appearance".into()),
+        _ => Point::new((x + width / 2.0) / unit, (y + height / 2.0) / unit),
     };
     Ok(GeometryAppearance {
         svg,
@@ -234,6 +270,9 @@ pub struct GeometryPairFill {
     pub source_index: usize,
     pub color: String,
     pub opacity: f64,
+    pub performed_index: usize,
+    pub instance_index: usize,
+    pub appearance: Option<GeometryAppearance>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -362,12 +401,13 @@ pub fn export_geometry(
         canvas: [canvas.width / unit, canvas.height / unit],
         background,
         ground: ground.is_some(),
-        presence_svg: crate::layers::render_presence_layer(&plan.score, canvas, &assignment)
-            .map(|layer| {
+        presence_svg: crate::layers::render_presence_layer(&plan.score, canvas, &assignment).map(
+            |layer| {
                 let mut document = crate::svg::Document::new(canvas);
                 document.push(layer);
                 document.serialize()
-            }),
+            },
+        ),
         marks: Vec::new(),
         diagnostics: Vec::new(),
         recoveries,
@@ -394,6 +434,7 @@ pub fn export_geometry(
     let mut obstacles = Vec::new();
     let mut point_count = 0;
     let mut appearance_bytes = 0usize;
+    let mut arc_appearances = std::collections::BTreeMap::new();
     let oil_fill_pass_limit = crate::fills::oil_fill_pass_limit(&plan.score.instructions);
     for (performed_index, (instruction, performed)) in ordered {
         let copies = if instruction.arrangement.is_some() {
@@ -434,6 +475,12 @@ pub fn export_geometry(
                 oil_fill_pass_limit: 0,
                 effects: copy.effects,
             };
+            if instruction.primitive == Primitive::Arc && instruction.arc_form.is_none() {
+                arc_appearances.insert(
+                    (performed_index, instance_index),
+                    (instruction.clone(), context),
+                );
+            }
             let style = mark_style(instruction, context);
             if let Some((_, _, width, height)) =
                 crate::surface_geometry::mark_bbox(geometry, instruction, context)
@@ -594,14 +641,11 @@ pub fn export_geometry(
             if point_count > 524_288 {
                 return Err("geometry_budget_exceeded".into());
             }
-            let appearance = if matches!(
-                instruction.primitive,
-                Primitive::Circle | Primitive::Ellipse
-            ) {
+            let appearance = {
                 // Geometry requests use Editable, but this isolated raster is
                 // the normal on-screen painter, including its material filters.
                 let profile = SvgProfile::Display;
-                let appearance = round_appearance(
+                let appearance = mark_appearance(
                     instruction,
                     geometry,
                     MarkContext {
@@ -612,14 +656,14 @@ pub fn export_geometry(
                     },
                     transform,
                     &clips,
+                    Some(&shape),
+                    None,
                 )?;
                 appearance_bytes = appearance_bytes.saturating_add(appearance.svg.len());
                 if appearance_bytes > 16 * 1024 * 1024 {
                     return Err("appearance_budget_exceeded".into());
                 }
                 Some(appearance)
-            } else {
-                None
             };
             if instruction.variation.is_some() && appearance.is_none() {
                 scene.diagnostics.push("variation_approximated".into());
@@ -701,11 +745,55 @@ pub fn export_geometry(
         }
         let mut contour = first.clone();
         contour.extend(boundary.into_iter().skip(1));
+        let mut pair_appearance = None;
+        if let (
+            Some((first_instruction, first_context)),
+            Some((second_instruction, second_context)),
+        ) = (
+            arc_appearances.get(&(leader, scene.marks[first_index].instance_index)),
+            arc_appearances.get(&(follower, second.instance_index)),
+        ) {
+            let display = |context| MarkContext {
+                profile: SvgProfile::Display,
+                use_filters: true,
+                oil_fill_pass_limit,
+                ..context
+            };
+            let first_context = display(*first_context);
+            let second_context = display(*second_context);
+            if let Some(paint) = crate::marks::render_closed_arc_pair_fill(
+                first_instruction,
+                first_context,
+                second_instruction,
+                second_context,
+            )
+            .map_err(|e| e.to_string())?
+            {
+                let [a, b, c, d, e, f] = second.transform;
+                let appearance = mark_appearance(
+                    second_instruction,
+                    MarkGeometry::of(second_instruction).map_err(|e| e.to_string())?,
+                    second_context,
+                    AffineTransform { a, b, c, d, e, f },
+                    &scene.marks[first_index].clips,
+                    None,
+                    Some(paint),
+                )?;
+                appearance_bytes = appearance_bytes.saturating_add(appearance.svg.len());
+                if appearance_bytes > 16 * 1024 * 1024 {
+                    return Err("appearance_budget_exceeded".into());
+                }
+                pair_appearance = Some(appearance);
+            }
+        }
         let fill = GeometryPairFill {
             points: contour,
             source_index: second.source_index,
             color: second.color.clone(),
             opacity: second.opacity,
+            performed_index: second.performed_index,
+            instance_index: second.instance_index,
+            appearance: pair_appearance,
         };
         scene.marks[first_index].pair_fill = Some(fill);
     }
@@ -787,7 +875,65 @@ mod tests {
                 .count(),
             1
         );
-        assert!(scene.marks[2].appearance.is_none());
+        assert!(scene.marks[2].appearance.is_some());
+    }
+
+    // Failure: square filters and line brushwork never reach the 3D texture.
+    #[test]
+    fn isolated_square_and_line_keep_the_display_filters() {
+        let colors = BTreeMap::from([("red".into(), "#bf3221".into())]);
+        let assignment = BTreeMap::new();
+        let context = MarkContext {
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            color_map: &colors,
+            work_assignment: &assignment,
+            render_seed: Some(163717),
+            instruction_seed_override: None,
+            instruction_index: 4,
+            mark_index: 0,
+            wild: false,
+            use_filters: true,
+            profile: SvgProfile::Display,
+            support: DEFAULT_SUPPORT,
+            geometry_transform: AffineTransform::identity(),
+            oil_fill_pass_limit: 16,
+            effects: Default::default(),
+        };
+        let square: Instruction = serde_json::from_str(
+            r#"{"primitive":"square","position":[0.3,0.3],"size":[0.2,0.2],"color":"red","filled":true,"weight":"chalk"}"#,
+        ).unwrap();
+        let painted = mark_appearance(
+            &square,
+            MarkGeometry::of(&square).unwrap(),
+            context,
+            AffineTransform::identity(),
+            &[],
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(painted.svg.contains("feTurbulence"));
+        assert!(painted.svg.contains("filter="));
+        assert!(painted.svg.contains("#bf3221"));
+        assert!(!painted.svg.contains("layer_00_background"));
+        let line: Instruction = serde_json::from_str(
+            r#"{"primitive":"line","from":[0.1,0.5],"to":[0.9,0.5],"color":"red","weight":"brush_thin"}"#,
+        ).unwrap();
+        let shape = GeometryShape::Path {
+            points: vec![[0.1, 0.5], [0.9, 0.5]],
+        };
+        let painted = mark_appearance(
+            &line,
+            MarkGeometry::of(&line).unwrap(),
+            context,
+            AffineTransform::identity(),
+            &[],
+            Some(&shape),
+            None,
+        )
+        .unwrap();
+        assert!(painted.svg.contains("#bf3221"));
+        assert!(painted.bounds[2] > 0.8 && painted.bounds[3] > 0.0);
     }
 
     // Failure: the saved work's dense oil circle becomes an ideal, uniform ball.
@@ -817,20 +963,24 @@ mod tests {
             effects: Default::default(),
         };
         let geometry = MarkGeometry::of(&instruction).unwrap();
-        let first = round_appearance(
+        let first = mark_appearance(
             &instruction,
             geometry,
             context,
             AffineTransform::identity(),
             &[],
+            None,
+            None,
         )
         .unwrap();
-        let second = round_appearance(
+        let second = mark_appearance(
             &instruction,
             geometry,
             context,
             AffineTransform::identity(),
             &[],
+            None,
+            None,
         )
         .unwrap();
         assert_eq!(first.svg, second.svg);

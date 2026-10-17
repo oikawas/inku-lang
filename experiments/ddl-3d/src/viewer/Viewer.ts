@@ -6,7 +6,7 @@ import type { MeshPacket, ScenePacket } from '../scene/types';
 import type { InitialView, ViewState } from '../input/protocol';
 import { skyTexture, type Background } from './background';
 import { frontView } from './frontView';
-import { prepareCircleAppearance, type CircleAppearanceResources } from './circleAppearance';
+import { preparePaintAppearance, type PaintAppearanceResources } from './circleAppearance';
 import { preparePresence } from './presence';
 
 type Projection = ViewState['projection'];
@@ -26,7 +26,7 @@ export class Viewer {
   background: Background = 'paint';
   private backgroundTexture: THREE.Texture | null = null;
   private referenceHeight = 2;
-  private appearances = new Map<THREE.Mesh, CircleAppearanceResources>();
+  private appearances = new Map<THREE.Mesh, PaintAppearanceResources>();
   private presence: Awaited<ReturnType<typeof preparePresence>> | null = null;
   private meshPackets = new Map<THREE.Mesh, MeshPacket>();
   private selection = new THREE.BoxHelper(new THREE.Object3D(), 0x338bff);
@@ -64,12 +64,12 @@ export class Viewer {
     this.controls.autoRotateSpeed = 1;
     this.controls.addEventListener('change', this.controlChanged);
     this.controls.addEventListener('end', this.rememberNow);
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x8c8c8c, 2));
-    const key = new THREE.DirectionalLight(0xffffff, 2.4); key.position.set(-2, 3, 4); this.scene.add(key);
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x8c8c8c, 0.65));
+    const key = new THREE.DirectionalLight(0xffffff, 0.35); key.position.set(-2, 3, 4); this.scene.add(key);
     this.model.name = 'DDL solids';
     this.model.userData = { inputDigest: packet.inputDigest, mappingVersion: packet.mappingVersion,
       schemaDigest: packet.schemaDigest, engineVersion: packet.engineVersion, diagnostics: packet.diagnostics, recoveries: packet.recoveries,
-      layerMapping: 'paint-order-v1', layerCount: packet.layerCount, layerSpacing: this.layerSpacing };
+      layerMapping: 'paint-order-stagger-v2', layerCount: packet.layerCount, layerSpacing: this.layerSpacing };
     const groups = new Map<number, THREE.Group>();
     for (const data of packet.meshes) {
       const mesh = new THREE.Mesh(unpackMesh(data), this.material(data.color, data.opacity));
@@ -114,7 +114,7 @@ export class Viewer {
 
   private material(color: string | number | THREE.Color, opacity: number): THREE.Material {
     const options = { color, opacity, transparent: opacity < 1, depthWrite: opacity >= 1, wireframe: this.wire, side: THREE.FrontSide };
-    return this.flat ? new THREE.MeshBasicMaterial(options) : new THREE.MeshStandardMaterial({ ...options, metalness: 0, roughness: 0.7 });
+    return this.flat ? new THREE.MeshBasicMaterial(options) : new THREE.MeshLambertMaterial(options);
   }
 
   async prepareAppearance() {
@@ -124,13 +124,14 @@ export class Viewer {
       this.presence = presence; this.scene.add(presence.mesh);
     }
     const painted = this.packet.meshes.filter(packet => packet.appearance).length;
-    const maxSide = Math.min(1024, Math.floor(Math.sqrt(16 * 1024 * 1024 / Math.max(1, painted))));
+    const maxSide = Math.min(1024, Math.floor(Math.sqrt(16 * 1024 * 1024 / Math.max(1, painted) / 2)));
     await Promise.all([...this.meshPackets].map(async ([mesh, packet]) => {
       const old = mesh.material as THREE.Material;
-      const resource = await prepareCircleAppearance(mesh, packet, this.packet.canvas, maxSide);
+      const resource = await preparePaintAppearance(mesh, packet, this.packet.canvas, maxSide);
       if (resource) {
         old.dispose();
-        if (this.disposed) resource.dispose(); else this.appearances.set(mesh, resource);
+        if (this.disposed) { resource.dispose(); mesh.geometry.dispose(); }
+        else this.appearances.set(mesh, resource);
       }
     }));
     if (!this.disposed) { this.placeSupport(); this.requestDraw(); }
@@ -284,12 +285,12 @@ export class Viewer {
       if (option === 'wire') this.wire = checked; else this.flat = checked;
       this.model.traverse(object => {
         if (object instanceof THREE.Mesh) {
-          const old = object.material as THREE.MeshStandardMaterial;
           const appearance = this.appearances.get(object);
-          object.material = appearance ? new THREE.MeshBasicMaterial({ map: appearance.texture, color: 0xffffff, opacity: 1,
-            transparent: true, alphaTest: 1 / 255, side: THREE.FrontSide, toneMapped: false, wireframe: this.wire })
-            : this.material(old.color, old.opacity);
-          old.dispose();
+          if (appearance) appearance.materials.forEach(material => { material.wireframe = this.wire; });
+          else {
+            const old = object.material as THREE.MeshLambertMaterial;
+            object.material = this.material(old.color, old.opacity); old.dispose();
+          }
         }
       });
     }

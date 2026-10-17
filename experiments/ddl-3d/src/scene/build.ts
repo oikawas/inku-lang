@@ -292,7 +292,7 @@ export function buildScene(input: PreparedScene): ScenePacket {
     output.bytes += scene.presenceSvg.length * 2;
   }
   const roundCount = scene.marks.filter(m => m.appearance && m.shape.kind === 'round').length;
-  if (scene.marks.some(m => m.appearance && roundSegments(m, roundCount) < 96)) output.diagnostics.push('round_detail_adapted');
+  if (scene.marks.some(m => m.appearance && m.shape.kind === 'round' && roundSegments(m, roundCount) < 96)) output.diagnostics.push('round_detail_adapted');
   const append = (geometry: BufferGeometry, mark: GeometryMark, role: MeshPacket['role']) => {
     try {
       if (mark.clips.length) geometry = clip(geometry, mark.clips, scene.canvas);
@@ -304,17 +304,19 @@ export function buildScene(input: PreparedScene): ScenePacket {
       const indices = geometry.index ? new Uint32Array(geometry.index.array) : null;
       output.triangles += (indices?.length ?? positions.length / 3) / 3;
       output.bytes += positions.byteLength + normals.byteLength + (indices?.byteLength ?? 0);
-      const appearance = role === 'object' ? mark.appearance : undefined;
+      const appearance = role === 'object' ? mark.appearance : mark.pairFill?.appearance;
       if (appearance) {
         if (appearance.svg.length > 2 * 1024 * 1024 || appearance.bounds.length !== 4
           || !appearance.bounds.every(finite) || appearance.bounds[2] <= 0 || appearance.bounds[3] <= 0
-          || !validPoint(appearance.center)) throw new Error('invalid_circle_appearance');
+          || !validPoint(appearance.center)) throw new Error('invalid_mark_appearance');
         output.bytes += appearance.svg.length * 2;
       }
       if (output.triangles > MAX_TRIANGLES || output.bytes > MAX_BYTES) throw new Error('mesh_budget_exceeded');
       output.meshes.push({ positions, normals, indices, color: mark.color, opacity: mark.opacity,
         sourceIndex: mark.sourceIndex, performedIndex: mark.performedIndex, instanceIndex: mark.instanceIndex, primitive: mark.primitive,
-        role, layerIndex: 0, layerZ: 0, ...(appearance ? { appearance } : {}), ...(role === 'pair-fill' ? { relatedSourceIndex: mark.pairFill?.sourceIndex } : {}) });
+        role, filled: role === 'pair-fill' || mark.filled, layerIndex: 0, layerZ: 0, ...(appearance ? { appearance } : {}),
+        ...(role === 'pair-fill' ? { relatedSourceIndex: mark.pairFill?.sourceIndex,
+          relatedPerformedIndex: mark.pairFill?.performedIndex, relatedInstanceIndex: mark.pairFill?.instanceIndex } : {}) });
     } finally { geometry.dispose(); }
   };
   for (const mark of scene.marks) {

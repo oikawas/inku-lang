@@ -20,19 +20,19 @@ function bounds(packet: ReturnType<typeof buildScene>['meshes'][number]) {
 }
 const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-6, `${actual} != ${expected}`);
 
-// Failure: every source layer shares Z=0, or scattered copies become separate layers.
+// Failure: scattered copies become separate layers or remain in one Z plane.
 test('paint layers keep copies together and place later layers toward positive Z', () => {
   const input = prepare(recoveredJson), original = structuredClone(input);
   const packet = buildScene(input);
   assert.equal(packet.layerCount, 2);
   assert.deepEqual(packet.meshes.map(m => m.layerIndex), [0, 0, 1]);
-  assert.deepEqual(packet.meshes.map(m => m.layerZ), [-0.4, -0.4, 0.4]);
+  assert.deepEqual(packet.meshes.map(m => m.layerZ), [-0.4, -0.401, 0.4]);
   assert.deepEqual(input, original);
   // Paint order, rather than the numeric source ID, determines front/back.
   input.scene.marks.reverse();
   const reversed = buildScene(input);
   assert.deepEqual(reversed.meshes.map(m => m.sourceIndex), [1, 0, 0]);
-  assert.deepEqual(reversed.meshes.map(m => m.layerZ), [-0.4, 0.4, 0.4]);
+  assert.deepEqual(reversed.meshes.map(m => m.layerZ), [-0.4, 0.4, 0.399]);
   input.scene.marks = [input.scene.marks[0]];
   assert.equal(buildScene(input).meshes[0].layerZ, 0);
 });
@@ -44,7 +44,10 @@ test('paint layers retain closed arc pairs in one plane', () => {
   const pairs = packet.meshes.filter(m => m.role === 'pair-fill');
   assert.equal(pairs.length, 15);
   for (const pair of pairs) {
-    for (const mesh of packet.meshes.filter(m => m.sourceIndex === pair.sourceIndex || m.sourceIndex === pair.relatedSourceIndex)) {
+    assert.ok(pair.appearance?.svg.includes('closed-arc-pair-fill-v1'));
+    for (const mesh of packet.meshes.filter(m =>
+      m.performedIndex === pair.performedIndex && m.instanceIndex === pair.instanceIndex
+      || m.performedIndex === pair.relatedPerformedIndex && m.instanceIndex === pair.relatedInstanceIndex)) {
       assert.equal(mesh.layerZ, pair.layerZ);
       assert.equal(mesh.layerIndex, pair.layerIndex);
     }

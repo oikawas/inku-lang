@@ -5,7 +5,6 @@ import org.json.JSONException
 import org.json.JSONObject
 
 internal const val REFINEMENT_VISION_ACTION = "refinement_vision_advice"
-internal const val REFINEMENT_ADVICE_TOOL = "submit_refinement_advice"
 
 data class RefinementVisionRequest(
     val modelId: String,
@@ -55,7 +54,6 @@ class RefinementVisionAdviser(
             temperature = 0.35,
             maxTokens = 320,
             systemInstruction = if (english) ENGLISH_SYSTEM else JAPANESE_SYSTEM,
-            tool = ModelTool(REFINEMENT_ADVICE_TOOL, "Submit bounded visual refinement advice.", ADVICE_SCHEMA),
             timeoutMs = request.timeoutMs,
             pipelineAction = REFINEMENT_VISION_ACTION,
             imagePng = request.imagePng,
@@ -103,6 +101,5 @@ class RefinementVisionAdviser(
         const val JAPANESE_SYSTEM = "あなたは世代数を限定した作品推敲ループの視覚的助言者です。画像に見える事実と、与えられた指示との対応だけを観察してください。" +
             "点数、順位、合否、称賛、否定を行わず、より良いと断定せずに次に試す具体的な方向を一つ提案してください。" +
             "observation、next_direction、suggested_kindを持つJSONだけを返してください。"
-        const val ADVICE_SCHEMA = """{"type":"object","properties":{"observation":{"type":"string"},"next_direction":{"type":"string"},"suggested_kind":{"type":"string"}},"required":["observation","next_direction","suggested_kind"],"additionalProperties":false}"""
     }
 }

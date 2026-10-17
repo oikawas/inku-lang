@@ -53,7 +53,9 @@ class RemoteVisionAnalyzer(private val provider: ModelProvider) : VisionAnalyzer
             Log.w("InkuProvider", providerHttpErrorLine("vision", request.modelId, error))
             throw error
         }
-        val text = LocalLiteRtLmOutput.visionDescription(response.text, request.languageCode)
+        // provider_wire has extracted the remote text; LiteRT stream cleanup
+        // belongs only to the on-device analyzer.
+        val text = response.text
         check(text.isNotBlank()) { "Image analysis returned an empty result." }
         return VisionAnalysisResult(text, request.modelId, System.currentTimeMillis() - started)
     }

@@ -173,7 +173,7 @@ internal fun chatGptRequestBody(request: ModelRequest): JSONObject {
     }
     if (request.pipelineAction == REFINEMENT_VISION_ACTION) {
         val image = request.imagePng
-        if (image == null || image.isEmpty() || request.imageJpeg != null || request.tool?.name != REFINEMENT_ADVICE_TOOL) {
+        if (image == null || image.isEmpty() || request.imageJpeg != null || request.tool != null) {
             throw ChatGptException("chatgpt_operation_not_supported")
         }
         RefinementVisionImage.requirePng768(image)

@@ -6,6 +6,14 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-10-17.
 
+## 2026-10-17 Provider bodies and responses in the shared core
+
+OpenAI-compatible, Anthropic and Gemini request bodies and response interpretation call shared-core `inku.provider-wire.v1` through JNI `providerWire`. Drawing uses `pipeline_request`/`pipeline_response`; Vision and demo instructions use `text_request`/`text_response`. The core decides URLs, non-secret headers, authentication header names and prefixes, output budgets, thinking and sampling, schema projection and order, body strings, and answer/cut/malformed/HTTP-refusal outcomes. The host sends the returned UTF-8 body bytes without reformatting and adds its key under the named header.
+
+At the author's decision, refinement Vision advice has no tool and extracts JSON from the text answer. Its image remains a 768×768 PNG. Remote camera Vision also uses core text responses without applying LiteRT stream cleanup. Keys, HTTP, timeouts, rate control, observations and on-device LiteRT-LM remain in the host. Gemini returns a `count_tokens` descriptor; Android does not add a preflight HTTP request it did not previously make.
+
+ChatGPT-plan requests and SSE remain for the next stage, retaining `OrderedSchemaJson.kt` and its ordering lookup. Only the dedicated Vision-advice admission changes to accept no tool; ChatGPT body and SSE formats stay the same. Host-JNI tests read all 246 pipeline requests, 81 text requests and 97 responses in `server/tests/data/provider-wire-cases.json`.
+
 ## 2026-10-17 Three saved-work refinements in the shared core
 
 Touch, ground and color-arrangement options and replacements call shared-core `inku.saved-variants.v1` through JNI `savedVariants`. Kotlin only transports inputs and displays or saves responses; it does not copy the tool/ground lists, defaults, sampling, Score replacement or color enumeration. The host supplies a new random 64-bit seed whenever touch options are requested. Refusals retain the core's `detail` unchanged.
@@ -141,7 +149,7 @@ in propertyOrdering order. Apply the same rule inside items, arrays and nested o
 unlisted properties follow in their previous order. Preserve every other key and value,
 propertyOrdering itself and all keywords. Composition readings put thesis first;
 the C5 schema puts joints last when all its fields are listed.
-Share GeminiJsonSchema's ordering calculation, keeping Gemini's projection, compaction and transport unchanged.
+The shared core performs ordering, projection and compaction for OpenAI-compatible, Anthropic and Gemini requests. Only ChatGPT plans retain `OrderedSchemaJson` and its ordering lookup until their migration.
 Write the order explicitly in the sent text rather than relying only on reinsertion into JSONObject.
 JSON whose order does not change uses its original toString, so Stage 1, Stage 2 and other requests
 without propertyOrdering keep the same bytes.
@@ -447,7 +455,7 @@ Debug headless `image` input uses the same two calls. `skip_draw` stops after bo
 
 ## 2026-09-30 Provider request and response alignment with Server
 
-Drawing follows the provider-kind request and response rules in Server's `pipeline_provider.py`; image descriptions follow `vision_client.py`.
+Drawing and image descriptions call the shared core's `provider_wire.rs` through JNI for the same provider-kind request and response rules as Server. Android adds keys and owns HTTP transport.
 
 - Anthropic: omit `temperature` for every model and use its default, including photo descriptions and demo descriptions. This fixes Sonnet 5.5 rejecting photo-description `temperature: 0.2` with HTTP 400. Offer the answer tool with `auto`; if called, read the `input` of exactly one requested tool. Read the JSON object when the answer is text. Join free-text blocks with newlines and ignore thinking.
 - OpenAI-compatible: explicitly set `stream: false`. OpenAI's own API retains the output-limit, sampling, and reasoning fields equivalent to `openai_sampling()`. If the answer tool is called, read the arguments of exactly one requested tool; without a call, read the message text.
@@ -545,7 +553,7 @@ This sketch pipeline's rendered output is produced by the packaged `core/crates/
 
 Gemini provider generation requests use the Gemini API `models/{model}:generateContent` endpoint. The API key is sent as `x-goog-api-key` (the model-list fetch sends it the same way and reads every page), and structured responses for the shared pipeline use native function declarations and `functionCall.args`. A successful model-list fetch does not establish that generation requests work.
 
-Shared-pipeline provider requests use the same conditions as Server's `pipeline_provider.py`. For Gemini, no temperature is sent, thinking follows "Gemini thinking levels by model" above, `allowedFunctionNames` restricts the response to one function, and the core response schema is projected into the same Gemini-supported subset as on Server (`const` becomes a one-element `enum`; hole-completion `oneOf` variants are flattened; shared Rust performs the exact validation). OpenAI-compatible providers use temperature 0.3 for Stage 1 (`generate_normalized_ddl`) and the composition reading (`read_composition`), and 0.0 for other requests. The answer budget is 2048 for Stage 1, sketch, and catalog selection, and 2048 for hole completion. Gemini requests with a thinking level add 8192 as specified above.
+The shared core's `provider_wire.rs` builds shared-pipeline provider requests, and Android sends the returned body bytes unchanged. Core also owns the following temperature, thinking, schema and output-budget rules. For Gemini, no temperature is sent, thinking follows "Gemini thinking levels by model" above, `allowedFunctionNames` restricts the response to one function, and the core response schema is projected into the same Gemini-supported subset as on Server (`const` becomes a one-element `enum`; hole-completion `oneOf` variants are flattened; shared Rust performs the exact validation). OpenAI-compatible providers use temperature 0.3 for Stage 1 (`generate_normalized_ddl`) and the composition reading (`read_composition`), and 0.0 for other requests. The answer budget is 2048 for Stage 1, sketch, and catalog selection, and 2048 for hole completion. Gemini requests with a thinking level add 8192 as specified above.
 
 The Room history cursor window is 160 MiB (32 MiB generated SVG + 32 MiB Score/snapshot + 64 MiB metadata/protocol + 32 MiB other-field headroom). Legacy rows above these bounds are not guaranteed unlimited reads. Execution BLOBs are read in 1 MiB chunks bound to one digest, then validated with SHA-256, without putting the complete BLOB into a cursor window. Latest-execution and execution-metadata queries omit the BLOB too. New host state keeps rendered data as a JSON object to avoid double escaping, while still reading legacy string encoding.
 

@@ -2,146 +2,23 @@ package app.inku.mobile.llm
 
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.Base64
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.json.JSONArray
-import org.json.JSONException
 import org.json.JSONObject
 
+/** Gemini connection; the core owns the model path, schema, thinking and answer. */
 class GeminiModelProvider(
     override val providerId: String,
     private val baseUrl: String,
     private val apiKey: String?,
     private val openConnection: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection },
 ) : ModelProvider {
-    override suspend fun generate(request: ModelRequest): ModelResponse = withContext(Dispatchers.IO) {
-        val started = System.currentTimeMillis()
-        ProviderUrlValidator.validateRemoteBaseUrl(baseUrl)
-        val model = request.modelId.removePrefix("$providerId:").removePrefix("models/")
-        val url = URL("${baseUrl.trimEnd('/')}/v1beta/models/${quotePathSegment(model)}:generateContent")
-        val connection = openConnection(url)
-        val response = try {
-            configureRemoteConnection(connection, "POST", apiKey = null, timeoutMs = request.timeoutMs)
-            apiKey?.takeIf { it.isNotBlank() }?.let { connection.setRequestProperty("x-goog-api-key", it) }
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.doOutput = true
-            connection.outputStream.writer(Charsets.UTF_8).use { it.write(payload(request).toString()) }
-            JSONObject(readProviderBody(connection))
-        } finally {
-            connection.disconnect()
-        }
-        val outputTruncated = response.optJSONArray("candidates")?.optJSONObject(0)?.optString("finishReason") == "MAX_TOKENS"
-        if (request.pipelineAction != null && outputTruncated) throw ProviderOutputLimitException()
-        val parts = response.optJSONArray("candidates")?.optJSONObject(0)
-            ?.optJSONObject("content")?.optJSONArray("parts")
-            ?: throw MalformedProviderResponseException("Gemini response did not contain content.")
-        val usage = response.optJSONObject("usageMetadata")
-        ModelResponse(
-            text = responseText(parts, request.tool?.name),
-            modelId = request.modelId,
-            promptTokens = usage?.optInt("promptTokenCount")?.takeIf { it > 0 },
-            completionTokens = usage?.optInt("candidatesTokenCount")?.takeIf { it > 0 },
-            outputTruncated = outputTruncated,
-            elapsedMs = System.currentTimeMillis() - started,
-        )
-    }
-
-    private fun payload(request: ModelRequest): JSONObject {
-        val pipelineAction = request.pipelineAction
-        val thinkingLevel = geminiThinkingLevel(request.modelId.removePrefix("$providerId:"))
-        // The wire budget includes thoughts; keep the caller's answer budget beside them.
-        val generation = JSONObject().put("maxOutputTokens", request.maxTokens.toLong() +
-            if (thinkingLevel == null) 0 else THINKING_ROOM_TOKENS)
-        // Sampling is model-default on every Gemini path, including vision and demo text.
-        thinkingLevel?.let { generation.put("thinkingConfig", JSONObject().put("thinkingLevel", it)) }
-        if (request.stopSequences.isNotEmpty()) generation.put("stopSequences", JSONArray(request.stopSequences))
-        val user = textContent(request.prompt).put("role", "user")
-        request.imagePayload()?.let { image ->
-            // The server sends Gemini the instruction followed by inline images.
-            val parts = JSONArray()
-                .put(JSONObject().put("text", request.prompt))
-                .put(
-                    JSONObject().put(
-                        "inlineData",
-                        JSONObject()
-                            .put("mimeType", image.mimeType)
-                            .put("data", Base64.getEncoder().encodeToString(image.bytes)),
-                    ),
-                )
-            user.put("parts", parts)
-        }
-        val payload = JSONObject()
-            .put("contents", JSONArray().put(user))
-            .put("generationConfig", generation)
-        request.systemInstruction?.takeIf { it.isNotBlank() }?.let {
-            payload.put("systemInstruction", textContent(it))
-        }
-        request.tool?.let { tool ->
-            val schema = JSONObject(tool.parametersJson)
-            val declaration = JSONObject()
-                .put("name", tool.name)
-                .put("description", tool.description)
-                .put(
-                    "parametersJsonSchema",
-                    if (pipelineAction == null) {
-                        schema
-                    } else {
-                        GeminiJsonSchema.project(
-                            schema,
-                            compactHoleEdits = pipelineAction == "complete_visible_ddl_holes",
-                        )
-                    },
-                )
-            payload.put("tools", JSONArray().put(JSONObject().put("functionDeclarations", JSONArray().put(declaration))))
-            payload.put(
-                "toolConfig",
-                JSONObject().put(
-                    "functionCallingConfig",
-                    JSONObject().put("mode", "ANY").put("allowedFunctionNames", JSONArray().put(tool.name)),
-                ),
-            )
-        }
-        return payload
-    }
-
-    private fun textContent(text: String): JSONObject =
-        JSONObject().put("parts", JSONArray().put(JSONObject().put("text", text)))
+    override suspend fun generate(request: ModelRequest): ModelResponse =
+        ProviderWireTransport.generate("gemini", providerId, baseUrl, apiKey, openConnection, request)
 
     internal companion object {
-        /**
-         * One path segment as the server's `quote(model, safe="")` writes it:
-         * A-Z, a-z, 0-9 and `_.-~` stay, every other UTF-8 byte is `%XX`.
-         */
-        internal fun quotePathSegment(value: String): String = buildString {
-            for (byte in value.toByteArray(Charsets.UTF_8)) {
-                val code = byte.toInt() and 0xff
-                val char = code.toChar()
-                if (char in 'A'..'Z' || char in 'a'..'z' || char in '0'..'9' || char in "_.-~") {
-                    append(char)
-                } else {
-                    append('%').append(HEX[code shr 4]).append(HEX[code and 0x0f])
-                }
-            }
-        }
-
-        private const val HEX = "0123456789ABCDEF"
-
-        /** A pipeline answer is exactly one requested function call, as on the server. */
-        internal fun responseText(parts: JSONArray, toolName: String?): String {
-            val objects = (0 until parts.length()).mapNotNull { parts.optJSONObject(it) }
-            if (toolName != null) {
-                val calls = objects.filter { it.has("functionCall") }.map { it.optJSONObject("functionCall") }
-                if (calls.size != 1 || calls[0]?.optString("name") != toolName) {
-                    throw JSONException("Gemini returned an unexpected function call.")
-                }
-                return calls[0]?.optJSONObject("args")?.toString()
-                    ?: throw JSONException("Gemini function call did not contain an arguments object.")
-            }
-            val text = objects.filter { it.has("text") && !it.optBoolean("thought") }
-                .joinToString("\n") { it.getString("text") }
-            if (text.isBlank()) throw MalformedProviderResponseException("Gemini response did not contain text.")
-            return text
-        }
+        /** Test seam: one function call is parsed by the shared core. */
+        internal fun responseText(parts: JSONArray, toolName: String?): String =
+            ProviderWireTransport.testAnswer("gemini", JSONObject().put("candidates", JSONArray()
+                .put(JSONObject().put("content", JSONObject().put("parts", parts)))))
     }
 }

@@ -5,6 +5,14 @@
 
 最終更新: 2026-10-17。
 
+## 2026-10-17 provider本文・応答の共有core化
+
+OpenAI互換・Anthropic・Geminiの要求本文と応答の読み方は、JNIの`providerWire`から共有coreの`inku.provider-wire.v1`を呼ぶ。描画は`pipeline_request`/`pipeline_response`、Visionとデモの指示文は`text_request`/`text_response`を使う。URL、鍵を含まないheader、認証headerの名前と前置き、出力予算、思考・sampling、schema変換と順序、本文の文字列、答え・切れ・malformed・HTTP拒否の分類をcoreが決める。hostは返った本文のUTF-8 bytesを再書式化せずに送り、鍵を指定headerへ足す。
+
+推敲のVision助言は作者の決定によりtoolを付けず、文字の答えからJSONを切り出す。画像は従来の768×768 PNGを保つ。カメラのremote Visionもcoreのtext応答を使い、LiteRTのstream整形をremote応答へ適用しない。鍵・HTTP・timeout・流量・観測記録と端末内LiteRT-LMはhostに残す。Geminiの`count_tokens` descriptorはcoreが返すが、従来Androidに無かった事前HTTP要求は加えない。
+
+ChatGPTプランの要求とSSEは次の段へ残し、`OrderedSchemaJson.kt`と必要な順序参照を保持する。専用Vision助言の受付だけをtoolなしに合わせ、ChatGPTの本文とSSEの形式は変えない。共通fixture `server/tests/data/provider-wire-cases.json`の要求246行・text要求81行・応答97行をhost JNIの試験で読む。
+
 ## 2026-10-17 保存作品の推敲3種の共有core化
 
 てざわり・支持体・配色の候補と差し替えは、JNIの`savedVariants`から共有coreの`inku.saved-variants.v1`を呼ぶ。Kotlinは入力の転送と応答の表示・保存だけを持ち、道具・支持体の一覧、既定値、候補の抽選、Scoreの書換え、配色の列挙を複製しない。てざわりの候補を求めるたびにhostが新しい64bit乱数seedを渡す。断りはcoreの`detail`をそのまま伝える。
@@ -121,7 +129,7 @@ Anthropicのinput_schema、ChatGPTプランのnamespace関数parametersも、送
 propertyOrderingの順でpropertiesを書き出す。items・配列・入れ子も同じ規則を使い、
 指定に無い欄は元の順で後に続ける。他の鍵と値、propertyOrderingそのものは保持し、語を選別しない。
 構図の読みはthesisが先になり、全欄が指定されたC5の型ではjointsが最後になる。
-順の計算はGeminiJsonSchemaと共通にし、Geminiの投影・圧縮と送り方は変更しない。
+OpenAI互換・Anthropic・Geminiの順の計算・投影・圧縮は共有coreが行う。ChatGPTプランだけは移行前の`OrderedSchemaJson`と順序参照を使う。
 JSONObjectへ入れ直すだけで済ませず、送信文字列の順を指定して書く。
 順序の変更が無いJSONは従来のtoStringをそのまま使うため、propertyOrderingの無い
 Stage 1・Stage 2等の本文は同じバイトになる。
@@ -413,7 +421,7 @@ debug headlessの`image`入力も同じ二段の処理を使う。`skip_draw`は
 
 ## 2026-09-30 Serverとのprovider要求・応答の同期
 
-描画はServerの`pipeline_provider.py`、画像の記述生成は`vision_client.py`と同じprovider種別ごとの要求・応答規則を使う。
+描画と画像の記述生成はJNI経由で共有coreの`provider_wire.rs`を呼び、Serverと同じprovider種別ごとの要求・応答規則を使う。鍵の追加とHTTP送受信はAndroidが行う。
 
 - Anthropic: モデルによらず`temperature`を省き、モデルの既定値を使う。写真の記述生成・デモ用記述も同じである。Sonnet 5.5が写真の記述生成の`temperature: 0.2`をHTTP 400で拒否していた不具合を修正した。回答ツールは`auto`で提示し、呼出しがあれば指定したツール1つの`input`を読む。テキストでの回答はJSONオブジェクトを読む。自由文のテキストブロックは改行で結び、thinkingは読まない。
 - OpenAI互換: `stream: false`を明示し、OpenAI自身のAPIでは既存の`openai_sampling()`相当の出力上限・sampling・思考指定を使う。回答ツールの呼出しがあれば指定したツール1つの引数だけを読む。呼出しが無い場合はメッセージのテキストを読む。
@@ -511,7 +519,7 @@ Androidの固定色カタログ13件はServerと同じID、色map、paletteを�
 
 Gemini provider の生成要求は Gemini API の `models/{model}:generateContent` に送る。API key は `x-goog-api-key` で渡し（モデル一覧の取得も同じヘッダーで渡し、最後のページまで読む）、共有pipelineの構造化応答は native function declaration と `functionCall.args` を使う。モデル一覧の取得だけが成功しても、生成要求の到達確認とは扱わない。
 
-共有pipelineのprovider要求はServerの`pipeline_provider.py`と同じ条件で送る。Geminiではtemperatureを送らず、思考は上の「Geminiのモデル別思考レベル」に従い、`allowedFunctionNames`で応答関数を1つに固定し、core のresponse schemaをServerと同じGemini対応subsetへ変換する（`const`は1要素の`enum`へ、hole補完の`oneOf`は平坦化する。厳密な検証は共有Rustが行う）。OpenAI互換providerではStage 1（`generate_normalized_ddl`）と構図の読み（`read_composition`）をtemperature 0.3、他の要求を0.0とする。Stage 1と写生・カタログ選択の本文予算は2048、hole補完は2048とする。Geminiの思考を送る要求は上の規則で8192を足す。
+共有pipelineのprovider要求は共有coreの`provider_wire.rs`が生成し、Androidは返された本文バイト列をそのまま送る。以下のtemperature・思考量・schema変換・出力予算もcoreが決める。Geminiではtemperatureを送らず、思考は上の「Geminiのモデル別思考レベル」に従い、`allowedFunctionNames`で応答関数を1つに固定し、core のresponse schemaをServerと同じGemini対応subsetへ変換する（`const`は1要素の`enum`へ、hole補完の`oneOf`は平坦化する。厳密な検証は共有Rustが行う）。OpenAI互換providerではStage 1（`generate_normalized_ddl`）と構図の読み（`read_composition`）をtemperature 0.3、他の要求を0.0とする。Stage 1と写生・カタログ選択の本文予算は2048、hole補完は2048とする。Geminiの思考を送る要求は上の規則で8192を足す。
 
 Room DBのhistory用cursor windowは160 MiBとする（生成SVG32＋Score/snapshot32＋metadata/protocol64＋他field余裕32 MiB）。この枠を超える旧行を無制限に読む保証ではない。実行状態のBLOBはcursorへ全量を載せず、固定digestを指定した1 MiBのchunkで読み、全量のSHA-256を検証する。最新実行・実行metadata queryもBLOBを含めない。新しいhost stateはrenderedをJSON objectで保持して二重escapeを避け、旧文字列形式も読み戻せる。
 

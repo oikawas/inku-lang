@@ -41,29 +41,28 @@ class OpenAiCompatibleRequestBodyTest {
     }
 
     @Test
-    fun onlyRefinementVisionAdviceAddsAnImageToOfficialOpenAiResponses() {
+    fun refinementVisionAdviceUsesTextRequestAndPngInChatCompletions() {
         val request = ModelRequest(
             modelId = "openai:gpt-4.1",
             prompt = "Observe this generation",
             temperature = 0.35,
             maxTokens = 320,
             systemInstruction = "Return bounded advice",
-            tool = ModelTool(REFINEMENT_ADVICE_TOOL, "Submit", """{"type":"object"}"""),
             pipelineAction = REFINEMENT_VISION_ACTION,
             imagePng = refinementPngHeader(),
         )
         val body = OpenAiCompatibleProvider.requestBody("openai", request, OPENAI_URL)
-        val content = body.getJSONArray("input").getJSONObject(0).getJSONArray("content")
-        assertEquals("input_text", content.getJSONObject(0).getString("type"))
+        val content = body.getJSONArray("messages").getJSONObject(1).getJSONArray("content")
+        assertEquals("text", content.getJSONObject(0).getString("type"))
         assertEquals(request.prompt, content.getJSONObject(0).getString("text"))
-        assertEquals("input_image", content.getJSONObject(1).getString("type"))
+        assertEquals("image_url", content.getJSONObject(1).getString("type"))
         assertEquals("data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(refinementPngHeader()),
-            content.getJSONObject(1).getString("image_url"))
+            content.getJSONObject(1).getJSONObject("image_url").getString("url"))
         RefinementVisionImage.requirePng768(java.util.Base64.getDecoder().decode(
-            content.getJSONObject(1).getString("image_url").substringAfter("base64,")))
+            content.getJSONObject(1).getJSONObject("image_url").getString("url").substringAfter("base64,")))
         assertEquals(0.35, body.getDouble("temperature"), 0.0)
-        assertEquals(320, body.getInt("max_output_tokens"))
-        assertEquals(REFINEMENT_ADVICE_TOOL, body.getJSONArray("tools").getJSONObject(0).getString("name"))
+        assertEquals(320, body.getInt("max_completion_tokens"))
+        assertFalse(body.has("tools"))
         assertEquals("Draw a circle", OpenAiCompatibleProvider.requestBody("openai", pipelineRequest("openai:gpt-4.1"), OPENAI_URL)
             .getJSONArray("input").getJSONObject(0).getString("content"))
         assertThrows(IllegalArgumentException::class.java) {
@@ -174,7 +173,7 @@ class OpenAiCompatibleRequestBodyTest {
             assertFalse(body.has("extra_body"))
             assertFalse(body.has("reasoning_effort"))
         }
-        val image = bodies.first().getJSONArray("messages").getJSONObject(0).getJSONArray("content")
+        val image = bodies.first().getJSONArray("messages").getJSONObject(1).getJSONArray("content")
         assertEquals("data:image/jpeg;base64,AQID", image.getJSONObject(1).getJSONObject("image_url").getString("url"))
         assertFalse(bodies.last().has("tools"))
     }
@@ -195,7 +194,7 @@ class OpenAiCompatibleRequestBodyTest {
             assertEquals(listOf(10240, 10240, 8448), bodies.map { it.getInt("max_tokens") })
             assertEquals(listOf("low", "low", "low"), bodies.map { it.getString("reasoning_effort") })
             assertEquals(listOf(0.2, 0.7, 0.85), bodies.map { it.getDouble("temperature") })
-            val image = bodies.first().getJSONArray("messages").getJSONObject(0).getJSONArray("content")
+            val image = bodies.first().getJSONArray("messages").getJSONObject(1).getJSONArray("content")
             assertEquals("data:image/jpeg;base64,AQID", image.getJSONObject(1).getJSONObject("image_url").getString("url"))
             assertFalse(bodies.last().has("tools"))
             RemoteVisionAnalyzer(provider).analyze(VisionAnalysisRequest(byteArrayOf(1), 1, 1, "en", "$id:gemma4:31b"))
@@ -278,7 +277,7 @@ class OpenAiCompatibleRequestBodyTest {
             val tool = body.getJSONArray("tools").getJSONObject(0)
             assertEquals(1, body.getJSONArray("tools").length())
             assertEquals("function", tool.getString("type")); assertEquals("submit_pipeline_response", tool.getString("name"))
-            assertEquals("Submit", tool.getString("description")); assertFalse(tool.getBoolean("strict"))
+            assertEquals("Submit the requested pipeline response.", tool.getString("description")); assertFalse(tool.getBoolean("strict"))
             assertEquals(JSONObject(schema).toString(), tool.getJSONObject("parameters").toString())
             if (effort == null) {
                 assertFalse(body.has("reasoning")); assertEquals(0.3, body.getDouble("temperature"), 0.0)
@@ -325,7 +324,7 @@ class OpenAiCompatibleRequestBodyTest {
             assertFalse(body.has("temperature")); assertFalse(body.has("top_p"))
             assertFalse(body.has("tools")); assertFalse(body.has("max_output_tokens"))
         }
-        val image = bodies.first().getJSONArray("messages").getJSONObject(0).getJSONArray("content")
+        val image = bodies.first().getJSONArray("messages").getJSONObject(1).getJSONArray("content")
         assertEquals("data:image/jpeg;base64,AQID", image.getJSONObject(1).getJSONObject("image_url").getString("url"))
     }
 
@@ -375,7 +374,7 @@ class OpenAiCompatibleRequestBodyTest {
         val result = JSONObject(effect.perform(action, models))
         assertEquals("normalized_ddl_generated", result.getString("tag"))
         assertEquals("circle", JSONObject(result.getString("response")).getString("normalized_ddl"))
-        assertEquals(12, received.single().promptTokens); assertEquals(7, received.single().completionTokens)
+        assertEquals(12, received.single().promptTokens); assertEquals(null, received.single().completionTokens)
         assertFalse(received.single().outputTruncated)
         val rejected = JSONObject(effect.perform(action, models))
         assertEquals("provider_rejected", rejected.getString("failure"))

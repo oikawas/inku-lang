@@ -138,7 +138,7 @@ class AnthropicModelProviderTest {
         assertEquals(JSONObject().put("type", "auto").toString(), payload.getJSONObject("tool_choice").toString())
         assertEquals("circle", JSONObject(response.text).getString("normalized_ddl"))
         assertEquals(11, response.promptTokens)
-        assertEquals(7, response.completionTokens)
+        assertNull(response.completionTokens)
     }
 
     /** The server's `test_anthropic_answer_given_as_text_is_read_as_the_response_object`. */

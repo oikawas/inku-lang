@@ -12,6 +12,10 @@
 
 カンバス地の糸目の破線が書く`stroke-dashoffset`を、共有coreの表示の照合表に足した。これまでカンバス地の作品は照合表の外になり、macOSの作品の画面では「Skiaで描けませんでした（attribute）」となって表示されず、AndroidではSkiaでなくresvgで描かれていた。SkiaはChromeと同じに破線をずらすことを、Chromeの絵との比較で確かめた。
 
+### 2026-10-17 — Androidのprovider本文と応答を共有coreへ移行
+
+OpenAI互換・Anthropic・Geminiの描画、Vision、デモの要求本文と応答の読みをJNI経由の`inku.provider-wire.v1`へ委譲した。本文bytesとschemaの元の順序を保ち、思考・出力予算・切れの判定・拒否の伏せ方はServerと同じcoreの規則を使う。推敲のVision助言はtoolを付けず文字のJSONを読む。鍵・HTTP・流量・観測と端末内モデルはhost、ChatGPTプランの要求/SSEは次の段へ残す。
+
 ### 2026-10-17 — Androidの端末内Visionモデルの構図読みを元に戻す
 
 作者の決定により、端末内Visionモデルでは構図を読まない動作へ戻した。E2Bの実機受入で構図読みを4回試みて約114秒後に既定の読みに切り替わったため、この点はServerとの意図的な差として残す。外部providerの構図読み、段ごとのprovider解決、Vision助言の768×768 PNGは維持する。

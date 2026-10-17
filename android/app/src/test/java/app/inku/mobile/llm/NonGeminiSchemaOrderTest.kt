@@ -24,9 +24,8 @@ class NonGeminiSchemaOrderTest {
             val cases = listOf("read_composition" to SchemaOrderFixtures.reading) + SchemaOrderFixtures.plain
             for ((action, schema) in cases) {
                 val request = SchemaOrderFixtures.request("$route:fixture-model", action, schema)
-                val native = if (provider is AnthropicModelProvider) provider.payload(request)
-                    else OpenAiCompatibleProvider.requestBody(route, request, base)
-                val before = native.toString()
+                val before = ProviderWireTransport.build(if (route == "anthropic") "anthropic" else "openai_compatible",
+                    route, base, request).getString("body")
                 provider.generate(request)
                 val wire = connection.sent.toString(Charsets.UTF_8.name())
                 if (action == "read_composition") {

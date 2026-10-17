@@ -1,177 +1,44 @@
 package app.inku.mobile.llm
 
-import android.util.Log
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.Base64
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 
-/**
- * Claude API through Anthropic's own Messages API.
- *
- * This is the request the server makes for the `anthropic` provider kind
- * (`pipeline_provider.py` `_request`): `POST /v1/messages` with `x-api-key` and
- * `anthropic-version`, and one answer tool offered with `tool_choice: auto`.
- * Its `input`, or the response object in a text answer, is the response.
- * The kind used to fall through to the
- * OpenAI-compatible transport, which posted `/chat/completions` with a Bearer
- * header, so the default Claude API base URL answered every drawing with 404.
- */
+/** Claude Messages connection; body and answer interpretation come from the shared core. */
 class AnthropicModelProvider(
     override val providerId: String,
     private val baseUrl: String,
     private val apiKey: String?,
     private val openConnection: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection },
 ) : ModelProvider {
-    override suspend fun generate(request: ModelRequest): ModelResponse = withContext(Dispatchers.IO) {
-        val started = System.currentTimeMillis()
-        ProviderUrlValidator.validateRemoteBaseUrl(baseUrl)
-        val url = URL("${baseUrl.trimEnd('/')}/v1/messages")
-        val body = payload(request)
-        val connection = openConnection(url)
-        val response = try {
-            configureRemoteConnection(connection, "POST", apiKey = null, timeoutMs = request.timeoutMs)
-            apiKey?.takeIf { it.isNotBlank() }?.let { connection.setRequestProperty("x-api-key", it) }
-            connection.setRequestProperty("anthropic-version", ANTHROPIC_VERSION)
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.doOutput = true
-            connection.outputStream.writer(Charsets.UTF_8).use { it.write(OrderedSchemaJson.encode(body)) }
-            JSONObject(readProviderBody(connection))
-        } finally {
-            connection.disconnect()
-        }
-        val outputTruncated = response.optString("stop_reason") == "max_tokens"
-        if (request.pipelineAction != null && outputTruncated) {
-            Log.w("InkuProvider", outputLimitLine(providerId, request, body, response))
-            throw ProviderOutputLimitException()
-        }
-        val blocks = response.optJSONArray("content")
-            ?: throw MalformedProviderResponseException("Claude response did not contain content.")
-        val usage = response.optJSONObject("usage")
-        ModelResponse(
-            text = responseText(blocks, request.tool?.name),
-            modelId = request.modelId,
-            promptTokens = usage?.optInt("input_tokens")?.takeIf { it > 0 },
-            completionTokens = usage?.optInt("output_tokens")?.takeIf { it > 0 },
-            outputTruncated = outputTruncated,
-            elapsedMs = System.currentTimeMillis() - started,
-        )
-    }
+    override suspend fun generate(request: ModelRequest): ModelResponse =
+        ProviderWireTransport.generate("anthropic", providerId, baseUrl, apiKey, openConnection, request)
 
-    internal fun payload(request: ModelRequest): JSONObject {
-        val model = request.modelId.removePrefix("$providerId:")
-        val payload = JSONObject()
-            .put("model", model)
-            // Server uses this budget for normal pipeline, Vision and demo requests.
-            .put("max_tokens", request.maxTokens.toLong() +
-                if (THINKS_BY_DEFAULT.containsMatchIn(model)) THINKING_ROOM_TOKENS else 0)
-            .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", userContent(request))))
-        // Both server transports (pipeline_provider.py and vision_client.py)
-        // omit temperature for this kind. Sonnet 5.5 refuses it on photo
-        // descriptions too; the rule follows the transport, not a model name.
-        request.systemInstruction?.takeIf { it.isNotBlank() }?.let { payload.put("system", it) }
-        if (request.stopSequences.isNotEmpty()) payload.put("stop_sequences", JSONArray(request.stopSequences))
-        request.tool?.let { tool ->
-            payload
-                .put(
-                    "tools",
-                    JSONArray().put(
-                        JSONObject()
-                            .put("name", tool.name)
-                            .put("description", tool.description)
-                            .put("input_schema", JSONObject(tool.parametersJson)),
-                    ),
-                )
-                // "auto" for every model, as the server sends it: Claude Opus 5.5
-                // refuses a forced tool ("tool_choice: type \"tool\" and \"any\" are
-                // not supported for this model"). The answer's tool stays the only one.
-                .put("tool_choice", JSONObject().put("type", "auto"))
-        }
-        return payload
-    }
+    internal fun payload(request: ModelRequest): JSONObject =
+        JSONObject(ProviderWireTransport.build("anthropic", providerId, baseUrl, request).getString("body"))
 
     internal companion object {
-        const val ANTHROPIC_VERSION = "2023-06-01"
-        private val THINKS_BY_DEFAULT =
-            Regex("^claude-(?:(?:opus|sonnet|haiku|fable|mythos)-5(?:-|$)|mythos-preview(?:-|$))")
+        /** Inspection seam for text-image ordering; the core writes the content. */
+        internal fun userContent(request: ModelRequest): Any =
+            JSONObject(ProviderWireTransport.build("anthropic", "anthropic", "https://api.anthropic.com", request)
+                .getString("body")).getJSONArray("messages").getJSONObject(0).get("content")
 
-        /** Bounded output-limit diagnostics; neither prompts nor answer contents are logged. */
-        internal fun outputLimitLine(providerId: String, request: ModelRequest, body: JSONObject, response: JSONObject): String {
-            val content = response.optJSONArray("content")
-            val blocks = (0 until (content?.length() ?: 0)).mapNotNull { content?.optJSONObject(it) }
-            val fields = JSONObject()
-                .put("action", request.pipelineAction)
-                .put("provider", providerId)
+        /** Test seam: the core validates tool calls and text answers. */
+        internal fun responseText(blocks: JSONArray, toolName: String?): String =
+            ProviderWireTransport.testAnswer("anthropic", JSONObject().put("content", blocks))
+
+        /** Bounded diagnostic fields are copied from the core's cut record. */
+        internal fun outputLimitLine(providerId: String, request: ModelRequest, body: JSONObject,
+                                     response: JSONObject): String {
+            val answer = SharedProviderWire.call(JSONObject().put("action", "pipeline_response")
+                .put("format", "anthropic").put("status", 200).put("body", response.toString()))
+            val fields = JSONObject().put("action", request.pipelineAction).put("provider", providerId)
                 .put("model", body.optString("model"))
                 .put("max_tokens", body.opt("max_tokens") ?: JSONObject.NULL)
-                .put("stop_reason", "max_tokens")
-                .put("output_tokens", response.optJSONObject("usage")?.opt("output_tokens") ?: JSONObject.NULL)
-                .put("thinking_blocks", blocks.count {
-                    it.optString("type") == "thinking" || it.optString("type") == "redacted_thinking"
-                })
-                .put("has_text", blocks.any { it.optString("type") == "text" && it.optString("text").isNotEmpty() })
-                .put("has_tool_use", blocks.any { it.optString("type") == "tool_use" })
+            answer.optJSONObject("cut")?.let { cut -> for (key in cut.keys()) fields.put(key, cut.get(key)) }
             return "provider_output_limit $fields"
-        }
-
-        /** Plain text, or one typed base64 image ahead of the instruction. */
-        internal fun userContent(request: ModelRequest): Any {
-            val image = request.imagePayload() ?: return request.prompt
-            return JSONArray()
-                .put(
-                    JSONObject()
-                        .put("type", "image")
-                        .put(
-                            "source",
-                            JSONObject()
-                                .put("type", "base64")
-                                .put("media_type", image.mimeType)
-                                .put("data", Base64.getEncoder().encodeToString(image.bytes)),
-                        ),
-                )
-                .put(JSONObject().put("type", "text").put("text", request.prompt))
-        }
-
-        /**
-         * The answer, read as the server's `pipeline_provider.py` reads it. When a
-         * tool was offered, a call of it is the answer: exactly one call of that
-         * tool, anything else malformed. With `tool_choice` "auto" the model may
-         * answer in text instead; then the object in the text blocks is the
-         * answer (see [jsonObjectIn]). Thinking blocks are never read. Without a
-         * tool, the text blocks are the answer.
-         */
-        internal fun responseText(blocks: JSONArray, toolName: String?): String {
-            val objects = (0 until blocks.length()).mapNotNull { blocks.optJSONObject(it) }
-            val texts = objects.filter { it.optString("type") == "text" }.map { it.optString("text") }
-            if (toolName != null) {
-                val calls = objects.filter { it.optString("type") == "tool_use" }
-                if (calls.isEmpty()) return jsonObjectIn(texts.joinToString("\n")).toString()
-                if (calls.size != 1 || calls[0].optString("name") != toolName) {
-                    throw JSONException("Claude returned an unexpected tool call.")
-                }
-                val input = calls[0].optJSONObject("input")
-                    ?: throw JSONException("Claude tool call did not contain an input object.")
-                return input.toString()
-            }
-            val text = texts.joinToString("\n")
-            if (text.isBlank()) throw MalformedProviderResponseException("Claude response did not contain text.")
-            return text
-        }
-
-        /**
-         * The object an answer given as text carries, fenced or not: from the
-         * first `{` to the last `}` (the server's `_json_object_in`). The shared
-         * core checks its shape; no object is a malformed answer.
-         */
-        internal fun jsonObjectIn(text: String): JSONObject {
-            val start = text.indexOf('{')
-            val end = text.lastIndexOf('}')
-            if (start == -1 || end <= start) throw JSONException("Claude answered without the response object.")
-            return JSONObject(text.substring(start, end + 1))
         }
     }
 }

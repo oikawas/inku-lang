@@ -122,7 +122,7 @@ class GeminiModelProviderTest {
         assertFalse(projected.has("const") || projected.has("examples"))
         assertEquals("circle", JSONObject(response.text).getString("normalized_ddl"))
         assertEquals(11, response.promptTokens)
-        assertEquals(7, response.completionTokens)
+        assertNull(response.completionTokens)
     }
 
     @Test
@@ -253,7 +253,7 @@ class GeminiVisionRequestTest {
         val inline = parts.getJSONObject(1).getJSONObject("inlineData")
         assertEquals("image/jpeg", inline.getString("mimeType"))
         assertEquals("AQID", inline.getString("data"))
-        assertEquals("A red circle. A blue rectangle.", response.text)
+        assertEquals("A red circle.\nA blue rectangle.", response.text)
     }
 }
 

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Align Android composition reading, provider resolution and refinement Vision images with Server
+
+On-device Vision models now request composition reading. Unresolved model references use the user's provider for the relevant stage rather than always falling back to the device provider. Existing qualified model settings carry forward; users with an on-device default keep that destination. Autonomous refinement sends a 768×768 PNG with `image/png` on every provider transport. The camera JPEG route is unchanged.
+
 ### 2026-10-17 — Android work identities and instruction language use the shared core
 
 Android now delegates description identity `dh1`, render identity `rh3`, canonical JSON, and instruction-language normalization/detection to the shared core through JNI. The Kotlin rule copies are removed, including lineage canonical JSON. JSON transport preserves floating-point and integer types. No migration rewrites stored identities. Kotlin checks the same fixtures as Server through JNI.

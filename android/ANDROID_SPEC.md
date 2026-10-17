@@ -6,6 +6,14 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-10-17.
 
+## 2026-10-17 Align composition reading, provider resolution and refinement Vision images with Server
+
+`composition.read` is always true, matching Server. On-device Vision models also receive `read_composition` after Stage 1. The existing shared pipeline owns model selection, retries, answer validation and fallback to the default reading.
+
+Provider resolution uses an explicit `provider:model`, then a sole enabled provider publishing the model, then the user's stage default. `complete_visible_ddl_holes` uses Stage 2; other requests use Stage 1. Confirming a model selection also saves `stage1_provider` and `stage2_provider` in `model_selection`. Older settings derive each provider from its qualified stage model without a Room migration. First-run defaults retain the existing on-device model. An unresolved setting or disabled default never silently switches to the device. ChatGPT-plan routing follows the same order and uses the session reference pinned at run start.
+
+Autonomous refinement rasterizes the saved SVG with its aspect ratio preserved inside 768×768, centers it on a transparent square, and sends PNG. The request MIME is `image/png` and IHDR dimensions are 768×768. Camera JPEG preparation and the on-device photo path remain unchanged.
+
 ## 2026-10-17 Work identities, canonical JSON and instruction language in the shared core
 
 `dh1`, `rh3`, canonical JSON, and instruction-language normalization/detection call shared-core functions through `NativePipelineBridge` (JNI). `PythonJson.kt` and the Kotlin hash/language rule copies are removed; lineage canonical JSON also delegates to the core. Kotlin retains only JSON transport that preserves floating-point/integer types and maps saved fields. No stored hash rewrite or Room migration is performed.
@@ -26,7 +34,7 @@ Progress says “Reading the composition…” while `read_composition` runs. Ba
 
 For supported Anthropic Claude models, normal drawing and Vision requests add 8,192 thinking tokens to the answer budget. A pipeline response ending at `max_tokens` is rejected and diagnosed before accepting even an apparently complete tool input or JSON body.
 
-Autonomous refinement on a saved work lets the author choose Random or Vision, 1–10 generations, allowed color-catalog and layout changes, and inherited or explicit Wild before starting; merely opening it draws nothing. Every generation starts from the preceding saved work's DDL. Intermediate generations are saved for lineage only, while the last child also appears in the normal Works list. Random chooses from the allowed elements. Vision sends a JPEG of the current work to the selected Vision model and receives an observation, a next direction and a suggested allowed element. Empty advice fails; an element outside the allowed set falls back to its first element. The dialog shows progress, observation, next direction, stop and failure. Only the dedicated Vision-advice request attaches an image through existing connections and the ChatGPT-plan session pin; this does not enable images for ordinary pipeline requests or add ChatGPT to camera model choices.
+Autonomous refinement on a saved work lets the author choose Random or Vision, 1–10 generations, allowed color-catalog and layout changes, and inherited or explicit Wild before starting; merely opening it draws nothing. Every generation starts from the preceding saved work's DDL. Intermediate generations are saved for lineage only, while the last child also appears in the normal Works list. Random chooses from the allowed elements. Vision sends a 768×768 PNG of the current work to the selected Vision model and receives an observation, a next direction and a suggested allowed element. Empty advice fails; an element outside the allowed set falls back to its first element. The dialog shows progress, observation, next direction, stop and failure. Only the dedicated Vision-advice request attaches an image through existing connections and the ChatGPT-plan session pin; this does not enable images for ordinary pipeline requests or add ChatGPT to camera model choices.
 
 ## 2026-10-14 Change the touches
 

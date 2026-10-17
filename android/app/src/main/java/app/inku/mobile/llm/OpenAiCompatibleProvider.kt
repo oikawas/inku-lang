@@ -245,12 +245,11 @@ class OpenAiCompatibleProvider(
             putOpenAiSampling(sampling, baseUrl, model, providerId, request.maxTokens,
                 pipelineTemperature(request.pipelineAction) ?: request.temperature)
             val inputContent: Any = if (request.pipelineAction == REFINEMENT_VISION_ACTION) {
-                val image = requireNotNull(request.imageJpeg) { "Refinement advice needs a JPEG." }
-                require(image.isNotEmpty()) { "Refinement advice needs a JPEG." }
+                val image = requireNotNull(request.imagePayload()) { "Refinement advice needs a PNG." }
                 JSONArray()
                     .put(JSONObject().put("type", "input_text").put("text", request.prompt))
                     .put(JSONObject().put("type", "input_image")
-                        .put("image_url", "data:image/jpeg;base64," + java.util.Base64.getEncoder().encodeToString(image)))
+                        .put("image_url", "data:${image.mimeType};base64," + java.util.Base64.getEncoder().encodeToString(image.bytes)))
             } else request.prompt
             val payload = JSONObject().put("model", model).put("store", false)
                 .put("instructions", request.systemInstruction.orEmpty())
@@ -297,9 +296,9 @@ class OpenAiCompatibleProvider(
             }
         }
 
-        /** Plain text, or the prompt with one JPEG as an image_url data URI. */
+        /** Plain text, or the prompt with one typed image_url data URI. */
         internal fun userContent(request: ModelRequest): Any {
-            val image = request.imageJpeg ?: return request.prompt
+            val image = request.imagePayload() ?: return request.prompt
             return JSONArray()
                 .put(JSONObject().put("type", "text").put("text", request.prompt))
                 .put(
@@ -309,7 +308,7 @@ class OpenAiCompatibleProvider(
                             "image_url",
                             JSONObject().put(
                                 "url",
-                                "data:image/jpeg;base64," + java.util.Base64.getEncoder().encodeToString(image),
+                                "data:${image.mimeType};base64," + java.util.Base64.getEncoder().encodeToString(image.bytes),
                             ),
                         ),
                 )

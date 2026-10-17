@@ -172,22 +172,23 @@ internal fun chatGptRequestBody(request: ModelRequest): JSONObject {
         throw ChatGptException("chatgpt_operation_not_supported")
     }
     if (request.pipelineAction == REFINEMENT_VISION_ACTION) {
-        val image = request.imageJpeg
-        if (image == null || image.isEmpty() || request.tool?.name != REFINEMENT_ADVICE_TOOL) {
+        val image = request.imagePng
+        if (image == null || image.isEmpty() || request.imageJpeg != null || request.tool?.name != REFINEMENT_ADVICE_TOOL) {
             throw ChatGptException("chatgpt_operation_not_supported")
         }
+        RefinementVisionImage.requirePng768(image)
         // Server request_vision: bounded assistant text with one input_image,
         // never a pipeline function call or the generic camera route.
         val content = JSONArray()
             .put(JSONObject().put("type", "input_text").put("text", request.prompt))
             .put(JSONObject().put("type", "input_image")
-                .put("image_url", "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(image)))
+                .put("image_url", "data:image/png;base64," + Base64.getEncoder().encodeToString(image)))
         return JSONObject().put("model", request.modelId.removePrefix("chatgpt:"))
             .put("store", false).put("stream", true)
             .put("instructions", request.systemInstruction.orEmpty())
             .put("input", JSONArray().put(JSONObject().put("role", "user").put("content", content)))
     }
-    if (request.pipelineAction !in CHATGPT_EFFECTS || request.imageJpeg != null || request.tool == null) {
+    if (request.pipelineAction !in CHATGPT_EFFECTS || request.imageJpeg != null || request.imagePng != null || request.tool == null) {
         throw ChatGptException("chatgpt_operation_not_supported")
     }
     return JSONObject().put("model", request.modelId.removePrefix("chatgpt:")).put("store", false).put("stream", true)

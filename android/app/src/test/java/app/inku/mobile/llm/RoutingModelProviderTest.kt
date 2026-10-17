@@ -8,14 +8,14 @@ import org.junit.Test
 
 class RoutingModelProviderTest {
     @Test
-    fun `ChatGPT never falls back to a key provider or owns a bare model`() {
+    fun `explicit ChatGPT never falls back and a sole published owner is used`() {
         val local = provider("local-litert-lm", isDefaultLocal = true)
         val api = provider("openai", models = "[\"personal-model\"]")
         val plan = provider("chatgpt", models = "[\"plan-only\"]")
-        assertNull(RoutingModelProvider.resolveProviderForRouting(listOf(local, api), "chatgpt:personal-model"))
-        assertNull(RoutingModelProvider.resolveProviderForRouting(listOf(local, api), "ChatGPT:personal-model"))
-        assertSame(local, RoutingModelProvider.resolveProviderForRouting(listOf(local, plan), "plan-only"))
-        assertSame(api, RoutingModelProvider.resolveProviderForRouting(listOf(local, plan, api), "personal-model"))
+        assertNull(RoutingModelProvider.resolveProviderForRouting(listOf(local, api), "chatgpt:personal-model", "local-litert-lm"))
+        assertNull(RoutingModelProvider.resolveProviderForRouting(listOf(local, api), "ChatGPT:personal-model", "local-litert-lm"))
+        assertSame(plan, RoutingModelProvider.resolveProviderForRouting(listOf(local, plan), "plan-only", "local-litert-lm"))
+        assertSame(api, RoutingModelProvider.resolveProviderForRouting(listOf(local, plan, api), "personal-model", "local-litert-lm"))
     }
 
     @Test
@@ -23,7 +23,7 @@ class RoutingModelProviderTest {
         val local = provider("local-litert-lm", isDefaultLocal = true)
         val ollama = provider("ollama", models = "[\"qwen3.5:4b-q4_K_M\"]")
 
-        assertSame(ollama, RoutingModelProvider.resolveProviderForRouting(listOf(local, ollama), "ollama:qwen3.5:4b-q4_K_M"))
+        assertSame(ollama, RoutingModelProvider.resolveProviderForRouting(listOf(local, ollama), "ollama:qwen3.5:4b-q4_K_M", "local-litert-lm"))
     }
 
     @Test
@@ -31,25 +31,25 @@ class RoutingModelProviderTest {
         val local = provider("local-litert-lm", isDefaultLocal = true)
         val nvidia = provider("nvidia", models = "[\"google/gemma-4-31b-it\"]")
 
-        assertSame(nvidia, RoutingModelProvider.resolveProviderForRouting(listOf(local, nvidia), "google/gemma-4-31b-it"))
+        assertSame(nvidia, RoutingModelProvider.resolveProviderForRouting(listOf(local, nvidia), "google/gemma-4-31b-it", "local-litert-lm"))
     }
 
     @Test
-    fun `ambiguous published owners resolve to default local regardless of input order`() {
+    fun `ambiguous published owners resolve to the stage default regardless of input order`() {
         val local = provider("local-litert-lm", isDefaultLocal = true)
         val openai = provider("openai", models = "[\"shared-model\"]")
         val ollama = provider("ollama", models = "[\"shared-model\"]")
 
-        assertSame(local, RoutingModelProvider.resolveProviderForRouting(listOf(openai, ollama, local), "shared-model"))
-        assertSame(local, RoutingModelProvider.resolveProviderForRouting(listOf(local, ollama, openai), "shared-model"))
+        assertSame(ollama, RoutingModelProvider.resolveProviderForRouting(listOf(openai, ollama, local), "shared-model", "ollama"))
+        assertSame(ollama, RoutingModelProvider.resolveProviderForRouting(listOf(local, ollama, openai), "shared-model", "ollama"))
     }
 
     @Test
-    fun `unknown ids resolve to default local without altering the model id`() {
+    fun `unknown ids use the stage default without altering the model id`() {
         val local = provider("local-litert-lm", isDefaultLocal = true)
         val modelId = "unknown:qwen3.5:4b-q4_K_M"
 
-        assertSame(local, RoutingModelProvider.resolveProviderForRouting(listOf(local), modelId))
+        assertSame(local, RoutingModelProvider.resolveProviderForRouting(listOf(local), modelId, "local-litert-lm"))
         assertEquals(modelId, OpenAiCompatibleProvider.modelForRequest("local-litert-lm", modelId))
     }
 
@@ -58,8 +58,8 @@ class RoutingModelProviderTest {
         val local = provider("local-litert-lm", isDefaultLocal = true)
         val disabled = provider("ollama", models = "[\"qwen3.5:4b-q4_K_M\"]", isEnabled = false)
 
-        assertSame(local, RoutingModelProvider.resolveProviderForRouting(listOf(disabled, local), "qwen3.5:4b-q4_K_M"))
-        assertSame(disabled, RoutingModelProvider.resolveProviderForRouting(listOf(local, disabled), "ollama:qwen3.5:4b-q4_K_M"))
+        assertSame(local, RoutingModelProvider.resolveProviderForRouting(listOf(disabled, local), "qwen3.5:4b-q4_K_M", "local-litert-lm"))
+        assertSame(disabled, RoutingModelProvider.resolveProviderForRouting(listOf(local, disabled), "ollama:qwen3.5:4b-q4_K_M", "local-litert-lm"))
         assertEquals(false, RoutingModelProvider.canGenerateWith(disabled))
     }
 
@@ -68,16 +68,16 @@ class RoutingModelProviderTest {
         val local = provider("local-litert-lm", isDefaultLocal = true)
         val ollama = provider("ollama", models = "[\"qwen3.5:4b-q4_K_M\"]")
 
-        assertSame(ollama, RoutingModelProvider.resolveProviderForRouting(listOf(local, ollama), "qwen3.5:4b-q4_K_M"))
-        assertSame(local, RoutingModelProvider.resolveProviderForRouting(listOf(local), "qwen3.5:4b-q4_K_M"))
+        assertSame(ollama, RoutingModelProvider.resolveProviderForRouting(listOf(local, ollama), "qwen3.5:4b-q4_K_M", "local-litert-lm"))
+        assertSame(local, RoutingModelProvider.resolveProviderForRouting(listOf(local), "qwen3.5:4b-q4_K_M", "local-litert-lm"))
     }
 
     @Test
-    fun `no default local means no provider is guessed`() {
+    fun `no configured stage default means no provider is guessed`() {
         val openai = provider("openai")
         val ollama = provider("ollama")
 
-        assertNull(RoutingModelProvider.resolveProviderForRouting(listOf(openai, ollama), "unknown-model"))
+        assertNull(RoutingModelProvider.resolveProviderForRouting(listOf(openai, ollama), "unknown-model", null))
     }
 
     @Test

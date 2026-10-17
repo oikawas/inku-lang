@@ -157,9 +157,10 @@ class InkuRepository(
             bundledPluginsEnabled = { isBundledPluginPackageEnabled() },
             readSvgLimitBytes = { SvgOutputLimit.storedMiB(getSetting(SvgOutputLimit.SETTING_KEY)) * SvgOutputLimit.BYTES_PER_MIB },
             pinModelSession = { models ->
-                if ((models.stage1ModelId.startsWith("chatgpt:") || models.stage2ModelId.startsWith("chatgpt:")) && modelProviderOverride == null) {
+                if (modelProviderOverride == null) {
                     // A DDL with no holes can render without credentials. The provider
-                    // checks this fixed reference if the run actually needs a model.
+                    // checks this fixed reference if the run actually needs a model,
+                    // including an unqualified model routed to the stage's plan provider.
                     models.copy(chatGptSession = chatGptPlan.state.value.activeSession)
                 } else models
             },

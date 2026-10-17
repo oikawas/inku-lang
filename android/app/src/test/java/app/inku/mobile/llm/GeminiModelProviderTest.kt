@@ -165,6 +165,24 @@ class GeminiModelProviderTest {
 
 class GeminiVisionRequestTest {
     @Test
+    fun refinementAdviceSendsPngWithItsMimeType() = runBlocking {
+        lateinit var connection: GeminiConnection
+        val provider = GeminiModelProvider("gemini", "https://generativelanguage.invalid", "test-only") { url ->
+            GeminiConnection(url, TEXT_ANSWER).also { connection = it }
+        }
+        provider.generate(ModelRequest(
+            modelId = "gemini:gemma-4-31b-it", prompt = "Observe", temperature = 0.35,
+            maxTokens = 320, pipelineAction = REFINEMENT_VISION_ACTION,
+            imagePng = refinementPngHeader(),
+        ))
+        val parts = JSONObject(connection.body.toString(Charsets.UTF_8.name()))
+            .getJSONArray("contents").getJSONObject(0).getJSONArray("parts")
+        val inline = parts.getJSONObject(1).getJSONObject("inlineData")
+        assertEquals("image/png", inline.getString("mimeType"))
+        RefinementVisionImage.requirePng768(java.util.Base64.getDecoder().decode(inline.getString("data")))
+    }
+
+    @Test
     fun demoUsesTheNewBudgetAndKeepsGemmasThoughtsOutOfTheInstruction() = runBlocking {
         for ((model, expected) in listOf("gemma-4-31b-it" to "minimal", "gemini-flash-latest" to "low",
             "gemini-2.5-flash-image" to null)) {

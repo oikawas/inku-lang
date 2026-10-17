@@ -1422,7 +1422,7 @@ class InkuViewModel @JvmOverloads constructor(
         modelId: String,
         providers: List<ProviderSettingEntity>,
     ): String {
-        val providerName = app.inku.mobile.llm.RoutingModelProvider.resolveProviderForRouting(providers, modelId)
+        val providerName = app.inku.mobile.llm.RoutingModelProvider.resolveProviderForRouting(providers, modelId, null)
             ?.takeUnless { it.isDefaultLocal }
             ?.displayName
             ?: modelId.substringBefore(':')
@@ -1962,9 +1962,14 @@ class InkuViewModel @JvmOverloads constructor(
         modelSelectionSnapshot = null
         val current = localState.value
         val unifiedModelId = current.selectedModelId
+        val selectedProvider = app.inku.mobile.llm.RoutingModelProvider.resolveProviderForRouting(
+            state.value.providerSettings, unifiedModelId, null,
+        )?.providerId
         persistSetting("model_selection", JSONObject()
             .put("stage1_model", unifiedModelId)
             .put("stage2_model", unifiedModelId)
+            .put("stage1_provider", selectedProvider)
+            .put("stage2_provider", selectedProvider)
             .put("include_thinking", current.includeThinking)
             .toString())
         val forCamera = current.modelSelectionForCamera
@@ -3763,18 +3768,12 @@ class InkuViewModel @JvmOverloads constructor(
             var item = original
             var advice: app.inku.mobile.llm.RefinementVisionAdvice? = null
             suspend fun observe() {
-                val jpeg = withContext(Dispatchers.IO) {
-                    val bitmap = app.inku.mobile.render.RustArtworkRasterizer().rasterize(item.displaySvg, targetWidth = 768)
-                    try {
-                        java.io.ByteArrayOutputStream().use { output ->
-                            check(bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, output))
-                            output.toByteArray()
-                        }
-                    } finally { bitmap.recycle() }
+                val png = withContext(Dispatchers.IO) {
+                    app.inku.mobile.llm.RefinementVisionImage.fromSvg(item.displaySvg)
                 }
                 advice = withContext(Dispatchers.IO) { repository.refineVisionAdvice(app.inku.mobile.llm.RefinementVisionRequest(
                     modelId = settings.modelId, instruction = sourceTextOf(item), direction = settings.direction,
-                    enabledKinds = settings.allowedKinds, languageCode = current.uiLanguage.code, imageJpeg = jpeg)) }
+                    enabledKinds = settings.allowedKinds, languageCode = current.uiLanguage.code, imagePng = png)) }
                 currentCoroutineContext().ensureActive()
                 localState.value = localState.value.copy(autonomousStatus = localState.value.autonomousStatus.copy(
                     observation = advice?.observation, nextDirection = advice?.nextDirection))

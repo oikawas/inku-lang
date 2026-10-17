@@ -118,9 +118,9 @@ class AnthropicModelProvider(
             return "provider_output_limit $fields"
         }
 
-        /** Plain text, or one base64 JPEG ahead of the instruction, as the server sends Anthropic. */
+        /** Plain text, or one typed base64 image ahead of the instruction. */
         internal fun userContent(request: ModelRequest): Any {
-            val image = request.imageJpeg ?: return request.prompt
+            val image = request.imagePayload() ?: return request.prompt
             return JSONArray()
                 .put(
                     JSONObject()
@@ -129,8 +129,8 @@ class AnthropicModelProvider(
                             "source",
                             JSONObject()
                                 .put("type", "base64")
-                                .put("media_type", "image/jpeg")
-                                .put("data", Base64.getEncoder().encodeToString(image)),
+                                .put("media_type", image.mimeType)
+                                .put("data", Base64.getEncoder().encodeToString(image.bytes)),
                         ),
                 )
                 .put(JSONObject().put("type", "text").put("text", request.prompt))

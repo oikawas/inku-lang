@@ -193,6 +193,20 @@ class AnthropicModelProviderTest {
     }
 
     @Test
+    fun refinementAdviceSendsPngWithItsMimeType() {
+        val request = ModelRequest(
+            modelId = "anthropic:claude-sonnet-5-5", prompt = "Observe", temperature = 0.35,
+            maxTokens = 320, pipelineAction = REFINEMENT_VISION_ACTION,
+            imagePng = refinementPngHeader(),
+        )
+        val content = AnthropicModelProvider.userContent(request) as org.json.JSONArray
+        val source = content.getJSONObject(0).getJSONObject("source")
+        assertEquals("image/png", source.getString("media_type"))
+        RefinementVisionImage.requirePng768(java.util.Base64.getDecoder().decode(source.getString("data")))
+        assertEquals("Observe", content.getJSONObject(1).getString("text"))
+    }
+
+    @Test
     fun sonnet55PhotoDescriptionOmitsUnsupportedTemperature() = runBlocking {
         lateinit var connection: AnthropicConnection
         val provider = AnthropicModelProvider("anthropic", "https://api.anthropic.com", "test-key") { url ->

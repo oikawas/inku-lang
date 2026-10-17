@@ -15,7 +15,7 @@
 
 ## 2026-10-17 構図読み・provider解決・Vision助言画像のServer追随
 
-`composition.read`はServerと同じく常にtrueとする。端末内VisionモデルにもStage 1の後で`read_composition`を要求し、実行するモデル・再試行・応答の判定・既定の読みによるfallbackは既存の共有pipelineを使う。
+**端末内のVisionモデルでは構図を読まない（作者の決定 2026-10-17）。** `composition.read`は`!isLocalVisionModel(modelId)`とし、外部providerのモデルではtrueを保つ。E2Bで構図読取りの4回の試行に約114秒を費やして既定読みに切り替わった受入結果により、端末内モデルだけ元の動作へ戻した。Serverが常にtrueとする点との意図的な差である。新規実行と保存作品からのforkの設定に同じ規則を使う。外部providerの再試行・応答の判定・fallbackは既存の共有pipelineを使う。
 
 providerは、明示した`provider:model`、そのモデルを公開する有効なproviderが1つ、利用者の段の既定provider、の順で選ぶ。Stage 2は`complete_visible_ddl_holes`、それ以外はStage 1の既定を使う。モデル選択の確定時に`model_selection`へ`stage1_provider`・`stage2_provider`も保存する。旧設定は各段の修飾付きモデルからproviderを読めるためRoom移行は不要。初回の既定は従来の端末内モデルを引き継ぎ、解決できない設定や無効な既定から端末内へ勝手に切り替えない。ChatGPTプランも同じ解決順で選び、開始時に固定したsession参照を使う。
 

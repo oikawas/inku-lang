@@ -16,6 +16,10 @@ At the author's decision, on-device Vision models skip composition reading again
 
 Touch, ground and color-arrangement options and replacements now call `inku.saved-variants.v1` through JNI, removing the Kotlin rule copies. An added ground sentence uses the saved instruction language or the shared core's resolution. Color indices, cursors and totals retain large integers; saved children use the core's `{color_arrangement_index, catalog_id}` metadata. Room also verifies touch and ground changes with the same core responses, without rewriting existing works in bulk.
 
+### 2026-10-17 — Move Swift touch, ground and color options to the shared core
+
+The three saved-work refinement actions now call UniFFI's `saved_variants`, removing the Swift rule copies. Ground sentences use the saved instruction language or the shared language rule. Color children store only the option index and catalog ID returned by core. Large color indices retain their precision, and refusals display the core's wording. Existing saved works are not rewritten.
+
 ### 2026-10-17 — Remove Server's unused `llm_retry.py`
 
 Server's `llm_retry.py`, which nothing imported, and its tests were removed. Retries of provider responses belong to the shared core's `RetryPolicy`.

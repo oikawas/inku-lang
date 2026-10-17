@@ -3,16 +3,11 @@ import InkuHost
 import InkuPersistence
 import Observation
 
-enum ColorArrangementCursor { case next(UInt64), exhausted }
+enum ColorArrangementCursor { case next(SavedVariantOrdinal), exhausted }
 
 enum RefinementResources {
     static func grounds() throws -> [GroundMaterial] {
-        guard let url = Bundle.module.url(forResource: "saijiki", withExtension: "json") else { throw HostError("ground_vocabulary_unavailable") }
-        let json = try ExactJSON(data: Data(contentsOf: url))
-        guard let category = json["categories"].array?.first(where: { $0["key"].string == "ji" }) else {
-            throw HostError("ground_vocabulary_unavailable")
-        }
-        return try JSONDecoder().decode([GroundMaterial].self, from: category["words"].data)
+        try SavedVariants.groundMaterials()
     }
 }
 

@@ -8,6 +8,8 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 
 作品識別`dh1`／`rh3`・正準JSON、指示言語の正規化と判定、記述ラベルの本文と除外位置はUniFFI経由で共有coreを呼ぶ。Swiftには同じ規則を複製せず、coreが返すUnicode scalar位置だけをmacOSエディタのUTF-16位置へ変換する。保存済みの識別値を書き換えない。`ExactJSON.text`は数値の表記を保持する転送用、`canonicalText`はcoreによる正準形とし、prompt用の空白付き`pythonText`は別の書式として保持する。
 
+保存作品の「てざわりを変える」「支持体を変える」「配色を変える」の候補と差し替えも、UniFFIの`saved_variants`（`inku.saved-variants.v1`）へ委譲する。Swiftは保存した親の条件を渡し、てざわりの作成ボタンを押すたびに新しいUInt64乱数を渡す。支持体の地の文は保存した指示言語を渡し、無ければcoreの共通判定を使う。子の付記はcoreの答えを保持し、配色は`color_arrangement_index`と`catalog_id`だけとする。配色番号と総数はcoreの十進表記を保持し、UInt64へ切り詰めない。断りはcoreの`detail`をそのまま表示する。既存作品と保存済み付記を書き換える移行は行わない（2026-10-17）。
+
 ## 更新ルール
 
 - `SWIFT_SPEC.ja.md`をSwift仕様の正本とする。

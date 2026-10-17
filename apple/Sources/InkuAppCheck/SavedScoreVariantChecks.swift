@@ -10,24 +10,6 @@ func runSavedScoreVariantChecks(folder: URL) async throws {
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     let url = folder.appendingPathComponent("works.sqlite")
     guard !FileManager.default.fileExists(atPath: url.path) else { throw CheckFailure.message("Refusing to overwrite variant fixture") }
-    let colors = Data(##"{"palette:1":"#000000","palette:2":"#808080","palette:3":"#ffffff"}"##.utf8)
-    let sequence = try ColorArrangementIndex(svg: ##"<svg><path fill="#000000"/><path style="stroke:#808080"/><stop stop-color="#fff"/></svg>"##,
-        colorMap: colors, workID: "swift-color-parity")
-    // Fixed outputs observed from Server color_arrangements.py, independently of Swift ranking.
-    let expected = [["#000000":"#808080", "#808080":"#000000", "#ffffff":"#ffffff"],
-                    ["#000000":"#ffffff", "#808080":"#808080", "#ffffff":"#000000"],
-                    ["#000000":"#808080", "#808080":"#ffffff", "#ffffff":"#000000"],
-                    ["#000000":"#000000", "#808080":"#ffffff", "#ffffff":"#808080"],
-                    ["#000000":"#ffffff", "#808080":"#000000", "#ffffff":"#808080"]]
-    guard sequence.total == 5 else { throw CheckFailure.message("Color assignment count is not P(3,3)-1") }
-    for (index, assignment) in expected.enumerated() {
-        guard try sequence.substitution(at: UInt64(index)) == assignment else { throw CheckFailure.message("Color spread differs from Server") }
-    }
-    let previous = Data(##"{"palette:1":"#000000","palette:2":"#808080","palette:3":"#ffffff","recolor:#000000":"#808080","recolor:#808080":"#ffffff"}"##.utf8)
-    let composed = try ExactJSON(data: sequence.colorMap(previous, at: 0))
-    guard composed["recolor:#000000"].string == nil, composed["recolor:#808080"].string == "#ffffff",
-          composed["recolor:#ffffff"].string == nil else { throw CheckFailure.message("Recolor was cascaded instead of composed once") }
-
     let transport = SavedVariantNoProvider()
     let app = AppModel(databaseURL: url, transport: transport)
     await app.initialize()
@@ -45,7 +27,7 @@ func runSavedScoreVariantChecks(folder: URL) async throws {
     guard ground.errorText == nil, ground.failures.isEmpty, ground.candidates.count == 6 else {
         throw CheckFailure.message("Expected six support options: \(ground.errorText ?? ground.failures.joined(separator: "; "))")
     }
-    guard ground.candidates.compactMap { $0.plan.ground?.value } == ["paper", "washi", "ink_wash", "charcoal_ground", "drawing_paper", "mezzotint"] else {
+    guard ground.candidates.compactMap({ $0.plan.ground?.value }) == ["paper", "washi", "ink_wash", "charcoal_ground", "drawing_paper", "mezzotint"] else {
         throw CheckFailure.message("Ground order differs from Saijiki")
     }
     for candidate in ground.candidates {
@@ -78,7 +60,7 @@ func runSavedScoreVariantChecks(folder: URL) async throws {
     color.preview(firstPage[0].id); color.selectCandidate(firstPage[0].id, selected: true)
     await color.generate(app: app)
     guard color.candidates.count == 8, color.previewID == nil, color.selectedCount == 0,
-          color.candidates.compactMap(\.plan.index) == Array(UInt64(8)..<UInt64(16)),
+          color.candidates.compactMap({ $0.plan.index?.rawValue }) == (8..<16).map(String.init),
           Set(firstPage.map(\.id)).isDisjoint(with: color.candidates.map(\.id)) else {
         throw CheckFailure.message("Next color page appended, repeated, or kept old selection/preview")
     }
@@ -97,10 +79,16 @@ func runSavedScoreVariantChecks(folder: URL) async throws {
           colorEdge.parentNodeID == parent.lineageNodeID, colorEdge.derivationKind == "color_arrangement_change" else {
         throw CheckFailure.message("Color saved the wrong lineage")
     }
-    guard try ExactJSON(data: Data(colorEdge.metadataJSON.utf8))["color_arrangement_index"].number == "8" else { throw CheckFailure.message("Color metadata index changed") }
+    let colorMetadata = try ExactJSON(data: Data(colorEdge.metadataJSON.utf8))
+    guard colorMetadata["color_arrangement_index"].number == "8",
+          colorMetadata["catalog_id"].string != nil,
+          Set(colorMetadata.object?.keys.map { $0 } ?? []) == ["color_arrangement_index", "catalog_id"] else {
+        throw CheckFailure.message("Color metadata must be the core's exact two fields")
+    }
     let host = PipelineHost(database: db, transport: transport)
     let page = try await host.makeColorArrangementPage(workID: parent.id, cursor: 0)
-    let lastPage = try await host.makeColorArrangementPage(workID: parent.id, cursor: page.total - 2)
+    guard let smallFixtureTotal = UInt64(page.total.rawValue), smallFixtureTotal >= 2 else { throw CheckFailure.message("Invalid test fixture total") }
+    let lastPage = try await host.makeColorArrangementPage(workID: parent.id, cursor: SavedVariantOrdinal(smallFixtureTotal - 2))
     let afterLast = try await host.makeColorArrangementPage(workID: parent.id, cursor: page.total)
     guard lastPage.plans.count == 2, lastPage.nextCursor == nil, afterLast.plans.isEmpty, afterLast.nextCursor == nil else {
         throw CheckFailure.message("Color exhaustion repeated or padded its final page")
@@ -124,7 +112,7 @@ func runSavedScoreVariantChecks(folder: URL) async throws {
     let plainGround = SavedScoreVariantModel(work: plain, kind: .ground)
     await plainGround.initialize(app: app)
     guard plainGround.candidates.count == 7, plainGround.candidates.first?.work.ddl?.hasPrefix("Paper.\n") == true else { throw CheckFailure.message("Plain/English ground did not offer seven named supports") }
-    print("Saved Score variants PASS: Server's five spread assignments; one-pass recolor composition; 8-option replacement and reopen cursor; 6/7 Saijiki grounds; only ground material changes; seeds/options/input/models preserved; separate preview/selection; selected-only history and correct parent/metadata; exact child replay; parent/drafts unchanged; provider=0. Isolated SQLite only.")
+    print("Saved Score variants PASS: core plans; 8-option replacement and reopen cursor; 6/7 core grounds; only ground material changes; seeds/options/input/models preserved; separate preview/selection; selected-only history and exact core metadata; exact child replay; parent/drafts unchanged; provider=0. Isolated SQLite only.")
 }
 
 private func sameSavedFacts(_ child: SavedWork, _ parent: SavedWork) throws {

@@ -248,6 +248,10 @@ public enum InkuCore {
         InkuCoreBindings.retouch(inputBytes: input)
     }
 
+    public static func savedVariants(_ input: Data) -> Data {
+        InkuCoreBindings.savedVariants(inputBytes: input)
+    }
+
     /// `inku.completion-range-states.v1` for `{config, source, completion_ranges}`: each range a completion wrote,
     /// as completed, numbers changed or words changed, with UTF-16 positions in the source.
     public static func completionRangeStates(_ input: Data) -> Data {

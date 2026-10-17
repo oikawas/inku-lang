@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+## v2.15.163 (2026-10-17 / Build 1239)
+
 ### 2026-10-16 — Optional 3D viewer replaces Score shapes with solids
 
 Added a 2D/3D toggle switch at the upper left of the canvas, below the Work label. A separate experimental WASM adapter and Three.js viewer preserve saved Score placement, aspect, colors and seeds while displaying spheres, boxes, pyramids and curved tubes. Includes orbit/pan/zoom, views, projection, guides, selection and PNG/GLB export. The October 17 integration bundles an independent distribution that loads only when 3D is selected. Core geometry reading is off by default. No database or work-saving path changes; `VITE_DDL_3D_VIEWER_URL=off` or removing the bridge and distribution restores a 2D-only application.

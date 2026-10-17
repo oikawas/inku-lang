@@ -51,7 +51,7 @@ enum ChatGPTWire {
             }
             return Stream(result: .failure(failure(result)), terminal: terminal)
         case "malformed":
-            return Stream(result: .failure(ChatGPTPlanFailure(diagnostic: .init(code: "chatgpt_response_invalid"))), terminal: terminal)
+            return Stream(result: .failure(ChatGPTPlanFailure(diagnostic: ChatGPTPlanDiagnostic(code: "chatgpt_response_invalid"))), terminal: terminal)
         default:
             throw HostError("chatgpt_response_invalid")
         }
@@ -83,10 +83,22 @@ enum ChatGPTWire {
         return Request(body: Data(try result.requiredString("body").utf8), wireLimit: limit)
     }
 
-    /// The core decides whether a failure is temporary; the next action shown stays the runtime's own table.
+    /// The next action and whether the pipeline may retry, from the core's one failure table. A table the core
+    /// cannot answer leaves the failure rejected, for the user to diagnose.
+    static func classify(code: String, temporary: Bool?) -> (failure: String, action: String) {
+        var input: ExactJSON = .object(["action": .string("chatgpt_failure"), "code": .string(code)])
+        if let temporary { input["temporary"] = .bool(temporary) }
+        guard let result = try? ProviderWire.evaluate(input.data), result["outcome"].string == "ok",
+              let failure = result["failure"].string, let action = result["action"].string else { return ("provider_rejected", "diagnose") }
+        return (failure, action)
+    }
+
+    /// A failure the core classified while reading: its failure and next action come from the same table.
     private static func failure(_ result: ExactJSON) -> ChatGPTPlanFailure {
-        ChatGPTPlanFailure(diagnostic: .init(code: result["code"].string ?? "chatgpt_response_failed", status: int(result["status"]),
-            requestID: result["request_id"].string, parameter: result["param"].string,
-            temporary: result["failure"].string == "transport_unavailable"))
+        let code = result["code"].string ?? "chatgpt_response_failed"
+        let classified = result["failure"].string.flatMap { failure in result["action"].string.map { (failure, $0) } }
+            ?? classify(code: code, temporary: nil)
+        return ChatGPTPlanFailure(diagnostic: ChatGPTPlanDiagnostic(code: code, status: int(result["status"]),
+            requestID: result["request_id"].string, parameter: result["param"].string, failure: classified.0, action: classified.1))
     }
 }

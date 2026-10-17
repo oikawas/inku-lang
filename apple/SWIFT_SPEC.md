@@ -18,6 +18,16 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-17 Move the ChatGPT plan's next-action table to the shared core
+
+For a ChatGPT plan failure, the next action shown (retry, reconnect, consent, settings, models, edit, usage, diagnose) and whether the pipeline may retry (`provider_rejected`, `transport_unavailable`, `transport_timeout`) come from UniFFI `provider_wire`'s `chatgpt_failure`. The shared core's [`provider_wire/chatgpt.rs`](../core/crates/inku-pipeline/src/provider_wire/chatgpt.rs) holds the table, and Server and Android use the same one. Requested by the Server session (shared Rust, step 5).
+
+- `ChatGPTPlanDiagnostic` no longer keeps its own list of temporary codes or its next-action table; it passes the code, and whether the failure is temporary only when the core classified it, to `chatgpt_failure`. A code outside the table is `provider_rejected` with "diagnose". When the core classifies a stream or HTTP failure itself, its answer's `failure` and `action` are used as they are.
+- Whether the pipeline retries is the table's `failure`, never derived from the next action. Codes such as `chatgpt_cancelled` show "retry" but stay `provider_rejected`, so the pipeline does not retry them on its own.
+- Seven codes Swift raises change their next action: `chatgpt_attempt_busy` (diagnose to retry), `chatgpt_auth_rejected` (diagnose to reconnect), `chatgpt_cancelled` (diagnose to retry), `chatgpt_consent_declined` (diagnose to consent), `chatgpt_registration_incomplete` (diagnose to reconnect), `chatgpt_session_changed` (reconnect to retry) and `chatgpt_session_stale` (diagnose to reconnect). No code changes whether the pipeline retries.
+- The core now checks the stream's response ID and the function call's ID, and drops model list rows it cannot publish and repeated slugs (the differences from old Swift reported in step 4). Swift needs no change for these.
+- Checks: all 162 rows of the shared fixture's `chatgpt` section (16 requests, 57 streams, 9 failures, 5 lists, 75 `chatgpt_failure`) are read through the core itself and through the Swift receivers. The test that refuses differing response IDs, removed in step 4, is back.
+
 ## 2026-10-17 Move ChatGPT plan bodies and stream reading to the shared core
 
 The ChatGPT plan's drawing and Vision request bodies, the reading of its SSE stream, HTTP failure classification and the model list call UniFFI's `provider_wire` (`inku.provider-wire.v1`) actions `chatgpt_request`, `chatgpt_vision_request`, `chatgpt_limits`, `chatgpt_stream`, `chatgpt_error` and `chatgpt_catalog`. The shared core's [`provider_wire/chatgpt.rs`](../core/crates/inku-pipeline/src/provider_wire/chatgpt.rs) is authoritative, and Server and Android read with the same rules. Requested by the Server session (shared Rust, step 4).

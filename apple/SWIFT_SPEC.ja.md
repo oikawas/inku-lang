@@ -18,6 +18,16 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-17 ChatGPTプランの次の行動の表を共有coreへ移す
+
+ChatGPTプランの失敗で画面に出す次の行動（再試行・接続し直す・同意・設定・モデル・書き直す・使用量・調べる）と、パイプラインが自動で再試行するか（`provider_rejected`・`transport_unavailable`・`transport_timeout`）は、UniFFIの`provider_wire`の`chatgpt_failure`が答える。表の正本は共有coreの[`provider_wire/chatgpt.rs`](../core/crates/inku-pipeline/src/provider_wire/chatgpt.rs)で、ServerとAndroidも同じ表を引く。Serverセッションの依頼（共通Rustの段5）による。
+
+- `ChatGPTPlanDiagnostic`の一時的な印の一覧と次の行動の表を消し、印と（coreが分類した失敗のときだけ）一時的かどうかを`chatgpt_failure`へ渡す。表に無い印は`provider_rejected`と「調べる」。coreが流れやHTTPの失敗を自分で分類したときは、その答えの`failure`と`action`をそのまま使う。
+- 自動で再試行するかは、次の行動から作らず、表の`failure`を使う。「再試行」を出す印でも、`chatgpt_cancelled`などは`provider_rejected`のままで、パイプラインは自動で再試行しない。
+- Swiftが出す印で次の行動が変わるのは7個：`chatgpt_attempt_busy`（調べる→再試行）、`chatgpt_auth_rejected`（調べる→接続し直す）、`chatgpt_cancelled`（調べる→再試行）、`chatgpt_consent_declined`（調べる→同意）、`chatgpt_registration_incomplete`（調べる→接続し直す）、`chatgpt_session_changed`（接続し直す→再試行）、`chatgpt_session_stale`（調べる→接続し直す）。自動で再試行するかが変わる印は無い。
+- coreは流れの応答IDと関数呼び出しのIDを確かめ、モデル一覧で公開できない行と同じslugの2行目以降を落とすようになった（段4で旧いSwiftとの違いとして伝えたもの）。Swiftの側の変更は無い。
+- 確認：共通の試験データの`chatgpt`の節162行（要求16、流れ57、失敗9、一覧5、`chatgpt_failure` 75）を、core自身とSwiftの受け手の両方で読む。段4で外した、応答IDの食い違いを断る試験を戻した。
+
 ## 2026-10-17 ChatGPTプランの本文と流れの読みを共有coreへ移す
 
 ChatGPTプランの描画とVisionの要求本文、SSEの流れの読み、HTTPの失敗の分類、モデル一覧の読みは、UniFFIの`provider_wire`（`inku.provider-wire.v1`）の`chatgpt_request`・`chatgpt_vision_request`・`chatgpt_limits`・`chatgpt_stream`・`chatgpt_error`・`chatgpt_catalog`を呼ぶ。正本は共有coreの[`provider_wire/chatgpt.rs`](../core/crates/inku-pipeline/src/provider_wire/chatgpt.rs)で、ServerとAndroidも同じ規則で読む。Serverセッションの依頼（共通Rustの段4）による。

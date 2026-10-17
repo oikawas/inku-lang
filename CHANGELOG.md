@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Move Swift's ChatGPT plan next-action table to the shared core
+
+Swift now takes the next action shown for a ChatGPT plan failure, and whether to retry automatically, from the shared core's table (`chatgpt_failure`), the same table Server and Android use. Seven codes Swift raises change their next action (for example `chatgpt_cancelled` goes from "diagnose" to "retry"). No code changes whether the pipeline retries automatically.
+
 ### 2026-10-17 — Take Android ChatGPT plan failure classes and model-list guards from the shared core
 
 Android now takes the failure class of the ChatGPT-plan codes it raises from the shared core's `chatgpt_failure` table, with the same classes as before. The model list is no longer refused whole for an empty or overlong name or de-duplicated in the host; the core drops those rows.

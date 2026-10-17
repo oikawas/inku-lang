@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-17 — SwiftのChatGPTプランの次の行動の表を共有coreへ移行
+
+SwiftのChatGPTプランの失敗で出す次の行動と、自動で再試行するかを、共有coreの表（`chatgpt_failure`）から引くようにした。ServerとAndroidと同じ表になる。Swiftが出す印のうち7個で次の行動が変わる（たとえば`chatgpt_cancelled`は「調べる」から「再試行」）。自動で再試行するかが変わる印は無い。
+
 ### 2026-10-17 — AndroidのChatGPTプランの失敗の分類と一覧の守りを共有coreから引く
 
 Androidが出すChatGPTプランの失敗の印の分類を、共有coreの`chatgpt_failure`の表から引くようにした。分類は前と変わらない。モデル一覧は、空や長すぎる名前で一覧全体を断ることも、hostで重複を除くこともやめ、coreがその行を落とす。

@@ -56,6 +56,7 @@ final class ChatGPTDecoderChecks: XCTestCase, @unchecked Sendable {
         assertCode("chatgpt_refused", started + event("response.refusal.delta", ["delta": .string("private raw text")]))
         assertCode("chatgpt_unexpected_tool", event("response.output_item.added", ["item": item(namespace: "other")]))
         assertCode("chatgpt_response_invalid", started + done + completion("{}"))
+        assertCode("chatgpt_response_invalid", started + done + completion(arguments, responseID: "resp_other"))
         assertCode("chatgpt_response_too_large", started + done, limit: 8)
         assertCode("subscription_sharing_usage_limit_exceeded", started + done + completion(arguments) +
             event("error", ["code": .string("subscription_sharing_usage_limit_exceeded")]))

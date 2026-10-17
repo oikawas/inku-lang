@@ -14,24 +14,18 @@ public struct ChatGPTPlanDiagnostic: Sendable, Equatable {
     public let requestID: String?
     public let parameter: String?
     public let status: Int?
-    /// `temporary` is the shared core's classification of a backend failure; the next action stays this table.
+    /// Whether the pipeline may retry (`provider_rejected`, `transport_unavailable`, `transport_timeout`).
+    public let pipelineFailure: String
+    /// The failure table is the shared core's (`chatgpt_failure`). `temporary` is given only for a failure the
+    /// core itself classified; without it only an incomplete response is temporary.
     public init(code: String, status: Int? = nil, requestID: String? = nil, parameter: String? = nil, temporary: Bool? = nil) {
-        self.code = code; self.status = status
-        let temporary = temporary ?? (["subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable", "chatgpt_transport_unavailable", "chatgpt_auth_unavailable",
-                         "chatgpt_response_incomplete", "chatgpt_refresh_not_ready", "chatgpt_transport_timeout"].contains(code) || (status ?? 0) >= 500)
-        if ["subscription_sharing_usage_limit_exceeded", "chatgpt_quota"].contains(code) { action = "usage" }
-        else if temporary { action = "retry" }
-        else if code == "chatgpt_scope_required" { action = "consent" }
-        else if code == "chatgpt_disabled" { action = "settings" }
-        else if code == "chatgpt_model_not_offered" { action = "models" }
-        else if code == "chatgpt_refused" { action = "edit" }
-        else if ["chatgpt_not_connected", "chatgpt_signed_out", "chatgpt_reauthentication_required", "chatgpt_session_changed", "chatgpt_identity_invalid", "chatgpt_identity_mismatch", "chatgpt_credentials_unavailable"].contains(code) { action = "reconnect" }
-        else { action = "diagnose" }
-        self.requestID = Self.safe(requestID); self.parameter = Self.safe(parameter)
+        let classified = ChatGPTWire.classify(code: code, temporary: temporary)
+        self.init(code: code, status: status, requestID: requestID, parameter: parameter,
+                  failure: classified.failure, action: classified.action)
     }
-    public var pipelineFailure: String {
-        if code == "chatgpt_transport_timeout" { return "transport_timeout" }
-        return action == "retry" ? "transport_unavailable" : "provider_rejected"
+    init(code: String, status: Int?, requestID: String?, parameter: String?, failure: String, action: String) {
+        self.code = code; self.status = status; self.pipelineFailure = failure; self.action = action
+        self.requestID = Self.safe(requestID); self.parameter = Self.safe(parameter)
     }
     private static func safe(_ value: String?) -> String? {
         guard let value, value.range(of: "^[A-Za-z0-9_.:\\[\\]-]{1,160}$", options: .regularExpression) != nil else { return nil }

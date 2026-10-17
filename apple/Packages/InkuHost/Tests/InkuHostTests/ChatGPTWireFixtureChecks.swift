@@ -42,6 +42,7 @@ final class ChatGPTWireFixtureChecks: XCTestCase {
                 case (.failure(let failure), "failed"):
                     XCTAssertEqual(failure.diagnostic.code, expected["code"].string, name)
                     XCTAssertEqual(failure.diagnostic.pipelineFailure, expected["failure"].string, name)
+                    XCTAssertEqual(failure.diagnostic.action, expected["action"].string, name)
                 case (.failure(let failure), "malformed"): XCTAssertEqual(failure.diagnostic.code, "chatgpt_response_invalid", name)
                 default: XCTFail(name + ": the Swift receiver answered differently")
                 }
@@ -50,17 +51,26 @@ final class ChatGPTWireFixtureChecks: XCTestCase {
                                                           requestID: request["request_id"].string).diagnostic
                 XCTAssertEqual(failure.code, expected["code"].string, name)
                 XCTAssertEqual(failure.pipelineFailure, expected["failure"].string, name)
+                XCTAssertEqual(failure.action, expected["action"].string, name)
                 XCTAssertEqual(failure.status.map { String($0) }, expected["status"].number, name)
                 XCTAssertEqual(failure.requestID, expected["request_id"].string, name)
                 XCTAssertEqual(failure.parameter, expected["param"].string, name)
             case "chatgpt_catalog":
+                guard expected["outcome"].string == "ok" else {
+                    XCTAssertThrowsError(try ChatGPTWire.catalog(request["value"]), name); continue
+                }
                 let models = try ChatGPTWire.catalog(request["value"])
                 XCTAssertEqual(models.map(\.id), expected["models"].array?.compactMap { $0["id"].string }, name)
                 XCTAssertEqual(models.map(\.label), expected["models"].array?.compactMap { $0["label"].string }, name)
+            case "chatgpt_failure":
+                let diagnostic = ChatGPTPlanDiagnostic(code: try request.requiredString("code"), temporary: request["temporary"].bool)
+                XCTAssertEqual(diagnostic.pipelineFailure, expected["failure"].string, name)
+                XCTAssertEqual(diagnostic.action, expected["action"].string, name)
             default: XCTFail(name + ": unknown action")
             }
         }
-        XCTAssertEqual(counts, ["chatgpt_request": 8, "chatgpt_vision_request": 8, "chatgpt_stream": 42, "chatgpt_error": 9, "chatgpt_catalog": 2])
-        print("Shared ChatGPT rows checked: \(counts.values.reduce(0, +)) (requests=8, vision=8, streams=42, errors=9, catalogs=2) through core and the Swift receivers; HTTP=0")
+        XCTAssertEqual(counts, ["chatgpt_request": 8, "chatgpt_vision_request": 8, "chatgpt_stream": 57, "chatgpt_error": 9, "chatgpt_catalog": 5,
+                                "chatgpt_failure": 75])
+        print("Shared ChatGPT rows checked: \(counts.values.reduce(0, +)) (requests=8, vision=8, streams=57, errors=9, catalogs=5, failures=75) through core and the Swift receivers; HTTP=0")
     }
 }

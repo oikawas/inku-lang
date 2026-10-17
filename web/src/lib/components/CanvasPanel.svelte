@@ -10,7 +10,6 @@
 	import Ddl3DModeSwitch from '$lib/features/experimental-3d/Ddl3DModeSwitch.svelte';
 	import { configuredViewer } from '$lib/features/experimental-3d/input';
 	import CanvasGenerationInfo from '$lib/features/canvas/CanvasGenerationInfo.svelte';
-	import CanvasWorkSearch from '$lib/features/canvas/CanvasWorkSearch.svelte';
 	import { pressChoosesWork } from '$lib/features/canvas/generation-info-follow';
 	import { generationInfoSettings } from '$lib/features/canvas/generation-info-settings.svelte';
 	import { ClipboardCopyRefused } from '$lib/clipboardExport';
@@ -48,11 +47,6 @@
 		outputTab: OutputTab;
 		libraryFocusRequest?: number;
 		viewMode?: '2d' | '3d';
-		canvasSearch: string;
-		canvasSearchBusy: boolean;
-		canvasSearchFailed: boolean;
-		canvasSearchTotal: number;
-		onCanvasSearch: (value: string) => void;
 		result: PaintResult | null;
 		rangePreview?: RangePreview | null;
 		unsavedRefinementPreview: boolean;
@@ -206,11 +200,6 @@
 	let {
 		outputTab = $bindable('canvas'),
 		viewMode = $bindable('2d'),
-		canvasSearch = $bindable(''),
-		canvasSearchBusy,
-		canvasSearchFailed,
-		canvasSearchTotal,
-		onCanvasSearch,
 		result,
 		rangePreview = null,
 		unsavedRefinementPreview = false,
@@ -724,7 +713,6 @@
 		<Tooltip placement="bottom" text={isJapanese ? '作品の派生関係を表示' : 'Show how this work was derived'}>
 			<button class="rtab" class:active={outputTab === 'lineage'} onclick={() => (outputTab = 'lineage')} disabled={!result}>{isJapanese ? '系譜' : 'Lineage'}</button>
 		</Tooltip>
-		<CanvasWorkSearch bind:value={canvasSearch} busy={canvasSearchBusy} failed={canvasSearchFailed} total={canvasSearchTotal} onSearch={onCanvasSearch} />
 		<div class="rtab-spacer"></div>
 		{#if result}
 			<div class="render-meta-strip" class:english={!isJapanese} aria-label={t().displayedWorkConditions}>

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-18 — Move the work search into the history strip
+
+The search field beside the Lineage tab in the canvas header now sits right of the filter buttons in the history strip. When the search or a mark filter matches no work, the strip stays and shows an empty "No matches" thumbnail tile; it used to disappear, taking the filter buttons with it. The tile replaces the "No matching works." note under the field.
+
 ### 2026-10-17 — Move Swift's ChatGPT plan next-action table to the shared core
 
 Swift now takes the next action shown for a ChatGPT plan failure, and whether to retry automatically, from the shared core's table (`chatgpt_failure`), the same table Server and Android use. Seven codes Swift raises change their next action (for example `chatgpt_cancelled` goes from "diagnose" to "retry"). No code changes whether the pipeline retries automatically.

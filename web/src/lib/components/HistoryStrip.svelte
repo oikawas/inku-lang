@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
+	import CanvasWorkSearch from '$lib/features/canvas/CanvasWorkSearch.svelte';
 	import { formatHistoryStripEngineVersion, type HistoryStripField } from '$lib/historyStripFields';
 	import { groupDigits } from '$lib/formatNumber';
 
@@ -73,6 +74,12 @@
 		developerMode: boolean;
 		/** Up to three, in the order they are declared. Empty means pictures only. */
 		historyStripFields: HistoryStripField[];
+		search: string;
+		searchBusy: boolean;
+		searchFailed: boolean;
+		/** A search or a mark narrows the listing, so none found is an answer, not an empty history. */
+		filtered: boolean;
+		onSearch: (value: string) => void;
 	};
 
 	let {
@@ -110,10 +117,18 @@
 		catalogName,
 		isJapanese,
 		developerMode,
-		historyStripFields
+		historyStripFields,
+		search = $bindable(''),
+		searchBusy,
+		searchFailed,
+		filtered,
+		onSearch
 	}: Props = $props();
 
 	let historyCollapsed = $state(false);
+	// Kept on screen while it finds nothing, so the search and the filters that
+	// emptied it are still there to be changed.
+	const noCandidates = $derived(filtered && historyTotal === 0 && !searchBusy && !searchFailed);
 
 	function lineageGenerationLabel(item: HistoryItem): string {
 		if (!item.lineage_generation) return isJapanese ? '独立作品' : 'Standalone';
@@ -168,7 +183,7 @@
 	}
 </script>
 
-{#if historyTotal > 0}
+{#if historyTotal > 0 || filtered}
 	<div class="history-strip" class:collapsed={historyCollapsed} class:locked={interactionLocked}>
 		<div class="history-head">
 			<div class="history-head-left">
@@ -199,6 +214,7 @@
 							><span class="history-filter-check" class:visible={historyForShareOnly} aria-hidden="true">✓</span>{t().historyForShareOnly}</button>
 						{/if}
 					</div>
+					<CanvasWorkSearch bind:value={search} busy={searchBusy} failed={searchFailed} {onSearch} />
 				{/if}
 				{#if interactionLocked}
 					<div class="history-lock-badge" role="status" aria-live="polite">
@@ -288,6 +304,11 @@
 						{/if}
 					</div>
 				{/each}
+				{#if noCandidates}
+					<div class="thumb thumb-empty" role="status">
+						<div class="thumb-empty-picture">{t().historyNoCandidates}</div>
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</div>
@@ -557,6 +578,18 @@
 		pointer-events: none;
 	}
 	.thumb-picture { position: relative; }
+	.thumb-empty {
+		border: 1px dashed var(--border2);
+		background: transparent;
+		cursor: default;
+	}
+	.thumb-empty-picture {
+		display: grid;
+		place-items: center;
+		height: 58px;
+		color: var(--fg3);
+		font-size: var(--ui-font-size-11);
+	}
 	.thumb-current-badge {
 		position: absolute;
 		bottom: 3px;

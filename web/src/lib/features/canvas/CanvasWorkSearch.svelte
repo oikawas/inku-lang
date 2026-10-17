@@ -6,10 +6,9 @@
 		value: string;
 		busy: boolean;
 		failed: boolean;
-		total: number;
 		onSearch: (value: string) => void;
 	};
-	let { value = $bindable(''), busy, failed, total, onSearch }: Props = $props();
+	let { value = $bindable(''), busy, failed, onSearch }: Props = $props();
 	let inputEl: HTMLInputElement;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let pending = $state(false);
@@ -38,8 +37,9 @@
 			aria-busy={busy} oninput={schedule} oncompositionend={() => { clearTimeout(timer); timer = setTimeout(search, 250); }} />
 		<button type="button" aria-label={t().historySearchClear} title={t().historySearchClear} disabled={!value} onclick={clear}>×</button>
 	</div>
-	{#if !pending && (failed || (value.trim() && !busy && total === 0))}
-		<span class="search-status" role="status">{failed ? t().canvasSearchFailed : t().canvasSearchEmpty}</span>
+	<!-- None found is said by the empty tile in the history strip. -->
+	{#if !pending && failed}
+		<span class="search-status" role="status">{t().canvasSearchFailed}</span>
 	{/if}
 </form>
 

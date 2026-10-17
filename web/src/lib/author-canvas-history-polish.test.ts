@@ -42,6 +42,18 @@ test('the three history filters follow the history button with one-em spacing', 
 	assert.match(HISTORY, /\.history-filter-group \{[^}]*margin-left: 1em;/);
 });
 
+test('the work search sits right of the history filters and none found leaves an empty tile', () => {
+	const head = HISTORY.slice(HISTORY.indexOf('<div class="history-head">'), HISTORY.indexOf('{#if starredFilterClearedNotice}'));
+	assert.ok(head.indexOf('history-filter-group') < head.indexOf('<CanvasWorkSearch'));
+	assert.ok(head.indexOf('<CanvasWorkSearch') < head.indexOf('history-page-nav'));
+	assert.doesNotMatch(PANEL, /CanvasWorkSearch|canvasSearch/);
+	assert.match(HISTORY, /\{#if historyTotal > 0 \|\| filtered\}/);
+	assert.match(HISTORY, /const noCandidates = \$derived\(filtered && historyTotal === 0 && !searchBusy && !searchFailed\);/);
+	assert.match(HISTORY, /\{#if noCandidates\}[\s\S]*?class="thumb thumb-empty"[\s\S]*?t\(\)\.historyNoCandidates/);
+	assert.equal(ja.historyNoCandidates, '候補無し');
+	assert.equal(en.historyNoCandidates, 'No matches');
+});
+
 test('the comment hint shares the row below the input with the character meter', () => {
 	assert.match(INPUT, /<div class="input-meta-row">[\s\S]*inputCommentHint[\s\S]*<DescriptionMeter[\s\S]*<\/div>/);
 	assert.equal(ja.inputCommentHint, '[括弧内文字列はコメント扱い]');

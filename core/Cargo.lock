@@ -575,6 +575,7 @@ dependencies = [
  "inku-ddl",
  "inku-render",
  "inku-score",
+ "roxmltree",
  "serde",
  "serde_json",
  "sha2",

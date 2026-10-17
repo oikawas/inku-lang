@@ -168,6 +168,17 @@ pub fn composition_ranges() -> String {
     inku_pipeline::recompose::composition_ranges_json()
 }
 
+/// The refinements that change one part of a saved Score (touches, support,
+/// color arrangement): one JSON request with an `action`, one JSON answer
+/// (`inku.saved-variants.v1`). A panic answers `{"error": "internal_invariant"}`.
+#[uniffi::export]
+pub fn saved_variants(input_bytes: Vec<u8>) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::saved_variants::saved_variants_json(&input_bytes)
+    }))
+    .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
+}
+
 /// A description's identity `dh1`, as Server's `identity.description_hash`
 /// computes it. Every host asks this one copy so stored identities agree.
 #[uniffi::export]

@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Move the touch, ground and color-arrangement refinements into the shared core
+
+The three refinements that replace one part of a saved Score (Change the touches, Change the ground, Change the color arrangement) now have one implementation of their options and replacement rules in the shared core (`inku.saved-variants.v1`). Server calls it instead of its Python `tool_variants.py`, `ground_variants.py` and `color_arrangements.py`; the API requests and responses keep their shape. Entries were added to UniFFI (Swift) and the Python binding. The tools and materials come from the core's saijiki asset. By the author's ruling (2026-10-17) an added ground sentence takes the work's saved instruction language or, without one, the shared instruction-language rule, and a color-arrangement child's record is `{color_arrangement_index, catalog_id}`, rebuilt from the parent by Server on saving. Compared with the old Python rules over the 4,712 works exported from 5173 and the 743 works of the fixed macOS app, ground options and replacements, touch readings and replacements, and color-arrangement pages and color maps all match; only the predicted 7 works get an added ground sentence in another language. Rust and Server tests read the shared table `server/tests/data/saved-variant-cases.json`. Android and Swift replace their copies in their own work.
+
 ### 2026-10-17 — Remove Server's unused `llm_retry.py`
 
 Server's `llm_retry.py`, which nothing imported, and its tests were removed. Retries of provider responses belong to the shared core's `RetryPolicy`.

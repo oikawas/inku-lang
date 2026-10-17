@@ -8,6 +8,10 @@
 
 ## 未リリース
 
+### 2026-10-17 — 推敲のてざわり・支持体・配色の規則を共有coreへ
+
+保存済みScoreの一部だけを差し替える推敲3種（てざわりを変える・支持体を変える・配色を変える）の候補の作り方と差し替えの規則を、共有coreの1つの実装（`inku.saved-variants.v1`）にまとめた。ServerはPythonの`tool_variants.py`・`ground_variants.py`・`color_arrangements.py`をやめてcoreを呼び、APIの要求と応答の形は変えていない。UniFFI（Swift）とPython bindingに入口を足した。道具と素材の一覧はcoreの歳時記の資産から作る。作者の決定（2026-10-17）で、地の文を足すときの言語は保存した指示言語、無ければ指示言語の共通の判定で決め、配色の子の記録は`{color_arrangement_index, catalog_id}`としてServerが保存時に親から作り直す。旧Python実装との照合は、5173の書き出し4,712作品と固定macOSアプリの743作品で、支持体の候補と差し替え・てざわりの読み取りと差し替え・配色の頁と配色の表がすべて一致した。地の文の言語が変わるのは予測した7作品の指示書だけである。共通の試験データ`server/tests/data/saved-variant-cases.json`をRustとServerの試験が読む。Android・Swiftの写しの置き換えは各アプリの作業で行う。
+
 ### 2026-10-17 — 使われていないServerの`llm_retry.py`を削除
 
 どこからも使われていなかったServerの`llm_retry.py`とその試験を削除した。provider応答の再試行は共有coreの`RetryPolicy`が持つ。

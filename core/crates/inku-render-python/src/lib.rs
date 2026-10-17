@@ -308,6 +308,17 @@ fn pipeline_completion_range_states<'py>(
     PyBytes::new(py, &output)
 }
 
+/// The saved-Score refinements (touches, support, color arrangement) from the shared core.
+#[pyfunction]
+fn pipeline_saved_variants<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::saved_variants(input));
+    PyBytes::new(py, &output)
+}
+
 /// A description's identity `dh1` (`identity.description_hash`), from the shared core.
 #[pyfunction]
 fn pipeline_description_hash(text: &str) -> String {
@@ -391,6 +402,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pipeline_composition_ranges, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_completion_range_states, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_canonical_json, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_saved_variants, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_description_hash, module)?)?;
     module.add_function(wrap_pyfunction!(
         pipeline_description_without_labels,

@@ -1,4 +1,5 @@
 import type { PaintResult } from '$lib/features/run/current-work';
+import installation from './installation.json';
 
 /** The experiment receives a snapshot, never application state or credentials. */
 export function snapshot(result: PaintResult): string {
@@ -16,8 +17,8 @@ export function snapshot(result: PaintResult): string {
 	return json;
 }
 
-/** Build-time opt in, restricted to a versioned static directory on this origin. */
-export function configuredViewer(value: unknown): string | null {
+/** The bundled registration can be overridden or disabled with an explicit value. */
+export function configuredViewer(value: unknown = installation.viewerUrl): string | null {
 	return typeof value === 'string' && /^\/experimental\/ddl-3d\/[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}\/index\.html$/.test(value)
 		? value : null;
 }

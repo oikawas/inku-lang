@@ -20,7 +20,9 @@ Open the local URL and choose a JSON file. Accepts a Score itself or an object w
 
 `build:wasm` emits `public/wasm/provenance.json` with the core base SHA, dirty flag, source hash including new untracked core files, and adapter/mapping versions. Runtime results also carry the Score schema digest and engine version. A base SHA alone does not identify a dirty build. The build collects dependency license texts into `public/THIRD_PARTY_NOTICES.txt` for distribution with the viewer.
 
-## Optional Web connection
+## Web connection and distribution
+
+The Web app ships the separately built viewer registered in `web/src/lib/features/experimental-3d/installation.json`. The initial view remains 2D. Three.js, the Worker and WASM load only after selecting 3D. Main Web dependencies and build scripts do not build or import the viewer; the viewer's own package and locks produce a self-contained static distribution.
 
 After building, install a uniquely named static artifact in the intended product checkout:
 
@@ -28,7 +30,9 @@ After building, install a uniquely named static artifact in the intended product
 npm run install:viewer --prefix experiments/ddl-3d -- /absolute/product-checkout local-3d-001
 ```
 
-The script prints `VITE_DDL_3D_VIEWER_URL=/experimental/ddl-3d/local-3d-001/index.html`. Set this at **Web build/dev startup**. With no setting, the normal 2D Work tab remains and no viewer assets load. Only same-origin versioned paths of this form are accepted. Installation refuses symlink destinations and existing build directories. It does not start, restart, or deploy any service.
+The script prints `VITE_DDL_3D_VIEWER_URL=/experimental/ddl-3d/local-3d-001/index.html`. Set this at **Web build/dev startup** to override the bundled registration for a local build. With no override, the bundled viewer is available. Only same-origin versioned paths of this form are accepted. Installation refuses symlink destinations and existing build directories. It does not start, restart, or deploy any service.
+
+For a distribution update, build from a clean, committed core source, install under a new immutable build name, update `installation.json`, and allow that exact directory in `web/.gitignore`. Commit the entire directory, including `wasm/provenance.json` and `THIRD_PARTY_NOTICES.txt`. Deploy it with the Web static files through the normal deployment workflow. Keep the previous directory while any running page still references it; never overwrite an existing build in place.
 
 The bridge projects only the current Score and saved color/aspect/seed/version metadata into an immutable JSON string. It supports a saved work, a newly created work, and an unsaved candidate without requiring a history ID. Decimal seed strings never pass through `Number`. Unsafe numeric seeds are rejected rather than silently rounded.
 
@@ -68,6 +72,6 @@ Build WASM before the Node tests. Browser verification must cover actual Work-ta
 
 ## Disable or remove
 
-To disable, unset `VITE_DDL_3D_VIEWER_URL` and rebuild/start Web using its normal workflow. This needs no database operation. Existing distributed asset directories may be removed separately when no page uses them.
+To disable, set `VITE_DDL_3D_VIEWER_URL=off` and rebuild/start Web using its normal workflow. Alternatively, set the registration's `viewerUrl` to an empty string and rebuild/start Web. This hides the switch and does not load viewer assets. Unsetting the environment override restores the bundled registration. This needs no database operation. Existing distributed asset directories may be removed separately when no page uses them.
 
-To remove the implementation, remove `experiments/ddl-3d/`, `web/src/lib/features/experimental-3d/`, the experimental imports/switch/conditional and `viewMode` guards in `CanvasPanel.svelte`, and the mode state/binding/keyboard condition in `+page.svelte`. Remove the seven `ddl3d*` labels from the two locale files and their type declarations. Remove the optional Cargo feature, module declaration and `geometry_export.rs`, and the feature-gated `export_arc_centerline` wrapper in `marks.rs`. Restore the original 2D branch and wheel/keyboard conditions. Remove the static-assets ignore entry and experimental SPEC/CHANGELOG entries as appropriate. The main npm/Cargo membership, DB and saved works have no reverse migration. Build and check Web and the default core afterward.
+To remove the implementation, remove `experiments/ddl-3d/`, `web/src/lib/features/experimental-3d/` (including the registration), `web/static/experimental/ddl-3d/`, the experimental imports/switch/conditional and `viewMode` guards in `CanvasPanel.svelte`, and the mode state/binding/keyboard condition in `+page.svelte`. Remove the seven `ddl3d*` labels from the two locale files and their type declarations. Remove the optional Cargo feature, module declaration and `geometry_export.rs`, and the feature-gated `export_arc_centerline` wrapper in `marks.rs`. Restore the original 2D branch and wheel/keyboard conditions. Remove the static-assets ignore entries and experimental SPEC/CHANGELOG entries as appropriate. The main npm/Cargo membership, DB and saved works have no reverse migration. Build and check Web and the default core afterward.

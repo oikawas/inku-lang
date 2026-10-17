@@ -189,11 +189,22 @@ AI自動推敲プロセスは、記述ロック・DDL直接入力の作品もVis
 - バッチが止まっていて失敗の行が残っていれば、結果の数の下に「エラー作品を再描画」を出す。押すと、失敗の行だけを、元の本文・行番号と開始時に固定した要求（描画条件・モデル）のまま描き直す。描き直しの中でも再試行の回数の設定は効く。待ち・要確認・省略・成功の行には触れない。成功した行は失敗・要確認の一覧から外れ、残った失敗はまた試せる。
 - 確認：AppCheck `--automation-only`（成功1・失敗1・待ち1の記録で、送るのは失敗の行だけ、開始時のモデル、待ちの行は待ちのまま）。この確かめは「登録したモデルだけで描く」の後に材料がモデルを登録しておらず落ちていたので、モデルを登録した。
 
+## 2026-10-17 providerの要求本文と応答を共有coreへ移す
+
+APIキーを使うproviderの描画・Vision（推敲助言・奥書）・デモの本文と応答は、UniFFIの`provider_wire`（`inku.provider-wire.v1`）を呼ぶ。正本は共有coreの[`provider_wire.rs`](../core/crates/inku-pipeline/src/provider_wire.rs)。以下のprovider別の説明もこの実装に従い、Swiftにモデル判定・出力枠・schema変形・応答抽出の規則を複製しない。ChatGPTプランの要求とSSEは次段の対象であり、今回変更しない。
+
+- `pipeline_request`へ接続の公開条件・モデル・effectのprompt・出力上限を渡し、`text_request`へsystem・text・画像data URL・temperature・上限を渡す。schemaのキー順序を保つため、promptは元のeffectのJSONバイト列のまま渡す。
+- 本文はcoreが返す文字列をUTF-8へ変換してそのまま送る。名前順への書き直しはしない。URL・秘密でないheader・応答format・出力予算・Gemini countTokensのURL/本文もcoreの答えを使う。鍵はcoreへ渡さず、指定されたheader/prefixへhostが足す。
+- `pipeline_response`／`text_response`のanswer・cut・malformed・http_errorと入力使用量を使う。HTTPの失敗分類と拒否の要約はcoreへ任せる。既知の実鍵の追加マスク、送受信・締切・流量・観測記録はhostに残す。
+- 打切りの記録はcoreの`cut`と`output_budget`をシステムログへ渡す。描画は打切りを`malformed_payload`で拒否し、Visionはcoreが読めた文章を返す。本文・推論文はこのログに入れない。
+- デモはServerのSDK廃止後と同じ1回送信とし、旧SDKを真似た追加再試行を削除する。助言のprompt文・助言JSONの切り出しは今回の移行に含めない。
+- 確認：共通`provider-wire-cases.json`の要求246・text要求81・応答97行、HTTP分類・使用量・countTokens・観測保存・補助送信の限定check。公開fixtureの鍵は合成`KEY`で、実鍵や実応答をfixtureへ保存しない。
+
 ## 2026-10-13 Claudeの思考の出力枠と、上限で切れた応答の記録をServerに揃える
 
-作者の指示（Server Build 1190との差の取り込み、段A）。正本はServerの`anthropic_request.py`・`gemini_request.py`・`openai_request.py`・`pipeline_provider.py`・`vision_client.py`。
+作者の指示（Server Build 1190との差の取り込み、段A）。要求と応答の正本は、2026-10-17に上記の共有coreへ移した。
 
-- Claude 5（opus・sonnet・haiku・fable・mythosの5）とMythos Previewは、描画・Vision・デモのどれでも`max_tokens`へ8,192を足す（`ProviderOutputLimit.anthropicMaxTokens`）。Claude 4系は足さない。
+- Claude 5（opus・sonnet・haiku・fable・mythosの5）とMythos Previewは、描画・Vision・デモのどれでもcoreが`max_tokens`へ8,192を足す。Claude 4系は足さない。
 - 描画で上限に当たって切れた応答（Claudeの`stop_reason: max_tokens`、Geminiの`finishReason: MAX_TOKENS`、OpenAI互換の`finish_reason: length`、Responsesの`incomplete`／`max_output_tokens`）は、どの社でも答えにせず`malformed_payload`で拒む（Geminiは前は`provider_output_limit`でprovider_rejectedに分かれていた）。
 - 切れた応答は、システムログ（subsystem `app.inku`、category `provider`）にServerと同じ1行`provider_output_limit {…}`を残す。JSONは鍵を名前の順に詰めて書き、`action`・`provider`・`model`・送った本文の上限`max_tokens`と、社ごとの項目（出力・思考／推論のトークン数、本文・関数呼び出しの有無など、無い値は`null`）を持つ。本文・推論文は含めない。Visionは切れた応答をそのまま返し、同じ行（`action: vision`）を残す。デモは残さない。この節より前の節の書き方（`unknown`、Geminiの`provider_output_limit`）はこれに改めた。
 - 有料プラン限定の確かめ（Ollama Cloudの1トークンの要求）は、402も403も有料プラン限定と読む。
@@ -217,7 +228,7 @@ NVIDIA NIMへの描画・Vision（推敲の助言・奥書）・デモの指示�
 
 - OpenAI互換の接続IDが`nvidia`で、モデル名の最後の`/`より後ろが`^gemma[-_]?4([-_]|$)`に一致するときだけ、大文字小文字を問わず`chat_template_kwargs: {"enable_thinking": false}`を送る。3経路で同じ判定を使う。
 - 他のNIMモデルや他providerにはこの指定を付けない。`max_tokens`と`temperature`は既存の値を保持する。公式OpenAIのURLでは既存の公式API指定を使う。
-- Swiftは生のJSONを組むため、`chat_template_kwargs`を要求本文へ直接入れる。SDK用の`extra_body`へは包まない。
+- coreが`chat_template_kwargs`を本文へ直接入れ、Swiftはそのバイト列を送る。SDK用の`extra_body`へは包まない。
 - 確認：InkuHostの`NIMGemmaThinkingTests`で、3経路の送信JSON、出力枠・温度、他モデル・他providerの対照、大文字小文字とモデル名の境界を確認する。
 
 ## 2026-10-13 Ollamaの推論指定と出力枠をServerに揃える
@@ -236,7 +247,7 @@ Geminiへの描画pipeline・Vision・デモの指示文は、共有coreの[`pro
 - 判定前に先頭の`models/`を外す。`^gemini-2\.5-flash-(lite|image)(-|$)`と`^antigravity-`は`thinkingConfig`を送らない。
 - `minimal`を送るのは`gemma-`で始まるものと、次の13名の完全一致だけ：`gemini-3.6-flash`、`gemini-3.5-flash`、`gemini-3.5-flash-lite`、`gemini-flash-lite-latest`、`gemini-3-flash-preview`、`gemini-3.1-flash-lite`、`gemini-3.1-flash-lite-preview`、`gemini-3.1-flash-image`、`gemini-3.1-flash-image-preview`、`gemini-3.1-flash-lite-image`、`gemini-robotics-er-2-preview`、`nano-banana-pro-preview`、`gemini-nano-banana-2.1`。ほかは`low`を送る（新モデルとFlash／Proのlatest別名を含む）。
 - 思考レベルを送るモデルは`maxOutputTokens`に8,192を足す。送らないモデルは答えの枠のまま。描画・Vision・デモはいずれもGeminiへ`temperature`を送らず、提供元の既定を使う（[GoogleのGemini 3案内](https://ai.google.dev/gemini-api/docs/gemini-3#temperature)）。
-- 描画の応答の先頭候補が`finishReason: MAX_TOKENS`なら、関数呼び出しが揃っていても答えとして使わず`provider_output_limit`で拒否する。Vision・デモは`thought: true`の部分を本文に混ぜない。
+- 描画の応答の先頭候補が`finishReason: MAX_TOKENS`なら、関数呼び出しが揃っていても答えとして使わず、coreのcutを`malformed_payload`で拒否する。Vision・デモはcoreが`thought: true`の部分を本文から除く。
 - デモのClaude要求は`temperature`を送らない。共有coreの[`provider_wire.rs`](../core/crates/inku-pipeline/src/provider_wire.rs)と同じ判定（`^claude-((opus|sonnet|haiku|fable|mythos)-5(-|$)|mythos-preview(-|$))`）に該当するモデルだけ、`max_tokens`へ8,192を足す。Claudeの描画・Visionの枠はこの変更の対象に含めない。
 - 確認：InkuHostの`GeminiThinkingLevelTests`で3経路の送信JSON、設定の省略と出力枠、打切り応答の拒否、Claudeデモの温度省略と出力枠を確認。`AuxiliaryServerParityChecks.testAnswerTextFollowsServerReaders`でデモへの思考文の混入を拒ぐ。
 

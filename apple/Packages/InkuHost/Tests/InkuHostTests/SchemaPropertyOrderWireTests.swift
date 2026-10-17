@@ -43,12 +43,16 @@ final class SchemaPropertyOrderWireTests: XCTestCase {
         }
     }
 
-    // Failure: a schema without propertyOrdering (Stage 1 and the others) changed its bytes.
-    func testSchemasWithoutOrderingKeepTheirBytes() throws {
+    // Failure: moving body byte order to core changes the schema's contents.
+    func testSchemasWithoutOrderingKeepTheirContents() throws {
         for (name, provider, model) in Self.paths {
             let request = try ProviderWire.request(action: SchemaOrderFixture.action(SchemaOrderFixture.unordered), provider: provider, model: model, maxTokens: 2048, key: nil)
             let body = try XCTUnwrap(request.httpBody)
-            XCTAssertEqual(body, try ExactJSON(data: body).data, name)
+            let json = try ExactJSON(data: body)
+            let tool = json["tools"].array?.first ?? .null
+            let schema = [tool["parameters"], tool["function"]["parameters"], tool["input_schema"],
+                          json["response_format"]["json_schema"]["schema"]].first { $0.object != nil }
+            XCTAssertEqual(schema, SchemaOrderFixture.unordered, name)
         }
     }
 }

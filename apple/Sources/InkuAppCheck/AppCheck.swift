@@ -11,6 +11,10 @@ struct AppCheck {
         if CommandLine.arguments.contains("--core-version-only") {
             print(InkuCore.versionReport); return
         }
+        if let index = CommandLine.arguments.firstIndex(of: "--provider-wire-ui-fixture") {
+            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Expected a fresh provider-wire fixture folder") }
+            try await makeProviderWireUIFixture(folder: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
+        }
         if let index = CommandLine.arguments.firstIndex(of: "--shared-saved-variants-only") {
             guard CommandLine.arguments.indices.contains(index + 2) else { throw CheckFailure.message("Expected shared corpus and fresh fixture folder") }
             try await runSharedSavedVariantChecks(casesURL: URL(fileURLWithPath: CommandLine.arguments[index + 1]),

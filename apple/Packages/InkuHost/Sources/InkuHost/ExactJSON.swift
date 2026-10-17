@@ -18,6 +18,42 @@ public indirect enum ExactJSON: Sendable, Equatable {
     }
 
     public var data: Data { Data(text.utf8) }
+    /// Select transport bytes without changing object member order or number spelling.
+    public static func rawMember(_ key: String, in data: Data) throws -> Data {
+        _ = try Self(data: data)
+        var parser = JSONParser(bytes: Array(data)); parser.whitespace()
+        guard parser.take(123) else { throw HostError("pipeline_schema_violation") }
+        parser.whitespace()
+        if !parser.take(125) {
+            while true {
+                parser.whitespace(); let name = try parser.string()
+                parser.whitespace(); guard parser.take(58) else { throw HostError("invalid_json") }
+                parser.whitespace(); let start = parser.index
+                _ = try parser.value(depth: 1)
+                if name == key { return Data(parser.bytes[start..<parser.index]) }
+                parser.whitespace()
+                if parser.take(125) { break }
+                guard parser.take(44) else { throw HostError("invalid_json") }
+            }
+        }
+        throw HostError("pipeline_schema_violation")
+    }
+
+    /// Split a validated JSON array into its unchanged element bytes.
+    public static func rawElements(in data: Data) throws -> [Data] {
+        _ = try Self(data: data)
+        var parser = JSONParser(bytes: Array(data)); parser.whitespace()
+        guard parser.take(91) else { throw HostError("pipeline_schema_violation") }
+        parser.whitespace(); if parser.take(93) { return [] }
+        var elements: [Data] = []
+        while true {
+            parser.whitespace(); let start = parser.index
+            _ = try parser.value(depth: 1)
+            elements.append(Data(parser.bytes[start..<parser.index]))
+            parser.whitespace(); if parser.take(93) { return elements }
+            guard parser.take(44) else { throw HostError("invalid_json") }
+        }
+    }
     /// Shared identity serialization; `text` remains the exact-lexeme transport representation.
     public var canonicalText: String? { InkuCore.canonicalJSON(text) }
     public var text: String {

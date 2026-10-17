@@ -189,11 +189,22 @@ At the author's instruction (bringing in the differences from Server Build 1190,
 - When a batch has stopped with failed rows left, "Retry failed works" appears below the result counts. It draws only the failed rows again, with their original text and line numbers and the request pinned when the batch began (drawing conditions and models). The retry count setting still applies within it. Waiting, uncertain, skipped and successful rows are left as they are. A row that succeeds leaves the failed and uncertain list, and failures that remain can be retried again.
 - Checks: AppCheck `--automation-only` (with one success, one failure and one waiting row, only the failed row is sent, with the pinned model, and the waiting row stays waiting). This check had been failing since drawing began to take only registered models, because its fixture registered none; it now registers its models.
 
+## 2026-10-17 Move provider request bodies and response reading to the shared core
+
+Drawing, Vision (refinement advice and colophons), and demo requests to key-based providers call UniFFI's `provider_wire` (`inku.provider-wire.v1`). The shared core's [`provider_wire.rs`](../core/crates/inku-pipeline/src/provider_wire.rs) is authoritative. The provider descriptions below follow it; Swift keeps no copies of model matching, output-budget, schema-transformation or answer-extraction rules. ChatGPT plan requests and SSE belong to the next stage and are unchanged here.
+
+- `pipeline_request` receives public connection settings, the model, effect prompt and output limit; `text_request` receives system, text, image data URLs, temperature and the limit. The prompt retains its original effect JSON bytes so schema member order survives transport.
+- Swift sends the core's body string as UTF-8 without sorting or re-encoding it. URL, nonsecret headers, response format, output budget, and Gemini countTokens URL/body also come from core. The key stays in the host, which adds it under the returned header and prefix.
+- The host uses `pipeline_response`/`text_response` outcomes answer, cut, malformed and http_error, and reported input usage. Core owns HTTP failure classification and refusal summaries. Additional masking of known actual credentials, HTTP, deadlines, rate accounting and observation storage remain in the host.
+- The system log receives the core's `cut` and `output_budget`. Cut drawing answers fail as `malformed_payload`; Vision returns prose that core could read. This log contains no answer or reasoning text.
+- Demo requests send once, following Server after its SDK removal; the old SDK-style extra retries are removed. Advice prompt wording and advice JSON extraction are outside this migration.
+- Checks: all 246 request, 81 text-request and 97 response rows in `provider-wire-cases.json`, plus focused HTTP, usage, countTokens, observation-storage and auxiliary-send checks. Fixtures use synthetic `KEY`; actual credentials and responses are not saved in public fixtures.
+
 ## 2026-10-13 Match Server's Claude thinking budget and cut-off answer records
 
-At the author's instruction (bringing in the differences from Server Build 1190, stage A). The sources are Server's `anthropic_request.py`, `gemini_request.py`, `openai_request.py`, `pipeline_provider.py` and `vision_client.py`.
+At the author's instruction (bringing in the differences from Server Build 1190, stage A). Request and response authority moved to the shared core above on 2026-10-17.
 
-- Claude 5 (opus, sonnet, haiku, fable and mythos 5) and Mythos Preview receive 8,192 extra `max_tokens` for drawing, Vision and demo alike (`ProviderOutputLimit.anthropicMaxTokens`). Claude 4 models do not.
+- Core adds 8,192 extra `max_tokens` for Claude 5 (opus, sonnet, haiku, fable and mythos 5) and Mythos Preview in drawing, Vision and demo alike. Claude 4 models receive none.
 - A drawing answer cut off at its output limit (Claude `stop_reason: max_tokens`, Gemini `finishReason: MAX_TOKENS`, OpenAI-compatible `finish_reason: length`, Responses `incomplete`/`max_output_tokens`) is never taken as the answer and is refused as `malformed_payload` for every provider (Gemini used to fail as `provider_output_limit`, classed as provider_rejected).
 - A cut-off answer leaves Server's one line `provider_output_limit {…}` in the system log (subsystem `app.inku`, category `provider`). The JSON has keys in name order with compact separators, and holds `action`, `provider`, `model`, the sent body's limit `max_tokens`, and each provider's fields (output and thinking or reasoning token counts, whether text or a function call is present; missing values are `null`). It holds no answer or reasoning text. Vision returns a cut-off answer as it is and leaves the same line (`action: vision`); the demo leaves none. This replaces what earlier sections said (`unknown`, Gemini's `provider_output_limit`).
 - The paid-plan check (Ollama Cloud's one-token request) reads both 402 and 403 as paid-plan only.
@@ -217,7 +228,7 @@ Drawing, Vision (refinement advice and colophons), and demo instruction requests
 
 - Only OpenAI-compatible connection ID `nvidia` with a model's final `/` segment matching `^gemma[-_]?4([-_]|$)`, case-insensitively, receives `chat_template_kwargs: {"enable_thinking": false}`. All three paths share this matching.
 - Other NIM models and providers receive no such field. Existing `max_tokens` and `temperature` values are preserved. Official OpenAI URLs retain the existing official API settings.
-- Swift builds raw JSON, so `chat_template_kwargs` is placed directly in the request body, without an SDK `extra_body` wrapper.
+- Core places `chat_template_kwargs` directly in the body, and Swift sends those bytes without an SDK `extra_body` wrapper.
 - Check: InkuHost's `NIMGemmaThinkingTests` verifies outgoing JSON for all three paths, token budgets and temperature, other-model and other-provider controls, case-insensitivity, and model-name boundaries.
 
 ## 2026-10-13 Match Server's Ollama reasoning controls and output budgets
@@ -236,7 +247,7 @@ Gemini drawing pipeline, Vision, and demo instruction requests use the model mat
 - Matching strips the leading `models/`. Names matching `^gemini-2\.5-flash-(lite|image)(-|$)` or `^antigravity-` receive no `thinkingConfig`.
 - `minimal` is sent only to names starting with `gemma-` and these 13 exact names: `gemini-3.6-flash`, `gemini-3.5-flash`, `gemini-3.5-flash-lite`, `gemini-flash-lite-latest`, `gemini-3-flash-preview`, `gemini-3.1-flash-lite`, `gemini-3.1-flash-lite-preview`, `gemini-3.1-flash-image`, `gemini-3.1-flash-image-preview`, `gemini-3.1-flash-lite-image`, `gemini-robotics-er-2-preview`, `nano-banana-pro-preview`, and `gemini-nano-banana-2.1`. Others receive `low`, including new models and the latest Flash/Pro aliases.
 - Models sent a thinking level receive 8,192 extra `maxOutputTokens`; models sent none keep the answer's budget. Drawing, Vision, and demo requests omit Gemini's `temperature` and use the provider's default ([Google's Gemini 3 guide](https://ai.google.dev/gemini-api/docs/gemini-3#temperature)).
-- If the first drawing candidate has `finishReason: MAX_TOKENS`, reject it with `provider_output_limit` even if its function call looks complete. Vision and demo text excludes parts marked `thought: true`.
+- If the first drawing candidate has `finishReason: MAX_TOKENS`, the core's cut is refused as `malformed_payload` even if its function call looks complete. Core excludes parts marked `thought: true` from Vision and demo text.
 - Claude demo requests omit `temperature`. Only models matching the shared core's [`provider_wire.rs`](../core/crates/inku-pipeline/src/provider_wire.rs) rule (`^claude-((opus|sonnet|haiku|fable|mythos)-5(-|$)|mythos-preview(-|$))`) receive 8,192 extra `max_tokens`. This change does not adjust Claude's drawing or Vision budgets.
 - Checks: InkuHost's `GeminiThinkingLevelTests` verifies outgoing JSON for all three Gemini paths, omitted configuration and output budgets, rejection of cut-off drawing responses, and Claude demo sampling and budgets. `AuxiliaryServerParityChecks.testAnswerTextFollowsServerReaders` prevents thought text from leaking into demo instructions.
 

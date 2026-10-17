@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-17 — Browse Library pages preceding the selected work
+
+The selected work or its lineage still starts the initial page. `← newer` now also reaches earlier positions in the listing, in both thumbnail and list views with chronological or lineage grouping. The query, filters, bulk selection and preview remain.
+
 ### 2026-10-17 — Name Android color-arrangement and ground changes in lineage
 
 Lineage edges for color-arrangement and ground changes now show Color arrangement and Ground instead of Unknown, matching the Web labels in both languages.

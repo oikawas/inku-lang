@@ -5,6 +5,7 @@ import app.inku.mobile.ui.i18n.inkuError
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.database.sqlite.SQLiteConstraintException
 import androidx.room.withTransaction
 import app.inku.mobile.BuildConfig
 import app.inku.mobile.data.db.AppSettingEntity
@@ -26,6 +27,9 @@ import app.inku.mobile.data.lineage.LineageGraph
 import app.inku.mobile.data.lineage.LineageGraphResult
 import app.inku.mobile.data.lineage.LineagePlanner
 import app.inku.mobile.data.model.CatalogSelection
+import app.inku.mobile.data.model.ColorCatalogs
+import app.inku.mobile.data.model.WorkColorSnapshot
+import app.inku.mobile.data.model.workColorSnapshot
 import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.data.model.CameraInputProvenance
 import app.inku.mobile.data.model.mergeInputProvenance
@@ -33,6 +37,13 @@ import app.inku.mobile.data.refinement.PaintSeeds
 import app.inku.mobile.data.refinement.RefinementParent
 import app.inku.mobile.data.refinement.RefinementPlan
 import app.inku.mobile.data.refinement.RefinementRoute
+import app.inku.mobile.data.refinement.ColorArrangementPage
+import app.inku.mobile.data.refinement.GroundVariantPlan
+import app.inku.mobile.data.refinement.GroundVariants
+import app.inku.mobile.data.refinement.ReplayComparison
+import app.inku.mobile.data.refinement.SavedColorArrangements
+import app.inku.mobile.data.refinement.SentPrompts
+import app.inku.mobile.data.refinement.sentPromptsFromHistoryRecord
 import app.inku.mobile.llm.DefaultModelDownloads
 import app.inku.mobile.llm.CameraDescriptionRequest
 import app.inku.mobile.llm.CameraDescriptionResult
@@ -68,9 +79,12 @@ import app.inku.mobile.render.RustArtworkRasterizer
 import app.inku.mobile.render.SvgOutputLimit
 import java.io.File
 import java.io.FileOutputStream
+import java.security.MessageDigest
+import java.util.UUID
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -251,6 +265,15 @@ class InkuRepository(
 
     suspend fun getHistoryById(id: String): HistoryItemEntity? = database.historyDao().getById(id)
 
+    suspend fun canvasSearchEntries(): List<app.inku.mobile.data.db.CanvasSearchEntry> =
+        database.historyDao().canvasSearchEntries()
+
+    suspend fun refineVisionAdvice(request: app.inku.mobile.llm.RefinementVisionRequest): app.inku.mobile.llm.RefinementVisionAdvice =
+        app.inku.mobile.llm.RefinementVisionAdviser(
+            activeModelProvider,
+            chatGptSession = chatGptPlan.state.value.activeSession,
+        ).advise(request)
+
     fun pipelineCommitStore(): PipelineCommitStore = sharedPipelineStore
 
     fun pipelineExecutionStore(): PipelineExecutionStore = sharedPipelineStore
@@ -258,6 +281,28 @@ class InkuRepository(
     suspend fun pipelineViewFor(item: HistoryItemEntity): PipelineView? {
         val executionId = JSONObject(item.renderMetadataJson).optString("pipeline_execution_id")
         return executionId.takeIf { it.isNotBlank() }?.let { pipeline.view(it) }
+    }
+
+    /** Read only the exact execution attached to this history row. */
+    suspend fun sentPrompts(historyId: String): SentPrompts {
+        val item = getHistoryById(historyId) ?: return SentPrompts.Unavailable
+        val metadata = runCatching { JSONObject(item.renderMetadataJson) }.getOrNull()
+            ?: return SentPrompts.Unavailable
+        val executionId = metadata.optString("pipeline_execution_id").takeIf(String::isNotBlank)
+            ?: return SentPrompts.NotRecorded
+        return try {
+            val history = sharedPipelineStore.readHistory(AndroidWorkPipeline.OWNER_ID, historyId)
+                ?: return SentPrompts.Unavailable
+            if (history.warning != null || history.variationId == null || history.revision == null ||
+                metadata.optString("pipeline_variation_id") != history.variationId ||
+                metadata.optString("pipeline_revision") != history.revision
+            ) return SentPrompts.Unavailable
+            sentPromptsFromHistoryRecord(item.renderMetadataJson, executionId, history.variationId, history.revision)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            SentPrompts.Unavailable
+        }
     }
 
     suspend fun completionRangeStates(source: String, executionId: String?, historyId: String?) =
@@ -923,6 +968,175 @@ class InkuRepository(
         return saveResult(result, catalogId, canvasAspect, model, model, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility, sourceText = sourceText)
     }
 
+    /** Eight distinct assignments per page, excluding the saved SVG's visible assignment. */
+    suspend fun colorArrangementPage(parent: RefinementParent, cursor: Int = 0): ColorArrangementPage {
+        val item = savedVariantParent(parent.historyId)
+        val colors = savedColorSnapshot(item)
+        return SavedColorArrangements.fromSaved(item.displaySvg, colors.colorMap, item.id).page(cursor)
+    }
+
+    suspend fun renderColorArrangementCandidate(
+        parent: RefinementParent,
+        index: Int,
+        renderWildOverride: Boolean? = null,
+    ): Pair<RefinementPlan, PaintResult> {
+        val item = savedVariantParent(parent.historyId)
+        val savedParent = RefinementParent.of(item, (item.sourceText ?: item.originalInput).trim())
+        require(savedParent.seeds.renderSeed != null) { "saved work has no performance seed to preserve its drawing" }
+        val colors = savedColorSnapshot(item)
+        val arranged = SavedColorArrangements.fromSaved(item.displaySvg, colors.colorMap, item.id)
+            .colorMap(colors.colorMap, index)
+        val plan = RefinementPlan(
+            element = null,
+            route = RefinementRoute.RenderFromScore,
+            catalogId = colors.catalogId,
+            canvasAspect = savedParent.canvasAspect,
+            seeds = savedParent.seeds,
+            derivationKind = "color_arrangement_change",
+            derivationMetadata = mapOf("color_arrangement_index" to index),
+            workColorSnapshotOverride = colors.copy(colorMap = arranged),
+            renderWildOverride = renderWildOverride,
+        )
+        return plan to renderRefinementCandidate(savedParent, plan)
+    }
+
+    fun groundVariantPlan(parent: RefinementParent): GroundVariantPlan = GroundVariants.plan(parent.scoreJson)
+
+    suspend fun renderGroundVariantCandidate(
+        parent: RefinementParent,
+        material: String,
+        renderWildOverride: Boolean? = null,
+    ): Pair<RefinementPlan, PaintResult> {
+        val item = savedVariantParent(parent.historyId)
+        val savedParent = RefinementParent.of(item, (item.sourceText ?: item.originalInput).trim())
+        require(savedParent.seeds.renderSeed != null) { "saved work has no performance seed to preserve its drawing" }
+        val current = GroundVariants.plan(savedParent.scoreJson)
+        require(current.entries.any { it.material == material }) { "ground must differ from the saved work" }
+        val plan = RefinementPlan(
+            element = null,
+            route = RefinementRoute.RenderFromScore,
+            catalogId = savedParent.catalogId,
+            canvasAspect = savedParent.canvasAspect,
+            seeds = savedParent.seeds,
+            derivationKind = "ground_change",
+            derivationMetadata = mapOf("ground_material" to material, "parent_ground_material" to current.current),
+            scoreOverrideJson = GroundVariants.scoreWithGround(savedParent.scoreJson, material),
+            ddlOverride = GroundVariants.ddlWithGround(savedParent.ddl, material, item.instructionLangResolved),
+            renderWildOverride = renderWildOverride,
+        )
+        return plan to renderRefinementCandidate(savedParent, plan)
+    }
+
+    private suspend fun savedVariantParent(historyId: String): HistoryItemEntity =
+        getHistoryById(historyId)?.takeUnless { it.trashed } ?: error("saved variant parent was not found")
+
+    private fun savedColorSnapshot(item: HistoryItemEntity): WorkColorSnapshot {
+        workColorSnapshot(item.renderMetadataJson)?.let { return it }
+        val catalog = ColorCatalogs.find(item.colorCatalogId)
+            ?: error("saved color catalog is unknown and has no snapshot")
+        return WorkColorSnapshot(catalog.id, catalog.renderMap, catalog.name, catalog.sub)
+    }
+
+    /** Compare a stored SVG with the current engine's rendering of its exact Score. */
+    suspend fun replaySavedWork(historyId: String): ReplayComparison {
+        val item = savedVariantParent(historyId)
+        val parentNode = requireNotNull(item.lineageNodeId) { "replay parent has no lineage node" }
+        val seeds = PaintSeeds.of(item)
+        val description = item.sourceText ?: item.originalInput
+        val started = System.currentTimeMillis()
+        val result = pipeline.renderFromScore(item.scoreJson, PaintRequest(
+            description = description,
+            originalText = description,
+            stage1Model = item.stage1Model.orEmpty(),
+            stage2Model = item.stage2Model.orEmpty(),
+            colorCatalogId = item.colorCatalogId,
+            canvasAspect = item.canvasAspect,
+            autoRepair = false,
+            parentHistoryId = item.id,
+            renderSeed = seeds.renderSeed ?: 0L,
+            compositionSeed = seeds.compositionSeed,
+            workColorSnapshot = workColorSnapshot(item.renderMetadataJson),
+            renderWild = item.drawnWild,
+            sketch = SketchInput(text = item.sketchText, grain = item.sketchGrain),
+            saveHistory = false,
+        ))
+        val originalMetadata = JSONObject(item.renderMetadataJson)
+        val replayMetadata = JSONObject(result.renderMetadataJson)
+        return ReplayComparison(
+            parentHistoryId = item.id,
+            parentLineageNodeId = parentNode,
+            originalSvg = item.displaySvg,
+            replayedSvg = result.displaySvg,
+            recordedVersion = originalMetadata.optString("render_engine_version").takeIf(String::isNotBlank),
+            currentVersion = replayMetadata.optString("render_engine_version").takeIf(String::isNotBlank),
+            provisionalSeed = seeds.renderSeed == null,
+            originalSvgBytes = item.displaySvg.toByteArray(Charsets.UTF_8).size,
+            replayedSvgBytes = result.displaySvg.toByteArray(Charsets.UTF_8).size,
+            renderHash = result.renderHash,
+            svgSha256 = sha256(result.displaySvg),
+            elapsedMs = System.currentTimeMillis() - started,
+            result = result,
+            catalogId = replayMetadata.optString("catalog_id").ifBlank { item.colorCatalogId },
+            canvasAspect = replayMetadata.optString("canvas_aspect_id").ifBlank { item.canvasAspect },
+            stage1ModelId = item.stage1Model.orEmpty(),
+            stage2ModelId = item.stage2Model.orEmpty(),
+            sourceText = description,
+            saveId = UUID.randomUUID().toString(),
+        )
+    }
+
+    /** A retry with the same comparison returns its one child. */
+    suspend fun saveReplayChild(comparison: ReplayComparison): HistoryItemEntity {
+        val parent = savedVariantParent(comparison.parentHistoryId)
+        require(parent.lineageNodeId == comparison.parentLineageNodeId &&
+            parent.displaySvg == comparison.originalSvg &&
+            LineagePlanner.canonicalJson(JSONObject(parent.scoreJson)) ==
+                LineagePlanner.canonicalJson(JSONObject(comparison.result.scoreJson))) {
+            "replay parent changed"
+        }
+        require(comparison.renderHash == comparison.result.renderHash &&
+            comparison.replayedSvg == comparison.result.displaySvg &&
+            comparison.svgSha256 == sha256(comparison.result.displaySvg)) { "replay preview changed" }
+        suspend fun verified(item: HistoryItemEntity): HistoryItemEntity {
+            val edge = item.lineageNodeId?.let { database.lineageDao().getEdgeByChildId(it) }
+            require(item.renderHash == comparison.renderHash && sha256(item.displaySvg) == comparison.svgSha256 &&
+                edge?.parentNodeId == comparison.parentLineageNodeId && edge.derivationKind == "replay") {
+                "replay save identity conflicts with another work"
+            }
+            return item
+        }
+        getHistoryById(comparison.saveId)?.let { return verified(it) }
+        val saved = try {
+            saveResult(
+                result = comparison.result,
+                catalogId = comparison.catalogId,
+                canvasAspect = comparison.canvasAspect,
+                stage1ModelId = comparison.stage1ModelId,
+                stage2ModelId = comparison.stage2ModelId,
+                elapsedMs = comparison.elapsedMs,
+                sourceText = comparison.sourceText,
+                lineage = LineageDeclaration(
+                    parentNodeId = comparison.parentLineageNodeId,
+                    derivationKind = "replay",
+                    derivationMetadata = mapOf(
+                        "replay_work_id" to comparison.parentHistoryId,
+                        "replay_render_hash" to comparison.renderHash,
+                        "replay_svg_sha256" to comparison.svgSha256,
+                        "provisional_render_seed" to comparison.provisionalSeed,
+                    ),
+                ),
+                historyIdOverride = comparison.saveId,
+            )
+        } catch (conflict: SQLiteConstraintException) {
+            getHistoryById(comparison.saveId)?.let { return verified(it) }
+            throw conflict
+        }
+        return verified(saved)
+    }
+
+    private fun sha256(value: String): String = MessageDigest.getInstance("SHA-256")
+        .digest(value.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+
     /**
      * Draws one refinement candidate and does **not** save it.
      *
@@ -934,7 +1148,19 @@ class InkuRepository(
     suspend fun renderRefinementCandidate(parent: RefinementParent, plan: RefinementPlan): PaintResult {
         val request = refinementRequest(parent, plan)
         return when (plan.route) {
-            RefinementRoute.RenderFromScore -> pipeline.renderFromScore(parent.scoreJson, request)
+            RefinementRoute.RenderFromScore -> if (plan.derivationKind == "ground_change") {
+                val result = pipeline.renderGroundVariant(
+                    parent.scoreJson,
+                    plan.derivationMetadata["ground_material"] as String,
+                    request,
+                )
+                check(result.normalizedDdl == plan.ddlOverride &&
+                    LineagePlanner.canonicalJson(JSONObject(result.scoreJson)) ==
+                    LineagePlanner.canonicalJson(JSONObject(requireNotNull(plan.scoreOverrideJson)))) {
+                    "ground variant differs from its plan"
+                }
+                result
+            } else pipeline.renderFromScore(parent.scoreJson, request)
             RefinementRoute.ComposeFromDdl -> pipeline.composeFromDdl(parent.ddl, request)
             RefinementRoute.Paint -> pipeline.paint(request)
         }
@@ -965,7 +1191,7 @@ class InkuRepository(
             // being asked of the layer, and the state derives from the prose.
             sketch = SketchInput(text = parent.sketchText, grain = parent.sketchGrain),
             workColorSnapshot = refinementColorSnapshot(parent, plan),
-            renderWild = parent.renderWild,
+            renderWild = plan.renderWildOverride ?: parent.renderWild,
             parentHistoryId = parent.historyId,
             saveHistory = false,
         )
@@ -1049,7 +1275,7 @@ class InkuRepository(
         historyVisibility = historyVisibility,
     )
 
-    private suspend fun saveResult(result: PaintResult, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, elapsedMs: Long, historyInput: String? = null, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, sourceText: String? = null, inputProvenance: CameraInputProvenance? = null, originalPhoto: File? = null): HistoryItemEntity {
+    private suspend fun saveResult(result: PaintResult, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, elapsedMs: Long, historyInput: String? = null, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, sourceText: String? = null, inputProvenance: CameraInputProvenance? = null, originalPhoto: File? = null, historyIdOverride: String? = null): HistoryItemEntity {
         val now = System.currentTimeMillis()
         // The server writes every one of these as a string
         // (`db.py:2090-2097`), including the numeric ones.
@@ -1071,10 +1297,11 @@ class InkuRepository(
                 ?.let { JSONObject(it).optString("catalog_mode") }
                 ?.takeIf { it.isNotBlank() }
             ?: if (catalogId == CatalogSelection.AUTO_ID) "auto" else "fixed"
-        val historyId = result.pipelineView?.takeIf { result.managedHistoryLink != null }
+        val historyId = historyIdOverride ?: result.pipelineView?.takeIf { result.managedHistoryLink != null }
             ?.let(::pipelineHistoryId) ?: pipeline.newHistoryId()
         database.historyDao().getById(historyId)?.let { saved ->
-            check(saved.normalizedDdl == result.normalizedDdl && saved.renderHash == result.renderHash) {
+            check(saved.normalizedDdl == result.normalizedDdl && saved.renderHash == result.renderHash &&
+                saved.displaySvg == result.displaySvg) {
                 "pipeline_history_identity_conflict"
             }
             originalPhoto?.let { originalPhotos.persist(historyId, it) }
@@ -1151,6 +1378,7 @@ class InkuRepository(
             when {
                 result.managedHistoryLink != null -> sharedPipelineStore.saveManagedHistory(item, write, result.managedHistoryLink)
                 result.managedToolChange != null -> sharedPipelineStore.saveManagedToolHistory(item, write, result.managedToolChange)
+                result.managedGroundVariant != null -> sharedPipelineStore.saveManagedGroundVariantHistory(item, write, result.managedGroundVariant)
                 result.managedHistoryReplay != null -> sharedPipelineStore.saveManagedReplayHistory(item, write, result.managedHistoryReplay)
                 else -> database.withTransaction {
                     database.historyDao().insert(item)
@@ -1471,7 +1699,9 @@ internal fun builtInProviderSetting(
 }
 
 internal fun refinementColorSnapshot(parent: RefinementParent, plan: RefinementPlan) =
-    if (plan.route == RefinementRoute.RenderFromScore && plan.catalogId == parent.catalogId) {
+    if (plan.workColorSnapshotOverride != null) {
+        plan.workColorSnapshotOverride
+    } else if (plan.route == RefinementRoute.RenderFromScore && plan.catalogId == parent.catalogId) {
         parent.workColorSnapshot
     } else {
         null

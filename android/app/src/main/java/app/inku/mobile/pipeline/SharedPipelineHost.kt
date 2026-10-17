@@ -98,7 +98,10 @@ class SharedPipelineHost(
             snapshotBytes = output.snapshotBytes,
             models = request.models,
             context = request.context,
-            hostContextJson = JSONObject(request.hostContextJson).toString(),
+            hostContextJson = JSONObject(request.hostContextJson)
+                .put("system_prompts", JSONObject())
+                .put("system_prompt_stages", JSONArray(listOf("sketch", "stage1", "composition", "stage2")))
+                .toString(),
             fresh = true,
             renderedJson = output.renderedJson,
             eventsJson = output.eventsJson,
@@ -138,7 +141,11 @@ class SharedPipelineHost(
                     session.context = session.context.copy(description = command.description)
                 }
                 if (updatedHostContextJson != null) {
-                    session.hostContextJson = updatedHostContextJson
+                    val previous = JSONObject(session.hostContextJson)
+                    val updated = JSONObject(updatedHostContextJson)
+                    previous.optJSONObject("system_prompts")?.let { updated.put("system_prompts", it) }
+                    previous.optJSONArray("system_prompt_stages")?.let { updated.put("system_prompt_stages", it) }
+                    session.hostContextJson = updated.toString()
                 }
                 try {
                     advanceLocked(session, commandPayload(command))
@@ -346,11 +353,18 @@ class SharedPipelineHost(
                 if (!sameAction(session.snapshot().optJSONObject("action"), action)) {
                     return@withLock false
                 }
-                recordProviderResult(session, action, JSONObject(resultJson))
-                advanceLocked(
-                    session,
-                    JSONObject().put("tag", "effect_result").put("result", JSONObject(resultJson)),
-                )
+                val priorContext = session.hostContextJson
+                try {
+                    recordSentPrompt(session, action)
+                    recordProviderResult(session, action, JSONObject(resultJson))
+                    advanceLocked(
+                        session,
+                        JSONObject().put("tag", "effect_result").put("result", JSONObject(resultJson)),
+                    )
+                } catch (error: Throwable) {
+                    session.hostContextJson = priorContext
+                    throw error
+                }
                 true
             }
         } finally {
@@ -361,6 +375,33 @@ class SharedPipelineHost(
             // as web shows no attempt while no model call is pending.
             attempt?.let { onProviderAttempt(it.executionId, null) }
         }
+    }
+
+    /** Keep the last attempted prompt of each sent stage in this execution's sidecar. */
+    private fun recordSentPrompt(session: Session, action: JSONObject) {
+        val stage = ACTION_STAGES[action.requiredString("tag")]
+        if (stage !in setOf("sketch", "stage1", "composition", "stage2")) return
+        val prompt = action.optJSONObject("payload")?.optJSONObject("prompt") ?: return
+        // A malformed or older action must not turn a completed model call into
+        // a pipeline failure merely because its observational record is absent.
+        val required = listOf("system", "prompt_id", "prompt_digest", "instruction_language")
+        if (required.any { prompt.optString(it).isEmpty() }) return
+        val attempt = action.optJSONObject("identity")?.optInt("attempt", -1)?.takeIf { it >= 0 } ?: return
+        val record = JSONObject()
+            .put("system", prompt.requiredString("system"))
+            .put("prompt_id", prompt.requiredString("prompt_id"))
+            .put("prompt_digest", prompt.requiredString("prompt_digest"))
+            .put("instruction_language", prompt.requiredString("instruction_language"))
+            .put("attempt", attempt)
+        if (stage == "sketch" || stage == "composition") {
+            prompt.optString("message").takeIf(String::isNotEmpty)?.let { record.put("message", it) }
+        }
+        val context = JSONObject(session.hostContextJson)
+        val prompts = context.optJSONObject("system_prompts") ?: JSONObject()
+        if (context.optJSONArray("system_prompt_stages") == null) {
+            context.put("system_prompt_stages", JSONArray(listOf("sketch", "stage1", "composition", "stage2")))
+        }
+        session.hostContextJson = context.put("system_prompts", prompts.put(stage, record)).toString()
     }
 
     /**

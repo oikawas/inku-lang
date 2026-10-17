@@ -81,6 +81,14 @@ class ChatGptPlanBoundaryTest {
     private fun completedStream(arguments: String = "{\"ddl\":\"赤い円。\"}"): String = event("response.output_item.added", "item", function().put("arguments", "")) +
         event("response.output_item.done", "item", function(arguments)) + event("response.completed", "response",
             JSONObject().put("status", "completed").put("output", JSONObject.NULL).put("usage", JSONObject().put("input_tokens", 10).put("output_tokens", 12)))
+    private fun completedVisionStream(text: String): String {
+        val item = JSONObject().put("type", "message").put("role", "assistant").put("id", "vision-item")
+            .put("status", "completed")
+            .put("content", JSONArray().put(JSONObject().put("type", "output_text").put("text", text)))
+        return event("response.output_item.done", "item", item) + event("response.completed", "response",
+            JSONObject().put("status", "completed").put("output", JSONObject.NULL)
+                .put("usage", JSONObject().put("input_tokens", 15).put("output_tokens", 28)))
+    }
 
     private fun rejected(code: String, block: () -> Unit) {
         try { block(); fail("Expected $code") } catch (error: ChatGptException) { assertEquals(code, error.code) }
@@ -199,6 +207,72 @@ class ChatGptPlanBoundaryTest {
             val saved = store.read().getJSONObject("profiles").getJSONObject("a")
             assertFalse(saved.has("access_token")); assertFalse(saved.has("refresh_token")); assertEquals(listOf("personal-model"), saved.stringList("published_models"))
         } finally { manager.cancelAuthorization(); scope.cancel() }
+    }
+
+    @Test
+    fun onlyPinnedRefinementVisionAdviceSendsAnImageAndReadsCompletedAssistantText() = runBlocking {
+        val text = """{"observation":"A circle sits low.","next_direction":"Move it up.","suggested_kind":"layout_change"}"""
+        withPlan({ completedVisionStream(text) }) { manager, ref, http ->
+            var wire = ""
+            http.handler = { url, token, body ->
+                assertEquals("access-a", token)
+                when {
+                    url.endsWith("/models") -> ChatGptHttpResponse(200,
+                        """{"models":[{"slug":"personal-model","display_name":"Personal model","visibility":"list"}]}""")
+                    url.endsWith("/responses") -> {
+                        wire = body!!
+                        ChatGptHttpResponse(200, completedVisionStream(text))
+                    }
+                    else -> error("Unexpected provider endpoint")
+                }
+            }
+            val visionRequest = RefinementVisionRequest(
+                modelId = "chatgpt:personal-model", instruction = "a circle", direction = "leave space",
+                enabledKinds = listOf("layout_change"), languageCode = "en", imageJpeg = byteArrayOf(1, 2, 3),
+            )
+            val advice = RefinementVisionAdviser(manager, ref).advise(visionRequest)
+            assertEquals("A circle sits low.", advice.observation)
+            assertEquals("Move it up.", advice.nextDirection)
+            val sent = JSONObject(wire)
+            assertFalse(sent.getBoolean("store"))
+            assertTrue(sent.getBoolean("stream"))
+            assertFalse(sent.has("tools"))
+            assertFalse(sent.has("tool_choice"))
+            assertFalse(sent.has("max_output_tokens"))
+            val content = sent.getJSONArray("input").getJSONObject(0).getJSONArray("content")
+            assertEquals("input_text", content.getJSONObject(0).getString("type"))
+            assertEquals("input_image", content.getJSONObject(1).getString("type"))
+            assertEquals("data:image/jpeg;base64,AQID", content.getJSONObject(1).getString("image_url"))
+            val calls = http.calls.size
+            rejected("chatgpt_operation_not_supported") {
+                chatGptRequestBody(request(ref).copy(imageJpeg = byteArrayOf(1, 2, 3)))
+            }
+            rejected("chatgpt_operation_not_supported") {
+                chatGptRequestBody(request(ref).copy(pipelineAction = null, imageJpeg = byteArrayOf(1, 2, 3)))
+            }
+            rejected("chatgpt_operation_not_supported") {
+                chatGptRequestBody(request(ref).copy(pipelineAction = REFINEMENT_VISION_ACTION, imageJpeg = byteArrayOf(1)))
+            }
+            try {
+                RefinementVisionAdviser(manager, ref.copy(generation = ref.generation - 1)).advise(visionRequest)
+                fail("An old profile generation must not advise")
+            } catch (error: ChatGptException) {
+                assertEquals("chatgpt_session_changed", error.code)
+            }
+            assertEquals(calls, http.calls.size)
+        }
+    }
+
+    @Test
+    fun visionStreamRejectsPartialTextAndFunctionCalls() {
+        val partial = ChatGptVisionSseDecoder()
+        partial.feed(("data: " + JSONObject().put("type", "response.output_text.delta")
+            .put("delta", "partial") + "\r\n\r\n").toByteArray())
+        rejected("chatgpt_response_incomplete") { partial.finish() }
+        val tool = ChatGptVisionSseDecoder()
+        rejected("chatgpt_unexpected_tool") {
+            tool.feed(event("response.output_item.done", "item", function()).toByteArray())
+        }
     }
 
     @Test

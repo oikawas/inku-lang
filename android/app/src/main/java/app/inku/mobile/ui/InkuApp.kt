@@ -217,6 +217,8 @@ import app.inku.mobile.data.lineage.LineageGraphResult
 import app.inku.mobile.data.refinement.ComparisonPlanner
 import app.inku.mobile.data.refinement.RefinementElement
 import app.inku.mobile.data.refinement.RefinementPlanner
+import app.inku.mobile.data.refinement.PromptStage
+import app.inku.mobile.data.refinement.SentPrompts
 import app.inku.mobile.data.model.CatalogSelection
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.DerivationKindRegistry
@@ -239,6 +241,7 @@ import app.inku.mobile.ui.i18n.messageFor
 import app.inku.mobile.ui.i18n.LocalUiLanguage
 import app.inku.mobile.ui.i18n.stringsFor
 import app.inku.mobile.ui.i18n.UiLanguage
+import app.inku.mobile.ui.i18n.savedWorkParityStrings
 import app.inku.mobile.ui.camera.CameraCaptureState
 import app.inku.mobile.ui.camera.CameraDevelopmentEffect
 import app.inku.mobile.ui.camera.CameraFailure
@@ -626,6 +629,44 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
                 state.workActionsTarget?.let { WorkActionsDialog(it, viewModel) }
                 if (state.toolChangeOpen) ToolChangeDialog(state, viewModel, S)
                 state.workSketchTarget?.let { WorkSketchDialog(it, viewModel) }
+                if (state.canvasSearchOpen) {
+                    val history by viewModel.historyItems.collectAsState()
+                    val byId = remember(history) { history.associateBy { it.id } }
+                    CanvasWorkSearchDialog(
+                        query = state.canvasSearchQuery, busy = state.canvasSearchBusy,
+                        failed = state.canvasSearchFailed,
+                        items = state.canvasSearchResultIds.mapNotNull(byId::get), language = state.uiLanguage,
+                        onQuery = viewModel::setCanvasSearchQuery,
+                        onSelect = viewModel::selectCanvasSearchResult,
+                        onDismiss = viewModel::closeCanvasSearch,
+                    )
+                }
+                if (state.replayOpen) {
+                    state.replayComparison?.let { comparison ->
+                        ReplayComparisonDialog(
+                            originalSvg = comparison.originalSvg, replayedSvg = comparison.replayedSvg,
+                            recordedVersion = comparison.recordedVersion, currentVersion = comparison.currentVersion,
+                            provisionalSeed = if (comparison.provisionalSeed) "0" else null,
+                            saving = state.replaySaving, saved = state.replaySavedHistoryId != null,
+                            error = state.replayError, language = state.uiLanguage,
+                            onSave = viewModel::saveReplayComparison, onDismiss = viewModel::closeReplayComparison,
+                        )
+                    } ?: AlertDialog(
+                        onDismissRequest = viewModel::closeReplayComparison,
+                        title = { Text(savedWorkParityStrings(state.uiLanguage).replayTitle) },
+                        text = { Text(state.replayError ?: S.working) },
+                        confirmButton = { TextButton(onClick = viewModel::closeReplayComparison) { Text(S.close) } },
+                    )
+                }
+                if (state.autonomousOpen) {
+                    AutonomousRefinementDialog(
+                        settings = state.autonomousSettings, status = state.autonomousStatus,
+                        models = visionModelChoicesFor(state).map { ParityModelChoice(it.id, it.label, it.providerName) },
+                        language = state.uiLanguage, onSettings = viewModel::updateAutonomousRefinementSettings,
+                        onStart = viewModel::startAutonomousRefinement, onStop = viewModel::stopAutonomousRefinement,
+                        onDismiss = viewModel::closeAutonomousRefinement,
+                    )
+                }
                 CameraDevelopmentSurface(state, viewModel)
             }
         }
@@ -712,12 +753,16 @@ private fun WorkActionsDialog(item: HistoryItemEntity, viewModel: InkuViewModel)
                 Text(S.editingWorkLabel(item.renderHashShort), style = MaterialTheme.typography.labelMedium)
                 TextButton(onClick = { viewModel.refineWork(item, RefinementElement.Layout) }, modifier = Modifier.fillMaxWidth().testTag(LAYOUT_REFINE_ENTRY_TAG)) { Text(S.layoutEditAction) }
                 TextButton(onClick = { viewModel.refineWork(item, RefinementElement.Color) }, modifier = Modifier.fillMaxWidth().testTag(COLOR_REFINE_ENTRY_TAG)) { Text(S.colorCatalogEditAction) }
+                TextButton(onClick = { viewModel.refineWork(item, RefinementSubview.ColorArrangement) }, modifier = Modifier.fillMaxWidth().testTag("color-arrangement-entry")) { Text(savedWorkParityStrings(LocalUiLanguage.current).colorArrangementAction) }
+                TextButton(onClick = { viewModel.refineWork(item, RefinementSubview.Ground) }, modifier = Modifier.fillMaxWidth().testTag("ground-entry")) { Text(savedWorkParityStrings(LocalUiLanguage.current).groundAction) }
                 TextButton(onClick = { viewModel.openToolChange(item) }, modifier = Modifier.fillMaxWidth().testTag(TOOL_CHANGE_ENTRY_TAG)) { Text(S.workActionTool) }
                 TextButton(onClick = { viewModel.editWorkDescription(item) }, modifier = Modifier.fillMaxWidth()) { Text(S.descriptionEditAction) }
                 TextButton(onClick = { viewModel.editWorkInstructions(item) }, modifier = Modifier.fillMaxWidth().testTag(DDL_ENTRY_TAG)) { Text(S.instructionEditAction) }
                 TextButton(onClick = { viewModel.showWorkSketch(item) }, modifier = Modifier.fillMaxWidth()) { Text(S.workActionSketchRedraw) }
                 TextButton(onClick = { viewModel.refineWork(item, RefinementSubview.Model) }, modifier = Modifier.fillMaxWidth().testTag(MODEL_ENTRY_TAG)) { Text(S.modelEditAction) }
+                TextButton(onClick = { viewModel.openAutonomousRefinement(item) }, modifier = Modifier.fillMaxWidth().testTag("autonomous-entry")) { Text(savedWorkParityStrings(LocalUiLanguage.current).autonomousTitle) }
                 HorizontalDivider()
+                TextButton(onClick = { viewModel.openReplayComparison(item) }, modifier = Modifier.fillMaxWidth().testTag("replay-entry")) { Text(savedWorkParityStrings(LocalUiLanguage.current).replayAction) }
                 TextButton(onClick = { viewModel.openWorkLineage(item) }, modifier = Modifier.fillMaxWidth()) { Text(S.workLineage) }
                 TextButton(onClick = { confirmTrash = true }, modifier = Modifier.fillMaxWidth().testTag(TRASH_ENTRY_TAG)) { Text(S.moveToTrash, color = MaterialTheme.colorScheme.error) }
             }
@@ -939,6 +984,8 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
                     groups = filteredGroups,
                     detectedWords = detectedWords,
                     selectedWord = selectedWord,
+                    ddlLanguage = InstructionLanguages.ofDdl(editorValue.text,
+                        state.selectedHistory?.normalizedDdl, state.selectedHistory?.instructionLangResolved, lang.code),
                     tokenForWord = { word -> vocabularyTokens.firstOrNull { it.word == word } },
                     onToggle = { vocabularyOpen = !vocabularyOpen },
                     onQueryChange = { vocabularyQuery = it },
@@ -1046,12 +1093,18 @@ private fun DdlVocabularyBar(
     groups: List<SaijikiGroup>,
     detectedWords: List<DdlVocabularyToken>,
     selectedWord: DdlVocabularyToken?,
+    ddlLanguage: String,
     tokenForWord: (String) -> DdlVocabularyToken?,
     onToggle: () -> Unit,
     onQueryChange: (String) -> Unit,
     onInsert: (String) -> Unit,
     onSelectDetected: (String) -> Unit,
 ) {
+    val uiLanguage = LocalUiLanguage.current
+    var activePreview by remember(uiLanguage, ddlLanguage) { mutableStateOf<SaijikiPreview?>(null) }
+    fun selectPreview(group: SaijikiGroup, word: String) {
+        activePreview = previewForSaijikiWord(group, word, uiLanguage, ddlLanguage)
+    }
     val alternativeTokens = remember(selectedWord) {
         selectedWord?.let { selected ->
             selected.group.words
@@ -1088,7 +1141,10 @@ private fun DdlVocabularyBar(
         ) {
             MiniPill(if (open) S.materialsClose else S.materials, selected = open, onClick = onToggle)
             if (selectedWord != null) {
-                DdlVocabularyPill(token = selectedWord, selected = true, onClick = { onSelectDetected(selectedWord.word) })
+                DdlVocabularyPill(token = selectedWord, selected = true, onClick = {
+                    selectPreview(selectedWord.group, selectedWord.word)
+                    onSelectDetected(selectedWord.word)
+                })
                 Text(S.replaceSuffix, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 Text(
@@ -1104,7 +1160,10 @@ private fun DdlVocabularyBar(
         if (prioritizedDetectedWords.isNotEmpty()) {
             WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
                 prioritizedDetectedWords.take(12).forEach { token ->
-                    DdlVocabularyPill(token = token, selected = token.word == selectedWord?.word, onClick = { onSelectDetected(token.word) })
+                    DdlVocabularyPill(token = token, selected = token.word == selectedWord?.word, onClick = {
+                        selectPreview(token.group, token.word)
+                        onSelectDetected(token.word)
+                    })
                 }
             }
         }
@@ -1135,9 +1194,15 @@ private fun DdlVocabularyBar(
                                 group.words.forEach { word ->
                                     val token = tokenForWord(word)
                                     if (token != null) {
-                                        DdlVocabularyPill(token = token, onClick = { onInsert(word) })
+                                        DdlVocabularyPill(token = token, onClick = {
+                                            selectPreview(group, word)
+                                            onInsert(word)
+                                        })
                                     } else {
-                                        MiniPill(word, onClick = { onInsert(word) })
+                                        MiniPill(word, onClick = {
+                                            selectPreview(group, word)
+                                            onInsert(word)
+                                        })
                                     }
                                 }
                             }
@@ -1146,7 +1211,16 @@ private fun DdlVocabularyBar(
                 }
             }
         }
+        if (open || activePreview != null) SaijikiPreviewCard(activePreview, uiLanguage)
     }
+}
+
+private fun previewForSaijikiWord(group: SaijikiGroup, word: String, uiLanguage: UiLanguage, ddlLanguage: String): SaijikiPreview {
+    val category = SaijikiGenerated.CATEGORIES.firstOrNull { it.key == group.key }
+    val index = category?.wordsJa?.indexOf(word)?.takeIf { it >= 0 }
+        ?: category?.wordsEn?.indexOf(word)?.takeIf { it >= 0 } ?: -1
+    val canonical = category?.wordsJa?.getOrNull(index) ?: word
+    return saijikiPreview(group.key, canonical, word, uiLanguage, ddlLanguage)
 }
 
 @Composable
@@ -1463,10 +1537,19 @@ private fun WebStyleModelStageEditor(
                         ) {
                             Text(if (option.qualifiedId == selectedModelId) "✓" else "", modifier = Modifier.width(Dimens.spaceL), color = MaterialTheme.colorScheme.secondary)
                             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                                ModelLabelWithSupportMark(
-                                    option.label,
-                                    SupportedModels.isSupported(option.qualifiedId.substringBefore(':'), option.qualifiedId),
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                                    Box(Modifier.weight(1f)) {
+                                        ModelLabelWithSupportMark(
+                                            option.label,
+                                            SupportedModels.isSupported(option.qualifiedId.substringBefore(':'), option.qualifiedId),
+                                        )
+                                    }
+                                    if (selectedProviderId != "local-litert-lm") {
+                                        ModelRecommendationStars(catalogModelFor(state, selectedProviderId, option.rawId),
+                                            if (state.modelSelectionForCamera) "vision" else "llm")
+                                    }
+                                }
                                 if (option.notes != null) {
                                     Text(option.notes, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
@@ -1481,7 +1564,11 @@ private fun WebStyleModelStageEditor(
 }
 
 @Composable
-private fun SaijikiPanel(viewModel: InkuViewModel) {
+private fun SaijikiPanel(state: InkuUiState, viewModel: InkuViewModel) {
+    val uiLanguage = LocalUiLanguage.current
+    val ddlLanguage = InstructionLanguages.ofDdl(state.ddl, state.selectedHistory?.normalizedDdl,
+        state.selectedHistory?.instructionLangResolved, uiLanguage.code)
+    var activePreview by remember(uiLanguage, ddlLanguage) { mutableStateOf<SaijikiPreview?>(null) }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(Dimens.radiusCard),
@@ -1490,16 +1577,20 @@ private fun SaijikiPanel(viewModel: InkuViewModel) {
         Column(modifier = Modifier.padding(Dimens.spaceL), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             Text(S.saijiki, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
             Text(S.saijikiTapNote, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            saijikiGroups(LocalUiLanguage.current).forEach { group ->
+            saijikiGroups(uiLanguage).forEach { group ->
                 Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                     Text("${group.label} / ${group.en}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
                         group.words.forEach { word ->
-                            MiniPill(word, onClick = { viewModel.insertDdlWord(word) })
+                            MiniPill(word, onClick = {
+                                activePreview = previewForSaijikiWord(group, word, uiLanguage, ddlLanguage)
+                                viewModel.insertDdlWord(word)
+                            })
                         }
                     }
                 }
             }
+            SaijikiPreviewCard(activePreview, uiLanguage)
         }
     }
 }
@@ -2406,6 +2497,7 @@ internal fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
     val attempt by viewModel.providerAttempt.collectAsState()
     // A drawing's own row; refinement candidates are made several at once.
     val attemptText = if (state.isDrawing) providerAttemptText(attempt, S) else ""
+    val readingComposition = attempt?.action == "read_composition" && state.isDrawing
     val retryColor = MaterialTheme.colorScheme.primary
     val startedAt = remember(state.isDrawing, state.refinementBusy) { System.currentTimeMillis() }
     var elapsedMs by remember(startedAt) { mutableStateOf(0L) }
@@ -2430,7 +2522,8 @@ internal fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
             MascotWidget(mascotKind = state.mascotKind)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                 Text(
-                    state.message?.takeIf { it.isNotBlank() } ?: S.drawing,
+                    if (readingComposition) savedWorkParityStrings(state.uiLanguage).readingComposition
+                    else state.message?.takeIf { it.isNotBlank() } ?: S.drawing,
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -2464,7 +2557,11 @@ internal fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
             }
             MiniPill(
                 text = S.stop,
-                onClick = if (state.refinementBusy) viewModel::abortRefinementCandidates else viewModel::stopDrawing,
+                onClick = when {
+                    state.autonomousStatus.busy -> viewModel::stopAutonomousRefinement
+                    state.refinementBusy -> viewModel::abortRefinementCandidates
+                    else -> viewModel::stopDrawing
+                },
             )
         }
     }
@@ -2530,6 +2627,12 @@ private fun CanvasHeroCard(
     var exportSheetOpen by remember { mutableStateOf(false) }
     var generationInfoOpen by remember { mutableStateOf(false) }
     var pngExporting by remember { mutableStateOf(false) }
+    var sentPrompts by remember(item?.id) { mutableStateOf<SentPrompts?>(null) }
+    LaunchedEffect(item?.id, state.renderTab) {
+        if (item != null && state.renderTab == RenderTab.Prompt) {
+            sentPrompts = try { viewModel.sentPrompts(item.id) } catch (_: Exception) { SentPrompts.Unavailable }
+        }
+    }
     // The note under the canvas answers one action -- a copy, an export -- and
     // used to stay until the next one, beside whatever work came after. It
     // clears itself now; a PNG still being made keeps its progress line.
@@ -2806,7 +2909,9 @@ private fun CanvasHeroCard(
                         )
                     }
                     MiniPill(text = S.seriesTitle, onClick = { item?.let(viewModel::openWorkLineage) })
-                    MiniPill(text = S.generationInfoTitle, onClick = { generationInfoOpen = true })
+                    if (state.refinementPreviewId == null) {
+                        MiniPill(text = S.generationInfoTitle, onClick = { generationInfoOpen = true })
+                    }
                     MiniPill(text = S.exportButton, onClick = { exportSheetOpen = true })
                 }
             }
@@ -2855,7 +2960,7 @@ private fun CanvasHeroCard(
             },
         )
     }
-    if (!presentation && showControls && generationInfoOpen) item?.let {
+    if (!presentation && showControls && generationInfoOpen && state.refinementPreviewId == null) item?.let {
         GenerationInfoSheet(item = it, onDismiss = { generationInfoOpen = false })
     }
     if (!presentation && showControls && pngExporting) {
@@ -2869,7 +2974,8 @@ private fun CanvasHeroCard(
     if (!presentation && showControls) item?.let {
         renderTabCopyText(
             state.renderTab,
-            promptText = renderPromptText(it),
+            promptText = sentPrompts?.let { prompts -> renderSentPrompts(prompts, savedWorkParityStrings(state.uiLanguage)) }
+                ?: savedWorkParityStrings(state.uiLanguage).sentPromptLoading,
             jsonText = renderJsonText(it),
         )?.let { text ->
             CopyableRenderTextView(
@@ -3129,7 +3235,7 @@ private fun DrawPanel(
                         DdlActionRow(state, viewModel)
                     }
                     if (state.saijikiOpen) {
-                        SaijikiPanel(viewModel)
+                        SaijikiPanel(state, viewModel)
                     }
                     DdlPreviewBox(
                         state = state,
@@ -3185,6 +3291,21 @@ private fun BatchPanel(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        val parityText = savedWorkParityStrings(state.uiLanguage)
+        CompactLabel(parityText.batchRetryLimit)
+        WrapRow(horizontal = Dimens.spaceXs, vertical = Dimens.spaceXs) {
+            (0..5).forEach { retryLimit ->
+                ChipButton(
+                    text = retryLimit.toString(),
+                    selected = state.batchRetryLimit == retryLimit,
+                    enabled = !state.isDrawing,
+                    onClick = { viewModel.setBatchRetryLimit(retryLimit) },
+                )
+            }
+        }
+        if (state.batchRetryRound > 0) {
+            Text(parityText.batchRetryRound(state.batchRetryRound), style = MaterialTheme.typography.labelSmall)
+        }
         if (!state.isDrawing) {
             if (state.batchPromptHistory.isNotEmpty()) {
                 CompactLabel(S.batchHistory)
@@ -3214,6 +3335,11 @@ private fun BatchPanel(
         }
         if (state.batchFailures.isNotEmpty() && !state.isDrawing) {
             BatchFailureSummary(state)
+            SecondarySmallButton(
+                text = parityText.batchRetry,
+                onClick = viewModel::retryFailedBatch,
+                enabled = state.batchCanRetry,
+            )
         }
         state.message?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall) }
         MetaPanel(state)
@@ -3787,6 +3913,8 @@ internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
 @Composable
 private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
     val parent = state.refinementParent
+    val parityStrings = savedWorkParityStrings(LocalUiLanguage.current)
+    val busy = state.refinementBusy || state.refinementCandidates.any { it.saveState == RefinementSaveState.Saving }
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
@@ -3796,16 +3924,25 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
-            Text(LocalStrings.current.comparisonKindDescription(state.refinementSubview.id), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            ChipButton(S.close, onClick = viewModel::closeRefinement)
+            Text(when (state.refinementSubview) {
+                RefinementSubview.ColorArrangement -> parityStrings.colorArrangementAction
+                RefinementSubview.Ground -> parityStrings.groundAction
+                else -> LocalStrings.current.comparisonKindDescription(state.refinementSubview.id)
+            }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            ChipButton(S.close, enabled = !busy, onClick = viewModel::closeRefinement)
         }
 
         // 調整・モデル (SPEC :616). Two faces of one screen.
         WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
             RefinementSubview.entries.forEach { subview ->
                 ChipButton(
-                    text = LocalStrings.current.comparisonKindLabel(subview.id),
+                    text = when (subview) {
+                        RefinementSubview.ColorArrangement -> parityStrings.colorArrangementAction
+                        RefinementSubview.Ground -> parityStrings.groundAction
+                        else -> LocalStrings.current.comparisonKindLabel(subview.id)
+                    },
                     selected = state.refinementSubview == subview,
+                    enabled = !busy,
                     modifier = Modifier.testTag(refinementSubviewTag(subview)),
                     onClick = { viewModel.setRefinementSubview(subview) },
                 )
@@ -3816,6 +3953,8 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
             when (state.refinementSubview) {
                 RefinementSubview.Adjust -> S.refineOneKindOnly
                 RefinementSubview.Model -> S.comparisonModelChoiceBlocked
+                RefinementSubview.ColorArrangement -> parityStrings.colorArrangementAction
+                RefinementSubview.Ground -> parityStrings.groundAction
             } + (parent?.let {
                 S.parentSuffix(it.renderHashShort, ColorCatalogs.currentDisplayCatalog(it.colorCatalogId)?.name ?: it.colorCatalogId)
             } ?: ""),
@@ -3823,9 +3962,21 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
+        state.groundCurrentLabel?.takeIf { state.refinementSubview == RefinementSubview.Ground }?.let {
+            Text(parityStrings.currentGround(it), style = MaterialTheme.typography.bodySmall)
+        }
+        WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceXs) {
+            Text(parityStrings.wild, style = MaterialTheme.typography.labelMedium)
+            listOf(null to parityStrings.inherit, true to parityStrings.on, false to parityStrings.off).forEach { (value, label) ->
+                ChipButton(label, selected = state.refinementWildOverride == value, enabled = !busy,
+                    onClick = { viewModel.setRefinementWildOverride(value) })
+            }
+        }
+
         when (state.refinementSubview) {
             RefinementSubview.Adjust -> RefinementAdjustControls(state, viewModel)
             RefinementSubview.Model -> ModelInspectionControls(state, viewModel)
+            RefinementSubview.ColorArrangement, RefinementSubview.Ground -> Unit
         }
 
         WrapRow(
@@ -3839,6 +3990,7 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
                     ChipButton(
                         text = S.optionCount(count),
                         selected = state.refinementCount == count,
+                        enabled = !busy,
                         onClick = { viewModel.setRefinementCount(count) },
                     )
                 }
@@ -3846,14 +3998,20 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
             ChipButton(
                 text = if (state.refinementBusy) S.working else S.makeCandidates,
                 modifier = Modifier.testTag(REFINE_GENERATE_TAG),
-                onClick = { if (!state.refinementBusy) viewModel.generateRefinementCandidates() },
+                enabled = !busy && !(state.refinementSubview == RefinementSubview.ColorArrangement && state.colorArrangementExhausted),
+                onClick = viewModel::generateRefinementCandidates,
             )
+        }
+
+        if (state.refinementSubview == RefinementSubview.ColorArrangement && state.colorArrangementExhausted) {
+            Text(parityStrings.noMoreArrangements, style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         RefinementProgressLanes(
             lanes = refinementProgressLanes(
                 candidateCount = state.refinementPlannedCount,
-                completedCount = state.refinementCandidates.size,
+                completedCount = state.refinementCandidates.size - state.refinementRoundStartCount,
                 busy = state.refinementBusy,
             ),
             selectedMascotKind = state.mascotKind,
@@ -3868,6 +4026,10 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
 
+        val selectedUnsaved = state.refinementCandidates.any { it.selected && it.saveState == RefinementSaveState.Unsaved }
+        if (selectedUnsaved) ChipButton(parityStrings.saveSelected, enabled = !busy,
+            modifier = Modifier.testTag("RefinementSaveSelected"), onClick = viewModel::saveSelectedRefinementCandidates)
+
         // 「2列（1案のみ全幅1列）でダイアログ内に収めて表示」.
         val columns = if (state.refinementCandidates.size <= 1) 1 else 2
         state.refinementCandidates.chunked(columns).forEach { row ->
@@ -3881,6 +4043,11 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
                         shownOnCanvas = state.refinementPreviewId == candidate.id,
                         onSave = { viewModel.saveRefinementCandidate(candidate.id) },
                         onPreview = { viewModel.previewRefinementCandidate(candidate.id) },
+                        onToggleSelected = if (state.refinementSubview == RefinementSubview.Adjust &&
+                            state.refinementElement == RefinementElement.Layout && state.refinementCount == 4) {
+                            { viewModel.toggleRefinementCandidateSelection(candidate.id) }
+                        } else null,
+                        enabled = !busy,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -4031,7 +4198,7 @@ private fun RefinementAdjustControls(
  */
 @Composable
 private fun ModelInspectionControls(state: InkuUiState, viewModel: InkuViewModel) {
-    val choices = modelChoicesFor(state, includeChatGpt = false)
+    val choices = modelChoicesFor(state.copy(modelSelectionForCamera = false), includeChatGpt = true)
     Text(S.modelsToCompare(MAX_COMPARE_SELECTION), style = MaterialTheme.typography.labelMedium)
     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
         choices.forEach { choice ->
@@ -4048,6 +4215,10 @@ private fun ModelInspectionControls(state: InkuUiState, viewModel: InkuViewModel
             )
         }
     }
+    state.modelCompareFailedModels.forEach { (id, error) ->
+        Text("${choices.firstOrNull { it.id == id }?.label ?: id}: $error",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+    }
 }
 
 @Composable
@@ -4058,6 +4229,8 @@ internal fun RefinementCandidateCard(
     onPreview: () -> Unit,
     modifier: Modifier = Modifier,
     onDiscard: (() -> Unit)? = null,
+    onToggleSelected: (() -> Unit)? = null,
+    enabled: Boolean = true,
 ) {
     Card(
         modifier = modifier
@@ -4073,9 +4246,17 @@ internal fun RefinementCandidateCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
-                    .clickable(onClick = onPreview),
+                    .clickable(enabled = enabled, onClick = onPreview),
             )
             Column(modifier = Modifier.padding(horizontal = Dimens.spaceM).padding(bottom = Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+                if (onToggleSelected != null && candidate.saveState == RefinementSaveState.Unsaved) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = candidate.selected, enabled = enabled, onCheckedChange = { onToggleSelected() },
+                            modifier = Modifier.testTag("RefinementSelect:${candidate.id}"))
+                        Text(savedWorkParityStrings(LocalUiLanguage.current).selectCandidate,
+                            style = MaterialTheme.typography.labelSmall)
+                    }
+                }
                 Text(candidate.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 candidate.plan.toolChange?.takeIf { it.mode == app.inku.mobile.data.refinement.ToolChangeMode.PerSentence }?.let { option ->
                     option.changes.forEach { change ->
@@ -4098,8 +4279,8 @@ internal fun RefinementCandidateCard(
                 when (candidate.saveState) {
                     RefinementSaveState.Unsaved ->
                         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                            ChipButton(S.save, modifier = Modifier.testTag(REFINE_SAVE_TAG), onClick = onSave)
-                            onDiscard?.let { discard -> ChipButton(S.toolChangeDiscard, onClick = discard) }
+                            ChipButton(S.save, modifier = Modifier.testTag(REFINE_SAVE_TAG), enabled = enabled, onClick = onSave)
+                            onDiscard?.let { discard -> ChipButton(S.toolChangeDiscard, enabled = enabled, onClick = discard) }
                         }
                     RefinementSaveState.Saving -> Text(S.saving, style = MaterialTheme.typography.labelSmall)
                     RefinementSaveState.Saved -> Text(S.saved, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -5517,6 +5698,22 @@ private fun modelChoicesFor(state: InkuUiState, includeChatGpt: Boolean = true):
     return choices.distinctBy { it.id }
 }
 
+private fun visionModelChoicesFor(state: InkuUiState): List<ModelChoice> = modelChoicesFor(
+    state.copy(modelSelectionForCamera = false), includeChatGpt = true,
+).filter { choice ->
+    val provider = providerOfModelId(choice.id, state)
+    if (provider == "local-litert-lm") return@filter false
+    val record = catalogModelFor(state, provider, choice.id).record
+    val purposes = record.optJSONArray("purposes") ?: return@filter false
+    val unsupported = record.optJSONArray("unsupported_purposes")
+    (0 until purposes.length()).any { purposes.optString(it) == "vision" } &&
+        (unsupported == null || (0 until unsupported.length()).none { unsupported.optString(it) == "vision" })
+}
+
+/** The same catalog-filtered IDs shown by the autonomous Vision picker. */
+internal fun autonomousVisionModelIds(state: InkuUiState): Set<String> =
+    visionModelChoicesFor(state).mapTo(linkedSetOf()) { it.id }
+
 private fun modelProviderGroupsFor(state: InkuUiState): List<app.inku.mobile.data.db.ProviderSettingEntity> {
     val local = state.providerSettings.filter { it.isDefaultLocal }
     val remote = state.providerSettings.filter { it.isEnabled && !it.isDefaultLocal && !(state.modelSelectionForCamera && it.providerId == "chatgpt") }
@@ -5922,6 +6119,12 @@ private fun String.compactLabel(maxChars: Int): String {
 private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     val item = state.selectedHistory
     var generationInfoOpen by remember { mutableStateOf(false) }
+    var sentPrompts by remember(item?.id) { mutableStateOf<SentPrompts?>(null) }
+    LaunchedEffect(item?.id, state.renderTab) {
+        if (item != null && state.renderTab == RenderTab.Prompt) {
+            sentPrompts = try { viewModel.sentPrompts(item.id) } catch (_: Exception) { SentPrompts.Unavailable }
+        }
+    }
     Surface(
         modifier = modifier.border(Dimens.hairline, CanvasPanelHairline, RoundedCornerShape(Dimens.radiusCard)),
         color = CanvasPanelSurface,
@@ -5942,7 +6145,11 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
                     )
                 }
                 Spacer(Modifier.weight(1f))
-                item?.let {
+                TextButton(onClick = viewModel::openCanvasSearch,
+                    enabled = !state.isRunning, modifier = Modifier.testTag("CanvasWorkSearchEntry")) {
+                    Text(S.search, style = MaterialTheme.typography.labelSmall)
+                }
+                item?.takeIf { state.refinementPreviewId == null }?.let {
                     Text(
                         S.generationInfoTitle,
                         modifier = Modifier.clickable { generationInfoOpen = true },
@@ -5969,7 +6176,8 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
                     } else {
                         renderTabCopyText(
                             state.renderTab,
-                            promptText = renderPromptText(item),
+                            promptText = sentPrompts?.let { renderSentPrompts(it, savedWorkParityStrings(state.uiLanguage)) }
+                                ?: savedWorkParityStrings(state.uiLanguage).sentPromptLoading,
                             jsonText = renderJsonText(item),
                         )?.let { text ->
                             CopyableRenderTextView(text, Modifier.fillMaxSize(),
@@ -5988,7 +6196,7 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
             }
         }
     }
-    if (generationInfoOpen) item?.let {
+    if (generationInfoOpen && state.refinementPreviewId == null) item?.let {
         GenerationInfoSheet(item = it, onDismiss = { generationInfoOpen = false })
     }
 }
@@ -6028,6 +6236,7 @@ internal enum class GenerationInfoField {
     CanvasAspect,
     CanvasRatio,
     RenderHash,
+    HistoryId,
     RenderEngineId,
     RenderEngineVersion,
     Created,
@@ -6168,6 +6377,7 @@ internal fun generationInfoSections(item: HistoryItemEntity): List<GenerationInf
         GenerationInfoSection(
             GenerationInfoSectionId.Identity,
             listOf(
+                GenerationInfoRow(GenerationInfoField.HistoryId, item.id),
                 GenerationInfoRow(GenerationInfoField.RenderHash, value(item.renderHash)),
                 GenerationInfoRow(GenerationInfoField.RenderEngineId, metadataValue("render_engine_id")),
                 GenerationInfoRow(GenerationInfoField.RenderEngineVersion, metadataValue("render_engine_version")),
@@ -6186,6 +6396,8 @@ internal fun generationInfoSections(item: HistoryItemEntity): List<GenerationInf
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GenerationInfoSheet(item: HistoryItemEntity, onDismiss: () -> Unit) {
+    val clipboard = LocalClipboardManager.current
+    val parityText = savedWorkParityStrings(LocalUiLanguage.current)
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
@@ -6212,10 +6424,15 @@ private fun GenerationInfoSheet(item: HistoryItemEntity, onDismiss: () -> Unit) 
                             )
                             Text(
                                 generationInfoDisplayValue(row),
-                                modifier = Modifier.weight(0.58f),
+                                modifier = Modifier.weight(if (row.field == GenerationInfoField.HistoryId) 0.38f else 0.58f),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
+                            if (row.field == GenerationInfoField.HistoryId) {
+                                TextButton(onClick = { clipboard.setText(AnnotatedString(row.value)) }) {
+                                    Text(parityText.copy)
+                                }
+                            }
                         }
                     }
                     if (section.colorMapEntries.isNotEmpty()) {
@@ -6311,6 +6528,7 @@ private fun generationInfoFieldLabel(field: GenerationInfoField): String = when 
     GenerationInfoField.CanvasAspect -> S.generationInfoCanvasAspect
     GenerationInfoField.CanvasRatio -> S.generationInfoCanvasRatio
     GenerationInfoField.RenderHash -> S.generationInfoRenderHash
+    GenerationInfoField.HistoryId -> savedWorkParityStrings(LocalUiLanguage.current).historyId
     GenerationInfoField.RenderEngineId -> S.generationInfoRenderEngineId
     GenerationInfoField.RenderEngineVersion -> S.generationInfoRenderEngineVersion
     GenerationInfoField.Created -> S.generationInfoCreated
@@ -6382,21 +6600,25 @@ private fun RenderTextView(text: String, modifier: Modifier = Modifier, ddl: Str
     }
 }
 
-private fun renderPromptText(item: HistoryItemEntity): String {
-    val source = item.sourceText?.takeIf { it.isNotBlank() } ?: item.originalInput
-    return buildString {
-        appendLine("Saved source:")
-        appendLine(source)
-        appendLine()
-        appendLine("Saved normalized DDL:")
-        appendLine(item.normalizedDdl.orEmpty())
-        appendLine()
-        appendLine("Prompt transcript:")
-        appendLine("Unavailable: this history row does not persist a prompt transcript or digest.")
-        appendLine()
-        appendLine("Recorded models:")
-        appendLine("Stage 1: ${item.stage1Model ?: "unrecorded"}")
-        appendLine("Stage 2: ${item.stage2Model ?: "unrecorded"}")
+private fun renderSentPrompts(prompts: SentPrompts, strings: app.inku.mobile.ui.i18n.SavedWorkParityStrings): String = when (prompts) {
+    SentPrompts.NotRecorded -> strings.sentPromptNotRecorded
+    SentPrompts.Unavailable -> strings.sentPromptUnavailable
+    is SentPrompts.Recorded -> buildString {
+        PromptStage.entries.forEachIndexed { index, stage ->
+            if (index > 0) appendLine()
+            appendLine(strings.sentPromptStages[index])
+            if (stage !in prompts.stages) {
+                appendLine(strings.sentPromptNotRecorded)
+            } else {
+                val record = prompts.prompts[stage]
+                if (record == null) {
+                    appendLine(strings.sentPromptNotInvoked)
+                } else {
+                    appendLine("${strings.sentPromptSystem}: ${record.system}")
+                    record.message?.let { appendLine("${strings.sentPromptMessage}: $it") }
+                }
+            }
+        }
     }
 }
 
@@ -7238,13 +7460,14 @@ private fun PresentationControlButton(
 }
 
 @Composable
-private fun ChipButton(text: String, selected: Boolean = false, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun ChipButton(text: String, selected: Boolean = false, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
     // The modifier goes on the button itself. A `testTag` on a Box around one of
     // these is not in the merged semantics tree at all -- the button merges its
     // descendants and the bare wrapper is dropped, so the tag can never be found.
     if (selected) {
         Button(
             onClick = onClick,
+            enabled = enabled,
             modifier = modifier,
             shape = RoundedCornerShape(100),
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = InkOnSecondary),
@@ -7252,6 +7475,7 @@ private fun ChipButton(text: String, selected: Boolean = false, modifier: Modifi
     } else {
         OutlinedButton(
             onClick = onClick,
+            enabled = enabled,
             modifier = modifier,
             shape = RoundedCornerShape(100),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),

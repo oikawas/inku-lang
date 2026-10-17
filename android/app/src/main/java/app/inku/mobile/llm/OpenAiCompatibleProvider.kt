@@ -244,9 +244,17 @@ class OpenAiCompatibleProvider(
             val sampling = JSONObject()
             putOpenAiSampling(sampling, baseUrl, model, providerId, request.maxTokens,
                 pipelineTemperature(request.pipelineAction) ?: request.temperature)
+            val inputContent: Any = if (request.pipelineAction == REFINEMENT_VISION_ACTION) {
+                val image = requireNotNull(request.imageJpeg) { "Refinement advice needs a JPEG." }
+                require(image.isNotEmpty()) { "Refinement advice needs a JPEG." }
+                JSONArray()
+                    .put(JSONObject().put("type", "input_text").put("text", request.prompt))
+                    .put(JSONObject().put("type", "input_image")
+                        .put("image_url", "data:image/jpeg;base64," + java.util.Base64.getEncoder().encodeToString(image)))
+            } else request.prompt
             val payload = JSONObject().put("model", model).put("store", false)
                 .put("instructions", request.systemInstruction.orEmpty())
-                .put("input", JSONArray().put(JSONObject().put("role", "user").put("content", request.prompt)))
+                .put("input", JSONArray().put(JSONObject().put("role", "user").put("content", inputContent)))
                 .put("tools", JSONArray().put(JSONObject().put("type", "function").put("name", tool.name)
                     .put("description", tool.description).put("parameters", JSONObject(tool.parametersJson)).put("strict", false)))
                 .put("tool_choice", "required").put("parallel_tool_calls", false)
@@ -311,10 +319,10 @@ class OpenAiCompatibleProvider(
          * The server's OpenAI-compatible pipeline sampling
          * (`_STAGE1_SAMPLED_ACTIONS`): 0.3 for Stage 1 and for the composition
          * reading, which is sent with Stage 1's model, limits and sampling;
-         * 0.0 for every other action.
+         * 0.0 for other drawing actions; refinement Vision keeps its 0.35 request.
          */
         internal fun pipelineTemperature(action: String?): Double? = when (action) {
-            null -> null
+            null, REFINEMENT_VISION_ACTION -> null
             "generate_normalized_ddl", "read_composition" -> 0.3
             else -> 0.0
         }

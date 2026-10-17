@@ -93,6 +93,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlin.math.abs
 import org.json.JSONArray
 import org.json.JSONObject
@@ -187,6 +189,9 @@ data class InkuUiState(
     val batchActiveElapsedMs: Long? = null,
     val batchElapsedMs: Long = 0L,
     val batchLatestHashShort: String? = null,
+    val batchRetryLimit: Int = 0,
+    val batchRetryRound: Int = 0,
+    val batchCanRetry: Boolean = false,
     val demoSeed: String = DefaultDemoSeedPhrase,
     val demoIntervalSeconds: Int = 30,
     val demoGeneratedPrompt: String = "",
@@ -234,6 +239,11 @@ data class InkuUiState(
     val lineageLoading: Boolean = false,
     val historySearchQuery: String = "",
     val historyStarredOnly: Boolean = false,
+    val canvasSearchOpen: Boolean = false,
+    val canvasSearchQuery: String = "",
+    val canvasSearchBusy: Boolean = false,
+    val canvasSearchFailed: Boolean = false,
+    val canvasSearchResultIds: List<String> = emptyList(),
     /** The works screen lists the trash instead of the works. */
     val historyTrashView: Boolean = false,
     /**
@@ -296,10 +306,14 @@ data class InkuUiState(
      * progress lanes count this rather than [refinementCount].
      */
     val refinementPlannedCount: Int = 0,
+    val refinementRoundStartCount: Int = 0,
     val refinementBusy: Boolean = false,
     // 「開始3秒後から共通デザインの停止ボタンでAPI要求を中断できる」.
     val refinementCanAbort: Boolean = false,
     val refinementStatus: String? = null,
+    val refinementWildOverride: Boolean? = null,
+    val colorArrangementExhausted: Boolean = false,
+    val groundCurrentLabel: String? = null,
     val refinementCandidates: List<RefinementCandidate> = emptyList(),
     // The candidate on the canvas that has not been saved. Drawing on from here
     // has to put it in the lineage first (SPEC :2105).
@@ -309,6 +323,17 @@ data class InkuUiState(
     // candidates, the busy flag, the stop and the save are the refinement's.
     val refinementSubview: RefinementSubview = RefinementSubview.Adjust,
     val modelCompareSelectedModels: List<String> = emptyList(),
+    val modelCompareFailedModels: Map<String, String> = emptyMap(),
+    val replayOpen: Boolean = false,
+    val replayBusy: Boolean = false,
+    val replaySaving: Boolean = false,
+    val replaySavedHistoryId: String? = null,
+    val replayError: String? = null,
+    val replayComparison: app.inku.mobile.data.refinement.ReplayComparison? = null,
+    val autonomousOpen: Boolean = false,
+    val autonomousParent: HistoryItemEntity? = null,
+    val autonomousSettings: AutonomousRefinementSettings = AutonomousRefinementSettings(),
+    val autonomousStatus: AutonomousRefinementStatus = AutonomousRefinementStatus(),
 ) {
     /**
      * Whether any operation is running.
@@ -320,7 +345,7 @@ data class InkuUiState(
      * DDL editor's draw; `refinementBusy` covers the lineage's refinement and
      * the model and language comparisons.
      */
-    val isRunning: Boolean get() = isDrawing || refinementBusy || cameraCaptureState.locksCameraInteraction
+    val isRunning: Boolean get() = isDrawing || refinementBusy || replayBusy || replaySaving || autonomousStatus.busy || cameraCaptureState.locksCameraInteraction
 }
 
 private data class CameraDrawRunInput(
@@ -349,6 +374,8 @@ private class CameraStageFailure(val failure: CameraFailure) : RuntimeException(
 enum class RefinementSubview(val id: String) {
     Adjust("adjust"),
     Model("model"),
+    ColorArrangement("color-arrangement"),
+    Ground("ground"),
     ;
 
     companion object {
@@ -403,6 +430,7 @@ data class RefinementCandidate(
     val savedHistoryId: String? = null,
     val savedNodeId: String? = null,
     val pipelineResult: PaintResult? = null,
+    val selected: Boolean = false,
 )
 
 enum class AppTab {
@@ -475,6 +503,15 @@ class InkuViewModel @JvmOverloads constructor(
     private var drawingJob: Job? = null
     private var lineageJob: Job? = null
     private var refinementJob: Job? = null
+    private var canvasSearchJob: Job? = null
+    private var replayJob: Job? = null
+    private var autonomousJob: Job? = null
+    private var refinementSaving = false
+    private var replaySerial = 0L
+    private var canvasSearchSerial = 0L
+    private var lastBatchSnapshot: BatchSnapshot? = null
+    private var lastBatchSavedWork: HistoryItemEntity? = null
+    private val colorArrangementCursors = mutableMapOf<String, Int?>()
     private var toolChangeNextNumber = 1
     private var litertWarmupJob: Job? = null
     private var cameraJob: Job? = null
@@ -589,6 +626,9 @@ class InkuViewModel @JvmOverloads constructor(
         drawingJob?.cancel()
         lineageJob?.cancel()
         refinementJob?.cancel()
+        replayJob?.cancel()
+        canvasSearchJob?.cancel()
+        autonomousJob?.cancel()
         modelDownloadJob?.cancel()
         litertWarmupJob?.cancel()
         cameraRunSerial += 1
@@ -1628,6 +1668,98 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = localState.value.copy(workActionsTarget = null)
     }
 
+    fun openCanvasSearch() {
+        if (state.value.isRunning) return
+        localState.value = localState.value.copy(canvasSearchOpen = true)
+        setCanvasSearchQuery(localState.value.canvasSearchQuery)
+    }
+
+    fun closeCanvasSearch() {
+        canvasSearchSerial++
+        canvasSearchJob?.cancel()
+        localState.value = localState.value.copy(canvasSearchOpen = false, canvasSearchBusy = false)
+    }
+
+    fun setCanvasSearchQuery(value: String) {
+        val query = value.take(200)
+        val serial = ++canvasSearchSerial
+        canvasSearchJob?.cancel()
+        localState.value = localState.value.copy(canvasSearchQuery = query, canvasSearchBusy = true, canvasSearchFailed = false, canvasSearchResultIds = emptyList())
+        canvasSearchJob = viewModelScope.launch {
+            delay(250)
+            runCatching {
+                withContext(Dispatchers.IO) { repository.canvasSearchEntries().filter { it.matches(query) }.map { it.id } }
+            }.onSuccess { ids ->
+                if (serial == canvasSearchSerial && localState.value.canvasSearchOpen) {
+                    localState.value = localState.value.copy(canvasSearchBusy = false, canvasSearchResultIds = ids)
+                }
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                if (serial == canvasSearchSerial) localState.value = localState.value.copy(canvasSearchBusy = false, canvasSearchFailed = true)
+            }
+        }
+    }
+
+    fun selectCanvasSearchResult(id: String) {
+        if (state.value.isRunning || id !in localState.value.canvasSearchResultIds) return
+        val serial = canvasSearchSerial
+        viewModelScope.launch {
+            val item = withContext(Dispatchers.IO) { repository.getHistoryById(id) } ?: return@launch
+            if (serial != canvasSearchSerial || !localState.value.canvasSearchOpen || state.value.isRunning || item.trashed) return@launch
+            closeCanvasSearch()
+            selectHistory(item)
+        }
+    }
+
+    fun openReplayComparison(item: HistoryItemEntity) {
+        if (state.value.isRunning || item.trashed) return
+        enterWorkContext(item)
+        closeRefinement()
+        val serial = ++replaySerial
+        localState.value = localState.value.copy(replayOpen = true, replayBusy = true, replayComparison = null, replayError = null, replaySavedHistoryId = null)
+        replayJob = viewModelScope.launch {
+            try {
+                val comparison = withContext(Dispatchers.IO) { repository.replaySavedWork(item.id) }
+                if (serial == replaySerial && localState.value.replayOpen) {
+                    localState.value = localState.value.copy(replayComparison = comparison)
+                }
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                if (serial == replaySerial) localState.value = localState.value.copy(replayError = messageFor(error, strings(), strings().statusDrawFailed))
+            } finally {
+                if (serial == replaySerial) localState.value = localState.value.copy(replayBusy = false)
+            }
+        }
+    }
+
+    fun closeReplayComparison() {
+        if (localState.value.replaySaving) return
+        replaySerial++
+        replayJob?.cancel()
+        localState.value = localState.value.copy(replayOpen = false, replayBusy = false, replayComparison = null, replayError = null)
+    }
+
+    fun saveReplayComparison() {
+        val current = localState.value
+        if (current.replayBusy || current.replaySaving || current.replaySavedHistoryId != null) return
+        val comparison = current.replayComparison ?: return
+        localState.value = current.copy(replaySaving = true, replayError = null)
+        viewModelScope.launch {
+            try {
+                val saved = withContext(Dispatchers.IO) { repository.saveReplayChild(comparison) }
+                localState.value = localState.value.copy(replaySavedHistoryId = saved.id)
+                refreshLineage()
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                localState.value = localState.value.copy(replayError = messageFor(error, strings(), strings().statusSaveFailed))
+            } finally {
+                localState.value = localState.value.copy(replaySaving = false)
+            }
+        }
+    }
+
+    suspend fun sentPrompts(historyId: String) = withContext(Dispatchers.IO) { repository.sentPrompts(historyId) }
+
     /** Establish the immutable target before any edit changes the shared pipeline input. */
     private fun enterWorkContext(item: HistoryItemEntity) {
         val current = localState.value
@@ -1751,6 +1883,11 @@ class InkuViewModel @JvmOverloads constructor(
         refinementCandidates = source.refinementCandidates, refinementPreviewId = source.refinementPreviewId,
         refinementSubview = source.refinementSubview, refinementStatus = source.refinementStatus,
         refinementBusy = false, refinementCanAbort = false,
+        refinementWildOverride = source.refinementWildOverride, modelCompareFailedModels = source.modelCompareFailedModels,
+        colorArrangementExhausted = source.colorArrangementExhausted, groundCurrentLabel = source.groundCurrentLabel,
+        replayOpen = false, replayBusy = false, replaySaving = false, replayComparison = null,
+        replaySavedHistoryId = null, replayError = null, canvasSearchOpen = false,
+        autonomousOpen = false, autonomousParent = null, autonomousStatus = AutonomousRefinementStatus(),
     )
 
     fun setSettingsPane(panel: SettingsPane) {
@@ -2561,6 +2698,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     private fun runSubmit(current: InkuUiState, cameraProvenance: CameraInputProvenance? = null, sketchRedraw: Boolean = false, suppliedSketchText: String? = null) {
+        if (current.autonomousStatus.busy || current.replayBusy || current.replaySaving) return
         if (current.descriptionLocked && !current.historyAuthorityLoading) return
         if (current.prompt.isBlank()) {
             localState.value = current.copy(message = strings().promptEmpty)
@@ -2689,6 +2827,7 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun drawFromDdl() {
         val current = state.value
+        if (current.autonomousStatus.busy || current.replayBusy || current.replaySaving) return
         val returnToLineage = current.tab == AppTab.Lineage
         if (current.refinementBusy) {
             localState.value = localState.value.copy(message = REFINEMENT_IN_PROGRESS(strings()))
@@ -2745,6 +2884,7 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun runBatch() {
         val current = state.value
+        if (current.isRunning) return
         validateSelectedModels(current)?.let { message ->
             localState.value = localState.value.copy(message = message)
             return
@@ -2761,93 +2901,132 @@ class InkuViewModel @JvmOverloads constructor(
             return
         }
         rememberBatchPrompt(current.batchText)
+        val snapshot = BatchSnapshot(current.batchText, lines.map { NumberedBatchLine(it.first, it.second) },
+            BatchConditions(current.selectedCatalogId, current.selectedCanvasAspect,
+                current.selectedModelId, current.selectedStage2ModelId, current.uiLanguage.code, current.renderWild))
+        lastBatchSnapshot = snapshot
+        lastBatchSavedWork = null
+        runBatchSnapshot(snapshot, snapshot.lines, retry = false)
+    }
+
+    fun setBatchRetryLimit(value: Int) {
+        if (state.value.isRunning) return
+        val limit = value.coerceIn(0, 5)
+        localState.value = localState.value.copy(batchRetryLimit = limit)
+        persistSetting("batch_retry_limit", JSONObject().put("value", limit).toString())
+    }
+
+    fun retryFailedBatch() {
+        val current = localState.value
+        if (state.value.isRunning || !current.batchCanRetry) return
+        val snapshot = lastBatchSnapshot ?: return
+        val failed = failedBatchLines(snapshot, current.batchFailures)
+        if (failed.isNotEmpty()) runBatchSnapshot(snapshot, failed, retry = true)
+    }
+
+    private fun runBatchSnapshot(snapshot: BatchSnapshot, requested: List<NumberedBatchLine>, retry: Boolean) {
+        val current = localState.value
+        val conditions = snapshot.conditions
         val runId = beginDrawingRun()
         drawingJob = viewModelScope.launch {
             val startedAt = System.currentTimeMillis()
-            var last: HistoryItemEntity? = null
-            var success = 0
+            var last: HistoryItemEntity? = if (retry) lastBatchSavedWork else null
+            var success = if (retry) current.batchSuccess else 0
             var failures = emptyList<BatchFailure>()
+            var pending = requested
+            var round = 0
             localState.value = localState.value.copy(
                 isDrawing = true,
-                batchTotal = lines.size,
+                batchTotal = snapshot.lines.size,
                 batchCurrent = 0,
-                batchSuccess = 0,
+                batchSuccess = success,
                 batchFailures = emptyList(),
                 batchActiveLine = null,
                 batchActiveDdl = null,
                 batchActiveElapsedMs = null,
                 batchElapsedMs = 0L,
                 batchLatestHashShort = null,
-                message = strings().batchRunning(0, lines.size),
+                batchCanRetry = false,
+                batchRetryRound = 0,
+                message = strings().batchRunning(0, pending.size),
             )
-            lines.forEachIndexed { index, (lineNumber, prompt) ->
-                val itemStartedAt = System.currentTimeMillis()
-                localState.value = localState.value.copy(
-                    batchCurrent = index + 1,
-                    batchActiveLine = lineNumber,
-                    batchActiveDdl = null,
-                    batchActiveElapsedMs = null,
-                    batchElapsedMs = System.currentTimeMillis() - startedAt,
-                    message = strings().batchRunning(index + 1, lines.size),
-                )
-                runCatching {
-                    // The setting as it is: `auto` goes to the shared pipeline,
-                    // which chooses the catalogue there.
-                    val catalogId = current.selectedCatalogId
-                    withContext(Dispatchers.IO) {
-                        repository.paint(
-                            description = prompt,
-                            catalogId = catalogId,
-                            canvasAspect = current.selectedCanvasAspect,
-                            stage1ModelId = current.selectedModelId,
-                            stage2ModelId = current.selectedStage2ModelId,
-                            historyInput = "#$lineNumber $prompt",
-                            instructionLang = InstructionLanguages.AUTO,
-                            uiLang = current.uiLanguage.code,
-                            // The prose without the line number: the same split
-                            // the server keeps between `input` and `source_text`.
-                            sourceText = prompt,
-                            renderWild = current.renderWild,
-                        )
-                    }
-                }.onSuccess { item ->
-                    if (!isCurrentDrawingRun(runId)) return@onSuccess
-                    success += 1
-                    last = item
-                    adoptSavedHistory(item, activeExecution = true, isCurrent = { isCurrentDrawingRun(runId) }) { latest ->
-                        latest.copy(
-                            // The line itself declared no parent -- every batch line
-                            // is a root of its own, as web's does (+page.svelte:3327-3345)
-                            // -- but the work now on screen is one, and web lowers
-                            // this flag on every saved paint (:2883).
-                            lineageDetached = false,
-                            ddl = item.normalizedDdl.orEmpty(),
-                            ddlEditedAfterGeneration = false,
-                            batchSuccess = success,
-                            batchFailures = failures,
-                            batchActiveDdl = item.normalizedDdl.orEmpty(),
-                            batchActiveElapsedMs = System.currentTimeMillis() - itemStartedAt,
-                            batchElapsedMs = System.currentTimeMillis() - startedAt,
-                            batchLatestHashShort = item.renderHashShort,
-                            message = strings().batchRunning(index + 1, lines.size),
-                        )
-                    }
-                }.onFailure { error ->
-                    if (error is CancellationException) throw error
-                    if (!isCurrentDrawingRun(runId)) return@onFailure
-                    if (presentPipelineInteraction(error)) return@launch
-                    // Every failure is kept (at most MaxBatchItems): the tally
-                    // counts this list, as web's report keeps each one.
-                    failures = failures + BatchFailure(lineNumber, prompt, messageFor(error, strings(), strings().statusDrawFailed))
+            do {
+                failures = emptyList()
+                val lines = pending.map { it.number to it.input }
+                localState.value = localState.value.copy(batchRetryRound = round, batchFailures = emptyList())
+                lines.forEachIndexed { index, (lineNumber, prompt) ->
+                    val itemStartedAt = System.currentTimeMillis()
                     localState.value = localState.value.copy(
-                        batchSuccess = success,
-                        batchFailures = failures,
-                        batchActiveElapsedMs = System.currentTimeMillis() - itemStartedAt,
+                        batchCurrent = index + 1,
+                        batchActiveLine = lineNumber,
+                        batchActiveDdl = null,
+                        batchActiveElapsedMs = null,
                         batchElapsedMs = System.currentTimeMillis() - startedAt,
                         message = strings().batchRunning(index + 1, lines.size),
                     )
+                    runCatching {
+                        // The setting as it is: `auto` goes to the shared pipeline,
+                        // which chooses the catalogue there.
+                        val catalogId = conditions.catalogId
+                        withContext(Dispatchers.IO) {
+                            repository.paint(
+                                description = prompt,
+                                catalogId = catalogId,
+                                canvasAspect = conditions.canvasAspect,
+                                stage1ModelId = conditions.modelId,
+                                stage2ModelId = conditions.stage2ModelId,
+                                historyInput = "#$lineNumber $prompt",
+                                instructionLang = InstructionLanguages.AUTO,
+                                uiLang = conditions.languageCode,
+                                // The prose without the line number: the same split
+                                // the server keeps between `input` and `source_text`.
+                                sourceText = prompt,
+                                renderWild = conditions.renderWild,
+                            )
+                        }
+                    }.onSuccess { item ->
+                        if (!isCurrentDrawingRun(runId)) return@onSuccess
+                        success += 1
+                        last = item
+                        lastBatchSavedWork = item
+                        adoptSavedHistory(item, activeExecution = true, isCurrent = { isCurrentDrawingRun(runId) }) { latest ->
+                            latest.copy(
+                                // The line itself declared no parent -- every batch line
+                                // is a root of its own, as web's does (+page.svelte:3327-3345)
+                                // -- but the work now on screen is one, and web lowers
+                                // this flag on every saved paint (:2883).
+                                lineageDetached = false,
+                                ddl = item.normalizedDdl.orEmpty(),
+                                ddlEditedAfterGeneration = false,
+                                batchSuccess = success,
+                                batchFailures = failures,
+                                batchActiveDdl = item.normalizedDdl.orEmpty(),
+                                batchActiveElapsedMs = System.currentTimeMillis() - itemStartedAt,
+                                batchElapsedMs = System.currentTimeMillis() - startedAt,
+                                batchLatestHashShort = item.renderHashShort,
+                                message = strings().batchRunning(index + 1, lines.size),
+                            )
+                        }
+                    }.onFailure { error ->
+                        if (error is CancellationException) throw error
+                        if (!isCurrentDrawingRun(runId)) return@onFailure
+                        if (presentPipelineInteraction(error)) return@launch
+                        // Every failure is kept (at most MaxBatchItems): the tally
+                        // counts this list, as web's report keeps each one.
+                        failures = failures + BatchFailure(lineNumber, prompt, messageFor(error, strings(), strings().statusDrawFailed))
+                        localState.value = localState.value.copy(
+                            batchSuccess = success,
+                            batchFailures = failures,
+                            batchActiveElapsedMs = System.currentTimeMillis() - itemStartedAt,
+                            batchElapsedMs = System.currentTimeMillis() - startedAt,
+                            message = strings().batchRunning(index + 1, lines.size),
+                        )
+                    }
                 }
-            }
+                pending = failedBatchLines(snapshot, failures)
+                val again = batchRetryAllowed(failures, round, current.batchRetryLimit, interrupted = !isActive)
+                if (again) round += 1
+            } while (again && isCurrentDrawingRun(runId))
             if (!isCurrentDrawingRun(runId)) return@launch
             localState.value = localState.value.copy(
                 selectedHistory = last,
@@ -2864,7 +3043,8 @@ class InkuViewModel @JvmOverloads constructor(
                 batchActiveDdl = null,
                 batchActiveElapsedMs = null,
                 batchElapsedMs = System.currentTimeMillis() - startedAt,
-                message = strings().batchCompleted(success, failures.size, lines.size),
+                batchCanRetry = failures.isNotEmpty(),
+                message = strings().batchCompleted(success, failures.size, snapshot.lines.size),
             )
         }
     }
@@ -2879,6 +3059,7 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun startDemo() {
         val current = state.value
+        if (current.isRunning) return
         validateSelectedModels(current)?.let { message ->
             localState.value = localState.value.copy(message = message)
             return
@@ -2996,7 +3177,7 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value.pipelineView?.takeIf { !it.terminal }?.let { view ->
             viewModelScope.launch { runCatching { repository.cancelPipeline(view.executionId) } }
         }
-        localState.value = localState.value.copy(isDrawing = false, demoWaitingSeconds = null, message = strings().statusStopped)
+        localState.value = localState.value.copy(isDrawing = false, demoWaitingSeconds = null, batchCanRetry = false, message = strings().statusStopped)
     }
 
     /** A successful early performance save ends the pre-save parent retention too. */
@@ -3017,6 +3198,7 @@ class InkuViewModel @JvmOverloads constructor(
      * する」).
      */
     fun openRefinement(item: HistoryItemEntity, subview: RefinementSubview = RefinementSubview.Adjust) {
+        if (refinementSaving || localState.value.refinementCandidates.any { it.saveState == RefinementSaveState.Saving }) return
         // 「対象作品変更時は結果を破棄し、進行中の要求を中断する」(SPEC :616, :686,
         // :2143). The running job is cancelled first: a candidate that lands
         // after the target changed belongs to a work that is no longer here.
@@ -3038,8 +3220,17 @@ class InkuViewModel @JvmOverloads constructor(
             // target starts from an empty one rather than from choices that were
             // legal for the last work.
             modelCompareSelectedModels = if (previous?.id == item.id) localState.value.modelCompareSelectedModels else emptyList(),
+            modelCompareFailedModels = emptyMap(),
+            refinementWildOverride = null,
+            colorArrangementExhausted = false,
+            groundCurrentLabel = null,
             tab = AppTab.Lineage,
         )
+        colorArrangementCursors.remove(item.id)
+        if (subview == RefinementSubview.ColorArrangement || subview == RefinementSubview.Ground ||
+            (subview == RefinementSubview.Adjust && localState.value.refinementElement == RefinementElement.Color)) {
+            generateRefinementCandidates()
+        }
     }
 
     fun setRefinementSubview(subview: RefinementSubview) {
@@ -3049,7 +3240,14 @@ class InkuViewModel @JvmOverloads constructor(
             refinementStatus = null,
             refinementCandidates = emptyList(),
             refinementPreviewId = null,
+            modelCompareFailedModels = emptyMap(),
+            colorArrangementExhausted = false,
         )
+        localState.value.refinementParent?.id?.let(colorArrangementCursors::remove)
+        if (subview == RefinementSubview.ColorArrangement || subview == RefinementSubview.Ground ||
+            (subview == RefinementSubview.Adjust && localState.value.refinementElement == RefinementElement.Color)) {
+            generateRefinementCandidates()
+        }
     }
 
     /** Up to four models to compare; each draws both stages (2026-09-30, the author). */
@@ -3076,6 +3274,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun closeRefinement() {
+        if (refinementSaving || localState.value.refinementCandidates.any { it.saveState == RefinementSaveState.Saving }) return
         refinementJob?.cancel()
         refinementJob = null
         localState.value = localState.value.copy(
@@ -3180,6 +3379,7 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = localState.value.copy(refinementElement = element, refinementStatus = null)
         // 「推敲要素の選択は前回値をブラウザに記憶する」.
         persistSetting(SETTING_KEY_REFINEMENT_ELEMENT, JSONObject().put("value", element.id).toString())
+        if (element == RefinementElement.Color && localState.value.refinementOpen) generateRefinementCandidates()
     }
 
     fun setRefinementLayoutMode(mode: RecomposeMode) {
@@ -3194,7 +3394,12 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     /** One candidate's orders plus the two strings the grid shows it under. */
-    private data class CandidateJob(val id: String, val label: String, val plan: RefinementPlan)
+    private data class CandidateJob(
+        val id: String, val label: String, val plan: RefinementPlan,
+        val render: (suspend () -> Pair<RefinementPlan, PaintResult>)? = null,
+        val colorArrangement: Boolean = false,
+        val nextColorCursor: Int? = null,
+    )
 
     /** A refusal the author has to read, not a failure: it carries the sentence. */
     // A refusal used to be its own exception carrying a finished sentence. It is
@@ -3208,10 +3413,34 @@ class InkuViewModel @JvmOverloads constructor(
      * no idea which sub-view it is running -- that is what stops the model
      * comparison from growing a second copy of it (SPEC `:688`).
      */
-    private fun candidateJobs(current: InkuUiState, parent: RefinementParent): List<CandidateJob> {
+    private suspend fun candidateJobs(current: InkuUiState, parent: RefinementParent): List<CandidateJob> {
         return when (current.refinementSubview) {
             RefinementSubview.Adjust -> adjustJobs(current, parent)
             RefinementSubview.Model -> modelJobs(current, parent)
+            RefinementSubview.ColorArrangement -> {
+                if (colorArrangementCursors.containsKey(parent.historyId) && colorArrangementCursors[parent.historyId] == null) return emptyList()
+                val page = withContext(Dispatchers.IO) { repository.colorArrangementPage(parent, colorArrangementCursors[parent.historyId] ?: 0) }
+                if (page.entries.isEmpty()) {
+                    colorArrangementCursors[parent.historyId] = null
+                    localState.value = localState.value.copy(colorArrangementExhausted = true)
+                }
+                page.entries.map { index ->
+                    CandidateJob("arrangement-$index", "${strings().colorArrangementEditAction} ${index + 1}",
+                        RefinementPlanner.plan(RefinementElement.Layout, parent),
+                        render = { repository.renderColorArrangementCandidate(parent, index, current.refinementWildOverride) },
+                        colorArrangement = true, nextColorCursor = (index + 1).takeIf { it < page.total })
+                }
+            }
+            RefinementSubview.Ground -> {
+                val plan = repository.groundVariantPlan(parent)
+                localState.value = localState.value.copy(groundCurrentLabel =
+                    (if (current.uiLanguage == UiLanguage.Ja) plan.currentLabelJa else plan.currentLabelEn) ?: plan.current)
+                plan.entries.map { entry ->
+                    CandidateJob("ground-${entry.material}", if (current.uiLanguage == UiLanguage.Ja) entry.labelJa else entry.labelEn,
+                        RefinementPlanner.plan(RefinementElement.Layout, parent),
+                        render = { repository.renderGroundVariantCandidate(parent, entry.material, current.refinementWildOverride) })
+                }
+            }
         }
     }
 
@@ -3237,7 +3466,7 @@ class InkuViewModel @JvmOverloads constructor(
                     parent = parent,
                     newCatalogId = catalogIds.getOrNull(index),
                     recomposeMode = current.refinementLayoutMode,
-                ),
+                ).copy(renderWildOverride = current.refinementWildOverride),
             )
         }
     }
@@ -3257,9 +3486,13 @@ class InkuViewModel @JvmOverloads constructor(
                     targetStage2Model = current.refinementParent?.stage2Model.orEmpty(),
                 )
             }
-        if (chosen.isEmpty()) throw InkuFailure(MODEL_SELECT_PROMPT)
+            .filterNot { model -> current.refinementCandidates.any { it.plan.stage1Model == model } }
+        if (chosen.isEmpty()) {
+            if (current.modelCompareSelectedModels.any { model -> current.refinementCandidates.any { it.plan.stage1Model == model } }) return emptyList()
+            throw InkuFailure(MODEL_SELECT_PROMPT)
+        }
         return chosen.map { model ->
-            val plan = ComparisonPlanner.modelPlan(model, parent)
+            val plan = ComparisonPlanner.modelPlan(model, parent).copy(renderWildOverride = current.refinementWildOverride)
             CandidateJob(
                 id = "$MODEL_COMPARISON_MODE:$model:$model",
                 label = model,
@@ -3282,22 +3515,12 @@ class InkuViewModel @JvmOverloads constructor(
         if (current.refinementBusy || current.isDrawing) return
         val parentItem = current.refinementParent ?: return
         val parent = RefinementParent.of(parentItem, sourceTextOf(parentItem))
-        // One entry point for all three sub-views: what differs between them is
-        // the list of orders, not the drawing, the stopping or the saving.
-        val jobs = try {
-            candidateJobs(current, parent)
-        } catch (refusal: InkuFailure) {
-            localState.value = current.copy(refinementStatus = refusal.text(strings()))
-            return
-        }
+        if (current.refinementCandidates.any { it.saveState == RefinementSaveState.Saving }) return
         refinementJob?.cancel()
         localState.value = current.copy(
             refinementBusy = true,
             refinementCanAbort = false,
             refinementStatus = null,
-            refinementCandidates = emptyList(),
-            refinementPreviewId = null,
-            refinementPlannedCount = jobs.size,
         )
         val run = viewModelScope.launch {
             // The stop appears three seconds in, not at once: a candidate that
@@ -3309,22 +3532,32 @@ class InkuViewModel @JvmOverloads constructor(
                 }
             }
             runCatching {
-                val made = mutableListOf<RefinementCandidate>()
+                // A four-layout round first preserves the chosen options from
+                // the preceding round. A failed save leaves that grid intact.
+                if (current.refinementSubview == RefinementSubview.Adjust &&
+                    current.refinementElement == RefinementElement.Layout && current.refinementCount == 4) {
+                    saveSelectedCandidatesNow(parentItem)
+                }
+                val jobs = candidateJobs(current, parent)
+                val append = current.refinementSubview == RefinementSubview.Model ||
+                    current.refinementSubview == RefinementSubview.ColorArrangement
+                localState.value = localState.value.copy(
+                    refinementCandidates = if (append) localState.value.refinementCandidates else emptyList(),
+                    refinementPreviewId = if (append) localState.value.refinementPreviewId else null,
+                    refinementPlannedCount = jobs.size,
+                    refinementRoundStartCount = if (append) localState.value.refinementCandidates.size else 0,
+                )
                 jobs.forEach { job ->
-                    val started = System.currentTimeMillis()
-                    val result = withContext(Dispatchers.IO) {
-                        repository.renderRefinementCandidate(parent, job.plan)
-                    }
-                    // 「対象作品変更時は結果を破棄し」: the target may have moved while
-                    // this candidate was being drawn, and a result that arrives
-                    // for a work nobody is looking at is thrown away rather than
-                    // shown against the new one.
-                    if (localState.value.refinementParent?.id != parentItem.id) return@forEach
-                    made.add(
-                        RefinementCandidate(
+                    try {
+                        val started = System.currentTimeMillis()
+                        val (plan, result) = withContext(Dispatchers.IO) {
+                            job.render?.invoke() ?: (job.plan to repository.renderRefinementCandidate(parent, job.plan))
+                        }
+                        if (localState.value.refinementParent?.id != parentItem.id) return@launch
+                        val candidate = RefinementCandidate(
                             id = "${job.id}-${result.renderHash.takeLast(8)}",
                             label = job.label,
-                            plan = job.plan,
+                            plan = plan,
                             displaySvg = result.displaySvg,
                             scoreJson = result.scoreJson,
                             normalizedDdl = result.normalizedDdl.orEmpty(),
@@ -3333,14 +3566,29 @@ class InkuViewModel @JvmOverloads constructor(
                             renderMetadataJson = result.renderMetadataJson,
                             pipelineResult = result,
                             elapsedMs = System.currentTimeMillis() - started,
-                            stage1Model = job.plan.stage1Model ?: parent.stage1Model,
-                            stage2Model = job.plan.stage2Model ?: parent.stage2Model,
+                            stage1Model = plan.stage1Model ?: parent.stage1Model,
+                            stage2Model = plan.stage2Model ?: parent.stage2Model,
                             instructionLangRequested = result.instructionLangRequested,
                             instructionLangResolved = result.instructionLangResolved,
-                        ),
-                    )
-                    // Shown as they arrive, the way web fills its grid.
-                    localState.value = localState.value.copy(refinementCandidates = made.toList())
+                        )
+                        localState.value = localState.value.copy(
+                            refinementCandidates = localState.value.refinementCandidates + candidate,
+                            modelCompareFailedModels = localState.value.modelCompareFailedModels - job.plan.stage1Model.orEmpty(),
+                        )
+                        if (job.colorArrangement) {
+                            colorArrangementCursors[parent.historyId] = job.nextColorCursor
+                            localState.value = localState.value.copy(colorArrangementExhausted = job.nextColorCursor == null)
+                        }
+                    } catch (error: Exception) {
+                        if (error is CancellationException) throw error
+                        if (current.refinementSubview != RefinementSubview.Model) throw error
+                        if (error is PipelineInteractionRequired) withContext(NonCancellable + Dispatchers.IO) {
+                            runCatching { repository.cancelPipeline(error.view.executionId) }
+                        }
+                        localState.value = localState.value.copy(modelCompareFailedModels =
+                            localState.value.modelCompareFailedModels +
+                                (job.plan.stage1Model.orEmpty() to messageFor(error, strings(), strings().modelFailed)))
+                    }
                 }
             }.onFailure { error ->
                 if (error is CancellationException) throw error
@@ -3381,6 +3629,7 @@ class InkuViewModel @JvmOverloads constructor(
 
     /** The stop button. Cancels the work in flight, which is what web's abort does. */
     fun abortRefinementCandidates() {
+        if (refinementSaving) return
         refinementJob?.cancel()
     }
 
@@ -3395,15 +3644,16 @@ class InkuViewModel @JvmOverloads constructor(
         val current = localState.value
         val candidate = current.refinementCandidates.firstOrNull { it.id == candidateId } ?: return
         if (candidate.saveState != RefinementSaveState.Unsaved) return
-        if (candidate.plan.toolChange != null && current.refinementBusy) return
+        if (current.refinementBusy) return
         val parentItem = current.refinementParent ?: return
         updateCandidate(candidateId) { it.copy(saveState = RefinementSaveState.Saving) }
-        viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
+        refinementSaving = true
+        localState.value = localState.value.copy(refinementBusy = true)
+        refinementJob = viewModelScope.launch {
+            try {
+                val item = withContext(NonCancellable + Dispatchers.IO) {
                     saveCandidateRow(candidate, parentItem, historyVisibility = null)
                 }
-            }.onSuccess { item ->
                 updateCandidate(candidateId) {
                     it.copy(
                         saveState = RefinementSaveState.Saved,
@@ -3412,9 +3662,170 @@ class InkuViewModel @JvmOverloads constructor(
                     )
                 }
                 localState.value = localState.value.copy(refinementStatus = strings().statusSaved(item.renderHashShort))
-            }.onFailure { error ->
+            } catch (error: Exception) {
                 updateCandidate(candidateId) { it.copy(saveState = RefinementSaveState.Unsaved) }
+                if (error is CancellationException) throw error
                 localState.value = localState.value.copy(refinementStatus = messageFor(error, strings(), strings().statusSaveFailed))
+            } finally {
+                refinementSaving = false
+                localState.value = localState.value.copy(refinementBusy = false)
+            }
+        }
+    }
+
+    fun setRefinementWildOverride(value: Boolean?) {
+        if (localState.value.refinementBusy) return
+        localState.value = localState.value.copy(refinementWildOverride = value)
+    }
+
+    fun toggleRefinementCandidateSelection(id: String) {
+        if (localState.value.refinementBusy) return
+        updateCandidate(id) { if (it.saveState == RefinementSaveState.Unsaved) it.copy(selected = !it.selected) else it }
+    }
+
+    fun saveSelectedRefinementCandidates() {
+        val current = localState.value
+        if (current.refinementBusy || current.refinementCandidates.any { it.saveState == RefinementSaveState.Saving }) return
+        val parent = current.refinementParent ?: return
+        refinementSaving = true
+        localState.value = current.copy(refinementBusy = true)
+        refinementJob = viewModelScope.launch {
+            try {
+                saveSelectedCandidatesNow(parent)
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                localState.value = localState.value.copy(refinementStatus = messageFor(error, strings(), strings().statusSaveFailed))
+            } finally {
+                refinementSaving = false
+                localState.value = localState.value.copy(refinementBusy = false)
+            }
+        }
+    }
+
+    private suspend fun saveSelectedCandidatesNow(parent: HistoryItemEntity) {
+        val selected = localState.value.refinementCandidates.filter { it.selected && it.saveState == RefinementSaveState.Unsaved }
+        refinementSaving = true
+        try {
+            for (candidate in selected) {
+                updateCandidate(candidate.id) { it.copy(saveState = RefinementSaveState.Saving) }
+                try {
+                    val saved = withContext(NonCancellable + Dispatchers.IO) { saveCandidateRow(candidate, parent, null) }
+                    updateCandidate(candidate.id) { it.copy(saveState = RefinementSaveState.Saved, selected = false,
+                        savedHistoryId = saved.id, savedNodeId = saved.lineageNodeId) }
+                } catch (error: Exception) {
+                    updateCandidate(candidate.id) { it.copy(saveState = RefinementSaveState.Unsaved) }
+                    throw error
+                }
+            }
+            if (selected.isNotEmpty()) refreshLineage()
+        } finally { refinementSaving = false }
+    }
+
+    fun openAutonomousRefinement(item: HistoryItemEntity) {
+        if (state.value.isRunning || item.trashed) return
+        enterWorkContext(item)
+        closeRefinement()
+        localState.value = localState.value.copy(
+            autonomousOpen = true, autonomousParent = item,
+            autonomousSettings = localState.value.autonomousSettings.copy(wildOverride = null),
+            autonomousStatus = AutonomousRefinementStatus(),
+        )
+    }
+
+    fun updateAutonomousRefinementSettings(settings: AutonomousRefinementSettings) {
+        if (localState.value.autonomousStatus.busy) return
+        localState.value = localState.value.copy(autonomousSettings = settings.copy(
+            generations = settings.generations.coerceIn(1, 10), direction = settings.direction.take(160)))
+    }
+
+    fun closeAutonomousRefinement() {
+        if (localState.value.autonomousStatus.busy) return
+        localState.value = localState.value.copy(autonomousOpen = false, autonomousParent = null)
+    }
+
+    fun stopAutonomousRefinement() {
+        autonomousJob?.cancel()
+    }
+
+    fun startAutonomousRefinement() {
+        val current = localState.value
+        if (state.value.isRunning || !current.autonomousOpen) return
+        val original = current.autonomousParent ?: return
+        val settings = current.autonomousSettings
+        if (settings.allowedKinds.isEmpty() || !DdlSource.hasBody(original.normalizedDdl) ||
+            (settings.mode == AutonomousRefinementMode.Vision &&
+                settings.modelId !in autonomousVisionModelIds(state.value))) {
+            localState.value = current.copy(autonomousStatus = AutonomousRefinementStatus(error = strings().refinementNoneToGenerate))
+            return
+        }
+        localState.value = current.copy(autonomousStatus = AutonomousRefinementStatus(busy = true, total = settings.generations))
+        autonomousJob = viewModelScope.launch {
+            var item = original
+            var advice: app.inku.mobile.llm.RefinementVisionAdvice? = null
+            suspend fun observe() {
+                val jpeg = withContext(Dispatchers.IO) {
+                    val bitmap = app.inku.mobile.render.RustArtworkRasterizer().rasterize(item.displaySvg, targetWidth = 768)
+                    try {
+                        java.io.ByteArrayOutputStream().use { output ->
+                            check(bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, output))
+                            output.toByteArray()
+                        }
+                    } finally { bitmap.recycle() }
+                }
+                advice = withContext(Dispatchers.IO) { repository.refineVisionAdvice(app.inku.mobile.llm.RefinementVisionRequest(
+                    modelId = settings.modelId, instruction = sourceTextOf(item), direction = settings.direction,
+                    enabledKinds = settings.allowedKinds, languageCode = current.uiLanguage.code, imageJpeg = jpeg)) }
+                currentCoroutineContext().ensureActive()
+                localState.value = localState.value.copy(autonomousStatus = localState.value.autonomousStatus.copy(
+                    observation = advice?.observation, nextDirection = advice?.nextDirection))
+            }
+            try {
+                if (settings.mode == AutonomousRefinementMode.Vision) observe()
+                repeat(settings.generations) { index ->
+                    currentCoroutineContext().ensureActive()
+                    val parent = RefinementParent.of(item, sourceTextOf(item))
+                    val kind = advice?.suggestedKind?.takeIf { it in settings.allowedKinds } ?: settings.allowedKinds.random()
+                    val element = if (kind == "catalog_change") RefinementElement.Color else RefinementElement.Layout
+                    val catalog = if (element == RefinementElement.Color)
+                        RefinementPlanner.catalogCandidateIds(parent.catalogId, ColorCatalogs.all.map { it.id }).random() else null
+                    val base = RefinementPlanner.plan(element, parent, catalog, RecomposeMode.Principled)
+                    // Both modes follow the current parent's DDL. Advice selects
+                    // an allowed intervention and is metadata, never new prose.
+                    val plan = base.copy(
+                        route = app.inku.mobile.data.refinement.RefinementRoute.ComposeFromDdl,
+                        stage1Model = settings.modelId.takeIf { settings.mode == AutonomousRefinementMode.Vision },
+                        stage2Model = settings.modelId.takeIf { settings.mode == AutonomousRefinementMode.Vision },
+                        renderWildOverride = settings.wildOverride,
+                        derivationMetadata = base.derivationMetadata + mapOf("autonomous_refine_mode" to settings.mode.name.lowercase()) +
+                            (advice?.let { mapOf("vision_model" to it.model, "vision_observation" to it.observation,
+                                "vision_next_direction" to it.nextDirection) } ?: emptyMap()),
+                    )
+                    localState.value = localState.value.copy(autonomousStatus = localState.value.autonomousStatus.copy(
+                        step = index + 1, message = strings().refinementElementLabel(element.id)))
+                    val started = System.currentTimeMillis()
+                    val result = withContext(Dispatchers.IO) { repository.renderRefinementCandidate(parent, plan) }
+                    currentCoroutineContext().ensureActive()
+                    item = withContext(Dispatchers.IO) {
+                        repository.saveRefinementCandidate(result, plan, item.lineageNodeId,
+                            System.currentTimeMillis() - started,
+                            historyVisibility = if (index == settings.generations - 1) "normal" else "lineage_only",
+                            stage1ModelId = plan.stage1Model ?: parent.stage1Model,
+                            stage2ModelId = plan.stage2Model ?: parent.stage2Model, sourceText = parent.description)
+                    }
+                    refreshLineage()
+                    if (settings.mode == AutonomousRefinementMode.Vision && index < settings.generations - 1) observe()
+                }
+                localState.value = localState.value.copy(autonomousStatus = localState.value.autonomousStatus.copy(
+                    message = strings().statusSaved(item.renderHashShort)))
+            } catch (error: Exception) {
+                if (error is PipelineInteractionRequired) withContext(NonCancellable + Dispatchers.IO) {
+                    runCatching { repository.cancelPipeline(error.view.executionId) }
+                }
+                localState.value = localState.value.copy(autonomousStatus = localState.value.autonomousStatus.copy(
+                    error = if (error is CancellationException) strings().statusStopped else messageFor(error, strings(), strings().refinementFailed)))
+            } finally {
+                localState.value = localState.value.copy(autonomousStatus = localState.value.autonomousStatus.copy(busy = false))
+                refreshLineage()
             }
         }
     }
@@ -3866,6 +4277,7 @@ class InkuViewModel @JvmOverloads constructor(
             demoSeed = demoSeed,
             demoIntervalSeconds = demoInterval.coerceIn(1, 999),
             batchPromptHistory = batchHistory,
+            batchRetryLimit = settings["batch_retry_limit"]?.let { JSONObject(it).optInt("value", 0).coerceIn(0, 5) } ?: 0,
             refinementElement = refinementElement,
             includeThinking = thinking,
             selectedModelId = restoredUnifiedModel,

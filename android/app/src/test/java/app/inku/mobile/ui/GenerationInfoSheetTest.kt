@@ -55,6 +55,7 @@ class GenerationInfoSheetTest {
         assertEquals("landscape", rows[GenerationInfoField.CanvasAspect])
         assertEquals("1.5", rows[GenerationInfoField.CanvasRatio])
         assertEquals("render-hash", rows[GenerationInfoField.RenderHash])
+        assertEquals(item.id, rows[GenerationInfoField.HistoryId])
         assertEquals("inku-svg", rows[GenerationInfoField.RenderEngineId])
         assertEquals("38", rows[GenerationInfoField.RenderEngineVersion])
         assertEquals("2500 ms", rows[GenerationInfoField.Elapsed])

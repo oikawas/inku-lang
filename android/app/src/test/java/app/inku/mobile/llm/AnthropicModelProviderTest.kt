@@ -42,6 +42,64 @@ class AnthropicModelProviderTest {
     }
 
     @Test
+    fun ordinaryPipelineClaudeFiveRequestAddsThinkingRoomWithoutDemoFlag() = runBlocking {
+        lateinit var connection: AnthropicConnection
+        val provider = AnthropicModelProvider("anthropic", "https://api.anthropic.com", "test-key") { url ->
+            AnthropicConnection(url).also { connection = it }
+        }
+        val response = provider.generate(
+            ModelRequest(
+                modelId = "anthropic:claude-sonnet-5-5",
+                prompt = "Draw a circle",
+                temperature = 0.0,
+                maxTokens = 2048,
+                tool = ModelTool("submit_pipeline_response", "Submit", """{"type":"object"}"""),
+                pipelineAction = "generate_normalized_ddl",
+            ),
+        )
+        assertEquals(10_240, JSONObject(connection.body.toString(Charsets.UTF_8.name())).getInt("max_tokens"))
+        assertEquals("circle", JSONObject(response.text).getString("normalized_ddl"))
+    }
+
+    @Test
+    fun pipelineRejectsMaxTokensEvenWhenToolInputLooksComplete() {
+        val answer = """{"stop_reason":"max_tokens","content":[{"type":"thinking","thinking":"private"},
+            {"type":"text","text":"private-output-sentinel"},
+            {"type":"tool_use","id":"t1","name":"submit_pipeline_response","input":{"normalized_ddl":"circle"}}],
+            "usage":{"output_tokens":10240}}"""
+        lateinit var connection: AnthropicConnection
+        val provider = AnthropicModelProvider("anthropic", "https://api.anthropic.com", "test-key") { url ->
+            AnthropicConnection(url, answer).also { connection = it }
+        }
+        val request = ModelRequest(
+            modelId = "anthropic:claude-sonnet-5-5",
+            prompt = "Draw a circle",
+            temperature = 0.0,
+            maxTokens = 2048,
+            tool = ModelTool("submit_pipeline_response", "Submit", """{"type":"object"}"""),
+            pipelineAction = "generate_normalized_ddl",
+        )
+        assertThrows(ProviderOutputLimitException::class.java) { runBlocking { provider.generate(request) } }
+
+        val line = AnthropicModelProvider.outputLimitLine(
+            "anthropic", request, JSONObject(connection.body.toString(Charsets.UTF_8.name())), JSONObject(answer),
+        )
+        assertTrue(line.startsWith("provider_output_limit "))
+        val fields = JSONObject(line.removePrefix("provider_output_limit "))
+        assertEquals("generate_normalized_ddl", fields.getString("action"))
+        assertEquals("anthropic", fields.getString("provider"))
+        assertEquals("claude-sonnet-5-5", fields.getString("model"))
+        assertEquals(10_240, fields.getInt("max_tokens"))
+        assertEquals("max_tokens", fields.getString("stop_reason"))
+        assertEquals(10_240, fields.getInt("output_tokens"))
+        assertEquals(1, fields.getInt("thinking_blocks"))
+        assertTrue(fields.getBoolean("has_text"))
+        assertTrue(fields.getBoolean("has_tool_use"))
+        assertFalse(line.contains("private-output-sentinel"))
+        assertFalse(line.contains("circle"))
+    }
+
+    @Test
     fun pipelineRequestUsesTheMessagesApiAndReturnsTheToolInput() = runBlocking {
         lateinit var connection: AnthropicConnection
         val provider = AnthropicModelProvider("anthropic", "https://api.anthropic.com/", "test-key") { url ->
@@ -148,6 +206,7 @@ class AnthropicModelProviderTest {
         )
         val payload = JSONObject(connection.body.toString(Charsets.UTF_8.name()))
         assertEquals("claude-sonnet-5-5", payload.getString("model"))
+        assertEquals(RemoteVisionAnalyzer.DESCRIPTION_MAX_TOKENS + 8192, payload.getInt("max_tokens"))
         assertFalse("Sonnet 5.5 rejects non-default temperature", payload.has("temperature"))
         val content = payload.getJSONArray("messages").getJSONObject(0).getJSONArray("content")
         assertEquals("AQID", content.getJSONObject(0).getJSONObject("source").getString("data"))

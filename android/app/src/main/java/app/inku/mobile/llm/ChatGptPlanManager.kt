@@ -329,8 +329,13 @@ class ChatGptPlanManager internal constructor(
                 }
                 check()
                 val token = accessToken(ref)
-                // The server decodes with the pipeline's response bound as its argument limit.
-                val decoder = ChatGptSseDecoder(argumentLimit = MAX_PROVIDER_RESPONSE_BYTES)
+                // Refinement advice uses Server's Vision text stream; drawing
+                // effects still require their completed namespace function.
+                val decoder: ChatGptStreamDecoder = if (request.pipelineAction == REFINEMENT_VISION_ACTION) {
+                    ChatGptVisionSseDecoder()
+                } else {
+                    ChatGptSseDecoder(argumentLimit = MAX_PROVIDER_RESPONSE_BYTES)
+                }
                 val response = http.request("$CHATGPT_RESOURCE/responses", "POST", token, body, timeoutMs = request.timeoutMs ?: 60_000,
                     check = ::check, onChunk = decoder::feed)
                 if (response.status !in 200..299) throw chatGptResponseError(runCatching { JSONObject(response.body) }.getOrDefault(JSONObject()), response.status)

@@ -14,6 +14,9 @@ package app.inku.mobile.ui.i18n
  * ellipsis, no exclamation marks.
  */
 object InkuStringsEn : InkuStrings {
+    override val colorArrangementEditAction = "Change the color arrangement"
+    override val modelFailed = "Drawing failed"
+    override val refinementNoneToGenerate = "Check the refinement elements, instructions, and Vision model."
     override val modelRecommendation = "Recommendation"
     override val modelAverageSeconds = "Average seconds"
     override val modelEstimatedCost = "Estimated cost"

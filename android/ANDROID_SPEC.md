@@ -4,11 +4,27 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-10-14.
+Last updated: 2026-10-17.
+
+## 2026-10-17 Saved-work refinement, search and execution details
+
+The saved-work menu adds Change color arrangement, Change ground, and Replay and compare saved Score. Color arrangement uses colors actually visible in the saved SVG and its saved color map to make distinct assignments within the same catalog, excluding the original, eight options at a time. Ground offers named supports other than the current one and changes the saved Score and DDL ground. Generating either kind of option does not save it; a chosen option is saved as a `color_arrangement_change` or `ground_change` child. The parent's saved render seeds and other drawing conditions are retained.
+
+Score replay places the original SVG next to a rendering by the current engine, showing the recorded and current engine versions and both SVG byte counts. An older work without a recorded render seed explicitly marks the preview as provisional with seed `0`. Save replay as a child saves that exact compared rendering as a `replay` child, rechecking its parent, Score, render hash and SVG SHA-256. Retrying the same comparison's save does not make a duplicate child.
+
+Before drawing the next four layout options, checked unsaved options are saved. A failed save leaves the options and checks in place and prevents the new drawing. Opening catalog refinement generates options for every other catalog. Model inspection skips models already drawn, appends new successes to the existing options, continues with other selected models after a model fails, and shows failures per model. Published ChatGPT-plan models that meet the connection conditions are eligible for model inspection. The camera's Vision-model choices still exclude ChatGPT. Refinement offers Wild Inherit, On and Off: Inherit uses the saved parent's value; an explicit value applies to that refinement.
+
+The Works list also searches UUIDs and their prefixes. Canvas search finds saved works by description text, render hash, description hash or full UUID, debounces input for 250 ms, opens a selected result, and distinguishes clear, empty results and errors. Generation information shows and copies a saved work's UUID, distinguishing an unsaved work. A saved work's prompt view reads the system prompts actually sent for its exact execution, grouped as Sketch, Stage 1, Composition reading and Stage 2; Sketch and Composition also show their sent messages. It distinguishes unrecorded, uncalled and unreadable data instead of reconstructing sent text from the saved source or DDL.
+
+Progress says “Reading the composition…” while `read_composition` runs. Batch drawing retains each original line number, text and drawing conditions so only failed lines can be retried manually. Automatic failed-line retries default to zero and allow 0–5 rounds; stopping a run does not restart it automatically. Saijiki shows a word's explanatory drawing, effect and example instruction, with the effect in the UI language and the example in the instruction language. Model-choice headings show recommendation stars for their purpose using the existing catalog evaluation.
+
+For supported Anthropic Claude models, normal drawing and Vision requests add 8,192 thinking tokens to the answer budget. A pipeline response ending at `max_tokens` is rejected and diagnosed before accepting even an apparently complete tool input or JSON body.
+
+Autonomous refinement on a saved work lets the author choose Random or Vision, 1–10 generations, allowed color-catalog and layout changes, and inherited or explicit Wild before starting; merely opening it draws nothing. Every generation starts from the preceding saved work's DDL. Intermediate generations are saved for lineage only, while the last child also appears in the normal Works list. Random chooses from the allowed elements. Vision sends a JPEG of the current work to the selected Vision model and receives an observation, a next direction and a suggested allowed element. Empty advice fails; an element outside the allowed set falls back to its first element. The dialog shows progress, observation, next direction, stop and failure. Only the dedicated Vision-advice request attaches an image through existing connections and the ChatGPT-plan session pin; this does not enable images for ordinary pipeline requests or add ChatGPT to camera model choices.
 
 ## 2026-10-14 Change the touches
 
-The saved-work menu places Change the touches after Another catalog. Its separate dialog offers Same tool for every sentence by default and A different tool for each sentence. Opening draws nothing; Make four options draws four in the chosen mode. Pressing it again discards the options shown and draws four new ones. Uniform options use the drawing tool's name; per-sentence options show a number and each sentence's change. Unsaved options must be saved or discarded before closing; discarding keeps works already saved.
+At the time of this addition, the saved-work menu placed Change the touches after Another catalog. Its separate dialog offers Same tool for every sentence by default and A different tool for each sentence. Opening draws nothing; Make four options draws four in the chosen mode. Pressing it again discards the options shown and draws four new ones. Uniform options use the drawing tool's name; per-sentence options show a number and each sentence's change. Unsaved options must be saved or discarded before closing; discarding keeps works already saved.
 
 JNI forwards shared-core retouch (`inku.touch-change.v1`). The core supplies eligible sentences and twelve tools; the saved Score's source_instruction owners supply the tools actually drawn. Only the corresponding instructions' weight changes. Placement, color, ground, canvas, seeds, Wild and drawing policy remain the parent's, and plugin-owned instructions stay intact. Only the core's rewritten and verified instructions are used. No model is called.
 
@@ -18,7 +34,7 @@ Saving redraws from the parent and the chosen tools, recording `tool_change` and
 
 At the author's decision, refinement no longer changes touch with words. After reading was removed on the same day, its two elements are color catalog and layout. The words field, word-seed plan and dedicated messages are removed. A saved `touch`, `reading` or `variation` selection displays layout without deleting the old setting.
 
-New drawing requests and execution options omit `seed_text`, and do not call the core's `render_seed_from_text`. Saved works replay with their stored `render_seed`. Historical `seed_text` remains in generation information and saved records; saved `touch_change` lineage edges and their Touch label remain readable. Room columns, schema and migrations are unchanged. The current Android app has no autonomous-refinement screen, execution entry point or Vision-advice `enabled_kinds`.
+New drawing requests and execution options omit `seed_text`, and do not call the core's `render_seed_from_text`. Saved works replay with their stored `render_seed`. Historical `seed_text` remains in generation information and saved records; saved `touch_change` lineage edges and their Touch label remain readable. Room columns, schema and migrations are unchanged. At the time of this removal, Android had no autonomous-refinement screen, execution entry point or Vision-advice `enabled_kinds`.
 
 ## 2026-10-14 Remove reading refinement
 
@@ -117,8 +133,9 @@ Reasoning models matching `^(gpt-5|gpt-6|o\d)` get no temperature.
 Models matching `^(gpt-5\.\d|gpt-6-(sol|luna)(-|$))` get effort=none and the original output budget.
 Other reasoning models (GPT-6 Astra, GPT-6.1 Sol, base GPT-5 and the o-series) get low and 25,000 extra tokens.
 Non-reasoning models such as GPT-4.1 get temperature and no reasoning setting.
-Drawing uses max_output_tokens and reasoning.effort; Vision, photo descriptions, colophons and demos
-keep Chat Completions with max_completion_tokens and reasoning_effort.
+Drawing uses max_output_tokens and reasoning.effort; other Vision calls, photo descriptions, colophons and demos
+keep Chat Completions with max_completion_tokens and reasoning_effort. Dedicated autonomous-refinement Vision advice
+uses an image-bearing Responses request on this official OpenAI connection.
 
 Only status=completed is an answer. Read arguments from exactly one function_call with the offered name
 and string arguments. With no calls, concatenate only message output_text. Exclude reasoning and refusals.
@@ -342,7 +359,7 @@ The DDL authority and description-based creation messages use “work”. Work-v
 
 Android is a local single-user host and connects directly to a personal ChatGPT plan. Settings has an independent ChatGPT plan pane. Continue with ChatGPT opens Chrome on the phone for authorization, without a Mac transfer helper or an API key. Return to inku, acknowledge the first-use plan notice, then open Model settings.
 
-In Settings → Models → ChatGPT plan, Model selection explicitly fetches the personal catalog; select models and save. Fetching alone publishes nothing. Only published models present in that catalog enter the drawing picker, with one `chatgpt:<slug>` for both stages. Retired publication references and saved work model IDs remain. Opening settings does not fetch models. This connection is excluded from API-key settings, bare-name ownership, photo observation, model inspection and demo instruction generation (Android has no colophon).
+In Settings → Models → ChatGPT plan, Model selection explicitly fetches the personal catalog; select models and save. Fetching alone publishes nothing. Only published models present in that catalog enter the drawing picker, with one `chatgpt:<slug>` for both stages. Retired publication references and saved work model IDs remain. Opening settings does not fetch models. This connection is excluded from API-key settings, bare-name ownership, camera-photo observation and demo instruction generation (Android has no colophon). Published personal models may be used in model inspection and dedicated autonomous Vision advice.
 
 Multiple registrations retain separate publication preferences and labels identifying the verified account and issued client ID. Users can select a registration, reauthorize, explicitly consent again, cancel authorization, disconnect and manage usage. The drawing screen also identifies the plan and registration in use. Identity alone does not authorize plan usage: both `resource.invoke` and `chatgpt.tokens.use.direct` scopes are required. Quota exhaustion stops more drawing calls; explicitly refreshing the catalog can check renewed availability. Disconnect removes local tokens first and reports unconfirmed remote revocation, retaining registration metadata and published models.
 

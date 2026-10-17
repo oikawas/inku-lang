@@ -522,9 +522,12 @@ export class HistoryManagerState {
 
 	setPage = (page: number) => {
 		const nextPage = Math.max(0, Math.min(page, this.totalPages - 1));
-		if (nextPage === this.page) return;
+		// Newer can continue before the selected work's retained starting point.
+		const nextStartOffset = page < 0 ? Math.max(0, this.startOffset + page * this.pageSize) : this.startOffset;
+		if (nextPage === this.page && nextStartOffset === this.startOffset) return;
 		this.awaitingInitialPageSize = false;
 		this.focusRequest = null;
+		this.startOffset = nextStartOffset;
 		this.page = nextPage;
 		void this.fetch({ page: nextPage });
 	};

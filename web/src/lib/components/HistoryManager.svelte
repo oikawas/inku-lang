@@ -568,6 +568,12 @@
 	}
 
 	function setLineageGroupPage(page: number): void {
+		if (page < 0 && lineageGroupPage === 0 && lineageStartOffset > 0) {
+			lineageStartOffset = Math.max(0, lineageStartOffset + page * lineageGroupPageSize);
+			// The relative page stays zero, so its effect will not fetch this move.
+			void fetchLineageGroups();
+			return;
+		}
 		lineageGroupPage = Math.max(0, Math.min(page, lineageGroupTotalPages - 1));
 	}
 
@@ -865,7 +871,7 @@
 						<button class="ghost-btn history-latest-btn" onclick={latestLineagePage} disabled={(lineageGroupPage <= 0 && lineageStartOffset === 0) || lineageGroupLoading}>{t().historyLatest}</button>
 					</Tooltip>
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryNewerPage}>
-						<button class="ghost-btn history-nav-btn" onclick={() => setLineageGroupPage(lineageGroupPage - 1)} disabled={lineageGroupPage <= 0 || lineageGroupLoading}>{t().historyNewer}</button>
+						<button class="ghost-btn history-nav-btn" onclick={() => setLineageGroupPage(lineageGroupPage - 1)} disabled={(lineageGroupPage <= 0 && lineageStartOffset === 0) || lineageGroupLoading}>{t().historyNewer}</button>
 					</Tooltip>
 					<span>{lineageGroupLoading ? t().historyLoading : (lineageGroupPage + 1) + ' / ' + lineageGroupTotalPages}</span>
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryOlderPage}>
@@ -879,7 +885,7 @@
 						<button class="ghost-btn history-latest-btn" onclick={onSetLatestPage} disabled={(historyManagerPage <= 0 && !historyManagerAnchored) || historyManagerLoading}>{t().historyLatest}</button>
 					</Tooltip>
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryNewerPage}>
-						<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage - 1)} disabled={historyManagerPage <= 0 || historyManagerLoading}>{t().historyNewer}</button>
+						<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage - 1)} disabled={historyManagerOffset === 0 || historyManagerLoading}>{t().historyNewer}</button>
 					</Tooltip>
 					<span>{historyManagerLoading ? t().historyLoading : (historyManagerPage + 1) + ' / ' + historyManagerTotalPages}</span>
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryOlderPage}>

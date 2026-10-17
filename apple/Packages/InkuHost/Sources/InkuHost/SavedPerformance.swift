@@ -3,22 +3,17 @@ import CryptoKit
 import InkuCore
 import InkuPersistence
 
-enum WorkIdentity {
+public enum WorkIdentity {
     static func sha256(_ value: Data) -> String { SHA256.hash(data: value).map { String(format: "%02x", $0) }.joined() }
-    static func description(_ text: String) -> String {
-        let normalized = text.precomposedStringWithCanonicalMapping.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
-        let whitespace = DDLSource.bodyWhitespaceCodepoints.union([28, 29, 30, 31])
-        let scalars = normalized.unicodeScalars
-        let body = scalars.drop(while: { whitespace.contains($0.value) }).reversed().drop(while: { whitespace.contains($0.value) }).reversed()
-        return "dh1:" + sha256(Data(String(String.UnicodeScalarView(body)).utf8))
+    public static func description(_ text: String) -> String {
+        InkuCore.descriptionHash(text)
     }
-    static func render(score: ExactJSON, options: ExactJSON, metadata: ExactJSON) -> String {
-        let seed = options["render_seed"].string.map(ExactJSON.number) ?? options["render_seed"]
-        let payload: ExactJSON = .object(["version": .string("rh3"), "score": score, "render_seed": seed,
-                                          "render_wild": .bool(options["wild"].bool ?? false),
-                                          "render_engine_id": metadata["render_engine_id"], "render_engine_version": metadata["render_engine_version"],
-                                          "render_color_catalog_id": options["catalog_id"]])
-        return "rh3:" + sha256(payload.data)
+    public static func render(score: ExactJSON, options: ExactJSON, metadata: ExactJSON) throws -> String {
+        let item: ExactJSON = .object(["score": score, "render_seed": options["render_seed"],
+            "render_wild": options["wild"], "render_engine_id": metadata["render_engine_id"],
+            "render_engine_version": metadata["render_engine_version"], "render_color_catalog_id": options["catalog_id"]])
+        guard let hash = InkuCore.renderHash(itemJSON: item.text) else { throw HostError("invalid_render_identity") }
+        return hash
     }
     static func savedID(executionID: String, sequence: String) -> String { executionID + "_" + sequence }
     static func location(_ workID: String) throws -> (executionID: String, effectID: String) {

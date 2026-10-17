@@ -29,7 +29,7 @@ final class HostBoundaryTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(WorkIdentity.description(" \r\nA\u{030A}\r "), "dh1:0a94dc9d420d1142d6b71de60f9bf7e2f345a4d62c9f141b091539769ddf3075")
         let hashOptions: ExactJSON = .object(["render_seed": .string("18446744073709551615"), "wild": .bool(false), "catalog_id": .string("default")])
         let hashMetadata: ExactJSON = .object(["render_engine_id": .string("rust"), "render_engine_version": .string("1")])
-        XCTAssertEqual(WorkIdentity.render(score: .object(["instructions": .array([])]), options: hashOptions, metadata: hashMetadata),
+        XCTAssertEqual(try WorkIdentity.render(score: .object(["instructions": .array([])]), options: hashOptions, metadata: hashMetadata),
                        "rh3:07e6e7bd570887e4b40fc6197e9f8f32ccb0230ca734f5190767fdc70e3e330a")
     }
 

@@ -205,8 +205,11 @@ pub fn resolve_instruction_language(
 /// A requested language code (`"auto"`, `"ja"` or `"en"`) normalized as
 /// Python's `(value or default).strip().lower()`, or `None` when unsupported.
 #[uniffi::export]
-pub fn normalize_instruction_language(value: Option<String>, default: String) -> Option<String> {
-    inku_ddl::normalize_instruction_language(value.as_deref(), &default)
+pub fn normalize_instruction_language(
+    value: Option<String>,
+    default_language: String,
+) -> Option<String> {
+    inku_ddl::normalize_instruction_language(value.as_deref(), &default_language)
         .ok()
         .map(|language| language.as_str().to_owned())
 }

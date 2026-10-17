@@ -1,4 +1,5 @@
 import Foundation
+import InkuCore
 
 /// JSON transport values retain number lexemes instead of rounding through Double.
 public indirect enum ExactJSON: Sendable, Equatable {
@@ -17,6 +18,8 @@ public indirect enum ExactJSON: Sendable, Equatable {
     }
 
     public var data: Data { Data(text.utf8) }
+    /// Shared identity serialization; `text` remains the exact-lexeme transport representation.
+    public var canonicalText: String? { InkuCore.canonicalJSON(text) }
     public var text: String {
         switch self {
         case .object(let fields):

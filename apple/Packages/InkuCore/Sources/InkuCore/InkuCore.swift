@@ -156,6 +156,35 @@ public enum InkuCore {
     public static var rasterAPIVersion: String { InkuCoreBindings.rasterApiVersion() }
     public static var canvasRegistry: Data { Data(InkuCoreBindings.canvasRegistry().utf8) }
 
+    public static func descriptionHash(_ text: String) -> String {
+        InkuCoreBindings.descriptionHash(text: text)
+    }
+
+    public static func renderHash(itemJSON: String) -> String? {
+        InkuCoreBindings.renderHash(itemJson: itemJSON)
+    }
+
+    public static func canonicalJSON(_ valueJSON: String) -> String? {
+        InkuCoreBindings.canonicalJson(valueJson: valueJSON)
+    }
+
+    public static func resolveInstructionLanguage(text: String, requested: String?, fallback: String) -> String? {
+        InkuCoreBindings.resolveInstructionLanguage(text: text, requested: requested, fallback: fallback)
+    }
+
+    public static func normalizeInstructionLanguage(value: String?, defaultLanguage: String) -> String? {
+        InkuCoreBindings.normalizeInstructionLanguage(value: value, defaultLanguage: defaultLanguage)
+    }
+
+    public static func descriptionWithoutLabels(_ text: String) -> String {
+        InkuCoreBindings.descriptionWithoutLabels(text: text)
+    }
+
+    /// `[[start, end, kind], ...]`, with Unicode scalar offsets owned by the shared core.
+    public static func descriptionLabelSpans(_ text: String) -> Data {
+        Data(InkuCoreBindings.descriptionLabelSpans(text: text).utf8)
+    }
+
     public static func renderSeedWords(fromText text: String) throws -> (seed: String, text: String) {
         guard let derived = InkuCoreBindings.renderSeedFromText(seedText: text) else {
             throw CoreFailure.emptySeedText

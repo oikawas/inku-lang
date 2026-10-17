@@ -2,9 +2,11 @@
 
 このディレクトリは、macOS先行のnative SwiftUIクライアントとApple向け共通packageのworkspaceである。本書をSwift host固有の仕様正本とし、[SWIFT_SPEC.md](SWIFT_SPEC.md)を対応英語版とする。共有DDL、Score、prompt、authoring authority、pipeline状態遷移、seed、描画の意味は[製品仕様](../SPEC.ja.md)を正本とし、Serverを開発上のprimaryとして同じRust coreへ追随する。Swift側に意味処理を複製しない。
 
-最終更新: 2026-10-16。
+最終更新: 2026-10-17。
 
 binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。macOSアプリの版は`apple/VERSION`と`apple/BUILD_NUMBER`を正本とする独自の版で、Server／Webの版とは別に採番する（初回は1.0.0／Build 1）。対応するServerの版はアプリの「inkuについて」と変更履歴に併記する。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
+
+作品識別`dh1`／`rh3`・正準JSON、指示言語の正規化と判定、記述ラベルの本文と除外位置はUniFFI経由で共有coreを呼ぶ。Swiftには同じ規則を複製せず、coreが返すUnicode scalar位置だけをmacOSエディタのUTF-16位置へ変換する。保存済みの識別値を書き換えない。`ExactJSON.text`は数値の表記を保持する転送用、`canonicalText`はcoreによる正準形とし、prompt用の空白付き`pythonText`は別の書式として保持する。
 
 ## 更新ルール
 

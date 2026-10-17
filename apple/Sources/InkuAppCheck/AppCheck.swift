@@ -11,6 +11,17 @@ struct AppCheck {
         if CommandLine.arguments.contains("--core-version-only") {
             print(InkuCore.versionReport); return
         }
+        if let index = CommandLine.arguments.firstIndex(of: "--shared-core-step1-only") {
+            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Missing shared case directory") }
+            try await runSharedCoreStep1Checks(casesDirectory: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
+        }
+        if let index = CommandLine.arguments.firstIndex(of: "--work-identity-inventory") {
+            guard CommandLine.arguments.indices.contains(index + 2) else {
+                throw CheckFailure.message("Expected a disposable identity-check.sqlite copy and an output JSON path")
+            }
+            try await runWorkIdentityInventory(databaseURL: URL(fileURLWithPath: CommandLine.arguments[index + 1]),
+                outputURL: URL(fileURLWithPath: CommandLine.arguments[index + 2])); return
+        }
         if CommandLine.arguments.contains("--png-preferences-parity-only") {
             try runPNGPreferencesParityChecks(); return
         }

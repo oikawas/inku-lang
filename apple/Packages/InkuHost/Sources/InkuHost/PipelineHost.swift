@@ -359,7 +359,7 @@ public actor PipelineHost {
         }
         work.renderEngineID = rendered["metadata"]["render_engine_id"].string
         work.renderEngineVersion = rendered["metadata"]["render_engine_version"].string
-        work.renderHash = WorkIdentity.render(score: request["request"]["score"], options: options, metadata: rendered["metadata"])
+        work.renderHash = try WorkIdentity.render(score: request["request"]["score"], options: options, metadata: rendered["metadata"])
         let node = LineageNode(id: nodeID, historyID: id, at: now, descriptionHash: work.descriptionHash,
                                renderHash: work.renderHash, rootNodeID: plan.parentNode.rootNodeID ?? plan.parentNode.id)
         let edge = LineageEdge(id: UUID().uuidString, parentNodeID: plan.parentNode.id, childNodeID: nodeID,
@@ -472,7 +472,7 @@ public actor PipelineHost {
         if !request.models.stage2Model.isEmpty { work.stage2Model = request.models.stage2Model }
         work.variationAmplitude = compiler["stage15_variation"]["amplitude"].string
         work.variationSeed = compiler["stage15_variation"]["seed"].string
-        work.renderHash = WorkIdentity.render(score: score, options: options, metadata: rendered["metadata"])
+        work.renderHash = try WorkIdentity.render(score: score, options: options, metadata: rendered["metadata"])
         let node = LineageNode(id: nodeID, historyID: id, state: request.historyVisibility == "lineage_only" ? "lineage_only" : "active",
             at: now, descriptionHash: work.descriptionHash, renderHash: work.renderHash, rootNodeID: parentNode.rootNodeID ?? parentNode.id)
         let edge = LineageEdge(id: UUID().uuidString, parentNodeID: parentNodeID, childNodeID: nodeID,
@@ -1044,7 +1044,7 @@ private actor ExecutionDriver {
         let metadata = rendered["metadata"]
         let id = WorkIdentity.savedID(executionID: try executionID(), sequence: try snapshot.requiredString("sequence"))
         let nodeID = newID(); let now = Int64(Date().timeIntervalSince1970 * 1000)
-        let renderHash = WorkIdentity.render(score: score, options: options, metadata: metadata)
+        let renderHash = try WorkIdentity.render(score: score, options: options, metadata: metadata)
         let descriptionHash = WorkIdentity.description(state.description)
         let compiler = delivery["compiler_options"]
         let compositionSeed = score["composition_seed"].string ?? score["composition_seed"].number ?? compiler["composition_seed"].string

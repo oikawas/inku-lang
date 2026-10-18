@@ -47,6 +47,8 @@ struct CreationView: View {
     @State private var rightPanelWidth: CGFloat = 0
     @State private var savedProviders: [InkuHost.ProviderSettings] = []
     @State private var workspaceGeneration: (nodeID: String, value: Int)?
+    /// The 3D view's bridge; each appearance of the view mounts a new viewer through it.
+    @State private var ddl3d = Ddl3DController()
     @Environment(\.inkuWindowSize) private var windowSize
     private var isBatch: Bool { automation.workspaceInputMode == "batch" }
     private var batchWork: SavedWork? { batchWorkspace.pinnedWork ?? (batchWorkspace.followsLatest ? automation.observedWork : nil) }
@@ -72,17 +74,26 @@ struct CreationView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
-                if !ui.leftPanelCollapsed {
+                // The 3D full screen keeps only the canvas area (Web requests full screen for `.canvas-area`).
+                if !ui.leftPanelCollapsed && !ui.canvasFullScreen {
                     leftPanel.frame(width: leftPanelWidth).disabled(inlinePanel != nil)
                 }
-                leftPanelToggle
+                if !ui.canvasFullScreen { leftPanelToggle }
                 rightPanel
             }
             if display.visible("history") {
-                Rectangle().fill(InkuColor.border).frame(height: 1)
-                HistoryStripView(model: model, history: history, displayedWorkID: workspaceWork?.id,
-                                 onSelectWork: { _ in batchWorkspace.showHistory() })
-                    .disabled(inlinePanel != nil)
+                VStack(spacing: 0) {
+                    Rectangle().fill(InkuColor.border).frame(height: 1)
+                    HistoryStripView(model: model, history: history, displayedWorkID: workspaceWork?.id,
+                                     onSelectWork: { _ in batchWorkspace.showHistory() })
+                        .disabled(inlinePanel != nil)
+                }
+                // Folded rather than removed in the 3D full screen, so the strip's reads are not restarted.
+                .frame(height: ui.canvasFullScreen ? 0 : nil, alignment: .top)
+                .clipped()
+                .opacity(ui.canvasFullScreen ? 0 : 1)
+                .allowsHitTesting(!ui.canvasFullScreen)
+                .accessibilityHidden(ui.canvasFullScreen)
             }
         }
         .overlay(alignment: .trailing) {
@@ -492,7 +503,7 @@ struct CreationView: View {
 
     private var rightPanel: some View {
         VStack(spacing: 0) {
-            if display.visible("work_tools") && inlinePanel == nil { tabsRow }
+            if display.visible("work_tools") && inlinePanel == nil && !ui.canvasFullScreen { tabsRow }
             canvasArea
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -670,7 +681,8 @@ struct CreationView: View {
                           // Below about 740pt the capsule would sit on the right corner row (seven 34pt buttons).
                           zoomControlsAtTop: rightPanelWidth < 740 * display.preferences.textScale,
                           aspectRatio: workspaceWork?.renderCanvasAspectRatio, viewport: $ui.canvasViewport,
-                          rangePreview: usesBatchWork ? nil : model.rangePreview)
+                          rangePreview: usesBatchWork ? nil : model.rangePreview,
+                          replacement: threeDimensionalReplacement)
             CreationCanvasControls(model: model, corner: .left, work: workspaceWork, saved: hasSavedWorkspaceWork,
                                    disabled: controlsDisabled, browsingDisabled: browsingDisabled,
                                    generationInfoOpen: ui.generationInfoOpen,
@@ -680,6 +692,7 @@ struct CreationView: View {
             CreationCanvasControls(model: model, corner: .right, work: workspaceWork, saved: hasSavedWorkspaceWork,
                                    disabled: controlsDisabled, browsingDisabled: browsingDisabled,
                                    generationInfoOpen: ui.generationInfoOpen,
+                                   threeDimensional: workspaceWork != nil && Ddl3DInstallation.available ? $ui.canvasThreeDimensional : nil,
                                    onReplayWork: onReplayWork, onWorkAction: onWorkAction, onShowSaijiki: { ui.saijikiOpen.toggle() })
                 .padding(.trailing, 18).padding(.bottom, 14)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
@@ -688,6 +701,29 @@ struct CreationView: View {
                 .padding([.top, .trailing], 12)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         }
+    }
+
+    /// CanvasPanel `threeDimensionalContent`: the viewer in the picture's place while 3D is chosen and a work is shown.
+    /// Its first front view matches the picture where it stands (Web `initialView`).
+    private var threeDimensionalReplacement: ArtworkReplacement? {
+        #if os(macOS)
+        guard ui.canvasThreeDimensional, let work = workspaceWork, let registration = Ddl3DInstallation.registered else { return nil }
+        let controller = ddl3d, ui = ui
+        return ArtworkReplacement(zoom: controller.displayZoom, available: controller.ready && controller.failure == nil,
+                                  setZoom: { controller.zoom(to: $0) }, fit: { controller.reset() }) { _, box, scale, offset in
+            AnyView(Ddl3DCanvas(controller: controller, registration: registration, work: work,
+                                initialView: Ddl3DInitialView(pixelWidth: box.width * scale, pixelHeight: box.height * scale,
+                                                              panX: offset.width, panY: offset.height, zoom: scale),
+                                onReturn: { ui.canvasThreeDimensional = false },
+                                onEscape: {
+                                    // In the full screen, Esc leaves it first, as a browser's full screen does.
+                                    guard ui.canvasFullScreen else { return false }
+                                    ui.exitCanvasFullScreen(); return true
+                                }))
+        }
+        #else
+        return nil
+        #endif
     }
 
     /// Web `.unsaved-refinement-badge` at the top centre, with the native save and close actions.

@@ -1,5 +1,8 @@
 import CoreGraphics
 import Observation
+#if os(macOS)
+import AppKit
+#endif
 
 /// The workspace canvas's zoom and pan, kept while its view is rebuilt (Web `canvasViewport` lives on the page).
 /// `svgKey` names the picture it belongs to; another picture starts fitted.
@@ -19,6 +22,17 @@ final class WorkspaceUIState {
     var leftPanelCollapsed = false
     /// CanvasPanel `outputTab`: "artwork" or "lineage".
     var workspaceTab = "artwork"
+    /// `+page.svelte` canvasViewMode: the work tab shows the experimental 3D view instead of the picture. For the
+    /// session only, as on the Web; it starts in 2D.
+    var canvasThreeDimensional = false
+    /// The 3D view's full screen: the canvas area alone fills the window, which goes full screen.
+    var canvasFullScreen = false
+    /// The window was full screen before, so leaving the canvas full screen keeps the window's.
+    var canvasFullScreenKeepsWindow = false
+    #if os(macOS)
+    /// The window the canvas full screen was entered in.
+    @ObservationIgnored weak var canvasFullScreenWindow: NSWindow?
+    #endif
     /// HistoryManager `active`: the library covers the whole window.
     var libraryOpen = false
     var settingsOpen = false

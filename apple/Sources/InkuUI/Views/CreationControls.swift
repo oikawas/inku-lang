@@ -32,6 +32,8 @@ struct CreationCanvasControls: View {
     let disabled: Bool
     var browsingDisabled = false
     var generationInfoOpen = false
+    /// The 2D/3D switch, present only for a work with a bundled viewer (CanvasPanel `ddl3dViewer && result`).
+    var threeDimensional: Binding<Bool>? = nil
     let onReplayWork: (SavedWork) -> Void
     let onWorkAction: (SavedWork, String) -> Void
     let onShowSaijiki: () -> Void
@@ -103,6 +105,8 @@ struct CreationCanvasControls: View {
 
     private var outputControls: some View {
         HStack(spacing: 6) {
+            // CanvasArtworkWorkspace `leadingCornerControls`: before the hash, in every interface mode.
+            if let threeDimensional { Ddl3DModeButton(display: model.display, threeDimensional: threeDimensional) }
             if model.display.visible("detail_status"), let hash = work?.renderHash, !hash.isEmpty {
                 // CanvasArtworkWorkspace.svelte:278: the bubble says the copy happened, for 1.2 s.
                 Button { perform("copy-hash") } label: { Text("#").fontWeight(.semibold) }

@@ -5,6 +5,8 @@
 // 8273b3ef82b95ba1d729eed7a21a7755867bd3bf and reading removal at 074bc00a984c9a65cfbc31ae1cddd1f20503ca8e,
 // verified through d7cd05f7b1ae198fe62cac6d2497748f30446313: 168 sites remain; other mappings keep their baseline.
 // 2026-10-18 (Web Build1260): the share controls the single-user Web hides and the held note, a paragraph, are excluded.
+// 2026-10-18 (Web Build1267, 6ce57e952): the 3D experiment's two sites, the 2D/3D switch's Tooltip and the viewer
+// frame's `title=`, are added with the app's 3D view: 170 sites.
 
 /// One Web tooltip site and the Swift source that carries it, or why the single-user app has none.
 struct TooltipParityEntry {
@@ -75,6 +77,8 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "CanvasPresentationOverlay.svelte:103", swift: "Views/ContentView.swift", marker: "serverKey: \"canvasCaptionToggle\""),
     .init(web: "CanvasPresentationOverlay.svelte:127", swift: "Views/ContentView.swift", marker: "serverKey: \"canvasPresentationClose\""),
     .init(web: "DatabaseAdministrationSettings.svelte:146", swift: "Views/SettingsView.swift", marker: "serverKey: \"settingsDbBackupEstimatedDiskHint\""),
+    .init(web: "Ddl3DHost.svelte:62", swift: "Views/Ddl3DViews.swift", marker: "title: display.webCopy(\"ddl3dTitle\""),
+    .init(web: "Ddl3DModeSwitch.svelte:8", swift: "Views/Ddl3DViews.swift", marker: "serverKey: \"ddl3dReturn\") : display.tooltip(\"3D表示（実験）\", serverKey: \"ddl3dTitle\")"),
     .init(web: "DdlEditor.svelte:141", swift: "Views/DdlEditorPane.swift", marker: "serverKey: \"tooltipDdlLang\""),
     .init(web: "DdlViewer.svelte:38", swift: "Views/CreationControls.swift", marker: "serverKey: \"tooltipDdlLang\""),
     .init(web: "DdlViewer.svelte:46", swift: "Views/CreationControls.swift", marker: "serverKey: \"tooltipDdlEdit\""),

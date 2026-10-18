@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-18 — macOS: type a page number in the history strip
+
+Following the Web (Build 1272), the macOS history strip's page number is the Library's page field: Return goes to the typed page, out-of-range numbers land on the first or last page, and Escape puts the number back. Like the strip's arrows, it keeps the shown work. The bundled `ui-reference.json` is copied again from Build 1272.
+
 ### 2026-10-18 — macOS: retire random autonomous refinement and group the work edit menu
 
 Follows the Web (Build 1271; the grouping is Builds 1269–1270). macOS autonomous refinement no longer offers a method (random / AI Vision): Vision is the only one, its model and direction fields always show, and each generation draws the kind Vision chose. A method kept before is dropped; generations drawn at random before keep their record. The work edit menu has four sections under headings — Color and texture, Form and instructions, Redraw from the description, Leave it to AI — and the four items that always call the LLM carry an LLM badge. The bundled `ui-reference.json` is copied again from Build 1271.

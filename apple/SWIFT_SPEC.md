@@ -18,6 +18,10 @@ Options and replacements for Change the touches, Change the ground and Change th
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-18 Typed page numbers in the history strip
+
+Following Web Build 1272 (`60dfcf2db`), the history strip's page number is the Library's page field (`LibraryPageField`), at the author's instruction. Return or leaving the field goes to the typed page; out-of-range numbers land on the first or last page, and a non-number or Escape puts the shown page back. Search and mark filters are kept. The field takes no number while browsing is locked (demo or generation), a read is under way, or nothing is listed. It uses the strip's 11 pt. After the move the shown work stays, as with the strip's arrow buttons (the Web shows the target page's first work, but Swift's arrows still keep the shown work, so the field follows them). The bundled `ui-reference.json` is copied again from Build 1272 (no text changed).
+
 ## 2026-10-18 Random autonomous refinement retired, and the work edit menu grouped
 
 Follows the Web (`cc0972a71`, Build 1271; the grouping is Builds 1269–1270), at the author's request relayed by the Server Claude session.

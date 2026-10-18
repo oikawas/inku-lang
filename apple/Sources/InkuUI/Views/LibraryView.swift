@@ -29,7 +29,6 @@ struct LibraryView: View {
     @State private var modelLines = LibraryModelLineMemo()
     /// Keyboard focus by the reused card slot: a page turn changes no focus binding, only what the slot shows.
     @FocusState private var focusedSlot: Int?
-    @FocusState private var searchFocused: Bool
     @State private var previewComment = LibraryNoteEditorModel()
     private var library: LibraryModel { model.library }
     private var display: DisplaySettings { model.display }
@@ -261,24 +260,24 @@ struct LibraryView: View {
         }
     }
 
+    /// Web 0f579f3d8: drawn like the history strip's search (the same field, so the same box, type size and clear
+    /// button), its outside label becoming the placeholder and the label its spoken name. What it matches is unchanged.
     private var searchField: some View {
         @Bindable var library = library
-        return HStack(spacing: 6) {
-            Text(display.webCopy("historySearchLabel", "検索（記述 / ハッシュ値 / 作品ID）:"))
-                .inkuFont(12).foregroundStyle(.secondary).fixedSize()
-            HStack(spacing: 0) {
-                TextField("", text: $library.query).textFieldStyle(.plain).focused($searchFocused)
-                    .accessibilityLabel(display.webCopy("historySearchLabel", "検索（記述 / ハッシュ値 / 作品ID）:"))
-                    .padding(.leading, 7)
-                Button { library.query = ""; searchFocused = true } label: { Text("×").frame(width: 28, height: 26) }
-                    .buttonStyle(.plain).disabled(library.query.isEmpty)
-                    .accessibilityLabel(display.webCopy("historySearchClear", "検索をクリア"))
-            }
-            .inkuFont(12).frame(minWidth: 120, maxWidth: 240, minHeight: 28)
-            .background(LibraryChrome.panel2, in: RoundedRectangle(cornerRadius: 4))
-            .overlay(RoundedRectangle(cornerRadius: 4).stroke(LibraryChrome.border))
-            .inkuTooltip(display.webCopy("historySearchHint", "ハッシュ値と作品IDは全体か先頭部分、ハッシュ値は下位4桁でも検索できます。"), focus: .text)
+        let placeholder = display.webCopy("historySearchPlaceholder", "記述・ハッシュ・作品ID")
+        let label = display.webCopy("historySearchLabel", "検索（記述 / ハッシュ値 / 作品ID）")
+        return Group {
+            #if os(macOS)
+            InkuSearchField(value: $library.query, placeholder: placeholder, label: label, onCancel: onClose,
+                            onSearch: { library.query = $0 })
+                .inkuSearchFieldHeight()
+            #else
+            TextField(placeholder, text: $library.query).accessibilityLabel(label)
+            #endif
         }
+        // Web `.history-search`: flex 0 1 22rem, at least 10rem.
+        .frame(minWidth: 130, idealWidth: 286, maxWidth: 286)
+        .inkuTooltip(display.webCopy("historySearchHint", "ハッシュ値と作品IDは全体か先頭部分、ハッシュ値は下位4桁でも検索できます。"), focus: .text)
     }
 
     // MARK: Status rows (Web .history-selection-status, .history-selection-reset)

@@ -8,6 +8,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-18 — macOS: faster Library page turns
+
+Each page turn rebuilt all 56 cards three times and decoded the 56 thumbnails at once. A card is now rebuilt only when what it shows changes, decodes run four at a time, and the next page's thumbnails are read ahead. In an off-screen measurement (a disposable database of 600 works, 56 per page, no AX client), the main thread time of one turn went from 416 ms to 207 ms.
+
+- When taller cards made a page hold fewer works, the Library read the page again and jumped to other works. As on the Web, the first work now stays and the works that no longer fit start the next page; ← Newer then reaches the works before it.
+- Turning Library pages made the lineage show the revision marks of its works that were not on that page as off. The lineage now shows the marks it read itself.
+- The part that locates a tooltip is placed when the pointer or keyboard focus arrives. Tooltips look, read and sit as before.
+- The thumbnail memory limit grows from 96 MiB to 160 MiB (two pages of 512px thumbnails besides the history strip and the lineage).
+
 ### 2026-10-18 — macOS: save before one refinement option, restart the zoom drawing process, identify the binary in the failure log
 
 - Making one layout option now saves the checked unsaved candidates first, as Server does since 2026-10-17. Before this, macOS dropped the checked candidates without saving them.

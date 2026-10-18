@@ -137,13 +137,32 @@ func runDdl3DChecks(arguments: [String]) async throws {
     }
     print("Q3 arrived: digest \(arrived.inputDigest) equals Swift's SHA-256 of the snapshot; objects \(arrived.objectCount), triangles \(arrived.triangles)")
 
+    // The work tab's SwiftUI host: the representable mounts its own viewer and `onChange` hands it the snapshot.
+    let hosted = Ddl3DController()
+    guard let host = Ddl3DProbe.hostingView(work: work, controller: hosted, display: DisplaySettings(),
+                                            initialView: Ddl3DInitialView(pixelWidth: 560, pixelHeight: 400, panX: 0, panY: 0, zoom: 1),
+                                            onReturn: {}) else { throw CheckFailure.message("No 3D hosting view") }
+    let viewWindow = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .resizable],
+                              backing: .buffered, defer: false)
+    viewWindow.isReleasedWhenClosed = false
+    host.frame = NSRect(origin: .zero, size: size)
+    viewWindow.contentView = host
+    defer { viewWindow.contentView = nil; viewWindow.close() }
+    let viewAfter = try await wait("rendered through the SwiftUI host", seconds: 16) { hosted.lastRendered != nil || hosted.failure != nil }
+    guard let viaView = hosted.lastRendered, viaView.inputDigest == sha256(snapshot), viaView.objectCount == 9,
+          !hosted.preparing, hosted.failure == nil, hosted.mountID != controller.mountID else {
+        throw CheckFailure.message("The SwiftUI host did not render the work: \(String(describing: hosted.lastRendered)), failure \(hosted.failure ?? "-")")
+    }
+    print("View: the SwiftUI host (a window of this process, never ordered in) mounted \(hosted.mountID) and rendered the snapshot "
+          + "in \(ms(viewAfter)) ms with the same digest; objects \(viaView.objectCount)")
+
     // Q5 conditions: what carried the module Worker and WASM.
     print("Q5: module Worker and WASM loaded through inku-3d:// (\(window == nil ? "no window" : "a window outside the screens")); "
           + "\(ms(clock.now - mountedAt)) ms in all; console lines \(console.lines.count)")
     if !console.lines.isEmpty { print("Console: " + console.lines.prefix(20).joined(separator: " | ")) }
     print("3D bridge passed: Q1 rendered \(first.objectCount) objects with the same digest in \(ms(renderedAfter)) ms; Q2 failed (\(reason)) "
           + "and retried under a new mount; Q3 \(keys.count) of \(webFields.count) Web fields, seeds as decimal text, digest equal; "
-          + "Q5 scheme, module Worker and WASM.")
+          + "the SwiftUI host rendered the same snapshot; Q5 scheme, module Worker and WASM.")
 }
 
 /// The pages' console and errors, for a failure report only (the product page installs no such script).

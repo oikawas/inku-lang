@@ -151,4 +151,16 @@ struct Ddl3DCanvas: View {
         .accessibilityElement(children: .contain)
     }
 }
+
+/// InkuAppCheck `--ddl3d-only`: the work tab's 3D view alone in a hosting view, built as CreationView builds it.
+@MainActor
+public enum Ddl3DProbe {
+    public static func hostingView(work: SavedWork, controller: Ddl3DController, display: DisplaySettings,
+                                   initialView: Ddl3DInitialView, onReturn: @escaping () -> Void) -> NSView? {
+        guard let registration = Ddl3DInstallation.registered else { return nil }
+        return NSHostingView(rootView: Ddl3DCanvas(controller: controller, registration: registration, work: work,
+                                                   initialView: initialView, onReturn: onReturn, onEscape: { false })
+            .environment(display))
+    }
+}
 #endif

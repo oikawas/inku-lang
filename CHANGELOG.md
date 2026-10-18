@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-18 — Group the work-editing menu lightest first and mark the items that call the LLM
-
-The ten items of the work-editing menu (`Refine` on the Work tab, `…` in Lineage) were ungrouped: the color items and the description items were mixed, and the Instruction editor sat among the description items (the author: hard to use in no clear order). They now run lightest first in four groups, each under a small heading and a rule: Color and texture (catalog, color arrangement, ground, touches), Form and instructions (composition, Instruction editor), Redraw from the description (description, sketch from life, model), and Leave it to the AI (Autonomous refinement process). The four items that always call the LLM carry a small LLM mark. Another composition and the Instruction editor call it only to fill a hole left in the instructions, so they carry none. The items' names and actions are unchanged.
-
 ### 2026-10-18 — Review Android navigation and the making of a work
 
 Fixes for problems a code and on-device review found. An unsaved refinement candidate could become the parent of a work drawn from another work. Moving to another work during a drawing silently stopped the batch, the demo or the drawing. Paint after editing the instructions by hand discarded the edits without asking. A batch ended without drawing its remaining lines when one line stopped in the pipeline. A drawing running on the lineage screen showed no progress. A refused new service closed its dialog and lost what was typed. A proposal waiting for approval was hidden by Studio or the full screen. A camera drawing that stopped lost its Retry and Cancel. The full screen's ‹ and › now go the way the swipe and web do, its ⋯ menu has Export and Generation info, and the canvas work search has a visible entry. Closing the keyboard brings the bottom bar back, and Back leaves the trash view first. From the on-device review: with a ChatGPT plan model selected the camera failed right after the shutter with no reason, and now stops before the capture and says why; back went to a work opened earlier; Change description on a refinement child could not be edited; stopping a drawing showed a red transport error; Sign out had no confirmation. By the author's decision, dropping unsaved refinement candidates or instructions edited on a saved work now always asks first, and a long press on a work card no longer toggles its star. See the 2026-10-18 section of `android/ANDROID_SPEC.md`.
@@ -142,6 +138,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.193 (2026-10-18 / Build 1269)
+
+### 2026-10-18 — Group the work-editing menu lightest first and mark the items that call the LLM
+
+The ten items of the work-editing menu (`Refine` on the Work tab, `…` in Lineage) were ungrouped: the color items and the description items were mixed, and the Instruction editor sat among the description items (the author: hard to use in no clear order). They now run lightest first in four groups, each under a small heading and a rule: Color and texture (catalog, color arrangement, ground, touches), Form and instructions (composition, Instruction editor), Redraw from the description (description, sketch from life, model), and Leave it to the AI (Autonomous refinement process). The four items that always call the LLM carry a small LLM mark. Another composition and the Instruction editor call it only to fill a hole left in the instructions, so they carry none. The items' names and actions are unchanged.
 
 ## v2.15.192 (2026-10-18 / Build 1268)
 

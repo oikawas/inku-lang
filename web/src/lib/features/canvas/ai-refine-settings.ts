@@ -2,11 +2,10 @@
 // time (author's request, 2026-09-28). Kept in this browser, like the export
 // settings; the Vision model is not here -- it is an account setting already.
 // The wild switch is not kept: it follows the work being refined.
-
-export type AiRefineMode = 'random' | 'vision';
+// There is no method to keep: random refinement was removed (the author,
+// 2026-10-18), and a method kept from before is dropped like any unknown field.
 
 export type AiRefineSettings = {
-	mode: AiRefineMode;
 	generations: number;
 	color: boolean;
 	layout: boolean;
@@ -14,7 +13,6 @@ export type AiRefineSettings = {
 };
 
 export const DEFAULT_AI_REFINE_SETTINGS: AiRefineSettings = {
-	mode: 'random',
 	generations: 5,
 	color: true,
 	layout: true,
@@ -36,7 +34,6 @@ export function parseAiRefineSettings(raw: string | null): AiRefineSettings {
 	const flag = (key: keyof AiRefineSettings, fallback: boolean) => (typeof stored[key] === 'boolean' ? stored[key] as boolean : fallback);
 	const generations = stored.generations;
 	return {
-		mode: stored.mode === 'vision' || stored.mode === 'random' ? stored.mode : d.mode,
 		generations: Number.isInteger(generations) && (generations as number) >= 1 && (generations as number) <= 10 ? generations as number : d.generations,
 		color: flag('color', d.color),
 		layout: flag('layout', d.layout),

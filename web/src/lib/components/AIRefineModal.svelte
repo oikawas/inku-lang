@@ -16,7 +16,6 @@
   import type { ComposeLayoutGeneration } from '$lib/features/canvas/recomposition';
   import { wildOverride as wildRenderOverride } from '$lib/features/wild/render';
 
-  type RefineMode = 'random' | 'vision';
   // The choices made last time (kept in this browser).
   const saved = loadAiRefineSettings();
   type VisionAdvice = { observation: string; next_direction: string; suggested_kind: string; model: string };
@@ -42,13 +41,12 @@
   }
   let prompt = $state(saved.direction);
   let generations = $state(saved.generations);
-  let refineMode = $state<RefineMode>(saved.mode);
   let selectedVisionModel = $state('');
   let enableColor = $state(saved.color);
   let enableLayout = $state(saved.layout);
   $effect(() => {
     saveAiRefineSettings({
-      mode: refineMode, generations, color: enableColor, layout: enableLayout,
+      generations, color: enableColor, layout: enableLayout,
       direction: prompt
     });
   });
@@ -69,8 +67,8 @@
   // A work its edited DDL holds is not read again from its description. Every
   // generation of any work is drawn from the parent's DDL, and Vision's advice
   // only picks the element, so Vision is offered here too (the author, 2026-10-14).
+  // Vision is the only method: random refinement was removed (the author, 2026-10-18).
   const held = $derived(node.history?.description_locked === true);
-  const mode = $derived<RefineMode>(refineMode);
 
   $effect(() => { if (!selectedVisionModel) selectedVisionModel = visionModel; });
 
@@ -85,12 +83,8 @@
     }
     return selectedVisionModel;
   });
-  // Vision mode is the only mode with a picker, so it is the only mode whose
-  // runs are drawn by a model the reader named. Random mode keeps the page's
-  // setting, which is the only thing it was ever offered.
-  const paintModelOverride = $derived(
-    mode === 'vision' && selectedVisionModel ? selectedVisionModel : null
-  );
+  // The runs are drawn by the model the reader named in the picker.
+  const paintModelOverride = $derived(selectedVisionModel || null);
   onDestroy(() => {
     abortController?.abort();
     // Abort-aware work normally stops this in finally, but a collaborator may
@@ -123,7 +117,7 @@
 
   async function startRefinement() {
     if (activeKinds.length === 0) { errorText = t().aiRefineMinElementsError; return; }
-    if (mode === 'vision' && (!selectedVisionModel || !node.history?.id)) { errorText = t().aiRefineVisionSourceError; return; }
+    if (!selectedVisionModel || !node.history?.id) { errorText = t().aiRefineVisionSourceError; return; }
     running = true;
     refineTokensIn = null;
     refineTokensOut = null;
@@ -152,12 +146,16 @@
       wild: node.history?.render_wild === true
     };
     let advice: VisionAdvice | null = null;
+    // A work drawn straight from DDL has no description: Vision is shown its
+    // instructions instead (as macOS does), not an empty text the server refuses.
+    const visionInstruction = () => currentText || parent.ddl;
 
     try {
-      if (mode === 'vision') advice = await readVisionAdvice(node.history!.id!, currentText);
+      advice = await readVisionAdvice(node.history!.id!, visionInstruction());
       for (let i = 0; i < generations; i++) {
         currentStep = i + 1;
-        let kind = mode === 'vision' && advice ? advice.suggested_kind : activeKinds[Math.floor(Math.random() * activeKinds.length)];
+        // Vision's advice names the element; nothing here draws it at random.
+        let kind = advice?.suggested_kind ?? activeKinds[0];
         if (!activeKinds.includes(kind)) kind = activeKinds[0];
         statusText = t().aiRefineStepStatus(generations, currentStep, kindLabel(kind));
 
@@ -165,7 +163,7 @@
           lineageParentNodeId: parentNodeId,
           derivationKind: kind,
           derivationMetadata: {
-            autonomous_refine_mode: mode,
+            autonomous_refine_mode: 'vision',
             ...(advice ? { vision_model: advice.model, vision_observation: advice.observation, vision_next_direction: advice.next_direction } : {})
           },
           // The catalog and the wild switch travel as render overrides, which is
@@ -213,7 +211,7 @@
           ddlSourceOrigin: result.ddl_source_origin ?? parent.ddlSourceOrigin,
           wild: result.render_wild ?? parent.wild
         };
-        if (mode === 'vision' && result.history_id) advice = await readVisionAdvice(result.history_id, currentText);
+        if (result.history_id) advice = await readVisionAdvice(result.history_id, visionInstruction());
       }
       statusText = t().aiRefineCompleted;
       await onLoadBranch(node.id);
@@ -253,16 +251,16 @@
         </RunStatus>
       {:else}
         {#if held}<p class="held-note">{t().aiRefineHeldNote}</p>{/if}
-        <fieldset class="mode-choice"><legend>{t().aiRefineModeLabel}</legend><label><input type="radio" name="ai-refine-mode" value="random" checked={mode === 'random'} onchange={() => (refineMode = 'random')} /><span><b>{t().aiRefineRandomMode}</b><small>{t().aiRefineRandomModeHint}</small></span></label><label><input type="radio" name="ai-refine-mode" value="vision" checked={mode === 'vision'} onchange={() => (refineMode = 'vision')} /><span><b>{t().aiRefineVisionMode}</b><small>{t().aiRefineVisionModeHint}</small></span></label></fieldset>
-        {#if mode === 'vision'}<ModelCardPicker label={t().aiRefineVisionModel} selectedModel={selectedVisionModel} providerGroups={visionProviderGroups} purpose="vision" onSelect={(provider: Provider, model: string) => { selectedVisionModel = qualifiedModelId(provider, model); void onSaveVisionModel(provider, model); }} />{/if}
-        {#if mode === 'vision'}<div class="form-group"><label for="ai-direction">{t().aiRefineDirectionLabel}</label><textarea id="ai-direction" placeholder={t().aiRefineDirectionPlaceholder} bind:value={prompt} maxlength="160" rows="2"></textarea></div>{/if}
+        <p class="method-note">{t().aiRefineVisionModeHint}</p>
+        <ModelCardPicker label={t().aiRefineVisionModel} selectedModel={selectedVisionModel} providerGroups={visionProviderGroups} purpose="vision" onSelect={(provider: Provider, model: string) => { selectedVisionModel = qualifiedModelId(provider, model); void onSaveVisionModel(provider, model); }} />
+        <div class="form-group"><label for="ai-direction">{t().aiRefineDirectionLabel}</label><textarea id="ai-direction" placeholder={t().aiRefineDirectionPlaceholder} bind:value={prompt} maxlength="160" rows="2"></textarea></div>
         <div class="form-row"><div class="form-group wild-group"><span class="wild-group-label">&nbsp;</span><WildToggle value={wildOverride ?? parentWild} {isJapanese} inherited={wildOverride === null} onSelect={(next) => (wildOverride = next)} /></div><div class="form-group select-generations"><label for="ai-gens">{t().aiRefineGensLabel}</label><div class="gen-stepper"><button type="button" aria-label="−" onclick={() => (generations = Math.max(1, generations - 1))} disabled={generations <= 1}>−</button><span id="ai-gens" class="gen-value">{generations}</span><button type="button" aria-label="＋" onclick={() => (generations = Math.min(10, generations + 1))} disabled={generations >= 10}>＋</button></div></div></div>
         <details class="advanced-settings" open><summary>{t().aiRefineElementsLabel}</summary><div class="checkbox-group"><Tooltip placement="bottom" text={t().refineCostColor}><label><input type="checkbox" bind:checked={enableColor} /><span>{t().canvasVaryColor}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostLayout}><label><input type="checkbox" bind:checked={enableLayout} /><span>{t().canvasVaryComposition}</span></label></Tooltip></div></details>
       {/if}
       {#if latestAdvice}<section class="vision-advice"><h4>{t().aiRefineVisionObservation}</h4><p>{latestAdvice.observation}</p><h4>{t().aiRefineVisionDirection}</h4><p>{latestAdvice.next_direction}</p></section>{/if}
       {#if errorText}<div class="error-banner">{errorText}</div>{/if}
     </div>
-    <footer>{#if !running}<button class="cancel-action" type="button" onclick={onClose}>{t().confirmCancel}</button><button class="confirm-action" type="button" disabled={activeKinds.length === 0 || (mode === 'vision' && (!selectedVisionModel || !node.history?.id)) || !node.history?.ddl} onclick={startRefinement}>{t().aiRefineStartButton}</button>{/if}</footer>
+    <footer>{#if !running}<button class="cancel-action" type="button" onclick={onClose}>{t().confirmCancel}</button><button class="confirm-action" type="button" disabled={activeKinds.length === 0 || !selectedVisionModel || !node.history?.id || !node.history?.ddl} onclick={startRefinement}>{t().aiRefineStartButton}</button>{/if}</footer>
   </div>
 </div>
 
@@ -273,8 +271,7 @@
   .close-btn { border:0; background:transparent; color:var(--fg3); font-size:1.4rem; cursor:pointer; padding:0 4px; }
   .modal-body { padding:18px; min-height:200px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; max-height:68vh; }
   .held-note { margin:0; padding:8px 10px; border:1px solid var(--border); border-radius:var(--r); background:var(--bg2); color:var(--fg2); font-size:.78rem; line-height:1.55; }
-  .mode-choice { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:0; padding:0; border:0; } .mode-choice legend { margin-bottom:6px; color:var(--fg3); font-size:.76rem; font-weight:500; }
-  .mode-choice label { display:flex; align-items:flex-start; gap:8px; padding:10px; border:1px solid var(--border2); border-radius:8px; background:var(--bg2); cursor:pointer; } .mode-choice input { margin-top:2px; accent-color:var(--accent); } .mode-choice span { display:grid; gap:3px; } .mode-choice b { font-size:.78rem; } .mode-choice small { color:var(--fg3); font-size:.68rem; line-height:1.35; }
+  .method-note { margin:0; color:var(--fg2); font-size:.76rem; line-height:1.5; }
   .form-group { display:flex; flex-direction:column; gap:6px; } .form-group label { font-size:.76rem; color:var(--fg3); font-weight:500; }
   textarea { box-sizing:border-box; width:100%; border:1px solid var(--border2); border-radius:6px; padding:8px 10px; background:var(--bg); color:var(--fg); font:inherit; font-size:.82rem; resize:none; line-height:1.4; }
   .form-row { display:flex; gap:12px; } .select-generations { width:120px; }
@@ -290,5 +287,4 @@
   .vision-advice { padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg2); } .vision-advice h4 { margin:0 0 3px; color:var(--fg3); font-size:.68rem; } .vision-advice p { margin:0 0 8px; color:var(--fg2); font-size:.76rem; line-height:1.45; } .vision-advice p:last-child { margin-bottom:0; }
   .error-banner { padding:8px 12px; background:color-mix(in srgb,var(--danger,#9b3d32) 10%,var(--panel)); border:1px solid var(--danger,#9b3d32); border-radius:6px; color:var(--danger,#9b3d32); font-size:.74rem; line-height:1.35; white-space:pre-line; }
   footer { display:flex; align-items:center; justify-content:flex-end; gap:8px; padding:12px 18px; border-top:1px solid var(--border); background:var(--bg2); } footer button { border:1px solid var(--border2); border-radius:6px; padding:7px 14px; font-size:.8rem; font-weight:500; cursor:pointer; background:var(--panel); color:var(--fg); } .confirm-action { background:var(--action-bg); color:var(--action-fg); border-color:var(--action-bg); } .confirm-action:hover:not(:disabled) { background:var(--action-hover); border-color:var(--action-hover); } .confirm-action:disabled { opacity:.5; cursor:default; } .cancel-action:hover { background:var(--bg); }
-  @media (max-width:560px) { .mode-choice { grid-template-columns:1fr; } }
 </style>

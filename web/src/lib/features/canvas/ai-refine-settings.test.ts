@@ -6,11 +6,18 @@ import { DEFAULT_AI_REFINE_SETTINGS, parseAiRefineSettings } from './ai-refine-s
 
 test('the autonomous refinement dialog drops retired variation choices and keeps the remaining choices', () => {
 	const kept = {
-		mode: 'vision', generations: 8, color: true, layout: false,
+		generations: 8, color: true, layout: false,
 		direction: '青を強く'
 	};
 	// The touch and the reading were removed (2026-10-14); a choice kept from before is dropped like the others.
 	assert.deepEqual(parseAiRefineSettings(JSON.stringify({ ...kept, variation: true, amplitude: 'large', touch: true, reading: false })), kept);
+});
+
+test('a method kept from before random refinement was removed is dropped (the author, 2026-10-18)', () => {
+	const kept = { generations: 3, color: true, layout: true, direction: '' };
+	assert.deepEqual(parseAiRefineSettings(JSON.stringify({ ...kept, mode: 'random' })), kept);
+	assert.deepEqual(parseAiRefineSettings(JSON.stringify({ ...kept, mode: 'vision' })), kept);
+	assert.equal('mode' in DEFAULT_AI_REFINE_SETTINGS, false);
 });
 
 test('nothing kept, or something unreadable, opens with the defaults field by field', () => {

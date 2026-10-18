@@ -9,12 +9,9 @@ Variation was retired on 2026-10-04. Once the focus reinterpretation was removed
 
 ## Letting the AI carry it
 
-Instead of picking the axis yourself, you can hand the act of accumulating generations to the AI. There are two modes.
+Instead of picking the axis yourself, you can hand the act of accumulating generations to the AI. AI Vision observes each image, and its advice chooses the next element to change; observations and the next direction are displayed and recorded. The mode that picked an axis at random for each generation was retired on 2026-10-18.
 
-- **Random automatic refinement** — each generation picks an axis at random from the ones you allowed
-- **AI Vision automatic refinement** — each image is observed, and the advice chooses the next element to change; observations and the next direction are displayed and recorded
-
-Only the Vision method accepts a direction of your own (a sentence such as "festive, and yet cool"), using it for observational advice. Both methods draw from the parent's saved instructions without appending the direction to the drawing text or running the sketch again. Everything born while the AI runs is still recorded in the lineage, so you can pick a drawing from the middle of the run and go back to redrawing it by hand.
+You can give a direction of your own (a sentence such as "festive, and yet cool"), used for observational advice. Each generation is drawn from the parent's saved instructions without appending the direction to the drawing text or running the sketch again. Everything born while the AI runs is still recorded in the lineage, so you can pick a drawing from the middle of the run and go back to redrawing it by hand.
 
 ## Accumulating generations
 

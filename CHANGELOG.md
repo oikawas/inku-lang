@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-18 — Retire random autonomous refinement
+
+The autonomous refinement process's "Random automatic refinement" chose, for each generation, whether to change the color catalog or the layout at random. The author does not want a feature that rolls dice on its own, so it was retired (the author's request). The dialog no longer offers a method: Vision automatic refinement is the only one, and the Vision model and direction fields are always shown. A method the dialog remembered from before is dropped. For a work drawn straight from DDL (an empty description), the dialog could send Vision an empty text the server refuses; it now shows Vision the instructions in place of the description, as macOS does. Generations an earlier random run recorded (`autonomous_refine_mode: random`) stay readable. The autonomous refinement itself is planned to be rebuilt separately.
+
 ### 2026-10-18 — macOS: copy the 3D viewer from its one place on the Web at build time
 
 The experimental 3D view's only source is now the Web's registered distribution (`web/static/experimental/ddl-3d/<build>/`), and the macOS app's copy left Git. A new Web registration needs no Swift copy or commit; the next build carries it.

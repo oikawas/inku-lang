@@ -4659,14 +4659,14 @@ archive](docs/history/changelog-v1.72-v2.4.md).
 
 ## Autonomous Refinement Methods
 
-Lineage's autonomous refinement is a bounded run of 1–10 generations whose final judgment remains human. Before starting, the user chooses one method:
+Lineage's autonomous refinement is a bounded run of 1–10 generations whose final judgment remains human. Its only method is `AI Vision automatic refinement`. `Random automatic refinement`, which chose each generation's refinement kind at random, was retired on 2026-10-18 by the author's decision (the author does not want a feature that rolls dice on its own). Generations an earlier random run recorded (`autonomous_refine_mode: random`) stay readable.
 
-- `Random automatic refinement` randomly chooses each generation's refinement kind from the enabled color-catalog and layout elements. It does not use Vision, and it shows no direction field, since no generation would receive it (2026-10-14).
-- `AI Vision automatic refinement` lets the user explicitly choose a Vision model from provider-grouped cards. During that run, the selected model serves both Stage 1 / Stage 2 generation and Vision advice, while those three roles and their prompts remain separate. The server rasterizes each saved generation to PNG and sends it with the original instruction, user direction, and allowed refinement kinds. Vision returns visible observations, one direction to try next, and one allowed refinement kind. The next generation is drawn with that kind; the direction is recorded and shown but not added to the drawing.
+- The user explicitly chooses a Vision model from provider-grouped cards. During that run, the selected model serves both Stage 1 / Stage 2 generation and Vision advice, while those three roles and their prompts remain separate. The server rasterizes each saved generation to PNG and sends it with the original instruction, user direction, and allowed refinement kinds. Vision returns visible observations, one direction to try next, and one allowed refinement kind. The next generation is drawn with that kind; the direction is recorded and shown but not added to the drawing.
+- For a work with an empty description (a work drawn straight from DDL), its saved instructions are sent to Vision in place of the original instruction.
 
 No generation reads the description again. A layout generation recomposes the parent's saved instructions and passes the parent's sketch prose, when there is one, without running the layer. A color generation draws the parent's saved instructions in another color catalog (until 2026-10-14 a work with a description was drawn again from Stage 1). The Describe tab's Sketch from life setting is not used.
 
-Either method can enable two refinement elements: color catalog and layout (variation was retired on 2026-10-04, and touch and reading on 2026-10-14, §12.13 / §8.4).
+The run can enable two refinement elements: color catalog and layout (variation was retired on 2026-10-04, and touch and reading on 2026-10-14, §12.13 / §8.4).
 
 The Vision method is a finite advisory loop, not quality optimization or automatic acceptance. Vision must not score, rank, accept, reject, praise, condemn, or discard a generated work. Intermediate generations remain `lineage_only`, the final generation enters regular history, and all generations remain in lineage. Derivation metadata records the method, Vision model, observation, and next direction, while the modal shows the latest advice. The model may be changed between runs but remains fixed during one run. Only the human may save, promote, star, or finally choose a work.
 

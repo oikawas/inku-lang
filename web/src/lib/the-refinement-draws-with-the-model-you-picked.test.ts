@@ -49,18 +49,20 @@ test('T-166  the run status names the model the run is drawing with', () => {
 	assert.match(MODAL, /stage2Model=\{paintModelOverride \? selectedVisionLabel : stage2ModelLabel\}/);
 });
 
-test('T-167  random mode is left alone, because it never offered a choice', () => {
-	// The picker only exists in vision mode. Overriding the models in random
-	// mode would change what that mode draws with, which nobody asked for.
-	assert.match(MODAL, /mode === 'vision' && selectedVisionModel \? selectedVisionModel : null/);
-	assert.match(MODAL, /\{#if mode === 'vision'\}<ModelCardPicker/);
+test('T-167  the picker is always offered, and the run draws with the model it names', () => {
+	// Random refinement was removed (the author, 2026-10-18): Vision is the only
+	// method, so the picker is no longer behind a method choice.
+	assert.match(MODAL, /const paintModelOverride = \$derived\(selectedVisionModel \|\| null\);/);
+	assert.match(MODAL, /\n\s*<ModelCardPicker label=\{t\(\)\.aiRefineVisionModel\}/);
+	assert.doesNotMatch(MODAL, /\{#if mode === 'vision'\}/);
 });
 
 test('a work its edited DDL holds offers the Vision method too (the author, 2026-10-14)', () => {
 	// Every generation is drawn from the parent's DDL and Vision only picks the
-	// element, so holding the description is no reason to withhold Vision.
-	assert.match(MODAL, /const mode = \$derived<RefineMode>\(refineMode\);/);
-	const visionRadio = MODAL.match(/<input type="radio" name="ai-refine-mode" value="vision"[^>]*>/)?.[0] ?? '';
-	assert.ok(visionRadio, 'the Vision radio was not found');
-	assert.doesNotMatch(visionRadio, /disabled/);
+	// element, so holding the description is no reason to withhold Vision. With
+	// no method to choose, the hold only adds its note and disables nothing.
+	assert.match(MODAL, /\{#if held\}<p class="held-note">\{t\(\)\.aiRefineHeldNote\}<\/p>\{\/if\}/);
+	const start = MODAL.match(/<button class="confirm-action"[^>]*>/)?.[0] ?? '';
+	assert.ok(start, 'the start button was not found');
+	assert.doesNotMatch(start, /held/);
 });

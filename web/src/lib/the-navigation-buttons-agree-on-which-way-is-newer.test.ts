@@ -438,26 +438,32 @@ async function managerAt(pageSize: number, page: number) {
 }
 
 // ── T-17 ────────────────────────────────────────────────────────────────────
-test('T-17  a modal that gets smaller fetches the works its numbers now name', async () => {
-	// Measured before the fix: the grid going from 52 to 40 moved offset from 156
-	// to 120 and fetched nothing, so the modal said "121-160" over works 156-207.
+test('T-17  a modal that gets smaller keeps its first work and fetches nothing it holds', async () => {
+	// Measured before the first fix: the grid going from 52 to 40 moved offset
+	// from 156 to 120 and fetched nothing, so the modal said "121-160" over works
+	// 156-207. Since 2026-10-17 (f03146c24) a change of size keeps the first work
+	// rather than the page number, so the numbers and the works stay at 156, and
+	// the 52 works in hand already hold the 40 now shown.
 	const { manager, offsets } = await managerAt(52, 3);
 	manager.setPageSize(40);
 	await settle();
 	refreshDerived(manager);
-	assert.equal(offsets.length, 1, `expected one fetch, got ${JSON.stringify(offsets)}`);
-	assert.equal(manager.offset, 120);
+	assert.deepEqual(offsets, [], `expected no fetch, got ${JSON.stringify(offsets)}`);
+	assert.equal(manager.offset, 156);
 	assert.equal(numberOf(manager.items[0]), manager.offset);
+	assert.equal(manager.items.length, 40);
 });
 
 // ── T-18 ────────────────────────────────────────────────────────────────────
-test('T-18  and so does one that gets bigger', async () => {
-	const { manager } = await managerAt(40, 3);
+test('T-18  and one that gets bigger keeps it too, fetching the works it lacks', async () => {
+	const { manager, offsets } = await managerAt(40, 3);
 	manager.setPageSize(52);
 	await settle();
 	refreshDerived(manager);
-	assert.equal(manager.offset, 156);
+	assert.deepEqual(offsets, [120], `expected one fetch at 120, got ${JSON.stringify(offsets)}`);
+	assert.equal(manager.offset, 120);
 	assert.equal(numberOf(manager.items[0]), manager.offset);
+	assert.equal(manager.items.length, 52);
 });
 
 // ── T-19 ────────────────────────────────────────────────────────────────────
@@ -469,26 +475,30 @@ test('T-19  a page size that has not changed costs nothing', async () => {
 });
 
 // ── T-20 ────────────────────────────────────────────────────────────────────
-test('T-20  a request still out does not answer for a different place in the listing', async () => {
+test('T-20  a request still out does not answer for a page bigger than it asked for', async () => {
 	// The duplicate-request guard is what makes opening the manager cost one page
-	// instead of two, and it used to match on the page number. A page number is a
-	// place divided by a page size, and when the size changes underneath it the
-	// same number names somewhere else -- so the request for 120 was dropped as
-	// already-asked and the answer for 156 arrived in its place.
+	// instead of two. It used to match on the page number, which names another
+	// place once the size changes; it matches the place and the size now. With
+	// the first work kept (f03146c24) the place stays, so what can differ is the
+	// size: a request for 40 still out cannot stand for a page of 52.
 	const made = makeCorpusManager();
-	made.manager.seedFromStrip([], CORPUS_TOTAL, 0, 52);
+	made.manager.seedFromStrip([], CORPUS_TOTAL, 0, 40);
 	refreshDerived(made.manager);
 
-	made.hold(156);
+	made.hold(120);
 	made.manager.setPage(3);
 	await settle();
-	assert.deepEqual(made.offsets, [156], 'setup: the page-3 request did not go out and hang');
+	assert.deepEqual(made.offsets, [120], 'setup: the page-3 request did not go out and hang');
 
-	made.manager.setPageSize(40);
+	made.manager.setPageSize(52);
 	await settle();
-	assert.ok(made.offsets.includes(120), `offset 120 was never asked for: ${JSON.stringify(made.offsets)}`);
+	assert.deepEqual(made.offsets, [120, 120], `the page of 52 was never asked for: ${JSON.stringify(made.offsets)}`);
 	made.release();
 	await settle();
+	refreshDerived(made.manager);
+	assert.equal(made.manager.offset, 120);
+	assert.equal(numberOf(made.manager.items[0]), 120);
+	assert.equal(made.manager.items.length, 52, 'the late answer for 40 overwrote the page of 52');
 });
 
 // ── T-21 ────────────────────────────────────────────────────────────────────

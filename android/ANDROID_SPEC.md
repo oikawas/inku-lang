@@ -6,6 +6,15 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-10-18.
 
+## 2026-10-18 Random autonomous refinement retired
+
+By the author's decision (no feature that rolls the dice on its own), a work's "Autonomous refinement" no longer offers the random method. The source of truth is "Autonomous refinement methods" in the root `SPEC.md`; this follows Web's `cc0972a71` at Serverセッション-claude's request and supersedes "random or Vision" in the 2026-10-17 section.
+
+- No method is offered. The Vision model and the direction are always shown, and starting needs a Vision model.
+- Each generation's element is Vision's `suggested_kind`; an element that is not allowed falls back to the first allowed one. Nothing draws it at random.
+- For a work with an empty description (drawn straight from DDL), Vision receives the saved instructions in place of the original text, as on Web and macOS.
+- New generations record `autonomous_refine_mode: vision` only. Generations made with the random method keep `random` and stay readable.
+
 ## 2026-10-18 Experimental 3D view of a work
 
 At the author's request the experimental 3D view of Web and macOS now reaches Android (frozen plan `android-task/ddl3d-20261018`). The shapes are drawn by Web's viewer build (Three.js, Worker, WASM); Android does not rebuild it and only connects it in a WebView. The sources of truth are `experiments/ddl-3d/README.md` and its protocol `inku.ddl3d.v1`.

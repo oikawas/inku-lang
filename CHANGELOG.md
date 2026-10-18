@@ -16,6 +16,10 @@ The experimental 3D view's only source is now the Web's registered distribution 
 - A plain `swift build` builds without the copy, and that app shows no 3D switch. `InkuAppCheck --ddl3d-only` reads the copy in place and, without it, stops naming `python3 apple/scripts/sync-ddl3d-viewer.py`.
 - "3D view (experiment)" under License in About inku reads the bundled viewer's notices file when the list opens (shown as before). The bundled notices JSON no longer embeds it and is about 430 KB smaller, back to its size before the 3D view; the Release notices attachment is unchanged.
 
+### 2026-10-18 — Retire random autonomous refinement on Android
+
+By the author's decision, a work's "Autonomous refinement" now has the Vision method only, as on Web. Vision's advice names each generation's element; nothing picks it at random. A work with an empty description shows Vision its instructions. Records of generations made at random stay readable.
+
 ### 2026-10-18 — Add the experimental 3D view to Android works
 
 Android now shows a work in the experimental 3D view as Web and macOS do. Web's viewer build is copied from its registration on every build (never committed) and opened in a WebView. The work's viewer input comes from the shared core's `ddl3d_snapshot`, which matched Web's `snapshot()` byte for byte in four cases. The native parent page lives in `experiments/ddl-3d/host/` so Swift can use the same one. A 3D / 2D switch sits next to the hash and in the full screen; the viewer's PNG and GLB go to the share sheet; Settings → Version shows the viewer's license notices. No database or saved work changes.

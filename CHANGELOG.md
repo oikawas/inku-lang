@@ -8,6 +8,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-18 — macOS: open the Library at the shown work, and open works with a double click
+
+This follows the Web's 2026-10-17 change.
+
+- When the saved work shown in Create falls under the search and filters, the Library opens with that work first on its page and its card focused, and an open preview switches to it. By lineage, its lineage comes first, and thumbnails by lineage keep it even with one work (the heading reads "(with derivations, plus the selected work’s lineage)"). Otherwise the page stays where it was. ← Newer and Latest reach the works before it.
+- When opening or closing the preview, or resizing the window, changes how many works a page holds, the first work stays. Moving between timeline and lineage views keeps the timeline's place.
+- A double click on a thumbnail opens the work, in the work tab on the timeline and in the lineage tab by lineage. A list table row opens with a double click.
+- The bundled copy of the Web's text and versions was regenerated from Build 1260. "About Inku" now shows render engine 85 instead of 82, and Server Build 1260 instead of 1235.
+
 ### 2026-10-18 — macOS: faster Library page turns
 
 Each page turn rebuilt all 56 cards three times and decoded the 56 thumbnails at once. A card is now rebuilt only when what it shows changes, decodes run four at a time, and the next page's thumbnails are read ahead. In an off-screen measurement (a disposable database of 600 works, 56 per page, no AX client), the main thread time of one turn went from 416 ms to 207 ms.

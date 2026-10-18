@@ -1170,6 +1170,8 @@ export interface LangPack {
 	historyRestoreSelected: string;
 	historyPermanentDelete: string;
 	historySearchLabel: string;
+	historySearchPlaceholder: string;
+	historyPageJumpLabel: (total: number) => string;
 	historySearchHint: string;
 	historySearchClear: string;
 	canvasSearchLabel: string;

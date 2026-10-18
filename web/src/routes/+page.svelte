@@ -2108,6 +2108,8 @@ $effect(() => {
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape' && ((e.target instanceof Element && e.target.closest('[data-settings-nested-dialog]')) || document.querySelector('[data-settings-nested-dialog], .settings-modal [role="dialog"][aria-modal="true"]'))) return;
 		if (e.target instanceof Element && e.target.closest('dialog[open], [role="menu"]')) return;
+		// A field that undoes its own edit on Escape (the Library's page number).
+		if (e.key === 'Escape' && e.target instanceof Element && e.target.closest('[data-escape-undoes-edit]')) return;
 		if (e.key === 'Escape') {
 			saijikiOpen = false;
 			userMenuOpen = false;

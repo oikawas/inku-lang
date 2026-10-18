@@ -3,7 +3,8 @@
 	import { onMount, tick, untrack } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
-	import { libraryPagePosition } from '$lib/libraryPagePosition';
+	import { libraryPagePosition, libraryRelativePage } from '$lib/libraryPagePosition';
+	import LibraryPageInput from '$lib/components/LibraryPageInput.svelte';
 	import SavedWorkExportMenu from '$lib/components/SavedWorkExportMenu.svelte';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { AnimationExportSettings } from '$lib/animationExport';
@@ -577,8 +578,15 @@
 	}
 
 	function setLineageGroupPage(page: number): void {
-		if (page < 0 && lineageGroupPage === 0 && lineageStartOffset > 0) {
+		// Counted from the start, so a typed page can move it from any page, not
+		// only from the start's own page as "Newer" does.
+		if (page < 0 && lineageStartOffset > 0) {
 			lineageStartOffset = Math.max(0, lineageStartOffset + page * lineageGroupPageSize);
+			if (lineageGroupPage !== 0) {
+				// Its effect fetches the new start along with the page.
+				lineageGroupPage = 0;
+				return;
+			}
 			// The relative page stays zero, so its effect will not fetch this move.
 			void fetchLineageGroups();
 			return;
@@ -882,7 +890,7 @@
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryNewerPage}>
 						<button class="ghost-btn history-nav-btn" onclick={() => setLineageGroupPage(lineageGroupPage - 1)} disabled={(lineageGroupPage <= 0 && lineageStartOffset === 0) || lineageGroupLoading}>{t().historyNewer}</button>
 					</Tooltip>
-					<span>{lineageGroupLoading ? t().historyLoading : lineagePosition.current + ' / ' + lineagePosition.total}</span>
+					{#if lineageGroupLoading}<span>{t().historyLoading}</span>{:else}<LibraryPageInput current={lineagePosition.current} total={lineagePosition.total} onJump={(page) => setLineageGroupPage(libraryRelativePage(page, lineageStartOffset, lineageGroupPageSize, lineageGroupTotal))} />{/if}
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryOlderPage}>
 						<button class="ghost-btn history-nav-btn" onclick={() => setLineageGroupPage(lineageGroupPage + 1)} disabled={lineageGroupPage >= lineageGroupTotalPages - 1 || lineageGroupLoading}>{t().historyOlder}</button>
 					</Tooltip>
@@ -896,7 +904,7 @@
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryNewerPage}>
 						<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage - 1)} disabled={historyManagerOffset === 0 || historyManagerLoading}>{t().historyNewer}</button>
 					</Tooltip>
-					<span>{historyManagerLoading ? t().historyLoading : managerPosition.current + ' / ' + managerPosition.total}</span>
+					{#if historyManagerLoading}<span>{t().historyLoading}</span>{:else}<LibraryPageInput current={managerPosition.current} total={managerPosition.total} onJump={(page) => onSetPage(libraryRelativePage(page, historyManagerStartOffset, historyManagerPageSize, managedHistoryTotal))} />{/if}
 					<Tooltip placement="bottom-left" text={t().tooltipHistoryOlderPage}>
 						<button class="ghost-btn history-nav-btn" onclick={() => onSetPage(historyManagerPage + 1)} disabled={historyManagerPage >= historyManagerTotalPages - 1 || historyManagerLoading}>{t().historyOlder}</button>
 					</Tooltip>
@@ -987,12 +995,13 @@
 				/>
 			{/if}
 		</div>
-		<div class="history-search">
-			<label for="library-history-search">{t().historySearchLabel}</label>
+		<!-- Drawn like the history strip's search, which searches differently. -->
+		<div class="history-search" role="search" aria-label={t().historySearchLabel}>
 			<div class="history-search-input">
-				<input id="library-history-search" bind:this={searchInputEl} bind:value={historySearch} title={t().historySearchHint} />
+				<input id="library-history-search" type="search" bind:this={searchInputEl} bind:value={historySearch}
+					aria-label={t().historySearchLabel} placeholder={t().historySearchPlaceholder} title={t().historySearchHint} />
 				<button
-					class="ghost-btn history-search-clear"
+					class="history-search-clear"
 					type="button"
 					aria-label={t().historySearchClear}
 					title={t().historySearchClear}
@@ -1543,45 +1552,50 @@
 		font-variant-numeric: tabular-nums;
 		margin-right: 2px;
 	}
+	/* The same box as the history strip's search (CanvasWorkSearch). */
 	.history-search {
 		margin-left: auto;
 		display: flex;
 		align-items: center;
-		gap: 6px;
-		color: var(--fg2);
-		font-size: var(--ui-font-size-12);
+		flex: 0 1 22rem;
+		min-width: min(10rem, 100%);
 	}
 	.history-search-input {
-		position: relative;
-		width: min(240px, 30vw);
+		display: flex;
+		align-items: center;
 		flex: 1;
 		min-width: 0;
-	}
-	.history-search input {
-		box-sizing: border-box;
-		width: 100%;
-		min-width: 0;
-		padding: 5px 34px 5px 7px;
 		border: 1px solid var(--border2);
-		border-radius: var(--r);
-		background: var(--panel);
-		color: var(--fg);
-		font-size: var(--ui-font-size-12);
-		font-family: inherit;
-	}
-	.history-search-clear {
-		position: absolute;
-		right: 1px;
-		top: 50%;
-		transform: translateY(-50%);
-		padding: var(--btn-sm-padding);
-		font-size: var(--btn-sm-font-size);
 		border-radius: var(--btn-sm-radius);
+		background: var(--panel);
+	}
+	.history-search-input:focus-within { outline: 1px solid var(--fg3); }
+	.history-search input {
+		flex: 1;
+		min-width: 0;
+		width: 100%;
 		border: 0;
-		line-height: 1;
+		padding: var(--btn-sm-padding);
+		background: transparent;
+		color: var(--fg);
+		font: inherit;
+		font-size: var(--btn-sm-font-size);
+		outline: none;
+	}
+	.history-search input::-webkit-search-cancel-button { display: none; }
+	.history-search-clear {
+		flex: 0 0 auto;
+		border: 0;
+		border-radius: var(--btn-sm-radius);
+		padding: var(--btn-sm-padding);
 		background: transparent;
 		color: var(--fg2);
+		font: inherit;
+		font-size: var(--btn-sm-font-size);
+		cursor: pointer;
 	}
+	.history-search-clear:hover:enabled { background: var(--bg2); color: var(--fg); }
+	.history-search-clear:disabled { opacity: .35; cursor: default; }
 	.history-search-clear:focus-visible {
 		outline: 2px solid var(--accent);
 		outline-offset: -2px;

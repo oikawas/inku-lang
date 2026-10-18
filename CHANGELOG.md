@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-18 — Type a Library page number to go to it, and draw the Library search like the strip's
+
+The Library's page number (timeline and by lineage) is now a field: type a number and press Enter to go to that page. Out-of-range numbers land on the first or last page, and Escape puts the number back without closing the Library. The Library search field now has the history strip search's box, type size and clear button, and its outside label became placeholder text (description, hash or work ID). What it matches is unchanged.
+
 ### 2026-10-18 — Remove the unreachable photo picker, input-source chooser and overwrite question from the Android camera
 
 The 2026-09-30 SPEC made the camera capture the only image input and took the Photo Picker and the input-source dialog off the screen; this removes what was left behind. That is the photo picker result handler, launch request and launch failure in `InkuViewModel`, the input-source choice and its cancel, the pre-capture overwrite question and its dialog, the capture states `ChoosingSource`, `PickingPhoto` and `AwaitingOverwriteConfirmation`, the `PhotoPickerUnavailable` failure, the selected-image cache `SelectedImageFileStore`, and seven strings that nothing used any more. None of it was reachable from the screen, so nothing the author does changes: the camera still goes straight to the capture. Works made earlier from a picked photo keep their provenance (`photo_picker`, shown as "Existing photo").

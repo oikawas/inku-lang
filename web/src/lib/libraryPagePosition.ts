@@ -13,3 +13,18 @@ export function libraryPagePosition(startOffset: number, page: number, pageSize:
 	const after = Math.max(1, Math.ceil((total - startOffset) / size));
 	return { current: before + page + 1, total: before + after };
 }
+
+/**
+ * The page to ask for when the reader types page `n` of the numbers above.
+ *
+ * Counted from the start, as `setPage` takes it: a negative page moves the
+ * start towards the newest, to where pressing "Newer" that many times would
+ * have put it. Out-of-range numbers land on the first or the last page.
+ */
+export function libraryRelativePage(n: number, startOffset: number, pageSize: number, total: number): number {
+	const size = Math.max(1, pageSize);
+	const before = Math.ceil(Math.max(0, startOffset) / size);
+	const position = libraryPagePosition(startOffset, 0, size, total);
+	const target = Math.max(1, Math.min(Math.trunc(n), position.total));
+	return target - 1 - before;
+}

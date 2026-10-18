@@ -36,7 +36,7 @@ func runAuxiliaryProvenanceChecks() async throws {
     await auxiliary.initialize(app: app)
     // Obsolete stored reading and touch selections must never reach Vision or generation.
     auxiliary.enabledKinds = ["reinterpretation", "touch_change", "catalog_change"]
-    auxiliary.generations = 2; auxiliary.visionMode = true
+    auxiliary.generations = 2
     auxiliary.modelReference = "check:vision"; auxiliary.direction = "keep the circle"
     await auxiliary.startRefinement(app: app)
     guard auxiliary.errorText == nil, auxiliary.completedGenerations == 2,
@@ -64,32 +64,9 @@ func runAuxiliaryProvenanceChecks() async throws {
         previousNodeID = nodeID
     }
 
-    // A later random run must not attach the advice still displayed from the previous Vision run. Like Web's
-    // AIRefineModal, every run starts again from the chosen source, not from the previous run's last child.
-    auxiliary.visionMode = false; auxiliary.generations = 1; auxiliary.modelReference = "check:unused"
-    auxiliary.enabledKinds = ["reinterpretation", "touch_change", "layout_change"]
-    await auxiliary.startRefinement(app: app)
-    guard auxiliary.errorText == nil, auxiliary.completedGenerations == 1,
-          auxiliary.generatedWorks.count == 1, let child = auxiliary.generatedWorks.first,
-          let nodeID = child.lineageNodeID, let edge = try await database.edge(childNodeID: nodeID),
-          edge.parentNodeID == parentNodeID, edge.derivationKind == "layout_change",
-          child.ddl == parent.ddl, child.effectiveSourceText == parent.effectiveSourceText,
-          auxiliary.enabledKinds == ["layout_change"],
-          try await database.work(id: child.id)?.historyVisibility == "normal" else {
-        throw CheckFailure.message("Random provenance child failed: \(auxiliary.errorText ?? auxiliary.status)")
-    }
-    let metadata = try ExactJSON(data: Data(edge.metadataJSON.utf8))
-    guard metadata["autonomous_refine_mode"].string == "random",
-          ["vision_model", "vision_observation", "vision_next_direction"].allSatisfy({ metadata.object?[$0] == nil }),
-          auxiliary.advice?.observation == "observation 2",
-          await transport.visionModels == ["check:vision", "check:vision"],
-          await transport.generationModels == ["check:generation"],
-          try await database.work(id: parent.id) == parent,
-          try await app.savedConfiguration(workID: parent.id).configuration == parentContext.configuration,
-          try await app.savedConfiguration(workID: parent.id).document == parentContext.document,
-          !auxiliary.running, !app.isBusy else {
-        throw CheckFailure.message("Random edge retained stale Vision fields, changed the parent or exceeded the provider budget")
-    }
+    // Random refinement is gone (the author, 2026-10-18): no run draws an element at random, so the only
+    // runs left are Vision's. The adoption below still starts from the chosen source with only layout enabled.
+    auxiliary.enabledKinds = ["layout_change"]
     // The displayed Vision advice suggests color, but a later adoption has only layout enabled. Its edited
     // draft is observation material and must never become drawing source text through the fallback path.
     let rowsBeforeAdoption = try await database.list().count
@@ -99,18 +76,18 @@ func runAuxiliaryProvenanceChecks() async throws {
     let adoptedWorks = try await database.list()
     guard auxiliary.errorText == nil, adoptedWorks.count == rowsBeforeAdoption + 1,
           let adopted = adoptedWorks.first(where: { work in
-              work.id != parent.id && !visionChildren.contains(where: { $0.id == work.id }) && work.id != child.id
+              work.id != parent.id && !visionChildren.contains(where: { $0.id == work.id })
           }), let adoptedNodeID = adopted.lineageNodeID,
           let adoptedEdge = try await database.edge(childNodeID: adoptedNodeID),
           adoptedEdge.parentNodeID == parentNodeID, adoptedEdge.derivationKind == "layout_change",
           adopted.ddl == parent.ddl, adopted.effectiveSourceText == parent.effectiveSourceText,
-          await transport.generationModels == ["check:generation"],
+          await transport.generationModels == ["check:generation"], await transport.visionModels == ["check:vision", "check:vision"],
           try await database.work(id: parent.id) == parent,
           try await app.savedConfiguration(workID: parent.id).configuration == parentContext.configuration,
           try await app.savedConfiguration(workID: parent.id).document == parentContext.document else {
         throw CheckFailure.message("Adopted advice reread, appended its draft, ignored the allowed fallback or changed the parent")
     }
-    // Failure: a DDL/held parent silently resets Vision to random although only catalog/layout are allowed now.
+    // Failure: a DDL/held parent draws from its description instead of the saved instructions.
     await app.selectWork(parent)
     app.ddlText = "place one blue circle at center."
     await app.commitDDL()
@@ -119,9 +96,8 @@ func runAuxiliaryProvenanceChecks() async throws {
     for source in [held, direct] {
         await transport.expectInstruction(source.effectiveSourceText.isEmpty ? (source.ddl ?? "") : source.effectiveSourceText)
         let vision = AuxiliaryModel(provider: AuxiliaryProvider(transport: transport, credentials: AuxiliaryProvenanceCredentials()))
-        vision.visionMode = true
         await vision.initialize(app: app, work: source)
-        guard vision.sourceIsLocked, vision.visionMode else { throw CheckFailure.message("Held/DDL initialization switched off Vision") }
+        guard vision.sourceIsLocked else { throw CheckFailure.message("Held/DDL initialization did not lock the source") }
         vision.generations = 1; vision.modelReference = "check:vision"
         vision.enabledKinds = ["catalog_change"]; vision.direction = "keep the circle"
         await vision.startRefinement(app: app)
@@ -136,7 +112,7 @@ func runAuxiliaryProvenanceChecks() async throws {
     guard await transport.visionModels.count == 4, await transport.generationModels == ["check:generation"] else {
         throw CheckFailure.message("Held/DDL Vision reread descriptions or failed to ask Vision")
     }
-    print("Auxiliary provenance passed: color Vision x2 and layout random x1 + advice adoption use saved DDL; held-description and direct-DDL Vision each draw one catalog child without Stage 1; retired reading/touch excluded; directions remain observation metadata. Isolated SQLite + mock transports + real Rust only.")
+    print("Auxiliary provenance passed: color Vision x2 + advice adoption use saved DDL; no method draws an element at random; held-description and direct-DDL Vision each draw one catalog child without Stage 1; retired reading/touch excluded; directions remain observation metadata. Isolated SQLite + mock transports + real Rust only.")
 }
 
 private actor AuxiliaryProvenanceCredentials: CredentialStore {

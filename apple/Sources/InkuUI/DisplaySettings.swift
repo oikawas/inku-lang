@@ -112,13 +112,14 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
 }
 
 /// Web `ai-refine-settings.ts`: the autonomous refinement dialog opens with the last choices. Wild is not kept.
+/// There is no method to keep: random refinement was removed (the author, 2026-10-18), and a `visionMode`
+/// kept from before is dropped like any unknown key.
 public struct AIRefineChoices: Codable, Sendable, Equatable {
-    public var visionMode: Bool
     public var generations: Int
     public var kinds: [String]
     public var direction: String
-    public init(visionMode: Bool, generations: Int, kinds: [String], direction: String) {
-        self.visionMode = visionMode; self.generations = generations; self.kinds = kinds; self.direction = direction
+    public init(generations: Int, kinds: [String], direction: String) {
+        self.generations = generations; self.kinds = kinds; self.direction = direction
     }
 }
 

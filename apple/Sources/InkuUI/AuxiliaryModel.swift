@@ -25,7 +25,6 @@ public final class AuxiliaryModel {
         set { directionValue = Self.boundedDirection(newValue) }
     }
     public var generations = 5
-    public var visionMode = false
     public var amplitude = "medium"
     public var inheritWild = true
     public var wildOverride = false
@@ -154,7 +153,7 @@ public final class AuxiliaryModel {
         guard let work = sourceWork, !work.trashed else {
             errorText = "画像助言には保存作品が必要です。"; return
         }
-        let direction = visionMode ? direction : ""
+        let direction = self.direction
         let reference = modelReference
         let language = language
         let kinds = orderedKinds
@@ -227,12 +226,11 @@ public final class AuxiliaryModel {
         guard let provider else { errorText = "補助モデルの接続がありません。"; return }
         guard let first = sourceWork, !first.trashed, !running, !selectingSource, !app.isBusy else { return }
         let count = min(10, max(1, generations))
-        let useVision = visionMode
         enabledKinds.formIntersection(AuxiliaryProvider.allowedKinds)
         let kinds = orderedKinds
         guard !kinds.isEmpty else { errorText = "少なくとも1つの推敲要素を選んでください。"; return }
         let model = modelReference
-        if useVision, !SettingsModel.isRegisteredModelAvailable(model, purpose: "vision", settings: await app.hostSettings()) {
+        if !SettingsModel.isRegisteredModelAvailable(model, purpose: "vision", settings: await app.hostSettings()) {
             errorText = "画像を扱える登録モデルを選択してください。"; return
         }
         let language = language
@@ -252,7 +250,8 @@ public final class AuxiliaryModel {
                     try Task.checkCancellation()
                     guard self.token == runToken else { return }
                     var nextAdvice: AuxiliaryAdvice?
-                    if useVision {
+                    // Vision picks each generation's element; nothing draws it at random (the author, 2026-10-18).
+                    do {
                         self.status = "\(index + 1) / \(count) 世代: モデルが観察しています"
                         let didRead = await app.performSerialized(status: self.status) { [self] _ in
                             guard let png = try await Self.png(svgs: [parent.svg], visionAdvice: true) else {
@@ -269,21 +268,19 @@ public final class AuxiliaryModel {
                         guard didRead, let answer = nextAdvice else { throw HostError("refinement_advice_failed") }
                         self.advice = answer
                     }
-                    let kind: String
-                    if let answer = nextAdvice { kind = answer.suggestedKind }
-                    else { kind = kinds.randomElement()! }
+                    guard let kind = nextAdvice?.suggestedKind else { throw HostError("refinement_advice_failed") }
                     self.status = "\(index + 1) / \(count) 世代: \(Self.kindLabel(kind))を生成中"
                     let catalog = kind == "catalog_change" ? self.randomCatalog(app: app, parent: parent) : nil
                     var request = try await app.makeRefinementRequest(work: parent, kind: kind,
                         amplitude: amplitude,
-                        modelReference: useVision && !model.isEmpty ? model : nil,
+                        modelReference: !model.isEmpty ? model : nil,
                         catalogIDOverride: catalog,
                         wildOverride: wild)
                     request.models = settings.models
                     request.providers = settings.providers
-                    if useVision, !model.isEmpty { request.models.stage1Model = model; request.models.stage2Model = model }
+                    if !model.isEmpty { request.models.stage1Model = model; request.models.stage2Model = model }
                     var metadata = try request.derivationMetadata.map { try ExactJSON(data: $0) } ?? .object([:])
-                    metadata["autonomous_refine_mode"] = .string(useVision ? "vision" : "random")
+                    metadata["autonomous_refine_mode"] = .string("vision")
                     if let answer = nextAdvice {
                         metadata["vision_model"] = .string(answer.model)
                         metadata["vision_observation"] = .string(answer.observation)

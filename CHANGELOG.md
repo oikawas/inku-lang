@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-18 — macOS: retire random autonomous refinement and group the work edit menu
+
+Follows the Web (Build 1271; the grouping is Builds 1269–1270). macOS autonomous refinement no longer offers a method (random / AI Vision): Vision is the only one, its model and direction fields always show, and each generation draws the kind Vision chose. A method kept before is dropped; generations drawn at random before keep their record. The work edit menu has four sections under headings — Color and texture, Form and instructions, Redraw from the description, Leave it to AI — and the four items that always call the LLM carry an LLM badge. The bundled `ui-reference.json` is copied again from Build 1271.
+
 ### 2026-10-18 — macOS: copy the 3D viewer from its one place on the Web at build time
 
 The experimental 3D view's only source is now the Web's registered distribution (`web/static/experimental/ddl-3d/<build>/`), and the macOS app's copy left Git. A new Web registration needs no Swift copy or commit; the next build carries it.

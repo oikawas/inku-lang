@@ -503,10 +503,6 @@ export interface LangPack {
 	refineGeneratingBody: string;
 	refineGeneratingTask: (task: string) => string;
 	aiRefineTitle: string;
-	aiRefineModeLabel: string;
-	aiRefineRandomMode: string;
-	aiRefineRandomModeHint: string;
-	aiRefineVisionMode: string;
 	aiRefineVisionModeHint: string;
 	aiRefineVisionModel: string;
 	aiRefineVisionReading: string;

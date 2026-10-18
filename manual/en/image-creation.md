@@ -331,24 +331,19 @@ Choosing, saving, and discarding options work as in 8.2.
 
 ## 9. Autonomous Refinement
 
-From the lineage tab the application can build generations on its own.
+From `Autonomous refinement process` in the work-editing menu (`Refine` on the Work tab, or `…` on each work in the Lineage tab), the application can build generations on its own. Vision observes each generation's picture and chooses the element the next generation changes (color catalog or composition). Random autonomous refinement, which chose the element at random, was retired on 2026-10-18.
 
-| Mode | Contents |
-|---|---|
-| Random autonomous refinement | Builds generations at random from the chosen elements |
-| Autonomous refinement with Vision | Observes the picture and chooses the element the next generation changes |
+You choose the Vision model, the number of generations and which refinement elements to use (color catalog and composition). The direction field is material for Vision's advice; it is not added to the drawing. For a work drawn straight from DDL (a work without a description), Vision is shown its instructions in place of the description.
 
-You choose the number of generations and which refinement elements to use (color catalog and composition). The direction field appears only with the Vision method, where it is material for Vision's advice; it is not added to the drawing.
+A color generation draws its parent's saved instructions in another color catalog, without reading the description again (until 2026-10-14 a work drawn from a description was drawn again from Stage 1).
 
-In either form of autonomous refinement, a color generation draws its parent's saved instructions in another color catalog, without reading the description again (until 2026-10-14 a work drawn from a description was drawn again from Stage 1).
+A composition generation rebuilds its parent's saved instructions `By principle`. A manual choice of `By chance` does not change this default. Choosing the composition ranges calls no LLM.
 
-In either form of autonomous refinement, a composition generation rebuilds its parent's saved instructions `By principle`. A manual choice of `By chance` does not change this default. Choosing the composition ranges calls no LLM.
+**The Vision model you choose is used to draw each generation, not only to observe it** (the running display names the model it is drawing with).
 
-**The model chosen for autonomous refinement with Vision is used to draw each generation, not only to observe it** (the running display names the model it is drawing with). Random autonomous refinement chooses no model, so it draws with the model selected on the page.
+The dialog remembers the number of generations, refinement elements and direction you chose last time, and opens with them next time (kept in this browser). The wild switch is not remembered; it starts from the work being refined.
 
-The dialog remembers the method, number of generations, refinement elements and direction you chose last time, and opens with them next time (kept in this browser). The wild switch is not remembered; it starts from the work being refined.
-
-Both methods draw the next generation from the parent's saved instructions without running the sketch again. The direction guides Vision's advice and choice of the next element to change; observations and the next direction are recorded, not appended to the drawing text. The sketch setting on the `Describe` tab is not used.
+The next generation is drawn from the parent's saved instructions without running the sketch again. The direction guides Vision's advice and choice of the next element to change; observations and the next direction are recorded, not appended to the drawing text. The sketch setting on the `Describe` tab is not used.
 
 ## 10. Change the Model
 

@@ -410,8 +410,8 @@ struct LibraryView: View {
             hashCopied: work.renderHash != nil && library.copiedHash == work.renderHash,
             modelLines: modelLines.lines(for: work, providers: providers),
             focus: $focusedSlot,
-            actions: LibraryGridCardActions(open: openWork, openLineage: openLineage, recordHeight: recordCardHeight,
-                                            menu: menuActions))
+            actions: LibraryGridCardActions(open: openWork, openThumbnail: openThumbnail, openLineage: openLineage,
+                                            recordHeight: recordCardHeight, menu: menuActions))
             .equatable()
     }
 
@@ -502,6 +502,9 @@ struct LibraryView: View {
         }
         .contextMenu(forSelectionType: String.self) { ids in
             if let id = ids.first, let work = library.works.first(where: { $0.id == id }) { workMenu(work) }
+        } primaryAction: { ids in
+            // HistoryManager.svelte:1268: a double click on a row opens the work (Return as well, as macOS tables do).
+            if let id = ids.first, let work = library.works.first(where: { $0.id == id }) { openThumbnail(work) }
         }
         .background { focusFollower(scroll: nil) }
         #else
@@ -562,6 +565,7 @@ struct LibraryView: View {
                         ArtworkThumbnail(work: group.representative.work, thumbnails: model.thumbnails).frame(width: 56, height: 56)
                     }
                     .buttonStyle(.plain)
+                    .simultaneousGesture(TapGesture(count: 2).onEnded { openThumbnail(group.representative.work) })
                     .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
                 }
                 VStack(alignment: .leading, spacing: 4) {
@@ -665,6 +669,7 @@ struct LibraryView: View {
                 }
             }
             .buttonStyle(.plain).disabled(model.isBrowsingLocked)
+            .simultaneousGesture(TapGesture(count: 2).onEnded { openThumbnail(work) })
             .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
             .overlay(alignment: .topLeading) { selectionCheck(work).padding(3) }
             .overlay(alignment: .topTrailing) {
@@ -701,6 +706,7 @@ struct LibraryView: View {
                 }.contentShape(Rectangle())
             }
             .buttonStyle(.plain).disabled(model.isBrowsingLocked)
+            .simultaneousGesture(TapGesture(count: 2).onEnded { openThumbnail(work) })
             .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
             LibraryWorkMarks(model: model, work: work, spacing: 4).disabled(writingDisabled)
             Menu { workMenu(work) } label: { Image(systemName: "ellipsis") }
@@ -720,6 +726,27 @@ struct LibraryView: View {
     private func openWork(_ work: SavedWork) {
         guard !model.isBrowsingLocked else { return }
         preview.show(work)
+    }
+
+    /// Web `openThumbnail` (HistoryManager.svelte:638): one click previews and a double click opens the work, in the
+    /// work tab on the timeline and in the lineage tab in a lineage view. Nothing opens from the trash.
+    private func openThumbnail(_ work: SavedWork) {
+        guard !library.isTrash, !work.trashed, !model.isBrowsingLocked else { return }
+        if library.isGrouped { openLineage(work) } else { openInWorkTab(work) }
+    }
+
+    /// Web `openLibraryWork(item, 'canvas')`: the work shown in Create's work tab, the library closed.
+    private func openInWorkTab(_ work: SavedWork) {
+        Task {
+            do {
+                let saved = try await library.fullWork(id: work.id)
+                guard !saved.trashed, !model.isBrowsingLocked, !Task.isCancelled else { return }
+                await model.selectWork(saved)
+                guard model.selectedWorkID == saved.id, !model.isBrowsingLocked else { return }
+                onClose?()
+                NotificationCenter.default.post(name: .inkuOpenSection, object: "create", userInfo: ["workID": saved.id])
+            } catch { model.errorText = error.localizedDescription }
+        }
     }
 
     private func openInCreate(_ work: SavedWork) {
@@ -1052,6 +1079,7 @@ struct LibraryCurrentBadge: View {
 
 private struct LibraryGridCardActions {
     let open: (SavedWork) -> Void
+    let openThumbnail: (SavedWork) -> Void
     let openLineage: (SavedWork) -> Void
     let recordHeight: (CGFloat, String) -> Void
     let menu: LibraryWorkMenuActions
@@ -1100,6 +1128,8 @@ private struct LibraryGridCard: View, Equatable {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain).disabled(browsingLocked)
+            // HistoryManager.svelte:1202: the click previews, a double click opens the work.
+            .simultaneousGesture(TapGesture(count: 2).onEnded { actions.openThumbnail(work) })
             .accessibilityLabel(display.localizedFormat("%@ を開く", title))
             .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
             .overlay(alignment: .topLeading) { selectionCheck(title: title).padding(1) }

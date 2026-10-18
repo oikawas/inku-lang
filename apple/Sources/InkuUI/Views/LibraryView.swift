@@ -137,9 +137,9 @@ struct LibraryView: View {
 
     private var countText: String {
         if library.isGrouped {
-            // The thumbnail tab lists only lineages with a derivation (minimum two works).
+            // The thumbnail tab lists the lineages with a derivation (minimum two works) and the opened work's.
             return "\(library.total) " + display.webCopy("historyLineageGroups", fallback: "系譜")
-                + (library.layout == .grid ? display.webCopy("historyLineageGroupsDerivedOnly", fallback: "（派生のある系譜のみ）") : "")
+                + (library.layout == .grid ? display.webCopy("historyLineageGroupsDerivedOnly", fallback: "（派生のある系譜と選択作品の系譜）") : "")
         }
         return library.total == 0 ? "0 / 0" : "\(library.shownFrom)-\(library.shownTo) / \(library.total)"
     }
@@ -348,19 +348,23 @@ struct LibraryView: View {
             // A page holds only complete rows; an always-on scroller would also take width from the columns.
             .scrollIndicators(.hidden)
             .focusSection()
+            .background { focusFollower(scroll: nil) }
             .onAppear { reportPageSize(viewport: geometry.size) }
             .onChange(of: geometry.size) { _, size in reportPageSize(viewport: size) }
         }
     }
 
+    private func focusFollower(scroll: ScrollViewProxy?) -> some View {
+        LibraryFocusFollower(library: library, preview: preview, focus: $focusedSlot, scroll: scroll)
+    }
+
     /// Web `calculatePageSize` and its ResizeObserver (HistoryManager.svelte:644-700): a new viewport starts again
     /// from 100; within one viewport the size only shrinks, so different cards cannot make two sizes alternate.
-    /// A shrink within one viewport comes from taller cards on the shown page: like Web `setPageSize`, the first work
-    /// stays and the works that no longer fit start the next page, without reading the page again.
+    /// Every new size keeps the first work, as Web `setPageSize` does: a new viewport (the window, or the preview
+    /// column opening and closing) and taller cards on the shown page alike.
     private func reportPageSize(viewport size: CGSize) {
         let viewport = CGSize(width: (size.width * 2).rounded() / 2, height: (size.height * 2).rounded() / 2)
-        let newViewport = viewport != measurements.viewport
-        if newViewport {
+        if viewport != measurements.viewport {
             measurements.viewport = viewport
             measurements.ceiling = LibraryGridPaging.maximumPageSize
         }
@@ -368,9 +372,7 @@ struct LibraryView: View {
         let heights = library.works.map { Double(measurements.cardHeights[$0.id] ?? 0) }
         let fitted = LibraryGridPaging.pageSize(width: size.width - 20, height: size.height - 14, cardHeights: heights)
         measurements.ceiling = min(measurements.ceiling, fitted)
-        guard library.pageSize != measurements.ceiling else { return }
-        if newViewport || measurements.ceiling > library.pageSize { library.pageSize = measurements.ceiling }
-        else { library.shrinkPageKeepingFirstWork(to: measurements.ceiling) }
+        library.resizePageKeepingFirstWork(to: measurements.ceiling)
     }
 
     private func recordCardHeight(_ height: CGFloat, for id: String) {
@@ -501,12 +503,14 @@ struct LibraryView: View {
         .contextMenu(forSelectionType: String.self) { ids in
             if let id = ids.first, let work = library.works.first(where: { $0.id == id }) { workMenu(work) }
         }
+        .background { focusFollower(scroll: nil) }
         #else
         ScrollView {
             LazyVStack(spacing: 8) {
                 ForEach(Array(library.works.enumerated()), id: \.element.id) { slot, work in gridCard(work, slot: slot) }
             }.padding(.top, 8).padding(.horizontal, 10).padding(.bottom, 6)
         }
+        .background { focusFollower(scroll: nil) }
         #endif
     }
 
@@ -534,13 +538,16 @@ struct LibraryView: View {
     // MARK: Lineage groups (Web .lineage-history-list)
 
     private var lineageList: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 10) {
-                ForEach(library.groups) { group in groupCard(group) }
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    ForEach(library.groups) { group in groupCard(group) }
+                }
+                .padding(.top, 10).padding(.horizontal, 12).padding(.bottom, 16)
             }
-            .padding(.top, 10).padding(.horizontal, 12).padding(.bottom, 16)
+            .focusSection()
+            .background { focusFollower(scroll: proxy) }
         }
-        .focusSection()
     }
 
     private func groupCard(_ group: LibraryGroup) -> some View {
@@ -905,6 +912,54 @@ private struct LibraryPager: View {
                 .inkuTooltip(display.tooltip("最終ページ", serverKey: "tooltipHistoryOldestPage"), placement: .bottom)
         }
         .disabled(library.mutating)
+    }
+}
+
+/// Web `focusWork` (HistoryManager.svelte:328-344): once the page that holds the opened work is read and shown, its
+/// grid card takes the keyboard focus (a lineage view scrolls its card into view), and a preview already open follows
+/// it; a closed preview stays closed. A visit applies once in each grouping and layout. It reads the loading flag in a
+/// view of its own, as the pager does.
+@MainActor
+private struct LibraryFocusFollower: View {
+    let library: LibraryModel
+    let preview: LibraryPreviewModel
+    let focus: FocusState<Int?>.Binding
+    let scroll: ScrollViewProxy?
+
+    private struct Target: Equatable {
+        let visit: Int
+        let work: SavedWork
+        let slot: Int?
+    }
+
+    private var target: Target? {
+        guard let request = library.focusRequest, !library.loading else { return nil }
+        if library.isGrouped {
+            for group in library.groups {
+                if let item = library.groupMembers[group.id]?.first(where: { $0.id == request.workID }) {
+                    return Target(visit: request.visit, work: item.work, slot: nil)
+                }
+            }
+            return nil
+        }
+        guard let slot = library.works.firstIndex(where: { $0.id == request.workID }) else { return nil }
+        return Target(visit: request.visit, work: library.works[slot], slot: slot)
+    }
+
+    var body: some View {
+        Color.clear.onChange(of: target, initial: true) { _, target in apply(target) }
+    }
+
+    private func apply(_ target: Target?) {
+        guard let target, target.visit != library.focusedVisit else { return }
+        library.focusedVisit = target.visit
+        if let shown = preview.work, shown.id != target.work.id { preview.show(target.work) }
+        let scroll = scroll
+        // After this update has put the cards in place.
+        Task { @MainActor in
+            if let slot = target.slot { focus.wrappedValue = slot }
+            scroll?.scrollTo(target.work.id, anchor: nil)
+        }
     }
 }
 

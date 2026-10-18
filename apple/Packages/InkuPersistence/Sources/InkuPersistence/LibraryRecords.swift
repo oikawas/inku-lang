@@ -66,6 +66,17 @@ public struct LibraryGroup: Sendable, Equatable, Identifiable {
 public struct LibraryGroupPage: Sendable, Equatable {
     public let groups: [LibraryGroup]
     public let total: Int
+    /// Where `groups` begins: the requested offset, or the anchor work's lineage when one was asked for and passes
+    /// the filter (Server `GET /api/history/lineage-groups` `offset`).
+    public let offset: Int
+    /// The anchor work's lineage, which then begins the page; nil without an anchor or when the filter leaves it out.
+    public let anchorRootNodeID: String?
+}
+
+/// A lineage's place in the grouped library listing (Server `lineage_group_position`).
+public struct LibraryGroupPosition: Sendable, Equatable {
+    public let index: Int
+    public let rootNodeID: String
 }
 
 public struct LineageItem: Sendable, Equatable, Identifiable {

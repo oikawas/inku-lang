@@ -18,6 +18,14 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-18 3Dのつなぎを、Androidと共有の親ページとcoreの関数に切り替える
+
+作者の問い（部品の共通化）に答えた案のうち、案2と案3をAndroidセッション-claudeが作り（`d33f06739`）、Swiftを切り替えた。
+
+- 親ページ：`Ddl3DWebHost.swift`の文字列の親ページを消し、Androidと共有の`experiments/ddl-3d/host/`（host.html・host.js・host.css）を使う。ビューアと同じくbuildのときに`apple/Sources/InkuUI/Resources/ddl3d/host/`へ写し（Gitに入れない）、`inku-3d://viewer/host.html`で開く。写しの照合（buildの後の`--check --app`とリリースの検査）は、ビューアの10ファイルと親ページの3ファイルを、それぞれの正本と比べる。親ページの写しが無いappは3Dの切替を出さない。PNG・GLBの保存は、今のWKDownloadの道のまま（host.jsの`download`はAndroidの道）。
+- 入力：`Ddl3DInput.snapshot`は、保存作品の列から描画の付記のJSONオブジェクトを組み、共有coreの`ddl3d_snapshot`に渡す。Androidは保存された付記の原文を渡すが、Swiftの保存作品には原文が無いので、組むのはSwiftに残る。欄の選び方と並び、nullを落とすこと、種の安全な整数の検査、文字列の外の空白を除くこと、16 MiBの上限はcoreに任せ、断る理由はcoreの語を出す。
+- 確かめ：`--ddl3d-only`は前と同じ（見本で9物体、digestが一致、失敗は`invalid_score_or_version`、SwiftUIの器も同じ）。前のSwiftの写しとcoreの写しを5件で一度だけ比べ、4件はバイトで同じだった。違った1件は、保存されたScoreに文字列の外の空白がある作品で、違いは空白だけだった（coreの形はWebの`JSON.stringify`と同じ）。
+
 ## 2026-10-18 履歴帯のページ番号を入力欄にする
 
 Web Build 1272（`60dfcf2db`）に合わせ、履歴帯のページ番号を、ライブラリと同じ入力欄（`LibraryPageField`）にした（作者の指示）。数字を入れて Return を押すか欄を離れると、そのページへ移る。範囲外は最初か最後へ丸め、数でない入力と Esc は表示中の番号へ戻す。検索・印の絞り込みは保つ。ブラウズのロック中（デモ・生成中）、読み込み中、作品が0件のときは入力できない。文字の大きさは履歴帯の 11 pt。移った後は、履歴帯の矢印のボタンと同じく、表示中の作品を変えない（Web は移った先の先頭作品を表示するが、Swift の矢印のボタンが今も変えないので、ボタンに揃えた）。同梱の `ui-reference.json` は Build 1272 から作り直した（文言の差は無い）。

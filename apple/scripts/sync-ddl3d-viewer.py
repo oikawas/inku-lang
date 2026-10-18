@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Copy the Web's registered 3D viewer into the macOS app's resources, or check the copy.
+"""Copy the Web's registered 3D viewer and the shared parent page into the macOS app's resources, or check the copy.
 
 The Web registers one immutable viewer build in web/src/lib/features/experimental-3d/installation.json
 (`viewerUrl` /experimental/ddl-3d/<build>/index.html) and serves web/static/experimental/ddl-3d/<build>/.
 These two are the only source. The app's copy, apple/Sources/InkuUI/Resources/ddl3d/ (the same files unchanged
-in <build>/, beside a copy of the registration), is made at build time and never committed (apple/.gitignore):
+in <build>/, beside a copy of the registration, and the parent page the native apps share with Android,
+experiments/ddl-3d/host/, in host/), is made at build time and never committed (apple/.gitignore):
 apple/scripts/build-macos.sh runs this script before xcodebuild and checks the built app with --check --app
 after it, so a new Web registration needs no Swift commit. The app reads only its copy of the registration: an
 empty `viewerUrl` hides the 3D switch and reads no viewer file, and then no build is copied. A package built
@@ -31,6 +32,9 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 WEB_REGISTRATION = ROOT / "web/src/lib/features/experimental-3d/installation.json"
 WEB_BUILDS = ROOT / "web/static/experimental/ddl-3d"
+# The parent page the native apps share with Android (experiments/ddl-3d/host/), copied beside the build as host/.
+SHARED_HOST = ROOT / "experiments/ddl-3d/host"
+HOST = "host"
 APP_COPY = ROOT / "apple/Sources/InkuUI/Resources/ddl3d"
 BUNDLED = Path("Contents/Resources/InkuApple_InkuUI.bundle/Contents/Resources/ddl3d")
 # Web configuredViewer (web/src/lib/features/experimental-3d/input.ts) and the app's Ddl3DInstallation.
@@ -82,19 +86,22 @@ def compare(copy: Path, label: str) -> int:
         return 0
     if registration.read_bytes() != WEB_REGISTRATION.read_bytes():
         raise SyncError(f"{label}: installation.json differs from the Web's registration ({web_build})")
-    if entries != sorted(["installation.json", build]):
-        raise SyncError(f"{label}: expected installation.json and {build}/, found {entries}")
-    expected, actual = files(WEB_BUILDS / build), files(copy / build)
-    if not expected:
-        raise SyncError(f"the Web has no files for {build}")
-    missing = sorted(set(expected) - set(actual))
-    extra = sorted(set(actual) - set(expected))
-    different = sorted(name for name in set(expected) & set(actual) if expected[name] != actual[name])
-    if missing or extra or different:
-        raise SyncError(f"{label}: {build} differs from the Web's: missing {missing}, extra {extra}, different {different}")
-    print(f"{label}: {len(expected)} files of {build} compared with web/static/experimental/ddl-3d/{build}/; "
-          f"all SHA-256 equal ({', '.join(expected)})")
-    return len(expected)
+    if entries != sorted(["installation.json", build, HOST]):
+        raise SyncError(f"{label}: expected installation.json, {build}/ and {HOST}/, found {entries}")
+    compared = 0
+    for name, source, shown in ((build, WEB_BUILDS / build, f"web/static/experimental/ddl-3d/{build}/"),
+                                (HOST, SHARED_HOST, "experiments/ddl-3d/host/")):
+        expected, actual = files(source), files(copy / name)
+        if not expected:
+            raise SyncError(f"{shown} has no files")
+        missing = sorted(set(expected) - set(actual))
+        extra = sorted(set(actual) - set(expected))
+        different = sorted(key for key in set(expected) & set(actual) if expected[key] != actual[key])
+        if missing or extra or different:
+            raise SyncError(f"{label}: {name}/ differs from {shown}: missing {missing}, extra {extra}, different {different}")
+        print(f"{label}: {len(expected)} files of {name}/ compared with {shown}; all SHA-256 equal ({', '.join(expected)})")
+        compared += len(expected)
+    return compared
 
 
 def sync() -> None:
@@ -110,8 +117,10 @@ def sync() -> None:
         source = WEB_BUILDS / build
         files(source)  # refuses links before anything is copied
         shutil.copytree(source, APP_COPY / build, ignore=shutil.ignore_patterns(*IGNORED))
+        files(SHARED_HOST)
+        shutil.copytree(SHARED_HOST, APP_COPY / HOST, ignore=shutil.ignore_patterns(*IGNORED))
     shutil.copyfile(WEB_REGISTRATION, APP_COPY / "installation.json")
-    print(f"Copied {'no build (the Web registration is empty)' if build is None else build} "
+    print(f"Copied {'no build (the Web registration is empty)' if build is None else build + ' and the shared host page'} "
           f"into {APP_COPY.relative_to(ROOT)}")
 
 

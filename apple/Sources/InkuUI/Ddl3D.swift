@@ -1,4 +1,5 @@
 import Foundation
+import InkuCore
 import InkuHost
 import InkuPersistence
 import Observation
@@ -19,6 +20,8 @@ public enum Ddl3DInstallation {
         public let build: String
         /// The bundled copy of `web/static/experimental/ddl-3d/<build>/`.
         public let directory: URL
+        /// The bundled copy of the parent page the native apps share, `experiments/ddl-3d/host/`.
+        public let hostDirectory: URL
     }
 
     /// Web `configuredViewer`: only a versioned path of the registered form names a build; anything else is none.
@@ -51,7 +54,10 @@ public enum Ddl3DInstallation {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: directory.appendingPathComponent("index.html").path, isDirectory: &isDirectory),
               !isDirectory.boolValue else { return nil }
-        return Registered(viewerPath: path, build: build, directory: directory)
+        let host = root.appendingPathComponent("host", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: host.appendingPathComponent("host.html").path, isDirectory: &isDirectory),
+              !isDirectory.boolValue else { return nil }
+        return Registered(viewerPath: path, build: build, directory: directory, hostDirectory: host)
     }
 }
 
@@ -105,23 +111,22 @@ public struct Ddl3DInputError: Error, Equatable, Sendable {
     public let reason: String
 }
 
-/// Web `snapshot()`: the experiment receives the Score and the saved drawing metadata, never application state.
+/// Web `snapshot()`: the experiment receives the Score and the saved drawing metadata, never application state. The
+/// projection is the shared core's (`ddl3d_snapshot`, as Android's): it picks the Web's fields in their order, leaves
+/// out nulls, refuses an unsafe numeric seed, drops the white space outside strings and keeps the 16 MiB budget.
 public enum Ddl3DInput {
-    /// The Web's fields in its order (`input.ts`). Saved works here carry no render build number or DDL versions,
-    /// so the app's snapshot holds a subset of them.
+    /// The Web's fields in its order (`input.ts`, core `ddl3d::FIELDS`). Saved works here carry no render build number
+    /// or DDL versions, so the app's snapshot holds a subset of them.
     public static let webFields = ["score", "render_seed", "composition_seed", "render_wild", "render_canvas_aspect_id",
                                    "render_canvas_aspect_ratio", "render_canvas_aspect", "render_color_map",
                                    "render_color_catalog_id", "render_engine_id", "render_engine_version",
                                    "render_build_number", "ddl_version", "ddl_engine_version"]
-    public static let maximumBytes = 16 * 1024 * 1024
 
-    /// The saved Score and color map go in as their stored JSON text; seeds stay decimal strings and never pass
-    /// through a binary number, so 2^53 + 1 arrives as written.
-    public static func snapshot(_ work: SavedWork) throws(Ddl3DInputError) -> String {
+    /// The render metadata the core reads, from this app's saved columns: Android hands the stored metadata text,
+    /// which works saved here do not keep. Seeds stay decimal strings and never pass through a binary number, so
+    /// 2^53 + 1 arrives as written; the color map goes in as its stored JSON text.
+    static func metadata(_ work: SavedWork) -> String {
         var members: [(String, String)] = []
-        let score = work.score.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard case .object = try? ExactJSON(data: Data(score.utf8)) else { throw Ddl3DInputError(reason: "invalid_score_json") }
-        members.append(("score", score))
         func string(_ key: String, _ value: String?) { if let value { members.append((key, ExactJSON.string(value).text)) } }
         string("render_seed", work.renderSeed)
         string("composition_seed", work.compositionSeed)
@@ -131,15 +136,23 @@ public enum Ddl3DInput {
         string("render_canvas_aspect", work.renderCanvasAspect)
         // Server reads an unreadable stored map as null, and the Web leaves a null out.
         if let map = work.renderColorMap?.trimmingCharacters(in: .whitespacesAndNewlines),
-           let value = try? ExactJSON(data: Data(map.utf8)), value != .null {
+           (try? ExactJSON(data: Data(map.utf8))) != nil {
             members.append(("render_color_map", map))
         }
         string("render_color_catalog_id", work.renderColorCatalogID)
         string("render_engine_id", work.renderEngineID)
         string("render_engine_version", work.renderEngineVersion)
-        let json = "{" + members.map { ExactJSON.string($0.0).text + ":" + $0.1 }.joined(separator: ",") + "}"
-        guard json.utf8.count <= maximumBytes else { throw Ddl3DInputError(reason: "input_budget_exceeded") }
-        return json
+        return "{" + members.map { ExactJSON.string($0.0).text + ":" + $0.1 }.joined(separator: ",") + "}"
+    }
+
+    /// The core's answer, or its reason (`invalid_score_json`, `unsafe_numeric_seed`, `input_budget_exceeded`, ...).
+    public static func snapshot(_ work: SavedWork) throws(Ddl3DInputError) -> String {
+        let request = ExactJSON.object(["score": .string(work.score), "metadata": .string(metadata(work))]).data
+        guard let answer = try? ExactJSON(data: InkuCore.ddl3dSnapshot(request)) else {
+            throw Ddl3DInputError(reason: "internal_invariant")
+        }
+        if let json = answer["json"].string { return json }
+        throw Ddl3DInputError(reason: answer["error"].string ?? "invalid_input")
     }
 }
 

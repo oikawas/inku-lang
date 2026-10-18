@@ -256,6 +256,13 @@ public enum InkuCore {
         InkuCoreBindings.providerWire(inputBytes: input)
     }
 
+    /// The experimental 3D viewer's input (`inku.ddl3d.v1`, Web `snapshot()`), shared with Android:
+    /// `{"score": "<stored Score text>", "metadata": "<render metadata object text>"}` in, `{"json": "<input>"}` or
+    /// `{"error": "<reason>"}` out.
+    public static func ddl3dSnapshot(_ input: Data) -> Data {
+        InkuCoreBindings.ddl3dSnapshot(inputBytes: input)
+    }
+
     /// `inku.completion-range-states.v1` for `{config, source, completion_ranges}`: each range a completion wrote,
     /// as completed, numbers changed or words changed, with UTF-16 positions in the source.
     public static func completionRangeStates(_ input: Data) -> Data {

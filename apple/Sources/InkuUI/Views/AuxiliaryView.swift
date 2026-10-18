@@ -97,15 +97,14 @@ public struct AuxiliaryView: View {
         }.disabled(auxiliary.running || auxiliary.selectingSource || model.isBusy)
     }
 
-    /// Web `inku-ai-refine-settings`: mode, generations, the two dimensions and the Vision direction, not the wild switch.
+    /// Web `inku-ai-refine-settings`: generations, the two dimensions and the Vision direction, not the wild switch.
     private var refineChoices: AIRefineChoices {
-        AIRefineChoices(visionMode: auxiliary.visionMode, generations: auxiliary.generations,
+        AIRefineChoices(generations: auxiliary.generations,
                         kinds: AuxiliaryProvider.allowedKinds.filter(auxiliary.enabledKinds.contains), direction: auxiliary.direction)
     }
     private func restoreRefineChoices() {
         refineChoicesRestored = true
         guard let saved = model.display.preferences.aiRefine else { return }
-        auxiliary.visionMode = saved.visionMode
         if (1...10).contains(saved.generations) { auxiliary.generations = saved.generations }
         auxiliary.enabledKinds = Set(saved.kinds.filter(AuxiliaryProvider.allowedKinds.contains))
         auxiliary.direction = saved.direction
@@ -115,22 +114,19 @@ public struct AuxiliaryView: View {
         @Bindable var auxiliary = auxiliary
         return GroupBox(model.display.localized("世代を限定した自律推敲")) {
             VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Text(model.display.localized("方式")).inkuFont(12).foregroundStyle(.secondary)
-                    InkuSegmentedButtons(options: [(false, model.display.localized("ランダム")), (true, "AI Vision")], selection: $auxiliary.visionMode)
-                }
+                // AIRefineModal.svelte: the only method is Vision, so its hint opens the dialog (2026-10-18).
+                Text(model.display.webCopy("aiRefineVisionModeHint", "画像を観察し、次の世代で変える要素（色カタログか配置）を選びます。"))
+                    .inkuFont(12).foregroundStyle(.secondary)
                 if auxiliary.sourceIsLocked {
                     Text(model.display.webCopy("aiRefineHeldNote", "DDLを編集した作品です。色・配置の世代を、この作品のDDLから描きます。"))
                         .inkuFont(12).foregroundStyle(.secondary)
                 }
-                if auxiliary.visionMode {
-                    visionSelection
-                    TextField(model.display.localized("AI に伝える方向性"), text: $auxiliary.direction, axis: .vertical).lineLimit(2...4)
-                        .disabled(auxiliary.running || auxiliary.selectingSource || model.isBusy)
-                        .inkuTooltip(model.display.tooltip("AIへ伝える方針は160文字までです。"), focus: .text)
-                    Text("\(auxiliary.direction.utf16.count) / \(AuxiliaryModel.directionLimit)").inkuFont(12).foregroundStyle(.secondary)
-                }
-                Text(model.display.localized(auxiliary.visionMode ? "上のモデルが観察し、同じモデルで各世代を描きます。" : "制作のモデルで描きます。"))
+                visionSelection
+                TextField(model.display.localized("AI に伝える方向性"), text: $auxiliary.direction, axis: .vertical).lineLimit(2...4)
+                    .disabled(auxiliary.running || auxiliary.selectingSource || model.isBusy)
+                    .inkuTooltip(model.display.tooltip("AIへ伝える方針は160文字までです。"), focus: .text)
+                Text("\(auxiliary.direction.utf16.count) / \(AuxiliaryModel.directionLimit)").inkuFont(12).foregroundStyle(.secondary)
+                Text(model.display.localized("上のモデルが観察し、同じモデルで各世代を描きます。"))
                     .inkuFont(12).foregroundStyle(.secondary)
                 Stepper(model.display.localizedFormat("生成する世代数: %ld", auxiliary.generations), value: $auxiliary.generations, in: 1...10)
                 HStack {
@@ -147,7 +143,7 @@ public struct AuxiliaryView: View {
                     if !auxiliary.inheritWild { Toggle(model.display.localized("ワイルド"), isOn: $auxiliary.wildOverride) }
                 }
                 Button(model.display.localizedFormat("%ld 世代の推敲を開始", auxiliary.generations), systemImage: "play") { Task { await auxiliary.startRefinement(app: model) } }
-                    .disabled(auxiliary.sourceWork == nil || auxiliary.enabledKinds.isEmpty || (auxiliary.visionMode && auxiliary.modelReference.isEmpty))
+                    .disabled(auxiliary.sourceWork == nil || auxiliary.enabledKinds.isEmpty || auxiliary.modelReference.isEmpty)
             }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
         }.disabled(auxiliary.running || auxiliary.selectingSource || model.isBusy)
     }

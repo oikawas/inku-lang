@@ -3,91 +3,9 @@ import AppKit
 import SwiftUI
 import WebKit
 
-/// The parent page of the viewer frame (Web `Ddl3DHost.svelte`'s iframe and listener). It checks the origin, the
-/// frame's window, the mount identity and the protocol, asks for the viewer's ready state when mounted and again
-/// after the frame loads, and relays both ways. Request numbers, the deadline and stale results are the controller's.
-enum Ddl3DHostPage {
-    static let html = """
-    <!doctype html>
-    <html lang="ja">
-    <head>
-    <meta charset="utf-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'">
-    <link rel="stylesheet" href="host.css">
-    </head>
-    <body><script src="host.js"></script></body>
-    </html>
-    """
-
-    static let css = """
-    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
-    iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
-    """
-
-    static let script = #"""
-    'use strict';
-    (() => {
-      const PROTOCOL = 'inku.ddl3d.v1';
-      const query = new URLSearchParams(location.search);
-      const mountId = query.get('mount') || '';
-      const viewer = query.get('viewer') || '';
-      const native = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.ddl3d;
-      let frame = null;
-      const tell = message => { if (native) native.postMessage(message); };
-      const fail = reason => tell({ type: 'host-failed', mountId, reason });
-      const hex64 = value => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
-      const count = value => Number.isSafeInteger(value) && value >= 0 ? value : -1;
-      // Web protocol.ts validViewState.
-      const vector = a => Array.isArray(a) && a.length === 3 && a.every(n => Number.isFinite(n) && Math.abs(n) < 10000);
-      const validViewState = v => !!v && typeof v === 'object' && vector(v.position) && vector(v.target)
-        && Number.isFinite(v.zoom) && v.zoom >= 0.001 && v.zoom <= 1000
-        && (v.projection === 'perspective' || v.projection === 'orthographic') && v.depth >= 0.1 && v.depth <= 3
-        && (v.layerSpacing === undefined || (Number.isFinite(v.layerSpacing) && v.layerSpacing >= 0 && v.layerSpacing <= 3))
-        && (v.background === undefined || ['none', 'support', 'sky', 'stars', 'paint', 'white', 'black'].includes(v.background))
-        && (v.referenceHeight === undefined || (Number.isFinite(v.referenceHeight) && v.referenceHeight > 0 && v.referenceHeight < 1000))
-        && (v.displayZoom === undefined || (Number.isFinite(v.displayZoom) && v.displayZoom > 0 && v.displayZoom <= 10000))
-        && Number.isFinite(v.orthoHeight) && v.orthoHeight > 0 && v.orthoHeight < 1000;
-      function deliver(message) {
-        if (!frame || !frame.contentWindow) return;
-        try { frame.contentWindow.postMessage(message, location.origin); }
-        catch (error) { fail('post_failed:' + ((error && error.name) || 'error')); }
-      }
-      window.addEventListener('message', event => {
-        if (!frame || event.origin !== location.origin || event.source !== frame.contentWindow) return;
-        const data = event.data;
-        if (!data || typeof data !== 'object' || data.mountId !== mountId) return;
-        if (data.protocol !== PROTOCOL) { tell({ type: 'protocol-mismatch', mountId }); return; }
-        const requestId = Number.isSafeInteger(data.requestId) ? data.requestId : -1;
-        if (data.type === 'ready') tell({ type: 'ready', mountId, requestId });
-        else if (data.type === 'rendered' && hex64(data.inputDigest)) {
-          tell({ type: 'rendered', mountId, requestId, inputDigest: data.inputDigest, objectCount: count(data.objectCount),
-                 triangles: count(data.triangles), bytes: count(data.bytes), preparationMs: count(data.preparationMs) });
-        } else if (data.type === 'failed' && typeof data.reason === 'string') {
-          tell({ type: 'failed', mountId, requestId, reason: data.reason.slice(0, 500) });
-        } else if (data.type === 'view-state' && validViewState(data.viewState)) {
-          tell({ type: 'view-state', mountId, requestId, viewState: JSON.stringify(data.viewState) });
-        } else if (data.type === 'return-2d') tell({ type: 'return-2d', mountId, requestId });
-      });
-      const requestReady = () => deliver({ protocol: PROTOCOL, type: 'request-ready', mountId, requestId: 0 });
-      window.inku3d = { deliver, focus() { if (frame) frame.focus(); } };
-      if (!/^[A-Za-z0-9._-]{1,128}$/.test(mountId)
-          || !/^\/experimental\/ddl-3d\/[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}\/index\.html$/.test(viewer)) { fail('invalid_mount'); return; }
-      frame = document.createElement('iframe');
-      frame.title = query.get('title') || '3D';
-      frame.allow = 'fullscreen';
-      frame.allowFullscreen = true;
-      frame.referrerPolicy = 'no-referrer';
-      frame.addEventListener('load', requestReady);
-      document.body.append(frame);
-      // Navigate after attachment: a src set on a detached frame can leave it at about:blank (Web Ddl3DHost).
-      frame.src = viewer + '#mount=' + encodeURIComponent(mountId);
-      requestReady();
-    })();
-    """#
-}
-
-/// Serves the parent page and the registered viewer build under `inku-3d://viewer/`, read-only from the bundle.
-/// Nothing else is reachable: no other build, no path outside it, no network.
+/// Serves the parent page the native apps share with Android (`experiments/ddl-3d/host/`, the Web `Ddl3DHost.svelte`'s
+/// iframe and listener) and the registered viewer build under `inku-3d://viewer/`, read-only from the bundle. Nothing
+/// else is reachable: no other build, no path outside them, no network.
 final class Ddl3DSchemeHandler: NSObject, WKURLSchemeHandler {
     private let registration: Ddl3DInstallation.Registered
 
@@ -107,23 +25,24 @@ final class Ddl3DSchemeHandler: NSObject, WKURLSchemeHandler {
 
     func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) {}
 
-    /// The page itself, or one file of the registered build, by its path below the Web's `/experimental/ddl-3d/<build>/`.
+    /// One of the parent page's three files (`/host.html`, `/host.js`, `/host.css`), or one file of the registered
+    /// build by its path below the Web's `/experimental/ddl-3d/<build>/`.
     func resource(for url: URL) -> (data: Data, type: String)? {
         guard url.scheme == Ddl3DInstallation.scheme, url.host == Ddl3DInstallation.host else { return nil }
-        switch url.path {
-        case "/host.html": return (Data(Ddl3DHostPage.html.utf8), "text/html; charset=utf-8")
-        case "/host.js": return (Data(Ddl3DHostPage.script.utf8), "text/javascript; charset=utf-8")
-        case "/host.css": return (Data(Ddl3DHostPage.css.utf8), "text/css; charset=utf-8")
-        default: break
+        let root: URL, relative: Substring
+        if ["/host.html", "/host.js", "/host.css"].contains(url.path) {
+            root = registration.hostDirectory; relative = url.path.dropFirst()
+        } else {
+            let prefix = "/experimental/ddl-3d/\(registration.build)/"
+            guard url.path.hasPrefix(prefix) else { return nil }
+            root = registration.directory; relative = url.path.dropFirst(prefix.count)
         }
-        let prefix = "/experimental/ddl-3d/\(registration.build)/"
-        guard url.path.hasPrefix(prefix) else { return nil }
-        let parts = url.path.dropFirst(prefix.count).split(separator: "/", omittingEmptySubsequences: false)
+        let parts = relative.split(separator: "/", omittingEmptySubsequences: false)
         guard !parts.isEmpty, parts.allSatisfy({ part in
             !part.isEmpty && part != "." && part != ".."
                 && part.unicodeScalars.allSatisfy { $0.isASCII && (CharacterSet.alphanumerics.contains($0) || "._-".unicodeScalars.contains($0)) }
         }) else { return nil }
-        let file = parts.reduce(registration.directory) { $0.appendingPathComponent(String($1)) }
+        let file = parts.reduce(root) { $0.appendingPathComponent(String($1)) }
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: file.path, isDirectory: &isDirectory), !isDirectory.boolValue,
               let data = try? Data(contentsOf: file) else { return nil }

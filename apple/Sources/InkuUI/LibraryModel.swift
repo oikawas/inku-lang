@@ -96,6 +96,10 @@ public final class LibraryModel {
     @ObservationIgnored private let includeListSVG: Bool
     /// Told when works are deleted for good, to drop their thumbnails.
     @ObservationIgnored public var thumbnails: ArtworkThumbnails?
+    /// The library reads the next page's thumbnails into memory once its own page is listed; the history strip,
+    /// a LibraryModel of its own, does not.
+    @ObservationIgnored public var prefetchesThumbnails = false
+    @ObservationIgnored private var prefetchTask: Task<Void, Never>?
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var keepingPage = false
     @ObservationIgnored private var refreshToken = UUID()
@@ -218,6 +222,21 @@ public final class LibraryModel {
         startOffset = first - page * size
         page = max(0, min(page, pageCount - 1))
         if works.count > size { works = Array(works.prefix(size)) }
+        prefetchNextPage(token: refreshToken)
+    }
+
+    /// Thumbnails of the page that ← older shows next, read while this one is looked at.
+    private func prefetchNextPage(token: UUID) {
+        guard prefetchesThumbnails, let thumbnails, let database, !isGrouped else { return }
+        let offset = startOffset + (page + 1) * pageSize
+        guard offset < total else { return }
+        let (query, size, shown) = (filter, pageSize, works)
+        prefetchTask?.cancel()
+        prefetchTask = Task { @MainActor [weak self] in
+            guard let next = try? await database.libraryPage(query: query, limit: size, offset: offset, includeSVG: false),
+                  !Task.isCancelled, self?.refreshToken == token else { return }
+            await thumbnails.prefetch(next.items.map(\.work), keeping: shown)
+        }
     }
 
     public func refresh(refreshLineage: Bool = true) async {
@@ -260,6 +279,7 @@ public final class LibraryModel {
             // Deletions can leave the kept first work past the end; the pages then begin at the newest again.
             if startOffset > 0, startOffset >= total { startOffset = 0; page = 0; await refresh(refreshLineage: refreshLineage); return }
             if page >= pageCount { page = pageCount - 1; await refresh(refreshLineage: refreshLineage); return }
+            if !requestedGrouping { prefetchNextPage(token: token) }
             let visibleRoots = requestedGrouping && layout == .grid ? groups.map(\.id) : Array(expandedGroups)
             for root in visibleRoots {
                 guard refreshToken == token, !Task.isCancelled else { return }

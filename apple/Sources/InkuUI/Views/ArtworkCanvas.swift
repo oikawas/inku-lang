@@ -475,6 +475,33 @@ private struct VerticalCaption: View {
     }
 }
 
+/// Thumbnails that finish loading are shown together at most every 50 ms, so the decodes of a page become a few
+/// updates of the window rather than one each. One already in memory is shown at once.
+@MainActor
+final class ThumbnailPublication {
+    static let shared = ThumbnailPublication()
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+    private var flush: Task<Void, Never>?
+
+    func next() async {
+        await withCheckedContinuation { continuation in
+            waiting.append(continuation)
+            guard flush == nil else { return }
+            flush = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(50))
+                self?.release()
+            }
+        }
+    }
+
+    private func release() {
+        flush = nil
+        let ready = waiting
+        waiting = []
+        ready.forEach { $0.resume() }
+    }
+}
+
 @MainActor
 struct ArtworkThumbnail: View {
     let work: SavedWork
@@ -529,6 +556,7 @@ struct ArtworkThumbnail: View {
             if image != nil { return }
             do {
                 let rendered = try await thumbnails.image(for: work)
+                await ThumbnailPublication.shared.next()
                 guard !Task.isCancelled else { return }
                 displayedIdentity = requestedIdentity
                 image = rendered

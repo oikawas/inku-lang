@@ -15,6 +15,14 @@ public actor ArtworkThumbnails {
     public static let width = UInt32(ThumbnailStore.baseWidth * scale)
     /// Server `INKU_THUMBNAIL_WORKERS` default.
     public static let backgroundWorkers = 4
+    /// Stored PNGs decoded at once for the screen. A page asks for all its cards together; more decodes than this
+    /// only finish later together, and a page left early would still run them all.
+    public static let displayDecoders = 4
+    /// Of those, the most a prefetch may hold, so a turn's own reads start at once.
+    static let prefetchDecoders = 2
+    /// Two pages of decoded 512px thumbnails (about 1 MB each) besides the history strip and the lineage, so the
+    /// next page can wait in memory without pushing out the page on screen.
+    public static let defaultByteLimit = 160 * 1024 * 1024
 
     public struct Statistics: Sendable, Equatable {
         public var memoryHits = 0
@@ -30,18 +38,31 @@ public actor ArtworkThumbnails {
         public var decodesInFlight = 0
         /// The most stored PNGs decoded at the same time.
         public var maxDecodesInFlight = 0
+        /// Decoded ahead for the next page and kept in memory.
+        public var prefetched = 0
+    }
+
+    /// One read shared by every view that shows the same work; the last view to stop waiting cancels it.
+    private struct Load {
+        let task: Task<CGImage, Error>
+        let token: UUID
+        var waiters: Int
     }
 
     private var store: ThumbnailStore?
     private var database: InkuDatabase?
     private nonisolated let memory: ThumbnailMemoryCache
-    private var inFlight: [String: Task<CGImage, Error>] = [:]
+    private var inFlight: [String: Load] = [:]
+    private var decoding = 0
+    private var displayWaiters: [CheckedContinuation<Void, Never>] = []
+    private var prefetchWaiters: [CheckedContinuation<Void, Never>] = []
+    private var prefetchTask: Task<Void, Never>?
     private var pass: Task<Void, Never>?
     private var statistics = Statistics()
     private let display = DispatchQueue(label: "app.inku.thumbnails", qos: .userInitiated, attributes: .concurrent)
     private let background = DispatchQueue(label: "app.inku.thumbnails.bake", qos: .utility, attributes: .concurrent)
 
-    public init(byteLimit: Int = 96 * 1024 * 1024) {
+    public init(byteLimit: Int = ArtworkThumbnails.defaultByteLimit) {
         memory = ThumbnailMemoryCache(byteLimit: max(0, byteLimit))
     }
 
@@ -57,15 +78,105 @@ public actor ArtworkThumbnails {
             statistics.memoryHits += 1
             return image
         }
-        if let running = inFlight[key] { return try await running.value }
-        let (id, svg, renderHash) = (work.id, work.svg, work.renderHash)
-        let task = Task { try await self.load(id: id, svg: svg, renderHash: renderHash) }
-        inFlight[key] = task
-        statistics.loadsInFlight = inFlight.count
-        defer { inFlight[key] = nil; statistics.loadsInFlight = inFlight.count }
-        let image = try await task.value
-        memory.insert(image, for: key)
-        return image
+        let load: Load
+        if var running = inFlight[key], !running.task.isCancelled {
+            running.waiters += 1
+            inFlight[key] = running
+            load = running
+        } else {
+            let (id, svg, renderHash) = (work.id, work.svg, work.renderHash)
+            let token = UUID()
+            load = Load(task: Task { try await self.load(id: id, svg: svg, renderHash: renderHash, key: key, token: token) },
+                        token: token, waiters: 1)
+            inFlight[key] = load
+            statistics.loadsInFlight = inFlight.count
+        }
+        let token = load.token
+        return try await withTaskCancellationHandler {
+            try await load.task.value
+        } onCancel: {
+            Task { await self.leave(key: key, token: token) }
+        }
+    }
+
+    /// A view stopped waiting (its card now shows another work); the last one to go stops the read and its decode.
+    private func leave(key: String, token: UUID) {
+        guard var load = inFlight[key], load.token == token else { return }
+        load.waiters -= 1
+        inFlight[key] = load
+        if load.waiters <= 0 { load.task.cancel() }
+    }
+
+    /// Decodes the stored PNGs of the works the next page turn will show, into memory and behind the screen's own
+    /// reads. The works on screen now (`keeping`) are never pushed out for them. A newer prefetch replaces this one.
+    public func prefetch(_ works: [SavedWork], keeping shown: [SavedWork]) {
+        prefetchTask?.cancel()
+        let protected = Set(shown.map { Self.key($0.id, $0.renderHash) })
+        let targets = works.filter { !memory.contains(Self.key($0.id, $0.renderHash)) }
+        guard store != nil, !targets.isEmpty else { prefetchTask = nil; return }
+        prefetchTask = Task(priority: .utility) { await self.runPrefetch(targets, protecting: protected) }
+    }
+
+    /// Waits for the current prefetch. For checks.
+    public func prefetchFinished() async { await prefetchTask?.value }
+
+    private func runPrefetch(_ works: [SavedWork], protecting protected: Set<String>) async {
+        // Entries the screen uses from here on are its own and stay too.
+        let since = memory.currentUse()
+        await withTaskGroup(of: Void.self) { group in
+            var running = 0
+            for work in works {
+                if Task.isCancelled { break }
+                if running == Self.prefetchDecoders { await group.next(); running -= 1 }
+                group.addTask { await self.prefetchOne(work, protecting: protected, since: since) }
+                running += 1
+            }
+        }
+    }
+
+    private func prefetchOne(_ work: SavedWork, protecting protected: Set<String>, since: UInt64) async {
+        let key = Self.key(work.id, work.renderHash)
+        // The screen's reads go first, the store's included.
+        while !inFlight.isEmpty, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(15)) }
+        guard !Task.isCancelled, !memory.contains(key), let store,
+              let stored = try? await store.thumbnail(historyID: work.id, scale: Self.scale),
+              stored.sourceRenderHash == work.renderHash, !Task.isCancelled,
+              let image = try? await decodeLimited(stored.png, prefetch: true) else { return }
+        if memory.insert(image, for: key, protecting: protected, usedAfter: since) { statistics.prefetched += 1 }
+    }
+
+    private func acquireDecoder(prefetch: Bool) async {
+        if prefetch {
+            if decoding < Self.prefetchDecoders, displayWaiters.isEmpty { decoding += 1; return }
+            await withCheckedContinuation { prefetchWaiters.append($0) }
+        } else {
+            if decoding < Self.displayDecoders { decoding += 1; return }
+            await withCheckedContinuation { displayWaiters.append($0) }
+        }
+    }
+
+    /// Hands the slot to the screen's next decode, then to a prefetch while few run, else frees it.
+    private func releaseDecoder() {
+        if !displayWaiters.isEmpty { displayWaiters.removeFirst().resume(); return }
+        if !prefetchWaiters.isEmpty, decoding - 1 < Self.prefetchDecoders { prefetchWaiters.removeFirst().resume(); return }
+        decoding -= 1
+    }
+
+    private func decodeLimited(_ png: Data, prefetch: Bool) async throws -> CGImage? {
+        await acquireDecoder(prefetch: prefetch)
+        defer { releaseDecoder() }
+        try Task.checkCancellation()
+        statistics.decodesInFlight += 1
+        statistics.maxDecodesInFlight = max(statistics.maxDecodesInFlight, statistics.decodesInFlight)
+        defer { statistics.decodesInFlight -= 1 }
+        return await Self.decode(png, on: prefetch ? background : display)
+    }
+
+    private func bakeLimited(_ svg: String) async throws -> (CGImage, Data) {
+        await acquireDecoder(prefetch: false)
+        defer { releaseDecoder() }
+        try Task.checkCancellation()
+        return try await Self.bake(svg: svg, on: display)
     }
 
     /// Like Web's cached PNG, a decoded image is available at presentation time without an
@@ -154,10 +265,16 @@ public actor ArtworkThumbnails {
         }
     }
 
-    private func load(id: String, svg: String, renderHash: String?) async throws -> CGImage {
+    private func load(id: String, svg: String, renderHash: String?, key: String, token: UUID) async throws -> CGImage {
+        defer {
+            if inFlight[key]?.token == token { inFlight[key] = nil }
+            statistics.loadsInFlight = inFlight.count
+        }
+        try Task.checkCancellation()
         if let store, let stored = try? await store.thumbnail(historyID: id, scale: Self.scale),
-           stored.sourceRenderHash == renderHash, let image = await countedDecode(stored.png) {
+           stored.sourceRenderHash == renderHash, let image = try await decodeLimited(stored.png, prefetch: false) {
             statistics.storeHits += 1
+            memory.insert(image, for: key)
             return image
         }
         do {
@@ -167,21 +284,17 @@ public actor ArtworkThumbnails {
             if !svg.isEmpty { source = svg }
             else if let database, let storedSVG = try await database.svgs(ids: [id])[id] { source = storedSVG }
             else { throw ArtworkError.imageUnavailable }
-            let (image, png) = try await Self.bake(svg: source, on: display)
+            let (image, png) = try await bakeLimited(source)
             statistics.bakedOnDisplay += 1
             try? await store?.put(historyID: id, scale: Self.scale, png: png, sourceRenderHash: renderHash)
+            memory.insert(image, for: key)
             return image
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             statistics.failed += 1
             throw error
         }
-    }
-
-    private func countedDecode(_ png: Data) async -> CGImage? {
-        statistics.decodesInFlight += 1
-        statistics.maxDecodesInFlight = max(statistics.maxDecodesInFlight, statistics.decodesInFlight)
-        defer { statistics.decodesInFlight -= 1 }
-        return await Self.decode(png, on: display)
     }
 
     private nonisolated static func key(_ id: String, _ renderHash: String?) -> String { id + "\u{0}" + (renderHash ?? "") }
@@ -243,18 +356,43 @@ private final class ThumbnailMemoryCache: @unchecked Sendable {
         return entry.image
     }
 
-    func insert(_ image: CGImage, for key: String) {
-        let bytes = image.bytesPerRow * image.height
-        guard bytes <= byteLimit else { return }
+    /// Without counting as a use.
+    func contains(_ key: String) -> Bool {
         lock.lock(); defer { lock.unlock() }
-        if let previous = images.removeValue(forKey: key) { retainedBytes -= previous.bytes }
-        while retainedBytes + bytes > byteLimit, let oldest = images.min(by: { $0.value.use < $1.value.use }) {
-            retainedBytes -= oldest.value.bytes
-            images.removeValue(forKey: oldest.key)
+        return images[key] != nil
+    }
+
+    func currentUse() -> UInt64 {
+        lock.lock(); defer { lock.unlock() }
+        return clock
+    }
+
+    /// Makes room by dropping the least recently used images. A prefetch passes what must stay: the keys on screen
+    /// and anything used after `usedAfter`; if the rest cannot make room, nothing is dropped and nothing kept.
+    @discardableResult
+    func insert(_ image: CGImage, for key: String, protecting protected: Set<String> = [], usedAfter: UInt64 = .max) -> Bool {
+        let bytes = image.bytesPerRow * image.height
+        guard bytes <= byteLimit else { return false }
+        lock.lock(); defer { lock.unlock() }
+        let previous = images[key]?.bytes ?? 0
+        if retainedBytes - previous + bytes > byteLimit {
+            let candidates = images.filter { $0.key != key && !protected.contains($0.key) && $0.value.use <= usedAfter }
+                .sorted { $0.value.use < $1.value.use }
+            var freed = 0
+            var victims: [String] = []
+            for (candidate, entry) in candidates where retainedBytes - previous - freed + bytes > byteLimit {
+                victims.append(candidate)
+                freed += entry.bytes
+            }
+            guard retainedBytes - previous - freed + bytes <= byteLimit else { return false }
+            for victim in victims { images.removeValue(forKey: victim) }
+            retainedBytes -= freed
         }
+        if let old = images.removeValue(forKey: key) { retainedBytes -= old.bytes }
         clock &+= 1
         images[key] = Entry(image: image, bytes: bytes, use: clock)
         retainedBytes += bytes
+        return true
     }
 
     func remove(historyIDs: Set<String>) {

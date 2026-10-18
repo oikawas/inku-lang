@@ -212,6 +212,8 @@ private final class PagingMeter {
         let before = (refreshes: LibraryPerformanceProbe.refreshesStarted, lineage: LibraryPerformanceProbe.lineageReads,
                       cards: LibraryPerformanceProbe.cardBodies, nodes: LibraryPerformanceProbe.lineageNodeBodies,
                       layouts: LibraryPerformanceProbe.hostingLayouts)
+        // As after looking at the page for a moment: whatever it read ahead is in memory.
+        await app.thumbnails.prefetchFinished()
         await app.thumbnails.resetPeaks()
         let statistics = await app.thumbnails.currentStatistics()
         let start = ContinuousClock.now

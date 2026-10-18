@@ -276,6 +276,7 @@ public final class AppModel {
             await thumbnails.connect(store: try? ThumbnailStore(url: ThumbnailStore.url(besideDatabase: url)), database: database)
             await thumbnails.synchronize()
             library.thumbnails = thumbnails
+            library.prefetchesThumbnails = true
             displayRenderer.connectFailureLog(directory: url.deletingLastPathComponent())
             let personalRuntime = ChatGPTPlanRuntime(directory: url.deletingLastPathComponent().appendingPathComponent("personal-chatgpt", isDirectory: true))
             let ordinary: any ProviderTransport

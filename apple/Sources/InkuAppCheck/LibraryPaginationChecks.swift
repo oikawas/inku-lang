@@ -253,6 +253,44 @@ private func checkPageNumbersFromTheNewest(folder: URL) async throws {
     }
     print("Page numbers passed (600 works, 56 a page, opened at offset 112): \(opened.0) where the start-counted pager said "
           + "\(fromStart); older \(older); newer \(newer.joined(separator: ", ")) reaching offset 0; older again \(olderFromNewest).")
+
+    // Failure (Web 0f579f3d8, c69ede09f): a typed page asked for the page counted from the start, so a page before
+    // the opened work was out of reach; text that is not a number moved or read the page; the lineage view took a
+    // page before its start only from the start's own page. PLAN P2.
+    await library.open(at: ids[112])
+    let reopened = shown()
+    let first = (await library.goToTypedPage("1"), shown(), library.startOffset, library.page, library.works.first?.id)
+    await library.open(at: ids[112])
+    let last = (await library.goToTypedPage("99"), shown(), library.works.first?.id)
+    LibraryPerformanceProbe.reset()
+    LibraryPerformanceProbe.counting = true
+    var unmoved: [Bool] = []
+    for typed in ["abc", "", "  ", "11"] { unmoved.append(await library.goToTypedPage(typed)) }
+    LibraryPerformanceProbe.counting = false
+    let still = (shown(), LibraryPerformanceProbe.refreshesStarted)
+    guard reopened == "3 / 11", first.0, first.1 == "1 / 11", first.2 == 0, first.3 == 0, first.4 == ids[0],
+          last.0, last.1 == "11 / 11", last.2 == ids[560], unmoved == [false, false, false, false],
+          still.0 == "11 / 11", still.1 == 0 else {
+        throw CheckFailure.message("Typed page numbers: from \(reopened), 1 gave \(first), 99 gave \(last), "
+                                   + "abc/empty/blank/shown moved \(unmoved) leaving \(still.0) with \(still.1) reads")
+    }
+    // The lineage list counts single-work lineages, eight a page as the library view sets it.
+    library.layout = .list
+    library.grouped = true
+    library.pageSize = 8
+    await library.open(at: ids[112])
+    let lineageOpened = (shown(), library.startOffset, library.groups.first?.id)
+    await library.setPage(library.page + 1)
+    let lineageOlder = shown()
+    let lineageTyped = (await library.goToTypedPage("14"), shown(), library.startOffset, library.page, library.groups.first?.id)
+    guard lineageOpened.0 == "15 / 75", lineageOpened.1 == 112, lineageOpened.2 == ids[112] + "-node", lineageOlder == "16 / 75",
+          lineageTyped.0, lineageTyped.1 == "14 / 75", lineageTyped.2 == 104, lineageTyped.3 == 0,
+          lineageTyped.4 == ids[104] + "-node" else {
+        throw CheckFailure.message("Typed page in the lineage view: opened \(lineageOpened), older \(lineageOlder), 14 gave \(lineageTyped)")
+    }
+    print("Typed page numbers passed: from \(reopened), 1 went to \(first.1) at offset 0 and 99 to \(last.1); abc, empty, blank "
+          + "and the shown page moved nothing with \(still.1) reads; the lineage list opened at \(lineageOpened.0), went older to "
+          + "\(lineageOlder), and 14 typed there moved the start to 104 (\(lineageTyped.1)).")
 }
 
 private actor PaginationLineageReader: LineageReading {

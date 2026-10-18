@@ -47,6 +47,25 @@ public struct LibraryPagePosition: Equatable, Sendable {
         self.total = before + max(1, Self.pages(total - startOffset, size))
     }
 
+    /// Web `libraryRelativePage` (Build 1266): the page to ask for when page `number` of these is typed, counted from
+    /// the start as `setPage` takes it. A negative page moves the start towards the newest, to where pressing ← newer
+    /// that many times would have put it. Numbers out of range land on the first or the last page.
+    public static func relativePage(_ number: Int, startOffset: Int, pageSize: Int, total: Int) -> Int {
+        let size = max(1, pageSize)
+        let position = LibraryPagePosition(startOffset: startOffset, page: 0, pageSize: size, total: total)
+        return min(max(1, number), position.total) - 1 - pages(max(0, startOffset), size)
+    }
+
+    /// Web `LibraryPageInput.commit` (Build 1266): the page a typed text names, kept within 1...total, or nil when it
+    /// does not move: empty, not a number (JavaScript `Number`, here `Double`), or the page shown.
+    public static func typedPage(_ text: String, current: Int, total: Int) -> Int? {
+        let typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !typed.isEmpty, let value = Double(typed), value.isFinite else { return nil }
+        // Kept within the pages before it becomes an Int, so a very large number cannot overflow.
+        let target = Int(min(max(1, value.rounded(.towardZero)), Double(max(1, total))))
+        return target == current ? nil : target
+    }
+
     /// `Math.ceil(count / size)` for a positive size; nothing to count is no page.
     private static func pages(_ count: Int, _ size: Int) -> Int { count <= 0 ? 0 : (count + size - 1) / size }
 }
@@ -321,6 +340,20 @@ public final class LibraryModel {
     public func setLatestPage() async {
         startOffset = 0
         await setPage(0)
+    }
+
+    /// Web `LibraryPageInput` `onJump` (Build 1266): go to the page a typed number names, counted from the newest as the
+    /// pager prints it. A page before the start moves the start as ← newer would, from any page, in the timeline and in
+    /// a lineage view alike; a number out of range lands on the first or the last page. Text that is not a number, or
+    /// names the shown page, moves nothing and reads nothing. Returns whether it moved.
+    @discardableResult
+    public func goToTypedPage(_ text: String) async -> Bool {
+        let position = pagePosition
+        guard let target = LibraryPagePosition.typedPage(text, current: position.current, total: position.total) else {
+            return false
+        }
+        await setPage(LibraryPagePosition.relativePage(target, startOffset: startOffset, pageSize: pageSize, total: total))
+        return true
     }
 
     /// Web `setPageSize`: the grid measured another capacity, because the window or the preview column changed its

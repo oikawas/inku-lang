@@ -192,6 +192,18 @@ pub fn provider_wire(input_bytes: Vec<u8>) -> Vec<u8> {
     .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
 }
 
+/// The experimental 3D viewer's input (`inku.ddl3d.v1`, Web `snapshot()`):
+/// `{"score": "<stored Score text>", "metadata": "<stored render metadata
+/// text>"}` in, `{"json": "<input>"}` or `{"error": "<reason>"}` out. A panic
+/// answers `{"error": "internal_invariant"}`.
+#[uniffi::export]
+pub fn ddl3d_snapshot(input_bytes: Vec<u8>) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::ddl3d::snapshot_json(&input_bytes)
+    }))
+    .unwrap_or_else(|_| br#"{"error":"internal_invariant"}"#.to_vec())
+}
+
 /// A description's identity `dh1`, as Server's `identity.description_hash`
 /// computes it. Every host asks this one copy so stored identities agree.
 #[uniffi::export]

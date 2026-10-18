@@ -317,6 +317,9 @@ data class InkuUiState(
     val refinementPreviewId: String? = null,
     // Something unsaved is about to be dropped and the author is asked first.
     val discardConfirm: DiscardConfirm? = null,
+    // The work is shown in the experimental 3D view (Web's `viewMode`). Kept in
+    // memory while moving between works and in and out of the full screen.
+    val canvas3d: Boolean = false,
     // 検分 (SPEC :616). The model comparison is a sub-view beside 調整 rather
     // than a screen of its own, and it shares every field above: the
     // candidates, the busy flag, the stop and the save are the refinement's.
@@ -4206,6 +4209,10 @@ class InkuViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             repository.setStarred(item.id, !item.starred)
         }
+    }
+
+    fun setCanvas3d(on: Boolean) {
+        localState.value = localState.value.copy(canvas3d = on)
     }
 
     fun setHistoryTrashView(on: Boolean) {

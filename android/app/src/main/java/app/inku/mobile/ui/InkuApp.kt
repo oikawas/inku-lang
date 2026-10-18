@@ -526,6 +526,8 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
         state.cameraCaptureState.locksCameraInteraction || state.cameraCaptureState is CameraCaptureState.Failed ->
             viewModel::cancelCameraDevelopment
         state.discardConfirm != null -> viewModel::cancelDiscard
+        // 3D goes back to 2D before anything else is left (Web's Esc).
+        state.canvas3d && (state.canvasPresentationMode || (state.tab == AppTab.Compose && state.selectedHistory != null)) -> ({ viewModel.setCanvas3d(false) })
         state.canvasPresentationMode -> viewModel::exitCanvasPresentationMode
         state.confirmDdlOverwrite -> viewModel::cancelDdlOverwrite
         state.ddlEditorOpen -> viewModel::closeDdlEditor
@@ -2637,6 +2639,12 @@ private fun CanvasHeroCard(
     var exportSheetOpen by remember { mutableStateOf(false) }
     var generationInfoOpen by remember { mutableStateOf(false) }
     var pngExporting by remember { mutableStateOf(false) }
+    // The experimental 3D view (Web's `viewMode`): offered only for a work, and
+    // only when the build carries a registered viewer.
+    val ddl3dRegistered = remember(context) { ddl3dRegistration(context) }
+    val ddl3dController = remember { app.inku.mobile.ui.ddl3d.Ddl3DController(app.inku.mobile.ui.ddl3d.MainThreadDdl3DTimer) }
+    val ddl3dOffered = ddl3dRegistered != null && item != null && showControls
+    val show3d = ddl3dOffered && state.canvas3d
     var sentPrompts by remember(item?.id) { mutableStateOf<SentPrompts?>(null) }
     LaunchedEffect(item?.id, state.renderTab) {
         if (item != null && state.renderTab == RenderTab.Prompt) {
@@ -2730,6 +2738,15 @@ private fun CanvasHeroCard(
                                     canvasMessage = strings.hashCopied
                                 },
                             )
+                            // Next to the hash, as on web; it names where it goes.
+                            if (ddl3dOffered) {
+                                MiniPill(
+                                    text = if (state.canvas3d) "2D" else "3D",
+                                    selected = state.canvas3d,
+                                    modifier = Modifier.semantics { contentDescription = strings.ddl3dMode },
+                                    onClick = { viewModel.setCanvas3d(!state.canvas3d) },
+                                )
+                            }
                             Spacer(Modifier.weight(1f))
                             TextButton(onClick = viewModel::enterCanvasPresentationMode) { Text(S.fullScreen) }
                         }
@@ -2751,14 +2768,17 @@ private fun CanvasHeroCard(
                         // full screen used to be bound the other way round, so
                         // the same finger movement meant opposite things
                         // depending on which of the two canvases was on screen.
+                        // In 3D a finger turns the model, so the swipe and the
+                        // taps of the 2D canvas step aside.
                         .historySwipeNavigation(
-                            enabled = presentation && state.canvasZoom <= CANVAS_FIT_ZOOM + CANVAS_ZOOM_EPSILON,
+                            enabled = presentation && !show3d && state.canvasZoom <= CANVAS_FIT_ZOOM + CANVAS_ZOOM_EPSILON,
                             gestureKey = item?.id,
                             deviceRotation = deviceRotation,
                             onSwipeRight = viewModel::selectPreviousHistory,
                             onSwipeLeft = viewModel::selectNextHistory,
                         )
-                        .pointerInput(item?.id, state.canvasPresentationMode, oneToOneZoom) {
+                        .pointerInput(item?.id, state.canvasPresentationMode, oneToOneZoom, show3d) {
+                            if (show3d) return@pointerInput
                             detectTapGestures(
                                 onTap = { if (presentation) presentationChromeVisible = !presentationChromeVisible },
                                 onDoubleTap = {
@@ -2779,9 +2799,19 @@ private fun CanvasHeroCard(
                     } else {
                         Modifier.fillMaxSize()
                     }
-                    Box(modifier = canvasModifier) {
+                    Box(modifier = if (show3d) Modifier.fillMaxSize() else canvasModifier) {
                         if (item == null) {
                             CanvasPlaceholderPreview(modifier = Modifier.fillMaxSize())
+                        } else if (show3d && ddl3dRegistered != null) {
+                            Ddl3DCanvas(
+                                item = item,
+                                registered = ddl3dRegistered,
+                                controller = ddl3dController,
+                                english = state.uiLanguage.isEnglish,
+                                onReturn = { viewModel.setCanvas3d(false) },
+                                onMessage = { canvasMessage = it },
+                                modifier = Modifier.fillMaxSize(),
+                            )
                         } else {
                             ArtworkPreview(
                                 item,
@@ -2838,7 +2868,7 @@ private fun CanvasHeroCard(
                             )
                         }
                     }
-                    if (presentation) ArtworkDisplayStatus(previewStatus, Modifier.align(Alignment.Center))
+                    if (presentation && !show3d) ArtworkDisplayStatus(previewStatus, Modifier.align(Alignment.Center))
                     if (presentation && state.demoWaitingSeconds != null) {
                         Surface(
                             modifier = Modifier
@@ -2869,8 +2899,12 @@ private fun CanvasHeroCard(
                                 .align(Alignment.BottomCenter)
                                 .padding(start = Dimens.spaceL, end = Dimens.spaceL, bottom = Dimens.spaceL),
                             counter = historyCounter,
-                            zoomPercent = (state.canvasZoom * 100).toInt(),
-                            onResetZoom = viewModel::resetCanvasZoom,
+                            // In 3D the zoom is the viewer's own, and resetting it
+                            // returns to the front view matched to the 2D canvas.
+                            zoomPercent = if (show3d) (ddl3dController.displayZoom * 100).toInt() else (state.canvasZoom * 100).toInt(),
+                            onResetZoom = if (show3d) ddl3dController::reset else viewModel::resetCanvasZoom,
+                            ddl3dLabel = if (ddl3dOffered) (if (state.canvas3d) "2D" else "3D") else null,
+                            onToggle3d = { viewModel.setCanvas3d(!state.canvas3d) },
                             starred = item?.starred == true,
                             canGoOlder = canGoOlder,
                             canGoLatest = canGoLatest,
@@ -4818,6 +4852,15 @@ internal fun VersionInfoPanel(viewModel: InkuViewModel, modifier: Modifier = Mod
             VersionInfoRow("applicationId", BuildConfig.APPLICATION_ID)
             VersionInfoRow("render engine", renderEngineIdentity)
         }
+        val context = LocalContext.current
+        val ddl3dRegistered = remember(context) { ddl3dRegistration(context) }
+        var noticesOpen by remember { mutableStateOf(false) }
+        ddl3dRegistered?.let { registered ->
+            SettingsCard(S.ddl3dTitle, S.ddl3dNotices, registered.build) {
+                SecondarySmallButton(S.ddl3dNotices, onClick = { noticesOpen = true })
+            }
+            if (noticesOpen) Ddl3DNoticesDialog(registered, onDismiss = { noticesOpen = false })
+        }
     }
 }
 
@@ -6724,7 +6767,7 @@ private fun JSONObject.putFrom(source: JSONObject, key: String, fallback: Any? =
     }
 }
 
-private data class SharePayload(
+internal data class SharePayload(
     val uri: Uri,
     val mimeType: String,
     val subject: String,
@@ -6815,7 +6858,7 @@ private fun buildHistoryPngPayload(context: Context, item: HistoryItemEntity, ta
  * PNG can be megabytes, and each work and height kept its own file. A
  * file older than a day has long been read by whatever it was shared to.
  */
-private fun exportCacheDir(context: Context): File {
+internal fun exportCacheDir(context: Context): File {
     val dir = File(context.cacheDir, "exports")
     check(dir.isDirectory || dir.mkdirs()) { "Export cache is unavailable." }
     val cutoff = System.currentTimeMillis() - EXPORT_RETENTION_MS
@@ -6827,7 +6870,7 @@ private fun exportCacheDir(context: Context): File {
 
 private const val EXPORT_RETENTION_MS = 24L * 60L * 60L * 1000L
 
-private fun launchShareIntent(context: Context, payload: SharePayload) {
+internal fun launchShareIntent(context: Context, payload: SharePayload) {
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = payload.mimeType
         putExtra(Intent.EXTRA_SUBJECT, payload.subject)
@@ -7447,6 +7490,8 @@ private fun PresentationControls(
     // reading how it was made have to be reachable from here as well.
     onExport: (() -> Unit)? = null,
     onGenerationInfo: (() -> Unit)? = null,
+    ddl3dLabel: String? = null,
+    onToggle3d: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -7477,6 +7522,7 @@ private fun PresentationControls(
             )
             PresentationControlButton("›", enabled = canGoOlder, onClick = onGoOlder)
             PresentationControlButton(S.description, selected = captionVisible, enabled = captionEnabled, wide = true, onClick = onToggleCaption)
+            ddl3dLabel?.let { PresentationControlButton(it, selected = it == "2D", onClick = onToggle3d) }
             Box {
                 PresentationControlButton("⋯", onClick = { menuOpen = true })
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {

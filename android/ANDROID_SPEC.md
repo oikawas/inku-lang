@@ -6,6 +6,18 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-10-18.
 
+## 2026-10-18 Experimental 3D view of a work
+
+At the author's request the experimental 3D view of Web and macOS now reaches Android (frozen plan `android-task/ddl3d-20261018`). The shapes are drawn by Web's viewer build (Three.js, Worker, WASM); Android does not rebuild it and only connects it in a WebView. The sources of truth are `experiments/ddl-3d/README.md` and its protocol `inku.ddl3d.v1`.
+
+- Distribution: on every build the Gradle task `syncDdl3dViewer` reads Web's registration `web/src/lib/features/experimental-3d/installation.json` and copies the registered `web/static/experimental/ddl-3d/<build>/` unchanged into generated assets (`ddl3d/`), with the registration and the shared parent page. No copy is committed; a new Web registration arrives with the next build. With an empty `viewerUrl` only the registration is copied and no 3D switch is shown. A JVM test compares the copy with Web's build file by file.
+- Parent page: the viewer requires a same-origin parent window, so the native-neutral parent page in `experiments/ddl-3d/host/`, shared by Apple and Android, sits between them. The WebView serves only that page and the registered build's files under `https://appassets.androidplatform.net/` (anything else is a 404; nothing goes to the network). Messages travel as JSON text on one MessagePort per mount. The 15-second deadline is native.
+- Input: the work's Score and saved drawing metadata are projected onto the 14 fields of Web's `snapshot()` by the shared core's `ddl3d_snapshot` (JNI `NativePipelineBridge.ddl3dSnapshot`; UniFFI `ddl3d_snapshot` for Swift). Values keep their stored spelling with only white space removed, so a seed above 2^53 arrives as written; an unsafe numeric seed is refused (`unsafe_numeric_seed`) and an input over 16 MiB is `input_budget_exceeded`. Four cases matched Web's implementation byte for byte.
+- Screen: the row above a work shows 3D / 2D next to the hash, and the full screen's control row shows the same switch. In 3D the canvas holds the viewer; the swipe and the 2D taps step aside, and the full screen's zoom figure and reset are the viewer's. Preparing shows "Preparing 3D…" with Return to 2D; a failure shows its text with Details, Retry and Return to 2D. Back returns from 3D to 2D. The view state stays in memory for the same input only and is never stored. The wording is Web's seven `ddl3d*` labels.
+- The viewer's PNG and GLB saves are read by the parent page from their same-origin blob and handed to the app, which offers them on the export share sheet.
+- Third-party notices: Settings → Version has "3D view (experiment) licenses", which reads `THIRD_PARTY_NOTICES.txt` from the APK's copy when opened.
+- No database, saved work or 2D drawing changes. No WebView is created until 3D is chosen.
+
 ## 2026-10-18 Navigation and the making of a work
 
 Fixes for the navigation gaps a code and on-device review found.

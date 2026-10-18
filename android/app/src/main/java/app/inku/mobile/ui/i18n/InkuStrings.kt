@@ -250,6 +250,16 @@ interface InkuStrings {
     val ddlOverwriteRedraw: String
     val cameraChatGptCannotReadPhoto: String
     val discard: String
+    // Web's seven `ddl3d*` labels (experimental 3D view).
+    val ddl3dMode: String
+    val ddl3dTitle: String
+    val ddl3dPreparing: String
+    val ddl3dFailed: String
+    val ddl3dDetails: String
+    val ddl3dRetry: String
+    val ddl3dReturn: String
+    val ddl3dNotices: String
+    val ddl3dShareFailed: String
     val discardCandidatesTitle: String
     fun discardCandidatesBody(count: Int): String
     val discardInstructionsTitle: String

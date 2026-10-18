@@ -92,7 +92,7 @@ struct LibraryModelFactsView: View {
                         .lineLimit(compact ? 1 : nil)
                         .textSelection(.enabled)
                 }
-                .inkuTooltip(display.tooltipValue(display.localized(fact.label) + ": " + (fact.reference ?? display.localized("未記録"))))
+                .inkuTooltip(display.tooltipValue(display.localized(fact.label) + ": " + (fact.reference ?? display.localized("未記録"))), focus: .none)
             }
         }.inkuFont(compact ? 10 : 12)
     }
@@ -113,7 +113,7 @@ struct LibraryModelLinesView: View {
                 let unrecorded = display.webCopy("historyModelUnrecorded", fallback: "未記録")
                 (Text(role.map { $0 + ":" } ?? "").foregroundStyle(.secondary) + Text(line.compact ?? unrecorded))
                     .lineLimit(1).truncationMode(.tail)
-                    .inkuTooltip(display.tooltipValue((role.map { $0 + ": " } ?? "") + (line.full ?? unrecorded)))
+                    .inkuTooltip(display.tooltipValue((role.map { $0 + ": " } ?? "") + (line.full ?? unrecorded)), focus: .none)
             }
         }
         .inkuFont(12).lineSpacing(3)

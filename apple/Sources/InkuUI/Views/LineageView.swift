@@ -396,7 +396,7 @@ struct LineageView: View {
                         }
                         if work.trashed { Text(model.display.localized("ゴミ箱（復元可能）")).inkuFont(12).foregroundStyle(.secondary) }
                         LibraryWorkTitle(work: work, untitled: model.display.localized("無題"), lineLimit: 2, size: 14)
-                            .inkuTooltip(model.display.tooltipValue(work.effectiveSourceText.isEmpty ? (work.descriptionHash ?? "") : work.effectiveSourceText))
+                            .inkuTooltip(model.display.tooltipValue(work.effectiveSourceText.isEmpty ? (work.descriptionHash ?? "") : work.effectiveSourceText), focus: .none)
                     }
                 }.buttonStyle(.plain).disabled(model.isBrowsingLocked)
                     .simultaneousGesture(TapGesture(count: 2).onEnded { openInCanvas(work) })
@@ -453,7 +453,7 @@ struct LineageView: View {
             Text(operation(graph.edges.first { $0.childNodeID == item.id }?.derivationKind)).fixedSize()
             if let work = item.work, !stageModelNames(work).isEmpty {
                 Text(stageModelNames(work)).lineLimit(1).truncationMode(.tail)
-                    .inkuTooltip(model.display.tooltipValue(stageModelTitle(work)))
+                    .inkuTooltip(model.display.tooltipValue(stageModelTitle(work)), focus: .none)
             }
         }.inkuFont(12).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
     }

@@ -14,7 +14,7 @@ import UniformTypeIdentifiers
 /// is hosted with the hidden lineage view in a window that is never ordered in. Nothing here opens the author's
 /// database, a provider or the fixed app, and nothing is shown on screen.
 ///
-/// Usage: `InkuAppCheck --library-paging-perf-only [--json <path>] [--size <width>x<height>] [--view-parents]`
+/// Usage: `InkuAppCheck --library-paging-perf-only [--json <path>] [--size <width>x<height>] [--view-parents] [--soak <turns>]`
 @MainActor
 func runLibraryPagingPerformance(arguments: [String]) async throws {
     func value(_ flag: String) -> String? {
@@ -95,7 +95,7 @@ func runLibraryPagingPerformance(arguments: [String]) async throws {
     print("L7 lineage marks: \(offPage.count) revision-marked lineage nodes off the first page; marked before paging \(lineageMarksBefore), after \(lineageMarksAfter)")
 
     print("")
-    print("turn                  refresh lineage cards  nodes  NSViews decodes mem/store  first_ms  settle_ms  main_cpu_ms  layout_ms  works")
+    print("turn                  refresh lineage cards  nodes  NSViews decodes mem/store  first_ms  settle_ms  main_cpu_ms  layout_ms  passes  works")
     for turn in turns {
         print(turn.row)
     }
@@ -109,6 +109,12 @@ func runLibraryPagingPerformance(arguments: [String]) async throws {
           + "main CPU median \(PagingMeter.format(median(turns.map(\.mainCPU)))) ms")
     print("Medians: settle \(PagingMeter.format(median(turns.map(\.settle)))) ms, first paint \(PagingMeter.format(median(turns.map(\.firstPaint)))) ms, "
           + "layout+display \(PagingMeter.format(median(turns.map(\.layout)))) ms, lineage node bodies \(Int(median(turns.map { Double($0.lineageNodeBodies) })))")
+
+    // For a profiler attached by pid: more turns after the measured ones, printing nothing per turn.
+    if let soak = value("--soak").flatMap(Int.init), soak > 0 {
+        print("Soak: \(soak) more turns (pid \(ProcessInfo.processInfo.processIdentifier))")
+        for index in 0..<soak { _ = try await meter.turn(label: "soak", to: 4 + index % 6) }
+    }
 
     if let jsonURL {
         let document: [String: Any] = [
@@ -133,6 +139,7 @@ private struct PagingTurn {
     let lineageReads: Int
     let cardBodies: Int
     let lineageNodeBodies: Int
+    let layouts: Int
     let viewCount: Int
     let maxDecodes: Int
     let memoryHits: Int
@@ -153,13 +160,13 @@ private struct PagingTurn {
         return pad(label, 20) + left(refreshes, 9) + left(lineageReads, 8) + left(cardBodies, 7) + left(lineageNodeBodies, 7)
             + left(viewCount, 9) + left(maxDecodes, 8) + left("\(memoryHits)/\(storeHits)", 11)
             + left(PagingMeter.format(firstPaint), 10) + left(PagingMeter.format(settle), 11)
-            + left(PagingMeter.format(mainCPU), 13) + left(PagingMeter.format(layout), 11)
+            + left(PagingMeter.format(mainCPU), 13) + left(PagingMeter.format(layout), 11) + left(layouts, 8)
             + "  \(shownFrom)-\(shownTo)/\(pageSize)"
     }
 
     var json: [String: Any] {
         ["label": label, "refreshes": refreshes, "lineage_reads": lineageReads,
-         "card_bodies": cardBodies, "lineage_node_bodies": lineageNodeBodies, "nsviews": viewCount,
+         "card_bodies": cardBodies, "lineage_node_bodies": lineageNodeBodies, "hosting_layouts": layouts, "nsviews": viewCount,
          "max_concurrent_decodes": maxDecodes, "memory_hits_at_publish": memoryHits, "store_hits": storeHits,
          "first_paint_ms": firstPaint, "settle_ms": settle, "main_thread_cpu_ms": mainCPU,
          "layout_display_ms": layout, "page_size": pageSize, "shown_from": shownFrom, "shown_to": shownTo]
@@ -203,7 +210,8 @@ private final class PagingMeter {
     func turn(label: String, to target: Int) async throws -> PagingTurn {
         let library = app.library
         let before = (refreshes: LibraryPerformanceProbe.refreshesStarted, lineage: LibraryPerformanceProbe.lineageReads,
-                      cards: LibraryPerformanceProbe.cardBodies, nodes: LibraryPerformanceProbe.lineageNodeBodies)
+                      cards: LibraryPerformanceProbe.cardBodies, nodes: LibraryPerformanceProbe.lineageNodeBodies,
+                      layouts: LibraryPerformanceProbe.hostingLayouts)
         await app.thumbnails.resetPeaks()
         let statistics = await app.thumbnails.currentStatistics()
         let start = ContinuousClock.now
@@ -220,6 +228,7 @@ private final class PagingMeter {
             lineageReads: LibraryPerformanceProbe.lineageReads - before.lineage,
             cardBodies: LibraryPerformanceProbe.cardBodies - before.cards,
             lineageNodeBodies: LibraryPerformanceProbe.lineageNodeBodies - before.nodes,
+            layouts: LibraryPerformanceProbe.hostingLayouts - before.layouts,
             viewCount: viewCount(), maxDecodes: after.maxDecodesInFlight, memoryHits: memoryHits,
             storeHits: after.storeHits - statistics.storeHits,
             firstPaint: settled.firstPaint.map(Self.ms) ?? -1, settle: Self.ms(settled.wall),

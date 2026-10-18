@@ -109,7 +109,7 @@ import InkuHost
                         .labelsHidden()
                         .textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing).frame(width: 100)
                         .accessibilityLabel(copy.limitLabels[key] ?? key)
-                        .inkuTooltip(model.display.preferences.showTooltips ? copy.limitHints[key] ?? "" : "")
+                        .inkuTooltip(model.display.preferences.showTooltips ? copy.limitHints[key] ?? "" : "", focus: .text)
                     Button { step(key, by: 1, definition: definition) } label: { Image(systemName: "plus") }
                 }.buttonStyle(.borderless).disabled(saving || model.isBrowsingLocked)
             }

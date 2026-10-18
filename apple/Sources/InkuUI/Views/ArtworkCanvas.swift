@@ -518,7 +518,7 @@ struct ArtworkThumbnail: View {
                     .frame(width: 7, height: 7)
                     .padding(3)
                     .accessibilityLabel(label)
-                    .inkuTooltip(display.tooltipValue(label))
+                    .inkuTooltip(display.tooltipValue(label), focus: .none)
             }
         }
         .task(id: identity) {

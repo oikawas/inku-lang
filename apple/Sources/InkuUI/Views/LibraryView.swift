@@ -23,7 +23,8 @@ struct LibraryView: View {
     // Measurement bookkeeping is not view state. A height notification for every new card
     // used to invalidate the whole library; only an actual page-size change needs a redraw.
     @State private var measurements = LibraryGridMeasurements()
-    @FocusState private var focusedWorkID: String?
+    /// Keyboard focus by the reused card slot: a page turn changes no focus binding, only what the slot shows.
+    @FocusState private var focusedSlot: Int?
     @FocusState private var searchFocused: Bool
     @State private var previewComment = LibraryNoteEditorModel()
     private var library: LibraryModel { model.library }
@@ -292,7 +293,7 @@ struct LibraryView: View {
             .inkuFont(12).frame(minWidth: 120, maxWidth: 240, minHeight: 28)
             .background(LibraryChrome.panel2, in: RoundedRectangle(cornerRadius: 4))
             .overlay(RoundedRectangle(cornerRadius: 4).stroke(LibraryChrome.border))
-            .inkuTooltip(display.webCopy("historySearchHint", "ハッシュ値と作品IDは全体か先頭部分、ハッシュ値は下位4桁でも検索できます。"))
+            .inkuTooltip(display.webCopy("historySearchHint", "ハッシュ値と作品IDは全体か先頭部分、ハッシュ値は下位4桁でも検索できます。"), focus: .text)
         }
     }
 
@@ -358,7 +359,7 @@ struct LibraryView: View {
                           alignment: .leading, spacing: LibraryGridPaging.gap) {
                     // Reuse the finite page's native card slots instead of destroying every
                     // button/menu on each turn. Work-specific state has its own identity below.
-                    ForEach(Array(library.works.enumerated()), id: \.offset) { _, work in gridCard(work) }
+                    ForEach(Array(library.works.enumerated()), id: \.offset) { slot, work in gridCard(work, slot: slot) }
                 }
                 .padding(.top, 8).padding(.horizontal, 10).padding(.bottom, 6)
             }
@@ -408,7 +409,7 @@ struct LibraryView: View {
 
     // MARK: Cards (Web .manager-thumb-wrap)
 
-    private func gridCard(_ work: SavedWork) -> some View {
+    private func gridCard(_ work: SavedWork, slot: Int) -> some View {
         LibraryPerformanceProbe.cardBody()
         let selected = library.selectedIDs.contains(work.id)
         return VStack(alignment: .leading, spacing: 5) {
@@ -441,7 +442,7 @@ struct LibraryView: View {
             .frame(minHeight: 64, alignment: .top)
         }
         .padding(5)
-        .modifier(LibraryCardSurface(current: selected || preview.work?.id == work.id, focused: focusedWorkID == work.id, cornerRadius: 4))
+        .modifier(LibraryCardSurface(current: selected || preview.work?.id == work.id, focused: focusedSlot == slot, cornerRadius: 4))
         .background {
             GeometryReader { proxy in
                 Color.clear
@@ -451,13 +452,13 @@ struct LibraryView: View {
             }
         }
         .contextMenu { workMenu(work) }
-        .focusable().focused($focusedWorkID, equals: work.id)
+        .focusable().focused($focusedSlot, equals: slot)
         .onKeyPress(.return) {
-            guard focusedWorkID == work.id, !model.isBrowsingLocked else { return .ignored }
+            guard focusedSlot == slot, !model.isBrowsingLocked else { return .ignored }
             openWork(work); return .handled
         }
         .onKeyPress(.space) {
-            guard focusedWorkID == work.id, !library.mutating, !model.isBrowsingLocked else { return .ignored }
+            guard focusedSlot == slot, !library.mutating, !model.isBrowsingLocked else { return .ignored }
             library.toggleSelection(work.id); return .handled
         }
     }
@@ -467,7 +468,7 @@ struct LibraryView: View {
         (Text(Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(date: .numeric, time: .shortened))
             + Text(" · " + ByteCountFormatter.string(fromByteCount: svgBytes(work), countStyle: .file)))
             .inkuFont(10).monospacedDigit().foregroundStyle(.tertiary).lineLimit(1)
-            .inkuTooltip(display.tooltipValue(display.localized("色") + ": " + (work.renderColorCatalogName ?? work.catalogID ?? display.localized("未記録"))))
+            .inkuTooltip(display.tooltipValue(display.localized("色") + ": " + (work.renderColorCatalogName ?? work.catalogID ?? display.localized("未記録"))), focus: .none)
     }
 
     /// Web `.thumb-action-row`: star, revision mark, hash; the native share mark, lineage and menu follow.
@@ -583,7 +584,7 @@ struct LibraryView: View {
         #else
         ScrollView {
             LazyVStack(spacing: 8) {
-                ForEach(library.works, id: \.id) { work in gridCard(work) }
+                ForEach(Array(library.works.enumerated()), id: \.element.id) { slot, work in gridCard(work, slot: slot) }
             }.padding(.top, 8).padding(.horizontal, 10).padding(.bottom, 6)
         }
         #endif
@@ -756,7 +757,7 @@ struct LibraryView: View {
             .inkuFont(12).buttonStyle(.borderless)
         }
         .padding(5)
-        .modifier(LibraryCardSurface(current: selected || model.selectedWorkID == work.id, focused: focusedWorkID == work.id, cornerRadius: 4))
+        .modifier(LibraryCardSurface(current: selected || model.selectedWorkID == work.id, cornerRadius: 4))
         .contextMenu { workMenu(work) }
     }
 
@@ -926,7 +927,7 @@ struct LibraryView: View {
                 .background(plate ? AnyShapeStyle(.background.opacity(0.9)) : AnyShapeStyle(Color.accentColor.opacity(0.14)),
                             in: RoundedRectangle(cornerRadius: plate ? 3 : 8))
                 .overlay(RoundedRectangle(cornerRadius: plate ? 3 : 8).stroke(plate ? LibraryChrome.border : Color.clear))
-                .inkuTooltip(display.tooltip("世代番号", serverKey: "historyGenerationTitle"))
+                .inkuTooltip(display.tooltip("世代番号", serverKey: "historyGenerationTitle"), focus: .none)
         }
     }
 

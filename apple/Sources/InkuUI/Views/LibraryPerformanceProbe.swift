@@ -15,9 +15,12 @@ public enum LibraryPerformanceProbe {
     public private(set) static var cardBodies = 0
     /// Times a lineage node card built its view tree (the lineage view stays beneath the library).
     public private(set) static var lineageNodeBodies = 0
+    /// Layout passes of the probe's hosting view, each a SwiftUI update of the whole window.
+    public private(set) static var hostingLayouts = 0
 
     public static func reset() {
         refreshesStarted = 0; refreshesFinished = 0; lineageReads = 0; cardBodies = 0; lineageNodeBodies = 0
+        hostingLayouts = 0
     }
 
     static func refreshStarted() { if counting { refreshesStarted += 1 } }
@@ -29,7 +32,14 @@ public enum LibraryPerformanceProbe {
     #if os(macOS)
     /// The library overlay over a hidden lineage view, as `ContentView` keeps the shell beneath the library.
     public static func hostingView(model: AppModel, preview: LibraryPreviewModel) -> NSView {
-        NSHostingView(rootView: ProbeRoot(model: model, preview: preview))
+        CountingHostingView(rootView: ProbeRoot(model: model, preview: preview))
+    }
+
+    private final class CountingHostingView: NSHostingView<ProbeRoot> {
+        override func layout() {
+            if LibraryPerformanceProbe.counting { LibraryPerformanceProbe.hostingLayouts += 1 }
+            super.layout()
+        }
     }
 
     private struct ProbeRoot: View {

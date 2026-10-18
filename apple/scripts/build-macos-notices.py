@@ -34,6 +34,10 @@ TARGETS = ("aarch64-apple-darwin", "x86_64-apple-darwin")
 METER_MANIFEST = APPLE / "scripts/description-meter-resources.json"
 METER_RESOURCES = APPLE / "Packages/InkuHost/Sources/InkuHost/Resources/description-meter"
 FONT_RESOURCES = APPLE / "Packages/InkuExport/Sources/InkuExport/Resources"
+# The Web's 3D viewer as the app bundles it (apple/scripts/sync-ddl3d-viewer.py).
+DDL3D_RESOURCES = APPLE / "Sources/InkuUI/Resources/ddl3d"
+DDL3D_VIEWER_URL = re.compile(r"^/experimental/ddl-3d/([a-zA-Z0-9][a-zA-Z0-9._-]{0,63})/index\.html$")
+DDL3D_HEADER = re.compile(r"^===== (.+?) \((.+)\) / .+ =====$", re.MULTILINE)
 SWIFT_CHECKOUTS = (APPLE / "build/macOS/SourcePackages/checkouts", APPLE / ".build/checkouts")
 LICENSE_NAME = re.compile(r"^(licen[cs]e|copying|notice|copyright)", re.IGNORECASE)
 # Crate archives without a license file, supplemented from the upstream repository's
@@ -277,6 +281,28 @@ def bundled_resources(notices: Notices) -> None:
                 f"NotoSerifJP-Variable.ttf, unmodified. Font copyright: {font_name(font, 0)}")
 
 
+def ddl3d_viewer(notices: Notices) -> None:
+    """The bundled 3D viewer carries its own notices file, written by its build; it is shown whole."""
+    viewer_url = json.loads((DDL3D_RESOURCES / "installation.json").read_text(encoding="utf-8")).get("viewerUrl")
+    if viewer_url == "":
+        return
+    match = DDL3D_VIEWER_URL.match(viewer_url) if isinstance(viewer_url, str) else None
+    if not match:
+        raise NoticeError(f"the bundled 3D viewer registration names no versioned build: {viewer_url!r}")
+    build = match[1]
+    body = read_text(DDL3D_RESOURCES / build / "THIRD_PARTY_NOTICES.txt")
+    headers = DDL3D_HEADER.findall(body)
+    if not headers:
+        raise NoticeError(f"the 3D viewer {build} notices name no component")
+    identifiers = sorted({"MIT"} | {token for _, expression in headers
+                                    for token in re.findall(r"[A-Za-z0-9.\-]+", expression) if token not in {"AND", "OR", "WITH"}})
+    notices.add("ddl3d", "inku DDL 3D viewer (experiment)", build, ", ".join(identifiers), "https://github.com/oikawas/inku-lang",
+                [notices.text("THIRD_PARTY_NOTICES.txt", body)],
+                f"Built from experiments/ddl-3d in this repository and bundled unchanged from "
+                f"web/static/experimental/ddl-3d/{build}/ (its own notices file, covering the viewer and the "
+                f"{len({name for name, _ in headers})} components its build collected).")
+
+
 def build() -> dict:
     notices = Notices()
     sysroot = toolchain_sysroot()
@@ -288,6 +314,7 @@ def build() -> dict:
     rust_crates(notices, sysroot)
     native_libraries(notices)
     bundled_resources(notices)
+    ddl3d_viewer(notices)
     return {"schema": "inku.macos-third-party-notices.v1",
             "inputs": {"core/Cargo.lock": hashlib.sha256((ROOT / "core/Cargo.lock").read_bytes()).hexdigest(),
                        "apple/Package.resolved": hashlib.sha256((APPLE / "Package.resolved").read_bytes()).hexdigest()},

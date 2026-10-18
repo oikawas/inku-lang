@@ -62,6 +62,9 @@ python3 "$APPLE/scripts/build-macos-notices.py" --check
 cmp -s "$APPLE/Sources/InkuUI/Resources/third-party-notices.json" \
     "$BUILT_APP/Contents/Resources/InkuApple_InkuUI.bundle/Contents/Resources/third-party-notices.json" \
     || fail 'The built app carries different third-party notices; rebuild it.'
+# The bundled 3D viewer is the Web's registered build, file for file, in the sources and in the built app.
+python3 "$APPLE/scripts/sync-ddl3d-viewer.py" --check --app "$BUILT_APP" \
+    || fail 'The 3D viewer copy differs from the Web registration; run apple/scripts/sync-ddl3d-viewer.py and rebuild.'
 
 plist() { /usr/libexec/PlistBuddy -c "Print :$2" "$1/Contents/Info.plist" 2>/dev/null; }
 [[ "$(plist "$BUILT_APP" CFBundleShortVersionString)" == "$VERSION" \

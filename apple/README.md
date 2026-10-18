@@ -94,6 +94,8 @@ apple/scripts/package-macos-release.sh --identity "Developer ID Application: <na
 
 The third-party notices are a reviewed snapshot written by `apple/scripts/build-macos-notices.py`. Regenerate it when dependencies change; the release script stops a stale snapshot with `--check`.
 
+The work tab's experimental 3D viewer is the Web's registered distribution (`web/static/experimental/ddl-3d/<build>/`), copied unchanged into `Sources/InkuUI/Resources/ddl3d/` by `apple/scripts/sync-ddl3d-viewer.py`. When the Web registration changes, copy it again, then regenerate the third-party notices. The release script compares the copy and the built app's contents with the Web's distribution file by file (`--check --app`).
+
 ### Keep one app in the Dock
 
 The macOS icon is generated from the existing incu image and bundled with the app. Build and install at a fixed location with:

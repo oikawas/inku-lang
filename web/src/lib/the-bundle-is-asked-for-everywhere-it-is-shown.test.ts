@@ -11,6 +11,10 @@
 // count is four). So this counts the sites rather than checking a handful by
 // name: a test that named three would be green with the fourth still missing,
 // which is the failure it exists to catch.
+//
+// The fifth: opening the Library at the selected work asks for that work's
+// place in the filtered listing (`openAt`, 2026-10-17). It carries all three
+// marks, which the site-by-site comparison below holds it to.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -44,14 +48,19 @@ test('T-203  every place that asks for a filtered listing asks for the share bun
 
 	assert.equal(
 		revisionTotal,
-		4,
-		`the listing is built in ${revisionTotal} places, not 4 -- a site appeared or moved: ${JSON.stringify(revision)}`
+		5,
+		`the listing is built in ${revisionTotal} places, not 5 -- a site appeared or moved: ${JSON.stringify(revision)}`
 	);
 	assert.equal(
 		shareTotal,
-		4,
-		`the share filter reaches ${shareTotal} of the 4 request builders: ${JSON.stringify(share)}`
+		5,
+		`the share filter reaches ${shareTotal} of the 5 request builders: ${JSON.stringify(share)}`
 	);
+	// The fifth by name: the place of the selected work, under the same marks.
+	const openAt = SOURCES[0].source.slice(SOURCES[0].source.indexOf('private async openAt('), SOURCES[0].source.indexOf('const response = await this.apiFetch(`/api/history?${params}`);'));
+	assert.match(openAt, /if \(this\.starredOnly\) params\.set\('starred', 'true'\);/);
+	assert.match(openAt, /if \(this\.forRevisionOnly\) params\.set\('for_revision', 'true'\);/);
+	assert.match(openAt, /if \(this\.forShareOnly\) params\.set\('for_share', 'true'\);/);
 	// Site by site as well as in total, so four in one file and none in another
 	// cannot pass.
 	assert.deepEqual(share, revision);

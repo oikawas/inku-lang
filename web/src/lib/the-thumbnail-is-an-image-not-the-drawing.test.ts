@@ -158,7 +158,7 @@ test('the two listings that draw thumbnails ask for no drawings', () => {
 test('every other listing sender is accounted for', () => {
 	// The roll-call the flag needs, because its default is true: a sender that
 	// writes nothing keeps receiving every drawing and nothing goes wrong loudly.
-	// A fifth sender appearing makes this fail and has to be decided about.
+	// A sixth sender appearing makes this fail and has to be decided about.
 	const page = readFileSync(fileURLToPath(new URL('../routes/+page.svelte', import.meta.url)), 'utf-8');
 	const batch = readFileSync(fileURLToPath(new URL('./features/batch/state.svelte.ts', import.meta.url)), 'utf-8');
 	const browsing = readFileSync(fileURLToPath(new URL('./features/history/browsing-state.svelte.ts', import.meta.url)), 'utf-8');
@@ -167,7 +167,11 @@ test('every other listing sender is accounted for', () => {
 		(total, source) => total + [...source.matchAll(/apiFetch\(\s*(?:`|')\/api\/history\?/g)].length,
 		0
 	);
-	assert.equal(getters, 4, 'four senders ask the listing for works');
+	assert.equal(getters, 5, 'five senders ask the listing for works');
+
+	// The fifth (2026-10-17): the place of the selected work when the Library
+	// opens at it. One work's position, never its drawing.
+	assert.match(manager, /const params = new URLSearchParams\(\{ anchor_id: anchorId, offset: String\(this\.offset\), limit: '1', q: this\.search\.trim\(\), include_svg: 'false' \}\);/, 'the selected work\'s place must ask for no drawing');
 
 	// The fourth: the sender that reads whether the last batch reached the end of
 	// its prompt, and which lines of it have a work. It wants two numbers off each

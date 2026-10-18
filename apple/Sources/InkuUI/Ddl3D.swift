@@ -192,11 +192,14 @@ public final class Ddl3DController {
     }
 
     /// The 3D view went away (Web onDestroy): tell the viewer, stop the deadline, keep nothing of the mount.
+    /// The input goes too: the next view hands over its own, as a new Web host derives its own, so an earlier
+    /// work's snapshot (or its failure) never shows under the next mount.
     public func unmount(page: Ddl3DPage) {
         guard self.page === page else { return }
         send("dispose")
         timer?.cancel(); timer = nil
         self.page = nil; ready = false; preparing = false
+        input = nil; activeInput = ""
     }
 
     /// Web `retry()`: a new frame under the next mount identity.

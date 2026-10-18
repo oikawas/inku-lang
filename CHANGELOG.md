@@ -8,6 +8,16 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-18 — macOS: experimental 3D view in the work tab
+
+The app now bundles the Web's 3D viewer distribution (Build 1267's registration, `zero-length-v1-677428a8`) and shows a work in 3D in the work tab. The same viewer as the Web draws the solids, their depth and paint.
+
+- With a work shown, a 3D button stands immediately left of the hash button at the bottom right. It opens the viewer in the work's place and becomes 2D. Orbit, pan and zoom, views, background, solid thickness, layer depth and PNG/GLB saving are the viewer's controls, as on the Web.
+- In 3D, the central zoom controls zoom the viewer (⊙ returns to the front view matched to 2D), and the full-screen button and the Work menu's Full-screen display put only the canvas area in full screen. Esc leaves it.
+- While preparing, "Preparing 3D…" shows at the top left; a work that cannot be shown gets "3D is unavailable for this work." with Retry, Return to 2D and the reason under Details. Esc in the viewer returns to 2D.
+- The view, thickness, depth and background are kept in memory for the same work only and come back when 3D is reopened after 2D. Nothing is saved.
+- The viewer's third-party licenses (Three.js and the Rust crates in its WebAssembly) are listed under License in About inku as "3D view (experiment)".
+
 ### 2026-10-18 — macOS: Library page numbers from the newest, typed page numbers, and the work search in the history strip
 
 This follows the Web's Builds 1265–1267.

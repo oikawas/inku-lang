@@ -18,6 +18,23 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-18 作品タブの3D表示（実験）
+
+作者の指示（2026-10-18「3Dの実装に入って」）。凍結した計画`swift-task/ddl-3d-20261018`に沿い、WebのBuild 1267（`6ce57e952`）の3D表示の接続部（`web/src/lib/features/experimental-3d/`、`CanvasPanel.svelte`）に合わせた。前の作業で作者が選んだ「F8（2D/3D表示）はSwiftに移さない」は、作者の指示でこの節に置き換わる。下の「ライブラリを表示中の作品の位置で開く」の節の「Swiftに3D表示は無く、引かない」（`ddl3d*`の文言）も、この節で置き換わる。
+
+- 配布物：Webが`installation.json`に登録したビューア（今は`zero-length-v1-677428a8`。10ファイル、3.3 MB。Three.js・Worker・WASM入り）を、`apple/scripts/sync-ddl3d-viewer.py`で`Sources/InkuUI/Resources/ddl3d/<build>/`へそのまま写し、登録の写し（`ddl3d/installation.json`）と一緒に同梱する。3Dの形・奥行き・塗りはビューアとWebが正本で、Swiftは作り直さず、描き方の写しも持たない。`--check`は登録の一致と全ファイルのSHA-256をWebの配布物と比べ、比べたファイルの数を印字する。release scriptは`--check --app`で、完成したappの中の写しも比べる。Webの登録を変えたら写し直し、第三者通知を作り直す。
+- 切り方：写した登録の`viewerUrl`を空にすると、切替のボタンを出さず、配布物も読まない（Webの`configuredViewer`と同じ形の版付きの道だけを受ける）。そのときは配布物を同梱しない（`--check`が確かめる）。撤去の範囲は[DDL 3D experiment](../experiments/ddl-3d/README.md)の「Disable or remove」に書いた。
+- つなぎ：WKWebViewに、アプリ専用のスキーム`inku-3d://viewer/`で小さな親ページを読み込み、その中のiframeに同じスキームで配布物の`index.html#mount=<id>`を置く。ビューアは親が同じoriginの別の窓であることを検査するので（`main.ts`）、Webと同じ形にした。`file:`はoriginが`null`になるので使わない。スキームは親ページと登録した版のファイルだけを、バンドルから読み取りで返す（拡張子ごとの型。WASMは`application/wasm`。ほかの道は404）。データの置き場は保存しない（`nonPersistent`）。ビューアのPNG・GLBの保存は保存先を聞いてから書き、ほかの移動・新しい窓・ダウンロードは止める。WebContentのプロセスが落ちたら失敗として出す。
+- 親ページと制御：親ページはWebの`Ddl3DHost`と同じく、origin・iframeの窓・mountの番号・protocolを確かめ、mountの後とiframeの読み込みの後に`request-ready`を送り、メッセージを中継する。要求の番号、古い応答を捨てること、15秒の待ちはSwiftの`Ddl3DController`が持つ（親ページ自体が読めなくても待ちが切れるように）。3Dの表示が現れるたびに新しいmount（番号・要求・待ち）で、消えると`dispose`を送る。再試行は次のmountの番号でiframeを作り直す。
+- 入力：Webの`snapshot()`と同じ欄を、保存済み作品・新しく描いた作品・未保存の候補の`SavedWork`から作る（`Ddl3DInput.snapshot`）。Scoreと色の対応は保存したJSONの文字のまま入れ、種は10進の文字列のまま数に通さない。16 MiBを超えたら送らずに`input_budget_exceeded`の失敗を出す。Swiftの保存作品には描画のBuild番号・DDLの版の欄が無いので、`render_build_number`・`ddl_version`・`ddl_engine_version`は入らない（ビューアはこの3つを読まない）。保存したScoreがJSONのオブジェクトとして読めなければ`invalid_score_json`で失敗にする。
+- 画面：作品タブで作品があるときだけ、右下のハッシュのボタンのすぐ左に「3D」／「2D」のボタン（読み上げは`ddl3dMode`、ツールチップは`ddl3dTitle`／`ddl3dReturn`）。表示の簡易・詳細を問わず出す（Webと同じ）。3Dの間は作品の画像の場所にビューアを置き、詞書・印・角の操作はそのまま重ねる。準備中は左上に`ddl3dPreparing`と「2Dに戻る」、失敗は作品の場所を覆って`ddl3dFailed`・再試行・2Dに戻る・`ddl3dDetails`（理由）を出す。文言は`ui-reference.json`の`ddl3d*`を引く。
+- 拡大と全画面：3Dの間は中央の拡大の操作がビューアの拡大（`viewer-command`の`zoom`）へ向く。段はSwiftの2Dと同じ1.25倍、範囲も0.25〜10。表示する率は2Dと同じく当てはめの倍率を掛けた数で、切り替えた時点で2Dと同じ数から始まる。⊙は2Dに合わせた正面へ戻す（`reset`）。最初の正面は2Dの画像の表示の大きさ・位置・拡大から合わせる（Webの`initialView`）。全画面のボタンと「作品」メニューの「全画面で表示」は、3Dの間は2Dのプレゼンテーションでなく、キャンバスの領域だけを全画面の窓に出す（Webの`canvasAreaEl.requestFullscreen()`。レール・入力パネル・タブの行を外し、履歴帯は畳む）。Escはまず全画面を出る。3Dを離れたとき、窓の全画面を窓のボタンで出たときも、キャンバスの全画面は終わる。ビューア自身の全画面（ツールバーの「全画面」）はWKWebViewの要素の全画面で開く。
+- Esc：3Dを選ぶとビューアにキーボードを渡し、ビューアにキーボードがある間はEscで2Dに戻る（ビューアの`return-2d`）。
+- 見た目の状態：カメラ・厚み・レイヤー奥行き・背景は、同じ入力の間だけメモリに残し（Webの`remember`／`recall`）、2Dへ戻って3Dを開き直すと戻る。保存しない。2Dの拡大と位置は別に保つ。
+- 第三者の表示：配布物の`THIRD_PARTY_NOTICES.txt`を、「inkuについて」のライセンス一覧の「3D表示（実験）」に全文で載せる（`build-macos-notices.py`が同梱の写しから読み、Release添付の第三者通知にも入る）。作り直しで、写しの入力の`core/Cargo.lock`のハッシュも今の値になった（部品の一覧は前と同じ136に、この1つが加わって137）。
+- Webと違う所：iOSは3Dを出さない（WebKitのつなぎはmacOSだけ。iOSのアプリのターゲットは無く、今のcoreの成果物もmacOSだけで、iOS向けのbuildは確かめていない）。入力が作れないとき、Webは最初の15秒の待ちを残すが、Swiftは止める。同じ入力のままなら読み直さない（Webは作品のオブジェクトが替わるたびに送り直す）。拡大の段と表示の率はSwiftの2Dに合わせた（Webは0.25ずつ足し、当てはめを100%と出す）。全画面中のEscは、窓の中のどこにキーボードがあっても全画面を出る（ブラウザの全画面と同じく、ビューアには届かない）。
+- 確認：AppCheck `--ddl3d-only`（窓に載せない画面外のWKWebView、960×640）。ready 215 ms、`fixtures/solids.json`の文字のままの入力で234 ms後に`rendered`、`inputDigest`はSwiftで計ったSHA-256と一致、9物体、17,058三角形、準備219 ms。Scoreでない入力は`invalid_score_or_version`の`failed`、再試行で新しいmountがreadyになり同じ入力はまた失敗する。種を2^53+1にした保存作品の入力は14欄のうち11欄（入らない3欄は上の版の欄）で、種は10進の文字列のまま、ビューアの`inputDigest`は入力のSHA-256と一致。作品タブと同じ組み立てのSwiftUIの器（このプロセスが作り、前に出さない窓）でも、別のmountで同じ入力を278 msで描き、`inputDigest`が一致した。module Worker・WASMはアプリ専用スキームで読めた。`--tooltips-leftovers-only`はWebの3Dの2か所（切替のツールチップとiframeの`title=`）の行を足して170か所・159一致・欠け0・除外11。`sync-ddl3d-viewer.py --check --app`は写しと完成appのそれぞれ10ファイルが一致。`build-macos-notices.py --check`は137部品で一致。Releaseのbuildは通り、同梱でappは約4.7 MB（resourceのbundleで3.8 MB。配布物3.4 MBと第三者通知の0.42 MB）大きくなった。切替の見た目、実際の窓での回す・拡大、Esc、キャンバスとビューアの全画面、PNG・GLBの保存先の確認、失敗の表示と再試行は、作者の画面での確認に残す。
+
 ## 2026-10-18 ライブラリのページ番号と番号の入力、履歴帯の作品の検索
 
 作者の指示（2026-10-18「以下の変更を反映」）。WebのBuild 1265〜1267のライブラリと履歴帯の変更（`72cc0ca77`、`0f579f3d8`、`c69ede09f`、`c265e28bb`、`f62812ed3`）に合わせた。次の節の「起点の後にWebへ入ったライブラリの変更（Build 1261〜1265…）は含めない」は、この節で取り込んだ。

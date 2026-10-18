@@ -35,3 +35,4 @@ vite.config.ts.timestamp-*
 !/static/experimental/ddl-3d/dense-presence-v1-bc5a988d/
 !/static/experimental/ddl-3d/dense-ready-v1-5ef728a0/
 !/static/experimental/ddl-3d/paint-depth-v2-9bf4aacc/
+!/static/experimental/ddl-3d/object-depth-v3-deac4943/

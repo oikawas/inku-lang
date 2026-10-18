@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-18 — Keep other 3D shapes visible when a line has zero length
-
-A straight line with identical endpoints no longer stops the whole 3D work with `degenerate_geometry`. Zero-length lines are kept separate without adding solids, while other shapes remain visible. The 3D controls show their count and original instruction numbers, and GLB retains their source IDs. Saved Scores and normal 2D rendering are unchanged.
-
 ### 2026-10-18 — macOS: open the Library at the shown work, and open works with a double click
 
 This follows the Web's 2026-10-17 change.
@@ -118,6 +114,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.192 (2026-10-18 / Build 1268)
+
+### 2026-10-18 — Keep other 3D shapes visible when a line has zero length
+
+A straight line with identical endpoints no longer stops the whole 3D work with `degenerate_geometry`. Zero-length lines are kept separate without adding solids, while other shapes remain visible. The 3D controls show their count and original instruction numbers, and GLB retains their source IDs. Saved Scores and normal 2D rendering are unchanged.
 
 ## v2.15.191 (2026-10-18 / Build 1267)
 

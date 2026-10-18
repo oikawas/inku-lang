@@ -165,6 +165,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
@@ -7517,19 +7518,23 @@ private fun PresentationControls(
             // ‹ is the newer work, as the swipe to the right is and as web's
             // left-hand button is (CanvasPanel.svelte `nav-left`).
             PresentationControlButton("‹", enabled = canGoNewer, onClick = onGoNewer)
-            // With the 3D button the counter's share is about 56 dp (each 32 dp
-            // button takes a 48 dp touch target), and "39 / 371" at a 1.15 font
-            // scale needs 57: it broke after the slash, and autoSize did not
-            // shrink it on the device. Thin spaces and no side padding make it
-            // about 46 dp of 64.
-            Text(
-                counter.replace(" / ", "\u2009/\u2009"),
-                modifier = Modifier.weight(1f),
-                color = PresentationControlLabelMuted,
-                style = MaterialTheme.typography.labelSmall,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-            )
+            // The counter's share is what the six buttons leave (about 41 dp:
+            // each 32 dp button takes a 48 dp touch target), and "39 / 371" at a
+            // 1.15 font scale is wider. It broke after the slash, a thin space
+            // broke the same way, and autoSize did not shrink it on the device.
+            // So the text is measured and set smaller just enough to fit, with
+            // spaces that do not break.
+            BoxWithConstraints(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                val measurer = rememberTextMeasurer()
+                val base = MaterialTheme.typography.labelSmall
+                val text = counter.replace(" / ", "\u202F/\u202F")
+                val available = constraints.maxWidth
+                val style = remember(text, available, base) {
+                    val width = measurer.measure(text, base, softWrap = false, maxLines = 1).size.width
+                    if (width <= available || width == 0) base else base.copy(fontSize = base.fontSize * (available * 0.96f / width))
+                }
+                Text(text, color = PresentationControlLabelMuted, style = style, textAlign = TextAlign.Center, maxLines = 1, softWrap = false)
+            }
             PresentationControlButton("›", enabled = canGoOlder, onClick = onGoOlder)
             PresentationControlButton(S.description, selected = captionVisible, enabled = captionEnabled, wide = true, onClick = onToggleCaption)
             ddl3dLabel?.let { PresentationControlButton(it, selected = it == "2D", onClick = onToggle3d) }

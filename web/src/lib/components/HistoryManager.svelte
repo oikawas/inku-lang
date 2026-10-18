@@ -1162,7 +1162,7 @@
 									{#each lineageThumbsMode ? lineageLaneItems(group) : membersInGenerationOrder(lineageGroupItems[group.root_node_id]) as it (it.id ?? it.at)}
 										<div class="lineage-member" class:current-work={currentHistoryId === it.id} class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
 											<button type="button" class="selection-checkbox" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={() => toggleSelection(it)}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
-											{#if lineageThumbsMode && it.lineage_generation != null}<span class="lineage-generation-badge" title={t().historyGenerationTitle}>{it.lineage_generation}</span>{/if}
+											{#if lineageThumbsMode && it.id && currentHistoryId === it.id}<span class="lineage-current-badge">{t().historyCurrentBadge}</span>{:else if lineageThumbsMode && it.lineage_generation != null}<span class="lineage-generation-badge" title={t().historyGenerationTitle}>{it.lineage_generation}</span>{/if}
 											<div class="lineage-member-content">
 												<button use:focusWork={it.id} data-library-work-id={it.id} class="lineage-member-main" type="button" title={t().historyPreviewTitle} onclick={() => void openPreview(it)} ondblclick={() => openThumbnail(it)}>
 													<HistoryThumbnail item={it} scope={'lineage-member-' + it.id} size={historyManagerTab === 'list' ? 'mini' : 'manager'} />
@@ -1223,6 +1223,7 @@
 							tabindex={historyManagerView === 'active' ? 0 : -1}
 						>
 							<HistoryThumbnail item={it} scope="manager" size="manager" />
+							{#if it.id && currentHistoryId === it.id}<span class="thumb-current-badge">{t().historyCurrentBadge}</span>{/if}
 						</div>
 						<div class="manager-thumb-actions">
 							{#if it.display_label}<span class="history-display-label">{it.display_label}</span>{/if}
@@ -1413,6 +1414,22 @@
 		background: color-mix(in srgb, var(--accent) 5%, var(--bg));
 	}
 	.lineage-history-list.thumbs-mode .lineage-member { flex: 0 0 142px; scroll-snap-align: start; }
+	/* The same badge the history strip puts on the work shown on the canvas;
+	   in a lineage lane it takes the generation number's place. */
+	.lineage-current-badge {
+		position: absolute; top: 8px; right: 8px; z-index: 5;
+		background: var(--accent); color: var(--accent-fg);
+		font-size: var(--ui-font-size-9);
+		padding: 1px 4px;
+		border-radius: 2px;
+	}
+	.manager-thumb .thumb-current-badge {
+		position: absolute; bottom: 3px; right: 3px; z-index: 2;
+		background: var(--accent); color: var(--accent-fg);
+		font-size: var(--ui-font-size-9);
+		padding: 1px 4px;
+		border-radius: 2px;
+	}
 	.lineage-generation-badge {
 		position: absolute; top: 8px; right: 8px; z-index: 5;
 		min-width: 16px; padding: 1px 5px;

@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Base64
 import android.util.Log
+import android.view.ViewGroup
 import android.webkit.ConsoleMessage
 import android.webkit.URLUtil
 import android.webkit.WebChromeClient
@@ -60,6 +61,10 @@ internal class Ddl3DWebHost(
     private val waiting = mutableListOf<JSONObject>()
 
     init {
+        // Without layout params AndroidView gives the view WRAP_CONTENT, and a web
+        // view whose height wraps its content lays the page out 0 px tall: the
+        // viewer drew into a frame no one could see (Build148421, black screen).
+        webView.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         webView.setBackgroundColor(Color.TRANSPARENT)
         webView.settings.apply {
             javaScriptEnabled = true

@@ -159,5 +159,14 @@ class Ddl3DTest {
         assertTrue(page.sent.isEmpty())
     }
 
+    /** A web view left at WRAP_CONTENT lays its page out 0 px tall: the 3D view rendered, black (Build148421). */
+    @Test
+    fun theWebViewFillsItsPlaceSoThePageHasAHeight() {
+        val source = listOf("app/src/main/java/app/inku/mobile/ui/ddl3d/Ddl3DWebView.kt", "android/app/src/main/java/app/inku/mobile/ui/ddl3d/Ddl3DWebView.kt",
+            "src/main/java/app/inku/mobile/ui/ddl3d/Ddl3DWebView.kt").map(::File).first(File::isFile).readText()
+        val init = source.substring(source.indexOf("    init {"), source.indexOf("webView.settings.apply"))
+        assertTrue(init.contains("webView.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)"))
+    }
+
     private fun sha256(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 }

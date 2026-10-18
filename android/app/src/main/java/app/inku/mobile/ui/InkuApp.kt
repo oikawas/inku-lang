@@ -78,8 +78,10 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -7512,13 +7514,16 @@ private fun PresentationControls(
             // ‹ is the newer work, as the swipe to the right is and as web's
             // left-hand button is (CanvasPanel.svelte `nav-left`).
             PresentationControlButton("‹", enabled = canGoNewer, onClick = onGoNewer)
-            Text(
+            // One line that shrinks rather than wraps: with the 3D button the
+            // counter's share is narrow, and "3 / 372" broke after the slash.
+            val counterStyle = MaterialTheme.typography.labelSmall
+            BasicText(
                 counter,
                 modifier = Modifier.weight(1f).padding(horizontal = Dimens.spaceXs),
-                color = PresentationControlLabelMuted,
-                style = MaterialTheme.typography.labelSmall,
-                textAlign = TextAlign.Center,
+                style = counterStyle.copy(color = PresentationControlLabelMuted, textAlign = TextAlign.Center),
                 maxLines = 1,
+                softWrap = false,
+                autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = counterStyle.fontSize),
             )
             PresentationControlButton("›", enabled = canGoOlder, onClick = onGoOlder)
             PresentationControlButton(S.description, selected = captionVisible, enabled = captionEnabled, wide = true, onClick = onToggleCaption)

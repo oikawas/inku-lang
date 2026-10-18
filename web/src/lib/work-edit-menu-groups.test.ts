@@ -32,3 +32,7 @@ test('a DDL work hides the description group with its heading', () => {
 	assert.match(MENU, /menuEl\?\.querySelectorAll<HTMLButtonElement>\('button'\)/);
 	assert.doesNotMatch(markup, /<button[^>]*class="work-action-group-label"/);
 });
+
+test('each item keeps to one line, the menu widening instead', () => {
+	assert.match(MENU, /\.work-action-dropdown > \.work-action-group > button \{ white-space: nowrap; \}/);
+});

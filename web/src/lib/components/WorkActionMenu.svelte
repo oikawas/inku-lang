@@ -172,6 +172,9 @@
 	.work-action-dropdown button { border: 0; background: transparent; color: var(--fg); padding: 6px 13px; font: inherit; font-size: var(--ui-font-size-12); line-height: 1.35; text-align: left; cursor: pointer; width: 100%; box-sizing: border-box; }
 	.work-action-dropdown button:hover { background: var(--bg2); }
 	.work-action-dropdown button:has(.work-action-llm) { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+	/* One line each: the menu widens to its longest item with its mark rather
+	   than folding "写生なし／ありで描き直す" under it (210px wrapped it on Build 1269). */
+	.work-action-dropdown > .work-action-group > button { white-space: nowrap; }
 	.work-action-group + .work-action-group { margin-top: 4px; border-top: 1px solid var(--border); }
 	.work-action-group-label { padding: 6px 13px 2px; color: var(--fg3); font-size: var(--ui-font-size-10); font-weight: 600; letter-spacing: 0.04em; }
 	.work-action-llm { flex-shrink: 0; padding: 0 4px; border: 1px solid var(--border2); border-radius: 3px; color: var(--fg3); font-size: var(--ui-font-size-9); font-weight: 600; line-height: 1.5; letter-spacing: 0.04em; }

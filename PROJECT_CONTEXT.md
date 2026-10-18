@@ -401,7 +401,7 @@ the complete suite remains a local gate;
 **(5) internal operational scripts**, which are maintained outside the product repository and are not CI inputs.
 **The population is not the same as a full local run.**
 
-Future real-provider tests and comparisons use ChatGPT plan / GPT-6-Luna (`chatgpt:gpt-6-luna`) as Primary and Gemini API (Cloud) / Gemma 4 31B IT (`gemini:gemma-4-31b-it`) as Secondary. Exclude NVIDIA NIM from candidates, defaults, fallbacks, and Vision evaluation. Select the model explicitly and stop on connection failure. See the [AI CLI testing procedure](manual/en/cli-reference-for-ai.md). Keep the product's NIM connection features and regression tests that check its wire format with mocks.
+Future real-provider tests and comparisons use ChatGPT plan / GPT-6-Luna (`chatgpt:gpt-6-luna`) as Primary and Gemini API (Cloud) / Gemma 4 31B IT (`gemini:gemma-4-31b-it`) as Secondary, and ChatGPT plan / GPT-6.1-Sol (`chatgpt:gpt-6.1-sol`) and GPT-6-Astra (`chatgpt:gpt-6-astra`) as the Vision models for tests that read pictures. Exclude NVIDIA NIM from candidates, defaults, fallbacks, and Vision evaluation. Select the model explicitly and stop on connection failure. See the [AI CLI testing procedure](manual/en/cli-reference-for-ai.md). Keep the product's NIM connection features and regression tests that check its wire format with mocks.
 
 ### On open issues
 

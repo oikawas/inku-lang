@@ -4,12 +4,16 @@ This document serves as a guideline for AI agents to operate the `inku-server` v
 
 It covers inku v2.13.42 (Web Build 929). The full flag list lives in the `inku-cli Reference`.
 
-Future tests and comparisons that call a real provider use these two routes. Exclude NVIDIA NIM from candidates, defaults, fallbacks, and Vision evaluation.
+Future tests and comparisons that call a real provider use these models (two routes: ChatGPT plan and Gemini API (Cloud)). Exclude NVIDIA NIM from candidates, defaults, fallbacks, and Vision evaluation.
 
 | Role | Connection and model | Explicit model reference |
 |---|---|---|
 | Primary | ChatGPT plan / GPT-6-Luna | `chatgpt:gpt-6-luna` |
 | Secondary | Gemini API (Cloud) / Gemma 4 31B IT | `gemini:gemma-4-31b-it` |
+| Vision | ChatGPT plan / GPT-6.1-Sol | `chatgpt:gpt-6.1-sol` |
+| Vision | ChatGPT plan / GPT-6-Astra | `chatgpt:gpt-6-astra` |
+
+The two Vision models are for tests that read pictures, such as Vision-assisted inspection of the exported pictures.
 
 Before running, confirm the person's connection, published models, and available allowance. Follow the [connection guide](../../docs/guide/chatgpt-plan.md) for ChatGPT plan requirements. Secondary uses the Gemini API connection; do not substitute NIM's `google/`-prefixed ID or a local Gemma. Stop if an entry point cannot select the model explicitly or its connection fails; do not switch to NIM. Keep the description, seeds, and other comparison conditions fixed, and record the actual provider, model, and result.
 
@@ -72,7 +76,7 @@ uv run inku-cli lineage show PARENT_ID
 * **AI Decision Logic**: Parse the output to verify that a child node (e.g., `b91ae625`) is nested under the parent (e.g., `dfced380`) with the expected `derivation_kind` edge label.
 
 ### Step 5: Inspect the exported pictures and select a work
-Compare the exported PNGs under the same viewing conditions. Check the description, composition, colours, omissions, and regressions, and record the selection reason. If Vision is also used, choose a Web/API entry point that explicitly selects a published Primary or Secondary model, and confirm the actual connection and model.
+Compare the exported PNGs under the same viewing conditions. Check the description, composition, colours, omissions, and regressions, and record the selection reason. If Vision is also used, choose a Web/API entry point that explicitly selects a published Vision model (or the Primary or Secondary model), and confirm the actual connection and model.
 
 `review evaluate` and `vision-review` are NIM-only product features. Do not run them in this testing and comparison procedure. Changing only `--model` to one of the references above does not change the destination. If no entry point can select the required model, record the visual inspection and stop.
 

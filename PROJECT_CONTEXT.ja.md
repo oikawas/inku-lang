@@ -305,7 +305,7 @@ host CIでは代替しない）、
 **⑤ internal repository の運用スクリプト**（製品 repository 外で管理し、CI の入力にしない）。
 **手元の全走とは母集団が違う。**
 
-今後の実providerテスト・比較はPrimaryをChatGPTプラン / GPT-6-Luna（`chatgpt:gpt-6-luna`）、SecondaryをGemini API（Cloud）/ Gemma 4 31B IT（`gemini:gemma-4-31b-it`）とし、NVIDIA NIMを候補・既定・fallback・Vision評価に使わない。モデルを明示し、接続失敗時は止める。[AI向けCLIテスト手順](manual/ja/cli-reference-for-ai.md)を参照。製品のNIM接続機能や、その通信形式をmockで検査する回帰テストは保持する。
+今後の実providerテスト・比較はPrimaryをChatGPTプラン / GPT-6-Luna（`chatgpt:gpt-6-luna`）、SecondaryをGemini API（Cloud）/ Gemma 4 31B IT（`gemini:gemma-4-31b-it`）、画像を読ませる試験のVisionをChatGPTプラン / GPT-6.1-Sol（`chatgpt:gpt-6.1-sol`）とGPT-6-Astra（`chatgpt:gpt-6-astra`）とし、NVIDIA NIMを候補・既定・fallback・Vision評価に使わない。モデルを明示し、接続失敗時は止める。[AI向けCLIテスト手順](manual/ja/cli-reference-for-ai.md)を参照。製品のNIM接続機能や、その通信形式をmockで検査する回帰テストは保持する。
 
 ### 残っている課題について
 

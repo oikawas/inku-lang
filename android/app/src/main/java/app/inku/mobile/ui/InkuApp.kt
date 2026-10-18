@@ -2817,6 +2817,7 @@ private fun CanvasHeroCard(
                                 zoom = if (presentation) state.canvasZoom else 1f,
                                 panX = if (presentation) state.canvasPanX else 0f,
                                 panY = if (presentation) state.canvasPanY else 0f,
+                                clearTopInset = presentation,
                             )
                         } else {
                             ArtworkPreview(
@@ -7520,13 +7521,14 @@ private fun PresentationControls(
             PresentationControlButton("‹", enabled = canGoNewer, onClick = onGoNewer)
             // One line that shrinks rather than wraps: with the 3D button the
             // counter's share is narrow, and "3 / 372" broke after the slash.
+            // The shrinking is measured by the second line it would need, so
+            // the text has to be allowed to wrap: unwrapped, "44 / 371" was cut.
             val counterStyle = MaterialTheme.typography.labelSmall
             BasicText(
                 counter,
                 modifier = Modifier.weight(1f).padding(horizontal = Dimens.spaceXs),
                 style = counterStyle.copy(color = PresentationControlLabelMuted, textAlign = TextAlign.Center),
                 maxLines = 1,
-                softWrap = false,
                 autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = counterStyle.fontSize),
             )
             PresentationControlButton("›", enabled = canGoOlder, onClick = onGoOlder)

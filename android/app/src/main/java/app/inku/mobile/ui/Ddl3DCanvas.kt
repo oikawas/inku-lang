@@ -5,8 +5,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -30,6 +32,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.ui.ddl3d.Ddl3DController
@@ -76,9 +79,14 @@ internal fun Ddl3DCanvas(
     zoom: Float = 1f,
     panX: Float = 0f,
     panY: Float = 0f,
+    clearTopInset: Boolean = false,
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current.density
+    // In the full screen the frame reaches under the status bar and the camera,
+    // where the viewer's own "3D controls" button sat on the clock. The viewer
+    // starts below them; the band above shows the full screen's background.
+    val topInset = if (clearTopInset) WindowInsets.safeDrawing.getTop(LocalDensity.current) else 0
     val title = S.ddl3dTitle
     val shareFailed = S.ddl3dShareFailed
     val currentReturn by rememberUpdatedState(onReturn)
@@ -100,12 +108,14 @@ internal fun Ddl3DCanvas(
         // button seems to give that picture depth where it stands (Web
         // `initialView`). A picture the full screen turned on its side has no
         // such view, and the viewer fits it by itself.
+        // The 2D picture is centred in the whole frame and the viewer's middle is
+        // half the inset lower, so the picture is moved up by that half.
         controller.initialView = pictureRatio?.takeIf { r -> r > 0f }?.let { r ->
             Ddl3DInitialView.ofPicture(it.width / density.toDouble(), it.height / density.toDouble(), r.toDouble(),
-                zoom.toDouble(), panX / density.toDouble(), panY / density.toDouble())
+                zoom.toDouble(), panX / density.toDouble(), (panY - topInset / 2f) / density.toDouble())
         }
     }) {
-        AndroidView(factory = { host.webView }, modifier = Modifier.fillMaxSize())
+        AndroidView(factory = { host.webView }, modifier = Modifier.fillMaxSize().padding(top = (topInset / density).dp))
         val failure = controller.failure
         if (failure != null) {
             var details by remember(failure) { mutableStateOf(false) }

@@ -136,7 +136,8 @@ public final class RefinementModel {
         do { fanoutLimit = try RefinementFanout.validatedLimit(app.display.preferences.refinementFanoutLimit) }
         catch { errorText = error.localizedDescription; return }
         let parent = work
-        let selection = count == 4 ? candidates.filter { $0.selected && $0.savedWork == nil } : []
+        // Web refinement-coordinator: either option count commits the checked options first (2026-10-17).
+        let selection = candidates.filter { $0.selected && $0.savedWork == nil }
         let selectedKind = kind
         let selectedMode = recomposeMode
         let selectedWild: Bool? = inheritWild ? nil : wildOverride
@@ -159,7 +160,7 @@ public final class RefinementModel {
                 let succeeded = await app.performComparison(status: "調整候補を用意中", restoreDisplayStatus: true) { token in
                     try Task.checkCancellation()
                     try await app.validateSavedAdjustmentParent(parent)
-                    // Advancing a four-option page commits checked options without the close action's cleanup.
+                    // Making new options commits the checked ones without the close action's cleanup.
                     for candidate in selection {
                         try Task.checkCancellation()
                         try await app.validateSavedAdjustmentParent(parent)

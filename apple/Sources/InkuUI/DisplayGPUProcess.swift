@@ -10,7 +10,8 @@ import os
 ///
 /// One request at a time; a request whose canvas moved on while it waited is not sent. When the
 /// process ends during a request, the request fails with the way it ended and the end of its standard
-/// error, and that work is not sent again in this run. The next work starts the process again.
+/// error, and that work is not sent again in this run. The next work starts the process again. A process
+/// that ended between requests (the system stopped it while idle) marks no work: the next request starts it again.
 final class DisplayGPUProcess: @unchecked Sendable {
     struct Failure: Error, Sendable {
         let code: String
@@ -55,6 +56,14 @@ final class DisplayGPUProcess: @unchecked Sendable {
     /// How many times the program was started.
     var launches: Int { launchCount.withLock { $0 } }
 
+    /// For checks: the running program's process ID, if one is running.
+    var runningProcessIdentifier: Int32? {
+        gate.wait()
+        defer { gate.signal() }
+        guard let process, process.isRunning else { return nil }
+        return process.processIdentifier
+    }
+
     /// The window `region` of `svg` (SHA-256 `digest`), unless `cancelled` says the canvas moved on.
     func window(svg: String, digest: [UInt8], region: DisplayRegion, cancelled: () -> Bool) throws -> CGImage {
         gate.wait()
@@ -64,6 +73,7 @@ final class DisplayGPUProcess: @unchecked Sendable {
         if let how = ended[key] {
             throw Failure(code: "gpu_process_exited", message: "not sent again in this run; it ended inku-display-gpu: \(how)")
         }
+        reapIfEnded()
         if process == nil { try launch() }
         var includeSVG = !sent.contains(key)
         for _ in 0..<2 {
@@ -179,6 +189,17 @@ final class DisplayGPUProcess: @unchecked Sendable {
         default:
             throw PipeEnded()
         }
+    }
+
+    /// The program ended between requests: no request caused it, so no work is marked. That includes the
+    /// watchdog's kill landing just after an answer was read. The next request starts it again.
+    private func reapIfEnded() {
+        guard let process, !process.isRunning else { return }
+        watch.withLock { $0.stopped = false }
+        errors?.fileHandleForReading.readabilityHandler = nil
+        Self.logger.notice("inku-display-gpu ended between requests (status \(process.terminationStatus, privacy: .public)); starting it again")
+        (self.process, input, output, errors) = (nil, nil, nil, nil)
+        sent.removeAll()
     }
 
     /// Stop a program whose answer cannot be read on; the next request starts it again.

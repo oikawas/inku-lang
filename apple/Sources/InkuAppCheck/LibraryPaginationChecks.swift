@@ -60,6 +60,11 @@ func runLibraryPaginationChecks() async throws {
     await library.loadLineage(work: works[0])
     let reads = await reader.reads
     await library.setPage(1)
+    // Failure: the page turn replaced the lineage's marks and notes with the new page's, so the lineage showed
+    // A without its note once A left the page.
+    guard library.annotations[works[0].id] == nil, library.lineageAnnotation(for: works[0].id).note == "A note" else {
+        throw CheckFailure.message("Paging dropped the note of a lineage work that left the page")
+    }
     guard library.errorText == nil, library.works.first?.id == works[1].id, library.works.first?.svg == "",
           library.svgSizes[works[1].id] == Int64(works[1].svg.utf8.count),
           try await library.fullWork(id: works[1].id) == works[1], await reader.reads == reads else {
@@ -106,8 +111,108 @@ func runLibraryPaginationChecks() async throws {
         let work = SavedWork(id: execution + "_0", at: 0, input: "", score: "{}", svg: "")
         guard app.workActionState(for: work) == expected else { throw CheckFailure.message("Batched menu state changed for \(execution)") }
     }
-    print("Library pagination passed: SVG-free list retains UTF-8 size/metadata; PNG hit1, missing drawing1; exact full action target; paging lineage reads0, explicit refresh reloads; history unchanged.")
+    print("Library pagination passed: SVG-free list retains UTF-8 size/metadata; PNG hit1, missing drawing1; exact full action target; paging lineage reads0, explicit refresh reloads; lineage keeps the note of a work off the page; history unchanged.")
+    try await checkMeasuredShrink(folder: folder)
+    try await checkOpenAtShownWork(folder: folder)
     print("Menu summaries passed: description/locked/user-DDL match full contexts; broken/mismatched/incomplete/missing/legacy records remain unavailable; page state published together.")
+}
+
+/// Failure: a shrink measured on the shown page moved its first work, read the page again, skipped the works that no
+/// longer fit, or left the newer works before the kept first work out of reach.
+@MainActor
+private func checkMeasuredShrink(folder: URL) async throws {
+    let database = try InkuDatabase(url: folder.appendingPathComponent("shrink.sqlite"))
+    let ids = (0..<10).map { String(format: "shrink-%02d", $0) }
+    for (index, id) in ids.enumerated() {
+        let work = SavedWork(id: id, at: Int64(100 - index), input: id, score: "{}", svg: "", lineageNodeID: id + "-node")
+        try await database.save(work, node: LineageNode(id: id + "-node", historyID: id, at: work.at))
+    }
+    let library = LibraryModel(includeListSVG: false)
+    library.pageSize = 4
+    await library.connect(database: database)
+    await library.setPage(1)
+    guard library.works.map(\.id) == Array(ids[4...7]) else { throw CheckFailure.message("Shrink fixture did not open on works 4-7") }
+    LibraryPerformanceProbe.reset()
+    LibraryPerformanceProbe.counting = true
+    defer { LibraryPerformanceProbe.counting = false }
+    library.resizePageKeepingFirstWork(to: 3)
+    let kept = (library.works.map(\.id), library.shownFrom, library.shownTo, LibraryPerformanceProbe.refreshesStarted)
+    await library.setPage(library.page + 1)
+    let next = library.works.map(\.id)
+    await library.setPage(0)
+    let first = (library.works.map(\.id), library.hasNewer)
+    await library.setPage(library.page - 1)
+    let newer = (library.works.map(\.id), library.startOffset, library.hasNewer)
+    await library.setPage(2)
+    await library.setLatestPage()
+    let latest = (library.works.map(\.id), library.startOffset)
+    guard kept.0 == Array(ids[4...6]), kept.1 == 5, kept.2 == 7, kept.3 == 0,
+          next == Array(ids[7...9]), first.0 == Array(ids[1...3]), first.1,
+          newer.0 == Array(ids[0...2]), newer.1 == 0, !newer.2, latest.0 == Array(ids[0...2]), latest.1 == 0 else {
+        throw CheckFailure.message("Measured shrink lost its place: kept \(kept), next \(next), first \(first), newer \(newer), latest \(latest)")
+    }
+    print("Measured shrink passed: 4 to 3 kept works 4-6 with reads0, the next page began at 7, page 0 held 1-3 with newer on, newer reached 0-2, latest returned to 0-2.")
+}
+
+/// Failures (Web 02b22ca0d, f03146c24, fd2568535): opening the library at the shown work left the page where it was, or
+/// began on the page boundary that holds the work, so it was not first and ← newer did not reach the works before it;
+/// a wider grid (the preview closing) moved the first work; a work the marks leave out moved the page; the thumbnail
+/// lineage view left out the shown work's single-work lineage or did not begin at it; leaving the lineage view lost
+/// the opened place.
+@MainActor
+private func checkOpenAtShownWork(folder: URL) async throws {
+    let database = try InkuDatabase(url: folder.appendingPathComponent("open-at.sqlite"))
+    // Twelve works, newest first. open-01 derives from open-00, the only lineage of two; open-06 is not starred.
+    let ids = (0..<12).map { String(format: "open-%02d", $0) }
+    for (index, id) in ids.enumerated() {
+        let work = SavedWork(id: id, at: Int64(100 - index), input: id, score: "{}", svg: "", starred: index != 6,
+                             lineageNodeID: id + "-node")
+        let child = index == 1
+        try await database.save(work, node: LineageNode(id: id + "-node", historyID: id, at: work.at,
+                                                        rootNodeID: child ? "open-00-node" : nil),
+                                edge: child ? LineageEdge(id: "open-edge", parentNodeID: "open-00-node", childNodeID: id + "-node",
+                                                          derivationKind: "ddl_edit", at: work.at) : nil)
+    }
+    let library = LibraryModel(includeListSVG: false)
+    library.pageSize = 4
+    await library.connect(database: database)
+    await library.setPage(1)
+    await library.open(at: ids[6])
+    let opened = (library.works.map(\.id), library.startOffset, library.page, library.hasNewer, library.focusRequest?.workID)
+    library.resizePageKeepingFirstWork(to: 5)
+    let widened = library.shownFrom
+    await library.setPage(library.page)
+    let widenedWorks = library.works.map(\.id)
+    await library.setPage(library.page - 1)
+    let newer = library.works.map(\.id)
+    await library.setLatestPage()
+    let latest = library.works.map(\.id)
+    library.starredOnly = true
+    await library.setPage(1)
+    let starredPage = library.works.map(\.id)
+    await library.open(at: ids[6])
+    let excluded = (library.works.map(\.id), library.page, library.focusRequest)
+    guard opened.0 == Array(ids[6...9]), opened.1 == 6, opened.2 == 0, opened.3, opened.4 == ids[6],
+          widened == 7, widenedWorks == Array(ids[6...10]), newer == Array(ids[1...5]), latest == Array(ids[0...4]),
+          excluded.0 == starredPage, excluded.1 == 1, excluded.2 == nil else {
+        throw CheckFailure.message("Opening at the shown work: opened \(opened), widened from \(widened) \(widenedWorks), "
+                                   + "newer \(newer), latest \(latest), left out \(excluded) against \(starredPage)")
+    }
+
+    library.starredOnly = false
+    library.grouped = true
+    await library.open(at: ids[6])
+    let lineages = (library.groups.map(\.id), library.total, library.startOffset, library.page)
+    library.grouped = false
+    let timeline = (library.shownFrom, library.focusRequest?.workID)
+    await library.setPage(library.page)
+    guard lineages.0.first == "open-06-node", lineages.1 == 2, lineages.2 == 1, lineages.3 == 0,
+          timeline.0 == 7, timeline.1 == ids[6], library.works.first?.id == ids[6] else {
+        throw CheckFailure.message("Lineage view at the shown work: \(lineages); timeline after it \(timeline) \(library.works.map(\.id))")
+    }
+    print("Opening at the shown work passed: works 6-9 from page 2 with newer on and focus asked; a wider page kept work 6 first (6-10); "
+          + "newer reached 1-5, latest 0-4; an unstarred work under the star filter left page 2 and no focus; the thumbnail lineage "
+          + "view began at the shown work's single-work lineage (2 lineages, start 1) and the timeline kept work 6 first after it.")
 }
 
 private actor PaginationLineageReader: LineageReading {

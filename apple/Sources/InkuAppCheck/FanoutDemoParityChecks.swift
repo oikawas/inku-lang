@@ -13,7 +13,7 @@ func runFanoutDemoParityChecks() async throws {
     defer { try? FileManager.default.removeItem(at: folder) }
     try await checkDemoInterval(folder: folder.appendingPathComponent("demo"))
     try await checkNextFour(folder: folder.appendingPathComponent("next"))
-    print("Fanout/demo parity passed: 1/4/16 caps, invalid 0/17 refused, ordered starts, captured setting, cancellation; UI seconds 1...999 and persisted 1...3600; layout/tool save-before-next-four with partial failure, trashed-parent refusal retaining options, retry without duplicate commits, and immutable parents independent of displayed selection. Offline isolated fixtures only.")
+    print("Fanout/demo parity passed: 1/4/16 caps, invalid 0/17 refused, ordered starts, captured setting, cancellation; UI seconds 1...999 and persisted 1...3600; layout save-before-next-one-or-four and tool save-before-next-four with partial failure, trashed-parent refusal retaining options, retry without duplicate commits, and immutable parents independent of displayed selection. Offline isolated fixtures only.")
 }
 
 @MainActor private func checkCapturedFanout() async throws {
@@ -131,10 +131,12 @@ func runFanoutDemoParityChecks() async throws {
           try await database.loadExecution(id: firstLayoutSaved.id) == firstLayoutSaved else {
         throw CheckFailure.message("Layout retry resaved a committed candidate or did not replace after all saves")
     }
-    layout.selectCandidate(layout.candidates[0].id, selected: true)
+    let checkedBeforeSingle = layout.candidates[0].id
+    layout.selectCandidate(checkedBeforeSingle, selected: true)
     await layout.generate(app: app, count: 1)
-    guard layout.candidates.count == 1, try await database.list().count == 3 else {
-        throw CheckFailure.message("Single layout option unexpectedly autosaved its prior selection")
+    guard layout.candidates.count == 1, !layout.candidates.contains(where: { $0.id == checkedBeforeSingle }),
+          layout.committedWorks.count == 3, try await database.list().count == 4 else {
+        throw CheckFailure.message("Single layout option did not save its prior checked selection first")
     }
     let touch = ToolChangeModel(work: parent)
     await touch.generate(app: app)
@@ -146,7 +148,7 @@ func runFanoutDemoParityChecks() async throws {
     await touch.generate(app: app)
     guard touch.candidates.map(\.id) == originalTouchIDs, touch.selectedCount == 1,
           touch.candidates[0].savedWork != nil, touch.candidates[1].selected, touch.errorText != nil,
-          try await database.listExecutionIDs() == beforeTouch, try await database.list().count == 4 else {
+          try await database.listExecutionIDs() == beforeTouch, try await database.list().count == 5 else {
         throw CheckFailure.message("Touch replaced options/generated after partial save failure")
     }
     let firstTouchSaved = try await database.loadExecution(id: touch.candidates[0].prepared.executionID)!
@@ -166,7 +168,7 @@ func runFanoutDemoParityChecks() async throws {
     await app.showSavedRefinement(touch.committedWorks[0])
     await touch.generate(app: app)
     guard touch.candidates.count == 4, touch.candidates.allSatisfy({ !originalTouchIDs.contains($0.id) }),
-          touch.committedWorks.count == 2, try await database.list().count == 5,
+          touch.committedWorks.count == 2, try await database.list().count == 6,
           try await database.loadExecution(id: firstTouchSaved.id) == firstTouchSaved,
           try await database.work(id: parent.id) == parent,
           layout.work.id == parent.id, touch.work.id == parent.id, await transport.calls == 0 else {

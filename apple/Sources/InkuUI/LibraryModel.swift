@@ -24,6 +24,22 @@ private enum LineageRetryRequest {
     case branch(nodeID: String, snapshot: LineageSnapshot)
 }
 
+/// Web `focusRequest`: the work the library opened at. Its card takes the keyboard focus, and an open preview follows
+/// it, once the page that holds it is shown. Each opening at a work is a new visit.
+public struct LibraryFocusRequest: Equatable, Sendable {
+    public let workID: String
+    public let visit: Int
+}
+
+/// Where the timeline was while a lineage view is shown: the Web manager's page and start are apart from the lineage
+/// list's, so leaving the lineage view finds the timeline where it was.
+private struct LibraryTimelinePlace {
+    var page: Int
+    var startOffset: Int
+    /// nil when the library has not measured the timeline in this grouping, for the grid to measure it.
+    var pageSize: Int?
+}
+
 @MainActor
 @Observable
 public final class LibraryModel {
@@ -35,23 +51,40 @@ public final class LibraryModel {
     public var isTrash = false { didSet { if isTrash != oldValue { changedFilter() } } }
     public var order: LibraryOrder = .newest { didSet { if order != oldValue { changedFilter() } } }
     public var layout: LibraryLayout = .grid {
-        didSet { if layout != oldValue { changedPresentation(resetPage: isGrouped || oldValue == .lineage) } }
+        didSet { if layout != oldValue { changedPresentation(wasGrouped: grouped || oldValue == .lineage) } }
     }
-    public var grouped = false { didSet { if grouped != oldValue { changedPresentation(resetPage: true) } } }
-    /// The library measures its own grid and sets this (Web `HistoryManagerState.pageSize`, initially 24).
+    public var grouped = false {
+        didSet { if grouped != oldValue { changedPresentation(wasGrouped: oldValue || layout == .lineage) } }
+    }
+    /// Web `HistoryManagerState.pageSize`, initially 24. Set directly by the history strip, by tests and for the lineage
+    /// view's eight groups; a new size here starts on the page boundary that holds the first work, which the strip's own
+    /// positions assume. The library grid's measurements go through `resizePageKeepingFirstWork` instead.
     public var pageSize = 24 {
         didSet {
             let bounded = min(1000, max(1, pageSize))
             if pageSize != bounded { pageSize = bounded; return }
-            if pageSize != oldValue {
-                page = page * oldValue / pageSize
-                changedPresentation(resetPage: false)
+            if pageSize != oldValue, !keepingPage {
+                page = (startOffset + page * oldValue) / pageSize
+                startOffset = 0
+                // While the opening reads the work's place, its own read follows with this size.
+                if positioning == nil { scheduleRefresh() }
             }
         }
     }
+    /// Web `startOffset`: where page 0 begins. Opening at a work begins the pages there, and a new capacity measured by
+    /// the grid keeps the first work (Web `setPageSize`); the newer works before it are reached with ← newer. Filters
+    /// start again at 0.
+    public private(set) var startOffset = 0
+    public private(set) var focusRequest: LibraryFocusRequest?
+    /// The visit whose focus the view applied in the present grouping and layout (Web `focusedVisit`); a new
+    /// grouping or layout applies it again.
+    @ObservationIgnored public var focusedVisit = -1
     public var selectedIDs: Set<String> = []
     public private(set) var works: [SavedWork] = []
     public private(set) var annotations: [String: LibraryAnnotation] = [:]
+    /// Marks and notes of the works in the lineage snapshots, apart from the listed page's: a page turn replaces
+    /// `annotations`, and the lineage still shows its own works.
+    public private(set) var lineageAnnotations: [String: LibraryAnnotation] = [:]
     public private(set) var svgSizes: [String: Int64] = [:]
     public private(set) var selectedAnnotationID: String?
     public private(set) var selectedAnnotation: LibraryAnnotation?
@@ -92,7 +125,27 @@ public final class LibraryModel {
     @ObservationIgnored private let includeListSVG: Bool
     /// Told when works are deleted for good, to drop their thumbnails.
     @ObservationIgnored public var thumbnails: ArtworkThumbnails?
+    /// The library reads the next page's thumbnails into memory once its own page is listed; the history strip,
+    /// a LibraryModel of its own, does not.
+    @ObservationIgnored public var prefetchesThumbnails = false
+    /// Read for each listed page before it is shown (the app reads menu states and labels from the saved journals),
+    /// so the cards appear with them in one update instead of being drawn again when they arrive.
+    @ObservationIgnored public var pageCompanions: (@MainActor ([String]) async -> Void)?
+    @ObservationIgnored private var prefetchTask: Task<Void, Never>?
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
+    @ObservationIgnored private var keepingPage = false
+    /// Web `positioning`: the opening's read of the work's place is out. A page turn or a filter change supersedes it;
+    /// a new page size or grouping waits for it.
+    @ObservationIgnored private var positioning: UUID?
+    @ObservationIgnored private var focusVisits = 0
+    /// Web `lineageAnchorVisit`: the visit whose lineage began the grouped listing in this grouping and layout.
+    @ObservationIgnored private var groupAnchorVisit = -1
+    /// Web `lineageIncludeId`: the opened work whose lineage the thumbnail lineage view keeps until the filter changes.
+    @ObservationIgnored private var lineageIncludeID: String?
+    /// The lineage of `focusRequest`, once a grouped read found it (Web `focusRequest.rootId`).
+    @ObservationIgnored private var focusLineageRootID: String?
+    @ObservationIgnored private var timelinePlace: LibraryTimelinePlace?
+    @ObservationIgnored private var pendingLineageRefresh = false
     @ObservationIgnored private var refreshToken = UUID()
     @ObservationIgnored private var selectedAnnotationToken = UUID()
     @ObservationIgnored private var lineageToken = UUID()
@@ -108,7 +161,7 @@ public final class LibraryModel {
     }
 
     public func connect(database: InkuDatabase) async {
-        refreshTask?.cancel()
+        cancelScheduledRefresh()
         self.database = database
         if lineageReader == nil { lineageReader = DatabaseLineageReader(database: database) }
         await refresh()
@@ -117,12 +170,20 @@ public final class LibraryModel {
     /// Restore replaces this actor's SQLite contents, so every derived work snapshot is invalid.
     /// Keep the current filters and presentation preferences while reading the restored database.
     public func resetAfterRestore() async {
-        refreshTask?.cancel()
+        cancelScheduledRefresh()
         refreshTask = nil
         refreshToken = UUID()
         clearSelectedAnnotation()
         lineageToken = UUID()
         selectedIDs.removeAll()
+        startOffset = 0
+        positioning = nil
+        focusRequest = nil
+        focusLineageRootID = nil
+        focusedVisit = -1
+        groupAnchorVisit = -1
+        lineageIncludeID = nil
+        timelinePlace = nil
         works.removeAll()
         annotations.removeAll()
         svgSizes.removeAll()
@@ -139,6 +200,7 @@ public final class LibraryModel {
         lineageFocusID = nil
         lineageNormalGraph = nil
         lineageOverviewGraph = nil
+        lineageAnnotations.removeAll()
         lineageBrowsing = LineageBrowsingState()
         lineageLoading = false
         lineageError = nil
@@ -146,69 +208,220 @@ public final class LibraryModel {
         await refresh()
     }
 
-    public var pageCount: Int { max(1, (total + pageSize - 1) / pageSize) }
-    public var shownFrom: Int { total == 0 ? 0 : page * pageSize + 1 }
-    public var shownTo: Int { min(total, (page + 1) * pageSize) }
+    public var pageCount: Int { max(1, (total - startOffset + pageSize - 1) / pageSize) }
+    public var shownFrom: Int { total == 0 ? 0 : startOffset + page * pageSize + 1 }
+    public var shownTo: Int { min(total, startOffset + (page + 1) * pageSize) }
+    /// ← newer and Latest: an earlier page, or newer works before the kept first work.
+    public var hasNewer: Bool { page > 0 || startOffset > 0 }
     public var isGrouped: Bool { grouped || layout == .lineage }
     public var filter: LibraryQuery {
         LibraryQuery(text: query, trashed: isTrash, starred: starredOnly,
                      forRevision: revisionOnly, order: order, canvasSearch: canvasSearch)
     }
 
+    /// Web: a new search, mark filter or trash view starts the timeline and the lineage list again at their first
+    /// page, ends the opening's focus and forgets the lineage kept for it (`resetStart`, `lineageIncludeId`).
     private func changedFilter() {
         page = 0
+        startOffset = 0
+        positioning = nil
+        if focusRequest != nil { focusRequest = nil }
+        focusLineageRootID = nil
+        lineageIncludeID = nil
+        if timelinePlace != nil { timelinePlace?.page = 0; timelinePlace?.startOffset = 0 }
         selectedIDs.removeAll()
-        changedPresentation(resetPage: false)
+        scheduleRefresh()
     }
 
-    /// Display changes retain checked works. A grouped lane starts again at its first group.
-    private func changedPresentation(resetPage: Bool) {
-        if resetPage { page = 0 }
+    /// Display changes retain checked works. Web `setHistoryDisplayMode` / `selectHistoryManagerTab`: a lineage view
+    /// starts again at its first group, or at the opened work's lineage while that focus stands, and the timeline
+    /// keeps its own place (grid and list share it), as the Web manager's page is apart from the lineage list's.
+    private func changedPresentation(wasGrouped: Bool) {
+        if isGrouped {
+            if !wasGrouped { timelinePlace = LibraryTimelinePlace(page: page, startOffset: startOffset, pageSize: pageSize) }
+            page = 0; startOffset = 0
+            groupAnchorVisit = -1
+        } else if wasGrouped {
+            let place = timelinePlace
+            timelinePlace = nil
+            if let size = place?.pageSize, size != pageSize {
+                keepingPage = true
+                pageSize = size
+                keepingPage = false
+            }
+            page = place?.page ?? 0
+            startOffset = place?.startOffset ?? 0
+        }
+        focusedVisit = -1
+        scheduleRefresh()
+    }
+
+    /// A read made now replaces the pending one, and its lineage reload with it, as before.
+    private func cancelScheduledRefresh() {
+        refreshTask?.cancel()
+        pendingLineageRefresh = false
+    }
+
+    /// A pending read that replaces another keeps its lineage reload: a new page size right after a filter change
+    /// still reloads the lineage.
+    private func scheduleRefresh(refreshLineage: Bool = true) {
         expandedGroups.removeAll()
         groupMembers.removeAll()
         groupMemberTotals.removeAll()
         refreshToken = UUID()
         refreshTask?.cancel()
+        pendingLineageRefresh = pendingLineageRefresh || refreshLineage
         refreshTask = Task { @MainActor [weak self] in
             // Coalesce typing; cancellation never changes a database operation.
             try? await Task.sleep(for: .milliseconds(180))
-            guard !Task.isCancelled else { return }
-            await self?.refresh()
+            guard !Task.isCancelled, let self else { return }
+            let lineage = self.pendingLineageRefresh
+            self.pendingLineageRefresh = false
+            await self.refresh(refreshLineage: lineage)
         }
     }
 
     public func setPage(_ value: Int) async {
-        refreshTask?.cancel()
+        cancelScheduledRefresh()
+        positioning = nil
+        // Web `setPage` ends the opening's focus; turning the lineage list's pages does not.
+        if !isGrouped, focusRequest != nil { focusRequest = nil }
+        // Web `setPage`: newer continues before the kept first work.
+        if value < 0 { startOffset = max(0, startOffset + value * pageSize) }
         page = min(max(0, value), pageCount - 1)
         await refresh(refreshLineage: false)
     }
 
+    /// Web `setLatestPage`: the newest works, wherever the pages began.
+    public func setLatestPage() async {
+        startOffset = 0
+        await setPage(0)
+    }
+
+    /// Web `setPageSize`: the grid measured another capacity, because the window or the preview column changed its
+    /// width, or taller cards on the shown page no longer fit. The first work keeps its place and the works before it
+    /// stay reachable with ← newer. When the works in hand already cover the new page (a smaller page, or a last page
+    /// that fits), nothing is read and the lineage stays as it is; otherwise only the page is read. A lineage view
+    /// pages by its own size.
+    public func resizePageKeepingFirstWork(to value: Int) {
+        let size = min(1000, max(1, value))
+        guard size != pageSize, !isGrouped else { return }
+        let first = startOffset + page * pageSize
+        keepingPage = true
+        pageSize = size
+        keepingPage = false
+        page = min(page, first / size)
+        startOffset = first - page * size
+        page = max(0, min(page, pageCount - 1))
+        // Web `positioning`: the opening's read follows with this size, from the work it opens at if it finds it.
+        guard positioning == nil else { return }
+        // A timeline listing holds no groups; a pending read after a view or filter change replaces the works anyway.
+        let inHand = startOffset + page * size == first && !loading && groups.isEmpty
+            && works.count >= min(size, total - first)
+        guard inHand else { scheduleRefresh(refreshLineage: false); return }
+        if works.count > size { works = Array(works.prefix(size)) }
+        prefetchNextPage(token: refreshToken)
+    }
+
+    /// Web `openWith(…, anchorId)` and `openAt`: the library opens with the saved work shown in Create first on its
+    /// page, under the present search, marks and order, and asks for its card to take the focus; a lineage view begins
+    /// at its lineage. The trash view, a work the filter leaves out and no work leave the page where it was. The open
+    /// reads the page again, as the Web does on every opening.
+    public func open(at workID: String?) async {
+        guard let workID, !isTrash, let database else { return }
+        let token = UUID()
+        positioning = token
+        if focusRequest != nil { focusRequest = nil }
+        let position: Int?
+        do {
+            position = try await database.libraryIndex(id: workID, query: filter)
+        } catch {
+            guard positioning == token else { return }
+            positioning = nil
+            errorText = error.localizedDescription
+            return
+        }
+        guard positioning == token else { return }
+        positioning = nil
+        if let position {
+            focusVisits += 1
+            focusRequest = LibraryFocusRequest(workID: workID, visit: focusVisits)
+            focusLineageRootID = nil
+            if isGrouped {
+                timelinePlace = LibraryTimelinePlace(page: 0, startOffset: position, pageSize: timelinePlace?.pageSize)
+            } else {
+                page = 0
+                startOffset = position
+            }
+        }
+        // This read replaces one a grouping change scheduled meanwhile, and keeps its lineage reload.
+        let lineage = pendingLineageRefresh
+        cancelScheduledRefresh()
+        await refresh(refreshLineage: lineage)
+    }
+
+    /// Thumbnails of the page that ← older shows next, read while this one is looked at.
+    private func prefetchNextPage(token: UUID) {
+        guard prefetchesThumbnails, let thumbnails, let database, !isGrouped else { return }
+        let offset = startOffset + (page + 1) * pageSize
+        guard offset < total else { return }
+        let (query, size, shown) = (filter, pageSize, works)
+        prefetchTask?.cancel()
+        prefetchTask = Task { @MainActor [weak self] in
+            guard let next = try? await database.libraryPage(query: query, limit: size, offset: offset, includeSVG: false),
+                  !Task.isCancelled, self?.refreshToken == token else { return }
+            await thumbnails.prefetch(next.items.map(\.work), keeping: shown)
+        }
+    }
+
     public func refresh(refreshLineage: Bool = true) async {
         guard let database else { return }
+        LibraryPerformanceProbe.refreshStarted()
+        defer { LibraryPerformanceProbe.refreshFinished() }
         let token = UUID()
         refreshToken = token
         let requestedFilter = filter
         let requestedGrouping = isGrouped
         let requestedMinimum = layout == .grid ? 2 : 1
         let requestedSize = pageSize
-        let requestedPage = page
+        let requestedOffset = startOffset + page * pageSize
         loading = true
-        errorText = nil
+        // An unchanged write still redraws every view that reads the error.
+        if errorText != nil { errorText = nil }
         do {
             let count = try await database.trashCount()
             if requestedGrouping {
+                // Web `fetchLineageGroups`: the opened work's lineage begins the first read of this grouping, and the
+                // thumbnail view keeps that lineage while the filter stands (Server `anchor_id`, `include_id`).
+                let anchor = focusRequest.flatMap { $0.visit == groupAnchorVisit ? nil : $0 }
                 let result = try await database.libraryGroups(query: requestedFilter, limit: requestedSize,
-                                                               offset: requestedPage * requestedSize, minimumItemCount: requestedMinimum, includeSVG: includeListSVG)
+                                                               offset: requestedOffset, minimumItemCount: requestedMinimum, includeSVG: includeListSVG,
+                                                               includeWorkID: lineageIncludeID, anchorWorkID: anchor?.workID)
                 guard refreshToken == token, !Task.isCancelled else { return }
+                if let anchor {
+                    groupAnchorVisit = anchor.visit
+                    lineageIncludeID = anchor.workID
+                    if let root = result.anchorRootNodeID {
+                        startOffset = result.offset; page = 0
+                        focusLineageRootID = root
+                    }
+                }
+                // Web: the list view opens the opened work's lineage while that focus stands.
+                if layout != .grid, focusRequest != nil, let root = focusLineageRootID,
+                   result.groups.contains(where: { $0.id == root }) {
+                    expandedGroups.insert(root)
+                }
                 groups = result.groups; total = result.total
                 works = result.groups.map(\.representative.work)
                 annotations = Dictionary(uniqueKeysWithValues: result.groups.map { ($0.representative.id, $0.representative.annotation) })
                 svgSizes = Dictionary(uniqueKeysWithValues: result.groups.map { ($0.representative.id, $0.representative.svgBytes) })
             } else {
                 let result = try await database.libraryPage(query: requestedFilter, limit: requestedSize,
-                                                             offset: requestedPage * requestedSize, includeSVG: includeListSVG)
+                                                             offset: requestedOffset, includeSVG: includeListSVG)
                 guard refreshToken == token, !Task.isCancelled else { return }
                 let listed = try await database.lineageGenerations(nodeIDs: result.items.compactMap { $0.work.lineageNodeID })
+                guard refreshToken == token, !Task.isCancelled else { return }
+                await pageCompanions?(result.items.map(\.id))
                 guard refreshToken == token, !Task.isCancelled else { return }
                 groups = []; total = result.total
                 works = result.items.map(\.work)
@@ -218,7 +431,10 @@ public final class LibraryModel {
             }
             trashTotal = count
             loading = false
+            // Deletions can leave the kept first work past the end; the pages then begin at the newest again.
+            if startOffset > 0, startOffset >= total { startOffset = 0; page = 0; await refresh(refreshLineage: refreshLineage); return }
             if page >= pageCount { page = pageCount - 1; await refresh(refreshLineage: refreshLineage); return }
+            if !requestedGrouping { prefetchNextPage(token: token) }
             let visibleRoots = requestedGrouping && layout == .grid ? groups.map(\.id) : Array(expandedGroups)
             for root in visibleRoots {
                 guard refreshToken == token, !Task.isCancelled else { return }
@@ -284,6 +500,7 @@ public final class LibraryModel {
 
     private func rememberAnnotation(_ value: LibraryAnnotation, id: String) {
         annotations[id] = value
+        if lineageAnnotations[id] != nil { lineageAnnotations[id] = value }
         if selectedAnnotationID == id {
             selectedAnnotationToken = UUID()
             selectedAnnotationLoading = false
@@ -433,6 +650,7 @@ public final class LibraryModel {
             lineageToken = UUID(); graph = nil; lineageFocusID = nil
             lineageNormalGraph = nil; lineageOverviewGraph = nil; lineageBrowsing = LineageBrowsingState()
             lineageLoading = false; lineageError = nil; failedLineageRequest = nil
+            refreshLineageAnnotations()
             return
         }
         await loadLineage(nodeID: id)
@@ -446,6 +664,7 @@ public final class LibraryModel {
 
     private func loadLineage(request: LineageGraphRequest, retrying: Bool = false) async {
         guard let lineageReader else { return }
+        LibraryPerformanceProbe.lineageRead()
         let token = UUID()
         lineageToken = token; lineageFocusID = request.nodeID
         lineageLoading = true
@@ -457,6 +676,7 @@ public final class LibraryModel {
                 graph = nil
                 lineageNormalGraph = nil; lineageOverviewGraph = nil; lineageBrowsing = LineageBrowsingState()
                 lineageLoading = false; lineageError = nil; failedLineageRequest = nil
+                refreshLineageAnnotations()
                 return
             }
             var snapshot = LineageSnapshot(result)
@@ -477,7 +697,7 @@ public final class LibraryModel {
             if retrying { lineageBrowsing.expandedNodeIDs = Set(request.expandedNodeIDs) }
             lineageNormalGraph = snapshot; lineageBrowsing.reconcile(snapshot)
             if request.pathOnly { lineageBrowsing.closeOverview() }
-            rememberLineageAnnotations(snapshot)
+            refreshLineageAnnotations()
             lineageLoading = false; lineageError = nil; failedLineageRequest = nil
             if lineageBrowsing.overviewOpen { await loadLineageOverview() }
         } catch {
@@ -504,7 +724,7 @@ public final class LibraryModel {
             if let result {
                 let snapshot = LineageSnapshot(result, focusNodeID: nodeID)
                 lineageOverviewGraph = snapshot; lineageBrowsing.openOverview()
-                rememberLineageAnnotations(snapshot)
+                refreshLineageAnnotations()
             }
             lineageLoading = false; lineageError = nil; failedLineageRequest = nil
         } catch {
@@ -559,7 +779,7 @@ public final class LibraryModel {
             guard lineageToken == token, lineageFocusID == snapshot.focusNodeID, !Task.isCancelled else { return }
             if let branch {
                 let merged = snapshot.merging(branch)
-                lineageNormalGraph = merged; rememberLineageAnnotations(merged)
+                lineageNormalGraph = merged; refreshLineageAnnotations()
                 lineageBrowsing.expandedNodeIDs.insert(nodeID)
             }
             lineageLoading = false; lineageError = nil; failedLineageRequest = nil
@@ -570,8 +790,18 @@ public final class LibraryModel {
         }
     }
 
-    private func rememberLineageAnnotations(_ snapshot: LineageSnapshot) {
-        for item in snapshot.nodes { if let work = item.work { annotations[work.id] = item.annotation } }
+    /// From the snapshots as read; the normal view's read wins over an older overview of the same work.
+    private func refreshLineageAnnotations() {
+        var values: [String: LibraryAnnotation] = [:]
+        for snapshot in [lineageOverviewGraph, lineageNormalGraph].compactMap({ $0 }) {
+            for item in snapshot.nodes { if let work = item.work { values[work.id] = item.annotation } }
+        }
+        if values != lineageAnnotations { lineageAnnotations = values }
+    }
+
+    /// What the lineage shows for one of its works.
+    public func lineageAnnotation(for id: String) -> LibraryAnnotation {
+        lineageAnnotations[id] ?? annotation(for: id)
     }
 
     public func promote(_ nodeID: String) async {

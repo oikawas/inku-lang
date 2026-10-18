@@ -23,7 +23,9 @@ struct LibraryView: View {
     // Measurement bookkeeping is not view state. A height notification for every new card
     // used to invalidate the whole library; only an actual page-size change needs a redraw.
     @State private var measurements = LibraryGridMeasurements()
-    @FocusState private var focusedWorkID: String?
+    @State private var modelLines = LibraryModelLineMemo()
+    /// Keyboard focus by the reused card slot: a page turn changes no focus binding, only what the slot shows.
+    @FocusState private var focusedSlot: Int?
     @FocusState private var searchFocused: Bool
     @State private var previewComment = LibraryNoteEditorModel()
     private var library: LibraryModel { model.library }
@@ -122,7 +124,7 @@ struct LibraryView: View {
                 ], selection: Binding(get: { library.grouped }, set: { library.grouped = $0 }))
             }
             Text(countText).inkuFont(12).monospacedDigit().foregroundStyle(.secondary).lineLimit(1).fixedSize()
-            if library.loading { ProgressView().controlSize(.small) }
+            LibraryLoadingIndicator(library: library)
         }
     }
 
@@ -135,9 +137,9 @@ struct LibraryView: View {
 
     private var countText: String {
         if library.isGrouped {
-            // The thumbnail tab lists only lineages with a derivation (minimum two works).
+            // The thumbnail tab lists the lineages with a derivation (minimum two works) and the opened work's.
             return "\(library.total) " + display.webCopy("historyLineageGroups", fallback: "系譜")
-                + (library.layout == .grid ? display.webCopy("historyLineageGroupsDerivedOnly", fallback: "（派生のある系譜のみ）") : "")
+                + (library.layout == .grid ? display.webCopy("historyLineageGroupsDerivedOnly", fallback: "（派生のある系譜と選択作品の系譜）") : "")
         }
         return library.total == 0 ? "0 / 0" : "\(library.shownFrom)-\(library.shownTo) / \(library.total)"
     }
@@ -153,29 +155,7 @@ struct LibraryView: View {
         }
     }
 
-    private var pager: some View {
-        HStack(spacing: 6) {
-            Button(display.webCopy("historyLatest", fallback: "最新")) { Task { await library.setPage(0) } }
-                .buttonStyle(LibraryGhostButtonStyle(minWidth: 54))
-                .disabled(library.page <= 0 || library.loading)
-                .inkuTooltip(display.tooltip("先頭ページ", serverKey: "tooltipHistoryLatestPage"), placement: .bottom)
-            Button(display.webCopy("historyNewer", fallback: "← 新しい")) { Task { await library.setPage(library.page - 1) } }
-                .buttonStyle(LibraryGhostButtonStyle(minWidth: 74))
-                .disabled(library.page <= 0 || library.loading)
-                .inkuTooltip(display.tooltip("前のページ", serverKey: "tooltipHistoryNewerPage"), placement: .bottom)
-            Text(library.loading ? display.webCopy("historyLoading", fallback: "読み込み中") : "\(library.page + 1) / \(library.pageCount)")
-                .inkuFont(12).monospacedDigit().foregroundStyle(.secondary).fixedSize()
-            Button(display.webCopy("historyOlder", fallback: "古い →")) { Task { await library.setPage(library.page + 1) } }
-                .buttonStyle(LibraryGhostButtonStyle(minWidth: 74))
-                .disabled(library.page + 1 >= library.pageCount || library.loading)
-                .inkuTooltip(display.tooltip("次のページ", serverKey: "tooltipHistoryOlderPage"), placement: .bottom)
-            Button(display.webCopy("historyOldest", fallback: "最古")) { Task { await library.setPage(library.pageCount - 1) } }
-                .buttonStyle(LibraryGhostButtonStyle(minWidth: 54))
-                .disabled(library.page + 1 >= library.pageCount || library.loading)
-                .inkuTooltip(display.tooltip("最終ページ", serverKey: "tooltipHistoryOldestPage"), placement: .bottom)
-        }
-        .disabled(library.mutating)
-    }
+    private var pager: some View { LibraryPager(library: library, display: display) }
 
     // MARK: Tools (Web .history-tools)
 
@@ -190,11 +170,12 @@ struct LibraryView: View {
     private var toolGroup: some View {
         @Bindable var library = library
         return HStack(spacing: 8) {
-            Button(allVisibleSelected ? display.localized("表示中のチェックを外す") : display.webCopy("historySelectAll", fallback: "すべて選択")) {
-                library.selectVisible()
+            LibraryDisabledWhileLoading(library: library, disabled: visibleIDs.isEmpty) {
+                Button(allVisibleSelected ? display.localized("表示中のチェックを外す") : display.webCopy("historySelectAll", fallback: "すべて選択")) {
+                    library.selectVisible()
+                }
+                .buttonStyle(LibraryGhostButtonStyle())
             }
-            .buttonStyle(LibraryGhostButtonStyle())
-            .disabled(visibleIDs.isEmpty || library.loading)
             .inkuTooltip(display.tooltip("このページの作品をすべて選択します", serverKey: "tooltipHistorySelectAll"), placement: .bottom)
             if !library.selectedIDs.isEmpty {
                 Button(display.localized("解除")) { library.selectedIDs.removeAll() }
@@ -220,11 +201,12 @@ struct LibraryView: View {
             }
             .labelsHidden().pickerStyle(.menu).fixedSize().controlSize(.small)
             .inkuTooltip(tip("保存日時の順序を切り替えます。"), placement: .bottom)
-            Button { Task { await library.refresh() } } label: { Image(systemName: "arrow.clockwise") }
-                .buttonStyle(LibraryGhostButtonStyle())
-                .accessibilityLabel(display.localized("更新"))
-                .disabled(library.loading)
-                .inkuTooltip(tip("ライブラリを読み直します。"), placement: .bottom)
+            LibraryDisabledWhileLoading(library: library, disabled: false) {
+                Button { Task { await library.refresh() } } label: { Image(systemName: "arrow.clockwise") }
+                    .buttonStyle(LibraryGhostButtonStyle())
+                    .accessibilityLabel(display.localized("更新"))
+            }
+            .inkuTooltip(tip("ライブラリを読み直します。"), placement: .bottom)
         }
     }
 
@@ -260,7 +242,7 @@ struct LibraryView: View {
         } else {
             let exportIDs = library.selectedIDs.sorted()
             SavedWorkExportMenu(model: model, count: exportIDs.count,
-                                title: display.webCopy("historyExportSelected", "選択作品を書き出す")) { action in
+                                title: display.webCopy("exportLabel", "書き出す")) { action in
                 onSelectionExport(exportIDs, action)
             }.disabled(exportIDs.isEmpty || writingDisabled)
             Button { deletion = LibraryDeletion(ids: library.selectedIDs.sorted(), movesToTrash: true) } label: {
@@ -292,7 +274,7 @@ struct LibraryView: View {
             .inkuFont(12).frame(minWidth: 120, maxWidth: 240, minHeight: 28)
             .background(LibraryChrome.panel2, in: RoundedRectangle(cornerRadius: 4))
             .overlay(RoundedRectangle(cornerRadius: 4).stroke(LibraryChrome.border))
-            .inkuTooltip(display.webCopy("historySearchHint", "ハッシュ値と作品IDは全体か先頭部分、ハッシュ値は下位4桁でも検索できます。"))
+            .inkuTooltip(display.webCopy("historySearchHint", "ハッシュ値と作品IDは全体か先頭部分、ハッシュ値は下位4桁でも検索できます。"), focus: .text)
         }
     }
 
@@ -329,7 +311,8 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var listing: some View {
-        if library.loading && library.works.isEmpty {
+        // Works first: while a page is shown, the loading flag is not read here, so loading does not redraw the grid.
+        if library.works.isEmpty && library.loading {
             ProgressView(display.localized("ライブラリを読み込み中")).frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = library.errorText, library.total == 0 {
             ContentUnavailableView {
@@ -358,20 +341,27 @@ struct LibraryView: View {
                           alignment: .leading, spacing: LibraryGridPaging.gap) {
                     // Reuse the finite page's native card slots instead of destroying every
                     // button/menu on each turn. Work-specific state has its own identity below.
-                    ForEach(Array(library.works.enumerated()), id: \.offset) { _, work in gridCard(work) }
+                    ForEach(Array(library.works.enumerated()), id: \.offset) { slot, work in gridCard(work, slot: slot) }
                 }
                 .padding(.top, 8).padding(.horizontal, 10).padding(.bottom, 6)
             }
             // A page holds only complete rows; an always-on scroller would also take width from the columns.
             .scrollIndicators(.hidden)
             .focusSection()
+            .background { focusFollower(scroll: nil) }
             .onAppear { reportPageSize(viewport: geometry.size) }
             .onChange(of: geometry.size) { _, size in reportPageSize(viewport: size) }
         }
     }
 
+    private func focusFollower(scroll: ScrollViewProxy?) -> some View {
+        LibraryFocusFollower(library: library, preview: preview, focus: $focusedSlot, scroll: scroll)
+    }
+
     /// Web `calculatePageSize` and its ResizeObserver (HistoryManager.svelte:644-700): a new viewport starts again
     /// from 100; within one viewport the size only shrinks, so different cards cannot make two sizes alternate.
+    /// Every new size keeps the first work, as Web `setPageSize` does: a new viewport (the window, or the preview
+    /// column opening and closing) and taller cards on the shown page alike.
     private func reportPageSize(viewport size: CGSize) {
         let viewport = CGSize(width: (size.width * 2).rounded() / 2, height: (size.height * 2).rounded() / 2)
         if viewport != measurements.viewport {
@@ -382,7 +372,7 @@ struct LibraryView: View {
         let heights = library.works.map { Double(measurements.cardHeights[$0.id] ?? 0) }
         let fitted = LibraryGridPaging.pageSize(width: size.width - 20, height: size.height - 14, cardHeights: heights)
         measurements.ceiling = min(measurements.ceiling, fitted)
-        if library.pageSize != measurements.ceiling { library.pageSize = measurements.ceiling }
+        library.resizePageKeepingFirstWork(to: measurements.ceiling)
     }
 
     private func recordCardHeight(_ height: CGFloat, for id: String) {
@@ -403,57 +393,26 @@ struct LibraryView: View {
 
     // MARK: Cards (Web .manager-thumb-wrap)
 
-    private func gridCard(_ work: SavedWork) -> some View {
-        let selected = library.selectedIDs.contains(work.id)
-        return VStack(alignment: .leading, spacing: 5) {
-            Button { openWork(work) } label: {
-                ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
-                    .aspectRatio(82.0 / 58.0, contentMode: .fit)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.plain).disabled(model.isBrowsingLocked)
-            .accessibilityLabel(display.localizedFormat("%@ を開く", LibraryWorkPresentation.title(work, untitled: display.localized("無題"))))
-            .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
-            .overlay(alignment: .topLeading) { selectionCheck(work).padding(1) }
-            // HistoryManager.svelte:1100-1102 `.manager-generation`: under the check, 30pt from the top.
-            .overlay(alignment: .topLeading) { generationBadge(work, plate: true).padding(.top, 30).padding(.leading, 6) }
-            .overlay(alignment: .bottomTrailing) { if model.selectedWorkID == work.id { currentBadge.padding(3) } }
-            VStack(alignment: .leading, spacing: 4) {
-                if let label = model.savedDisplayLabels[work.id] {
-                    Text(label).inkuFont(12, weight: .semibold).foregroundStyle(.tertiary)
-                }
-                LibraryExpandableTitle(work: work, display: display, size: 14)
-                    .id(work.id)
-                    .foregroundStyle(.secondary)
-                if let note = library.annotation(for: work.id).note, !note.isEmpty {
-                    (Text(display.webCopy("historyPreviewCommentLabel", fallback: "作品へのコメント") + " ").fontWeight(.semibold) + Text(note))
-                        .inkuFont(10).foregroundStyle(.tertiary).lineLimit(1)
-                }
-                LibraryModelLinesView(work: work, display: display, naming: naming)
-                cardActions(work)
-            }
-            .frame(minHeight: 64, alignment: .top)
-        }
-        .padding(5)
-        .modifier(LibraryCardSurface(current: selected || preview.work?.id == work.id, focused: focusedWorkID == work.id, cornerRadius: 4))
-        .background {
-            GeometryReader { proxy in
-                Color.clear
-                    .onAppear { recordCardHeight(proxy.size.height, for: work.id) }
-                    .onChange(of: work.id) { _, _ in recordCardHeight(proxy.size.height, for: work.id) }
-                    .onChange(of: proxy.size.height) { _, height in recordCardHeight(height, for: work.id) }
-            }
-        }
-        .contextMenu { workMenu(work) }
-        .focusable().focused($focusedWorkID, equals: work.id)
-        .onKeyPress(.return) {
-            guard focusedWorkID == work.id, !model.isBrowsingLocked else { return .ignored }
-            openWork(work); return .handled
-        }
-        .onKeyPress(.space) {
-            guard focusedWorkID == work.id, !library.mutating, !model.isBrowsingLocked else { return .ignored }
-            library.toggleSelection(work.id); return .handled
-        }
+    /// The card takes values read here, so SwiftUI rebuilds a slot only when what it shows changed.
+    private func gridCard(_ work: SavedWork, slot: Int) -> some View {
+        LibraryGridCard(
+            model: model, work: work, slot: slot,
+            label: model.savedDisplayLabels[work.id],
+            note: library.annotation(for: work.id).note,
+            generation: work.lineageNodeID.flatMap { library.generations[$0] },
+            selected: library.selectedIDs.contains(work.id),
+            previewed: preview.work?.id == work.id,
+            shown: model.selectedWorkID == work.id,
+            focused: focusedSlot == slot,
+            browsingLocked: model.isBrowsingLocked,
+            writingDisabled: writingDisabled,
+            mutating: library.mutating,
+            hashCopied: work.renderHash != nil && library.copiedHash == work.renderHash,
+            modelLines: modelLines.lines(for: work, providers: providers),
+            focus: $focusedSlot,
+            actions: LibraryGridCardActions(open: openWork, openThumbnail: openThumbnail, openLineage: openLineage,
+                                            recordHeight: recordCardHeight, menu: menuActions))
+            .equatable()
     }
 
     /// Native facts the Web card does not print: saved time and SVG size, with the colour catalog on hover.
@@ -461,40 +420,10 @@ struct LibraryView: View {
         (Text(Date(timeIntervalSince1970: Double(work.at) / 1000).formatted(date: .numeric, time: .shortened))
             + Text(" · " + ByteCountFormatter.string(fromByteCount: svgBytes(work), countStyle: .file)))
             .inkuFont(10).monospacedDigit().foregroundStyle(.tertiary).lineLimit(1)
-            .inkuTooltip(display.tooltipValue(display.localized("色") + ": " + (work.renderColorCatalogName ?? work.catalogID ?? display.localized("未記録"))))
+            .inkuTooltip(display.tooltipValue(display.localized("色") + ": " + (work.renderColorCatalogName ?? work.catalogID ?? display.localized("未記録"))), focus: .none)
     }
 
-    /// Web `.thumb-action-row`: star, revision mark, hash; the native share mark, lineage and menu follow.
-    private func cardActions(_ work: SavedWork) -> some View {
-        HStack(spacing: 4) {
-            LibraryWorkMarks(model: model, work: work, spacing: 4).disabled(writingDisabled)
-            if let hash = work.renderHash {
-                Button("#\(hash.suffix(4))") { library.copyHash(hash) }
-                    .inkuFont(10, design: .monospaced)
-                    .inkuTooltip(hashCopyTooltip(hash))
-            }
-            if work.lineageNodeID != nil {
-                Button { openLineage(work) } label: { Image(systemName: "point.3.connected.trianglepath.dotted") }
-                    .accessibilityLabel(display.localized("系譜")).disabled(model.isBrowsingLocked)
-                    .inkuTooltip(display.tooltip("この作品の系譜を開きます。"))
-            }
-            Spacer(minLength: 0)
-            Menu { workMenu(work) } label: { Image(systemName: "ellipsis") }
-                #if os(macOS)
-                .menuStyle(.borderlessButton).menuIndicator(.hidden)
-                #endif
-                .fixedSize().accessibilityLabel(display.localized("作品の操作"))
-                .inkuTooltip(tip("作品の操作"))
-        }
-        .inkuFont(12).buttonStyle(.borderless)
-    }
-
-    private var currentBadge: some View {
-        Text(display.webCopy("historyCurrentBadge", fallback: "表示中"))
-            .inkuFont(9).foregroundStyle(.white)
-            .padding(.vertical, 1).padding(.horizontal, 4)
-            .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 2))
-    }
+    private var currentBadge: some View { LibraryCurrentBadge(display: display) }
 
     private func selectionCheck(_ work: SavedWork) -> some View {
         let selected = library.selectedIDs.contains(work.id)
@@ -573,13 +502,18 @@ struct LibraryView: View {
         }
         .contextMenu(forSelectionType: String.self) { ids in
             if let id = ids.first, let work = library.works.first(where: { $0.id == id }) { workMenu(work) }
+        } primaryAction: { ids in
+            // HistoryManager.svelte:1268: a double click on a row opens the work (Return as well, as macOS tables do).
+            if let id = ids.first, let work = library.works.first(where: { $0.id == id }) { openThumbnail(work) }
         }
+        .background { focusFollower(scroll: nil) }
         #else
         ScrollView {
             LazyVStack(spacing: 8) {
-                ForEach(library.works, id: \.id) { work in gridCard(work) }
+                ForEach(Array(library.works.enumerated()), id: \.element.id) { slot, work in gridCard(work, slot: slot) }
             }.padding(.top, 8).padding(.horizontal, 10).padding(.bottom, 6)
         }
+        .background { focusFollower(scroll: nil) }
         #endif
     }
 
@@ -607,13 +541,16 @@ struct LibraryView: View {
     // MARK: Lineage groups (Web .lineage-history-list)
 
     private var lineageList: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 10) {
-                ForEach(library.groups) { group in groupCard(group) }
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    ForEach(library.groups) { group in groupCard(group) }
+                }
+                .padding(.top, 10).padding(.horizontal, 12).padding(.bottom, 16)
             }
-            .padding(.top, 10).padding(.horizontal, 12).padding(.bottom, 16)
+            .focusSection()
+            .background { focusFollower(scroll: proxy) }
         }
-        .focusSection()
     }
 
     private func groupCard(_ group: LibraryGroup) -> some View {
@@ -628,6 +565,7 @@ struct LibraryView: View {
                         ArtworkThumbnail(work: group.representative.work, thumbnails: model.thumbnails).frame(width: 56, height: 56)
                     }
                     .buttonStyle(.plain)
+                    .simultaneousGesture(TapGesture(count: 2).onEnded { openThumbnail(group.representative.work) })
                     .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
                 }
                 VStack(alignment: .leading, spacing: 4) {
@@ -731,6 +669,7 @@ struct LibraryView: View {
                 }
             }
             .buttonStyle(.plain).disabled(model.isBrowsingLocked)
+            .simultaneousGesture(TapGesture(count: 2).onEnded { openThumbnail(work) })
             .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
             .overlay(alignment: .topLeading) { selectionCheck(work).padding(3) }
             .overlay(alignment: .topTrailing) {
@@ -750,7 +689,7 @@ struct LibraryView: View {
             .inkuFont(12).buttonStyle(.borderless)
         }
         .padding(5)
-        .modifier(LibraryCardSurface(current: selected || model.selectedWorkID == work.id, focused: focusedWorkID == work.id, cornerRadius: 4))
+        .modifier(LibraryCardSurface(current: selected || model.selectedWorkID == work.id, cornerRadius: 4))
         .contextMenu { workMenu(work) }
     }
 
@@ -767,6 +706,7 @@ struct LibraryView: View {
                 }.contentShape(Rectangle())
             }
             .buttonStyle(.plain).disabled(model.isBrowsingLocked)
+            .simultaneousGesture(TapGesture(count: 2).onEnded { openThumbnail(work) })
             .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
             LibraryWorkMarks(model: model, work: work, spacing: 4).disabled(writingDisabled)
             Menu { workMenu(work) } label: { Image(systemName: "ellipsis") }
@@ -786,6 +726,27 @@ struct LibraryView: View {
     private func openWork(_ work: SavedWork) {
         guard !model.isBrowsingLocked else { return }
         preview.show(work)
+    }
+
+    /// Web `openThumbnail` (HistoryManager.svelte:638): one click previews and a double click opens the work, in the
+    /// work tab on the timeline and in the lineage tab in a lineage view. Nothing opens from the trash.
+    private func openThumbnail(_ work: SavedWork) {
+        guard !library.isTrash, !work.trashed, !model.isBrowsingLocked else { return }
+        if library.isGrouped { openLineage(work) } else { openInWorkTab(work) }
+    }
+
+    /// Web `openLibraryWork(item, 'canvas')`: the work shown in Create's work tab, the library closed.
+    private func openInWorkTab(_ work: SavedWork) {
+        Task {
+            do {
+                let saved = try await library.fullWork(id: work.id)
+                guard !saved.trashed, !model.isBrowsingLocked, !Task.isCancelled else { return }
+                await model.selectWork(saved)
+                guard model.selectedWorkID == saved.id, !model.isBrowsingLocked else { return }
+                onClose?()
+                NotificationCenter.default.post(name: .inkuOpenSection, object: "create", userInfo: ["workID": saved.id])
+            } catch { model.errorText = error.localizedDescription }
+        }
     }
 
     private func openInCreate(_ work: SavedWork) {
@@ -827,37 +788,13 @@ struct LibraryView: View {
         }
     }
 
-    @ViewBuilder
     private func workMenu(_ work: SavedWork) -> some View {
-        Button(display.localized("作品プレビュー"), systemImage: "eye") { openWork(work) }.disabled(model.isBrowsingLocked)
-        Button(display.localized("生成情報"), systemImage: "info.circle") { performWorkAction(work, "info") }.disabled(model.isBrowsingLocked || work.trashed)
-        Button(display.localized("制作で開く"), systemImage: "pencil") {
-            openWork(work); openInCreate(work)
-        }.disabled(model.isBrowsingLocked || work.trashed)
-        SavedWorkRefinementActions(model: model, work: work, onAction: performWorkAction, writingLocked: writingDisabled)
-        Button(display.localized("書き出す"), systemImage: "square.and.arrow.up") { performWorkAction(work, "export") }.disabled(writingDisabled || work.trashed)
-        if work.lineageNodeID != nil { Button(display.localized("系譜"), systemImage: "point.3.connected.trianglepath.dotted") { openLineage(work) }.disabled(model.isBrowsingLocked) }
-        Divider()
-        Button(display.localized(library.selectedIDs.contains(work.id) ? "チェックを外す" : "複数選択に追加"), systemImage: "checkmark.square") { library.toggleSelection(work.id) }
-            .disabled(library.mutating || model.isBrowsingLocked)
-        Button(display.localized(work.starred ? "お気に入りを解除" : "お気に入り"), systemImage: "star") { Task { await library.toggleStar(work) } }
-            .disabled(library.mutating || writingDisabled)
-        Button(display.localized("推敲の印"), systemImage: library.annotation(for: work.id).forRevision ? "pencil.circle.fill" : "pencil.circle") { Task { await library.toggleRevision(work) } }
-            .disabled(library.mutating || writingDisabled)
-        if let hash = work.renderHash { Button(display.localized("描画ハッシュ全体をコピー"), systemImage: "doc.on.doc") { library.copyHash(hash) } }
-        Divider()
-        if work.trashed {
-            // HistoryManager.svelte:1069-1070,1215-1226: the per-work buttons' titles, on the menu items that replace them.
-            Button(display.localized("戻す"), systemImage: "arrow.uturn.backward") { Task { await library.restore(ids: [work.id]) } }.disabled(library.mutating || writingDisabled)
-                .help(display.tooltip("ごみ箱から元に戻します", serverKey: "historyRestoreTitle"))
-            Button(display.localized("完全に削除"), role: .destructive) { deletion = LibraryDeletion(ids: [work.id]) }.disabled(library.mutating || writingDisabled)
-                .help(display.tooltip("完全に削除します。元に戻せません", serverKey: "historyPermanentDeleteTitle"))
-        } else {
-            Button(display.localized("ごみ箱へ"), systemImage: "trash") {
-                deletion = LibraryDeletion(ids: [work.id], movesToTrash: true)
-            }.disabled(library.mutating || writingDisabled)
-                .help(display.tooltip("この作品をごみ箱へ移します", serverKey: "historyTrashItemTitle"))
-        }
+        LibraryWorkMenu(model: model, work: work, writingDisabled: writingDisabled, actions: menuActions)
+    }
+
+    private var menuActions: LibraryWorkMenuActions {
+        LibraryWorkMenuActions(open: openWork, openInCreate: openInCreate, perform: performWorkAction, openLineage: openLineage,
+                               delete: { deletion = $0 })
     }
 
     private func toggleGroup(_ id: String) {
@@ -920,7 +857,7 @@ struct LibraryView: View {
                 .background(plate ? AnyShapeStyle(.background.opacity(0.9)) : AnyShapeStyle(Color.accentColor.opacity(0.14)),
                             in: RoundedRectangle(cornerRadius: plate ? 3 : 8))
                 .overlay(RoundedRectangle(cornerRadius: plate ? 3 : 8).stroke(plate ? LibraryChrome.border : Color.clear))
-                .inkuTooltip(display.tooltip("世代番号", serverKey: "historyGenerationTitle"))
+                .inkuTooltip(display.tooltip("世代番号", serverKey: "historyGenerationTitle"), focus: .none)
         }
     }
 
@@ -938,6 +875,28 @@ private final class LibraryGridMeasurements {
     var cardHeights: [String: CGFloat] = [:]
 }
 
+/// Web `modelLines` of each card resolves both references against every connection and the bundled catalog; a
+/// page repeats a few model pairs, so they are worked out once per pair until the connections change.
+@MainActor
+private final class LibraryModelLineMemo {
+    private var providers: [ProviderSettings] = []
+    private var naming = ModelNaming()
+    private var lines: [String: [ModelNaming.Line]] = [:]
+
+    func lines(for work: SavedWork, providers: [ProviderSettings]) -> [ModelNaming.Line] {
+        if providers != self.providers {
+            self.providers = providers
+            naming = ModelNaming(providers: providers)
+            lines.removeAll()
+        }
+        let key = (work.stage1Model ?? "") + "\u{0}" + (work.stage2Model ?? "")
+        if let known = lines[key] { return known }
+        let computed = naming.cardLines(stage1: work.stage1Model, stage2: work.stage2Model)
+        lines[key] = computed
+        return computed
+    }
+}
+
 
 private struct LibraryDeletion: Identifiable {
     let id = UUID()
@@ -949,6 +908,321 @@ private struct LibraryDeletion: Identifiable {
 private struct LibraryTableRow: Identifiable {
     let work: SavedWork
     var id: String { work.id }
+}
+
+/// The pager reads the loading flag itself, so the start and end of a page read redraw these buttons and not the
+/// whole library.
+@MainActor
+private struct LibraryPager: View {
+    let library: LibraryModel
+    let display: DisplaySettings
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button(display.webCopy("historyLatest", fallback: "最新")) { Task { await library.setLatestPage() } }
+                .buttonStyle(LibraryGhostButtonStyle(minWidth: 54))
+                .disabled(!library.hasNewer || library.loading)
+                .inkuTooltip(display.tooltip("先頭ページ", serverKey: "tooltipHistoryLatestPage"), placement: .bottom)
+            Button(display.webCopy("historyNewer", fallback: "← 新しい")) { Task { await library.setPage(library.page - 1) } }
+                .buttonStyle(LibraryGhostButtonStyle(minWidth: 74))
+                .disabled(!library.hasNewer || library.loading)
+                .inkuTooltip(display.tooltip("前のページ", serverKey: "tooltipHistoryNewerPage"), placement: .bottom)
+            Text(library.loading ? display.webCopy("historyLoading", fallback: "読み込み中") : "\(library.page + 1) / \(library.pageCount)")
+                .inkuFont(12).monospacedDigit().foregroundStyle(.secondary).fixedSize()
+            Button(display.webCopy("historyOlder", fallback: "古い →")) { Task { await library.setPage(library.page + 1) } }
+                .buttonStyle(LibraryGhostButtonStyle(minWidth: 74))
+                .disabled(library.page + 1 >= library.pageCount || library.loading)
+                .inkuTooltip(display.tooltip("次のページ", serverKey: "tooltipHistoryOlderPage"), placement: .bottom)
+            Button(display.webCopy("historyOldest", fallback: "最古")) { Task { await library.setPage(library.pageCount - 1) } }
+                .buttonStyle(LibraryGhostButtonStyle(minWidth: 54))
+                .disabled(library.page + 1 >= library.pageCount || library.loading)
+                .inkuTooltip(display.tooltip("最終ページ", serverKey: "tooltipHistoryOldestPage"), placement: .bottom)
+        }
+        .disabled(library.mutating)
+    }
+}
+
+/// Web `focusWork` (HistoryManager.svelte:328-344): once the page that holds the opened work is read and shown, its
+/// grid card takes the keyboard focus (a lineage view scrolls its card into view), and a preview already open follows
+/// it; a closed preview stays closed. A visit applies once in each grouping and layout. It reads the loading flag in a
+/// view of its own, as the pager does.
+@MainActor
+private struct LibraryFocusFollower: View {
+    let library: LibraryModel
+    let preview: LibraryPreviewModel
+    let focus: FocusState<Int?>.Binding
+    let scroll: ScrollViewProxy?
+
+    private struct Target: Equatable {
+        let visit: Int
+        let work: SavedWork
+        let slot: Int?
+    }
+
+    private var target: Target? {
+        guard let request = library.focusRequest, !library.loading else { return nil }
+        if library.isGrouped {
+            for group in library.groups {
+                if let item = library.groupMembers[group.id]?.first(where: { $0.id == request.workID }) {
+                    return Target(visit: request.visit, work: item.work, slot: nil)
+                }
+            }
+            return nil
+        }
+        guard let slot = library.works.firstIndex(where: { $0.id == request.workID }) else { return nil }
+        return Target(visit: request.visit, work: library.works[slot], slot: slot)
+    }
+
+    var body: some View {
+        Color.clear.onChange(of: target, initial: true) { _, target in apply(target) }
+    }
+
+    private func apply(_ target: Target?) {
+        guard let target, target.visit != library.focusedVisit else { return }
+        library.focusedVisit = target.visit
+        if let shown = preview.work, shown.id != target.work.id { preview.show(target.work) }
+        let scroll = scroll
+        // After this update has put the cards in place.
+        Task { @MainActor in
+            if let slot = target.slot { focus.wrappedValue = slot }
+            scroll?.scrollTo(target.work.id, anchor: nil)
+        }
+    }
+}
+
+@MainActor
+private struct LibraryLoadingIndicator: View {
+    let library: LibraryModel
+
+    var body: some View {
+        if library.loading { ProgressView().controlSize(.small) }
+    }
+}
+
+/// Applies the loading flag in a view of its own, for the same reason as the pager.
+@MainActor
+private struct LibraryDisabledWhileLoading<Content: View>: View {
+    let library: LibraryModel
+    let disabled: Bool
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content.disabled(disabled || library.loading)
+    }
+}
+
+private struct LibraryWorkMenuActions {
+    let open: (SavedWork) -> Void
+    let openInCreate: (SavedWork) -> Void
+    let perform: (SavedWork, String) -> Void
+    let openLineage: (SavedWork) -> Void
+    let delete: (LibraryDeletion) -> Void
+}
+
+/// A work's menu, as the context menu and the ⋯ button. A view of its own, so the state it reads (checks, marks,
+/// action states) rebuilds the menu alone and not the card around it.
+@MainActor
+private struct LibraryWorkMenu: View {
+    @Bindable var model: AppModel
+    let work: SavedWork
+    let writingDisabled: Bool
+    let actions: LibraryWorkMenuActions
+    private var library: LibraryModel { model.library }
+    private var display: DisplaySettings { model.display }
+
+    var body: some View {
+        let _ = LibraryPerformanceProbe.menuBody()
+        Button(display.localized("作品プレビュー"), systemImage: "eye") { actions.open(work) }.disabled(model.isBrowsingLocked)
+        Button(display.localized("生成情報"), systemImage: "info.circle") { actions.perform(work, "info") }.disabled(model.isBrowsingLocked || work.trashed)
+        Button(display.localized("制作で開く"), systemImage: "pencil") {
+            actions.open(work); actions.openInCreate(work)
+        }.disabled(model.isBrowsingLocked || work.trashed)
+        SavedWorkRefinementActions(model: model, work: work, onAction: actions.perform, writingLocked: writingDisabled)
+        Button(display.localized("書き出す"), systemImage: "square.and.arrow.up") { actions.perform(work, "export") }.disabled(writingDisabled || work.trashed)
+        if work.lineageNodeID != nil { Button(display.localized("系譜"), systemImage: "point.3.connected.trianglepath.dotted") { actions.openLineage(work) }.disabled(model.isBrowsingLocked) }
+        Divider()
+        Button(display.localized(library.selectedIDs.contains(work.id) ? "チェックを外す" : "複数選択に追加"), systemImage: "checkmark.square") { library.toggleSelection(work.id) }
+            .disabled(library.mutating || model.isBrowsingLocked)
+        Button(display.localized(work.starred ? "お気に入りを解除" : "お気に入り"), systemImage: "star") { Task { await library.toggleStar(work) } }
+            .disabled(library.mutating || writingDisabled)
+        Button(display.localized("推敲の印"), systemImage: library.annotation(for: work.id).forRevision ? "pencil.circle.fill" : "pencil.circle") { Task { await library.toggleRevision(work) } }
+            .disabled(library.mutating || writingDisabled)
+        if let hash = work.renderHash { Button(display.localized("描画ハッシュ全体をコピー"), systemImage: "doc.on.doc") { library.copyHash(hash) } }
+        Divider()
+        if work.trashed {
+            // HistoryManager.svelte:1069-1070,1215-1226: the per-work buttons' titles, on the menu items that replace them.
+            Button(display.localized("戻す"), systemImage: "arrow.uturn.backward") { Task { await library.restore(ids: [work.id]) } }.disabled(library.mutating || writingDisabled)
+                .help(display.tooltip("ごみ箱から元に戻します", serverKey: "historyRestoreTitle"))
+            Button(display.localized("完全に削除"), role: .destructive) { actions.delete(LibraryDeletion(ids: [work.id])) }.disabled(library.mutating || writingDisabled)
+                .help(display.tooltip("完全に削除します。元に戻せません", serverKey: "historyPermanentDeleteTitle"))
+        } else {
+            Button(display.localized("ごみ箱へ"), systemImage: "trash") {
+                actions.delete(LibraryDeletion(ids: [work.id], movesToTrash: true))
+            }.disabled(library.mutating || writingDisabled)
+                .help(display.tooltip("この作品をごみ箱へ移します", serverKey: "historyTrashItemTitle"))
+        }
+    }
+}
+
+/// HistoryManager.svelte `.current-badge`: the work shown in Create.
+@MainActor
+struct LibraryCurrentBadge: View {
+    let display: DisplaySettings
+
+    var body: some View {
+        Text(display.webCopy("historyCurrentBadge", fallback: "表示中"))
+            .inkuFont(9).foregroundStyle(.white)
+            .padding(.vertical, 1).padding(.horizontal, 4)
+            .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 2))
+    }
+}
+
+private struct LibraryGridCardActions {
+    let open: (SavedWork) -> Void
+    let openThumbnail: (SavedWork) -> Void
+    let openLineage: (SavedWork) -> Void
+    let recordHeight: (CGFloat, String) -> Void
+    let menu: LibraryWorkMenuActions
+}
+
+/// One card of the thumbnail grid (Web `.manager-thumb-wrap`). It is given values rather than reading the models, and
+/// compares them, so a page turn rebuilds each slot once and a change that leaves a card as it was (the page loading,
+/// labels of other works) rebuilds none. Its menus and marks read the models in views of their own.
+@MainActor
+private struct LibraryGridCard: View, Equatable {
+    let model: AppModel
+    let work: SavedWork
+    let slot: Int
+    let label: String?
+    let note: String?
+    let generation: Int?
+    let selected: Bool
+    let previewed: Bool
+    let shown: Bool
+    let focused: Bool
+    let browsingLocked: Bool
+    let writingDisabled: Bool
+    let mutating: Bool
+    let hashCopied: Bool
+    let modelLines: [ModelNaming.Line]
+    let focus: FocusState<Int?>.Binding
+    let actions: LibraryGridCardActions
+    private var display: DisplaySettings { model.display }
+    private var library: LibraryModel { model.library }
+
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.slot == rhs.slot && lhs.work == rhs.work && lhs.label == rhs.label && lhs.note == rhs.note
+            && lhs.generation == rhs.generation && lhs.selected == rhs.selected && lhs.previewed == rhs.previewed
+            && lhs.shown == rhs.shown && lhs.focused == rhs.focused && lhs.browsingLocked == rhs.browsingLocked
+            && lhs.writingDisabled == rhs.writingDisabled && lhs.mutating == rhs.mutating && lhs.hashCopied == rhs.hashCopied
+            && lhs.modelLines == rhs.modelLines
+    }
+
+    var body: some View {
+        LibraryPerformanceProbe.cardBody()
+        let title = LibraryWorkPresentation.title(work, untitled: display.localized("無題"))
+        return VStack(alignment: .leading, spacing: 5) {
+            Button { actions.open(work) } label: {
+                ArtworkThumbnail(work: work, thumbnails: model.thumbnails)
+                    .aspectRatio(82.0 / 58.0, contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.plain).disabled(browsingLocked)
+            // HistoryManager.svelte:1202: the click previews, a double click opens the work.
+            .simultaneousGesture(TapGesture(count: 2).onEnded { actions.openThumbnail(work) })
+            .accessibilityLabel(display.localizedFormat("%@ を開く", title))
+            .inkuTooltip(display.tooltip("作品プレビュー", serverKey: "historyPreviewTitle"))
+            .overlay(alignment: .topLeading) { selectionCheck(title: title).padding(1) }
+            // HistoryManager.svelte:1100-1102 `.manager-generation`: under the check, 30pt from the top.
+            .overlay(alignment: .topLeading) { generationBadge.padding(.top, 30).padding(.leading, 6) }
+            .overlay(alignment: .bottomTrailing) { if shown { LibraryCurrentBadge(display: display).padding(3) } }
+            VStack(alignment: .leading, spacing: 4) {
+                if let label {
+                    Text(label).inkuFont(12, weight: .semibold).foregroundStyle(.tertiary)
+                }
+                LibraryExpandableTitle(work: work, display: display, size: 14)
+                    .id(work.id)
+                    .foregroundStyle(.secondary)
+                if let note, !note.isEmpty {
+                    (Text(display.webCopy("historyPreviewCommentLabel", fallback: "作品へのコメント") + " ").fontWeight(.semibold) + Text(note))
+                        .inkuFont(10).foregroundStyle(.tertiary).lineLimit(1)
+                }
+                LibraryModelLinesView(lines: modelLines, display: display)
+                cardActions
+            }
+            .frame(minHeight: 64, alignment: .top)
+        }
+        .padding(5)
+        .modifier(LibraryCardSurface(current: selected || previewed, focused: focused, cornerRadius: 4))
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { actions.recordHeight(proxy.size.height, work.id) }
+                    .onChange(of: work.id) { _, _ in actions.recordHeight(proxy.size.height, work.id) }
+                    .onChange(of: proxy.size.height) { _, height in actions.recordHeight(height, work.id) }
+            }
+        }
+        .contextMenu { LibraryWorkMenu(model: model, work: work, writingDisabled: writingDisabled, actions: actions.menu) }
+        .focusable().focused(focus, equals: slot)
+        .onKeyPress(.return) {
+            guard focus.wrappedValue == slot, !model.isBrowsingLocked else { return .ignored }
+            actions.open(work); return .handled
+        }
+        .onKeyPress(.space) {
+            guard focus.wrappedValue == slot, !library.mutating, !model.isBrowsingLocked else { return .ignored }
+            library.toggleSelection(work.id); return .handled
+        }
+    }
+
+    /// Web `.thumb-action-row`: star, revision mark, hash; the native share mark, lineage and menu follow.
+    private var cardActions: some View {
+        HStack(spacing: 4) {
+            LibraryWorkMarks(model: model, work: work, spacing: 4).disabled(writingDisabled)
+            if let hash = work.renderHash {
+                Button("#\(hash.suffix(4))") { library.copyHash(hash) }
+                    .inkuFont(10, design: .monospaced)
+                    // HistoryManager.svelte:1134,1198: "copied" for 1.2 s after the click.
+                    .inkuTooltip(hashCopied ? display.tooltip("コピーしました", serverKey: "historyHashCopied")
+                                 : display.tooltip("描画ハッシュ全体をコピー", serverKey: "historyHashCopyTitle"))
+            }
+            if work.lineageNodeID != nil {
+                Button { actions.openLineage(work) } label: { Image(systemName: "point.3.connected.trianglepath.dotted") }
+                    .accessibilityLabel(display.localized("系譜")).disabled(browsingLocked)
+                    .inkuTooltip(display.tooltip("この作品の系譜を開きます。"))
+            }
+            Spacer(minLength: 0)
+            Menu { LibraryWorkMenu(model: model, work: work, writingDisabled: writingDisabled, actions: actions.menu) } label: { Image(systemName: "ellipsis") }
+                #if os(macOS)
+                .menuStyle(.borderlessButton).menuIndicator(.hidden)
+                #endif
+                .fixedSize().accessibilityLabel(display.localized("作品の操作"))
+                .inkuTooltip(display.tooltip("作品の操作"))
+        }
+        .inkuFont(12).buttonStyle(.borderless)
+    }
+
+    private func selectionCheck(title: String) -> some View {
+        Button { library.toggleSelection(work.id) } label: { LibrarySelectionBox(selected: selected) }
+            .buttonStyle(.plain)
+            .accessibilityLabel(display.localizedFormat("%@ を選択", title))
+            .accessibilityValue(display.localized(selected ? "選択済み" : "未選択"))
+            .disabled(mutating || browsingLocked)
+            .inkuTooltip(display.tooltip(selected ? "作品の選択を解除" : "作品を選択"))
+    }
+
+    @ViewBuilder private var generationBadge: some View {
+        if let generation {
+            Text("\(generation)")
+                .font(.system(size: 10 * display.preferences.textScale, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(Color.secondary)
+                .padding(.horizontal, 3).padding(.vertical, 0)
+                .frame(minWidth: 16, minHeight: 16)
+                .background(AnyShapeStyle(.background.opacity(0.9)), in: RoundedRectangle(cornerRadius: 3))
+                .overlay(RoundedRectangle(cornerRadius: 3).stroke(LibraryChrome.border))
+                .inkuTooltip(display.tooltip("世代番号", serverKey: "historyGenerationTitle"), focus: .none)
+        }
+    }
 }
 
 @MainActor

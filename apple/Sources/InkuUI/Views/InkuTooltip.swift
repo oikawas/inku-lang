@@ -8,6 +8,16 @@ public enum InkuTooltipPlacement: Sendable {
     case top, bottom, left, right
 }
 
+/// How keyboard focus can reach what a tooltip describes, for the `:focus-visible` bubble.
+public enum InkuTooltipFocus: Sendable {
+    /// A control: focusable from the keyboard only while Full Keyboard Access is on.
+    case control
+    /// A text input, focusable with Tab either way.
+    case text
+    /// Text, an image or a mark: never focused, so no focus binding.
+    case none
+}
+
 private struct InkuTooltipsCoveredKey: EnvironmentKey {
     static let defaultValue = false
 }
@@ -27,8 +37,9 @@ extension View {
     /// `.disabled` so the reason shows. Empty text shows nothing; `DisplaySettings.tooltip` returns "" while
     /// tooltips are off, which is how the rail switch hides every bubble (`.tooltips-disabled .tooltip-bubble`).
     /// Items inside a `Menu` keep `.help`: AppKit draws those as menu item tool tips.
-    public func inkuTooltip(_ text: String, placement: InkuTooltipPlacement = .top, wide: Bool = false) -> some View {
-        modifier(InkuTooltipModifier(text: text, placement: placement, wide: wide))
+    public func inkuTooltip(_ text: String, placement: InkuTooltipPlacement = .top, wide: Bool = false,
+                            focus: InkuTooltipFocus = .control) -> some View {
+        modifier(InkuTooltipModifier(text: text, placement: placement, wide: wide, focus: focus))
     }
 }
 
@@ -69,41 +80,70 @@ public enum InkuTooltipLayout {
 }
 
 #if os(macOS)
+/// A page of library cards holds hundreds of these, so an idle tooltip keeps no AppKit view and no focus binding it
+/// cannot use. The anchor that locates the bubble is placed when the pointer or keyboard focus arrives, and for a
+/// control disabled from outside, which needs it to notice the pointer at all.
 private struct InkuTooltipModifier: ViewModifier {
     let text: String
     let placement: InkuTooltipPlacement
     let wide: Bool
+    let focus: InkuTooltipFocus
     @Environment(\.inkuTextScale) private var scale
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.inkuTooltipsCovered) private var covered
     @State private var token = InkuTooltipToken()
+    @State private var engaged = false
     @FocusState private var focused: Bool
 
+    private struct Inputs: Equatable {
+        let text: String
+        let dark: Bool
+        let covered: Bool
+        let scale: Double
+    }
+
+    private var focusable: Bool {
+        switch focus {
+        case .text: true
+        case .control: NSApp?.isFullKeyboardAccessEnabled ?? false
+        case .none: false
+        }
+    }
+
     func body(content: Content) -> some View {
-        content
+        focusTracking(content
             .onHover { token.overContent = $0; sync() }
             .background {
                 ZStack {
                     // Disabled from outside (`.inkuTooltip(…).disabled(…)`), SwiftUI may report no hover at all,
                     // so the anchor tracks the pointer itself.
-                    InkuTooltipAnchor(token: token, tracksPointer: !isEnabled) { token.overTracked = $0; sync() }
+                    if engaged || !isEnabled {
+                        InkuTooltipAnchor(token: token, tracksPointer: !isEnabled) { token.overTracked = $0; sync() }
+                    }
                     // Disabled inside (`.disabled(…).inkuTooltip(…)`), the control takes no hover of its own and
                     // this shape behind it does, so the reason shows.
                     Color.clear.contentShape(Rectangle()).onHover { token.overBackground = $0; sync() }
                 }
-            }
-            .focused($focused)
+            })
             .accessibilityHint(text)
-            .onChange(of: focused) { _, now in
-                // `:focus-visible`: focus that arrives with a key, not the focus a click leaves behind.
-                token.focusVisible = now && NSApp.currentEvent?.type == .keyDown
-                sync()
+            .onChange(of: Inputs(text: text, dark: colorScheme == .dark, covered: covered, scale: scale)) {
+                if token.engaged || engaged { sync() }
             }
-            .onChange(of: text) { sync() }
-            .onChange(of: colorScheme) { sync() }
-            .onChange(of: covered) { sync() }
-            .onDisappear { InkuTooltipPresenter.shared.deactivate(token) }
+            .onDisappear { if token.engaged || engaged { InkuTooltipPresenter.shared.deactivate(token) } }
+    }
+
+    @ViewBuilder private func focusTracking(_ view: some View) -> some View {
+        if focusable {
+            view.focused($focused)
+                .onChange(of: focused) { _, now in
+                    // `:focus-visible`: focus that arrives with a key, not the focus a click leaves behind.
+                    token.focusVisible = now && NSApp.currentEvent?.type == .keyDown
+                    sync()
+                }
+        } else {
+            view
+        }
     }
 
     private func sync() {
@@ -112,6 +152,7 @@ private struct InkuTooltipModifier: ViewModifier {
         token.wide = wide
         token.scale = scale
         token.dark = colorScheme == .dark
+        if engaged != token.engaged { engaged = token.engaged }
         if token.engaged && !covered { InkuTooltipPresenter.shared.activate(token) }
         else { InkuTooltipPresenter.shared.deactivate(token) }
     }
@@ -144,6 +185,10 @@ private struct InkuTooltipAnchor: NSViewRepresentable {
         return view
     }
 
+    static func dismantleNSView(_ view: AnchorView, coordinator: ()) {
+        view.onPointer = nil
+    }
+
     func updateNSView(_ view: AnchorView, context: Context) {
         token.view = view
         view.onPointer = onPointer
@@ -160,6 +205,15 @@ private struct InkuTooltipAnchor: NSViewRepresentable {
             }
         }
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
+        /// Placed after the pointer arrived: the bubble waits for this view to have a window and a frame.
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if window != nil { InkuTooltipPresenter.shared.anchorPlaced() }
+        }
+        override func setFrameSize(_ newSize: NSSize) {
+            super.setFrameSize(newSize)
+            if window != nil { InkuTooltipPresenter.shared.anchorPlaced() }
+        }
         override func updateTrackingAreas() {
             trackingAreas.forEach(removeTrackingArea)
             if tracksPointer {
@@ -180,6 +234,7 @@ final class InkuTooltipPresenter {
     static let shared = InkuTooltipPresenter()
     private var engaged: [InkuTooltipToken] = []
     private var shown: InkuTooltipToken?
+    private var placing = false
     private lazy var panel: NSPanel = {
         let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
         panel.isOpaque = false
@@ -205,11 +260,26 @@ final class InkuTooltipPresenter {
         present()
     }
 
+    /// An anchor placed on arrival reached its window or its frame; a bubble waiting for it can be shown.
+    func anchorPlaced() {
+        guard let token = engaged.last(where: { !$0.text.isEmpty }), token.view != nil, !placing else { return }
+        placing = true
+        // After this layout pass, when the anchor has its final frame.
+        DispatchQueue.main.async { [weak self] in
+            MainActor.assumeIsolated {
+                self?.placing = false
+                self?.present()
+            }
+        }
+    }
+
     private func present() {
         // Only the key window shows bubbles, as with native tool tips: ordering the child bubble front would
         // also bring an inactive parent window in front of the window the author is using.
-        guard let token = engaged.last(where: { !$0.text.isEmpty && $0.view?.window != nil }),
-              let view = token.view, let window = view.window, window.isVisible, window.isKeyWindow,
+        guard let token = engaged.last(where: { !$0.text.isEmpty }) else { hide(); return }
+        // The innermost tooltip's anchor is placed in this update; show nothing else meanwhile.
+        if token.view == nil { return }
+        guard let view = token.view, let window = view.window, window.isVisible, window.isKeyWindow,
               window.attachedSheet == nil else { hide(); return }
         let anchor = window.convertToScreen(view.convert(view.bounds, to: nil))
         var bounds = window.frame.insetBy(dx: 8, dy: 8)
@@ -349,6 +419,8 @@ private struct InkuTooltipModifier: ViewModifier {
     let text: String
     let placement: InkuTooltipPlacement
     let wide: Bool
-    func body(content: Content) -> some View { content.inkuTooltip(text) }
+    let focus: InkuTooltipFocus
+    // inkuTooltip applies this modifier, so calling it here would recurse; iOS has no hover bubble.
+    func body(content: Content) -> some View { content.help(text) }
 }
 #endif

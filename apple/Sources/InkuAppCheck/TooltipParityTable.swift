@@ -4,6 +4,7 @@
 // AIRefineModal, RefinementAdjustView and WorkActionMenu follow the touch removal at
 // 8273b3ef82b95ba1d729eed7a21a7755867bd3bf and reading removal at 074bc00a984c9a65cfbc31ae1cddd1f20503ca8e,
 // verified through d7cd05f7b1ae198fe62cac6d2497748f30446313: 168 sites remain; other mappings keep their baseline.
+// 2026-10-18 (Web Build1260): the share controls the single-user Web hides and the held note, a paragraph, are excluded.
 
 /// One Web tooltip site and the Swift source that carries it, or why the single-user app has none.
 struct TooltipParityEntry {
@@ -25,7 +26,7 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "+page.svelte:3260", swift: "Views/AboutInkuView.swift", marker: "\"appInfoHintDdlEngine\""),
     .init(web: "+page.svelte:3262", swift: "Views/AboutInkuView.swift", marker: "\"appInfoHintRenderEngine\""),
     .init(web: "+page.svelte:3264", swift: "Views/AboutInkuView.swift", marker: "\"appInfoHintBindingProtocol\""),
-    .init(web: "AIRefineModal.svelte:255", swift: "Views/AuxiliaryView.swift", marker: "webCopy(\"aiRefineHeldNote\""),
+    .init(web: "AIRefineModal.svelte:255", excluded: "Webでも段落の文（held-note）でツールチップではない。Swiftも段落で出す"),
     .init(web: "AIRefineModal.svelte:260", swift: "Views/AuxiliaryView.swift", marker: "serverKey: \"refineCostColor\""),
     .init(web: "AIRefineModal.svelte:260", swift: "Views/AuxiliaryView.swift", marker: "serverKey: \"refineCostLayout\""),
     .init(web: "AppRail.svelte:81", swift: "Views/AppRailView.swift", marker: "serverKey: \"tooltipAppRailToggle\""),
@@ -44,6 +45,7 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "CanvasArtworkWorkspace.svelte:193", swift: "Views/CreationControls.swift", marker: "serverKey: \"tooltipCanvasCaption\""),
     .init(web: "CanvasArtworkWorkspace.svelte:220", swift: "Views/CreationControls.swift", marker: "starred ? \"starOn\" : \"starOff\""),
     .init(web: "CanvasArtworkWorkspace.svelte:234", swift: "Views/LibraryPresentation.swift", marker: "marked ? \"forRevisionOn\" : \"forRevisionOff\""),
+    .init(web: "CanvasArtworkWorkspace.svelte:271", excluded: "単一利用者モードのWebは共有対象の印を出さない（daf6469d1）"),
     .init(web: "CanvasArtworkWorkspace.svelte:278", swift: "Views/CreationControls.swift", marker: "copiedHash == hash ? \"コピーしました\" : \"クリックでfull hashをコピーします\""),
     .init(web: "CanvasArtworkWorkspace.svelte:288", swift: "Views/CreationControls.swift", marker: "serverKey: \"historyReplayTitle\""),
     .init(web: "CanvasArtworkWorkspace.svelte:302", swift: "Views/CreationControls.swift", marker: "tooltip(\"選択中作品の生成情報を表示\")"),
@@ -97,7 +99,7 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "HistoryManager.svelte:829", swift: "Views/LibraryView.swift", marker: "serverKey: \"tooltipHistorySelectAll\""),
     .init(web: "HistoryManager.svelte:834", swift: "Views/LibraryView.swift", marker: "serverKey: \"tooltipHistoryStarredOnly\""),
     .init(web: "HistoryManager.svelte:842", swift: "Views/LibraryView.swift", marker: "serverKey: \"tooltipHistoryForRevisionOnly\""),
-    .init(web: "HistoryManager.svelte:850", swift: "Views/LibraryView.swift", marker: "serverKey: \"tooltipHistoryForShareOnly\""),
+    .init(web: "HistoryManager.svelte:928", excluded: "単一利用者モードのWebは共有のみの絞り込みを出さない（daf6469d1）"),
     .init(web: "HistoryManager.svelte:859", swift: "Views/LibraryView.swift", marker: "serverKey: \"tooltipHistoryTrashView\""),
     .init(web: "HistoryManager.svelte:867", swift: "Views/LibraryView.swift", marker: "serverKey: \"tooltipHistoryMoveToTrash\""),
     .init(web: "HistoryManager.svelte:880", swift: "Views/LibraryView.swift", marker: "serverKey: \"tooltipHistoryRestoreSelected\""),

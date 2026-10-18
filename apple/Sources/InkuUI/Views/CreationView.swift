@@ -374,7 +374,7 @@ struct CreationView: View {
                 Text(display.localized("記述から選択")).tag("auto")
             }.inkuTooltip(tip("次の作品の配色を選びます。"))
             TextField(display.localized("シード（空欄で新規）"), text: $model.seedText).textFieldStyle(.roundedBorder)
-                .inkuTooltip(tip("空欄なら次の描画で新しいシードを使います。"))
+                .inkuTooltip(tip("空欄なら次の描画で新しいシードを使います。"), focus: .text)
         }.padding(16).frame(width: 360).disabled(controlsDisabled)
     }
 

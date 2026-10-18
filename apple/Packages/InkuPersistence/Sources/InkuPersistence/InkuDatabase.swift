@@ -211,26 +211,30 @@ public actor InkuDatabase {
         }
     }
 
-    /// Group filtering and pagination happen before fetching representative SVGs.
+    /// Group filtering and pagination happen before fetching representative SVGs. As Server
+    /// `GET /api/history/lineage-groups`: `includeWorkID` keeps that work's lineage when the minimum would drop it, and
+    /// `anchorWorkID` begins the page at that work's lineage (and keeps it). Either applies only to a work that passes
+    /// the filter; the anchor wins over the include.
     public func libraryGroups(query: LibraryQuery = LibraryQuery(), limit: Int = 12,
-                              offset: Int = 0, minimumItemCount: Int = 1, includeSVG: Bool = true) throws -> LibraryGroupPage {
+                              offset: Int = 0, minimumItemCount: Int = 1, includeSVG: Bool = true,
+                              includeWorkID: String? = nil, anchorWorkID: String? = nil) throws -> LibraryGroupPage {
         try Self.validatePage(limit: limit, offset: offset)
         guard minimumItemCount >= 1 else { throw PersistenceError.invalidRecord("invalid group size") }
         return try queue.read { db in
             let filter = Self.libraryFilter(query)
-            let grouped = """
-                SELECT coalesce(n.root_node_id, n.id) AS root_id, count(*) AS item_count,
-                       sum(h.starred) AS starred_count, sum(coalesce(a.for_revision, 0)) AS revision_count,
-                       max(h.at) AS latest_at
-                \(Self.libraryJoin) WHERE \(filter.sql) AND n.id IS NOT NULL
-                GROUP BY coalesce(n.root_node_id, n.id) HAVING count(*) >= ?
-                """
-            let arguments = filter.arguments + [minimumItemCount]
+            // One read, so the anchor's place and the page it begins cannot disagree.
+            let anchor = try anchorWorkID.flatMap {
+                try Self.groupPosition(of: $0, filter: filter, order: query.order, minimumItemCount: minimumItemCount, in: db)
+            }
+            let start = anchor?.index ?? offset
+            let included = minimumItemCount > 1
+                ? try (anchorWorkID ?? includeWorkID).flatMap { try Self.groupRoot(of: $0, filter: filter, in: db) } : nil
+            let (grouped, arguments) = Self.groupedLibrary(filter: filter, minimumItemCount: minimumItemCount, includedRoot: included)
             let total = try Int.fetchOne(db, sql: "SELECT count(*) FROM (\(grouped))", arguments: arguments) ?? 0
             let rows = try Row.fetchAll(db, sql: """
                 \(grouped) ORDER BY latest_at \(query.order == .newest ? "DESC" : "ASC"), root_id ASC
                 LIMIT ? OFFSET ?
-                """, arguments: arguments + [limit, offset])
+                """, arguments: arguments + [limit, start])
             let groups = try rows.map { row -> LibraryGroup in
                 let root: String = row["root_id"]
                 guard let representative = try Row.fetchOne(db, sql: """
@@ -244,8 +248,56 @@ public actor InkuDatabase {
                                     itemCount: row["item_count"], starredCount: row["starred_count"],
                                     revisionCount: row["revision_count"], latestAt: row["latest_at"])
             }
-            return LibraryGroupPage(groups: groups, total: total)
+            return LibraryGroupPage(groups: groups, total: total, offset: start, anchorRootNodeID: anchor?.rootNodeID)
         }
+    }
+
+    /// Zero-based place of a work's lineage in the grouped listing under the library predicate and ordering, counting
+    /// that lineage even when the minimum would drop it (Server `lineage_group_position`). nil when the filter leaves
+    /// the work out or it has no lineage node.
+    public func libraryGroupIndex(id: String, query: LibraryQuery = LibraryQuery(),
+                                  minimumItemCount: Int = 1) throws -> LibraryGroupPosition? {
+        guard minimumItemCount >= 1 else { throw PersistenceError.invalidRecord("invalid group size") }
+        return try queue.read { db in
+            try Self.groupPosition(of: id, filter: Self.libraryFilter(query), order: query.order,
+                                   minimumItemCount: minimumItemCount, in: db)
+        }
+    }
+
+    private static func groupRoot(of id: String, filter: (sql: String, arguments: StatementArguments),
+                                  in db: Database) throws -> String? {
+        try String.fetchOne(db, sql: """
+            SELECT coalesce(n.root_node_id, n.id) \(libraryJoin) WHERE \(filter.sql) AND n.id IS NOT NULL AND h.id = ?
+            """, arguments: filter.arguments + [id])
+    }
+
+    private static func groupPosition(of id: String, filter: (sql: String, arguments: StatementArguments),
+                                      order: LibraryOrder, minimumItemCount: Int, in db: Database) throws -> LibraryGroupPosition? {
+        guard let root = try groupRoot(of: id, filter: filter, in: db) else { return nil }
+        let (grouped, arguments) = groupedLibrary(filter: filter, minimumItemCount: minimumItemCount, includedRoot: root)
+        let index = try Int.fetchOne(db, sql: """
+            SELECT position FROM (
+                SELECT root_id, row_number() OVER (ORDER BY latest_at \(order == .newest ? "DESC" : "ASC"), root_id ASC) - 1 AS position
+                FROM (\(grouped))
+            ) WHERE root_id = ?
+            """, arguments: arguments + [root])
+        return index.map { LibraryGroupPosition(index: $0, rootNodeID: root) }
+    }
+
+    /// The lineages under the library predicate with at least `minimumItemCount` matching works, and `includedRoot`
+    /// whatever its count.
+    private static func groupedLibrary(filter: (sql: String, arguments: StatementArguments), minimumItemCount: Int,
+                                       includedRoot: String?) -> (sql: String, arguments: StatementArguments) {
+        var arguments = filter.arguments + [minimumItemCount]
+        if let includedRoot { arguments += [includedRoot] }
+        return ("""
+            SELECT coalesce(n.root_node_id, n.id) AS root_id, count(*) AS item_count,
+                   sum(h.starred) AS starred_count, sum(coalesce(a.for_revision, 0)) AS revision_count,
+                   max(h.at) AS latest_at
+            \(libraryJoin) WHERE \(filter.sql) AND n.id IS NOT NULL
+            GROUP BY coalesce(n.root_node_id, n.id)
+            HAVING count(*) >= ?\(includedRoot == nil ? "" : " OR coalesce(n.root_node_id, n.id) = ?")
+            """, arguments)
     }
 
     public func trashCount() throws -> Int {

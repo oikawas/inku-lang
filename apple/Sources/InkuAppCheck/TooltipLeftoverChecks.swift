@@ -36,7 +36,7 @@ func runTooltipAndLeftoverChecks() async throws {
     }
     let equal = counts.values.map(\.equal).reduce(0, +)
     let excluded = counts.values.map(\.excluded).reduce(0, +)
-    guard tooltipParityTable.count == 168, missing.isEmpty, excluded == 8, equal == 160 else {
+    guard tooltipParityTable.count == 168, missing.isEmpty, excluded == 11, equal == 157 else {
         throw CheckFailure.message("Tooltip parity: \(tooltipParityTable.count) sites, \(equal) equal, \(excluded) excluded, missing \(missing)")
     }
 
@@ -52,7 +52,9 @@ func runTooltipAndLeftoverChecks() async throws {
         if help > 0 { helps[file.lastPathComponent] = help }
         bubbles += text.components(separatedBy: ".inkuTooltip(").count - 1
     }
-    guard helps == ["SavedWorkActionState.swift": 3, "LineageView.swift": 3, "LibraryView.swift": 3] else {
+    // The export menus' SVG/PNG items are menu items too; InkuTooltip's one is the iOS stand-in, which has no bubble.
+    guard helps == ["SavedWorkActionState.swift": 3, "LineageView.swift": 3, "LibraryView.swift": 3,
+                    "LibraryPreviewPanel.swift": 2, "SavedWorkExportMenu.swift": 1, "InkuTooltip.swift": 1] else {
         throw CheckFailure.message("`.help` outside menu items: \(helps)")
     }
 
@@ -105,11 +107,12 @@ func runTooltipAndLeftoverChecks() async throws {
         throw CheckFailure.message("Failed drawing status differs from Web: \(failing.status)")
     }
 
-    // Failure (2, 3): the demo interval stops at 999 s, or the demo draws with the app's wild switch.
+    // Failure (2, 3): the demo interval editor leaves Server's 1...999 s (saved 1000...3600 s are kept, checked by
+    // --fanout-demo-parity-only), or the demo draws with the app's wild switch.
     failing.wild = true
     let demo = try ExactJSON(data: failing.requestForDemoDescription("A red circle", sketchMode: "off").renderOptions)
-    guard demo["wild"].bool == false, try lines("Views/AutomationView.swift").contains(where: { $0.contains("in: 1...3600)") }) else {
-        throw CheckFailure.message("Demo must draw with wild off and allow 3600 s: wild \(demo["wild"])")
+    guard demo["wild"].bool == false, try lines("Views/AutomationView.swift").contains(where: { $0.contains("in: 1...999)") }) else {
+        throw CheckFailure.message("Demo must draw with wild off and edit 1...999 s: wild \(demo["wild"])")
     }
 
     // Failure (4): the fetched-list message is the native count instead of the Web's notice.
@@ -196,8 +199,8 @@ func runTooltipAndLeftoverChecks() async throws {
     }
     print("Tooltips and leftovers passed: 168 Web tooltip sites compared — \(equal) equal, 0 missing, \(excluded) excluded "
           + "(per component equal/missing/excluded: \(table.joined(separator: ", "))); \(bubbles) inkuTooltip calls, "
-          + "9 menu-item .help; 4 placements inside the window; switch copy and off state; failed status text; demo wild off "
-          + "and 3600 s; fetch notice; 3 chatgptStatus strings; batch rows [2, 5] kept after reconnect; fork edge and 2 refusals; "
+          + "12 menu-item .help and the iOS stand-in; 4 placements inside the window; switch copy and off state; failed status text; demo wild off "
+          + "and 1...999 s; fetch notice; 3 chatgptStatus strings; batch rows [2, 5] kept after reconnect; fork edge and 2 refusals; "
           + "comparison choice pruned. Temporary SQLite and offline provider mocks only.")
 }
 

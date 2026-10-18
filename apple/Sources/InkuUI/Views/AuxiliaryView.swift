@@ -127,7 +127,7 @@ public struct AuxiliaryView: View {
                     visionSelection
                     TextField(model.display.localized("AI に伝える方向性"), text: $auxiliary.direction, axis: .vertical).lineLimit(2...4)
                         .disabled(auxiliary.running || auxiliary.selectingSource || model.isBusy)
-                        .inkuTooltip(model.display.tooltip("AIへ伝える方針は160文字までです。"))
+                        .inkuTooltip(model.display.tooltip("AIへ伝える方針は160文字までです。"), focus: .text)
                     Text("\(auxiliary.direction.utf16.count) / \(AuxiliaryModel.directionLimit)").inkuFont(12).foregroundStyle(.secondary)
                 }
                 Text(model.display.localized(auxiliary.visionMode ? "上のモデルが観察し、同じモデルで各世代を描きます。" : "制作のモデルで描きます。"))

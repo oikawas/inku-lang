@@ -68,4 +68,52 @@ func runThumbnailMemoryChecks() async throws {
     try require(thumbnails.cachedImage(for: a) == nil, "Pruning left a synchronous orphan image")
     print("Thumbnail memory passed: cold miss; immediate decoded-image hit; work/hash isolation; "
           + "bounded and disabled cache; orphan removal; no display rasterization. 10,000 synchronous hits: \(elapsed).")
+    try await checkLimitedLoads(database: database, store: store, png: data as Data, imageBytes: loaded.bytesPerRow * loaded.height)
+}
+
+/// Failures: more than four PNGs decode at once; a view that stops waiting leaves a later viewer of the same work with
+/// a cancelled read; a prefetch for the next page pushes the shown work out of memory or exceeds the cache.
+@MainActor
+private func checkLimitedLoads(database: InkuDatabase, store: ThumbnailStore, png: Data, imageBytes: Int) async throws {
+    let works = (0..<12).map { SavedWork(id: "limit-\($0)", at: Int64(100 + $0), input: "L\($0)", score: "{}", svg: "",
+                                        renderHash: "hash-limit-\($0)", lineageNodeID: "limit-\($0)-node") }
+    for work in works {
+        try await database.save(work, node: LineageNode(id: work.lineageNodeID!, historyID: work.id, at: work.at))
+        try await store.put(historyID: work.id, scale: ArtworkThumbnails.scale, png: png, sourceRenderHash: work.renderHash)
+    }
+    let thumbnails = ArtworkThumbnails()
+    await thumbnails.connect(store: store, database: database)
+    let loaded = try await withThrowingTaskGroup(of: Bool.self) { group in
+        for work in works.prefix(10) { group.addTask { try await thumbnails.image(for: work).width == 8 } }
+        var count = 0
+        for try await ok in group where ok { count += 1 }
+        return count
+    }
+    let peak = await thumbnails.currentStatistics().maxDecodesInFlight
+    guard loaded == 10, (1...ArtworkThumbnails.displayDecoders).contains(peak) else {
+        throw CheckFailure.message("Ten loads gave \(loaded) images with a decode peak of \(peak)")
+    }
+    let left = Task { try await thumbnails.image(for: works[10]) }
+    left.cancel()
+    _ = try? await left.value
+    guard try await thumbnails.image(for: works[10]).width == 8 else {
+        throw CheckFailure.message("A later viewer did not get the image after the first one stopped waiting")
+    }
+    // Room for two images: the shown one stays, the other old one makes room, and a third prefetch is dropped.
+    let small = ArtworkThumbnails(byteLimit: imageBytes * 2)
+    await small.connect(store: store, database: database)
+    _ = try await small.image(for: works[0])
+    _ = try await small.image(for: works[1])
+    await small.prefetch([works[2]], keeping: [works[1]])
+    await small.prefetchFinished()
+    let afterFirst = (small.cachedImage(for: works[0]) == nil, small.cachedImage(for: works[1]) != nil, small.cachedImage(for: works[2]) != nil)
+    await small.prefetch([works[3]], keeping: [works[1], works[2]])
+    await small.prefetchFinished()
+    let afterSecond = (small.cachedImage(for: works[1]) != nil, small.cachedImage(for: works[2]) != nil, small.cachedImage(for: works[3]) == nil)
+    guard afterFirst == (true, true, true), afterSecond == (true, true, true),
+          await small.currentStatistics().prefetched == 1 else {
+        throw CheckFailure.message("Prefetch kept/dropped the wrong images: \(afterFirst), \(afterSecond)")
+    }
+    print("Limited loads passed: 10 concurrent loads decoded with a peak of \(peak) (limit \(ArtworkThumbnails.displayDecoders)); "
+          + "a later viewer got the image after the first stopped waiting; a prefetch kept the shown work, replaced an old one and dropped what had no room.")
 }

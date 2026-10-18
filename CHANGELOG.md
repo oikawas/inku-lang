@@ -8,6 +8,31 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-18 — macOS: open the Library at the shown work, and open works with a double click
+
+This follows the Web's 2026-10-17 change.
+
+- When the saved work shown in Create falls under the search and filters, the Library opens with that work first on its page and its card focused, and an open preview switches to it. By lineage, its lineage comes first, and thumbnails by lineage keep it even with one work (the heading reads "(with derivations, plus the selected work’s lineage)"). Otherwise the page stays where it was. ← Newer and Latest reach the works before it.
+- When opening or closing the preview, or resizing the window, changes how many works a page holds, the first work stays. Moving between timeline and lineage views keeps the timeline's place.
+- A double click on a thumbnail opens the work, in the work tab on the timeline and in the lineage tab by lineage. A list table row opens with a double click.
+- The bundled copy of the Web's text and versions was regenerated from Build 1260. "About Inku" now shows render engine 85 instead of 82, and Server Build 1260 instead of 1235.
+
+### 2026-10-18 — macOS: faster Library page turns
+
+Each page turn rebuilt all 56 cards three times and decoded the 56 thumbnails at once. A card is now rebuilt only when what it shows changes, decodes run four at a time, and the next page's thumbnails are read ahead. In an off-screen measurement (a disposable database of 600 works, 56 per page, no AX client), the main thread time of one turn went from 416 ms to 207 ms.
+
+- When taller cards made a page hold fewer works, the Library read the page again and jumped to other works. As on the Web, the first work now stays and the works that no longer fit start the next page; ← Newer then reaches the works before it.
+- Turning Library pages made the lineage show the revision marks of its works that were not on that page as off. The lineage now shows the marks it read itself.
+- The part that locates a tooltip is placed when the pointer or keyboard focus arrives. Tooltips look, read and sit as before.
+- The thumbnail memory limit grows from 96 MiB to 160 MiB (two pages of 512px thumbnails besides the history strip and the lineage).
+
+### 2026-10-18 — macOS: save before one refinement option, restart the zoom drawing process, identify the binary in the failure log
+
+- Making one layout option now saves the checked unsaved candidates first, as Server does since 2026-10-17. Before this, macOS dropped the checked candidates without saving them.
+- If the zoom window process (`inku-display-gpu`) had ended while no request was running, the next work zoomed was treated as one that ended it and could not be zoomed until the app quit. It is now started again without marking any work.
+- Each display failure log line now carries the executable's SHA-256 (`app_executable_sha256`). The display API version and the Build stay the same across rebuilds, so a failure could not be matched to a build record.
+- The Library's export button for checked works now reads "Export", as on the Web.
+
 ### 2026-10-18 — Remove the unreachable photo picker, input-source chooser and overwrite question from the Android camera
 
 The 2026-09-30 SPEC made the camera capture the only image input and took the Photo Picker and the input-source dialog off the screen; this removes what was left behind. That is the photo picker result handler, launch request and launch failure in `InkuViewModel`, the input-source choice and its cancel, the pre-capture overwrite question and its dialog, the capture states `ChoosingSource`, `PickingPhoto` and `AwaitingOverwriteConfirmation`, the `PhotoPickerUnavailable` failure, the selected-image cache `SelectedImageFileStore`, and seven strings that nothing used any more. None of it was reachable from the screen, so nothing the author does changes: the camera still goes straight to the capture. Works made earlier from a picked photo keep their provenance (`photo_picker`, shown as "Existing photo").

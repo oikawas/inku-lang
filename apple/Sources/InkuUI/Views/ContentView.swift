@@ -390,6 +390,10 @@ public struct ContentView: View {
     private func openLibrary() {
         ui.settingsOpen = false
         ui.libraryOpen = true
+        // Web `openManager()`: the library opens at the saved work shown in Create; an unsaved candidate is not one,
+        // and nothing is saved for this.
+        let shown = workspaceWork.flatMap { $0.id == model.previewWork?.id ? nil : $0.id }
+        Task { await model.library.open(at: shown) }
     }
     private func closeLibrary() { ui.libraryOpen = false }
     /// Web `openSettings()`: with no destination, the tab the author last chose (`settings_tab`), else the first.

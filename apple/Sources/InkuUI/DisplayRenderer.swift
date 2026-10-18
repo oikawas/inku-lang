@@ -115,6 +115,9 @@ public final class DisplayRenderer: Sendable {
     /// How many times `inku-display-gpu` was started (nil: windows are drawn on the CPU).
     public var gpuLaunches: Int? { gpu?.launches }
 
+    /// For checks: the running `inku-display-gpu`'s process ID (nil: none running, or windows on the CPU).
+    public var gpuProcessIdentifier: Int32? { gpu?.runningProcessIdentifier }
+
     /// For checks: set in `WindowPainter.gpu`'s environment to an SVG's SHA-256 (hex), the program stops
     /// on that work's request, as a GPU driver that ends the process would.
     public static let gpuCheckAbortVariable = DisplayGPUProcess.checkAbortVariable
@@ -277,7 +280,9 @@ public final class DisplayRenderer: Sendable {
         default: String(describing: error)
         }
         Self.logger.error("Skia display failed: \(stage, privacy: .public) \(code, privacy: .public) \(message, privacy: .public)")
-        failureLog.withLock { $0?.append(svg: svg, stage: stage, code: code, message: message, request: request) }
+        // Read once per run, before the lock: the same measure as the build records' built/installed SHA-256.
+        let executable = FailureLog.executableSHA256
+        failureLog.withLock { $0?.append(svg: svg, stage: stage, code: code, message: message, request: request, executable: executable) }
         return Failed(code: code)
     }
 
@@ -332,7 +337,17 @@ private struct FailureLog: Sendable {
 
     init(folder: URL) { self.folder = folder }
 
-    mutating func append(svg: String, stage: String, code: String, message: String, request: [String: Int]) {
+    /// SHA-256 (hex) of the running executable: the display version and the app build stay the same across
+    /// rebuilds, so this is what tells which binary failed. Empty if it cannot be read.
+    static let executableSHA256: String = {
+        guard let url = Bundle.main.executableURL, let handle = try? FileHandle(forReadingFrom: url) else { return "" }
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        while let chunk = try? handle.read(upToCount: 4 * 1024 * 1024), !chunk.isEmpty { hasher.update(data: chunk) }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }()
+
+    mutating func append(svg: String, stage: String, code: String, message: String, request: [String: Int], executable: String) {
         let digest = SHA256.hash(data: Data(svg.utf8)).map { String(format: "%02x", $0) }.joined()
         guard written.insert("\(digest):\(stage):\(code)").inserted else { return }
         let info = Bundle.main.infoDictionary
@@ -341,6 +356,7 @@ private struct FailureLog: Sendable {
             "request": request, "svg_sha256": digest, "svg_bytes": svg.utf8.count, "svg_file": digest + ".svg",
             "display_api_version": InkuCore.displayAPIVersion,
             "app_version": info?["CFBundleShortVersionString"] as? String ?? "", "app_build": info?["CFBundleVersion"] as? String ?? "",
+            "app_executable_sha256": executable,
         ]
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

@@ -186,7 +186,7 @@ struct BatchConditionsView: View {
             Text(model.display.localized("描画条件はバッチ開始時に固定します。再開には前回の条件を使います。"))
                 .inkuFont(12).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             TextField(model.display.localized("シード（空欄で新規）"), text: $model.seedText).textFieldStyle(.roundedBorder)
-                .inkuTooltip(tip("空欄なら次の描画で新しいシードを使います。"))
+                .inkuTooltip(tip("空欄なら次の描画で新しいシードを使います。"), focus: .text)
         }
         .padding(16).frame(width: 340).disabled(disabled)
     }

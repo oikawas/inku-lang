@@ -24,6 +24,7 @@ func displayGPUHelper() -> URL {
 /// Failure (pixels): the window crosses the pipe in another byte order, stride or place than the CPU draws it.
 /// Failure (G4): a program that ends takes the app with it, or is started again and again for the same work,
 /// or leaves no cause in the display failure log, or keeps the next work from being drawn.
+/// Failure (idle end): a program the system stopped between requests marks the next work as one that ended it.
 @MainActor
 func runDisplayGPUChecks(svg: String, helper: URL) async throws {
     #if arch(arm64)
@@ -95,7 +96,8 @@ func runDisplayGPUChecks(svg: String, helper: URL) async throws {
     let message = logged?["message"] as? String ?? ""
     guard codes == ["gpu_process_exited", "gpu_process_exited"], launchesAfterEnd == 1, lines.count == 1,
           logged?["code"] as? String == "gpu_process_exited", logged?["stage"] as? String == "window",
-          message.contains("signal 6"), message.contains(DisplayRenderer.gpuCheckAbortVariable) else {
+          message.contains("signal 6"), message.contains(DisplayRenderer.gpuCheckAbortVariable),
+          (logged?["app_executable_sha256"] as? String)?.count == 64 else {
         throw fail("An ended program was not handled: \(codes), launches \(launchesAfterEnd ?? -1), log \(lines)")
     }
     let next = try await windows(ending, plain, plainZoom)
@@ -103,11 +105,28 @@ func runDisplayGPUChecks(svg: String, helper: URL) async throws {
         throw fail("The next work was not drawn by a new program: \(next.map(\.complete)), launches \(ending.gpuLaunches ?? -1)")
     }
 
+    // Idle end: the program is stopped while no request is running; the same work is drawn by a new one.
+    guard let idlePID = ending.gpuProcessIdentifier else { throw fail("No running inku-display-gpu after the next work") }
+    kill(idlePID, SIGKILL)
+    let deadline = ContinuousClock.now + .seconds(5)
+    while ending.gpuProcessIdentifier != nil, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
+    var idleCodes: [String] = []
+    for _ in 0..<2 {
+        do { idleCodes.append(try await windows(ending, plain, plainZoom).last?.complete == true ? "drawn" : "partial") }
+        catch let failed as DisplayRenderer.Failed { idleCodes.append(failed.code) }
+    }
+    let idleLines = (try? String(contentsOf: logFolder.appendingPathComponent("display-failures/failures.jsonl"), encoding: .utf8))?
+        .split(separator: "\n") ?? []
+    guard idleCodes == ["drawn", "drawn"], ending.gpuLaunches == 3, idleLines.count == 1 else {
+        throw fail("A program stopped while idle was not started again: \(idleCodes), launches \(ending.gpuLaunches ?? -1), "
+            + "log lines \(idleLines.count)")
+    }
+
     print("Display GPU passed: 4x window \(first[0].image.width)x\(first[0].image.height) in one piece, first \(firstTook) "
         + "(start included), again \(againTook); "
         + (workDifference.map { "against the CPU: worst block \($0.worstBlock), far \($0.farShare); " } ?? "")
         + "plain work worst block \(plainDifference.worstBlock); ended program logged once (\(message.prefix(80))), "
-        + "not restarted for the same work, restarted for the next.")
+        + "not restarted for the same work, restarted for the next; stopped while idle, started again for the same work.")
     #else
     print("Display GPU skipped: windows are drawn on the CPU on this architecture.")
     #endif

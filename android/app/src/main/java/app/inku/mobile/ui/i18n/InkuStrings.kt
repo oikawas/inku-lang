@@ -248,6 +248,8 @@ interface InkuStrings {
     val baseUrlChange: String
     val drawFromDdl: String
     val ddlOverwriteTitle: String
+    val ddlOverwriteRedraw: String
+    val pipelineProposalNotAnswered: String
     val ddlEdit: String
     val mascotSubtitle: String
     val mascotIncu: String

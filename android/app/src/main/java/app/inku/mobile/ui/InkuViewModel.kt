@@ -519,6 +519,9 @@ class InkuViewModel @JvmOverloads constructor(
     private var cameraRunSerial: Long = 0L
     private var cameraComposeSnapshot: InkuUiState? = null
     private var cameraRetryInput: CameraDrawRunInput? = null
+    // The run a camera capture stopped in for an answer. Its photo goes with
+    // that run's approval or resume and with no other run's.
+    private var cameraPipelineExecutionId: String? = null
     private val mutableCameraCaptureRequests = MutableSharedFlow<CameraCaptureRequest>(extraBufferCapacity = 1)
     val cameraCaptureRequests: SharedFlow<CameraCaptureRequest> = mutableCameraCaptureRequests.asSharedFlow()
     private val mutableChatGptAuthorizationRequests = MutableSharedFlow<String>()
@@ -671,6 +674,11 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = localState.value.copy(
             tab = AppTab.Compose,
             composeMode = ComposeMode.Write,
+            // The answer is asked for on the studio; a full screen opened over
+            // it, here or from Works, would hide it (SPEC 2026-10-12).
+            canvasPresentationMode = false,
+            presentationHistory = null,
+            presentationSequence = emptyList(),
             refinementOpen = false,
             refinementBusy = false,
             selectedHistory = selected,
@@ -701,6 +709,22 @@ class InkuViewModel @JvmOverloads constructor(
         )
     }
 
+    /**
+     * For a run nobody is there to answer -- a batch line, a demo cycle: the
+     * stopped run is cancelled and the reason returned, so the caller can go
+     * on. Null when the failure was not the pipeline stopping.
+     */
+    private suspend fun abandonPipelineInteraction(error: Throwable): String? {
+        if (error !is PipelineInteractionRequired) return null
+        val view = error.view
+        runCatching { withContext(Dispatchers.IO) { repository.cancelPipeline(view.executionId) } }
+        return when {
+            view.patchProposal != null -> strings().pipelineProposalNotAnswered
+            view.phaseReason != null -> pipelineAttentionText(view.phaseReason, view.providerFailure, strings(), view.svgOutputLimitMiB)
+            else -> strings().pipelineCheckDdl
+        }
+    }
+
     private fun presentPipelineInteraction(error: Throwable): Boolean {
         if (error !is PipelineInteractionRequired) return false
         presentPipelineView(error.view)
@@ -713,7 +737,7 @@ class InkuViewModel @JvmOverloads constructor(
 
     private fun continuePipeline(approve: Boolean) {
         val view = localState.value.pipelineView ?: return
-        val originalPhoto = cameraRetryInput?.originalPhoto
+        val originalPhoto = cameraRetryInput?.originalPhoto?.takeIf { view.executionId == cameraPipelineExecutionId }
         val runId = beginDrawingRun()
         localState.value = localState.value.copy(isDrawing = true)
         drawingJob = viewModelScope.launch {
@@ -1009,7 +1033,7 @@ class InkuViewModel @JvmOverloads constructor(
             }
             throw error
         } catch (error: PipelineInteractionRequired) {
-            if (serial == cameraRunSerial) presentPipelineInteraction(error)
+            if (serial == cameraRunSerial) presentCameraPipelineStop(serial, error)
         } catch (_: Throwable) {
             failCameraRun(
                 serial,
@@ -1068,7 +1092,7 @@ class InkuViewModel @JvmOverloads constructor(
                 }
                 throw error
             } catch (error: PipelineInteractionRequired) {
-                if (serial == cameraRunSerial) presentPipelineInteraction(error)
+                if (serial == cameraRunSerial) presentCameraPipelineStop(serial, error)
             } catch (_: Throwable) {
                 failCameraRun(serial, CameraFailure.DrawFailed, canRetryDraw = true)
             }
@@ -1223,6 +1247,31 @@ class InkuViewModel @JvmOverloads constructor(
                     isJapanese = !current.uiLanguage.isEnglish,
                     animationsEnabled = false,
                 )?.message,
+            )
+        }
+    }
+
+    /**
+     * A camera drawing the pipeline stopped. A proposal, or a run that can be
+     * resumed, is shown for an answer as any drawing's is, and keeps the photo.
+     * A stop with nothing to answer is the drawing failing: the development
+     * screen stays with its 再試行 from the poetic description and its 取消
+     * back to before the capture (SPEC 2026-09-30), which the studio's stop
+     * panel offered neither of.
+     */
+    private suspend fun presentCameraPipelineStop(serial: Long, error: PipelineInteractionRequired) {
+        val view = error.view
+        val answerable = view.patchProposal != null || view.phaseReason == null || view.phaseReason == "svg_output_too_large"
+        if (answerable) {
+            cameraPipelineExecutionId = view.executionId
+            presentPipelineInteraction(error)
+            return
+        }
+        runCatching { withContext(Dispatchers.IO) { repository.cancelPipeline(view.executionId) } }
+        failCameraRun(serial, CameraFailure.DrawFailed, canRetryDraw = cameraRetryInput != null)
+        if (serial == cameraRunSerial) {
+            localState.value = localState.value.copy(
+                message = pipelineAttentionText(view.phaseReason!!, view.providerFailure, strings(), view.svgOutputLimitMiB),
             )
         }
     }
@@ -1482,6 +1531,18 @@ class InkuViewModel @JvmOverloads constructor(
         if (localState.value.cameraCaptureState.locksCameraInteraction) return
         if (localState.value.isDrawing) {
             setTab(AppTab.Compose)
+            return
+        }
+        // A proposal waiting for 承認 or 辞退 stays on screen until it is
+        // answered (SPEC 2026-10-12); 「新しい作品」 is what drops it, and says so
+        // by cancelling the run. Leaving it here used to hide the answer with
+        // no way back to it.
+        if (localState.value.pipelineView?.patchProposal != null) {
+            setTab(AppTab.Compose)
+            localState.value = localState.value.copy(
+                composeMode = ComposeMode.Write,
+                canvasPresentationMode = false, presentationHistory = null, presentationSequence = emptyList(),
+            )
             return
         }
         closeRefinement()
@@ -2200,6 +2261,9 @@ class InkuViewModel @JvmOverloads constructor(
         adoptSavedHistory(item) { current ->
             current.copy(
                 descriptionForkRequested = false,
+                // The canvas now shows this work, so no refinement candidate is
+                // what the next drawing comes from (`withPreviewParent`).
+                refinementPreviewId = null,
                 // Only an explicit work operation establishes a parent.
                 lineageDetached = !asParent,
                 prompt = item.originalInput,
@@ -2359,6 +2423,9 @@ class InkuViewModel @JvmOverloads constructor(
      */
     fun selectLineageNode(node: LineageGraphNode) {
         val item = (node as? LineageGraphNode.Work)?.history?.item ?: return
+        // Picking another work selects it, and selecting stops the drawing; a
+        // tap on a card is not how a run is meant to be stopped.
+        if (localState.value.isRunning) return
         val inWorkContext = localState.value.workContextId != null
         applyHistorySelection(item, AppTab.Lineage)
         if (inWorkContext) localState.value = localState.value.copy(workContextId = item.id)
@@ -2379,6 +2446,7 @@ class InkuViewModel @JvmOverloads constructor(
             viewer.presentationSequence.firstOrNull()?.let(::showPresentationHistory)
             return
         }
+        if (viewer.isRunning) return
         viewModelScope.launch {
             val latest = historyItems.value.firstOrNull() ?: history.first().firstOrNull() ?: return@launch
             selectHistory(latest)
@@ -2398,6 +2466,10 @@ class InkuViewModel @JvmOverloads constructor(
             showPresentationHistory(viewer.presentationSequence[next])
             return
         }
+        // Moving to another work selects it, and selecting stops the drawing
+        // (`applyHistorySelection`). A swipe while a batch, the demo or a DDL
+        // drawing is running would end it without a word.
+        if (viewer.isRunning) return
         viewModelScope.launch {
             val items = historyItems.value.ifEmpty { history.first() }
             if (items.isEmpty()) return@launch
@@ -2440,6 +2512,14 @@ class InkuViewModel @JvmOverloads constructor(
         }
         validateModelsForRun(current)?.let { message ->
             localState.value = localState.value.copy(message = message)
+            return
+        }
+        // Drawing from the description replaces the instructions with what
+        // Stage 1 writes. Instructions the author edited by hand are asked
+        // about first; the dialog also offers to draw from them. The dialog was
+        // there from the start, but nothing ever raised it.
+        if (cameraProvenance == null && current.ddlEditedAfterGeneration && DdlSource.hasBody(current.ddl)) {
+            localState.value = localState.value.copy(confirmDdlOverwrite = true)
             return
         }
         runSubmit(current, cameraProvenance)
@@ -2642,7 +2722,13 @@ class InkuViewModel @JvmOverloads constructor(
                     return@launch
                 }
             }
-            val lineage = withPreviewParent(current, declared)
+            // A candidate that cannot be kept leaves the declared parent: the
+            // drawing is still the author's, and an uncaught failure here
+            // would take the app down.
+            val lineage = runCatching { withPreviewParent(current, declared) }.getOrElse { error ->
+                if (error is CancellationException) throw error
+                declared
+            }
             localState.value = localState.value.beginDescriptionDrawing(parent = descriptionParent, message = strings().statusStage1)
             runCatching {
                 withContext(Dispatchers.IO) {
@@ -2706,7 +2792,13 @@ class InkuViewModel @JvmOverloads constructor(
         val declared = ddlLineage(current)
         val runId = beginDrawingRun()
         drawingJob = viewModelScope.launch {
-            val lineage = withPreviewParent(current, declared)
+            // A candidate that cannot be kept leaves the declared parent: the
+            // drawing is still the author's, and an uncaught failure here
+            // would take the app down.
+            val lineage = runCatching { withPreviewParent(current, declared) }.getOrElse { error ->
+                if (error is CancellationException) throw error
+                declared
+            }
             localState.value = localState.value.copy(isDrawing = true, message = strings().statusComposingFromDdl)
             runCatching {
                 withContext(Dispatchers.IO) {
@@ -2878,10 +2970,14 @@ class InkuViewModel @JvmOverloads constructor(
                     }.onFailure { error ->
                         if (error is CancellationException) throw error
                         if (!isCurrentDrawingRun(runId)) return@onFailure
-                        if (presentPipelineInteraction(error)) return@launch
+                        // A line the pipeline stopped is a failed line like any
+                        // other, so the rest are still drawn and this one can be
+                        // run again (SPEC 2026-10-17). Turning to its stop used
+                        // to end the whole batch with no tally.
+                        val reason = abandonPipelineInteraction(error) ?: messageFor(error, strings(), strings().statusDrawFailed)
                         // Every failure is kept (at most MaxBatchItems): the tally
                         // counts this list, as web's report keeps each one.
-                        failures = failures + BatchFailure(lineNumber, prompt, messageFor(error, strings(), strings().statusDrawFailed))
+                        failures = failures + BatchFailure(lineNumber, prompt, reason)
                         localState.value = localState.value.copy(
                             batchSuccess = success,
                             batchFailures = failures,
@@ -3007,10 +3103,12 @@ class InkuViewModel @JvmOverloads constructor(
                     }.onFailure { error ->
                         if (error is CancellationException) throw error
                         if (!isCurrentDrawingRun(runId)) return@onFailure
-                        if (presentPipelineInteraction(error)) return@launch
+                        // The demo goes on to its next cycle, as it does after
+                        // any other failed drawing.
+                        val reason = abandonPipelineInteraction(error) ?: messageFor(error, strings(), strings().demoFailed)
                         localState.value = localState.value.copy(
                             demoCurrentElapsedMs = System.currentTimeMillis() - startedAt,
-                            message = messageFor(error, strings(), strings().demoFailed),
+                            message = reason,
                         )
                         delay(1000)
                     }
@@ -3042,10 +3140,15 @@ class InkuViewModel @JvmOverloads constructor(
         drawingRunSerial += 1
         drawingJob?.cancel()
         drawingJob = null
-        localState.value.pipelineView?.takeIf { !it.terminal }?.let { view ->
+        val cancelled = localState.value.pipelineView?.takeIf { !it.terminal }?.also { view ->
             viewModelScope.launch { runCatching { repository.cancelPipeline(view.executionId) } }
         }
-        localState.value = localState.value.copy(isDrawing = false, demoWaitingSeconds = null, batchCanRetry = false, message = strings().statusStopped)
+        localState.value = localState.value.copy(
+            isDrawing = false, demoWaitingSeconds = null, batchCanRetry = false, message = strings().statusStopped,
+            // The run is cancelled, so its proposal and its 承認・辞退 can no
+            // longer be answered; left on screen they only failed when pressed.
+            pipelineView = if (cancelled != null) null else localState.value.pipelineView,
+        )
     }
 
     /** A successful early performance save ends the pre-save parent retention too. */
@@ -3094,6 +3197,10 @@ class InkuViewModel @JvmOverloads constructor(
             groundCurrentLabel = null,
             tab = AppTab.Lineage,
         )
+        // The tab is set here rather than through `setTab`, which is what reads
+        // the lineage; closing the refinement would otherwise show an empty
+        // lineage, or the one of a work opened before.
+        refreshLineage()
         colorArrangementCursors.remove(item.id)
         if (subview == RefinementSubview.ColorArrangement || subview == RefinementSubview.Ground ||
             (subview == RefinementSubview.Adjust && localState.value.refinementElement == RefinementElement.Color)) {
@@ -3155,6 +3262,8 @@ class InkuViewModel @JvmOverloads constructor(
             refinementCanAbort = false,
             refinementStatus = null,
         )
+        // A child saved one by one is not in the graph read when the refinement opened.
+        if (localState.value.tab == AppTab.Lineage) refreshLineage()
     }
 
     fun openToolChange(item: HistoryItemEntity) {
@@ -3785,6 +3894,12 @@ class InkuViewModel @JvmOverloads constructor(
      */
     private suspend fun withPreviewParent(current: InkuUiState, declaration: LineageDeclaration): LineageDeclaration {
         if (current.refinementPreviewId == null) return declaration
+        // Only from the work the candidate was refined out of, while its
+        // refinement is still open. The mark outlives a move to another tab, and
+        // without this a drawing from a different work hung off this candidate.
+        if (!current.refinementOpen) return declaration
+        val refinedFrom = current.refinementParent?.lineageNodeId ?: return declaration
+        if (declaration.parentNodeId != refinedFrom) return declaration
         if (declaration.parentNodeId.isNullOrEmpty()) return declaration
         val nodeId = materializePreviewNode(current) ?: return declaration
         return declaration.copy(parentNodeId = nodeId)
@@ -3864,6 +3979,9 @@ class InkuViewModel @JvmOverloads constructor(
         baseUrl: String,
         apiKey: String,
         publishedModelsText: String,
+        // Told whether the save went through: null when it did, otherwise the
+        // reason, so the screen that asked can stay open and say why.
+        onResult: (String?) -> Unit,
     ) {
         viewModelScope.launch {
             runCatching {
@@ -3877,8 +3995,11 @@ class InkuViewModel @JvmOverloads constructor(
                 )
             }.onSuccess {
                 localState.value = localState.value.copy(message = strings().modelSettingsSaved)
+                onResult(null)
             }.onFailure { error ->
-                localState.value = localState.value.copy(message = messageFor(error, strings(), strings().modelSettingsSaveFailed))
+                val message = messageFor(error, strings(), strings().modelSettingsSaveFailed)
+                localState.value = localState.value.copy(message = message)
+                onResult(message)
             }
         }
     }
@@ -4042,6 +4163,8 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = current.copy(
             selectedHistory = current.selectedHistory?.let { if (it.id == id) it.copy(trashed = trashed) else it },
             pendingDescriptionParent = current.pendingDescriptionParent?.let { if (it.id == id) it.copy(trashed = trashed) else it },
+            // The full screen draws this row, and its menu reads the flag.
+            presentationHistory = current.presentationHistory?.let { if (it.id == id) it.copy(trashed = trashed) else it },
             workNotice = notice,
         )
         if (current.tab == AppTab.Lineage) refreshLineage()

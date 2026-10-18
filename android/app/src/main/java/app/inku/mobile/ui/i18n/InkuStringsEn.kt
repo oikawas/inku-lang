@@ -382,6 +382,8 @@ object InkuStringsEn : InkuStrings {
     override val baseUrlChange = "Change the Base URL"
     override val drawFromDdl = "Draw from instructions"
     override val ddlOverwriteTitle = "The edited instructions will be lost"
+    override val ddlOverwriteRedraw = "Redraw from the description"
+    override val pipelineProposalNotAnswered = "Stopped: a proposed DDL change needed approval."
     override val ddlEdit = "DDL edit"
     override val mascotSubtitle = "Incu (cube) or Yuragi (crab)"
     override val mascotIncu = "Incu (cube)"

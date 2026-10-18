@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-18 — Review Android navigation and the making of a work
+
+Fixes for problems a code and on-device review found. An unsaved refinement candidate could become the parent of a work drawn from another work. Moving to another work during a drawing silently stopped the batch, the demo or the drawing. Paint after editing the instructions by hand discarded the edits without asking. A batch ended without drawing its remaining lines when one line stopped in the pipeline. A drawing running on the lineage screen showed no progress. A refused new service closed its dialog and lost what was typed. A proposal waiting for approval was hidden by Studio or the full screen. A camera drawing that stopped lost its Retry and Cancel. The full screen's ‹ and › now go the way the swipe and web do, its ⋯ menu has Export and Generation info, and the canvas work search has a visible entry. Closing the keyboard brings the bottom bar back, and Back leaves the trash view first. See the 2026-10-18 section of `android/ANDROID_SPEC.md`.
+
 ### 2026-10-18 — Remove the unreachable photo picker, input-source chooser and overwrite question from the Android camera
 
 The 2026-09-30 SPEC made the camera capture the only image input and took the Photo Picker and the input-source dialog off the screen; this removes what was left behind. That is the photo picker result handler, launch request and launch failure in `InkuViewModel`, the input-source choice and its cancel, the pre-capture overwrite question and its dialog, the capture states `ChoosingSource`, `PickingPhoto` and `AwaitingOverwriteConfirmation`, the `PhotoPickerUnavailable` failure, the selected-image cache `SelectedImageFileStore`, and seven strings that nothing used any more. None of it was reachable from the screen, so nothing the author does changes: the camera still goes straight to the capture. Works made earlier from a picked photo keep their provenance (`photo_picker`, shown as "Existing photo").

@@ -90,6 +90,8 @@
 	}
 </script>
 
+{#snippet llmMark()}<span class="work-action-llm" role="img" aria-label={t().workActionLlmMarkLabel}>LLM</span>{/snippet}
+
 <svelte:window onkeydown={onWindowKeydown} onclick={(event) => {
 	if (open && event.target instanceof Node && !wrapperEl?.contains(event.target)) onOpenChange(false);
 }} />
@@ -120,21 +122,35 @@
 				{#if ddlOrigin}<span class="work-action-origin">{t().workActionDdlOrigin}</span>{/if}
 				{#if descriptionLocked}<span class="work-action-origin">{t().descriptionLockedMark}</span>{/if}
 			</div>
-			<button type="button" role="menuitem" onclick={(event) => select('layout', event)}>{t().canvasVaryComposition}</button>
-			<button type="button" role="menuitem" onclick={(event) => select('color-catalog', event)}>{t().canvasVaryColor}</button>
-			<button type="button" role="menuitem" onclick={(event) => select('color-arrangement', event)}>{t().workActionColorArrangement}</button>
-			<button type="button" role="menuitem" onclick={(event) => select('ground', event)}>{t().workActionGround}</button>
-			<button type="button" role="menuitem" onclick={(event) => select('tool', event)}>{t().workActionTool}</button>
+			<!-- Lightest first: the saved Score redrawn without the LLM, then the
+			     instructions, then a new reading of the description, then the AI.
+			     The mark goes on the items that always call the LLM; layout and the
+			     instruction editor call it only to fill a hole left in the text. -->
+			<div class="work-action-group" role="group" aria-label={t().workActionGroupLook}>
+				<div class="work-action-group-label" aria-hidden="true">{t().workActionGroupLook}</div>
+				<button type="button" role="menuitem" onclick={(event) => select('color-catalog', event)}>{t().canvasVaryColor}</button>
+				<button type="button" role="menuitem" onclick={(event) => select('color-arrangement', event)}>{t().workActionColorArrangement}</button>
+				<button type="button" role="menuitem" onclick={(event) => select('ground', event)}>{t().workActionGround}</button>
+				<button type="button" role="menuitem" onclick={(event) => select('tool', event)}>{t().workActionTool}</button>
+			</div>
+			<div class="work-action-group" role="group" aria-label={t().workActionGroupForm}>
+				<div class="work-action-group-label" aria-hidden="true">{t().workActionGroupForm}</div>
+				<button type="button" role="menuitem" onclick={(event) => select('layout', event)}>{t().canvasVaryComposition}</button>
+				<button type="button" role="menuitem" onclick={(event) => select('instructions', event)}>{t().workActionInstructions}</button>
+			</div>
 			{#if !ddlOrigin}
-				<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('description', event)}>{t().workActionDescription}</button>
+				<div class="work-action-group" role="group" aria-label={t().workActionGroupDescription}>
+					<div class="work-action-group-label" aria-hidden="true">{t().workActionGroupDescription}</div>
+					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('description', event)}>{t().workActionDescription}{@render llmMark()}</button>
+					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('sketch-grain', event)}>{t().workActionSketchGrain}{@render llmMark()}</button>
+					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('models', event)}>{t().workActionModels}{@render llmMark()}</button>
+					{#if descriptionLocked}<p class="work-action-held-note">{t().descriptionLockedReason}</p>{/if}
+				</div>
 			{/if}
-			<button type="button" role="menuitem" onclick={(event) => select('instructions', event)}>{t().workActionInstructions}</button>
-			{#if !ddlOrigin}
-				<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('sketch-grain', event)}>{t().workActionSketchGrain}</button>
-				<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('models', event)}>{t().workActionModels}</button>
-				{#if descriptionLocked}<p class="work-action-held-note">{t().descriptionLockedReason}</p>{/if}
-			{/if}
-			<button type="button" role="menuitem" onclick={(event) => select('autonomous', event)}>{t().workActionAutonomous}</button>
+			<div class="work-action-group" role="group" aria-label={t().workActionGroupAi}>
+				<div class="work-action-group-label" aria-hidden="true">{t().workActionGroupAi}</div>
+				<button type="button" role="menuitem" onclick={(event) => select('autonomous', event)}>{t().workActionAutonomous}{@render llmMark()}</button>
+			</div>
 		</div>
 	{/if}
 </div>
@@ -155,6 +171,10 @@
 	.work-action-menu.header .work-action-dropdown { top: calc(100% + 6px); right: 0; }
 	.work-action-dropdown button { border: 0; background: transparent; color: var(--fg); padding: 6px 13px; font: inherit; font-size: var(--ui-font-size-12); line-height: 1.35; text-align: left; cursor: pointer; width: 100%; box-sizing: border-box; }
 	.work-action-dropdown button:hover { background: var(--bg2); }
+	.work-action-dropdown button:has(.work-action-llm) { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+	.work-action-group + .work-action-group { margin-top: 4px; border-top: 1px solid var(--border); }
+	.work-action-group-label { padding: 6px 13px 2px; color: var(--fg3); font-size: var(--ui-font-size-10); font-weight: 600; letter-spacing: 0.04em; }
+	.work-action-llm { flex-shrink: 0; padding: 0 4px; border: 1px solid var(--border2); border-radius: 3px; color: var(--fg3); font-size: var(--ui-font-size-9); font-weight: 600; line-height: 1.5; letter-spacing: 0.04em; }
 	.work-action-title { margin-bottom: 4px; padding: 7px 13px; border-bottom: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); color: var(--fg); font-size: var(--ui-font-size-12); font-weight: 700; letter-spacing: 0.08em; }
 	.work-action-origin { display: block; margin-top: 2px; color: var(--fg2); font-size: var(--ui-font-size-12); font-weight: 500; letter-spacing: 0.02em; }
 </style>

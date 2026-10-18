@@ -272,7 +272,7 @@ The conditions of the displayed work and the conditions for the next work are se
 
 ## 8. Refine
 
-A refinement changes exactly one element at a time, chosen from the work-editing menu (`Refine` on the Work tab, or `…` on each work in the Lineage tab).
+A refinement changes exactly one element at a time, chosen from the work-editing menu (`Refine` on the Work tab, or `…` on each work in the Lineage tab). The menu runs lightest first in four groups: `Color and texture`, `Form and instructions`, `Redraw from the description`, and `Leave it to the AI`. The items that always call the LLM carry an `LLM` mark (they take time and tokens).
 
 | Element | What changes | Cost |
 |---|---|---|

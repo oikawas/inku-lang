@@ -624,6 +624,11 @@ export interface LangPack {
 	workActionSketchGrain: string;
 	workActionModels: string;
 	workActionAutonomous: string;
+	workActionGroupLook: string;
+	workActionGroupForm: string;
+	workActionGroupDescription: string;
+	workActionGroupAi: string;
+	workActionLlmMarkLabel: string;
 	workActionSaveFirst: string;
 	workActionGenerationLocked: string;
 	workEditCloseBackdrop: string;

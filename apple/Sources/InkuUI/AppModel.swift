@@ -277,6 +277,7 @@ public final class AppModel {
             await thumbnails.synchronize()
             library.thumbnails = thumbnails
             library.prefetchesThumbnails = true
+            library.pageCompanions = { [weak self] ids in await self?.loadWorkActionStates(workIDs: ids) }
             displayRenderer.connectFailureLog(directory: url.deletingLastPathComponent())
             let personalRuntime = ChatGPTPlanRuntime(directory: url.deletingLastPathComponent().appendingPathComponent("personal-chatgpt", isDirectory: true))
             let ordinary: any ProviderTransport
@@ -812,9 +813,10 @@ public final class AppModel {
             let states = Dictionary(uniqueKeysWithValues: missing.map { id in
                 (id, summaries[id].map { SavedWorkActionState(origin: $0.origin, authority: $0.authority) } ?? .unavailable)
             })
-            // Every menu observes this dictionary. Publish the page once, not once per card.
-            workActionStates.merge(states) { _, new in new }
-            savedDisplayLabels.merge(labels) { _, new in new }
+            // Every menu observes this dictionary. Publish the page once, not once per card, and not at all when
+            // nothing new came back: an unchanged write still redraws every reader.
+            if !states.isEmpty { workActionStates.merge(states) { _, new in new } }
+            if !labels.isEmpty { savedDisplayLabels.merge(labels) { _, new in new } }
             displayLabelReads.formUnion(labelIDs)
         } catch {
             guard token == workActionReadToken, !Task.isCancelled else { return }

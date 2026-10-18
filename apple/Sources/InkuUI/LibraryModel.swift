@@ -99,6 +99,9 @@ public final class LibraryModel {
     /// The library reads the next page's thumbnails into memory once its own page is listed; the history strip,
     /// a LibraryModel of its own, does not.
     @ObservationIgnored public var prefetchesThumbnails = false
+    /// Read for each listed page before it is shown (the app reads menu states and labels from the saved journals),
+    /// so the cards appear with them in one update instead of being drawn again when they arrive.
+    @ObservationIgnored public var pageCompanions: (@MainActor ([String]) async -> Void)?
     @ObservationIgnored private var prefetchTask: Task<Void, Never>?
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var keepingPage = false
@@ -267,6 +270,8 @@ public final class LibraryModel {
                                                              offset: requestedOffset, includeSVG: includeListSVG)
                 guard refreshToken == token, !Task.isCancelled else { return }
                 let listed = try await database.lineageGenerations(nodeIDs: result.items.compactMap { $0.work.lineageNodeID })
+                guard refreshToken == token, !Task.isCancelled else { return }
+                await pageCompanions?(result.items.map(\.id))
                 guard refreshToken == token, !Task.isCancelled else { return }
                 groups = []; total = result.total
                 works = result.items.map(\.work)

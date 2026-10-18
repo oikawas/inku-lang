@@ -101,13 +101,22 @@ struct LibraryModelFactsView: View {
 /// Web `modelLines` on a library card: "解釈:" / "描画:" only when the two stages differ (HistoryManager.svelte:364-374).
 @MainActor
 struct LibraryModelLinesView: View {
-    let work: SavedWork
+    let lines: [ModelNaming.Line]
     let display: DisplaySettings
-    let naming: ModelNaming
+
+    init(work: SavedWork, display: DisplaySettings, naming: ModelNaming) {
+        self.init(lines: naming.cardLines(stage1: work.stage1Model, stage2: work.stage2Model), display: display)
+    }
+
+    /// Lines worked out by the caller, who can keep them across cards with the same models.
+    init(lines: [ModelNaming.Line], display: DisplaySettings) {
+        self.lines = lines
+        self.display = display
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(naming.cardLines(stage1: work.stage1Model, stage2: work.stage2Model).enumerated()), id: \.offset) { _, line in
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                 let role = line.role.map { display.webCopy($0 == .interpretation ? "historyModelInterpretation" : "historyModelDrawing",
                                                             fallback: $0 == .interpretation ? "解釈" : "描画") }
                 let unrecorded = display.webCopy("historyModelUnrecorded", fallback: "未記録")

@@ -78,10 +78,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -7519,17 +7517,18 @@ private fun PresentationControls(
             // ‹ is the newer work, as the swipe to the right is and as web's
             // left-hand button is (CanvasPanel.svelte `nav-left`).
             PresentationControlButton("‹", enabled = canGoNewer, onClick = onGoNewer)
-            // One line that shrinks rather than wraps: with the 3D button the
-            // counter's share is narrow, and "3 / 372" broke after the slash.
-            // The shrinking is measured by the second line it would need, so
-            // the text has to be allowed to wrap: unwrapped, "44 / 371" was cut.
-            val counterStyle = MaterialTheme.typography.labelSmall
-            BasicText(
-                counter,
-                modifier = Modifier.weight(1f).padding(horizontal = Dimens.spaceXs),
-                style = counterStyle.copy(color = PresentationControlLabelMuted, textAlign = TextAlign.Center),
+            // With the 3D button the counter's share is about 56 dp (each 32 dp
+            // button takes a 48 dp touch target), and "39 / 371" at a 1.15 font
+            // scale needs 57: it broke after the slash, and autoSize did not
+            // shrink it on the device. Thin spaces and no side padding make it
+            // about 46 dp of 64.
+            Text(
+                counter.replace(" / ", "\u2009/\u2009"),
+                modifier = Modifier.weight(1f),
+                color = PresentationControlLabelMuted,
+                style = MaterialTheme.typography.labelSmall,
+                textAlign = TextAlign.Center,
                 maxLines = 1,
-                autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = counterStyle.fontSize),
             )
             PresentationControlButton("›", enabled = canGoOlder, onClick = onGoOlder)
             PresentationControlButton(S.description, selected = captionVisible, enabled = captionEnabled, wide = true, onClick = onToggleCaption)

@@ -244,7 +244,8 @@ private final class PagingMeter {
             let spent = drawStart.duration(to: .now)
             layout += spent
             let now = await signature()
-            if firstPaint == nil, let published, now.works == published, !now.loading {
+            // A measured shrink can drop the last row of the published page before the first tick.
+            if firstPaint == nil, let published, !now.works.isEmpty, published.starts(with: now.works), !now.loading {
                 firstPaint = start.duration(to: .now)
             }
             if now != last || spent > .milliseconds(1) {

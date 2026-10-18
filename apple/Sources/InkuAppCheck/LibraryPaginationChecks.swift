@@ -107,7 +107,45 @@ func runLibraryPaginationChecks() async throws {
         guard app.workActionState(for: work) == expected else { throw CheckFailure.message("Batched menu state changed for \(execution)") }
     }
     print("Library pagination passed: SVG-free list retains UTF-8 size/metadata; PNG hit1, missing drawing1; exact full action target; paging lineage reads0, explicit refresh reloads; history unchanged.")
+    try await checkMeasuredShrink(folder: folder)
     print("Menu summaries passed: description/locked/user-DDL match full contexts; broken/mismatched/incomplete/missing/legacy records remain unavailable; page state published together.")
+}
+
+/// Failure: a shrink measured on the shown page moved its first work, read the page again, skipped the works that no
+/// longer fit, or left the newer works before the kept first work out of reach.
+@MainActor
+private func checkMeasuredShrink(folder: URL) async throws {
+    let database = try InkuDatabase(url: folder.appendingPathComponent("shrink.sqlite"))
+    let ids = (0..<10).map { String(format: "shrink-%02d", $0) }
+    for (index, id) in ids.enumerated() {
+        let work = SavedWork(id: id, at: Int64(100 - index), input: id, score: "{}", svg: "", lineageNodeID: id + "-node")
+        try await database.save(work, node: LineageNode(id: id + "-node", historyID: id, at: work.at))
+    }
+    let library = LibraryModel(includeListSVG: false)
+    library.pageSize = 4
+    await library.connect(database: database)
+    await library.setPage(1)
+    guard library.works.map(\.id) == Array(ids[4...7]) else { throw CheckFailure.message("Shrink fixture did not open on works 4-7") }
+    LibraryPerformanceProbe.reset()
+    LibraryPerformanceProbe.counting = true
+    defer { LibraryPerformanceProbe.counting = false }
+    library.shrinkPageKeepingFirstWork(to: 3)
+    let kept = (library.works.map(\.id), library.shownFrom, library.shownTo, LibraryPerformanceProbe.refreshesStarted)
+    await library.setPage(library.page + 1)
+    let next = library.works.map(\.id)
+    await library.setPage(0)
+    let first = (library.works.map(\.id), library.hasNewer)
+    await library.setPage(library.page - 1)
+    let newer = (library.works.map(\.id), library.startOffset, library.hasNewer)
+    await library.setPage(2)
+    await library.setLatestPage()
+    let latest = (library.works.map(\.id), library.startOffset)
+    guard kept.0 == Array(ids[4...6]), kept.1 == 5, kept.2 == 7, kept.3 == 0,
+          next == Array(ids[7...9]), first.0 == Array(ids[1...3]), first.1,
+          newer.0 == Array(ids[0...2]), newer.1 == 0, !newer.2, latest.0 == Array(ids[0...2]), latest.1 == 0 else {
+        throw CheckFailure.message("Measured shrink lost its place: kept \(kept), next \(next), first \(first), newer \(newer), latest \(latest)")
+    }
+    print("Measured shrink passed: 4 to 3 kept works 4-6 with reads0, the next page began at 7, page 0 held 1-3 with newer on, newer reached 0-2, latest returned to 0-2.")
 }
 
 private actor PaginationLineageReader: LineageReading {

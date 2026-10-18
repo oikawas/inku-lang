@@ -43,12 +43,16 @@ public final class LibraryModel {
         didSet {
             let bounded = min(1000, max(1, pageSize))
             if pageSize != bounded { pageSize = bounded; return }
-            if pageSize != oldValue {
-                page = page * oldValue / pageSize
+            if pageSize != oldValue, !keepingPage {
+                page = (startOffset + page * oldValue) / pageSize
+                startOffset = 0
                 changedPresentation(resetPage: false)
             }
         }
     }
+    /// Web `startOffset`: where page 0 begins. Only a shrink measured on the shown page moves it (Web `setPageSize`
+    /// keeps the first work); the newer works before it are reached with ← newer. Filters and views start again at 0.
+    public private(set) var startOffset = 0
     public var selectedIDs: Set<String> = []
     public private(set) var works: [SavedWork] = []
     public private(set) var annotations: [String: LibraryAnnotation] = [:]
@@ -93,6 +97,7 @@ public final class LibraryModel {
     /// Told when works are deleted for good, to drop their thumbnails.
     @ObservationIgnored public var thumbnails: ArtworkThumbnails?
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
+    @ObservationIgnored private var keepingPage = false
     @ObservationIgnored private var refreshToken = UUID()
     @ObservationIgnored private var selectedAnnotationToken = UUID()
     @ObservationIgnored private var lineageToken = UUID()
@@ -123,6 +128,7 @@ public final class LibraryModel {
         clearSelectedAnnotation()
         lineageToken = UUID()
         selectedIDs.removeAll()
+        startOffset = 0
         works.removeAll()
         annotations.removeAll()
         svgSizes.removeAll()
@@ -146,9 +152,11 @@ public final class LibraryModel {
         await refresh()
     }
 
-    public var pageCount: Int { max(1, (total + pageSize - 1) / pageSize) }
-    public var shownFrom: Int { total == 0 ? 0 : page * pageSize + 1 }
-    public var shownTo: Int { min(total, (page + 1) * pageSize) }
+    public var pageCount: Int { max(1, (total - startOffset + pageSize - 1) / pageSize) }
+    public var shownFrom: Int { total == 0 ? 0 : startOffset + page * pageSize + 1 }
+    public var shownTo: Int { min(total, startOffset + (page + 1) * pageSize) }
+    /// ← newer and Latest: an earlier page, or newer works before the kept first work.
+    public var hasNewer: Bool { page > 0 || startOffset > 0 }
     public var isGrouped: Bool { grouped || layout == .lineage }
     public var filter: LibraryQuery {
         LibraryQuery(text: query, trashed: isTrash, starred: starredOnly,
@@ -157,13 +165,15 @@ public final class LibraryModel {
 
     private func changedFilter() {
         page = 0
+        startOffset = 0
         selectedIDs.removeAll()
         changedPresentation(resetPage: false)
     }
 
     /// Display changes retain checked works. A grouped lane starts again at its first group.
     private func changedPresentation(resetPage: Bool) {
-        if resetPage { page = 0 }
+        if resetPage { page = 0; startOffset = 0 }
+        else if startOffset > 0 { page = (startOffset + page * pageSize) / pageSize; startOffset = 0 }
         expandedGroups.removeAll()
         groupMembers.removeAll()
         groupMemberTotals.removeAll()
@@ -179,8 +189,35 @@ public final class LibraryModel {
 
     public func setPage(_ value: Int) async {
         refreshTask?.cancel()
+        // Web `setPage`: newer continues before the kept first work.
+        if value < 0 { startOffset = max(0, startOffset + value * pageSize) }
         page = min(max(0, value), pageCount - 1)
         await refresh(refreshLineage: false)
+    }
+
+    /// Web `setLatestPage`: the newest works, wherever the pages began.
+    public func setLatestPage() async {
+        startOffset = 0
+        await setPage(0)
+    }
+
+    /// Web `setPageSize` for cards measured on the shown page that no longer fit: the first work keeps its place and
+    /// the works after the last complete row start the next page. They are in hand, so nothing is read and the
+    /// lineage stays as it is. A larger size, a grouped lane or a page still loading takes the ordinary path.
+    public func shrinkPageKeepingFirstWork(to value: Int) {
+        let size = min(1000, max(1, value))
+        guard size < pageSize, !isGrouped, !loading else {
+            pageSize = size
+            return
+        }
+        let first = startOffset + page * pageSize
+        keepingPage = true
+        pageSize = size
+        keepingPage = false
+        page = min(page, first / size)
+        startOffset = first - page * size
+        page = max(0, min(page, pageCount - 1))
+        if works.count > size { works = Array(works.prefix(size)) }
     }
 
     public func refresh(refreshLineage: Bool = true) async {
@@ -193,14 +230,14 @@ public final class LibraryModel {
         let requestedGrouping = isGrouped
         let requestedMinimum = layout == .grid ? 2 : 1
         let requestedSize = pageSize
-        let requestedPage = page
+        let requestedOffset = startOffset + page * pageSize
         loading = true
         errorText = nil
         do {
             let count = try await database.trashCount()
             if requestedGrouping {
                 let result = try await database.libraryGroups(query: requestedFilter, limit: requestedSize,
-                                                               offset: requestedPage * requestedSize, minimumItemCount: requestedMinimum, includeSVG: includeListSVG)
+                                                               offset: requestedOffset, minimumItemCount: requestedMinimum, includeSVG: includeListSVG)
                 guard refreshToken == token, !Task.isCancelled else { return }
                 groups = result.groups; total = result.total
                 works = result.groups.map(\.representative.work)
@@ -208,7 +245,7 @@ public final class LibraryModel {
                 svgSizes = Dictionary(uniqueKeysWithValues: result.groups.map { ($0.representative.id, $0.representative.svgBytes) })
             } else {
                 let result = try await database.libraryPage(query: requestedFilter, limit: requestedSize,
-                                                             offset: requestedPage * requestedSize, includeSVG: includeListSVG)
+                                                             offset: requestedOffset, includeSVG: includeListSVG)
                 guard refreshToken == token, !Task.isCancelled else { return }
                 let listed = try await database.lineageGenerations(nodeIDs: result.items.compactMap { $0.work.lineageNodeID })
                 guard refreshToken == token, !Task.isCancelled else { return }
@@ -220,6 +257,8 @@ public final class LibraryModel {
             }
             trashTotal = count
             loading = false
+            // Deletions can leave the kept first work past the end; the pages then begin at the newest again.
+            if startOffset > 0, startOffset >= total { startOffset = 0; page = 0; await refresh(refreshLineage: refreshLineage); return }
             if page >= pageCount { page = pageCount - 1; await refresh(refreshLineage: refreshLineage); return }
             let visibleRoots = requestedGrouping && layout == .grid ? groups.map(\.id) : Array(expandedGroups)
             for root in visibleRoots {

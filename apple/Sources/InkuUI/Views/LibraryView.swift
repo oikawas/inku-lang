@@ -155,13 +155,13 @@ struct LibraryView: View {
 
     private var pager: some View {
         HStack(spacing: 6) {
-            Button(display.webCopy("historyLatest", fallback: "最新")) { Task { await library.setPage(0) } }
+            Button(display.webCopy("historyLatest", fallback: "最新")) { Task { await library.setLatestPage() } }
                 .buttonStyle(LibraryGhostButtonStyle(minWidth: 54))
-                .disabled(library.page <= 0 || library.loading)
+                .disabled(!library.hasNewer || library.loading)
                 .inkuTooltip(display.tooltip("先頭ページ", serverKey: "tooltipHistoryLatestPage"), placement: .bottom)
             Button(display.webCopy("historyNewer", fallback: "← 新しい")) { Task { await library.setPage(library.page - 1) } }
                 .buttonStyle(LibraryGhostButtonStyle(minWidth: 74))
-                .disabled(library.page <= 0 || library.loading)
+                .disabled(!library.hasNewer || library.loading)
                 .inkuTooltip(display.tooltip("前のページ", serverKey: "tooltipHistoryNewerPage"), placement: .bottom)
             Text(library.loading ? display.webCopy("historyLoading", fallback: "読み込み中") : "\(library.page + 1) / \(library.pageCount)")
                 .inkuFont(12).monospacedDigit().foregroundStyle(.secondary).fixedSize()
@@ -372,9 +372,12 @@ struct LibraryView: View {
 
     /// Web `calculatePageSize` and its ResizeObserver (HistoryManager.svelte:644-700): a new viewport starts again
     /// from 100; within one viewport the size only shrinks, so different cards cannot make two sizes alternate.
+    /// A shrink within one viewport comes from taller cards on the shown page: like Web `setPageSize`, the first work
+    /// stays and the works that no longer fit start the next page, without reading the page again.
     private func reportPageSize(viewport size: CGSize) {
         let viewport = CGSize(width: (size.width * 2).rounded() / 2, height: (size.height * 2).rounded() / 2)
-        if viewport != measurements.viewport {
+        let newViewport = viewport != measurements.viewport
+        if newViewport {
             measurements.viewport = viewport
             measurements.ceiling = LibraryGridPaging.maximumPageSize
         }
@@ -382,7 +385,9 @@ struct LibraryView: View {
         let heights = library.works.map { Double(measurements.cardHeights[$0.id] ?? 0) }
         let fitted = LibraryGridPaging.pageSize(width: size.width - 20, height: size.height - 14, cardHeights: heights)
         measurements.ceiling = min(measurements.ceiling, fitted)
-        if library.pageSize != measurements.ceiling { library.pageSize = measurements.ceiling }
+        guard library.pageSize != measurements.ceiling else { return }
+        if newViewport || measurements.ceiling > library.pageSize { library.pageSize = measurements.ceiling }
+        else { library.shrinkPageKeepingFirstWork(to: measurements.ceiling) }
     }
 
     private func recordCardHeight(_ height: CGFloat, for id: String) {

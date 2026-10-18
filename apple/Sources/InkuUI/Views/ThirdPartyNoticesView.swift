@@ -45,7 +45,7 @@ struct ThirdPartyNoticesView: View {
     @State private var loaded = false
     @State private var selection: ThirdPartyNotices.Component.ID?
 
-    private static let groups = ["inku", "swift", "rust", "native", "resources"]
+    private static let groups = ["inku", "swift", "rust", "native", "resources", "ddl3d"]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -134,6 +134,8 @@ struct ThirdPartyNoticesView: View {
         case "rust": display.localized("Rustクレート")
         case "native": display.localized("ネイティブライブラリ")
         case "resources": display.localized("同梱の辞書とフォント")
+        // The bundled 3D viewer's own notices file (apple/scripts/build-macos-notices.py).
+        case "ddl3d": display.webCopy("ddl3dTitle", "3D表示（実験）")
         default: "inku"
         }
     }

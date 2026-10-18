@@ -9,6 +9,18 @@ import AppKit
 import UIKit
 #endif
 
+/// Web CanvasArtworkWorkspace `artworkContent` and `zoomControls`: another view of the same work in the picture's
+/// place. The caption and the zoom capsule stay over it, and the capsule steps the replacement's own zoom.
+struct ArtworkReplacement {
+    /// The replacement's zoom, 1 where it matches the fitted picture; the capsule shows it times the fit.
+    var zoom: CGFloat
+    var available: Bool
+    var setZoom: (CGFloat) -> Void
+    var fit: () -> Void
+    /// The view, given where the picture stands: the area, the fitted box at 100%, and the picture's scale and offset.
+    var content: (_ area: CGSize, _ box: CGSize, _ scale: CGFloat, _ offset: CGSize) -> AnyView
+}
+
 @MainActor
 struct ArtworkCanvas: View {
     /// `.embedded` keeps the framed preview used by dialogs and the library. `.workspace` is the Web canvas area:
@@ -28,6 +40,8 @@ struct ArtworkCanvas: View {
     var viewport: Binding<CanvasViewport>? = nil
     /// Web DdlRangePreview: the numeric range the instructions' caret or pointer is on, over the work.
     var rangePreview: CompositionRanges.Preview? = nil
+    /// The work tab's 3D view in place of the picture (workspace style only). The picture stays drawn behind it.
+    var replacement: ArtworkReplacement? = nil
     @Environment(DisplaySettings.self) private var display
     @Environment(\.displayScale) private var displayScale
     @State private var picture = CanvasPicture()
@@ -64,11 +78,24 @@ struct ArtworkCanvas: View {
     private var workspaceBody: some View {
         GeometryReader { geometry in
             let fit = webFit(in: geometry.size)
-            interactiveCanvas(size: geometry.size, box: fit.box)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .inkuTooltip(display.tooltip("マウスホイールで拡大・縮小、ドラッグで移動します。"))
-                .task(id: requestKey(box: fit.box)) { await render(box: fit.box) }
-                .onChange(of: fit.zoom, initial: true) { _, zoom in fitZoom = zoom }
+            Group {
+                if let replacement {
+                    // The replacement takes the pointer and the wheel; the caption stays over it, as on the Web.
+                    // A kept zoom of the previous picture, not yet reset for this one, counts as the fit.
+                    let current = viewport.map { $0.wrappedValue.svgKey == svg.hashValue } ?? true
+                    ZStack {
+                        replacement.content(geometry.size, fit.box, current ? scale : 1, current ? offset : .zero)
+                        if display.preferences.captionVisible, !caption.isEmpty { workspaceCaption(size: geometry.size) }
+                    }
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                } else {
+                    interactiveCanvas(size: geometry.size, box: fit.box)
+                        .inkuTooltip(display.tooltip("マウスホイールで拡大・縮小、ドラッグで移動します。"))
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .task(id: requestKey(box: fit.box)) { await render(box: fit.box) }
+            .onChange(of: fit.zoom, initial: true) { _, zoom in fitZoom = zoom }
         }
         .overlay(alignment: zoomControlsAtTop ? .top : .bottom) {
             if showsZoomControls { zoomCapsule.padding(zoomControlsAtTop ? .top : .bottom, 14) }
@@ -84,20 +111,24 @@ struct ArtworkCanvas: View {
     }
 
     /// Web `.zoom-controls`: one capsule with −, the percentage, ＋ and a fit button, 14pt above the bottom.
+    /// Over a replacement it steps and fits the replacement instead (Web `ddl3dZoomControls`), in the same steps.
     private var zoomCapsule: some View {
-        HStack(spacing: 0) {
-            Button { setScale(scale / 1.25) } label: { Text("−").inkuFont(16).frame(width: 32, height: 28).contentShape(Rectangle()) }
+        let zoom = replacement?.zoom ?? scale
+        return HStack(spacing: 0) {
+            Button { stepZoom(1 / 1.25) } label: { Text("−").inkuFont(16).frame(width: 32, height: 28).contentShape(Rectangle()) }
                 .accessibilityLabel(display.localized("縮小"))
-                .disabled(scale <= CanvasInteraction.minimumScale)
+                .disabled(zoom <= CanvasInteraction.minimumScale)
                 .inkuTooltip(display.tooltip("縮小", serverKey: "tooltipCanvasZoomOut"))
-            Text("\(Int((fitZoom * scale * 100).rounded()))%").inkuFont(11, weight: .medium).monospacedDigit()
+            Text("\(Int((fitZoom * zoom * 100).rounded()))%").inkuFont(11, weight: .medium).monospacedDigit()
                 .frame(minWidth: 38)
-            Button { setScale(scale * 1.25) } label: { Text("＋").inkuFont(16).frame(width: 32, height: 28).contentShape(Rectangle()) }
+            Button { stepZoom(1.25) } label: { Text("＋").inkuFont(16).frame(width: 32, height: 28).contentShape(Rectangle()) }
                 .accessibilityLabel(display.localized("拡大"))
-                .disabled(scale >= CanvasInteraction.maximumScale)
+                .disabled(zoom >= CanvasInteraction.maximumScale)
                 .inkuTooltip(display.tooltip("拡大", serverKey: "tooltipCanvasZoomIn"))
             Rectangle().fill(InkuColor.border).frame(width: 1, height: 28)
-            Button { reset() } label: { Text("⊙").inkuFont(11).foregroundStyle(.secondary).frame(width: 32, height: 28).contentShape(Rectangle()) }
+            Button { if let replacement { replacement.fit() } else { reset() } } label: {
+                Text("⊙").inkuFont(11).foregroundStyle(.secondary).frame(width: 32, height: 28).contentShape(Rectangle())
+            }
                 .accessibilityLabel(display.localized("用紙に合わせる"))
                 .inkuTooltip(display.tooltip("拡大率と位置をリセット", serverKey: "tooltipCanvasZoomReset"))
         }
@@ -106,7 +137,11 @@ struct ArtworkCanvas: View {
         .overlay(Capsule().stroke(InkuColor.border2))
         .clipShape(Capsule())
         .shadow(color: .black.opacity(0.1), radius: 3, y: 1)
-        .disabled(picture.image == nil)
+        .disabled(replacement.map { !$0.available } ?? (picture.image == nil))
+    }
+
+    private func stepZoom(_ factor: CGFloat) {
+        if let replacement { replacement.setZoom(CanvasInteraction.boundedScale(replacement.zoom * factor)) } else { setScale(scale * factor) }
     }
 
     private var embeddedBody: some View {

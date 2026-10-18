@@ -148,6 +148,9 @@ struct AppCheck {
         if CommandLine.arguments.contains("--canvas-wheel-only") {
             try runCanvasWheelChecks(); return
         }
+        if CommandLine.arguments.contains("--ddl3d-only") {
+            try await runDdl3DChecks(arguments: CommandLine.arguments); return
+        }
         if let index = CommandLine.arguments.firstIndex(of: "--display-only"), CommandLine.arguments.indices.contains(index + 1) {
             let fixture = URL(fileURLWithPath: CommandLine.arguments[index + 1])
             try runDisplayChecks(fixtureURL: fixture)

@@ -31,6 +31,45 @@ public struct LibraryFocusRequest: Equatable, Sendable {
     public let visit: Int
 }
 
+/// Web `libraryPagePosition` (libraryPagePosition.ts, Build 1265): where a page sits among all of them, counted from the
+/// newest. The library can begin its pages at the opened work (`startOffset`) and pages on from there; counting from
+/// that start said 1 at the opened work and added a page to the total for each step towards the newest. The pages in
+/// front of the start are the presses of ← newer it takes to reach the newest, so they come first in the number and in
+/// the total. Both pagers (timeline and lineage) print it.
+public struct LibraryPagePosition: Equatable, Sendable {
+    public let current: Int
+    public let total: Int
+
+    public init(startOffset: Int, page: Int, pageSize: Int, total: Int) {
+        let size = max(1, pageSize)
+        let before = Self.pages(max(0, startOffset), size)
+        current = before + page + 1
+        self.total = before + max(1, Self.pages(total - startOffset, size))
+    }
+
+    /// Web `libraryRelativePage` (Build 1266): the page to ask for when page `number` of these is typed, counted from
+    /// the start as `setPage` takes it. A negative page moves the start towards the newest, to where pressing ← newer
+    /// that many times would have put it. Numbers out of range land on the first or the last page.
+    public static func relativePage(_ number: Int, startOffset: Int, pageSize: Int, total: Int) -> Int {
+        let size = max(1, pageSize)
+        let position = LibraryPagePosition(startOffset: startOffset, page: 0, pageSize: size, total: total)
+        return min(max(1, number), position.total) - 1 - pages(max(0, startOffset), size)
+    }
+
+    /// Web `LibraryPageInput.commit` (Build 1266): the page a typed text names, kept within 1...total, or nil when it
+    /// does not move: empty, not a number (JavaScript `Number`, here `Double`), or the page shown.
+    public static func typedPage(_ text: String, current: Int, total: Int) -> Int? {
+        let typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !typed.isEmpty, let value = Double(typed), value.isFinite else { return nil }
+        // Kept within the pages before it becomes an Int, so a very large number cannot overflow.
+        let target = Int(min(max(1, value.rounded(.towardZero)), Double(max(1, total))))
+        return target == current ? nil : target
+    }
+
+    /// `Math.ceil(count / size)` for a positive size; nothing to count is no page.
+    private static func pages(_ count: Int, _ size: Int) -> Int { count <= 0 ? 0 : (count + size - 1) / size }
+}
+
 /// Where the timeline was while a lineage view is shown: the Web manager's page and start are apart from the lineage
 /// list's, so leaving the lineage view finds the timeline where it was.
 private struct LibraryTimelinePlace {
@@ -97,6 +136,11 @@ public final class LibraryModel {
     public private(set) var total = 0
     public private(set) var trashTotal = 0
     public private(set) var loading = false
+    /// A change has scheduled a read (the 180 ms pause that coalesces typing) that has not begun.
+    public private(set) var readScheduled = false
+    /// Web `fetchInFlight > 0`: the answer to the present filters is awaited, from the moment a change schedules its
+    /// read. The history strip, emptied by a search that found nothing, keeps its place while the next answer comes.
+    public var awaitingRead: Bool { loading || readScheduled }
     public private(set) var mutating = false
     public private(set) var errorText: String?
     public private(set) var status = ""
@@ -209,6 +253,11 @@ public final class LibraryModel {
     }
 
     public var pageCount: Int { max(1, (total - startOffset + pageSize - 1) / pageSize) }
+    /// What the pager prints: the shown page and the number of pages, counted from the newest. `page` and `pageCount`
+    /// still count from the start.
+    public var pagePosition: LibraryPagePosition {
+        LibraryPagePosition(startOffset: startOffset, page: page, pageSize: pageSize, total: total)
+    }
     public var shownFrom: Int { total == 0 ? 0 : startOffset + page * pageSize + 1 }
     public var shownTo: Int { min(total, startOffset + (page + 1) * pageSize) }
     /// ← newer and Latest: an earlier page, or newer works before the kept first work.
@@ -260,6 +309,7 @@ public final class LibraryModel {
     private func cancelScheduledRefresh() {
         refreshTask?.cancel()
         pendingLineageRefresh = false
+        if readScheduled { readScheduled = false }
     }
 
     /// A pending read that replaces another keeps its lineage reload: a new page size right after a filter change
@@ -271,12 +321,15 @@ public final class LibraryModel {
         refreshToken = UUID()
         refreshTask?.cancel()
         pendingLineageRefresh = pendingLineageRefresh || refreshLineage
+        if !readScheduled { readScheduled = true }
         refreshTask = Task { @MainActor [weak self] in
             // Coalesce typing; cancellation never changes a database operation.
             try? await Task.sleep(for: .milliseconds(180))
             guard !Task.isCancelled, let self else { return }
             let lineage = self.pendingLineageRefresh
             self.pendingLineageRefresh = false
+            // `refresh` marks itself loading before it first waits, so the answer stays awaited throughout.
+            self.readScheduled = false
             await self.refresh(refreshLineage: lineage)
         }
     }
@@ -296,6 +349,20 @@ public final class LibraryModel {
     public func setLatestPage() async {
         startOffset = 0
         await setPage(0)
+    }
+
+    /// Web `LibraryPageInput` `onJump` (Build 1266): go to the page a typed number names, counted from the newest as the
+    /// pager prints it. A page before the start moves the start as ← newer would, from any page, in the timeline and in
+    /// a lineage view alike; a number out of range lands on the first or the last page. Text that is not a number, or
+    /// names the shown page, moves nothing and reads nothing. Returns whether it moved.
+    @discardableResult
+    public func goToTypedPage(_ text: String) async -> Bool {
+        let position = pagePosition
+        guard let target = LibraryPagePosition.typedPage(text, current: position.current, total: position.total) else {
+            return false
+        }
+        await setPage(LibraryPagePosition.relativePage(target, startOffset: startOffset, pageSize: pageSize, total: total))
+        return true
     }
 
     /// Web `setPageSize`: the grid measured another capacity, because the window or the preview column changed its

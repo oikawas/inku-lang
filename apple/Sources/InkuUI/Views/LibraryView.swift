@@ -1,6 +1,9 @@
 import InkuHost
 import InkuPersistence
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 /// The library as Web `HistoryManager.svelte` (Build1162) lays it out: a heading row, a tool row, then the
 /// listing with the preview column beside it. The thumbnail grid holds as many complete rows as fit and pages
@@ -26,7 +29,6 @@ struct LibraryView: View {
     @State private var modelLines = LibraryModelLineMemo()
     /// Keyboard focus by the reused card slot: a page turn changes no focus binding, only what the slot shows.
     @FocusState private var focusedSlot: Int?
-    @FocusState private var searchFocused: Bool
     @State private var previewComment = LibraryNoteEditorModel()
     private var library: LibraryModel { model.library }
     private var display: DisplaySettings { model.display }
@@ -258,24 +260,24 @@ struct LibraryView: View {
         }
     }
 
+    /// Web 0f579f3d8: drawn like the history strip's search (the same field, so the same box, type size and clear
+    /// button), its outside label becoming the placeholder and the label its spoken name. What it matches is unchanged.
     private var searchField: some View {
         @Bindable var library = library
-        return HStack(spacing: 6) {
-            Text(display.webCopy("historySearchLabel", "検索（記述 / ハッシュ値 / 作品ID）:"))
-                .inkuFont(12).foregroundStyle(.secondary).fixedSize()
-            HStack(spacing: 0) {
-                TextField("", text: $library.query).textFieldStyle(.plain).focused($searchFocused)
-                    .accessibilityLabel(display.webCopy("historySearchLabel", "検索（記述 / ハッシュ値 / 作品ID）:"))
-                    .padding(.leading, 7)
-                Button { library.query = ""; searchFocused = true } label: { Text("×").frame(width: 28, height: 26) }
-                    .buttonStyle(.plain).disabled(library.query.isEmpty)
-                    .accessibilityLabel(display.webCopy("historySearchClear", "検索をクリア"))
-            }
-            .inkuFont(12).frame(minWidth: 120, maxWidth: 240, minHeight: 28)
-            .background(LibraryChrome.panel2, in: RoundedRectangle(cornerRadius: 4))
-            .overlay(RoundedRectangle(cornerRadius: 4).stroke(LibraryChrome.border))
-            .inkuTooltip(display.webCopy("historySearchHint", "ハッシュ値と作品IDは全体か先頭部分、ハッシュ値は下位4桁でも検索できます。"), focus: .text)
+        let placeholder = display.webCopy("historySearchPlaceholder", "記述・ハッシュ・作品ID")
+        let label = display.webCopy("historySearchLabel", "検索（記述 / ハッシュ値 / 作品ID）")
+        return Group {
+            #if os(macOS)
+            InkuSearchField(value: $library.query, placeholder: placeholder, label: label, onCancel: onClose,
+                            onSearch: { library.query = $0 })
+                .inkuSearchFieldHeight()
+            #else
+            TextField(placeholder, text: $library.query).accessibilityLabel(label)
+            #endif
         }
+        // Web `.history-search`: flex 0 1 22rem, at least 10rem.
+        .frame(minWidth: 130, idealWidth: 286, maxWidth: 286)
+        .inkuTooltip(display.webCopy("historySearchHint", "ハッシュ値と作品IDは全体か先頭部分、ハッシュ値は下位4桁でも検索できます。"), focus: .text)
     }
 
     // MARK: Status rows (Web .history-selection-status, .history-selection-reset)
@@ -927,8 +929,16 @@ private struct LibraryPager: View {
                 .buttonStyle(LibraryGhostButtonStyle(minWidth: 74))
                 .disabled(!library.hasNewer || library.loading)
                 .inkuTooltip(display.tooltip("前のページ", serverKey: "tooltipHistoryNewerPage"), placement: .bottom)
-            Text(library.loading ? display.webCopy("historyLoading", fallback: "読み込み中") : "\(library.page + 1) / \(library.pageCount)")
-                .inkuFont(12).monospacedDigit().foregroundStyle(.secondary).fixedSize()
+            if library.loading {
+                Text(display.webCopy("historyLoading", fallback: "読み込み中"))
+                    .inkuFont(12).monospacedDigit().foregroundStyle(.secondary).fixedSize()
+            } else {
+                // Web 72cc0ca77, 0f579f3d8: counted from the newest, the pages before the opened work included, and
+                // typed to go there.
+                LibraryPageField(position: library.pagePosition, display: display) { typed in
+                    Task { await library.goToTypedPage(typed) }
+                }
+            }
             Button(display.webCopy("historyOlder", fallback: "古い →")) { Task { await library.setPage(library.page + 1) } }
                 .buttonStyle(LibraryGhostButtonStyle(minWidth: 74))
                 .disabled(library.page + 1 >= library.pageCount || library.loading)
@@ -941,6 +951,137 @@ private struct LibraryPager: View {
         .disabled(library.mutating)
     }
 }
+
+/// Web `LibraryPageInput` (Build 1266, `0f579f3d8`, `c69ede09f`): the pager's page, counted from the newest, as a field
+/// followed by "/ total". Return goes to the typed page, and leaving the field goes as Return does; Escape puts the page
+/// back without closing the library. A typed text that does not move puts the shown page back into the field.
+@MainActor
+private struct LibraryPageField: View {
+    let position: LibraryPagePosition
+    let display: DisplaySettings
+    let onJump: (String) -> Void
+    @Environment(\.inkuTextScale) private var scale
+
+    var body: some View {
+        let label = display.webCopyFormat("historyPageJumpLabel", "ページ番号（1〜%@）を入力してEnterで移動", position.total)
+        HStack(spacing: 4) {
+            input(label: label)
+                .inkuTooltip(display.tooltipValue(label), placement: .bottom)
+            Text("/ \(position.total)").inkuFont(12).monospacedDigit().foregroundStyle(.secondary).fixedSize()
+        }
+    }
+
+    @ViewBuilder private func input(label: String) -> some View {
+        #if os(macOS)
+        let size = 12 * scale
+        // Web `width: (digits + 1.5)ch`, at least 3ch, and the bezel.
+        let digit = ("0" as NSString).size(withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: size, weight: .regular)]).width
+        LibraryPageNumberInput(current: position.current, label: label, fontSize: size, onJump: onJump)
+            .frame(width: (max(3, Double(String(position.total).count) + 1.5) * digit + 10).rounded(.up))
+        #else
+        LibraryPageNumberInput(current: position.current, label: label, onJump: onJump)
+        #endif
+    }
+}
+
+#if os(macOS)
+/// The AppKit field under `LibraryPageField`: it selects its number when it takes the focus (Web `begin`) and takes
+/// Return and Escape before the library does, which closes on Escape.
+@MainActor
+private struct LibraryPageNumberInput: NSViewRepresentable {
+    let current: Int
+    let label: String
+    let fontSize: CGFloat
+    let onJump: (String) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeNSView(context: Context) -> NSTextField {
+        let field = LibraryPageNumberTextField(string: String(current))
+        field.delegate = context.coordinator
+        field.bezelStyle = .roundedBezel
+        field.alignment = .right
+        field.usesSingleLineMode = true
+        field.lineBreakMode = .byClipping
+        field.cell?.isScrollable = true
+        return field
+    }
+
+    func updateNSView(_ field: NSTextField, context: Context) {
+        context.coordinator.parent = self
+        if field.font?.pointSize != fontSize { field.font = .monospacedDigitSystemFont(ofSize: fontSize, weight: .regular) }
+        field.isEnabled = context.environment.isEnabled
+        field.setAccessibilityLabel(label)
+        // Web `shown`: the page shown, except while the reader is typing.
+        if field.currentEditor() == nil, field.stringValue != String(current) { field.stringValue = String(current) }
+    }
+
+    @MainActor final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: LibraryPageNumberInput
+        /// Web `editing`: from the first typed character until Return, Escape or leaving the field.
+        private var editing = false
+        init(_ parent: LibraryPageNumberInput) { self.parent = parent }
+
+        func controlTextDidBeginEditing(_ notification: Notification) { editing = true }
+
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+            guard let field = control as? NSTextField else { return false }
+            switch selector {
+            case #selector(NSResponder.insertNewline(_:)):
+                let typed = editing ? field.stringValue : nil
+                finish(field)
+                if let typed { parent.onJump(typed) }
+            case #selector(NSResponder.cancelOperation(_:)):
+                // Escape only puts the number back: the library stays open.
+                finish(field)
+            default:
+                return false
+            }
+            return true
+        }
+
+        /// Web `onblur={commit}`: leaving the field goes to the typed page.
+        func controlTextDidEndEditing(_ notification: Notification) {
+            guard editing, let field = notification.object as? NSTextField else { return }
+            editing = false
+            let typed = field.stringValue
+            field.stringValue = String(parent.current)
+            parent.onJump(typed)
+        }
+
+        /// Web `restore` (c69ede09f): leave the field and write the page shown back into it, whatever was typed.
+        private func finish(_ field: NSTextField) {
+            editing = false
+            field.window?.makeFirstResponder(nil)
+            field.stringValue = String(parent.current)
+        }
+    }
+}
+
+/// Web `begin`: the number is selected when the field takes the focus, by a click as by Tab.
+private final class LibraryPageNumberTextField: NSTextField {
+    override func becomeFirstResponder() -> Bool {
+        guard super.becomeFirstResponder() else { return false }
+        // After the click that focused the field has placed the caret.
+        DispatchQueue.main.async { [weak self] in self?.currentEditor()?.selectAll(nil) }
+        return true
+    }
+}
+#else
+private struct LibraryPageNumberInput: View {
+    let current: Int
+    let label: String
+    let onJump: (String) -> Void
+    @State private var draft = ""
+
+    var body: some View {
+        TextField(String(current), text: $draft)
+            .multilineTextAlignment(.trailing).monospacedDigit().frame(width: 56)
+            .accessibilityLabel(label)
+            .onSubmit { let typed = draft; draft = ""; onJump(typed) }
+    }
+}
+#endif
 
 /// Web `focusWork` (HistoryManager.svelte:328-344): once the page that holds the opened work is read and shown, its
 /// grid card takes the keyboard focus (a lineage view scrolls its card into view), and a preview already open follows

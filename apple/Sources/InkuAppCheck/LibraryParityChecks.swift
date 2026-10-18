@@ -64,6 +64,37 @@ func runLibraryParityChecks() async throws {
     guard canvas.library.filter.canvasSearch, !library.filter.canvasSearch, library.query.isEmpty else {
         throw CheckFailure.message("Canvas query leaked into library state")
     }
+
+    // Failure (Web c265e28bb, f62812ed3, 72cc0ca77): a canvas search that found nothing left no tile to say so, the
+    // wait for the next answer showed nothing, and clearing the search hid the strip for the pause that coalesces
+    // typing, before its read began. PLAN library-1267-20261018 P4.
+    let strip = HistoryModel()
+    await strip.library.connect(database: database)
+    let held = strip.library.total > 0
+    func settle() async throws {
+        var waited = 0
+        while strip.library.awaitingRead, waited < 5000 { try await Task.sleep(for: .milliseconds(20)); waited += 20 }
+        guard !strip.library.awaitingRead else { throw CheckFailure.message("The strip's read did not settle") }
+    }
+    strip.library.query = "zz-no-such-work"
+    let typed = (strip.placeholder(heldWorks: held), strip.library.awaitingRead)
+    try await settle()
+    let none = (strip.placeholder(heldWorks: held), strip.library.total, strip.filtered)
+    strip.library.query = "zz-no-such-work-either"
+    let waiting = strip.placeholder(heldWorks: held)
+    try await settle()
+    strip.library.query = ""
+    let cleared = (strip.placeholder(heldWorks: held), strip.filtered)
+    try await settle()
+    let back = (strip.placeholder(heldWorks: held), strip.library.total)
+    guard held, typed.0 == nil, typed.1, none.0 == .noCandidates, none.1 == 0, none.2, waiting == .searching,
+          cleared.0 == .loading, !cleared.1, back.0 == nil, back.1 == works.count else {
+        throw CheckFailure.message("History strip tile: typed \(typed), none found \(none), waiting \(String(describing: waiting)), "
+                                   + "cleared \(cleared), back \(back)")
+    }
     guard try await database.list() == works else { throw CheckFailure.message("Browsing modified saved records") }
     print("Library parity passed: ordered mixed/fractional/unknown rows; saved label identity and invalid acknowledgement; independent literal canvas UUID/description/both hashes.")
+    print("History strip tile passed: a search keeps the \(works.count) thumbnails while its read is awaited, none found gives one "
+          + "\(none.0.map { "\($0)" } ?? "-") tile, the next search awaited with none shown \(waiting.map { "\($0)" } ?? "-"), "
+          + "clearing it \(cleared.0.map { "\($0)" } ?? "-") before its read began, and the \(back.1) works came back with no tile.")
 }

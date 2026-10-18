@@ -114,6 +114,7 @@ func runLibraryPaginationChecks() async throws {
     print("Library pagination passed: SVG-free list retains UTF-8 size/metadata; PNG hit1, missing drawing1; exact full action target; paging lineage reads0, explicit refresh reloads; lineage keeps the note of a work off the page; history unchanged.")
     try await checkMeasuredShrink(folder: folder)
     try await checkOpenAtShownWork(folder: folder)
+    try await checkPageNumbersFromTheNewest(folder: folder)
     print("Menu summaries passed: description/locked/user-DDL match full contexts; broken/mismatched/incomplete/missing/legacy records remain unavailable; page state published together.")
 }
 
@@ -213,6 +214,83 @@ private func checkOpenAtShownWork(folder: URL) async throws {
     print("Opening at the shown work passed: works 6-9 from page 2 with newer on and focus asked; a wider page kept work 6 first (6-10); "
           + "newer reached 1-5, latest 0-4; an unstarred work under the star filter left page 2 and no focus; the thumbnail lineage "
           + "view began at the shown work's single-work lineage (2 lineages, start 1) and the timeline kept work 6 first after it.")
+}
+
+/// Failure (Web 72cc0ca77): the pager numbered the pages from the opened work, so a library opened at work 113 of 600
+/// said "1 / 9", and each ← newer kept 1 and added a page to the total. PLAN library-1267-20261018 P1: 600 works, 56 a
+/// page, opened at offset 112.
+@MainActor
+private func checkPageNumbersFromTheNewest(folder: URL) async throws {
+    let database = try InkuDatabase(url: folder.appendingPathComponent("page-numbers.sqlite"))
+    let ids = (0..<600).map { String(format: "number-%03d", $0) }
+    for (index, id) in ids.enumerated() {
+        let work = SavedWork(id: id, at: Int64(10_000 - index), input: id, score: "{}", svg: "", lineageNodeID: id + "-node")
+        try await database.save(work, node: LineageNode(id: id + "-node", historyID: id, at: work.at))
+    }
+    let library = LibraryModel(includeListSVG: false)
+    library.pageSize = 56
+    await library.connect(database: database)
+    func shown() -> String { "\(library.pagePosition.current) / \(library.pagePosition.total)" }
+    await library.open(at: ids[112])
+    // What the pager printed before (page counted from the start).
+    let fromStart = "\(library.page + 1) / \(library.pageCount)"
+    let opened = (shown(), library.startOffset, library.works.first?.id)
+    await library.setPage(library.page + 1)
+    let older = shown()
+    var newer: [String] = []
+    for _ in 0..<3 {
+        await library.setPage(library.page - 1)
+        newer.append(shown())
+    }
+    let newest = (library.startOffset, library.page, library.works.first?.id)
+    await library.setPage(library.page + 1)
+    let olderFromNewest = shown()
+    guard fromStart == "1 / 9", opened.0 == "3 / 11", opened.1 == 112, opened.2 == ids[112], older == "4 / 11",
+          newer == ["3 / 11", "2 / 11", "1 / 11"], newest.0 == 0, newest.1 == 0, newest.2 == ids[0],
+          olderFromNewest == "2 / 11" else {
+        throw CheckFailure.message("Page numbers from the newest: opened \(opened) (from the start \(fromStart)), older \(older), "
+                                   + "newer \(newer), newest \(newest), older again \(olderFromNewest)")
+    }
+    print("Page numbers passed (600 works, 56 a page, opened at offset 112): \(opened.0) where the start-counted pager said "
+          + "\(fromStart); older \(older); newer \(newer.joined(separator: ", ")) reaching offset 0; older again \(olderFromNewest).")
+
+    // Failure (Web 0f579f3d8, c69ede09f): a typed page asked for the page counted from the start, so a page before
+    // the opened work was out of reach; text that is not a number moved or read the page; the lineage view took a
+    // page before its start only from the start's own page. PLAN P2.
+    await library.open(at: ids[112])
+    let reopened = shown()
+    let first = (await library.goToTypedPage("1"), shown(), library.startOffset, library.page, library.works.first?.id)
+    await library.open(at: ids[112])
+    let last = (await library.goToTypedPage("99"), shown(), library.works.first?.id)
+    LibraryPerformanceProbe.reset()
+    LibraryPerformanceProbe.counting = true
+    var unmoved: [Bool] = []
+    for typed in ["abc", "", "  ", "11"] { unmoved.append(await library.goToTypedPage(typed)) }
+    LibraryPerformanceProbe.counting = false
+    let still = (shown(), LibraryPerformanceProbe.refreshesStarted)
+    guard reopened == "3 / 11", first.0, first.1 == "1 / 11", first.2 == 0, first.3 == 0, first.4 == ids[0],
+          last.0, last.1 == "11 / 11", last.2 == ids[560], unmoved == [false, false, false, false],
+          still.0 == "11 / 11", still.1 == 0 else {
+        throw CheckFailure.message("Typed page numbers: from \(reopened), 1 gave \(first), 99 gave \(last), "
+                                   + "abc/empty/blank/shown moved \(unmoved) leaving \(still.0) with \(still.1) reads")
+    }
+    // The lineage list counts single-work lineages, eight a page as the library view sets it.
+    library.layout = .list
+    library.grouped = true
+    library.pageSize = 8
+    await library.open(at: ids[112])
+    let lineageOpened = (shown(), library.startOffset, library.groups.first?.id)
+    await library.setPage(library.page + 1)
+    let lineageOlder = shown()
+    let lineageTyped = (await library.goToTypedPage("14"), shown(), library.startOffset, library.page, library.groups.first?.id)
+    guard lineageOpened.0 == "15 / 75", lineageOpened.1 == 112, lineageOpened.2 == ids[112] + "-node", lineageOlder == "16 / 75",
+          lineageTyped.0, lineageTyped.1 == "14 / 75", lineageTyped.2 == 104, lineageTyped.3 == 0,
+          lineageTyped.4 == ids[104] + "-node" else {
+        throw CheckFailure.message("Typed page in the lineage view: opened \(lineageOpened), older \(lineageOlder), 14 gave \(lineageTyped)")
+    }
+    print("Typed page numbers passed: from \(reopened), 1 went to \(first.1) at offset 0 and 99 to \(last.1); abc, empty, blank "
+          + "and the shown page moved nothing with \(still.1) reads; the lineage list opened at \(lineageOpened.0), went older to "
+          + "\(lineageOlder), and 14 typed there moved the start to 104 (\(lineageTyped.1)).")
 }
 
 private actor PaginationLineageReader: LineageReading {

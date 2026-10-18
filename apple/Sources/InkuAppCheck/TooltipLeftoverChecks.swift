@@ -36,7 +36,7 @@ func runTooltipAndLeftoverChecks() async throws {
     }
     let equal = counts.values.map(\.equal).reduce(0, +)
     let excluded = counts.values.map(\.excluded).reduce(0, +)
-    guard tooltipParityTable.count == 168, missing.isEmpty, excluded == 11, equal == 157 else {
+    guard tooltipParityTable.count == 170, missing.isEmpty, excluded == 11, equal == 159 else {
         throw CheckFailure.message("Tooltip parity: \(tooltipParityTable.count) sites, \(equal) equal, \(excluded) excluded, missing \(missing)")
     }
 
@@ -197,7 +197,7 @@ func runTooltipAndLeftoverChecks() async throws {
         let row = counts[component]!
         return "\(component) \(row.equal)/\(row.missing)/\(row.excluded)"
     }
-    print("Tooltips and leftovers passed: 168 Web tooltip sites compared — \(equal) equal, 0 missing, \(excluded) excluded "
+    print("Tooltips and leftovers passed: 170 Web tooltip sites compared — \(equal) equal, 0 missing, \(excluded) excluded "
           + "(per component equal/missing/excluded: \(table.joined(separator: ", "))); \(bubbles) inkuTooltip calls, "
           + "12 menu-item .help and the iOS stand-in; 4 placements inside the window; switch copy and off state; failed status text; demo wild off "
           + "and 1...999 s; fetch notice; 3 chatgptStatus strings; batch rows [2, 5] kept after reconnect; fork edge and 2 refusals; "

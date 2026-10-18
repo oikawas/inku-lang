@@ -8,6 +8,26 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-18 — macOS: experimental 3D view in the work tab
+
+The app now bundles the Web's 3D viewer distribution (Build 1267's registration, `zero-length-v1-677428a8`) and shows a work in 3D in the work tab. The same viewer as the Web draws the solids, their depth and paint.
+
+- With a work shown, a 3D button stands immediately left of the hash button at the bottom right. It opens the viewer in the work's place and becomes 2D. Orbit, pan and zoom, views, background, solid thickness, layer depth and PNG/GLB saving are the viewer's controls, as on the Web.
+- In 3D, the central zoom controls zoom the viewer (⊙ returns to the front view matched to 2D), and the full-screen button and the Work menu's Full-screen display put only the canvas area in full screen. Esc leaves it.
+- While preparing, "Preparing 3D…" shows at the top left; a work that cannot be shown gets "3D is unavailable for this work." with Retry, Return to 2D and the reason under Details. Esc in the viewer returns to 2D.
+- The view, thickness, depth and background are kept in memory for the same work only and come back when 3D is reopened after 2D. Nothing is saved.
+- The viewer's third-party licenses (Three.js and the Rust crates in its WebAssembly) are listed under License in About inku as "3D view (experiment)".
+
+### 2026-10-18 — macOS: Library page numbers from the newest, typed page numbers, and the work search in the history strip
+
+This follows the Web's Builds 1265–1267.
+
+- Library page numbers (timeline and lineage views) count from the newest. A Library opened at the selected work counts the pages in front of it (with 600 works, 56 a page, opened at the 113th work, "1 / 9" now reads "3 / 11"); ← Newer takes one off and Older → adds one.
+- The page number is a field: type a number and press Return to go to that page. Out-of-range numbers land on the first or last page, and text that is not a number does not move. Escape only puts the number back and does not close the Library. The lineage view takes a typed page from any page.
+- The Library search field is now the history strip search's field, and its outside label became placeholder text (description, hash or work ID). What it matches is unchanged. Both search fields use 12 pt text that follows the text-size setting.
+- The work search moved from the right of the lineage tab above the canvas to the right of the history strip's filter buttons. A search or mark filter that finds nothing keeps the strip and shows one empty "No matches" tile, which replaces the "No matching works." note under the field. While an answer is awaited the tile reads "Searching…", right after clearing a search it reads "Loading", and the thumbnail row never becomes lower than it has been.
+- The bundled copy of the Web's text and versions was regenerated from Build 1267. "About Inku" now names Server Build 1267 instead of 1260; render engine stays 85.
+
 ### 2026-10-18 — macOS: open the Library at the shown work, and open works with a double click
 
 This follows the Web's 2026-10-17 change.

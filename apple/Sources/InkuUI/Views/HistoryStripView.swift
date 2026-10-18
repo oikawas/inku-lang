@@ -16,11 +16,19 @@ import SwiftUI
     @State private var collapsed = false
     @State private var measuredWindowWidth: CGFloat = 0
     @State private var providers: [ProviderSettings] = []
+    /// Web `heldWorks`: the strip has held works since it appeared, so an emptied strip awaiting works keeps its place.
+    @State private var heldWorks = false
+    /// Web `keptHeights`: the highest the thumbnail row has been, for each choice of fields under the pictures.
+    @State private var keptHeights: [String: CGFloat] = [:]
     private var library: LibraryModel { history.library }
     private var display: DisplaySettings { model.display }
     private var selectionID: String? { displayedWorkID ?? model.selectedWorkID }
     private var locked: Bool { model.isBrowsingLocked }
-    private var hasFilters: Bool { library.starredOnly || library.revisionOnly || !library.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    private var placeholder: HistoryStripPlaceholder? { history.placeholder(heldWorks: heldWorks) }
+    /// Web `fieldsKey`, with the text size, which sets the height of the field lines here.
+    private var fieldsKey: String {
+        display.preferences.historyStripFields.joined(separator: ",") + "@\(display.preferences.textScale)"
+    }
     /// Web `visibleThumbCount` (+page.svelte:1246).
     private var capacity: Int? {
         let width = windowWidth ?? measuredWindowWidth
@@ -31,8 +39,8 @@ import SwiftUI
     var body: some View {
         // The container stays mounted so its tasks are never cancelled by an empty listing.
         VStack(alignment: .leading, spacing: 0) {
-            // Web renders nothing until there is a work to list.
-            if library.total > 0 || hasFilters {
+            // Web renders nothing until there is a work to list, and stays while a filter is on or works are awaited.
+            if library.total > 0 || history.filtered || placeholder != nil {
                 VStack(alignment: .leading, spacing: 0) {
                     head.padding(.bottom, collapsed ? 0 : 7)
                     if let error = library.errorText { Text(error).inkuFont(12).foregroundStyle(.red).padding(.bottom, 7) }
@@ -63,6 +71,7 @@ import SwiftUI
         .task(id: selectionID) { await history.locate(app: model, workID: selectionID) }
         .task(id: library.filter) { await history.locate(app: model, workID: selectionID) }
         .task(id: model.providerSettingsRevision) { providers = await model.hostSettings().providers }
+        .onChange(of: library.total, initial: true) { _, total in if total > 0, !heldWorks { heldWorks = true } }
     }
 
     // MARK: Head (Web .history-head)
@@ -85,7 +94,12 @@ import SwiftUI
             .buttonStyle(HistoryTitleButtonStyle())
             .disabled(locked)
             .inkuTooltip(tip("ライブラリを開き、検索や複数選択を使えます。"))
-            if !collapsed { filters.padding(.leading, 12) }
+            if !collapsed {
+                filters.padding(.leading, 12)
+                // Web c265e28bb: the work search sits right of the filters (it was right of the canvas's lineage tab).
+                CanvasWorkSearchView(library: library, display: display)
+                    .frame(minWidth: 100, idealWidth: 180, maxWidth: 286).padding(.horizontal, 8)
+            }
             if locked {
                 HStack(spacing: 6) {
                     Text("◇").inkuFont(10).foregroundStyle(.tertiary)
@@ -163,12 +177,33 @@ import SwiftUI
     // MARK: Thumbnails (Web .thumb-strip, .thumb)
 
     private var thumbs: some View {
+        let key = fieldsKey
+        let kept = keptHeights[key] ?? 0
         // The count follows the window width (Web); a narrower strip clips the last tiles instead of widening the window.
-        HStack(alignment: .top, spacing: 7) {
+        return HStack(alignment: .top, spacing: 7) {
             ForEach(library.works, id: \.id) { work in tile(work) }
+            if let placeholder { emptyTile(placeholder, height: max(58, kept)) }
         }
-        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+        // Web f62812ed3: the row never gets lower than it has been for the chosen fields, so a search, or a page with
+        // shorter tiles, does not move the canvas above it.
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: kept > 0 ? kept : nil, alignment: .topLeading)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+            if height > (keptHeights[key] ?? 0) { keptHeights[key] = height }
+        }
         .clipped()
+    }
+
+    /// Web `.thumb.thumb-empty`: one dashed tile a thumbnail wide and the row high, its words in the middle.
+    private func emptyTile(_ placeholder: HistoryStripPlaceholder, height: CGFloat) -> some View {
+        let text = switch placeholder {
+        case .noCandidates: display.webCopy("historyNoCandidates", fallback: "候補無し")
+        case .searching: display.webCopy("historySearching", fallback: "検索中…")
+        case .loading: display.webCopy("historyLoading", fallback: "読み込み中")
+        }
+        return Text(text)
+            .inkuFont(11).foregroundStyle(.tertiary).multilineTextAlignment(.center)
+            .frame(width: 82, height: height)
+            .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(InkuColor.border2, style: StrokeStyle(lineWidth: 1, dash: [3, 2])))
     }
 
     private func tile(_ work: SavedWork) -> some View {

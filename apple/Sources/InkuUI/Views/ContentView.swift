@@ -159,6 +159,22 @@ public struct ContentView: View {
             if running && automation.mode == "batch" { batchWorkspace.followLatest() }
         }
         .onChange(of: presentation) { _, _ in batchWorkspace.invalidateReads() }
+        // The canvas full screen belongs to the 3D view; leaving 3D leaves it.
+        .onChange(of: threeDimensionalShown) { _, shown in if !shown { ui.exitCanvasFullScreen() } }
+        #if os(macOS)
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { note in
+            // The window left full screen by itself (its button or the menu); the canvas area does too.
+            if ui.canvasFullScreen, (note.object as? NSWindow) === ui.canvasFullScreenWindow { ui.canvasFullScreen = false }
+        }
+        .background {
+            // Esc leaves the canvas full screen wherever the keyboard is (the viewer takes it first otherwise).
+            if ui.canvasFullScreen {
+                Button("") { ui.exitCanvasFullScreen() }
+                    .keyboardShortcut(.escape, modifiers: [])
+                    .frame(width: 0, height: 0).opacity(0).accessibilityHidden(true)
+            }
+        }
+        #endif
         .onChange(of: dialog?.id) { _, _ in batchWorkspace.invalidateReads() }
         .onChange(of: model.works) { _, _ in Task {
             await history.library.refresh()
@@ -224,12 +240,14 @@ public struct ContentView: View {
     /// Web `.root`: the rail, then the main shell (input panel, canvas panel and history strip).
     private var mainShell: some View {
         HStack(spacing: 0) {
-            AppRailView(model: model, expanded: $ui.railExpanded, settingsOpen: ui.settingsOpen,
-                        drawingLogsDisabled: dialog != nil || importing,
-                        onOpenSettings: { openSettings(nil) },
-                        onOpenDrawingLogs: { if dialog == nil, !importing { dialog = .drawingLogs } },
-                        onOpenAbout: openAbout)
-                .disabled(!canNavigateSections && !ui.settingsOpen)
+            if !ui.canvasFullScreen {
+                AppRailView(model: model, expanded: $ui.railExpanded, settingsOpen: ui.settingsOpen,
+                            drawingLogsDisabled: dialog != nil || importing,
+                            onOpenSettings: { openSettings(nil) },
+                            onOpenDrawingLogs: { if dialog == nil, !importing { dialog = .drawingLogs } },
+                            onOpenAbout: openAbout)
+                    .disabled(!canNavigateSections && !ui.settingsOpen)
+            }
             CreationView(model: model, history: history, automation: automation, maintenance: maintenance, ui: ui,
                          batchWorkspace: $batchWorkspace,
                          onEditWork: openWorkEdit, onAdjustWork: { openRefinement($0) }, onReplayWork: openReplay,
@@ -378,8 +396,15 @@ public struct ContentView: View {
         case .drawingLogs: dialog = .drawingLogs
         case .export: Task { await openExport() }
         case .copyImage: if let work = workTarget { Task { await model.copyImage(work: work) } }
-        case .presentation: Task { await preparePresentation() }
+        case .presentation: if threeDimensionalShown { ui.toggleCanvasFullScreen() } else { Task { await preparePresentation() } }
         }
+    }
+
+    /// The work tab shows the 3D view: full screen then means the canvas area (Web `canvasAreaEl.requestFullscreen()`),
+    /// not the 2D presentation.
+    private var threeDimensionalShown: Bool {
+        ui.canvasThreeDimensional && Ddl3DInstallation.available && workspaceWork != nil
+            && !ui.libraryOpen && !ui.settingsOpen && ui.workspaceTab != "lineage"
     }
 
     private func showCreation(tab: String?) {
@@ -534,7 +559,9 @@ public struct ContentView: View {
             // CanvasGenerationInfo is a drawer over the canvas; elsewhere the same view opens as a sheet.
             if !ui.libraryOpen, work.id == workspaceWork?.id { ui.generationInfoOpen.toggle() }
             else { dialog = .information(RefinementSession(work: work)) }
-        case "presentation": Task { await preparePresentation(work: work) }
+        case "presentation":
+            if threeDimensionalShown, work.id == workspaceWork?.id { ui.toggleCanvasFullScreen() }
+            else { Task { await preparePresentation(work: work) } }
         case "copy-hash": model.library.copyHash(work.renderHash)
         case "export-card": dialog = .export(ExportSession(works: [work], preserveOrder: false, directCard: true))
         case "draw-ddl":

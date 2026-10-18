@@ -2,6 +2,24 @@ import Foundation
 import InkuPersistence
 import Observation
 
+/// Web `HistoryStrip.svelte` (Builds 1265–1267: `c265e28bb`, `f62812ed3`, `72cc0ca77`): the one empty tile the history
+/// strip shows where thumbnails would be, so the strip, its filters and its search stay on screen.
+public enum HistoryStripPlaceholder: Equatable, Sendable {
+    /// "No matches": a search or a mark found nothing, and the answer is in (Web `noCandidates`).
+    case noCandidates
+    /// "Searching…": a filtered strip with no thumbnails awaits its answer (Web `searching` while `filtered`).
+    case searching
+    /// "Loading": a strip that has held works awaits its answer with no thumbnails, as after clearing a search
+    /// (Web `searching` while not `filtered`).
+    case loading
+
+    public init?(filtered: Bool, total: Int, showsNoWorks: Bool, awaiting: Bool, failed: Bool, heldWorks: Bool) {
+        if (filtered || heldWorks) && showsNoWorks && awaiting { self = filtered ? .searching : .loading }
+        else if filtered && total == 0 && !awaiting && !failed { self = .noCandidates }
+        else { return nil }
+    }
+}
+
 @MainActor @Observable
 public final class HistoryModel {
     public let library = LibraryModel()
@@ -17,6 +35,17 @@ public final class HistoryModel {
 
     public var canMoveNewer: Bool { (selectedIndex ?? 0) > 0 }
     public var canMoveOlder: Bool { library.total > 0 && (selectedIndex ?? 0) < library.total - 1 }
+
+    /// Web `filtered`: a search or a mark narrows the strip, so none found is an answer, not an empty history.
+    public var filtered: Bool {
+        library.starredOnly || library.revisionOnly || !library.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// The strip's empty tile now. `heldWorks` is whether the strip has held works since it appeared (Web `heldWorks`).
+    public func placeholder(heldWorks: Bool) -> HistoryStripPlaceholder? {
+        HistoryStripPlaceholder(filtered: filtered, total: library.total, showsNoWorks: library.works.isEmpty,
+                                awaiting: library.awaitingRead, failed: library.errorText != nil, heldWorks: heldWorks)
+    }
 
     public func updateCapacity(_ value: Int, app: AppModel, workID: String? = nil) async {
         let capacity = max(1, value)

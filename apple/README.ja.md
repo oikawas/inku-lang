@@ -94,6 +94,8 @@ apple/scripts/package-macos-release.sh --identity "Developer ID Application: <na
 
 第三者通知は`apple/scripts/build-macos-notices.py`で作るreview済みsnapshotです。依存を変えたら再生成し、release scriptは古いsnapshotを`--check`で止めます。
 
+作品タブの3D表示（実験）のビューアは、Webが登録した配布物（`web/static/experimental/ddl-3d/<build>/`）を`apple/scripts/sync-ddl3d-viewer.py`でそのまま`Sources/InkuUI/Resources/ddl3d/`へ写したものです。Webの登録を変えたら写し直してから第三者通知を再生成します。release scriptは`--check --app`で、写しと完成したappの中身をWebの配布物とファイルごとに比べます。
+
 ### Dockから同じアプリを起動する
 
 既存のincu画像からmacOS用アイコンを生成し、appに含めます。固定先へinstallして使う場合は次を実行します。

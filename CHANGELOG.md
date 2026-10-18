@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-18 — Mark the work shown on the canvas with a Current badge on Web Library cards
-
-Library thumbnails now mark the work shown on the canvas with the same Current badge as the history strip: at the picture's lower right in `Timeline`, and in place of the generation number at the upper right in `By lineage`. The macOS Library had it, while Web showed it only in the history strip (found in the Swift review; the author chose to bring Web in line with macOS). The List views carry no badge, as in the macOS list.
-
 ### 2026-10-18 — Remove the unreachable photo picker, input-source chooser and overwrite question from the Android camera
 
 The 2026-09-30 SPEC made the camera capture the only image input and took the Photo Picker and the input-source dialog off the screen; this removes what was left behind. That is the photo picker result handler, launch request and launch failure in `InkuViewModel`, the input-source choice and its cancel, the pre-capture overwrite question and its dialog, the capture states `ChoosingSource`, `PickingPhoto` and `AwaitingOverwriteConfirmation`, the `PhotoPickerUnavailable` failure, the selected-image cache `SelectedImageFileStore`, and seven strings that nothing used any more. None of it was reachable from the screen, so nothing the author does changes: the camera still goes straight to the capture. Works made earlier from a picked photo keep their provenance (`photo_picker`, shown as "Existing photo").
@@ -93,6 +89,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.190 (2026-10-18 / Build 1266)
+
+### 2026-10-18 — Mark the work shown on the canvas with a Current badge on Web Library cards
+
+Library thumbnails now mark the work shown on the canvas with the same Current badge as the history strip: at the picture's lower right in `Timeline`, and in place of the generation number at the upper right in `By lineage`. The macOS Library had it, while Web showed it only in the history strip (found in the Swift review; the author chose to bring Web in line with macOS). The List views carry no badge, as in the macOS list.
 
 ## v2.15.189 (2026-10-18 / Build 1265)
 

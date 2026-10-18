@@ -103,6 +103,27 @@ func runDdl3DChecks(arguments: [String]) async throws {
         throw CheckFailure.message("Q1 failed: \(first), failure \(controller.failure ?? "-")")
     }
 
+    // Failure (2026-10-18, a trusted click reproduced it): WKWebView drops the viewer's PNG/GLB download link, so no
+    // file reaches the app. The save-link script hands it to the shared parent page, which passes the file on.
+    var saved: [(name: String, data: Data)] = []
+    bridge.onViewerFile = { name, data in saved.append((name, data)) }
+    for label in ["PNG", "GLB"] {
+        _ = try await bridge.webView.callAsyncJavaScript("""
+        const d = document.querySelector('iframe').contentDocument;
+        const b = [...d.querySelectorAll('button')].find(x => x.textContent.includes(label));
+        if (b) b.click();
+        """, arguments: ["label": label], contentWorld: .page)
+    }
+    _ = try await wait("PNG and GLB saves", seconds: 15) { saved.count >= 2 }
+    bridge.onViewerFile = nil
+    let prefix = "inku-3d-\(String(first.inputDigest.prefix(12)))"
+    let png = saved.first { $0.name.hasSuffix(".png") }, glb = saved.first { $0.name.hasSuffix(".glb") }
+    print("Saves: \(saved.map { "\($0.name) \($0.data.count) B" }.joined(separator: ", "))")
+    guard saved.count == 2, let png, let glb, png.name == prefix + ".png", glb.name == prefix + ".glb",
+          png.data.prefix(4) == Data([0x89, 0x50, 0x4E, 0x47]), glb.data.prefix(4) == Data("glTF".utf8) else {
+        throw CheckFailure.message("Saves: the viewer's PNG/GLB did not reach the app as files: \(saved.map(\.name))")
+    }
+
     // Q2: an input that is not a Score → `failed`, the failure display state, and a retry under a new mount.
     let invalid = #"{"score":"not a score"}"#
     controller.update(input: .success(invalid), locale: "ja")
@@ -180,7 +201,7 @@ func runDdl3DChecks(arguments: [String]) async throws {
     print("Q5: module Worker and WASM loaded through inku-3d:// (\(window == nil ? "no window" : "a window outside the screens")); "
           + "\(ms(clock.now - mountedAt)) ms in all; console lines \(console.lines.count)")
     if !console.lines.isEmpty { print("Console: " + console.lines.prefix(20).joined(separator: " | ")) }
-    print("3D bridge passed: Q1 rendered \(first.objectCount) objects with the same digest in \(ms(renderedAfter)) ms; Q2 failed (\(reason)) "
+    print("3D bridge passed: PNG and GLB saves reached the app; Q1 rendered \(first.objectCount) objects with the same digest in \(ms(renderedAfter)) ms; Q2 failed (\(reason)) "
           + "and retried under a new mount; Q3 \(keys.count) of \(webFields.count) Web fields, seeds as decimal text, digest equal; "
           + "the SwiftUI host rendered the same snapshot; Q5 scheme, module Worker and WASM.")
 }

@@ -63,6 +63,10 @@ private final class Ddl3DMessageProxy: NSObject, WKScriptMessageHandler {
         let origin = message.frameInfo.securityOrigin
         guard message.frameInfo.isMainFrame, origin.protocol == Ddl3DInstallation.scheme, origin.host == Ddl3DInstallation.host,
               let body = message.body as? [String: Any] else { return }
+        if let type = body["type"] as? String, type == "download" || type == "download-failed" {
+            bridge?.receiveViewerFile(body)
+            return
+        }
         bridge?.controller?.receive(body)
     }
 }
@@ -88,6 +92,29 @@ public final class Ddl3DWebView: WKWebView {
     }
 }
 
+/// The viewer saves PNG and GLB through a `download` link to a blob it made, clicked after the file is ready. WKWebView
+/// drops that click: it never asks `decidePolicyFor`, so no WKDownload starts (2026-10-18, a trusted click reproduced
+/// it). In the viewer frame this script hands such a link to the shared parent page's `inku3d.download`, which reads
+/// the blob and passes it to the app as Android's way does. The viewer and the parent page stay unchanged.
+enum Ddl3DSaveLink {
+    static let source = #"""
+    (() => {
+      if (window.parent === window || location.protocol !== 'inku-3d:' || !location.pathname.startsWith('/experimental/ddl-3d/')) return;
+      const click = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = function () {
+        const href = String(this.href || '');
+        let host = null;
+        try { host = window.parent.inku3d; } catch (_) { host = null; }
+        if (this.hasAttribute('download') && href.startsWith('blob:' + location.origin + '/') && host && typeof host.download === 'function') {
+          host.download(href, this.download);
+          return;
+        }
+        return click.call(this);
+      };
+    })();
+    """#
+}
+
 /// One mount's web view: a non-persistent store, the app-only scheme, and no navigation, window or download
 /// outside it except the viewer's own PNG/GLB saves, which ask where to save.
 @MainActor
@@ -106,6 +133,8 @@ public final class Ddl3DWebHost: NSObject, Ddl3DPage, WKNavigationDelegate, WKUI
         webView = Ddl3DWebView(frame: .zero, configuration: configuration)
         super.init()
         configuration.userContentController.add(Ddl3DMessageProxy(bridge: self), name: "ddl3d")
+        configuration.userContentController.addUserScript(WKUserScript(source: Ddl3DSaveLink.source, injectionTime: .atDocumentStart,
+                                                                       forMainFrameOnly: false, in: .page))
         webView.bridge = self
         webView.navigationDelegate = self
         webView.uiDelegate = self
@@ -189,6 +218,31 @@ public final class Ddl3DWebHost: NSObject, Ddl3DPage, WKNavigationDelegate, WKUI
                         for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? { nil }
 
     // MARK: The viewer's PNG and GLB
+
+    /// The checks take the saved file here instead of the panel.
+    public var onViewerFile: ((_ name: String, _ data: Data) -> Void)?
+
+    /// host.js `download`: `{type: 'download', mountId, name, mimeType, dataUrl}` for the current mount, or
+    /// `download-failed` when the blob could not be read.
+    fileprivate func receiveViewerFile(_ body: [String: Any]) {
+        guard let controller, body["mountId"] as? String == controller.mountID else { return }
+        guard body["type"] as? String == "download", let dataURL = body["dataUrl"] as? String,
+              let comma = dataURL.firstIndex(of: ","), dataURL[..<comma].hasSuffix(";base64"),
+              let data = Data(base64Encoded: String(dataURL[dataURL.index(after: comma)...])) else {
+            NSSound.beep(); return
+        }
+        let suggested = (body["name"] as? String).map { ($0 as NSString).lastPathComponent } ?? ""
+        let name = suggested.isEmpty ? "inku-3d" : suggested
+        if let onViewerFile { return onViewerFile(name, data) }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = name
+        panel.canCreateDirectories = true
+        let finish: (NSApplication.ModalResponse) -> Void = { result in
+            guard result == .OK, let url = panel.url else { return }
+            do { try data.write(to: url, options: .atomic) } catch { NSSound.beep() }
+        }
+        if let window = webView.window { panel.beginSheetModal(for: window, completionHandler: finish) } else { panel.begin(completionHandler: finish) }
+    }
 
     public func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String,
                          completionHandler: @escaping @MainActor (URL?) -> Void) {

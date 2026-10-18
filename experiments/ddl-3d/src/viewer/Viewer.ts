@@ -70,7 +70,7 @@ export class Viewer {
     const key = new THREE.DirectionalLight(0xffffff, 0.35); key.position.set(-2, 3, 4); this.scene.add(key);
     this.model.name = 'DDL solids';
     this.model.userData = { inputDigest: packet.inputDigest, mappingVersion: packet.mappingVersion,
-      schemaDigest: packet.schemaDigest, engineVersion: packet.engineVersion, diagnostics: packet.diagnostics, recoveries: packet.recoveries,
+      schemaDigest: packet.schemaDigest, engineVersion: packet.engineVersion, diagnostics: packet.diagnostics, recoveries: packet.recoveries, emptyPaths: packet.emptyPaths,
       layerMapping: 'paint-order-joints-v3', layerCount: packet.layerCount, layerSpacing: this.layerSpacing };
     const groups = new Map<number, THREE.Group>();
     for (const data of packet.meshes) {

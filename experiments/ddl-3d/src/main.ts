@@ -162,10 +162,15 @@ function load(value: LoadMessage) {
       root.querySelector<HTMLSelectElement>('select[data-option=background]')!.value = viewer.background;
       overlay.hidden = true; sceneControls.forEach(control => control.disabled = false);
       status.textContent = `${words.objects}: ${packet.objectCount} · ${words.triangles}: ${packet.triangles.toLocaleString(locale)} · ${words.layer}: ${packet.layerCount}`;
-      if (packet.recoveries.length) {
+      if (packet.recoveries.length || packet.emptyPaths.length) {
         recoveryNotice.hidden = false;
-        element('summary', recoveryNotice, `${words.recovered} (${packet.recoveries.length})`);
-        element('p', recoveryNotice, words.recoveredText);
+        element('summary', recoveryNotice, packet.recoveries.length ? `${words.recovered} (${packet.recoveries.length})` : `${words.emptyPaths} (${packet.emptyPaths.length})`);
+        if (packet.recoveries.length) element('p', recoveryNotice, words.recoveredText);
+        if (packet.emptyPaths.length) {
+          element('p', recoveryNotice, `${words.emptyPaths}: ${packet.emptyPaths.length}`);
+          element('p', recoveryNotice, words.emptyPathsText);
+          element('p', recoveryNotice, `${words.instruction}: ${[...new Set(packet.emptyPaths.map(path => path.sourceIndex + 1))].join(', ')}`);
+        }
         for (const recovery of packet.recoveries) {
           const source = recovery.anchor_index !== undefined ? `${words.anchor} #${recovery.anchor_index + 1}`
             : recovery.instruction_index !== undefined ? `${words.instruction} #${recovery.instruction_index + 1}` : words.resourceGroup;

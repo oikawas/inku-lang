@@ -284,7 +284,7 @@ export function buildScene(input: PreparedScene): ScenePacket {
   const { scene } = input;
   if (scene.marks.length > 4096 || !validPoint(scene.canvas) || scene.canvas.some(v => v <= 0)) throw new Error('object_budget_exceeded');
   const output: ScenePacket = { ...input, meshes: [], canvas: scene.canvas, background: scene.background, ground: scene.ground, diagnostics: [...scene.diagnostics], recoveries: [...scene.recoveries],
-    objectCount: scene.marks.length, triangles: 0, bytes: 0, clippedObjects: 0, layerCount: 0 };
+    objectCount: scene.marks.length, triangles: 0, bytes: 0, clippedObjects: 0, layerCount: 0, emptyPaths: [] };
   // Do not retain the expanded DTO in the worker reply.
   delete (output as ScenePacket & { scene?: unknown }).scene;
   if (scene.presenceSvg !== undefined) {
@@ -293,7 +293,22 @@ export function buildScene(input: PreparedScene): ScenePacket {
     output.bytes += scene.presenceSvg.length * 2;
   }
   const roundCount = scene.marks.filter(m => m.appearance && m.shape.kind === 'round').length;
-  const lineDepth = lineDepthLayout(scene.marks, scene.canvas);
+  const marks = scene.marks.filter(mark => {
+    if (!/^#[0-9a-f]{6}$/i.test(mark.color) || !Number.isFinite(mark.opacity) || mark.opacity < 0 || mark.opacity > 1) throw new Error('invalid_material');
+    const shape = mark.shape;
+    // A valid zero-length stroke has no tube. Keep its identity rather than
+    // inventing a length or stopping all the other geometry in the work.
+    if (mark.primitive === 'line' && mark.width > 0 && finite(mark.width)
+      && mark.transform.length === 6 && mark.transform.every(finite)
+      && Math.abs(mark.transform[0] * mark.transform[3] - mark.transform[1] * mark.transform[2]) > EPS
+      && shape.kind === 'path' && shape.points.length >= 2 && shape.points.length <= 8192
+      && shape.points.every(point => validPoint(point) && point[0] === shape.points[0][0] && point[1] === shape.points[0][1])) {
+      output.emptyPaths.push({ sourceIndex: mark.sourceIndex, performedIndex: mark.performedIndex, instanceIndex: mark.instanceIndex });
+      return false;
+    }
+    return true;
+  });
+  const lineDepth = lineDepthLayout(marks, scene.canvas);
   if (scene.marks.some(m => m.appearance && m.shape.kind === 'round' && roundSegments(m, roundCount) < 96)) output.diagnostics.push('round_detail_adapted');
   const append = (geometry: BufferGeometry, mark: GeometryMark, role: MeshPacket['role']) => {
     try {
@@ -321,8 +336,7 @@ export function buildScene(input: PreparedScene): ScenePacket {
           relatedPerformedIndex: mark.pairFill?.performedIndex, relatedInstanceIndex: mark.pairFill?.instanceIndex } : {}) });
     } finally { geometry.dispose(); }
   };
-  for (const mark of scene.marks) {
-    if (!/^#[0-9a-f]{6}$/i.test(mark.color) || !Number.isFinite(mark.opacity) || mark.opacity < 0 || mark.opacity > 1) throw new Error('invalid_material');
+  for (const mark of marks) {
     append(world(localGeometry(lineDepth.mark(mark), roundCount), mark.transform, scene.canvas), mark, 'object');
     if (mark.pairFill) append(world(prism(mark.pairFill.points), [1, 0, 0, 1, 0, 0], scene.canvas),
       { ...mark, color: mark.pairFill.color, opacity: mark.pairFill.opacity }, 'pair-fill');

@@ -20,6 +20,26 @@ function bounds(packet: ReturnType<typeof buildScene>['meshes'][number]) {
 }
 const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-6, `${actual} != ${expected}`);
 
+// Failure: one zero-length line copy aborts the work's otherwise valid tubes.
+test('zero-length lines retain their IDs without stopping drawable strokes', () => {
+  const value = JSON.parse(solidsJson);
+  value.score.instructions = [
+    { primitive: 'line', from: [0.1, 0.2], to: [0.9, 0.2], color: 'blue', weight: 'crayon' },
+    { primitive: 'line', from: [0.5, 0.5], to: [0.5, 0.5], color: 'red', weight: 'crayon', arrangement: { count: 3, layout: 'scatter' } },
+  ];
+  const input = prepare(JSON.stringify(value)), original = structuredClone(input), packet = buildScene(input);
+  assert.equal(packet.objectCount, 4);
+  assert.equal(packet.meshes.length, 1);
+  assert.equal(packet.meshes[0].sourceIndex, 0);
+  assert.ok(packet.triangles > 0 && packet.meshes[0].positions.every(Number.isFinite));
+  assert.equal(packet.layerCount, 1); assert.equal(packet.meshes[0].layerZ, 0);
+  assert.deepEqual(packet.emptyPaths, input.scene.marks.slice(1).map(({ sourceIndex, performedIndex, instanceIndex }) => ({ sourceIndex, performedIndex, instanceIndex })));
+  assert.deepEqual(input, original);
+  const bad = input.scene.marks[1].shape;
+  if (bad.kind === 'path') bad.points.forEach(point => { point[0] = NaN; });
+  assert.throws(() => buildScene(input), /invalid_or_excessive_contour/);
+});
+
 // Failure: scattered copies become separate layers or remain in one Z plane.
 test('paint layers keep copies together and place later layers toward positive Z', () => {
   const input = prepare(recoveredJson), original = structuredClone(input);

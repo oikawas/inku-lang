@@ -36,5 +36,6 @@ export interface ScenePacket {
   meshes: MeshPacket[]; canvas: XY; background: string; ground: boolean; diagnostics: string[];
   recoveries: GeometryRecovery[];
   objectCount: number; triangles: number; bytes: number; clippedObjects: number; layerCount: number;
+  emptyPaths: { sourceIndex: number; performedIndex: number; instanceIndex: number }[];
   inputDigest: string; schemaDigest: string; mappingVersion: string; engineVersion: number;
 }

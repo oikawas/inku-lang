@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-18 — Keep other 3D shapes visible when a line has zero length
+
+A straight line with identical endpoints no longer stops the whole 3D work with `degenerate_geometry`. Zero-length lines are kept separate without adding solids, while other shapes remain visible. The 3D controls show their count and original instruction numbers, and GLB retains their source IDs. Saved Scores and normal 2D rendering are unchanged.
+
 ### 2026-10-18 — macOS: open the Library at the shown work, and open works with a double click
 
 This follows the Web's 2026-10-17 change.

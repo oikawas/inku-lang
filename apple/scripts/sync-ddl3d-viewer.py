@@ -3,13 +3,17 @@
 
 The Web registers one immutable viewer build in web/src/lib/features/experimental-3d/installation.json
 (`viewerUrl` /experimental/ddl-3d/<build>/index.html) and serves web/static/experimental/ddl-3d/<build>/.
-The app bundles the same files unchanged in apple/Sources/InkuUI/Resources/ddl3d/<build>/, beside a copy of
-the registration. The app reads only that registration: an empty `viewerUrl` there hides the 3D switch and
-reads no viewer file, and then no build is bundled.
+These two are the only source. The app's copy, apple/Sources/InkuUI/Resources/ddl3d/ (the same files unchanged
+in <build>/, beside a copy of the registration), is made at build time and never committed (apple/.gitignore):
+apple/scripts/build-macos.sh runs this script before xcodebuild and checks the built app with --check --app
+after it, so a new Web registration needs no Swift commit. The app reads only its copy of the registration: an
+empty `viewerUrl` hides the 3D switch and reads no viewer file, and then no build is copied. A package built
+without any copy (a plain `swift build`) declares no 3D resource and its app shows no 3D switch; InkuAppCheck
+--ddl3d-only reads the copy itself and, without it, fails naming this script.
 
-  sync-ddl3d-viewer.py              replace the app's copy with the Web's registered build
+  sync-ddl3d-viewer.py              replace the copy with the Web's registered build, then compare it
   sync-ddl3d-viewer.py --check      compare the registration and every file of the copy with the Web's build
-  sync-ddl3d-viewer.py --check --app PATH/Inku.app   the same for the copy inside a built application
+  sync-ddl3d-viewer.py --check --app PATH/Inku.app   the same, then for the copy inside a built application
 
 The check prints how many files it compared. Only `.DS_Store` is ignored, on both sides.
 """
@@ -67,7 +71,8 @@ def compare(copy: Path, label: str) -> int:
     web_build = registered_build(WEB_REGISTRATION)
     registration = copy / "installation.json"
     if not registration.is_file():
-        raise SyncError(f"{label}: no installation.json")
+        raise SyncError(f"{label}: no installation.json; copy the viewer with apple/scripts/sync-ddl3d-viewer.py "
+                        f"(apple/scripts/build-macos.sh runs it) and build again")
     build = registered_build(registration)
     entries = sorted(path.name for path in copy.iterdir() if path.name not in IGNORED)
     if build is None:

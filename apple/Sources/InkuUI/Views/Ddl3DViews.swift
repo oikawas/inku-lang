@@ -152,14 +152,14 @@ struct Ddl3DCanvas: View {
     }
 }
 
-/// InkuAppCheck `--ddl3d-only`: the work tab's 3D view alone in a hosting view, built as CreationView builds it.
+/// InkuAppCheck `--ddl3d-only`: the work tab's 3D view alone in a hosting view, built as CreationView builds it, over
+/// the copy of the viewer the check names (the build's copy in the source tree).
 @MainActor
 public enum Ddl3DProbe {
-    public static func hostingView(work: SavedWork, controller: Ddl3DController, display: DisplaySettings,
-                                   initialView: Ddl3DInitialView, onReturn: @escaping () -> Void) -> NSView? {
-        guard let registration = Ddl3DInstallation.registered else { return nil }
-        return NSHostingView(rootView: Ddl3DCanvas(controller: controller, registration: registration, work: work,
-                                                   initialView: initialView, onReturn: onReturn, onEscape: { false })
+    public static func hostingView(registration: Ddl3DInstallation.Registered, work: SavedWork, controller: Ddl3DController,
+                                   display: DisplaySettings, initialView: Ddl3DInitialView, onReturn: @escaping () -> Void) -> NSView {
+        NSHostingView(rootView: Ddl3DCanvas(controller: controller, registration: registration, work: work,
+                                            initialView: initialView, onReturn: onReturn, onEscape: { false })
             .environment(display))
     }
 }

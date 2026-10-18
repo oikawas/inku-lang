@@ -58,6 +58,8 @@ if [[ -n "${INKU_APPLE_REFERENCE_ROOT:-}" ]]; then
 fi
 uv sync --project "$ROOT/server" --frozen
 python3 "$APPLE/scripts/prepare-meter-resources.py"
+# The Web's registered 3D viewer is not committed here: copy it unchanged, then compare every file with the Web's.
+python3 "$APPLE/scripts/sync-ddl3d-viewer.py"
 "$APPLE/scripts/build-core.sh" macos
 xcodegen generate --spec "$APPLE/project.yml" --project "$APPLE" --project-root "$APPLE"
 
@@ -87,6 +89,8 @@ for pair in "CFBundleShortVersionString=$MARKETING_VERSION" "CFBundleVersion=$BU
     actual="$(/usr/libexec/PlistBuddy -c "Print :${pair%%=*}" "$APP/Contents/Info.plist")"
     [[ "$actual" == "${pair#*=}" ]] || { printf 'Built %s is %s, expected %s\n' "${pair%%=*}" "$actual" "${pair#*=}" >&2; exit 1; }
 done
+# The app carries the copy, file for file (the package declares it only when the copy exists).
+python3 "$APPLE/scripts/sync-ddl3d-viewer.py" --check --app "$APP"
 printf 'Built unsigned Universal application %s (%s): %s\n' "$MARKETING_VERSION" "$BUILD_NUMBER" "$APP"
 if [[ "$INSTALL_APP" == true ]]; then
     python3 "$APPLE/scripts/install-macos.py" --app "$APP"

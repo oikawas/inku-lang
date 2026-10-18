@@ -1,5 +1,13 @@
 // swift-tools-version: 6.1
+import Foundation
 import PackageDescription
+
+// The Web's registered 3D viewer, unchanged, is never committed: apple/scripts/build-macos.sh copies it into
+// Sources/InkuUI/Resources/ddl3d/ (apple/scripts/sync-ddl3d-viewer.py) before building the app. A `.copy` of a
+// missing path fails the build, so the resource is declared only when the copy exists; a build without it has no
+// 3D switch. SwiftPM keeps the manifest it read until this file changes, so a package first built before the copy
+// existed goes on without it (InkuAppCheck --ddl3d-only reads the copy where it is).
+let ddl3dCopied = FileManager.default.fileExists(atPath: Context.packageDirectory + "/Sources/InkuUI/Resources/ddl3d")
 
 let package = Package(
     name: "InkuApple",
@@ -22,9 +30,7 @@ let package = Package(
                             .copy("Resources/ui-reference.json"), .copy("Resources/third-party-notices.json"),
                             .copy("Resources/macro-sources.json"), .copy("Resources/saijiki.json"),
                             .copy("Resources/plugin-words.json"), .copy("Resources/plugin-previews"),
-                            // The Web's registered 3D viewer, unchanged (apple/scripts/sync-ddl3d-viewer.py).
-                            .copy("Resources/ddl3d"),
-                            .process("Resources/Localization")]),
+                            .process("Resources/Localization")] + (ddl3dCopied ? [.copy("Resources/ddl3d")] : [])),
         .executableTarget(name: "InkuMac", dependencies: ["InkuUI"]),
         .executableTarget(name: "InkuAppCheck", dependencies: ["InkuUI", "InkuPersistence", "InkuCore", "InkuHost", "InkuExport"]),
     ],

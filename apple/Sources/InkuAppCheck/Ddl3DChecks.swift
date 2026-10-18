@@ -6,17 +6,31 @@ import InkuPersistence
 import InkuUI
 import WebKit
 
-/// The 3D bridge against the bundled Web viewer (plan swift-task/ddl-3d-20261018, Q1–Q3 and Q5). Offscreen by default:
-/// the web view is in no window. `--ddl3d-window` hosts it in a window of this process placed outside every screen.
-/// No database, provider or network: the viewer is served from the app bundle under `inku-3d://viewer/`.
+/// The 3D bridge against the Web's registered viewer (plan swift-task/ddl-3d-20261018, Q1–Q3 and Q5). Offscreen by
+/// default: the web view is in no window. `--ddl3d-window` hosts it in a window of this process placed outside every
+/// screen. No database, provider or network: the viewer is served under `inku-3d://viewer/` from the copy the app
+/// build makes (apple/scripts/sync-ddl3d-viewer.py), read where it is, so the check needs no rebuild after copying
+/// and does not depend on whether SwiftPM read the manifest before the copy existed.
 @MainActor
 func runDdl3DChecks(arguments: [String]) async throws {
     // Each step's line stays in a redirected log even if a later step stops the process.
     setvbuf(stdout, nil, _IOLBF, 0)
     let product = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent().deletingLastPathComponent()
-    guard let registration = Ddl3DInstallation.registered else {
-        throw CheckFailure.message("No bundled 3D viewer registration (Resources/ddl3d/installation.json)")
+    // The copy is not committed, so a checkout without it, or with an earlier registration's, stops here.
+    let sync = "python3 apple/scripts/sync-ddl3d-viewer.py"
+    let copy = product.appendingPathComponent("apple/Sources/InkuUI/Resources/ddl3d", isDirectory: true)
+    let webRegistration = product.appendingPathComponent("web/src/lib/features/experimental-3d/installation.json")
+    let webViewer = (try JSONSerialization.jsonObject(with: Data(contentsOf: webRegistration)) as? [String: Any])?["viewerUrl"] as? String ?? ""
+    guard !webViewer.isEmpty else {
+        throw CheckFailure.message("The Web registers no 3D viewer (empty viewerUrl in \(webRegistration.path)); nothing to check")
+    }
+    guard FileManager.default.fileExists(atPath: copy.appendingPathComponent("installation.json").path) else {
+        throw CheckFailure.message("No copy of the 3D viewer at \(copy.path): it is made at build time and not committed. "
+            + "Run `\(sync)` (apple/scripts/build-macos.sh runs it), then this check again")
+    }
+    guard let registration = Ddl3DInstallation.registration(in: copy), registration.viewerPath == webViewer else {
+        throw CheckFailure.message("The copy at \(copy.path) is not the Web's registered viewer \(webViewer). Run `\(sync)`, then this check again")
     }
     print("Viewer: \(registration.viewerPath) from \(registration.directory.path)")
 
@@ -139,9 +153,9 @@ func runDdl3DChecks(arguments: [String]) async throws {
 
     // The work tab's SwiftUI host: the representable mounts its own viewer and `onChange` hands it the snapshot.
     let hosted = Ddl3DController()
-    guard let host = Ddl3DProbe.hostingView(work: work, controller: hosted, display: DisplaySettings(),
-                                            initialView: Ddl3DInitialView(pixelWidth: 560, pixelHeight: 400, panX: 0, panY: 0, zoom: 1),
-                                            onReturn: {}) else { throw CheckFailure.message("No 3D hosting view") }
+    let host = Ddl3DProbe.hostingView(registration: registration, work: work, controller: hosted, display: DisplaySettings(),
+                                      initialView: Ddl3DInitialView(pixelWidth: 560, pixelHeight: 400, panX: 0, panY: 0, zoom: 1),
+                                      onReturn: {})
     let viewWindow = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .resizable],
                               backing: .buffered, defer: false)
     viewWindow.isReleasedWhenClosed = false

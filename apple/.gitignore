@@ -5,3 +5,4 @@ Inku.xcodeproj/
 *.xcuserstate
 xcuserdata/
 Packages/InkuHost/Sources/InkuHost/Resources/description-meter/
+Sources/InkuUI/Resources/ddl3d/

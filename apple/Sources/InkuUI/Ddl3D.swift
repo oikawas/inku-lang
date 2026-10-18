@@ -4,8 +4,9 @@ import InkuPersistence
 import Observation
 
 /// The work tab's experimental 3D view (Web `features/experimental-3d`, `inku.ddl3d.v1`). The viewer is the Web's
-/// registered distribution, bundled unchanged (`apple/scripts/sync-ddl3d-viewer.py`); the app only connects it.
-/// Shapes, depth and paint stay the viewer's: nothing here draws.
+/// registered distribution, copied unchanged at build time and never committed (`apple/scripts/sync-ddl3d-viewer.py`,
+/// which `apple/scripts/build-macos.sh` runs); the app only connects it. Shapes, depth and paint stay the viewer's:
+/// nothing here draws.
 public enum Ddl3DInstallation {
     /// The viewer and its parent page are served under one app-only origin, so the viewer's same-origin checks
     /// (`main.ts`) hold. A `file:` page would have the opaque origin `null`.
@@ -34,13 +35,15 @@ public enum Ddl3DInstallation {
         return name
     }
 
-    /// The registration bundled with the app. An empty `viewerUrl` turns the view off: no switch, no viewer file read.
+    /// The registration bundled with the app. An empty `viewerUrl`, or a build made without the copy (a plain
+    /// `swift build`), turns the view off: no switch, no viewer file read.
     public static let registered: Registered? = {
         guard let root = Bundle.module.url(forResource: "ddl3d", withExtension: nil) else { return nil }
         return registration(in: root)
     }()
 
-    static func registration(in root: URL) -> Registered? {
+    /// The registration in a copy of the viewer (a `ddl3d` folder): its `installation.json` and the build it names.
+    public static func registration(in root: URL) -> Registered? {
         guard let data = try? Data(contentsOf: root.appendingPathComponent("installation.json")),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let path = object["viewerUrl"] as? String, let build = build(ofViewerPath: path) else { return nil }

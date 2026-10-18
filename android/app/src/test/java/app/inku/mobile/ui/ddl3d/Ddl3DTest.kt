@@ -159,6 +159,21 @@ class Ddl3DTest {
         assertTrue(page.sent.isEmpty())
     }
 
+    /** The viewer's front view is pixelHeight / canvas height px per unit: the picture's height, not the box's. */
+    @Test
+    fun theFirstViewIsThePictureWhereTheCanvasShowsIt() {
+        // A square work in a phone's full screen (411 x 923 dp) fills the width.
+        val square = Ddl3DInitialView.ofPicture(411.0, 923.0, 1.0, 1.0, 0.0, 0.0)
+        assertEquals(411.0, square.pixelWidth, 1e-9)
+        assertEquals(411.0, square.pixelHeight, 1e-9)
+        // A wide work in a short box fits the height; the 2D magnification and move go with it.
+        val wide = Ddl3DInitialView.ofPicture(400.0, 100.0, 2.0, 1.5, 10.0, -4.0)
+        assertEquals(300.0, wide.pixelWidth, 1e-9)
+        assertEquals(150.0, wide.pixelHeight, 1e-9)
+        assertEquals(10.0, wide.message()!!.getDouble("panX"), 0.0)
+        assertEquals(1.5, wide.message()!!.getDouble("zoom"), 0.0)
+    }
+
     /** A web view left at WRAP_CONTENT lays its page out 0 px tall: the 3D view rendered, black (Build148421). */
     @Test
     fun theWebViewFillsItsPlaceSoThePageHasAHeight() {

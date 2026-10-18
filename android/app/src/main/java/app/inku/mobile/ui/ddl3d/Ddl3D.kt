@@ -118,6 +118,19 @@ data class Ddl3DInitialView(val pixelWidth: Double, val pixelHeight: Double, val
         return JSONObject().put("pixelWidth", pixelWidth).put("pixelHeight", pixelHeight)
             .put("panX", panX).put("panY", panY).put("zoom", zoom)
     }
+
+    companion object {
+        /**
+         * The picture where the 2D canvas shows it, in CSS px (dp): [ratio] (width
+         * over height) fitted whole into the box, magnified by [zoom], moved by
+         * [panX] and [panY]. The viewer reads the picture's height, not the box's;
+         * the box sent in its place showed a phone's work 2.6 times too close.
+         */
+        fun ofPicture(boxWidth: Double, boxHeight: Double, ratio: Double, zoom: Double, panX: Double, panY: Double): Ddl3DInitialView {
+            val width = minOf(boxWidth, boxHeight * ratio)
+            return Ddl3DInitialView(width * zoom, width / ratio * zoom, panX, panY, zoom)
+        }
+    }
 }
 
 /** The parent page the controller talks through; the identities, requests and deadline are the controller's. */

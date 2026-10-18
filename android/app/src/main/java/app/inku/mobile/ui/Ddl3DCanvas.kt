@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.viewinterop.AndroidView
@@ -71,8 +72,13 @@ internal fun Ddl3DCanvas(
     onReturn: () -> Unit,
     onMessage: (String) -> Unit,
     modifier: Modifier = Modifier,
+    pictureRatio: Float? = null,
+    zoom: Float = 1f,
+    panX: Float = 0f,
+    panY: Float = 0f,
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current.density
     val title = S.ddl3dTitle
     val shareFailed = S.ddl3dShareFailed
     val currentReturn by rememberUpdatedState(onReturn)
@@ -90,8 +96,14 @@ internal fun Ddl3DCanvas(
         controller.update(input, if (english) "en" else "ja")
     }
     Box(modifier.onSizeChanged {
-        // The first front view matches the canvas the 2D work filled.
-        controller.initialView = Ddl3DInitialView(it.width.toDouble(), it.height.toDouble(), 0.0, 0.0, 1.0)
+        // The first front view is the picture as the 2D canvas showed it, so the
+        // button seems to give that picture depth where it stands (Web
+        // `initialView`). A picture the full screen turned on its side has no
+        // such view, and the viewer fits it by itself.
+        controller.initialView = pictureRatio?.takeIf { r -> r > 0f }?.let { r ->
+            Ddl3DInitialView.ofPicture(it.width / density.toDouble(), it.height / density.toDouble(), r.toDouble(),
+                zoom.toDouble(), panX / density.toDouble(), panY / density.toDouble())
+        }
     }) {
         AndroidView(factory = { host.webView }, modifier = Modifier.fillMaxSize())
         val failure = controller.failure

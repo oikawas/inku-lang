@@ -2813,6 +2813,10 @@ private fun CanvasHeroCard(
                                 onReturn = { viewModel.setCanvas3d(false) },
                                 onMessage = { canvasMessage = it },
                                 modifier = Modifier.fillMaxSize(),
+                                pictureRatio = ratio.takeIf { presentationArtworkRotation == 0 },
+                                zoom = if (presentation) state.canvasZoom else 1f,
+                                panX = if (presentation) state.canvasPanX else 0f,
+                                panY = if (presentation) state.canvasPanY else 0f,
                             )
                         } else {
                             ArtworkPreview(

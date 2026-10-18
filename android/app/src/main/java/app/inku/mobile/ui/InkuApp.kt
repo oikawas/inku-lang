@@ -245,7 +245,6 @@ import app.inku.mobile.ui.i18n.savedWorkParityStrings
 import app.inku.mobile.ui.camera.CameraCaptureState
 import app.inku.mobile.ui.camera.CameraDevelopmentEffect
 import app.inku.mobile.ui.camera.CameraFailure
-import app.inku.mobile.ui.camera.CameraInputSource
 import app.inku.mobile.ui.camera.CameraOriginalPhotoStore
 import app.inku.mobile.ui.camera.cameraOriginalPhotoWords
 import app.inku.mobile.ui.camera.cameraDevelopmentPresentation
@@ -527,9 +526,7 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
     val backTarget: (() -> Unit)? = when {
         state.cameraCaptureState.locksCameraInteraction || state.cameraCaptureState is CameraCaptureState.Failed ->
             viewModel::cancelCameraDevelopment
-        state.cameraCaptureState == CameraCaptureState.ChoosingSource -> viewModel::cancelCameraInputSource
         state.canvasPresentationMode -> viewModel::exitCanvasPresentationMode
-        state.cameraCaptureState == CameraCaptureState.AwaitingOverwriteConfirmation -> viewModel::cancelCameraOverwrite
         state.confirmDdlOverwrite -> viewModel::cancelDdlOverwrite
         state.ddlEditorOpen -> viewModel::closeDdlEditor
         state.modelSelectionOpen -> viewModel::cancelModelSelection
@@ -610,9 +607,6 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
                 }
                 if (state.confirmDdlOverwrite) {
                     DdlOverwriteDialog(viewModel)
-                }
-                if (state.cameraCaptureState == CameraCaptureState.AwaitingOverwriteConfirmation) {
-                    CameraOverwriteDialog(viewModel)
                 }
                 if (state.ddlEditorOpen) {
                     DdlEditorDialog(state, viewModel)
@@ -696,25 +690,6 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
         }
     }
     }
-}
-
-@Composable
-private fun CameraOverwriteDialog(viewModel: InkuViewModel) {
-    AlertDialog(
-        onDismissRequest = viewModel::cancelCameraOverwrite,
-        title = { Text(S.cameraOverwriteTitle) },
-        text = { Text(S.cameraOverwriteBody) },
-        confirmButton = {
-            TextButton(onClick = viewModel::confirmCameraOverwrite) {
-                Text(S.cameraOverwriteAction)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = viewModel::cancelCameraOverwrite) {
-                Text(S.cancel)
-            }
-        },
-    )
 }
 
 @Composable
@@ -1777,8 +1752,6 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
     // overwrite question -- keeps the key.
     val appOwnsBack = state.cameraCaptureState.locksCameraInteraction ||
         state.cameraCaptureState is CameraCaptureState.Failed ||
-        state.cameraCaptureState == CameraCaptureState.ChoosingSource ||
-        state.cameraCaptureState == CameraCaptureState.AwaitingOverwriteConfirmation ||
         state.confirmDdlOverwrite
     BackHandler(enabled = editingWork && hasWork && !appOwnsBack) {
         if (state.workContextId != null) viewModel.closeWorkContext() else viewModel.finishDescriptionEditing()
@@ -3105,11 +3078,7 @@ private fun SketchModeRow(state: InkuUiState, viewModel: InkuViewModel) {
  */
 @Composable
 private fun cameraStatusText(state: CameraCaptureState): String? = when (state) {
-    CameraCaptureState.Idle,
-    CameraCaptureState.ChoosingSource,
-    CameraCaptureState.AwaitingOverwriteConfirmation,
-    CameraCaptureState.PickingPhoto,
-    -> null
+    CameraCaptureState.Idle -> null
     CameraCaptureState.Capturing -> S.cameraCapturing
     CameraCaptureState.PreparingImage -> S.cameraPreparingImage
     CameraCaptureState.LoadingLocalModel -> S.cameraLoadingLocalModel
@@ -3131,7 +3100,6 @@ private fun cameraStatusText(state: CameraCaptureState): String? = when (state) 
     is CameraCaptureState.Failed -> when (state.reason) {
         CameraFailure.ModelNotReady -> S.cameraModelNotReady
         CameraFailure.CaptureUnavailable -> S.cameraCaptureUnavailable
-        CameraFailure.PhotoPickerUnavailable -> S.cameraPhotoPickerUnavailable
         CameraFailure.EmptyImage -> S.cameraEmptyImage
         CameraFailure.DecodeFailed -> S.cameraDecodeFailed
         CameraFailure.AnalysisFailed -> S.cameraAnalysisFailed

@@ -56,6 +56,9 @@ public final class LibraryModel {
     public var selectedIDs: Set<String> = []
     public private(set) var works: [SavedWork] = []
     public private(set) var annotations: [String: LibraryAnnotation] = [:]
+    /// Marks and notes of the works in the lineage snapshots, apart from the listed page's: a page turn replaces
+    /// `annotations`, and the lineage still shows its own works.
+    public private(set) var lineageAnnotations: [String: LibraryAnnotation] = [:]
     public private(set) var svgSizes: [String: Int64] = [:]
     public private(set) var selectedAnnotationID: String?
     public private(set) var selectedAnnotation: LibraryAnnotation?
@@ -152,6 +155,7 @@ public final class LibraryModel {
         lineageFocusID = nil
         lineageNormalGraph = nil
         lineageOverviewGraph = nil
+        lineageAnnotations.removeAll()
         lineageBrowsing = LineageBrowsingState()
         lineageLoading = false
         lineageError = nil
@@ -254,7 +258,8 @@ public final class LibraryModel {
         let requestedSize = pageSize
         let requestedOffset = startOffset + page * pageSize
         loading = true
-        errorText = nil
+        // An unchanged write still redraws every view that reads the error.
+        if errorText != nil { errorText = nil }
         do {
             let count = try await database.trashCount()
             if requestedGrouping {
@@ -350,6 +355,7 @@ public final class LibraryModel {
 
     private func rememberAnnotation(_ value: LibraryAnnotation, id: String) {
         annotations[id] = value
+        if lineageAnnotations[id] != nil { lineageAnnotations[id] = value }
         if selectedAnnotationID == id {
             selectedAnnotationToken = UUID()
             selectedAnnotationLoading = false
@@ -499,6 +505,7 @@ public final class LibraryModel {
             lineageToken = UUID(); graph = nil; lineageFocusID = nil
             lineageNormalGraph = nil; lineageOverviewGraph = nil; lineageBrowsing = LineageBrowsingState()
             lineageLoading = false; lineageError = nil; failedLineageRequest = nil
+            refreshLineageAnnotations()
             return
         }
         await loadLineage(nodeID: id)
@@ -524,6 +531,7 @@ public final class LibraryModel {
                 graph = nil
                 lineageNormalGraph = nil; lineageOverviewGraph = nil; lineageBrowsing = LineageBrowsingState()
                 lineageLoading = false; lineageError = nil; failedLineageRequest = nil
+                refreshLineageAnnotations()
                 return
             }
             var snapshot = LineageSnapshot(result)
@@ -544,7 +552,7 @@ public final class LibraryModel {
             if retrying { lineageBrowsing.expandedNodeIDs = Set(request.expandedNodeIDs) }
             lineageNormalGraph = snapshot; lineageBrowsing.reconcile(snapshot)
             if request.pathOnly { lineageBrowsing.closeOverview() }
-            rememberLineageAnnotations(snapshot)
+            refreshLineageAnnotations()
             lineageLoading = false; lineageError = nil; failedLineageRequest = nil
             if lineageBrowsing.overviewOpen { await loadLineageOverview() }
         } catch {
@@ -571,7 +579,7 @@ public final class LibraryModel {
             if let result {
                 let snapshot = LineageSnapshot(result, focusNodeID: nodeID)
                 lineageOverviewGraph = snapshot; lineageBrowsing.openOverview()
-                rememberLineageAnnotations(snapshot)
+                refreshLineageAnnotations()
             }
             lineageLoading = false; lineageError = nil; failedLineageRequest = nil
         } catch {
@@ -626,7 +634,7 @@ public final class LibraryModel {
             guard lineageToken == token, lineageFocusID == snapshot.focusNodeID, !Task.isCancelled else { return }
             if let branch {
                 let merged = snapshot.merging(branch)
-                lineageNormalGraph = merged; rememberLineageAnnotations(merged)
+                lineageNormalGraph = merged; refreshLineageAnnotations()
                 lineageBrowsing.expandedNodeIDs.insert(nodeID)
             }
             lineageLoading = false; lineageError = nil; failedLineageRequest = nil
@@ -637,8 +645,18 @@ public final class LibraryModel {
         }
     }
 
-    private func rememberLineageAnnotations(_ snapshot: LineageSnapshot) {
-        for item in snapshot.nodes { if let work = item.work { annotations[work.id] = item.annotation } }
+    /// From the snapshots as read; the normal view's read wins over an older overview of the same work.
+    private func refreshLineageAnnotations() {
+        var values: [String: LibraryAnnotation] = [:]
+        for snapshot in [lineageOverviewGraph, lineageNormalGraph].compactMap({ $0 }) {
+            for item in snapshot.nodes { if let work = item.work { values[work.id] = item.annotation } }
+        }
+        if values != lineageAnnotations { lineageAnnotations = values }
+    }
+
+    /// What the lineage shows for one of its works.
+    public func lineageAnnotation(for id: String) -> LibraryAnnotation {
+        lineageAnnotations[id] ?? annotation(for: id)
     }
 
     public func promote(_ nodeID: String) async {

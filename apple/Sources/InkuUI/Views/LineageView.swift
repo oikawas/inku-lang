@@ -2,6 +2,61 @@ import InkuHost
 import InkuPersistence
 import SwiftUI
 
+/// A lineage card's refinement menu. Its heading names the saved state, read here so that the action states arriving
+/// for a library page redraw the menu and not every card of the lineage beneath the library.
+@MainActor
+private struct LineageNodeRefinementMenu: View {
+    @Bindable var model: AppModel
+    let work: SavedWork
+    let onAction: (SavedWork, String) -> Void
+    let writingLocked: Bool
+
+    private var title: String {
+        let title = model.display.webCopy("workActionMenuTitle", "作品編集")
+        switch model.workActionState(for: work) {
+        case .userDDL: return title + " " + model.display.webCopy("workActionDdlOrigin", "（DDL直接生成作品）")
+        case .lockedDescription: return title + " " + model.display.webCopy("descriptionLockedMark", "ロック")
+        default: return title
+        }
+    }
+
+    var body: some View {
+        Section {
+            SavedWorkRefinementActions(model: model, work: work, onAction: onAction, writingLocked: writingLocked)
+        } header: {
+            Text(title)
+        }
+    }
+}
+
+/// The lock of a work fixed by an edited DDL, read here for the same reason as the menu above.
+@MainActor
+private struct LineageNodeLockMark: View {
+    let model: AppModel
+    let work: SavedWork
+
+    var body: some View {
+        if model.workActionState(for: work) == .lockedDescription {
+            Label(model.display.webCopy("descriptionLockedMark", "ロック"), systemImage: "lock.fill").inkuFont(10)
+                .inkuTooltip(model.display.tooltip("編集した指示書で確定した作品です。記述を読み直す操作は使えません。", serverKey: "descriptionLockedReason"))
+        }
+    }
+}
+
+/// The saved display label of a lineage card, read here so that labels arriving for a library page redraw this
+/// line and not every card of the lineage beneath the library.
+@MainActor
+private struct LineageNodeDisplayLabel: View {
+    let model: AppModel
+    let workID: String
+
+    var body: some View {
+        if let label = model.savedDisplayLabels[workID] {
+            Text(label).inkuFont(12, weight: .semibold).foregroundStyle(.secondary)
+        }
+    }
+}
+
 private struct LineageDetailsSession: Identifiable {
     let item: LineageItem
     let note: LibraryNoteEditorModel
@@ -368,7 +423,7 @@ struct LineageView: View {
                         Image(systemName: "flag.fill").inkuFont(12).frame(width: 24, height: 24)
                             .background(Color.secondary.opacity(0.08), in: Circle()).overlay(Circle().stroke(InkuColor.border))
                     }
-                        .foregroundStyle(library.annotation(for: work.id).forRevision ? Color.red : Color.secondary)
+                        .foregroundStyle(library.lineageAnnotation(for: work.id).forRevision ? Color.red : Color.secondary)
                         .accessibilityLabel(model.display.localized("推敲の印"))
                         .disabled(writingDisabled || library.mutating)
                 }
@@ -376,11 +431,7 @@ struct LineageView: View {
                 Spacer(minLength: 0)
                 if let work = item.work, !work.trashed {
                     Menu {
-                        Section {
-                            SavedWorkRefinementActions(model: model, work: work, onAction: dispatchWorkAction, writingLocked: writingDisabled)
-                        } header: {
-                            Text(cardRefinementTitle(work))
-                        }
+                        LineageNodeRefinementMenu(model: model, work: work, onAction: dispatchWorkAction, writingLocked: writingDisabled)
                     } label: { Image(systemName: "ellipsis") }
                         .fixedSize().accessibilityLabel(model.display.webCopy("workActionOpenMenu", "作品編集メニューを開く"))
                         .disabled(writingDisabled)
@@ -391,9 +442,7 @@ struct LineageView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         operationRow(item, graph: graph)
                         ArtworkThumbnail(work: work, thumbnails: model.thumbnails).frame(height: 118)
-                        if let label = model.savedDisplayLabels[work.id] {
-                            Text(label).inkuFont(12, weight: .semibold).foregroundStyle(.secondary)
-                        }
+                        LineageNodeDisplayLabel(model: model, workID: work.id)
                         if work.trashed { Text(model.display.localized("ゴミ箱（復元可能）")).inkuFont(12).foregroundStyle(.secondary) }
                         LibraryWorkTitle(work: work, untitled: model.display.localized("無題"), lineLimit: 2, size: 14)
                             .inkuTooltip(model.display.tooltipValue(work.effectiveSourceText.isEmpty ? (work.descriptionHash ?? "") : work.effectiveSourceText), focus: .none)
@@ -458,23 +507,11 @@ struct LineageView: View {
         }.inkuFont(12).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func cardRefinementTitle(_ work: SavedWork) -> String {
-        let title = model.display.webCopy("workActionMenuTitle", "作品編集")
-        switch model.workActionState(for: work) {
-        case .userDDL: return title + " " + model.display.webCopy("workActionDdlOrigin", "（DDL直接生成作品）")
-        case .lockedDescription: return title + " " + model.display.webCopy("descriptionLockedMark", "ロック")
-        default: return title
-        }
-    }
-
     private func identityMarks(_ item: LineageItem, graph: LineageSnapshot) -> some View {
         let focus = graph.nodes.first { $0.id == graph.focusNodeID }
         return VStack(alignment: .leading, spacing: 3) {
             if item.id == graph.focusNodeID { identityBadge("表示中", active: true) }
-            if let work = item.work, model.workActionState(for: work) == .lockedDescription {
-                Label(model.display.webCopy("descriptionLockedMark", "ロック"), systemImage: "lock.fill").inkuFont(10)
-                    .inkuTooltip(model.display.tooltip("編集した指示書で確定した作品です。記述を読み直す操作は使えません。", serverKey: "descriptionLockedReason"))
-            }
+            if let work = item.work { LineageNodeLockMark(model: model, work: work) }
             if item.node.state == "lineage_only" { identityBadge("中間作品・履歴非表示") }
             if LineageWorkScope.sameText(item, focus: focus) { identityBadge("同じ記述") }
             if LineageWorkScope.sameEdition(item, focus: focus) { identityBadge("同じ版") }
@@ -535,7 +572,7 @@ struct LineageView: View {
             }.disabled(library.mutating || model.isBrowsingLocked || work.trashed)
             Button(model.display.localized(work.starred ? "お気に入りを解除" : "お気に入り"), systemImage: "star") { Task { await library.toggleStar(work) } }
                 .disabled(library.mutating || writingDisabled)
-            Button(model.display.localized("推敲の印"), systemImage: library.annotation(for: work.id).forRevision ? "pencil.circle.fill" : "pencil.circle") { Task { await library.toggleRevision(work) } }
+            Button(model.display.localized("推敲の印"), systemImage: library.lineageAnnotation(for: work.id).forRevision ? "pencil.circle.fill" : "pencil.circle") { Task { await library.toggleRevision(work) } }
                 .disabled(library.mutating || writingDisabled)
             if let hash = work.renderHash { Button(model.display.localized("描画ハッシュ全体をコピー"), systemImage: "doc.on.doc") { library.copyHash(hash) } }
             if item.node.state == "lineage_only" {

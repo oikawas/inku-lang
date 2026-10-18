@@ -85,17 +85,18 @@ func runLibraryPagingPerformance(arguments: [String]) async throws {
     // L7, before any turn: a revision-marked lineage node that the first page does not list.
     let offPage = PagingFixture.revisionMarkedLineageMembers.map(PagingFixture.id)
         .filter { id in !library.works.contains { $0.id == id } && graph.nodes.contains { $0.work?.id == id } }
-    let lineageMarksBefore = offPage.filter { library.annotation(for: $0).forRevision }.count
+    // What the lineage view reads for its revision flag (before 2026-10-18 stage B it read `annotation(for:)`).
+    let lineageMarksBefore = offPage.filter { library.lineageAnnotation(for: $0).forRevision }.count
 
     var turns: [PagingTurn] = []
     for (label, target) in [("2nd page", 1), ("3rd page", 2), ("4th page", 3), ("back to 3rd", 2), ("4th again", 3)] {
         turns.append(try await meter.turn(label: label, to: target))
     }
-    let lineageMarksAfter = offPage.filter { library.annotation(for: $0).forRevision }.count
+    let lineageMarksAfter = offPage.filter { library.lineageAnnotation(for: $0).forRevision }.count
     print("L7 lineage marks: \(offPage.count) revision-marked lineage nodes off the first page; marked before paging \(lineageMarksBefore), after \(lineageMarksAfter)")
 
     print("")
-    print("turn                  refresh lineage cards  nodes  NSViews decodes mem/store  first_ms  settle_ms  main_cpu_ms  layout_ms  passes  works")
+    print("turn                  refresh lineage cards  nodes  NSViews decodes mem/store  first_ms  settle_ms  main_cpu_ms  layout_ms  passes  menus  works")
     for turn in turns {
         print(turn.row)
     }
@@ -139,6 +140,7 @@ private struct PagingTurn {
     let lineageReads: Int
     let cardBodies: Int
     let lineageNodeBodies: Int
+    let menuBodies: Int
     let layouts: Int
     let viewCount: Int
     let maxDecodes: Int
@@ -160,13 +162,13 @@ private struct PagingTurn {
         return pad(label, 20) + left(refreshes, 9) + left(lineageReads, 8) + left(cardBodies, 7) + left(lineageNodeBodies, 7)
             + left(viewCount, 9) + left(maxDecodes, 8) + left("\(memoryHits)/\(storeHits)", 11)
             + left(PagingMeter.format(firstPaint), 10) + left(PagingMeter.format(settle), 11)
-            + left(PagingMeter.format(mainCPU), 13) + left(PagingMeter.format(layout), 11) + left(layouts, 8)
+            + left(PagingMeter.format(mainCPU), 13) + left(PagingMeter.format(layout), 11) + left(layouts, 8) + left(menuBodies, 7)
             + "  \(shownFrom)-\(shownTo)/\(pageSize)"
     }
 
     var json: [String: Any] {
         ["label": label, "refreshes": refreshes, "lineage_reads": lineageReads,
-         "card_bodies": cardBodies, "lineage_node_bodies": lineageNodeBodies, "hosting_layouts": layouts, "nsviews": viewCount,
+         "card_bodies": cardBodies, "lineage_node_bodies": lineageNodeBodies, "menu_bodies": menuBodies, "hosting_layouts": layouts, "nsviews": viewCount,
          "max_concurrent_decodes": maxDecodes, "memory_hits_at_publish": memoryHits, "store_hits": storeHits,
          "first_paint_ms": firstPaint, "settle_ms": settle, "main_thread_cpu_ms": mainCPU,
          "layout_display_ms": layout, "page_size": pageSize, "shown_from": shownFrom, "shown_to": shownTo]
@@ -211,7 +213,7 @@ private final class PagingMeter {
         let library = app.library
         let before = (refreshes: LibraryPerformanceProbe.refreshesStarted, lineage: LibraryPerformanceProbe.lineageReads,
                       cards: LibraryPerformanceProbe.cardBodies, nodes: LibraryPerformanceProbe.lineageNodeBodies,
-                      layouts: LibraryPerformanceProbe.hostingLayouts)
+                      layouts: LibraryPerformanceProbe.hostingLayouts, menus: LibraryPerformanceProbe.menuBodies)
         // As after looking at the page for a moment: whatever it read ahead is in memory.
         await app.thumbnails.prefetchFinished()
         await app.thumbnails.resetPeaks()
@@ -230,6 +232,7 @@ private final class PagingMeter {
             lineageReads: LibraryPerformanceProbe.lineageReads - before.lineage,
             cardBodies: LibraryPerformanceProbe.cardBodies - before.cards,
             lineageNodeBodies: LibraryPerformanceProbe.lineageNodeBodies - before.nodes,
+            menuBodies: LibraryPerformanceProbe.menuBodies - before.menus,
             layouts: LibraryPerformanceProbe.hostingLayouts - before.layouts,
             viewCount: viewCount(), maxDecodes: after.maxDecodesInFlight, memoryHits: memoryHits,
             storeHits: after.storeHits - statistics.storeHits,

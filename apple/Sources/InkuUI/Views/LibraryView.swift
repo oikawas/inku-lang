@@ -124,7 +124,7 @@ struct LibraryView: View {
                 ], selection: Binding(get: { library.grouped }, set: { library.grouped = $0 }))
             }
             Text(countText).inkuFont(12).monospacedDigit().foregroundStyle(.secondary).lineLimit(1).fixedSize()
-            if library.loading { ProgressView().controlSize(.small) }
+            LibraryLoadingIndicator(library: library)
         }
     }
 
@@ -155,29 +155,7 @@ struct LibraryView: View {
         }
     }
 
-    private var pager: some View {
-        HStack(spacing: 6) {
-            Button(display.webCopy("historyLatest", fallback: "最新")) { Task { await library.setLatestPage() } }
-                .buttonStyle(LibraryGhostButtonStyle(minWidth: 54))
-                .disabled(!library.hasNewer || library.loading)
-                .inkuTooltip(display.tooltip("先頭ページ", serverKey: "tooltipHistoryLatestPage"), placement: .bottom)
-            Button(display.webCopy("historyNewer", fallback: "← 新しい")) { Task { await library.setPage(library.page - 1) } }
-                .buttonStyle(LibraryGhostButtonStyle(minWidth: 74))
-                .disabled(!library.hasNewer || library.loading)
-                .inkuTooltip(display.tooltip("前のページ", serverKey: "tooltipHistoryNewerPage"), placement: .bottom)
-            Text(library.loading ? display.webCopy("historyLoading", fallback: "読み込み中") : "\(library.page + 1) / \(library.pageCount)")
-                .inkuFont(12).monospacedDigit().foregroundStyle(.secondary).fixedSize()
-            Button(display.webCopy("historyOlder", fallback: "古い →")) { Task { await library.setPage(library.page + 1) } }
-                .buttonStyle(LibraryGhostButtonStyle(minWidth: 74))
-                .disabled(library.page + 1 >= library.pageCount || library.loading)
-                .inkuTooltip(display.tooltip("次のページ", serverKey: "tooltipHistoryOlderPage"), placement: .bottom)
-            Button(display.webCopy("historyOldest", fallback: "最古")) { Task { await library.setPage(library.pageCount - 1) } }
-                .buttonStyle(LibraryGhostButtonStyle(minWidth: 54))
-                .disabled(library.page + 1 >= library.pageCount || library.loading)
-                .inkuTooltip(display.tooltip("最終ページ", serverKey: "tooltipHistoryOldestPage"), placement: .bottom)
-        }
-        .disabled(library.mutating)
-    }
+    private var pager: some View { LibraryPager(library: library, display: display) }
 
     // MARK: Tools (Web .history-tools)
 
@@ -192,11 +170,12 @@ struct LibraryView: View {
     private var toolGroup: some View {
         @Bindable var library = library
         return HStack(spacing: 8) {
-            Button(allVisibleSelected ? display.localized("表示中のチェックを外す") : display.webCopy("historySelectAll", fallback: "すべて選択")) {
-                library.selectVisible()
+            LibraryDisabledWhileLoading(library: library, disabled: visibleIDs.isEmpty) {
+                Button(allVisibleSelected ? display.localized("表示中のチェックを外す") : display.webCopy("historySelectAll", fallback: "すべて選択")) {
+                    library.selectVisible()
+                }
+                .buttonStyle(LibraryGhostButtonStyle())
             }
-            .buttonStyle(LibraryGhostButtonStyle())
-            .disabled(visibleIDs.isEmpty || library.loading)
             .inkuTooltip(display.tooltip("このページの作品をすべて選択します", serverKey: "tooltipHistorySelectAll"), placement: .bottom)
             if !library.selectedIDs.isEmpty {
                 Button(display.localized("解除")) { library.selectedIDs.removeAll() }
@@ -222,11 +201,12 @@ struct LibraryView: View {
             }
             .labelsHidden().pickerStyle(.menu).fixedSize().controlSize(.small)
             .inkuTooltip(tip("保存日時の順序を切り替えます。"), placement: .bottom)
-            Button { Task { await library.refresh() } } label: { Image(systemName: "arrow.clockwise") }
-                .buttonStyle(LibraryGhostButtonStyle())
-                .accessibilityLabel(display.localized("更新"))
-                .disabled(library.loading)
-                .inkuTooltip(tip("ライブラリを読み直します。"), placement: .bottom)
+            LibraryDisabledWhileLoading(library: library, disabled: false) {
+                Button { Task { await library.refresh() } } label: { Image(systemName: "arrow.clockwise") }
+                    .buttonStyle(LibraryGhostButtonStyle())
+                    .accessibilityLabel(display.localized("更新"))
+            }
+            .inkuTooltip(tip("ライブラリを読み直します。"), placement: .bottom)
         }
     }
 
@@ -331,7 +311,8 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var listing: some View {
-        if library.loading && library.works.isEmpty {
+        // Works first: while a page is shown, the loading flag is not read here, so loading does not redraw the grid.
+        if library.works.isEmpty && library.loading {
             ProgressView(display.localized("ライブラリを読み込み中")).frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = library.errorText, library.total == 0 {
             ContentUnavailableView {
@@ -895,6 +876,59 @@ private struct LibraryTableRow: Identifiable {
     var id: String { work.id }
 }
 
+/// The pager reads the loading flag itself, so the start and end of a page read redraw these buttons and not the
+/// whole library.
+@MainActor
+private struct LibraryPager: View {
+    let library: LibraryModel
+    let display: DisplaySettings
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button(display.webCopy("historyLatest", fallback: "最新")) { Task { await library.setLatestPage() } }
+                .buttonStyle(LibraryGhostButtonStyle(minWidth: 54))
+                .disabled(!library.hasNewer || library.loading)
+                .inkuTooltip(display.tooltip("先頭ページ", serverKey: "tooltipHistoryLatestPage"), placement: .bottom)
+            Button(display.webCopy("historyNewer", fallback: "← 新しい")) { Task { await library.setPage(library.page - 1) } }
+                .buttonStyle(LibraryGhostButtonStyle(minWidth: 74))
+                .disabled(!library.hasNewer || library.loading)
+                .inkuTooltip(display.tooltip("前のページ", serverKey: "tooltipHistoryNewerPage"), placement: .bottom)
+            Text(library.loading ? display.webCopy("historyLoading", fallback: "読み込み中") : "\(library.page + 1) / \(library.pageCount)")
+                .inkuFont(12).monospacedDigit().foregroundStyle(.secondary).fixedSize()
+            Button(display.webCopy("historyOlder", fallback: "古い →")) { Task { await library.setPage(library.page + 1) } }
+                .buttonStyle(LibraryGhostButtonStyle(minWidth: 74))
+                .disabled(library.page + 1 >= library.pageCount || library.loading)
+                .inkuTooltip(display.tooltip("次のページ", serverKey: "tooltipHistoryOlderPage"), placement: .bottom)
+            Button(display.webCopy("historyOldest", fallback: "最古")) { Task { await library.setPage(library.pageCount - 1) } }
+                .buttonStyle(LibraryGhostButtonStyle(minWidth: 54))
+                .disabled(library.page + 1 >= library.pageCount || library.loading)
+                .inkuTooltip(display.tooltip("最終ページ", serverKey: "tooltipHistoryOldestPage"), placement: .bottom)
+        }
+        .disabled(library.mutating)
+    }
+}
+
+@MainActor
+private struct LibraryLoadingIndicator: View {
+    let library: LibraryModel
+
+    var body: some View {
+        if library.loading { ProgressView().controlSize(.small) }
+    }
+}
+
+/// Applies the loading flag in a view of its own, for the same reason as the pager.
+@MainActor
+private struct LibraryDisabledWhileLoading<Content: View>: View {
+    let library: LibraryModel
+    let disabled: Bool
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content.disabled(disabled || library.loading)
+    }
+}
+
 private struct LibraryWorkMenuActions {
     let open: (SavedWork) -> Void
     let openInCreate: (SavedWork) -> Void
@@ -915,6 +949,7 @@ private struct LibraryWorkMenu: View {
     private var display: DisplaySettings { model.display }
 
     var body: some View {
+        let _ = LibraryPerformanceProbe.menuBody()
         Button(display.localized("作品プレビュー"), systemImage: "eye") { actions.open(work) }.disabled(model.isBrowsingLocked)
         Button(display.localized("生成情報"), systemImage: "info.circle") { actions.perform(work, "info") }.disabled(model.isBrowsingLocked || work.trashed)
         Button(display.localized("制作で開く"), systemImage: "pencil") {

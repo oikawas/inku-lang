@@ -17,10 +17,12 @@ public enum LibraryPerformanceProbe {
     public private(set) static var lineageNodeBodies = 0
     /// Layout passes of the probe's hosting view, each a SwiftUI update of the whole window.
     public private(set) static var hostingLayouts = 0
+    /// Times a library work menu (context menu or ⋯) built its items.
+    public private(set) static var menuBodies = 0
 
     public static func reset() {
         refreshesStarted = 0; refreshesFinished = 0; lineageReads = 0; cardBodies = 0; lineageNodeBodies = 0
-        hostingLayouts = 0
+        hostingLayouts = 0; menuBodies = 0
     }
 
     static func refreshStarted() { if counting { refreshesStarted += 1 } }
@@ -28,6 +30,7 @@ public enum LibraryPerformanceProbe {
     static func lineageRead() { if counting { lineageReads += 1 } }
     static func cardBody() { if counting { cardBodies += 1 } }
     static func lineageNodeBody() { if counting { lineageNodeBodies += 1 } }
+    static func menuBody() { if counting { menuBodies += 1 } }
 
     #if os(macOS)
     /// The library overlay over a hidden lineage view, as `ContentView` keeps the shell beneath the library.

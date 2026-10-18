@@ -60,6 +60,11 @@ func runLibraryPaginationChecks() async throws {
     await library.loadLineage(work: works[0])
     let reads = await reader.reads
     await library.setPage(1)
+    // Failure: the page turn replaced the lineage's marks and notes with the new page's, so the lineage showed
+    // A without its note once A left the page.
+    guard library.annotations[works[0].id] == nil, library.lineageAnnotation(for: works[0].id).note == "A note" else {
+        throw CheckFailure.message("Paging dropped the note of a lineage work that left the page")
+    }
     guard library.errorText == nil, library.works.first?.id == works[1].id, library.works.first?.svg == "",
           library.svgSizes[works[1].id] == Int64(works[1].svg.utf8.count),
           try await library.fullWork(id: works[1].id) == works[1], await reader.reads == reads else {
@@ -106,7 +111,7 @@ func runLibraryPaginationChecks() async throws {
         let work = SavedWork(id: execution + "_0", at: 0, input: "", score: "{}", svg: "")
         guard app.workActionState(for: work) == expected else { throw CheckFailure.message("Batched menu state changed for \(execution)") }
     }
-    print("Library pagination passed: SVG-free list retains UTF-8 size/metadata; PNG hit1, missing drawing1; exact full action target; paging lineage reads0, explicit refresh reloads; history unchanged.")
+    print("Library pagination passed: SVG-free list retains UTF-8 size/metadata; PNG hit1, missing drawing1; exact full action target; paging lineage reads0, explicit refresh reloads; lineage keeps the note of a work off the page; history unchanged.")
     try await checkMeasuredShrink(folder: folder)
     print("Menu summaries passed: description/locked/user-DDL match full contexts; broken/mismatched/incomplete/missing/legacy records remain unavailable; page state published together.")
 }

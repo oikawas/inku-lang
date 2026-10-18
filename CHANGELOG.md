@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-18 — macOS: connect the 3D view through the host page and core snapshot shared with Android
+
+The macOS experimental 3D view now loads the viewer through `experiments/ddl-3d/host/`, the parent page Android shares, and leaves the viewer input to the shared core's `ddl3d_snapshot`. The page is copied at build time like the viewer and never committed. The view looks and behaves as before; the input loses only white space outside strings when the stored Score has some (the Web's form).
+
 ### 2026-10-18 — macOS: type a page number in the history strip
 
 Following the Web (Build 1272), the macOS history strip's page number is the Library's page field: Return goes to the typed page, out-of-range numbers land on the first or last page, and Escape puts the number back. Like the strip's arrows, it keeps the shown work. The bundled `ui-reference.json` is copied again from Build 1272.

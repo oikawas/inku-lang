@@ -110,6 +110,13 @@ internal class Ddl3DWebHost(
     }
 
     override fun deliver(message: JSONObject) {
+        if (message.optString("type") == "load-work") {
+            // The viewer reports the SHA-256 of the exact input it read; this is the
+            // one sent, so the two lines in the log show the input arrived whole.
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(message.optString("inputJson").toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+            Log.i(TAG, "load-work request=${message.opt("requestId")} digest=$digest bytes=${message.optString("inputJson").toByteArray().size}")
+        }
         send(JSONObject().put("kind", "deliver").put("message", message))
     }
 

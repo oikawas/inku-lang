@@ -33,6 +33,12 @@ func runDdl3DChecks(arguments: [String]) async throws {
         throw CheckFailure.message("The copy at \(copy.path) is not the Web's registered viewer \(webViewer). Run `\(sync)`, then this check again")
     }
     print("Viewer: \(registration.viewerPath) from \(registration.directory.path)")
+    // About inku's 3D entry is read from the copy, not from the notices snapshot.
+    guard let notices = Ddl3DViewerNotices(registration: registration) else {
+        throw CheckFailure.message("The viewer \(registration.build) carries no readable THIRD_PARTY_NOTICES.txt")
+    }
+    print("Notices: \(Ddl3DViewerNotices.name) \(notices.build) (\(notices.license)), \(notices.componentCount) components, "
+          + "\(notices.text.utf8.count) bytes, SHA-256 \(SHA256.hash(data: Data(notices.text.utf8)).map { String(format: "%02x", $0) }.joined())")
 
     _ = NSApplication.shared
     NSApp.setActivationPolicy(.prohibited)

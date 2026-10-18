@@ -4,7 +4,8 @@ import SwiftUI
 import AppKit
 #endif
 
-/// The reviewed snapshot that apple/scripts/build-macos-notices.py writes from the locked inputs.
+/// The reviewed snapshot that apple/scripts/build-macos-notices.py writes from the locked inputs, followed by the
+/// bundled 3D viewer's own notices file, read from the app's copy (`Ddl3DViewerNotices`; never in the snapshot).
 /// Identical license texts are stored once and referenced by key.
 struct ThirdPartyNotices: Decodable, Sendable {
     struct LicenseText: Decodable, Sendable {
@@ -28,8 +29,16 @@ struct ThirdPartyNotices: Decodable, Sendable {
 
     static func bundled() -> ThirdPartyNotices? {
         guard let url = Bundle.module.url(forResource: "third-party-notices", withExtension: "json"),
-              let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode(ThirdPartyNotices.self, from: data)
+              let data = try? Data(contentsOf: url),
+              let snapshot = try? JSONDecoder().decode(ThirdPartyNotices.self, from: data) else { return nil }
+        // An app built without the viewer's copy (a plain `swift build`) ships none of it, so it lists no 3D entry.
+        guard let registration = Ddl3DInstallation.registered,
+              let viewer = Ddl3DViewerNotices(registration: registration) else { return snapshot }
+        let key = "ddl3d/\(viewer.build)"
+        let component = Component(group: "ddl3d", name: Ddl3DViewerNotices.name, version: viewer.build, license: viewer.license,
+                                  source: Ddl3DViewerNotices.source, note: viewer.note,
+                                  texts: [LicenseText(label: "THIRD_PARTY_NOTICES.txt", text: key)])
+        return ThirdPartyNotices(components: snapshot.components + [component], texts: snapshot.texts.merging([key: viewer.text]) { $1 })
     }
 
     func body(of component: Component) -> String {
@@ -134,7 +143,7 @@ struct ThirdPartyNoticesView: View {
         case "rust": display.localized("Rustクレート")
         case "native": display.localized("ネイティブライブラリ")
         case "resources": display.localized("同梱の辞書とフォント")
-        // The bundled 3D viewer's own notices file (apple/scripts/build-macos-notices.py).
+        // The bundled 3D viewer's own notices file, read from the app's copy (Ddl3DViewerNotices).
         case "ddl3d": display.webCopy("ddl3dTitle", "3D表示（実験）")
         default: "inku"
         }

@@ -55,6 +55,51 @@ public enum Ddl3DInstallation {
     }
 }
 
+/// The viewer's own notices file, which its build writes (`experiments/ddl-3d`), and the entry the license list in
+/// About inku shows for it. It is read from the copy when the list opens and is not in the reviewed notices snapshot,
+/// so a new Web registration changes no committed file. `apple/scripts/build-macos-notices.py` (`ddl3d_viewer`)
+/// derives the same entry for the Release attachment.
+public struct Ddl3DViewerNotices: Equatable, Sendable {
+    public static let name = "inku DDL 3D viewer (experiment)"
+    public static let source = "https://github.com/oikawas/inku-lang"
+    private static let heading = try! NSRegularExpression(pattern: #"^===== (.+?) \((.+)\) / .+ =====$"#, options: .anchorsMatchLines)
+    private static let identifier = try! NSRegularExpression(pattern: #"[A-Za-z0-9.\-]+"#)
+
+    public let build: String
+    /// Every license its headings name, with the viewer's own MIT, sorted and joined.
+    public let license: String
+    /// How many components its headings (`===== <name> (<license>) / <file> =====`) name.
+    public let componentCount: Int
+    /// The whole file, `\r\n` read as `\n` and the outer white space trimmed to one final line end, as in the snapshot.
+    public let text: String
+
+    public var note: String {
+        "Built from experiments/ddl-3d in this repository and bundled unchanged from web/static/experimental/ddl-3d/\(build)/ "
+            + "(its own notices file, covering the viewer and the \(componentCount) components its build collected)."
+    }
+
+    /// Nil when the copy carries no readable `THIRD_PARTY_NOTICES.txt`.
+    public init?(registration: Ddl3DInstallation.Registered) {
+        guard let data = try? Data(contentsOf: registration.directory.appendingPathComponent("THIRD_PARTY_NOTICES.txt")) else { return nil }
+        let text = String(decoding: data, as: UTF8.self).replacingOccurrences(of: "\r\n", with: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines) + "\n"
+        let whole = text as NSString
+        var names = Set<String>(), identifiers: Set<String> = ["MIT"]
+        for heading in Self.heading.matches(in: text, range: NSRange(location: 0, length: whole.length)) {
+            names.insert(whole.substring(with: heading.range(at: 1)))
+            let expression = whole.substring(with: heading.range(at: 2)) as NSString
+            for token in Self.identifier.matches(in: expression as String, range: NSRange(location: 0, length: expression.length)) {
+                let identifier = expression.substring(with: token.range)
+                if !["AND", "OR", "WITH"].contains(identifier) { identifiers.insert(identifier) }
+            }
+        }
+        build = registration.build
+        license = identifiers.sorted().joined(separator: ", ")
+        componentCount = names.count
+        self.text = text
+    }
+}
+
 /// A snapshot the viewer cannot take, named like the Web's (`input_budget_exceeded`).
 public struct Ddl3DInputError: Error, Equatable, Sendable {
     public let reason: String

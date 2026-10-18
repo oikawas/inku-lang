@@ -8,6 +8,11 @@ inku-pipeline-uniffi with its `display` feature (as apple/scripts/build-core.sh
 builds it) on both Apple targets (registry, git, path and vendored), including
 proc-macro crates; build-script-only dependencies are not shipped. The native
 libraries are Skia and the third-party code compiled into its prebuilt binaries.
+
+The bundled 3D viewer's own notices file is not in the snapshot: the app reads it
+from its build-time copy of the viewer, so a new Web registration changes no
+committed file. --text adds it, read from the Web's registered build, to the
+Release attachment.
 """
 
 from __future__ import annotations
@@ -34,8 +39,9 @@ TARGETS = ("aarch64-apple-darwin", "x86_64-apple-darwin")
 METER_MANIFEST = APPLE / "scripts/description-meter-resources.json"
 METER_RESOURCES = APPLE / "Packages/InkuHost/Sources/InkuHost/Resources/description-meter"
 FONT_RESOURCES = APPLE / "Packages/InkuExport/Sources/InkuExport/Resources"
-# The Web's 3D viewer as the app bundles it (apple/scripts/sync-ddl3d-viewer.py).
-DDL3D_RESOURCES = APPLE / "Sources/InkuUI/Resources/ddl3d"
+# The Web's registered 3D viewer, which the app build copies unchanged (apple/scripts/sync-ddl3d-viewer.py).
+DDL3D_REGISTRATION = ROOT / "web/src/lib/features/experimental-3d/installation.json"
+DDL3D_BUILDS = ROOT / "web/static/experimental/ddl-3d"
 DDL3D_VIEWER_URL = re.compile(r"^/experimental/ddl-3d/([a-zA-Z0-9][a-zA-Z0-9._-]{0,63})/index\.html$")
 DDL3D_HEADER = re.compile(r"^===== (.+?) \((.+)\) / .+ =====$", re.MULTILINE)
 SWIFT_CHECKOUTS = (APPLE / "build/macOS/SourcePackages/checkouts", APPLE / ".build/checkouts")
@@ -282,15 +288,20 @@ def bundled_resources(notices: Notices) -> None:
 
 
 def ddl3d_viewer(notices: Notices) -> None:
-    """The bundled 3D viewer carries its own notices file, written by its build; it is shown whole."""
-    viewer_url = json.loads((DDL3D_RESOURCES / "installation.json").read_text(encoding="utf-8")).get("viewerUrl")
+    """The 3D viewer carries its own notices file, written by its build; it is shown whole.
+
+    Only the Release attachment adds it here. The app derives the same entry from its copy
+    (Ddl3DViewerNotices in apple/Sources/InkuUI/Ddl3D.swift), which the release script compares
+    with this registration file by file before writing the attachment.
+    """
+    viewer_url = json.loads(DDL3D_REGISTRATION.read_text(encoding="utf-8")).get("viewerUrl")
     if viewer_url == "":
         return
     match = DDL3D_VIEWER_URL.match(viewer_url) if isinstance(viewer_url, str) else None
     if not match:
-        raise NoticeError(f"the bundled 3D viewer registration names no versioned build: {viewer_url!r}")
+        raise NoticeError(f"the Web's 3D viewer registration names no versioned build: {viewer_url!r}")
     build = match[1]
-    body = read_text(DDL3D_RESOURCES / build / "THIRD_PARTY_NOTICES.txt")
+    body = read_text(DDL3D_BUILDS / build / "THIRD_PARTY_NOTICES.txt")
     headers = DDL3D_HEADER.findall(body)
     if not headers:
         raise NoticeError(f"the 3D viewer {build} notices name no component")
@@ -314,7 +325,6 @@ def build() -> dict:
     rust_crates(notices, sysroot)
     native_libraries(notices)
     bundled_resources(notices)
-    ddl3d_viewer(notices)
     return {"schema": "inku.macos-third-party-notices.v1",
             "inputs": {"core/Cargo.lock": hashlib.sha256((ROOT / "core/Cargo.lock").read_bytes()).hexdigest(),
                        "apple/Package.resolved": hashlib.sha256((APPLE / "Package.resolved").read_bytes()).hexdigest()},
@@ -322,30 +332,35 @@ def build() -> dict:
 
 
 def write_text(path: Path) -> int:
-    """Render the committed snapshot, exactly as the app shows it, as one plain-text Release attachment."""
+    """Render the committed snapshot and the 3D viewer's notices, exactly as the app shows them, as one
+    plain-text Release attachment."""
     notices = json.loads(OUTPUT.read_text(encoding="utf-8"))
+    viewer = Notices()
+    ddl3d_viewer(viewer)
+    components, texts = notices["components"] + viewer.components, {**notices["texts"], **viewer.texts}
     lines = ["Third-party notices for the inku macOS application", ""]
-    for component in notices["components"]:
+    for component in components:
         version = f" {component['version']}" if component["version"] else ""
         lines += ["=" * 72, f"{component['name']}{version} ({component['license']})", component["source"]]
         if component.get("note"):
             lines.append(component["note"])
         for text in component["texts"]:
-            lines += ["", f"--- {text['label']} ---", notices["texts"][text["text"]].rstrip("\n")]
+            lines += ["", f"--- {text['label']} ---", texts[text["text"]].rstrip("\n")]
         lines.append("")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"Wrote {path} ({len(notices['components'])} components)")
+    print(f"Wrote {path} ({len(components)} components)")
     return 0
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--check", action="store_true", help="Fail when the committed snapshot differs")
-    parser.add_argument("--text", type=Path, help="Write the committed snapshot as plain text to this path")
+    parser.add_argument("--text", type=Path,
+                        help="Write the committed snapshot and the 3D viewer's notices as plain text to this path")
     arguments = parser.parse_args()
-    if arguments.text:
-        return write_text(arguments.text)
     try:
+        if arguments.text:
+            return write_text(arguments.text)
         notices = build()
         rendered = json.dumps(notices, ensure_ascii=False, indent=1) + "\n"
     except (NoticeError, OSError, KeyError, ValueError) as error:

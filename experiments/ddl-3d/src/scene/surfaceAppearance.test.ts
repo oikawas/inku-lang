@@ -50,13 +50,14 @@ const mesh = (performedIndex: number, sourceIndex = 0): MeshPacket => ({
   primitive: 'line', role: 'object', layerIndex: 0, layerZ: 0,
 });
 
-// Failure: lines in a layer share Z, or a dense layer crosses its neighbours.
-test('later objects recede within a bounded source layer', () => {
+// Failure: copies still occupy an imperceptibly thin plane.
+test('individual objects share the full range without crossing source layers', () => {
   const objects = Array.from({ length: 100 }, (_, i) => mesh(i));
   objects.push(mesh(100, 1));
   assert.equal(assignLayers(objects, [1, 1]), 2);
   assert.ok(objects.slice(1, 100).every((m, i) => m.layerZ < objects[i].layerZ));
-  assert.ok(objects[0].layerZ - objects[99].layerZ <= 0.020000001);
+  assert.ok(objects[0].layerZ - objects[99].layerZ > 0.79);
+  assert.ok(objects[100].layerZ > objects[0].layerZ);
   assert.equal(objects[100].layerZ, 0.4);
 });
 

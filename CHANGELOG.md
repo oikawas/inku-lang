@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-18 — Individual 3D depth with connected straight lines
+
+Copies of one instruction now receive individual depths across a visible range instead of a tiny stagger. Straight lines share depth at their joints, including inserted vertices for interior branches, and interpolate depth between joints. Endpoints touching another shape follow that shape's depth. Layer depth scales layers, individual objects and joints together, returning them to one plane at 0. Changing Solid thickness preserves the joints. The change stays within the independent viewer; saved Scores and normal 2D rendering are unchanged.
+
 ### 2026-10-18 — macOS: open the Library at the shown work, and open works with a double click
 
 This follows the Web's 2026-10-17 change.

@@ -28,6 +28,7 @@ export interface MeshPacket {
   primitive: string; role: 'object' | 'pair-fill'; relatedSourceIndex?: number;
   relatedPerformedIndex?: number; relatedInstanceIndex?: number; filled?: boolean;
   layerIndex: number; layerZ: number;
+  depthPath?: { points: XY[]; depths: number[] };
   appearance?: PaintAppearance;
 }
 export interface ScenePacket {

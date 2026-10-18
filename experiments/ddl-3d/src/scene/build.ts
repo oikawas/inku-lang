@@ -6,6 +6,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Brush, Evaluator, INTERSECTION } from 'three-bvh-csg';
 import type { XY, GeometryMark, PreparedScene, MeshPacket, ScenePacket } from './types.ts';
 import { assignLayers } from './layers.ts';
+import { lineDepthLayout } from './lineDepth.ts';
 
 const MAX_TRIANGLES = 500_000;
 const MAX_BYTES = 128 * 1024 * 1024;
@@ -292,6 +293,7 @@ export function buildScene(input: PreparedScene): ScenePacket {
     output.bytes += scene.presenceSvg.length * 2;
   }
   const roundCount = scene.marks.filter(m => m.appearance && m.shape.kind === 'round').length;
+  const lineDepth = lineDepthLayout(scene.marks, scene.canvas);
   if (scene.marks.some(m => m.appearance && m.shape.kind === 'round' && roundSegments(m, roundCount) < 96)) output.diagnostics.push('round_detail_adapted');
   const append = (geometry: BufferGeometry, mark: GeometryMark, role: MeshPacket['role']) => {
     try {
@@ -321,12 +323,13 @@ export function buildScene(input: PreparedScene): ScenePacket {
   };
   for (const mark of scene.marks) {
     if (!/^#[0-9a-f]{6}$/i.test(mark.color) || !Number.isFinite(mark.opacity) || mark.opacity < 0 || mark.opacity > 1) throw new Error('invalid_material');
-    append(world(localGeometry(mark, roundCount), mark.transform, scene.canvas), mark, 'object');
+    append(world(localGeometry(lineDepth.mark(mark), roundCount), mark.transform, scene.canvas), mark, 'object');
     if (mark.pairFill) append(world(prism(mark.pairFill.points), [1, 0, 0, 1, 0, 0], scene.canvas),
       { ...mark, color: mark.pairFill.color, opacity: mark.pairFill.opacity }, 'pair-fill');
   }
   if (!output.meshes.length && !scene.ground && !output.presenceSvg) throw new Error('no_visible_geometry');
   output.layerCount = assignLayers(output.meshes, scene.canvas);
+  lineDepth.assign(output.meshes);
   return output;
 }
 

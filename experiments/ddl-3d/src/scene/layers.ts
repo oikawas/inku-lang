@@ -37,15 +37,16 @@ export function assignLayers(meshes: MeshPacket[], canvas: XY): number {
     const unit = unitRoot(key(mesh));
     if (!layer.has(unit)) layer.set(unit, layer.size);
   }
-  // Later objects recede by at most one source pixel per step. A dense layer
-  // cannot use more than 2% of the canvas or a quarter of the layer gap.
+  // Divide the full depth range between individual objects, including copies.
+  // Keep source layers ordered and reverse the order within each layer.
   const shortSide = Math.min(...canvas), span = shortSide * 0.8;
-  const gap = ranks.size > 1 ? span / (ranks.size - 1) : span;
+  const starts = new Map<number, number>();
+  let count = 0;
+  for (const [index, layer] of members) { starts.set(index, count); count += layer.size; }
   for (const mesh of meshes) {
     const layer = members.get(mesh.layerIndex)!;
-    const step = Math.min(shortSide * 0.001, Math.min(shortSide * 0.02, gap / 4) / Math.max(1, layer.size - 1));
-    const base = ranks.size > 1 ? (mesh.layerIndex / (ranks.size - 1) - 0.5) * span : 0;
-    mesh.layerZ = base - layer.get(unitRoot(key(mesh)))! * step;
+    const index = starts.get(mesh.layerIndex)! + layer.size - 1 - layer.get(unitRoot(key(mesh)))!;
+    mesh.layerZ = count > 1 ? (index / (count - 1) - 0.5) * span : 0;
   }
   return ranks.size;
 }

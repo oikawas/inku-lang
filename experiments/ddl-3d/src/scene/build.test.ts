@@ -26,13 +26,13 @@ test('paint layers keep copies together and place later layers toward positive Z
   const packet = buildScene(input);
   assert.equal(packet.layerCount, 2);
   assert.deepEqual(packet.meshes.map(m => m.layerIndex), [0, 0, 1]);
-  assert.deepEqual(packet.meshes.map(m => m.layerZ), [-0.4, -0.401, 0.4]);
+  assert.deepEqual(packet.meshes.map(m => m.layerZ), [0, -0.4, 0.4]);
   assert.deepEqual(input, original);
   // Paint order, rather than the numeric source ID, determines front/back.
   input.scene.marks.reverse();
   const reversed = buildScene(input);
   assert.deepEqual(reversed.meshes.map(m => m.sourceIndex), [1, 0, 0]);
-  assert.deepEqual(reversed.meshes.map(m => m.layerZ), [-0.4, 0.4, 0.399]);
+  assert.deepEqual(reversed.meshes.map(m => m.layerZ), [-0.4, 0.4, 0]);
   input.scene.marks = [input.scene.marks[0]];
   assert.equal(buildScene(input).meshes[0].layerZ, 0);
 });

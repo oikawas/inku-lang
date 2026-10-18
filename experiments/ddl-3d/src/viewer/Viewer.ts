@@ -8,6 +8,7 @@ import { skyTexture, type Background } from './background';
 import { frontView } from './frontView';
 import { preparePaintAppearance, type PaintAppearanceResources } from './circleAppearance';
 import { preparePresence } from './presence';
+import { objectDepth } from './objectDepth';
 
 type Projection = ViewState['projection'];
 export class Viewer {
@@ -29,6 +30,7 @@ export class Viewer {
   private appearances = new Map<THREE.Mesh, PaintAppearanceResources>();
   private presence: Awaited<ReturnType<typeof preparePresence>> | null = null;
   private meshPackets = new Map<THREE.Mesh, MeshPacket>();
+  private objectDepths = new Map<THREE.Mesh, ReturnType<typeof objectDepth>>();
   private selection = new THREE.BoxHelper(new THREE.Object3D(), 0x338bff);
   private resize: ResizeObserver;
   private events = new AbortController();
@@ -69,7 +71,7 @@ export class Viewer {
     this.model.name = 'DDL solids';
     this.model.userData = { inputDigest: packet.inputDigest, mappingVersion: packet.mappingVersion,
       schemaDigest: packet.schemaDigest, engineVersion: packet.engineVersion, diagnostics: packet.diagnostics, recoveries: packet.recoveries,
-      layerMapping: 'paint-order-stagger-v2', layerCount: packet.layerCount, layerSpacing: this.layerSpacing };
+      layerMapping: 'paint-order-joints-v3', layerCount: packet.layerCount, layerSpacing: this.layerSpacing };
     const groups = new Map<number, THREE.Group>();
     for (const data of packet.meshes) {
       const mesh = new THREE.Mesh(unpackMesh(data), this.material(data.color, data.opacity));
@@ -77,7 +79,7 @@ export class Viewer {
       mesh.name = `${data.primitive}-${data.sourceIndex}-${data.performedIndex}-${data.instanceIndex}-${data.role}`;
       mesh.userData = { sourceIndex: data.sourceIndex, performedIndex: data.performedIndex, instanceIndex: data.instanceIndex,
         primitive: data.primitive, role: data.role, relatedSourceIndex: data.relatedSourceIndex,
-        layerIndex: data.layerIndex, layerZ: data.layerZ };
+        layerIndex: data.layerIndex, layerZ: data.layerZ, depthPath: data.depthPath };
       mesh.position.z = data.layerZ;
       let group = groups.get(data.sourceIndex);
       if (!group) { group = new THREE.Group(); group.name = `instruction-${data.sourceIndex}`; groups.set(data.sourceIndex, group); this.model.add(group); }
@@ -134,7 +136,10 @@ export class Viewer {
         else this.appearances.set(mesh, resource);
       }
     }));
-    if (!this.disposed) { this.placeSupport(); this.requestDraw(); }
+    if (!this.disposed) {
+      for (const [mesh, packet] of this.meshPackets) this.objectDepths.set(mesh, objectDepth(mesh, packet));
+      this.updateObjectDepths(); this.placeSupport(); this.requestDraw();
+    }
   }
 
   private controlChanged = () => {
@@ -261,14 +266,17 @@ export class Viewer {
 
   setDepth(depth: number) {
     this.depth = Math.max(0.1, Math.min(3, depth));
-    this.model.traverse(object => { if (object instanceof THREE.Mesh) object.scale.z = this.depth; });
+    this.updateObjectDepths();
     this.placeSupport(); if (this.selected) this.selection.setFromObject(this.selected); this.controlChanged();
   }
   setLayerSpacing(spacing: number) {
     this.layerSpacing = Math.max(0, Math.min(3, spacing));
     this.model.userData.layerSpacing = this.layerSpacing;
-    this.model.traverse(object => { if (object instanceof THREE.Mesh) object.position.z = object.userData.layerZ * this.layerSpacing; });
+    this.updateObjectDepths();
     this.placeSupport(); if (this.selected) this.selection.setFromObject(this.selected); this.controlChanged();
+  }
+  private updateObjectDepths() {
+    for (const update of this.objectDepths.values()) update(this.depth, this.layerSpacing);
   }
   private placeSupport() {
     const box = new THREE.Box3().setFromObject(this.model);

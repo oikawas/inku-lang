@@ -31,6 +31,26 @@ public struct LibraryFocusRequest: Equatable, Sendable {
     public let visit: Int
 }
 
+/// Web `libraryPagePosition` (libraryPagePosition.ts, Build 1265): where a page sits among all of them, counted from the
+/// newest. The library can begin its pages at the opened work (`startOffset`) and pages on from there; counting from
+/// that start said 1 at the opened work and added a page to the total for each step towards the newest. The pages in
+/// front of the start are the presses of ← newer it takes to reach the newest, so they come first in the number and in
+/// the total. Both pagers (timeline and lineage) print it.
+public struct LibraryPagePosition: Equatable, Sendable {
+    public let current: Int
+    public let total: Int
+
+    public init(startOffset: Int, page: Int, pageSize: Int, total: Int) {
+        let size = max(1, pageSize)
+        let before = Self.pages(max(0, startOffset), size)
+        current = before + page + 1
+        self.total = before + max(1, Self.pages(total - startOffset, size))
+    }
+
+    /// `Math.ceil(count / size)` for a positive size; nothing to count is no page.
+    private static func pages(_ count: Int, _ size: Int) -> Int { count <= 0 ? 0 : (count + size - 1) / size }
+}
+
 /// Where the timeline was while a lineage view is shown: the Web manager's page and start are apart from the lineage
 /// list's, so leaving the lineage view finds the timeline where it was.
 private struct LibraryTimelinePlace {
@@ -209,6 +229,11 @@ public final class LibraryModel {
     }
 
     public var pageCount: Int { max(1, (total - startOffset + pageSize - 1) / pageSize) }
+    /// What the pager prints: the shown page and the number of pages, counted from the newest. `page` and `pageCount`
+    /// still count from the start.
+    public var pagePosition: LibraryPagePosition {
+        LibraryPagePosition(startOffset: startOffset, page: page, pageSize: pageSize, total: total)
+    }
     public var shownFrom: Int { total == 0 ? 0 : startOffset + page * pageSize + 1 }
     public var shownTo: Int { min(total, startOffset + (page + 1) * pageSize) }
     /// ← newer and Latest: an earlier page, or newer works before the kept first work.

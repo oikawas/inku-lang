@@ -927,7 +927,9 @@ private struct LibraryPager: View {
                 .buttonStyle(LibraryGhostButtonStyle(minWidth: 74))
                 .disabled(!library.hasNewer || library.loading)
                 .inkuTooltip(display.tooltip("前のページ", serverKey: "tooltipHistoryNewerPage"), placement: .bottom)
-            Text(library.loading ? display.webCopy("historyLoading", fallback: "読み込み中") : "\(library.page + 1) / \(library.pageCount)")
+            // Web 72cc0ca77: counted from the newest, the pages before the opened work included.
+            Text(library.loading ? display.webCopy("historyLoading", fallback: "読み込み中")
+                 : "\(library.pagePosition.current) / \(library.pagePosition.total)")
                 .inkuFont(12).monospacedDigit().foregroundStyle(.secondary).fixedSize()
             Button(display.webCopy("historyOlder", fallback: "古い →")) { Task { await library.setPage(library.page + 1) } }
                 .buttonStyle(LibraryGhostButtonStyle(minWidth: 74))

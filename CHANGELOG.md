@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-18 — Type a Library page number to go to it, and draw the Library search like the strip's
-
-The Library's page number (timeline and by lineage) is now a field: type a number and press Enter to go to that page. Out-of-range numbers land on the first or last page, and Escape puts the number back without closing the Library. The Library search field now has the history strip search's box, type size and clear button, and its outside label became placeholder text (description, hash or work ID). What it matches is unchanged.
-
 ### 2026-10-18 — Remove the unreachable photo picker, input-source chooser and overwrite question from the Android camera
 
 The 2026-09-30 SPEC made the camera capture the only image input and took the Photo Picker and the input-source dialog off the screen; this removes what was left behind. That is the photo picker result handler, launch request and launch failure in `InkuViewModel`, the input-source choice and its cancel, the pre-capture overwrite question and its dialog, the capture states `ChoosingSource`, `PickingPhoto` and `AwaitingOverwriteConfirmation`, the `PhotoPickerUnavailable` failure, the selected-image cache `SelectedImageFileStore`, and seven strings that nothing used any more. None of it was reachable from the screen, so nothing the author does changes: the camera still goes straight to the capture. Works made earlier from a picked photo keep their provenance (`photo_picker`, shown as "Existing photo").
@@ -93,6 +89,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.188 (2026-10-18 / Build 1264)
+
+### 2026-10-18 — Type a Library page number to go to it, and draw the Library search like the strip's
+
+The Library's page number (timeline and by lineage) is now a field: type a number and press Enter to go to that page. Out-of-range numbers land on the first or last page, and Escape puts the number back without closing the Library. The Library search field now has the history strip search's box, type size and clear button, and its outside label became placeholder text (description, hash or work ID). What it matches is unchanged.
 
 ## v2.15.187 (2026-10-18 / Build 1263)
 

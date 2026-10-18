@@ -4828,6 +4828,7 @@ private fun VersionInfoRow(label: String, value: String) {
 internal fun ChatGptSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val plan = state.chatGptPlan
+    var signOutTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
     Column(
         modifier = modifier.testTag("ChatGPTPlanSettings").verticalScroll(rememberScrollState()).padding(horizontal = Dimens.spaceXs),
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
@@ -4843,7 +4844,9 @@ internal fun ChatGptSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, 
                         WrapRow {
                             SecondarySmallButton(S.chatGptReauthenticate, onClick = { viewModel.authorizeChatGpt(profile.id) }, enabled = !plan.pending)
                             if (!profile.planAllowed) SecondarySmallButton(S.chatGptEnablePlan, onClick = { viewModel.authorizeChatGpt(profile.id, consent = true) }, enabled = !plan.pending)
-                            SecondarySmallButton(S.chatGptSignOut, onClick = { viewModel.signOutChatGpt(profile.id) }, enabled = !plan.pending)
+                            // Asked first, as deleting an API key is: signing out
+                            // takes a new authorization to undo.
+                            SecondarySmallButton(S.chatGptSignOut, onClick = { signOutTarget = profile.id to profile.label }, enabled = !plan.pending)
                         }
                     }
                 }
@@ -4860,6 +4863,20 @@ internal fun ChatGptSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, 
             state.message?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
             if (plan.revocationUnconfirmed) Text(S.chatGptRevocationUnconfirmed, style = MaterialTheme.typography.bodyMedium)
         }
+    }
+    signOutTarget?.let { (profileId, label) ->
+        AlertDialog(
+            onDismissRequest = { signOutTarget = null },
+            title = { Text(S.chatGptSignOut) },
+            text = { Text(S.chatGptSignOutBody(label)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    signOutTarget = null
+                    viewModel.signOutChatGpt(profileId)
+                }) { Text(S.chatGptSignOut) }
+            },
+            dismissButton = { TextButton(onClick = { signOutTarget = null }) { Text(S.cancel) } },
+        )
     }
 }
 

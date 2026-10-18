@@ -69,4 +69,24 @@ class NavigationReviewWiringTest {
         val resume = body("private fun continuePipeline", "fun declinePipelinePatch()")
         assertTrue(resume.contains("takeIf { view.executionId == cameraPipelineExecutionId }"))
     }
+
+    @Test
+    fun theCameraRefusesAChatGptModelBeforeTheShutter() {
+        val start = body("private fun startCameraCapture()", "mutableCameraCaptureRequests.emit(")
+        val refuse = start.indexOf("strings().cameraChatGptCannotReadPhoto")
+        assertTrue(refuse >= 0)
+        assertTrue(refuse < start.indexOf("CameraCaptureState.Capturing"))
+    }
+
+    @Test
+    fun changeDescriptionOpensAnEditableDescription() {
+        assertTrue(body("fun editWorkDescription", "fun editWorkInstructions").contains("descriptionForkRequested = true"))
+    }
+
+    @Test
+    fun aStoppedChatGptCallIsACancellationNotATransportFailure() {
+        val manager = projectFile("app/src/main/java/app/inku/mobile/llm/ChatGptPlanManager.kt").readText()
+        val generate = manager.substring(manager.indexOf("override suspend fun generate"), manager.indexOf("private fun reportFailure"))
+        assertTrue(generate.indexOf("if (!currentCoroutineContext().isActive) throw CancellationException") < generate.indexOf("reportFailure(ref, safe.code)"))
+    }
 }

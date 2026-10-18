@@ -24,6 +24,11 @@ Fixes for the navigation gaps a code and on-device review found.
 - Back from the trash view returns to the works. Moving the full-screen work to the trash removes its refinement entry at once.
 - Closing the keyboard lets go of the description field's focus, which brings the bottom bar back.
 - Revise and New work under a result are disabled while a drawing runs.
+- When the selected model is a ChatGPT plan model, the camera stops before the capture with "Not ready to capture" and a pointer to choose a model that can read a photo (the plan is not a camera Vision candidate); it used to fail right after the shutter with no reason. A readiness failure before the capture is no longer titled "Image processing failed".
+- Entering another work's lineage or refinement again from Works (the list or its full screen) makes back return to that screen; the studio draft kept is still the one from before the first work.
+- A work entered through Change description can be edited and drawn from its description even when its DDL leads (a refinement child, an edited DDL). Paint on a locked description says why instead of doing nothing.
+- The ChatGPT connection a stopped drawing cuts is no longer recorded as a ChatGPT transport failure.
+- Signing out of the ChatGPT plan asks first.
 
 ## 2026-10-17 ChatGPT plan failure classes and model list in the shared core
 

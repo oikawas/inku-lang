@@ -383,6 +383,8 @@ object InkuStringsEn : InkuStrings {
     override val drawFromDdl = "Draw from instructions"
     override val ddlOverwriteTitle = "The edited instructions will be lost"
     override val ddlOverwriteRedraw = "Redraw from the description"
+    override fun chatGptSignOutBody(label: String) = "Sign \"$label\" out of the ChatGPT plan. Using it again takes a new authorization."
+    override val cameraChatGptCannotReadPhoto = "ChatGPT plan models cannot read a photo. Choose one that can under Model on the studio."
     override val pipelineProposalNotAnswered = "Stopped: a proposed DDL change needed approval."
     override val ddlEdit = "DDL edit"
     override val mascotSubtitle = "Incu (cube) or Yuragi (crab)"

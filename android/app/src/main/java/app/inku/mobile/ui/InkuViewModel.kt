@@ -830,6 +830,19 @@ class InkuViewModel @JvmOverloads constructor(
                 val cameraProviders = providerSettings.first()
                 val cameraAssets = modelAssets.first()
                 val visionModelId = snapshot.selectedModelId
+                // The ChatGPT plan does not read the photo (SPEC 2026-10-17: not a
+                // camera Vision candidate). The shared model selection can still
+                // hold one, and the capture used to fail right after the shutter
+                // with no reason given.
+                if (visionModelId.startsWith("chatgpt:")) {
+                    if (serial == cameraRunSerial) {
+                        localState.value = localState.value.copy(
+                            cameraCaptureState = CameraCaptureState.Failed(CameraFailure.ModelNotReady),
+                            message = strings().cameraChatGptCannotReadPhoto,
+                        )
+                    }
+                    return@launch
+                }
                 modelReadinessIssue(visionModelId, cameraProviders, cameraAssets)?.let { issue ->
                     if (serial == cameraRunSerial) {
                         localState.value = localState.value.copy(
@@ -1691,7 +1704,21 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = current.copy(workActionsTarget = null, canvasPresentationMode = false, presentationHistory = null, presentationSequence = emptyList())
             return
         }
-        if (authoringReturnState == null) authoringReturnState = current.copy(workActionsTarget = null)
+        val returnTo = authoringReturnState
+        authoringReturnState = when {
+            returnTo == null -> current.copy(workActionsTarget = null)
+            // Entered again from Works -- its list or its full screen -- after
+            // the bottom bar left an earlier work's context. Back goes to where
+            // this entry was made; the draft kept is still the one from before
+            // the first work. Kept whole, back went to the first work's viewer.
+            current.tab == AppTab.History || current.presentationHistory != null -> returnTo.copy(
+                tab = current.tab,
+                canvasPresentationMode = current.canvasPresentationMode,
+                presentationHistory = current.presentationHistory,
+                presentationSequence = current.presentationSequence,
+            )
+            else -> returnTo
+        }
         val paused = pausedWorkState?.takeIf { it.workContextId == item.id }
         if (paused != null) {
             localState.value = current.restoreAuthoring(paused)
@@ -1711,7 +1738,14 @@ class InkuViewModel @JvmOverloads constructor(
     fun editWorkDescription(item: HistoryItemEntity) {
         if (state.value.isRunning) return
         enterWorkContext(item)
-        localState.value = localState.value.copy(tab = AppTab.Compose, descriptionEditing = true, composeMode = ComposeMode.Write)
+        localState.value = localState.value.copy(
+            tab = AppTab.Compose, descriptionEditing = true, composeMode = ComposeMode.Write,
+            // 「記述を変える」 is the request to draw from a changed description.
+            // A work led by its DDL (a 推敲 child, an edited DDL) otherwise
+            // opened with the field locked and 描画する doing nothing, until
+            // 「記述から新しい作品を作る」 was found and pressed.
+            descriptionForkRequested = true,
+        )
     }
 
     fun editWorkInstructions(item: HistoryItemEntity) {
@@ -2647,7 +2681,11 @@ class InkuViewModel @JvmOverloads constructor(
 
     private fun runSubmit(current: InkuUiState, cameraProvenance: CameraInputProvenance? = null, sketchRedraw: Boolean = false, suppliedSketchText: String? = null) {
         if (current.autonomousStatus.busy || current.replayBusy || current.replaySaving) return
-        if (current.descriptionLocked && !current.historyAuthorityLoading) return
+        if (current.descriptionLocked && !current.historyAuthorityLoading) {
+            // Said rather than ignored: the button looks the same either way.
+            localState.value = current.copy(message = strings().pipelineDdlAuthority)
+            return
+        }
         if (current.prompt.isBlank()) {
             localState.value = current.copy(message = strings().promptEmpty)
             return

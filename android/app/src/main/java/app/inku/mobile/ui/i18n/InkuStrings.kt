@@ -249,6 +249,8 @@ interface InkuStrings {
     val drawFromDdl: String
     val ddlOverwriteTitle: String
     val ddlOverwriteRedraw: String
+    val cameraChatGptCannotReadPhoto: String
+    fun chatGptSignOutBody(label: String): String
     val pipelineProposalNotAnswered: String
     val ddlEdit: String
     val mascotSubtitle: String

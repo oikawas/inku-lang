@@ -160,8 +160,12 @@ import SwiftUI
                 .buttonStyle(LibraryGhostButtonStyle(minWidth: 92))
                 .disabled(locked || library.page == 0)
                 .inkuTooltip(display.tooltip("前のページ", serverKey: "tooltipHistoryNewerPage"))
-            Text("\(library.page + 1) / \(library.pageCount)")
-                .inkuFont(11).monospacedDigit().foregroundStyle(.tertiary).frame(minWidth: 30)
+            // Web Build 1272 (60dfcf2db): the page is the Library's field. It moves as the arrows here do, and takes
+            // no number while browsing is locked, a read is under way or nothing is listed.
+            LibraryPageField(position: library.pagePosition, display: display, fontSize: 11) { typed in
+                Task { await library.goToTypedPage(typed) }
+            }
+            .disabled(locked || library.loading || library.total == 0)
             Button(display.label("古い\(library.pageSize)件 →", "older \(library.pageSize) →")) { Task { await library.setPage(library.page + 1) } }
                 .buttonStyle(LibraryGhostButtonStyle(minWidth: 92))
                 .disabled(locked || library.page + 1 >= library.pageCount)

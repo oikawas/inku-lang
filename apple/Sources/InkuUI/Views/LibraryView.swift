@@ -955,10 +955,12 @@ private struct LibraryPager: View {
 /// Web `LibraryPageInput` (Build 1266, `0f579f3d8`, `c69ede09f`): the pager's page, counted from the newest, as a field
 /// followed by "/ total". Return goes to the typed page, and leaving the field goes as Return does; Escape puts the page
 /// back without closing the library. A typed text that does not move puts the shown page back into the field.
+/// The history strip uses the same field (Web Build 1272, `60dfcf2db`) at its own type size.
 @MainActor
-private struct LibraryPageField: View {
+struct LibraryPageField: View {
     let position: LibraryPagePosition
     let display: DisplaySettings
+    var fontSize: CGFloat = 12
     let onJump: (String) -> Void
     @Environment(\.inkuTextScale) private var scale
 
@@ -967,13 +969,13 @@ private struct LibraryPageField: View {
         HStack(spacing: 4) {
             input(label: label)
                 .inkuTooltip(display.tooltipValue(label), placement: .bottom)
-            Text("/ \(position.total)").inkuFont(12).monospacedDigit().foregroundStyle(.secondary).fixedSize()
+            Text("/ \(position.total)").inkuFont(fontSize).monospacedDigit().foregroundStyle(.secondary).fixedSize()
         }
     }
 
     @ViewBuilder private func input(label: String) -> some View {
         #if os(macOS)
-        let size = 12 * scale
+        let size = fontSize * scale
         // Web `width: (digits + 1.5)ch`, at least 3ch, and the bezel.
         let digit = ("0" as NSString).size(withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: size, weight: .regular)]).width
         LibraryPageNumberInput(current: position.current, label: label, fontSize: size, onJump: onJump)

@@ -13,7 +13,17 @@
 	// that answers mid-edit does not overwrite it.
 	let draft = $state('');
 	let editing = $state(false);
+	let inputEl: HTMLInputElement;
 	const shown = $derived(editing ? draft : String(current));
+
+	// Put the page shown back into the field itself. Svelte writes `shown` only
+	// when it has changed since its last write, and an Enter or Escape that
+	// lands before the typed value was ever drawn leaves `shown` where it was --
+	// the field would keep the typing (measured on 5173 Build 1264).
+	function restore(): void {
+		editing = false;
+		if (inputEl) inputEl.value = String(current);
+	}
 
 	function begin(event: FocusEvent & { currentTarget: HTMLInputElement }): void {
 		draft = String(current);
@@ -23,13 +33,13 @@
 
 	function commit(): void {
 		if (!editing) return;
-		editing = false;
 		const typed = draft.trim();
 		const page = Number(typed);
-		// Not a number: the page shown stays, as if nothing was typed.
-		if (!typed || !Number.isFinite(page)) return;
 		const target = Math.max(1, Math.min(Math.trunc(page), total));
-		if (target !== current) onJump(target);
+		restore();
+		// Not a number: the page shown stays, as if nothing was typed.
+		if (!typed || !Number.isFinite(page) || target === current) return;
+		onJump(target);
 	}
 
 	function handleKeydown(event: KeyboardEvent & { currentTarget: HTMLInputElement }): void {
@@ -41,7 +51,7 @@
 			// The Library closes on Escape; here it only puts the number back
 			// (the page's own handler steps aside for data-escape-undoes-edit).
 			event.preventDefault();
-			editing = false;
+			restore();
 			event.currentTarget.blur();
 		}
 	}
@@ -49,6 +59,7 @@
 
 <span class="library-page">
 	<input
+		bind:this={inputEl}
 		type="text"
 		inputmode="numeric"
 		autocomplete="off"

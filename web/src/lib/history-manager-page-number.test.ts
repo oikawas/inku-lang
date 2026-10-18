@@ -56,3 +56,11 @@ test('both Library pagers take a typed page, and the search is drawn like the st
 	assert.match(MANAGER, /placeholder=\{t\(\)\.historySearchPlaceholder\}/);
 	assert.match(MANAGER, /\.history-search-input \{[^}]*border-radius: var\(--btn-sm-radius\);/);
 });
+
+test('a page field that does not move puts the page shown back into itself', () => {
+	const field = fs.readFileSync(path.join(here, 'components/LibraryPageInput.svelte'), 'utf8');
+	assert.match(field, /function restore\(\): void \{\s*editing = false;\s*if \(inputEl\) inputEl\.value = String\(current\);\s*\}/);
+	// Both ways out that do not move: Enter on the same or no number, and Escape.
+	assert.match(field, /restore\(\);\s*\/\/ Not a number: the page shown stays/);
+	assert.match(field, /event\.key === 'Escape'\) \{[\s\S]*?restore\(\);/);
+});

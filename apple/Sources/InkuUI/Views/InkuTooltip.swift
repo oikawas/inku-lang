@@ -420,6 +420,7 @@ private struct InkuTooltipModifier: ViewModifier {
     let placement: InkuTooltipPlacement
     let wide: Bool
     let focus: InkuTooltipFocus
-    func body(content: Content) -> some View { content.inkuTooltip(text) }
+    // inkuTooltip applies this modifier, so calling it here would recurse; iOS has no hover bubble.
+    func body(content: Content) -> some View { content.help(text) }
 }
 #endif

@@ -56,18 +56,18 @@ public final class LibraryModel {
     public var grouped = false {
         didSet { if grouped != oldValue { changedPresentation(wasGrouped: oldValue || layout == .lineage) } }
     }
-    /// Set by whoever measures the page (the history strip; tests). The library grid calls `resizePageKeepingFirstWork`
-    /// instead (Web `HistoryManagerState.pageSize`, initially 24). Here a new size starts on the page boundary that
-    /// holds the first work, which the strip's own positions assume.
+    /// Web `HistoryManagerState.pageSize`, initially 24. Set directly by the history strip, by tests and for the lineage
+    /// view's eight groups; a new size here starts on the page boundary that holds the first work, which the strip's own
+    /// positions assume. The library grid's measurements go through `resizePageKeepingFirstWork` instead.
     public var pageSize = 24 {
         didSet {
             let bounded = min(1000, max(1, pageSize))
             if pageSize != bounded { pageSize = bounded; return }
-            // Web `setPageSize` while positioning: the size is recorded and the opening's read places the page.
-            if pageSize != oldValue, !keepingPage, positioning == nil {
+            if pageSize != oldValue, !keepingPage {
                 page = (startOffset + page * oldValue) / pageSize
                 startOffset = 0
-                scheduleRefresh()
+                // While the opening reads the work's place, its own read follows with this size.
+                if positioning == nil { scheduleRefresh() }
             }
         }
     }
@@ -161,7 +161,7 @@ public final class LibraryModel {
     }
 
     public func connect(database: InkuDatabase) async {
-        refreshTask?.cancel()
+        cancelScheduledRefresh()
         self.database = database
         if lineageReader == nil { lineageReader = DatabaseLineageReader(database: database) }
         await refresh()
@@ -170,7 +170,7 @@ public final class LibraryModel {
     /// Restore replaces this actor's SQLite contents, so every derived work snapshot is invalid.
     /// Keep the current filters and presentation preferences while reading the restored database.
     public func resetAfterRestore() async {
-        refreshTask?.cancel()
+        cancelScheduledRefresh()
         refreshTask = nil
         refreshToken = UUID()
         clearSelectedAnnotation()
@@ -256,6 +256,12 @@ public final class LibraryModel {
         scheduleRefresh()
     }
 
+    /// A read made now replaces the pending one, and its lineage reload with it, as before.
+    private func cancelScheduledRefresh() {
+        refreshTask?.cancel()
+        pendingLineageRefresh = false
+    }
+
     /// A pending read that replaces another keeps its lineage reload: a new page size right after a filter change
     /// still reloads the lineage.
     private func scheduleRefresh(refreshLineage: Bool = true) {
@@ -276,7 +282,7 @@ public final class LibraryModel {
     }
 
     public func setPage(_ value: Int) async {
-        refreshTask?.cancel()
+        cancelScheduledRefresh()
         positioning = nil
         // Web `setPage` ends the opening's focus; turning the lineage list's pages does not.
         if !isGrouped, focusRequest != nil { focusRequest = nil }
@@ -304,11 +310,11 @@ public final class LibraryModel {
         keepingPage = true
         pageSize = size
         keepingPage = false
-        // Web `positioning`: the opening's read places the page with this size.
-        guard positioning == nil else { return }
         page = min(page, first / size)
         startOffset = first - page * size
         page = max(0, min(page, pageCount - 1))
+        // Web `positioning`: the opening's read follows with this size, from the work it opens at if it finds it.
+        guard positioning == nil else { return }
         // A timeline listing holds no groups; a pending read after a view or filter change replaces the works anyway.
         let inHand = startOffset + page * size == first && !loading && groups.isEmpty
             && works.count >= min(size, total - first)
@@ -348,8 +354,10 @@ public final class LibraryModel {
                 startOffset = position
             }
         }
-        refreshTask?.cancel()
-        await refresh(refreshLineage: false)
+        // This read replaces one a grouping change scheduled meanwhile, and keeps its lineage reload.
+        let lineage = pendingLineageRefresh
+        cancelScheduledRefresh()
+        await refresh(refreshLineage: lineage)
     }
 
     /// Thumbnails of the page that ← older shows next, read while this one is looked at.

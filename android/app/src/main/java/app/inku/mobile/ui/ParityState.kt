@@ -26,10 +26,12 @@ internal fun failedBatchLines(snapshot: BatchSnapshot, failures: List<BatchFailu
 internal fun batchRetryAllowed(failures: List<BatchFailure>, completedRounds: Int, limit: Int, interrupted: Boolean): Boolean =
     !interrupted && failures.isNotEmpty() && completedRounds < limit.coerceIn(0, 5)
 
-enum class AutonomousRefinementMode { Random, Vision }
-
+/**
+ * Vision is the only method: the random one, which drew each generation's
+ * element by chance, was removed (the author, 2026-10-18). Generations made
+ * with it keep `autonomous_refine_mode: random` and stay readable.
+ */
 data class AutonomousRefinementSettings(
-    val mode: AutonomousRefinementMode = AutonomousRefinementMode.Random,
     val generations: Int = 3,
     val changeColor: Boolean = true,
     val changeLayout: Boolean = true,

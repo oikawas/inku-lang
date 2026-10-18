@@ -42,6 +42,10 @@ The host assigns the iframe URL after DOM attachment, then requests the viewer's
 
 The macOS app bundles the same registered build without committing a copy. Before each app build, `apple/scripts/build-macos.sh` runs `apple/scripts/sync-ddl3d-viewer.py`, which copies it unchanged, with the registration, into `apple/Sources/InkuUI/Resources/ddl3d/` (ignored by Git); after the build it compares the app's copy with the registered directory file by file, as the macOS release check does. The app serves it under the app-only origin `inku-3d://viewer/` behind the same kind of parent page and protocol, and its license list reads `THIRD_PARTY_NOTICES.txt` from that copy. A registration update needs no macOS commit; the next app build carries it. See the [Swift specification](../../apple/SWIFT_SPEC.md).
 
+The Android app does the same at build time: the Gradle task `syncDdl3dViewer` copies the registered build, the registration and the native parent page into generated assets (never committed), and a JVM test compares the copy with the registered directory file by file. It serves them under `https://appassets.androidplatform.net/` from a WebView that reaches nothing else. See the [Android notes](../../android/ANDROID_SPEC.md).
+
+`host/` is the native apps' parent page (`host.html`, `host.js`, `host.css`): the viewer frame, the origin/window/mount/protocol checks and the relay. Only the way to the app differs: Apple's `webkit.messageHandlers.ddl3d` with `window.inku3d.deliver`, or the MessagePort Android hands the main frame (data `inku.ddl3d.native`). Native hosts build the viewer input with the shared core's `ddl3d_snapshot` (`inku-pipeline`), which projects a stored Score and render metadata onto Web's `snapshot()` fields.
+
 ## Viewing and exports
 
 - Drag / one finger: orbit. Right drag or Shift-drag: pan. Wheel or two fingers: zoom. Arrow keys pan, `+`/`-` zoom while the canvas has focus. `F` fits, `R` resets, and `Esc` returns to 2D when embedded.

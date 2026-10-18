@@ -8,6 +8,7 @@ pub mod completion_ranges;
 pub mod composition;
 pub mod composition_reading;
 pub mod core_boundary;
+pub mod ddl3d;
 mod hole_completion;
 pub mod identity;
 pub mod machine;

@@ -224,7 +224,7 @@ internal fun AutonomousRefinementDialog(
     val s = savedWorkParityStrings(language)
     val busy = status.busy
     val canStart = !busy && settings.generations in 1..10 && settings.allowedKinds.isNotEmpty() &&
-        (settings.mode != AutonomousRefinementMode.Vision || models.any { it.id == settings.modelId })
+        models.any { it.id == settings.modelId }
     var modelMenuOpen by remember { mutableStateOf(false) }
     Dialog(
         onDismissRequest = { if (!busy) onDismiss() },
@@ -241,18 +241,11 @@ internal fun AutonomousRefinementDialog(
                     TextButton(onClick = onDismiss, enabled = !busy) { Text(s.close) }
                 }
                 Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Dimens.spaceL)) {
-                    Text(s.method, style = MaterialTheme.typography.titleSmall)
-                    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                        FilterChip(selected = settings.mode == AutonomousRefinementMode.Random,
-                            onClick = { onSettings(settings.copy(mode = AutonomousRefinementMode.Random)) },
-                            enabled = !busy, label = { Text(s.random) })
-                        FilterChip(selected = settings.mode == AutonomousRefinementMode.Vision,
-                            onClick = { onSettings(settings.copy(mode = AutonomousRefinementMode.Vision)) },
-                            enabled = !busy, label = { Text(s.vision) })
-                    }
-                    Text(if (settings.mode == AutonomousRefinementMode.Vision) s.visionHint else s.randomHint,
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (settings.mode == AutonomousRefinementMode.Vision) {
+                    // Vision is the only method (2026-10-18): its model and the
+                    // direction are always asked for.
+                    Text(s.vision, style = MaterialTheme.typography.titleSmall)
+                    Text(s.visionHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    run {
                         Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                             Text(s.visionModel,
                                 style = MaterialTheme.typography.labelMedium)

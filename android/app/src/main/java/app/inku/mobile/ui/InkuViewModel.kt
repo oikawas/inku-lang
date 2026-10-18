@@ -317,6 +317,9 @@ data class InkuUiState(
     val refinementPreviewId: String? = null,
     // Something unsaved is about to be dropped and the author is asked first.
     val discardConfirm: DiscardConfirm? = null,
+    // The work is shown in the experimental 3D view (Web's `viewMode`). Kept in
+    // memory while moving between works and in and out of the full screen.
+    val canvas3d: Boolean = false,
     // 検分 (SPEC :616). The model comparison is a sub-view beside 調整 rather
     // than a screen of its own, and it shares every field above: the
     // candidates, the busy flag, the stop and the save are the refinement's.
@@ -3842,8 +3845,7 @@ class InkuViewModel @JvmOverloads constructor(
         val original = current.autonomousParent ?: return
         val settings = current.autonomousSettings
         if (settings.allowedKinds.isEmpty() || !DdlSource.hasBody(original.normalizedDdl) ||
-            (settings.mode == AutonomousRefinementMode.Vision &&
-                settings.modelId !in autonomousVisionModelIds(state.value))) {
+            settings.modelId !in autonomousVisionModelIds(state.value)) {
             localState.value = current.copy(autonomousStatus = AutonomousRefinementStatus(error = strings().refinementNoneToGenerate))
             return
         }
@@ -3856,18 +3858,23 @@ class InkuViewModel @JvmOverloads constructor(
                     app.inku.mobile.llm.RefinementVisionImage.fromSvg(item.displaySvg)
                 }
                 advice = withContext(Dispatchers.IO) { repository.refineVisionAdvice(app.inku.mobile.llm.RefinementVisionRequest(
-                    modelId = settings.modelId, instruction = sourceTextOf(item), direction = settings.direction,
+                    // A work drawn straight from DDL has no description; Vision is
+                    // shown its instructions instead, as on Web and macOS.
+                    modelId = settings.modelId, instruction = sourceTextOf(item).ifBlank { item.normalizedDdl.orEmpty() },
+                    direction = settings.direction,
                     enabledKinds = settings.allowedKinds, languageCode = current.uiLanguage.code, imagePng = png)) }
                 currentCoroutineContext().ensureActive()
                 localState.value = localState.value.copy(autonomousStatus = localState.value.autonomousStatus.copy(
                     observation = advice?.observation, nextDirection = advice?.nextDirection))
             }
             try {
-                if (settings.mode == AutonomousRefinementMode.Vision) observe()
+                observe()
                 repeat(settings.generations) { index ->
                     currentCoroutineContext().ensureActive()
                     val parent = RefinementParent.of(item, sourceTextOf(item))
-                    val kind = advice?.suggestedKind?.takeIf { it in settings.allowedKinds } ?: settings.allowedKinds.random()
+                    // Vision's advice names the element; one outside the allowed
+                    // ones falls back to the first allowed. Nothing draws it at random.
+                    val kind = advice?.suggestedKind?.takeIf { it in settings.allowedKinds } ?: settings.allowedKinds.first()
                     val element = if (kind == "catalog_change") RefinementElement.Color else RefinementElement.Layout
                     val catalog = if (element == RefinementElement.Color)
                         RefinementPlanner.catalogCandidateIds(parent.catalogId, ColorCatalogs.all.map { it.id }).random() else null
@@ -3876,10 +3883,10 @@ class InkuViewModel @JvmOverloads constructor(
                     // an allowed intervention and is metadata, never new prose.
                     val plan = base.copy(
                         route = app.inku.mobile.data.refinement.RefinementRoute.ComposeFromDdl,
-                        stage1Model = settings.modelId.takeIf { settings.mode == AutonomousRefinementMode.Vision },
-                        stage2Model = settings.modelId.takeIf { settings.mode == AutonomousRefinementMode.Vision },
+                        stage1Model = settings.modelId,
+                        stage2Model = settings.modelId,
                         renderWildOverride = settings.wildOverride,
-                        derivationMetadata = base.derivationMetadata + mapOf("autonomous_refine_mode" to settings.mode.name.lowercase()) +
+                        derivationMetadata = base.derivationMetadata + mapOf("autonomous_refine_mode" to "vision") +
                             (advice?.let { mapOf("vision_model" to it.model, "vision_observation" to it.observation,
                                 "vision_next_direction" to it.nextDirection) } ?: emptyMap()),
                     )
@@ -3896,7 +3903,7 @@ class InkuViewModel @JvmOverloads constructor(
                             stage2ModelId = plan.stage2Model ?: parent.stage2Model, sourceText = parent.description)
                     }
                     refreshLineage()
-                    if (settings.mode == AutonomousRefinementMode.Vision && index < settings.generations - 1) observe()
+                    if (index < settings.generations - 1) observe()
                 }
                 localState.value = localState.value.copy(autonomousStatus = localState.value.autonomousStatus.copy(
                     message = strings().statusSaved(item.renderHashShort)))
@@ -4206,6 +4213,10 @@ class InkuViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             repository.setStarred(item.id, !item.starred)
         }
+    }
+
+    fun setCanvas3d(on: Boolean) {
+        localState.value = localState.value.copy(canvas3d = on)
     }
 
     fun setHistoryTrashView(on: Boolean) {

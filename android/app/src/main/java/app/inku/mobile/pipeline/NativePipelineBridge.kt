@@ -33,6 +33,13 @@ object NativePipelineBridge : SharedPipelineBinding {
     external override fun normalizeInstructionLanguage(value: String?, default: String): String?
     external override fun renderSeedFromText(seedText: String): String?
 
+    /**
+     * The experimental 3D viewer's input for one saved work (Web `snapshot()`):
+     * `{"score": "<Score text>", "metadata": "<render metadata text>"}` in,
+     * `{"json": "<input>"}` or `{"error": "<reason>"}` out.
+     */
+    external fun ddl3dSnapshot(inputBytes: ByteArray): ByteArray
+
     /** One saved Saijiki v1 unit in, the same unit in the current edition out (SPEC §3.3). */
     external fun migrateSaijikiV1(inputBytes: ByteArray): ByteArray
 }

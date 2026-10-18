@@ -71,7 +71,33 @@ val syncModelCatalog = tasks.register<Sync>("syncModelCatalog") {
     from(rootProject.file("../server/src/inku_server/model_catalog.json"))
     into(modelCatalogAssets)
 }
+// The experimental 3D viewer is Web's registered build, copied unchanged at
+// build time and never committed (experiments/ddl-3d/README.md). The copy holds
+// the registration, the native parent page and the build it names; with no
+// build named (an empty `viewerUrl`) only the registration goes in, and the app
+// shows no 3D switch.
+val ddl3dViewerAssets = layout.buildDirectory.dir("generated/ddl3dAssets")
+val ddl3dRegistration = rootProject.file("../web/src/lib/features/experimental-3d/installation.json")
+// Web `configuredViewer`: only a versioned path of this form names a build.
+fun registeredDdl3dBuild(): String? {
+    val registration = groovy.json.JsonSlurper().parse(ddl3dRegistration) as? Map<*, *> ?: return null
+    val url = registration["viewerUrl"] as? String ?: return null
+    return Regex("^/experimental/ddl-3d/([a-zA-Z0-9][a-zA-Z0-9._-]{0,63})/index\\.html$").find(url)?.groupValues?.get(1)
+}
+val syncDdl3dViewer = tasks.register<Sync>("syncDdl3dViewer") {
+    into(ddl3dViewerAssets.map { it.dir("ddl3d") })
+    from(ddl3dRegistration)
+    from(rootProject.file("../experiments/ddl-3d/host")) { into("host") }
+    registeredDdl3dBuild()?.let { build ->
+        from(rootProject.file("../web/static/experimental/ddl-3d/$build")) { into(build) }
+    }
+}
 tasks.withType<Test>().configureEach {
+    // The 3D copy is compared with the Web registration it follows.
+    dependsOn(syncDdl3dViewer)
+    systemProperty("inku.ddl3dCopy", ddl3dViewerAssets.get().dir("ddl3d").asFile.absolutePath)
+    systemProperty("inku.ddl3dRegistration", ddl3dRegistration.absolutePath)
+    systemProperty("inku.ddl3dFixture", rootProject.file("../experiments/ddl-3d/fixtures/solids.json").absolutePath)
     systemProperty("inku.modelCatalogSource", rootProject.file("../server/src/inku_server/model_catalog.json").absolutePath)
     systemProperty("inku.modelCatalogCases", rootProject.file("../server/tests/data/model-catalog-cases.json").absolutePath)
     systemProperty("inku.identityCases", rootProject.file("../server/tests/data/identity-cases.json").absolutePath)
@@ -158,6 +184,7 @@ android {
     }
     sourceSets.getByName("main") {
         assets.srcDir(modelCatalogAssets)
+        assets.srcDir(ddl3dViewerAssets)
         jniLibs.srcDir(rustGeneratedJniLibsDirectory)
     }
 
@@ -170,7 +197,7 @@ android {
     }
 }
 
-tasks.named("preBuild") { dependsOn(syncModelCatalog) }
+tasks.named("preBuild") { dependsOn(syncModelCatalog, syncDdl3dViewer) }
 
 val rustNdkDirectory = androidComponents.sdkComponents.ndkDirectory
 val rustLibrary = rustTargetDirectory.map {

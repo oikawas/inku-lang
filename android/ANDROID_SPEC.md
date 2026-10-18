@@ -6,6 +6,28 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-10-18.
 
+## 2026-10-18 Random autonomous refinement retired
+
+By the author's decision (no feature that rolls the dice on its own), a work's "Autonomous refinement" no longer offers the random method. The source of truth is "Autonomous refinement methods" in the root `SPEC.md`; this follows Web's `cc0972a71` at Serverセッション-claude's request and supersedes "random or Vision" in the 2026-10-17 section.
+
+- No method is offered. The Vision model and the direction are always shown, and starting needs a Vision model.
+- Each generation's element is Vision's `suggested_kind`; an element that is not allowed falls back to the first allowed one. Nothing draws it at random.
+- For a work with an empty description (drawn straight from DDL), Vision receives the saved instructions in place of the original text, as on Web and macOS.
+- New generations record `autonomous_refine_mode: vision` only. Generations made with the random method keep `random` and stay readable.
+
+## 2026-10-18 Experimental 3D view of a work
+
+At the author's request the experimental 3D view of Web and macOS now reaches Android (frozen plan `android-task/ddl3d-20261018`). The shapes are drawn by Web's viewer build (Three.js, Worker, WASM); Android does not rebuild it and only connects it in a WebView. The sources of truth are `experiments/ddl-3d/README.md` and its protocol `inku.ddl3d.v1`.
+
+- Distribution: on every build the Gradle task `syncDdl3dViewer` reads Web's registration `web/src/lib/features/experimental-3d/installation.json` and copies the registered `web/static/experimental/ddl-3d/<build>/` unchanged into generated assets (`ddl3d/`), with the registration and the shared parent page. No copy is committed; a new Web registration arrives with the next build. With an empty `viewerUrl` only the registration is copied and no 3D switch is shown. A JVM test compares the copy with Web's build file by file.
+- Parent page: the viewer requires a same-origin parent window, so the native-neutral parent page in `experiments/ddl-3d/host/`, shared by Apple and Android, sits between them. The WebView serves only that page and the registered build's files under `https://appassets.androidplatform.net/` (anything else is a 404; nothing goes to the network). Messages travel as JSON text on one MessagePort per mount. The 15-second deadline is native.
+- Input: the work's Score and saved drawing metadata are projected onto the 14 fields of Web's `snapshot()` by the shared core's `ddl3d_snapshot` (JNI `NativePipelineBridge.ddl3dSnapshot`; UniFFI `ddl3d_snapshot` for Swift). Values keep their stored spelling with only white space removed, so a seed above 2^53 arrives as written; an unsafe numeric seed is refused (`unsafe_numeric_seed`) and an input over 16 MiB is `input_budget_exceeded`. Four cases matched Web's implementation byte for byte.
+- Screen: the row above a work shows 3D / 2D next to the hash, and the full screen's control row shows the same switch. In 3D the canvas holds the viewer; the swipe and the 2D taps step aside, and the full screen's zoom figure and reset are the viewer's. Preparing shows "Preparing 3D…" with Return to 2D; a failure shows its text with Details, Retry and Return to 2D. Back returns from 3D to 2D. The view state stays in memory for the same input only and is never stored. The wording is Web's seven `ddl3d*` labels.
+- First front view: `initialView` carries the box the picture filled on the 2D canvas (its aspect fitted into the canvas, times the full screen's magnification and move; dp, which are CSS px), so the button seems to give that picture depth where it stands and the whole picture shows, as on Web and macOS. When the full screen has turned the picture on its side none is sent and the viewer fits it by itself. In the full screen the viewer starts below the status bar and camera's safe inset, so its "3D controls" button is clear of the clock; the 2D picture is centred in the whole frame, so the first view is moved up by half the inset to keep it in place.
+- The viewer's PNG and GLB saves are read by the parent page from their same-origin blob and handed to the app, which offers them on the export share sheet.
+- Third-party notices: Settings → Version has "3D view (experiment) licenses", which reads `THIRD_PARTY_NOTICES.txt` from the APK's copy when opened.
+- No database, saved work or 2D drawing changes. No WebView is created until 3D is chosen.
+
 ## 2026-10-18 Navigation and the making of a work
 
 Fixes for the navigation gaps a code and on-device review found.

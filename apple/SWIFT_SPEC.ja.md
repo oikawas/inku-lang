@@ -18,6 +18,18 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-18 3Dビューアの配布物をWebの1か所だけに置く
+
+作者の問い（2026-10-18「Swiftの配布物は、Webの配布物を写してGitに入れたものです。この運用は無駄が多いように思う。」）に答えた案1で、作者の「進めてください。」による。凍結した計画`swift-task/ddl3d-single-source-20261018`に沿った。次の「作品タブの3D表示（実験）」の節のうち、配布物と登録の写しをcommitすること、写した登録の`viewerUrl`を空にしてappだけで3Dを切ること、第三者通知のJSONに配布物のnoticesの全文を入れることは、この節で置き換わる。
+
+- 正本：Webの`web/src/lib/features/experimental-3d/installation.json`と、それが名指す`web/static/experimental/ddl-3d/<build>/`の2つだけにした。Swiftの側には配布物も登録の写しもcommitしない。`apple/Sources/InkuUI/Resources/ddl3d/`はbuildのときにできるだけの場所で、`apple/.gitignore`に入れた。Webが登録を変えても、Swiftの側でcommitし直すファイルは無く、次のbuildで新しい配布物が入る。
+- build：`apple/scripts/build-macos.sh`は、xcodebuildの前に`apple/scripts/sync-ddl3d-viewer.py`を走らせ、登録の配布物と登録をそのまま`ddl3d/`へ写して、全ファイルのSHA-256をWebの配布物と比べる。xcodebuildの後には`--check --app`で完成したappの中の写しも比べ、違えば`--install`の前に止まる。release scriptの`--check --app`はそのまま残した。appだけで3Dを切る道は無くなり、Webの登録の`viewerUrl`を空にすると、次のbuildでappの切替も消える。
+- 写しの無いbuild：Swift 6.4のSwiftPMは、`.copy`した道が無いと、警告の後でbuildを失敗させる（CpResource）。辞書の`description-meter`と同じ扱い（いつも`.copy`する）では、写しの無い`swift build`が通らない。そこで`Package.swift`は、`ddl3d/`があるときだけ資源に加える。写しの無い`swift build`・`swift run InkuAppCheck`はbuildでき、そのappは3Dの切替を出さない（`Ddl3DInstallation.registered`がnil）。SwiftPMのコマンドは読んだmanifestを`Package.swift`が変わるまで使い続けるので、写しの無いうちにbuildしたpackageは、後で写しても資源に入らない。Xcodeのbuildはそのときも読み直した（試しのpackageで確認）。build-macos.shは写した後にxcodebuildを走らせ、後の照合で確かめる。
+- AppCheck `--ddl3d-only`：appの資源でなく、ソースの木の写し（`apple/Sources/InkuUI/Resources/ddl3d/`）をその場で読む。写した後はbuildし直さずに走り、上のmanifestの読み残しにも左右されない。写しが無いとき、写しがWebの登録と違う版のときは、`python3 apple/scripts/sync-ddl3d-viewer.py`を名指して失敗する。Webの登録が空なら、確かめるものが無いとして失敗する。
+- 第三者の表示：第三者通知のJSON（`third-party-notices.json`）には、配布物の版の名前もnoticesの全文も入れない。「inkuについて」のライセンス一覧を開くと、appに入った写しの`THIRD_PARTY_NOTICES.txt`をその場で読み、「3D表示（実験）」の項に、前と同じ名前・版・ライセンス（見出しが名指すものとビューア自身のMIT）・注記・全文を出す（`Ddl3DViewerNotices`）。写しの無いappは配布物を含まないので、この項も群の見出しも出さない。Release添付の第三者通知には、`build-macos-notices.py --text`がWebの登録の配布物から同じ項を足す（release scriptは、その前に完成したappの写しをその登録とファイルごとに比べる）。
+- buildの手順の変化（swift-codexも同じ`apple/`と固定アプリを使う）：この変更を取り込むと、作業木にあった`ddl3d/`はGitが消す。build-macos.shは毎回写し直すので、appのbuildの手順は変わらない。`swift build`・`swift run InkuAppCheck`は写し無しで通るが、そのappに3Dは無い。`--ddl3d-only`の前には`python3 apple/scripts/sync-ddl3d-viewer.py`を走らせる。Webの登録が変わったときの写し直しのcommitと、第三者通知の作り直しは要らなくなった。
+- 確認：`git ls-files apple/Sources/InkuUI/Resources/ddl3d`は11件から0件。`build-macos-notices.py`の作り直しで136部品・783,528 B（1,213,690 Bから430,162 B減）、`--check`は一致、JSONの中に配布物の版の名前は0件で、3Dの項を除いた前のJSONとバイトで同じ。`--text`のRelease添付は前とバイトで同じ（137部品）。写した後の`--ddl3d-only`は前と同じく通った（ready 236 ms、`rendered` 250 ms、digestの一致、9物体、17,058三角形。Scoreでない入力は`invalid_score_or_version`、保存作品の入力は14欄のうち11欄、SwiftUIの器も同じdigest）。そこで`Ddl3DViewerNotices`が写しから読んだ3Dの項は、前のJSONの項と名前・版・ライセンス・部品数（40）・全文（419,977 B、SHA-256）が同じ。`build-macos.sh Release --keep-running`は通り、xcodebuildの前の写しの照合と、後の完成appの写しの照合は、それぞれ10ファイルが一致した。完成appの配布物の10ファイルと登録は、今の固定アプリの中のものとSHA-256で同じで、完成appの第三者通知のJSONは作り直したものと同じ。写しの無い`swift build`は、作業木の写しを消すことになるので走らせていない（試しのpackageで、写しが無いときに資源を宣言しないbuildが通って`Bundle.module`が道を返さないことと、いつも`.copy`する形ではbuildが失敗することを見た）。ライセンスの画面と3Dの動きは、作者の画面での確認に残す。
+
 ## 2026-10-18 作品タブの3D表示（実験）
 
 作者の指示（2026-10-18「3Dの実装に入って」）。凍結した計画`swift-task/ddl-3d-20261018`に沿い、WebのBuild 1267（`6ce57e952`）の3D表示の接続部（`web/src/lib/features/experimental-3d/`、`CanvasPanel.svelte`）に合わせた。前の作業で作者が選んだ「F8（2D/3D表示）はSwiftに移さない」は、作者の指示でこの節に置き換わる。下の「ライブラリを表示中の作品の位置で開く」の節の「Swiftに3D表示は無く、引かない」（`ddl3d*`の文言）も、この節で置き換わる。

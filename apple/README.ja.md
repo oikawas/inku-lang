@@ -62,7 +62,7 @@ apple/scripts/build-macos.sh Release
 
 `build-macos.sh`は必要toolの確認後、resource／core／appの変更前に[停止helper](scripts/stop-existing-macos.py)を実行します。現在のユーザーが所有する既知のInku bundle IDと実行fileを検証し、PIDのidentityを再確認してSIGKILLで停止します。最大10秒で停止を確認できなければbuildを中止し、結果は`apple/build/macOS/stop-existing.json`へ記録します。未知のInku類似processは検証errorとして扱い、signalを送信しません。
 
-通常のbuildはcommit済みのreview済みreference／default／catalog snapshotを使い、`uv sync --project server --frozen`で固定したbuild用依存を用意します。[辞書準備script](scripts/prepare-meter-resources.py)がSudachi small（約113MiB）、読み設定とCMUdictをhash検証し、licenseと共にInkuHost resourceへコピーします。共通RustとSwift binding／XCFrameworkを生成し、`project.yml`からXcode projectを作ってmacOS appをbuildします。generic Mac destination、`ARCHS=arm64 x86_64`、`ONLY_ACTIVE_ARCH=NO`を指定し、最後に両sliceの存在を検査します。Apple account、Team、証明書を使わないunsigned local buildです。署名・公証した配布物は下の「配布物の作成」で作ります。
+通常のbuildはcommit済みのreview済みreference／default／catalog snapshotを使い、`uv sync --project server --frozen`で固定したbuild用依存を用意します。[辞書準備script](scripts/prepare-meter-resources.py)がSudachi small（約113MiB）、読み設定とCMUdictをhash検証し、licenseと共にInkuHost resourceへコピーします。[3Dビューアのscript](scripts/sync-ddl3d-viewer.py)が、Webが登録した3DビューアをそのままInkuUI resourceへ写し、Webのものと比べます（下の3Dビューアの段落）。共通RustとSwift binding／XCFrameworkを生成し、`project.yml`からXcode projectを作ってmacOS appをbuildします。generic Mac destination、`ARCHS=arm64 x86_64`、`ONLY_ACTIVE_ARCH=NO`を指定し、最後に両sliceの存在を検査します。Apple account、Team、証明書を使わないunsigned local buildです。署名・公証した配布物は下の「配布物の作成」で作ります。
 
 Rust 1.95のmacOS host proc-macro stripによる[LINKEDIT alignment問題](https://github.com/rust-lang/rust/issues/157750)を避けるため、releaseのhost build dependencyだけstripを無効にします。target Rust archiveの最適化とstripは維持します。cache削除やtoolchain変更は不要です。
 
@@ -94,7 +94,7 @@ apple/scripts/package-macos-release.sh --identity "Developer ID Application: <na
 
 第三者通知は`apple/scripts/build-macos-notices.py`で作るreview済みsnapshotです。依存を変えたら再生成し、release scriptは古いsnapshotを`--check`で止めます。
 
-作品タブの3D表示（実験）のビューアは、Webが登録した配布物（`web/static/experimental/ddl-3d/<build>/`）を`apple/scripts/sync-ddl3d-viewer.py`でそのまま`Sources/InkuUI/Resources/ddl3d/`へ写したものです。Webの登録を変えたら写し直してから第三者通知を再生成します。release scriptは`--check --app`で、写しと完成したappの中身をWebの配布物とファイルごとに比べます。
+作品タブの3D表示（実験）のビューアは、Webが登録した配布物（`web/static/experimental/ddl-3d/<build>/`）で、`apple/`にはcommitしません。`build-macos.sh`がxcodebuildの前に`apple/scripts/sync-ddl3d-viewer.py`でそのまま`Sources/InkuUI/Resources/ddl3d/`（Gitの対象外）へ写し、buildの後に完成したappの中の写しをWebの配布物とファイルごとに比べます（`--check --app`。release scriptも同じく比べます）。Webが登録を変えてもSwiftのcommitは要らず、第三者通知のsnapshotも変わりません（「inkuについて」はappの写しから配布物の第三者通知を読みます）。写しの無い`swift build`もbuildでき、そのappは3Dの切替を出しません。`swift run --package-path apple InkuAppCheck --ddl3d-only`は写しをその場で読み、写しが無いと止まるので、先に`python3 apple/scripts/sync-ddl3d-viewer.py`を走らせます。
 
 ### Dockから同じアプリを起動する
 

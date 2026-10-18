@@ -521,8 +521,6 @@ struct CreationView: View {
                 }
                 .disabled(workspaceWork == nil || browsingDisabled)
                 .inkuTooltip(display.tooltip("作品の派生関係を表示"), placement: .bottom)
-                CanvasWorkSearchView(library: history.library, display: display)
-                    .frame(minWidth: 100, idealWidth: 180, maxWidth: 286).padding(.horizontal, 8)
                 if wide && showsMeta, let work = workspaceWork {
                     Spacer(minLength: 12)
                     metaStrip(work)

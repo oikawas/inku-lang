@@ -136,6 +136,11 @@ public final class LibraryModel {
     public private(set) var total = 0
     public private(set) var trashTotal = 0
     public private(set) var loading = false
+    /// A change has scheduled a read (the 180 ms pause that coalesces typing) that has not begun.
+    public private(set) var readScheduled = false
+    /// Web `fetchInFlight > 0`: the answer to the present filters is awaited, from the moment a change schedules its
+    /// read. The history strip, emptied by a search that found nothing, keeps its place while the next answer comes.
+    public var awaitingRead: Bool { loading || readScheduled }
     public private(set) var mutating = false
     public private(set) var errorText: String?
     public private(set) var status = ""
@@ -304,6 +309,7 @@ public final class LibraryModel {
     private func cancelScheduledRefresh() {
         refreshTask?.cancel()
         pendingLineageRefresh = false
+        if readScheduled { readScheduled = false }
     }
 
     /// A pending read that replaces another keeps its lineage reload: a new page size right after a filter change
@@ -315,12 +321,15 @@ public final class LibraryModel {
         refreshToken = UUID()
         refreshTask?.cancel()
         pendingLineageRefresh = pendingLineageRefresh || refreshLineage
+        if !readScheduled { readScheduled = true }
         refreshTask = Task { @MainActor [weak self] in
             // Coalesce typing; cancellation never changes a database operation.
             try? await Task.sleep(for: .milliseconds(180))
             guard !Task.isCancelled, let self else { return }
             let lineage = self.pendingLineageRefresh
             self.pendingLineageRefresh = false
+            // `refresh` marks itself loading before it first waits, so the answer stays awaited throughout.
+            self.readScheduled = false
             await self.refresh(refreshLineage: lineage)
         }
     }

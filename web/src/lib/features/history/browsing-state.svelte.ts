@@ -418,6 +418,14 @@ export class HistoryBrowsingState {
 		return this.select(this.indexOf(target));
 	}
 
+	async jumpToPage(page: number): Promise<HistoryItem | null> {
+		if (!Number.isFinite(page) || this.navState.busy || this.navState.locked || this.total <= 0) return null;
+		const targetPage = Math.max(1, Math.min(Math.trunc(page), this.totalPages));
+		const offset = (targetPage - 1) * Math.max(1, this.windowSize);
+		if (offset === this.offset || !(await this.fetchOffset(offset))) return null;
+		return this.select(0);
+	}
+
 	async resize(windowSize: number): Promise<void> {
 		const nextSize = Math.max(1, Math.floor(windowSize));
 		this.windowSize = nextSize;

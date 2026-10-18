@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-18 — Type a page number to move through the history strip
+
+The current page in the history strip's "1 / n" now uses the Library's page field. Type a number and press Enter or leave the field to move; out-of-range numbers land on the first or last page. Escape and nonnumeric input restore the shown number. Search and mark filters stay in effect, and the first work on the destination page opens. The field is disabled while history is loading or a demo is running.
+
 ### 2026-10-18 — macOS: copy the 3D viewer from its one place on the Web at build time
 
 The experimental 3D view's only source is now the Web's registered distribution (`web/static/experimental/ddl-3d/<build>/`), and the macOS app's copy left Git. A new Web registration needs no Swift copy or commit; the next build carries it.

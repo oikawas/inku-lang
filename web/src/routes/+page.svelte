@@ -2098,6 +2098,11 @@ $effect(() => {
 		if (item) loadIterationItem(item);
 	}
 
+	async function jumpToHistoryPage(page: number): Promise<void> {
+		const item = await history.jumpToPage(page);
+		if (item) loadIterationItem(item);
+	}
+
 	// Both canvas controls and the strip pager read one owner projection.
 	const historyNavButtonsDisabled = $derived(history.navDisabled);
 	const historyPageNavDisabled = $derived(history.pageDisabled);
@@ -3201,6 +3206,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onOlderPage={gotoHistoryOlderPage}
 			onLatestPage={gotoHistoryLatestPage}
 			onOldestPage={gotoHistoryOldestPage}
+			onJumpPage={jumpToHistoryPage}
 			onLoadItem={loadIterationItem}
 			onToggleStar={toggleHistoryStar}
 			interactionLocked={demoRunning}

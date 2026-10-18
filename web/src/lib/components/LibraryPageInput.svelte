@@ -5,9 +5,10 @@
 		/** Counted from the newest, as the pager prints it. */
 		current: number;
 		total: number;
+		disabled?: boolean;
 		onJump: (page: number) => void;
 	};
-	let { current, total, onJump }: Props = $props();
+	let { current, total, disabled = false, onJump }: Props = $props();
 
 	// What the reader is typing, kept apart from the page shown so a listing
 	// that answers mid-edit does not overwrite it.
@@ -33,6 +34,7 @@
 
 	function commit(): void {
 		if (!editing) return;
+		if (disabled) { restore(); return; }
 		const typed = draft.trim();
 		const page = Number(typed);
 		const target = Math.max(1, Math.min(Math.trunc(page), total));
@@ -63,6 +65,7 @@
 		type="text"
 		inputmode="numeric"
 		autocomplete="off"
+		{disabled}
 		data-escape-undoes-edit
 		value={shown}
 		aria-label={t().historyPageJumpLabel(total)}

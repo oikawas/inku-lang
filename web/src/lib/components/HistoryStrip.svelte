@@ -2,6 +2,7 @@
 	import { untrack } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
+	import LibraryPageInput from '$lib/components/LibraryPageInput.svelte';
 	import CanvasWorkSearch from '$lib/features/canvas/CanvasWorkSearch.svelte';
 	import { formatHistoryStripEngineVersion, type HistoryStripField } from '$lib/historyStripFields';
 	import { groupDigits } from '$lib/formatNumber';
@@ -46,6 +47,7 @@
 		onOlderPage: () => void | Promise<void>;
 		onLatestPage: () => void | Promise<void>;
 		onOldestPage: () => void | Promise<void>;
+		onJumpPage: (page: number) => void | Promise<void>;
 		onLoadItem: (item: HistoryItem) => void;
 		onToggleStar: (item: HistoryItem, event?: Event) => void | Promise<void>;
 		interactionLocked: boolean;
@@ -95,6 +97,7 @@
 		onOlderPage,
 		onLatestPage,
 		onOldestPage,
+		onJumpPage,
 		onLoadItem,
 		onToggleStar,
 		interactionLocked,
@@ -248,7 +251,7 @@
 					<div class="history-page-nav">
 						<button class="ghost-btn history-latest-btn" onclick={onLatestPage} disabled={interactionLocked || navLatestDisabled}>{t().historyLatest}</button>
 						<button class="ghost-btn history-nav-btn" onclick={onNewerPage} disabled={interactionLocked || navNewerPageDisabled}>{t().historyNewerPage(historyNavSpan)}</button>
-						<span class="history-page-indicator">{historyPage + 1} / {historyTotalPages}</span>
+						<span class="history-page-indicator"><LibraryPageInput current={historyPage + 1} total={historyTotalPages} disabled={interactionLocked || searchBusy || historyTotal === 0} onJump={onJumpPage} /></span>
 						<button class="ghost-btn history-nav-btn" onclick={onOlderPage} disabled={interactionLocked || navOlderPageDisabled}>{t().historyOlderPage(historyNavSpan)}</button>
 						<button class="ghost-btn history-oldest-btn" onclick={onOldestPage} disabled={interactionLocked || navOldestDisabled}>{t().historyOldest}</button>
 					</div>

@@ -412,7 +412,8 @@ class LineageScreenTest {
         awaitState("the edited DDL to reach shared state") {
             it.ddl == EDITED_DDL && it.ddlEditedAfterGeneration
         }
-        vm().closeDdlEditor()
+        // What the editor's draw button does: close without asking to discard.
+        vm().closeDdlEditor(askToDiscard = false)
         vm().drawFromDdl()
         val saved = awaitNewestAfter(3)
         generatedThumbnailHashes += saved.renderHash

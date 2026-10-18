@@ -29,6 +29,8 @@ Fixes for the navigation gaps a code and on-device review found.
 - A work entered through Change description can be edited and drawn from its description even when its DDL leads (a refinement child, an edited DDL). Paint on a locked description says why instead of doing nothing.
 - The ChatGPT connection a stopped drawing cuts is no longer recorded as a ChatGPT transport failure.
 - Signing out of the ChatGPT plan asks first.
+- Every action that drops unsaved refinement candidates (closing or backing out of a refinement, Studio in the bottom bar, switching the sub-view, switching to the colour element, closing the tool change) asks "Discard unsaved candidates?" and drops them on Discard. This replaces the tool change's refusal to close until its options were saved or discarded (the author, 2026-10-18). Closing the DDL editor opened on a saved work with edited instructions asks "Discard the edited instructions?"; Discard returns to the saved instructions.
+- A long press on a work card no longer toggles its star; only the card's star badge does (the author, 2026-10-18).
 
 ## 2026-10-17 ChatGPT plan failure classes and model list in the shared core
 

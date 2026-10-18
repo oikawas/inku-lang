@@ -41,7 +41,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.imePadding
@@ -526,6 +525,7 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
     val backTarget: (() -> Unit)? = when {
         state.cameraCaptureState.locksCameraInteraction || state.cameraCaptureState is CameraCaptureState.Failed ->
             viewModel::cancelCameraDevelopment
+        state.discardConfirm != null -> viewModel::cancelDiscard
         state.canvasPresentationMode -> viewModel::exitCanvasPresentationMode
         state.confirmDdlOverwrite -> viewModel::cancelDdlOverwrite
         state.ddlEditorOpen -> viewModel::closeDdlEditor
@@ -538,7 +538,7 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
             ({ viewModel.setSettingsPane(SettingsPane.Home) })
         state.tab == AppTab.Settings -> viewModel::closeSettings
         // Up one level from 推敲 is the lineage it was opened on, not 制作.
-        state.tab == AppTab.Lineage && state.refinementOpen -> viewModel::closeRefinement
+        state.tab == AppTab.Lineage && state.refinementOpen -> viewModel::requestCloseRefinement
         // The trash is a view of Works; back returns to the works themselves
         // before leaving the tab, and the tab is not found in the trash next time.
         state.tab == AppTab.History && state.historyTrashView -> ({ viewModel.setHistoryTrashView(false) })
@@ -631,6 +631,8 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
                 }
                 state.workActionsTarget?.let { WorkActionsDialog(it, viewModel) }
                 if (state.toolChangeOpen) ToolChangeDialog(state, viewModel, S)
+                // After the dialogs it may be asked from, so it is drawn over them.
+                state.discardConfirm?.let { DiscardConfirmDialog(it, viewModel) }
                 state.workSketchTarget?.let { WorkSketchDialog(it, viewModel) }
                 if (state.canvasSearchOpen) {
                     val history by viewModel.historyItems.collectAsState()
@@ -699,6 +701,17 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
         }
     }
     }
+}
+
+@Composable
+private fun DiscardConfirmDialog(confirm: DiscardConfirm, viewModel: InkuViewModel) {
+    AlertDialog(
+        onDismissRequest = viewModel::cancelDiscard,
+        title = { Text(if (confirm is DiscardConfirm.Candidates) S.discardCandidatesTitle else S.discardInstructionsTitle) },
+        text = { Text(if (confirm is DiscardConfirm.Candidates) S.discardCandidatesBody(confirm.count) else S.discardInstructionsBody) },
+        confirmButton = { TextButton(onClick = viewModel::confirmDiscard) { Text(S.discard) } },
+        dismissButton = { TextButton(onClick = viewModel::cancelDiscard) { Text(S.cancel) } },
+    )
 }
 
 @Composable
@@ -850,9 +863,9 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
             }
         }
     }
-    fun closeEditor() {
+    fun closeEditor(askToDiscard: Boolean = true) {
         syncEditor(leaving = true)
-        viewModel.closeDdlEditor()
+        viewModel.closeDdlEditor(askToDiscard)
     }
     val context = LocalContext.current
     val importScope = rememberCoroutineScope()
@@ -924,7 +937,8 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
                     }
                     TextButton(
                         onClick = {
-                            closeEditor()
+                            // Drawing is what the edit was for; nothing is discarded.
+                            closeEditor(askToDiscard = false)
                             viewModel.drawFromDdl()
                         },
                         enabled = !state.isDrawing && DdlSource.hasBody(state.ddl),
@@ -3889,7 +3903,7 @@ internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
         StudioHeader(if (state.refinementOpen) S.reviseWork else S.workLineage, viewModel,
-            onBack = { if (state.refinementOpen) viewModel.closeRefinement() else if (state.workContextId != null) viewModel.closeWorkContext() else viewModel.openStudio() })
+            onBack = { if (state.refinementOpen) viewModel.requestCloseRefinement() else if (state.workContextId != null) viewModel.closeWorkContext() else viewModel.openStudio() })
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -3950,7 +3964,7 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
                 RefinementSubview.Ground -> parityStrings.groundAction
                 else -> LocalStrings.current.comparisonKindDescription(state.refinementSubview.id)
             }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            ChipButton(S.close, enabled = !busy, onClick = viewModel::closeRefinement)
+            ChipButton(S.close, enabled = !busy, onClick = viewModel::requestCloseRefinement)
         }
 
         // 調整・モデル (SPEC :616). Two faces of one screen.
@@ -6868,10 +6882,10 @@ private fun HistoryGridTile(
 ) {
     Card(
         modifier = modifier
-            .combinedClickable(
-                onClick = onSelect,
-                onLongClick = onToggleStar,
-            )
+            // A tap opens the work; the star is the badge's alone. A long
+            // press used to toggle it too, unseen, while scrolling (2026-10-18,
+            // the author).
+            .clickable(onClick = onSelect)
             .border(Dimens.hairline, if (selected) MaterialTheme.colorScheme.primary else CardHairline, RoundedCornerShape(0.dp)),
         shape = RoundedCornerShape(0.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),

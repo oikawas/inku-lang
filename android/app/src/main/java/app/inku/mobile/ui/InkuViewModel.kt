@@ -315,6 +315,8 @@ data class InkuUiState(
     // The candidate on the canvas that has not been saved. Drawing on from here
     // has to put it in the lineage first (SPEC :2105).
     val refinementPreviewId: String? = null,
+    // Something unsaved is about to be dropped and the author is asked first.
+    val discardConfirm: DiscardConfirm? = null,
     // 検分 (SPEC :616). The model comparison is a sub-view beside 調整 rather
     // than a screen of its own, and it shares every field above: the
     // candidates, the busy flag, the stop and the save are the refinement's.
@@ -391,6 +393,13 @@ data class BatchFailure(
  * (SPEC `:678`). Three states rather than a boolean, because the middle one is
  * what stops a second tap while the first save is still in the database.
  */
+/** Unsaved work the author is asked about before it is dropped. */
+sealed interface DiscardConfirm {
+    data class Candidates(val count: Int) : DiscardConfirm
+    /** The instructions edited in the DDL editor opened on a saved work. */
+    data object Instructions : DiscardConfirm
+}
+
 enum class RefinementSaveState {
     Unsaved,
     Saving,
@@ -1542,6 +1551,7 @@ class InkuViewModel @JvmOverloads constructor(
     /** The global Studio action returns to writing, never to a viewed work. */
     fun openStudio() {
         if (localState.value.cameraCaptureState.locksCameraInteraction) return
+        if (askBeforeDroppingCandidates(::openStudio)) return
         if (localState.value.isDrawing) {
             setTab(AppTab.Compose)
             return
@@ -2237,8 +2247,23 @@ class InkuViewModel @JvmOverloads constructor(
         refreshLineage()
     }
 
-    fun closeDdlEditor() {
-        localState.value = localState.value.copy(ddlEditorOpen = false)
+    fun closeDdlEditor(askToDiscard: Boolean = true) {
+        val current = localState.value
+        val work = current.selectedHistory
+        // Opened on a saved work (指示書を編集), the editor is the only place the
+        // edit is seen: the lineage it returns to shows the saved work, and the
+        // next opening reads the saved DDL again.
+        if (askToDiscard && current.tab == AppTab.Lineage && work != null && current.ddlEditedAfterGeneration &&
+            current.ddl != work.normalizedDdl.orEmpty()) {
+            afterDiscardConfirmed = {
+                localState.value = localState.value.copy(
+                    ddl = work.normalizedDdl.orEmpty(), ddlEditedAfterGeneration = false, ddlEditorOpen = false,
+                )
+            }
+            localState.value = current.copy(discardConfirm = DiscardConfirm.Instructions)
+            return
+        }
+        localState.value = current.copy(ddlEditorOpen = false)
     }
 
     fun selectHistory(item: HistoryItemEntity) = applyHistorySelection(item, AppTab.Compose)
@@ -3248,6 +3273,7 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun setRefinementSubview(subview: RefinementSubview) {
         if (localState.value.refinementBusy) return
+        if (subview != localState.value.refinementSubview && askBeforeDroppingCandidates { setRefinementSubview(subview) }) return
         localState.value = localState.value.copy(
             refinementSubview = subview,
             refinementStatus = null,
@@ -3284,6 +3310,51 @@ class InkuViewModel @JvmOverloads constructor(
             else -> selected + modelId
         }
         localState.value = current.copy(modelCompareSelectedModels = next, refinementStatus = null)
+    }
+
+    /** What [InkuUiState.discardConfirm] asks about. */
+    private var afterDiscardConfirmed: (() -> Unit)? = null
+
+    private fun unsavedCandidateCount(): Int = localState.value.takeIf { it.refinementOpen }
+        ?.refinementCandidates?.count { it.saveState == RefinementSaveState.Unsaved } ?: 0
+
+    /**
+     * Asks before [action] drops unsaved refinement candidates; true when it
+     * asked, and [action] then runs on 破棄. One rule for every refinement
+     * (2026-10-18, the author): てざわり used to refuse to close and the others
+     * dropped their candidates without a word.
+     */
+    private fun askBeforeDroppingCandidates(action: () -> Unit): Boolean {
+        val count = unsavedCandidateCount()
+        if (count == 0) return false
+        afterDiscardConfirmed = action
+        localState.value = localState.value.copy(discardConfirm = DiscardConfirm.Candidates(count))
+        return true
+    }
+
+    fun confirmDiscard() {
+        val action = afterDiscardConfirmed
+        afterDiscardConfirmed = null
+        val current = localState.value
+        localState.value = current.copy(
+            discardConfirm = null,
+            // Dropped here, so the action that asked does not ask again.
+            refinementCandidates = if (current.discardConfirm is DiscardConfirm.Candidates) {
+                current.refinementCandidates.filterNot { it.saveState == RefinementSaveState.Unsaved }
+            } else current.refinementCandidates,
+        )
+        action?.invoke()
+    }
+
+    fun cancelDiscard() {
+        afterDiscardConfirmed = null
+        localState.value = localState.value.copy(discardConfirm = null)
+    }
+
+    /** Close, back and 閉じる on a refinement. */
+    fun requestCloseRefinement() {
+        if (askBeforeDroppingCandidates(::closeRefinement)) return
+        closeRefinement()
     }
 
     fun closeRefinement() {
@@ -3323,10 +3394,7 @@ class InkuViewModel @JvmOverloads constructor(
     fun closeToolChange(discard: Boolean = false) {
         val current = localState.value
         if (current.refinementBusy || current.refinementCandidates.any { it.saveState == RefinementSaveState.Saving }) return
-        if (!discard && current.refinementCandidates.any { it.saveState == RefinementSaveState.Unsaved }) {
-            localState.value = current.copy(refinementStatus = strings().toolChangeSaveOrDiscard)
-            return
-        }
+        if (!discard && askBeforeDroppingCandidates(::closeRefinement)) return
         closeRefinement()
     }
 
@@ -3391,6 +3459,9 @@ class InkuViewModel @JvmOverloads constructor(
     /** The radio. One value replaces the previous one; two are not spellable. */
     fun setRefinementElement(element: RefinementElement) {
         if (localState.value.refinementBusy) return
+        // The colour element draws its candidates over the ones on screen.
+        if (element == RefinementElement.Color && element != localState.value.refinementElement &&
+            askBeforeDroppingCandidates { setRefinementElement(element) }) return
         localState.value = localState.value.copy(refinementElement = element, refinementStatus = null)
         // 「推敲要素の選択は前回値をブラウザに記憶する」.
         persistSetting(SETTING_KEY_REFINEMENT_ELEMENT, JSONObject().put("value", element.id).toString())

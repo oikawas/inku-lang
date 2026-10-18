@@ -84,6 +84,16 @@ class NavigationReviewWiringTest {
     }
 
     @Test
+    fun droppingUnsavedCandidatesAsksFirstAndALongPressDoesNotStar() {
+        assertTrue(body("fun requestCloseRefinement()", "fun closeRefinement()").contains("askBeforeDroppingCandidates(::closeRefinement)"))
+        assertTrue(body("fun closeToolChange(", "fun discardToolChangeCandidate").contains("askBeforeDroppingCandidates(::closeRefinement)"))
+        assertTrue(body("fun openStudio()", "fun closeSettings()").contains("askBeforeDroppingCandidates(::openStudio)"))
+        val app = projectFile("app/src/main/java/app/inku/mobile/ui/InkuApp.kt").readText()
+        assertFalse(app.contains("viewModel::closeRefinement"))
+        assertFalse(app.contains("onLongClick = onToggleStar"))
+    }
+
+    @Test
     fun aStoppedChatGptCallIsACancellationNotATransportFailure() {
         val manager = projectFile("app/src/main/java/app/inku/mobile/llm/ChatGptPlanManager.kt").readText()
         val generate = manager.substring(manager.indexOf("override suspend fun generate"), manager.indexOf("private fun reportFailure"))

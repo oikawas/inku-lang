@@ -101,7 +101,6 @@ interface InkuStrings {
     val toolChangeMakeFour: String
     val toolChangeDiscard: String
     val toolChangeDiscardAndClose: String
-    val toolChangeSaveOrDiscard: String
     val colorArrangementEditAction: String
     val modelFailed: String
     val refinementNoneToGenerate: String
@@ -248,6 +247,15 @@ interface InkuStrings {
     val baseUrlChange: String
     val drawFromDdl: String
     val ddlOverwriteTitle: String
+    val ddlOverwriteRedraw: String
+    val cameraChatGptCannotReadPhoto: String
+    val discard: String
+    val discardCandidatesTitle: String
+    fun discardCandidatesBody(count: Int): String
+    val discardInstructionsTitle: String
+    val discardInstructionsBody: String
+    fun chatGptSignOutBody(label: String): String
+    val pipelineProposalNotAnswered: String
     val ddlEdit: String
     val mascotSubtitle: String
     val mascotIncu: String

@@ -4,7 +4,33 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-10-17.
+Last updated: 2026-10-18.
+
+## 2026-10-18 Navigation and the making of a work
+
+Fixes for the navigation gaps a code and on-device review found.
+
+- A refinement candidate becomes the parent of a new work only when that refinement is still open and the drawing comes from the same work. Selecting a work clears the candidate mark, so a work drawn from another work is never saved as a child of an unsaved candidate. If the candidate cannot be kept, the drawing keeps its declared parent.
+- While a drawing runs (including a batch, the demo, a DDL drawing and the continuation after an approval), moving to the previous, next or latest work and picking a lineage card are refused; selecting used to stop the drawing without a word. Moving through a full screen opened from Works still works and does not stop the run.
+- In the full screen, ‹ goes to the newer work and › to the older one, the direction of the swipe to the right and of web's buttons.
+- Pressing Paint after editing the instructions by hand asks first ("The edited instructions will be lost"), with Redraw from the description, Cancel and Draw from instructions. The DDL editor's draw button is called Draw from instructions.
+- A drawing that runs on the lineage screen (redrawing with or without 写生, drawing from the DDL editor) shows its progress row and Stop there, and its result or failure afterwards. The lineage is read again when a refinement opens and closes, so children saved one at a time appear.
+- When adding a service, or saving its name, Base URL, API key or published models, is refused, the add dialog keeps what was typed and says why; the connection card keeps showing the saved values and says why.
+- While a proposal waits for approval, Studio in the bottom bar does not drop it; New work cancels the run. A run that needs an answer leaves the full screen for the studio, and a full screen does not hide the answer. A stopped run's proposal and its Approve and Decline are taken off the screen.
+- A batch line or demo cycle the pipeline stops is cancelled and counted as a failed line, and the batch or demo goes on; the line can be retried by hand or automatically. A line stopped for an approval reads "Stopped: a proposed DDL change needed approval."
+- A camera drawing the pipeline stops with nothing to answer (no proposal, no resumable stop) is cancelled and shown as a failed development, keeping Retry from the poetic description and Cancel back to before the capture, with the reason as the detail. A run with something to answer is answered on the studio as before. The captured photo goes only with that capture's approval or resume. The bottom bar is hidden while a failed development is shown.
+- The row under a work has Search, which opens the canvas work search (its 2026-10-17 entry sat in a component nothing drew).
+- The full screen's ⋯ has Export and Generation info, so a work opened from Works can be exported from there.
+- Back from the trash view returns to the works. Moving the full-screen work to the trash removes its refinement entry at once.
+- Closing the keyboard lets go of the description field's focus, which brings the bottom bar back.
+- Revise and New work under a result are disabled while a drawing runs.
+- When the selected model is a ChatGPT plan model, the camera stops before the capture with "Not ready to capture" and a pointer to choose a model that can read a photo (the plan is not a camera Vision candidate); it used to fail right after the shutter with no reason. A readiness failure before the capture is no longer titled "Image processing failed".
+- Entering another work's lineage or refinement again from Works (the list or its full screen) makes back return to that screen; the studio draft kept is still the one from before the first work.
+- A work entered through Change description can be edited and drawn from its description even when its DDL leads (a refinement child, an edited DDL). Paint on a locked description says why instead of doing nothing.
+- The ChatGPT connection a stopped drawing cuts is no longer recorded as a ChatGPT transport failure.
+- Signing out of the ChatGPT plan asks first.
+- Every action that drops unsaved refinement candidates (closing or backing out of a refinement, Studio in the bottom bar, switching the sub-view, switching to the colour element, closing the tool change) asks "Discard unsaved candidates?" and drops them on Discard. This replaces the tool change's refusal to close until its options were saved or discarded (the author, 2026-10-18). Closing the DDL editor opened on a saved work with edited instructions asks "Discard the edited instructions?"; Discard returns to the saved instructions.
+- A long press on a work card no longer toggles its star; only the card's star badge does (the author, 2026-10-18).
 
 ## 2026-10-17 ChatGPT plan failure classes and model list in the shared core
 

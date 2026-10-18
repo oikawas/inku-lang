@@ -163,8 +163,12 @@ class ToolChangeDeviceTest {
         val parentScore = LineagePlanner.canonicalJson(JSONObject(parent.scoreJson))
         assertEquals(parentScore, LineagePlanner.canonicalJson(JSONObject(requireNotNull(repo.getHistoryById(parent.id)).scoreJson)))
         assertTrue(first.all { it.pipelineResult?.renderSeed == 4242L })
+        // Unsaved options are asked about (2026-10-18); declining keeps them.
         ui.runOnIdle { requireNotNull(vm).closeToolChange() }
         assertTrue(requireNotNull(vm).state.value.toolChangeOpen)
+        assertEquals(DiscardConfirm.Candidates(4), requireNotNull(vm).state.value.discardConfirm)
+        ui.runOnIdle { requireNotNull(vm).cancelDiscard() }
+        assertEquals(first.map { it.id }, requireNotNull(vm).state.value.refinementCandidates.map { it.id })
         capture("tool-change-manual-uniform-20261014.png")
         ui.onNodeWithTag("tool-mode-per_sentence").performScrollTo().performClick()
         ui.runOnIdle {

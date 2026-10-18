@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-18 — Review Android navigation and the making of a work
+
+Fixes for problems a code and on-device review found. An unsaved refinement candidate could become the parent of a work drawn from another work. Moving to another work during a drawing silently stopped the batch, the demo or the drawing. Paint after editing the instructions by hand discarded the edits without asking. A batch ended without drawing its remaining lines when one line stopped in the pipeline. A drawing running on the lineage screen showed no progress. A refused new service closed its dialog and lost what was typed. A proposal waiting for approval was hidden by Studio or the full screen. A camera drawing that stopped lost its Retry and Cancel. The full screen's ‹ and › now go the way the swipe and web do, its ⋯ menu has Export and Generation info, and the canvas work search has a visible entry. Closing the keyboard brings the bottom bar back, and Back leaves the trash view first. From the on-device review: with a ChatGPT plan model selected the camera failed right after the shutter with no reason, and now stops before the capture and says why; back went to a work opened earlier; Change description on a refinement child could not be edited; stopping a drawing showed a red transport error; Sign out had no confirmation. By the author's decision, dropping unsaved refinement candidates or instructions edited on a saved work now always asks first, and a long press on a work card no longer toggles its star. See the 2026-10-18 section of `android/ANDROID_SPEC.md`.
+
 ### 2026-10-18 — macOS: experimental 3D view in the work tab
 
 The app now bundles the Web's 3D viewer distribution (Build 1267's registration, `zero-length-v1-677428a8`) and shows a work in 3D in the work tab. The same viewer as the Web draws the solids, their depth and paint.

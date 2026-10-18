@@ -65,6 +65,10 @@ internal fun cameraDevelopmentPresentation(
         )
         is CameraCaptureState.Failed -> if (state.reason == CameraFailure.DescriptionFailed) Triple(
             "記述をまとめられませんでした", "Could not shape the description", CameraDevelopmentEffect.GrainAndForms,
+        ) else if (state.reason == CameraFailure.ModelNotReady || state.reason == CameraFailure.DrawModelNotReady) Triple(
+            // Refused before a photo was taken: nothing was processed, and the
+            // detail line under this says which model and what to do.
+            "撮影の準備ができていません", "Not ready to capture", CameraDevelopmentEffect.PhotoPreparing,
         ) else Triple(
             if (state.reason.isDrawFailure) "現像に失敗しました" else "画像処理に失敗しました",
             if (state.reason.isDrawFailure) "Development failed" else "Image processing failed",

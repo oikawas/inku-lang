@@ -10,6 +10,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -344,6 +346,10 @@ class ChatGptPlanManager internal constructor(
             } }
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (error: Exception) {
+            // A stopped drawing disconnects the socket, and the read under it
+            // throws an IOException rather than the cancellation. Reported, it
+            // showed a red "could not complete" beside 「停止しました」.
+            if (!currentCoroutineContext().isActive) throw CancellationException("stopped").apply { initCause(error) }
             // Public codes only, but the class the server gives the cause:
             // a read timeout, an answer that is not JSON, and bytes that are
             // not UTF-8 are not the same failure as a dropped connection.

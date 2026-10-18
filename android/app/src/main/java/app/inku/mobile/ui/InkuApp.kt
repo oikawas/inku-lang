@@ -41,7 +41,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.imePadding
@@ -526,6 +525,7 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
     val backTarget: (() -> Unit)? = when {
         state.cameraCaptureState.locksCameraInteraction || state.cameraCaptureState is CameraCaptureState.Failed ->
             viewModel::cancelCameraDevelopment
+        state.discardConfirm != null -> viewModel::cancelDiscard
         state.canvasPresentationMode -> viewModel::exitCanvasPresentationMode
         state.confirmDdlOverwrite -> viewModel::cancelDdlOverwrite
         state.ddlEditorOpen -> viewModel::closeDdlEditor
@@ -538,7 +538,10 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
             ({ viewModel.setSettingsPane(SettingsPane.Home) })
         state.tab == AppTab.Settings -> viewModel::closeSettings
         // Up one level from 推敲 is the lineage it was opened on, not 制作.
-        state.tab == AppTab.Lineage && state.refinementOpen -> viewModel::closeRefinement
+        state.tab == AppTab.Lineage && state.refinementOpen -> viewModel::requestCloseRefinement
+        // The trash is a view of Works; back returns to the works themselves
+        // before leaving the tab, and the tab is not found in the trash next time.
+        state.tab == AppTab.History && state.historyTrashView -> ({ viewModel.setHistoryTrashView(false) })
         state.workContextId != null && state.tab != AppTab.History -> viewModel::closeWorkContext
         state.tab != AppTab.Compose -> viewModel::openStudio
         // The compose screen is the root. Back leaves the app from here.
@@ -571,7 +574,11 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
                 // step aside: keeping them would hold a bar's worth of height
                 // between the keyboard and 「描画する」, and going somewhere else
                 // is not what one is about to do mid-sentence.
-                if (!state.canvasPresentationMode && !state.descriptionFocused && !state.cameraCaptureState.locksCameraInteraction) {
+                // A failed development covers the content with its own 再試行
+                // and 取消; the bar under it changed tabs out of sight, and its
+                // カメラ took the failed capture as the state to come back to.
+                if (!state.canvasPresentationMode && !state.descriptionFocused && !state.cameraCaptureState.locksCameraInteraction &&
+                    state.cameraCaptureState !is CameraCaptureState.Failed) {
                     BottomNavigationBar(if (state.workContextId != null && state.tab == AppTab.Compose) null else state.tab, viewModel)
                 }
             },
@@ -590,7 +597,9 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
                     .imePadding()
                     .background(MaterialTheme.colorScheme.background),
             ) {
-                if (state.canvasPresentationMode) {
+                // A full screen over a run that is waiting for an answer gives
+                // way to the studio, which keeps the answer beside the work.
+                if (state.canvasPresentationMode && (state.presentationHistory != null || composeScreenLayout(state).presentationOnly)) {
                     CanvasHeroCard(state, viewModel, modifier = Modifier.fillMaxSize(), deviceRotation = deviceRotation)
                 } else {
                     screenStates.SaveableStateProvider("${state.tab}:${state.workContextId.orEmpty()}") {
@@ -622,6 +631,8 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
                 }
                 state.workActionsTarget?.let { WorkActionsDialog(it, viewModel) }
                 if (state.toolChangeOpen) ToolChangeDialog(state, viewModel, S)
+                // After the dialogs it may be asked from, so it is drawn over them.
+                state.discardConfirm?.let { DiscardConfirmDialog(it, viewModel) }
                 state.workSketchTarget?.let { WorkSketchDialog(it, viewModel) }
                 if (state.canvasSearchOpen) {
                     val history by viewModel.historyItems.collectAsState()
@@ -693,6 +704,17 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
 }
 
 @Composable
+private fun DiscardConfirmDialog(confirm: DiscardConfirm, viewModel: InkuViewModel) {
+    AlertDialog(
+        onDismissRequest = viewModel::cancelDiscard,
+        title = { Text(if (confirm is DiscardConfirm.Candidates) S.discardCandidatesTitle else S.discardInstructionsTitle) },
+        text = { Text(if (confirm is DiscardConfirm.Candidates) S.discardCandidatesBody(confirm.count) else S.discardInstructionsBody) },
+        confirmButton = { TextButton(onClick = viewModel::confirmDiscard) { Text(S.discard) } },
+        dismissButton = { TextButton(onClick = viewModel::cancelDiscard) { Text(S.cancel) } },
+    )
+}
+
+@Composable
 private fun DdlOverwriteDialog(viewModel: InkuViewModel) {
     AlertDialog(
         onDismissRequest = viewModel::cancelDdlOverwrite,
@@ -700,7 +722,7 @@ private fun DdlOverwriteDialog(viewModel: InkuViewModel) {
         text = { Text(S.ddlOverwriteBody) },
         confirmButton = {
             TextButton(onClick = viewModel::confirmDdlOverwriteRegenerate) {
-                Text("OK")
+                Text(S.ddlOverwriteRedraw)
             }
         },
         dismissButton = {
@@ -841,9 +863,9 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
             }
         }
     }
-    fun closeEditor() {
+    fun closeEditor(askToDiscard: Boolean = true) {
         syncEditor(leaving = true)
-        viewModel.closeDdlEditor()
+        viewModel.closeDdlEditor(askToDiscard)
     }
     val context = LocalContext.current
     val importScope = rememberCoroutineScope()
@@ -915,12 +937,15 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
                     }
                     TextButton(
                         onClick = {
-                            closeEditor()
+                            // Drawing is what the edit was for; nothing is discarded.
+                            closeEditor(askToDiscard = false)
                             viewModel.drawFromDdl()
                         },
                         enabled = !state.isDrawing && DdlSource.hasBody(state.ddl),
                     ) {
-                        Text(S.renderTabArtwork)
+                        // The name the note above uses for it, rather than the
+                        // tab's (「描画」, and "Work" in English).
+                        Text(S.drawFromDdl)
                     }
                 }
                 DdlSelectedVocabularyHeader(selectedWord)
@@ -1756,6 +1781,15 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
     BackHandler(enabled = editingWork && hasWork && !appOwnsBack) {
         if (state.workContextId != null) viewModel.closeWorkContext() else viewModel.finishDescriptionEditing()
     }
+    // Closing the keyboard (its own key, or the first back) leaves the field
+    // focused, and the bottom bar stays away while it is; the next back then
+    // left the app. Only the change from shown to hidden lets go of the focus,
+    // so a field that is focused before the keyboard rises keeps it.
+    var imeWasVisible by remember { mutableStateOf(imeVisible) }
+    LaunchedEffect(imeVisible) {
+        if (imeWasVisible && !imeVisible && state.descriptionFocused) focusManager.clearFocus()
+        imeWasVisible = imeVisible
+    }
     val writeImeBar = state.descriptionFocused && state.composeMode == ComposeMode.Write
     val batchImeBar = batchEditorFocused && imeVisible && state.composeMode == ComposeMode.Batch && !state.isDrawing
     // The pinned bar lies over the bottom of the scroll. Room of the same
@@ -1823,8 +1857,11 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
                     Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
                         // A work in the trash has no edits on offer, as its
                         // lineage card has none.
-                        PrimarySmallButton(S.reviseWork, onClick = { state.selectedHistory?.let(viewModel::openWorkActions) }, enabled = !inTrash, modifier = Modifier.weight(1f))
-                        SecondarySmallButton(S.newWork, onClick = viewModel::clearPrompt)
+                        // Both are refused while a drawing runs (and 推敲する while
+                        // anything runs); greyed out rather than pressable with
+                        // nothing happening.
+                        PrimarySmallButton(S.reviseWork, onClick = { state.selectedHistory?.let(viewModel::openWorkActions) }, enabled = !inTrash && !state.isRunning, modifier = Modifier.weight(1f))
+                        SecondarySmallButton(S.newWork, onClick = viewModel::clearPrompt, enabled = !state.isDrawing)
                     }
                 }
                 // While the work is revised, the description field below holds
@@ -2859,7 +2896,22 @@ private fun CanvasHeroCard(
                                 }
                             },
                             onClose = viewModel::exitCanvasPresentationMode,
+                            onExport = item?.let { { exportSheetOpen = true } },
+                            onGenerationInfo = item?.takeIf { state.refinementPreviewId == null }?.let { { generationInfoOpen = true } },
                         )
+                        // What the export says (preparing, done, failed); under
+                        // the canvas, where it goes otherwise, there is nothing
+                        // in the full screen.
+                        (canvasMessage ?: strings.exportPreparing("PNG").takeIf { pngExporting })?.let { message ->
+                            Surface(
+                                modifier = Modifier.align(Alignment.TopCenter).padding(Dimens.spaceL),
+                                shape = RoundedCornerShape(100),
+                                color = PresentationControlsSurface,
+                            ) {
+                                Text(message, modifier = Modifier.padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
+                                    color = PresentationControlLabelMuted, style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
                     }
                 }
             }
@@ -2886,17 +2938,21 @@ private fun CanvasHeroCard(
                         MiniPill(text = S.generationInfoTitle, onClick = { generationInfoOpen = true })
                     }
                     MiniPill(text = S.exportButton, onClick = { exportSheetOpen = true })
+                    // The search over saved works (SPEC 2026-10-17). Its button
+                    // was added to `CanvasPanel`, which nothing draws.
+                    MiniPill(text = S.search, modifier = Modifier.testTag("CanvasWorkSearchEntry"), onClick = viewModel::openCanvasSearch)
                 }
             }
         }
     }
-    if (!presentation && showControls && exportSheetOpen) item?.let {
+    if (showControls && exportSheetOpen) item?.let {
         ExportSheet(
             item = it,
             templates = state.exportTemplates,
             onDismiss = { exportSheetOpen = false },
             onEditTemplates = {
                 exportSheetOpen = false
+                if (presentation) viewModel.exitCanvasPresentationMode()
                 viewModel.setTab(AppTab.Settings)
                 viewModel.setSettingsPane(SettingsPane.Export)
             },
@@ -2933,7 +2989,7 @@ private fun CanvasHeroCard(
             },
         )
     }
-    if (!presentation && showControls && generationInfoOpen && state.refinementPreviewId == null) item?.let {
+    if (showControls && generationInfoOpen && state.refinementPreviewId == null) item?.let {
         GenerationInfoSheet(item = it, onDismiss = { generationInfoOpen = false })
     }
     if (!presentation && showControls && pngExporting) {
@@ -3847,7 +3903,7 @@ internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
         StudioHeader(if (state.refinementOpen) S.reviseWork else S.workLineage, viewModel,
-            onBack = { if (state.refinementOpen) viewModel.closeRefinement() else if (state.workContextId != null) viewModel.closeWorkContext() else viewModel.openStudio() })
+            onBack = { if (state.refinementOpen) viewModel.requestCloseRefinement() else if (state.workContextId != null) viewModel.closeWorkContext() else viewModel.openStudio() })
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -3859,6 +3915,17 @@ internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
             ChipButton(S.makeNewOrigin, onClick = viewModel::detachLineage)
         }
         WorkNotice(state.workNotice, viewModel)
+        // A redraw with or without 写生 and a drawing from the DDL editor run
+        // while the lineage stays on screen; without this row the screen showed
+        // neither their progress, a way to stop them, nor why one failed.
+        // Refinement candidates report in their own panel.
+        if (state.isDrawing) {
+            RunStatusRow(state, viewModel)
+        } else if (!state.refinementOpen) {
+            state.message?.takeIf { it.isNotBlank() }?.let { message ->
+                Text(message, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
+            }
+        }
         when {
             state.refinementOpen -> RefinementPanel(state, viewModel)
             state.lineageLoading && graph == null ->
@@ -3897,7 +3964,7 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
                 RefinementSubview.Ground -> parityStrings.groundAction
                 else -> LocalStrings.current.comparisonKindDescription(state.refinementSubview.id)
             }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            ChipButton(S.close, enabled = !busy, onClick = viewModel::closeRefinement)
+            ChipButton(S.close, enabled = !busy, onClick = viewModel::requestCloseRefinement)
         }
 
         // 調整・モデル (SPEC :616). Two faces of one screen.
@@ -4775,6 +4842,7 @@ private fun VersionInfoRow(label: String, value: String) {
 internal fun ChatGptSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val plan = state.chatGptPlan
+    var signOutTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
     Column(
         modifier = modifier.testTag("ChatGPTPlanSettings").verticalScroll(rememberScrollState()).padding(horizontal = Dimens.spaceXs),
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
@@ -4790,7 +4858,9 @@ internal fun ChatGptSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, 
                         WrapRow {
                             SecondarySmallButton(S.chatGptReauthenticate, onClick = { viewModel.authorizeChatGpt(profile.id) }, enabled = !plan.pending)
                             if (!profile.planAllowed) SecondarySmallButton(S.chatGptEnablePlan, onClick = { viewModel.authorizeChatGpt(profile.id, consent = true) }, enabled = !plan.pending)
-                            SecondarySmallButton(S.chatGptSignOut, onClick = { viewModel.signOutChatGpt(profile.id) }, enabled = !plan.pending)
+                            // Asked first, as deleting an API key is: signing out
+                            // takes a new authorization to undo.
+                            SecondarySmallButton(S.chatGptSignOut, onClick = { signOutTarget = profile.id to profile.label }, enabled = !plan.pending)
                         }
                     }
                 }
@@ -4807,6 +4877,20 @@ internal fun ChatGptSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, 
             state.message?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
             if (plan.revocationUnconfirmed) Text(S.chatGptRevocationUnconfirmed, style = MaterialTheme.typography.bodyMedium)
         }
+    }
+    signOutTarget?.let { (profileId, label) ->
+        AlertDialog(
+            onDismissRequest = { signOutTarget = null },
+            title = { Text(S.chatGptSignOut) },
+            text = { Text(S.chatGptSignOutBody(label)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    signOutTarget = null
+                    viewModel.signOutChatGpt(profileId)
+                }) { Text(S.chatGptSignOut) }
+            },
+            dismissButton = { TextButton(onClick = { signOutTarget = null }) { Text(S.cancel) } },
+        )
     }
 }
 
@@ -4914,7 +4998,7 @@ private fun ProviderConnectionCard(
     provider: app.inku.mobile.data.db.ProviderSettingEntity,
     candidateModelIds: List<String>?,
     modelAssets: List<app.inku.mobile.data.db.ModelAssetEntity>,
-    onSave: (String, String, String, String, String, String) -> Unit,
+    onSave: (String, String, String, String, String, String, (String?) -> Unit) -> Unit,
     onClearApiKey: () -> Unit,
     onDelete: () -> Unit,
     onFetchModels: () -> Unit,
@@ -4937,6 +5021,13 @@ private fun ProviderConnectionCard(
     var modelPickerOpen by remember(provider.providerId) { mutableStateOf(false) }
     var confirmClearKey by remember(provider.providerId) { mutableStateOf(false) }
     var confirmDeleteService by remember(provider.providerId) { mutableStateOf(false) }
+    // The fields show the saved values; a refused save leaves them as they
+    // were and says why here, instead of showing a value that was not kept.
+    var saveError by remember(provider.providerId) { mutableStateOf<String?>(null) }
+    fun save(name: String, url: String, key: String, models: String) {
+        saveError = null
+        onSave(provider.providerId, name, kind, url, key, models) { error -> saveError = error }
+    }
     val publishedModels = remember(provider.providerId, provider.publishedModelsJson) {
         parsePublishedModelIds(provider.publishedModelsJson).joinToString("\n")
     }
@@ -4953,6 +5044,7 @@ private fun ProviderConnectionCard(
         },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+            saveError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
             ModelSettingValueRow(
                 label = "Base URL",
                 value = baseUrl.ifBlank { provider.baseUrl ?: "-" },
@@ -5020,9 +5112,8 @@ private fun ProviderConnectionCard(
             initialValue = displayName,
             onDismiss = { editNameOpen = false },
             onSave = { value ->
-                displayName = value
                 editNameOpen = false
-                onSave(provider.providerId, value, kind, baseUrl, "", publishedModels)
+                save(value, baseUrl, "", publishedModels)
             },
         )
     }
@@ -5034,9 +5125,8 @@ private fun ProviderConnectionCard(
             keyboardOptions = UrlKeyboardOptions,
             onDismiss = { editBaseUrlOpen = false },
             onSave = { value ->
-                baseUrl = value
                 editBaseUrlOpen = false
-                onSave(provider.providerId, displayName, kind, value, "", publishedModels)
+                save(displayName, value, "", publishedModels)
             },
         )
     }
@@ -5051,7 +5141,7 @@ private fun ProviderConnectionCard(
                 apiKey = value
                 editApiKeyOpen = false
                 if (apiKey.isNotBlank()) {
-                    onSave(provider.providerId, displayName, kind, baseUrl, apiKey, publishedModels)
+                    save(displayName, baseUrl, apiKey, publishedModels)
                     apiKey = ""
                 }
             },
@@ -5070,7 +5160,7 @@ private fun ProviderConnectionCard(
                 statusMessage = statusMessage,
                 onSave = { selected ->
                     modelPickerOpen = false
-                    onSave(provider.providerId, displayName, kind, baseUrl, "", selected.joinToString("\n"))
+                    save(displayName, baseUrl, "", selected.joinToString("\n"))
                 },
             )
         } else {
@@ -5085,7 +5175,7 @@ private fun ProviderConnectionCard(
                 onCheckAccess = onCheckAccess,
                 onSave = { selected ->
                     modelPickerOpen = false
-                    onSave(provider.providerId, displayName, kind, baseUrl, "", selected.joinToString("\n"))
+                    save(displayName, baseUrl, "", selected.joinToString("\n"))
                 },
             )
         }
@@ -5448,7 +5538,7 @@ private fun ModelPickerActionButton(text: String, onClick: () -> Unit, modifier:
 
 @Composable
 private fun AddProviderCard(
-    onAdd: (String, String, String, String, String, String) -> Unit,
+    onAdd: (String, String, String, String, String, String, (String?) -> Unit) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     var providerId by remember { mutableStateOf("") }
@@ -5456,6 +5546,8 @@ private fun AddProviderCard(
     var kind by remember { mutableStateOf("openai-compatible") }
     var baseUrl by remember { mutableStateOf("") }
     var apiKey by remember { mutableStateOf("") }
+    var adding by remember { mutableStateOf(false) }
+    var addError by remember { mutableStateOf<String?>(null) }
     // Closing forgets what was typed, the key above all: it would otherwise
     // wait in memory and come back filled in the next time the dialog opens.
     fun close() {
@@ -5465,6 +5557,8 @@ private fun AddProviderCard(
         kind = "openai-compatible"
         baseUrl = ""
         apiKey = ""
+        adding = false
+        addError = null
     }
     SecondaryActionButton(text = S.providerAdd, onClick = { open = true })
     if (open) {
@@ -5500,15 +5594,21 @@ private fun AddProviderCard(
                         keyboardOptions = SecretKeyboardOptions,
                         visualTransformation = PasswordVisualTransformation(),
                     )
+                    // A refused service keeps what was typed, so only the
+                    // field that was wrong has to be typed again.
+                    addError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
                 }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        onAdd(providerId, displayName, kind, baseUrl, apiKey, "")
-                        close()
+                        adding = true
+                        addError = null
+                        onAdd(providerId, displayName, kind, baseUrl, apiKey, "") { error ->
+                            if (error == null) close() else { adding = false; addError = error }
+                        }
                     },
-                    enabled = providerId.isNotBlank(),
+                    enabled = providerId.isNotBlank() && !adding,
                 ) { Text(S.add) }
             },
             dismissButton = {
@@ -6114,7 +6214,7 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
                 }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = viewModel::openCanvasSearch,
-                    enabled = !state.isRunning, modifier = Modifier.testTag("CanvasWorkSearchEntry")) {
+                    enabled = !state.isRunning) {
                     Text(S.search, style = MaterialTheme.typography.labelSmall)
                 }
                 item?.takeIf { state.refinementPreviewId == null }?.let {
@@ -6782,10 +6882,10 @@ private fun HistoryGridTile(
 ) {
     Card(
         modifier = modifier
-            .combinedClickable(
-                onClick = onSelect,
-                onLongClick = onToggleStar,
-            )
+            // A tap opens the work; the star is the badge's alone. A long
+            // press used to toggle it too, unseen, while scrolling (2026-10-18,
+            // the author).
+            .clickable(onClick = onSelect)
             .border(Dimens.hairline, if (selected) MaterialTheme.colorScheme.primary else CardHairline, RoundedCornerShape(0.dp)),
         shape = RoundedCornerShape(0.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -7343,6 +7443,10 @@ private fun PresentationControls(
     onOpenLineage: () -> Unit,
     onToggleCaption: () -> Unit,
     onClose: () -> Unit,
+    // A work opened from Works is seen only here, so getting a file of it and
+    // reading how it was made have to be reachable from here as well.
+    onExport: (() -> Unit)? = null,
+    onGenerationInfo: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -7360,7 +7464,9 @@ private fun PresentationControls(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             PresentationControlButton("×", onClick = onClose)
-            PresentationControlButton("‹", enabled = canGoOlder, onClick = onGoOlder)
+            // ‹ is the newer work, as the swipe to the right is and as web's
+            // left-hand button is (CanvasPanel.svelte `nav-left`).
+            PresentationControlButton("‹", enabled = canGoNewer, onClick = onGoNewer)
             Text(
                 counter,
                 modifier = Modifier.weight(1f).padding(horizontal = Dimens.spaceXs),
@@ -7369,13 +7475,15 @@ private fun PresentationControls(
                 textAlign = TextAlign.Center,
                 maxLines = 1,
             )
-            PresentationControlButton("›", enabled = canGoNewer, onClick = onGoNewer)
+            PresentationControlButton("›", enabled = canGoOlder, onClick = onGoOlder)
             PresentationControlButton(S.description, selected = captionVisible, enabled = captionEnabled, wide = true, onClick = onToggleCaption)
             Box {
                 PresentationControlButton("⋯", onClick = { menuOpen = true })
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     if (canOpenLineage) DropdownMenuItem(text = { Text(S.workLineage) }, modifier = Modifier.testTag(WORK_LINEAGE_ENTRY_TAG), onClick = { menuOpen = false; onOpenLineage() })
                     if (canEdit) DropdownMenuItem(text = { Text(S.reviseWork) }, onClick = { menuOpen = false; onEdit() })
+                    onExport?.let { open -> DropdownMenuItem(text = { Text(S.exportButton) }, onClick = { menuOpen = false; open() }) }
+                    onGenerationInfo?.let { open -> DropdownMenuItem(text = { Text(S.generationInfoTitle) }, onClick = { menuOpen = false; open() }) }
                     DropdownMenuItem(text = { Text(if (starred) "★" else "☆") }, enabled = canToggleStar, onClick = { menuOpen = false; onToggleStar() })
                     DropdownMenuItem(text = { Text(S.latest) }, enabled = canGoLatest, onClick = { menuOpen = false; onGoLatest() })
                     DropdownMenuItem(text = { Text("${zoomPercent}%") }, enabled = zoomPercent != (CANVAS_FIT_ZOOM * 100).toInt(), onClick = { menuOpen = false; onResetZoom() })

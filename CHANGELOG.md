@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-19 — 3D: open works with heavy brush texture and unfilled clouds
+
+The experimental 3D view now paints at most four marks at a time, and each five-second deadline counts from that mark's own SVG decode. Mark and presence SVGs decode at their texture's size, and a mark's 3D SVG applies the performance-touch filter only where the mark's bounds meet the original filter region (2D SVGs are unchanged). In WebKit, including the macOS app, works with heavy brush texture could miss the 15-second limit, and marks that had only waited in line failed the deadline. An unfilled cloudform is now one tube along its contour, fixing works with a smooth unfilled cloud that would not open in 3D. "GPU unavailable" now appears only when the renderer cannot be created; other failures show their own reason in the details. The distribution is `paint-speed-v1-ae78d6d7`.
+
 ### 2026-10-18 — macOS: 3D PNG and GLB saves start again
 
 In the macOS experimental 3D view, PNG save and GLB save opened no save panel: WKWebView silently dropped the viewer's download link. The viewer's saves now reach the app through the parent page shared with Android. Focus selection works once a shape is clicked to select it, as on the Web.

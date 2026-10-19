@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-19 — Juxtapose: Model selection lets you choose a model
-
-In the Web's Juxtapose, Model selection squeezed the model list into the Juxtapose dialog as a thin line and left the whole dialog blurred, so no model could be chosen. The CSS transform that centred the dialog made it the box the list is laid out in; the dialog is now centred by its margins, as the Instruction editor is.
-
 ### 2026-10-18 — macOS: 3D PNG and GLB saves start again
 
 In the macOS experimental 3D view, PNG save and GLB save opened no save panel: WKWebView silently dropped the viewer's download link. The viewer's saves now reach the app through the parent page shared with Android. Focus selection works once a shape is clicked to select it, as on the Web.
@@ -174,6 +170,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.203 (2026-10-19 / Build 1279)
+
+### 2026-10-19 — Juxtapose: Model selection lets you choose a model
+
+In the Web's Juxtapose, Model selection squeezed the model list into the Juxtapose dialog as a thin line and left the whole dialog blurred, so no model could be chosen. The CSS transform that centred the dialog made it the box the list is laid out in; the dialog is now centred by its margins, as the Instruction editor is.
 
 ## v2.15.202 (2026-10-19 / Build 1278)
 

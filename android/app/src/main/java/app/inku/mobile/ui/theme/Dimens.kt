@@ -159,6 +159,9 @@ object Dimens {
     /** 248dp. The vocabulary bar's ceiling. */
     val vocabularyBarMaxHeight: Dp = 248.dp
 
+    /** 92dp. The drawn sample above a tapped word's effect. */
+    val vocabularyPreviewImageHeight: Dp = 92.dp
+
     /** 252dp. The preview inside the demo panel. */
     val demoPreviewMaxHeight: Dp = 252.dp
 
@@ -196,6 +199,9 @@ object Dimens {
 
     /** 680dp. The local model management dialog. */
     val localModelDialogMaxHeight: Dp = 680.dp
+
+    /** 600dp. From this width the replay dialog sets the two drawings side by side. */
+    val replayComparisonSideBySideMinWidth: Dp = 600.dp
 
     // --- Headers and touch targets ----------------------------------------
 

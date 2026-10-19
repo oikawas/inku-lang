@@ -15,7 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import app.inku.mobile.render.RustArtworkRasterizer
 import app.inku.mobile.ui.i18n.UiLanguage
 import app.inku.mobile.ui.theme.Dimens
@@ -163,7 +162,7 @@ internal fun SaijikiPreviewCard(preview: SaijikiPreview?, uiLanguage: UiLanguage
                 }
             }.value
             Column(modifier = Modifier.padding(Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                if (bitmap != null) Image(bitmap, contentDescription = null, modifier = Modifier.fillMaxWidth().height(92.dp))
+                if (bitmap != null) Image(bitmap, contentDescription = null, modifier = Modifier.fillMaxWidth().height(Dimens.vocabularyPreviewImageHeight))
                 Text(preview.word, style = MaterialTheme.typography.titleSmall)
                 Text(preview.effect, style = MaterialTheme.typography.bodySmall)
                 Text((if (uiLanguage.isEnglish) "Example instructions: " else "指示書の例：") + preview.example,

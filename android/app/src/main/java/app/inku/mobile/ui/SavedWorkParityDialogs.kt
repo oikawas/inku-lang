@@ -44,7 +44,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import app.inku.mobile.data.db.HistoryListItem
@@ -159,7 +158,7 @@ internal fun ReplayComparisonDialog(
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
-                    val wide = maxWidth >= 600.dp
+                    val wide = maxWidth >= Dimens.replayComparisonSideBySideMinWidth
                     if (wide) {
                         Row(
                             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),

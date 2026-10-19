@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { en } from '../../i18n/en.ts';
 import { ja } from '../../i18n/ja.ts';
 import { formatPipelineDiagnostic } from './diagnostics.ts';
 
@@ -60,6 +61,27 @@ test('saved render clip omission names its instruction, reason, omission, and co
 	assert.equal(
 		actual,
 		'描画指示 3 の箇所。 クリップ処理の上限を超えました。 描画指示 3 を省略しました。 ほかの部分の描画は続けました。',
+	);
+});
+
+test('words whose shape could not be decided are named as omitted source words', () => {
+	const diagnostic = {
+		channel: 'upstream' as const,
+		value: {
+			disposition: { kind: 'omitted', unit: { kind: 'source_occurrence', span: { start_byte: 12, end_byte: 18 } } },
+			issue_kind: 'conflict',
+			reason: 'ambiguous_entity_ownership',
+			span: { start_byte: 12, end_byte: 18 },
+		},
+	};
+
+	assert.equal(
+		formatPipelineDiagnostic(diagnostic, ja),
+		'原文のバイト位置 12〜18。 この言葉がどの形のものか決められませんでした。 原文の言葉 を省略しました。 ほかの部分の描画は続けました。',
+	);
+	assert.equal(
+		formatPipelineDiagnostic(diagnostic, en),
+		'Source byte range 12–18. Which shape these words belong to could not be decided. Omitted source words. The rest of the drawing continued.',
 	);
 });
 

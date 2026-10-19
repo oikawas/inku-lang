@@ -200,6 +200,22 @@ const JAPANESE_COUNTERS_V1: &[&str] = &["本", "個", "枚"];
 pub(crate) fn is_japanese_counter_surface(surface: &str) -> bool {
     JAPANESE_COUNTERS_V1.contains(&surface) || surface == "つ"
 }
+
+/// A size keyword takes the number after it as one dimension of its shape;
+/// canvas, axis, position, and range keywords place rather than size.
+pub(crate) fn is_numeric_size_keyword(keyword: GeometryKeyword) -> bool {
+    matches!(
+        keyword,
+        GeometryKeyword::Radius
+            | GeometryKeyword::Diameter
+            | GeometryKeyword::Length
+            | GeometryKeyword::Chord
+            | GeometryKeyword::Sagitta
+            | GeometryKeyword::Width
+            | GeometryKeyword::Height
+            | GeometryKeyword::Side
+    )
+}
 const GROUP_LAYOUT_FUNCTION_WORDS_JA: &[&str] = &["重ねて", "並べて"];
 const GROUP_LAYOUT_FUNCTION_WORDS_EN: &[&str] = &["overlapping", "side by side"];
 const NATIVE_TSU_CARDINALS_JA: &[(&str, u64)] = &[
@@ -416,7 +432,7 @@ fn selection_at(
             },
         });
     }
-    if let Some((end_byte, keyword)) = geometry_keyword_at(source, start_byte, language) {
+    if let Some((end_byte, keyword)) = geometry_keyword_at(edition, source, start_byte, language) {
         return Some(Selection::Token {
             end_byte,
             kind: NeutralTokenKind::GeometryKeyword { keyword },
@@ -1084,42 +1100,46 @@ pub(crate) fn is_group_layout_function_word(surface: &str) -> bool {
             .any(|candidate| surface.eq_ignore_ascii_case(candidate))
 }
 
+const GEOMETRY_KEYWORDS_JA: &[(&str, GeometryKeyword)] = &[
+    ("画面の", GeometryKeyword::Canvas),
+    ("位置に", GeometryKeyword::Position),
+    ("半径", GeometryKeyword::Radius),
+    ("直径", GeometryKeyword::Diameter),
+    ("弦長", GeometryKeyword::Chord),
+    ("矢高", GeometryKeyword::Sagitta),
+    ("高さ", GeometryKeyword::Height),
+    ("一辺", GeometryKeyword::Side),
+    ("長さ", GeometryKeyword::Length),
+    ("画面", GeometryKeyword::Canvas),
+    ("位置", GeometryKeyword::Position),
+    ("幅", GeometryKeyword::Width),
+    ("横", GeometryKeyword::AxisX),
+    ("縦", GeometryKeyword::AxisY),
+];
+const GEOMETRY_KEYWORDS_EN: &[(&str, GeometryKeyword)] = &[
+    ("side length", GeometryKeyword::Side),
+    ("horizontal", GeometryKeyword::AxisX),
+    ("vertical", GeometryKeyword::AxisY),
+    ("diameter", GeometryKeyword::Diameter),
+    ("sagitta", GeometryKeyword::Sagitta),
+    ("position", GeometryKeyword::Position),
+    ("radius", GeometryKeyword::Radius),
+    ("length", GeometryKeyword::Length),
+    ("height", GeometryKeyword::Height),
+    ("chord", GeometryKeyword::Chord),
+    ("canvas", GeometryKeyword::Canvas),
+    ("width", GeometryKeyword::Width),
+];
+
 fn geometry_keyword_at(
+    edition: SaijikiEdition,
     source: &str,
     start_byte: usize,
     language: ResolvedInstructionLanguage,
 ) -> Option<(usize, GeometryKeyword)> {
-    let candidates: &[(&str, GeometryKeyword)] = match language {
-        ResolvedInstructionLanguage::Ja => &[
-            ("画面の", GeometryKeyword::Canvas),
-            ("位置に", GeometryKeyword::Position),
-            ("半径", GeometryKeyword::Radius),
-            ("直径", GeometryKeyword::Diameter),
-            ("弦長", GeometryKeyword::Chord),
-            ("矢高", GeometryKeyword::Sagitta),
-            ("高さ", GeometryKeyword::Height),
-            ("一辺", GeometryKeyword::Side),
-            ("長さ", GeometryKeyword::Length),
-            ("画面", GeometryKeyword::Canvas),
-            ("位置", GeometryKeyword::Position),
-            ("幅", GeometryKeyword::Width),
-            ("横", GeometryKeyword::AxisX),
-            ("縦", GeometryKeyword::AxisY),
-        ],
-        ResolvedInstructionLanguage::En => &[
-            ("side length", GeometryKeyword::Side),
-            ("horizontal", GeometryKeyword::AxisX),
-            ("vertical", GeometryKeyword::AxisY),
-            ("diameter", GeometryKeyword::Diameter),
-            ("sagitta", GeometryKeyword::Sagitta),
-            ("position", GeometryKeyword::Position),
-            ("radius", GeometryKeyword::Radius),
-            ("length", GeometryKeyword::Length),
-            ("height", GeometryKeyword::Height),
-            ("chord", GeometryKeyword::Chord),
-            ("canvas", GeometryKeyword::Canvas),
-            ("width", GeometryKeyword::Width),
-        ],
+    let candidates = match language {
+        ResolvedInstructionLanguage::Ja => GEOMETRY_KEYWORDS_JA,
+        ResolvedInstructionLanguage::En => GEOMETRY_KEYWORDS_EN,
     };
     for (surface, keyword) in candidates {
         let end_byte = start_byte.checked_add(surface.len())?;
@@ -1130,7 +1150,14 @@ fn geometry_keyword_at(
             ResolvedInstructionLanguage::Ja => actual == *surface,
             ResolvedInstructionLanguage::En => actual.eq_ignore_ascii_case(surface),
         };
-        if !matches || !geometry_keyword_left_boundary(source, start_byte, language) {
+        if !matches
+            || !(geometry_keyword_left_boundary(source, start_byte, language)
+                // A Japanese size may directly follow a recognized word, e.g.
+                // `赤い 長さ 0.6 の 線`.
+                || (language == ResolvedInstructionLanguage::Ja
+                    && is_numeric_size_keyword(*keyword)
+                    && has_japanese_recognized_left_candidate(edition, source, start_byte)))
+        {
             continue;
         }
         if language == ResolvedInstructionLanguage::En
@@ -1184,6 +1211,17 @@ fn geometry_keyword_left_boundary(
                 )
         }
     }
+}
+
+/// Where the keyword of a Japanese numeric size (`長さ0.6`) starting at `start_byte` ends.
+fn japanese_numeric_size_keyword_end(source: &str, start_byte: usize) -> Option<usize> {
+    GEOMETRY_KEYWORDS_JA.iter().find_map(|(surface, keyword)| {
+        let end_byte = start_byte.checked_add(surface.len())?;
+        (is_numeric_size_keyword(*keyword)
+            && source.get(start_byte..end_byte) == Some(*surface)
+            && numeric_follows_keyword(source, end_byte))
+        .then_some(end_byte)
+    })
 }
 
 fn numeric_follows_keyword(source: &str, end_byte: usize) -> bool {
@@ -1394,6 +1432,24 @@ fn has_relative_scale_head_context(
         }
         if cursor >= source.len() {
             return false;
+        }
+        // A numeric size between the scale and its head keeps the phrase, e.g.
+        // `大きな 長さ 0.6 の 線` and `大きな 幅 0.3、高さ 0.2 の 四角`.
+        if language == ResolvedInstructionLanguage::Ja
+            && let Some(keyword_end) = japanese_numeric_size_keyword_end(source, cursor)
+        {
+            let number_start = source.len() - source[keyword_end..].trim_start().len();
+            let Some(number_end) = exact_decimal_end(source, number_start, language) else {
+                return false;
+            };
+            cursor = number_end;
+            let after_comma = cursor + '、'.len_utf8();
+            if source[cursor..].starts_with('、')
+                && japanese_numeric_size_keyword_end(source, after_comma).is_some()
+            {
+                cursor = after_comma;
+            }
+            continue;
         }
         let next = candidates_at(edition, source, cursor, language, false)
             .into_iter()
@@ -1702,6 +1758,9 @@ fn has_candidate_boundary(
             end_byte == source.len()
                 || source[end_byte..].chars().next().is_some_and(is_separator)
                 || !candidates_at(edition, source, end_byte, language, false).is_empty()
+                // A numeric size between a modifier and its head, e.g.
+                // `細い 長さ 0.6 の 線`.
+                || japanese_numeric_size_keyword_end(source, end_byte).is_some()
         }
     }
 }

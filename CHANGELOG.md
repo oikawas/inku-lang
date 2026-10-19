@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-19 — 3D: open works with overlapping lines, and share vertices
-
-In the experimental 3D view, an endpoint lying inside a parallel line it overlaps no longer makes a joint, as with copies stacked along their own direction ("line up two hundred vertical lines vertically"). Each such joint added tube rings, and five works exceeded the triangle limit; they now open. Ends meeting ends, and T joints across another line, still join. GLB `layerMapping` is `paint-order-joints-v4`. Tubes and painted surfaces now keep shared vertices, cutting painted vertices across all works to 0.22 times with the same shapes, colors and UVs. Depth along jointed lines is also computed faster. The distribution is `shared-vertices-v1-03ae25f1`.
-
 ### 2026-10-18 — macOS: 3D PNG and GLB saves start again
 
 In the macOS experimental 3D view, PNG save and GLB save opened no save panel: WKWebView silently dropped the viewer's download link. The viewer's saves now reach the app through the parent page shared with Android. Focus selection works once a shape is clicked to select it, as on the Web.
@@ -174,6 +170,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.198 (2026-10-19 / Build 1274)
+
+### 2026-10-19 — 3D: open works with overlapping lines, and share vertices
+
+In the experimental 3D view, an endpoint lying inside a parallel line it overlaps no longer makes a joint, as with copies stacked along their own direction ("line up two hundred vertical lines vertically"). Each such joint added tube rings, and five works exceeded the triangle limit; they now open. Ends meeting ends, and T joints across another line, still join. GLB `layerMapping` is `paint-order-joints-v4`. Tubes and painted surfaces now keep shared vertices, cutting painted vertices across all works to 0.22 times with the same shapes, colors and UVs. Depth along jointed lines is also computed faster. The distribution is `shared-vertices-v1-03ae25f1`.
 
 ## v2.15.197 (2026-10-19 / Build 1273)
 

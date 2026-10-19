@@ -1,5 +1,5 @@
-//! The laws stage (`choose_laws`), stage B-2c of the laws port (the author's
-//! decisions of 2026-10-19: the laws are written in numbers, after the
+//! The laws stage (`choose_laws`), stages B-2c and B-3 of the laws port (the
+//! author's decisions of 2026-10-19: the laws are written in numbers, after the
 //! composition, and stay off until every law is in).
 //!
 //! After the composition places a plan's layers, a reader chooses laws of
@@ -8,16 +8,21 @@
 //! document's Score as the prototype did, and prints the layers the laws
 //! changed again in numbers: a numeric point, the two ends of a row or a line,
 //! a numeric range, a numeric size. Every other layer keeps the bytes the
-//! composition printed. The prototype let the canvas cut a mark; a mark at a
-//! numeric point lies wholly on it, so a line is printed by the ends the canvas
-//! shows, a pair as a row of two (whose marks the canvas may cut), and another
-//! mark that leaves the canvas is refused ([`off_canvas`]).
+//! composition printed. A layer progression or beat groups open into marks is
+//! printed one sentence per mark. The prototype let the canvas cut a mark; a
+//! mark at a numeric point lies wholly on it, so a line is printed by the ends
+//! the canvas shows, a pair as a row of two (whose marks the canvas may cut),
+//! and another mark that leaves the canvas is refused ([`off_canvas`]).
 //!
-//! This stage holds the placement, size and hand laws (B1 to B8, B15, B21). The
-//! computation is the prototype's, function by function and in its order. On a
-//! square canvas it is the prototype's to the bit; on another canvas, places
-//! stay canvas fractions and lengths compared with mark sizes are taken in
-//! short-edge units (the prototype ran on square canvases only).
+//! This stage holds the placement, size, arrangement and hand laws (B1 to B10,
+//! B12, B15, B21). The computation is the prototype's, function by function and
+//! in its order, with two departures: a grid takes the columns and rows the
+//! core tiles its range with (the printed tile is drawn so), and a layer an
+//! arrangement law spaces that would need a shrink below the floor keeps its
+//! size (the author's dense layer). On a square canvas it is otherwise the
+//! prototype's to the bit; on another canvas, places stay canvas fractions and
+//! lengths compared with mark sizes are taken in short-edge units (the
+//! prototype ran on square canvases only).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -41,10 +46,20 @@ use crate::prompts::{LlmPrompt, LlmStage, PromptError, PromptLimits};
 pub const LAWS_PROMPT_ID: &str = "inku.laws-prompt.v1";
 
 /// The laws this core applies, in the order the request lists them.
-pub const LAWS: [&str; 10] = ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B15", "B21"];
+pub const LAWS: [&str; 13] = [
+    "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10", "B12", "B15", "B21",
+];
 
 /// The laws that set a layer's place; a layer takes one of them at most.
 const PLACEMENT: [&str; 7] = ["B1", "B2", "B3", "B4", "B5", "B7", "B8"];
+
+/// The laws that arrange a layer's marks; a layer takes one of them at most,
+/// and its marks are kept apart (R1).
+const ARRANGEMENT: [&str; 3] = ["B9", "B10", "B12"];
+
+/// The Score the laws leave holds this many instructions and marks at most.
+const MAX_INSTRUCTIONS: usize = 60;
+const MAX_MARKS: u64 = 380;
 
 /// The prototype's values of `PHI = (1 + 5 ** 0.5) / 2`, as Python computed them.
 const PHI_SQUARED: f64 = 2.618_033_988_749_895;
@@ -599,8 +614,105 @@ fn build_grid(
     }
 }
 
-/// One mark of a layer opened into marks: the layer's instruction alone at a point.
-fn single(template: &Instruction, point: [f64; 2]) -> Instruction {
+/// The columns and rows the core tiles a range of `w` by `h` short-edge units
+/// with (`score_lowering.rs`, `PlacementAction::Tile`): the long side takes the
+/// least `k` whose square is at least the count times the long side over the
+/// short one, the short side the count over `k`, rounded up.
+fn tile(count: u32, w: f64, h: f64) -> (u64, u64) {
+    let n = u64::from(count.max(1));
+    let landscape = h <= w;
+    let long = if w == 0.0 || h == 0.0 {
+        n
+    } else {
+        let target = n as f64 * if landscape { w / h } else { h / w };
+        (1..=n).find(|k| (k * k) as f64 >= target).unwrap_or(n)
+    };
+    let short = n.div_ceil(long);
+    if landscape {
+        (long, short)
+    } else {
+        (short, long)
+    }
+}
+
+/// A grid over a region with the columns and rows the core tiles it with.
+fn build_tiled_grid(instruction: &mut Instruction, region: [f64; 4], units: Units) -> (u64, u64) {
+    let [x0, y0, x1, y1] = region;
+    let (columns, rows) = tile(
+        count_of(instruction),
+        (x1 - x0) * units.x,
+        (y1 - y0) * units.y,
+    );
+    build_grid(instruction, region, columns, rows, units);
+    (columns, rows)
+}
+
+/// R2: the part of the run `p0` to `p1` inside the canvas less `EDGE`, in the
+/// same direction (Liang-Barsky). A run already inside, or one that never
+/// enters, is returned as it is.
+#[allow(clippy::float_cmp)]
+fn inside_frame(p0: [f64; 2], p1: [f64; 2]) -> ([f64; 2], [f64; 2]) {
+    let (low, high) = (EDGE, 1.0 - EDGE);
+    let (dx, dy) = (p1[0] - p0[0], p1[1] - p0[1]);
+    let (mut t0, mut t1) = (0.0_f64, 1.0_f64);
+    for (p, q) in [
+        (-dx, p0[0] - low),
+        (dx, high - p0[0]),
+        (-dy, p0[1] - low),
+        (dy, high - p0[1]),
+    ] {
+        if p.abs() < 1e-12 {
+            if q < 0.0 {
+                return (p0, p1);
+            }
+            continue;
+        }
+        if p < 0.0 {
+            t0 = py_max(t0, q / p);
+        } else {
+            t1 = py_min(t1, q / p);
+        }
+    }
+    if t0 > t1 || (t0 == 0.0 && t1 == 1.0) {
+        return (p0, p1);
+    }
+    (
+        [p0[0] + dx * t0, p0[1] + dy * t0],
+        [p0[0] + dx * t1, p0[1] + dy * t1],
+    )
+}
+
+/// The width and height an arrangement covers now, in canvas fractions: a
+/// row's run, a scatter's spread or a region; else the line it lies along.
+fn extent_now(instruction: &Instruction, units: Units) -> (f64, f64) {
+    let span = || {
+        let ([ax, ay], [bx, by]) = current_span(instruction, units);
+        ((bx - ax).abs(), (by - ay).abs())
+    };
+    if is_row(instruction) {
+        return span();
+    }
+    if is_scatter(instruction) {
+        let [w, h] = domain_of(instruction).unwrap_or([0.5, 0.5]);
+        return (w / units.x, h / units.y);
+    }
+    let region = region_or_center(instruction);
+    if region[2] - region[0] > 1e-6 || region[3] - region[1] > 1e-6 {
+        return (region[2] - region[0], region[3] - region[1]);
+    }
+    span()
+}
+
+/// The smallest step between neighbouring fractions of a run.
+fn min_gap(ts: &[f64]) -> f64 {
+    ts.windows(2)
+        .map(|pair| pair[1] - pair[0])
+        .fold(f64::INFINITY, py_min)
+}
+
+/// One mark of a layer opened into marks: the layer's instruction alone at a
+/// point, `scale` times its size, placed by the laws.
+fn single(template: &Instruction, point: [f64; 2], scale: f64) -> Instruction {
     let mut mark = template.clone();
     if let Some(arrangement) = mark.arrangement.as_mut() {
         arrangement.count = 1;
@@ -611,6 +723,8 @@ fn single(template: &Instruction, point: [f64; 2]) -> Instruction {
         }
     }
     set_point_region(&mut mark, clamp(point[0]), clamp(point[1]));
+    scale_geometry(&mut mark, scale);
+    moved(&mut mark);
     mark
 }
 
@@ -705,6 +819,17 @@ fn stretch_span(p0: [f64; 2], p1: [f64; 2], length: f64, pinned: bool) -> ([f64;
         [mx + ux * before, my + uy * before]
     };
     (start, end)
+}
+
+/// Canvas fractions along a run per short-edge unit of its length.
+fn along_per_unit(units: Units, row: Row) -> f64 {
+    let along = hypot(row.to[0] - row.from[0], row.to[1] - row.from[1]);
+    let physical = units.distance(row.from, row.to);
+    if physical > 0.0 {
+        along / physical
+    } else {
+        1.0
+    }
 }
 
 // --- what the reader is told -------------------------------------------------------------------
@@ -940,6 +1065,13 @@ impl LawsContext {
                         .is_some_and(|shape| SIZED.contains(&shape))
                 })
                 .collect(),
+            "B9" | "B10" | "B12" => movable
+                .into_iter()
+                .filter(|layer| {
+                    self.summary(*layer)
+                        .is_some_and(|summary| summary.count >= 2)
+                })
+                .collect(),
             "B15" | "B21" => self
                 .summaries
                 .iter()
@@ -970,7 +1102,7 @@ struct LawText {
     example: &'static str,
 }
 
-const LAW_TEXTS: [(&str, LawText); 10] = [
+const LAW_TEXTS: [(&str, LawText); 13] = [
     (
         "B1",
         LawText {
@@ -1123,6 +1255,66 @@ const LAW_TEXTS: [(&str, LawText); 10] = [
         },
     ),
     (
+        "B9",
+        LawText {
+            name: ["等間隔の反復", "Equal repetition"],
+            family: ["律動", "rhythm"],
+            source: [
+                "Dow の Repetition、Ross『A Theory of Pure Design』(1907)",
+                "Dow: Repetition; Ross, A Theory of Pure Design (1907)",
+            ],
+            law: [
+                "同じ形を同じ間隔で並べる。列は置き場の線（無ければ今の長い向き）に沿って等しい間隔、格子は数を列×行に割った等しいます目。",
+                "Repeat the same shape at equal intervals. A row runs at equal spacing along the placement law's line (or the current long side); a grid divides the count into equal cells of columns × rows.",
+            ],
+            choose: [
+                "複数の物の層ごとに、形（row 列・grid 格子）。",
+                "for each layer of several things, the form (row, grid).",
+            ],
+            example: r#"{"targets":[{"layer":1,"form":"grid"}]}"#,
+        },
+    ),
+    (
+        "B10",
+        LawText {
+            name: ["漸進", "Progression"],
+            family: ["律動", "rhythm"],
+            source: [
+                "Ross の尺度の漸進、Dow の Transition",
+                "Ross: the progression of scale; Dow: Transition",
+            ],
+            law: [
+                "物を一つずつに開いて列にし、大きさか間隔を、隣どうし同じ比で変える。端から端までの比は 0.618 か 0.382。",
+                "Open the things one by one into a row and change their size or their spacing by the same ratio between neighbours. The ratio from one end to the other is 0.618 or 0.382.",
+            ],
+            choose: [
+                "複数の物の層ごとに、変えるもの（size・spacing）、比、小さく・詰まっていく向き（toward: left・right・top・bottom）。",
+                "for each layer of several things, what changes (size, spacing), the ratio, and the side they get smaller or closer toward (toward: left, right, top, bottom).",
+            ],
+            example: r#"{"targets":[{"layer":1,"change":"size","ratio":"0.618","toward":"right"}]}"#,
+        },
+    ),
+    (
+        "B12",
+        LawText {
+            name: ["拍の群", "Beat groups"],
+            family: ["律動", "rhythm"],
+            source: [
+                "Klee『教育スケッチブック』(1925)、音楽の拍子と強弱",
+                "Klee, Pedagogical Sketchbook (1925); the meter and accents of music",
+            ],
+            law: [
+                "物を 2・3・4 個ずつの群にして、群の間に間（並びの間隔の2倍）をおいて列に並べる。強拍を選ぶと、群の初めが大きく、ほかは 0.618 になる。",
+                "Group the things by 2, 3 or 4 and line them up with a rest (twice the row's spacing) between the groups. With a strong beat, the first of each group is large and the others are 0.618.",
+            ],
+            choose: [
+                "複数の物の層ごとに、群の大きさ（\"2\"・\"3\"・\"4\"）と強拍（first・none）。",
+                "for each layer of several things, the group size (\"2\", \"3\", \"4\") and the strong beat (first, none).",
+            ],
+            example: r#"{"targets":[{"layer":1,"group":"3","strong":"first"}]}"#,
+        },
+    ),
+    (
         "B15",
         LawText {
             name: ["空気遠近", "Aerial perspective"],
@@ -1160,27 +1352,27 @@ const LAW_TEXTS: [(&str, LawText); 10] = [
 
 const SYSTEM_JA: &str = "あなたは、絵画・意匠・音楽の法則を組み合わせて、作品の記述を一枚の画にする係です。
 作品は、記述（作者の文）から作った楽譜です。楽譜の層（物）は、まだ法則なしで置かれています。
-法則の一覧（10）から、この作品に使う法則を選び、法則ごとの値を選択肢から選んでください。座標は書きません。座標と大きさは、道具が法則から計算します。
+法則の一覧（13）から、この作品に使う法則を選び、法則ごとの値を選択肢から選んでください。座標は書きません。座標と大きさは、道具が法則から計算します。
 
 決まり:
 1. 主の法則（main_law）を一つ決めます。画を見た人が最初に読み取る、画の骨組みになる法則です。B21 は主にしません。主の層（main_layer）も一つ決めます。
 2. 法則の数は、送る文の最後の「この答えの決まり」に従います。法則は、層をいくつに当てても1つと数えます。
-3. 一つの層に、置き場の法則（B1〜B5・B7・B8）は一つまで。大きさの法則（B6・B15）は掛け合わせます。
+3. 一つの層に、置き場の法則（B1〜B5・B7・B8）は一つ、並びの法則（B9・B10・B12）は一つまで。大きさの法則（B6・B10・B12・B15）は掛け合わせます。
 4. 記述が名指した物の種類と道具は変えません。記述そのものが数を書いた物（「一羽」「三度」など）は数を変えず、その層の番号を description_counts に入れます。
-5. 道具は、置き場 → 大きさ → 空気遠近 → 手 の順に当てます。決まりに合わない答えは、理由を添えて返されます。
+5. 道具は、置き場 → 大きさ → 並び → 空気遠近 → 手 の順に当てます。決まりに合わない答えは、理由を添えて返されます。
 6. reason には、記述の言葉を「」で引いて、主の法則を選んだ理由を1〜2行で書きます。
 答えは決まった形の JSON で返します。laws には、使う法則の番号を鍵にして、法則ごとの値を書きます。";
 
 const SYSTEM_EN: &str = "You combine laws of painting, design and music to make a work's description into one picture.
 The work is a Score made from the description (the author's words). The Score's layers (things) are placed without laws yet.
-From the list of laws (10), choose the laws this work uses and, for each law, its values from the choices. Write no coordinates: the tool computes coordinates and sizes from the laws.
+From the list of laws (13), choose the laws this work uses and, for each law, its values from the choices. Write no coordinates: the tool computes coordinates and sizes from the laws.
 
 Rules:
 1. Choose one main law (main_law): the law a viewer reads first, the framework of the picture. B21 is never the main law. Choose one main layer (main_layer) too.
 2. The number of laws follows \"The rule of this answer\" at the end of the message. A law counts as one however many layers it takes.
-3. A layer takes one placement law (B1 to B5, B7, B8) at most. The size laws (B6, B15) multiply.
+3. A layer takes one placement law (B1 to B5, B7, B8) and one arrangement law (B9, B10, B12) at most. The size laws (B6, B10, B12, B15) multiply.
 4. Keep the kinds of things and the tools the description names. Keep the count of a thing the description itself counts (\"one heron\", \"three times\"), and put that layer's number in description_counts.
-5. The tool applies placement, then size, then aerial perspective, then the hand. An answer that breaks the rules comes back with the reason.
+5. The tool applies placement, then size, then arrangement, then aerial perspective, then the hand. An answer that breaks the rules comes back with the reason.
 6. In reason, quote the description's words in “ ” and say in one or two lines why you chose the main law.
 Return the answer as JSON of the given shape. In laws, key each law you use by its number and write its values.";
 
@@ -1237,14 +1429,14 @@ fn message(
             "## 記述",
             "## 楽譜の層（法則を当てる前）",
             "## 地: ",
-            "## 法則の一覧（10）",
+            "## 法則の一覧（13）",
             "## 答え全体の例（この作品と別の記述）",
         ],
         ResolvedInstructionLanguage::En => [
             "## Description",
             "## The Score's layers (before the laws)",
             "## Ground: ",
-            "## The laws (10)",
+            "## The laws (13)",
             "## A whole answer (for another description)",
         ],
     };
@@ -1391,6 +1583,51 @@ fn law_schema(law: &str, context: &LawsContext) -> Option<Value> {
                     "axis": {"type": "string", "enum": ["vertical", "horizontal", "both"]}
                 },
                 "required": ["layer", "axis"]
+            }))},
+            "required": ["targets"]
+        }),
+        "B9" => json!({
+            "type": "object",
+            "propertyOrdering": ["targets"],
+            "properties": {"targets": targets(json!({
+                "type": "object",
+                "propertyOrdering": ["layer", "form"],
+                "properties": {
+                    "layer": layer,
+                    "form": {"type": "string", "enum": ["row", "grid"]}
+                },
+                "required": ["layer", "form"]
+            }))},
+            "required": ["targets"]
+        }),
+        "B10" => json!({
+            "type": "object",
+            "propertyOrdering": ["targets"],
+            "properties": {"targets": targets(json!({
+                "type": "object",
+                "propertyOrdering": ["layer", "change", "ratio", "toward"],
+                "properties": {
+                    "layer": layer,
+                    "change": {"type": "string", "enum": ["size", "spacing"]},
+                    "ratio": {"type": "string", "enum": ["0.618", "0.382"]},
+                    "toward": {"type": "string", "enum": ["left", "right", "top", "bottom"]}
+                },
+                "required": ["layer", "change", "ratio", "toward"]
+            }))},
+            "required": ["targets"]
+        }),
+        "B12" => json!({
+            "type": "object",
+            "propertyOrdering": ["targets"],
+            "properties": {"targets": targets(json!({
+                "type": "object",
+                "propertyOrdering": ["layer", "group", "strong"],
+                "properties": {
+                    "layer": layer,
+                    "group": {"type": "string", "enum": ["2", "3", "4"]},
+                    "strong": {"type": "string", "enum": ["first", "none"]}
+                },
+                "required": ["layer", "group", "strong"]
             }))},
             "required": ["targets"]
         }),
@@ -1655,7 +1892,7 @@ fn law_targets(law: &str, value: &Value) -> Vec<usize> {
             .collect()
     };
     match law {
-        "B1" | "B2" | "B3" | "B4" | "B5" | "B8" | "B21" => value["targets"]
+        "B1" | "B2" | "B3" | "B4" | "B5" | "B8" | "B9" | "B10" | "B12" | "B21" => value["targets"]
             .as_array()
             .into_iter()
             .flatten()
@@ -1742,6 +1979,7 @@ fn check(answer: &Value, context: &LawsContext, count_rule: bool) -> Result<Answ
         ));
     }
     let mut placed: BTreeMap<usize, Vec<&str>> = BTreeMap::new();
+    let mut arranging: BTreeMap<usize, Vec<&str>> = BTreeMap::new();
     for (law, value) in &laws {
         let seen = law_targets(law, value);
         if seen.iter().collect::<BTreeSet<_>>().len() != seen.len() {
@@ -1762,6 +2000,9 @@ fn check(answer: &Value, context: &LawsContext, count_rule: bool) -> Result<Answ
             if PLACEMENT.contains(law) {
                 placed.entry(layer).or_default().push(law);
             }
+            if ARRANGEMENT.contains(law) {
+                arranging.entry(layer).or_default().push(law);
+            }
         }
     }
     for (layer, found) in &placed {
@@ -1774,6 +2015,23 @@ fn check(answer: &Value, context: &LawsContext, count_rule: bool) -> Result<Answ
                 ),
                 format!(
                     "layer {layer} takes two placement laws ({}); keep one",
+                    found.join(", ")
+                ),
+            ));
+        }
+    }
+    for (layer, found) in &mut arranging {
+        if found.len() > 1 {
+            // In the order of the list of laws (the answer's keys sort as text).
+            found.sort_by_key(|law| LAWS.iter().position(|known| known == law));
+            return Err(refusal(
+                "arrangement_twice",
+                format!(
+                    "layer {layer} に並びの法則が二つ（{}）。一つにする",
+                    found.join("・")
+                ),
+                format!(
+                    "layer {layer} takes two arrangement laws ({}); keep one",
                     found.join(", ")
                 ),
             ));
@@ -1840,10 +2098,21 @@ pub struct Note {
     pub value: Option<f64>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct Row {
     from: [f64; 2],
     to: [f64; 2],
+}
+
+/// How a law arranged a layer, as the fit to spacing reads it.
+#[derive(Clone, Debug, PartialEq)]
+enum Arranged {
+    /// A row from its first mark's center to its last.
+    Row(Row),
+    /// A grid's cell width and height, in canvas fractions.
+    Grid([f64; 2]),
+    /// Marks opened along a run, at these fractions of it.
+    Opened(Row, Vec<f64>),
 }
 
 struct Compiler<'a> {
@@ -1852,12 +2121,24 @@ struct Compiler<'a> {
     laws: &'a BTreeMap<&'static str, Value>,
     main: usize,
     notes: Vec<Note>,
-    /// The layers a law laid in a row, in the order the laws arranged them.
-    arranged: Vec<(usize, Row)>,
+    /// The layers a law arranged, in the order the laws arranged them.
+    arranged: Vec<(usize, Arranged)>,
     arranged_by: BTreeMap<usize, &'static str>,
+    /// The line a placement law laid each layer along.
+    rows: BTreeMap<usize, Row>,
     pinned: BTreeSet<usize>,
     /// The layers B8 opened into a pair.
     paired: BTreeSet<usize>,
+    /// The layers progression or beat groups opened into marks.
+    opened: BTreeSet<usize>,
+}
+
+/// What the laws left: the Score, the notes, the pairs and the opened layers.
+struct Applied {
+    score: Score,
+    notes: Vec<Note>,
+    paired: BTreeSet<usize>,
+    opened: BTreeSet<usize>,
 }
 
 impl Compiler<'_> {
@@ -1891,11 +2172,11 @@ impl Compiler<'_> {
         self.notes.push(Note { code, layer, value });
     }
 
-    fn arrange(&mut self, layer: usize, row: Row, law: &'static str) {
+    fn arrange(&mut self, layer: usize, arranged: Arranged, law: &'static str) {
         if let Some(entry) = self.arranged.iter_mut().find(|(found, _)| *found == layer) {
-            entry.1 = row;
+            entry.1 = arranged;
         } else {
-            self.arranged.push((layer, row));
+            self.arranged.push((layer, arranged));
         }
         self.arranged_by.insert(layer, law);
     }
@@ -1971,12 +2252,15 @@ impl Compiler<'_> {
                     let target = &mut self.score.instructions[position];
                     moved(target);
                     apply_row(target, p0, p1, units);
-                    self.arrange(layer, Row { from: p0, to: p1 }, law);
+                    let row = Row { from: p0, to: p1 };
+                    self.rows.insert(layer, row);
+                    self.arrange(layer, Arranged::Row(row), law);
                 } else if is_line(shape) {
                     let (p0, p1) = self.span_on(axis, value, current, &instruction);
                     let target = &mut self.score.instructions[position];
                     moved(target);
                     apply_line(target, p0, p1);
+                    self.rows.insert(layer, Row { from: p0, to: p1 });
                 } else {
                     let [cx, cy] = center_of(&instruction);
                     let point = match axis {
@@ -2032,9 +2316,10 @@ impl Compiler<'_> {
             };
             let target = &mut self.score.instructions[position];
             moved(target);
+            let row = Row { from: p0, to: p1 };
             if count_of(target) >= 2 {
                 apply_row(target, p0, p1, units);
-                self.arrange(layer, Row { from: p0, to: p1 }, "B5");
+                self.arrange(layer, Arranged::Row(row), "B5");
             } else if is_line(target.primitive) {
                 apply_line(target, p0, p1);
             } else {
@@ -2044,6 +2329,7 @@ impl Compiler<'_> {
                     format!("B5: layer {layer} is one closed shape and cannot lie on the armature"),
                 ));
             }
+            self.rows.insert(layer, row);
         }
         Ok(())
     }
@@ -2075,7 +2361,7 @@ impl Compiler<'_> {
                 // The pair mirrors: the second mark turns the other way. The
                 // pair is printed as a row of two, whose marks share one turn;
                 // the mirrored one waits for a numeric angle.
-                let mut marks = points.map(|point| single(&instruction, point));
+                let mut marks = points.map(|point| single(&instruction, point, 1.0));
                 let turned = marks[1].rotation.filter(|turn| *turn != 0.0);
                 if let Some(turn) = turned {
                     marks[1].rotation = Some(-turn);
@@ -2096,6 +2382,22 @@ impl Compiler<'_> {
                 set_point_region(target, point[0], point[1]);
             } else {
                 translate(target, point, units);
+            }
+            if count >= 3 {
+                // The line a later arrangement lays the layer along: its run now,
+                // moved to the axis.
+                let (a, b) = current_span(&self.score.instructions[position], units);
+                let shift = [
+                    point[0] - (a[0] + b[0]) / 2.0,
+                    point[1] - (a[1] + b[1]) / 2.0,
+                ];
+                self.rows.insert(
+                    layer,
+                    Row {
+                        from: [a[0] + shift[0], a[1] + shift[1]],
+                        to: [b[0] + shift[0], b[1] + shift[1]],
+                    },
+                );
             }
         }
         Ok(())
@@ -2207,41 +2509,325 @@ impl Compiler<'_> {
         }
     }
 
-    fn spacing(&self, row: Row, count: u32) -> f64 {
-        self.units().distance(row.from, row.to) / f64::from(count.saturating_sub(1).max(1))
+    /// The line an arrangement lays a layer along: the one a placement law laid
+    /// it on, else its current long side.
+    fn row_of(&self, layer: usize, position: usize) -> Row {
+        self.rows.get(&layer).copied().unwrap_or_else(|| {
+            let (from, to) = current_span(&self.score.instructions[position], self.units());
+            Row { from, to }
+        })
     }
 
-    /// Stretch a row toward the inner frame until its spacing is `spacing`, as
-    /// far as the frame allows; a layer set on a point keeps its center.
-    fn stretch(&mut self, layer: usize, row: Row, position: usize, spacing: f64) -> f64 {
+    /// B9: the same shape at equal intervals, a row along the layer's line or a
+    /// grid over its extent (widened to 0.382 of its long side and at least 0.3,
+    /// inside the canvas less `EDGE`). The grid's columns and rows are the
+    /// core's, which the printed tile is drawn with.
+    fn repetition(&mut self) -> Result<(), Refusal> {
         let units = self.units();
-        let count = count_of(&self.score.instructions[position]);
-        let pinned = self.pinned.contains(&layer);
-        let along = hypot(row.to[0] - row.from[0], row.to[1] - row.from[1]);
-        let physical = units.distance(row.from, row.to);
-        let per = if physical > 0.0 {
-            along / physical
-        } else {
-            1.0
-        };
-        let length = spacing * f64::from(count - 1) * per;
-        let (q0, q1) = stretch_span(row.from, row.to, length, pinned);
-        let mut now = row;
-        if (q0, q1) != (row.from, row.to) {
-            apply_row(&mut self.score.instructions[position], q0, q1, units);
-            now = Row { from: q0, to: q1 };
-            self.arrange(layer, now, self.arranged_by[&layer]);
-            self.note("row_stretched", Some(layer), Some(units.distance(q0, q1)));
+        let value = self.laws["B9"].clone();
+        for target in value["targets"].as_array().into_iter().flatten() {
+            let layer = layer_number(&target["layer"]);
+            let position = self.only(layer, "B9")?;
+            moved(&mut self.score.instructions[position]);
+            if target["form"].as_str() == Some("row") {
+                let row = self.row_of(layer, position);
+                apply_row(
+                    &mut self.score.instructions[position],
+                    row.from,
+                    row.to,
+                    units,
+                );
+                self.arrange(layer, Arranged::Row(row), "B9");
+                continue;
+            }
+            let instruction = &self.score.instructions[position];
+            let count = count_of(instruction);
+            let [mut cx, mut cy] = center_of(instruction);
+            if let Some(row) = self.rows.get(&layer) {
+                cx = (row.from[0] + row.to[0]) / 2.0;
+                cy = (row.from[1] + row.to[1]) / 2.0;
+            }
+            let (w, h) = extent_now(instruction, units);
+            let side = py_max(py_max(w, h), 0.3);
+            let (w, h) = (py_max(w, side * GOLDEN), py_max(h, side * GOLDEN));
+            let (w, h) = (py_min(w, 1.0 - 2.0 * EDGE), py_min(h, 1.0 - 2.0 * EDGE));
+            let x0 = clamp_between(cx - w / 2.0, EDGE, 1.0 - EDGE - w);
+            let y0 = clamp_between(cy - h / 2.0, EDGE, 1.0 - EDGE - h);
+            let (columns, rows) = build_tiled_grid(
+                &mut self.score.instructions[position],
+                [x0, y0, x0 + w, y0 + h],
+                units,
+            );
+            if columns * rows != u64::from(count) {
+                let last = u64::from(count) % columns;
+                let last = if last == 0 { columns } else { last };
+                self.note("grid_last_row", Some(layer), Some(last as f64));
+            }
+            self.arrange(
+                layer,
+                Arranged::Grid([w / columns as f64, h / rows as f64]),
+                "B9",
+            );
         }
-        self.spacing(now, count)
+        Ok(())
     }
 
-    /// A1: a row a law set closer than its origin drew its marks (and closer
-    /// than touching) is first stretched toward the inner frame; what is still
-    /// missing is shrunk, never below the floor. Lines keep their length.
+    /// A run's ends ordered so that the second lies toward the given side.
+    fn oriented(row: Row, toward: &str) -> Result<Row, Refusal> {
+        let (dx, dy) = (row.to[0] - row.from[0], row.to[1] - row.from[1]);
+        let component = if matches!(toward, "left" | "right") {
+            dx
+        } else {
+            dy
+        };
+        if component.abs() < 1e-6 {
+            return Err(refusal(
+                "row_direction",
+                format!(
+                    "B10: 列の向きに {toward} が無い（横の列には left・right、縦の列には top・bottom）"
+                ),
+                format!(
+                    "B10: the row does not run toward {toward} (a horizontal row takes left or right, a vertical row top or bottom)"
+                ),
+            ));
+        }
+        let positive = matches!(toward, "right" | "bottom");
+        Ok(if (component > 0.0) == positive {
+            row
+        } else {
+            Row {
+                from: row.to,
+                to: row.from,
+            }
+        })
+    }
+
+    /// R2: a run opened into marks is cut to its part inside the canvas less `EDGE`.
+    fn inside(&mut self, layer: usize, row: Row) -> Row {
+        let (from, to) = inside_frame(row.from, row.to);
+        if (from, to) != (row.from, row.to) {
+            self.note(
+                "run_inside",
+                Some(layer),
+                Some(self.units().distance(from, to)),
+            );
+        }
+        Row { from, to }
+    }
+
+    /// Open a layer into one mark per point, each `scale` times its size.
+    fn unroll(&mut self, layer: usize, position: usize, points: &[[f64; 2]], scales: &[f64]) {
+        let template = self.score.instructions[position].clone();
+        let marks: Vec<Instruction> = points
+            .iter()
+            .zip(scales)
+            .map(|(point, scale)| single(&template, *point, *scale))
+            .collect();
+        self.score.instructions.splice(position..=position, marks);
+        self.opened.insert(layer);
+    }
+
+    /// B10: the marks opened along the row, their size or the gaps between them
+    /// changing by one ratio between neighbours (the given ratio end to end).
+    fn progression(&mut self) -> Result<(), Refusal> {
+        let value = self.laws["B10"].clone();
+        for target in value["targets"].as_array().into_iter().flatten() {
+            let layer = layer_number(&target["layer"]);
+            let position = self.only(layer, "B10")?;
+            let count = count_of(&self.score.instructions[position]);
+            let ratio: f64 = target["ratio"]
+                .as_str()
+                .and_then(|ratio| ratio.parse().ok())
+                .unwrap_or(INVERSE_PHI);
+            let row = Self::oriented(
+                self.row_of(layer, position),
+                target["toward"].as_str().unwrap_or_default(),
+            )?;
+            let row = self.inside(layer, row);
+            let (ts, scales): (Vec<f64>, Vec<f64>) = if target["change"].as_str() == Some("size") {
+                let ts: Vec<f64> = (0..count)
+                    .map(|k| f64::from(k) / f64::from(count - 1))
+                    .collect();
+                let scales = ts.iter().map(|t| ratio.powf(*t)).collect();
+                (ts, scales)
+            } else {
+                if count < 3 {
+                    return Err(refusal(
+                        "progression_count",
+                        format!("B10: layer {layer} は {count} 個で、間隔の漸進には3個以上要る"),
+                        format!(
+                            "B10: layer {layer} has {count} things; a progression of spacing takes three or more"
+                        ),
+                    ));
+                }
+                let q = ratio.powf(1.0 / f64::from(count - 2));
+                let mut ts = vec![0.0];
+                for k in 0..count - 1 {
+                    let last = ts[ts.len() - 1];
+                    ts.push(last + q.powf(f64::from(k)));
+                }
+                let end = ts[ts.len() - 1];
+                (
+                    ts.iter().map(|t| t / end).collect(),
+                    vec![1.0; count as usize],
+                )
+            };
+            let points: Vec<[f64; 2]> = ts
+                .iter()
+                .map(|t| {
+                    [
+                        row.from[0] + (row.to[0] - row.from[0]) * t,
+                        row.from[1] + (row.to[1] - row.from[1]) * t,
+                    ]
+                })
+                .collect();
+            self.unroll(layer, position, &points, &scales);
+            self.arrange(layer, Arranged::Opened(row, ts), "B10");
+        }
+        Ok(())
+    }
+
+    /// B12: the marks in groups of two to four along the row, a rest of one more
+    /// step between groups; with a strong beat, a group's later marks are 0.618
+    /// of its first.
+    fn beats(&mut self) -> Result<(), Refusal> {
+        let value = self.laws["B12"].clone();
+        for target in value["targets"].as_array().into_iter().flatten() {
+            let layer = layer_number(&target["layer"]);
+            let position = self.only(layer, "B12")?;
+            let count = count_of(&self.score.instructions[position]);
+            let group: u32 = target["group"]
+                .as_str()
+                .and_then(|group| group.parse().ok())
+                .unwrap_or(2);
+            if count <= group {
+                return Err(refusal(
+                    "beat_count",
+                    format!("B12: layer {layer} は {count} 個で、{group} 個ずつの群が二つできない"),
+                    format!(
+                        "B12: layer {layer} has {count} things, too few for two groups of {group}"
+                    ),
+                ));
+            }
+            let row = self.row_of(layer, position);
+            let row = self.inside(layer, row);
+            let steps = (count - 1) + (count.div_ceil(group) - 1);
+            let ts: Vec<f64> = (0..count)
+                .map(|k| f64::from(k + k / group) / f64::from(steps))
+                .collect();
+            let strong = target["strong"].as_str() != Some("none");
+            let scales: Vec<f64> = (0..count)
+                .map(|k| {
+                    if !strong || k % group == 0 {
+                        1.0
+                    } else {
+                        INVERSE_PHI
+                    }
+                })
+                .collect();
+            let points: Vec<[f64; 2]> = ts
+                .iter()
+                .map(|t| {
+                    [
+                        row.from[0] + (row.to[0] - row.from[0]) * t,
+                        row.from[1] + (row.to[1] - row.from[1]) * t,
+                    ]
+                })
+                .collect();
+            self.unroll(layer, position, &points, &scales);
+            self.arrange(layer, Arranged::Opened(row, ts), "B12");
+        }
+        Ok(())
+    }
+
+    /// The spacing of an arrangement in short-edge units: a row's step, a
+    /// grid's smaller cell side, an opened run's smallest gap.
+    fn spacing(&self, arranged: &Arranged, count: u32) -> f64 {
+        let units = self.units();
+        match arranged {
+            Arranged::Row(row) => {
+                units.distance(row.from, row.to) / f64::from(count.saturating_sub(1).max(1))
+            }
+            Arranged::Grid([w, h]) => py_min(w * units.x, h * units.y),
+            Arranged::Opened(row, ts) => units.distance(row.from, row.to) * min_gap(ts),
+        }
+    }
+
+    /// Stretch an arrangement toward the inner frame until its spacing is
+    /// `spacing`, as far as the frame allows: a row along its own line, a
+    /// grid's region side by side (the stretched region tiled anew), opened
+    /// marks along their run. A layer set on a point keeps its center.
+    fn stretch(&mut self, layer: usize, arranged: &Arranged, found: &[usize], spacing: f64) -> f64 {
+        let units = self.units();
+        let pinned = self.pinned.contains(&layer);
+        let count = count_of(&self.score.instructions[found[0]]);
+        let now = match arranged {
+            Arranged::Grid(_) => {
+                let position = found[0];
+                let Some(ResolvedPlacementRecipe::Grid { columns, rows, .. }) =
+                    recipe(&self.score.instructions[position]).cloned()
+                else {
+                    return self.spacing(arranged, count);
+                };
+                let [x0, y0, x1, y1] = region_or_center(&self.score.instructions[position]);
+                let (cx, cy) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
+                let ([nx0, _], [nx1, _]) = stretch_span(
+                    [x0, cy],
+                    [x1, cy],
+                    spacing * columns as f64 / units.x,
+                    pinned,
+                );
+                let ([_, ny0], [_, ny1]) =
+                    stretch_span([cx, y0], [cx, y1], spacing * rows as f64 / units.y, pinned);
+                let region = [nx0, ny0, nx1, ny1];
+                if region == [x0, y0, x1, y1] {
+                    return self.spacing(arranged, count);
+                }
+                let (columns, rows) =
+                    build_tiled_grid(&mut self.score.instructions[position], region, units);
+                self.note("grid_stretched", Some(layer), None);
+                Arranged::Grid([(nx1 - nx0) / columns as f64, (ny1 - ny0) / rows as f64])
+            }
+            Arranged::Row(row) => {
+                let length = spacing * f64::from(count - 1) * along_per_unit(units, *row);
+                let (q0, q1) = stretch_span(row.from, row.to, length, pinned);
+                if (q0, q1) == (row.from, row.to) {
+                    return self.spacing(arranged, count);
+                }
+                apply_row(&mut self.score.instructions[found[0]], q0, q1, units);
+                self.note("row_stretched", Some(layer), Some(units.distance(q0, q1)));
+                Arranged::Row(Row { from: q0, to: q1 })
+            }
+            Arranged::Opened(row, ts) => {
+                let length = spacing / min_gap(ts) * along_per_unit(units, *row);
+                let (q0, q1) = stretch_span(row.from, row.to, length, pinned);
+                if (q0, q1) == (row.from, row.to) {
+                    return self.spacing(arranged, count);
+                }
+                for (position, t) in found.iter().zip(ts) {
+                    set_point_region(
+                        &mut self.score.instructions[*position],
+                        clamp(q0[0] + (q1[0] - q0[0]) * t),
+                        clamp(q0[1] + (q1[1] - q0[1]) * t),
+                    );
+                }
+                self.note("run_stretched", Some(layer), Some(units.distance(q0, q1)));
+                Arranged::Opened(Row { from: q0, to: q1 }, ts.clone())
+            }
+        };
+        self.arrange(layer, now.clone(), self.arranged_by[&layer]);
+        self.spacing(&now, count)
+    }
+
+    /// A1 and R1: an arrangement a law set closer than allowed is first
+    /// stretched toward the inner frame; what is still missing is shrunk. A
+    /// placement law's row is allowed its origin's overlap and is never shrunk
+    /// below the floor (A1). An arrangement law's layer is allowed no overlap
+    /// (R1), and one that would need a shrink below the floor keeps its size:
+    /// the author's dense layer. Lines keep their length.
     fn fit(&mut self) {
         let units = self.units();
-        for (layer, row) in self.arranged.clone() {
+        for (layer, arranged) in self.arranged.clone() {
             let found = self.instructions_of(layer);
             let Some(&first) = found.first() else {
                 continue;
@@ -2253,24 +2839,36 @@ impl Compiler<'_> {
                 .iter()
                 .map(|position| 2.0 * largest_extent(&self.score.instructions[*position], units))
                 .fold(f64::NEG_INFINITY, py_max);
-            let origin = layers(&self.context.score)
-                .remove(&layer)
-                .and_then(|positions| positions.first().copied())
-                .map_or(0.0, |position| {
-                    origin_ratio(&self.context.score.instructions[position], units)
-                });
-            let (allowed, target) = fit_ratio(origin);
+            let separate = self
+                .arranged_by
+                .get(&layer)
+                .is_some_and(|law| ARRANGEMENT.contains(law));
+            let (allowed, target) = if separate {
+                (1.0, FIT_TARGET)
+            } else {
+                let origin = layers(&self.context.score)
+                    .remove(&layer)
+                    .and_then(|positions| positions.first().copied())
+                    .map_or(0.0, |position| {
+                        origin_ratio(&self.context.score.instructions[position], units)
+                    });
+                fit_ratio(origin)
+            };
             let count = count_of(&self.score.instructions[first]);
-            let spacing = self.spacing(row, count);
+            let spacing = self.spacing(&arranged, count);
             if width <= 0.0 || spacing <= 0.0 || width <= allowed * spacing {
                 continue;
             }
-            let spacing = self.stretch(layer, row, first, width / target);
+            let spacing = self.stretch(layer, &arranged, &found, width / target);
             if width <= allowed * spacing {
                 continue;
             }
             let mut factor = target * spacing / width;
             if factor < FIT_FLOOR {
+                if separate {
+                    self.note("dense_kept", Some(layer), Some(factor));
+                    continue;
+                }
                 self.note("shrink_floor", Some(layer), Some(factor));
                 factor = FIT_FLOOR;
             }
@@ -2279,6 +2877,39 @@ impl Compiler<'_> {
             }
             self.note("shrunk_to_spacing", Some(layer), Some(factor));
         }
+    }
+
+    /// The Score the laws leave holds at most `MAX_INSTRUCTIONS` instructions
+    /// and `MAX_MARKS` marks.
+    fn check_limits(&self) -> Result<(), Refusal> {
+        let instructions = self.score.instructions.len();
+        if instructions > MAX_INSTRUCTIONS {
+            return Err(refusal(
+                "too_many_instructions",
+                format!(
+                    "指示が {instructions} になり上限 {MAX_INSTRUCTIONS} を超える。数や回数を小さくするか法則を減らす"
+                ),
+                format!(
+                    "the laws leave {instructions} instructions, over the limit of {MAX_INSTRUCTIONS}; take smaller counts or fewer laws"
+                ),
+            ));
+        }
+        let marks: u64 = self
+            .score
+            .instructions
+            .iter()
+            .map(|instruction| u64::from(count_of(instruction)))
+            .sum();
+        if marks > MAX_MARKS {
+            return Err(refusal(
+                "too_many_marks",
+                format!("痕が {marks} になり上限 {MAX_MARKS} を超える。数を小さくする"),
+                format!(
+                    "the laws leave {marks} marks, over the limit of {MAX_MARKS}; take smaller counts"
+                ),
+            ));
+        }
+        Ok(())
     }
 
     fn aerial_size(&mut self) {
@@ -2411,7 +3042,7 @@ impl Compiler<'_> {
         Ok(())
     }
 
-    fn run(mut self) -> Result<(Score, Vec<Note>, BTreeSet<usize>), Refusal> {
+    fn run(mut self) -> Result<Applied, Refusal> {
         for law in ["B1", "B2", "B3", "B4"] {
             if self.laws.contains_key(law) {
                 self.proportion(law)?;
@@ -2427,12 +3058,27 @@ impl Compiler<'_> {
             self.balance()?;
         }
         self.sizes();
+        if self.laws.contains_key("B9") {
+            self.repetition()?;
+        }
+        if self.laws.contains_key("B10") {
+            self.progression()?;
+        }
+        if self.laws.contains_key("B12") {
+            self.beats()?;
+        }
         self.fit();
         self.aerial_size();
         self.aerial_color();
         self.hands();
         self.check_colors()?;
-        Ok((self.score, self.notes, self.paired))
+        self.check_limits()?;
+        Ok(Applied {
+            score: self.score,
+            notes: self.notes,
+            paired: self.paired,
+            opened: self.opened,
+        })
     }
 }
 
@@ -2465,7 +3111,8 @@ pub struct Chosen {
 }
 
 /// The composed plan as the laws print it: the layers they changed are edited
-/// and carry what they write in numbers, a layer for each composed layer.
+/// and carry what they write in numbers, a layer for each composed layer and
+/// one for each mark of a layer opened into marks.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LawsPrint {
     pub plan: WorkPlan,
@@ -2474,6 +3121,8 @@ pub struct LawsPrint {
     pub numeric: Vec<Option<NumericWriting>>,
     /// The plan layers the laws changed (their place in the composed plan).
     pub changed: Vec<usize>,
+    /// The composed plan layer each printed layer comes from.
+    pub composed: Vec<usize>,
 }
 
 impl LawsPrint {
@@ -2710,25 +3359,60 @@ fn edit_layer(
                     let [x, y] = center_of(after);
                     NumericPlace::Point { at: [x, y] }
                 }
-                ResolvedPlacementRecipe::Grid { .. }
-                | ResolvedPlacementRecipe::ScatterUniformWithCentroidTranslation => {
+                ResolvedPlacementRecipe::Grid { .. } => {
+                    // A grid is a tile over its range (B9 lays one over any layer).
+                    layer.action = "tile".to_owned();
+                    layer.attributes.remove(&WorkPlanSlot::LineUpDirection);
+                    moved_range(after, units)?
+                }
+                ResolvedPlacementRecipe::ScatterUniformWithCentroidTranslation => {
                     moved_range(after, units)?
                 }
                 _ => return None,
             }
         });
     }
+    if let Some(size) = resized(before, after, units, moved && single_line) {
+        numeric.size = Some(size?);
+        layer.attributes.remove(&WorkPlanSlot::Size);
+        layer.proportion = None;
+    }
+    retouch(&mut layer, before, after, hand);
+    // A pair is placed in numbers; a relation would move its marks again.
+    let dropped = before.relation.is_some() && after.relation.is_none();
+    let keep_joint = !(paired || dropped);
+    Some(Edit {
+        layer,
+        numeric,
+        keep_joint,
+    })
+}
+
+/// The numeric size of a mark the laws resized (`Some(None)` when its shape
+/// has none to write); `None` when it keeps its size or its ends write its
+/// length (`by_ends`).
+fn resized(
+    before: &Instruction,
+    after: &Instruction,
+    units: Units,
+    by_ends: bool,
+) -> Option<Option<NumericSize>> {
     let size = |instruction: &Instruction| 2.0 * largest_extent(instruction, units);
     let factor = if size(before) != 0.0 {
         size(after) / size(before)
     } else {
         1.0
     };
-    if (factor - 1.0).abs() > 1e-9 && !(moved && single_line) {
-        numeric.size = Some(numeric_size(after, units)?);
-        layer.attributes.remove(&WorkPlanSlot::Size);
-        layer.proportion = None;
-    }
+    ((factor - 1.0).abs() > 1e-9 && !by_ends).then(|| numeric_size(after, units))
+}
+
+/// The hand B21 gives a layer and the color the laws changed.
+fn retouch(
+    layer: &mut inku_ddl::work_plan::WorkPlanLayer,
+    before: &Instruction,
+    after: &Instruction,
+    hand: Option<Hand>,
+) {
     match hand {
         Some(Hand::Still) => {
             for slot in [
@@ -2754,13 +3438,50 @@ fn edit_layer(
             .attributes
             .insert(WorkPlanSlot::Color, after.color.as_str().to_owned());
     }
-    // A pair is placed in numbers; a relation would move its marks again.
-    let dropped = before.relation.is_some() && after.relation.is_none();
-    let keep_joint = !(paired || dropped);
+}
+
+/// One mark of a layer progression or beat groups opened, as its own sentence:
+/// one of it, placed (or drawn, when the layer draws), without a line-up
+/// direction or a joint; a closed shape at a numeric point and a line by the
+/// ends the canvas shows; a numeric size when the laws resized it.
+fn edit_opened(
+    layer: &inku_ddl::work_plan::WorkPlanLayer,
+    before: &Instruction,
+    mark: &Instruction,
+    hand: Option<Hand>,
+    units: Units,
+) -> Option<Edit> {
+    let mut layer = layer.clone();
+    layer.count = 1;
+    if !matches!(layer.action.as_str(), "place" | "draw") {
+        layer.action = "place".to_owned();
+    }
+    layer.attributes.remove(&WorkPlanSlot::LineUpDirection);
+    let line = is_line(mark.primitive);
+    let place = if line {
+        layer.attributes.remove(&WorkPlanSlot::Angle);
+        layer.attributes.remove(&WorkPlanSlot::Size);
+        layer.proportion = None;
+        line_ends(mark, units)?
+    } else {
+        NumericPlace::Point {
+            at: center_of(mark),
+        }
+    };
+    let mut numeric = NumericWriting {
+        place: Some(place),
+        ..NumericWriting::default()
+    };
+    if let Some(size) = resized(before, mark, units, line) {
+        numeric.size = Some(size?);
+        layer.attributes.remove(&WorkPlanSlot::Size);
+        layer.proportion = None;
+    }
+    retouch(&mut layer, before, mark, hand);
     Some(Edit {
         layer,
         numeric,
-        keep_joint,
+        keep_joint: false,
     })
 }
 
@@ -2769,10 +3490,10 @@ fn edit_layer(
 fn print_changes(
     composed: &ComposedPlan,
     context: &LawsContext,
-    after: &Score,
+    applied: &Applied,
     hands: &BTreeMap<usize, Hand>,
-    paired: &BTreeSet<usize>,
 ) -> Option<LawsPrint> {
+    let after = &applied.score;
     let before = layers(&context.score);
     let now = layers(after);
     let mut print = LawsPrint {
@@ -2784,6 +3505,7 @@ fn print_changes(
         joints: Vec::new(),
         numeric: Vec::new(),
         changed: Vec::new(),
+        composed: Vec::new(),
     };
     for (k, layer) in composed.plan.layers.iter().enumerate() {
         let index = context.first_plan_layer + k;
@@ -2802,34 +3524,44 @@ fn print_changes(
             print.ranges.push(composed.ranges[k].clone());
             print.joints.push(composed.joints[k].clone());
             print.numeric.push(None);
+            print.composed.push(k);
             continue;
         }
         print.changed.push(k);
         let [before] = was.as_slice() else {
             return None;
         };
-        if is.len() != if paired.contains(&index) { 2 } else { 1 } {
-            return None;
+        let hand = hands.get(&index).copied();
+        let edits = if applied.opened.contains(&index) {
+            is.iter()
+                .map(|mark| edit_opened(layer, before, mark, hand, context.units))
+                .collect::<Option<Vec<Edit>>>()?
+        } else {
+            let marks = if applied.paired.contains(&index) {
+                2
+            } else {
+                1
+            };
+            if is.len() != marks {
+                return None;
+            }
+            vec![edit_layer(layer, before, &is, hand, context.units)?]
+        };
+        for edit in edits {
+            print.ranges.push(if edit.numeric.place.is_some() {
+                None
+            } else {
+                composed.ranges[k].clone()
+            });
+            print.joints.push(if edit.keep_joint {
+                composed.joints[k].clone()
+            } else {
+                None
+            });
+            print.plan.layers.push(edit.layer);
+            print.numeric.push(Some(edit.numeric));
+            print.composed.push(k);
         }
-        let edit = edit_layer(
-            layer,
-            before,
-            &is,
-            hands.get(&index).copied(),
-            context.units,
-        )?;
-        print.plan.layers.push(edit.layer);
-        print.ranges.push(if edit.numeric.place.is_some() {
-            None
-        } else {
-            composed.ranges[k].clone()
-        });
-        print.joints.push(if edit.keep_joint {
-            composed.joints[k].clone()
-        } else {
-            None
-        });
-        print.numeric.push(Some(edit.numeric));
     }
     Some(print)
 }
@@ -2848,10 +3580,12 @@ fn apply(
         notes: Vec::new(),
         arranged: Vec::new(),
         arranged_by: BTreeMap::new(),
+        rows: BTreeMap::new(),
         pinned: BTreeSet::new(),
         paired: BTreeSet::new(),
+        opened: BTreeSet::new(),
     };
-    let (after, notes, paired) = compiler.run()?;
+    let applied = compiler.run()?;
     let mut hands = BTreeMap::new();
     if let Some(value) = answer.laws.get("B21") {
         for target in value["targets"].as_array().into_iter().flatten() {
@@ -2860,7 +3594,7 @@ fn apply(
             }
         }
     }
-    let print = print_changes(composed, context, &after, &hands, &paired).ok_or_else(|| {
+    let print = print_changes(composed, context, &applied, &hands).ok_or_else(|| {
         refusal(
             "unprintable",
             "法則が変えた層を数の形で書けない".to_owned(),
@@ -2881,7 +3615,7 @@ fn apply(
         laws,
         main_law: answer.main_law.clone(),
         main_layer: answer.main_layer,
-        notes,
+        notes: applied.notes,
         print,
         named,
     })
@@ -2890,14 +3624,17 @@ fn apply(
 /// The reason to ask again when the printed document cannot hold a layer the
 /// laws changed on the canvas: a mark the laws place at a point is drawn whole,
 /// where the prototype let the canvas cut it. `instruction` is the source
-/// instruction of the printed document; `None` when it is not a changed layer.
+/// instruction of the printed document, where a layer opened into marks takes
+/// one per mark; the reason names the layer as the request numbered it. `None`
+/// when it is not a changed layer.
 #[must_use]
 pub fn off_canvas(chosen: &Chosen, context: &LawsContext, instruction: usize) -> Option<Refusal> {
-    let k = instruction.checked_sub(context.first_plan_layer)?;
+    let printed = instruction.checked_sub(context.first_plan_layer)?;
+    let k = *chosen.print.composed.get(printed)?;
     if !chosen.print.changed.contains(&k) {
         return None;
     }
-    let layer = instruction;
+    let layer = context.first_plan_layer + k;
     // A hand neither places nor sizes a mark.
     let laws: Vec<&str> = chosen
         .named

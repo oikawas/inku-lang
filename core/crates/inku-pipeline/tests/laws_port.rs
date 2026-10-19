@@ -1,11 +1,14 @@
-//! The laws stage (stage B-2c of the laws port) answers as its prototype did.
+//! The laws stage (stages B-2c and B-3 of the laws port) answers as its
+//! prototype did.
 //!
 //! The fixture holds, for each work of a replayed run, the run's compiler
 //! options and the composed plan the laws stage waits with, the colour-stripped
-//! answer narrowed to this stage's laws and the DDL the Python prototype printed
-//! from it; and made cases for the forms the works do not have (a moved grid or
-//! scatter, a pair, a triangle, a joint dropped). The requests are the
-//! prototype's, in both languages. It holds no description text and no reason.
+//! answer narrowed to this stage's laws and the DDL the Python reference printed
+//! from it; made cases for the forms the works do not have (a moved grid or
+//! scatter, a pair, a triangle, a joint dropped, beat groups, a progression of
+//! sizes, a grid the core tiles otherwise than the prototype counted); and wide
+//! cases on the wide canvas. The requests are the reference's, in both
+//! languages. It holds no description text and no reason.
 
 mod common;
 
@@ -19,7 +22,7 @@ use inku_ddl::{
 use inku_pipeline::core_boundary::{CompilerOptions, compile_committed};
 use inku_pipeline::laws::{
     ComposedPlan, LAWS_PROMPT_ID, LawsContext, apply_laws_without_count_rule, build_laws_prompt,
-    choose_laws,
+    choose_laws, off_canvas,
 };
 use inku_pipeline::prompts::{LlmStage, PromptLimits, work_plan_plugins};
 use serde::Deserialize;
@@ -43,7 +46,7 @@ struct Fixture {
     cases: Vec<Case>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 struct Case {
     id: String,
     kind: String,
@@ -57,6 +60,9 @@ struct Case {
     schema: Option<Value>,
     answer: Option<Value>,
     laws: Option<String>,
+    /// The layer the stage refuses because the canvas cannot hold the print.
+    #[serde(default)]
+    off_canvas: Option<usize>,
 }
 
 fn fixture() -> Fixture {
@@ -169,8 +175,9 @@ fn the_composed_plans_print_the_composed_sources() {
 }
 
 /// The laws are applied and printed as the prototype applied and printed them:
-/// byte for byte, works and made cases. The works measured with one law are
-/// applied as the prototype applied them, without the request's count rule.
+/// byte for byte, works, made cases and wide cases, each on its run's canvas.
+/// The works measured with one law are applied as the prototype applied them,
+/// without the request's count rule.
 #[test]
 fn the_laws_print_as_the_prototype_printed_them() {
     let fixture = fixture();
@@ -180,8 +187,9 @@ fn the_laws_print_as_the_prototype_printed_them() {
         .iter()
         .filter(|case| case.answer.is_some())
         .collect();
-    assert_eq!(cases.len(), 26);
-    assert_eq!(cases.iter().filter(|case| case.kind == "made").count(), 8);
+    assert_eq!(cases.len(), 41);
+    assert_eq!(cases.iter().filter(|case| case.kind == "made").count(), 14);
+    assert_eq!(cases.iter().filter(|case| case.kind == "wide").count(), 4);
     let failures: Vec<String> = common::par_map(&cases, |case| {
         let (context, plugins, _) = context(case, None, &definitions);
         let answer = case.answer.as_ref().expect("an answer");
@@ -206,7 +214,8 @@ fn the_laws_print_as_the_prototype_printed_them() {
 /// Every printed document compiles with its run's options as cleanly as a
 /// committed document must: a Score whose lowering did not stop, no resource
 /// failure, no diagnostic and nothing left out. A mark at a numeric point the
-/// canvas cannot hold reads canonically and has no diagnostic, but no Score.
+/// canvas cannot hold reads canonically and has no diagnostic, but no Score
+/// (the cases that say so are the next test's).
 #[test]
 fn the_printed_documents_compile_to_a_score() {
     let fixture = fixture();
@@ -214,7 +223,7 @@ fn the_printed_documents_compile_to_a_score() {
     let cases: Vec<&Case> = fixture
         .cases
         .iter()
-        .filter(|case| case.answer.is_some())
+        .filter(|case| case.answer.is_some() && case.off_canvas.is_none())
         .collect();
     let failures: Vec<String> = common::par_map(&cases, |case| {
         let (context, plugins, compiler) = context(case, None, &definitions);
@@ -250,6 +259,76 @@ fn the_printed_documents_compile_to_a_score() {
     .flatten()
     .collect();
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// A layer opened into marks that leave the canvas is refused with the layer
+/// the request numbered, though the printed document's instruction is one of
+/// the opened layer's marks.
+#[test]
+fn a_print_the_canvas_cannot_hold_names_the_requested_layer() {
+    let fixture = fixture();
+    let definitions = definitions();
+    let cases: Vec<&Case> = fixture
+        .cases
+        .iter()
+        .filter(|case| case.off_canvas.is_some())
+        .collect();
+    assert_eq!(cases.len(), 1);
+    for case in cases {
+        let (context, plugins, compiler) = context(case, None, &definitions);
+        let chosen = apply_laws_without_count_rule(
+            case.answer.as_ref().expect("an answer"),
+            &context,
+            &case.composed,
+        )
+        .unwrap_or_else(|refusal| panic!("{}: refused {refusal:?}", case.id));
+        let printed = chosen.print.source(language(&case.lang), &plugins);
+        let delivery = compile_committed(
+            document(&printed, language(&case.lang), &definitions),
+            &definitions,
+            &compiler,
+        )
+        .unwrap_or_else(|error| panic!("{}: {error:?}", case.id));
+        assert!(delivery.score.is_none(), "{}", case.id);
+        let failure = delivery.resource_failure.expect("a resource failure");
+        let owner = &failure["value"]["value"]["owner"];
+        assert_eq!(
+            owner["kind"], "source_instruction",
+            "{}: {failure}",
+            case.id
+        );
+        let instruction = owner["instruction_index"]
+            .as_u64()
+            .and_then(|index| usize::try_from(index).ok())
+            .expect("an instruction index");
+        let layer = case.off_canvas.expect("the refused layer");
+        let refusal = off_canvas(&chosen, &context, instruction)
+            .unwrap_or_else(|| panic!("{}: instruction {instruction} is not refused", case.id));
+        assert_eq!(refusal.code, "off_canvas");
+        assert!(
+            refusal.ja.starts_with(&format!("layer {layer} は")),
+            "{}: {}",
+            case.id,
+            refusal.ja
+        );
+        assert!(
+            refusal
+                .en
+                .starts_with(&format!("layer {layer} does not fit")),
+            "{}: {}",
+            case.id,
+            refusal.en
+        );
+        // The refused layer is printed as one sentence per mark.
+        let k = layer - case.composed.plan.plugins.len();
+        let marks = chosen
+            .print
+            .composed
+            .iter()
+            .filter(|composed| **composed == k)
+            .count();
+        assert!(marks > 1, "{}: layer {layer} is opened into marks", case.id);
+    }
 }
 
 /// The request is the prototype's: its system text and message in both
@@ -382,7 +461,7 @@ fn the_tool_refuses_answers_that_break_the_rules() {
         ),
         (
             answer(
-                json!({"B5": diagonal, "B9": {"targets": [{"layer": 0, "form": "row"}]}}),
+                json!({"B5": diagonal, "B11": {"targets": [{"layer": 0, "colors": ["white", "orange"]}]}}),
                 "B5",
                 0,
             ),
@@ -416,4 +495,112 @@ fn the_tool_refuses_answers_that_break_the_rules() {
     assert_eq!(chosen.laws, ["B5", "B21"]);
     // Layer 1 has no fluctuation to still, so only the row the armature lays changes.
     assert_eq!(chosen.print.changed, [0]);
+}
+
+/// The arrangement laws' refusals, with the prototype's reasons: two of them on
+/// one layer, a progression toward a side its row does not run to, a
+/// progression of spacing or beat groups with too few things, an arrangement of
+/// a pair B8 opened, and a Score past the limit of instructions.
+#[test]
+fn the_tool_refuses_arrangements_it_cannot_lay() {
+    let fixture = fixture();
+    let definitions = definitions();
+    let answer = |laws: Value, main_law: &str, main_layer: u64| {
+        json!({"main_layer": main_layer, "main_law": main_law, "description_counts": [],
+               "laws": laws, "reason": "（理由）"})
+        .to_string()
+    };
+    let case = fixture
+        .cases
+        .iter()
+        .find(|case| case.id == "ja-04")
+        .expect("ja-04");
+    let (context, _, _) = context(case, None, &definitions);
+    let still = json!({"targets": [{"layer": 2, "hand": "still"}]});
+    for (response, code, ja) in [
+        (
+            answer(
+                json!({"B9": {"targets": [{"layer": 1, "form": "row"}]},
+                       "B12": {"targets": [{"layer": 1, "group": "3", "strong": "first"}]}}),
+                "B9",
+                1,
+            ),
+            "arrangement_twice",
+            "layer 1 に並びの法則が二つ（B9・B12）。一つにする",
+        ),
+        (
+            answer(
+                json!({"B10": {"targets": [{"layer": 1, "change": "size", "ratio": "0.618", "toward": "left"}]},
+                       "B21": still}),
+                "B10",
+                1,
+            ),
+            "row_direction",
+            "B10: 列の向きに left が無い（横の列には left・right、縦の列には top・bottom）",
+        ),
+        (
+            answer(
+                json!({"B10": {"targets": [{"layer": 0, "change": "spacing", "ratio": "0.618", "toward": "right"}]},
+                       "B21": still}),
+                "B10",
+                0,
+            ),
+            "progression_count",
+            "B10: layer 0 は 2 個で、間隔の漸進には3個以上要る",
+        ),
+        (
+            answer(
+                json!({"B12": {"targets": [{"layer": 0, "group": "2", "strong": "first"}]},
+                       "B21": still}),
+                "B12",
+                0,
+            ),
+            "beat_count",
+            "B12: layer 0 は 2 個で、2 個ずつの群が二つできない",
+        ),
+        (
+            answer(
+                json!({"B8": {"targets": [{"layer": 0, "axis": "vertical"}]},
+                       "B9": {"targets": [{"layer": 0, "form": "row"}]}}),
+                "B8",
+                0,
+            ),
+            "layer_split",
+            "B9: layer 0 はすでに 2 個の指示に分かれていて、この法則を当てられない",
+        ),
+    ] {
+        let refusal = choose_laws(&response, &context, &case.composed, LIMITS)
+            .expect_err(&format!("{response} is refused"));
+        assert_eq!(refusal.code, code, "{response}: {refusal:?}");
+        assert_eq!(refusal.ja, ja, "{response}");
+        assert!(!refusal.en.is_empty());
+    }
+    // Seventy points opened one by one leave seventy-one instructions.
+    let mut many = fixture
+        .cases
+        .iter()
+        .find(|case| case.id == "ja-05")
+        .expect("ja-05")
+        .clone();
+    assert_eq!(many.source.matches("点を24個散らす").count(), 1);
+    many.source = many.source.replace("点を24個散らす", "点を70個散らす");
+    many.composed.plan.layers[1].count = 70;
+    let (crowded, _, _) = self::context(&many, None, &definitions);
+    let refusal = choose_laws(
+        &answer(
+            json!({"B10": {"targets": [{"layer": 1, "change": "spacing", "ratio": "0.618", "toward": "right"}]},
+                   "B21": {"targets": [{"layer": 1, "hand": "still"}]}}),
+            "B10",
+            1,
+        ),
+        &crowded,
+        &many.composed,
+        LIMITS,
+    )
+    .expect_err("seventy-one instructions are refused");
+    assert_eq!(refusal.code, "too_many_instructions", "{refusal:?}");
+    assert_eq!(
+        refusal.ja,
+        "指示が 71 になり上限 60 を超える。数や回数を小さくするか法則を減らす"
+    );
 }

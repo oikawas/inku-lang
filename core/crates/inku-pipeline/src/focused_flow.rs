@@ -2833,6 +2833,74 @@ fn a_printed_layer_the_canvas_cannot_hold_is_asked_again_with_the_reason() {
     );
 }
 
+/// A plan whose dots come before the large circle the description places at
+/// the bottom.
+fn dots_then_circle_plan_response() -> serde_json::Value {
+    json!({"ground": "paper", "background": "white", "plugins": [], "layers": [
+        plan_layer("line_up", "point", 6, "top", "very_small", "black"),
+        plan_layer("place", "circle", 1, "bottom", "large", "red"),
+    ]})
+}
+
+/// The dots (the composed plan's layer 0) in beat groups of three, and the
+/// circle (its layer 1) placed by the golden section.
+fn beats_and_golden(at: &str) -> serde_json::Value {
+    json!({"main_layer": 1, "main_law": "B1", "description_counts": [],
+           "laws": {"B1": {"targets": [{"layer": 1, "at": at}]},
+                    "B12": {"targets": [{"layer": 0, "group": "3", "strong": "first"}]}},
+           "reason": "“A red circle” leads the picture."})
+}
+
+#[test]
+fn a_layer_after_an_opened_layer_is_asked_again_by_its_own_number() {
+    let start = laws_start(Some(LawsConfig {}));
+    let asked = plan_answer_with(&start, &dots_then_circle_plan_response()).snapshot;
+    // The six dots are printed one sentence each, so the circle is the printed
+    // document's seventh instruction; the reason names it as the request did.
+    let refused = laws_answer(&asked, &beats_and_golden("line_left"));
+    let retried = event(&refused, "retry_scheduled").expect("a retry");
+    assert_eq!(retried["detail"], "off_canvas");
+    let again = refused.snapshot.action.as_ref().unwrap();
+    let message = again.payload["prompt"]["message"].as_str().unwrap();
+    assert!(
+        message.ends_with(
+            "The previous answer could not be used: layer 1 does not fit on the canvas where the \
+             laws on it (B1) place and size it; change or drop those laws\nReturn a corrected answer."
+        ),
+        "{message}"
+    );
+    let chosen = laws_answer(&refused.snapshot, &beats_and_golden("point_ul"));
+    assert!(
+        event(&chosen, "laws_chosen").is_some(),
+        "{:?}",
+        tags(&chosen)
+    );
+    let source = committed_source(&chosen.snapshot);
+    let lines: Vec<&str> = source.lines().collect();
+    // The ground and background, six dots, one circle.
+    assert_eq!(lines.len(), 9, "{source}");
+    assert!(
+        lines[2..8]
+            .iter()
+            .all(|line| line.starts_with("Place one ") && line.contains(" at horizontal ")),
+        "{source}"
+    );
+    assert!(
+        lines[8].contains(" at horizontal 0.381966, vertical 0.381966."),
+        "{source}"
+    );
+    let committed = run(
+        Some(&chosen.snapshot),
+        &envelope(Some(&chosen.snapshot), ack(&chosen.snapshot)),
+    )
+    .snapshot;
+    assert!(
+        matches!(committed.phase, PipelinePhase::ScoreReady),
+        "{:?}",
+        committed.phase
+    );
+}
+
 #[test]
 fn a_printed_document_the_run_cannot_take_commits_the_composed_document() {
     let asked = plan_answer_with(

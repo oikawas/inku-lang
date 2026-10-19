@@ -65,12 +65,15 @@ the core places the layers whose place the description does not state on ranges
 of the thirds grid before the commit. With `read` false the default reading
 places them without a request; without `composition` Stage 1 is committed as it
 printed it. `choose_laws` runs only when the configuration has `laws` and the plan
-was composed: a reader chooses laws of placement, size and hand for the composed
-layers, and the core applies them to the composed document's Score and prints the
-layers they change in numbers (a numeric point, the ends of a row or a line, a
-numeric range, a numeric size) before the commit; a moved line is printed by its
-ends, cut where the canvas cuts it. The printed document is compiled as the run
-compiles it before it is committed. An answer the core refuses is asked again
+was composed: a reader chooses laws of placement, size, arrangement and hand for
+the composed layers, and the core applies them to the composed document's Score
+and prints the layers they change in numbers (a numeric point, the ends of a row
+or a line, a numeric range, a numeric size) before the commit; a moved line is
+printed by its ends, cut where the canvas cuts it, a grid as a numeric range the
+core tiles, and a layer a progression or beat groups open as one sentence per
+mark. An arranged layer's marks are fitted to their spacing, but a layer that
+would shrink below the floor keeps its size. The printed document is compiled as
+the run compiles it before it is committed. An answer the core refuses is asked again
 with the reason as a new action within the same budget, also when a mark it
 places at a numeric point does not lie wholly on the canvas. Each result
 echoes action ID, attempt, and request

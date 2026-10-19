@@ -1,5 +1,5 @@
 <script module lang="ts">
-	export type WorkAction = 'layout' | 'color-catalog' | 'color-arrangement' | 'ground' | 'tool' | 'description' | 'instructions' | 'sketch-grain' | 'models' | 'autonomous';
+	export type WorkAction = 'layout' | 'color-catalog' | 'color-arrangement' | 'ground' | 'tool' | 'description' | 'instructions' | 'sketch-grain' | 'models' | 'juxtapose' | 'autonomous';
 
 	let lastWorkActionTrigger: HTMLButtonElement | null = null;
 
@@ -28,7 +28,7 @@
 	};
 
 	let { node, isJapanese, variant, open, available = undefined, unavailableReason, onRequestOpen, onOpenChange, onAction }: Props = $props();
-	const READS_THE_DESCRIPTION = new Set<WorkAction>(['description', 'sketch-grain', 'models']);
+	const READS_THE_DESCRIPTION = new Set<WorkAction>(['description', 'sketch-grain', 'models', 'juxtapose']);
 	let triggerEl = $state<HTMLButtonElement | null>(null);
 	let menuEl = $state<HTMLDivElement | null>(null);
 	let wrapperEl = $state<HTMLDivElement | null>(null);
@@ -144,6 +144,7 @@
 					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('description', event)}>{t().workActionDescription}{@render llmMark()}</button>
 					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('sketch-grain', event)}>{t().workActionSketchGrain}{@render llmMark()}</button>
 					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('models', event)}>{t().workActionModels}{@render llmMark()}</button>
+					<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('juxtapose', event)}>{t().workActionJuxtapose}{@render llmMark()}</button>
 					{#if descriptionLocked}<p class="work-action-held-note">{t().descriptionLockedReason}</p>{/if}
 				</div>
 			{/if}

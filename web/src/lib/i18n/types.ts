@@ -620,6 +620,16 @@ export interface LangPack {
 	workActionSketchGrain: string;
 	workActionModels: string;
 	workActionAutonomous: string;
+	workActionJuxtapose: string;
+	juxtaposeTitle: string;
+	juxtaposeHelp: string;
+	juxtaposeModel: string;
+	juxtaposeAsk: string;
+	juxtaposeAskAgain: string;
+	juxtaposeAsking: string;
+	juxtaposeChoices: string;
+	juxtaposeJoined: string;
+	juxtaposeDraw: string;
 	workActionGroupLook: string;
 	workActionGroupForm: string;
 	workActionGroupDescription: string;

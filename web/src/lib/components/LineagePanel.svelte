@@ -6,6 +6,8 @@
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
 	import SavedWorkExportMenu from './SavedWorkExportMenu.svelte';
 	import WorkEditDialog from './WorkEditDialog.svelte';
+	import JuxtaposeDialog from './JuxtaposeDialog.svelte';
+	import type { JuxtapositionResult } from '$lib/features/juxtaposition/juxtaposition';
 	import type { SketchMode } from '$lib/sketch';
 	import { derivationKindLabel } from '$lib/derivation';
 	import { t } from '$lib/i18n/index.svelte';
@@ -36,7 +38,7 @@
 		onToggleStar: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onToggleForRevision: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onOpenRefinement: (node: LineageNode, view: RefinementView) => void | Promise<void>;
-		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null) => void | Promise<void>;
+		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null, metadata?: Record<string, unknown>) => void | Promise<void>;
 		onOpenDdlEditor: (node: LineageNode) => void;
 		stageLabel: string;
 		stage1ModelLabel: string;
@@ -56,6 +58,7 @@
 		/** Redraw a work with the sketch off or on, as its child. */
 		onDrawSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal) => Promise<void>;
 		onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<any>;
+		onJuxtapose: (historyId: string, model: string, exclude: string[], signal: AbortSignal) => Promise<JuxtapositionResult>;
 		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
 		visionModel: string;
 		okugakiModel: string;
@@ -83,7 +86,7 @@
 	}
 
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
-	let { graph, loading, focusRequest = 0, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, runAttempt = null, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintDdl, onComposeLayout, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
+	let { graph, loading, focusRequest = 0, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, runAttempt = null, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintDdl, onComposeLayout, onVisionAdvice, onJuxtapose, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
 
 	let handledFocusRequest = 0;
 	$effect(() => {
@@ -114,6 +117,7 @@
 	let activeMenuNodeId = $state<string | null>(null);
 	let headerWorkMenuOpen = $state(false);
 	let activeAIRefineNode = $state<LineageNode | null>(null);
+	let activeJuxtaposeNode = $state<LineageNode | null>(null);
 	let activeEditNode = $state<LineageNode | null>(null);
 	// Sketch from life (Stage 0.5): the grain lives on the edit shelf beside
 	// description and the instructions -- not on the refinement radio, because
@@ -447,6 +451,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 			case 'instructions': onOpenDdlEditor(node); break;
 			case 'sketch-grain': openSketchDialog(node); break;
 			case 'models': await onOpenRefinement(node, 'compare'); break;
+			case 'juxtapose': activeJuxtaposeNode = node; break;
 			case 'autonomous': activeAIRefineNode = node; break;
 		}
 	}
@@ -971,6 +976,10 @@ $effect(() => {
 			</div>
 		</div>
 	</div>
+{/if}
+
+{#if activeJuxtaposeNode}
+	<JuxtaposeDialog node={activeJuxtaposeNode} {visionModel} {visionProviderGroups} {stageLabel} {stage1ModelLabel} {stage2ModelLabel} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} onClose={() => (activeJuxtaposeNode = null)} {onSaveVisionModel} {onJuxtapose} {onDrawDescription} />
 {/if}
 
 {#if activeAIRefineNode}

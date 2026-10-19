@@ -1685,7 +1685,7 @@ async function showNewLineageChild(historyId: string | null | undefined, nodeId:
 	});
 }
 
-async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null): Promise<void> {
+async function drawLineageDescriptionEdit(node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null, metadata?: Record<string, unknown>): Promise<void> {
 	const sourceText = text.trim();
 	if (!sourceText || !node.history?.id) return;
 	// Ask before the words are carried into a child (contract § stage 4).
@@ -1702,7 +1702,8 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 			canvasAspectId: lineageCanvasAspectId(node),
 			lineageParentNodeId: node.id,
 			derivationKind: 'description_edit',
-			derivationMetadata: { edited_from_history_id: node.history.id ?? null },
+			// A juxtaposition adds what it added, so the lineage can leave it out next time.
+			derivationMetadata: { edited_from_history_id: node.history.id ?? null, ...(metadata ?? {}) },
 			// null override = inherit the parent work's setting.
 			renderOverrides: {
 				...colorCatalogOverride(lineageCatalogId(node)),
@@ -3186,6 +3187,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onPaintDdl={paintFromParentDdl}
 				onComposeLayout={refinement.composeLayoutGeneration}
 				onVisionAdvice={work.requestVisionRefineAdvice}
+				onJuxtapose={work.requestJuxtaposition}
 				pngTemplates={exportTemplates}
 				animationExportSettings={exportSettings.animation}
 				{apiFetch}

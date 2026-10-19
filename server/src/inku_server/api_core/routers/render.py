@@ -17,6 +17,9 @@ from pydantic import BaseModel, Field, computed_field, field_validator
 from ... import db as _db
 from ... import pipeline_compat as _pipeline_compat
 from ...autonomous_refine import ALLOWED_KINDS as AUTONOMOUS_REFINE_KINDS, vision_refine_advice
+from ...description_labels import pipeline_description
+from ...juxtaposition import CHOICES as JUXTAPOSITION_CHOICES, JuxtapositionAnswerError, gather_candidates
+from ...juxtaposition import suggest_juxtaposition
 from ...limits import limits_as_dict
 import secrets
 
@@ -608,6 +611,28 @@ class VisionRefineAdviceResponse(BaseModel):
     suggested_kind: str
     model: str
 
+
+class JuxtapositionBody(BaseModel):
+    history_id: str = Field(..., min_length=1, max_length=200)
+    model: str | None = Field(default=None, min_length=1, max_length=200)
+    language: str = Field(default="ja", pattern="^(ja|en)$")
+    # Sentences shown before, left out when the author asks for another four.
+    exclude: list[str] = Field(default_factory=list, max_length=64)
+
+
+class JuxtapositionChoice(BaseModel):
+    sentence: str
+    reason: str
+    history_ids: list[str]
+    rank: int
+    position: float
+
+
+class JuxtapositionResponse(BaseModel):
+    choices: list[JuxtapositionChoice]
+    candidates: int
+    model: str
+
 @router.post("/api/render-score", response_model=RenderScoreResponse, response_model_exclude_none=True)
 def api_render_score(req: RenderScoreRequest, actor: dict = Depends(_current_user)) -> RenderScoreResponse:
     # Authorization stays outside the render handler: an unknown work is 404.
@@ -878,3 +903,73 @@ def api_vision_refine_advice(
     except Exception as exc:  # noqa: BLE001
         raise _unexpected_http_error("Vision refinement advice", 502) from exc
     return VisionRefineAdviceResponse(**advice)
+
+
+def _juxtaposition_lineage(actor: dict, work: dict) -> tuple[list[str], list[str]]:
+    """The lineage's descriptions, root to the work, and the sentences it already added."""
+    node_id = work.get("lineage_node_id")
+    branch = _db.get_lineage_branch(actor["id"], node_id) if node_id else None
+    texts: list[str] = []
+    for node in (branch or {}).get("nodes", []):
+        history = node.get("history") or {}
+        text = pipeline_description(history.get("source_text") or history.get("input") or "").strip()
+        if text and (not texts or texts[-1] != text):
+            texts.append(text)
+    added = []
+    for edge in (branch or {}).get("edges", []):
+        recorded = (edge.get("metadata") or {}).get("juxtaposition")
+        sentence = str(recorded.get("sentence") or "").strip() if isinstance(recorded, dict) else ""
+        if sentence:
+            added.append(sentence)
+    return texts, added
+
+
+@router.post("/api/refine/juxtaposition", response_model=JuxtapositionResponse)
+def api_juxtaposition(
+    body: JuxtapositionBody,
+    actor: dict = Depends(_current_user),
+) -> JuxtapositionResponse:
+    """Four sentences from the author's other works that a model would add after this work's description."""
+    items = _db.get_items(actor["id"], [body.history_id])
+    if not items:
+        raise HTTPException(status_code=404, detail="juxtaposition source not found")
+    work = items[0]
+    if work.get("description_locked") or work.get("display_label") == "DDL":
+        raise HTTPException(status_code=409, detail=DESCRIPTION_LOCKED_DETAIL)
+    description = pipeline_description(work.get("source_text") or work.get("input") or "").strip()
+    if not description:
+        raise HTTPException(status_code=422, detail="juxtaposition source has no description")
+    svg = str(work.get("svg") or "")
+    if not svg:
+        raise HTTPException(status_code=422, detail="juxtaposition source has no image")
+    lineage, added = _juxtaposition_lineage(actor, work)
+    sources = [
+        (history_id, pipeline_description(text))
+        for history_id, text in _db.juxtaposition_sources(actor["id"])
+        if history_id != work.get("id")
+    ]
+    candidates = gather_candidates(sources, description=description, lineage=lineage, added=added,
+                                   exclude=body.exclude)
+    if len(candidates) < JUXTAPOSITION_CHOICES:
+        raise HTTPException(status_code=422, detail="not enough sentences in other works to choose from")
+    model = _resolved_vision_model(body.model, actor)
+    settings = prepare_vision_settings(actor, model, _db.get_model_settings())
+    try:
+        result = suggest_juxtaposition(
+            svg=svg,
+            description=description,
+            lineage=lineage,
+            candidates=candidates,
+            model=model,
+            language=body.language,
+            settings=settings,
+        )
+    except ChatGPTError as exc:
+        raise chatgpt_vision_error(exc) from None
+    except JuxtapositionAnswerError as exc:
+        raise HTTPException(status_code=502, detail=f"the model's choices could not be used: {exc}") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise _unexpected_http_error("Juxtaposition", 502) from exc
+    return JuxtapositionResponse(**result)

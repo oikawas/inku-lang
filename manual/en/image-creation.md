@@ -329,6 +329,18 @@ Pressing `Make four options` again first saves the options checked at that momen
 
 Choosing, saving, and discarding options work as in 8.2.
 
+### 8.7 Juxtapose
+
+Choosing `Juxtapose` (marked `LLM`) under `Redraw from the description` in the work-editing menu opens a dialog that adds a sentence from another work's description after this one. Opening it draws nothing.
+
+1. Choose the Vision model that picks the sentences (by default the account's Vision model) and press `Pick sentences`. From the first sentences of the descriptions of your other works, the AI picks four, each with one sentence on how adding it moves the idea of the work.
+2. Choosing one shows `The description with the sentence`. `Draw with this description` draws a child of the selected work from Stage 1 and saves it to the lineage, as `Change the description` does. The color catalog, canvas, seeds and Wild come from the original work.
+3. If none fits, press `Pick again`. The sentences shown earlier in this dialog are left out and four are picked again.
+
+Only the descriptions of works you own are candidates; shared works and other people's works are never read. Works in the trash, DDL-authored works, works whose comment says `test data`, and works whose description is held are not used either. Sentences that differ only in spacing or spelling count once. A sentence matching the description of this work or of its lineage, and one this lineage already added by a juxtaposition, is not offered.
+
+`Juxtapose` cannot be chosen for a work whose description is held or for a DDL-authored work, as with `Change the description`.
+
 ## 9. Autonomous Refinement
 
 From `Autonomous refinement process` in the work-editing menu (`Refine` on the Work tab, or `…` on each work in the Lineage tab), the application can build generations on its own. Vision observes each generation's picture and chooses the element the next generation changes (color catalog or composition). Random autonomous refinement, which chose the element at random, was retired on 2026-10-18.

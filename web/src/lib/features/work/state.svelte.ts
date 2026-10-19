@@ -19,6 +19,7 @@ import type { NumberedLine } from '$lib/features/batch/resume';
 import type { CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
 import type { HistoryItem, Score } from '$lib/historyManagerState.svelte';
 import type { ReplayComparison } from '$lib/features/history/replay';
+import type { JuxtapositionResult } from '$lib/features/juxtaposition/juxtaposition';
 import type { SessionState } from '$lib/features/session/state.svelte';
 import { BatchState } from '$lib/features/batch/state.svelte';
 import { DemoState } from '$lib/features/demo/state.svelte';
@@ -459,6 +460,21 @@ export function createWorkState(deps: WorkStateDeps) {
 			throw new Error(describeApiError(data.detail, r.status));
 		}
 		return await r.json() as { observation: string; next_direction: string; suggested_kind: string; model: string; };
+	}
+
+	/** Four sentences from the author's other works that a model would add after this work's description. */
+	async function requestJuxtaposition(historyId: string, model: string, exclude: string[], signal: AbortSignal): Promise<JuxtapositionResult> {
+		const r = await apiFetch('/api/refine/juxtaposition', {
+			method: 'POST',
+			signal,
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ history_id: historyId, model, exclude, language: getLang() })
+		});
+		if (!r.ok) {
+			const data = await r.json().catch(() => ({})) as { detail?: unknown; };
+			throw new Error(describeApiError(data.detail, r.status));
+		}
+		return await r.json() as JuxtapositionResult;
 	}
 
 	async function paintOne(text: string, options: PaintOptions = {}): Promise<{ ddl: string; thinking: string | null; } & PaintResult> {
@@ -1073,6 +1089,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		startTimer,
 		stopTimer,
 		requestVisionRefineAdvice,
+		requestJuxtaposition,
 		paintOne,
 		pipelineCompatibilityError,
 		authorDescription,

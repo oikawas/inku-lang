@@ -556,6 +556,14 @@ def history_description_locked(history_id: str) -> bool:
         return history_id in locked_history_ids(session, [history_id])
 
 
+def juxtaposition_sources(user_id: str) -> list[tuple[str, str]]:
+    """(id, description) of the user's own works that may lend a sentence to a juxtaposition."""
+    from .persistence.juxtaposition import owned_description_sources
+
+    with SessionLocal() as session:
+        return owned_description_sources(session, _actor_of(user_id))
+
+
 def lineage_node_description_locked(node_id: str) -> bool:
     """Whether the work at this lineage node is held by its DDL (not redrawn from its description)."""
     from .persistence.description_lock import node_is_locked

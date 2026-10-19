@@ -28,6 +28,8 @@
 	import Tooltip from './Tooltip.svelte';
 	import WorkActionMenu, { type WorkAction } from './WorkActionMenu.svelte';
 	import WorkEditDialog from './WorkEditDialog.svelte';
+	import JuxtaposeDialog from './JuxtaposeDialog.svelte';
+	import type { JuxtapositionResult } from '$lib/features/juxtaposition/juxtaposition';
 	import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
 	import type { CanvasViewport } from '$lib/features/canvas/viewport-state.svelte';
 	import type { PaintResult } from '$lib/features/run/current-work';
@@ -165,7 +167,7 @@
 		onFocusLatestRefinementChild: (parentNodeId: string, knownChildNodeIds: Set<string>) => boolean | Promise<boolean>;
 		onToggleLineageStar: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onToggleLineageForRevision: (node: LineageNode, event?: Event) => void | Promise<void>;
-		onDrawLineageDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null) => void | Promise<void>;
+		onDrawLineageDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null, metadata?: Record<string, unknown>) => void | Promise<void>;
 		onOpenLineageDdlEditor: (node: LineageNode) => void;
 		onDrawLineageSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal) => Promise<void>;
 		onToggleSaijiki: () => void;
@@ -195,6 +197,7 @@
 		onPaintDdl: (parent: { id: string; pipeline_variation_id?: string | null }, ddl: string, options: any) => Promise<any>;
 		onComposeLayout: ComposeLayoutGeneration;
 		onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<any>;
+		onJuxtapose: (historyId: string, model: string, exclude: string[], signal: AbortSignal) => Promise<JuxtapositionResult>;
 	};
 
 	let {
@@ -319,7 +322,8 @@
 		onLoadLineageBranch,
 		onPaintDdl,
 		onComposeLayout,
-		onVisionAdvice
+		onVisionAdvice,
+		onJuxtapose
 	}: Props = $props();
 
 	let canvasContentEl = $state<HTMLDivElement | null>(null);
@@ -439,6 +443,7 @@
 	let directEditNode = $state<LineageNode | null>(null);
 	let directEditMode = $state<'description' | 'sketch-grain' | null>(null);
 	let directAIRefineNode = $state<LineageNode | null>(null);
+	let directJuxtaposeNode = $state<LineageNode | null>(null);
 	let directAIRefineSaved = $state(false);
 	const statusGenerationValue = $derived(
 		statusGeneration
@@ -517,6 +522,7 @@
 			case 'models':
 				startDirectRefinement(node, 'compare');
 				break;
+			case 'juxtapose': directJuxtaposeNode = node; break;
 			case 'autonomous':
 				directAIRefineNode = node;
 				directAIRefineSaved = false;
@@ -921,7 +927,7 @@
 						stage2ModelLabel={runStage2ModelLabel} {runTokensIn} {runTokensOut} {runAttempt} onSaveOkugakiModel={onSaveOkugakiModel}
 						{onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote}
 						onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview}
-						onLoadBranch={onLoadLineageBranch} {onPaintDdl} {onComposeLayout} {onVisionAdvice} {visionModel} {okugakiModel}
+						onLoadBranch={onLoadLineageBranch} {onPaintDdl} {onComposeLayout} {onVisionAdvice} {onJuxtapose} {visionModel} {okugakiModel}
 						{visionProviderGroups} {animationExportSettings} {pngTemplates}
 						onDownloadSavedWorkSVG={savedWorkExportActions.onDownloadSVG}
 						onDownloadSavedWorkPNG={savedWorkExportActions.onDownloadPNG}
@@ -1005,6 +1011,24 @@
 		onClose={closeDirectEdit}
 		onDrawDescription={onDrawLineageDescription}
 		onDrawSketchGrain={onDrawLineageSketchGrain}
+	/>
+{/if}
+
+{#if directJuxtaposeNode}
+	<JuxtaposeDialog
+		node={directJuxtaposeNode}
+		{visionModel}
+		{visionProviderGroups}
+		{stageLabel}
+		stage1ModelLabel={runStage1ModelLabel}
+		stage2ModelLabel={runStage2ModelLabel}
+		tokensIn={runTokensIn}
+		tokensOut={runTokensOut}
+		attempt={runAttempt}
+		onClose={() => (directJuxtaposeNode = null)}
+		{onSaveVisionModel}
+		{onJuxtapose}
+		onDrawDescription={onDrawLineageDescription}
 	/>
 {/if}
 

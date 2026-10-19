@@ -13,7 +13,7 @@ test('the work edit menu runs lightest first, in four groups', () => {
 	assert.deepEqual(actions, [
 		'color-catalog', 'color-arrangement', 'ground', 'tool',
 		'layout', 'instructions',
-		'description', 'sketch-grain', 'models',
+		'description', 'sketch-grain', 'models', 'juxtapose',
 		'autonomous',
 	]);
 	const groups = [...markup.matchAll(/role="group" aria-label=\{t\(\)\.(workActionGroup\w+)\}/g)].map((m) => m[1]);
@@ -22,8 +22,8 @@ test('the work edit menu runs lightest first, in four groups', () => {
 
 test('the items that call the LLM carry its mark, and only those', () => {
 	const items = [...markup.matchAll(/select\('([a-z-]+)', event\)\}>\{t\(\)\.\w+\}(\{@render llmMark\(\)\})?<\/button>/g)];
-	assert.equal(items.length, 10);
-	assert.deepEqual(items.filter((m) => m[2]).map((m) => m[1]), ['description', 'sketch-grain', 'models', 'autonomous']);
+	assert.equal(items.length, 11);
+	assert.deepEqual(items.filter((m) => m[2]).map((m) => m[1]), ['description', 'sketch-grain', 'models', 'juxtapose', 'autonomous']);
 });
 
 test('a DDL work hides the description group with its heading', () => {

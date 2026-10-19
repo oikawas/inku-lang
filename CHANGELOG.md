@@ -8,13 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-19 — Work plan: design one picture, not a list
-
-The work plan (Stage 1) instructions for a new work now open with the principle that a work plan is the design of one picture, not a list of what the description mentions (the author's decision). The planner chooses one idea for the picture and keeps only the layers that idea needs (principle 2), makes shapes large and clear and may choose an order of the same shape at the same size and spacing (3), uses one tool per work by default and at most two (5), and lets only layers whose description speaks of swaying, waves, trembling, or flow fluctuate (7). Colors, the background included, are limited to two or three, with the main color contrasting with the background in lightness (14). Principle 13 on free lines no longer points at the replaced principles by number. Both the Japanese and the English instructions changed.
-
-- Saved works draw as before; redrawing reads the saved instructions.
-- The sketch and completion instructions are unchanged. The prompt ID and the DDL engine, DDL, Score, and render engine versions are unchanged; the sent instructions stay recorded by digest as before.
-
 ### 2026-10-18 — macOS: 3D PNG and GLB saves start again
 
 In the macOS experimental 3D view, PNG save and GLB save opened no save panel: WKWebView silently dropped the viewer's download link. The viewer's saves now reach the app through the parent page shared with Android. Focus selection works once a shape is clicked to select it, as on the Web.
@@ -177,6 +170,15 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.200 (2026-10-19 / Build 1276)
+
+### 2026-10-19 — Work plan: design one picture, not a list
+
+The work plan (Stage 1) instructions for a new work now open with the principle that a work plan is the design of one picture, not a list of what the description mentions (the author's decision). The planner chooses one idea for the picture and keeps only the layers that idea needs (principle 2), makes shapes large and clear and may choose an order of the same shape at the same size and spacing (3), uses one tool per work by default and at most two (5), and lets only layers whose description speaks of swaying, waves, trembling, or flow fluctuate (7). Colors, the background included, are limited to two or three, with the main color contrasting with the background in lightness (14). Principle 13 on free lines no longer points at the replaced principles by number. Both the Japanese and the English instructions changed.
+
+- Saved works draw as before; redrawing reads the saved instructions.
+- The sketch and completion instructions are unchanged. The prompt ID and the DDL engine, DDL, Score, and render engine versions are unchanged; the sent instructions stay recorded by digest as before.
 
 ## v2.15.199 (2026-10-19 / Build 1275)
 

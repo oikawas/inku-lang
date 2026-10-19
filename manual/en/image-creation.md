@@ -339,6 +339,8 @@ Choosing `Juxtapose` (marked `LLM`) under `Redraw from the description` in the w
 
 Only the descriptions of works you own are candidates; shared works and other people's works are never read. Works in the trash, DDL-authored works, works whose comment says `test data`, and works whose description is held are not used either. Sentences that differ only in spacing or spelling count once. A sentence matching the description of this work or of its lineage, and one this lineage already added by a juxtaposition, is not offered. At most the administrator's `Most sentences to choose from` (in `Other (server)` of Settings, 400 by default) go to the AI; when there are more candidates, each request draws that many at random from all of them.
 
+Only sentences in the language of the current description are candidates: a description with even one kana or kanji counts as Japanese, any other as English. The request follows the screen's language, so with the screen in Japanese the `Reason` comes in Japanese even for an English work. When the sentence is added, a Japanese description that does not end with a stop such as 「。」 gets 「。」 first, with no space; an English description gets a space, or ". " when it ends without a stop.
+
 `Juxtapose` cannot be chosen for a work whose description is held or for a DDL-authored work, as with `Change the description`.
 
 ## 9. Autonomous Refinement

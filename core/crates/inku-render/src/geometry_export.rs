@@ -187,7 +187,20 @@ fn mark_appearance(
     }
     if context.use_filters {
         if let Some(seed) = context.render_seed {
-            let (id, filter) = crate::materials::performance_touch_filter(seed, context.canvas);
+            let (id, mut filter) = crate::materials::performance_touch_filter(seed, context.canvas);
+            // Noise depends on canvas coordinates only, so the canvas-wide
+            // region narrows to this mark's bounds without moving the touch.
+            let canvas = context.canvas;
+            let left = bounds[0].max(-0.02 * canvas.width);
+            let top = bounds[1].max(-0.02 * canvas.height);
+            let right = (bounds[0] + bounds[2]).min(1.02 * canvas.width);
+            let bottom = (bounds[1] + bounds[3]).min(1.02 * canvas.height);
+            if right > left && bottom > top {
+                filter.set_attr("x", format_number(left));
+                filter.set_attr("y", format_number(top));
+                filter.set_attr("width", format_number(right - left));
+                filter.set_attr("height", format_number(bottom - top));
+            }
             document.push_definition(filter);
             mark = Element::new("g")
                 .attr("filter", format!("url(#{id})"))
@@ -934,6 +947,72 @@ mod tests {
         .unwrap();
         assert!(painted.svg.contains("#bf3221"));
         assert!(painted.bounds[2] > 0.8 && painted.bounds[3] > 0.0);
+    }
+
+    // Failure: a small mark's 3D texture filters noise across the whole canvas.
+    #[test]
+    fn touch_filter_region_is_the_mark_bounds_within_the_canvas_region() {
+        let colors = BTreeMap::from([("red".into(), "#bf3221".into())]);
+        let assignment = BTreeMap::new();
+        let context = MarkContext {
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            color_map: &colors,
+            work_assignment: &assignment,
+            render_seed: Some(163717),
+            instruction_seed_override: None,
+            instruction_index: 4,
+            mark_index: 0,
+            wild: false,
+            use_filters: true,
+            profile: SvgProfile::Display,
+            support: DEFAULT_SUPPORT,
+            geometry_transform: AffineTransform::identity(),
+            oil_fill_pass_limit: 16,
+            effects: Default::default(),
+        };
+        let region = |svg: &str| -> [f64; 4] {
+            let start = svg.find("<filter id=\"performance_touch_").unwrap();
+            let tag = &svg[start..start + svg[start..].find('>').unwrap()];
+            ["x", "y", "width", "height"].map(|name| {
+                let key = format!(" {name}=\"");
+                let from = tag.find(&key).unwrap() + key.len();
+                tag[from..from + tag[from..].find('"').unwrap()]
+                    .parse()
+                    .unwrap()
+            })
+        };
+        for (json, clipped) in [
+            (
+                r#"{"primitive":"square","position":[0.3,0.3],"size":[0.2,0.2],"color":"red","filled":true,"weight":"chalk"}"#,
+                false,
+            ),
+            (
+                r#"{"primitive":"square","position":[0.95,0.95],"size":[0.2,0.2],"color":"red","filled":true,"weight":"chalk"}"#,
+                true,
+            ),
+        ] {
+            let square: Instruction = serde_json::from_str(json).unwrap();
+            let painted = mark_appearance(
+                &square,
+                MarkGeometry::of(&square).unwrap(),
+                context,
+                AffineTransform::identity(),
+                &[],
+                None,
+                None,
+            )
+            .unwrap();
+            let b = painted.bounds.map(|v| v * 1000.0);
+            let left = b[0].max(-20.0);
+            let top = b[1].max(-20.0);
+            let right = (b[0] + b[2]).min(1020.0);
+            let bottom = (b[1] + b[3]).min(1020.0);
+            assert_eq!(clipped, right < b[0] + b[2] || bottom < b[1] + b[3]);
+            let actual = region(&painted.svg);
+            for (actual, expected) in actual.iter().zip([left, top, right - left, bottom - top]) {
+                assert!((actual - expected).abs() < 1e-3, "{actual} != {expected}");
+            }
+        }
     }
 
     // Failure: the saved work's dense oil circle becomes an ideal, uniform ball.

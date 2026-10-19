@@ -13,6 +13,20 @@ export interface PaintAppearanceResources {
 const MAX_RASTER_SIDE = 1024;
 const RAYS = 256;
 
+/** Give the root <svg> the raster's pixel size, keeping its viewBox. WebKit
+ * otherwise runs the filters at the SVG's own, larger size before scaling. */
+export function rasterSizedSvg(svg: string, width: number, height: number): string {
+  const root = /<svg[\s>]/.exec(svg);
+  if (!root) return svg;
+  const end = svg.indexOf('>', root.index);
+  if (end < 0) return svg;
+  const tag = svg.slice(root.index, end);
+  const size = /\s(width|height)\s*=\s*("[^"]*"|'[^']*')/g;
+  if ((tag.match(size) ?? []).length !== 2) return svg;
+  const sized = tag.replace(size, (_, name: string) => ` ${name}="${name === 'width' ? width : height}"`);
+  return svg.slice(0, root.index) + sized + svg.slice(end);
+}
+
 /** The outer painted radius, including sparse brush fringe, on each radial ray. */
 export function paintedRadii(data: Uint8ClampedArray, width: number, height: number,
   bounds: [number, number, number, number], center: XY): Float64Array {
@@ -102,7 +116,7 @@ export async function preparePaintAppearance(mesh: Mesh, packet: MeshPacket, can
   raster.width = width; raster.height = height;
   const context = raster.getContext('2d', { willReadFrequently: true });
   if (!context) throw new Error('circle_raster_unavailable');
-  const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+  const url = URL.createObjectURL(new Blob([rasterSizedSvg(svg, width, height)], { type: 'image/svg+xml' }));
   const image = new Image();
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {

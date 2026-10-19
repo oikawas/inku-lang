@@ -11,6 +11,7 @@ import { preparePresence } from './presence';
 import { objectDepth } from './objectDepth';
 
 type Projection = ViewState['projection'];
+const PAINT_CONCURRENCY = 4;
 export class Viewer {
   readonly scene = new THREE.Scene();
   readonly model = new THREE.Group();
@@ -47,7 +48,8 @@ export class Viewer {
     private changed: (state: ViewState) => void,
     private selectedChanged: (data: Record<string, unknown> | null) => void,
     private failed: (reason: string) => void, private initialView?: InitialView) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: false });
+    try { this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: false }); }
+    catch { throw new Error('webgl_unavailable'); }
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -127,15 +129,25 @@ export class Viewer {
     }
     const painted = this.packet.meshes.filter(packet => packet.appearance).length;
     const maxSide = Math.min(1024, Math.floor(Math.sqrt(16 * 1024 * 1024 / Math.max(1, painted) / 2)));
-    await Promise.all([...this.meshPackets].map(async ([mesh, packet]) => {
-      const old = mesh.material as THREE.Material;
-      const resource = await preparePaintAppearance(mesh, packet, this.packet.canvas, maxSide);
-      if (resource) {
-        old.dispose();
-        if (this.disposed) { resource.dispose(); mesh.geometry.dispose(); }
-        else this.appearances.set(mesh, resource);
+    // Decodes run in turn anyway. A few at a time start each deadline with
+    // its own decode, rather than letting queued marks expire while waiting.
+    const queue = [...this.meshPackets];
+    let failed = false;
+    const paint = async () => {
+      while (queue.length && !failed && !this.disposed) {
+        const [mesh, packet] = queue.shift()!;
+        const old = mesh.material as THREE.Material;
+        let resource: PaintAppearanceResources | null;
+        try { resource = await preparePaintAppearance(mesh, packet, this.packet.canvas, maxSide); }
+        catch (error) { failed = true; throw error; }
+        if (resource) {
+          old.dispose();
+          if (this.disposed) { resource.dispose(); mesh.geometry.dispose(); }
+          else this.appearances.set(mesh, resource);
+        }
       }
-    }));
+    };
+    await Promise.all(Array.from({ length: PAINT_CONCURRENCY }, paint));
     if (!this.disposed) {
       for (const [mesh, packet] of this.meshPackets) this.objectDepths.set(mesh, objectDepth(mesh, packet));
       this.updateObjectDepths(); this.placeSupport(); this.requestDraw();

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { paintedRadii } from '../viewer/circleAppearance.ts';
+import { paintedRadii, rasterSizedSvg } from '../viewer/circleAppearance.ts';
 import { buildScene } from './build.ts';
 import type { PreparedScene } from './types.ts';
 
@@ -36,4 +36,14 @@ test('painted circle radii preserve the outer alpha fringe and ignore transparen
   assert.ok(Math.max(...radii) < 28 / 64);
   assert.ok(radii.some(radius => radius > 19 / 64 && radius < 21 / 64));
   assert.deepEqual(radii, paintedRadii(data, size, size, [0, 0, 1, 1], [0.5, 0.5]));
+});
+
+// Failure: WebKit filters the SVG at its own larger size, or the rewrite reaches a child or the viewBox.
+test('raster-sized SVG changes only the root width and height', () => {
+  const svg = '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="1300.5" height="900" viewBox="0 0 1300.5 900">'
+    + '<rect width="5" height="6"/></svg>';
+  assert.equal(rasterSizedSvg(svg, 341, 236), '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="341" height="236" viewBox="0 0 1300.5 900">'
+    + '<rect width="5" height="6"/></svg>');
+  const unsized = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="5" height="6"/></svg>';
+  assert.equal(rasterSizedSvg(unsized, 341, 236), unsized);
 });

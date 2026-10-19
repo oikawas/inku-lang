@@ -228,6 +228,8 @@ function localGeometry(mark: GeometryMark, roundCount: number): BufferGeometry {
   if (shape.kind === 'path') {
     return combine(dashedPaths(points, mark.dash).map(path => tube(path.map(p => new Vector3(...p, 0)), width / 2)));
   }
+  // A smooth cloud's solid has no edge sharp enough to outline; trace the contour itself.
+  if (mark.primitive === 'cloudform' && !mark.filled) return stroke3d(points.map(p => new Vector3(...p, 0)), width, mark.dash, true);
   const solid = mark.primitive === 'triangle' ? pyramid(points) : mark.primitive === 'cloudform' ? cloud(points) : prism(points);
   if (mark.filled) return solid;
   const edges = new EdgesGeometry(solid, 28), positions = edges.getAttribute('position');

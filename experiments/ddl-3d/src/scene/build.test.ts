@@ -167,3 +167,24 @@ test('saved maple fixture creates all three placed leaves with closed interiors'
   assert.equal(packet.objectCount, 33); assert.equal(packet.meshes.filter(m => m.role === 'pair-fill').length, 15);
   assert.ok(packet.meshes.every(m => !bounds(m).isEmpty()));
 });
+
+// Failure: a smooth unfilled cloud has no 28° edges, so it has no tube and the work fails.
+test('unfilled cloudform is one tube along its contour', () => {
+  const value = JSON.parse(solidsJson);
+  const cloud = { primitive: 'cloudform', center: [0.5, 0.5], size: [0.1, 0.08], color: 'red', weight: 'brush_thick' };
+  value.score.instructions = [{ ...cloud, filled: false }, { ...cloud, filled: true }];
+  const input = prepare(JSON.stringify(value));
+  // Like the 147-point contour that stops work #1085: no turn reaches the edge angle.
+  const smooth = Array.from({ length: 147 }, (_, i): [number, number] =>
+    [0.5 + 0.05 * Math.cos(i * 2 * Math.PI / 147), 0.5 + 0.04 * Math.sin(i * 2 * Math.PI / 147)]);
+  for (const mark of input.scene.marks) mark.shape = { kind: 'contour', points: smooth };
+  const packet = buildScene(input);
+  assert.equal(packet.meshes.length, 2);
+  const [outline, solid] = packet.meshes.map(bounds), width = input.scene.marks[0].width;
+  const size = outline.getSize(new Vector3());
+  assert.ok(size.z > 0 && size.z <= width + 1e-6, `${size.z} > ${width}`);
+  for (const axis of ['x', 'y'] as const) {
+    assert.ok(Math.abs(outline.min[axis] - solid.min[axis]) <= width / 2 + 1e-6);
+    assert.ok(Math.abs(outline.max[axis] - solid.max[axis]) <= width / 2 + 1e-6);
+  }
+});

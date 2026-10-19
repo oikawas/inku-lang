@@ -1,5 +1,6 @@
 import { CanvasTexture, DoubleSide, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace } from 'three';
 import type { XY } from '../scene/types';
+import { rasterSizedSvg } from './circleAppearance';
 
 /** Keep the shared painter's abstract presence behind the solids, without
  * inventing physical shapes or omitting the saved layer. */
@@ -10,7 +11,7 @@ export async function preparePresence(svg: string, canvas: XY) {
   raster.height = Math.max(1, Math.ceil(canvas[1] * scale));
   const context = raster.getContext('2d');
   if (!context) throw new Error('presence_raster_unavailable');
-  const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+  const url = URL.createObjectURL(new Blob([rasterSizedSvg(svg, raster.width, raster.height)], { type: 'image/svg+xml' }));
   const image = new Image();
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {

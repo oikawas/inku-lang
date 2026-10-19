@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-19 — A line-up at a range away from the canvas's center stays on the canvas (DDL engine 63)
-
-A line-up of two or more marks at a range away from the canvas's center put marks off the canvas: the row was as long as the canvas and centered on the range's center. The composition chooses such ranges for rows whose description names no place, and 「右上（横2/3〜1、縦0〜1/3）に、橙の細筆の濃いとても小さな点を5個並べる。」 drew two of its five dots off the canvas. A line-up now runs on the chord that the line through the range's center, in the row's direction, cuts across the canvas, with its marks at the centers of equal cells: a horizontal row or a vertical column crosses the whole canvas through the range's center and is centered on the canvas along itself, and a diagonal row shortens its step to its chord, also when its count is reduced for resources. Rows through the canvas's center, rows of one mark, scatters and tiles are unchanged. In the 5173 works export (2026-10-14), recompiling the 487 works since the composition stage (2026-10-02) that compile without holes changed 58 rows in 49 works, every one a row that put marks off the canvas, and no row is off the canvas afterwards; the other 438 works keep their Scores byte for byte. Saved works keep their Scores; a new work, a rearranged placement and a redrawn instruction use the new rule. DDL engine 63; DDL 19, render engine 85 and the Score format are unchanged.
-
 ### 2026-10-18 — macOS: 3D PNG and GLB saves start again
 
 In the macOS experimental 3D view, PNG save and GLB save opened no save panel: WKWebView silently dropped the viewer's download link. The viewer's saves now reach the app through the parent page shared with Android. Focus selection works once a shape is clicked to select it, as on the Web.
@@ -174,6 +170,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.204 (2026-10-19 / Build 1280)
+
+### 2026-10-19 — A line-up at a range away from the canvas's center stays on the canvas (DDL engine 63)
+
+A line-up of two or more marks at a range away from the canvas's center put marks off the canvas: the row was as long as the canvas and centered on the range's center. The composition chooses such ranges for rows whose description names no place, and 「右上（横2/3〜1、縦0〜1/3）に、橙の細筆の濃いとても小さな点を5個並べる。」 drew two of its five dots off the canvas. A line-up now runs on the chord that the line through the range's center, in the row's direction, cuts across the canvas, with its marks at the centers of equal cells: a horizontal row or a vertical column crosses the whole canvas through the range's center and is centered on the canvas along itself, and a diagonal row shortens its step to its chord, also when its count is reduced for resources. Rows through the canvas's center, rows of one mark, scatters and tiles are unchanged. In the 5173 works export (2026-10-14), recompiling the 487 works since the composition stage (2026-10-02) that compile without holes changed 58 rows in 49 works, every one a row that put marks off the canvas, and no row is off the canvas afterwards; the other 438 works keep their Scores byte for byte. Saved works keep their Scores; a new work, a rearranged placement and a redrawn instruction use the new rule. DDL engine 63; DDL 19, render engine 85 and the Score format are unchanged.
 
 ## v2.15.203 (2026-10-19 / Build 1279)
 

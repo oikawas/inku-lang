@@ -156,8 +156,9 @@
 
 <style>
 	.juxtapose-dialog::backdrop { background: #0009; }
-	.juxtapose-dialog { margin: 0; padding: 0; color: var(--fg); }
-	.juxtapose-dialog { position: fixed; z-index: 1461; top: 50%; left: 50%; transform: translate(-50%, -50%); box-sizing: border-box; width: min(780px, 96vw); max-height: 92vh; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--border2); border-radius: 12px; background: var(--panel); box-shadow: 0 24px 80px #000a; }
+	.juxtapose-dialog { padding: 0; color: var(--fg); }
+	/* Centred by its margins, not by a transform: a transform makes the dialog the box the model list's fixed layers are laid out in, and squeezes the list into it. */
+	.juxtapose-dialog { position: fixed; z-index: 1461; inset: 0; margin: auto; box-sizing: border-box; width: min(780px, 96vw); height: fit-content; max-height: 92vh; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--border2); border-radius: 12px; background: var(--panel); box-shadow: 0 24px 80px #000a; }
 	.juxtapose-dialog > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 18px 20px 14px; margin: 0; border-bottom: 1px solid var(--border); }
 	.juxtapose-dialog > header h2 { margin: 0 0 4px; font-size: 1.05rem; }
 	.juxtapose-dialog > header p { margin: 0; color: var(--fg2); font-size: var(--ui-font-size-12); }

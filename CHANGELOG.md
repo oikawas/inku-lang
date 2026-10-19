@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-19 — Juxtapose: Model selection lets you choose a model
+
+In the Web's Juxtapose, Model selection squeezed the model list into the Juxtapose dialog as a thin line and left the whole dialog blurred, so no model could be chosen. The CSS transform that centred the dialog made it the box the list is laid out in; the dialog is now centred by its margins, as the Instruction editor is.
+
 ### 2026-10-18 — macOS: 3D PNG and GLB saves start again
 
 In the macOS experimental 3D view, PNG save and GLB save opened no save panel: WKWebView silently dropped the viewer's download link. The viewer's saves now reach the app through the parent page shared with Android. Focus selection works once a shape is clicked to select it, as on the Web.

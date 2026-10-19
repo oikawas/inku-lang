@@ -1823,7 +1823,7 @@ pub fn chance_answer(
         .enumerate()
         .map(|(index, layer)| {
             // Without joints no layer is on either side of one.
-            let options = chance_options(layer, fixed, index, false)?;
+            let options = one_per_center(layer, chance_options(layer, fixed, index, false)?);
             Ok(chance_pick(&options, seed, work_id, index))
         })
         .collect()
@@ -1882,6 +1882,7 @@ pub fn other_joined_answer(
         &group.reading,
         background,
         &group.edge_joints,
+        &group.jointed(),
     )?
     .with_joined(group.joined);
     let searched = search_work(&work)?;
@@ -1909,7 +1910,10 @@ pub fn chance_joined_answer(
         .zip(&group.joined)
         .zip(&group.edge_joints)
         .map(|((index, joined), edge_joint)| {
-            let options = chance_options(&layers[*index], &reading.fixed, *index, *edge_joint)?;
+            let mut options = chance_options(&layers[*index], &reading.fixed, *index, *edge_joint)?;
+            if joined.is_empty() {
+                options = one_per_center(&layers[*index], options);
+            }
             let options = fitting(&layers[*index], options, joined);
             Ok(chance_pick(&options, seed, work_id, *index))
         })
@@ -1930,6 +1934,19 @@ fn at_edge_joints<'a>(joints: impl IntoIterator<Item = &'a Joint>, count: usize)
         }
     }
     edge
+}
+
+/// Whether each of `count` layers is on either side of one of `joints`.
+fn in_joints<'a>(joints: impl IntoIterator<Item = &'a Joint>, count: usize) -> Vec<bool> {
+    let mut jointed = vec![false; count];
+    for joint in joints {
+        for index in [joint.a, joint.b] {
+            if let Some(slot) = jointed.get_mut(index) {
+                *slot = true;
+            }
+        }
+    }
+    jointed
 }
 
 fn candidates(
@@ -1986,6 +2003,8 @@ fn candidates(
 
 /// The canvas extent the compiler gives a layer placed in `rect`: a row runs the
 /// full row or column through the range centre, a full-width line spans the width.
+/// A diagonal row keeps its range here; the solver weighs it by its chord
+/// ([`footprints`]) unless it is in a joint.
 fn effective(layer: &WorkPlanLayer, rect: &Rect) -> Rect {
     let span = match layer_kind(layer) {
         LayerKind::Row => {
@@ -2010,6 +2029,136 @@ fn effective(layer: &WorkPlanLayer, rect: &Rect) -> Rect {
         Some(false) => [cx - TWELFTH, Frac::ZERO, cx + TWELFTH, Frac::ONE],
         None => *rect,
     }
+}
+
+/// Where a layer's marks lie, as the solver weighs them: `extent`, the box of the
+/// whole layer (where it sits and how far it spreads), and `cover`, the boxes its
+/// marks are in, which do not overlap. For every layer but a diagonal row the
+/// cover is the extent.
+#[derive(Clone, Debug, PartialEq)]
+struct Footprint {
+    extent: Rect,
+    cover: Vec<Rect>,
+}
+
+impl Footprint {
+    fn whole(extent: Rect) -> Self {
+        Self {
+            extent,
+            cover: vec![extent],
+        }
+    }
+
+    /// The area its marks are in.
+    fn area(&self) -> f64 {
+        match self.cover.as_slice() {
+            [only] => area(only),
+            cover => sum(cover.iter().map(area)),
+        }
+    }
+}
+
+/// How much of two footprints' covers lie on each other.
+fn cover_overlap(a: &Footprint, b: &Footprint) -> f64 {
+    match (a.cover.as_slice(), b.cover.as_slice()) {
+        ([p], [q]) => intersection(p, q),
+        (p, q) => sum(p
+            .iter()
+            .flat_map(|p| q.iter().map(move |q| intersection(p, q)))),
+    }
+}
+
+/// The gap between two footprints' covers.
+fn cover_gap(a: &Footprint, b: &Footprint) -> f64 {
+    match (a.cover.as_slice(), b.cover.as_slice()) {
+        ([p], [q]) => box_gap(p, q),
+        (p, q) => p
+            .iter()
+            .flat_map(|p| q.iter().map(move |q| box_gap(p, q)))
+            .fold(f64::INFINITY, f64::min),
+    }
+}
+
+/// The side of the squares a diagonal row's band is made of: a horizontal row's
+/// band is as thick, a sixth of the canvas.
+const SIXTH: Frac = frac(1, 6);
+
+/// The footprint of a diagonal row of two or more marks placed in `rect`: the
+/// compiler runs it on the chord that the line through the range's centre at 45
+/// degrees cuts across the canvas (the author's decision of 2026-10-19), falling
+/// to the right when `falling` and rising otherwise, on a square canvas. Its
+/// extent is the box of the chord, and its cover the squares a sixth of the
+/// canvas wide that the chord crosses corner to corner from its left end, the
+/// last cut at its right end.
+fn chord_footprint(rect: &Rect, falling: bool) -> Footprint {
+    let (cx, cy) = exact_center(rect);
+    let (zero, one) = (Frac::ZERO, Frac::ONE);
+    // The chord is y = x + offset when it falls and y = offset - x when it rises.
+    let (offset, start, end) = if falling {
+        let offset = cy - cx;
+        (offset, zero.max(zero - offset), one.min(one - offset))
+    } else {
+        let offset = cx + cy;
+        (offset, zero.max(offset - one), one.min(offset))
+    };
+    let y = |x: Frac| if falling { x + offset } else { offset - x };
+    let mut cover = Vec::new();
+    let mut x = start;
+    while x < end {
+        let next = (x + SIXTH).min(end);
+        let (from, to) = (y(x), y(next));
+        cover.push([x, from.min(to), next, from.max(to)]);
+        x = next;
+    }
+    let (from, to) = (y(start), y(end));
+    Footprint {
+        extent: [start, from.min(to), end, from.max(to)],
+        cover,
+    }
+}
+
+/// The ways a diagonal row of two or more marks can run (falling is `true`):
+/// one for a falling or rising row, both for a bare diagonal row, whose
+/// direction the compiler chooses from the printed instructions.
+fn diagonal_directions(layer: &WorkPlanLayer) -> Option<&'static [bool]> {
+    if layer_kind(layer) != LayerKind::Row {
+        return None;
+    }
+    match orientation(layer) {
+        Some("falling") => Some(&[true]),
+        Some("rising") => Some(&[false]),
+        Some("diagonal") => Some(&[true, false]),
+        _ => None,
+    }
+}
+
+/// The footprints a layer placed in `rect` can take, weighed alike: its extent,
+/// or for a diagonal row the chord of each way it can run, falling first. A
+/// diagonal row in a joint (`jointed`) keeps its range: a joint puts the joined
+/// layer by its partner's box, and a chord does not say where on it.
+fn footprints(layer: &WorkPlanLayer, rect: &Rect, jointed: bool) -> Vec<Footprint> {
+    match diagonal_directions(layer) {
+        Some(directions) if !jointed => directions
+            .iter()
+            .map(|falling| chord_footprint(rect, *falling))
+            .collect(),
+        _ => vec![Footprint::whole(effective(layer, rect))],
+    }
+}
+
+/// A diagonal row runs on the chord through its range's centre, so ranges with
+/// one centre draw it alike: it keeps the first range of each centre among
+/// `options`. Every other layer keeps `options`.
+fn one_per_center(layer: &WorkPlanLayer, options: Vec<usize>) -> Vec<usize> {
+    if diagonal_directions(layer).is_none() {
+        return options;
+    }
+    let table = regions();
+    let mut centers = BTreeSet::new();
+    options
+        .into_iter()
+        .filter(|index| centers.insert(exact_center(&table.all[*index].rect)))
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -2085,18 +2234,21 @@ fn separation(a: &Rect, b: &Rect) -> f64 {
     distance(ca, cb)
 }
 
-/// How much of a range the other drawn layers take (0 to 1).
-fn occupied(region: &Rect, boxes: &[Rect], obstacles: &[usize]) -> f64 {
+/// How much of a range the other drawn layers' marks take (0 to 1).
+fn occupied(region: &Rect, placed: &[&Footprint], obstacles: &[usize]) -> f64 {
     let size = area(region);
     if size <= 0.0 {
         return 0.0;
     }
-    let share = sum(obstacles.iter().map(|i| intersection(region, &boxes[*i]))) / size;
+    let share = sum(obstacles
+        .iter()
+        .flat_map(|i| placed[*i].cover.iter().map(|q| intersection(region, q))))
+        / size;
     if share < 1.0 { share } else { 1.0 }
 }
 
 /// Open space ahead of a moving bundle, in the direction it moves (lead room).
-fn lead_room(a: &Rect, direction: &str, boxes: &[Rect], obstacles: &[usize]) -> f64 {
+fn lead_room(a: &Rect, direction: &str, placed: &[&Footprint], obstacles: &[usize]) -> f64 {
     let (zero, one) = (Frac::ZERO, Frac::ONE);
     let ahead = match direction {
         "up" => [a[0], zero, a[2], a[1]],
@@ -2113,18 +2265,18 @@ fn lead_room(a: &Rect, direction: &str, boxes: &[Rect], obstacles: &[usize]) -> 
     let shortfall = pos(1.0 / 3.0 - extent) / (1.0 / 3.0);
     shortfall
         + if size != 0.0 {
-            occupied(&ahead, boxes, obstacles)
+            occupied(&ahead, placed, obstacles)
         } else {
             0.0
         }
 }
 
-fn drawn_area(boxes: &[Rect], sparse_layers: &[bool]) -> f64 {
-    let rects: Vec<&Rect> = boxes
+fn drawn_area(placed: &[&Footprint], sparse_layers: &[bool]) -> f64 {
+    let rects: Vec<&Rect> = placed
         .iter()
         .zip(sparse_layers)
         .filter(|(_, sparse)| !**sparse)
-        .map(|(r, _)| r)
+        .flat_map(|(p, _)| p.cover.iter())
         .collect();
     if rects.is_empty() {
         return 0.0;
@@ -2153,13 +2305,16 @@ fn drawn_area(boxes: &[Rect], sparse_layers: &[bool]) -> f64 {
 }
 
 /// How far the weight on the thirds grid is from its left-right mirror image (0 to 1).
-fn mirror_mismatch(boxes: &[Rect], weights: &[f64]) -> f64 {
+fn mirror_mismatch(placed: &[&Footprint], weights: &[f64]) -> f64 {
     let mut grid = [[0.0_f64; 3]; 3];
-    for (r, w) in boxes.iter().zip(weights) {
-        let size = area(r);
-        for (row, line) in grid.iter_mut().enumerate() {
-            for (col, value) in line.iter_mut().enumerate() {
-                *value += w * intersection(&cell(col, row), r) / size;
+    for (p, w) in placed.iter().zip(weights) {
+        // A layer weighs where its marks are.
+        let size = p.area();
+        for r in &p.cover {
+            for (row, line) in grid.iter_mut().enumerate() {
+                for (col, value) in line.iter_mut().enumerate() {
+                    *value += w * intersection(&cell(col, row), r) / size;
+                }
             }
         }
     }
@@ -2252,6 +2407,8 @@ struct Work<'a> {
     options: Vec<Vec<usize>>,
     /// The layers joined to each layer (I-711 stage C); empty without joints.
     joined: Vec<Vec<Joined>>,
+    /// The footprints each layer can take, by range index.
+    footprints: Vec<Vec<Vec<Footprint>>>,
 }
 
 /// A layer joined to a composed layer: the joint, the size of the range the
@@ -2380,17 +2537,20 @@ impl<'a> Work<'a> {
             reading,
             background,
             &at_edge_joints(&joints, layers.len()),
+            &in_joints(&joints, layers.len()),
         )
     }
 
     /// [`Work::new`] told whether each layer is on either side of a joint that
-    /// rests on or crosses (`edge_joints`, by layer), which the reading of a work
-    /// taken apart at its joints no longer holds.
+    /// rests on or crosses (`edge_joints`, by layer) and of any joint
+    /// (`jointed`), which the reading of a work taken apart at its joints no
+    /// longer holds.
     fn with_edge_joints(
         layers: &'a [WorkPlanLayer],
         reading: &'a CheckedReading,
         background: &str,
         edge_joints: &[bool],
+        jointed: &[bool],
     ) -> Result<Self, Unsolved> {
         if let Some(place) = reading
             .fixed
@@ -2421,7 +2581,9 @@ impl<'a> Work<'a> {
             tension,
             options: Vec::with_capacity(layers.len()),
             joined: vec![Vec::new(); layers.len()],
+            footprints: Vec::with_capacity(layers.len()),
         };
+        let table = regions();
         for (i, layer) in layers.iter().enumerate() {
             let (tone, surface, fixed) = weight_parts(layer, background_lightness);
             work.tone.push(tone);
@@ -2434,7 +2596,18 @@ impl<'a> Work<'a> {
                 edge_joints[i],
             )
             .ok_or(Unsolved::NoRanges)?;
-            work.options.push(options);
+            work.options.push(if jointed[i] {
+                options
+            } else {
+                one_per_center(layer, options)
+            });
+            work.footprints.push(
+                table
+                    .all
+                    .iter()
+                    .map(|region| footprints(layer, &region.rect, jointed[i]))
+                    .collect(),
+            );
         }
         Ok(work)
     }
@@ -2444,24 +2617,26 @@ impl<'a> Work<'a> {
     }
 
     /// Keep the layers joined to each layer: a layer with joined layers keeps
-    /// only the ranges where its group lies on the canvas, when there is one.
+    /// only the ranges where its group lies on the canvas, when there is one,
+    /// and is scored as the box of its extent grown by the layers joined to it.
     fn with_joined(mut self, joined: Vec<Vec<Joined>>) -> Self {
+        let table = regions();
         for (i, group) in joined.iter().enumerate() {
             let options = std::mem::take(&mut self.options[i]);
             self.options[i] = fitting(&self.layers[i], options, group);
+            if !group.is_empty() {
+                self.footprints[i] = table
+                    .all
+                    .iter()
+                    .map(|region| {
+                        let own = effective(&self.layers[i], &region.rect);
+                        vec![Footprint::whole(joint_group(&own, group))]
+                    })
+                    .collect();
+            }
         }
         self.joined = joined;
         self
-    }
-
-    /// The box a layer is scored with: its extent, grown by the layers joined to it.
-    fn boxed(&self, i: usize, rect: &Rect) -> Rect {
-        let own = effective(&self.layers[i], rect);
-        if self.joined[i].is_empty() {
-            own
-        } else {
-            joint_group(&own, &self.joined[i])
-        }
     }
 
     fn weight(&self, i: usize, r: &Rect) -> f64 {
@@ -2494,8 +2669,11 @@ impl<'a> Work<'a> {
         self.tension.get(axis).map(String::as_str)
     }
 
+    /// A relation's penalty, measured on the layers' extents (`boxes`), and on
+    /// where their marks are (`placed`) for overlapping, nearness, isolation,
+    /// straying and the room ahead.
     #[allow(clippy::too_many_lines)]
-    fn relation_penalty(&self, relation: &Relation, boxes: &[Rect]) -> f64 {
+    fn relation_penalty(&self, relation: &Relation, boxes: &[Rect], placed: &[&Footprint]) -> f64 {
         let roles = &self.reading.roles;
         let ia = relation.a;
         let a = &boxes[ia];
@@ -2541,16 +2719,16 @@ impl<'a> Work<'a> {
                 }
             }
             RelationKind::Overlap => {
-                let b = b.expect("overlap relates two layers");
-                if intersection(a, b) > 0.0 {
+                let ib = relation.b.expect("overlap relates two layers");
+                if cover_overlap(placed[ia], placed[ib]) > 0.0 {
                     0.0
                 } else {
-                    1.0 + box_gap(a, b) / 0.2
+                    1.0 + cover_gap(placed[ia], placed[ib]) / 0.2
                 }
             }
             RelationKind::Near => {
-                let b = b.expect("near relates two layers");
-                pos(box_gap(a, b) - 0.1) / 0.2 + side_penalty(b)
+                let ib = relation.b.expect("near relates two layers");
+                pos(cover_gap(placed[ia], placed[ib]) - 0.1) / 0.2 + side_penalty(&boxes[ib])
             }
             RelationKind::Apart => {
                 pos(0.45 - separation(a, b.expect("apart relates two layers"))) / 0.45
@@ -2593,9 +2771,9 @@ impl<'a> Work<'a> {
                 if ka == LayerKind::Bundle {
                     // A bundle moving up or down sits on the side it comes from, with room ahead.
                     return if relation.kind == RelationKind::Rising {
-                        pos(0.5 - ca.1) / 0.25 + 0.5 * lead_room(a, "up", boxes, &obstacles)
+                        pos(0.5 - ca.1) / 0.25 + 0.5 * lead_room(a, "up", placed, &obstacles)
                     } else {
-                        pos(ca.1 - 0.5) / 0.25 + 0.5 * lead_room(a, "down", boxes, &obstacles)
+                        pos(ca.1 - 0.5) / 0.25 + 0.5 * lead_room(a, "down", placed, &obstacles)
                     };
                 }
                 pos(2.0 / 3.0 - (a[3] - a[1]).f()) / (1.0 / 3.0)
@@ -2615,7 +2793,7 @@ impl<'a> Work<'a> {
                     if (toward == "right") == (ca.0 > 0.5) && (ca.0 - 0.5).abs() > 1e-9 {
                         pen += 1.0;
                     }
-                    return pen + 0.5 * lead_room(a, toward, boxes, &obstacles);
+                    return pen + 0.5 * lead_room(a, toward, placed, &obstacles);
                 }
                 let wide = (a[2] - a[0]).f() >= 2.0 / 3.0 - 1e-9 && (a[3] - a[1]).f() <= 0.5;
                 if wide { 0.0 } else { 1.0 }
@@ -2635,7 +2813,7 @@ impl<'a> Work<'a> {
                 let mut gap = 1.0;
                 let mut first = true;
                 for i in &obstacles {
-                    let g = box_gap(a, &boxes[*i]);
+                    let g = cover_gap(placed[ia], placed[*i]);
                     if first || g < gap {
                         gap = g;
                         first = false;
@@ -2676,8 +2854,9 @@ impl<'a> Work<'a> {
                 pen
             }
             RelationKind::Deviation => {
-                let b = b.expect("deviation relates two layers");
-                intersection(a, b) / area(a) + pos(box_gap(a, b) - 0.2) / 0.2
+                let ib = relation.b.expect("deviation relates two layers");
+                cover_overlap(placed[ia], placed[ib]) / placed[ia].area()
+                    + pos(cover_gap(placed[ia], placed[ib]) - 0.2) / 0.2
             }
             RelationKind::Dividing => {
                 let direction = band_direction(a).unwrap_or(if a[2] - a[0] >= a[3] - a[1] {
@@ -2705,14 +2884,72 @@ impl<'a> Work<'a> {
     }
 
     /// The score of one combination of ranges (lower is better), with its terms.
-    #[allow(clippy::too_many_lines, clippy::cast_precision_loss)]
+    /// A bare diagonal row runs either way, as the compiler chooses from the
+    /// printed instructions, so a work with such rows scores the mean over
+    /// every way they can run (the first row's way changing first): each term
+    /// is the mean of its values, none where a way lacks it, in the order the
+    /// ways first add them, and the total is their sum.
+    #[allow(clippy::cast_precision_loss)]
     fn score(&self, choice: &[usize], terms: &mut Terms) -> Score {
-        let table = regions();
+        let ways: Vec<&[Footprint]> = choice
+            .iter()
+            .enumerate()
+            .map(|(i, region)| self.footprints[i][*region].as_slice())
+            .collect();
+        let count: usize = ways.iter().map(|way| way.len()).product();
+        let pick = |mut way: usize| -> Vec<&Footprint> {
+            ways.iter()
+                .map(|footprints| {
+                    let chosen = &footprints[way % footprints.len()];
+                    way /= footprints.len();
+                    chosen
+                })
+                .collect()
+        };
+        if count == 1 {
+            return self.score_placed(&pick(0), terms);
+        }
+        let mut scores = Vec::with_capacity(count);
+        let mut each = Vec::with_capacity(count);
+        for way in 0..count {
+            let mut way_terms = Terms::default();
+            scores.push(self.score_placed(&pick(way), &mut way_terms));
+            each.push(way_terms);
+        }
+        let n = count as f64;
+        terms.0.clear();
+        for way_terms in &each {
+            for (term, _) in &way_terms.0 {
+                if terms.0.iter().all(|(seen, _)| seen != term) {
+                    let values = each.iter().map(|other| {
+                        other
+                            .0
+                            .iter()
+                            .find(|(found, _)| found == term)
+                            .map_or(0.0, |(_, value)| *value)
+                    });
+                    terms.0.push((*term, sum(values) / n));
+                }
+            }
+        }
+        let mean = |value: fn(&Score) -> f64| sum(scores.iter().map(value)) / n;
+        Score {
+            total: terms.total(),
+            moment: mean(|score| score.moment),
+            center: (mean(|score| score.center.0), mean(|score| score.center.1)),
+            void_cells: mean(|score| score.void_cells),
+            void_area: mean(|score| score.void_area),
+        }
+    }
+
+    /// The score of one placement of every layer, with its terms: each layer's
+    /// extent says where it sits and how far it spreads, and its cover where its
+    /// marks are (the empty cells, the drawn area, the mirror, overlapping).
+    #[allow(clippy::too_many_lines, clippy::cast_precision_loss)]
+    fn score_placed(&self, placed: &[&Footprint], terms: &mut Terms) -> Score {
         let roles = &self.reading.roles;
         let n = self.layers.len();
-        let boxes: Vec<Rect> = (0..n)
-            .map(|i| self.boxed(i, &table.all[choice[i]].rect))
-            .collect();
+        let boxes: Vec<Rect> = placed.iter().map(|footprint| footprint.extent).collect();
         terms.0.clear();
         let weights: Vec<f64> = (0..n).map(|i| self.weight(i, &boxes[i])).collect();
         // 計白当黒: every empty cell of the thirds grid weighs a ninth of the marks, so an
@@ -2721,7 +2958,9 @@ impl<'a> Work<'a> {
         for row in 0..3 {
             for col in 0..3 {
                 let c = cell(col, row);
-                if !(0..n).any(|i| !self.sparse[i] && intersection(&c, &boxes[i]) > 0.0) {
+                if !(0..n).any(|i| {
+                    !self.sparse[i] && placed[i].cover.iter().any(|q| intersection(&c, q) > 0.0)
+                }) {
                     voids.push(center(&c));
                 }
             }
@@ -2811,7 +3050,7 @@ impl<'a> Work<'a> {
         }
         if symmetric {
             // The whole picture mirrors across the vertical axis, not only the focal thing.
-            terms.set(Term::Symmetry, mirror_mismatch(&boxes, &weights) / 0.1);
+            terms.set(Term::Symmetry, mirror_mismatch(placed, &weights) / 0.1);
         }
         if let Some(focus) = self.tension("focus") {
             // Everything drawn except the ground counts; a thing read as isolated or
@@ -2841,7 +3080,7 @@ impl<'a> Work<'a> {
             }
         }
         // 余白の割合: the area outside the drawn ranges, at the shares of five and three of the nine cells.
-        let drawn = drawn_area(&boxes, &self.sparse);
+        let drawn = drawn_area(placed, &self.sparse);
         let need = match self.tension("void") {
             Some("strong") => 5.0 / 9.0,
             Some("medium") => 3.0 / 9.0,
@@ -2854,7 +3093,7 @@ impl<'a> Work<'a> {
         for (index, relation) in self.reading.relations.iter().enumerate() {
             terms.set(
                 Term::Relation(index),
-                2.0 * self.relation_penalty(relation, &boxes),
+                2.0 * self.relation_penalty(relation, &boxes, placed),
             );
             if matches!(
                 relation.kind,
@@ -2875,9 +3114,9 @@ impl<'a> Work<'a> {
                 if roles[i] == Role::Field || roles[j] == Role::Field {
                     continue;
                 }
-                let shared = intersection(&boxes[i], &boxes[j]);
+                let shared = cover_overlap(placed[i], placed[j]);
                 if shared != 0.0 {
-                    let smaller = area(&boxes[i]).min(area(&boxes[j]));
+                    let smaller = placed[i].area().min(placed[j].area());
                     terms.add(Term::Overlap, 0.5 * shared / smaller);
                 }
             }
@@ -2898,19 +3137,21 @@ impl<'a> Work<'a> {
             total: terms.total(),
             moment,
             center: (cx, cy),
-            void_cells: voids.len(),
+            void_cells: voids.len() as f64,
             void_area: 1.0 - drawn,
         }
     }
 }
 
-/// The score of one placement and what it shows.
+/// The score of one placement and what it shows. With a bare diagonal row each
+/// value is the mean over the ways it can run, so the empty cells can be a
+/// fraction.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Score {
     pub total: f64,
     pub moment: f64,
     pub center: (f64, f64),
-    pub void_cells: usize,
+    pub void_cells: f64,
     pub void_area: f64,
 }
 
@@ -3125,6 +3366,7 @@ pub fn join(
         &group.reading,
         background,
         &group.edge_joints,
+        &group.jointed(),
     ) else {
         return plain;
     };
@@ -3157,6 +3399,17 @@ struct Grouped {
     reading: CheckedReading,
     joined: Vec<Vec<Joined>>,
     edge_joints: Vec<bool>,
+}
+
+impl Grouped {
+    /// Whether each layer placed again is in a joint: the partners, which the
+    /// joined layers lead to.
+    fn jointed(&self) -> Vec<bool> {
+        self.joined
+            .iter()
+            .map(|joined| !joined.is_empty())
+            .collect()
+    }
 }
 
 /// Take a work apart at its joints (`attached`, by joined layer): a joined layer
@@ -3708,9 +3961,14 @@ mod tests {
             grouped(&layers, &reading, &attached, "white", |_| Some(WHOLE)).expect("grouped");
         assert_eq!(group.keep, [0, 3, 5]);
         assert_eq!(group.edge_joints, [true, true, false]);
-        let work =
-            Work::with_edge_joints(&group.layers, &group.reading, "white", &group.edge_joints)
-                .expect("a work");
+        let work = Work::with_edge_joints(
+            &group.layers,
+            &group.reading,
+            "white",
+            &group.edge_joints,
+            &group.jointed(),
+        )
+        .expect("a work");
         assert_eq!(work.options[0], before(Role::Field));
     }
 
@@ -3739,6 +3997,282 @@ mod tests {
         assert_eq!(
             candidates(&shaped("scatter", None), Role::Scattered, None, false),
             Some(table.composed.clone())
+        );
+    }
+
+    fn diagonal_row(direction: &str) -> WorkPlanLayer {
+        let mut layer = plan_layer("line_up", "circle", None);
+        layer.count = 5;
+        layer
+            .attributes
+            .insert(WorkPlanSlot::LineUpDirection, direction.into());
+        layer
+    }
+
+    fn range_rect(key: &str) -> Rect {
+        regions().all[region_index(key).expect(key)].rect
+    }
+
+    /// The author's decision of 2026-10-19: the compiler runs a diagonal row on
+    /// the chord through its range's centre at 45 degrees, so the solver weighs
+    /// it by that chord: the chord's box, and the squares a sixth of the canvas
+    /// wide that it crosses corner to corner.
+    #[test]
+    fn a_diagonal_row_is_weighed_by_its_chord() {
+        let (zero, one) = (Frac::ZERO, Frac::ONE);
+        // The top right cell: falling, the cell's own diagonal; rising, the canvas's.
+        let falling = chord_footprint(&range_rect("cell-20"), true);
+        assert_eq!(falling.extent, range_rect("cell-20"));
+        assert_eq!(
+            falling.cover,
+            [
+                [frac(2, 3), zero, frac(5, 6), frac(1, 6)],
+                [frac(5, 6), frac(1, 6), one, frac(1, 3)],
+            ]
+        );
+        let rising = chord_footprint(&range_rect("cell-20"), false);
+        assert_eq!(rising.extent, WHOLE);
+        assert_eq!(rising.cover.len(), 6);
+        assert_eq!(rising.cover[0], [zero, frac(5, 6), frac(1, 6), one]);
+        assert_eq!(rising.cover[5], [frac(5, 6), zero, one, frac(1, 6)]);
+        // The top centre cell runs two thirds of the canvas either way.
+        assert_eq!(
+            chord_footprint(&range_rect("cell-10"), true).extent,
+            [frac(1, 3), zero, one, frac(2, 3)]
+        );
+        assert_eq!(
+            chord_footprint(&range_rect("cell-10"), false).extent,
+            [zero, zero, frac(2, 3), frac(2, 3)]
+        );
+        // A stated corner, a fifth of the canvas: the last square is cut at the edge.
+        assert_eq!(
+            chord_footprint(&range_rect("corner-tr"), true).cover,
+            [
+                [frac(4, 5), zero, frac(29, 30), frac(1, 6)],
+                [frac(29, 30), frac(1, 6), one, frac(1, 5)],
+            ]
+        );
+        assert_eq!(
+            chord_footprint(&range_rect("named-right_edge"), true).extent,
+            [frac(9, 20), zero, one, frac(11, 20)]
+        );
+        // Every range, either way: the chord passes through the range's centre,
+        // ends on the canvas's edges, and its squares follow it end to end.
+        let on_edge = |x: Frac, y: Frac| x == zero || x == one || y == zero || y == one;
+        for region in &regions().all {
+            let (cx, cy) = exact_center(&region.rect);
+            for falling in [true, false] {
+                let footprint = chord_footprint(&region.rect, falling);
+                let [left, top, right, bottom] = footprint.extent;
+                let (start, end) = if falling {
+                    ((left, top), (right, bottom))
+                } else {
+                    ((left, bottom), (right, top))
+                };
+                let through = if falling {
+                    cy - start.1 == cx - start.0
+                } else {
+                    start.1 - cy == cx - start.0
+                };
+                assert!(through, "{} {falling}", region.key);
+                assert!(
+                    on_edge(start.0, start.1) && on_edge(end.0, end.1),
+                    "{}",
+                    region.key
+                );
+                assert!(zero <= left && right <= one && zero <= top && bottom <= one);
+                let mut at = start;
+                for square in &footprint.cover {
+                    let width = square[2] - square[0];
+                    assert!(
+                        width <= SIXTH && square[3] - square[1] == width,
+                        "{}",
+                        region.key
+                    );
+                    let next = if falling {
+                        (square[2], at.1 + width)
+                    } else {
+                        (square[2], at.1 - width)
+                    };
+                    assert_eq!(square[0], at.0, "{}", region.key);
+                    assert_eq!((square[1], square[3]), (at.1.min(next.1), at.1.max(next.1)));
+                    at = next;
+                }
+                assert_eq!(at, end, "{}", region.key);
+            }
+        }
+    }
+
+    /// A bare diagonal row runs either way, as the compiler chooses, so a
+    /// placement with one scores the mean of its two ways: each term, the
+    /// centre and the empty cells, with the total the sum of the terms.
+    #[test]
+    fn a_bare_diagonal_row_weighs_the_mean_of_its_two_ways() {
+        let at = |key: &str| region_index(key).expect(key);
+        // Alone in the top right cell: falling it keeps to the cell (eight empty
+        // cells, two squares), rising it crosses the canvas (six, six squares).
+        let alone = |direction: &str| {
+            let layers = [diagonal_row(direction)];
+            let reading = default_reading(&layers);
+            let work = Work::new(&layers, &reading, "white").expect("a work");
+            work.score(&[at("cell-20")], &mut Terms::default())
+        };
+        let (falling, rising, either) = (alone("falling"), alone("rising"), alone("diagonal"));
+        assert_eq!(
+            (falling.void_cells, rising.void_cells, either.void_cells),
+            (8.0, 6.0, 7.0)
+        );
+        assert_eq!(falling.void_area, 1.0 - 2.0 / 36.0);
+        assert_eq!(rising.void_area, 1.0 - 6.0 / 36.0);
+        assert_eq!(
+            either.void_area,
+            sum([falling.void_area, rising.void_area]) / 2.0
+        );
+        // With another layer, relations on the row's marks and a symmetric
+        // reading, every term is the mean of the two ways.
+        let reading = CheckedReading {
+            roles: vec![Role::Secondary, Role::Focal],
+            relations: vec![
+                Relation {
+                    kind: RelationKind::Near,
+                    a: 1,
+                    b: Some(0),
+                    c: None,
+                    side: None,
+                    toward: None,
+                },
+                Relation {
+                    kind: RelationKind::Deviation,
+                    a: 0,
+                    b: Some(1),
+                    c: None,
+                    side: None,
+                    toward: None,
+                },
+            ],
+            tension: [("symmetry".to_owned(), "symmetric".to_owned())].into(),
+            ..CheckedReading::default()
+        };
+        let scored = |direction: &str| {
+            let layers = [diagonal_row(direction), plan_layer("place", "square", None)];
+            let work = Work::new(&layers, &reading, "white").expect("a work");
+            let mut terms = Terms::default();
+            let score = work.score(&[at("cell-12"), at("cell-00")], &mut terms);
+            (score, terms.0)
+        };
+        let ((falling, falling_terms), (rising, rising_terms), (either, either_terms)) =
+            (scored("falling"), scored("rising"), scored("diagonal"));
+        let mean = |a: f64, b: f64| sum([a, b]) / 2.0;
+        let value = |terms: &[(Term, f64)], term: Term| {
+            terms
+                .iter()
+                .find(|(found, _)| *found == term)
+                .map_or(0.0, |(_, value)| *value)
+        };
+        let mut expected: Vec<(Term, f64)> = Vec::new();
+        for (term, _) in falling_terms.iter().chain(&rising_terms) {
+            if expected.iter().all(|(seen, _)| seen != term) {
+                let both = mean(value(&falling_terms, *term), value(&rising_terms, *term));
+                expected.push((*term, both));
+            }
+        }
+        assert_ne!(falling_terms, rising_terms);
+        assert_eq!(either_terms, expected);
+        assert_eq!(either.total, Terms(expected).total());
+        assert_eq!(
+            either.center,
+            (
+                mean(falling.center.0, rising.center.0),
+                mean(falling.center.1, rising.center.1)
+            )
+        );
+        assert_eq!(either.moment, mean(falling.moment, rising.moment));
+    }
+
+    /// Ranges with one centre draw a diagonal row alike, so it keeps the first
+    /// of each; a diagonal row in a joint keeps every range and its range's
+    /// box, and every other layer keeps its ranges.
+    #[test]
+    fn a_diagonal_row_keeps_one_range_per_centre() {
+        let table = regions();
+        let kept = |layer: &WorkPlanLayer, role: Role| {
+            one_per_center(layer, candidates(layer, role, None, false).expect("ranges"))
+        };
+        let centres = |options: &[usize]| {
+            options
+                .iter()
+                .map(|index| exact_center(&table.all[*index].rect))
+                .collect::<BTreeSet<_>>()
+                .len()
+        };
+        for direction in ["diagonal", "falling", "rising"] {
+            let row = diagonal_row(direction);
+            for (role, count) in [(Role::Focal, 13), (Role::Field, 13), (Role::Secondary, 21)] {
+                let options = kept(&row, role);
+                assert_eq!(options.len(), count, "{direction} {role:?}");
+                assert_eq!(centres(&options), count, "{direction} {role:?}");
+            }
+        }
+        let keys = |role: Role| -> Vec<&str> {
+            kept(&diagonal_row("diagonal"), role)
+                .into_iter()
+                .map(region_key)
+                .collect()
+        };
+        let secondary = keys(Role::Secondary);
+        assert!(secondary.contains(&"cell-11") && !secondary.contains(&"whole"));
+        assert!(secondary.contains(&"cell-10") && !secondary.contains(&"hband-0"));
+        let field = keys(Role::Field);
+        assert!(field.contains(&"hband-1") && !field.contains(&"vband-1"));
+        assert!(!field.contains(&"whole"));
+        // Every other line-up, a diagonal row of one mark, and the other actions.
+        let mut layers: Vec<WorkPlanLayer> = ["horizontal", "vertical"]
+            .into_iter()
+            .map(diagonal_row)
+            .collect();
+        let mut plain = diagonal_row("diagonal");
+        plain.attributes.remove(&WorkPlanSlot::LineUpDirection);
+        layers.push(plain);
+        let mut one = diagonal_row("diagonal");
+        one.count = 1;
+        layers.push(one);
+        for action in ["draw", "place", "scatter", "tile", "fill"] {
+            layers.push(shaped(action, None));
+        }
+        for layer in &layers {
+            for role in ROLES {
+                let options = candidates(layer, role, None, false).expect("ranges");
+                assert_eq!(one_per_center(layer, options.clone()), options);
+            }
+        }
+        // In a joint, a diagonal row keeps every range and its range's box.
+        let cell = region_index("cell-20").expect("a cell");
+        let rect = table.all[cell].rect;
+        let layers = [
+            diagonal_row("diagonal"),
+            plan_layer("place", "square", None),
+        ];
+        let jointed = CheckedReading {
+            roles: vec![Role::Secondary, Role::Secondary],
+            joints: vec![Joint {
+                kind: JointKind::Overlaps,
+                a: 1,
+                b: 0,
+            }],
+            ..CheckedReading::default()
+        };
+        let work = Work::new(&layers, &jointed, "white").expect("a work");
+        assert_eq!(work.options[0], table.composed);
+        assert_eq!(work.footprints[0][cell], [Footprint::whole(rect)]);
+        let alone = CheckedReading {
+            joints: Vec::new(),
+            ..jointed
+        };
+        let work = Work::new(&layers, &alone, "white").expect("a work");
+        assert_eq!(work.options[0].len(), 21);
+        assert_eq!(
+            work.footprints[0][cell],
+            [chord_footprint(&rect, true), chord_footprint(&rect, false)]
         );
     }
 }

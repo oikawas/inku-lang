@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-19 — Composition: weigh a diagonal row by the chord the compiler draws
+
+The composition solver weighed a layer lining up two or more marks diagonally, rising or falling as its range's box, while the compiler runs such a row on the chord that the line through the range's center at 45 degrees cuts across the canvas (v2.15.204): a diagonal row in the center cell was drawn along the whole diagonal of the canvas. The solver now weighs it by the chord's box and a band of squares a sixth of the canvas wide along it. A row that says only diagonally takes its direction from the printed instructions in the compiler, so it is compared by the mean of the scores of its two ways. Ranges with one center give a diagonal row the same chord, so it keeps one range per center. New compositions and Another composition change for works with a diagonal row; saved works draw as before, and no version changes.
+
 ### 2026-10-19 — Android: 3D PNG and GLB saves carry Web's file name
 
 In the Android experimental 3D view, a saved PNG or GLB reached the share sheet as `<UUID>.png` or `<UUID>.bin`, and the GLB went with no known type: the web view's download notice never carries the link's name. The app now reads the format from the file's first bytes and hands it on as `inku-3d-<first 12 of the digest>.png` or `.glb`, typed `image/png` or `model/gltf-binary`, as Web names it.

@@ -1905,6 +1905,27 @@ fn collect_pre_head_phrase_ownership(
                             matches!(candidate, ClauseAtom::UnattachedExactNumber(number)
                                 if number.span.end_byte == span.start_byte)
                         }) => {}
+                // A numeric size before the head stays inside the noun phrase,
+                // so modifiers before it still reach the head, e.g.
+                // `赤 の 長さ 0.6 の 線`.
+                ClauseAtom::FunctionWord {
+                    geometry_keyword: Some(keyword),
+                    ..
+                } if crate::parser::is_numeric_size_keyword(*keyword) => {}
+                ClauseAtom::FunctionWord {
+                    exact_decimal: Some(_),
+                    ..
+                } if clause
+                    .atoms
+                    .iter()
+                    .take_while(|candidate| candidate.span().end_byte <= span.start_byte)
+                    .last()
+                    .is_some_and(|previous| {
+                        matches!(previous, ClauseAtom::FunctionWord {
+                            geometry_keyword: Some(keyword),
+                            ..
+                        } if crate::parser::is_numeric_size_keyword(*keyword))
+                    }) => {}
                 ClauseAtom::FunctionWord { .. } => break,
                 _ if is_pre_head_modifier_atom(atom) => ownership.insert(head_span, span),
                 _ => {}

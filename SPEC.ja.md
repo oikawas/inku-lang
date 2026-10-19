@@ -2240,7 +2240,7 @@ Direct typed DDLは、JAの`半径N` / `直径N` / `幅N、高さN` / `一辺N`�
 
 痕のisotropic size、円・弧の半径、`radial`の環、`at.region`の広がり、clusterの帯、pathの交差軸のずれは、そのallocationまたはcanvas短辺を基準に画素へ直す。Circleをaspect-correctに保ち、ellipseは記述したaspectを保つ。置き場所・region中心・cluster中心は幅と高さに比例し、pathの進行量（`margin` / `span`）と`arrangement.margin`は各軸の割合を保つ。この決定は§18の単一`inku.geometry-resolution-policy.v1` ownerに従う。
 
-Direct typed DDLのfinite geometryには、JAの`長さN` / `弦長N、矢高N`と対応するEN `length N` / `chord N, sagitta N`も含む。Line / Arc / Pointは既存4 closed shapeと同じactual Score lowererへ入り、Pointは既存`半径N` / `直径N`を使う。JA `点`は独立noun headならPointであり、別の明確な形状headを修飾する同一phraseでは既存stipple surfaceのままである。
+Direct typed DDLのfinite geometryには、JAの`長さN` / `弦長N、矢高N`と対応するEN `length N` / `chord N, sagitta N`も含む。Line / Arc / Pointは既存4 closed shapeと同じactual Score lowererへ入り、Pointは既存`半径N` / `直径N`を使う。JA `点`は独立noun headならPointであり、別の明確な形状headを修飾する同一phraseでは既存stipple surfaceのままである。名詞の前の修飾語は、寸法（寸法の語と数）の前にも後ろにも置ける。`赤い太筆の長さ0.6の線`は`長さ0.6の赤い太筆の線`と同じ意味で、`赤い半径0.1の円`・`赤い幅0.3、高さ0.2の四角`は`半径0.1の赤い円`・`幅0.3、高さ0.2の赤い四角`と同じScoreになる（DDL 20）。
 
 ### 数値の解像度（マスターグリッド）
 

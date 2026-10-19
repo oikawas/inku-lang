@@ -3893,7 +3893,11 @@ the corresponding English `length N` / `chord N, sagitta N`. Line, arc, and
 point enter the same actual Score lowerer as the six closed shapes;
 point reuses `radius` or `diameter`. Japanese `点` is Point as an independent
 noun head and remains the existing stipple surface when the same phrase owns it
-as a modifier of another explicit shape head.
+as a modifier of another explicit shape head. A Japanese prenominal modifier may
+stand before a numeric size (the size word and its number) as well as after it:
+`赤い太筆の長さ0.6の線` means the same as `長さ0.6の赤い太筆の線`, and
+`赤い半径0.1の円` and `赤い幅0.3、高さ0.2の四角` lower to the same Score as
+`半径0.1の赤い円` and `幅0.3、高さ0.2の赤い四角` (DDL 20).
 
 ### The Resolution of a Number (the Master Grid)
 

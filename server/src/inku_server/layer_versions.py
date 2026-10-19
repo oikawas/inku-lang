@@ -360,7 +360,14 @@
 # canvas along itself, and a diagonal row's step is its chord over the count.
 # A row as long as the canvas around an off-center range had put marks off the
 # canvas (58 rows in 49 of the 500 works since 2026-10-02 in the 5173 export).
-DDL_ENGINE_VERSION = "63"
+# 64: A Japanese prenominal modifier before a numeric size reaches the same
+# head as one after it. The size word and its number stay inside the noun
+# phrase, as a count does since 47; a size word may directly follow a
+# recognized word; and a scale word looks past a size to its head. So
+# `赤い太筆の長さ0.6の線` keeps 赤い and 太筆, and `赤い長さ0.6の線` and
+# `大きな長さ0.6の線` are read instead of left as an unresolved clause. No
+# saved work changes (the 4,712 works of the 2026-10-14 5173 export).
+DDL_ENGINE_VERSION = "64"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -405,4 +412,7 @@ DDL_ENGINE_VERSION = "63"
 # 19 (2026-10-15): 自由線 / free line joins the shape vocabulary. Until the
 # reader's rule for choosing it is written (I-715 stage B2), it is read in DDL
 # but neither offered to Stage 1 nor listed in the saijiki.
-DDL_VERSION = "19"
+# 20 (2026-10-19): A Japanese modifier may stand before a numeric size
+# (`赤い太筆の長さ0.6の線`, `赤い半径0.1の円`, `赤い幅0.3、高さ0.2の四角`)
+# as well as after it.
+DDL_VERSION = "20"

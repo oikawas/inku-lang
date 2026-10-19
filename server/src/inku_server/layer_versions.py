@@ -354,7 +354,13 @@
 # numbers from before the continuation joined the instruction it continues,
 # so they named the next instruction, or none when the sequence closed the
 # description and the compiler stopped (I-722).
-DDL_ENGINE_VERSION = "62"
+# 63: A line-up of two or more marks over a range runs on the chord that the
+# line through the range's center, in the row's direction, cuts across the
+# canvas, in equal cells. A horizontal or vertical row is centered on the
+# canvas along itself, and a diagonal row's step is its chord over the count.
+# A row as long as the canvas around an off-center range had put marks off the
+# canvas (58 rows in 49 of the 500 works since 2026-10-02 in the 5173 export).
+DDL_ENGINE_VERSION = "63"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

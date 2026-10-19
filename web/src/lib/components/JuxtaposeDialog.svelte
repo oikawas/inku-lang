@@ -150,8 +150,13 @@
 			<RunStatus variant="inline" label={asking ? t().juxtaposeAsking : (stageLabel || t().pipelineWorking)} stage1Model={asking ? null : stage1ModelLabel} stage2Model={asking ? null : stage2ModelLabel} {elapsedMs} tokensIn={asking ? null : tokensIn} tokensOut={asking ? null : tokensOut} attempt={asking ? null : attempt} onStop={() => controller?.abort()} />
 		{:else}
 			<button type="button" onclick={close}>{t().pipelineCancel}</button>
-			<button type="button" disabled={!selectedModel || !node.history?.id} onclick={ask}>{result ? t().juxtaposeAskAgain : t().juxtaposeAsk}</button>
-			<button type="button" class="juxtapose-draw" disabled={!choice} onclick={draw}>{t().juxtaposeDraw}</button>
+			{#if result}
+				<button type="button" disabled={!selectedModel || !node.history?.id} onclick={ask}>{t().juxtaposeAskAgain}</button>
+				<button type="button" class="juxtapose-primary" disabled={!choice} onclick={draw}>{t().juxtaposeDraw}</button>
+			{:else}
+				<!-- Nothing can be drawn before four sentences are shown, so asking is the one action. -->
+				<button type="button" class="juxtapose-primary" disabled={!selectedModel || !node.history?.id} onclick={ask}>{t().juxtaposeAsk}</button>
+			{/if}
 		{/if}
 	</footer>
 </dialog>
@@ -180,7 +185,7 @@
 	.juxtapose-error { padding: 8px 12px; border: 1px solid var(--danger, #9b3d32); border-radius: 6px; color: var(--danger, #9b3d32); font-size: var(--ui-font-size-12); white-space: pre-line; }
 	.juxtapose-dialog > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--border); }
 	.juxtapose-dialog > footer button { border: 1px solid var(--border2); border-radius: 7px; padding: 9px 15px; background: var(--panel); color: var(--fg); cursor: pointer; }
-	.juxtapose-dialog > footer .juxtapose-draw { border-color: var(--action-bg); background: var(--action-bg); color: var(--action-fg); font-weight: 700; }
-	.juxtapose-dialog > footer .juxtapose-draw:hover:not(:disabled) { border-color: var(--action-hover); background: var(--action-hover); }
+	.juxtapose-dialog > footer .juxtapose-primary { border-color: var(--action-bg); background: var(--action-bg); color: var(--action-fg); font-weight: 700; }
+	.juxtapose-dialog > footer .juxtapose-primary:hover:not(:disabled) { border-color: var(--action-hover); background: var(--action-hover); }
 	.juxtapose-dialog button:disabled { opacity: .55; cursor: default; }
 </style>

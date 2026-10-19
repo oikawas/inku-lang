@@ -1,5 +1,5 @@
 import './style.css';
-import { Viewer } from './viewer/Viewer';
+import { Viewer, type Unpainted } from './viewer/Viewer';
 import { labels, type Labels } from './viewer/labels';
 import { PROTOCOL, MAX_INPUT_BYTES, validLoad, type LoadMessage } from './input/protocol';
 import type { ScenePacket } from './scene/types';
@@ -11,7 +11,7 @@ const mountId = new URLSearchParams(location.hash.slice(1)).get('mount') || 'sta
 let current: LoadMessage | null = null, viewer: Viewer | null = null, worker: Worker | null = null;
 let generation = 0, timeout = 0, locale: 'ja' | 'en' = 'ja';
 let words = labels(locale);
-let stage: HTMLElement, status: HTMLElement, details: HTMLElement, selection: HTMLElement, overlay: HTMLElement, recoveryNotice: HTMLElement;
+let stage: HTMLElement, status: HTMLElement, details: HTMLElement, selection: HTMLElement, overlay: HTMLElement, recoveryNotice: HTMLElement, paintNotice: HTMLElement;
 let cancel: HTMLButtonElement, retry: HTMLButtonElement;
 const sceneControls: (HTMLButtonElement | HTMLInputElement | HTMLSelectElement)[] = [];
 const urls = new Set<string>();
@@ -33,7 +33,7 @@ function message(text: string, busy = false) {
 }
 function stop() {
   generation++; clearTimeout(timeout); worker?.terminate(); worker = null;
-  viewer?.dispose(); viewer = null;
+  viewer?.dispose(); viewer = null; stage.removeAttribute('aria-busy');
 }
 function fail(reason: string) {
   stop();
@@ -110,6 +110,7 @@ function ui() {
   for (const format of ['png', 'glb'] as const) button(options, words[format], () => { void save(format); });
   const help = element('details', toolbar); element('summary', help, words.help); element('p', help, words.helpText); element('p', help, words.layerHelp);
   recoveryNotice = element('details', toolbar); recoveryNotice.className = 'recovery-notice'; recoveryNotice.hidden = true;
+  paintNotice = element('details', toolbar); paintNotice.className = 'recovery-notice'; paintNotice.hidden = true;
   stage = element('section', root); stage.className = 'stage'; stage.setAttribute('aria-label', '3D');
   overlay = element('div', stage); overlay.className = 'overlay'; overlay.setAttribute('role', 'status'); element('p', overlay);
   cancel = button(overlay, words.cancel, () => fail('cancelled'), false);
@@ -152,16 +153,18 @@ function load(value: LoadMessage) {
         selection.textContent = data ? `${words.selected}: ${data.primitive} · #${Number(data.sourceIndex) + 1} (${Number(data.performedIndex) + 1}) · ${words.layer} ${Number(data.layerIndex) + 1}` : `${words.selected}: ${words.none}`;
       }, fail, value.initialView);
       const preparedViewer = viewer;
-      await preparedViewer.prepareAppearance();
-      if (localGeneration !== generation || viewer !== preparedViewer) return;
+      // The plain solids come first; paint follows once they can be moved.
+      viewer.prepareShape();
       if (value.viewState) {
         viewer.restore(value.viewState);
         root.querySelector<HTMLSelectElement>('select[data-option=projection]')!.value = value.viewState.projection;
         updateDepthControls(value.viewState.depth, value.viewState.layerSpacing ?? 1);
       }
       root.querySelector<HTMLSelectElement>('select[data-option=background]')!.value = viewer.background;
+      viewer.drawNow();
       overlay.hidden = true; sceneControls.forEach(control => control.disabled = false);
-      status.textContent = `${words.objects}: ${packet.objectCount} · ${words.triangles}: ${packet.triangles.toLocaleString(locale)} · ${words.layer}: ${packet.layerCount}`;
+      const counts = `${words.objects}: ${packet.objectCount} · ${words.triangles}: ${packet.triangles.toLocaleString(locale)} · ${words.layer}: ${packet.layerCount}`;
+      status.textContent = counts;
       if (packet.recoveries.length || packet.emptyPaths.length) {
         recoveryNotice.hidden = false;
         element('summary', recoveryNotice, packet.recoveries.length ? `${words.recovered} (${packet.recoveries.length})` : `${words.emptyPaths} (${packet.emptyPaths.length})`);
@@ -186,9 +189,17 @@ function load(value: LoadMessage) {
       for (const note of packet.diagnostics) element('p', details, words[note as keyof Labels] ?? note);
       if (packet.clippedObjects) element('p', details, `${words.clipped}: ${packet.clippedObjects}`);
       element('p', details, `${packet.mappingVersion} · Engine ${packet.engineVersion} · ${packet.inputDigest}`);
+      const total = viewer.paintTotal;
+      if (total) { stage.setAttribute('aria-busy', 'true'); status.textContent = `${counts} · ${words.painting} 0/${total}`; }
       post('rendered', { inputDigest: packet.inputDigest, objectCount: packet.objectCount, triangles: packet.triangles, bytes: packet.bytes, preparationMs: Math.round(performance.now() - started) });
       post('view-state', { viewState: viewer.state() });
       if (packet.diagnostics.length) post('diagnostic', { diagnostics: packet.diagnostics });
+      const shown = () => localGeneration === generation && viewer === preparedViewer;
+      preparedViewer.paint((done, all) => { if (shown()) status.textContent = `${counts} · ${words.painting} ${done}/${all}`; }).then(unpainted => {
+        if (!shown()) return;
+        stage.removeAttribute('aria-busy'); status.textContent = counts;
+        if (unpainted.length) showUnpainted(unpainted);
+      }, error => { if (shown()) fail(error instanceof Error && error.message ? error.message : String(error) || 'paint_failed'); });
     } catch (error) {
       if (localGeneration !== generation) return;
       // Only a renderer that could not be created means no GPU; keep any other cause.
@@ -198,15 +209,27 @@ function load(value: LoadMessage) {
   worker.postMessage({ inputJson: value.inputJson, wasmUrl: new URL('wasm/score_adapter.js', document.baseURI).href });
 }
 
+function showUnpainted(unpainted: Unpainted[]) {
+  paintNotice.hidden = false;
+  element('summary', paintNotice, `${words.unpainted} (${unpainted.length})`);
+  element('p', paintNotice, words.unpaintedText);
+  const instructions = [...new Set(unpainted.flatMap(item => 'sourceIndex' in item ? [item.sourceIndex + 1] : []))];
+  if (instructions.length) element('p', paintNotice, `${words.instruction}: ${instructions.join(', ')}`);
+  if (unpainted.some(item => item.role === 'presence')) element('p', paintNotice, words.presenceUnpainted);
+  const info = element('details', paintNotice); element('summary', info, words.details);
+  element('pre', info, JSON.stringify(unpainted, null, 2));
+}
+
 async function save(format: 'png' | 'glb') {
   const source = viewer; if (!source) return;
   try {
+    // Waits for the paint, so the file has every mark that could be painted.
     const blob = await source[format]();
     if (source !== viewer) return;
     const url = URL.createObjectURL(blob); urls.add(url);
     const link = document.createElement('a'); link.href = url; link.download = `inku-3d-${source.packet.inputDigest.slice(0, 12)}.${format}`;
     link.click(); setTimeout(() => { URL.revokeObjectURL(url); urls.delete(url); }, 1000);
-  } catch { status.textContent = words.exportFailed; }
+  } catch { if (source === viewer) status.textContent = words.exportFailed; }
 }
 
 window.addEventListener('message', event => {

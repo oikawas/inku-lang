@@ -4,7 +4,7 @@ Same-origin `postMessage`, with an exact `targetOrigin`. Parent checks `source =
 
 Parent → child: `load-work {mountId,requestId,inputJson,locale,theme,viewState?}` and `dispose`. `inputJson` is at most 16 MiB of UTF-8. Locale is `ja|en`; theme is `light|dark`. No URLs or credentials are obtained from Score data.
 
-Child → parent: `ready` (request 0), `rendered {inputDigest,objectCount,triangles,bytes,preparationMs}`, `diagnostic {diagnostics}`, `failed {reason}`, `view-state {viewState}`, `return-2d`. The child computes SHA-256 over the exact input JSON in WASM. Stale-result protection uses request/mount identity and does not require WebCrypto on HTTP LAN hosts.
+Child → parent: `ready` (request 0), `rendered {inputDigest,objectCount,triangles,bytes,preparationMs}`, `diagnostic {diagnostics}`, `failed {reason}`, `view-state {viewState}`, `return-2d`. `rendered` comes once the plain solids are drawn and the controls work, and `preparationMs` measures that much; the child paints them afterwards, and a later `failed` (such as a lost graphics context) still ends the view. The child computes SHA-256 over the exact input JSON in WASM. Stale-result protection uses request/mount identity and does not require WebCrypto on HTTP LAN hosts.
 
 `viewState` contains finite three-element `position`/`target`, positive bounded `zoom`, `projection`, `depth` (solid thickness, 0.1–3), `orthoHeight`, and optional `layerSpacing` (0–3; defaults to 1). Older states remain valid. It is accepted only for the current request and cached with the exact input JSON. No storage API is used.
 

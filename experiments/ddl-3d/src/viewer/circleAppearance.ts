@@ -120,11 +120,19 @@ export function mapPaintSurfaces(geometry: BufferGeometry, bounds: [number, numb
   return result;
 }
 
-/** Rasterize the shared SVG filters once, then paint caps and solid walls. */
-export async function preparePaintAppearance(mesh: Mesh, packet: MeshPacket, canvas: XY, maxSize = MAX_RASTER_SIDE): Promise<PaintAppearanceResources | null> {
+/** A mark's decoded paint and wall pigment, not yet given to its mesh. */
+export interface PaintRaster {
+  raster: HTMLCanvasElement;
+  sideRaster: HTMLCanvasElement;
+  pixels: ImageData;
+  dispose(): void;
+}
+
+/** Rasterize the shared SVG filters once. Nothing here touches the mesh. */
+export async function rasterizePaint(packet: MeshPacket, maxSize = MAX_RASTER_SIDE): Promise<PaintRaster | null> {
   const appearance = packet.appearance;
   if (!appearance) return null;
-  const { bounds, center, svg } = appearance;
+  const { bounds, svg } = appearance;
   if (!Number.isFinite(maxSize) || maxSize < 3) throw new Error('invalid_circle_raster_budget');
   const limit = Math.min(MAX_RASTER_SIDE, Math.floor(maxSize));
   const scale = Math.min(1, limit / Math.max(bounds[2], bounds[3]) / 1024);
@@ -154,6 +162,20 @@ export async function preparePaintAppearance(mesh: Mesh, packet: MeshPacket, can
   context.clearRect(0, 0, width, 1); context.clearRect(0, height - 1, width, 1);
   context.clearRect(0, 0, 1, height); context.clearRect(width - 1, 0, 1, height);
   const pixels = context.getImageData(0, 0, width, height);
+  const sideRaster = document.createElement('canvas');
+  sideRaster.width = width; sideRaster.height = height;
+  const sideContext = sideRaster.getContext('2d');
+  if (!sideContext) throw new Error('paint_side_raster_unavailable');
+  const sidePixels = sideContext.createImageData(width, height);
+  sidePixels.data.set(sidePaintPixels(pixels.data, packet.color));
+  sideContext.putImageData(sidePixels, 0, 0);
+  return { raster, sideRaster, pixels, dispose() { raster.width = raster.height = sideRaster.width = sideRaster.height = 1; } };
+}
+
+/** Fit caps and solid walls to the decoded paint in one step, without waiting. */
+export function applyPaint(mesh: Mesh, packet: MeshPacket, canvas: XY, painted: PaintRaster): PaintAppearanceResources {
+  const { bounds, center } = packet.appearance!;
+  const { raster, sideRaster, pixels } = painted, { width, height } = pixels;
   const round = packet.primitive === 'circle' || packet.primitive === 'ellipse';
   const radii = round ? paintedRadii(pixels.data, width, height, bounds, center) : null;
   const positions = mesh.geometry.getAttribute('position');
@@ -182,13 +204,6 @@ export async function preparePaintAppearance(mesh: Mesh, packet: MeshPacket, can
   mesh.geometry = mapPaintSurfaces(previous, bounds, canvas,
     packet.filled === true || (!round && ['line', 'free_line', 'arc'].includes(packet.primitive)));
   if (mesh.geometry !== previous) previous.dispose();
-  const sideRaster = document.createElement('canvas');
-  sideRaster.width = width; sideRaster.height = height;
-  const sideContext = sideRaster.getContext('2d');
-  if (!sideContext) throw new Error('paint_side_raster_unavailable');
-  const sidePixels = sideContext.createImageData(width, height);
-  sidePixels.data.set(sidePaintPixels(pixels.data, packet.color));
-  sideContext.putImageData(sidePixels, 0, 0);
   const texture = new CanvasTexture(raster), sideTexture = new CanvasTexture(sideRaster);
   for (const map of [texture, sideTexture]) {
     map.colorSpace = SRGBColorSpace;
@@ -202,7 +217,6 @@ export async function preparePaintAppearance(mesh: Mesh, packet: MeshPacket, can
   const materials = [material, wall];
   mesh.material = materials;
   return { texture, materials, dispose() {
-    texture.dispose(); sideTexture.dispose(); materials.forEach(m => m.dispose());
-    raster.width = raster.height = sideRaster.width = sideRaster.height = 1;
+    texture.dispose(); sideTexture.dispose(); materials.forEach(m => m.dispose()); painted.dispose();
   } };
 }

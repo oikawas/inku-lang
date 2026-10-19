@@ -6,12 +6,19 @@ import type { MeshPacket, ScenePacket } from '../scene/types';
 import type { InitialView, ViewState } from '../input/protocol';
 import { skyTexture, type Background } from './background';
 import { frontView } from './frontView';
-import { preparePaintAppearance, type PaintAppearanceResources } from './circleAppearance';
+import { applyPaint, rasterizePaint, type PaintAppearanceResources } from './circleAppearance';
 import { preparePresence } from './presence';
 import { objectDepth } from './objectDepth';
+import { paintInTurn, paintOrder } from './paintQueue';
 
 type Projection = ViewState['projection'];
+/** An object, or the presence plane, whose paint could not be prepared. */
+export type Unpainted = { sourceIndex: number; performedIndex: number; instanceIndex: number; role: MeshPacket['role']; reason: string }
+  | { role: 'presence'; reason: string };
 const PAINT_CONCURRENCY = 4;
+// WebKit (the macOS app and Safari) paints its heaviest works sooner with a quarter of the pixels.
+const PAINT_PIXELS = navigator.vendor.startsWith('Apple') ? 4 * 1024 * 1024 : 16 * 1024 * 1024;
+const PAINT_REDRAW_MS = 250;
 export class Viewer {
   readonly scene = new THREE.Scene();
   readonly model = new THREE.Group();
@@ -37,6 +44,9 @@ export class Viewer {
   private events = new AbortController();
   private frame = 0;
   private stateTimer = 0;
+  private painting: Promise<unknown> = Promise.resolve();
+  private paintTimer = 0;
+  private paintDrawn = 0;
   private disposed = false;
   private lastTime = 0;
   private startPointer: [number, number] | null = null;
@@ -121,37 +131,80 @@ export class Viewer {
     return this.flat ? new THREE.MeshBasicMaterial(options) : new THREE.MeshLambertMaterial(options);
   }
 
-  async prepareAppearance() {
-    if (this.packet.presenceSvg) {
-      const presence = await preparePresence(this.packet.presenceSvg, this.packet.canvas);
-      if (this.disposed) { presence.dispose(); return; }
-      this.presence = presence; this.scene.add(presence.mesh);
-    }
-    const painted = this.packet.meshes.filter(packet => packet.appearance).length;
-    const maxSide = Math.min(1024, Math.floor(Math.sqrt(16 * 1024 * 1024 / Math.max(1, painted) / 2)));
+  /** Joint depths and the support for the plain solids, before any paint. */
+  prepareShape() {
+    for (const [mesh, packet] of this.meshPackets) this.objectDepths.set(mesh, objectDepth(mesh, packet));
+    this.updateObjectDepths(); this.placeSupport();
+  }
+  /** Draw at once, so the shape is on screen before the host hears of it. */
+  drawNow() {
+    cancelAnimationFrame(this.frame); this.frame = 0;
+    this.renderer.render(this.scene, this.camera);
+  }
+  get paintTotal() { return (this.packet.presenceSvg ? 1 : 0) + this.packet.meshes.filter(packet => packet.appearance).length; }
+
+  /** Paint the shown solids: the presence plane first, then marks from the
+   * front layer back. A mark whose paint fails keeps its plain color. */
+  paint(progress: (done: number, total: number) => void): Promise<Unpainted[]> {
+    const marks = paintOrder([...this.meshPackets].filter(([, packet]) => packet.appearance), ([, packet]) => packet.layerZ);
+    const tasks = this.packet.presenceSvg ? [null, ...marks] : marks;
+    const maxSide = Math.min(1024, Math.floor(Math.sqrt(PAINT_PIXELS / Math.max(1, marks.length) / 2)));
+    let done = 0;
     // Decodes run in turn anyway. A few at a time start each deadline with
     // its own decode, rather than letting queued marks expire while waiting.
-    const queue = [...this.meshPackets];
-    let failed = false;
-    const paint = async () => {
-      while (queue.length && !failed && !this.disposed) {
-        const [mesh, packet] = queue.shift()!;
-        const old = mesh.material as THREE.Material;
-        let resource: PaintAppearanceResources | null;
-        try { resource = await preparePaintAppearance(mesh, packet, this.packet.canvas, maxSide); }
-        catch (error) { failed = true; throw error; }
-        if (resource) {
-          old.dispose();
-          if (this.disposed) { resource.dispose(); mesh.geometry.dispose(); }
-          else this.appearances.set(mesh, resource);
-        }
+    const painting = paintInTurn(tasks, PAINT_CONCURRENCY, async task => {
+      try { await (task ? this.paintMark(task[0], task[1], maxSide) : this.paintPresence()); }
+      finally { if (!this.disposed) progress(++done, tasks.length); }
+    }, () => this.disposed).then(failures => {
+      const reasons = new Map(failures.map(({ item, error }) => [item?.[1] ?? null,
+        (error instanceof Error && error.message ? error.message : String(error)).slice(0, 200)]));
+      const unpainted: Unpainted[] = [
+        ...reasons.has(null) ? [{ role: 'presence' as const, reason: reasons.get(null)! }] : [],
+        ...this.packet.meshes.filter(packet => reasons.has(packet)).map(packet => ({ sourceIndex: packet.sourceIndex,
+          performedIndex: packet.performedIndex, instanceIndex: packet.instanceIndex, role: packet.role, reason: reasons.get(packet)! })),
+      ];
+      if (!this.disposed) {
+        if (unpainted.length) this.model.userData.unpaintedObjects = unpainted;
+        clearTimeout(this.paintTimer); this.paintTimer = 0;
+        this.placeSupport(); this.requestDraw();
       }
-    };
-    await Promise.all(Array.from({ length: PAINT_CONCURRENCY }, paint));
-    if (!this.disposed) {
-      for (const [mesh, packet] of this.meshPackets) this.objectDepths.set(mesh, objectDepth(mesh, packet));
-      this.updateObjectDepths(); this.placeSupport(); this.requestDraw();
+      return unpainted;
+    });
+    this.painting = painting.catch(() => undefined);
+    return painting;
+  }
+
+  private async paintPresence() {
+    const presence = await preparePresence(this.packet.presenceSvg!, this.packet.canvas);
+    if (this.disposed) { presence.dispose(); return; }
+    this.presence = presence; this.scene.add(presence.mesh); this.placeSupport(); this.paintedDraw();
+  }
+
+  private async paintMark(mesh: THREE.Mesh, packet: MeshPacket, maxSide: number) {
+    const painted = await rasterizePaint(packet, maxSide);
+    if (!painted) return;
+    if (this.disposed) { painted.dispose(); return; }
+    // Paint maps the line's own Z; its joint depth returns on the new vertices.
+    if (packet.depthPath) this.objectDepths.get(mesh)?.(1, 0);
+    const old = mesh.material as THREE.Material;
+    try {
+      const resource = applyPaint(mesh, packet, this.packet.canvas, painted);
+      old.dispose(); resource.materials.forEach(material => { material.wireframe = this.wire; });
+      this.appearances.set(mesh, resource);
+    } catch (error) { painted.dispose(); throw error; }
+    finally {
+      const update = objectDepth(mesh, packet); this.objectDepths.set(mesh, update); update(this.depth, this.layerSpacing);
+      if (this.selected === mesh) this.selection.setFromObject(mesh);
+      this.paintedDraw();
     }
+  }
+
+  /** Paint redraws at most every 0.25 seconds; view changes still draw at once. */
+  private paintedDraw() {
+    if (this.paintTimer || this.disposed) return;
+    this.paintTimer = window.setTimeout(() => {
+      this.paintTimer = 0; this.paintDrawn = performance.now(); this.requestDraw();
+    }, Math.max(0, this.paintDrawn + PAINT_REDRAW_MS - performance.now()));
   }
 
   private controlChanged = () => {
@@ -341,11 +394,15 @@ export class Viewer {
   };
 
   async png(): Promise<Blob> {
+    await this.painting;
+    if (this.disposed) throw new Error('disposed');
     this.renderer.render(this.scene, this.camera);
     return new Promise((resolve, reject) => this.renderer.domElement.toBlob(blob => blob ? resolve(blob) : reject(new Error('empty_png')), 'image/png'));
   }
   async glb(): Promise<Blob> {
     // Geometry, current depth, source IDs and color/opacity; guides and selection stay in the viewer.
+    await this.painting;
+    if (this.disposed) throw new Error('disposed');
     const group = new THREE.Group(); group.add(this.model.clone(true));
     if (this.presence) group.add(this.presence.mesh.clone());
     if (this.support.visible) group.add(this.support.clone());
@@ -357,7 +414,7 @@ export class Viewer {
   dispose() {
     if (this.disposed) return;
     this.changed(this.state()); this.disposed = true;
-    cancelAnimationFrame(this.frame); clearTimeout(this.stateTimer);
+    cancelAnimationFrame(this.frame); clearTimeout(this.stateTimer); clearTimeout(this.paintTimer);
     this.events.abort(); this.resize.disconnect(); this.controls.removeEventListener('change', this.controlChanged); this.controls.removeEventListener('end', this.rememberNow); this.controls.dispose();
     const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
     this.scene.traverse(object => {

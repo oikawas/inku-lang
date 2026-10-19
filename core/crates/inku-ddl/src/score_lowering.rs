@@ -4919,6 +4919,7 @@ fn resolve_object_plan(
             Rational::from_ratio(height.into(), short.into())?,
         ];
         let mut default_line_axis = [1, 0];
+        let mut line_up_range = None;
         let anchor = match resolved.placement {
             ScorePlacement::Numeric(position) => input
                 .numeric_position
@@ -4939,6 +4940,7 @@ fn resolve_object_plan(
                     .expect("the shared range was already resolved");
                     if resolved.action == PlacementAction::LineUp {
                         default_line_axis = range_long_axis(range);
+                        line_up_range = Some(range);
                     } else {
                         scale_domain_to_range(&mut domain, range)?;
                     }
@@ -4958,6 +4960,16 @@ fn resolve_object_plan(
         let line_axis = layout_direction
             .as_ref()
             .map_or(default_line_axis, |direction| direction.axis);
+        let anchor = match line_up_range {
+            Some(range) => match line_up_chord(range, line_axis, &mut domain)? {
+                Some([x, y]) => {
+                    let (x, y) = (x.to_f64()?, y.to_f64()?);
+                    ObjectAnchor::Named([x, y, x, y])
+                }
+                None => anchor,
+            },
+            None => anchor,
+        };
         let recipe = if let Some(recipe) = fill_recipe {
             recipe
         } else {
@@ -6319,8 +6331,9 @@ fn group_anchor_region(
 
 /// How a placement uses the range of its position. A tile always fills its
 /// range; a scatter of more than one mark stays inside it; a line-up of more
-/// than one mark runs through its center along its long side; one mark, or
-/// several placed at one spot, anchors in the shrunk range.
+/// than one mark runs across the canvas through its center, along its long
+/// side unless a direction is written (`line_up_chord`); one mark, or several
+/// placed at one spot, anchors in the shrunk range.
 fn range_use_for(action: PlacementAction, count: u32) -> crate::geometry::RangeUse {
     match action {
         PlacementAction::Tile => crate::geometry::RangeUse::Distribute,
@@ -6349,9 +6362,77 @@ fn range_long_axis(range: crate::geometry::RationalRange) -> [i8; 2] {
     }
 }
 
+/// Where a line-up of more than one mark over a range runs: on the chord that
+/// the line through the range's center, along the row's axis, cuts across the
+/// canvas, in equal cells (the author's decision of 2026-10-19; a row as long
+/// as the canvas around an off-center range put marks off the canvas). A
+/// horizontal or vertical chord crosses the whole canvas, so the row only
+/// moves to the canvas's center along itself and `domain` is kept. A diagonal
+/// chord can be shorter than the canvas's short side, so `domain` (the canvas
+/// measured on its short side) is scaled by the chord's share of that side:
+/// the step is then the chord over the count, also when a count is reduced
+/// for resources. Returns the chord's middle in canvas fractions when it is
+/// not the range's center.
+fn line_up_chord(
+    range: crate::geometry::RationalRange,
+    axis: [i8; 2],
+    domain: &mut [Rational; 2],
+) -> Result<Option<[Rational; 2]>, ScoreFieldGap> {
+    let fraction = |(numerator, denominator): (u64, u64)| {
+        Rational::from_ratio(numerator.into(), denominator.into())
+    };
+    let middle = |start: (u64, u64), end: (u64, u64)| -> Result<Rational, ScoreFieldGap> {
+        Ok(reduced_ratio(
+            fraction(start)?.add(fraction(end)?)?.div_i128(2)?,
+        ))
+    };
+    let max = |a: Rational, b: Rational| -> Result<Rational, ScoreFieldGap> {
+        Ok(if a.le(b)? { b } else { a })
+    };
+    let min = |a: Rational, b: Rational| -> Result<Rational, ScoreFieldGap> {
+        Ok(if a.le(b)? { a } else { b })
+    };
+    let center = [middle(range[0], range[2])?, middle(range[1], range[3])?];
+    let zero = Rational::from_ratio(0, 1)?;
+    let half = Rational::from_ratio(1, 2)?;
+    let shift = match axis {
+        [1, 0] => [half.sub(center[0])?, zero],
+        [0, 1] => [zero, half.sub(center[1])?],
+        [1, sign] => {
+            // In short-side units the canvas is `domain`, and the row's line
+            // is (x + t, y + sign t) through the range's center (x, y).
+            let [width, height] = *domain;
+            let (x, y) = (center[0].mul(width)?, center[1].mul(height)?);
+            let (low, high) = if sign > 0 {
+                (zero.sub(y)?, height.sub(y)?)
+            } else {
+                (y.sub(height)?, y)
+            };
+            let start = max(zero.sub(x)?, low)?;
+            let end = min(width.sub(x)?, high)?;
+            let length = reduced_ratio(end.sub(start)?);
+            *domain = [
+                reduced_ratio(width.mul(length)?),
+                reduced_ratio(height.mul(length)?),
+            ];
+            let along = reduced_ratio(start.add(end)?.div_i128(2)?);
+            [along.div(width)?, along.mul_i128(sign.into())?.div(height)?]
+        }
+        _ => unreachable!("closed layout axes"),
+    };
+    if shift.iter().all(|value| value.numerator() == 0) {
+        return Ok(None);
+    }
+    Ok(Some([
+        reduced_ratio(center[0].add(shift[0])?),
+        reduced_ratio(center[1].add(shift[1])?),
+    ]))
+}
+
 /// Scale a canvas-sized domain to the range, axis by axis. The marks of a
 /// scatter or tile then stay inside the range instead of spreading over a
-/// canvas-sized area around it. A line-up keeps its canvas-long row.
+/// canvas-sized area around it. A line-up runs its chord across the canvas
+/// instead (`line_up_chord`).
 fn scale_domain_to_range(
     domain: &mut [Rational; 2],
     range: crate::geometry::RationalRange,
@@ -6368,7 +6449,8 @@ fn scale_domain_to_range(
 
 /// The anchor region of a distribution over `range`. A tile stays at the
 /// range's origin (the renderer places a named grid there), while a line-up or
-/// scatter centers its group on the range's center point.
+/// scatter centers its group on the range's center point; a line-up then moves
+/// to the middle of its chord (`line_up_chord`).
 fn distribution_anchor(action: PlacementAction, range: [f64; 4]) -> [f64; 4] {
     if action == PlacementAction::Tile {
         return range;

@@ -100,6 +100,30 @@ object Ddl3DInput {
 class Ddl3DInputError(val reason: String) : Exception(reason)
 
 /**
+ * A saved PNG or GLB, named as Web's viewer names it (`inku-3d-<12 of the digest>.<format>`).
+ * The web view's download listener never sees the link's name, only the blob URL,
+ * so the files went out as `<UUID>.png` and `<UUID>.bin` (Build148430); the
+ * format is read from the bytes and the digest from the work last rendered.
+ */
+object Ddl3DSave {
+    data class Named(val name: String, val mimeType: String)
+
+    private val PNG = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
+    private val GLB = "glTF".toByteArray(Charsets.US_ASCII)
+
+    fun named(bytes: ByteArray, inputDigest: String?): Named? {
+        fun starts(magic: ByteArray) = bytes.size >= magic.size && magic.indices.all { bytes[it] == magic[it] }
+        val (format, mimeType) = when {
+            starts(PNG) -> "png" to "image/png"
+            starts(GLB) -> "glb" to "model/gltf-binary"
+            else -> return null
+        }
+        val stem = inputDigest?.takeIf { Regex("^[0-9a-f]{12,}$").matches(it) }?.let { "inku-3d-${it.take(12)}" } ?: "inku-3d"
+        return Named("$stem.$format", mimeType)
+    }
+}
+
+/**
  * Web `protocol.ts` remember/recall: the last camera, thickness, layer depth and
  * background, in memory only and only for the exact same input.
  */

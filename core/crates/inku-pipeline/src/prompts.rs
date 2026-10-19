@@ -51,8 +51,8 @@ pub(crate) const LEGACY_HOLE_COMPLETION_PROMPT_ID: &str =
 const PROMPT_DIGEST_DOMAIN: &[u8] = b"inku.llm-prompt.v1";
 const CATALOG_DIGEST_DOMAIN: &[u8] = b"inku.prompt-catalog-projection.v1";
 
-/// The LLM effects accepted by I-523, plus the optional sketch before Stage 1
-/// and the composition reading after it.
+/// The LLM effects accepted by I-523, plus the optional sketch before Stage 1,
+/// the composition reading after it and the laws after the composition.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmStage {
@@ -61,6 +61,7 @@ pub enum LlmStage {
     GenerateNormalizedDdl,
     CompleteVisibleDdlHoles,
     ReadComposition,
+    ChooseLaws,
 }
 
 impl LlmStage {
@@ -72,6 +73,7 @@ impl LlmStage {
             Self::GenerateNormalizedDdl => "generate_normalized_ddl",
             Self::CompleteVisibleDdlHoles => "complete_visible_ddl_holes",
             Self::ReadComposition => "read_composition",
+            Self::ChooseLaws => "choose_laws",
         }
     }
 }
@@ -1744,10 +1746,11 @@ pub(crate) fn finish_prompt(mut prompt: LlmPrompt) -> Result<LlmPrompt, PromptEr
     };
     // v3 transports supply response_schema through their structured-output contract.
     // Preserve old stage prompt bytes and persisted request editions. The prompts
-    // written for that contract (hole completion, the composition reading) carry the
-    // schema only there.
+    // written for that contract (hole completion, the composition reading, the laws)
+    // carry the schema only there.
     if prompt.prompt_id != HOLE_COMPLETION_PROMPT_ID
         && prompt.prompt_id != crate::composition_reading::COMPOSITION_READING_PROMPT_ID
+        && prompt.prompt_id != crate::laws::LAWS_PROMPT_ID
     {
         prompt.system.push_str(&format!(
             "\n\n{response_instruction}\n# response_schema\n{schema_text}"

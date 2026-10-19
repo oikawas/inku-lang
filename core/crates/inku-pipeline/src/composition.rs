@@ -202,8 +202,9 @@ fn power_of_two(k: i32) -> f64 {
 }
 
 /// The length of `(x, y)`: lossless scaling, squaring and summation, then one
-/// differential correction of the square root.
-fn hypot(x: f64, y: f64) -> f64 {
+/// differential correction of the square root. The laws stage measures with it
+/// too, as its prototype measured with Python's `math.hypot` and `math.dist`.
+pub(crate) fn hypot(x: f64, y: f64) -> f64 {
     let (x, y) = (x.abs(), y.abs());
     let mut max = 0.0_f64;
     for v in [x, y] {

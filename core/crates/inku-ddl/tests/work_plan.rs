@@ -2,8 +2,9 @@ mod common;
 
 use inku_ddl::ResolvedInstructionLanguage;
 use inku_ddl::work_plan::{
-    WorkPlan, WorkPlanLayer, WorkPlanSlot, derive_work_plan_capabilities, normalize_work_plan,
-    print_work_plan, work_plan_capabilities, work_plan_response_schema,
+    NumericPlace, NumericSize, NumericWriting, WorkPlan, WorkPlanLayer, WorkPlanSlot,
+    derive_work_plan_capabilities, normalize_work_plan, number, print_work_plan,
+    print_work_plan_with_numbers, work_plan_capabilities, work_plan_response_schema,
     work_plan_source_compiles_cleanly, work_plan_vocabulary,
 };
 use serde_json::json;
@@ -380,4 +381,173 @@ fn japanese_layers_never_double_the_particle_no() {
         doubled.len(),
         doubled.join("\n")
     );
+}
+
+/// A number the laws stage writes has six decimals at most and no trailing
+/// zeros, rounded from the binary value as the prototype's Python wrote it.
+#[test]
+fn laws_numbers_drop_trailing_zeros() {
+    for (value, written) in [
+        (0.0, "0"),
+        (-0.000_000_1, "0"),
+        (0.5, "0.5"),
+        (1.0, "1"),
+        (2.0 / 3.0, "0.666667"),
+        (0.381_966_011_250_105_1, "0.381966"),
+        (0.118_034, "0.118034"),
+        (0.000_000_5, "0"),
+        (10.25, "10.25"),
+    ] {
+        assert_eq!(number(value), written, "{value}");
+    }
+}
+
+fn numeric_layer(
+    shape: &str,
+    action: &str,
+    count: u32,
+    attributes: &[(WorkPlanSlot, &str)],
+) -> WorkPlanLayer {
+    WorkPlanLayer {
+        shape: shape.into(),
+        action: action.into(),
+        count,
+        attributes: attributes
+            .iter()
+            .map(|(slot, value)| (*slot, (*value).to_owned()))
+            .collect(),
+        ..WorkPlanLayer::default()
+    }
+}
+
+/// The laws stage writes a place and a size in numbers (stage B-2c). The place
+/// takes the place word's or range's spot, the size heads the Japanese noun
+/// phrase and follows the English noun, and every form compiles cleanly. A
+/// layer without numbers prints as the composition prints it.
+#[test]
+fn numeric_places_and_sizes_print_where_the_compiler_reads_them() {
+    let point = |x, y| Some(NumericPlace::Point { at: [x, y] });
+    let segment = |x0, y0, x1, y1| {
+        Some(NumericPlace::Segment {
+            from: [x0, y0],
+            to: [x1, y1],
+        })
+    };
+    let cases = [
+        (
+            numeric_layer("circle", "place", 1, &[(WorkPlanSlot::Color, "blue")]),
+            NumericWriting {
+                place: point(0.381_966, 0.5),
+                size: Some(NumericSize::Radius { radius: 0.05 }),
+            },
+            "画面の横0.381966、縦0.5の位置に、半径0.05の青の円を1個置く。",
+            "Place one blue circle radius 0.05 at horizontal 0.381966, vertical 0.5.",
+        ),
+        (
+            numeric_layer("line", "draw", 1, &[]),
+            NumericWriting {
+                place: segment(0.118, 0.118, 0.882, 0.882),
+                size: None,
+            },
+            "画面の横0.118、縦0.118から横0.882、縦0.882まで、線を1個引く。",
+            "Draw one line from horizontal 0.118, vertical 0.118 to horizontal 0.882, vertical 0.882.",
+        ),
+        (
+            numeric_layer("circle", "line_up", 5, &[]),
+            NumericWriting {
+                place: segment(0.118, 0.5, 0.882, 0.5),
+                size: Some(NumericSize::Radius { radius: 0.03 }),
+            },
+            "画面の横0.118、縦0.5から横0.882、縦0.5まで、半径0.03の円を5個並べる。",
+            "Line up 5 circles radius 0.03 from horizontal 0.118, vertical 0.5 to horizontal 0.882, vertical 0.5.",
+        ),
+        (
+            numeric_layer("point", "scatter", 12, &[(WorkPlanSlot::Color, "white")]),
+            NumericWriting {
+                place: Some(NumericPlace::Range {
+                    bounds: [0.2, 0.3, 0.8, 0.6],
+                }),
+                size: None,
+            },
+            "画面の横0.2〜0.8、縦0.3〜0.6の範囲に、白の点を12個散らす。",
+            "Scatter 12 white points in the range horizontal 0.2 to 0.8, vertical 0.3 to 0.6.",
+        ),
+        (
+            numeric_layer("ellipse", "place", 1, &[]),
+            NumericWriting {
+                place: point(0.5, 0.25),
+                size: Some(NumericSize::WidthHeight {
+                    width: 0.2,
+                    height: 0.1,
+                }),
+            },
+            "画面の横0.5、縦0.25の位置に、幅0.2、高さ0.1の楕円を1個置く。",
+            "Place one ellipse width 0.2, height 0.1 at horizontal 0.5, vertical 0.25.",
+        ),
+        (
+            numeric_layer("arc", "draw", 1, &[]),
+            NumericWriting {
+                place: point(0.5, 0.5),
+                size: Some(NumericSize::ChordSagitta {
+                    chord: 0.2,
+                    sagitta: 0.05,
+                }),
+            },
+            "画面の横0.5、縦0.5の位置に、弦長0.2、矢高0.05の弧を1個引く。",
+            "Draw one arc chord 0.2, sagitta 0.05 at horizontal 0.5, vertical 0.5.",
+        ),
+        (
+            numeric_layer("triangle", "place", 1, &[]),
+            NumericWriting {
+                place: point(0.3, 0.7),
+                size: Some(NumericSize::WidthHeight {
+                    width: 0.2,
+                    height: 0.15,
+                }),
+            },
+            "画面の横0.3、縦0.7の位置に、幅0.2、高さ0.15の三角を1個置く。",
+            "Place one triangle width 0.2, height 0.15 at horizontal 0.3, vertical 0.7.",
+        ),
+        // A size alone keeps the layer's own place word.
+        (
+            numeric_layer("square", "place", 3, &[(WorkPlanSlot::Position, "center")]),
+            NumericWriting {
+                place: None,
+                size: Some(NumericSize::Side { side: 0.1 }),
+            },
+            "中心に、一辺0.1の四角を3個置く。",
+            "Place 3 squares side length 0.1 at the center.",
+        ),
+        (
+            numeric_layer("free_line", "draw", 1, &[(WorkPlanSlot::Position, "top")]),
+            NumericWriting {
+                place: None,
+                size: Some(NumericSize::Length { length: 0.4 }),
+            },
+            "上に、長さ0.4の自由線を1個引く。",
+            "Draw one free line length 0.4 at the top.",
+        ),
+    ];
+    for (layer, written, ja, en) in cases {
+        let plan = WorkPlan {
+            layers: vec![layer],
+            ..WorkPlan::default()
+        };
+        for (language, expected) in [
+            (ResolvedInstructionLanguage::Ja, ja),
+            (ResolvedInstructionLanguage::En, en),
+        ] {
+            let source =
+                print_work_plan_with_numbers(&plan, language, &[], &[], &[], &[Some(written)]);
+            assert_eq!(source, expected, "{language:?}");
+            assert!(
+                work_plan_source_compiles_cleanly(&source, language),
+                "{language:?}: {source}"
+            );
+            assert_eq!(
+                print_work_plan_with_numbers(&plan, language, &[], &[], &[], &[None]),
+                print_work_plan(&plan, language)
+            );
+        }
+    }
 }

@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use inku_ddl::work_plan::{WorkPlan, print_work_plan_composed_with_joints};
+use inku_ddl::work_plan::WorkPlan;
 use inku_ddl::{
     CompilerLockState, CompletionRangeRecord, MacroDefinition, MacroLock, NormalizedDdlDocument,
     RANGE_WORDS_CHANGED_HOLE_KIND, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID,
@@ -24,6 +24,7 @@ use crate::composition_reading::{
 };
 use crate::core_boundary::CatalogMode;
 use crate::core_boundary::{CompiledDelivery, CompilerOptions, ResolvedHostOptions};
+use crate::laws::{self, ComposedPlan, LawsContext};
 use crate::prompts::{
     DescriptionCatalogEntry, HOLE_COMPLETION_PROMPT_ID, HoleCompletionResult,
     HolePatchEditResponse, HolePatchResponse, LEGACY_HOLE_COMPLETION_PROMPT_ID, LlmPrompt,
@@ -193,6 +194,15 @@ pub struct PipelineConfig {
     /// Budget for the composition reading; the catalog budget when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub composition_retry: Option<RetryPolicy>,
+    /// The laws stage after the composition (stage B-2c of the laws port): a
+    /// reader chooses laws for the composed plan, and the core prints what they
+    /// change in numbers before the commit. Absent, the composed document is
+    /// committed as the composition printed it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub laws: Option<LawsConfig>,
+    /// Budget for the laws; the catalog budget when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub laws_retry: Option<RetryPolicy>,
 }
 
 /// How a run composes its Stage 1 plan: the layers whose place the description
@@ -213,6 +223,23 @@ pub struct CompositionConfig {
 #[serde(deny_unknown_fields)]
 pub struct PendingComposition {
     pub plan: WorkPlan,
+    pub document: VisibleDocument,
+    pub reason: String,
+}
+
+/// How a run applies laws to its composed plan: present, the run asks
+/// `choose_laws` once the composition is printed.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LawsConfig {}
+
+/// A composed document waiting for its laws: the composed plan it was printed
+/// from, the document (committed as it is when the laws fail) and the reason
+/// its commit carries.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PendingLaws {
+    pub composed: ComposedPlan,
     pub document: VisibleDocument,
     pub reason: String,
 }
@@ -455,6 +482,9 @@ pub struct PipelineSnapshot {
     /// A settled Stage 1 result waiting for its composition reading.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub composition: Option<PendingComposition>,
+    /// A composed document waiting for its laws.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub laws: Option<PendingLaws>,
     /// The record of the ranges completions wrote into this work's DDL (A3):
     /// a host keeps it with each saved work and brings it back with a direct
     /// DDL from that work. Absent when there is none.
@@ -517,6 +547,7 @@ impl PipelineSnapshot {
             self.document.as_ref(),
             self.stage1_fallback.as_ref(),
             self.composition.as_ref().map(|pending| &pending.document),
+            self.laws.as_ref().map(|pending| &pending.document),
             phase_document,
         ]
         .into_iter()
@@ -534,6 +565,18 @@ impl PipelineSnapshot {
                 self.phase,
                 PipelinePhase::AwaitingLlm {
                     stage: LlmStage::ReadComposition,
+                    ..
+                }
+            ) {
+                return Err(ProtocolError::InvalidState);
+            }
+        }
+        if let Some(pending) = &self.laws {
+            pending.document.document()?;
+            if !matches!(
+                self.phase,
+                PipelinePhase::AwaitingLlm {
+                    stage: LlmStage::ChooseLaws,
                     ..
                 }
             ) {
@@ -760,6 +803,7 @@ impl PipelineSnapshot {
         self.stage1_fallback = None;
         self.stage1_fallback_plan = None;
         self.composition = None;
+        self.laws = None;
         let payload = json!({
             "variation_id": self.variation_id,
             "document": document,
@@ -794,6 +838,7 @@ impl PipelineSnapshot {
                 .config
                 .composition_retry
                 .unwrap_or(self.config.catalog_retry),
+            LlmStage::ChooseLaws => self.config.laws_retry.unwrap_or(self.config.catalog_retry),
         }
     }
 
@@ -883,6 +928,9 @@ impl PipelineConfig {
             policy.validate()?;
         }
         if let Some(policy) = self.composition_retry {
+            policy.validate()?;
+        }
+        if let Some(policy) = self.laws_retry {
             policy.validate()?;
         }
         self.stage1_retry.validate()?;
@@ -1127,19 +1175,39 @@ impl PipelineSnapshot {
         attempt: u32,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
-        let policy = self.config.stage1_retry;
+        self.reissue(
+            LlmStage::GenerateNormalizedDdl,
+            prompt,
+            description,
+            elapsed_ms,
+            attempt,
+            events,
+        )
+    }
+
+    /// Send a changed request of a stage as the next attempt of its budget.
+    fn reissue(
+        &mut self,
+        stage: LlmStage,
+        prompt: LlmPrompt,
+        description: String,
+        elapsed_ms: u64,
+        attempt: u32,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let policy = self.retry_policy(stage);
         let total = elapsed_ms
             .checked_add(policy.retry_delay_ms.get())
             .ok_or(ProtocolError::InvalidPolicy)?;
         self.phase = PipelinePhase::AwaitingLlm {
-            stage: LlmStage::GenerateNormalizedDdl,
+            stage,
             description: Some(description),
             hole_ids: Vec::new(),
             elapsed_ms: DecimalU64::new(total),
         };
         // A changed request gets a new action identity but keeps the stage budget.
         self.issue_attempt(
-            LlmStage::GenerateNormalizedDdl.action_name(),
+            stage.action_name(),
             json!({"prompt": prompt, "policy": policy}),
             policy.remaining_attempt_timeout(total),
             attempt,
@@ -1190,7 +1258,7 @@ impl PipelineSnapshot {
             return self.commit_stage1(candidate, reason, events);
         };
         if config.read
-            && let Some(description) = description
+            && let Some(description) = description.clone()
         {
             let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
             match build_composition_reading_prompt(
@@ -1214,7 +1282,7 @@ impl PipelineSnapshot {
             }
         }
         let reading = composition::default_reading(&plan.layers);
-        self.compose_and_commit(candidate, plan, reading, reason, events)
+        self.compose_and_commit(candidate, plan, reading, reason, description, events)
     }
 
     fn commit_stage1(
@@ -1252,8 +1320,8 @@ impl PipelineSnapshot {
         ) else {
             return self.failure(ProviderFailure::SchemaViolation, spent_ms, events);
         };
-        let description = description.unwrap_or_default();
-        let quoted = |_: usize, words: &str| description.contains(words);
+        let text = description.clone().unwrap_or_default();
+        let quoted = |_: usize, words: &str| text.contains(words);
         let Ok((reading, findings)) =
             composition::check(&parsed.reading, &pending.plan.layers, Some(&quoted))
         else {
@@ -1271,23 +1339,28 @@ impl PipelineSnapshot {
             pending.plan,
             reading,
             &pending.reason,
+            description,
             events,
         )
     }
 
     /// Place the plan's layers from a checked reading and commit the composed
     /// document. When the plan cannot be composed, Stage 1 is committed as it
-    /// printed it and an event says why.
+    /// printed it and an event says why. A run with laws asks for them first.
     fn compose_and_commit(
         &mut self,
         candidate: VisibleDocument,
         plan: WorkPlan,
         reading: CheckedReading,
         reason: &str,
+        description: Option<String>,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
         match self.composed_document(&candidate, &plan, &reading) {
-            Ok(document) => self.commit_stage1(document, reason, events),
+            Ok((document, composed)) if self.config.laws.is_some() => {
+                self.ask_laws(document, composed, reason, description, events)
+            }
+            Ok((document, _)) => self.commit_stage1(document, reason, events),
             Err(skipped) => {
                 self.event(events, "composition_skipped", json!({"reason": skipped}))?;
                 self.commit_stage1(candidate, reason, events)
@@ -1300,7 +1373,7 @@ impl PipelineSnapshot {
         candidate: &VisibleDocument,
         plan: &WorkPlan,
         reading: &CheckedReading,
-    ) -> Result<VisibleDocument, &'static str> {
+    ) -> Result<(VisibleDocument, ComposedPlan), &'static str> {
         let background = plan.background.as_deref().unwrap_or("white");
         let searched =
             composition::search(&plan.layers, reading, background).map_err(|unsolved| {
@@ -1337,14 +1410,16 @@ impl PipelineSnapshot {
         // it, by the layer numbers of the plan the reading saw.
         let plan = composition::with_free_line_angles(plan, reading);
         let (composed, ranges, joints) = composition::composed_plan_with_joints(&plan, &jointed);
+        let composed = ComposedPlan {
+            plan: composed,
+            ranges,
+            joints: joints
+                .into_iter()
+                .map(|joint| joint.map(str::to_owned))
+                .collect(),
+        };
         let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
-        let source = print_work_plan_composed_with_joints(
-            &composed,
-            self.config.language,
-            &plugins,
-            &ranges,
-            &joints,
-        );
+        let source = composed.source(self.config.language, &plugins);
         let document = self.new_document(source).map_err(|_| "document")?;
         let compiled = compile_typed_ddl(
             document.document().map_err(|_| "document")?,
@@ -1359,7 +1434,214 @@ impl PipelineSnapshot {
         {
             return Err("compile");
         }
-        Ok(document)
+        Ok((document, composed))
+    }
+
+    /// Ask for the laws of a composed document (stage B-2c). When the request
+    /// cannot be built (no description, a Score the laws cannot read, no law
+    /// that takes a layer of the work), the composed document is committed.
+    fn ask_laws(
+        &mut self,
+        document: VisibleDocument,
+        composed: ComposedPlan,
+        reason: &str,
+        description: Option<String>,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let prompt = description.as_deref().and_then(|description| {
+            let context = self.laws_context(&document, &composed)?;
+            laws::build_laws_prompt(
+                description,
+                &context,
+                self.config.language,
+                self.config.prompt_limits,
+            )
+            .ok()
+        });
+        let Some(prompt) = prompt else {
+            self.event(events, "laws_fallback", json!({"failure": "prompt"}))?;
+            return self.commit_stage1(document, reason, events);
+        };
+        self.laws = Some(PendingLaws {
+            composed,
+            document,
+            reason: reason.to_owned(),
+        });
+        self.begin_llm(prompt, description, Vec::new(), events)
+    }
+
+    /// What the laws read of a composed document: its Score as the run compiles it.
+    fn laws_context(
+        &self,
+        document: &VisibleDocument,
+        composed: &ComposedPlan,
+    ) -> Option<LawsContext> {
+        let delivery = crate::core_boundary::compile_committed(
+            document.document().ok()?,
+            &self.config.definitions,
+            &self.config.compiler,
+        )
+        .ok()?;
+        LawsContext::new(
+            delivery.score?,
+            composed,
+            self.config.compiler.host.palette(),
+            self.config.compiler.host.canvas_format_id(),
+        )
+    }
+
+    /// Read the laws reply, apply it and commit the document the laws printed.
+    /// A reply the tool refuses is asked again with the reason within the
+    /// stage's budget. When the budget is spent, or the printed document does
+    /// not compile, the composed document is committed as it is.
+    fn laws_response(
+        &mut self,
+        response: &str,
+        spent_ms: u64,
+        description: Option<String>,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let pending = self.laws.as_ref().ok_or(ProtocolError::InternalInvariant)?;
+        let Some(context) = self.laws_context(&pending.document, &pending.composed) else {
+            return self.laws_fallback(json!({"failure": "context"}), events);
+        };
+        let chosen = match laws::choose_laws(
+            response,
+            &context,
+            &pending.composed,
+            self.config.prompt_limits,
+        ) {
+            Ok(chosen) => chosen,
+            Err(refusal) => {
+                let description = description.ok_or(ProtocolError::InternalInvariant)?;
+                return self.ask_laws_again(&context, &refusal, description, spent_ms, events);
+            }
+        };
+        let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
+        let Some(document) =
+            self.laws_document(chosen.print.source(self.config.language, &plugins))
+        else {
+            return self.laws_fallback(json!({"failure": "compile"}), events);
+        };
+        self.action = None;
+        let pending = self.laws.take().ok_or(ProtocolError::InternalInvariant)?;
+        self.event(
+            events,
+            "laws_chosen",
+            json!({
+                "laws": chosen.laws,
+                "main_law": chosen.main_law,
+                "main_layer": chosen.main_layer,
+                "notes": chosen.notes,
+            }),
+        )?;
+        self.commit_stage1(document, &pending.reason, events)
+    }
+
+    /// Ask for the laws again with the tool's reason for refusing the answer, as
+    /// the next attempt of the stage's budget; when it is spent, commit the
+    /// composed document.
+    fn ask_laws_again(
+        &mut self,
+        context: &LawsContext,
+        refusal: &laws::Refusal,
+        description: String,
+        spent_ms: u64,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let PipelinePhase::AwaitingLlm { elapsed_ms, .. } = &self.phase else {
+            return Err(ProtocolError::InvalidState);
+        };
+        let total = elapsed_ms
+            .get()
+            .checked_add(spent_ms)
+            .ok_or(ProtocolError::InvalidPolicy)?;
+        // An answer that does not read as the requested shape is a schema
+        // violation; an answer the laws' rules refuse is a semantic one.
+        let failure = if matches!(
+            refusal.code,
+            "too_long"
+                | "not_json"
+                | "not_object"
+                | "missing"
+                | "not_array"
+                | "count"
+                | "not_integer"
+                | "not_string"
+                | "not_boolean"
+                | "not_a_choice"
+        ) {
+            ProviderFailure::SchemaViolation
+        } else {
+            ProviderFailure::SemanticViolation
+        };
+        let attempt = self
+            .action
+            .as_ref()
+            .ok_or(ProtocolError::InvalidState)?
+            .identity
+            .attempt;
+        let next = self
+            .retry_policy(LlmStage::ChooseLaws)
+            .next_budgeted_attempt(attempt, total);
+        let prompt = next.and_then(|_| {
+            laws::build_laws_prompt(
+                &description,
+                context,
+                self.config.language,
+                self.config.prompt_limits,
+            )
+            .and_then(|prompt| laws::with_laws_feedback(prompt, refusal, self.config.prompt_limits))
+            .ok()
+        });
+        let (Some(next), Some(prompt)) = (next, prompt) else {
+            return self.laws_fallback(json!({"failure": failure, "detail": refusal.code}), events);
+        };
+        self.reissue(
+            LlmStage::ChooseLaws,
+            prompt,
+            description,
+            total,
+            next,
+            events,
+        )?;
+        self.event(
+            events,
+            "retry_scheduled",
+            json!({
+                "identity": self.action.as_ref().unwrap().identity,
+                "failure": failure,
+                "detail": refusal.code,
+            }),
+        )
+    }
+
+    /// The document the laws printed, when it compiles as the composed one did.
+    fn laws_document(&self, source: String) -> Option<VisibleDocument> {
+        let document = self.new_document(source).ok()?;
+        let compiled = compile_typed_ddl(
+            document.document().ok()?,
+            &self.config.definitions,
+            self.config.compiler.composition_seed().ok()?,
+            self.config.compiler.macro_limits().ok()?,
+        );
+        compiled
+            .compiler_lock
+            .as_ref()
+            .is_some_and(|lock| lock.state == CompilerLockState::CanonicalReady)
+            .then_some(document)
+    }
+
+    /// Commit the composed document without laws and say why.
+    fn laws_fallback(
+        &mut self,
+        payload: serde_json::Value,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        self.action = None;
+        let pending = self.laws.take().ok_or(ProtocolError::InternalInvariant)?;
+        self.event(events, "laws_fallback", payload)?;
+        self.commit_stage1(pending.document, &pending.reason, events)
     }
 
     fn residual_execution_preflight(&self, candidate: &VisibleDocument) -> bool {
@@ -1650,8 +1932,16 @@ impl PipelineSnapshot {
                     pending.plan,
                     reading,
                     &pending.reason,
+                    description,
                     events,
                 )
+            }
+            LlmStage::ChooseLaws => {
+                let mut payload = json!({"failure": failure});
+                if let Some(detail) = detail {
+                    payload["detail"] = json!(detail);
+                }
+                self.laws_fallback(payload, events)
             }
         }
     }
@@ -2353,6 +2643,7 @@ impl PipelineSnapshot {
             LlmStage::ReadComposition => {
                 self.composition_response(&response, spent_ms, description, events)
             }
+            LlmStage::ChooseLaws => self.laws_response(&response, spent_ms, description, events),
             LlmStage::CompleteVisibleDdlHoles => {
                 self.hole_response(&response, &hole_ids, spent_ms, events)
             }
@@ -2628,6 +2919,7 @@ fn advance_impl(
             stage1_fallback: None,
             stage1_fallback_plan: None,
             composition: None,
+            laws: None,
             completion_ranges: None,
             snapshot_digest: String::new(),
         };
@@ -2729,6 +3021,11 @@ impl PipelineSnapshot {
                 elapsed_ms.get(),
                 events,
             ),
+            EffectResult::LawsChosen {
+                response,
+                elapsed_ms,
+                ..
+            } => self.llm_response(LlmStage::ChooseLaws, response, elapsed_ms.get(), events),
             EffectResult::ProviderFailed {
                 failure,
                 elapsed_ms,

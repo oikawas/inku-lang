@@ -11,6 +11,7 @@ pub mod core_boundary;
 pub mod ddl3d;
 mod hole_completion;
 pub mod identity;
+pub mod laws;
 pub mod machine;
 pub mod prompts;
 pub mod protocol;

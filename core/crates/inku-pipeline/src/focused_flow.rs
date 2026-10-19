@@ -13,7 +13,7 @@ use crate::core_boundary::{
     ResolvedPaletteColorDto, ResolvedPaletteDto,
 };
 use crate::machine::{
-    AuthoringInput, CompositionConfig, PipelineConfig, PipelineInput, PipelinePhase,
+    AuthoringInput, CompositionConfig, LawsConfig, PipelineConfig, PipelineInput, PipelinePhase,
     PipelineSnapshot, SketchRequest, SketchState, StepOutput,
 };
 use crate::prompts::PromptLimits;
@@ -109,6 +109,8 @@ pub(crate) fn config() -> PipelineConfig {
         sketch_retry: None,
         composition: None,
         composition_retry: None,
+        laws: None,
+        laws_retry: None,
     }
 }
 
@@ -2281,6 +2283,10 @@ fn composed_plan_response() -> serde_json::Value {
 fn composition_start(composition: Option<CompositionConfig>) -> PipelineSnapshot {
     let mut pipeline_config = config();
     pipeline_config.composition = composition;
+    started_description(pipeline_config)
+}
+
+fn started_description(pipeline_config: PipelineConfig) -> PipelineSnapshot {
     let start = envelope(
         None,
         PipelineInput::Start {
@@ -2595,4 +2601,178 @@ fn saved_compiler_options_with_the_retired_variation_still_read() {
         let read: CompilerOptions = serde_json::from_value(saved).unwrap();
         assert_eq!(read, options);
     }
+}
+
+/// A run that composes from the default reading and then asks for its laws.
+fn laws_start(laws: Option<LawsConfig>) -> PipelineSnapshot {
+    let mut pipeline_config = config();
+    pipeline_config.composition = Some(CompositionConfig { read: false });
+    pipeline_config.laws = laws;
+    started_description(pipeline_config)
+}
+
+fn laws_reply(state: &PipelineSnapshot, result: EffectResult) -> StepOutput {
+    assert_eq!(state.action.as_ref().unwrap().tag, "choose_laws");
+    run(
+        Some(state),
+        &envelope(Some(state), PipelineInput::EffectResult { result }),
+    )
+}
+
+fn laws_answer(state: &PipelineSnapshot, answer: &serde_json::Value) -> StepOutput {
+    let identity = state.action.as_ref().unwrap().identity.clone();
+    laws_reply(
+        state,
+        EffectResult::LawsChosen {
+            identity,
+            response: answer.to_string(),
+            elapsed_ms: DecimalU64::new(30),
+        },
+    )
+}
+
+/// The red circle on the golden section's upper left crossing, the dots far
+/// away in aerial perspective (the composed plan's layers 1 and 2).
+fn two_laws() -> serde_json::Value {
+    json!({"main_layer": 1, "main_law": "B1", "description_counts": [],
+           "laws": {"B1": {"targets": [{"layer": 1, "at": "point_ul"}]}, "B15": {"layers": [2]}},
+           "reason": "“A red circle” leads the picture."})
+}
+
+fn one_law() -> serde_json::Value {
+    json!({"main_layer": 1, "main_law": "B1", "description_counts": [],
+           "laws": {"B1": {"targets": [{"layer": 1, "at": "point_ul"}]}},
+           "reason": "“A red circle” leads the picture."})
+}
+
+fn event<'a>(output: &'a StepOutput, tag: &str) -> Option<&'a serde_json::Value> {
+    output
+        .events
+        .iter()
+        .find(|event| event.tag == tag)
+        .map(|event| &event.payload)
+}
+
+#[test]
+fn a_run_with_laws_asks_for_them_and_commits_what_they_print() {
+    let pending = laws_start(Some(LawsConfig {}));
+    let asked = plan_answer(&pending).snapshot;
+    let action = asked.action.as_ref().unwrap();
+    assert_eq!(action.tag, "choose_laws");
+    assert!(asked.laws.is_some());
+    let message = action.payload["prompt"]["message"].as_str().unwrap();
+    assert!(
+        message.starts_with(&format!("## Description\n{COMPOSED_DESCRIPTION}")),
+        "{message}"
+    );
+    let chosen = laws_answer(&asked, &two_laws());
+    assert_eq!(
+        event(&chosen, "laws_chosen").map(|payload| payload["laws"].clone()),
+        Some(json!(["B1", "B15"])),
+        "{:?}",
+        tags(&chosen)
+    );
+    let source = committed_source(&chosen.snapshot);
+    let lines: Vec<&str> = source.lines().collect();
+    // The field keeps its range; the circle is on the crossing in numbers; the
+    // dots are smaller, at the place the description states.
+    assert!(lines[2].contains(" (horizontal "), "{source}");
+    assert!(
+        lines[3].ends_with(" at horizontal 0.381966, vertical 0.381966."),
+        "{source}"
+    );
+    assert!(lines[4].contains(" radius "), "{source}");
+    assert!(lines[4].ends_with(" at the bottom."), "{source}");
+    assert!(chosen.snapshot.laws.is_none());
+    let committed = run(
+        Some(&chosen.snapshot),
+        &envelope(Some(&chosen.snapshot), ack(&chosen.snapshot)),
+    )
+    .snapshot;
+    assert!(
+        matches!(committed.phase, PipelinePhase::ScoreReady),
+        "{:?}",
+        committed.phase
+    );
+}
+
+#[test]
+fn a_refused_answer_is_asked_again_with_the_reason() {
+    let asked = plan_answer(&laws_start(Some(LawsConfig {}))).snapshot;
+    let first = asked.action.as_ref().unwrap().identity.clone();
+    let refused = laws_answer(&asked, &one_law());
+    let retried = event(&refused, "retry_scheduled").expect("a retry");
+    assert_eq!(retried["failure"], "semantic_violation");
+    assert_eq!(retried["detail"], "law_count");
+    let again = refused.snapshot.action.as_ref().unwrap();
+    assert_eq!(again.tag, "choose_laws");
+    assert_eq!(again.identity.attempt, 2);
+    assert_ne!(again.identity.action_id, first.action_id);
+    let message = again.payload["prompt"]["message"].as_str().unwrap();
+    assert!(
+        message.ends_with(
+            "## The tool's reply to the previous answer\nThe previous answer could not be used: \
+             V2 takes two or three laws with the main law (now 1: B1)\nReturn a corrected answer."
+        ),
+        "{message}"
+    );
+    let chosen = laws_answer(&refused.snapshot, &two_laws());
+    assert!(
+        event(&chosen, "laws_chosen").is_some(),
+        "{:?}",
+        tags(&chosen)
+    );
+    assert!(committed_source(&chosen.snapshot).contains(" at horizontal 0.381966"));
+}
+
+#[test]
+fn refused_answers_that_spend_the_budget_commit_the_composed_document() {
+    let mut state = plan_answer(&laws_start(Some(LawsConfig {}))).snapshot;
+    let composed = state.laws.as_ref().unwrap().document.source.clone();
+    let mut last = None;
+    for _ in 0..2 {
+        let output = laws_answer(&state, &one_law());
+        state = output.snapshot.clone();
+        last = Some(output);
+    }
+    let last = last.unwrap();
+    assert_eq!(
+        event(&last, "laws_fallback"),
+        Some(&json!({"failure": "semantic_violation", "detail": "law_count"}))
+    );
+    assert_eq!(committed_source(&state), composed);
+    assert!(state.laws.is_none());
+}
+
+#[test]
+fn a_failed_laws_request_commits_the_composed_document() {
+    let mut state = plan_answer(&laws_start(Some(LawsConfig {}))).snapshot;
+    let composed = state.laws.as_ref().unwrap().document.source.clone();
+    let mut last = None;
+    for _ in 0..2 {
+        let identity = state.action.as_ref().unwrap().identity.clone();
+        let output = laws_reply(
+            &state,
+            EffectResult::ProviderFailed {
+                identity,
+                failure: ProviderFailure::RateLimited,
+                elapsed_ms: DecimalU64::new(10),
+            },
+        );
+        state = output.snapshot.clone();
+        last = Some(output);
+    }
+    assert_eq!(
+        event(&last.unwrap(), "laws_fallback"),
+        Some(&json!({"failure": "rate_limited"}))
+    );
+    assert_eq!(committed_source(&state), composed);
+}
+
+#[test]
+fn a_run_without_laws_commits_the_composed_document_without_asking() {
+    let output = plan_answer(&laws_start(None));
+    assert!(committed_source(&output.snapshot).contains(" (horizontal "));
+    assert!(!tags(&output).iter().any(|tag| tag.starts_with("laws")));
+    assert!(output.snapshot.laws.is_none());
 }

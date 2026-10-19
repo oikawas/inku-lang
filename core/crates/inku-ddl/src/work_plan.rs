@@ -780,11 +780,162 @@ impl ComposedRange {
     }
 }
 
-fn print_layer_ja(layer: &WorkPlanLayer, range: Option<&ComposedRange>) -> String {
+/// A place the laws stage writes in numbers (stage B-2c) instead of a place
+/// word or a composed range, in canvas fractions (x from the left, y from the
+/// top): a point, the two ends of a row or of one line, or a range.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum NumericPlace {
+    Point {
+        at: [f64; 2],
+    },
+    Segment {
+        from: [f64; 2],
+        to: [f64; 2],
+    },
+    /// Left, top, right, bottom.
+    Range {
+        bounds: [f64; 4],
+    },
+}
+
+impl NumericPlace {
+    /// `画面の横0.382、縦0.5の位置に、`: the place with the words after it.
+    fn written_ja(self) -> String {
+        match self {
+            Self::Point { at: [x, y] } => {
+                format!("画面の横{}、縦{}の位置に、", number(x), number(y))
+            }
+            Self::Segment {
+                from: [x0, y0],
+                to: [x1, y1],
+            } => format!(
+                "画面の横{}、縦{}から横{}、縦{}まで、",
+                number(x0),
+                number(y0),
+                number(x1),
+                number(y1)
+            ),
+            Self::Range {
+                bounds: [left, top, right, bottom],
+            } => format!(
+                "画面の横{}〜{}、縦{}〜{}の範囲に、",
+                number(left),
+                number(right),
+                number(top),
+                number(bottom)
+            ),
+        }
+    }
+
+    /// ` at horizontal 0.382, vertical 0.5`: the place as the sentence ends.
+    fn written_en(self) -> String {
+        match self {
+            Self::Point { at: [x, y] } => {
+                format!(" at horizontal {}, vertical {}", number(x), number(y))
+            }
+            Self::Segment {
+                from: [x0, y0],
+                to: [x1, y1],
+            } => format!(
+                " from horizontal {}, vertical {} to horizontal {}, vertical {}",
+                number(x0),
+                number(y0),
+                number(x1),
+                number(y1)
+            ),
+            Self::Range {
+                bounds: [left, top, right, bottom],
+            } => format!(
+                " in the range horizontal {} to {}, vertical {} to {}",
+                number(left),
+                number(right),
+                number(top),
+                number(bottom)
+            ),
+        }
+    }
+}
+
+/// A size the laws stage writes in numbers, in canvas short-edge units: before
+/// the layer's words in Japanese, after its noun in English. The form is the
+/// one the layer's shape reads (a circle's radius, an arc's chord and sagitta).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum NumericSize {
+    Radius { radius: f64 },
+    WidthHeight { width: f64, height: f64 },
+    Side { side: f64 },
+    ChordSagitta { chord: f64, sagitta: f64 },
+    Length { length: f64 },
+}
+
+impl NumericSize {
+    fn written_ja(self) -> String {
+        match self {
+            Self::Radius { radius } => format!("半径{}の", number(radius)),
+            Self::WidthHeight { width, height } => {
+                format!("幅{}、高さ{}の", number(width), number(height))
+            }
+            Self::Side { side } => format!("一辺{}の", number(side)),
+            Self::ChordSagitta { chord, sagitta } => {
+                format!("弦長{}、矢高{}の", number(chord), number(sagitta))
+            }
+            Self::Length { length } => format!("長さ{}の", number(length)),
+        }
+    }
+
+    fn written_en(self) -> String {
+        match self {
+            Self::Radius { radius } => format!("radius {}", number(radius)),
+            Self::WidthHeight { width, height } => {
+                format!("width {}, height {}", number(width), number(height))
+            }
+            Self::Side { side } => format!("side length {}", number(side)),
+            Self::ChordSagitta { chord, sagitta } => {
+                format!("chord {}, sagitta {}", number(chord), number(sagitta))
+            }
+            Self::Length { length } => format!("length {}", number(length)),
+        }
+    }
+}
+
+/// What the laws stage writes in numbers for one layer: its place, its size,
+/// or both. The layer's own words are edited before printing (a numeric size
+/// drops the size word, a row has no line-up direction).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct NumericWriting {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub place: Option<NumericPlace>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<NumericSize>,
+}
+
+/// A number as the laws stage writes it: six decimals, without trailing zeros
+/// (`0.381966`, `0.5`, `1`). The digits are the binary value correctly rounded,
+/// as the prototype's Python `format(value, ".6f")` writes them.
+#[must_use]
+pub fn number(value: f64) -> String {
+    let text = format!("{value:.6}");
+    let text = text.trim_end_matches('0').trim_end_matches('.');
+    if text.is_empty() || text == "-0" {
+        "0".to_owned()
+    } else {
+        text.to_owned()
+    }
+}
+
+fn print_layer_ja(
+    layer: &WorkPlanLayer,
+    range: Option<&ComposedRange>,
+    numeric: Option<&NumericWriting>,
+) -> String {
     let ja = ResolvedInstructionLanguage::Ja;
     let no = MarkerId::JaNo.surface();
     let mut out = String::new();
-    if let Some(range) = range {
+    if let Some(place) = numeric.and_then(|numeric| numeric.place) {
+        out.push_str(&place.written_ja());
+    } else if let Some(range) = range {
         out.push_str(&format!(
             "{}（横{}〜{}、縦{}〜{}）",
             range.words_ja,
@@ -799,6 +950,10 @@ fn print_layer_ja(layer: &WorkPlanLayer, range: Option<&ComposedRange>) -> Strin
         out.push_str(&surface(WorkPlanSlot::Position, place, ja));
         out.push_str(MarkerId::JaNi.surface());
         out.push('、');
+    }
+    // A numeric size heads the noun phrase, before every word of the layer.
+    if let Some(size) = numeric.and_then(|numeric| numeric.size) {
+        out.push_str(&size.written_ja());
     }
     if let Some(quality) = layer.attribute(WorkPlanSlot::MotionQuality) {
         for slot in [WorkPlanSlot::MotionAmplitude, WorkPlanSlot::MotionSpacing] {
@@ -844,7 +999,11 @@ fn print_layer_ja(layer: &WorkPlanLayer, range: Option<&ComposedRange>) -> Strin
     out
 }
 
-fn print_layer_en(layer: &WorkPlanLayer, range: Option<&ComposedRange>) -> String {
+fn print_layer_en(
+    layer: &WorkPlanLayer,
+    range: Option<&ComposedRange>,
+    numeric: Option<&NumericWriting>,
+) -> String {
     let en = ResolvedInstructionLanguage::En;
     let mut words: Vec<String> = Vec::new();
     if let Some(quality) = layer.attribute(WorkPlanSlot::MotionQuality) {
@@ -884,6 +1043,10 @@ fn print_layer_en(layer: &WorkPlanLayer, range: Option<&ComposedRange>) -> Strin
     } else {
         head
     });
+    // A numeric size follows the noun it measures.
+    if let Some(size) = numeric.and_then(|numeric| numeric.size) {
+        words.push(size.written_en());
+    }
     let action = surface(WorkPlanSlot::Action, &layer.action, en);
     let mut action = action.replace('-', " ");
     if let Some(first) = action.get_mut(0..1) {
@@ -902,7 +1065,9 @@ fn print_layer_en(layer: &WorkPlanLayer, range: Option<&ComposedRange>) -> Strin
             surface(WorkPlanSlot::LineUpDirection, direction, en)
         ));
     }
-    if let Some(range) = range {
+    if let Some(place) = numeric.and_then(|numeric| numeric.place) {
+        out.push_str(&place.written_en());
+    } else if let Some(range) = range {
         out.push_str(&format!(
             " at the {} (horizontal {} to {}, vertical {} to {})",
             range.words_en,
@@ -1090,6 +1255,23 @@ pub fn print_work_plan_composed_with_joints(
     ranges: &[Option<ComposedRange>],
     joints: &[Option<&str>],
 ) -> String {
+    print_work_plan_with_numbers(plan, language, plugins, ranges, joints, &[])
+}
+
+/// [`print_work_plan_composed_with_joints`] with what the laws stage writes in
+/// numbers for each layer (stage B-2c): a numeric place replaces the layer's
+/// range or place word, and a numeric size heads its words in Japanese and
+/// follows its noun in English. Layers past the end of `numeric`, or with
+/// `None`, print as the composition prints them.
+#[must_use]
+pub fn print_work_plan_with_numbers(
+    plan: &WorkPlan,
+    language: ResolvedInstructionLanguage,
+    plugins: &[WorkPlanPlugin],
+    ranges: &[Option<ComposedRange>],
+    joints: &[Option<&str>],
+    numeric: &[Option<NumericWriting>],
+) -> String {
     let mut lines = Vec::new();
     if let Some(ground) = &plan.ground {
         let text = surface(WorkPlanSlot::Ground, ground, language);
@@ -1132,9 +1314,10 @@ pub fn print_work_plan_composed_with_joints(
     }
     for (index, layer) in plan.layers.iter().enumerate() {
         let range = ranges.get(index).and_then(Option::as_ref);
+        let written = numeric.get(index).and_then(Option::as_ref);
         let sentence = match language {
-            ResolvedInstructionLanguage::Ja => print_layer_ja(layer, range),
-            ResolvedInstructionLanguage::En => print_layer_en(layer, range),
+            ResolvedInstructionLanguage::Ja => print_layer_ja(layer, range, written),
+            ResolvedInstructionLanguage::En => print_layer_en(layer, range, written),
         };
         let relation = joints
             .get(index)

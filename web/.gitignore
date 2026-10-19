@@ -23,20 +23,6 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .build-number
 
-# Keep local builds out; retain registered distributions for already open pages.
+# Keep local builds out; commit only the registered distribution.
 /static/experimental/ddl-3d/*
-!/static/experimental/ddl-3d/solid-v1-c257fc78/
-!/static/experimental/ddl-3d/solid-v1-6cfd2b38/
-!/static/experimental/ddl-3d/layers-v1-c8b910f9/
-!/static/experimental/ddl-3d/parity-v1-08ff4165/
-!/static/experimental/ddl-3d/parity-v1-1f15fb00/
-!/static/experimental/ddl-3d/backgrounds-v1-c2a7d95f/
-!/static/experimental/ddl-3d/background-default-v1-d91ef409/
-!/static/experimental/ddl-3d/dense-presence-v1-bc5a988d/
-!/static/experimental/ddl-3d/dense-ready-v1-5ef728a0/
-!/static/experimental/ddl-3d/paint-depth-v2-9bf4aacc/
-!/static/experimental/ddl-3d/object-depth-v3-deac4943/
-!/static/experimental/ddl-3d/zero-length-v1-677428a8/
-!/static/experimental/ddl-3d/paint-speed-v1-ae78d6d7/
-!/static/experimental/ddl-3d/shared-vertices-v1-03ae25f1/
 !/static/experimental/ddl-3d/shape-first-v1-6970f20c/

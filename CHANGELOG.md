@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-19 — 3D: show the solids first, then paint them
+
+The experimental 3D view now shows a work's solids in their plain colors as soon as their shapes and joint depths are ready, and they can be turned and zoomed at once; in 113 sample works the solids appeared within half a second, in the macOS app and in Chrome alike. The paint then arrives on them: the presence plane first, then marks from the front layer back. While painting, the status line in the 3D controls reads "Applying paint n/m". A mark whose paint cannot be prepared no longer fails the whole work: it keeps its plain color, and a notice and the GLB metadata (`unpaintedObjects`) list it. PNG and GLB saves wait until painting finishes, and the finished view is the same as before. In WebKit (the macOS app and Safari) the texture budget is 4 million pixels instead of 16 million, which shortens the heaviest works; close up, their paint can look slightly softer. The distribution is `shape-first-v1-6970f20c`.
+
 ### 2026-10-18 — macOS: 3D PNG and GLB saves start again
 
 In the macOS experimental 3D view, PNG save and GLB save opened no save panel: WKWebView silently dropped the viewer's download link. The viewer's saves now reach the app through the parent page shared with Android. Focus selection works once a shape is clicked to select it, as on the Web.

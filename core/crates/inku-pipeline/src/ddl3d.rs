@@ -63,12 +63,11 @@ pub fn snapshot(score: &str, metadata: &str) -> Result<String, &'static str> {
         if value.is_null() {
             continue;
         }
-        if field == "render_seed" || field == "composition_seed" {
-            if let Value::Number(number) = &value {
-                if !is_safe_integer(number) {
-                    return Err("unsafe_numeric_seed");
-                }
-            }
+        if (field == "render_seed" || field == "composition_seed")
+            && let Value::Number(number) = &value
+            && !is_safe_integer(number)
+        {
+            return Err("unsafe_numeric_seed");
         }
         if out.len() > 1 {
             out.push(',');

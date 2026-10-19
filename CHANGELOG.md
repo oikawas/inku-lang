@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-19 — Juxtapose: label the four, and make the candidate limit a setting
-
-The Web's Juxtapose now shows each of the four under the labels Sentence and Reason; on an English work, the Japanese reason sat under the English sentence with nothing to say what it was. The most sentences given to the AI, fixed at 600, is now the administrator's Most sentences to choose from (Other (server) in Settings, 400 by default, 10 to 1000). With more candidates, each request draws that many at random from all of them. The new API is `PUT /api/settings/juxtaposition`.
-
 ### 2026-10-19 — Android: 3D PNG and GLB saves carry Web's file name
 
 In the Android experimental 3D view, a saved PNG or GLB reached the share sheet as `<UUID>.png` or `<UUID>.bin`, and the GLB went with no known type: the web view's download notice never carries the link's name. The app now reads the format from the file's first bytes and hands it on as `inku-3d-<first 12 of the digest>.png` or `.glb`, typed `image/png` or `model/gltf-binary`, as Web names it.
@@ -178,6 +174,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.205 (2026-10-19 / Build 1281)
+
+### 2026-10-19 — Juxtapose: label the four, and make the candidate limit a setting
+
+The Web's Juxtapose now shows each of the four under the labels Sentence and Reason; on an English work, the Japanese reason sat under the English sentence with nothing to say what it was. The most sentences given to the AI, fixed at 600, is now the administrator's Most sentences to choose from (Other (server) in Settings, 400 by default, 10 to 1000). With more candidates, each request draws that many at random from all of them. The new API is `PUT /api/settings/juxtaposition`.
 
 ## v2.15.204 (2026-10-19 / Build 1280)
 

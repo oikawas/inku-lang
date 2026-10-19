@@ -137,6 +137,7 @@
 	const renderConcurrencyStatus = $derived(settings.renderConcurrencyStatus);
 	const descriptionMeterStatus = $derived(settings.descriptionMeterStatus);
 	const dbWriteLockStatus = $derived(settings.dbWriteLockStatus);
+	const juxtapositionStatus = $derived(settings.juxtapositionStatus);
 	const onClose = () => settings.close();
 	const onSelectSettingsTab = (tab: SettingsTab) => settings.selectTab(tab);
 	const onSetSettingsDetail = (detail: SettingsDetailLevel) => settings.setDetail(detail);
@@ -147,6 +148,7 @@
 	const onUpdateRenderConcurrencySettings = (serverLimit: number, clientLimit: number) => settings.updateRenderConcurrencySettings(serverLimit, clientLimit);
 	const onUpdateDescriptionMeterSettings = (switches: MeterSwitches) => settings.updateDescriptionMeterSettings(switches);
 	const onUpdateDbWriteLock = (locked: boolean) => settings.updateDbWriteLock(locked);
+	const onUpdateJuxtapositionSettings = (candidateLimit: number) => settings.updateJuxtapositionSettings(candidateLimit);
 	const onUpdateLogRetentionSettings = (enabled: boolean, retentionDays: number, rotate: string, compress: boolean) => settings.updateLogRetentionSettings(enabled, retentionDays, rotate, compress);
 	const onUpdateRenderLimits = (patch: Record<string, number> | null) => settings.updateRenderLimits(patch);
 	// The category navigation asks the same question as the navigation guard from the same module.
@@ -353,7 +355,7 @@
 			/>
 		{:else if settingsTab === 'server_misc'}
 			<ServerRuntimeSettings
-				status={settingsStatus ? { output_save: settingsStatus.output_save, render_concurrency: settingsStatus.render_concurrency, description_meter: settingsStatus.description_meter, db_write_lock: settingsStatus.db_write_lock } : null}
+				status={settingsStatus ? { output_save: settingsStatus.output_save, render_concurrency: settingsStatus.render_concurrency, description_meter: settingsStatus.description_meter, db_write_lock: settingsStatus.db_write_lock, juxtaposition: settingsStatus.juxtaposition } : null}
 				statusError={settingsStatusError}
 				loading={settingsStatusLoading}
 				{outputSaveStatus}
@@ -366,6 +368,8 @@
 				onUpdateDescriptionMeter={onUpdateDescriptionMeterSettings}
 				{dbWriteLockStatus}
 				{onUpdateDbWriteLock}
+				{juxtapositionStatus}
+				onUpdateJuxtaposition={onUpdateJuxtapositionSettings}
 			/>
 		{:else if settingsTab === 'logs'}
 			<div class="popover-group">

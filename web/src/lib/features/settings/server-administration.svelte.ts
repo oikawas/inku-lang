@@ -89,6 +89,7 @@ export type SettingsStatus = {
 	};
 	description_meter: MeterSwitches;
 	db_write_lock: { locked: boolean };
+	juxtaposition: { candidate_limit: number; min_limit: number; max_limit: number };
 	render_limits: {
 		limits: Record<string, number>;
 		defaults: Record<string, number>;
@@ -128,6 +129,7 @@ export type ServerAdministration = {
 	readonly renderConcurrencyStatus: string | null;
 	readonly descriptionMeterStatus: string | null;
 	readonly dbWriteLockStatus: string | null;
+	readonly juxtapositionStatus: string | null;
 	loadStatus: () => Promise<void>;
 	resetForLoggedOut: () => void;
 	deletePlugin: (id: string) => Promise<boolean>;
@@ -138,6 +140,7 @@ export type ServerAdministration = {
 	updateRenderConcurrencySettings: (serverLimit: number, clientLimit: number) => Promise<void>;
 	updateDescriptionMeterSettings: (switches: MeterSwitches) => Promise<void>;
 	updateDbWriteLock: (locked: boolean) => Promise<void>;
+	updateJuxtapositionSettings: (candidateLimit: number) => Promise<void>;
 	updateLogRetentionSettings: (enabled: boolean, retentionDays: number, rotate: string, compress: boolean) => Promise<void>;
 	updateRenderLimits: (patch: Record<string, number> | null) => Promise<SettingsStatus['render_limits'] | null>;
 };
@@ -156,6 +159,7 @@ export function createServerAdministration<TActor extends SettingsActor>(
 	let renderConcurrencyStatus = $state<string | null>(null);
 	let descriptionMeterStatus = $state<string | null>(null);
 	let dbWriteLockStatus = $state<string | null>(null);
+	let juxtapositionStatus = $state<string | null>(null);
 
 	function resetForLoggedOut(): void {
 		settingsStatus = null;
@@ -366,6 +370,27 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		}
 	}
 
+	async function updateJuxtapositionSettings(candidateLimit: number): Promise<void> {
+		juxtapositionStatus = null;
+		try {
+			const response = await deps.apiFetch('/api/settings/juxtaposition', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ candidate_limit: candidateLimit })
+			});
+			if (!response.ok) {
+				const body = await response.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(deps.describeApiError(body.detail, response.status));
+			}
+			const next = await response.json() as SettingsStatus['juxtaposition'];
+			if (settingsStatus) settingsStatus = { ...settingsStatus, juxtaposition: next };
+			juxtapositionStatus = t().settingsJuxtapositionSaved;
+		} catch (error) {
+			juxtapositionStatus = error instanceof Error ? error.message : String(error);
+			console.warn('failed to update juxtaposition settings', error);
+		}
+	}
+
 	// A null patch restores defaults. The response is authoritative after server normalization.
 	async function updateRenderLimits(
 		patch: Record<string, number> | null
@@ -425,6 +450,7 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		get renderConcurrencyStatus() { return renderConcurrencyStatus; },
 		get descriptionMeterStatus() { return descriptionMeterStatus; },
 		get dbWriteLockStatus() { return dbWriteLockStatus; },
+		get juxtapositionStatus() { return juxtapositionStatus; },
 		loadStatus: loadSettingsStatus,
 		resetForLoggedOut,
 		deletePlugin,
@@ -435,6 +461,7 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		updateRenderConcurrencySettings,
 		updateDescriptionMeterSettings,
 		updateDbWriteLock,
+		updateJuxtapositionSettings,
 		updateLogRetentionSettings,
 		updateRenderLimits
 	};

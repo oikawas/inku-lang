@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-19 — Juxtapose: label the four, and make the candidate limit a setting
+
+The Web's Juxtapose now shows each of the four under the labels Sentence and Reason; on an English work, the Japanese reason sat under the English sentence with nothing to say what it was. The most sentences given to the AI, fixed at 600, is now the administrator's Most sentences to choose from (Other (server) in Settings, 400 by default, 10 to 1000). With more candidates, each request draws that many at random from all of them. The new API is `PUT /api/settings/juxtaposition`.
+
 ### 2026-10-18 — macOS: 3D PNG and GLB saves start again
 
 In the macOS experimental 3D view, PNG save and GLB save opened no save panel: WKWebView silently dropped the viewer's download link. The viewer's saves now reach the app through the parent page shared with Android. Focus selection works once a shape is clicked to select it, as on the Web.

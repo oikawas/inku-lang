@@ -949,7 +949,7 @@ def api_juxtaposition(
         if history_id != work.get("id")
     ]
     candidates = gather_candidates(sources, description=description, lineage=lineage, added=added,
-                                   exclude=body.exclude)
+                                   exclude=body.exclude, limit=_db.get_juxtaposition_settings()["candidate_limit"])
     if len(candidates) < JUXTAPOSITION_CHOICES:
         raise HTTPException(status_code=422, detail="not enough sentences in other works to choose from")
     model = _resolved_vision_model(body.model, actor)

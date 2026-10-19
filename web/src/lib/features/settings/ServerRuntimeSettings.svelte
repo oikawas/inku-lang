@@ -3,7 +3,7 @@
 	import type { SettingsStatus } from './state.svelte';
 	import type { MeterSwitches } from '$lib/verseForm';
 
-	type ServerRuntimeStatus = Pick<SettingsStatus, 'output_save' | 'render_concurrency' | 'description_meter' | 'db_write_lock'>;
+	type ServerRuntimeStatus = Pick<SettingsStatus, 'output_save' | 'render_concurrency' | 'description_meter' | 'db_write_lock' | 'juxtaposition'>;
 
 	type Props = {
 		status: ServerRuntimeStatus | null;
@@ -19,6 +19,8 @@
 		onUpdateDescriptionMeter: (switches: MeterSwitches) => void | Promise<void>;
 		dbWriteLockStatus: string | null;
 		onUpdateDbWriteLock: (locked: boolean) => void | Promise<void>;
+		juxtapositionStatus: string | null;
+		onUpdateJuxtaposition: (candidateLimit: number) => void | Promise<void>;
 	};
 
 	let {
@@ -34,7 +36,9 @@
 		descriptionMeterStatus,
 		onUpdateDescriptionMeter,
 		dbWriteLockStatus,
-		onUpdateDbWriteLock
+		onUpdateDbWriteLock,
+		juxtapositionStatus,
+		onUpdateJuxtaposition
 	}: Props = $props();
 </script>
 
@@ -194,6 +198,35 @@
 		</label>
 		{#if descriptionMeterStatus}
 			<div class="inline-message">{descriptionMeterStatus}</div>
+		{/if}
+	{:else}
+		<div class="inline-message">{statusError ?? t().settingsLoadFailed}</div>
+	{/if}
+</div>
+<div class="popover-group">
+	<div class="popover-group-label">{t().settingsJuxtapositionTitle}</div>
+	{#if loading}
+		<div class="inline-message">{t().settingsLoading}</div>
+	{:else if status}
+		<label class="server-path-row compact-control">
+			<span>
+				{t().settingsJuxtapositionCandidateLimit}
+				<span class="info-dot" aria-label={t().settingsJuxtapositionCandidateLimitHelp}>
+					i
+					<span class="info-tooltip">{t().settingsJuxtapositionCandidateLimitHelp}</span>
+				</span>
+			</span>
+			<input
+				type="number"
+				min={status.juxtaposition.min_limit}
+				max={status.juxtaposition.max_limit}
+				value={status.juxtaposition.candidate_limit}
+				onchange={(e) => onUpdateJuxtaposition(Number((e.currentTarget as HTMLInputElement).value))}
+			/>
+		</label>
+		<div class="db-test-result">{t().settingsJuxtapositionRange(status.juxtaposition.min_limit, status.juxtaposition.max_limit)}</div>
+		{#if juxtapositionStatus}
+			<div class="inline-message">{juxtapositionStatus}</div>
 		{/if}
 	{:else}
 		<div class="inline-message">{statusError ?? t().settingsLoadFailed}</div>

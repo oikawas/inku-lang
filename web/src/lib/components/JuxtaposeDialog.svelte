@@ -131,7 +131,9 @@
 				{#each result.choices as item, index (item.sentence)}
 					<label class="juxtapose-choice" class:chosen={chosen === index}>
 						<input type="radio" name="juxtapose-choice" checked={chosen === index} onchange={() => (chosen = index)} />
+						<span class="juxtapose-tag">{t().juxtaposeSentenceLabel}</span>
 						<span class="juxtapose-sentence">{item.sentence}</span>
+						<span class="juxtapose-tag">{t().juxtaposeReasonLabel}</span>
 						<span class="juxtapose-reason">{item.reason}</span>
 					</label>
 				{/each}
@@ -169,9 +171,10 @@
 	.juxtapose-text.joined { border-color: var(--border2); }
 	.juxtapose-choices { margin: 4px 0 0; padding: 10px 12px; display: grid; gap: 6px; border: 1px solid var(--border); border-radius: 8px; }
 	.juxtapose-choices legend { padding: 0 4px; color: var(--fg2); font-size: var(--ui-font-size-12); font-weight: 700; }
-	.juxtapose-choice { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; row-gap: 2px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+	.juxtapose-choice { display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; column-gap: 8px; row-gap: 2px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
 	.juxtapose-choice.chosen { background: var(--bg2); }
-	.juxtapose-choice input { grid-row: span 2; margin: 3px 0 0; accent-color: var(--accent); }
+	.juxtapose-choice input { grid-row: span 2; align-self: start; margin: 3px 0 0; accent-color: var(--accent); }
+	.juxtapose-tag { color: var(--fg3); font-size: var(--ui-font-size-12); white-space: nowrap; }
 	.juxtapose-sentence { line-height: 1.5; }
 	.juxtapose-reason { color: var(--fg2); font-size: var(--ui-font-size-12); line-height: 1.45; }
 	.juxtapose-error { padding: 8px 12px; border: 1px solid var(--danger, #9b3d32); border-radius: 6px; color: var(--danger, #9b3d32); font-size: var(--ui-font-size-12); white-space: pre-line; }

@@ -628,6 +628,8 @@ export interface LangPack {
 	juxtaposeAskAgain: string;
 	juxtaposeAsking: string;
 	juxtaposeChoices: string;
+	juxtaposeSentenceLabel: string;
+	juxtaposeReasonLabel: string;
 	juxtaposeJoined: string;
 	juxtaposeDraw: string;
 	workActionGroupLook: string;
@@ -887,6 +889,11 @@ export interface LangPack {
 	settingsDbWriteLockHelp: string;
 	settingsDbWriteLockOn: string;
 	settingsDbWriteLockOff: string;
+	settingsJuxtapositionTitle: string;
+	settingsJuxtapositionCandidateLimit: string;
+	settingsJuxtapositionCandidateLimitHelp: string;
+	settingsJuxtapositionRange: (min: number, max: number) => string;
+	settingsJuxtapositionSaved: string;
 	settingsLogRetentionTitle: string;
 	settingsLogRetentionEnabled: string;
 	settingsLogRetentionDays: string;

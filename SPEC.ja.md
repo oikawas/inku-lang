@@ -2142,6 +2142,14 @@ semantic schemaの新versionを意味しない。未指定位置は補わず、n
 - 線・自由線（引く・置く、1本）: `from`を一つ目の点、`to`を二つ目の点にし、回転は書かない。
 - 未対応と衝突: 閉じた形・点・弧を1個置く、1個の並べる、散らす・敷き詰める・埋める、線を2本以上置く、まとまりの成員、埋める対象の図形は`unsupported_numeric_segment`。二つの点が向きと長さを決めるので、1本の線の長さ（数の寸法）・大きさの語・幅の語（全幅・半幅）・かたむきの語と、並べる向きの語は`numeric_segment_conflict`。Macroの呼び出しに書いたら`unbound_macro_caller_meaning`。
 - 作品計画（下絵）は数値の端のある文を読まない。数値の位置と同じく、「配置を変える」（§12.6.3）はその作品を選び直さない。Scoreの形は変わらない。
+
+数値の角度（DDL Spec 22、DDL engine 66、2026-10-20、段B-4a）: 痕を回す角度を度の数で書ける。
+
+- 書き方: 日本語は「回転A度」（`画面の横0.5、縦0.5の位置に、一辺0.1の回転30度の赤い四角を1個置く。`）、英語は`rotated A degrees`（`degree`も読む。`place one red square side length 0.1 rotated 30 degrees at horizontal 0.5, vertical 0.5.`）。数値の範囲・数値の端と同じく一つの字句として、語より先に読む（整数を個数として読まない）。日本語は句の頭か「の」「、」などの後に書き、「の」で形に付く。英語は数の寸法と同じく名詞の後に書き、語の大文字小文字を問わない。数のない「回転」「rotated」は、今までどおり種で選ぶ角度の語。
+- 値: 整数か小数（小数点以下6桁まで。日本語は全角の数字と小数点も読む）。符号と分数は書けない。0以上360未満で、外れたら`invalid_numeric_angle`（blocking）。
+- 意味: 楽譜の`rotation`をA度にする（楽譜と同じく時計回り、yは下向き）。一つの文の痕の全て（1個・列・敷き詰め・散らし）に効く。上弦・下弦の弧は、かたむきの語と同じく、その上に90度・270度を足す。意味の`numeric_angle`は`{"degrees":正確な有理数,"sense":"clockwise"}`で、数値の角度の無い文の意味・出典のbytesとdigestは変わらない。鏡写しの文に書いた数値の角度は、かたむきの語と同じに扱う。
+- 未対応と衝突: 点は角度を持たない（`unsupported_angle_for_primitive`）。かたむきの語と一緒に書いたり、二つ書いたりすると`conflicting_angles`。二つの点で書く1本の線・自由線は二つの点が向きを決めるので`numeric_segment_conflict`。Macroの呼び出しに書いたら`unbound_macro_caller_meaning`。
+- 作品計画（下絵）の語には入らず、作品計画は数値の角度のある文を読まない。数値の位置と同じく、「配置を変える」（§12.6.3）はその作品を選び直さない。Scoreの形は変わらない。
 Noncenterとrelationの未対応境界は広げず、relationを黙って落とさない。このdeliveryは通常の共有runtime / UI / 保存経路から使用される。
 
 JSON Score は共有lowererが検証済みmeaningから作る機械可読の楽譜である。**最終的な作品ではない** — renderer が演奏する構造である。
@@ -2246,7 +2254,7 @@ Canvas selectionはvisible DDLやmacroの意味ではなく、shared coreの`ink
 
 Position座標は`0.0`から`1.0`の正規化のままで、Xはcanvas幅、Yはcanvas高さの割合である。左上は`(0.0,0.0)`、右下は`(1.0,1.0)`、exact centerは`(0.5,0.5)`とする。Named center、qualitative region、exact numeric coordinateは別authorityで、exact coordinateをsilent move / clamp / snapしない。Boundary anchorの妥当性と、shape extentがcanvasからclipする診断は別に扱う。
 
-Direct typed DDLは、JAの`半径N` / `直径N` / `幅N、高さN` / `一辺N`と`画面の横X、縦Yの位置`、数値の範囲と数値の端（§18）、対応するENの有限構造、および日英の有限7class size modifierを受け入れる。小数は元のspellingとsource spanをprovenanceに残し、意味では符号付きbase-10係数とscaleへ正規化する。Lock検証済みStage 1.5 v5 viewとhostが明示したcanvas / backgroundを入口とし、color省略時だけ対応するresolved palette contextも要求する。数値位置、またはverified direct instructionの元`place:center`と、place actionが解決済みのcircle、ellipse、cloudform、square、triangle、polygonの独立instruction群は、明示numeric geometryまたは現行normal / qualitative geometryと、省略count=1 / pen / solid / fill / contrast colorをactual `Score`へ変換できる。`none` / `solid` / surface省略の既存fillを保ったまま、`wash` / `grain` / `stipple` / `hatch` / `crosshatch` / `bleed` / `aquatint`は既存Rendererの`SurfaceSpec`へ、検証済みの`paper` / `washi` / `ink_wash` / `charcoal_ground` / `canvas` / `drawing_paper` / `mezzotint`はhost解決済みaspectを持つ`Canvas::Spec`の既存`CanvasGroundSpec`へ届く。数値のtexture / material defaultやseedをcompilerは作らない。solidな閉じた塗りのSurface intensityは道具別のnormal／dense／faintへ届く。非solid・Pointの明示surface等のrecoverableな未対応組合せは、旧Stop / OmitAndContinue入力にかかわらず最小fieldまたは実行単位を診断付きで省略し、残るScoreを返す。Groundだけも描画内容であり、Groundを残す場合も元の省略診断を保つ。整合性不良または全省略はstoppedである。この共有Rust経路を通常Server／Web／Androidが使用する。
+Direct typed DDLは、JAの`半径N` / `直径N` / `幅N、高さN` / `一辺N`と`画面の横X、縦Yの位置`、数値の範囲・数値の端・数値の角度（§18）、対応するENの有限構造、および日英の有限7class size modifierを受け入れる。小数は元のspellingとsource spanをprovenanceに残し、意味では符号付きbase-10係数とscaleへ正規化する。Lock検証済みStage 1.5 v5 viewとhostが明示したcanvas / backgroundを入口とし、color省略時だけ対応するresolved palette contextも要求する。数値位置、またはverified direct instructionの元`place:center`と、place actionが解決済みのcircle、ellipse、cloudform、square、triangle、polygonの独立instruction群は、明示numeric geometryまたは現行normal / qualitative geometryと、省略count=1 / pen / solid / fill / contrast colorをactual `Score`へ変換できる。`none` / `solid` / surface省略の既存fillを保ったまま、`wash` / `grain` / `stipple` / `hatch` / `crosshatch` / `bleed` / `aquatint`は既存Rendererの`SurfaceSpec`へ、検証済みの`paper` / `washi` / `ink_wash` / `charcoal_ground` / `canvas` / `drawing_paper` / `mezzotint`はhost解決済みaspectを持つ`Canvas::Spec`の既存`CanvasGroundSpec`へ届く。数値のtexture / material defaultやseedをcompilerは作らない。solidな閉じた塗りのSurface intensityは道具別のnormal／dense／faintへ届く。非solid・Pointの明示surface等のrecoverableな未対応組合せは、旧Stop / OmitAndContinue入力にかかわらず最小fieldまたは実行単位を診断付きで省略し、残るScoreを返す。Groundだけも描画内容であり、Groundを残す場合も元の省略診断を保つ。整合性不良または全省略はstoppedである。この共有Rust経路を通常Server／Web／Androidが使用する。
 
 痕のisotropic size、円・弧の半径、`radial`の環、`at.region`の広がり、clusterの帯、pathの交差軸のずれは、そのallocationまたはcanvas短辺を基準に画素へ直す。Circleをaspect-correctに保ち、ellipseは記述したaspectを保つ。置き場所・region中心・cluster中心は幅と高さに比例し、pathの進行量（`margin` / `span`）と`arrangement.margin`は各軸の割合を保つ。この決定は§18の単一`inku.geometry-resolution-policy.v1` ownerに従う。
 

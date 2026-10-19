@@ -468,6 +468,9 @@ pub struct SemanticEntity {
     pub touch: Option<SemanticTerm>,
     pub continuity: Option<SemanticTerm>,
     pub angle: Option<SemanticTerm>,
+    /// The degrees the marks turn, written in numbers (stage B-4a); exclusive
+    /// with `angle`.
+    pub numeric_angle: Option<crate::SemanticNumericAngle>,
     pub surface: SemanticSurface,
     pub fluctuation: SemanticFluctuation,
     pub proportion: SemanticProportion,
@@ -498,6 +501,7 @@ pub enum OwnedSemanticOccurrence {
     Touch(SemanticTerm),
     Continuity(SemanticTerm),
     Angle(SemanticTerm),
+    NumericAngle(crate::SemanticNumericAngle),
     Surface(SemanticTerm),
     Fluctuation(SemanticTerm),
     Proportion(SemanticTerm),
@@ -524,6 +528,7 @@ impl OwnedSemanticOccurrence {
             Self::NumericPosition(position) => position.source(),
             Self::NumericRange(range) => range.source(),
             Self::NumericSegment(segment) => segment.source(),
+            Self::NumericAngle(angle) => angle.source(),
         }
     }
 
@@ -543,6 +548,7 @@ impl OwnedSemanticOccurrence {
             | Self::Touch(_)
             | Self::Continuity(_)
             | Self::Angle(_)
+            | Self::NumericAngle(_)
             | Self::Surface(_)
             | Self::Fluctuation(_)
             | Self::Proportion(_) => 1,
@@ -567,6 +573,7 @@ pub enum SemanticAssociationIssueKind {
     IncompleteNumericPosition,
     InvalidNumericRange,
     InvalidNumericSegment,
+    InvalidNumericAngle,
     UnownedExactDecimal,
     ConflictingTouches,
     ConflictingContinuities,
@@ -608,6 +615,7 @@ impl SemanticAssociationIssueKind {
             Self::IncompleteNumericPosition => "incomplete_numeric_position",
             Self::InvalidNumericRange => "invalid_numeric_range",
             Self::InvalidNumericSegment => "invalid_numeric_segment",
+            Self::InvalidNumericAngle => "invalid_numeric_angle",
             Self::UnownedExactDecimal => "unowned_exact_decimal",
             Self::ConflictingTouches => "conflicting_touches",
             Self::ConflictingContinuities => "conflicting_continuities",
@@ -1726,6 +1734,7 @@ struct AssociationRegion {
     touches: Vec<SemanticTerm>,
     continuities: Vec<SemanticTerm>,
     angles: Vec<SemanticTerm>,
+    numeric_angles: Vec<crate::SemanticNumericAngle>,
     surface_qualities: Vec<SemanticTerm>,
     surface_intensities: Vec<SemanticTerm>,
     unclassified_surfaces: Vec<SemanticTerm>,
@@ -2284,6 +2293,7 @@ fn build_semantic_entities(
         owned_occurrence_count += geometry_analysis.positions.len();
         owned_occurrence_count += geometry_analysis.ranges.len();
         owned_occurrence_count += geometry_analysis.segments.len();
+        owned_occurrence_count += geometry_analysis.angles.len();
         regions
             .entry(region_index)
             .or_default()
@@ -2304,6 +2314,11 @@ fn build_semantic_entities(
             .or_default()
             .numeric_segments
             .extend(geometry_analysis.segments);
+        regions
+            .entry(region_index)
+            .or_default()
+            .numeric_angles
+            .extend(geometry_analysis.angles);
         for geometry_issue in geometry_analysis.issues {
             let kind = match geometry_issue.kind {
                 GeometrySyntaxIssueKind::IncompleteGeometry => {
@@ -2320,6 +2335,9 @@ fn build_semantic_entities(
                 }
                 GeometrySyntaxIssueKind::InvalidSegment => {
                     SemanticAssociationIssueKind::InvalidNumericSegment
+                }
+                GeometrySyntaxIssueKind::InvalidAngle => {
+                    SemanticAssociationIssueKind::InvalidNumericAngle
                 }
             };
             issues.push(SemanticAssociationIssue {
@@ -2838,6 +2856,11 @@ fn associate_fill_geometry_ownership(
                     ownership.insert(head.source().span, segment.source().span);
                 }
             }
+            for angle in &region.numeric_angles {
+                if within(angle.source().span) {
+                    ownership.insert(head.source().span, angle.source().span);
+                }
+            }
         }
     }
 }
@@ -3282,6 +3305,12 @@ fn associate_region(
                     .map(OwnedSemanticOccurrence::Continuity),
             )
             .chain(region.angles.drain(..).map(OwnedSemanticOccurrence::Angle))
+            .chain(
+                region
+                    .numeric_angles
+                    .drain(..)
+                    .map(OwnedSemanticOccurrence::NumericAngle),
+            )
             .chain(surface_occurrences)
             .chain(fluctuation_occurrences)
             .chain(proportion_occurrences)
@@ -3364,6 +3393,12 @@ fn associate_region(
                     .map(OwnedSemanticOccurrence::Continuity),
             )
             .chain(region.angles.drain(..).map(OwnedSemanticOccurrence::Angle))
+            .chain(
+                region
+                    .numeric_angles
+                    .drain(..)
+                    .map(OwnedSemanticOccurrence::NumericAngle),
+            )
             .chain(surface_occurrences)
             .chain(fluctuation_occurrences)
             .chain(proportion_occurrences)
@@ -3397,6 +3432,10 @@ fn associate_region(
     owned_region
         .numeric_segments
         .append(&mut region.numeric_segments);
+    // An English angle follows its noun, as a numeric size does.
+    owned_region
+        .numeric_angles
+        .append(&mut region.numeric_angles);
     let occurrences = take_all_modifier_occurrences(&mut region);
     if !occurrences.is_empty() {
         issues.push(SemanticAssociationIssue {
@@ -3537,13 +3576,41 @@ fn associate_region(
         region_index,
         issues,
     );
-    let angle = select_term(
-        owned_region.angles,
-        OwnedSemanticOccurrence::Angle,
-        SemanticAssociationIssueKind::ConflictingAngles,
-        region_index,
-        issues,
-    );
+    // An angle word and an angle written in numbers each turn the marks, so one
+    // of either is allowed and any second one is a conflict.
+    let (angle, numeric_angle) = if owned_region.numeric_angles.is_empty() {
+        let angle = select_term(
+            owned_region.angles,
+            OwnedSemanticOccurrence::Angle,
+            SemanticAssociationIssueKind::ConflictingAngles,
+            region_index,
+            issues,
+        );
+        (angle, None)
+    } else if owned_region.angles.is_empty() && owned_region.numeric_angles.len() == 1 {
+        (None, owned_region.numeric_angles.pop())
+    } else {
+        let mut occurrences = owned_region
+            .angles
+            .into_iter()
+            .map(OwnedSemanticOccurrence::Angle)
+            .chain(
+                owned_region
+                    .numeric_angles
+                    .into_iter()
+                    .map(OwnedSemanticOccurrence::NumericAngle),
+            )
+            .collect::<Vec<_>>();
+        occurrences.sort_by_key(|occurrence| occurrence.source().span.start_byte);
+        issues.push(SemanticAssociationIssue {
+            kind: SemanticAssociationIssueKind::ConflictingAngles,
+            region_index,
+            occurrences,
+            causal_provenance: SemanticIssueCausalProvenance::Unattributed,
+            upstream_diagnostic: None,
+        });
+        (None, None)
+    };
     let quality = select_term(
         owned_region.surface_qualities,
         OwnedSemanticOccurrence::Surface,
@@ -3658,6 +3725,7 @@ fn associate_region(
         touch,
         continuity,
         angle,
+        numeric_angle,
         surface: SemanticSurface { quality, intensity },
         fluctuation: SemanticFluctuation {
             spread,
@@ -3738,6 +3806,12 @@ fn take_all_modifier_occurrences(region: &mut AssociationRegion) -> Vec<OwnedSem
                 .map(OwnedSemanticOccurrence::Continuity),
         )
         .chain(region.angles.drain(..).map(OwnedSemanticOccurrence::Angle))
+        .chain(
+            region
+                .numeric_angles
+                .drain(..)
+                .map(OwnedSemanticOccurrence::NumericAngle),
+        )
         .chain(surface_occurrences)
         .chain(fluctuation_occurrences)
         .chain(proportion_occurrences)
@@ -3794,6 +3868,13 @@ fn take_pre_head_region(
         touches: take_owned_terms(&mut region.touches, &head, ownership),
         continuities: take_owned_terms(&mut region.continuities, &head, ownership),
         angles: take_owned_terms(&mut region.angles, &head, ownership),
+        numeric_angles: {
+            let (owned, remaining) = std::mem::take(&mut region.numeric_angles)
+                .into_iter()
+                .partition(|angle| ownership.owns(&head, angle.source().span));
+            region.numeric_angles = remaining;
+            owned
+        },
         surface_qualities: take_owned_terms(&mut region.surface_qualities, &head, ownership),
         surface_intensities: take_owned_terms(&mut region.surface_intensities, &head, ownership),
         unclassified_surfaces: take_owned_terms(
@@ -4194,6 +4275,7 @@ fn entity_occurrence_count(entity: &SemanticEntity) -> usize {
         + usize::from(entity.touch.is_some())
         + usize::from(entity.continuity.is_some())
         + usize::from(entity.angle.is_some())
+        + usize::from(entity.numeric_angle.is_some())
         + usize::from(entity.surface.quality.is_some())
         + usize::from(entity.surface.intensity.is_some())
         + usize::from(entity.fluctuation.amplitude.is_some())
@@ -4383,6 +4465,13 @@ pub(crate) fn semantic_entity_value(entity: &SemanticEntity) -> Value {
             semantic_numeric_segment_value(segment),
         );
     }
+    // Absent from older records, so an entity without an angle keeps its bytes.
+    if let Some(angle) = &entity.numeric_angle {
+        record.insert(
+            "numeric_angle".to_owned(),
+            semantic_numeric_angle_value(angle),
+        );
+    }
     record.insert(
         "proportion".to_owned(),
         semantic_proportion_value(&entity.proportion),
@@ -4562,6 +4651,25 @@ pub(crate) fn semantic_numeric_segment_value(segment: &crate::SemanticNumericSeg
         "to".to_owned(),
         Value::Array(vec![fraction(x1), fraction(y1)]),
     );
+    Value::Object(record.into_iter().collect())
+}
+
+/// The meaning of a numeric angle: its degrees as an exact fraction, turned
+/// clockwise on the canvas.
+pub(crate) fn semantic_numeric_angle_value(angle: &crate::SemanticNumericAngle) -> Value {
+    let (numerator, denominator) = angle.rational_degrees();
+    let mut degrees = BTreeMap::new();
+    degrees.insert(
+        "denominator".to_owned(),
+        Value::String(denominator.to_string()),
+    );
+    degrees.insert("numerator".to_owned(), Value::String(numerator.to_string()));
+    let mut record = BTreeMap::new();
+    record.insert(
+        "degrees".to_owned(),
+        Value::Object(degrees.into_iter().collect()),
+    );
+    record.insert("sense".to_owned(), Value::String("clockwise".to_owned()));
     Value::Object(record.into_iter().collect())
 }
 

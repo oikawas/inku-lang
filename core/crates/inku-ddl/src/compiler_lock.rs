@@ -113,6 +113,7 @@ pub enum SemanticDeliveryOwner {
     Touch,
     Continuity,
     Angle,
+    NumericAngle,
     LayoutDirection,
     SurfaceQuality,
     SurfaceIntensity,
@@ -153,6 +154,7 @@ impl SemanticDeliveryOwner {
             Self::Touch => "touch",
             Self::Continuity => "continuity",
             Self::Angle => "angle",
+            Self::NumericAngle => "numeric_angle",
             Self::LayoutDirection => "layout_direction",
             Self::SurfaceQuality => "surface_quality",
             Self::SurfaceIntensity => "surface_intensity",
@@ -1169,6 +1171,7 @@ fn project_deliveries(
             | SemanticAssociationIssueKind::IncompleteNumericPosition
             | SemanticAssociationIssueKind::InvalidNumericRange
             | SemanticAssociationIssueKind::InvalidNumericSegment
+            | SemanticAssociationIssueKind::InvalidNumericAngle
             | SemanticAssociationIssueKind::UnownedExactDecimal
             | SemanticAssociationIssueKind::UnknownSurfaceDimension
             | SemanticAssociationIssueKind::ConflictingFluctuationSpreads
@@ -2114,6 +2117,16 @@ fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mu
             compact_json(&crate::semantic_association::semantic_numeric_segment_value(segment)),
         );
     }
+    if let Some(angle) = &instruction.entity.numeric_angle {
+        add_explicit(
+            projection,
+            angle.source().span,
+            SemanticDeliveryOwner::NumericAngle,
+            compact_json(&crate::semantic_association::semantic_numeric_angle_value(
+                angle,
+            )),
+        );
+    }
     if let Some(relation) = &instruction.relation {
         add_explicit(
             projection,
@@ -2223,6 +2236,12 @@ fn owned_occurrence_key(occurrence: &OwnedSemanticOccurrence) -> String {
         OwnedSemanticOccurrence::NumericSegment(segment) => format!(
             "numeric_segment:{}",
             compact_json(&crate::semantic_association::semantic_numeric_segment_value(segment))
+        ),
+        OwnedSemanticOccurrence::NumericAngle(angle) => format!(
+            "numeric_angle:{}",
+            compact_json(&crate::semantic_association::semantic_numeric_angle_value(
+                angle
+            ))
         ),
     }
 }
@@ -3011,6 +3030,9 @@ pub(crate) fn semantic_source_occurrences(ast: &SemanticDocumentAst) -> Vec<&Sou
         if let Some(segment) = &entity.numeric_segment {
             occurrences.push(segment.source());
         }
+        if let Some(angle) = &entity.numeric_angle {
+            occurrences.push(angle.source());
+        }
     }
 
     let mut occurrences = Vec::new();
@@ -3371,6 +3393,36 @@ fn entity_provenance_value(entity: &crate::SemanticEntity) -> Value {
             numeric_segment_provenance_value(segment),
         );
     }
+    // Absent from older records, so an entity without an angle keeps its bytes.
+    if let Some(angle) = &entity.numeric_angle {
+        record.insert(
+            "numeric_angle".to_owned(),
+            numeric_angle_provenance_value(angle),
+        );
+    }
+    Value::Object(record.into_iter().collect())
+}
+
+// The whole angle lexeme and the spelling of its degrees.
+fn numeric_angle_provenance_value(angle: &crate::SemanticNumericAngle) -> Value {
+    let mut degrees = BTreeMap::new();
+    degrees.insert(
+        "end_byte".to_owned(),
+        Value::from(angle.degrees_span.end_byte as u64),
+    );
+    degrees.insert(
+        "start_byte".to_owned(),
+        Value::from(angle.degrees_span.start_byte as u64),
+    );
+    let mut record = BTreeMap::new();
+    record.insert(
+        "angle".to_owned(),
+        source_occurrence_value(&angle.provenance),
+    );
+    record.insert(
+        "degrees".to_owned(),
+        Value::Object(degrees.into_iter().collect()),
+    );
     Value::Object(record.into_iter().collect())
 }
 

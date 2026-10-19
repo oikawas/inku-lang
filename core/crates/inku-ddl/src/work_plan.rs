@@ -901,14 +901,47 @@ impl NumericSize {
 }
 
 /// What the laws stage writes in numbers for one layer: its place, its size,
-/// or both. The layer's own words are edited before printing (a numeric size
-/// drops the size word, a row has no line-up direction).
+/// its turn, the two colors it alternates and the polygon it is drawn as. The
+/// layer's own words are edited before printing (a numeric size drops the size
+/// word, a row has no line-up direction, a turn has no angle word).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct NumericWriting {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub place: Option<NumericPlace>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size: Option<NumericSize>,
+    /// The degrees the marks turn, clockwise (stage B-4a): `回転30度の` after a
+    /// numeric size in Japanese, `rotated 30 degrees` after it in English.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn: Option<f64>,
+    /// Two colors the marks alternate in their order, written instead of the
+    /// color word: `白と青を交互にして、` after the place in Japanese, and
+    /// `, alternating white and blue` at the end in English.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cycle: Option<[inku_score::Color; 2]>,
+    /// The sides of the regular polygon the layer is drawn as (5 to 8), written
+    /// as its own noun (`六角形`, `hexagon`) instead of the layer's shape word.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sides: Option<u8>,
+}
+
+/// The nouns of the regular polygons a work plan has no shape word for, from
+/// five sides to eight. English reads them in the singular only.
+const POLYGON_NOUNS: [(u8, &str, &str); 4] = [
+    (5, "五角形", "pentagon"),
+    (6, "六角形", "hexagon"),
+    (7, "七角形", "heptagon"),
+    (8, "八角形", "octagon"),
+];
+
+fn polygon_noun(sides: u8, language: ResolvedInstructionLanguage) -> Option<&'static str> {
+    POLYGON_NOUNS
+        .iter()
+        .find(|(count, _, _)| *count == sides)
+        .map(|(_, ja, en)| match language {
+            ResolvedInstructionLanguage::Ja => *ja,
+            ResolvedInstructionLanguage::En => *en,
+        })
 }
 
 /// A number as the laws stage writes it: six decimals, without trailing zeros
@@ -951,9 +984,22 @@ fn print_layer_ja(
         out.push_str(MarkerId::JaNi.surface());
         out.push('、');
     }
-    // A numeric size heads the noun phrase, before every word of the layer.
+    // Two alternating colors say the color of every mark, before its noun phrase.
+    let cycle = numeric.and_then(|numeric| numeric.cycle);
+    if let Some([first, second]) = cycle {
+        out.push_str(&format!(
+            "{}と{}を交互にして、",
+            surface(WorkPlanSlot::Color, first.as_str(), ja),
+            surface(WorkPlanSlot::Color, second.as_str(), ja)
+        ));
+    }
+    // A numeric size heads the noun phrase, before every word of the layer, and
+    // a numeric angle follows it.
     if let Some(size) = numeric.and_then(|numeric| numeric.size) {
         out.push_str(&size.written_ja());
+    }
+    if let Some(turn) = numeric.and_then(|numeric| numeric.turn) {
+        out.push_str(&format!("回転{}度の", number(turn)));
     }
     if let Some(quality) = layer.attribute(WorkPlanSlot::MotionQuality) {
         for slot in [WorkPlanSlot::MotionAmplitude, WorkPlanSlot::MotionSpacing] {
@@ -976,6 +1022,9 @@ fn print_layer_ja(
         WorkPlanSlot::Surface,
         WorkPlanSlot::Angle,
     ] {
+        if slot == WorkPlanSlot::Color && cycle.is_some() {
+            continue;
+        }
         if let Some(value) = layer.attribute(slot) {
             out.push_str(&ja_modifier(&surface(slot, value, ja)));
         }
@@ -987,7 +1036,13 @@ fn print_layer_ja(
     if let Some(size) = layer.attribute(WorkPlanSlot::Size) {
         out.push_str(&ja_modifier(&surface(WorkPlanSlot::Size, size, ja)));
     }
-    out.push_str(&surface(WorkPlanSlot::Shape, &layer.shape, ja));
+    match numeric
+        .and_then(|numeric| numeric.sides)
+        .and_then(|sides| polygon_noun(sides, ja))
+    {
+        Some(polygon) => out.push_str(polygon),
+        None => out.push_str(&surface(WorkPlanSlot::Shape, &layer.shape, ja)),
+    }
     out.push_str(MarkerId::JaWo.surface());
     if let Some(direction) = layer.attribute(WorkPlanSlot::LineUpDirection) {
         out.push_str(&surface(WorkPlanSlot::LineUpDirection, direction, ja));
@@ -1018,6 +1073,7 @@ fn print_layer_en(
     if let Some(bleeding) = layer.attribute(WorkPlanSlot::Bleeding) {
         words.push(surface(WorkPlanSlot::Bleeding, bleeding, en));
     }
+    let cycle = numeric.and_then(|numeric| numeric.cycle);
     for slot in [
         WorkPlanSlot::Color,
         WorkPlanSlot::Thinness,
@@ -1027,6 +1083,9 @@ fn print_layer_en(
         WorkPlanSlot::Surface,
         WorkPlanSlot::Angle,
     ] {
+        if slot == WorkPlanSlot::Color && cycle.is_some() {
+            continue;
+        }
         if let Some(value) = layer.attribute(slot) {
             words.push(surface(slot, value, en));
         }
@@ -1037,15 +1096,29 @@ fn print_layer_en(
     if let Some(size) = layer.attribute(WorkPlanSlot::Size) {
         words.push(surface(WorkPlanSlot::Size, size, en));
     }
-    let head = surface(WorkPlanSlot::Shape, &layer.shape, en);
-    words.push(if layer.count > 1 {
-        format!("{head}s")
-    } else {
-        head
-    });
-    // A numeric size follows the noun it measures.
+    match numeric
+        .and_then(|numeric| numeric.sides)
+        .and_then(|sides| polygon_noun(sides, en))
+    {
+        // A polygon's noun is read in the singular whatever the count.
+        Some(polygon) => words.push(polygon.to_owned()),
+        None => {
+            let head = surface(WorkPlanSlot::Shape, &layer.shape, en);
+            words.push(if layer.count > 1 {
+                format!("{head}s")
+            } else {
+                head
+            });
+        }
+    }
+    // A numeric size follows the noun it measures, and a numeric angle follows it.
     if let Some(size) = numeric.and_then(|numeric| numeric.size) {
         words.push(size.written_en());
+    }
+    if let Some(turn) = numeric.and_then(|numeric| numeric.turn) {
+        #[allow(clippy::float_cmp)]
+        let unit = if turn == 1.0 { "degree" } else { "degrees" };
+        words.push(format!("rotated {} {unit}", number(turn)));
     }
     let action = surface(WorkPlanSlot::Action, &layer.action, en);
     let mut action = action.replace('-', " ");
@@ -1080,6 +1153,13 @@ fn print_layer_en(
         out.push_str(&format!(
             " at the {}",
             surface(WorkPlanSlot::Position, place, en)
+        ));
+    }
+    if let Some([first, second]) = cycle {
+        out.push_str(&format!(
+            ", alternating {} and {}",
+            surface(WorkPlanSlot::Color, first.as_str(), en),
+            surface(WorkPlanSlot::Color, second.as_str(), en)
         ));
     }
     out.push('.');
@@ -1137,7 +1217,7 @@ fn plan_size_id(value: CoreModifierValue) -> Option<String> {
 /// line-up direction. An alternate composition reads these from the visible
 /// instructions alone (draw-system05, 2026-10-04). `None` for an instruction a
 /// plan does not write: a Macro word, a relation, a sequence, a fill of a
-/// shape, a numeric point or segment, or a value outside the plan's words.
+/// shape, a numeric point, segment or angle, or a value outside the plan's words.
 #[must_use]
 pub fn composition_layer(instruction: &crate::SemanticInstruction) -> Option<WorkPlanLayer> {
     let entity = &instruction.entity;
@@ -1149,6 +1229,7 @@ pub fn composition_layer(instruction: &crate::SemanticInstruction) -> Option<Wor
         || instruction.fill_target.is_some()
         || entity.numeric_position.is_some()
         || entity.numeric_segment.is_some()
+        || entity.numeric_angle.is_some()
         || !entity.additional_relative_scales.is_empty()
     {
         return None;

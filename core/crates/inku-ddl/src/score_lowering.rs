@@ -281,6 +281,7 @@ fn project_source_instruction<'a>(
             .angle
             .as_ref()
             .map(|term| (&term.identity).into()),
+        numeric_angle: instruction.entity.numeric_angle.as_ref(),
         angle_context: Some(ScoreAngleContext {
             composition_seed: view.composition_seed(),
             original_pre_expansion_digest: view.original_pre_expansion_digest(),
@@ -548,6 +549,7 @@ fn checked_object_relation(
                 || input.proportion_width_extent.is_some()
                 || input.numeric_segment.is_some(),
             direction_fixed: input.angle.is_some()
+                || input.numeric_angle.is_some()
                 || input.proportion_arc_form.is_some()
                 || input.numeric_segment.is_some(),
         }),
@@ -1470,6 +1472,7 @@ fn macro_caller_has_unbound_geometry(instruction: &SemanticInstruction) -> bool 
         || instruction.entity.numeric_range.is_some()
         || instruction.entity.numeric_segment.is_some()
         || instruction.entity.angle.is_some()
+        || instruction.entity.numeric_angle.is_some()
         || instruction.entity.fluctuation.amplitude.is_some()
         || instruction.entity.fluctuation.frequency.is_some()
         || instruction.entity.fluctuation.quality.is_some()
@@ -1768,6 +1771,7 @@ fn project_macro_emit<'a>(
             CoreModifierValue::from_semantic_ref(identity.category, identity.id)
         }),
         angle,
+        numeric_angle: None,
         angle_context: None,
         layout_direction,
         fluctuation,
@@ -3864,6 +3868,11 @@ fn resolved_mirror_follower_direction(
             .find(|(projected_index, _)| {
                 view.source_instruction_index(*projected_index) == Some(source_instruction_index)
             })?;
+    // An angle written in numbers is the direction as an angle word's choice is.
+    if let Some(angle) = &instruction.entity.numeric_angle {
+        let (numerator, denominator) = angle.rational_degrees();
+        return Some(numerator as f64 / denominator as f64);
+    }
     let angle = instruction.entity.angle.as_ref()?;
     resolve_score_angle(
         &angle.identity.id,
@@ -4486,7 +4495,14 @@ fn source_span_for_gap(
             .entity
             .angle
             .as_ref()
-            .map(|angle| angle.provenance.source.span),
+            .map(|angle| angle.provenance.source.span)
+            .or_else(|| {
+                instruction
+                    .entity
+                    .numeric_angle
+                    .as_ref()
+                    .map(|angle| angle.source().span)
+            }),
         ScoreFieldGap::UnsupportedLayoutDirection { .. } => instruction
             .layout_direction
             .as_ref()
@@ -4752,6 +4768,8 @@ struct ScoreLoweringInput<'a> {
     explicit_geometry: Option<&'a SemanticExplicitGeometry>,
     relative_scale: Option<CoreModifierValue>,
     angle: Option<SemanticInputIdentity<'a>>,
+    /// The degrees written in numbers (stage B-4a); exclusive with `angle`.
+    numeric_angle: Option<&'a crate::SemanticNumericAngle>,
     angle_context: Option<ScoreAngleContext<'a>>,
     layout_direction: Option<SemanticInputIdentity<'a>>,
     fluctuation: [Option<SemanticInputIdentity<'a>>; 3],
@@ -5960,9 +5978,15 @@ fn resolve_complete_object<'a>(
             return Err(gaps);
         }
     };
-    let mut rotation = if primitive == Primitive::Point && input.angle.is_some() {
+    let mut rotation = if primitive == Primitive::Point
+        && (input.angle.is_some() || input.numeric_angle.is_some())
+    {
         gaps.push(ScoreFieldGap::UnsupportedAngleForPrimitive { primitive });
         None
+    } else if let Some(angle) = input.numeric_angle {
+        // The degrees written in numbers are the rotation itself (stage B-4a).
+        let (numerator, denominator) = angle.rational_degrees();
+        Some(numerator as f64 / denominator as f64)
     } else {
         match input.angle {
             None => None,
@@ -6558,7 +6582,8 @@ fn numeric_segment_gap(
                 || !input.additional_relative_scales.is_empty()
                 || input.proportion_width_extent.is_some()
                 || !input.additional_width_extents.is_empty();
-            (sized || input.angle.is_some()).then_some(ScoreFieldGap::NumericSegmentConflict)
+            (sized || input.angle.is_some() || input.numeric_angle.is_some())
+                .then_some(ScoreFieldGap::NumericSegmentConflict)
         }
         _ => Some(ScoreFieldGap::UnsupportedNumericSegment),
     }

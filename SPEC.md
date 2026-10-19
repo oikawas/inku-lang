@@ -3653,6 +3653,14 @@ Numeric segments (DDL Spec 21, DDL engine 65; the author's decision of 2026-10-1
 - Line and free line (drawn or placed, one): `from` is the first point and `to` the second, with no rotation.
 - Unsupported uses and conflicts: one closed shape, point or arc placed, a line-up of one, scatter, tile and fill, two or more lines placed, a coordinated-group member, and a shape being filled are `unsupported_numeric_segment`. The two points set the direction and the length, so a single line's length (a numeric size), size word, width word (full width, half width) or angle word, and a line-up direction word, are `numeric_segment_conflict`. On a Macro caller it is `unbound_macro_caller_meaning`.
 - The work plan (the underdrawing) does not read a sentence with a numeric segment, so, as with a numeric position, "Change the arrangement" (§12.6.3) does not choose the work again. The Score form is unchanged.
+
+Numeric angles (DDL Spec 22, DDL engine 66; 2026-10-20, stage B-4a): the angle a mark turns may be written as a number of degrees.
+
+- Form: Japanese writes 「回転A度」 (`画面の横0.5、縦0.5の位置に、一辺0.1の回転30度の赤い四角を1個置く。`), and English writes `rotated A degrees` (or `degree`; `place one red square side length 0.1 rotated 30 degrees at horizontal 0.5, vertical 0.5.`). Like a numeric range or segment, it is read as one lexeme before the words, so its whole number is not read as a count. Japanese writes it at the head of a phrase or after 「の」, 「、」 and the like, joined to the shape with 「の」; English writes it after the noun, as a numeric size, in any letter case. 「回転」 or `rotated` without a number is still the angle word whose angle the seed chooses.
+- Values: a whole or decimal number (up to six decimal places; Japanese also reads full-width digits and decimal points), with no sign and no fraction, from 0 up to but not including 360. Otherwise the angle is `invalid_numeric_angle` (blocking).
+- Meaning: the Score's `rotation` becomes A degrees (clockwise, y down, as the Score turns marks). It turns every mark of its sentence (one mark, a row, a tile or a scatter). A waxing or waning arc adds its 90 or 270 degrees on top, as with an angle word. The meaning's `numeric_angle` is `{"degrees":an exact rational,"sense":"clockwise"}`; a sentence without one keeps its meaning and provenance bytes and their digests. A numeric angle on a mirrored sentence is treated as an angle word there.
+- Unsupported uses and conflicts: a point takes no angle (`unsupported_angle_for_primitive`). With an angle word, or written twice, it is `conflicting_angles`. One line or free line between two points has its direction from them, so it is `numeric_segment_conflict` there. On a Macro caller it is `unbound_macro_caller_meaning`.
+- The work plan's words do not include it, and the work plan does not read a sentence with one, so, as with a numeric position, "Change the arrangement" (§12.6.3) does not choose the work again. The Score form is unchanged.
 Unsupported noncenter relations remain unsupported and are never silently discarded. The normal shared runtime,
 UI, and persistence path uses this delivery.
 
@@ -3866,7 +3874,7 @@ An exact coordinate is never silently moved, clamped, or snapped. Boundary-ancho
 extent clips the canvas are separate matters.
 
 Direct typed DDL accepts the finite JA forms `半径N`, `直径N`, `幅N、高さN`,
-`一辺N`, `画面の横X、縦Yの位置`, numeric ranges and numeric segments (§18), their corresponding EN forms, and the finite
+`一辺N`, `画面の横X、縦Yの位置`, numeric ranges, numeric segments and numeric angles (§18), their corresponding EN forms, and the finite
 seven-class size modifiers in both languages. A decimal retains its original
 spelling and source span as provenance while its meaning is normalized to a
 signed base-10 coefficient and scale. The entrypoint takes a lock-verified Stage

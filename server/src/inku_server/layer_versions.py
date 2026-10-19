@@ -373,7 +373,12 @@
 # first and last mark on them in equal steps, and one line or free line runs
 # from the first to the second. Such a sentence was an unresolved clause. No
 # saved work changes (the 4,712 works of the 2026-10-14 5173 export).
-DDL_ENGINE_VERSION = "65"
+# 66: An angle written in numbers (`回転30度`, `rotated 30 degrees`) turns
+# every mark of its sentence by that many degrees, clockwise as the Score's
+# rotation. Such a sentence was an unresolved clause, its whole number read
+# as a count. No saved work changes (the 4,712 works of the 2026-10-14 5173
+# export).
+DDL_ENGINE_VERSION = "66"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -426,4 +431,6 @@ DDL_ENGINE_VERSION = "65"
 # 21 (2026-10-19): The two ends of a row or of a line may be written in
 # numbers, `横A、縦Bから横C、縦Dまで` and `from horizontal A, vertical B to
 # horizontal C, vertical D`.
-DDL_VERSION = "21"
+# 22 (2026-10-20): The angle a mark turns may be written in numbers,
+# `回転A度` and `rotated A degrees`.
+DDL_VERSION = "22"

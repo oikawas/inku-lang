@@ -8,6 +8,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-19 — Composition: a fill without a place takes the whole canvas
+
+The composition's solver now places a fill layer whose place the description does not state on the whole canvas only, whatever its role and proportion (wide, tall or full width) (the author's decision). A fill cuts its marks at the edge of its range, so a shape placed on a range such as the upper two thirds could be cut off at its edge. A fill on either side of a joint that rests on or crosses, the joined layer or its partner, still takes a range as before. Tile layers and the other actions are unchanged.
+
+- Saved works draw as before: a work saves its composed instructions and Score, and a redraw reads the saved instructions.
+- "Another composition" on a saved work (by principle or by chance) and the layout generations of AI and autonomous refinement use the same candidates, so they change: a fill written with a numeric range moves to the whole canvas, and a work whose combinations exceeded the cap by principle may now be solved.
+- The DDL engine, DDL, Score and render engine versions are unchanged.
+
 ### 2026-10-18 — macOS: 3D PNG and GLB saves start again
 
 In the macOS experimental 3D view, PNG save and GLB save opened no save panel: WKWebView silently dropped the viewer's download link. The viewer's saves now reach the app through the parent page shared with Android. Focus selection works once a shape is clicked to select it, as on the Web.

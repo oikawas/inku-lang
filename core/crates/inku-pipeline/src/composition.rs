@@ -1822,22 +1822,26 @@ pub fn chance_answer(
         .iter()
         .enumerate()
         .map(|(index, layer)| {
-            let options = chance_options(layer, fixed, index)?;
+            // Without joints no layer is on either side of one.
+            let options = chance_options(layer, fixed, index, false)?;
             Ok(chance_pick(&options, seed, work_id, index))
         })
         .collect()
 }
 
-/// The ranges chance chooses from for layer `index`.
+/// The ranges chance chooses from for layer `index`; `edge_joint` says whether
+/// the layer is on either side of a joint that rests on or crosses.
 fn chance_options(
     layer: &WorkPlanLayer,
     fixed: &BTreeMap<usize, String>,
     index: usize,
+    edge_joint: bool,
 ) -> Result<Vec<usize>, Unsolved> {
     candidates(
         layer,
         Role::Secondary,
         fixed.get(&index).map(String::as_str),
+        edge_joint,
     )
     .filter(|options| !options.is_empty())
     .ok_or(Unsolved::NoRanges)
@@ -1873,7 +1877,13 @@ pub fn other_joined_answer(
     work_id: &str,
 ) -> Result<(Vec<usize>, OtherAnswer), Unsolved> {
     let group = grouped_by_bounds(layers, reading, background, bounds)?;
-    let work = Work::new(&group.layers, &group.reading, background)?.with_joined(group.joined);
+    let work = Work::with_edge_joints(
+        &group.layers,
+        &group.reading,
+        background,
+        &group.edge_joints,
+    )?
+    .with_joined(group.joined);
     let searched = search_work(&work)?;
     other_of(&searched, current, seed, work_id, || Ok(work))
 }
@@ -1897,18 +1907,48 @@ pub fn chance_joined_answer(
         .keep
         .iter()
         .zip(&group.joined)
-        .map(|(index, joined)| {
-            let options = chance_options(&layers[*index], &reading.fixed, *index)?;
+        .zip(&group.edge_joints)
+        .map(|((index, joined), edge_joint)| {
+            let options = chance_options(&layers[*index], &reading.fixed, *index, *edge_joint)?;
             let options = fitting(&layers[*index], options, joined);
             Ok(chance_pick(&options, seed, work_id, *index))
         })
         .collect()
 }
 
-fn candidates(layer: &WorkPlanLayer, role: Role, fixed: Option<&str>) -> Option<Vec<usize>> {
+/// Whether each of `count` layers is on either side of one of `joints` that rests
+/// on or crosses: such a joint meets the layer at the edge of its range.
+fn at_edge_joints<'a>(joints: impl IntoIterator<Item = &'a Joint>, count: usize) -> Vec<bool> {
+    let mut edge = vec![false; count];
+    for joint in joints {
+        if matches!(joint.kind, JointKind::RestsOn | JointKind::Crosses) {
+            for index in [joint.a, joint.b] {
+                if let Some(slot) = edge.get_mut(index) {
+                    *slot = true;
+                }
+            }
+        }
+    }
+    edge
+}
+
+fn candidates(
+    layer: &WorkPlanLayer,
+    role: Role,
+    fixed: Option<&str>,
+    edge_joint: bool,
+) -> Option<Vec<usize>> {
     let table = regions();
     if let Some(place) = fixed {
         return stated_regions(place);
+    }
+    // A fill cuts its marks at the edge of its range, so a range chosen here would
+    // cut them: a fill without a fixed place keeps the whole canvas (the author's
+    // decision of 2026-10-19). A fill on either side of a joint that rests on or
+    // crosses still takes a range: the other layer stands on or crosses its edge,
+    // and a joined fill as large as the canvas would leave the paper.
+    if layer.action == "fill" && !edge_joint {
+        return region_index("whole").map(|index| vec![index]);
     }
     let kind = layer_kind(layer);
     let direction = orientation(layer);
@@ -2334,6 +2374,24 @@ impl<'a> Work<'a> {
         reading: &'a CheckedReading,
         background: &str,
     ) -> Result<Self, Unsolved> {
+        let (joints, _) = check_joints(&reading.joints, layers, &reading.fixed);
+        Self::with_edge_joints(
+            layers,
+            reading,
+            background,
+            &at_edge_joints(&joints, layers.len()),
+        )
+    }
+
+    /// [`Work::new`] told whether each layer is on either side of a joint that
+    /// rests on or crosses (`edge_joints`, by layer), which the reading of a work
+    /// taken apart at its joints no longer holds.
+    fn with_edge_joints(
+        layers: &'a [WorkPlanLayer],
+        reading: &'a CheckedReading,
+        background: &str,
+        edge_joints: &[bool],
+    ) -> Result<Self, Unsolved> {
         if let Some(place) = reading
             .fixed
             .values()
@@ -2373,6 +2431,7 @@ impl<'a> Work<'a> {
                 layer,
                 reading.roles[i],
                 reading.fixed.get(&i).map(String::as_str),
+                edge_joints[i],
             )
             .ok_or(Unsolved::NoRanges)?;
             work.options.push(options);
@@ -3061,7 +3120,12 @@ pub fn join(
     }) else {
         return plain;
     };
-    let Ok(work) = Work::new(&group.layers, &group.reading, background) else {
+    let Ok(work) = Work::with_edge_joints(
+        &group.layers,
+        &group.reading,
+        background,
+        &group.edge_joints,
+    ) else {
         return plain;
     };
     let work = work.with_joined(group.joined);
@@ -3085,12 +3149,14 @@ pub fn join(
 }
 
 /// A work taken apart at its joints: the layers placed again (`keep`, in their
-/// order) with their reading, and the layers joined to each of them.
+/// order) with their reading, the layers joined to each of them, and whether
+/// each of them is the partner of a joint that rests on or crosses.
 struct Grouped {
     keep: Vec<usize>,
     layers: Vec<WorkPlanLayer>,
     reading: CheckedReading,
     joined: Vec<Vec<Joined>>,
+    edge_joints: Vec<bool>,
 }
 
 /// Take a work apart at its joints (`attached`, by joined layer): a joined layer
@@ -3130,9 +3196,11 @@ fn grouped(
             surface,
         });
     }
+    let edge_joints = at_edge_joints(attached.values(), layers.len());
     Some(Grouped {
         layers: keep.iter().map(|i| layers[*i].clone()).collect(),
         reading: reduce_reading(reading, &keep),
+        edge_joints: keep.iter().map(|i| edge_joints[*i]).collect(),
         keep,
         joined,
     })
@@ -3537,5 +3605,140 @@ mod tests {
                 .collect();
             assert_eq!(chosen, [key], "{name}");
         }
+    }
+
+    const ROLES: [Role; 5] = [
+        Role::Field,
+        Role::Focal,
+        Role::Secondary,
+        Role::Scattered,
+        Role::Accent,
+    ];
+    const PROPORTIONS: [Option<&str>; 4] = [None, Some("full_width"), Some("wide"), Some("tall")];
+
+    fn shaped(action: &str, proportion: Option<&str>) -> WorkPlanLayer {
+        let mut layer = plan_layer(action, "square", None);
+        layer.count = 5;
+        layer.proportion = proportion.map(str::to_owned);
+        layer
+    }
+
+    /// The author's decision of 2026-10-19: a fill cuts its marks at the edge of
+    /// its range, so a fill without a fixed place keeps the whole canvas, in any
+    /// role and of any proportion. A stated place is kept.
+    #[test]
+    fn a_fill_without_a_fixed_place_keeps_the_whole_canvas() {
+        let whole = Some(vec![region_index("whole").expect("the whole canvas")]);
+        for proportion in PROPORTIONS {
+            let fill = shaped("fill", proportion);
+            for role in ROLES {
+                assert_eq!(
+                    candidates(&fill, role, None, false),
+                    whole,
+                    "{role:?} {proportion:?}"
+                );
+            }
+            assert_eq!(
+                candidates(&fill, Role::Field, Some("top"), false),
+                stated_regions("top"),
+                "{proportion:?}"
+            );
+        }
+    }
+
+    /// A fill on either side of a joint that rests on or crosses takes the
+    /// ranges it took before (those of a tile of its proportion), both when the
+    /// work is solved with its joints and when it is taken apart at them; a fill
+    /// joined by another joint keeps the whole canvas.
+    #[test]
+    fn a_fill_on_either_side_of_a_joint_that_rests_on_or_crosses_keeps_its_ranges() {
+        for proportion in PROPORTIONS {
+            let (fill, tile) = (shaped("fill", proportion), shaped("tile", proportion));
+            for role in ROLES {
+                assert_eq!(
+                    candidates(&fill, role, None, true),
+                    candidates(&tile, role, None, false),
+                    "{role:?} {proportion:?}"
+                );
+            }
+        }
+        let before = |role: Role| {
+            candidates(&shaped("tile", Some("wide")), role, None, false).expect("ranges")
+        };
+        let joint = |kind: JointKind, a: usize, b: usize| Joint { kind, a, b };
+        // A circle rests on the first band, the second band crosses a square and
+        // the third overlaps an ellipse.
+        let layers = [
+            shaped("fill", Some("wide")),
+            plan_layer("place", "circle", None),
+            shaped("fill", Some("wide")),
+            plan_layer("place", "square", None),
+            shaped("fill", Some("wide")),
+            plan_layer("place", "ellipse", None),
+        ];
+        let reading = CheckedReading {
+            roles: vec![
+                Role::Field,
+                Role::Focal,
+                Role::Secondary,
+                Role::Secondary,
+                Role::Secondary,
+                Role::Secondary,
+            ],
+            joints: vec![
+                joint(JointKind::RestsOn, 1, 0),
+                joint(JointKind::Crosses, 2, 3),
+                joint(JointKind::Overlaps, 4, 5),
+            ],
+            ..CheckedReading::default()
+        };
+        let work = Work::new(&layers, &reading, "white").expect("a work");
+        assert_eq!(work.options[0], before(Role::Field));
+        assert_eq!(work.options[2], before(Role::Secondary));
+        assert_eq!(
+            work.options[4],
+            [region_index("whole").expect("the whole canvas")]
+        );
+        let attached: BTreeMap<usize, Joint> = reading
+            .joints
+            .iter()
+            .map(|joint| (joint.a, *joint))
+            .collect();
+        let group =
+            grouped(&layers, &reading, &attached, "white", |_| Some(WHOLE)).expect("grouped");
+        assert_eq!(group.keep, [0, 3, 5]);
+        assert_eq!(group.edge_joints, [true, true, false]);
+        let work =
+            Work::with_edge_joints(&group.layers, &group.reading, "white", &group.edge_joints)
+                .expect("a work");
+        assert_eq!(work.options[0], before(Role::Field));
+    }
+
+    /// Every layer but a fill without a fixed place keeps its ranges: a joint
+    /// changes none of them, a tile of the field keeps the large ranges and a
+    /// scattered layer the composition ranges.
+    #[test]
+    fn every_other_layer_keeps_its_ranges() {
+        for action in ["draw", "line_up", "place", "scatter", "tile"] {
+            for proportion in PROPORTIONS {
+                let layer = shaped(action, proportion);
+                for role in ROLES {
+                    assert_eq!(
+                        candidates(&layer, role, None, true),
+                        candidates(&layer, role, None, false),
+                        "{action} {role:?} {proportion:?}"
+                    );
+                }
+            }
+        }
+        let table = regions();
+        assert_eq!(
+            candidates(&shaped("tile", None), Role::Field, None, false),
+            Some(table.large.clone())
+        );
+        assert_eq!(
+            candidates(&shaped("scatter", None), Role::Scattered, None, false),
+            Some(table.composed.clone())
+        );
     }
 }

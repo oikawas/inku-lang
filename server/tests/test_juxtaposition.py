@@ -14,6 +14,7 @@ from inku_server import juxtaposition
 from inku_server.juxtaposition import JuxtapositionAnswerError, gather_candidates, same_text, suggest_juxtaposition
 from inku_server.persistence import juxtaposition as sources_module
 from inku_server.persistence.schema import HistoryRow
+from inku_server.persistence.settings import checked_juxtaposition_limit, normalize_juxtaposition_settings
 
 SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><circle cx="5" cy="5" r="2"/></svg>'
 OTHERS = ["雪原の狼。", "港の灯台。", "砂の時計。", "森の鹿。", "川の舟。"]
@@ -42,6 +43,7 @@ def test_the_same_poem_in_another_spelling_and_a_sentence_already_added_are_not_
         added=["廃駅のホームに時刻表だけが残り、来ない列車の時間を正確に告げ続けた。"],
         exclude=[],
         rng=random.Random(0),
+        limit=10,
     )
     by_sentence = {candidate["sentence"]: candidate["history_ids"] for candidate in candidates}
     poem = "ちはやぶる　神代も聞かず　竜田川　からくれなゐに　水くくるとは"
@@ -134,6 +136,7 @@ def test_the_route_refuses_a_held_work_and_keeps_the_lineage_out_of_the_candidat
     monkeypatch.setattr(render._db, "juxtaposition_sources", lambda _user: [
         ("w", "今の記述。"), ("r", "根の記述。"), ("p", "前に足した一文。")] + [
         (f"s{n}", text) for n, text in enumerate(OTHERS)])
+    monkeypatch.setattr(render._db, "get_juxtaposition_settings", lambda: {"candidate_limit": 10})
     monkeypatch.setattr(render._db, "get_model_settings", lambda: {})
     monkeypatch.setattr(render, "prepare_vision_settings", lambda *_: {})
     seen = {}
@@ -150,6 +153,42 @@ def test_the_route_refuses_a_held_work_and_keeps_the_lineage_out_of_the_candidat
     assert offered == set(OTHERS)
     assert seen["lineage"] == ["根の記述。", "今の記述。"]
     assert len(answer.choices) == 4 and answer.candidates == 5
+
+
+def test_the_route_offers_the_model_no_more_sentences_than_the_administrators_limit(monkeypatch):
+    # Failure: the limit is saved in the settings, yet every sentence in the database still goes out.
+    from inku_server.api_core.routers import render
+
+    monkeypatch.setattr(render._db, "get_items", lambda *_: [{"id": "w", "source_text": "今の記述。", "svg": SVG}])
+    monkeypatch.setattr(render._db, "juxtaposition_sources", lambda _user: [
+        (f"s{n}", "".join(chr(0x4E00 + n * 5 + k) for k in range(4)) + "の文。") for n in range(30)])
+    monkeypatch.setattr(render._db, "get_juxtaposition_settings", lambda: {"candidate_limit": 10})
+    monkeypatch.setattr(render._db, "get_model_settings", lambda: {})
+    monkeypatch.setattr(render, "prepare_vision_settings", lambda *_: {})
+    seen = {}
+
+    def suggest(**kwargs):
+        seen.update(kwargs)
+        return {"choices": [{"sentence": c["sentence"], "reason": "r", "history_ids": c["history_ids"], "rank": n,
+                             "position": 0.0} for n, c in enumerate(kwargs["candidates"][:4], start=1)],
+                "candidates": len(kwargs["candidates"]), "model": kwargs["model"]}
+
+    monkeypatch.setattr(render, "suggest_juxtaposition", suggest)
+    answer = render.api_juxtaposition(render.JuxtapositionBody(history_id="w", model="test:vision"), {"id": "u"})
+    assert len(seen["candidates"]) == 10 and answer.candidates == 10
+
+
+def test_the_limit_stays_in_its_range_when_saved_and_when_read():
+    # Failure: a limit out of range is saved, or a stored row that says a million, or nothing
+    # usable, offers the model every sentence there is.
+    assert normalize_juxtaposition_settings(None) == {"candidate_limit": 400}
+    assert normalize_juxtaposition_settings({"candidate_limit": 50}) == {"candidate_limit": 50}
+    for stored in (1_000_000, 9, True, "400", None):
+        assert normalize_juxtaposition_settings({"candidate_limit": stored}) == {"candidate_limit": 400}
+    for refused in (9, 1001, "400"):
+        with pytest.raises(ValueError):
+            checked_juxtaposition_limit(refused)
+    assert checked_juxtaposition_limit(10) == 10 and checked_juxtaposition_limit(1000) == 1000
 
 
 def test_the_prompt_lists_every_candidate_with_its_id_and_the_image(monkeypatch):

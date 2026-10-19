@@ -333,11 +333,11 @@ Choosing, saving, and discarding options work as in 8.2.
 
 Choosing `Juxtapose` (marked `LLM`) under `Redraw from the description` in the work-editing menu opens a dialog that adds a sentence from another work's description after this one. Opening it draws nothing.
 
-1. Choose the Vision model that picks the sentences (by default the account's Vision model) and press `Pick sentences`. From the first sentences of the descriptions of your other works, the AI picks four, each with one sentence on how adding it moves the idea of the work.
+1. Choose the Vision model that picks the sentences (by default the account's Vision model) and press `Pick sentences`. From the first sentences of the descriptions of your other works, the AI picks four. Each is shown as its `Sentence` and its `Reason`, one sentence on how adding it moves the idea of the work.
 2. Choosing one shows `The description with the sentence`. `Draw with this description` draws a child of the selected work from Stage 1 and saves it to the lineage, as `Change the description` does. The color catalog, canvas, seeds and Wild come from the original work.
 3. If none fits, press `Pick again`. The sentences shown earlier in this dialog are left out and four are picked again.
 
-Only the descriptions of works you own are candidates; shared works and other people's works are never read. Works in the trash, DDL-authored works, works whose comment says `test data`, and works whose description is held are not used either. Sentences that differ only in spacing or spelling count once. A sentence matching the description of this work or of its lineage, and one this lineage already added by a juxtaposition, is not offered.
+Only the descriptions of works you own are candidates; shared works and other people's works are never read. Works in the trash, DDL-authored works, works whose comment says `test data`, and works whose description is held are not used either. Sentences that differ only in spacing or spelling count once. A sentence matching the description of this work or of its lineage, and one this lineage already added by a juxtaposition, is not offered. At most the administrator's `Most sentences to choose from` (in `Other (server)` of Settings, 400 by default) go to the AI; when there are more candidates, each request draws that many at random from all of them.
 
 `Juxtapose` cannot be chosen for a work whose description is held or for a DDL-authored work, as with `Change the description`.
 

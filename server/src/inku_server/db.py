@@ -122,6 +122,8 @@ _RENDER_CONCURRENCY_SETTINGS_KEY = _settings.RENDER_CONCURRENCY_SETTINGS_KEY
 _RENDER_CONCURRENCY_DEFAULT_SETTINGS = _settings.RENDER_CONCURRENCY_DEFAULT_SETTINGS
 RENDER_CONCURRENCY_MIN = _settings.RENDER_CONCURRENCY_MIN
 RENDER_CONCURRENCY_MAX = _settings.RENDER_CONCURRENCY_MAX
+JUXTAPOSITION_CANDIDATE_MIN = _settings.JUXTAPOSITION_CANDIDATE_MIN
+JUXTAPOSITION_CANDIDATE_MAX = _settings.JUXTAPOSITION_CANDIDATE_MAX
 _RENDER_LIMIT_SETTINGS_KEY = _settings.RENDER_LIMIT_SETTINGS_KEY
 _LOG_RETENTION_SETTINGS_KEY = _settings.LOG_RETENTION_SETTINGS_KEY
 _LOG_RETENTION_DEFAULT_SETTINGS = _settings.LOG_RETENTION_DEFAULT_SETTINGS
@@ -828,6 +830,14 @@ def get_description_meter_settings() -> dict:
 
 def update_description_meter_settings(japanese: bool, english: bool) -> dict:
     return _settings.DescriptionMeterSettingsStore(_app_settings_store()).update(japanese, english)
+
+
+def get_juxtaposition_settings() -> dict:
+    return _settings.JuxtapositionSettingsStore(_app_settings_store()).get()
+
+
+def update_juxtaposition_settings(candidate_limit: int) -> dict:
+    return _settings.JuxtapositionSettingsStore(_app_settings_store()).update(candidate_limit)
 
 
 def get_db_write_lock() -> dict:

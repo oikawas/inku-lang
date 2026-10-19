@@ -12,6 +12,9 @@ refinement study):
   spelling of one poem do not make a new sentence (`same_text`).
 - The candidates are shuffled for every request. The prototype's models leaned
   to the head of a long list, so a fixed order would choose for them.
+- At most the administrator's limit goes out (400 by default; the prototype
+  offered 549, about 18k tokens). Above it, each request draws that many at
+  random.
 - Sentences the lineage already added are left out. The prototype's models kept
   coming back to one sentence across works.
 """
@@ -30,7 +33,6 @@ from .model_settings import provider_for_model
 from .vision_client import vision_connection, vision_text
 
 CHOICES = 4
-CANDIDATE_LIMIT = 600  # the prototype offered 549 sentences, about 18k tokens
 SAME_TEXT = 0.8  # share of two-character pieces at which two sentences are the same one
 
 _SENTENCE = re.compile(r"(.+?(?:[。！？]|[.!?](?=\s|$)))")
@@ -100,9 +102,9 @@ def gather_candidates(
     added: Iterable[str] = (),
     exclude: Iterable[str] = (),
     rng: random.Random | None = None,
-    limit: int = CANDIDATE_LIMIT,
+    limit: int,
 ) -> list[dict[str, Any]]:
-    """Candidate sentences, in a fresh random order.
+    """At most `limit` candidate sentences, in a fresh random order.
 
     `sources` pairs a work id with its description, labels already removed. Only
     sentences in the description's language are offered. A sentence is left out

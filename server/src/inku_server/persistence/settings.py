@@ -116,6 +116,13 @@ DESCRIPTION_METER_DEFAULT_SETTINGS = {"japanese": True, "english": True}
 # of the database is counted and until the service stops for a migration).
 DB_WRITE_LOCK_SETTINGS_KEY = "db_write_lock"
 DB_WRITE_LOCK_DEFAULT_SETTINGS = {"locked": False}
+# How many sentences Juxtaposition hands the model to choose from (the author,
+# 2026-10-19: offering every sentence in the database is a risk). Above the
+# limit, each request draws that many at random from all of them.
+JUXTAPOSITION_SETTINGS_KEY = "juxtaposition_settings"
+JUXTAPOSITION_DEFAULT_SETTINGS = {"candidate_limit": 400}
+JUXTAPOSITION_CANDIDATE_MIN = 10
+JUXTAPOSITION_CANDIDATE_MAX = 1000
 THUMBNAIL_SETTINGS_KEY = "thumbnail_settings"
 # Off by default: the second size doubles the rebuild and roughly quadruples the
 # stored bytes, and is worth neither until someone is looking at the listing on
@@ -456,6 +463,32 @@ def normalize_description_meter_settings(settings: dict | None) -> dict:
     return clean
 
 
+def checked_juxtaposition_limit(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError("candidate_limit must be an integer")
+    if value < JUXTAPOSITION_CANDIDATE_MIN or value > JUXTAPOSITION_CANDIDATE_MAX:
+        raise ValueError(
+            f"candidate_limit must be between {JUXTAPOSITION_CANDIDATE_MIN} and "
+            f"{JUXTAPOSITION_CANDIDATE_MAX}"
+        )
+    return value
+
+
+def normalize_juxtaposition_settings(settings: dict | None) -> dict:
+    """The stored limit, or the default where the stored one cannot be used.
+
+    A value out of range falls back rather than being clamped: a row that says
+    a million must not offer the model every sentence there is.
+    """
+    clean = dict(JUXTAPOSITION_DEFAULT_SETTINGS)
+    if isinstance(settings, dict):
+        try:
+            clean["candidate_limit"] = checked_juxtaposition_limit(settings.get("candidate_limit"))
+        except ValueError:
+            pass
+    return clean
+
+
 def normalize_db_write_lock_settings(settings: dict | None) -> dict:
     clean = dict(DB_WRITE_LOCK_DEFAULT_SETTINGS)
     if isinstance(settings, dict) and isinstance(settings.get("locked"), bool):
@@ -711,6 +744,20 @@ class DescriptionMeterSettingsStore:
     def update(self, japanese: bool, english: bool) -> dict:
         clean = normalize_description_meter_settings({"japanese": japanese, "english": english})
         return self.app_settings.write(DESCRIPTION_METER_SETTINGS_KEY, clean)
+
+
+@dataclass(frozen=True)
+class JuxtapositionSettingsStore:
+    """Read and write how many sentences Juxtaposition offers the model."""
+
+    app_settings: AppSettingsStore
+
+    def get(self) -> dict:
+        return normalize_juxtaposition_settings(self.app_settings.read(JUXTAPOSITION_SETTINGS_KEY))
+
+    def update(self, candidate_limit: int) -> dict:
+        clean = {"candidate_limit": checked_juxtaposition_limit(candidate_limit)}
+        return self.app_settings.write(JUXTAPOSITION_SETTINGS_KEY, clean)
 
 
 @dataclass(frozen=True)

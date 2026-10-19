@@ -290,6 +290,12 @@ class DbWriteLockStatus(BaseModel):
     locked: bool = Field(description="DB への書き込みを伴う要求をすべて断る（管理者の切り替えだけは通す）")
 
 
+class JuxtapositionSettingsStatus(BaseModel):
+    candidate_limit: int = Field(description="取り合わせで AI に渡す一文の上限。超えるときは要求ごとに無作為に選ぶ")
+    min_limit: int
+    max_limit: int
+
+
 class SettingsStatusResponse(BaseModel):
     database: DatabaseSettingsStatus
     db_backup: DbBackupStatus
@@ -301,6 +307,7 @@ class SettingsStatusResponse(BaseModel):
     render_limits: RenderLimitsStatus
     description_meter: DescriptionMeterStatus
     db_write_lock: DbWriteLockStatus
+    juxtaposition: JuxtapositionSettingsStatus
 
 
 @router.get("/api/settings/status", response_model=SettingsStatusResponse)
@@ -338,6 +345,7 @@ def api_settings_status() -> SettingsStatusResponse:
         stage_execution=_stage_execution_status(),
         description_meter=DescriptionMeterStatus(**_db.get_description_meter_settings()),
         db_write_lock=DbWriteLockStatus(**_db.get_db_write_lock()),
+        juxtaposition=_juxtaposition_status(),
     )
 
 
@@ -852,6 +860,27 @@ class DescriptionMeterBody(BaseModel):
 @router.put("/api/settings/description-meter", response_model=DescriptionMeterStatus)
 def api_settings_update_description_meter(body: DescriptionMeterBody) -> DescriptionMeterStatus:
     return DescriptionMeterStatus(**_db.update_description_meter_settings(body.japanese, body.english))
+
+
+def _juxtaposition_status() -> JuxtapositionSettingsStatus:
+    return JuxtapositionSettingsStatus(
+        **_db.get_juxtaposition_settings(),
+        min_limit=_db.JUXTAPOSITION_CANDIDATE_MIN,
+        max_limit=_db.JUXTAPOSITION_CANDIDATE_MAX,
+    )
+
+
+class JuxtapositionSettingsBody(BaseModel):
+    candidate_limit: StrictInt
+
+
+@router.put("/api/settings/juxtaposition", response_model=JuxtapositionSettingsStatus)
+def api_settings_update_juxtaposition(body: JuxtapositionSettingsBody) -> JuxtapositionSettingsStatus:
+    try:
+        _db.update_juxtaposition_settings(body.candidate_limit)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return _juxtaposition_status()
 
 
 class DbWriteLockBody(BaseModel):

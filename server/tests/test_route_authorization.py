@@ -83,7 +83,8 @@ PUBLIC = {  # every entry needs a reason
 #   /api/ground-variants/plan, /api/render-ground-variant,
 #   /api/tool-variants/plan and /api/render-tool-variant (2026-10-14).
 #   +1 for POST /api/refine/juxtaposition, the sentences a juxtaposition offers (2026-10-19).
-EXPECTED_ROUTE_COUNT = 129
+#   +1 for PUT /api/settings/juxtaposition, how many sentences it offers the model (2026-10-19).
+EXPECTED_ROUTE_COUNT = 130
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

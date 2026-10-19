@@ -1,4 +1,11 @@
-//! Numeric position ranges written into a DDL position phrase.
+//! Numeric position ranges and numeric segments written into a DDL position phrase.
+//!
+//! A segment (stage B-2a, the author's decision of 2026-10-19) gives the two
+//! points a row or a line runs between, read as one lexeme in its own language:
+//! Japanese `（画面の）横0.118、縦0.5から横0.882、縦0.5まで` and English
+//! `from horizontal 0.118, vertical 0.5 to horizontal 0.882, vertical 0.5`.
+//! Its values are read as a range's are, and whether its points lie on the
+//! canvas and differ is checked by the geometry analysis.
 //!
 //! A range is read as one lexeme, and only in its own instruction language:
 //!
@@ -106,7 +113,85 @@ pub(crate) fn numeric_range_at(
     }
 }
 
+/// One numeric segment lexeme. `ends` holds the first point and then the second,
+/// each horizontal then vertical. A value is `None` when its spelling cannot be
+/// represented within the value limits.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NumericSegmentLexeme {
+    pub span: SourceSpan,
+    pub ends: [Option<ExactFraction>; 4],
+    pub end_spans: [SourceSpan; 4],
+}
+
+/// Read a numeric segment that starts exactly at `start`, or return `None`.
+pub(crate) fn numeric_segment_at(
+    source: &str,
+    start: usize,
+    language: ResolvedInstructionLanguage,
+) -> Option<NumericSegmentLexeme> {
+    if !source.is_char_boundary(start) || start >= source.len() {
+        return None;
+    }
+    match language {
+        ResolvedInstructionLanguage::Ja => japanese_segment(source, start),
+        ResolvedInstructionLanguage::En => english_segment(source, start),
+    }
+}
+
+/// One point of a segment: its values and their spans, horizontal then vertical.
+struct SegmentPoint {
+    values: [Option<ExactFraction>; 2],
+    spans: [SourceSpan; 2],
+}
+
+fn segment_lexeme(
+    start: usize,
+    end: usize,
+    from: SegmentPoint,
+    to: SegmentPoint,
+) -> NumericSegmentLexeme {
+    NumericSegmentLexeme {
+        span: SourceSpan {
+            start_byte: start,
+            end_byte: end,
+        },
+        ends: [from.values[0], from.values[1], to.values[0], to.values[1]],
+        end_spans: [from.spans[0], from.spans[1], to.spans[0], to.spans[1]],
+    }
+}
+
 // ----- Japanese -------------------------------------------------------------
+
+// `（画面の）横A、縦Bから横C、縦Dまで`, with optional spaces between the parts.
+fn japanese_segment(source: &str, start: usize) -> Option<NumericSegmentLexeme> {
+    if !japanese_keyword_left_boundary(source, start) {
+        return None;
+    }
+    let cursor = source[start..]
+        .strip_prefix("画面の")
+        .map_or(start, |_| start + "画面の".len());
+    let (cursor, from) = japanese_point(source, cursor)?;
+    let cursor = literal(source, skip_japanese_space(source, cursor), "から")?;
+    let (cursor, to) = japanese_point(source, cursor)?;
+    let end = literal(source, skip_japanese_space(source, cursor), "まで")?;
+    Some(segment_lexeme(start, end, from, to))
+}
+
+// `横A、縦B`.
+fn japanese_point(source: &str, start: usize) -> Option<(usize, SegmentPoint)> {
+    let cursor = literal(source, skip_japanese_space(source, start), "横")?;
+    let (cursor, x, x_span) = japanese_number(source, skip_japanese_space(source, cursor))?;
+    let cursor = japanese_axis_separator(source, skip_japanese_space(source, cursor))?;
+    let cursor = literal(source, skip_japanese_space(source, cursor), "縦")?;
+    let (cursor, y, y_span) = japanese_number(source, skip_japanese_space(source, cursor))?;
+    Some((
+        cursor,
+        SegmentPoint {
+            values: [x, y],
+            spans: [x_span, y_span],
+        },
+    ))
+}
 
 fn japanese_numbers_only(source: &str, start: usize) -> Option<NumericRangeLexeme> {
     if !japanese_keyword_left_boundary(source, start) {
@@ -304,6 +389,34 @@ fn followed_by_ni(source: &str, end: usize) -> bool {
 }
 
 // ----- English --------------------------------------------------------------
+
+// `from horizontal A, vertical B to horizontal C, vertical D`.
+fn english_segment(source: &str, start: usize) -> Option<NumericSegmentLexeme> {
+    let cursor = english_word(source, start, "from")?;
+    let (cursor, from) = english_point(source, skip_english_space_required(source, cursor)?)?;
+    let cursor = english_word(source, skip_english_space_required(source, cursor)?, "to")?;
+    let (end, to) = english_point(source, skip_english_space_required(source, cursor)?)?;
+    Some(segment_lexeme(start, end, from, to))
+}
+
+// `horizontal A, vertical B`; the comma is optional, as in a numeric point.
+fn english_point(source: &str, start: usize) -> Option<(usize, SegmentPoint)> {
+    let cursor = english_word(source, start, "horizontal")?;
+    let (cursor, x, x_span) = english_number(source, skip_english_space_required(source, cursor)?)?;
+    let mut cursor = skip_english_space(source, cursor);
+    if source[cursor..].starts_with(',') {
+        cursor = skip_english_space(source, cursor + 1);
+    }
+    let cursor = english_word(source, cursor, "vertical")?;
+    let (cursor, y, y_span) = english_number(source, skip_english_space_required(source, cursor)?)?;
+    Some((
+        cursor,
+        SegmentPoint {
+            values: [x, y],
+            spans: [x_span, y_span],
+        },
+    ))
+}
 
 fn english_numbers_only(source: &str, start: usize) -> Option<NumericRangeLexeme> {
     if !english_follows_place_preposition(source, start) {
@@ -746,5 +859,135 @@ mod tests {
         let lexeme = read(source, "右下", ResolvedInstructionLanguage::Ja).unwrap();
         assert_eq!(lexeme.bounds[0], None);
         assert_eq!(lexeme.bounds[3], None);
+    }
+
+    fn segment(
+        source: &str,
+        start_text: &str,
+        language: ResolvedInstructionLanguage,
+    ) -> Option<NumericSegmentLexeme> {
+        let start = source
+            .find(start_text)
+            .expect("the start text is in the source");
+        numeric_segment_at(source, start, language)
+    }
+
+    /// Stage B-2a: a segment gives the two points a row or a line runs between,
+    /// with or without the canvas, with any axis separator, full-width digits,
+    /// fractions and spaces, as a range does. It ends at まで.
+    #[test]
+    fn a_japanese_segment_reads_its_two_points() {
+        let source = "画面の横0.118、縦0.5から横0.882、縦0.5まで、半径0.03の青の円を5個並べる。";
+        let lexeme = segment(source, "画面の", ResolvedInstructionLanguage::Ja).unwrap();
+        assert_eq!(
+            lexeme.ends,
+            [
+                fraction(118, 1000),
+                fraction(1, 2),
+                fraction(882, 1000),
+                fraction(1, 2)
+            ]
+        );
+        assert_eq!(
+            &source[..lexeme.span.end_byte],
+            "画面の横0.118、縦0.5から横0.882、縦0.5まで"
+        );
+        assert_eq!(
+            &source[lexeme.end_spans[2].start_byte..lexeme.end_spans[2].end_byte],
+            "0.882"
+        );
+        assert_eq!(
+            segment(source, "画面の", ResolvedInstructionLanguage::En),
+            None
+        );
+        let bare = "横１／３, 縦0 から 横2/3，縦１まで、灰の鉛筆の線を1本引く。";
+        let lexeme = segment(bare, "横", ResolvedInstructionLanguage::Ja).unwrap();
+        assert_eq!(
+            lexeme.ends,
+            [
+                fraction(1, 3),
+                fraction(0, 1),
+                fraction(2, 3),
+                fraction(1, 1)
+            ]
+        );
+        assert!(bare[lexeme.span.end_byte..].starts_with('、'));
+    }
+
+    /// A point, a range, a segment without its second point or its まで, and a
+    /// segment in the middle of a word are not segments.
+    #[test]
+    fn a_japanese_point_or_range_is_not_a_segment() {
+        let ja = ResolvedInstructionLanguage::Ja;
+        for (source, start) in [
+            ("画面の横0.5、縦0.5の位置に、赤い円を1個置く。", "画面の"),
+            (
+                "画面の横0.2〜0.8、縦0.3〜0.6の範囲に、円を5個並べる。",
+                "画面の",
+            ),
+            ("画面の横0.1、縦0.5から右へ、円を5個並べる。", "画面の"),
+            (
+                "画面の横0.1、縦0.5から横0.9、縦0.5、円を5個並べる。",
+                "画面の",
+            ),
+            (
+                "赤い横0.1、縦0.5から横0.9、縦0.5まで、円を5個並べる。",
+                "横",
+            ),
+        ] {
+            assert_eq!(segment(source, start, ja), None, "{source}");
+        }
+    }
+
+    /// English: `from horizontal A, vertical B to horizontal C, vertical D`, in
+    /// any letter case, with the comma between the axes optional as in a point.
+    #[test]
+    fn an_english_segment_reads_its_two_points() {
+        let en = ResolvedInstructionLanguage::En;
+        let source = "Line up 5 blue circles radius 0.03 from horizontal 0.118, vertical 0.5 to horizontal 0.882, vertical 0.5.";
+        let lexeme = segment(source, "from", en).unwrap();
+        assert_eq!(
+            lexeme.ends,
+            [
+                fraction(118, 1000),
+                fraction(1, 2),
+                fraction(882, 1000),
+                fraction(1, 2)
+            ]
+        );
+        assert!(source[lexeme.span.end_byte..].starts_with('.'));
+        assert_eq!(
+            segment(source, "from", ResolvedInstructionLanguage::Ja),
+            None
+        );
+        let loose =
+            "Draw one gray line From Horizontal 1/10 vertical 0.1 TO horizontal 0.9 vertical 0.9.";
+        let lexeme = segment(loose, "From", en).unwrap();
+        assert_eq!(
+            lexeme.ends,
+            [
+                fraction(1, 10),
+                fraction(1, 10),
+                fraction(9, 10),
+                fraction(9, 10)
+            ]
+        );
+        for (source, start) in [
+            (
+                "Place one red circle at horizontal 0.5, vertical 0.3.",
+                "at",
+            ),
+            ("Draw smoke from the chimney to the sky.", "from"),
+            (
+                "Draw one line from horizontal 0.1, vertical 0.5 to the edge.",
+                "from",
+            ),
+            (
+                "Draw one line fromhorizontal 0.1, vertical 0.5 to horizontal 0.9, vertical 0.5.",
+                "from",
+            ),
+        ] {
+            assert_eq!(segment(source, start, en), None, "{source}");
+        }
     }
 }

@@ -262,6 +262,7 @@ fn project_source_instruction<'a>(
             .map(|term| (&term.identity).into()),
         numeric_position: instruction.entity.numeric_position.as_ref(),
         numeric_range: instruction.entity.numeric_range.as_ref(),
+        numeric_segment: instruction.entity.numeric_segment.as_ref(),
         generated_position: None,
         generated_geometries: [None; 6],
         has_named_position: instruction.position.is_some(),
@@ -544,8 +545,11 @@ fn checked_object_relation(
         touching_constraints: touching.then_some(TouchingConstraints {
             dimensions_fixed: input.exact_geometry().is_some()
                 || input.relative_scale.is_some()
-                || input.proportion_width_extent.is_some(),
-            direction_fixed: input.angle.is_some() || input.proportion_arc_form.is_some(),
+                || input.proportion_width_extent.is_some()
+                || input.numeric_segment.is_some(),
+            direction_fixed: input.angle.is_some()
+                || input.proportion_arc_form.is_some()
+                || input.numeric_segment.is_some(),
         }),
     })
 }
@@ -1464,6 +1468,7 @@ fn macro_caller_has_unbound_geometry(instruction: &SemanticInstruction) -> bool 
         || instruction.entity.explicit_geometry.is_some()
         || instruction.entity.numeric_position.is_some()
         || instruction.entity.numeric_range.is_some()
+        || instruction.entity.numeric_segment.is_some()
         || instruction.entity.angle.is_some()
         || instruction.entity.fluctuation.amplitude.is_some()
         || instruction.entity.fluctuation.frequency.is_some()
@@ -1755,6 +1760,7 @@ fn project_macro_emit<'a>(
         action,
         numeric_position: None,
         numeric_range: None,
+        numeric_segment: None,
         has_named_position: place.is_some(),
         named_position: place,
         explicit_geometry: None,
@@ -4429,6 +4435,13 @@ fn source_span_for_gap(
                 .as_ref()
                 .map(|action| action.provenance.source.span)
         }
+        ScoreFieldGap::UnsupportedNumericSegment | ScoreFieldGap::NumericSegmentConflict => {
+            instruction
+                .entity
+                .numeric_segment
+                .as_ref()
+                .map(|segment| segment.source().span)
+        }
         ScoreFieldGap::NamedAndNumericPositionConflict
         | ScoreFieldGap::UnsupportedNamedPosition
         | ScoreFieldGap::UnsupportedNumericRange
@@ -4451,6 +4464,13 @@ fn source_span_for_gap(
                     .numeric_range
                     .as_ref()
                     .map(|range| range.source().span)
+            })
+            .or_else(|| {
+                instruction
+                    .entity
+                    .numeric_segment
+                    .as_ref()
+                    .map(|segment| segment.source().span)
             }),
         ScoreFieldGap::NonPositiveDimension
         | ScoreFieldGap::GeometryRepresentationLimit
@@ -4649,7 +4669,8 @@ fn macro_key_for_gap(gap: &ScoreFieldGap) -> Option<String> {
         ScoreFieldGap::UnsupportedLayoutDirection { .. } => Some("layout_direction".to_owned()),
         ScoreFieldGap::MissingNumericPosition
         | ScoreFieldGap::UnsupportedNamedPosition
-        | ScoreFieldGap::UnsupportedNumericRange => Some("place".to_owned()),
+        | ScoreFieldGap::UnsupportedNumericRange
+        | ScoreFieldGap::UnsupportedNumericSegment => Some("place".to_owned()),
         ScoreFieldGap::ExactCountZero { .. }
         | ScoreFieldGap::ExactCountExceedsScoreRange { .. }
         | ScoreFieldGap::RepeatedCountUnsupported { .. }
@@ -4725,6 +4746,7 @@ struct ScoreLoweringInput<'a> {
     action: Option<SemanticInputIdentity<'a>>,
     numeric_position: Option<&'a SemanticNumericPosition>,
     numeric_range: Option<&'a crate::SemanticNumericRange>,
+    numeric_segment: Option<&'a crate::SemanticNumericSegment>,
     has_named_position: bool,
     named_position: Option<SemanticInputIdentity<'a>>,
     explicit_geometry: Option<&'a SemanticExplicitGeometry>,
@@ -4739,7 +4761,7 @@ struct ScoreLoweringInput<'a> {
 
 impl<'a> ScoreLoweringInput<'a> {
     fn position_authority(self) -> ConnectedPositionAuthority {
-        if self.exact_position().is_some() {
+        if self.exact_position().is_some() || self.numeric_segment.is_some() {
             ConnectedPositionAuthority::NumericFixed
         } else {
             ConnectedPositionAuthority::NamedMovable
@@ -4794,6 +4816,7 @@ fn lower_complete_instruction(
         ScorePlacement::Named(region) => {
             lower_named_geometry(resolved.dimensions, region, context.canvas_format)
         }
+        ScorePlacement::Segment(ends) => lower_segment_geometry(ends),
     }
     .map_err(|gap| vec![gap])?;
     Ok(instruction_from_resolved_geometry(
@@ -4818,6 +4841,10 @@ pub(crate) fn lower_resolved_object_template(
         PlacementRecipe::FillUniformInRegionAndClip { .. }
     ) {
         lower_named_geometry(object.dimensions, [0.5; 4], context.canvas_format)?
+    } else if let (Some(ends), PlacementRecipe::Place) = (object.segment, &object.recipe) {
+        // One line between two points; its anchor is their middle, so the
+        // performer leaves it where it is.
+        lower_segment_geometry(ends)?
     } else {
         match &object.anchor {
             ObjectAnchor::Numeric(position) => lower_numeric_geometry(
@@ -4920,11 +4947,20 @@ fn resolve_object_plan(
         ];
         let mut default_line_axis = [1, 0];
         let mut line_up_range = None;
+        let mut segment = None;
         let anchor = match resolved.placement {
             ScorePlacement::Numeric(position) => input
                 .numeric_position
                 .map(|source| ObjectAnchor::Numeric(Box::new(source.clone())))
                 .unwrap_or(ObjectAnchor::GeneratedNumeric(position)),
+            ScorePlacement::Segment(ends) => {
+                // The middle of the two points, as one point of a range: the
+                // centroid of a row or of a line goes there (stage B-2a).
+                segment = Some(ends);
+                let x = reduced_ratio(ends[0].add(ends[2])?.div_i128(2)?).to_f64()?;
+                let y = reduced_ratio(ends[1].add(ends[3])?.div_i128(2)?).to_f64()?;
+                ObjectAnchor::Named([x, y, x, y])
+            }
             ScorePlacement::Named(region) => {
                 // A group member keeps the group's placement; only the group
                 // distributes over the range.
@@ -4972,6 +5008,22 @@ fn resolve_object_plan(
         };
         let recipe = if let Some(recipe) = fill_recipe {
             recipe
+        } else if let Some(ends) = segment.filter(|_| resolved.action == PlacementAction::LineUp) {
+            // A row between two points: n cells along a horizontal or vertical
+            // row, as a named row's cells divide the canvas; the canvas for
+            // any other row.
+            let recipe =
+                segment_row_recipe(segment_span(ends, context.canvas_format)?, u64::from(n))?;
+            match &recipe {
+                PlacementRecipe::HorizontalLine { cell_width } => {
+                    domain[0] = reduced_ratio(cell_width.mul_i128(n.into())?);
+                }
+                PlacementRecipe::VerticalLine { cell_height } => {
+                    domain[1] = reduced_ratio(cell_height.mul_i128(n.into())?);
+                }
+                _ => {}
+            }
+            recipe
         } else {
             placement_recipe(
                 resolved.action,
@@ -5018,6 +5070,7 @@ fn resolve_object_plan(
             anchor,
             domain,
             recipe,
+            segment,
             relation: None,
         })
     };
@@ -5135,6 +5188,9 @@ fn resolve_fill_group(
         if instruction.entity.numeric_range.is_some() {
             return Err(ScoreFieldGap::UnsupportedNumericRange);
         }
+        if instruction.entity.numeric_segment.is_some() {
+            return Err(ScoreFieldGap::UnsupportedNumericSegment);
+        }
         let count = instruction
             .entity
             .quantity
@@ -5190,6 +5246,9 @@ fn prepare_single_macro_fill(
     }
     if instruction.entity.numeric_range.is_some() {
         return Err(ScoreFieldGap::UnsupportedNumericRange);
+    }
+    if instruction.entity.numeric_segment.is_some() {
+        return Err(ScoreFieldGap::UnsupportedNumericSegment);
     }
     let count = instruction
         .entity
@@ -5470,6 +5529,9 @@ fn resolve_fill_region(
                 return Err(ScoreFieldGap::InvalidFillTarget);
             }
             let entity = &instruction.entity;
+            if entity.numeric_segment.is_some() {
+                return Err(ScoreFieldGap::UnsupportedNumericSegment);
+            }
             let SemanticHead::Primitive(term) = &entity.head else {
                 return Err(ScoreFieldGap::InvalidFillTarget);
             };
@@ -6140,16 +6202,25 @@ fn resolve_complete_object<'a>(
         gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
     }
     let range_use = range_use_for(action, count);
-    // A word, a point, and a range each say where the mark goes; two of them
-    // together are a conflict.
+    // A word, a point, a range, and two points each say where the mark goes;
+    // two of them together are a conflict.
     let position_sources = usize::from(input.has_named_position)
         + usize::from(input.exact_position().is_some())
-        + usize::from(input.numeric_range.is_some());
+        + usize::from(input.numeric_range.is_some())
+        + usize::from(input.numeric_segment.is_some());
     let named_region = if input.numeric_range.is_some() && input.group_region.is_some() {
         gaps.push(ScoreFieldGap::UnsupportedNumericRange);
         None
+    } else if input.numeric_segment.is_some() && input.group_region.is_some() {
+        gaps.push(ScoreFieldGap::UnsupportedNumericSegment);
+        None
     } else if position_sources > 1 {
         gaps.push(ScoreFieldGap::NamedAndNumericPositionConflict);
+        None
+    } else if input.numeric_segment.is_some() {
+        if let Some(gap) = numeric_segment_gap(input, primitive, action, count) {
+            gaps.push(gap);
+        }
         None
     } else if let Some(region) = input.group_region {
         Some(region)
@@ -6262,9 +6333,12 @@ fn resolve_complete_object<'a>(
         return Err(gaps);
     }
 
-    let placement = match (input.exact_position(), named_region) {
-        (Some(position), None) => ScorePlacement::Numeric(position),
-        (None, Some(region)) => ScorePlacement::Named(region),
+    let placement = match (input.exact_position(), named_region, input.numeric_segment) {
+        (Some(position), None, None) => ScorePlacement::Numeric(position),
+        (None, Some(region), None) => ScorePlacement::Named(region),
+        (None, None, Some(segment)) => {
+            ScorePlacement::Segment(segment_ends(segment).map_err(|gap| vec![gap])?)
+        }
         _ => unreachable!("checked position authority"),
     };
     let (dimensions, _) =
@@ -6460,6 +6534,101 @@ fn distribution_anchor(action: PlacementAction, range: [f64; 4]) -> [f64; 4] {
     [x, y, x, y]
 }
 
+/// What two points written in numbers cannot do here (stage B-2a, the
+/// author's decision of 2026-10-19). They set the ends of a row of two marks
+/// or more, or of one line or free line drawn between them, so they leave no
+/// room for a row's direction word, or for a line's length, size or direction.
+fn numeric_segment_gap(
+    input: ScoreLoweringInput<'_>,
+    primitive: Primitive,
+    action: PlacementAction,
+    count: u32,
+) -> Option<ScoreFieldGap> {
+    match action {
+        PlacementAction::LineUp if count > 1 => input
+            .layout_direction
+            .is_some()
+            .then_some(ScoreFieldGap::NumericSegmentConflict),
+        PlacementAction::Place
+            if count == 1 && matches!(primitive, Primitive::Line | Primitive::FreeLine) =>
+        {
+            let sized = input.explicit_geometry.is_some()
+                || !input.additional_explicit_geometries.is_empty()
+                || input.relative_scale.is_some()
+                || !input.additional_relative_scales.is_empty()
+                || input.proportion_width_extent.is_some()
+                || !input.additional_width_extents.is_empty();
+            (sized || input.angle.is_some()).then_some(ScoreFieldGap::NumericSegmentConflict)
+        }
+        _ => Some(ScoreFieldGap::UnsupportedNumericSegment),
+    }
+}
+
+/// The two points of a numeric segment as exact canvas fractions.
+fn segment_ends(segment: &crate::SemanticNumericSegment) -> Result<[Rational; 4], ScoreFieldGap> {
+    let mut ends = [Rational::from_ratio(0, 1)?; 4];
+    for (output, (numerator, denominator)) in ends.iter_mut().zip(segment.rational_ends()) {
+        *output = Rational::from_ratio(i128::from(numerator), i128::from(denominator))?;
+    }
+    Ok(ends)
+}
+
+/// From the first point of a segment to the second, in canvas-short-edge units.
+pub(crate) fn segment_span(
+    ends: [Rational; 4],
+    canvas: CanvasFormat,
+) -> Result<[Rational; 2], ScoreFieldGap> {
+    let (width, height) = canvas.integer_ratio();
+    let short = width.min(height);
+    Ok([
+        reduced_ratio(
+            ends[2]
+                .sub(ends[0])?
+                .mul_ratio(width.into(), short.into())?,
+        ),
+        reduced_ratio(
+            ends[3]
+                .sub(ends[1])?
+                .mul_ratio(height.into(), short.into())?,
+        ),
+    ])
+}
+
+/// The recipe of a row of `n` marks between two points written in numbers:
+/// the first mark on the first point, the last on the second, and equal steps
+/// between; a single mark is translated to the middle. A row along an axis,
+/// written left to right or top to bottom, is a horizontal or vertical line;
+/// any other row steps from the first point to the second.
+pub(crate) fn segment_row_recipe(
+    span: [Rational; 2],
+    n: u64,
+) -> Result<PlacementRecipe, ScoreFieldGap> {
+    let intervals = i128::from(n.max(2) - 1);
+    let x = reduced_ratio(span[0].div_i128(intervals)?);
+    let y = reduced_ratio(span[1].div_i128(intervals)?);
+    Ok(match (x.numerator().signum(), y.numerator().signum()) {
+        (1, 0) => PlacementRecipe::HorizontalLine { cell_width: x },
+        (0, 1) => PlacementRecipe::VerticalLine { cell_height: y },
+        _ => PlacementRecipe::DiagonalLine { step: [x, y] },
+    })
+}
+
+/// A line drawn between two points written in numbers: from the first to the
+/// second, with no rotation.
+fn lower_segment_geometry(ends: [Rational; 4]) -> Result<LoweredGeometry, ScoreFieldGap> {
+    Ok(LoweredGeometry {
+        from: Some(Point::new(ends[0].to_f64()?, ends[1].to_f64()?)),
+        to: Some(Point::new(ends[2].to_f64()?, ends[3].to_f64()?)),
+        center: None,
+        radius: None,
+        position: None,
+        size: None,
+        angle_start: None,
+        angle_end: None,
+        at: None,
+    })
+}
+
 fn surface_spec_from_identity(
     identity: SemanticInputIdentity<'_>,
 ) -> Result<SurfaceSpec, ScoreFieldGap> {
@@ -6592,6 +6761,9 @@ struct LoweredGeometry {
 enum ScorePlacement {
     Numeric(crate::geometry::ExactPosition),
     Named([f64; 4]),
+    /// Two points written in numbers, in canvas fractions: horizontal and
+    /// vertical of the first point, then of the second.
+    Segment([Rational; 4]),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -91,6 +91,12 @@ pub enum ScoreFieldGap {
     /// A range written in numbers where no shared range path delivers it yet:
     /// a Macro caller, or a member of a coordinated group.
     UnsupportedNumericRange,
+    /// Two points written in numbers where they set neither a row's ends nor
+    /// a line's ends: one mark, a scatter, tile or fill, or a group member.
+    UnsupportedNumericSegment,
+    /// Two points written in numbers together with a word they already
+    /// decide: a line's length, size or direction, or a row's direction.
+    NumericSegmentConflict,
     UnsupportedInstructionMeaning,
     UnsupportedRelation {
         kind: SemanticRelationKind,

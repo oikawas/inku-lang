@@ -462,6 +462,9 @@ pub struct SemanticEntity {
     pub numeric_position: Option<SemanticNumericPosition>,
     /// A position range written in numbers; exclusive with `numeric_position`.
     pub numeric_range: Option<crate::SemanticNumericRange>,
+    /// Two points written in numbers that a row or a line runs between (stage
+    /// B-2a); exclusive with `numeric_position` and `numeric_range`.
+    pub numeric_segment: Option<crate::SemanticNumericSegment>,
     pub touch: Option<SemanticTerm>,
     pub continuity: Option<SemanticTerm>,
     pub angle: Option<SemanticTerm>,
@@ -491,6 +494,7 @@ pub enum OwnedSemanticOccurrence {
     ExplicitGeometry(SemanticExplicitGeometry),
     NumericPosition(SemanticNumericPosition),
     NumericRange(crate::SemanticNumericRange),
+    NumericSegment(crate::SemanticNumericSegment),
     Touch(SemanticTerm),
     Continuity(SemanticTerm),
     Angle(SemanticTerm),
@@ -519,6 +523,7 @@ impl OwnedSemanticOccurrence {
             Self::ExplicitGeometry(geometry) => geometry.source(),
             Self::NumericPosition(position) => position.source(),
             Self::NumericRange(range) => range.source(),
+            Self::NumericSegment(segment) => segment.source(),
         }
     }
 
@@ -534,6 +539,7 @@ impl OwnedSemanticOccurrence {
             | Self::ExplicitGeometry(_)
             | Self::NumericPosition(_)
             | Self::NumericRange(_)
+            | Self::NumericSegment(_)
             | Self::Touch(_)
             | Self::Continuity(_)
             | Self::Angle(_)
@@ -560,6 +566,7 @@ pub enum SemanticAssociationIssueKind {
     IncompleteNumericGeometry,
     IncompleteNumericPosition,
     InvalidNumericRange,
+    InvalidNumericSegment,
     UnownedExactDecimal,
     ConflictingTouches,
     ConflictingContinuities,
@@ -600,6 +607,7 @@ impl SemanticAssociationIssueKind {
             Self::IncompleteNumericGeometry => "incomplete_numeric_geometry",
             Self::IncompleteNumericPosition => "incomplete_numeric_position",
             Self::InvalidNumericRange => "invalid_numeric_range",
+            Self::InvalidNumericSegment => "invalid_numeric_segment",
             Self::UnownedExactDecimal => "unowned_exact_decimal",
             Self::ConflictingTouches => "conflicting_touches",
             Self::ConflictingContinuities => "conflicting_continuities",
@@ -1714,6 +1722,7 @@ struct AssociationRegion {
     explicit_geometries: Vec<SemanticExplicitGeometry>,
     numeric_positions: Vec<SemanticNumericPosition>,
     numeric_ranges: Vec<crate::SemanticNumericRange>,
+    numeric_segments: Vec<crate::SemanticNumericSegment>,
     touches: Vec<SemanticTerm>,
     continuities: Vec<SemanticTerm>,
     angles: Vec<SemanticTerm>,
@@ -2274,6 +2283,7 @@ fn build_semantic_entities(
         owned_occurrence_count += geometry_analysis.geometries.len();
         owned_occurrence_count += geometry_analysis.positions.len();
         owned_occurrence_count += geometry_analysis.ranges.len();
+        owned_occurrence_count += geometry_analysis.segments.len();
         regions
             .entry(region_index)
             .or_default()
@@ -2289,6 +2299,11 @@ fn build_semantic_entities(
             .or_default()
             .numeric_ranges
             .extend(geometry_analysis.ranges);
+        regions
+            .entry(region_index)
+            .or_default()
+            .numeric_segments
+            .extend(geometry_analysis.segments);
         for geometry_issue in geometry_analysis.issues {
             let kind = match geometry_issue.kind {
                 GeometrySyntaxIssueKind::IncompleteGeometry => {
@@ -2302,6 +2317,9 @@ fn build_semantic_entities(
                 }
                 GeometrySyntaxIssueKind::InvalidRange => {
                     SemanticAssociationIssueKind::InvalidNumericRange
+                }
+                GeometrySyntaxIssueKind::InvalidSegment => {
+                    SemanticAssociationIssueKind::InvalidNumericSegment
                 }
             };
             issues.push(SemanticAssociationIssue {
@@ -2815,6 +2833,11 @@ fn associate_fill_geometry_ownership(
                     ownership.insert(head.source().span, range.source().span);
                 }
             }
+            for segment in &region.numeric_segments {
+                if within(segment.source().span) {
+                    ownership.insert(head.source().span, segment.source().span);
+                }
+            }
         }
     }
 }
@@ -3245,6 +3268,12 @@ fn associate_region(
                     .drain(..)
                     .map(OwnedSemanticOccurrence::NumericRange),
             )
+            .chain(
+                region
+                    .numeric_segments
+                    .drain(..)
+                    .map(OwnedSemanticOccurrence::NumericSegment),
+            )
             .chain(region.touches.drain(..).map(OwnedSemanticOccurrence::Touch))
             .chain(
                 region
@@ -3321,6 +3350,12 @@ fn associate_region(
                     .drain(..)
                     .map(OwnedSemanticOccurrence::NumericRange),
             )
+            .chain(
+                region
+                    .numeric_segments
+                    .drain(..)
+                    .map(OwnedSemanticOccurrence::NumericSegment),
+            )
             .chain(region.touches.drain(..).map(OwnedSemanticOccurrence::Touch))
             .chain(
                 region
@@ -3359,6 +3394,9 @@ fn associate_region(
     owned_region
         .numeric_ranges
         .append(&mut region.numeric_ranges);
+    owned_region
+        .numeric_segments
+        .append(&mut region.numeric_segments);
     let occurrences = take_all_modifier_occurrences(&mut region);
     if !occurrences.is_empty() {
         issues.push(SemanticAssociationIssue {
@@ -3445,15 +3483,17 @@ fn associate_region(
         take_size_candidates(owned_region.relative_scales);
     let (explicit_geometry, additional_explicit_geometries) =
         take_size_candidates(owned_region.explicit_geometries);
-    // A point and a range both say where the mark goes, so one of either is
-    // allowed and any second one is a conflict.
-    let (numeric_position, numeric_range) = match (
+    // A point, a range and a segment each say where the mark goes, so one of
+    // them is allowed and any second one is a conflict.
+    let (numeric_position, numeric_range, numeric_segment) = match (
         owned_region.numeric_positions.len(),
         owned_region.numeric_ranges.len(),
+        owned_region.numeric_segments.len(),
     ) {
-        (0, 0) => (None, None),
-        (1, 0) => (owned_region.numeric_positions.pop(), None),
-        (0, 1) => (None, owned_region.numeric_ranges.pop()),
+        (0, 0, 0) => (None, None, None),
+        (1, 0, 0) => (owned_region.numeric_positions.pop(), None, None),
+        (0, 1, 0) => (None, owned_region.numeric_ranges.pop(), None),
+        (0, 0, 1) => (None, None, owned_region.numeric_segments.pop()),
         _ => {
             let mut occurrences = owned_region
                 .numeric_positions
@@ -3465,6 +3505,12 @@ fn associate_region(
                         .into_iter()
                         .map(OwnedSemanticOccurrence::NumericRange),
                 )
+                .chain(
+                    owned_region
+                        .numeric_segments
+                        .into_iter()
+                        .map(OwnedSemanticOccurrence::NumericSegment),
+                )
                 .collect::<Vec<_>>();
             occurrences.sort_by_key(|occurrence| occurrence.source().span.start_byte);
             issues.push(SemanticAssociationIssue {
@@ -3474,7 +3520,7 @@ fn associate_region(
                 causal_provenance: SemanticIssueCausalProvenance::Unattributed,
                 upstream_diagnostic: None,
             });
-            (None, None)
+            (None, None, None)
         }
     };
     let touch = select_term(
@@ -3608,6 +3654,7 @@ fn associate_region(
         additional_width_extents,
         numeric_position,
         numeric_range,
+        numeric_segment,
         touch,
         continuity,
         angle,
@@ -3677,6 +3724,12 @@ fn take_all_modifier_occurrences(region: &mut AssociationRegion) -> Vec<OwnedSem
                 .drain(..)
                 .map(OwnedSemanticOccurrence::NumericRange),
         )
+        .chain(
+            region
+                .numeric_segments
+                .drain(..)
+                .map(OwnedSemanticOccurrence::NumericSegment),
+        )
         .chain(region.touches.drain(..).map(OwnedSemanticOccurrence::Touch))
         .chain(
             region
@@ -3729,6 +3782,13 @@ fn take_pre_head_region(
                 .into_iter()
                 .partition(|range| ownership.owns(&head, range.source().span));
             region.numeric_ranges = remaining;
+            owned
+        },
+        numeric_segments: {
+            let (owned, remaining) = std::mem::take(&mut region.numeric_segments)
+                .into_iter()
+                .partition(|segment| ownership.owns(&head, segment.source().span));
+            region.numeric_segments = remaining;
             owned
         },
         touches: take_owned_terms(&mut region.touches, &head, ownership),
@@ -4130,6 +4190,7 @@ fn entity_occurrence_count(entity: &SemanticEntity) -> usize {
         + entity.additional_width_extents.len()
         + usize::from(entity.numeric_position.is_some())
         + usize::from(entity.numeric_range.is_some())
+        + usize::from(entity.numeric_segment.is_some())
         + usize::from(entity.touch.is_some())
         + usize::from(entity.continuity.is_some())
         + usize::from(entity.angle.is_some())
@@ -4315,6 +4376,13 @@ pub(crate) fn semantic_entity_value(entity: &SemanticEntity) -> Value {
             semantic_numeric_range_value(range),
         );
     }
+    // Absent from older records, so an entity without a segment keeps its bytes.
+    if let Some(segment) = &entity.numeric_segment {
+        record.insert(
+            "numeric_segment".to_owned(),
+            semantic_numeric_segment_value(segment),
+        );
+    }
     record.insert(
         "proportion".to_owned(),
         semantic_proportion_value(&entity.proportion),
@@ -4464,6 +4532,35 @@ pub(crate) fn semantic_numeric_range_value(range: &crate::SemanticNumericRange) 
                 })
                 .collect(),
         ),
+    );
+    Value::Object(record.into_iter().collect())
+}
+
+/// The meaning of a numeric segment: its two points, each horizontal then
+/// vertical as exact fractions.
+pub(crate) fn semantic_numeric_segment_value(segment: &crate::SemanticNumericSegment) -> Value {
+    let fraction = |value: crate::ExactFraction| {
+        let mut fraction = BTreeMap::new();
+        fraction.insert(
+            "denominator".to_owned(),
+            Value::String(value.denominator().to_string()),
+        );
+        fraction.insert(
+            "numerator".to_owned(),
+            Value::String(value.numerator().to_string()),
+        );
+        Value::Object(fraction.into_iter().collect())
+    };
+    let [x0, y0, x1, y1] = segment.ends;
+    let mut record = BTreeMap::new();
+    record.insert("basis".to_owned(), Value::String("canvas_axes".to_owned()));
+    record.insert(
+        "from".to_owned(),
+        Value::Array(vec![fraction(x0), fraction(y0)]),
+    );
+    record.insert(
+        "to".to_owned(),
+        Value::Array(vec![fraction(x1), fraction(y1)]),
     );
     Value::Object(record.into_iter().collect())
 }

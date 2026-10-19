@@ -972,7 +972,7 @@ fn plan_size_id(value: CoreModifierValue) -> Option<String> {
 /// line-up direction. An alternate composition reads these from the visible
 /// instructions alone (draw-system05, 2026-10-04). `None` for an instruction a
 /// plan does not write: a Macro word, a relation, a sequence, a fill of a
-/// shape, a numeric point, or a value outside the plan's words.
+/// shape, a numeric point or segment, or a value outside the plan's words.
 #[must_use]
 pub fn composition_layer(instruction: &crate::SemanticInstruction) -> Option<WorkPlanLayer> {
     let entity = &instruction.entity;
@@ -983,6 +983,7 @@ pub fn composition_layer(instruction: &crate::SemanticInstruction) -> Option<Wor
         || instruction.sequence.is_some()
         || instruction.fill_target.is_some()
         || entity.numeric_position.is_some()
+        || entity.numeric_segment.is_some()
         || !entity.additional_relative_scales.is_empty()
     {
         return None;

@@ -430,6 +430,9 @@ pub struct ObjectPlacementPlan {
     pub(crate) anchor: ObjectAnchor,
     pub(crate) domain: [Rational; 2],
     pub(crate) recipe: PlacementRecipe,
+    /// Two points written in numbers, in canvas fractions: a line placed
+    /// alone runs between them, and a row puts its first and last mark there.
+    pub(crate) segment: Option<[Rational; 4]>,
     pub(crate) relation: Option<PlanRelation>,
 }
 
@@ -512,6 +515,10 @@ impl ObjectPlacementPlan {
     }
     pub fn recipe(&self) -> &PlacementRecipe {
         &self.recipe
+    }
+    /// Two points written in numbers that a line or a row runs between.
+    pub fn segment(&self) -> Option<[Rational; 4]> {
+        self.segment
     }
     pub fn relation(&self) -> Option<&PlanRelation> {
         self.relation.as_ref()

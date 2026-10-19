@@ -367,13 +367,21 @@
 # `赤い太筆の長さ0.6の線` keeps 赤い and 太筆, and `赤い長さ0.6の線` and
 # `大きな長さ0.6の線` are read instead of left as an unresolved clause. No
 # saved work changes (the 4,712 works of the 2026-10-14 5173 export).
-DDL_ENGINE_VERSION = "64"
+# 65: Two points written in numbers (`横0.118、縦0.5から横0.882、縦0.5まで`,
+# `from horizontal 0.118, vertical 0.5 to horizontal 0.882, vertical 0.5`)
+# set the ends of a row or of a line: a row of two marks or more puts its
+# first and last mark on them in equal steps, and one line or free line runs
+# from the first to the second. Such a sentence was an unresolved clause. No
+# saved work changes (the 4,712 works of the 2026-10-14 5173 export).
+DDL_ENGINE_VERSION = "65"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
 # them and Stage 1 offers them. This follows the same rule version 2 followed for the
 # thinness word: the language version rises when its vocabulary grows, not when its
 # grammar changes. Works saved earlier keep the version they were written under.
+# (Since 13, an added grammar raises it as well, as SPEC states: grammar or
+# vocabulary added, changed, or retired.)
 # 4 (2026-09-07): 点 / point joins the independent shape vocabulary. Japanese
 # 点 remains the existing stipple surface when phrase ownership attaches it to
 # another explicit shape; a standalone shape head owns the new point identity.
@@ -415,4 +423,7 @@ DDL_ENGINE_VERSION = "64"
 # 20 (2026-10-19): A Japanese modifier may stand before a numeric size
 # (`赤い太筆の長さ0.6の線`, `赤い半径0.1の円`, `赤い幅0.3、高さ0.2の四角`)
 # as well as after it.
-DDL_VERSION = "20"
+# 21 (2026-10-19): The two ends of a row or of a line may be written in
+# numbers, `横A、縦Bから横C、縦Dまで` and `from horizontal A, vertical B to
+# horizontal C, vertical D`.
+DDL_VERSION = "21"

@@ -1045,6 +1045,16 @@ fn record_entity_associations(
             crate::semantic_association::semantic_numeric_range_value(numeric_range),
         );
     }
+    if let Some(segment) = &entity.numeric_segment
+        && span_within(segment.source().span, range)
+    {
+        record_association(
+            associations,
+            target,
+            "numeric_segment",
+            crate::semantic_association::semantic_numeric_segment_value(segment),
+        );
+    }
     for (owner, term, value) in [
         ("touch", entity.touch.as_ref(), field("touch")),
         (

@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// Stable identity for the neutral parser foundation.
-pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v13";
+pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v14";
 
 /// A half-open UTF-8 byte span into the source document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -422,8 +422,16 @@ fn selection_at(
     language: ResolvedInstructionLanguage,
 ) -> Option<Selection> {
     let source = document.source();
-    // A numeric range is one lexeme that may hold the author's own words, so it
-    // is tried before any word inside it could be.
+    // A numeric segment and a numeric range are each one lexeme (a range may hold
+    // the author's own words), so they are tried before any word inside them could be.
+    if let Some(segment) = crate::numeric_range::numeric_segment_at(source, start_byte, language) {
+        return Some(Selection::Token {
+            end_byte: segment.span.end_byte,
+            kind: NeutralTokenKind::GeometryKeyword {
+                keyword: GeometryKeyword::NumericSegment,
+            },
+        });
+    }
     if let Some(range) = crate::numeric_range::numeric_range_at(source, start_byte, language) {
         return Some(Selection::Token {
             end_byte: range.span.end_byte,
@@ -1327,9 +1335,14 @@ fn left_candidate_ends(edition: SaijikiEdition, source: &str) -> Rc<LeftCandidat
             ResolvedInstructionLanguage::Ja,
             false,
         );
-        // A numeric range is one recognized lexeme, so the particle after it
-        // (`…の範囲に`, `…）に`) is recognized too.
+        // A numeric range or segment is one recognized lexeme, so the particle after
+        // it (`…の範囲に`, `…）に`) is recognized too.
         let range = crate::numeric_range::numeric_range_at(
+            source,
+            candidate_start,
+            ResolvedInstructionLanguage::Ja,
+        );
+        let segment = crate::numeric_range::numeric_segment_at(
             source,
             candidate_start,
             ResolvedInstructionLanguage::Ja,
@@ -1338,6 +1351,7 @@ fn left_candidate_ends(edition: SaijikiEdition, source: &str) -> Rc<LeftCandidat
             .iter()
             .map(|candidate| candidate.end_byte)
             .chain(range.map(|range| range.span.end_byte))
+            .chain(segment.map(|segment| segment.span.end_byte))
         {
             earliest_start.entry(end_byte).or_insert(candidate_start);
         }

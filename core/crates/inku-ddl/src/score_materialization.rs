@@ -20,7 +20,9 @@ use crate::{
     Rational, ResolvedFillRegion, ResolvedGeometryDimensions, ScoreAnchorOrigin, ScoreFieldGap,
     ScoreInstructionOrigin, ScoreLoweringDiagnostic, SelectedCompositionPlan,
     plan_resources::PlanResourceOmission,
-    score_lowering::{lower_resolved_object_template, placement_recipe},
+    score_lowering::{
+        lower_resolved_object_template, placement_recipe, segment_row_recipe, segment_span,
+    },
 };
 
 const ORDINAL_SCHEME: InstanceOrdinalScheme = InstanceOrdinalScheme::SourceMemberThenInstanceV1;
@@ -174,13 +176,20 @@ pub fn materialize_selected_composition(
                     ..
                 }
             );
-            let adjusted = placement_recipe(
-                action,
-                u64::from(count),
-                object.domain(),
-                object.line_axis(),
-                translate_to_numeric_anchor,
-            )
+            // A row between two points keeps its ends with fewer marks.
+            let adjusted = match object.segment() {
+                Some(ends) if action == PlacementAction::LineUp => {
+                    segment_span(ends, plan.context().canvas_format())
+                        .and_then(|span| segment_row_recipe(span, u64::from(count)))
+                }
+                _ => placement_recipe(
+                    action,
+                    u64::from(count),
+                    object.domain(),
+                    object.line_axis(),
+                    translate_to_numeric_anchor,
+                ),
+            }
             .map_err(|_| {
                 ScoreMaterializationError::InvalidContract(
                     "partial count recipe cannot be represented",

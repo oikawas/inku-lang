@@ -1059,6 +1059,9 @@ fn apply_continuation_occurrence(
         OwnedSemanticOccurrence::NumericRange(value) => {
             set_if_empty(&mut instruction.entity.numeric_range, value)
         }
+        OwnedSemanticOccurrence::NumericSegment(value) => {
+            set_if_empty(&mut instruction.entity.numeric_segment, value)
+        }
         OwnedSemanticOccurrence::Touch(term) => set_if_empty(&mut instruction.entity.touch, term),
         OwnedSemanticOccurrence::Continuity(term) => {
             set_if_empty(&mut instruction.entity.continuity, term)
@@ -1260,6 +1263,7 @@ fn has_continuation_predicate(instruction: &SemanticInstruction) -> bool {
         || entity.explicit_geometry.is_some()
         || entity.numeric_position.is_some()
         || entity.numeric_range.is_some()
+        || entity.numeric_segment.is_some()
         || entity.proportion.aspect.is_some()
         || entity.proportion.width_extent.is_some()
         || entity.proportion.arc_form.is_some()
@@ -1310,9 +1314,14 @@ fn predicate_is_compatible(
         && option_is_mergeable(&left.thinness, &right.thinness)
         && option_is_mergeable(&left.numeric_position, &right.numeric_position)
         && option_is_mergeable(&left.numeric_range, &right.numeric_range)
-        // A point and a range cannot both place the same mark.
+        && option_is_mergeable(&left.numeric_segment, &right.numeric_segment)
+        // A point, a range and a segment cannot place the same mark together.
         && !(left.numeric_position.is_some() && right.numeric_range.is_some())
         && !(left.numeric_range.is_some() && right.numeric_position.is_some())
+        && !(left.numeric_segment.is_some()
+            && (right.numeric_position.is_some() || right.numeric_range.is_some()))
+        && !(right.numeric_segment.is_some()
+            && (left.numeric_position.is_some() || left.numeric_range.is_some()))
         && option_is_mergeable(&left.touch, &right.touch)
         && option_is_mergeable(&left.continuity, &right.continuity)
         && option_is_mergeable(&left.angle, &right.angle)
@@ -1372,6 +1381,10 @@ fn merge_predicate(target: &mut SemanticInstruction, continuation: &SemanticInst
     merge_option(
         &mut target.entity.numeric_range,
         &continuation.entity.numeric_range,
+    );
+    merge_option(
+        &mut target.entity.numeric_segment,
+        &continuation.entity.numeric_segment,
     );
     merge_option(&mut target.entity.touch, &continuation.entity.touch);
     merge_option(

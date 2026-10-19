@@ -27,7 +27,10 @@ const GEOMETRY_RESOLUTION_POLICY_MIDDLE: &str = concat!(
     "\"numeric\":{\"anchor\":\"declared_unit_interval\",\"extent\":\"must_fit\"},",
     "\"numeric_range\":{\"anchor\":\"same_as_named_range\",\"extent\":\"not_must_fit\",",
     "\"fill_target\":\"same_as_named_range\",\"region\":\"unclipped\",",
-    "\"values\":\"exact_decimal_or_fraction_unit_interval_nonzero_width\",\"words\":\"kept_unread\"}},",
+    "\"values\":\"exact_decimal_or_fraction_unit_interval_nonzero_width\",\"words\":\"kept_unread\"},",
+    "\"numeric_segment\":{\"anchor\":\"segment_midpoint\",\"extent\":\"not_must_fit\",",
+    "\"line\":\"from_first_point_to_second_point\",\"row\":\"first_and_last_mark_on_the_points\",",
+    "\"values\":\"exact_decimal_or_fraction_unit_interval_distinct_points\"}},",
     "\"capability\":[\"circle_radius_or_diameter\",\"ellipse_width_height\",",
     "\"cloudform_width_height\",\"square_side\",\"square_rotated_declared_rectangle\",",
     "\"line_length\",\"free_line_length\",\"arc_chord_sagitta\",\"point_radius_or_diameter\",",
@@ -468,6 +471,8 @@ pub enum GeometryKeyword {
     Position,
     /// A whole numeric range, read again from its source span.
     NumericRange,
+    /// A whole numeric segment (two points), read again from its source span.
+    NumericSegment,
 }
 
 impl GeometryKeyword {
@@ -486,6 +491,7 @@ impl GeometryKeyword {
             Self::AxisY => "axis_y",
             Self::Position => "position",
             Self::NumericRange => "numeric_range",
+            Self::NumericSegment => "numeric_segment",
         }
     }
 }
@@ -619,6 +625,28 @@ impl SemanticNumericRange {
     }
 }
 
+/// Two points written in numbers that a row or a line runs between (stage B-2a,
+/// the author's decision of 2026-10-19): the first point and then the second,
+/// each horizontal then vertical, as exact canvas fractions.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SemanticNumericSegment {
+    pub ends: [crate::ExactFraction; 4],
+    pub provenance: SourceOccurrence,
+    pub end_spans: [SourceSpan; 4],
+}
+
+impl SemanticNumericSegment {
+    pub const fn source(&self) -> &SourceOccurrence {
+        &self.provenance
+    }
+
+    /// The points as exact `(numerator, denominator)` pairs: horizontal and
+    /// vertical of the first point, then of the second.
+    pub(crate) fn rational_ends(&self) -> [(u64, u64); 4] {
+        self.ends.map(|end| (end.numerator(), end.denominator()))
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum GeometrySyntaxIssueKind {
     IncompleteGeometry,
@@ -626,6 +654,8 @@ pub(crate) enum GeometrySyntaxIssueKind {
     UnownedDecimal,
     /// A numeric range off the canvas, without width, or beyond the value limits.
     InvalidRange,
+    /// A numeric segment off the canvas, of no length, or beyond the value limits.
+    InvalidSegment,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -639,6 +669,7 @@ pub(crate) struct ClauseGeometryAnalysis {
     pub geometries: Vec<SemanticExplicitGeometry>,
     pub positions: Vec<SemanticNumericPosition>,
     pub ranges: Vec<SemanticNumericRange>,
+    pub segments: Vec<SemanticNumericSegment>,
     pub consumed_numeric_spans: BTreeSet<(usize, usize)>,
     pub issues: Vec<GeometrySyntaxIssue>,
 }
@@ -846,6 +877,30 @@ pub(crate) fn analyze_clause_geometry(
                     )),
                 }
             }
+            GeometryKeyword::NumericSegment => {
+                let span = atoms[index].span();
+                let lexeme = crate::numeric_range::numeric_segment_at(
+                    document.source(),
+                    span.start_byte,
+                    document.language(),
+                )
+                .filter(|lexeme| lexeme.span == span);
+                match lexeme
+                    .and_then(|lexeme| valid_segment_ends(&lexeme).map(|ends| (lexeme, ends)))
+                {
+                    Some((lexeme, ends)) => result.segments.push(SemanticNumericSegment {
+                        ends,
+                        provenance: occurrence(document, span, region_index, clause_index, index),
+                        end_spans: lexeme.end_spans,
+                    }),
+                    None => result.issues.push(issue(
+                        GeometrySyntaxIssueKind::InvalidSegment,
+                        atoms,
+                        index,
+                        index + 1,
+                    )),
+                }
+            }
             GeometryKeyword::Canvas | GeometryKeyword::Position => {}
         }
     }
@@ -867,6 +922,16 @@ pub(crate) fn analyze_clause_geometry(
         }
     }
     result
+}
+
+// Both points are on the canvas and they differ.
+fn valid_segment_ends(
+    lexeme: &crate::numeric_range::NumericSegmentLexeme,
+) -> Option<[crate::ExactFraction; 4]> {
+    let [x0, y0, x1, y1] = lexeme.ends;
+    let ends = [x0?, y0?, x1?, y1?];
+    (ends.iter().all(|end| end.is_at_most_one()) && (ends[0], ends[1]) != (ends[2], ends[3]))
+        .then_some(ends)
 }
 
 // Every bound is on the canvas and each axis has a width.
@@ -1174,8 +1239,16 @@ mod tests {
             "same_as_named_range"
         );
         assert_eq!(
+            payload["bounds"]["numeric_segment"]["anchor"],
+            "segment_midpoint"
+        );
+        assert_eq!(
+            payload["bounds"]["numeric_segment"]["row"],
+            "first_and_last_mark_on_the_points"
+        );
+        assert_eq!(
             geometry_resolution_policy_digest(),
-            "4d06b6ce4cc6631aea0c8fdcfa7f5f1d3d9b07207cdc2ead64da2284ac747c4f"
+            "74fb923d342e3fcd792a9ea997ab299b41fe30959b16431903edfc1e2f998e7c"
         );
         assert_eq!(
             payload["object_placement"]["layout_direction"]["vertical"],

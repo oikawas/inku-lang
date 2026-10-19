@@ -109,6 +109,7 @@ pub enum SemanticDeliveryOwner {
     ExplicitGeometry,
     NumericPosition,
     NumericRange,
+    NumericSegment,
     Touch,
     Continuity,
     Angle,
@@ -148,6 +149,7 @@ impl SemanticDeliveryOwner {
             Self::ExplicitGeometry => "explicit_geometry",
             Self::NumericPosition => "numeric_position",
             Self::NumericRange => "numeric_range",
+            Self::NumericSegment => "numeric_segment",
             Self::Touch => "touch",
             Self::Continuity => "continuity",
             Self::Angle => "angle",
@@ -1166,6 +1168,7 @@ fn project_deliveries(
             | SemanticAssociationIssueKind::IncompleteNumericGeometry
             | SemanticAssociationIssueKind::IncompleteNumericPosition
             | SemanticAssociationIssueKind::InvalidNumericRange
+            | SemanticAssociationIssueKind::InvalidNumericSegment
             | SemanticAssociationIssueKind::UnownedExactDecimal
             | SemanticAssociationIssueKind::UnknownSurfaceDimension
             | SemanticAssociationIssueKind::ConflictingFluctuationSpreads
@@ -2103,6 +2106,14 @@ fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mu
             )),
         );
     }
+    if let Some(segment) = &instruction.entity.numeric_segment {
+        add_explicit(
+            projection,
+            segment.source().span,
+            SemanticDeliveryOwner::NumericSegment,
+            compact_json(&crate::semantic_association::semantic_numeric_segment_value(segment)),
+        );
+    }
     if let Some(relation) = &instruction.relation {
         add_explicit(
             projection,
@@ -2208,6 +2219,10 @@ fn owned_occurrence_key(occurrence: &OwnedSemanticOccurrence) -> String {
             compact_json(&crate::semantic_association::semantic_numeric_range_value(
                 range
             ))
+        ),
+        OwnedSemanticOccurrence::NumericSegment(segment) => format!(
+            "numeric_segment:{}",
+            compact_json(&crate::semantic_association::semantic_numeric_segment_value(segment))
         ),
     }
 }
@@ -2993,6 +3008,9 @@ pub(crate) fn semantic_source_occurrences(ast: &SemanticDocumentAst) -> Vec<&Sou
         if let Some(range) = &entity.numeric_range {
             occurrences.push(range.source());
         }
+        if let Some(segment) = &entity.numeric_segment {
+            occurrences.push(segment.source());
+        }
     }
 
     let mut occurrences = Vec::new();
@@ -3346,6 +3364,33 @@ fn entity_provenance_value(entity: &crate::SemanticEntity) -> Value {
             numeric_range_provenance_value(range),
         );
     }
+    // Absent from older records, so an entity without a segment keeps its bytes.
+    if let Some(segment) = &entity.numeric_segment {
+        record.insert(
+            "numeric_segment".to_owned(),
+            numeric_segment_provenance_value(segment),
+        );
+    }
+    Value::Object(record.into_iter().collect())
+}
+
+// The whole segment lexeme and each value's spelling, in the order of `ends`.
+fn numeric_segment_provenance_value(segment: &crate::SemanticNumericSegment) -> Value {
+    fn span_value(span: SourceSpan) -> Value {
+        let mut record = BTreeMap::new();
+        record.insert("end_byte".to_owned(), Value::from(span.end_byte as u64));
+        record.insert("start_byte".to_owned(), Value::from(span.start_byte as u64));
+        Value::Object(record.into_iter().collect())
+    }
+    let mut record = BTreeMap::new();
+    record.insert(
+        "ends".to_owned(),
+        Value::Array(segment.end_spans.iter().copied().map(span_value).collect()),
+    );
+    record.insert(
+        "segment".to_owned(),
+        source_occurrence_value(&segment.provenance),
+    );
     Value::Object(record.into_iter().collect())
 }
 

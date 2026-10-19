@@ -31,7 +31,7 @@ pub mod macro_resolution;
 pub mod macro_seed;
 pub mod noun_phrase;
 pub mod numeric_range;
-pub use numeric_range::{ExactFraction, NumericRangeLexeme};
+pub use numeric_range::{ExactFraction, NumericRangeLexeme, NumericSegmentLexeme};
 pub mod opaque_head;
 pub mod parser;
 pub mod phrase;
@@ -127,7 +127,7 @@ pub use execution_diagnostics::{
 pub use geometry::{
     ExactGeometry, ExactPosition, GEOMETRY_RESOLUTION_POLICY_ID, GeometryKeyword,
     SemanticExactDecimal, SemanticExplicitGeometry, SemanticGeometryValue, SemanticNumericPosition,
-    SemanticNumericRange, geometry_resolution_policy_canonical_bytes,
+    SemanticNumericRange, SemanticNumericSegment, geometry_resolution_policy_canonical_bytes,
     geometry_resolution_policy_digest,
 };
 

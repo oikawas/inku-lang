@@ -117,3 +117,18 @@ test('a numeric range the author got wrong is said in words, whichever tag carri
 	assert.match(unsupported, /まだ数値の範囲を書けません。/);
 	assert.doesNotMatch(unsupported, /diagnostic/);
 });
+
+test('two points written in numbers are said in words, in each language', () => {
+	const invalid = { channel: 'upstream' as const, value: { issue_kind: 'invalid_numeric_segment' } };
+	assert.match(formatPipelineDiagnostic(invalid, ja), /数値で書いた二つの点（〜から〜まで）が正しくありません。/);
+	assert.match(formatPipelineDiagnostic(invalid, en), /The two points written in numbers \(from … to …\) are not valid\./);
+	for (const [type, japanese, english] of [
+		['unsupported_numeric_segment', /列の両端か、1本の線・自由線の両端にだけ使えます。/, /the ends of a row of two or more marks/],
+		['numeric_segment_conflict', /並べる向きの言葉とは一緒に書けません。/, /already set the direction and the length/],
+	] as const) {
+		const downstream = { channel: 'downstream' as const, value: { reason: { type } } };
+		assert.match(formatPipelineDiagnostic(downstream, ja), japanese);
+		assert.match(formatPipelineDiagnostic(downstream, en), english);
+		assert.doesNotMatch(formatPipelineDiagnostic(downstream, en), /Reason:/);
+	}
+});

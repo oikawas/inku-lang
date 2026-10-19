@@ -175,8 +175,9 @@ internal class Ddl3DWebHost(
         if (!dataUrl.startsWith("data:") || comma < 0 || !dataUrl.substring(0, comma).endsWith(";base64")) return onShareFailed()
         if ((dataUrl.length - comma) / 4L * 3 > MAXIMUM_DOWNLOAD_BYTES) return onShareFailed()
         val bytes = runCatching { Base64.decode(dataUrl.substring(comma + 1), Base64.DEFAULT) }.getOrNull() ?: return onShareFailed()
-        val name = body.optString("name").takeIf { Regex("^[A-Za-z0-9._-]{1,128}$").matches(it) } ?: "inku-3d"
-        val mimeType = body.optString("mimeType").ifEmpty { "application/octet-stream" }
+        val named = Ddl3DSave.named(bytes, controller.lastRendered?.inputDigest)
+        val name = named?.name ?: body.optString("name").takeIf { Regex("^[A-Za-z0-9._-]{1,128}$").matches(it) } ?: "inku-3d"
+        val mimeType = named?.mimeType ?: body.optString("mimeType").ifEmpty { "application/octet-stream" }
         runCatching {
             val file = File(exportCacheDir(context), name)
             file.writeBytes(bytes)

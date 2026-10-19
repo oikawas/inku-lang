@@ -174,6 +174,22 @@ class Ddl3DTest {
         assertEquals(1.5, wide.message()!!.getDouble("zoom"), 0.0)
     }
 
+    /** The share sheet gets Web's name and type, not the blob URL's `<UUID>.bin` (Build148430). */
+    @Test
+    fun aSaveIsNamedAsWebNamesItFromItsBytes() {
+        val digest = "5118b99514c8a1809d418536ebc73d5fdea7de124d04b9bf724f2c1f25310598"
+        val png = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0)
+        assertEquals(Ddl3DSave.Named("inku-3d-5118b99514c8.png", "image/png"), Ddl3DSave.named(png, digest))
+        val glb = "glTF".toByteArray() + byteArrayOf(2, 0, 0, 0)
+        assertEquals(Ddl3DSave.Named("inku-3d-5118b99514c8.glb", "model/gltf-binary"), Ddl3DSave.named(glb, digest))
+        // No digest to name it by: still the right format.
+        assertEquals("inku-3d.glb", Ddl3DSave.named(glb, null)?.name)
+        assertEquals("inku-3d.glb", Ddl3DSave.named(glb, "../x")?.name)
+        // Neither: the page's own name and type stand.
+        assertNull(Ddl3DSave.named("glT".toByteArray(), digest))
+        assertNull(Ddl3DSave.named(byteArrayOf(), digest))
+    }
+
     /** A web view left at WRAP_CONTENT lays its page out 0 px tall: the 3D view rendered, black (Build148421). */
     @Test
     fun theWebViewFillsItsPlaceSoThePageHasAHeight() {

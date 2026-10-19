@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-19 — 3D: open works with heavy brush texture and unfilled clouds
-
-The experimental 3D view now paints at most four marks at a time, and each five-second deadline counts from that mark's own SVG decode. Mark and presence SVGs decode at their texture's size, and a mark's 3D SVG applies the performance-touch filter only where the mark's bounds meet the original filter region (2D SVGs are unchanged). In WebKit, including the macOS app, works with heavy brush texture could miss the 15-second limit, and marks that had only waited in line failed the deadline. An unfilled cloudform is now one tube along its contour, fixing works with a smooth unfilled cloud that would not open in 3D. "GPU unavailable" now appears only when the renderer cannot be created; other failures show their own reason in the details. The distribution is `paint-speed-v1-ae78d6d7`.
-
 ### 2026-10-18 — macOS: 3D PNG and GLB saves start again
 
 In the macOS experimental 3D view, PNG save and GLB save opened no save panel: WKWebView silently dropped the viewer's download link. The viewer's saves now reach the app through the parent page shared with Android. Focus selection works once a shape is clicked to select it, as on the Web.
@@ -174,6 +170,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.197 (2026-10-19 / Build 1273)
+
+### 2026-10-19 — 3D: open works with heavy brush texture and unfilled clouds
+
+The experimental 3D view now paints at most four marks at a time, and each five-second deadline counts from that mark's own SVG decode. Mark and presence SVGs decode at their texture's size, and a mark's 3D SVG applies the performance-touch filter only where the mark's bounds meet the original filter region (2D SVGs are unchanged). In WebKit, including the macOS app, works with heavy brush texture could miss the 15-second limit, and marks that had only waited in line failed the deadline. An unfilled cloudform is now one tube along its contour, fixing works with a smooth unfilled cloud that would not open in 3D. "GPU unavailable" now appears only when the renderer cannot be created; other failures show their own reason in the details. The distribution is `paint-speed-v1-ae78d6d7`.
 
 ## v2.15.196 (2026-10-18 / Build 1272)
 

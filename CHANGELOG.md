@@ -8,10 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-19 — 3D: show the solids first, then paint them
-
-The experimental 3D view now shows a work's solids in their plain colors as soon as their shapes and joint depths are ready, and they can be turned and zoomed at once; in 113 sample works the solids appeared within half a second, in the macOS app and in Chrome alike. The paint then arrives on them: the presence plane first, then marks from the front layer back. While painting, the status line in the 3D controls reads "Applying paint n/m". A mark whose paint cannot be prepared no longer fails the whole work: it keeps its plain color, and a notice and the GLB metadata (`unpaintedObjects`) list it. PNG and GLB saves wait until painting finishes, and the finished view is the same as before. In WebKit (the macOS app and Safari) the texture budget is 4 million pixels instead of 16 million, which shortens the heaviest works; close up, their paint can look slightly softer. The distribution is `shape-first-v1-6970f20c`. Only the registered distribution stays in the repository now; the 14 earlier ones (47.4 MB) are removed.
-
 ### 2026-10-18 — macOS: 3D PNG and GLB saves start again
 
 In the macOS experimental 3D view, PNG save and GLB save opened no save panel: WKWebView silently dropped the viewer's download link. The viewer's saves now reach the app through the parent page shared with Android. Focus selection works once a shape is clicked to select it, as on the Web.
@@ -174,6 +170,12 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.202 (2026-10-19 / Build 1278)
+
+### 2026-10-19 — 3D: show the solids first, then paint them
+
+The experimental 3D view now shows a work's solids in their plain colors as soon as their shapes and joint depths are ready, and they can be turned and zoomed at once; in 113 sample works the solids appeared within half a second, in the macOS app and in Chrome alike. The paint then arrives on them: the presence plane first, then marks from the front layer back. While painting, the status line in the 3D controls reads "Applying paint n/m". A mark whose paint cannot be prepared no longer fails the whole work: it keeps its plain color, and a notice and the GLB metadata (`unpaintedObjects`) list it. PNG and GLB saves wait until painting finishes, and the finished view is the same as before. In WebKit (the macOS app and Safari) the texture budget is 4 million pixels instead of 16 million, which shortens the heaviest works; close up, their paint can look slightly softer. The distribution is `shape-first-v1-6970f20c`. Only the registered distribution stays in the repository now; the 14 earlier ones (47.4 MB) are removed.
 
 ## v2.15.201 (2026-10-19 / Build 1277)
 

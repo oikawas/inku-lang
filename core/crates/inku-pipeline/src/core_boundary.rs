@@ -3,7 +3,7 @@
 use std::fmt;
 
 use inku_ddl::{
-    MacroDefinition, MacroExpansionLimits, NormalizedDdlDocument,
+    CompilerResourceExecutionResult, MacroDefinition, MacroExpansionLimits, NormalizedDdlDocument,
     RESOURCE_COMPILER_EXECUTION_SCHEMA_ID, ScoreInstructionOrigin, ScoreLoweringContext,
     ScoreLoweringOutcome, SourceSpan, TYPED_DDL_COMPILATION_SCHEMA_ID,
     compile_ddl_to_score_with_resources,
@@ -413,15 +413,15 @@ impl CompiledDelivery {
     }
 }
 
-/// Compile the exact committed document once and retain all observable evidence.
-pub fn compile_committed(
+/// Compile a document as [`compile_committed`] compiles it, keeping the typed
+/// result.
+pub(crate) fn compile_with_resources(
     document: NormalizedDdlDocument,
     definitions: &[MacroDefinition],
     options: &CompilerOptions,
-) -> Result<CompiledDelivery, BoundaryError> {
+) -> Result<CompilerResourceExecutionResult, BoundaryError> {
     options.validate()?;
-    let source_digest = sha256_hex(document.source().as_bytes());
-    let result = compile_ddl_to_score_with_resources(
+    Ok(compile_ddl_to_score_with_resources(
         document,
         definitions,
         options.composition_seed()?,
@@ -430,7 +430,17 @@ pub fn compile_committed(
         options.error_policy,
         options.hard_resource_policy.clone(),
         options.operational_resource_budget,
-    );
+    ))
+}
+
+/// Compile the exact committed document once and retain all observable evidence.
+pub fn compile_committed(
+    document: NormalizedDdlDocument,
+    definitions: &[MacroDefinition],
+    options: &CompilerOptions,
+) -> Result<CompiledDelivery, BoundaryError> {
+    let source_digest = sha256_hex(document.source().as_bytes());
+    let result = compile_with_resources(document, definitions, options)?;
     let compilation = result.compilation();
     let semantic_digest = compilation
         .compiler_lock

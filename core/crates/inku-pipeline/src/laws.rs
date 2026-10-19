@@ -8,7 +8,10 @@
 //! document's Score as the prototype did, and prints the layers the laws
 //! changed again in numbers: a numeric point, the two ends of a row or a line,
 //! a numeric range, a numeric size. Every other layer keeps the bytes the
-//! composition printed.
+//! composition printed. The prototype let the canvas cut a mark; a mark at a
+//! numeric point lies wholly on it, so a line is printed by the ends the canvas
+//! shows, a pair as a row of two (whose marks the canvas may cut), and another
+//! mark that leaves the canvas is refused ([`off_canvas`]).
 //!
 //! This stage holds the placement, size and hand laws (B1 to B8, B15, B21). The
 //! computation is the prototype's, function by function and in its order. On a
@@ -2069,11 +2072,17 @@ impl Compiler<'_> {
                     }
                     _ => [[0.5 - d, 0.5 - d], [0.5 + d, 0.5 + d]],
                 };
-                // The pair is two marks; the second's mirrored turn waits for a numeric angle.
-                let marks = points.map(|point| single(&instruction, point));
+                // The pair mirrors: the second mark turns the other way. The
+                // pair is printed as a row of two, whose marks share one turn;
+                // the mirrored one waits for a numeric angle.
+                let mut marks = points.map(|point| single(&instruction, point));
+                let turned = marks[1].rotation.filter(|turn| *turn != 0.0);
+                if let Some(turn) = turned {
+                    marks[1].rotation = Some(-turn);
+                    self.note("pair_mirror_unwritten", Some(layer), None);
+                }
                 self.score.instructions.splice(position..=position, marks);
                 self.paired.insert(layer);
-                self.note("pair_mirror_unwritten", Some(layer), None);
                 continue;
             }
             let point = match axis {
@@ -2451,10 +2460,12 @@ pub struct Chosen {
     pub main_layer: usize,
     pub notes: Vec<Note>,
     pub print: LawsPrint,
+    /// The laws that name each layer of the Score.
+    pub named: BTreeMap<usize, Vec<&'static str>>,
 }
 
 /// The composed plan as the laws print it: the layers they changed are edited
-/// and carry what they write in numbers; a pair B8 opened is two layers.
+/// and carry what they write in numbers, a layer for each composed layer.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LawsPrint {
     pub plan: WorkPlan,
@@ -2528,7 +2539,8 @@ fn row_ends(instruction: &Instruction, units: Units) -> Option<NumericPlace> {
 }
 
 /// A line's two ends where it is drawn: its ends about their middle, turned by
-/// its rotation (clockwise, y down) in short-edge units, at its anchor.
+/// its rotation (clockwise, y down) in short-edge units, at its anchor, and
+/// cut where the canvas cuts it.
 fn line_ends(instruction: &Instruction, units: Units) -> Option<NumericPlace> {
     let (from, to) = (instruction.from_?, instruction.to?);
     let (mx, my) = ((from.x + to.x) / 2.0, (from.y + to.y) / 2.0);
@@ -2543,10 +2555,52 @@ fn line_ends(instruction: &Instruction, units: Units) -> Option<NumericPlace> {
             cy + dx * s / units.y + dy * c / units.y,
         ]
     };
-    Some(NumericPlace::Segment {
-        from: end(from.x, from.y),
-        to: end(to.x, to.y),
-    })
+    let (from, to) = on_canvas(end(from.x, from.y), end(to.x, to.y))?;
+    Some(NumericPlace::Segment { from, to })
+}
+
+/// The part of a segment (canvas fractions) the canvas shows. The prototype
+/// drew a line past the canvas and the canvas cut it, where numeric ends lie
+/// on the canvas (a full-width line moved off the middle). Ends already on it
+/// are kept as they are; `None` when none of the line is on it.
+#[allow(clippy::float_cmp)]
+fn on_canvas(from: [f64; 2], to: [f64; 2]) -> Option<([f64; 2], [f64; 2])> {
+    let inside = |[x, y]: [f64; 2]| (0.0..=1.0).contains(&x) && (0.0..=1.0).contains(&y);
+    if inside(from) && inside(to) {
+        return Some((from, to));
+    }
+    let (dx, dy) = (to[0] - from[0], to[1] - from[1]);
+    let (mut start, mut end) = (0.0_f64, 1.0_f64);
+    // Liang and Barsky: each side of the canvas bounds the segment's parameter.
+    for (p, q) in [
+        (-dx, from[0]),
+        (dx, 1.0 - from[0]),
+        (-dy, from[1]),
+        (dy, 1.0 - from[1]),
+    ] {
+        if p == 0.0 {
+            if q < 0.0 {
+                return None;
+            }
+        } else if p < 0.0 {
+            start = start.max(q / p);
+        } else {
+            end = end.min(q / p);
+        }
+    }
+    if start >= end {
+        return None;
+    }
+    let at = |t: f64| {
+        [
+            (from[0] + t * dx).clamp(0.0, 1.0),
+            (from[1] + t * dy).clamp(0.0, 1.0),
+        ]
+    };
+    Some((
+        if start > 0.0 { at(start) } else { from },
+        if end < 1.0 { at(end) } else { to },
+    ))
 }
 
 /// The range a grid or a scatter covers after a law moved it.
@@ -2617,20 +2671,30 @@ struct Edit {
 fn edit_layer(
     layer: &inku_ddl::work_plan::WorkPlanLayer,
     before: &Instruction,
-    after: &Instruction,
+    marks: &[&Instruction],
     hand: Option<Hand>,
-    paired: bool,
     units: Units,
 ) -> Option<Edit> {
     let mut layer = layer.clone();
     let mut numeric = NumericWriting::default();
+    let after = *marks.first()?;
+    // A pair B8 opened is its two marks; it is written as one sentence, so the
+    // layers after it keep their source instructions (and the seeds they draw with).
+    let paired = marks.len() == 2;
     let moved = paired || place_of(before) != place_of(after);
     let count = count_of(after);
+    // One line is written by its ends: a mark placed at a numeric point must lie
+    // wholly on the canvas, a line by its ends may have been cut by it.
     let single_line = is_line(after.primitive) && count == 1 && !paired;
     if moved {
         numeric.place = Some(if paired {
-            let [x, y] = center_of(after);
-            NumericPlace::Point { at: [x, y] }
+            // The pair's marks are the two ends of a row of two.
+            layer.action = "line_up".to_owned();
+            layer.attributes.remove(&WorkPlanSlot::LineUpDirection);
+            NumericPlace::Segment {
+                from: center_of(after),
+                to: center_of(marks[1]),
+            }
         } else if is_row_recipe(after) && count >= 2 {
             layer.action = "line_up".to_owned();
             layer.attributes.remove(&WorkPlanSlot::LineUpDirection);
@@ -2653,9 +2717,6 @@ fn edit_layer(
                 _ => return None,
             }
         });
-    }
-    if paired {
-        layer.count = 1;
     }
     let size = |instruction: &Instruction| 2.0 * largest_extent(instruction, units);
     let factor = if size(before) != 0.0 {
@@ -2744,35 +2805,31 @@ fn print_changes(
             continue;
         }
         print.changed.push(k);
-        let pair = paired.contains(&index);
         let [before] = was.as_slice() else {
             return None;
         };
-        if is.len() != if pair { 2 } else { 1 } {
+        if is.len() != if paired.contains(&index) { 2 } else { 1 } {
             return None;
         }
-        for mark in &is {
-            let edit = edit_layer(
-                layer,
-                before,
-                mark,
-                hands.get(&index).copied(),
-                pair,
-                context.units,
-            )?;
-            print.plan.layers.push(edit.layer);
-            print.ranges.push(if edit.numeric.place.is_some() {
-                None
-            } else {
-                composed.ranges[k].clone()
-            });
-            print.joints.push(if edit.keep_joint {
-                composed.joints[k].clone()
-            } else {
-                None
-            });
-            print.numeric.push(Some(edit.numeric));
-        }
+        let edit = edit_layer(
+            layer,
+            before,
+            &is,
+            hands.get(&index).copied(),
+            context.units,
+        )?;
+        print.plan.layers.push(edit.layer);
+        print.ranges.push(if edit.numeric.place.is_some() {
+            None
+        } else {
+            composed.ranges[k].clone()
+        });
+        print.joints.push(if edit.keep_joint {
+            composed.joints[k].clone()
+        } else {
+            None
+        });
+        print.numeric.push(Some(edit.numeric));
     }
     Some(print)
 }
@@ -2810,16 +2867,59 @@ fn apply(
             "a layer the laws changed cannot be written in numbers".to_owned(),
         )
     })?;
+    let laws: Vec<&'static str> = LAWS
+        .into_iter()
+        .filter(|law| answer.laws.contains_key(law))
+        .collect();
+    let mut named: BTreeMap<usize, Vec<&'static str>> = BTreeMap::new();
+    for &law in &laws {
+        for layer in law_targets(law, &answer.laws[law]) {
+            named.entry(layer).or_default().push(law);
+        }
+    }
     Ok(Chosen {
-        laws: LAWS
-            .into_iter()
-            .filter(|law| answer.laws.contains_key(law))
-            .collect(),
+        laws,
         main_law: answer.main_law.clone(),
         main_layer: answer.main_layer,
         notes,
         print,
+        named,
     })
+}
+
+/// The reason to ask again when the printed document cannot hold a layer the
+/// laws changed on the canvas: a mark the laws place at a point is drawn whole,
+/// where the prototype let the canvas cut it. `instruction` is the source
+/// instruction of the printed document; `None` when it is not a changed layer.
+#[must_use]
+pub fn off_canvas(chosen: &Chosen, context: &LawsContext, instruction: usize) -> Option<Refusal> {
+    let k = instruction.checked_sub(context.first_plan_layer)?;
+    if !chosen.print.changed.contains(&k) {
+        return None;
+    }
+    let layer = instruction;
+    // A hand neither places nor sizes a mark.
+    let laws: Vec<&str> = chosen
+        .named
+        .get(&layer)?
+        .iter()
+        .copied()
+        .filter(|law| *law != "B21")
+        .collect();
+    if laws.is_empty() {
+        return None;
+    }
+    Some(refusal(
+        "off_canvas",
+        format!(
+            "layer {layer} は、当てた法則（{}）の置き場と大きさでは画面に収まらない。その層の法則を変えるか外す",
+            laws.join("・")
+        ),
+        format!(
+            "layer {layer} does not fit on the canvas where the laws on it ({}) place and size it; change or drop those laws",
+            laws.join(", ")
+        ),
+    ))
 }
 
 /// Read a reply to the laws request, check it and apply it.

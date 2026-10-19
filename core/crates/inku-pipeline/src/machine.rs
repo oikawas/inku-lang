@@ -4,9 +4,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use inku_ddl::work_plan::WorkPlan;
 use inku_ddl::{
-    CompilerLockState, CompletionRangeRecord, MacroDefinition, MacroLock, NormalizedDdlDocument,
+    CompilerLockState, CompilerResourceExecutionFailure, CompilerResourceExecutionResult,
+    CompletionRangeRecord, MacroDefinition, MacroLock, NormalizedDdlDocument,
     RANGE_WORDS_CHANGED_HOLE_KIND, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID,
-    SAIJIKI_V1_ASSET_ID, TypedDdlCompilation, compile_typed_ddl,
+    SAIJIKI_V1_ASSET_ID, ScoreDiagnosticOwner, ScoreFieldGap, ScoreInstructionOrigin,
+    ScoreMaterializationError, TypedDdlCompilation, compile_typed_ddl,
     migrate_macro_definition_from_saijiki_v1, record_after_patch, record_keeping_numbers,
     settle_completion_record, validate_visible_ddl_patch, validate_visible_ddl_patch_detailed,
     visible_ddl_patch_available, with_completion_record,
@@ -886,6 +888,42 @@ fn proposal(
     }
 }
 
+/// How much a compile diagnosed or left out: the document the laws printed is
+/// committed only when it adds none to the composed document's.
+fn shortfalls(compiled: &CompilerResourceExecutionResult) -> usize {
+    compiled.upstream_diagnostics().len()
+        + compiled.downstream_diagnostics().len()
+        + compiled.resource_omissions().len()
+        + compiled.relation_omissions().len()
+}
+
+/// The source instruction a compile could not hold on the canvas: a mark at a
+/// numeric point lies wholly on it, where a named range lets the canvas cut it.
+fn off_canvas_instruction(compiled: &CompilerResourceExecutionResult) -> Option<usize> {
+    if let Some(CompilerResourceExecutionFailure::Materialization(
+        ScoreMaterializationError::Geometry {
+            owner,
+            reason: ScoreFieldGap::GeometryExtentOutOfBounds,
+        },
+    )) = compiled.failure()
+        && let ScoreInstructionOrigin::SourceInstruction { instruction_index } = **owner
+    {
+        return Some(instruction_index);
+    }
+    compiled
+        .downstream_diagnostics()
+        .iter()
+        .find_map(|diagnostic| match (&diagnostic.reason, &diagnostic.owner) {
+            (
+                ScoreFieldGap::GeometryExtentOutOfBounds,
+                ScoreDiagnosticOwner::SourceInstruction {
+                    instruction_index, ..
+                },
+            ) => Some(*instruction_index),
+            _ => None,
+        })
+}
+
 impl PipelineSnapshot {
     /// The provider attempt in flight, or `None` while no provider effect runs.
     ///
@@ -1449,7 +1487,7 @@ impl PipelineSnapshot {
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
         let prompt = description.as_deref().and_then(|description| {
-            let context = self.laws_context(&document, &composed)?;
+            let (context, _) = self.laws_context(&document, &composed)?;
             laws::build_laws_prompt(
                 description,
                 &context,
@@ -1470,30 +1508,42 @@ impl PipelineSnapshot {
         self.begin_llm(prompt, description, Vec::new(), events)
     }
 
-    /// What the laws read of a composed document: its Score as the run compiles it.
+    /// What the laws read of a composed document: its Score as the run compiles
+    /// it, and how much that compile diagnosed or left out (`shortfalls`).
     fn laws_context(
         &self,
         document: &VisibleDocument,
         composed: &ComposedPlan,
-    ) -> Option<LawsContext> {
-        let delivery = crate::core_boundary::compile_committed(
+    ) -> Option<(LawsContext, usize)> {
+        let compiled = self.compile_for_run(document)?;
+        let context = LawsContext::new(
+            compiled.score()?.clone(),
+            composed,
+            self.config.compiler.host.palette(),
+            self.config.compiler.host.canvas_format_id(),
+        )?;
+        Some((context, shortfalls(&compiled)))
+    }
+
+    /// A document compiled as the run's commit compiles it.
+    fn compile_for_run(
+        &self,
+        document: &VisibleDocument,
+    ) -> Option<CompilerResourceExecutionResult> {
+        crate::core_boundary::compile_with_resources(
             document.document().ok()?,
             &self.config.definitions,
             &self.config.compiler,
         )
-        .ok()?;
-        LawsContext::new(
-            delivery.score?,
-            composed,
-            self.config.compiler.host.palette(),
-            self.config.compiler.host.canvas_format_id(),
-        )
+        .ok()
     }
 
     /// Read the laws reply, apply it and commit the document the laws printed.
     /// A reply the tool refuses is asked again with the reason within the
-    /// stage's budget. When the budget is spent, or the printed document does
-    /// not compile, the composed document is committed as it is.
+    /// stage's budget, also when the printed document cannot hold a layer the
+    /// laws changed on the canvas. When the budget is spent, or the printed
+    /// document does not compile as the composed one did, the composed
+    /// document is committed as it is.
     fn laws_response(
         &mut self,
         response: &str,
@@ -1502,7 +1552,9 @@ impl PipelineSnapshot {
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
         let pending = self.laws.as_ref().ok_or(ProtocolError::InternalInvariant)?;
-        let Some(context) = self.laws_context(&pending.document, &pending.composed) else {
+        let Some((context, composed_shortfalls)) =
+            self.laws_context(&pending.document, &pending.composed)
+        else {
             return self.laws_fallback(json!({"failure": "context"}), events);
         };
         let chosen = match laws::choose_laws(
@@ -1518,11 +1570,20 @@ impl PipelineSnapshot {
             }
         };
         let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
-        let Some(document) =
+        let Some((document, compiled)) =
             self.laws_document(chosen.print.source(self.config.language, &plugins))
         else {
             return self.laws_fallback(json!({"failure": "compile"}), events);
         };
+        if let Some(refusal) = off_canvas_instruction(&compiled)
+            .and_then(|instruction| laws::off_canvas(&chosen, &context, instruction))
+        {
+            let description = description.ok_or(ProtocolError::InternalInvariant)?;
+            return self.ask_laws_again(&context, &refusal, description, spent_ms, events);
+        }
+        if compiled.score().is_none() || shortfalls(&compiled) > composed_shortfalls {
+            return self.laws_fallback(json!({"failure": "compile"}), events);
+        }
         self.action = None;
         let pending = self.laws.take().ok_or(ProtocolError::InternalInvariant)?;
         self.event(
@@ -1616,20 +1677,20 @@ impl PipelineSnapshot {
         )
     }
 
-    /// The document the laws printed, when it compiles as the composed one did.
-    fn laws_document(&self, source: String) -> Option<VisibleDocument> {
+    /// The document the laws printed and the run's compile of it, when it reads
+    /// as canonically as the composed one did.
+    fn laws_document(
+        &self,
+        source: String,
+    ) -> Option<(VisibleDocument, CompilerResourceExecutionResult)> {
         let document = self.new_document(source).ok()?;
-        let compiled = compile_typed_ddl(
-            document.document().ok()?,
-            &self.config.definitions,
-            self.config.compiler.composition_seed().ok()?,
-            self.config.compiler.macro_limits().ok()?,
-        );
+        let compiled = self.compile_for_run(&document)?;
         compiled
+            .compilation()
             .compiler_lock
             .as_ref()
             .is_some_and(|lock| lock.state == CompilerLockState::CanonicalReady)
-            .then_some(document)
+            .then_some((document, compiled))
     }
 
     /// Commit the composed document without laws and say why.

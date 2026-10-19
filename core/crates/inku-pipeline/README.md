@@ -68,8 +68,11 @@ printed it. `choose_laws` runs only when the configuration has `laws` and the pl
 was composed: a reader chooses laws of placement, size and hand for the composed
 layers, and the core applies them to the composed document's Score and prints the
 layers they change in numbers (a numeric point, the ends of a row or a line, a
-numeric range, a numeric size) before the commit. An answer the core refuses is
-asked again with the reason as a new action within the same budget. Each result
+numeric range, a numeric size) before the commit; a moved line is printed by its
+ends, cut where the canvas cuts it. The printed document is compiled as the run
+compiles it before it is committed. An answer the core refuses is asked again
+with the reason as a new action within the same budget, also when a mark it
+places at a numeric point does not lie wholly on the canvas. Each result
 echoes action ID, attempt, and request
 digest. Retries preserve the logical action ID and increase its attempt; a new
 action receives a new identity. Corrective Stage 1 normalization is a new action
@@ -86,7 +89,8 @@ provider attempt, but not a delay already accounted for by the core.
 | Stage 1 exhausted or rejected | Fail without a new semantic artifact |
 | Composition reading exhausted or rejected | Place the layers from the default reading and commit; a plan that cannot be composed is committed as Stage 1 printed it |
 | Laws answer refused by the core's rules | Request the laws again with the original message and the reason, using a new logical action within the same laws `max_attempts` and `total_timeout_ms` budget |
-| Laws exhausted, or a laws document that does not compile | Commit the composed document as the composition printed it (`laws_fallback`) |
+| Laws answer whose printed mark at a numeric point leaves the canvas | Request the laws again with the reason that names the layer and its laws, within the same budget |
+| Laws exhausted, or a laws document that compiles to no Score or to more diagnostics or omissions than the composed document | Commit the composed document as the composition printed it (`laws_fallback`) |
 | Hole completion exhausted or rejected | Keep committed DDL and require user editing |
 | Host commit failure | Fail and retain the last acknowledged document and authority |
 | Cancellation | Invalidate the outstanding action; later results are stale |

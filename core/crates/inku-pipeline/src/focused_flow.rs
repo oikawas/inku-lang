@@ -2311,12 +2311,16 @@ fn stage1_system(state: &PipelineSnapshot) -> &str {
 }
 
 fn plan_answer(state: &PipelineSnapshot) -> StepOutput {
+    plan_answer_with(state, &composed_plan_response())
+}
+
+fn plan_answer_with(state: &PipelineSnapshot, plan: &serde_json::Value) -> StepOutput {
     let action = state.action.as_ref().unwrap();
     assert_eq!(action.tag, "generate_normalized_ddl");
     let result = PipelineInput::EffectResult {
         result: EffectResult::NormalizedDdlGenerated {
             identity: action.identity.clone(),
-            response: composed_plan_response().to_string(),
+            response: plan.to_string(),
             elapsed_ms: DecimalU64::new(20),
         },
     };
@@ -2645,6 +2649,22 @@ fn one_law() -> serde_json::Value {
            "reason": "“A red circle” leads the picture."})
 }
 
+/// A plan whose large circle the description places at the bottom.
+fn bottom_circle_plan_response() -> serde_json::Value {
+    json!({"ground": "paper", "background": "white", "plugins": [], "layers": [
+        plan_layer("fill", "square", 1, "unspecified", "large", "gray"),
+        plan_layer("place", "circle", 1, "bottom", "large", "red"),
+    ]})
+}
+
+/// The circle (the composed plan's layer 1) placed by the golden section.
+fn golden(at: &str) -> serde_json::Value {
+    json!({"main_layer": 1, "main_law": "B1", "description_counts": [],
+           "laws": {"B1": {"targets": [{"layer": 1, "at": at}]},
+                    "B21": {"targets": [{"layer": 1, "hand": "still"}]}},
+           "reason": "“A red circle” leads the picture."})
+}
+
 fn event<'a>(output: &'a StepOutput, tag: &str) -> Option<&'a serde_json::Value> {
     output
         .events
@@ -2767,6 +2787,78 @@ fn a_failed_laws_request_commits_the_composed_document() {
         Some(&json!({"failure": "rate_limited"}))
     );
     assert_eq!(committed_source(&state), composed);
+}
+
+#[test]
+fn a_printed_layer_the_canvas_cannot_hold_is_asked_again_with_the_reason() {
+    let start = laws_start(Some(LawsConfig {}));
+    let asked = plan_answer_with(&start, &bottom_circle_plan_response()).snapshot;
+    // The golden section's left line keeps the circle's height at the bottom,
+    // where a large circle at a numeric point crosses the lower edge.
+    let refused = laws_answer(&asked, &golden("line_left"));
+    let retried = event(&refused, "retry_scheduled").expect("a retry");
+    assert_eq!(retried["failure"], "semantic_violation");
+    assert_eq!(retried["detail"], "off_canvas");
+    let again = refused.snapshot.action.as_ref().unwrap();
+    assert_eq!(again.tag, "choose_laws");
+    let message = again.payload["prompt"]["message"].as_str().unwrap();
+    assert!(
+        message.ends_with(
+            "The previous answer could not be used: layer 1 does not fit on the canvas where the \
+             laws on it (B1) place and size it; change or drop those laws\nReturn a corrected answer."
+        ),
+        "{message}"
+    );
+    // The upper left crossing holds it.
+    let chosen = laws_answer(&refused.snapshot, &golden("point_ul"));
+    assert!(
+        event(&chosen, "laws_chosen").is_some(),
+        "{:?}",
+        tags(&chosen)
+    );
+    let source = committed_source(&chosen.snapshot);
+    assert!(
+        source.contains(" at horizontal 0.381966, vertical 0.381966."),
+        "{source}"
+    );
+    let committed = run(
+        Some(&chosen.snapshot),
+        &envelope(Some(&chosen.snapshot), ack(&chosen.snapshot)),
+    )
+    .snapshot;
+    assert!(
+        matches!(committed.phase, PipelinePhase::ScoreReady),
+        "{:?}",
+        committed.phase
+    );
+}
+
+#[test]
+fn a_printed_document_the_run_cannot_take_commits_the_composed_document() {
+    let asked = plan_answer_with(
+        &laws_start(Some(LawsConfig {})),
+        &bottom_circle_plan_response(),
+    )
+    .snapshot;
+    let composed = asked.laws.as_ref().unwrap().document.source.clone();
+    let printed = committed_source(&laws_answer(&asked, &golden("point_ul")).snapshot);
+    // The numbers make the printed document longer than the composed one.
+    assert!(printed.len() > composed.len(), "{printed}");
+    let mut pipeline_config = config();
+    pipeline_config.composition = Some(CompositionConfig { read: false });
+    pipeline_config.laws = Some(LawsConfig {});
+    pipeline_config.prompt_limits.max_source_bytes = composed.len();
+    let start = started_description(pipeline_config);
+    let asked = plan_answer_with(&start, &bottom_circle_plan_response()).snapshot;
+    let output = laws_answer(&asked, &golden("point_ul"));
+    assert_eq!(
+        event(&output, "laws_fallback"),
+        Some(&json!({"failure": "compile"})),
+        "{:?}",
+        tags(&output)
+    );
+    assert_eq!(committed_source(&output.snapshot), composed);
+    assert!(output.snapshot.laws.is_none());
 }
 
 #[test]

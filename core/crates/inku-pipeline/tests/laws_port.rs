@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 use inku_ddl::work_plan::WorkPlanPlugin;
 use inku_ddl::{
     MacroDefinition, MacroLock, NATURE_LEAVES_V1_JSON, NormalizedDdlDocument,
-    ResolvedInstructionLanguage,
+    ResolvedInstructionLanguage, ScoreLoweringOutcome,
 };
 use inku_pipeline::core_boundary::{CompilerOptions, compile_committed};
 use inku_pipeline::laws::{
@@ -201,6 +201,55 @@ fn the_laws_print_as_the_prototype_printed_them() {
         cases.len(),
         failures.join("\n")
     );
+}
+
+/// Every printed document compiles with its run's options as cleanly as a
+/// committed document must: a Score whose lowering did not stop, no resource
+/// failure, no diagnostic and nothing left out. A mark at a numeric point the
+/// canvas cannot hold reads canonically and has no diagnostic, but no Score.
+#[test]
+fn the_printed_documents_compile_to_a_score() {
+    let fixture = fixture();
+    let definitions = definitions();
+    let cases: Vec<&Case> = fixture
+        .cases
+        .iter()
+        .filter(|case| case.answer.is_some())
+        .collect();
+    let failures: Vec<String> = common::par_map(&cases, |case| {
+        let (context, plugins, compiler) = context(case, None, &definitions);
+        let answer = case.answer.as_ref().expect("an answer");
+        let chosen = apply_laws_without_count_rule(answer, &context, &case.composed)
+            .unwrap_or_else(|refusal| panic!("{}: refused {refusal:?}", case.id));
+        let printed = chosen.print.source(language(&case.lang), &plugins);
+        let delivery = compile_committed(
+            document(&printed, language(&case.lang), &definitions),
+            &definitions,
+            &compiler,
+        )
+        .unwrap_or_else(|error| panic!("{}: {error:?}", case.id));
+        let clean = delivery.score.is_some()
+            && delivery.outcome != ScoreLoweringOutcome::Stopped
+            && delivery.resource_failure.is_none()
+            && delivery.upstream_diagnostics.is_empty()
+            && delivery.downstream_diagnostics.is_empty()
+            && delivery.resource_omissions.is_empty()
+            && delivery.relation_omissions.is_empty();
+        (!clean).then(|| {
+            format!(
+                "{}: {:?} {:?} {:?} {:?}",
+                case.id,
+                delivery.outcome,
+                delivery.resource_failure,
+                delivery.upstream_diagnostics,
+                delivery.downstream_diagnostics
+            )
+        })
+    })
+    .into_iter()
+    .flatten()
+    .collect();
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 /// The request is the prototype's: its system text and message in both

@@ -8,14 +8,6 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-19 — Composition: a fill without a place takes the whole canvas
-
-The composition's solver now places a fill layer whose place the description does not state on the whole canvas only, whatever its role and proportion (wide, tall or full width) (the author's decision). A fill cuts its marks at the edge of its range, so a shape placed on a range such as the upper two thirds could be cut off at its edge. A fill on either side of a joint that rests on or crosses, the joined layer or its partner, still takes a range as before. Tile layers and the other actions are unchanged.
-
-- Saved works draw as before: a work saves its composed instructions and Score, and a redraw reads the saved instructions.
-- "Another composition" on a saved work (by principle or by chance) and the layout generations of AI and autonomous refinement use the same candidates, so they change: a fill written with a numeric range moves to the whole canvas, and a work whose combinations exceeded the cap by principle may now be solved.
-- The DDL engine, DDL, Score and render engine versions are unchanged.
-
 ### 2026-10-18 — macOS: 3D PNG and GLB saves start again
 
 In the macOS experimental 3D view, PNG save and GLB save opened no save panel: WKWebView silently dropped the viewer's download link. The viewer's saves now reach the app through the parent page shared with Android. Focus selection works once a shape is clicked to select it, as on the Web.
@@ -178,6 +170,16 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.199 (2026-10-19 / Build 1275)
+
+### 2026-10-19 — Composition: a fill without a place takes the whole canvas
+
+The composition's solver now places a fill layer whose place the description does not state on the whole canvas only, whatever its role and proportion (wide, tall or full width) (the author's decision). A fill cuts its marks at the edge of its range, so a shape placed on a range such as the upper two thirds could be cut off at its edge. A fill on either side of a joint that rests on or crosses, the joined layer or its partner, still takes a range as before. Tile layers and the other actions are unchanged.
+
+- Saved works draw as before: a work saves its composed instructions and Score, and a redraw reads the saved instructions.
+- "Another composition" on a saved work (by principle or by chance) and the layout generations of AI and autonomous refinement use the same candidates, so they change: a fill written with a numeric range moves to the whole canvas, and a work whose combinations exceeded the cap by principle may now be solved.
+- The DDL engine, DDL, Score and render engine versions are unchanged.
 
 ## v2.15.198 (2026-10-19 / Build 1274)
 

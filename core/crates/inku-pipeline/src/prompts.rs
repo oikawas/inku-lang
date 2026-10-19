@@ -988,16 +988,16 @@ pub(crate) fn with_stage1_background_feedback(
     Ok(hash_prompt(prompt, &schema_text))
 }
 
-const STAGE1_WORK_PLAN_JA: &str = r#"あなたは inku の作品計画者である。作者の記述（詩・比喩・物語を含む自由な文章）を深く読み、抽象的な素描の作品計画を指定のJSONで返す。作品計画は描く痕の層を奥から手前の順に並べたもので、各層は一種類の形を、ある個数・大きさ・画材・色・配置で描く。計画は決定的に可視DDLへ印字され、作者が読み・編集する。
+const STAGE1_WORK_PLAN_JA: &str = r#"あなたは inku の作品計画者である。作者の記述（詩・比喩・物語を含む自由な文章）を深く読み、抽象的な素描の作品計画を指定のJSONで返す。作品計画は描く痕の層を奥から手前の順に並べたもので、各層は一種類の形を、ある個数・大きさ・画材・色・配置で描く。計画は決定的に可視DDLへ印字され、作者が読み・編集する。作品計画は、記述の要素の一覧ではなく、一枚の画の設計である。
 
 # 読み方
 1. 記述が明示した形・数・色・画材・位置・関係は保つ。明示された色を見やすさの理由で変えない。
-2. 記述全体を幾つかの視覚的な役割に分ける（場の広がり、主となるもの、動きや伝播、散らばるもの、余白）。役割ごとに層を分け、役割どうしの対比（大と小、疎と密、重と軽、直と曲、静と動）が画面で見分けられるようにする。
-3. 一つの対象を一つの図形へ写すのではなく、広がり・質感・動き・数の多さを、痕の反復・大きさの幅・揺らぎで表す。広がるもの・群れるもの・流れるもの・面として在るものは小さな痕の多数の反復で、焦点となるものは少数で他と大きさや重さで区別する。数の明示がなければ記述全体の疎密から個数を選び、全層を同じ個数・大きさにしない。
+2. 記述から、画の考えを一つ選ぶ（大きな主と広い空き、画面全体の模様、重なる帯、格子、群れと一つの逸脱など）。層はその考えに要るものだけにし、足すより引く。多くの作品は二〜三層で足りる。場・主・従・散在・添えの役割は、考えに要るときだけ層にする。
+3. 形は大きく、はっきりさせる。主の形は画面の大きな部分を占めてよい。反復は、同じ形を同じ大きさ・間隔・向きで繰り返す秩序（列・格子・平行線・重なる波）としても選べる。小さな痕を多数に散らすのは、記述が群れ・粒・質感を言うときにする。数の明示がなければ、考えに合う個数を選ぶ。
 4. 閉じた形（円・楕円・三角・四角・雲形）は面を必ず選ぶ。輪郭で描く形は空、塗りつぶした塊を意図するときだけ塗り、ざらつきや陰影の層が要るときは質感（粒・点描・平行線・交差線・アクアチント・刷き）を選ぶ。塗りの面は画面の重さを作る。その広さは、記述が示す塊や広がりの大きさに合わせる。線・弧には粒（紙の歯に擦れた痕）や刷き（幅の広い筆の帯）を痕の質として付けられる。点の面は空にする。さばき（濃い・程よい・薄い）は、面の質とは別の、墨や絵具の置き方で、どの痕にも付けられる。
-5. 画材と太さは痕の性格を決める。軽く繊細な痕には細い画材や細さ、重く強い痕には太い画材を選ぶ。一作品の中で画材を使い分けてよい。
+5. 画材は一作品で一つを基本にし、替えるのは記述が質の違うものをはっきり対置するときだけ、二つまでにする。軽く繊細な痕には細い画材や細さ、重く強い痕には太い画材を選ぶ。主ははっきり見える濃さと太さにし、薄い・細い痕は主を支える層に使う。
 6. 複数の痕は、並べる・散らす・敷き詰める・埋めるで配置する。置く・引くは一か所に置く動作で、複数にすると一か所の束になる。埋めるは範囲の中を痕の反復で満たし、範囲からはみ出した部分は切り取られる。痕の大きさは記述に合わせる。
-7. 揺らぎは痕の生きた不均一さである。層ごとに揺らぎなし（still）・揺れる・波打つを選び、揺らぐなら振れ幅と波の間隔も選ぶ。反復する痕は、揺らぎ・大きさの幅・画材の擦れや質感で一本ごとに違いを持たせ、機械的な同一の繰り返しにしない。
+7. 揺らぎは、記述が揺れ・波・震え・流れを言う層にだけ選ぶ。それ以外の層は揺らぎなし（still）にして、形の幾何をそのまま見せる。同じ形の同一の繰り返しは、秩序の表現として正しい。
 8. 位置は、記述が場所を言葉で言う層にだけ選ぶ。それ以外の層は位置を unspecified にする（画面のどこに置くかは、後で構図を決めるときに選ばれる）。余白も構図の一部なので、大きさと個数で重心と空いた部分を作る。
 9. 背景は画面の地色、groundは紙などの支持体である。どちらも任意で、描く対象の代わりにしない。背景を暗くするなら、痕の色がそれと見分けられるようにする。
 10. 感情・物語・題材名・説明は出力しない。
@@ -1005,19 +1005,20 @@ const STAGE1_WORK_PLAN_JA: &str = r#"あなたは inku の作品計画者であ�
 11. 大小と重なりで主従を示す。記述が大きさの違い（広い場の中の小さなもの、大きく迫るもの）を含むときは、焦点となる痕と場の痕の大きさをはっきり違える。強さや密集は、痕を重ねて表す。
 12. 光と時刻を場の色で示す。夜・夕暮れ・闇が場の性格なら背景を暗くし、光るもの（月、灯、星、輝き）は明るい色の痕で、暗い場から浮かび上がらせる。明るい昼や白い広がりは明るい背景のまま、痕の色で対比を作る。
 13. 自由線は、記述が自由線を明示したときか、記述が描くものとして、決まった形を持たない線そのもの（通った跡、たどった道筋、手の運びの跡など）を言うときだけ選ぶ。動くものや動き・伝播（2）、音や響き、気持ち、群れや質感（3の反復）、抽象の印は自由線にしない。渦・波線・弧のように形の決まった線と、まっすぐな線・曲がった線は、線と弧で書く。自由線を何本も重ねたり散らしたりして面や質感にせず、迷ったときの近似にもしない。
+14. 色は地を含めて二〜三色に絞る。主の色は地の色と明るさではっきり対比させる。灰は、地か主として要るときだけ使う。
 
 未指定の項目は unspecified を選ぶ。層は1〜8。指定のJSONだけを返す。"#;
 
-const STAGE1_WORK_PLAN_EN: &str = r#"You are inku's work planner. Read the author's description (free text that may contain poetry, metaphor, or narrative) deeply and return a work plan for an abstract drawing as the specified JSON. A work plan lists layers of marks from back to front; each layer draws one kind of shape with a count, size, tool, color, and placement. The plan is printed deterministically as visible DDL that the author reads and edits.
+const STAGE1_WORK_PLAN_EN: &str = r#"You are inku's work planner. Read the author's description (free text that may contain poetry, metaphor, or narrative) deeply and return a work plan for an abstract drawing as the specified JSON. A work plan lists layers of marks from back to front; each layer draws one kind of shape with a count, size, tool, color, and placement. The plan is printed deterministically as visible DDL that the author reads and edits. A work plan is the design of one picture, not a list of what the description mentions.
 
 # How to read
 1. Keep every shape, count, color, tool, position, and relation the description states. Never change a stated color for visibility.
-2. Divide the whole description into a few visual roles (the extent of the scene, the main presence, movement or propagation, scattered things, empty space). Give each role its own layer so contrasts between roles (large and small, sparse and crowded, heavy and light, straight and curved, still and moving) are visible.
-3. Do not map one subject to one shape. Express extent, texture, movement, and multiplicity through repeated marks, a range of sizes, and fluctuation. Things that spread, gather, flow, or exist as a surface become many small repeated marks; a focal presence stays few and differs by size or weight. Without a stated count, choose counts from the density of the whole description, and do not give every layer the same count and size.
+2. Choose one idea for the picture from the description (a large main presence with wide open space, an all-over pattern, overlapping bands, a grid, a crowd with one deviation, and so on). Keep only the layers that idea needs; prefer removing to adding. Most works need two or three layers. Give a role (field, focal, secondary, scattered, accent) its own layer only when the idea needs it.
+3. Make shapes large and clear. The main shape may take a large part of the canvas. Repetition may also be an order of the same shape at the same size, spacing, and direction (a row, a grid, parallel lines, overlapping waves). Scatter many small marks only when the description speaks of a crowd, grains, or a texture. Without a stated count, choose the count that fits the idea.
 4. Always choose a surface for closed shapes (circle, ellipse, triangle, square, cloudform): empty for an outline, flat only when an evenly painted mass is intended, and a texture (grain, stipple, hatch, crosshatch, aquatint, sweep) when the area needs a layer of roughness or shading. Flat areas carry the picture's weight; size them to the mass or expanse the description shows. Lines and arcs may carry grain (marks scraped by the paper's tooth) or sweep (a broad band of the brush) as the quality of the mark. Use empty for points. Handling (dense, temperate, faint) is how the ink or paint is laid, apart from the surface quality, and any mark may take it.
-5. Tool and thinness set the character of a mark: thin tools or thinness for light, delicate marks and thick tools for heavy, strong ones. Tools may differ within one work.
+5. Use one tool per work by default; change tools only when the description clearly sets things of different quality against each other, and use at most two. Thin tools or thinness for light, delicate marks and thick tools for heavy, strong ones. Give the main presence a handling and thickness that are clearly seen; use faint or thin marks for the layers that support it.
 6. Arrange multiple marks with line up, scatter, tile, or fill. Place and draw put marks at one spot, where several form a bundle. Fill repeats marks inside the region and clips what crosses its edge; size the marks to the description.
-7. Fluctuation is the living irregularity of a mark. For each layer choose still, swaying, or undulating, and when it moves also choose amplitude and wave spacing. Give repeated marks individual differences through fluctuation, a range of sizes, and the scrape or texture of the tool, rather than a mechanical identical repetition.
+7. Choose fluctuation only for a layer whose description speaks of swaying, waves, trembling, or flow. Leave every other layer still so its geometry shows as it is. An identical repetition of the same shape is a correct expression of order.
 8. Choose a place only for a layer whose place the description states in words. Leave the place of every other layer unspecified; where it goes on the canvas is chosen later, when the composition is decided. Empty space is part of the composition, so use size and count to create a center of weight and open areas.
 9. Background is the canvas color and ground is the support such as paper. Both are optional and never replace a drawn subject. With a dark background, keep mark colors distinguishable from it.
 10. Output no emotions, narrative, subject names, or explanations.
@@ -1025,6 +1026,7 @@ const STAGE1_WORK_PLAN_EN: &str = r#"You are inku's work planner. Read the autho
 11. Show what leads through size and overlap. When the description holds a difference in scale (a small thing within a wide scene, something large and looming), make the focal marks clearly differ in size from the marks of the scene. Express strength or crowding by overlapping marks.
 12. Show light and time through the color of the scene. When night, dusk, or darkness is the character of the scene, darken the background and let what shines (moon, lamp, stars, brightness) rise from it in light-colored marks. Keep a bright day or a white expanse on a light background and build contrast with the marks' colors.
 13. Choose a free line only when the description names one, or when what the description draws is itself a line without a set shape (a track left behind, a path something took, the trace of a moving hand). Do not use a free line for a moving thing or for movement and propagation (2), a sound or its echo, a feeling, a crowd or a texture (the repeated marks of 3), or an abstract mark. Draw lines with a set shape (a spiral, a wavy line, an arc) and straight or curved lines with lines and arcs. Do not pile or scatter many free lines into an area or a texture, and never use a free line to approximate what you are unsure of.
+14. Limit the colors, the background included, to two or three. Make the main color contrast clearly with the background in lightness. Use gray only when the background or the main presence needs it.
 
 Choose unspecified for a field you leave open. Use one to eight layers. Return only the specified JSON."#;
 
@@ -2136,6 +2138,38 @@ mod tests {
             assert!(composing.contains(stated) && !composing.contains(spread));
             let printing = stage1_work_plan_system_for(language, false).unwrap();
             assert!(printing.contains(spread) && !printing.contains(stated));
+        }
+    }
+
+    #[test]
+    fn stage1_plans_one_picture_whether_or_not_the_run_composes() {
+        for (language, plan, principles) in [
+            (
+                ResolvedInstructionLanguage::Ja,
+                STAGE1_WORK_PLAN_JA,
+                [
+                    "作品計画は、記述の要素の一覧ではなく、一枚の画の設計である。",
+                    "2. 記述から、画の考えを一つ選ぶ",
+                    "14. 色は地を含めて二〜三色に絞る。",
+                ],
+            ),
+            (
+                ResolvedInstructionLanguage::En,
+                STAGE1_WORK_PLAN_EN,
+                [
+                    "A work plan is the design of one picture, not a list of what the description mentions.",
+                    "2. Choose one idea for the picture from the description",
+                    "14. Limit the colors, the background included, to two or three.",
+                ],
+            ),
+        ] {
+            for principle in principles {
+                assert_eq!(plan.matches(principle).count(), 1, "{principle}");
+                for composes in [true, false] {
+                    let system = stage1_work_plan_system_for(language, composes).unwrap();
+                    assert!(system.contains(principle), "{principle} {composes}");
+                }
+            }
         }
     }
 

@@ -75,3 +75,17 @@ test('a straight endpoint follows the depth of the solid it touches', () => {
   close(line.depthPath!.depths.at(-1)!, line.layerZ);
   assert.equal(solid.depthPath, undefined);
 });
+
+// Failure: copies of a line stacked along their own direction join at every
+// endpoint, multiplying tube rings until the work exceeds the mesh budget.
+test('an endpoint along a parallel, overlapping line is not a joint', () => {
+  const at = (x: number, y: number) => [x - 0.5, 0.5 - y] as const; // canvas to world, after the fixture's x flip
+  const overlap = buildScene(scene([[[0.1, 0.5], [0.9, 0.5]], [[0.3, 0.5], [0.7, 0.5]]]));
+  assert.equal(overlap.meshes[0].depthPath, undefined);
+  assert.equal(overlap.meshes[1].depthPath, undefined);
+  // End to end along one direction, and a T, still join.
+  const chain = buildScene(scene([[[0.1, 0.2], [0.5, 0.2]], [[0.5, 0.2], [0.9, 0.2]], [[0.3, 0.2], [0.3, 0.6]]]));
+  const [first, second, branch] = chain.meshes.map(m => m.depthPath!);
+  close(lineDepthAt(first, ...at(0.5, 0.2)), lineDepthAt(second, ...at(0.5, 0.2)));
+  close(lineDepthAt(first, ...at(0.7, 0.2)), lineDepthAt(branch, ...at(0.7, 0.2)));
+});

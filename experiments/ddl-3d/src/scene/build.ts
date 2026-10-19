@@ -32,7 +32,9 @@ function attributes(geometry: BufferGeometry): BufferGeometry {
 
 function combine(parts: BufferGeometry[]): BufferGeometry {
   if (!parts.length) throw new Error('empty_geometry');
-  const source = parts.map(g => attributes(g.index ? g.toNonIndexed() : g));
+  // Tubes share their ring vertices; keep that unless a part has no index.
+  const indexed = parts.every(g => g.index);
+  const source = parts.map(g => attributes(g.index && !indexed ? g.toNonIndexed() : g));
   const merged = mergeGeometries(source, false);
   for (const geometry of new Set([...parts, ...source])) geometry.dispose();
   if (!merged) throw new Error('geometry_merge_failed');

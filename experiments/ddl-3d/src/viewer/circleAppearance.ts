@@ -1,6 +1,6 @@
 import {
   BufferGeometry, CanvasTexture, ClampToEdgeWrapping, Float32BufferAttribute, FrontSide,
-  Mesh, MeshBasicMaterial, SRGBColorSpace, Vector3,
+  Mesh, MeshBasicMaterial, SRGBColorSpace, Uint32BufferAttribute, Vector3,
 } from 'three';
 import type { MeshPacket, XY } from '../scene/types.ts';
 
@@ -68,38 +68,56 @@ export function sidePaintPixels(data: Uint8ClampedArray, color: string): Uint8Cl
   return output;
 }
 
-/** Caps retain canvas UVs; walls unfold Z across the same filtered paint. */
+/** Caps retain canvas UVs; walls unfold Z across the same filtered paint.
+ * A source vertex is shared by every triangle that maps it the same way. */
 export function mapPaintSurfaces(geometry: BufferGeometry, bounds: [number, number, number, number],
   canvas: XY, walls: boolean): BufferGeometry {
-  const mapped = geometry.index ? geometry.toNonIndexed() : geometry;
-  mapped.computeBoundingBox(); mapped.clearGroups();
-  const box = mapped.boundingBox!, size = box.max.clone().sub(box.min);
-  const positions = mapped.getAttribute('position'), uv = new Float32Array(positions.count * 2);
+  geometry.computeBoundingBox();
+  const box = geometry.boundingBox!, size = box.max.clone().sub(box.min);
+  const positions = geometry.getAttribute('position'), normals = geometry.getAttribute('normal');
+  const index = geometry.index, corners = index ? index.count : positions.count;
+  const source = (corner: number) => index ? index.getX(corner) : corner;
+  // Cap, X-facing wall or Y-facing wall: each maps a source vertex to one UV.
+  const mapped = new Map<number, number>(), order: number[] = [], faces: number[] = [];
+  const triangles = new Uint32Array(corners);
   const a = new Vector3(), b = new Vector3(), c = new Vector3();
+  const result = new BufferGeometry();
   let lastMaterial = -1, groupStart = 0;
-  for (let i = 0; i < positions.count; i += 3) {
-    a.fromBufferAttribute(positions, i); b.fromBufferAttribute(positions, i + 1); c.fromBufferAttribute(positions, i + 2);
+  for (let i = 0; i < corners; i += 3) {
+    a.fromBufferAttribute(positions, source(i)); b.fromBufferAttribute(positions, source(i + 1)); c.fromBufferAttribute(positions, source(i + 2));
     const normal = b.sub(a).cross(c.sub(a)).normalize();
     const wall = walls && Math.abs(normal.z) < 0.5;
-    const material = wall ? 1 : 0;
+    const material = wall ? 1 : 0, face = !wall ? 0 : Math.abs(normal.x) > Math.abs(normal.y) ? 1 : 2;
     if (material !== lastMaterial) {
-      if (lastMaterial >= 0) mapped.addGroup(groupStart, i - groupStart, lastMaterial);
+      if (lastMaterial >= 0) result.addGroup(groupStart, i - groupStart, lastMaterial);
       lastMaterial = material; groupStart = i;
     }
     for (let j = i; j < i + 3; j++) {
-      let u = (positions.getX(j) + canvas[0] / 2 - bounds[0]) / bounds[2];
-      let v = 1 - (canvas[1] / 2 - positions.getY(j) - bounds[1]) / bounds[3];
-      if (wall) {
-        const z = (positions.getZ(j) - box.min.z) / Math.max(1e-8, size.z);
-        if (Math.abs(normal.x) > Math.abs(normal.y)) u = 0.15 + z * 0.7;
-        else v = 0.15 + z * 0.7;
-      }
-      uv[j * 2] = u; uv[j * 2 + 1] = v;
+      const key = source(j) * 3 + face;
+      let vertex = mapped.get(key);
+      if (vertex === undefined) { vertex = order.length; mapped.set(key, vertex); order.push(source(j)); faces.push(face); }
+      triangles[j] = vertex;
     }
   }
-  if (lastMaterial >= 0) mapped.addGroup(groupStart, positions.count - groupStart, lastMaterial);
-  mapped.setAttribute('uv', new Float32BufferAttribute(uv, 2));
-  return mapped;
+  if (lastMaterial >= 0) result.addGroup(groupStart, corners - groupStart, lastMaterial);
+  const position = new Float32Array(order.length * 3), normal = new Float32Array(order.length * 3), uv = new Float32Array(order.length * 2);
+  order.forEach((vertex, k) => {
+    const x = positions.getX(vertex), y = positions.getY(vertex), z = positions.getZ(vertex);
+    position.set([x, y, z], k * 3);
+    if (normals) normal.set([normals.getX(vertex), normals.getY(vertex), normals.getZ(vertex)], k * 3);
+    let u = (x + canvas[0] / 2 - bounds[0]) / bounds[2];
+    let v = 1 - (canvas[1] / 2 - y - bounds[1]) / bounds[3];
+    const depth = (z - box.min.z) / Math.max(1e-8, size.z);
+    if (faces[k] === 1) u = 0.15 + depth * 0.7;
+    else if (faces[k] === 2) v = 0.15 + depth * 0.7;
+    uv[k * 2] = u; uv[k * 2 + 1] = v;
+  });
+  result.setAttribute('position', new Float32BufferAttribute(position, 3));
+  if (normals) result.setAttribute('normal', new Float32BufferAttribute(normal, 3));
+  result.setAttribute('uv', new Float32BufferAttribute(uv, 2));
+  result.setIndex(new Uint32BufferAttribute(triangles, 1));
+  result.boundingBox = box.clone();
+  return result;
 }
 
 /** Rasterize the shared SVG filters once, then paint caps and solid walls. */

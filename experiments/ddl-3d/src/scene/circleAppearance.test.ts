@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { paintedRadii, rasterSizedSvg } from '../viewer/circleAppearance.ts';
+import { SphereGeometry } from 'three';
+import { mapPaintSurfaces, paintedRadii, rasterSizedSvg } from '../viewer/circleAppearance.ts';
 import { buildScene } from './build.ts';
 import type { PreparedScene } from './types.ts';
 
@@ -46,4 +47,24 @@ test('raster-sized SVG changes only the root width and height', () => {
     + '<rect width="5" height="6"/></svg>');
   const unsized = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="5" height="6"/></svg>';
   assert.equal(rasterSizedSvg(unsized, 341, 236), unsized);
+});
+
+// Failure: painting expands every triangle corner into its own vertex, or the
+// worker already expanded a tube, multiplying GPU memory, GLB size and depth work.
+test('painted surfaces keep shared vertices and the same corners', () => {
+  const sphere = new SphereGeometry(0.1, 8, 6).translate(0.2, -0.1, 0);
+  const shared = mapPaintSurfaces(sphere.clone(), [0.2, 0.2, 0.4, 0.4], [1, 1], true);
+  const expanded = mapPaintSurfaces(sphere.clone().toNonIndexed(), [0.2, 0.2, 0.4, 0.4], [1, 1], true);
+  assert.ok(shared.index, 'indexed');
+  assert.ok(shared.getAttribute('position').count < expanded.getAttribute('position').count);
+  const corners = shared.toNonIndexed();
+  for (const name of ['position', 'normal', 'uv']) assert.deepEqual(corners.getAttribute(name).array, expanded.getAttribute(name).array, name);
+  assert.deepEqual(shared.groups, expanded.groups);
+  const tube = buildScene({ ok: true, inputDigest: '', schemaDigest: '', mappingVersion: '', engineVersion: 1,
+    scene: { canvas: [1, 1], background: '#ffffff', ground: false, diagnostics: [], recoveries: [], marks: [{
+      sourceIndex: 0, performedIndex: 0, instanceIndex: 0, primitive: 'line',
+      shape: { kind: 'path', points: [[0.1, 0.5], [0.9, 0.5]] }, transform: [1, 0, 0, 1, 0, 0],
+      color: '#333333', width: 0.01, filled: false, opacity: 1, dash: [], weight: 'rotring', clips: [],
+    }] } });
+  assert.ok(tube.meshes[0].indices, 'worker keeps the tube indexed');
 });

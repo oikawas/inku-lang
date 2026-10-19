@@ -73,7 +73,7 @@ export class Viewer {
     this.model.name = 'DDL solids';
     this.model.userData = { inputDigest: packet.inputDigest, mappingVersion: packet.mappingVersion,
       schemaDigest: packet.schemaDigest, engineVersion: packet.engineVersion, diagnostics: packet.diagnostics, recoveries: packet.recoveries, emptyPaths: packet.emptyPaths,
-      layerMapping: 'paint-order-joints-v3', layerCount: packet.layerCount, layerSpacing: this.layerSpacing };
+      layerMapping: 'paint-order-joints-v4', layerCount: packet.layerCount, layerSpacing: this.layerSpacing };
     const groups = new Map<number, THREE.Group>();
     for (const data of packet.meshes) {
       const mesh = new THREE.Mesh(unpackMesh(data), this.material(data.color, data.opacity));

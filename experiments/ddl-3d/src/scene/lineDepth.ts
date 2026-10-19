@@ -82,6 +82,11 @@ export function lineDepthLayout(marks: GeometryMark[], canvas: XY) {
       if (!squared) return;
       const t = Math.max(0, Math.min(1, ((point[0] - a[0])*dx + (point[1] - a[1])*dy) / squared));
       if (length(point, lerp(a, b, t)) > tolerance) return;
+      // Copies stacked along their own direction overlap rather than meet;
+      // only their ends touching each other still join.
+      const inside = (t > 0 || i > 0) && (t < 1 || i < target.world.length - 2);
+      const next = end ? path.world.at(-2)! : path.world[1], ox = next[0] - point[0], oy = next[1] - point[1];
+      if (inside && Math.abs(ox * dy - oy * dx) <= 1e-9 * Math.hypot(ox, oy) * Math.sqrt(squared)) return;
       const distance = target.distances[i] + t * Math.sqrt(squared);
       let knot = target.knots.find(k => Math.abs(k.distance - distance) <= tolerance);
       if (!knot) { knot = { distance, node: node() }; target.knots.push(knot); }

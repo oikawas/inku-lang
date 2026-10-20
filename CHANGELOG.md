@@ -8,6 +8,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-21 — The laws stage's retries carry the refused answer, and a semicircle no longer drops out of the print
+
+When the laws stage refuses an answer and asks again, the request now carries the refused answer as it was written along with the reason. Before, it carried the reason only, and the model mostly wrote a new answer that was often refused somewhere else. An answer too long to read is not repeated. This holds for the laws stage of a description run and for the laws move of the AI refinement; the color stage's retries still carry the reason only.
+
+When the laws or color stage printed a semicircle's size in numbers, its chord and sagitta were rounded apart, so the sagitta could pass half the chord by a hair and the compile dropped the arc (card C4's shrink, for one). The sagitta is now written at most half the written chord. Before, a description run committed its composed document without laws there, and the laws move stopped with `laws_compile`.
+
 ### 2026-10-20 — Android: choose whether a model is used for LLM or Vision in the settings
 
 As in Server's model administration, a connection's Model selection now has LLM and Vision toggles for each published model. The drawing model chooser and model inspection offer only the models used for LLM, and the Vision chooser of Juxtapose and Autonomous refinement only those used for Vision. A connection card shows its published models in an LLM row and a Vision row. A purpose a model gave no response to when measured cannot be chosen.

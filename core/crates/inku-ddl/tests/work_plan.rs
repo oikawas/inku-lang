@@ -502,6 +502,35 @@ fn numeric_places_and_sizes_print_where_the_compiler_reads_them() {
             "画面の横0.5、縦0.5の位置に、弦長0.2、矢高0.05の弧を1個引く。",
             "Draw one arc chord 0.2, sagitta 0.05 at horizontal 0.5, vertical 0.5.",
         ),
+        // A semicircle whose sagitta, rounded alone, would pass half the
+        // written chord (0.046729 against 0.0467285) is written at that half
+        // cut to six decimals; one that stays within keeps its digits.
+        (
+            numeric_layer("arc", "draw", 1, &[]),
+            NumericWriting {
+                place: point(0.5, 0.5),
+                size: Some(NumericSize::ChordSagitta {
+                    chord: 0.093_457_2,
+                    sagitta: 0.046_728_6,
+                }),
+                ..NumericWriting::default()
+            },
+            "画面の横0.5、縦0.5の位置に、弦長0.093457、矢高0.046728の弧を1個引く。",
+            "Draw one arc chord 0.093457, sagitta 0.046728 at horizontal 0.5, vertical 0.5.",
+        ),
+        (
+            numeric_layer("arc", "draw", 1, &[]),
+            NumericWriting {
+                place: point(0.5, 0.5),
+                size: Some(NumericSize::ChordSagitta {
+                    chord: 0.151_216_8,
+                    sagitta: 0.075_608_4,
+                }),
+                ..NumericWriting::default()
+            },
+            "画面の横0.5、縦0.5の位置に、弦長0.151217、矢高0.075608の弧を1個引く。",
+            "Draw one arc chord 0.151217, sagitta 0.075608 at horizontal 0.5, vertical 0.5.",
+        ),
         (
             numeric_layer("triangle", "place", 1, &[]),
             NumericWriting {

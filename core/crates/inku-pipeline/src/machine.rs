@@ -1809,10 +1809,10 @@ impl PipelineSnapshot {
     }
 
     /// Read the laws reply, apply it and commit the document the laws printed.
-    /// A reply the tool refuses is asked again with the reason within the
-    /// stage's budget, also when the printed document cannot hold a layer the
-    /// laws changed on the canvas. When the budget is spent, or the printed
-    /// document does not compile as the composed one did, the composed
+    /// A reply the tool refuses is asked again with the reply and the reason
+    /// within the stage's budget, also when the printed document cannot hold
+    /// a layer the laws changed on the canvas. When the budget is spent, or the
+    /// printed document does not compile as the composed one did, the composed
     /// document is committed as it is.
     fn laws_response(
         &mut self,
@@ -1836,7 +1836,14 @@ impl PipelineSnapshot {
             Ok(chosen) => chosen,
             Err(refusal) => {
                 let description = description.ok_or(ProtocolError::InternalInvariant)?;
-                return self.ask_laws_again(&context, &refusal, description, spent_ms, events);
+                return self.ask_laws_again(
+                    &context,
+                    &refusal,
+                    response,
+                    description,
+                    spent_ms,
+                    events,
+                );
             }
         };
         let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
@@ -1863,7 +1870,14 @@ impl PipelineSnapshot {
             .and_then(|instruction| laws::off_canvas(&chosen, &context, instruction))
         {
             let description = description.ok_or(ProtocolError::InternalInvariant)?;
-            return self.ask_laws_again(&context, &refusal, description, spent_ms, events);
+            return self.ask_laws_again(
+                &context,
+                &refusal,
+                response,
+                description,
+                spent_ms,
+                events,
+            );
         }
         if compiled.score().is_none() || shortfalls(&compiled) > composed_shortfalls {
             return self.laws_fallback(json!({"failure": "compile"}), events);
@@ -1907,13 +1921,14 @@ impl PipelineSnapshot {
         )
     }
 
-    /// Ask for the laws again with the tool's reason for refusing the answer, as
-    /// the next attempt of the stage's budget; when it is spent, commit the
-    /// composed document.
+    /// Ask for the laws again with the refused answer and the tool's reason for
+    /// refusing it, as the next attempt of the stage's budget; when it is
+    /// spent, commit the composed document.
     fn ask_laws_again(
         &mut self,
         context: &LawsContext,
         refusal: &laws::Refusal,
+        answer: &str,
         description: String,
         spent_ms: u64,
         events: &mut Vec<PipelineEvent>,
@@ -1961,7 +1976,9 @@ impl PipelineSnapshot {
                 self.config.language,
                 self.config.prompt_limits,
             )
-            .and_then(|prompt| laws::with_laws_feedback(prompt, refusal, self.config.prompt_limits))
+            .and_then(|prompt| {
+                laws::with_laws_feedback(prompt, refusal, Some(answer), self.config.prompt_limits)
+            })
             .ok()
         });
         let (Some(next), Some(prompt)) = (next, prompt) else {

@@ -52,7 +52,8 @@ READING = {
 
 
 def _laws_refused(action: dict) -> dict:
-    # A refusal is not asked again: the run commits the composed document.
+    # A refusal is not asked again: the run commits the composed document. The
+    # color stage after the laws (a default) is refused the same way.
     return {"tag": "provider_failed", "identity": action["identity"],
             "failure": "provider_rejected", "elapsed_ms": "0"}
 
@@ -89,7 +90,7 @@ def sent(monkeypatch):
 
         def __call__(self, action):
             actions.append(action)
-            if action["tag"] == "choose_laws":
+            if action["tag"] in ("choose_laws", "choose_colors"):
                 return _laws_refused(action)
             tag, answer, elapsed = answers[action["tag"]]
             return {"tag": tag, "identity": action["identity"],
@@ -108,7 +109,9 @@ def test_a_description_is_composed_from_its_reading(author, sent):
         "description": DESCRIPTION, "stage1_model": "nvidia:poolside/laguna-xs-2.1",
     }, headers=author)
     assert painted.status_code == 200, painted.text
-    assert [action["tag"] for action in sent] == ["generate_normalized_ddl", "read_composition", "choose_laws"]
+    assert [action["tag"] for action in sent] == [
+        "generate_normalized_ddl", "read_composition", "choose_laws", "choose_colors",
+    ]
     reading = sent[1]["payload"]["prompt"]
     assert reading["message"].startswith("記述:\n" + DESCRIPTION + "\n")
     assert "〔下絵が付けた場所: 下〕" in reading["message"]
@@ -151,7 +154,7 @@ def test_a_free_line_is_written_in_the_direction_its_reading_moves_it(author, mo
             pass
 
         def __call__(self, action):
-            if action["tag"] == "choose_laws":
+            if action["tag"] in ("choose_laws", "choose_colors"):
                 return _laws_refused(action)
             tag, answer, elapsed = answers[action["tag"]]
             return {"tag": tag, "identity": action["identity"],

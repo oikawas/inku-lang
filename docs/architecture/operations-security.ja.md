@@ -9,7 +9,7 @@
 - 117 endpointのうちguardなしは理由付きallowlist 3 pathだけで、live routeをtestが列挙する。共有pipelineの`/api/pipeline/*`は各routeで`_current_user`を要求し、認証済みの利用者をexecution・variation・historyの所有者として全操作へ渡す。他人のexecutionやhistory linkは所有者の不一致で見えない。
 - ChatGPTの接続APIは同じsession guardに明示有効化・モード・起動・owner検証を重ねる。HTTPには本人の非秘密stateだけを返し、自己ホスト認証はMac loopbackと封印した一登録の保護移送を使う。host専用鍵・単一refresh所有者・profile/generation固定と通信cancelを[接続仕様](../guide/chatgpt-plan.ja.md)に記す。
 - clientはsnapshot、authority sidecar、effect結果、資源policy、`render` commandを送れない。資源上限はinstallationのmanifestと管理者設定から解決し、作品の保存済みbudgetは上げられない。保存済みScoreも自分の予算を自己申告できず、Serverが所有するhistory linkを持つ作品だけが保存policyで再演される。
-- `INKU_DEVELOPER_MODE`が有効なときだけ、要求は`developer_disable_llm_retries`（全LLM段を1回に限定）、`developer_capture_provider_io`（provider送受信の原文を記録）、`developer_colors_stage`（まだ既定でない配色の段を実行に持たせる）を指定できる。記録は送信前に作れた場合だけ送信し、URL・header・credential・接続設定・例外文を持たず、同じ所有者だけが`/api/pipeline/executions/{id}/provider-observations`で読む。developer mode外の指定は拒否する。
+- `INKU_DEVELOPER_MODE`が有効なときだけ、要求は`developer_disable_llm_retries`（全LLM段を1回に限定）、`developer_capture_provider_io`（provider送受信の原文を記録）、`developer_colors_stage`（既定の配色の段を、保存した設定に段の無い実行にも持たせる）を指定できる。記録は送信前に作れた場合だけ送信し、URL・header・credential・接続設定・例外文を持たず、同じ所有者だけが`/api/pipeline/executions/{id}/provider-observations`で読む。developer mode外の指定は拒否する。
 - request body上限、process-wide request concurrency、render concurrencyを別々に持つ。
 
 ```mermaid

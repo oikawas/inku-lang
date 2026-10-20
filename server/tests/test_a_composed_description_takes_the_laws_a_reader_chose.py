@@ -76,7 +76,9 @@ def author():
 
 @pytest.fixture
 def sent(monkeypatch):
-    """Stage 1, the reader and the laws stage each answering once, keeping each action."""
+    """Stage 1, the reader and the laws stage each answering once, keeping each
+    action. The color stage after the laws (a default) is refused once, so the
+    run commits the document the laws printed."""
     actions: list[dict] = []
     answers = {
         "generate_normalized_ddl": ("normalized_ddl_generated", PLAN, "3"),
@@ -90,6 +92,9 @@ def sent(monkeypatch):
 
         def __call__(self, action):
             actions.append(action)
+            if action["tag"] == "choose_colors":
+                return {"tag": "provider_failed", "identity": action["identity"],
+                        "failure": "provider_rejected", "elapsed_ms": "0"}
             tag, answer, elapsed = answers[action["tag"]]
             return {"tag": tag, "identity": action["identity"],
                     "response": json.dumps(answer, ensure_ascii=False), "elapsed_ms": elapsed}
@@ -103,7 +108,9 @@ def test_a_composed_description_is_printed_with_the_laws_its_reader_chose(author
         "description": DESCRIPTION, "stage1_model": "nvidia:poolside/laguna-xs-2.1",
     }, headers=author)
     assert painted.status_code == 200, painted.text
-    assert [action["tag"] for action in sent] == ["generate_normalized_ddl", "read_composition", "choose_laws"]
+    assert [action["tag"] for action in sent] == [
+        "generate_normalized_ddl", "read_composition", "choose_laws", "choose_colors",
+    ]
     laws = sent[2]["payload"]["prompt"]
     assert DESCRIPTION in laws["message"]
 

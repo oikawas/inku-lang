@@ -2,8 +2,8 @@
 
 After the laws stage the shared pipeline can ask a reader for the color laws
 the work uses, and prints the colors they change before the commit. The color
-stage is not a default yet: a run started in developer mode asks for it with
-the option `developer_colors_stage`. The run carries the seed the work is
+stage is a default; in developer mode the option `developer_colors_stage`
+also gives it to a run whose configuration has none. The run carries the seed the work is
 drawn with, so that the stage's estimate of the drawing lays a scatter's
 marks where the picture does, and the catalog's names of the nine paints the
 request shows. The request is sent with Stage 1's model, timed apart from

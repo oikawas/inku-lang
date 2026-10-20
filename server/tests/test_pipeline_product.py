@@ -62,7 +62,7 @@ def test_developer_retry_opt_in_does_not_change_the_normal_default():
     assert [normal[name]["max_attempts"] for name in normal] == [4, 4, 4]
     with pytest.raises(CandidateHostError, match="developer_mode_required"):
         _apply_developer_options(normal, {"developer_capture_provider_io": True}, developer_mode=False)
-    # The color stage is tried in developer mode only, before it is a default.
+    # The option that adds the color stage to a run without one asks for developer mode.
     with pytest.raises(CandidateHostError, match="developer_mode_required"):
         _apply_developer_options(normal, {"developer_colors_stage": True}, developer_mode=False)
     assert "colors" not in normal

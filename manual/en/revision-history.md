@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-20 — The color stage as a default
+
+With the color stage now a default of drawing from a description, the laws paragraph in Creating Images no longer says that it is being tried: it says which colors the stage keeps, which it chooses again, how a work is settled when no colors can be laid, and that a refinement drawn from a work saved before the default does not take it. The waiting indicator `Choosing the colors…` is no longer described as one of a trial run.
+
 ## 2026-10-20 — The color stage after the laws (a trial)
 
 With a color stage, which chooses a work's colors by laws of color after the laws stage, now open to trial, the laws paragraph in Creating Images says that the stage exists and that the default drawing does not take it yet. The waiting indicator in a run that tries it (`Choosing the colors…`) and the color stage in the Prompts tab are described too.

@@ -106,6 +106,10 @@ def default_manifest(binding: PipelineBinding) -> dict:
             # Then lay the laws a reader chooses for the composed plan, printed in
             # numbers before the commit (SPEC 12.6.4). Its budget is the catalog's.
             "laws": {},
+            # Then the color laws a reader chooses for the document the laws
+            # left (SPEC 12.6.5), a default since 2026-10-20. The run's render
+            # seed is added when it starts.
+            "colors": {},
         },
         "render": {
             "options": {"canvas": {"width": CANVAS_BASE_PX, "height": CANVAS_BASE_PX}, "svg_profile": "display"},

@@ -43,7 +43,9 @@ def pytest_sessionfinish(session, exitstatus):
     from inku_server.api_core.thumbnails import shutdown_bake_pool
 
     shutdown_bake_pool()
-    for path in (_TEST_DB_PATH, _TEST_THUMBS_PATH):
+    # The AI refinement's run store is derived beside the canonical file, named after it.
+    runs = _TEST_DB_PATH.with_name(f"{_TEST_DB_PATH.stem}-autonomous-runs.db") if _TEST_DB_PATH else None
+    for path in (_TEST_DB_PATH, _TEST_THUMBS_PATH, runs):
         if path is None:
             continue
         try:

@@ -56,6 +56,9 @@ LINEAGE_DERIVATION_KINDS = {
     # or absent). The web client has sent this since v2.9.37; until v2.11.3 the
     # server did not know the name and the whole save was lost ([I-137]).
     "sketch_grain_change",
+    # The AI refinement's laws move: the laws stage again on the parent's saved
+    # DDL (2026-10-21). The Server's run saves it; no client sends it.
+    "laws_change",
 }
 
 

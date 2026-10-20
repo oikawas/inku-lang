@@ -13,6 +13,7 @@ gives the answer back. It saves nothing.
 
 from __future__ import annotations
 
+import base64
 import importlib
 import json
 import random
@@ -21,11 +22,17 @@ from functools import lru_cache
 from types import ModuleType
 from typing import Any
 
-from .autonomous_refine import _png_data_url
+from inku_analysis.rasterizer import svg_to_png
+
 from .model_settings import provider_for_model
 from .vision_client import vision_connection, vision_text
 
 CHOICES = 4
+
+
+def _png_data_url(svg: str) -> str:
+    png = svg_to_png(svg, width=768, height=768)
+    return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
 
 
 class JuxtapositionAnswerError(RuntimeError):

@@ -42,6 +42,7 @@ EXPECTED_KINDS = {
     "ground_change",
     "hacho_change",
     "language_comparison",
+    "laws_change",
     "layout_change",
     "model_comparison",
     "reinterpretation",
@@ -57,11 +58,13 @@ EXPECTED_KINDS = {
 # Kinds the server names but no web screen sends. Four are reserved for
 # operations that do not exist yet on either side (`hacho` / `renga` / `age`
 # have no implementation anywhere); `render_engine_change` and
-# `external_seed_change` are written by other paths.
+# `external_seed_change` are written by other paths, and `laws_change` by the
+# Server's AI refinement run (2026-10-21).
 RESERVED_WITHOUT_A_WEB_SENDER = {
     "age_change",
     "external_seed_change",
     "hacho_change",
+    "laws_change",
     "render_engine_change",
     "renga_reply",
 }

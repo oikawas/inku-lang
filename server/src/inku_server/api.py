@@ -34,7 +34,8 @@ from .api_core.thumbnails import shutdown_bake_pool
 from .pipeline_api import pipeline_router, register_pipeline_errors
 from .pipeline_runtime import get_binding as _pipeline_binding, get_service as _pipeline_service, shutdown as _shutdown_pipeline
 from .api_core.deps import _current_user
-from .api_core.routers import public, auth, me, plugins, settings, users, history, lineage, render, feedback, description, chatgpt
+from .api_core.routers import public, auth, me, plugins, settings, users, history, lineage, render, feedback, description, chatgpt, autonomous
+from . import autonomous_refine as _autonomous_refine
 
 
 _DB_BACKUP_SCHEDULER_TICK_SECONDS = 60
@@ -78,6 +79,8 @@ async def _lifespan(_app: FastAPI):
         # else closes them: they are held in a pool that outlives every request,
         # unlike the rebuild's, which is made and dropped inside one run.
         shutdown_bake_pool()
+        # The refinement runs stop before the pipeline runs they wait on.
+        _autonomous_refine.shutdown()
         _shutdown_pipeline()
 
 
@@ -90,6 +93,8 @@ _db.init_db()
 # deleting its file is the supported way to clear every thumbnail, and the next
 # start makes an empty one again.
 _thumbs_db.init_thumbs_db()
+# The AI refinement runs this process was taking when it stopped were cut off.
+_autonomous_refine.get_runner().recover()
 
 
 def _apply_stored_render_concurrency() -> None:
@@ -291,6 +296,7 @@ app.include_router(users.router)
 app.include_router(history.router)
 app.include_router(lineage.router)
 app.include_router(render.router)
+app.include_router(autonomous.router)
 app.include_router(pipeline_router(_pipeline_service, _current_user, binding_for=_pipeline_binding))
 app.include_router(feedback.router)
 app.include_router(description.router)

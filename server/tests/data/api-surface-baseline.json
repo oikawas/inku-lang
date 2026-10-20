@@ -1,7 +1,7 @@
 {
-  "endpoint_count": 130,
-  "operation_count": 130,
-  "schema_count": 190,
+  "endpoint_count": 133,
+  "operation_count": 133,
+  "schema_count": 195,
   "operations": [
     {
       "path": "/api/admin/unread-words",
@@ -1358,6 +1358,65 @@
       }
     },
     {
+      "path": "/api/refine/autonomous",
+      "method": "GET",
+      "operationId": "api_autonomous_for_history_api_refine_autonomous_get",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt",
+        "query:history_id:req"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AutonomousRunList\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/refine/autonomous",
+      "method": "POST",
+      "operationId": "api_autonomous_start_api_refine_autonomous_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AutonomousRunBody\"}}},\"required\":true}",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AutonomousRunResponse\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/refine/autonomous/{run_id}",
+      "method": "GET",
+      "operationId": "api_autonomous_get_api_refine_autonomous__run_id__get",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt",
+        "path:run_id:req"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AutonomousRunResponse\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/refine/autonomous/{run_id}/stop",
+      "method": "POST",
+      "operationId": "api_autonomous_stop_api_refine_autonomous__run_id__stop_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt",
+        "path:run_id:req"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AutonomousRunResponse\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
       "path": "/api/refine/juxtaposition",
       "method": "POST",
       "operationId": "api_juxtaposition_api_refine_juxtaposition_post",
@@ -1368,20 +1427,6 @@
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/JuxtapositionBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/JuxtapositionResponse\"}}},\"description\":\"Successful Response\"}",
-        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
-      }
-    },
-    {
-      "path": "/api/refine/vision-advice",
-      "method": "POST",
-      "operationId": "api_vision_refine_advice_api_refine_vision_advice_post",
-      "params": [
-        "cookie:inku_session:opt",
-        "header:authorization:opt"
-      ],
-      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/VisionRefineAdviceBody\"}}},\"required\":true}",
-      "responses": {
-        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/VisionRefineAdviceResponse\"}}},\"description\":\"Successful Response\"}",
         "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
       }
     },
@@ -1905,6 +1950,13 @@
     "AuthSettingsBody": "{\"properties\":{\"google_enabled\":{\"title\":\"Google Enabled\",\"type\":\"boolean\"},\"local_enabled\":{\"title\":\"Local Enabled\",\"type\":\"boolean\"}},\"required\":[\"google_enabled\",\"local_enabled\"],\"title\":\"AuthSettingsBody\",\"type\":\"object\"}",
     "AuthorDdlBody": "{\"additionalProperties\":false,\"properties\":{\"expected_revision\":{\"title\":\"Expected Revision\",\"type\":\"string\"},\"options\":{\"additionalProperties\":true,\"default\":{},\"title\":\"Options\",\"type\":\"object\"},\"source\":{\"title\":\"Source\",\"type\":\"string\"}},\"required\":[\"expected_revision\",\"source\"],\"title\":\"AuthorDdlBody\",\"type\":\"object\"}",
     "AuthorizeBody": "{\"additionalProperties\":false,\"properties\":{\"consent\":{\"default\":false,\"title\":\"Consent\",\"type\":\"boolean\"},\"language\":{\"default\":\"en\",\"enum\":[\"ja\",\"en\"],\"title\":\"Language\",\"type\":\"string\"},\"profile_id\":{\"anyOf\":[{\"maxLength\":128,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Profile Id\"}},\"title\":\"AuthorizeBody\",\"type\":\"object\"}",
+    "AutonomousCurrent": "{\"properties\":{\"attempt\":{\"title\":\"Attempt\",\"type\":\"integer\"},\"kind\":{\"title\":\"Kind\",\"type\":\"string\"},\"turn\":{\"title\":\"Turn\",\"type\":\"integer\"}},\"required\":[\"turn\",\"attempt\",\"kind\"],\"title\":\"AutonomousCurrent\",\"type\":\"object\"}",
+    "AutonomousRunBody": "{\"additionalProperties\":false,\"properties\":{\"history_id\":{\"maxLength\":200,\"minLength\":1,\"title\":\"History Id\",\"type\":\"string\"},\"kinds\":{\"items\":{\"enum\":[\"laws\",\"juxtaposition\"],\"type\":\"string\"},\"maxItems\":2,\"minItems\":1,\"title\":\"Kinds\",\"type\":\"array\"},\"language\":{\"default\":\"ja\",\"pattern\":\"^(ja|en)$\",\"title\":\"Language\",\"type\":\"string\"},\"model\":{\"anyOf\":[{\"maxLength\":200,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Model\"},\"moves\":{\"default\":5,\"maximum\":10.0,\"minimum\":1.0,\"title\":\"Moves\",\"type\":\"integer\"},\"note\":{\"anyOf\":[{\"maxLength\":1000,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Note\"},\"wild\":{\"anyOf\":[{\"type\":\"boolean\"},{\"type\":\"null\"}],\"title\":\"Wild\"}},\"required\":[\"history_id\"],\"title\":\"AutonomousRunBody\",\"type\":\"object\"}",
+    "AutonomousRunList": "{\"properties\":{\"runs\":{\"items\":{\"$ref\":\"#/components/schemas/AutonomousRunResponse\"},\"title\":\"Runs\",\"type\":\"array\"}},\"required\":[\"runs\"],\"title\":\"AutonomousRunList\",\"type\":\"object\"}",
+    "AutonomousRunResponse": "{\"properties\":{\"created_at\":{\"title\":\"Created At\",\"type\":\"integer\"},\"current\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/AutonomousCurrent\"},{\"type\":\"null\"}]},\"error\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Error\"},\"history_id\":{\"title\":\"History Id\",\"type\":\"string\"},\"id\":{\"title\":\"Id\",\"type\":\"string\"},\"last_kept_history_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Last Kept History Id\"},\"settings\":{\"$ref\":\"#/components/schemas/AutonomousSettings\"},\"state\":{\"title\":\"State\",\"type\":\"string\"},\"stop_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Stop Reason\"},\"stopping\":{\"default\":false,\"title\":\"Stopping\",\"type\":\"boolean\"},\"turns\":{\"items\":{\"$ref\":\"#/components/schemas/AutonomousTurn\"},\"title\":\"Turns\",\"type\":\"array\"},\"updated_at\":{\"title\":\"Updated At\",\"type\":\"integer\"}},\"required\":[\"id\",\"history_id\",\"state\",\"settings\",\"turns\",\"created_at\",\"updated_at\"],\"title\":\"AutonomousRunResponse\",\"type\":\"object\"}",
+    "AutonomousSettings": "{\"properties\":{\"kinds\":{\"items\":{\"type\":\"string\"},\"title\":\"Kinds\",\"type\":\"array\"},\"language\":{\"title\":\"Language\",\"type\":\"string\"},\"model\":{\"title\":\"Model\",\"type\":\"string\"},\"moves\":{\"title\":\"Moves\",\"type\":\"integer\"},\"note\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Note\"},\"wild\":{\"anyOf\":[{\"type\":\"boolean\"},{\"type\":\"null\"}],\"title\":\"Wild\"}},\"required\":[\"moves\",\"kinds\",\"model\",\"language\"],\"title\":\"AutonomousSettings\",\"type\":\"object\"}",
+    "AutonomousTry": "{\"properties\":{\"attempt\":{\"title\":\"Attempt\",\"type\":\"integer\"},\"history_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"History Id\"},\"kind\":{\"title\":\"Kind\",\"type\":\"string\"},\"lineage_node_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Lineage Node Id\"},\"main_law\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Main Law\"},\"outcome\":{\"title\":\"Outcome\",\"type\":\"string\"},\"rank\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"title\":\"Rank\"},\"reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Reason\"},\"sentence\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Sentence\"},\"share\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}],\"title\":\"Share\"}},\"required\":[\"attempt\",\"kind\",\"outcome\"],\"title\":\"AutonomousTry\",\"type\":\"object\"}",
+    "AutonomousTurn": "{\"properties\":{\"attempts\":{\"items\":{\"$ref\":\"#/components/schemas/AutonomousTry\"},\"title\":\"Attempts\",\"type\":\"array\"}},\"required\":[\"attempts\"],\"title\":\"AutonomousTurn\",\"type\":\"object\"}",
     "BatchPromptHistoryBody": "{\"properties\":{\"items\":{\"items\":{\"type\":\"string\"},\"title\":\"Items\",\"type\":\"array\"}},\"title\":\"BatchPromptHistoryBody\",\"type\":\"object\"}",
     "BatchPromptHistoryResponse": "{\"properties\":{\"items\":{\"items\":{\"type\":\"string\"},\"title\":\"Items\",\"type\":\"array\"}},\"title\":\"BatchPromptHistoryResponse\",\"type\":\"object\"}",
     "BboxDimensions": "{\"additionalProperties\":false,\"properties\":{\"height\":{\"exclusiveMinimum\":0.0,\"title\":\"Height\",\"type\":\"number\"},\"kind\":{\"const\":\"bbox\",\"title\":\"Kind\",\"type\":\"string\"},\"width\":{\"exclusiveMinimum\":0.0,\"title\":\"Width\",\"type\":\"number\"}},\"required\":[\"kind\",\"width\",\"height\"],\"title\":\"BboxDimensions\",\"type\":\"object\"}",
@@ -2083,9 +2135,7 @@
     "UserSettingsBody": "{\"properties\":{\"download_folder_enabled\":{\"anyOf\":[{\"type\":\"boolean\"},{\"type\":\"null\"}],\"title\":\"Download Folder Enabled\"},\"download_folder_name\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Download Folder Name\"},\"history_strip_fields\":{\"anyOf\":[{\"items\":{\"type\":\"string\"},\"type\":\"array\"},{\"type\":\"null\"}],\"title\":\"History Strip Fields\"},\"model_settings\":{\"anyOf\":[{\"additionalProperties\":true,\"type\":\"object\"},{\"type\":\"null\"}],\"title\":\"Model Settings\"},\"settings_tab\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Settings Tab\"},\"tooltips_enabled\":{\"anyOf\":[{\"type\":\"boolean\"},{\"type\":\"null\"}],\"title\":\"Tooltips Enabled\"},\"ui_custom\":{\"anyOf\":[{\"additionalProperties\":{\"type\":\"boolean\"},\"type\":\"object\"},{\"type\":\"null\"}],\"title\":\"Ui Custom\"},\"ui_mode\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Ui Mode\"},\"ui_theme\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Ui Theme\"}},\"title\":\"UserSettingsBody\",\"type\":\"object\"}",
     "ValidationError": "{\"properties\":{\"ctx\":{\"title\":\"Context\",\"type\":\"object\"},\"input\":{\"title\":\"Input\"},\"loc\":{\"items\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"integer\"}]},\"title\":\"Location\",\"type\":\"array\"},\"msg\":{\"title\":\"Message\",\"type\":\"string\"},\"type\":{\"title\":\"Error Type\",\"type\":\"string\"}},\"required\":[\"loc\",\"msg\",\"type\"],\"title\":\"ValidationError\",\"type\":\"object\"}",
     "Variation": "{\"additionalProperties\":false,\"properties\":{\"amplitude\":{\"default\":\"medium\",\"description\":\"揺れ幅: fine=細かく・震える / medium=中程度 / broad=大きく\",\"enum\":[\"fine\",\"medium\",\"broad\"],\"title\":\"Amplitude\",\"type\":\"string\"},\"dimensions\":{\"description\":\"揺れ軸: 横線→[position_y] / 縦線→[position_x] / 斜め→[position_x,position_y]\",\"items\":{\"enum\":[\"position_x\",\"position_y\",\"angle\",\"length\",\"rotation\",\"radius\"],\"type\":\"string\"},\"title\":\"Dimensions\",\"type\":\"array\"},\"frequency\":{\"default\":\"medium\",\"description\":\"揺れ頻度: slow=ゆっくり / medium=普通 / high=速く\",\"enum\":[\"slow\",\"medium\",\"high\"],\"title\":\"Frequency\",\"type\":\"string\"},\"quality\":{\"default\":\"none\",\"description\":\"揺れ種類: perlin=細かい揺れ・震える / wave=ゆっくり揺れる・波打つ / pink=滲む / white=白色雑音 / none=なし\",\"enum\":[\"none\",\"white\",\"perlin\",\"pink\",\"wave\"],\"title\":\"Quality\",\"type\":\"string\"}},\"title\":\"Variation\",\"type\":\"object\"}",
-    "VerticalLineRecipe": "{\"additionalProperties\":false,\"properties\":{\"cell_height\":{\"exclusiveMinimum\":0.0,\"title\":\"Cell Height\",\"type\":\"number\"},\"kind\":{\"const\":\"vertical_line\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"cell_height\"],\"title\":\"VerticalLineRecipe\",\"type\":\"object\"}",
-    "VisionRefineAdviceBody": "{\"properties\":{\"direction\":{\"default\":\"\",\"maxLength\":2000,\"title\":\"Direction\",\"type\":\"string\"},\"enabled_kinds\":{\"items\":{\"type\":\"string\"},\"maxItems\":2,\"minItems\":1,\"title\":\"Enabled Kinds\",\"type\":\"array\"},\"history_id\":{\"maxLength\":200,\"minLength\":1,\"title\":\"History Id\",\"type\":\"string\"},\"instruction\":{\"maxLength\":100000,\"minLength\":1,\"title\":\"Instruction\",\"type\":\"string\"},\"language\":{\"default\":\"ja\",\"pattern\":\"^(ja|en)$\",\"title\":\"Language\",\"type\":\"string\"},\"model\":{\"anyOf\":[{\"maxLength\":200,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Model\"}},\"required\":[\"history_id\",\"instruction\",\"enabled_kinds\"],\"title\":\"VisionRefineAdviceBody\",\"type\":\"object\"}",
-    "VisionRefineAdviceResponse": "{\"properties\":{\"model\":{\"title\":\"Model\",\"type\":\"string\"},\"next_direction\":{\"title\":\"Next Direction\",\"type\":\"string\"},\"observation\":{\"title\":\"Observation\",\"type\":\"string\"},\"suggested_kind\":{\"title\":\"Suggested Kind\",\"type\":\"string\"}},\"required\":[\"observation\",\"next_direction\",\"suggested_kind\",\"model\"],\"title\":\"VisionRefineAdviceResponse\",\"type\":\"object\"}"
+    "VerticalLineRecipe": "{\"additionalProperties\":false,\"properties\":{\"cell_height\":{\"exclusiveMinimum\":0.0,\"title\":\"Cell Height\",\"type\":\"number\"},\"kind\":{\"const\":\"vertical_line\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"cell_height\"],\"title\":\"VerticalLineRecipe\",\"type\":\"object\"}"
   },
-  "digest": "f63cb4c3b8e624b8c391c39f07bd8fa917abb1da1bba6e8872dec7625c8313d3"
+  "digest": "714b6121347931c47f375c0aeb1bed210ecdb849d3823e77978d256c2b3e019a"
 }

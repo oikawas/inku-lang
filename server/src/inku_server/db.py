@@ -592,6 +592,16 @@ def promote_lineage_node(user_id: str, node_id: str) -> dict | None:
     ).promote_lineage_node(user_id, node_id)
 
 
+def set_lineage_edge_metadata(user_id: str, child_node_id: str, metadata: dict) -> bool:
+    """Replace the metadata of the edge into one of the user's own nodes. The AI
+    refinement writes a child's move record once the child is measured (2026-10-21)."""
+    return _lineage.LineageStore(
+        session_factory=SessionLocal,
+        actor_of_fn=_actor_of,
+        row_to_dict_fn=_row_to_dict,
+    ).set_lineage_edge_metadata(user_id, child_node_id, _canonical_json(metadata))
+
+
 def get_lineage_branch(user_id: str, target_node_id: str) -> dict | None:
     """Return the single primary-parent path from root through target."""
     return _lineage.LineageStore(

@@ -209,7 +209,12 @@ class PipelineService:
 
     def start(self, owner: str, kind: str, text: str, *, parent: dict | None = None, source_work: dict | None = None,
               canvas_format_id: str | None = None, canvas_aspect: str | None = None,
-              options: dict | None = None, prepared: tuple[dict, dict] | None = None) -> dict:
+              options: dict | None = None, prepared: tuple[dict, dict] | None = None,
+              direction: dict | None = None) -> dict:
+        """Start a run. `kind` is `description`, `direct_ddl`, or `saved_laws`: the
+        laws stage again on a saved work's DDL (`text`), with the records
+        `source_work` keeps and the refinement's `direction` (the AI
+        refinement's laws move, 2026-10-21)."""
         description = text if kind == "description" else (source_work or {}).get("description", "")
         drawn = _drawn_description(text) if kind == "description" else text
         context = {"description": description, "committed_description": description, "parent": parent, "derivation_kind": "new"}
@@ -241,13 +246,16 @@ class PipelineService:
             if selected is not None:
                 config = select_canvas(config, self.binding.canvas_registry, selected)
             run = self._host(owner, config, context)
-            authoring = {"tag": "description", "description": drawn, "auto_catalog": context.get("auto_catalog", self.auto_catalog)} if kind == "description" else {"tag": "direct_ddl", "source": text}
-            if kind == "direct_ddl" and source_work and source_work.get("completion_ranges") is not None:
-                authoring["completion_ranges"] = deepcopy(source_work["completion_ranges"])
-            if kind == "direct_ddl" and source_work and source_work.get("laws_layers") is not None:
-                authoring["laws_layers"] = deepcopy(source_work["laws_layers"])
-            if kind == "direct_ddl" and source_work and source_work.get("laws_basis") is not None:
-                authoring["laws_basis"] = deepcopy(source_work["laws_basis"])
+            if kind == "description":
+                authoring = {"tag": "description", "description": drawn, "auto_catalog": context.get("auto_catalog", self.auto_catalog)}
+            elif kind == "saved_laws":
+                authoring = {"tag": "saved_laws", "source": text,
+                             "description": pipeline_description(description), "direction": deepcopy(direction or {})}
+            else:
+                authoring = {"tag": "direct_ddl", "source": text}
+            for record in ("completion_ranges", "laws_layers", "laws_basis"):
+                if kind != "description" and source_work and source_work.get(record) is not None:
+                    authoring[record] = deepcopy(source_work[record])
             sketch = context.get("sketch_request") or {"mode": "off"}
             if kind == "description" and sketch["mode"] != "off":
                 authoring["sketch"] = sketch

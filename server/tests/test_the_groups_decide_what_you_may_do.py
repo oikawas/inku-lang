@@ -235,9 +235,12 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
     # Plugin document writes left with the editor that used them (I-703).
     # Variation endpoints and their request/response schemas were retired
     # together on 2026-10-04; stored historical works remain readable.
+    # The Vision advice of the browser-driven refinement left when the Server
+    # took the runs (2026-10-21); the records it wrote remain readable.
     declared_retirements = {
         "PromptsResponse", "PluginCreateBody", "PluginUpdateBody",
         "VariationSeedsRequest", "VariationSeedsResponse",
+        "VisionRefineAdviceBody", "VisionRefineAdviceResponse",
     }
     assert declared_retirements <= set(frozen_names)
     for name in declared_retirements:

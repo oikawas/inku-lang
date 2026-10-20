@@ -13,7 +13,6 @@ from pydantic import ValidationError
 def test_retired_requests_results_and_seed_route_leave_history_readable():
     from inku_server.api_core.models import HistoryItem, HistoryPostBody
     from inku_server.api_core.routers import render
-    from inku_server.autonomous_refine import ALLOWED_KINDS
     from inku_server.pipeline_product import RunOptions
 
     retired = {"focus", "variation_amplitude", "variation_seed", "variation_moved_axes"}
@@ -22,8 +21,6 @@ def test_retired_requests_results_and_seed_route_leave_history_readable():
         assert not retired.intersection(model.model_fields), model.__name__
     with pytest.raises(ValidationError):
         RunOptions.model_validate({"variation_seed": 7})
-    # The touch and the reading left refinement on 2026-10-14.
-    assert set(ALLOWED_KINDS) == {"layout_change", "catalog_change"}
     app = FastAPI()
     app.include_router(render.router)
     with TestClient(app) as client:

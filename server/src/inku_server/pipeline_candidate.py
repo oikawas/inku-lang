@@ -217,9 +217,11 @@ class CandidateExecution:
     def start_new(self, authoring: dict) -> dict:
         """A fresh host-minted identity; absence in history never implies newness."""
         with self._lock:
-            if self._snapshot is not None or authoring.get("tag") not in {"direct_ddl", "description"}:
+            if self._snapshot is not None or authoring.get("tag") not in {"direct_ddl", "description", "saved_laws"}:
                 raise CandidateHostError("invalid_start")
-            direct = authoring["tag"] == "direct_ddl"
+            # The laws stage from a saved work starts from the work's DDL and
+            # commits a DDL its laws printed: the DDL holds the child.
+            direct = authoring["tag"] in {"direct_ddl", "saved_laws"}
             self._fresh = True
             return self._advance({
                 "tag": "start", "variation_id": uuid.uuid4().hex,

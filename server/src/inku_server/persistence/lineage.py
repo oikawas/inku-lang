@@ -376,6 +376,20 @@ class LineageStore:
                 ],
             }
 
+    def set_lineage_edge_metadata(self, user_id: str, child_node_id: str, metadata_json: str) -> bool:
+        """Replace the metadata of the edge into one of the user's own nodes."""
+        actor = self.actor_of_fn(user_id)
+        with self.session_factory() as session:
+            edge = session.query(LineageEdgeRow).filter(
+                LineageEdgeRow.child_node_id == child_node_id,
+                access._owned_by(actor, LineageEdgeRow.user_id),
+            ).first()
+            if edge is None:
+                return False
+            edge.metadata_json = metadata_json
+            session.commit()
+            return True
+
     def promote_lineage_node(self, user_id: str, node_id: str) -> dict | None:
         actor = self.actor_of_fn(user_id)
         with self.session_factory() as session:

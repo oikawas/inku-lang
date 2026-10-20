@@ -371,7 +371,8 @@ class ProductPipelineEffects:
         )
         # Refused before anything runs rather than when the stage calls out. A
         # description is read by Stage 1; hand-written DDL reaches only Stage 2,
-        # which completes its holes.
+        # which completes its holes. The laws stage from a saved work is sent
+        # with Stage 1's model, as a description run's is.
         model_settings = db.get_model_settings()
         from .model_settings import provider_for_model
         from .chatgpt_store import ChatGPTError
@@ -383,7 +384,7 @@ class ProductPipelineEffects:
                 selected["chatgpt_profile"], selected["chatgpt_generation"] = pin(owner)
                 model_settings = {**model_settings, "chatgpt_profile_id": selected["chatgpt_profile"],
                                   "chatgpt_generation": selected["chatgpt_generation"]}
-            for stage in ("stage1", "stage2") if kind == "description" else ("stage2",):
+            for stage in ("stage1", "stage2") if kind in {"description", "saved_laws"} else ("stage2",):
                 if not _model_offered_to(
                     actor, selected[f"{stage}_model"], stage=stage, purpose="llm", settings=model_settings, operation="pipeline"
                 ):

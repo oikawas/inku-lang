@@ -170,7 +170,7 @@ def test_text_decoder_requires_completion_and_refuses_partial_refusal_tool_and_b
     assert fallback.finish() == "墨"
 
 
-@pytest.mark.parametrize("route", ["refine", "colophon"])
+@pytest.mark.parametrize("route", ["juxtaposition", "colophon"])
 def test_vision_routes_carry_owner_pin_and_preserve_chatgpt_error(personal, monkeypatch, route):
     # Failure: the route loses owner/profile/generation or turns the classified refusal into a generic 502.
     from inku_server.api_core.routers import render, lineage
@@ -183,12 +183,15 @@ def test_vision_routes_carry_owner_pin_and_preserve_chatgpt_error(personal, monk
         assert kwargs["settings"]["chatgpt_profile_id"] == "fixture-a"
         assert kwargs["settings"]["chatgpt_generation"] == 1
         raise ChatGPTError("chatgpt_session_changed")
-    monkeypatch.setattr(render, "vision_refine_advice", refuse)
+    monkeypatch.setattr(render, "suggest_juxtaposition", refuse)
     monkeypatch.setattr(lineage, "generate_okugaki", refuse)
     with pytest.raises(HTTPException) as refused:
-        if route == "refine":
-            render.api_vision_refine_advice(render.VisionRefineAdviceBody(history_id="fixture", model="chatgpt:sight",
-                instruction="fixture", enabled_kinds=["layout_change"]), {"id": "owner"})
+        if route == "juxtaposition":
+            # The juxtaposition's model call, as the AI refinement's runs also make it (2026-10-21).
+            model, settings = render.juxtaposition_settings({"id": "owner"}, "chatgpt:sight")
+            render.juxtaposition_choices({"svg": "<svg/>", "description": "fixture", "lineage": [],
+                                          "candidates": [], "written": "fixture"},
+                                         model=model, settings=settings, language="ja")
         else:
             lineage.api_okugaki_generate("fixture", lineage.OkugakiGenerateBody(model="chatgpt:sight", save=False), None, {"id": "owner"})
     assert refused.value.status_code == 403

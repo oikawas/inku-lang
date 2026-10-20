@@ -84,7 +84,10 @@ PUBLIC = {  # every entry needs a reason
 #   /api/tool-variants/plan and /api/render-tool-variant (2026-10-14).
 #   +1 for POST /api/refine/juxtaposition, the sentences a juxtaposition offers (2026-10-19).
 #   +1 for PUT /api/settings/juxtaposition, how many sentences it offers the model (2026-10-19).
-EXPECTED_ROUTE_COUNT = 130
+#   +4 for the AI refinement's runs: POST /api/refine/autonomous, GET /api/refine/autonomous,
+#   GET /api/refine/autonomous/{run_id} and POST /api/refine/autonomous/{run_id}/stop, and
+#   -1 for retiring POST /api/refine/vision-advice, which they replace (2026-10-21).
+EXPECTED_ROUTE_COUNT = 133
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

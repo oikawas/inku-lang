@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-21 — Android: the camera's model chooser follows the model purposes, and Juxtapose's held reason matches Web
+
+At the author's decision, the camera's model chooser offers only the models set to be used for both LLM and Vision. The camera reads the photo and draws with the same model, so a model with only one of the two purposes stops partway. If the chosen model has only one, it has to be chosen again. Also, in the work-editing menu of a description-locked work, the reason under Juxtapose is now Web's "This work's DDL was edited. Drawing it from the description would lose the edits, so this is not offered. …". As the way to start again from the description, Android names Change the description in the same menu.
+
 ### 2026-10-20 — Android: choose whether a model is used for LLM or Vision in the settings
 
 As in Server's model administration, a connection's Model selection now has LLM and Vision toggles for each published model. The drawing model chooser and model inspection offer only the models used for LLM, and the Vision chooser of Juxtapose and Autonomous refinement only those used for Vision. A connection card shows its published models in an LLM row and a Vision row. A purpose a model gave no response to when measured cannot be chosen.

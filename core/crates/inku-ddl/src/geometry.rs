@@ -473,6 +473,8 @@ pub enum GeometryKeyword {
     NumericRange,
     /// A whole numeric segment (two points), read again from its source span.
     NumericSegment,
+    /// A whole numeric angle (degrees), read again from its source span.
+    NumericAngle,
 }
 
 impl GeometryKeyword {
@@ -492,6 +494,7 @@ impl GeometryKeyword {
             Self::Position => "position",
             Self::NumericRange => "numeric_range",
             Self::NumericSegment => "numeric_segment",
+            Self::NumericAngle => "numeric_angle",
         }
     }
 }
@@ -647,6 +650,26 @@ impl SemanticNumericSegment {
     }
 }
 
+/// The degrees a mark turns, written in numbers (stage B-4a): clockwise on the
+/// canvas, as the Score's rotation, from 0 up to but not including 360.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SemanticNumericAngle {
+    pub degrees: crate::ExactFraction,
+    pub provenance: SourceOccurrence,
+    pub degrees_span: SourceSpan,
+}
+
+impl SemanticNumericAngle {
+    pub const fn source(&self) -> &SourceOccurrence {
+        &self.provenance
+    }
+
+    /// The degrees as an exact `(numerator, denominator)` pair.
+    pub(crate) fn rational_degrees(&self) -> (u64, u64) {
+        (self.degrees.numerator(), self.degrees.denominator())
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum GeometrySyntaxIssueKind {
     IncompleteGeometry,
@@ -656,6 +679,8 @@ pub(crate) enum GeometrySyntaxIssueKind {
     InvalidRange,
     /// A numeric segment off the canvas, of no length, or beyond the value limits.
     InvalidSegment,
+    /// A numeric angle of 360 degrees or more, or beyond the value limits.
+    InvalidAngle,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -670,6 +695,7 @@ pub(crate) struct ClauseGeometryAnalysis {
     pub positions: Vec<SemanticNumericPosition>,
     pub ranges: Vec<SemanticNumericRange>,
     pub segments: Vec<SemanticNumericSegment>,
+    pub angles: Vec<SemanticNumericAngle>,
     pub consumed_numeric_spans: BTreeSet<(usize, usize)>,
     pub issues: Vec<GeometrySyntaxIssue>,
 }
@@ -901,6 +927,30 @@ pub(crate) fn analyze_clause_geometry(
                     )),
                 }
             }
+            GeometryKeyword::NumericAngle => {
+                let span = atoms[index].span();
+                let lexeme = crate::numeric_range::numeric_angle_at(
+                    document.source(),
+                    span.start_byte,
+                    document.language(),
+                )
+                .filter(|lexeme| lexeme.span == span);
+                match lexeme.and_then(|lexeme| {
+                    valid_angle_degrees(&lexeme).map(|degrees| (lexeme, degrees))
+                }) {
+                    Some((lexeme, degrees)) => result.angles.push(SemanticNumericAngle {
+                        degrees,
+                        provenance: occurrence(document, span, region_index, clause_index, index),
+                        degrees_span: lexeme.degrees_span,
+                    }),
+                    None => result.issues.push(issue(
+                        GeometrySyntaxIssueKind::InvalidAngle,
+                        atoms,
+                        index,
+                        index + 1,
+                    )),
+                }
+            }
             GeometryKeyword::Canvas | GeometryKeyword::Position => {}
         }
     }
@@ -922,6 +972,14 @@ pub(crate) fn analyze_clause_geometry(
         }
     }
     result
+}
+
+// The degrees are below a full turn.
+fn valid_angle_degrees(
+    lexeme: &crate::numeric_range::NumericAngleLexeme,
+) -> Option<crate::ExactFraction> {
+    let degrees = lexeme.degrees?;
+    (u128::from(degrees.numerator()) < 360 * u128::from(degrees.denominator())).then_some(degrees)
 }
 
 // Both points are on the canvas and they differ.
@@ -1247,8 +1305,16 @@ mod tests {
             "first_and_last_mark_on_the_points"
         );
         assert_eq!(
+            payload["angle"]["choices"]["numeric"]["degrees"],
+            "exact_decimal_at_least_0_below_360"
+        );
+        assert_eq!(
+            payload["angle"]["choices"]["numeric"]["sense"],
+            "clockwise_canvas_y_down"
+        );
+        assert_eq!(
             geometry_resolution_policy_digest(),
-            "74fb923d342e3fcd792a9ea997ab299b41fe30959b16431903edfc1e2f998e7c"
+            "180161298cc072dcf13182bc5a8641cd2c9d63c00745e357397877d2a149f615"
         );
         assert_eq!(
             payload["object_placement"]["layout_direction"]["vertical"],

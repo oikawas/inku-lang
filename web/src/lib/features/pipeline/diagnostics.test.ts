@@ -132,3 +132,13 @@ test('two points written in numbers are said in words, in each language', () => 
 		assert.doesNotMatch(formatPipelineDiagnostic(downstream, en), /Reason:/);
 	}
 });
+
+test('an angle written in numbers is said in words, in each language', () => {
+	const invalid = { channel: 'upstream' as const, value: { issue_kind: 'invalid_numeric_angle' } };
+	assert.match(formatPipelineDiagnostic(invalid, ja), /数値で書いた角度（回転〜度）が正しくありません。/);
+	assert.match(formatPipelineDiagnostic(invalid, en), /The angle written in numbers \(rotated … degrees\) is not valid\./);
+	assert.doesNotMatch(formatPipelineDiagnostic(invalid, en), /Reason:/);
+	const conflict = { channel: 'downstream' as const, value: { reason: { type: 'numeric_segment_conflict' } } };
+	assert.match(formatPipelineDiagnostic(conflict, ja), /数値の角度/);
+	assert.match(formatPipelineDiagnostic(conflict, en), /a numeric angle/);
+});

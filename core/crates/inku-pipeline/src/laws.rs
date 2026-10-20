@@ -15,14 +15,22 @@
 //! and another mark that leaves the canvas is refused ([`off_canvas`]).
 //!
 //! This stage holds the placement, size, arrangement and hand laws (B1 to B10,
-//! B12, B15, B21). The computation is the prototype's, function by function and
-//! in its order, with two departures: a grid takes the columns and rows the
-//! core tiles its range with (the printed tile is drawn so), and a layer an
-//! arrangement law spaces that would need a shrink below the floor keeps its
-//! size (the author's dense layer). On a square canvas it is otherwise the
-//! prototype's to the bit; on another canvas, places stay canvas fractions and
-//! lengths compared with mark sizes are taken in short-edge units (the
-//! prototype ran on square canvases only).
+//! B12, B15, B21) and the cards (C1 to C6, stage B-4b). The computation is the
+//! prototype's, function by function and in its order, with two departures: a
+//! grid takes the columns and rows the core tiles its range with (the printed
+//! tile is drawn so), and a layer an arrangement law spaces that would need a
+//! shrink below the floor keeps its size (the author's dense layer). The cards
+//! come after the fit to spacing and rebuild their layers, which are printed
+//! one sentence per instruction, with the departures the DDL needs: a pattern's
+//! cells are exact squares on the canvas's micro-lattice (so the core tiles the
+//! printed range as counted), seigaiha's grids and kikko's one-row tiles stay
+//! inside their range, one grid draws at most what one instruction may, each
+//! polyrhythm voice is drawn where its layer is, and a jo-ha-kyu row keeps its
+//! direction. A pair B8 opens whose marks turn is printed as two marks with
+//! their mirrored turns. On a square canvas it is otherwise the prototype's to
+//! the bit; on another canvas, places stay canvas fractions and lengths compared
+//! with mark sizes are taken in short-edge units (the prototype ran on square
+//! canvases only).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -46,9 +54,18 @@ use crate::prompts::{LlmPrompt, LlmStage, PromptError, PromptLimits};
 pub const LAWS_PROMPT_ID: &str = "inku.laws-prompt.v1";
 
 /// The laws this core applies, in the order the request lists them.
-pub const LAWS: [&str; 13] = [
-    "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10", "B12", "B15", "B21",
+pub const LAWS: [&str; 19] = [
+    "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10", "B12", "B15", "B21", "C1", "C2",
+    "C3", "C4", "C5", "C6",
 ];
+
+/// The cards, which rebuild a layer's place and arrangement: a layer they take
+/// takes no other placement or arrangement law and no other card.
+const REBUILD: [&str; 6] = ["C1", "C2", "C3", "C4", "C5", "C6"];
+
+/// One instruction draws this many marks at most (the shipping hard policy's
+/// marks per instruction); a pattern's unit widens until each grid fits.
+const MAX_PER_INSTRUCTION: u64 = 240;
 
 /// The laws that set a layer's place; a layer takes one of them at most.
 const PLACEMENT: [&str; 7] = ["B1", "B2", "B3", "B4", "B5", "B7", "B8"];
@@ -62,6 +79,8 @@ const MAX_INSTRUCTIONS: usize = 60;
 const MAX_MARKS: u64 = 380;
 
 /// The prototype's values of `PHI = (1 + 5 ** 0.5) / 2`, as Python computed them.
+const PHI: f64 = 1.618_033_988_749_895;
+const SQRT_PHI: f64 = 1.272_019_649_514_069;
 const PHI_SQUARED: f64 = 2.618_033_988_749_895;
 const INVERSE_PHI: f64 = 0.618_033_988_749_894_8;
 /// The golden section `1 / PHI ** 2`.
@@ -85,6 +104,22 @@ const VISIBLE: f64 = 0.15;
 const AERIAL_DIFFERENCE: f64 = 0.2;
 /// The cool colors and gray aerial perspective chooses from, in its order.
 const AERIAL_COLORS: [Color; 4] = [Color::Blue, Color::Green, Color::Purple, Color::Gray];
+/// `2 ** 0.5` (std's), `3 ** 0.5` and `3 ** 0.5 / 2`, as Python computed them.
+const SQRT_2: f64 = std::f64::consts::SQRT_2;
+const SQRT_3: f64 = 1.732_050_807_568_877_2;
+const HALF_SQRT_3: f64 = 0.866_025_403_784_438_6;
+/// The nine colors in the order the request's table lists them.
+const COLORS: [Color; 9] = [
+    Color::White,
+    Color::Black,
+    Color::Blue,
+    Color::Red,
+    Color::Green,
+    Color::Gray,
+    Color::Yellow,
+    Color::Orange,
+    Color::Purple,
+];
 
 const LINE: [Primitive; 2] = [Primitive::Line, Primitive::FreeLine];
 /// The closed shapes and the arc: what subordination sizes.
@@ -127,11 +162,25 @@ fn round3(value: f64) -> f64 {
     format!("{value:.3}").parse().unwrap_or(value)
 }
 
-/// The canvas in short-edge units: the width and height over the short edge.
+/// Python's `round(value, 2)`.
+fn round2(value: f64) -> f64 {
+    format!("{value:.2}").parse().unwrap_or(value)
+}
+
+/// Python's `round(value)`: the nearest integer, a tie to even.
+#[allow(clippy::cast_possible_truncation)]
+fn round_int(value: f64) -> i64 {
+    value.round_ties_even() as i64
+}
+
+/// The canvas in short-edge units: the width and height over the short edge,
+/// with the canvas's integer ratio.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Units {
     x: f64,
     y: f64,
+    width: u32,
+    height: u32,
 }
 
 impl Units {
@@ -141,7 +190,26 @@ impl Units {
         Some(Self {
             x: f64::from(format.width_units) / short,
             y: f64::from(format.height_units) / short,
+            width: format.width_units,
+            height: format.height_units,
         })
+    }
+
+    /// The micro-lattice an exact square cell lies on: `t` x-steps of a
+    /// millionth by `t` y-steps measure `t` physical steps of a millionth of
+    /// the short edge each way. Returns the x step, the y step and the
+    /// physical step.
+    fn lattice(self) -> (u64, u64, u64) {
+        let (mut a, mut b) = (u64::from(self.width), u64::from(self.height));
+        while b != 0 {
+            (a, b) = (b, a % b);
+        }
+        let g = a.max(1);
+        (
+            u64::from(self.height) / g,
+            u64::from(self.width) / g,
+            u64::from(self.width.max(self.height)) / g,
+        )
     }
 
     /// The length of a step in canvas fractions, in short-edge units.
@@ -728,6 +796,388 @@ fn single(template: &Instruction, point: [f64; 2], scale: f64) -> Instruction {
     mark
 }
 
+// --- the cards' marks, as the prototype's card tool wrote them --------------------------------
+
+/// One mark a card places: the template alone at a point (not moved inside the
+/// canvas's edge, as the card tool placed it), `scale` times its size, turned
+/// to `rotation` when one is given.
+fn card_single(
+    template: &Instruction,
+    point: [f64; 2],
+    scale: f64,
+    rotation: Option<f64>,
+) -> Instruction {
+    let mut mark = template.clone();
+    if let Some(arrangement) = mark.arrangement.as_mut() {
+        arrangement.count = 1;
+        arrangement.color_cycle = Vec::new();
+        if let Some(resolved) = arrangement.resolved.as_mut() {
+            resolved.recipe = ResolvedPlacementRecipe::Place;
+            resolved.domain = inku_score::Point::new(1.0, 1.0);
+        }
+    }
+    moved(&mut mark);
+    set_point_region(&mut mark, point[0], point[1]);
+    scale_geometry(&mut mark, scale);
+    if rotation.is_some() {
+        mark.rotation = rotation;
+    }
+    mark
+}
+
+/// The template's tool, color and stroke with another primitive's geometry,
+/// unturned and still (the card tool's `shaped`), without the template's arc
+/// form: a crescent or a waxing arc is not the pattern's shape.
+fn shaped(template: &Instruction, primitive: Primitive) -> Instruction {
+    let mut mark = template.clone();
+    mark.from_ = None;
+    mark.to = None;
+    mark.center = None;
+    mark.position = None;
+    mark.radius = None;
+    mark.size = None;
+    mark.sides = None;
+    mark.angle_start = None;
+    mark.angle_end = None;
+    mark.arc_form = None;
+    mark.primitive = primitive;
+    mark.rotation = Some(0.0);
+    set_hand(&mut mark, Hand::Still);
+    mark
+}
+
+/// A row from its first mark to its last, kept in that order, with the recipe
+/// the core gives a row written by these numeric ends: a horizontal row from
+/// left to right, a vertical row from top to bottom, and a diagonal row
+/// otherwise (right to left and bottom to top included).
+fn apply_directed_row(instruction: &mut Instruction, from: [f64; 2], to: [f64; 2], units: Units) {
+    let ([x0, y0], [x1, y1]) = (from, to);
+    if ((y1 - y0).abs() < 1e-9 && x0 < x1) || ((x1 - x0).abs() < 1e-9 && y0 < y1) {
+        apply_row(instruction, from, to, units);
+        return;
+    }
+    let n = f64::from(count_of(instruction));
+    set_point_region(instruction, (x0 + x1) / 2.0, (y0 + y1) / 2.0);
+    if let Some(resolved) = resolved_mut(instruction) {
+        resolved.domain = inku_score::Point::new(units.x, units.y);
+        resolved.recipe = ResolvedPlacementRecipe::DiagonalLine {
+            step: inku_score::Point::new(
+                (x1 - x0) * units.x / (n - 1.0),
+                (y1 - y0) * units.y / (n - 1.0),
+            ),
+        };
+    }
+    if let Some(arrangement) = instruction.arrangement.as_mut() {
+        arrangement.rhythm_spacing = RhythmSpacing::None;
+    }
+}
+
+/// The marks a layer's instructions draw.
+fn total_marks(instructions: &[Instruction]) -> u64 {
+    instructions
+        .iter()
+        .map(|instruction| u64::from(count_of(instruction)))
+        .sum()
+}
+
+/// One part of a pattern: a grid over a range, or (kikko) one hexagon.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Part {
+    Grid([f64; 4], u64, u64),
+    Point([f64; 2]),
+}
+
+impl Part {
+    fn marks(self) -> u64 {
+        match self {
+            Self::Grid(_, columns, rows) => columns * rows,
+            Self::Point(_) => 1,
+        }
+    }
+}
+
+/// A count of millionths as the float the printer writes.
+#[allow(clippy::cast_precision_loss)]
+fn micro(value: i64) -> f64 {
+    value as f64 / 1e6
+}
+
+/// The first millionth of a run of `length` millionths centered at `middle`.
+#[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+fn centered(middle: f64, length: i64) -> i64 {
+    (middle * 1e6 - length as f64 / 2.0 + 1e-6).floor() as i64
+}
+
+/// An even number of lattice steps whose square cell is no wider than `side`
+/// short-edge units (2 at least).
+#[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+fn square_side(side: f64, physical: i64) -> i64 {
+    (2 * ((side * 1e6 / (2.0 * physical as f64) + 1e-9).floor() as i64)).max(2)
+}
+
+/// The parts of a pattern over a region and the physical side of its cell: the
+/// prototype's count of columns and rows, and exact square cells on the
+/// canvas's micro-lattice (`lattice`), centered in the region. Seigaiha's two
+/// grids stay inside it, and so do kikko's one-row tiles (a row's marks would
+/// take the brush's member sway, which a tile does not).
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss
+)]
+fn pattern_plan(region: [f64; 4], unit: f64, pattern: &str, units: Units) -> (Vec<Part>, f64) {
+    let [x0, y0, x1, y1] = region;
+    let (w, h) = (x1 - x0, y1 - y0);
+    let row_factor = match pattern {
+        "seigaiha" => 0.5,
+        "kikko" => HALF_SQRT_3,
+        _ => 1.0,
+    };
+    let mut columns = ((w * units.x / unit).round_ties_even() as i64).max(1);
+    let rows = ((h * units.y / (unit * row_factor)).round_ties_even() as i64).max(1);
+    let (xs, ys, physical) = units.lattice();
+    let (xs, ys, physical) = (xs as i64, ys as i64, physical as i64);
+    let (middle_x, middle_y) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
+    if pattern == "kikko" {
+        let t = square_side(py_min(w * units.x / columns as f64, h * units.y), physical);
+        let (sx, sy) = (t * xs, t * ys);
+        let pitch = sy as f64 * HALF_SQRT_3;
+        let fit = ((h * 1e6 - sy as f64) / pitch + 1e-9).floor() as i64 + 1;
+        let kept = rows.min(fit).max(1);
+        let width = columns * sx;
+        let left = centered(middle_x, width);
+        let top = centered(
+            middle_y,
+            sy + ((kept - 1) as f64 * pitch).round_ties_even() as i64,
+        );
+        let mut parts = Vec::new();
+        for parity in [0_i64, 1] {
+            if parity == 1 && columns <= 1 {
+                continue;
+            }
+            let (a, b) = (left + parity * sx / 2, left + width - parity * sx / 2);
+            let mut k = parity;
+            while k < kept {
+                let y = top + (k as f64 * pitch).round_ties_even() as i64;
+                if columns - parity == 1 {
+                    parts.push(Part::Point([micro((a + b) / 2), micro(y + sy / 2)]));
+                } else {
+                    let row = [micro(a), micro(y), micro(b), micro(y + sy)];
+                    parts.push(Part::Grid(row, (columns - parity) as u64, 1));
+                }
+                k += 2;
+            }
+        }
+        return (parts, micro(t * physical));
+    }
+    let (cw, ch) = (w * units.x / columns as f64, h * units.y / rows as f64);
+    let side = if pattern == "seigaiha" {
+        py_min(cw, 2.0 * ch)
+    } else {
+        py_min(cw, ch)
+    };
+    let t = square_side(side, physical);
+    let (sx, sy) = (t * xs, t * ys);
+    let side = micro(t * physical);
+    if matches!(pattern, "ichimatsu" | "uroko") && columns % 2 == 0 && columns > 1 {
+        // A color cycle in reading order alternates both ways only over an odd row length.
+        columns -= 1;
+    }
+    if pattern != "seigaiha" {
+        let (width, height) = (columns * sx, rows * sy);
+        let (left, top) = (centered(middle_x, width), centered(middle_y, height));
+        let region = [
+            micro(left),
+            micro(top),
+            micro(left + width),
+            micro(top + height),
+        ];
+        return (vec![Part::Grid(region, columns as u64, rows as u64)], side);
+    }
+    let kept = (rows - 1).max(1);
+    let (even, odd) = ((kept + 1) / 2, kept / 2);
+    let (width, height) = (columns * sx, (kept + 1) * sy / 2);
+    let (left, top) = (centered(middle_x, width), centered(middle_y, height));
+    let mut parts = vec![Part::Grid(
+        [
+            micro(left),
+            micro(top),
+            micro(left + width),
+            micro(top + even * sy),
+        ],
+        columns as u64,
+        even as u64,
+    )];
+    if odd > 0 && columns > 1 {
+        parts.push(Part::Grid(
+            [
+                micro(left + sx / 2),
+                micro(top + sy / 2),
+                micro(left + width - sx / 2),
+                micro(top + sy / 2 + odd * sy),
+            ],
+            (columns - 1) as u64,
+            odd as u64,
+        ));
+    }
+    (parts, side)
+}
+
+/// Where a layer's instructions put their marks; `None` for a seeded scatter.
+fn layer_centers(instructions: &[Instruction], units: Units) -> Option<Vec<[f64; 2]>> {
+    let mut centers = Vec::new();
+    for instruction in instructions {
+        centers.extend(mark_centers(instruction, units)?);
+    }
+    Some(centers)
+}
+
+/// C4's repeats: each one's size, the turn it adds to the one before and
+/// whether an echo follows it.
+fn motif_sizes(sequence: &[&str], repeats: usize) -> Vec<(f64, f64, bool)> {
+    let mut size = 1.0;
+    let mut steps = Vec::new();
+    for m in 0..repeats {
+        let (mut turn, mut echo) = (0.0, false);
+        if m > 0 {
+            match sequence[(m - 1) % sequence.len()] {
+                "grow" => size *= SQRT_PHI,
+                "shrink" => size /= SQRT_PHI,
+                "rotate" => turn = 30.0,
+                "mirror" => turn = 180.0,
+                _ => echo = true,
+            }
+        }
+        steps.push((size, turn, echo));
+    }
+    steps
+}
+
+/// The golden spiral's places, its radius in short-edge units.
+fn spiral_points(count: usize, radius: f64, units: Units) -> Vec<[f64; 2]> {
+    (0..count)
+        .map(|m| {
+            #[allow(clippy::cast_precision_loss)]
+            let m = m as f64;
+            let angle = (200.0 + 90.0 * m).to_radians();
+            let r = radius / PHI.powf(m / 1.5);
+            [
+                clamp_between(0.5 + r * angle.cos() / units.x, 0.06, 0.94),
+                clamp_between(0.5 + r * angle.sin() / units.y, 0.06, 0.94),
+            ]
+        })
+        .collect()
+}
+
+/// C4's places along its path; `stretch` lengthens the path about its middle.
+#[allow(clippy::cast_precision_loss, clippy::float_cmp)]
+fn motif_points(path: &str, repeats: usize, cy: f64, units: Units, stretch: f64) -> Vec<[f64; 2]> {
+    let last = (repeats - 1) as f64;
+    if stretch == 1.0 {
+        return match path {
+            "row" => (0..repeats)
+                .map(|m| [0.14 + 0.72 * m as f64 / last, cy])
+                .collect(),
+            "diagonal" => (0..repeats)
+                .map(|m| [0.16 + 0.68 * m as f64 / last, 0.84 - 0.68 * m as f64 / last])
+                .collect(),
+            _ => spiral_points(repeats, 0.34, units),
+        };
+    }
+    match path {
+        "row" => (0..repeats)
+            .map(|m| [0.5 + (-0.36 + 0.72 * m as f64 / last) * stretch, cy])
+            .collect(),
+        "diagonal" => (0..repeats)
+            .map(|m| {
+                [
+                    0.5 + (-0.34 + 0.68 * m as f64 / last) * stretch,
+                    0.5 + (0.34 - 0.68 * m as f64 / last) * stretch,
+                ]
+            })
+            .collect(),
+        _ => spiral_points(repeats, 0.34 * stretch, units),
+    }
+}
+
+/// The largest overlap of two neighbouring repeats: their mean width over the
+/// distance between them, in short-edge units (an echo is left out).
+fn motif_crowding(
+    points: &[[f64; 2]],
+    sizes: &[(f64, f64, bool)],
+    width: f64,
+    units: Units,
+) -> f64 {
+    let mut worst = 0.0_f64;
+    for k in 1..points.len().min(sizes.len()) {
+        let distance = units.distance(points[k - 1], points[k]);
+        let crowding = if distance > 0.0 {
+            (sizes[k - 1].0 + sizes[k].0) / 2.0 * width / distance
+        } else {
+            f64::INFINITY
+        };
+        worst = py_max(worst, crowding);
+    }
+    worst
+}
+
+/// How far each of C4's paths may lengthen inside the inner frame.
+fn motif_stretch(path: &str) -> f64 {
+    if path == "row" {
+        (0.5 - INNER.0) / 0.36
+    } else {
+        (0.5 - INNER.0) / 0.34
+    }
+}
+
+/// The hands C6 draws its degrees with: shin's stillness, gyo's fine and slow
+/// wave, and so's sway in three degrees, each with the turn it adds.
+fn c6_hand(level: &str, degree: &str) -> (Option<inku_score::Variation>, f64) {
+    let variation = |amplitude, frequency, quality| {
+        Some(inku_score::Variation {
+            amplitude,
+            frequency,
+            quality,
+            dimensions: vec![
+                inku_score::Dimension::PositionX,
+                inku_score::Dimension::PositionY,
+            ],
+        })
+    };
+    match (level, degree) {
+        ("shin", _) => (None, 0.0),
+        ("gyo", _) => (
+            variation(Amplitude::Fine, Frequency::Slow, inku_score::Quality::Wave),
+            8.0,
+        ),
+        (_, "small") => (
+            variation(
+                Amplitude::Fine,
+                Frequency::Medium,
+                inku_score::Quality::Perlin,
+            ),
+            14.0,
+        ),
+        (_, "medium") => (
+            variation(
+                Amplitude::Medium,
+                Frequency::Medium,
+                inku_score::Quality::Perlin,
+            ),
+            24.0,
+        ),
+        _ => (
+            variation(
+                Amplitude::Broad,
+                Frequency::Medium,
+                inku_score::Quality::Perlin,
+            ),
+            36.0,
+        ),
+    }
+}
+
 /// How far the origin's own arrangement overlapped its marks: one mark's width
 /// over the spacing (a bundle at one spot without limit, a single mark not at all).
 fn origin_ratio(instruction: &Instruction, units: Units) -> f64 {
@@ -948,13 +1398,26 @@ pub struct LawsContext {
     units: Units,
     /// The CIELAB lightness of each of the nine colors the run's palette draws.
     lightness: Option<BTreeMap<&'static str, f64>>,
+    /// The nine colors as the request's table shows them.
+    colors: Option<Vec<ColorRow>>,
     summaries: Vec<LayerSummary>,
     /// The layer index of the plan's first layer: plugin sentences come first.
     first_plan_layer: usize,
 }
 
-/// The CIELAB lightness (0 to 1) of an sRGB color, as the prototype measured it.
-fn lightness_of([r, g, b]: [u8; 3]) -> f64 {
+/// One of the nine colors as the request shows it: the lightness the
+/// prototype measured (0 to 1, two decimals), the chroma and the hue angle.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ColorRow {
+    pub name: &'static str,
+    pub lightness: f64,
+    pub chroma: i64,
+    pub hue: i64,
+}
+
+/// The CIELAB lightness (0 to 1), chroma and hue angle (degrees) of an sRGB
+/// color under D65, as the prototype measured it (`model.lch`).
+fn lch_of([r, g, b]: [u8; 3]) -> (f64, f64, f64) {
     let linear = |channel: u8| {
         let c = f64::from(channel) / 255.0;
         if c <= 0.04045 {
@@ -964,7 +1427,9 @@ fn lightness_of([r, g, b]: [u8; 3]) -> f64 {
         }
     };
     let lin = [linear(r), linear(g), linear(b)];
+    let x = (0.4124 * lin[0] + 0.3576 * lin[1] + 0.1805 * lin[2]) / 0.95047;
     let y = 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+    let z = (0.0193 * lin[0] + 0.1192 * lin[1] + 0.9505 * lin[2]) / 1.08883;
     let f = |t: f64| {
         if t > 0.008856 {
             t.powf(1.0 / 3.0)
@@ -972,7 +1437,17 @@ fn lightness_of([r, g, b]: [u8; 3]) -> f64 {
             7.787 * t + 16.0 / 116.0
         }
     };
-    (116.0 * f(y) - 16.0) / 100.0
+    let (a, b) = (500.0 * (f(x) - f(y)), 200.0 * (f(y) - f(z)));
+    (
+        (116.0 * f(y) - 16.0) / 100.0,
+        hypot(a, b),
+        b.atan2(a).to_degrees().rem_euclid(360.0),
+    )
+}
+
+/// The CIELAB lightness (0 to 1) of an sRGB color, as the prototype measured it.
+fn lightness_of(rgb: [u8; 3]) -> f64 {
+    lch_of(rgb).0
 }
 
 impl LawsContext {
@@ -998,6 +1473,23 @@ impl LawsContext {
                 })
                 .collect()
         });
+        let colors = palette.observations.and_then(|observations| {
+            COLORS
+                .iter()
+                .map(|color| {
+                    let observed = observations
+                        .iter()
+                        .find(|observed| observed.abstract_color == *color)?;
+                    let (lightness, chroma, hue) = lch_of(observed.concrete_rgb);
+                    Some(ColorRow {
+                        name: color.as_str(),
+                        lightness: round2(lightness),
+                        chroma: round_int(chroma),
+                        hue: round_int(hue),
+                    })
+                })
+                .collect::<Option<Vec<ColorRow>>>()
+        });
         let summaries = summaries(&score, units);
         let plan_layers = composed.plan.layers.len();
         let first_plan_layer = composed.plan.plugins.len();
@@ -1013,6 +1505,7 @@ impl LawsContext {
             score,
             units,
             lightness,
+            colors,
             summaries,
             first_plan_layer,
         })
@@ -1078,8 +1571,44 @@ impl LawsContext {
                 .filter(|summary| summary.arranged != Some("plugin"))
                 .map(|summary| summary.layer)
                 .collect(),
+            "C1" | "C2" | "C3" | "C4" => movable,
+            "C5" => movable
+                .into_iter()
+                .filter(|layer| {
+                    self.summary(*layer)
+                        .is_some_and(|summary| summary.count >= 6)
+                })
+                .collect(),
+            // C6 draws each mark of a row or a grid apart: a bundle's marks share
+            // one spot, a scatter's are seeded, and a point cannot sway.
+            "C6" => movable
+                .into_iter()
+                .filter(|layer| {
+                    self.summary(*layer).is_some_and(|summary| {
+                        summary.count >= 3
+                            && summary.shape != Primitive::Point.as_str()
+                            && matches!(
+                                summary.arranged,
+                                Some("row_horizontal" | "row_vertical" | "row_diagonal" | "grid")
+                            )
+                    })
+                })
+                .collect(),
             _ => Vec::new(),
         }
+    }
+
+    /// The largest count of a layer a law may move (C4's repeats go up to it).
+    fn max_count(&self) -> u64 {
+        self.movable()
+            .into_iter()
+            .filter_map(|layer| self.summary(layer).map(|summary| summary.count))
+            .fold(1, u64::max)
+    }
+
+    /// A layer's count in the composed document's Score.
+    fn count(&self, layer: usize) -> u64 {
+        self.summary(layer).map_or(0, |summary| summary.count)
     }
 
     /// The laws a reader may choose for this work: those with a layer to take.
@@ -1102,7 +1631,7 @@ struct LawText {
     example: &'static str,
 }
 
-const LAW_TEXTS: [(&str, LawText); 13] = [
+const LAW_TEXTS: [(&str, LawText); 19] = [
     (
         "B1",
         LawText {
@@ -1348,32 +1877,154 @@ const LAW_TEXTS: [(&str, LawText); 13] = [
             example: r#"{"targets":[{"layer":0,"hand":"still"},{"layer":1,"hand":"fine"}]}"#,
         },
     ),
+    (
+        "C1",
+        LawText {
+            name: ["疎密", "Sparse and dense"],
+            family: ["カード", "card"],
+            source: [
+                "中国の画論の疎密・聚散（「疎処は馬を走らすべく、密処は風を透さしめず」、鄧石如の言として伝わる）",
+                "the sparse and dense, gathering and scattering of Chinese painting theory (“where it is sparse, a horse may run; where it is dense, no wind passes”, told as Deng Shiru's words)",
+            ],
+            law: [
+                "画面の中に、物が隙間なく詰まる密の所を一つ作り、ほかを大きく空ける。密の所は黄金分割か三分割の交点か中心に置く。",
+                "Make one dense place in the picture where things crowd without a gap, and leave the rest wide open. Put the dense place on a crossing of the golden section or the thirds, or at the center.",
+            ],
+            choose: [
+                "密にする層（1〜2、数の多い物や群れ・粒の物）と、それぞれの数（記述が数を書いた層は今の数のまま。ほかは今の1〜6倍まで）、密の場所、密の広さ（画面の短辺に対する比）。",
+                "the layers to make dense (1 or 2: things of many, flocks or grains), the count of each (a layer whose count the description writes keeps it; another takes 1 to 6 times its count), the dense place, and how wide it is (a ratio of the canvas's short side).",
+            ],
+            example: r#"{"targets":[{"layer":1,"count":60}],"spot":"golden_lr","extent":"0.25"}"#,
+        },
+    ),
+    (
+        "C2",
+        LawText {
+            name: ["文様", "Patterns"],
+            family: ["カード", "card"],
+            source: [
+                "日本の文様（青海波・七宝・市松・鱗・亀甲）",
+                "the patterns of Japan (seigaiha, shippo, ichimatsu, uroko, kikko)",
+            ],
+            law: [
+                "一つの単位の形を、規則で敷き詰める。青海波は重なる同心の半円、七宝は重なる円、市松は二色の四角の交互、鱗は三角の交互、亀甲は六角の連なり。記述の面や群れ（水面・畑・屋根・窓・雨・雪など）を描く形として使い、単体の物には使わない。",
+                "Tile the canvas with one unit shape by a rule: seigaiha is overlapping concentric semicircles, shippo overlapping circles, ichimatsu squares alternating in two colors, uroko alternating triangles, and kikko a run of hexagons. Use it as the shape that draws a surface or a crowd the description names (a water surface, fields, roofs, windows, rain, snow), not for one thing alone.",
+            ],
+            choose: [
+                "対象の層（その層を文様の単位で描き直す）、文様、範囲（上・中・下の帯、全面、その層の今の範囲）、単位の大きさ（画面の短辺に対する比）、色（1〜2。地と明るさが 0.15 以上違う色。市松と鱗は2色で交互）。",
+                "the layer (drawn again in the pattern's unit), the pattern, the area (the top, middle or bottom band, the whole canvas, the layer's current area), the unit's size (a ratio of the canvas's short side), and the colors (1 or 2, each differing from the ground in lightness by 0.15 or more; ichimatsu and uroko alternate two).",
+            ],
+            example: r#"{"layer":0,"pattern":"seigaiha","area":"bottom_band","unit":"1/8","colors":["white"]}"#,
+        },
+    ),
+    (
+        "C3",
+        LawText {
+            name: ["ポリリズム", "Polyrhythm"],
+            family: ["カード", "card"],
+            source: [
+                "音楽の複合リズム（2対3・3対4・3対5）、Klee の多声の画",
+                "the compound rhythms of music (2 against 3, 3 against 4, 3 against 5); Klee's polyphonic pictures",
+            ],
+            law: [
+                "二つの声部を、同じ長さに違う数で等間隔に並べて重ねる。二つの拍が合う所と外れる所が、画の中に周期を作る。",
+                "Lay two voices over each other, each lined up at equal spacing along the same length with a different count. Where the two beats meet and where they part makes a period in the picture.",
+            ],
+            choose: [
+                "二つの声部にする層（1〜2。1つなら同じ物を二つの声部に分ける）、比、基の数（声部の数は 基×比 になる）、軸（横・縦・斜め）、帯の位置（画面の縦か横の比）。",
+                "the layers of the two voices (1 or 2; with one, the same thing is split into two voices), the ratio, the base count (a voice's count is the base times its term of the ratio), the axis (horizontal, vertical, diagonal), and the band's place (a ratio of the canvas's height or width).",
+            ],
+            example: r#"{"voices":[0,1],"ratio":"2:3","base":4,"axis":"horizontal","band":"0.618"}"#,
+        },
+    ),
+    (
+        "C4",
+        LawText {
+            name: ["動機と変奏", "Motif and variation"],
+            family: ["カード", "card"],
+            source: [
+                "主題と変奏、フーガの拡大・縮小・反行、カノンのずらした重ね",
+                "theme and variations; the fugue's augmentation, diminution and inversion; the canon's staggered entries",
+            ],
+            law: [
+                "一つの形（動機）を、大きさ・向き・鏡映・ずらした重ねを順に変えながら繰り返す。",
+                "Repeat one shape (the motif), changing its size, its turn, its mirror image and a staggered overlap in turn.",
+            ],
+            choose: [
+                "動機にする層、回数（記述が数を書いた層は今の数。ほかは今の数から、今の数と 9 の大きいほうまで。3以上）、変奏の列（拡大・縮小・回転・鏡映・ずらした重ねから1〜4。順に繰り返し当てる）、道筋（横の列・斜め・黄金の渦）。",
+                "the motif's layer, the repeats (a layer whose count the description writes keeps it; another goes from its count up to the larger of its count and 9, 3 at least), the variations (1 to 4 of grow, shrink, rotate, mirror, echo, applied in turn and again), and the path (a horizontal row, a diagonal, the golden spiral).",
+            ],
+            example: r#"{"layer":0,"repeats":6,"sequence":["shrink","rotate"],"path":"golden_spiral"}"#,
+        },
+    ),
+    (
+        "C5",
+        LawText {
+            name: ["序破急", "Jo-ha-kyū"],
+            family: ["カード", "card"],
+            source: [
+                "雅楽、世阿弥（能の構成）",
+                "gagaku; Zeami (the structure of noh)",
+            ],
+            law: [
+                "一つの流れを三段にする。序は静かに広い間隔で始まり、破で崩れて変わり、急で間隔が詰まって終わる。画面では、ある向きに沿って、まばら→変化→密になる。",
+                "Make one flow in three stages: jo begins quiet at wide spacing, ha breaks and changes, and kyu ends with the spacing closing in. On the canvas it runs from sparse to changing to dense along one direction.",
+            ],
+            choose: [
+                "対象の層（6個以上の物）、向き、三段の長さの比（序:破:急）、破での変化（向き・大きさ・色。色なら破の色）、急の密度（序の何倍か）。数は今のまま。",
+                "the layer (6 things or more), the direction, the stages' lengths (jo:ha:kyu), the change at ha (turn, size, color; for color, ha's color), and kyu's density (how many times jo's). The count stays.",
+            ],
+            example: r#"{"layer":1,"direction":"bottom_to_top","lengths":"3:2:1","break_change":"size","break_color":"orange","kyu_density":"3"}"#,
+        },
+    ),
+    (
+        "C6",
+        LawText {
+            name: ["真・行・草", "Shin, gyō and sō"],
+            family: ["カード", "card"],
+            source: [
+                "書の楷行草、庭・いけばな・茶の真行草",
+                "the regular, running and cursive scripts of calligraphy; the shin, gyō and sō of gardens, ikebana and tea",
+            ],
+            law: [
+                "同じ形を、厳格（真）・半ば崩す（行）・自在（草）の三つの度合いで描き分ける。",
+                "Draw the same shape in three degrees: strict (shin), half loosened (gyo) and free (so).",
+            ],
+            choose: [
+                "対象の層（3つ以上の同じ物の列か格子。束と散らす層は使えない）、分け方（三つの帯に分ける・並びの順に移る）、並びの順（真→行→草 か 草→行→真）、草の崩しの度合い。数は今のまま。",
+                "the layer (a row or a grid of 3 or more of the same thing; a bundle or a scatter cannot be used), the split (into three bands, or moving along the order), the order (shin to gyo to so, or so to gyo to shin), and how far so loosens. The count stays.",
+            ],
+            example: r#"{"layer":0,"split":"three_bands","order":"shin_gyo_so","so_degree":"medium"}"#,
+        },
+    ),
 ];
 
 const SYSTEM_JA: &str = "あなたは、絵画・意匠・音楽の法則を組み合わせて、作品の記述を一枚の画にする係です。
 作品は、記述（作者の文）から作った楽譜です。楽譜の層（物）は、まだ法則なしで置かれています。
-法則の一覧（13）から、この作品に使う法則を選び、法則ごとの値を選択肢から選んでください。座標は書きません。座標と大きさは、道具が法則から計算します。
+法則の一覧（19）から、この作品に使う法則を選び、法則ごとの値を選択肢から選んでください。座標は書きません。座標と大きさは、道具が法則から計算します。
 
 決まり:
 1. 主の法則（main_law）を一つ決めます。画を見た人が最初に読み取る、画の骨組みになる法則です。B21 は主にしません。主の層（main_layer）も一つ決めます。
 2. 法則の数は、送る文の最後の「この答えの決まり」に従います。法則は、層をいくつに当てても1つと数えます。
-3. 一つの層に、置き場の法則（B1〜B5・B7・B8）は一つ、並びの法則（B9・B10・B12）は一つまで。大きさの法則（B6・B10・B12・B15）は掛け合わせます。
+3. 一つの層に、置き場の法則（B1〜B5・B7・B8）は一つ、並びの法則（B9・B10・B12）は一つまで。C1〜C6 は置き場と並びを作り直すので、同じ層に、ほかの置き場・並びの法則や、ほかの C1〜C6 を重ねません。大きさの法則（B6・B10・B12・B15・C4）は掛け合わせます。
 4. 記述が名指した物の種類と道具は変えません。記述そのものが数を書いた物（「一羽」「三度」など）は数を変えず、その層の番号を description_counts に入れます。
-5. 道具は、置き場 → 大きさ → 並び → 空気遠近 → 手 の順に当てます。決まりに合わない答えは、理由を添えて返されます。
-6. reason には、記述の言葉を「」で引いて、主の法則を選んだ理由を1〜2行で書きます。
+5. 道具は、置き場 → 大きさ → 並び → C1〜C6 → 空気遠近 → 手 の順に当てます。決まりに合わない答えは、理由を添えて返されます。
+6. 1作品の痕は 380、指示は 60 までです。
+7. reason には、記述の言葉を「」で引いて、主の法則を選んだ理由を1〜2行で書きます。
 答えは決まった形の JSON で返します。laws には、使う法則の番号を鍵にして、法則ごとの値を書きます。";
 
 const SYSTEM_EN: &str = "You combine laws of painting, design and music to make a work's description into one picture.
 The work is a Score made from the description (the author's words). The Score's layers (things) are placed without laws yet.
-From the list of laws (13), choose the laws this work uses and, for each law, its values from the choices. Write no coordinates: the tool computes coordinates and sizes from the laws.
+From the list of laws (19), choose the laws this work uses and, for each law, its values from the choices. Write no coordinates: the tool computes coordinates and sizes from the laws.
 
 Rules:
 1. Choose one main law (main_law): the law a viewer reads first, the framework of the picture. B21 is never the main law. Choose one main layer (main_layer) too.
 2. The number of laws follows \"The rule of this answer\" at the end of the message. A law counts as one however many layers it takes.
-3. A layer takes one placement law (B1 to B5, B7, B8) and one arrangement law (B9, B10, B12) at most. The size laws (B6, B10, B12, B15) multiply.
+3. A layer takes one placement law (B1 to B5, B7, B8) and one arrangement law (B9, B10, B12) at most. C1 to C6 rebuild a layer's place and arrangement, so a layer that takes one of them takes no other placement or arrangement law and no other of C1 to C6. The size laws (B6, B10, B12, B15, C4) multiply.
 4. Keep the kinds of things and the tools the description names. Keep the count of a thing the description itself counts (\"one heron\", \"three times\"), and put that layer's number in description_counts.
-5. The tool applies placement, then size, then arrangement, then aerial perspective, then the hand. An answer that breaks the rules comes back with the reason.
-6. In reason, quote the description's words in “ ” and say in one or two lines why you chose the main law.
+5. The tool applies placement, then size, then arrangement, then C1 to C6, then aerial perspective, then the hand. An answer that breaks the rules comes back with the reason.
+6. A work holds 380 marks and 60 instructions at most.
+7. In reason, quote the description's words in “ ” and say in one or two lines why you chose the main law.
 Return the answer as JSON of the given shape. In laws, key each law you use by its number and write its values.";
 
 const LAYER_NOTE: [&str; 2] = [
@@ -1400,8 +2051,15 @@ const EXAMPLE_LAYERS: [&str; 3] = [
 
 /// The prototype's example answer with the laws of this stage only.
 const EXAMPLE_ANSWER: [&str; 2] = [
-    r#"{"main_layer":0,"main_law":"B1","description_counts":[0],"laws":{"B1":{"targets":[{"layer":0,"at":"line_left","span":"full"}]},"B21":{"targets":[{"layer":2,"hand":"fine"}]}},"reason":"「一本の木が立っていた」の木を画の骨にするため、幹を黄金分割の左の線に全幅で立てた。"}"#,
-    r#"{"main_layer":0,"main_law":"B1","description_counts":[0],"laws":{"B1":{"targets":[{"layer":0,"at":"line_left","span":"full"}]},"B21":{"targets":[{"layer":2,"hand":"fine"}]}},"reason":"To make the tree of “a single tree … stood” the bone of the picture, its trunk stands at full length on the golden section's left line."}"#,
+    r#"{"main_layer":0,"main_law":"B1","description_counts":[0],"laws":{"B1":{"targets":[{"layer":0,"at":"line_left","span":"full"}]},"C1":{"targets":[{"layer":1,"count":21}],"spot":"golden_ul","extent":"0.15"},"B21":{"targets":[{"layer":2,"hand":"fine"}]}},"reason":"「一本の木が立っていた」の木を画の骨にするため、幹を黄金分割の左の線に全幅で立てた。"}"#,
+    r#"{"main_layer":0,"main_law":"B1","description_counts":[0],"laws":{"B1":{"targets":[{"layer":0,"at":"line_left","span":"full"}]},"C1":{"targets":[{"layer":1,"count":21}],"spot":"golden_ul","extent":"0.15"},"B21":{"targets":[{"layer":2,"hand":"fine"}]}},"reason":"To make the tree of “a single tree … stood” the bone of the picture, its trunk stands at full length on the golden section's left line."}"#,
+];
+
+/// The head of the table of the work's nine colors, shown when the run's
+/// palette has observations.
+const COLOR_HEAD: [&str; 2] = [
+    "## この作品のカタログの色（9つの色名と、それが描く色。lightness は明るさ 0〜1、chroma は鮮やかさ、hue は色相の角度）",
+    "## The colors of this work's catalog (the nine color names and the colors they draw; lightness is the lightness from 0 to 1, chroma the vividness and hue the hue angle)",
 ];
 
 const COUNT_RULE: [&str; 2] = [
@@ -1429,14 +2087,14 @@ fn message(
             "## 記述",
             "## 楽譜の層（法則を当てる前）",
             "## 地: ",
-            "## 法則の一覧（13）",
+            "## 法則の一覧（19）",
             "## 答え全体の例（この作品と別の記述）",
         ],
         ResolvedInstructionLanguage::En => [
             "## Description",
             "## The Score's layers (before the laws)",
             "## Ground: ",
-            "## The laws (13)",
+            "## The laws (19)",
             "## A whole answer (for another description)",
         ],
     };
@@ -1451,6 +2109,14 @@ fn message(
     lines.push(String::new());
     lines.push(format!("{}{ground}", heads[2]));
     lines.push(String::new());
+    // The colors' lightness, so that a reader sees which of them the ground hides.
+    if let Some(colors) = &context.colors {
+        lines.push(COLOR_HEAD[at].to_owned());
+        for color in colors {
+            lines.push(serde_json::to_string(color).unwrap_or_default());
+        }
+        lines.push(String::new());
+    }
     lines.push(heads[3].to_owned());
     lines.push(AT_NOTE[at].to_owned());
     let offered = context.offered();
@@ -1651,9 +2317,105 @@ fn law_schema(law: &str, context: &LawsContext) -> Option<Value> {
             }))},
             "required": ["targets"]
         }),
+        "C1" => json!({
+            "type": "object",
+            "propertyOrdering": ["targets", "spot", "extent"],
+            "properties": {
+                "targets": {"type": "array", "minItems": 1, "maxItems": 2, "items": {
+                    "type": "object",
+                    "propertyOrdering": ["layer", "count"],
+                    "properties": {
+                        "layer": layer,
+                        "count": {"type": "integer", "minimum": 1, "maximum": 240}
+                    },
+                    "required": ["layer", "count"]
+                }},
+                "spot": {"type": "string", "enum": SPOTS.map(|(name, _)| name)},
+                "extent": {"type": "string", "enum": ["0.15", "0.25", "0.35"]}
+            },
+            "required": ["targets", "spot", "extent"]
+        }),
+        "C2" => json!({
+            "type": "object",
+            "propertyOrdering": ["layer", "pattern", "area", "unit", "colors"],
+            "properties": {
+                "layer": layer,
+                "pattern": {"type": "string", "enum": ["seigaiha", "shippo", "ichimatsu", "uroko", "kikko"]},
+                "area": {"type": "string", "enum": ["top_band", "middle_band", "bottom_band", "whole", "current"]},
+                "unit": {"type": "string", "enum": ["1/12", "1/8", "1/5"]},
+                "colors": {"type": "array", "minItems": 1, "maxItems": 2, "items": color_enum()}
+            },
+            "required": ["layer", "pattern", "area", "unit", "colors"]
+        }),
+        "C3" => json!({
+            "type": "object",
+            "propertyOrdering": ["voices", "ratio", "base", "axis", "band"],
+            "properties": {
+                "voices": {"type": "array", "minItems": 1, "maxItems": 2, "items": layer},
+                "ratio": {"type": "string", "enum": ["2:3", "3:4", "3:5"]},
+                "base": {"type": "integer", "minimum": 2, "maximum": 8},
+                "axis": {"type": "string", "enum": ["horizontal", "vertical", "diagonal"]},
+                "band": {"type": "string", "enum": ["0.382", "0.5", "0.618"]}
+            },
+            "required": ["voices", "ratio", "base", "axis", "band"]
+        }),
+        "C4" => json!({
+            "type": "object",
+            "propertyOrdering": ["layer", "repeats", "sequence", "path"],
+            "properties": {
+                "layer": layer,
+                "repeats": {"type": "integer", "minimum": 3, "maximum": context.max_count().max(9)},
+                "sequence": {"type": "array", "minItems": 1, "maxItems": 4,
+                             "items": {"type": "string", "enum": ["grow", "shrink", "rotate", "mirror", "echo"]}},
+                "path": {"type": "string", "enum": ["row", "diagonal", "golden_spiral"]}
+            },
+            "required": ["layer", "repeats", "sequence", "path"]
+        }),
+        "C5" => json!({
+            "type": "object",
+            "propertyOrdering": ["layer", "direction", "lengths", "break_change", "break_color", "kyu_density"],
+            "properties": {
+                "layer": layer,
+                "direction": {"type": "string", "enum": ["left_to_right", "right_to_left", "top_to_bottom", "bottom_to_top"]},
+                "lengths": {"type": "string", "enum": ["3:2:1", "2:2:1", "1:1:1"]},
+                "break_change": {"type": "string", "enum": ["rotate", "size", "color"]},
+                "break_color": color_enum(),
+                "kyu_density": {"type": "string", "enum": ["2", "3", "4"]}
+            },
+            "required": ["layer", "direction", "lengths", "break_change", "break_color", "kyu_density"]
+        }),
+        "C6" => json!({
+            "type": "object",
+            "propertyOrdering": ["layer", "split", "order", "so_degree"],
+            "properties": {
+                "layer": layer,
+                "split": {"type": "string", "enum": ["three_bands", "sequence"]},
+                "order": {"type": "string", "enum": ["shin_gyo_so", "so_gyo_shin"]},
+                "so_degree": {"type": "string", "enum": ["small", "medium", "large"]}
+            },
+            "required": ["layer", "split", "order", "so_degree"]
+        }),
         _ => return None,
     })
 }
+
+fn color_enum() -> Value {
+    json!({"type": "string", "enum": COLORS.map(|color| color.as_str())})
+}
+
+/// The places C1 may make dense: the golden section's and the thirds'
+/// crossings (as the prototype wrote them) and the center.
+const SPOTS: [(&str, [f64; 2]); 9] = [
+    ("golden_ul", [0.382, 0.382]),
+    ("golden_ur", [0.618, 0.382]),
+    ("golden_ll", [0.382, 0.618]),
+    ("golden_lr", [0.618, 0.618]),
+    ("third_ul", [1.0 / 3.0, 1.0 / 3.0]),
+    ("third_ur", [2.0 / 3.0, 1.0 / 3.0]),
+    ("third_ll", [1.0 / 3.0, 2.0 / 3.0]),
+    ("third_lr", [2.0 / 3.0, 2.0 / 3.0]),
+    ("center", [0.5, 0.5]),
+];
 
 /// The answer's schema for this work, its choices narrowed to the work's layers.
 #[must_use]
@@ -1837,6 +2599,32 @@ fn conform(value: &Value, schema: &Value, path: &str) -> Result<(), Refusal> {
                 format!("{path} is not an integer"),
             ));
         }
+        Some("integer") => {
+            let number = value.as_i64().unwrap_or(i64::MAX);
+            let minimum = schema["minimum"].as_i64();
+            let maximum = schema["maximum"].as_i64();
+            if minimum.is_some_and(|minimum| number < minimum)
+                || maximum.is_some_and(|maximum| number > maximum)
+            {
+                let shown =
+                    |bound: Option<i64>| bound.map_or("None".to_owned(), |bound| bound.to_string());
+                return Err(refusal(
+                    "out_of_range",
+                    format!(
+                        "{path} = {} は {}〜{} の外",
+                        shown(Some(number)),
+                        shown(minimum),
+                        shown(maximum)
+                    ),
+                    format!(
+                        "{path} = {} is outside {} to {}",
+                        shown(Some(number)),
+                        shown(minimum),
+                        shown(maximum)
+                    ),
+                ));
+            }
+        }
         Some("string") if !value.is_string() => {
             return Err(refusal(
                 "not_string",
@@ -1903,8 +2691,15 @@ fn law_targets(law: &str, value: &Value) -> Vec<usize> {
             layers.extend(list("accent"));
             layers
         }
-        "B7" => vec![layer_number(&value["layer"])],
+        "B7" | "C2" | "C4" | "C5" | "C6" => vec![layer_number(&value["layer"])],
         "B15" => list("layers"),
+        "C1" => value["targets"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|target| layer_number(&target["layer"]))
+            .collect(),
+        "C3" => list("voices"),
         _ => Vec::new(),
     }
 }
@@ -1914,6 +2709,8 @@ struct Answer {
     main_layer: usize,
     main_law: String,
     laws: BTreeMap<&'static str, Value>,
+    /// The layers whose count the description itself writes.
+    fixed: BTreeSet<usize>,
 }
 
 /// Read an answer and check it against the schema and the prototype's rules.
@@ -1980,6 +2777,8 @@ fn check(answer: &Value, context: &LawsContext, count_rule: bool) -> Result<Answ
     }
     let mut placed: BTreeMap<usize, Vec<&str>> = BTreeMap::new();
     let mut arranging: BTreeMap<usize, Vec<&str>> = BTreeMap::new();
+    // The placement, arrangement and card laws that name each layer.
+    let mut roles: BTreeMap<usize, Vec<&str>> = BTreeMap::new();
     for (law, value) in &laws {
         let seen = law_targets(law, value);
         if seen.iter().collect::<BTreeSet<_>>().len() != seen.len() {
@@ -2002,6 +2801,9 @@ fn check(answer: &Value, context: &LawsContext, count_rule: bool) -> Result<Answ
             }
             if ARRANGEMENT.contains(law) {
                 arranging.entry(layer).or_default().push(law);
+            }
+            if PLACEMENT.contains(law) || ARRANGEMENT.contains(law) || REBUILD.contains(law) {
+                roles.entry(layer).or_default().push(law);
             }
         }
     }
@@ -2032,6 +2834,22 @@ fn check(answer: &Value, context: &LawsContext, count_rule: bool) -> Result<Answ
                 ),
                 format!(
                     "layer {layer} takes two arrangement laws ({}); keep one",
+                    found.join(", ")
+                ),
+            ));
+        }
+    }
+    for (layer, found) in &mut roles {
+        if found.len() > 1 && found.iter().any(|law| REBUILD.contains(law)) {
+            found.sort_by_key(|law| LAWS.iter().position(|known| known == law));
+            return Err(refusal(
+                "rebuild_shared",
+                format!(
+                    "layer {layer} は C1〜C6 が置き場と並びを作り直すので、ほかの置き場・並びの法則や C1〜C6 と重ねられない（{}）",
+                    found.join("・")
+                ),
+                format!(
+                    "C1 to C6 rebuild layer {layer}'s place and arrangement, so it takes no other placement or arrangement law and no other of C1 to C6 ({})",
                     found.join(", ")
                 ),
             ));
@@ -2080,10 +2898,69 @@ fn check(answer: &Value, context: &LawsContext, count_rule: bool) -> Result<Answ
             "B7 balances a layer that is not the main layer".to_owned(),
         ));
     }
+    if let (Some(hands), Some(c6)) = (laws.get("B21"), laws.get("C6"))
+        && law_targets("B21", hands).contains(&layer_number(&c6["layer"]))
+    {
+        return Err(refusal(
+            "hand_on_c6",
+            "C6 の層の手は C6 が決めるので、B21 を重ねない".to_owned(),
+            "C6 sets its layer's hand, so B21 does not take that layer".to_owned(),
+        ));
+    }
+    let fixed: BTreeSet<usize> = answer["description_counts"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(layer_number)
+        .collect();
+    for (law, ja, en) in [("C2", "文様", "a pattern"), ("C3", "声部", "voices")] {
+        let Some(value) = laws.get(law) else {
+            continue;
+        };
+        if let Some(layer) = law_targets(law, value)
+            .into_iter()
+            .find(|layer| fixed.contains(layer))
+        {
+            return Err(refusal(
+                "counted_layer",
+                format!("layer {layer} は記述が数を書いた物なので、数の変わる{ja}にできない"),
+                format!(
+                    "the description writes the count of layer {layer}, so it cannot become {en}, whose count changes"
+                ),
+            ));
+        }
+    }
+    if let Some(value) = laws.get("C1") {
+        for target in value["targets"].as_array().into_iter().flatten() {
+            let layer = layer_number(&target["layer"]);
+            let count = context.count(layer);
+            let wanted = target["count"].as_u64().unwrap_or(0);
+            if fixed.contains(&layer) && wanted != count {
+                return Err(refusal(
+                    "count_kept",
+                    format!("layer {layer} は記述が数を書いた物なので {count} のまま"),
+                    format!(
+                        "the description writes the count of layer {layer}, so it stays {count}"
+                    ),
+                ));
+            }
+            if wanted > 6 * count && !fixed.contains(&layer) {
+                return Err(refusal(
+                    "count_six_times",
+                    format!("layer {layer} の数は今の6倍（{}）まで", 6 * count),
+                    format!(
+                        "layer {layer} takes up to six times its count ({})",
+                        6 * count
+                    ),
+                ));
+            }
+        }
+    }
     Ok(Answer {
         main_layer,
         main_law,
         laws,
+        fixed,
     })
 }
 
@@ -2131,14 +3008,20 @@ struct Compiler<'a> {
     paired: BTreeSet<usize>,
     /// The layers progression or beat groups opened into marks.
     opened: BTreeSet<usize>,
+    /// The layers whose count the description itself writes.
+    fixed: &'a BTreeSet<usize>,
+    /// The layers a card rebuilt.
+    rebuilt: BTreeSet<usize>,
 }
 
-/// What the laws left: the Score, the notes, the pairs and the opened layers.
+/// What the laws left: the Score, the notes, the pairs, the opened layers and
+/// the rebuilt ones.
 struct Applied {
     score: Score,
     notes: Vec<Note>,
     paired: BTreeSet<usize>,
     opened: BTreeSet<usize>,
+    rebuilt: BTreeSet<usize>,
 }
 
 impl Compiler<'_> {
@@ -2358,14 +3241,12 @@ impl Compiler<'_> {
                     }
                     _ => [[0.5 - d, 0.5 - d], [0.5 + d, 0.5 + d]],
                 };
-                // The pair mirrors: the second mark turns the other way. The
-                // pair is printed as a row of two, whose marks share one turn;
-                // the mirrored one waits for a numeric angle.
+                // The pair mirrors: the second mark turns the other way. A pair
+                // that turns is printed as its two marks with their numeric
+                // angles, and an unturned one as a row of two.
                 let mut marks = points.map(|point| single(&instruction, point, 1.0));
-                let turned = marks[1].rotation.filter(|turn| *turn != 0.0);
-                if let Some(turn) = turned {
+                if let Some(turn) = marks[1].rotation.filter(|turn| *turn != 0.0) {
                     marks[1].rotation = Some(-turn);
-                    self.note("pair_mirror_unwritten", Some(layer), None);
                 }
                 self.score.instructions.splice(position..=position, marks);
                 self.paired.insert(layer);
@@ -3042,6 +3923,720 @@ impl Compiler<'_> {
         Ok(())
     }
 
+    // --- the cards (stage B-4b): after the fit to spacing, in their order ---------------------
+
+    /// A layer's marks in the Score the laws have left so far.
+    fn marks_of(&self, layer: usize) -> u64 {
+        self.instructions_of(layer)
+            .into_iter()
+            .map(|position| u64::from(count_of(&self.score.instructions[position])))
+            .sum()
+    }
+
+    /// Take a layer's instructions out of the Score: where they began, and them.
+    fn take_layer(
+        &mut self,
+        layer: usize,
+        law: &str,
+    ) -> Result<(usize, Vec<Instruction>), Refusal> {
+        let positions = self.instructions_of(layer);
+        let Some(&first) = positions.first() else {
+            return Err(refusal(
+                "no_such_layer",
+                format!("{law}: layer {layer} は楽譜に無い"),
+                format!("{law}: the Score has no layer {layer}"),
+            ));
+        };
+        let mut taken: Vec<Instruction> = positions
+            .iter()
+            .rev()
+            .map(|position| self.score.instructions.remove(*position))
+            .collect();
+        taken.reverse();
+        Ok((first, taken))
+    }
+
+    fn rebuild(&mut self) -> Result<(), Refusal> {
+        for law in REBUILD {
+            let Some(value) = self.laws.get(law).cloned() else {
+                continue;
+            };
+            match law {
+                "C1" => self.dense(&value)?,
+                "C2" => self.pattern(&value)?,
+                "C3" => self.polyrhythm(&value)?,
+                "C4" => self.motif(&value)?,
+                "C5" => self.jo_ha_kyu(&value)?,
+                _ => self.shin_gyo_so(&value)?,
+            }
+            self.rebuilt.extend(law_targets(law, &value));
+        }
+        Ok(())
+    }
+
+    /// C1: one or two layers scattered densely at one spot, their counts raised
+    /// (a count the description writes stays; past the marks' limit, the raise
+    /// shrinks by one ratio).
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        clippy::cast_precision_loss,
+        clippy::cast_sign_loss
+    )]
+    fn dense(&mut self, value: &Value) -> Result<(), Refusal> {
+        let spot = value["spot"]
+            .as_str()
+            .and_then(|name| SPOTS.iter().find(|(spot, _)| *spot == name))
+            .map_or([0.5, 0.5], |(_, at)| *at);
+        let extent: f64 = value["extent"]
+            .as_str()
+            .and_then(|extent| extent.parse().ok())
+            .unwrap_or(0.25);
+        let targets: Vec<(usize, u64)> = value["targets"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|target| {
+                (
+                    layer_number(&target["layer"]),
+                    target["count"].as_u64().unwrap_or(1),
+                )
+            })
+            .collect();
+        let current: Vec<u64> = targets
+            .iter()
+            .map(|(layer, _)| self.marks_of(*layer))
+            .collect();
+        let others =
+            total_marks(&self.score.instructions) as i64 - current.iter().sum::<u64>() as i64;
+        let wanted: u64 = targets.iter().map(|(_, count)| count).sum();
+        let factor = if wanted > 0 {
+            py_min(1.0, (MAX_MARKS as i64 - others) as f64 / wanted as f64)
+        } else {
+            1.0
+        };
+        for (k, ((layer, asked), now)) in targets.iter().zip(&current).enumerate() {
+            let fixed = self.fixed.contains(layer);
+            let mut count = if fixed { *now } else { *asked };
+            if factor < 1.0 && !fixed {
+                count = (*now).max((count as f64 * factor) as u64);
+                self.note("dense_count_limited", Some(*layer), Some(count as f64));
+            }
+            let (position, taken) = self.take_layer(*layer, "C1")?;
+            let mut mark = taken[0].clone();
+            moved(&mut mark);
+            let k = k as f64;
+            set_point_region(&mut mark, spot[0] + 0.02 * k, spot[1] + 0.02 * k);
+            if let Some(arrangement) = mark.arrangement.as_mut() {
+                arrangement.count = u32::try_from(count).unwrap_or(u32::MAX);
+                if let Some(resolved) = arrangement.resolved.as_mut() {
+                    // The extent is a side in short-edge units: the scatter's domain.
+                    resolved.domain = inku_score::Point::new(extent, extent);
+                    resolved.recipe =
+                        ResolvedPlacementRecipe::ScatterUniformWithCentroidTranslation;
+                }
+            }
+            self.score.instructions.insert(position, mark);
+        }
+        Ok(())
+    }
+
+    /// C2: a layer drawn again as a pattern of one unit shape over a band, the
+    /// whole canvas or its own area grown by one and a half units.
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        clippy::float_cmp
+    )]
+    fn pattern(&mut self, value: &Value) -> Result<(), Refusal> {
+        let units = self.units();
+        let layer = layer_number(&value["layer"]);
+        let (position, taken) = self.take_layer(layer, "C2")?;
+        let template = taken[0].clone();
+        let first_unit = match value["unit"].as_str() {
+            Some("1/12") => 1.0 / 12.0,
+            Some("1/5") => 1.0 / 5.0,
+            _ => 1.0 / 8.0,
+        };
+        let region = match value["area"].as_str() {
+            Some("current") => {
+                let boxes: Vec<[f64; 4]> = taken.iter().map(|item| mark_box(item, units)).collect();
+                let [x0, y0, x1, y1] = boxes.iter().skip(1).fold(boxes[0], |all, b| {
+                    [
+                        py_min(all[0], b[0]),
+                        py_min(all[1], b[1]),
+                        py_max(all[2], b[2]),
+                        py_max(all[3], b[3]),
+                    ]
+                });
+                let grow = first_unit * 1.5;
+                [
+                    clamp_between(x0 - grow / units.x, 0.0, 1.0),
+                    clamp_between(y0 - grow / units.y, 0.0, 1.0),
+                    clamp_between(x1 + grow / units.x, 0.0, 1.0),
+                    clamp_between(y1 + grow / units.y, 0.0, 1.0),
+                ]
+            }
+            Some("top_band") => [0.0, 0.0, 1.0, 0.382],
+            Some("middle_band") => [0.0, 0.309, 1.0, 0.691],
+            Some("bottom_band") => [0.0, 0.618, 1.0, 1.0],
+            _ => [0.0, 0.0, 1.0, 1.0],
+        };
+        let colors: Vec<Color> = value["colors"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|color| {
+                Color::ALL
+                    .iter()
+                    .copied()
+                    .find(|known| Some(known.as_str()) == color.as_str())
+            })
+            .collect();
+        let Some(&first) = colors.first() else {
+            return Err(refusal(
+                "missing",
+                "C2: colors が無い".to_owned(),
+                "C2: colors is missing".to_owned(),
+            ));
+        };
+        let ground = self.score.background;
+        if let Some(ground_lightness) = self.lightness(ground) {
+            for color in &colors {
+                if self
+                    .lightness(*color)
+                    .is_some_and(|lightness| (lightness - ground_lightness).abs() < VISIBLE)
+                {
+                    return Err(refusal(
+                        "invisible_color",
+                        format!(
+                            "文様の色 {} は地 {} と明るさが 0.15 未満しか違わず見えない",
+                            color.as_str(),
+                            ground.as_str()
+                        ),
+                        format!(
+                            "the pattern's color {} differs from the ground {} by less than 0.15 in lightness and is not seen",
+                            color.as_str(),
+                            ground.as_str()
+                        ),
+                    ));
+                }
+            }
+        }
+        let second = colors.get(1).copied().unwrap_or(ground);
+        let pattern = value["pattern"].as_str().unwrap_or("seigaiha");
+        let rings: u64 = if pattern == "seigaiha" { 3 } else { 1 };
+        let budget = MAX_MARKS as i64 - total_marks(&self.score.instructions) as i64;
+        let mut unit = first_unit;
+        let (parts, side) = loop {
+            let (parts, side) = pattern_plan(region, unit, pattern, units);
+            let marks = rings * parts.iter().map(|part| part.marks()).sum::<u64>();
+            // One instruction draws MAX_PER_INSTRUCTION marks at most.
+            if (marks as i64 <= budget
+                && parts.iter().all(|part| part.marks() <= MAX_PER_INSTRUCTION))
+                || unit > 0.5
+            {
+                break (parts, side);
+            }
+            unit *= 1.15;
+        };
+        if unit != first_unit {
+            self.note("pattern_unit_widened", Some(layer), Some(unit));
+        }
+        let cycle = (matches!(pattern, "ichimatsu" | "uroko") && second != first)
+            .then_some([first, second]);
+        let mut built = Vec::new();
+        for part in parts {
+            let shapes: Vec<Instruction> = match pattern {
+                "seigaiha" => {
+                    let half = (side * 1e6 / 2.0).round_ties_even();
+                    [1.0, 0.66, 0.33]
+                        .iter()
+                        .map(|ring| {
+                            let mut mark = shaped(&template, Primitive::Arc);
+                            mark.center = Some(inku_score::Point::new(0.5, 0.5));
+                            mark.position = Some(inku_score::Point::new(0.5, 0.5));
+                            mark.radius = Some(micro((half * ring).round_ties_even() as i64));
+                            mark.angle_start = Some(180.0);
+                            mark.angle_end = Some(0.0);
+                            mark.filled = false;
+                            mark.color = first;
+                            mark
+                        })
+                        .collect()
+                }
+                "shippo" => {
+                    let mut mark = shaped(&template, Primitive::Circle);
+                    mark.radius = Some(side / 2.0 * SQRT_2);
+                    mark.filled = false;
+                    mark.color = first;
+                    vec![mark]
+                }
+                "ichimatsu" | "uroko" => {
+                    let primitive = if pattern == "ichimatsu" {
+                        Primitive::Square
+                    } else {
+                        Primitive::Triangle
+                    };
+                    let mut mark = shaped(&template, primitive);
+                    mark.size = Some(inku_score::Point::new(side, side));
+                    mark.filled = true;
+                    mark.color = first;
+                    vec![mark]
+                }
+                // Kikko: pointy-top hexagons whose width is the cell width.
+                _ => {
+                    let mut mark = shaped(&template, Primitive::Polygon);
+                    mark.sides = Some(6);
+                    mark.radius = Some(side / SQRT_3);
+                    mark.filled = false;
+                    mark.color = first;
+                    vec![mark]
+                }
+            };
+            for mut mark in shapes {
+                moved(&mut mark);
+                if let Some(arrangement) = mark.arrangement.as_mut() {
+                    arrangement.color_cycle = Vec::new();
+                    arrangement.count = u32::try_from(part.marks()).unwrap_or(u32::MAX);
+                }
+                match part {
+                    Part::Grid(region, columns, rows) => {
+                        build_grid(&mut mark, region, columns, rows, units);
+                        if let Some(cycle) = cycle {
+                            if let Some(arrangement) = mark.arrangement.as_mut() {
+                                arrangement.color_cycle = cycle.to_vec();
+                            }
+                            mark.color = cycle[0];
+                        }
+                    }
+                    Part::Point([x, y]) => {
+                        if let Some(resolved) = resolved_mut(&mut mark) {
+                            resolved.recipe = ResolvedPlacementRecipe::Place;
+                            resolved.domain = inku_score::Point::new(1.0, 1.0);
+                        }
+                        set_point_region(&mut mark, x, y);
+                    }
+                }
+                built.push(mark);
+            }
+        }
+        self.score.instructions.splice(position..position, built);
+        Ok(())
+    }
+
+    /// C3: two voices lined up across the same length with counts in a ratio,
+    /// side by side about a band; one layer is split into the two voices. Each
+    /// voice is drawn where its own layer is drawn.
+    #[allow(clippy::cast_precision_loss)]
+    fn polyrhythm(&mut self, value: &Value) -> Result<(), Refusal> {
+        let units = self.units();
+        let (p, q) = value["ratio"]
+            .as_str()
+            .and_then(|ratio| ratio.split_once(':'))
+            .and_then(|(p, q)| Some((p.parse::<u64>().ok()?, q.parse::<u64>().ok()?)))
+            .unwrap_or((2, 3));
+        let base = value["base"].as_u64().unwrap_or(2);
+        let counts = [base * p, base * q];
+        let band: f64 = value["band"]
+            .as_str()
+            .and_then(|band| band.parse().ok())
+            .unwrap_or(0.5);
+        let gap = 0.05;
+        let mut voices: Vec<usize> = Vec::new();
+        for voice in value["voices"].as_array().into_iter().flatten() {
+            let voice = layer_number(voice);
+            if !voices.contains(&voice) {
+                voices.push(voice);
+            }
+        }
+        let others = total_marks(&self.score.instructions)
+            - voices
+                .iter()
+                .map(|voice| self.marks_of(*voice))
+                .sum::<u64>();
+        if others + counts[0] + counts[1] > MAX_MARKS {
+            return Err(refusal(
+                "too_many_marks",
+                "二つの声部の数が痕の上限 380 を超える。基の数を小さくする".to_owned(),
+                "the two voices take the marks past the limit of 380; take a smaller base"
+                    .to_owned(),
+            ));
+        }
+        let mut templates = Vec::new();
+        for voice in &voices {
+            let position = self.only(*voice, "C3")?;
+            templates.push(self.score.instructions[position].clone());
+        }
+        let plan: Vec<(usize, &Instruction)> = if voices.len() == 1 {
+            vec![(voices[0], &templates[0]), (voices[0], &templates[0])]
+        } else {
+            voices.iter().copied().zip(templates.iter()).collect()
+        };
+        let mut built: BTreeMap<usize, Vec<Instruction>> = BTreeMap::new();
+        for (k, ((layer, template), count)) in plan.into_iter().zip(counts).enumerate() {
+            let mut mark = template.clone();
+            moved(&mut mark);
+            if let Some(arrangement) = mark.arrangement.as_mut() {
+                arrangement.count = u32::try_from(count).unwrap_or(u32::MAX);
+            }
+            let offset = if k == 0 { -gap } else { gap };
+            let (from, to) = match value["axis"].as_str() {
+                Some("horizontal") => (
+                    [0.1, band + offset / units.y],
+                    [0.9, band + offset / units.y],
+                ),
+                Some("vertical") => (
+                    [band + offset / units.x, 0.1],
+                    [band + offset / units.x, 0.9],
+                ),
+                _ => {
+                    let d = offset / SQRT_2;
+                    (
+                        [0.12 + d / units.x, 0.88 + d / units.y],
+                        [0.88 + d / units.x, 0.12 + d / units.y],
+                    )
+                }
+            };
+            let spacing = units.distance(from, to) / (count - 1) as f64;
+            let width = 2.0 * largest_extent(&mark, units);
+            if width > 0.8 * spacing {
+                scale_geometry(&mut mark, 0.8 * spacing / width);
+            }
+            apply_row(&mut mark, from, to, units);
+            built.entry(layer).or_default().push(mark);
+        }
+        for voice in &voices {
+            let position = self.only(*voice, "C3")?;
+            let marks = built.remove(voice).unwrap_or_default();
+            self.score.instructions.splice(position..=position, marks);
+        }
+        Ok(())
+    }
+
+    /// C4: one shape repeated along a row, a diagonal or the golden spiral,
+    /// growing, shrinking, turning, mirrored or echoed in turn; repeats that
+    /// crowd more than the origin drew them first lengthen the path, then
+    /// shrink (A3).
+    #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+    fn motif(&mut self, value: &Value) -> Result<(), Refusal> {
+        let units = self.units();
+        let layer = layer_number(&value["layer"]);
+        let repeats = value["repeats"].as_u64().unwrap_or(3);
+        let count = self.marks_of(layer);
+        let most = count.max(9);
+        let fixed = self.fixed.contains(&layer);
+        if fixed && repeats != count {
+            return Err(refusal(
+                "repeats_kept",
+                format!("layer {layer} の数は記述が書いた数 {count} のままにする"),
+                format!("layer {layer} keeps the count the description writes, {count}"),
+            ));
+        }
+        if repeats > most {
+            return Err(refusal(
+                "repeats_most",
+                format!("layer {layer} の回数は {most} まで（今の数と 9 の大きいほう）"),
+                format!(
+                    "layer {layer} repeats {most} times at most (the larger of its count and 9)"
+                ),
+            ));
+        }
+        if !fixed && repeats < count {
+            return Err(refusal(
+                "repeats_least",
+                format!(
+                    "layer {layer} は今 {count} 個。記述が数を書いていない層は減らさない（回数は {count}〜{most}）"
+                ),
+                format!(
+                    "layer {layer} has {count} things now, and a layer whose count the description does not write keeps at least that many (repeats {count} to {most})"
+                ),
+            ));
+        }
+        let origin = layers(&self.context.score)
+            .remove(&layer)
+            .and_then(|positions| positions.first().copied())
+            .map_or(0.0, |position| {
+                origin_ratio(&self.context.score.instructions[position], units)
+            });
+        let (position, taken) = self.take_layer(layer, "C4")?;
+        let mut template = taken[0].clone();
+        let centers = layer_centers(&taken, units)
+            .filter(|centers| !centers.is_empty())
+            .unwrap_or_else(|| vec![[0.5, 0.5]]);
+        let cy = clamp_between(
+            centers.iter().fold(0.0, |sum, center| sum + center[1]) / centers.len() as f64,
+            0.25,
+            0.75,
+        );
+        let sequence: Vec<&str> = value["sequence"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .collect();
+        let repeats = repeats as usize;
+        let sizes = motif_sizes(&sequence, repeats);
+        let path = value["path"].as_str().unwrap_or("row");
+        let mut points = motif_points(path, repeats, cy, units, 1.0);
+        let width = 2.0 * largest_extent(&template, units);
+        let (allowed, target) = fit_ratio(origin);
+        let mut crowding = motif_crowding(&points, &sizes, width, units);
+        if width > 0.0 && crowding > allowed {
+            let stretch = py_min(crowding / target, motif_stretch(path));
+            if stretch > 1.0 {
+                points = motif_points(path, repeats, cy, units, stretch);
+                crowding = motif_crowding(&points, &sizes, width, units);
+                self.note("motif_stretched", Some(layer), Some(stretch));
+            }
+            if crowding > allowed {
+                let mut factor = target / crowding;
+                if factor < FIT_FLOOR {
+                    self.note("shrink_floor", Some(layer), Some(factor));
+                    factor = FIT_FLOOR;
+                }
+                scale_geometry(&mut template, factor);
+                self.note("shrunk_to_spacing", Some(layer), Some(factor));
+            }
+        }
+        let mut rotation = template.rotation.unwrap_or(0.0);
+        let mut built = Vec::new();
+        for (point, (size, turn, echo)) in points.iter().zip(&sizes) {
+            if *turn != 0.0 {
+                rotation += turn;
+            }
+            built.push(card_single(&template, *point, *size, Some(rotation)));
+            if *echo {
+                let offset = 0.035 * size;
+                built.push(card_single(
+                    &template,
+                    [point[0] + offset / units.x, point[1] + offset / units.y],
+                    size / PHI,
+                    Some(rotation),
+                ));
+            }
+        }
+        self.score.instructions.splice(position..position, built);
+        Ok(())
+    }
+
+    /// C5: a layer of six or more in three stages along one direction, sparse,
+    /// broken (turned, larger or recolored) and dense; every stage shrinks by
+    /// the tightest one, and a stage of one is one mark at its middle.
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        clippy::cast_precision_loss,
+        clippy::cast_sign_loss
+    )]
+    fn jo_ha_kyu(&mut self, value: &Value) -> Result<(), Refusal> {
+        let units = self.units();
+        let layer = layer_number(&value["layer"]);
+        let count = self.marks_of(layer);
+        let too_few = |count: u64| {
+            refusal(
+                "jo_ha_kyu_count",
+                format!(
+                    "layer {layer} は {count} 個で、三段の間隔が見えない。数の多い層を選ぶか C5 を外す"
+                ),
+                format!(
+                    "layer {layer} has {count} things, too few to see three stages' spacing; choose a layer of more or drop C5"
+                ),
+            )
+        };
+        if count < 6 {
+            return Err(too_few(count));
+        }
+        let (position, taken) = self.take_layer(layer, "C5")?;
+        let mut template = taken[0].clone();
+        let centers = layer_centers(&taken, units);
+        let direction = value["direction"].as_str().unwrap_or("left_to_right");
+        let horizontal = matches!(direction, "left_to_right" | "right_to_left");
+        let reverse = matches!(direction, "right_to_left" | "bottom_to_top");
+        let cross = match &centers {
+            Some(centers) if !centers.is_empty() => {
+                centers.iter().fold(0.0, |sum, center| {
+                    sum + if horizontal { center[1] } else { center[0] }
+                }) / centers.len() as f64
+            }
+            _ => 0.5,
+        };
+        let cross = clamp_between(cross, 0.2, 0.8);
+        let lengths: Vec<f64> = value["lengths"]
+            .as_str()
+            .unwrap_or("1:1:1")
+            .split(':')
+            .map(|length| length.parse().unwrap_or(1.0))
+            .collect();
+        let dense: f64 = value["kyu_density"]
+            .as_str()
+            .and_then(|dense| dense.parse().ok())
+            .unwrap_or(2.0);
+        let densities = [1.0, (1.0 + dense) / 2.0, dense];
+        let weights: Vec<f64> = lengths
+            .iter()
+            .zip(densities)
+            .map(|(length, density)| length * density)
+            .collect();
+        let total = weights.iter().fold(0.0, |sum, weight| sum + weight);
+        let mut counts: Vec<i64> = weights
+            .iter()
+            .map(|weight| ((count as f64 * weight / total).round_ties_even() as i64).max(1))
+            .collect();
+        counts[2] += count as i64 - counts.iter().sum::<i64>();
+        if counts[2] < 1 {
+            counts[1] += counts[2] - 1;
+            counts[2] = 1;
+        }
+        if counts.iter().any(|stage| *stage < 1) {
+            return Err(too_few(count));
+        }
+        let all = lengths.iter().fold(0.0, |sum, length| sum + length);
+        let mut cuts = vec![0.08];
+        for length in &lengths {
+            let last = cuts[cuts.len() - 1];
+            cuts.push(last + (0.92 - 0.08) * length / all);
+        }
+        let point = |s: f64| {
+            let s = if reverse { 1.0 - s } else { s };
+            if horizontal { [s, cross] } else { [cross, s] }
+        };
+        let change = value["break_change"].as_str().unwrap_or("size");
+        let width = 2.0 * largest_extent(&template, units);
+        if width > 0.0 {
+            let along = if horizontal { units.x } else { units.y };
+            let least = (0..3)
+                .map(|k| {
+                    0.8 * (cuts[k + 1] - cuts[k]) * along
+                        / counts[k] as f64
+                        / (width
+                            * if k == 1 && change == "size" {
+                                1.45
+                            } else {
+                                1.0
+                            })
+                })
+                .fold(f64::INFINITY, py_min);
+            if least < 1.0 {
+                scale_geometry(&mut template, least);
+            }
+        }
+        let break_color = value["break_color"]
+            .as_str()
+            .and_then(|name| {
+                Color::ALL
+                    .iter()
+                    .copied()
+                    .find(|color| color.as_str() == name)
+            })
+            .unwrap_or(template.color);
+        let mut built = Vec::new();
+        for k in 0..3 {
+            let (start, end, n) = (cuts[k], cuts[k + 1], counts[k]);
+            let step = (end - start) / n as f64;
+            let (first, last) = (start + step / 2.0, end - step / 2.0);
+            let mut mark = template.clone();
+            moved(&mut mark);
+            if k == 1 {
+                match change {
+                    "rotate" => mark.rotation = Some(mark.rotation.unwrap_or(0.0) + 25.0),
+                    "size" => scale_geometry(&mut mark, 1.45),
+                    _ => {
+                        mark.color = break_color;
+                        if let Some(arrangement) = mark.arrangement.as_mut() {
+                            arrangement.color_cycle = Vec::new();
+                        }
+                    }
+                }
+            }
+            if n == 1 {
+                built.push(card_single(&mark, point((start + end) / 2.0), 1.0, None));
+                continue;
+            }
+            if let Some(arrangement) = mark.arrangement.as_mut() {
+                arrangement.count = n as u32;
+            }
+            apply_directed_row(&mut mark, point(first), point(last), units);
+            built.push(mark);
+        }
+        self.score.instructions.splice(position..position, built);
+        Ok(())
+    }
+
+    /// C6: a row or a grid of three or more opened one mark each and drawn in
+    /// three degrees, strict (shin), half loosened (gyo) and free (so), by
+    /// three bands along its long side or along its order.
+    #[allow(clippy::cast_precision_loss)]
+    fn shin_gyo_so(&mut self, value: &Value) -> Result<(), Refusal> {
+        let units = self.units();
+        let layer = layer_number(&value["layer"]);
+        let marks = self.marks_of(layer);
+        let (position, taken) = self.take_layer(layer, "C6")?;
+        let centers = layer_centers(&taken, units).filter(|centers| !centers.is_empty());
+        let count = centers
+            .as_ref()
+            .map_or(marks, |centers| centers.len() as u64);
+        if count < 3 {
+            return Err(refusal(
+                "shin_gyo_so_count",
+                format!("layer {layer} は {count} 個で、三つの度合いに分けられない"),
+                format!("layer {layer} has {count} things, too few for three degrees"),
+            ));
+        }
+        let Some(centers) = centers.filter(|_| count <= 54) else {
+            return Err(refusal(
+                "c6_unopenable",
+                format!(
+                    "layer {layer} は並べ方（散らす・{count} 個）のため一つずつに分けられない。別の層を選ぶか C6 を外す"
+                ),
+                format!(
+                    "layer {layer} cannot be opened one by one for how it is arranged (scattered, or {count} things); choose another layer or drop C6"
+                ),
+            ));
+        };
+        let order: Vec<usize> = if value["split"].as_str() == Some("three_bands") {
+            let spread = |axis: usize| {
+                let values = centers.iter().map(|center| center[axis]);
+                values.clone().fold(f64::NEG_INFINITY, py_max) - values.fold(f64::INFINITY, py_min)
+            };
+            let axis = usize::from(spread(0) * units.x < spread(1) * units.y);
+            let mut order: Vec<usize> = (0..centers.len()).collect();
+            order.sort_by(|a, b| {
+                centers[*a][axis]
+                    .partial_cmp(&centers[*b][axis])
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            order
+        } else {
+            (0..centers.len()).collect()
+        };
+        let levels = if value["order"].as_str() == Some("shin_gyo_so") {
+            ["shin", "gyo", "so"]
+        } else {
+            ["so", "gyo", "shin"]
+        };
+        let degree = value["so_degree"].as_str().unwrap_or("medium");
+        let template = &taken[0];
+        let base = template.rotation.unwrap_or(0.0);
+        let total = centers.len();
+        let mut built = Vec::new();
+        for (rank, k) in order.into_iter().enumerate() {
+            let level = levels[(rank * 3 / total).min(2)];
+            let (variation, turn) = c6_hand(level, degree);
+            let sign = if (rank * 7919) % 3 == 0 { -1.0 } else { 1.0 };
+            let unfixed = if level == "shin" { 0.0 } else { 1.0 };
+            let rotation = base + sign * turn * ((rank % 3) as f64 / 2.0 + 0.5) * unfixed;
+            let mut mark = card_single(template, centers[k], 1.0, Some(rotation));
+            mark.variation = variation;
+            if let Some(arrangement) = mark.arrangement.as_mut() {
+                arrangement.jitter = 0.0;
+            }
+            built.push(mark);
+        }
+        self.score.instructions.splice(position..position, built);
+        Ok(())
+    }
+
     fn run(mut self) -> Result<Applied, Refusal> {
         for law in ["B1", "B2", "B3", "B4"] {
             if self.laws.contains_key(law) {
@@ -3068,6 +4663,7 @@ impl Compiler<'_> {
             self.beats()?;
         }
         self.fit();
+        self.rebuild()?;
         self.aerial_size();
         self.aerial_color();
         self.hands();
@@ -3078,6 +4674,7 @@ impl Compiler<'_> {
             notes: self.notes,
             paired: self.paired,
             opened: self.opened,
+            rebuilt: self.rebuilt,
         })
     }
 }
@@ -3485,6 +5082,234 @@ fn edit_opened(
     })
 }
 
+/// The numeric angle a turn is written with (0 up to 360), or `None` when the
+/// mark does not turn as printed.
+fn turn_of(rotation: Option<f64>) -> Option<f64> {
+    let turn = rotation.unwrap_or(0.0).rem_euclid(360.0);
+    let text = inku_ddl::work_plan::number(turn);
+    (text != "0" && text != "360").then_some(turn)
+}
+
+/// The motion words the Score's variation draws (stage B-4's §3.2): an
+/// amplitude other than medium, a spacing other than medium and the sway's
+/// quality; no variation drops them. A quality the plan has no word for keeps
+/// the layer's words.
+fn write_hand(
+    layer: &mut inku_ddl::work_plan::WorkPlanLayer,
+    variation: Option<&inku_score::Variation>,
+) {
+    let quality = match variation.map(|variation| variation.quality) {
+        Some(inku_score::Quality::Perlin) => Some("swaying"),
+        Some(inku_score::Quality::Wave) => Some("undulating"),
+        Some(_) => return,
+        None => None,
+    };
+    for slot in [
+        WorkPlanSlot::MotionAmplitude,
+        WorkPlanSlot::MotionSpacing,
+        WorkPlanSlot::MotionQuality,
+    ] {
+        layer.attributes.remove(&slot);
+    }
+    let (Some(variation), Some(quality)) = (variation, quality) else {
+        return;
+    };
+    match variation.amplitude {
+        Amplitude::Fine => {
+            layer
+                .attributes
+                .insert(WorkPlanSlot::MotionAmplitude, "narrowly".to_owned());
+        }
+        Amplitude::Broad => {
+            layer
+                .attributes
+                .insert(WorkPlanSlot::MotionAmplitude, "broadly".to_owned());
+        }
+        Amplitude::Medium => {}
+    }
+    match variation.frequency {
+        Frequency::Slow => {
+            layer
+                .attributes
+                .insert(WorkPlanSlot::MotionSpacing, "loosely".to_owned());
+        }
+        Frequency::High => {
+            layer
+                .attributes
+                .insert(WorkPlanSlot::MotionSpacing, "tightly".to_owned());
+        }
+        Frequency::Medium => {}
+    }
+    layer
+        .attributes
+        .insert(WorkPlanSlot::MotionQuality, quality.to_owned());
+}
+
+/// One instruction of a layer a card rebuilt, as its own sentence: one mark at
+/// a numeric point (a line by the ends the canvas shows), a row by its numeric
+/// ends, a grid as a numeric range it tiles, a scatter as a numeric range. The
+/// sentence writes the instruction's count, its shape (C2's; a polygon as its
+/// noun), a numeric size when its size or shape changed (and for an arc that
+/// turns in numbers), its color when it changed (two alternating colors as a
+/// cycle), C2's surface and the hand its variation draws; a turn the card
+/// changed is written in numbers instead of an angle word.
+fn edit_rebuilt(
+    layer: &inku_ddl::work_plan::WorkPlanLayer,
+    before: &Instruction,
+    mark: &Instruction,
+    turned: bool,
+    pattern: bool,
+    units: Units,
+) -> Option<Edit> {
+    let mut layer = layer.clone();
+    layer.attributes.remove(&WorkPlanSlot::LineUpDirection);
+    let count = count_of(mark);
+    layer.count = count;
+    let line = is_line(mark.primitive) && count == 1;
+    let place = match recipe(mark)? {
+        ResolvedPlacementRecipe::Place => {
+            if !matches!(layer.action.as_str(), "place" | "draw") {
+                layer.action = "place".to_owned();
+            }
+            if line {
+                line_ends(mark, units)?
+            } else {
+                NumericPlace::Point {
+                    at: center_of(mark),
+                }
+            }
+        }
+        ResolvedPlacementRecipe::HorizontalLine { .. }
+        | ResolvedPlacementRecipe::VerticalLine { .. }
+        | ResolvedPlacementRecipe::DiagonalLine { .. }
+            if count >= 2 =>
+        {
+            layer.action = "line_up".to_owned();
+            row_ends(mark, units)?
+        }
+        ResolvedPlacementRecipe::Grid { .. } => {
+            layer.action = "tile".to_owned();
+            moved_range(mark, units)?
+        }
+        ResolvedPlacementRecipe::ScatterUniformWithCentroidTranslation => {
+            layer.action = "scatter".to_owned();
+            moved_range(mark, units)?
+        }
+        _ => return None,
+    };
+    let mut numeric = NumericWriting {
+        place: Some(place),
+        ..NumericWriting::default()
+    };
+    let reshaped = mark.primitive != before.primitive || mark.sides != before.sides;
+    if reshaped && mark.primitive != Primitive::Polygon {
+        mark.primitive.as_str().clone_into(&mut layer.shape);
+    }
+    if mark.primitive == Primitive::Polygon {
+        numeric.sides = mark.sides;
+    }
+    if line {
+        layer.attributes.remove(&WorkPlanSlot::Angle);
+        layer.attributes.remove(&WorkPlanSlot::Size);
+        layer.proportion = None;
+    } else {
+        let was = largest_extent(before, units);
+        let factor = if was == 0.0 {
+            1.0
+        } else {
+            (2.0 * largest_extent(mark, units)) / (2.0 * was)
+        };
+        let arc_turned = mark.primitive == Primitive::Arc && turned;
+        if reshaped || (factor - 1.0).abs() > 1e-9 || arc_turned {
+            numeric.size = Some(numeric_size(mark, units)?);
+            layer.attributes.remove(&WorkPlanSlot::Size);
+            layer.proportion = None;
+        }
+        if turned {
+            layer.attributes.remove(&WorkPlanSlot::Angle);
+            numeric.turn = turn_of(mark.rotation);
+        }
+    }
+    let cycle = mark
+        .arrangement
+        .as_ref()
+        .map_or(&[][..], |arrangement| arrangement.color_cycle.as_slice());
+    match cycle {
+        [] => {
+            if mark.color != before.color {
+                layer
+                    .attributes
+                    .insert(WorkPlanSlot::Color, mark.color.as_str().to_owned());
+            }
+        }
+        [first, second] if first != second => numeric.cycle = Some([*first, *second]),
+        _ => return None,
+    }
+    if pattern {
+        if !mark.filled {
+            layer
+                .attributes
+                .insert(WorkPlanSlot::Surface, "empty".to_owned());
+        } else if layer
+            .attributes
+            .get(&WorkPlanSlot::Surface)
+            .is_none_or(|surface| surface == "empty")
+        {
+            layer
+                .attributes
+                .insert(WorkPlanSlot::Surface, "flat".to_owned());
+        }
+    }
+    write_hand(&mut layer, mark.variation.as_ref());
+    Some(Edit {
+        layer,
+        numeric,
+        keep_joint: false,
+    })
+}
+
+/// One mark of a pair B8 opened whose marks turn: one of it at a numeric point
+/// (a line by its ends) with its own turn in numbers.
+fn edit_pair_mark(
+    layer: &inku_ddl::work_plan::WorkPlanLayer,
+    before: &Instruction,
+    mark: &Instruction,
+    hand: Option<Hand>,
+    units: Units,
+) -> Option<Edit> {
+    let mut layer = layer.clone();
+    layer.count = 1;
+    if !matches!(layer.action.as_str(), "place" | "draw") {
+        layer.action = "place".to_owned();
+    }
+    layer.attributes.remove(&WorkPlanSlot::LineUpDirection);
+    let line = is_line(mark.primitive);
+    let mut numeric = NumericWriting::default();
+    if line {
+        layer.attributes.remove(&WorkPlanSlot::Angle);
+        layer.attributes.remove(&WorkPlanSlot::Size);
+        layer.proportion = None;
+        numeric.place = Some(line_ends(mark, units)?);
+    } else {
+        layer.attributes.remove(&WorkPlanSlot::Angle);
+        numeric.place = Some(NumericPlace::Point {
+            at: center_of(mark),
+        });
+        numeric.turn = turn_of(mark.rotation);
+    }
+    if let Some(size) = resized(before, mark, units, line) {
+        numeric.size = Some(size?);
+        layer.attributes.remove(&WorkPlanSlot::Size);
+        layer.proportion = None;
+    }
+    retouch(&mut layer, before, mark, hand);
+    Some(Edit {
+        layer,
+        numeric,
+        keep_joint: false,
+    })
+}
+
 /// The composed plan printed with what the laws changed, or `None` when a
 /// changed layer is one the printer cannot write in numbers.
 fn print_changes(
@@ -3492,6 +5317,7 @@ fn print_changes(
     context: &LawsContext,
     applied: &Applied,
     hands: &BTreeMap<usize, Hand>,
+    pattern: Option<usize>,
 ) -> Option<LawsPrint> {
     let after = &applied.score;
     let before = layers(&context.score);
@@ -3532,9 +5358,36 @@ fn print_changes(
             return None;
         };
         let hand = hands.get(&index).copied();
-        let edits = if applied.opened.contains(&index) {
+        let edits = if applied.rebuilt.contains(&index) {
+            // A card that turns any of the layer's marks writes every turn in numbers.
+            #[allow(clippy::float_cmp)]
+            let turned = is
+                .iter()
+                .any(|mark| mark.rotation.unwrap_or(0.0) != before.rotation.unwrap_or(0.0));
+            is.iter()
+                .map(|mark| {
+                    edit_rebuilt(
+                        layer,
+                        before,
+                        mark,
+                        turned,
+                        pattern == Some(index),
+                        context.units,
+                    )
+                })
+                .collect::<Option<Vec<Edit>>>()?
+        } else if applied.opened.contains(&index) {
             is.iter()
                 .map(|mark| edit_opened(layer, before, mark, hand, context.units))
+                .collect::<Option<Vec<Edit>>>()?
+        } else if applied.paired.contains(&index)
+            && is.iter().any(|mark| turn_of(mark.rotation).is_some())
+        {
+            if is.len() != 2 {
+                return None;
+            }
+            is.iter()
+                .map(|mark| edit_pair_mark(layer, before, mark, hand, context.units))
                 .collect::<Option<Vec<Edit>>>()?
         } else {
             let marks = if applied.paired.contains(&index) {
@@ -3584,6 +5437,8 @@ fn apply(
         pinned: BTreeSet::new(),
         paired: BTreeSet::new(),
         opened: BTreeSet::new(),
+        fixed: &answer.fixed,
+        rebuilt: BTreeSet::new(),
     };
     let applied = compiler.run()?;
     let mut hands = BTreeMap::new();
@@ -3594,7 +5449,11 @@ fn apply(
             }
         }
     }
-    let print = print_changes(composed, context, &applied, &hands).ok_or_else(|| {
+    let pattern = answer
+        .laws
+        .get("C2")
+        .map(|value| layer_number(&value["layer"]));
+    let print = print_changes(composed, context, &applied, &hands, pattern).ok_or_else(|| {
         refusal(
             "unprintable",
             "法則が変えた層を数の形で書けない".to_owned(),

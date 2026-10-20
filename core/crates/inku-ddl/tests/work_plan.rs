@@ -439,6 +439,7 @@ fn numeric_places_and_sizes_print_where_the_compiler_reads_them() {
             NumericWriting {
                 place: point(0.381_966, 0.5),
                 size: Some(NumericSize::Radius { radius: 0.05 }),
+                ..NumericWriting::default()
             },
             "画面の横0.381966、縦0.5の位置に、半径0.05の青の円を1個置く。",
             "Place one blue circle radius 0.05 at horizontal 0.381966, vertical 0.5.",
@@ -448,6 +449,7 @@ fn numeric_places_and_sizes_print_where_the_compiler_reads_them() {
             NumericWriting {
                 place: segment(0.118, 0.118, 0.882, 0.882),
                 size: None,
+                ..NumericWriting::default()
             },
             "画面の横0.118、縦0.118から横0.882、縦0.882まで、線を1個引く。",
             "Draw one line from horizontal 0.118, vertical 0.118 to horizontal 0.882, vertical 0.882.",
@@ -457,6 +459,7 @@ fn numeric_places_and_sizes_print_where_the_compiler_reads_them() {
             NumericWriting {
                 place: segment(0.118, 0.5, 0.882, 0.5),
                 size: Some(NumericSize::Radius { radius: 0.03 }),
+                ..NumericWriting::default()
             },
             "画面の横0.118、縦0.5から横0.882、縦0.5まで、半径0.03の円を5個並べる。",
             "Line up 5 circles radius 0.03 from horizontal 0.118, vertical 0.5 to horizontal 0.882, vertical 0.5.",
@@ -468,6 +471,7 @@ fn numeric_places_and_sizes_print_where_the_compiler_reads_them() {
                     bounds: [0.2, 0.3, 0.8, 0.6],
                 }),
                 size: None,
+                ..NumericWriting::default()
             },
             "画面の横0.2〜0.8、縦0.3〜0.6の範囲に、白の点を12個散らす。",
             "Scatter 12 white points in the range horizontal 0.2 to 0.8, vertical 0.3 to 0.6.",
@@ -480,6 +484,7 @@ fn numeric_places_and_sizes_print_where_the_compiler_reads_them() {
                     width: 0.2,
                     height: 0.1,
                 }),
+                ..NumericWriting::default()
             },
             "画面の横0.5、縦0.25の位置に、幅0.2、高さ0.1の楕円を1個置く。",
             "Place one ellipse width 0.2, height 0.1 at horizontal 0.5, vertical 0.25.",
@@ -492,6 +497,7 @@ fn numeric_places_and_sizes_print_where_the_compiler_reads_them() {
                     chord: 0.2,
                     sagitta: 0.05,
                 }),
+                ..NumericWriting::default()
             },
             "画面の横0.5、縦0.5の位置に、弦長0.2、矢高0.05の弧を1個引く。",
             "Draw one arc chord 0.2, sagitta 0.05 at horizontal 0.5, vertical 0.5.",
@@ -504,6 +510,7 @@ fn numeric_places_and_sizes_print_where_the_compiler_reads_them() {
                     width: 0.2,
                     height: 0.15,
                 }),
+                ..NumericWriting::default()
             },
             "画面の横0.3、縦0.7の位置に、幅0.2、高さ0.15の三角を1個置く。",
             "Place one triangle width 0.2, height 0.15 at horizontal 0.3, vertical 0.7.",
@@ -514,6 +521,7 @@ fn numeric_places_and_sizes_print_where_the_compiler_reads_them() {
             NumericWriting {
                 place: None,
                 size: Some(NumericSize::Side { side: 0.1 }),
+                ..NumericWriting::default()
             },
             "中心に、一辺0.1の四角を3個置く。",
             "Place 3 squares side length 0.1 at the center.",
@@ -523,6 +531,7 @@ fn numeric_places_and_sizes_print_where_the_compiler_reads_them() {
             NumericWriting {
                 place: None,
                 size: Some(NumericSize::Length { length: 0.4 }),
+                ..NumericWriting::default()
             },
             "上に、長さ0.4の自由線を1個引く。",
             "Draw one free line length 0.4 at the top.",
@@ -549,5 +558,196 @@ fn numeric_places_and_sizes_print_where_the_compiler_reads_them() {
                 print_work_plan(&plan, language)
             );
         }
+    }
+}
+
+/// The Score of a printed sentence, compiled whole on the square canvas with
+/// room for every mark it repeats.
+fn printed_score(source: &str, language: ResolvedInstructionLanguage) -> inku_score::Score {
+    let hard = inku_score::HardResourcePolicy {
+        identity: "work-plan-numeric-test.v1".into(),
+        budget: inku_score::ResourceBudget {
+            maximum: inku_score::ResourceDemand {
+                logical_objects: 400,
+                primitive_marks: 400,
+                object_templates: 64,
+                maximum_per_template_primitive_marks: 240,
+                maximum_resolved_count: 2000,
+                template_nodes: 512,
+                anchor_instances: 400,
+                transform_instances: 400,
+                placement_instances: 400,
+                fill_instances: 400,
+            },
+        },
+    };
+    let result = inku_ddl::compile_ddl_to_score_with_resources(
+        inku_ddl::NormalizedDdlDocument::new(source, language, Vec::new()).unwrap(),
+        &[],
+        Some(19),
+        inku_ddl::MacroExpansionLimits {
+            max_invocations: 8,
+            max_depth: 8,
+            max_evaluation_steps: 128,
+            max_nodes_per_invocation: 32,
+            max_total_nodes: 64,
+        },
+        inku_ddl::ScoreLoweringContext::resolve("square", inku_score::Color::White).unwrap(),
+        inku_ddl::ScoreErrorPolicy::Stop,
+        hard.clone(),
+        inku_score::OperationalResourceBudget(hard.budget),
+    );
+    assert!(
+        result.downstream_diagnostics().is_empty(),
+        "{source}: {:?}",
+        result.downstream_diagnostics()
+    );
+    result
+        .score()
+        .cloned()
+        .unwrap_or_else(|| panic!("{source}"))
+}
+
+/// The laws stage writes a turn, two alternating colors and a polygon too
+/// (stage B-4a): each compiles cleanly to the turn, the cycle and the sides it
+/// writes, in both languages.
+#[test]
+fn numeric_turns_cycles_and_polygons_print_where_the_compiler_reads_them() {
+    let point = |x, y| Some(NumericPlace::Point { at: [x, y] });
+    let range = |bounds| Some(NumericPlace::Range { bounds });
+    let cases = [
+        (
+            numeric_layer("square", "place", 1, &[(WorkPlanSlot::Color, "red")]),
+            NumericWriting {
+                place: point(0.5, 0.5),
+                size: Some(NumericSize::Side { side: 0.1 }),
+                turn: Some(30.0),
+                ..NumericWriting::default()
+            },
+            "画面の横0.5、縦0.5の位置に、一辺0.1の回転30度の赤の四角を1個置く。",
+            "Place one red square side length 0.1 rotated 30 degrees at horizontal 0.5, vertical 0.5.",
+        ),
+        (
+            numeric_layer("arc", "draw", 1, &[(WorkPlanSlot::Color, "blue")]),
+            NumericWriting {
+                place: point(0.5, 0.5),
+                size: Some(NumericSize::ChordSagitta {
+                    chord: 0.2,
+                    sagitta: 0.1,
+                }),
+                turn: Some(1.0),
+                ..NumericWriting::default()
+            },
+            "画面の横0.5、縦0.5の位置に、弦長0.2、矢高0.1の回転1度の青の弧を1個引く。",
+            "Draw one blue arc chord 0.2, sagitta 0.1 rotated 1 degree at horizontal 0.5, vertical 0.5.",
+        ),
+        (
+            numeric_layer("ellipse", "line_up", 4, &[(WorkPlanSlot::Color, "black")]),
+            NumericWriting {
+                place: Some(NumericPlace::Segment {
+                    from: [0.2, 0.5],
+                    to: [0.8, 0.5],
+                }),
+                turn: Some(337.5),
+                ..NumericWriting::default()
+            },
+            "画面の横0.2、縦0.5から横0.8、縦0.5まで、回転337.5度の黒の楕円を4個並べる。",
+            "Line up 4 black ellipses rotated 337.5 degrees from horizontal 0.2, vertical 0.5 to horizontal 0.8, vertical 0.5.",
+        ),
+        (
+            numeric_layer(
+                "square",
+                "tile",
+                49,
+                &[
+                    (WorkPlanSlot::Color, "white"),
+                    (WorkPlanSlot::Surface, "flat"),
+                ],
+            ),
+            NumericWriting {
+                place: range([0.0, 0.0, 1.0, 1.0]),
+                size: Some(NumericSize::Side { side: 0.142_857 }),
+                cycle: Some([inku_score::Color::White, inku_score::Color::Blue]),
+                ..NumericWriting::default()
+            },
+            "画面の横0〜1、縦0〜1の範囲に、白と青を交互にして、一辺0.142857の塗りの四角を49個敷き詰める。",
+            "Tile 49 flat squares side length 0.142857 in the range horizontal 0 to 1, vertical 0 to 1, alternating white and blue.",
+        ),
+        (
+            numeric_layer(
+                "circle",
+                "tile",
+                9,
+                &[
+                    (WorkPlanSlot::Color, "black"),
+                    (WorkPlanSlot::Surface, "empty"),
+                ],
+            ),
+            NumericWriting {
+                place: range([0.1, 0.1, 0.9, 0.9]),
+                size: Some(NumericSize::Radius { radius: 0.072 }),
+                sides: Some(6),
+                ..NumericWriting::default()
+            },
+            "画面の横0.1〜0.9、縦0.1〜0.9の範囲に、半径0.072の黒の空の六角形を9個敷き詰める。",
+            "Tile 9 black empty hexagon radius 0.072 in the range horizontal 0.1 to 0.9, vertical 0.1 to 0.9.",
+        ),
+        (
+            numeric_layer(
+                "circle",
+                "line_up",
+                7,
+                &[
+                    (WorkPlanSlot::Color, "black"),
+                    (WorkPlanSlot::Surface, "empty"),
+                ],
+            ),
+            NumericWriting {
+                place: Some(NumericPlace::Segment {
+                    from: [0.1, 0.1],
+                    to: [0.9, 0.1],
+                }),
+                size: Some(NumericSize::Radius { radius: 0.072 }),
+                sides: Some(6),
+                ..NumericWriting::default()
+            },
+            "画面の横0.1、縦0.1から横0.9、縦0.1まで、半径0.072の黒の空の六角形を7個並べる。",
+            "Line up 7 black empty hexagon radius 0.072 from horizontal 0.1, vertical 0.1 to horizontal 0.9, vertical 0.1.",
+        ),
+    ];
+    for (layer, written, ja, en) in cases {
+        let plan = WorkPlan {
+            layers: vec![layer],
+            ..WorkPlan::default()
+        };
+        let mut scores = Vec::new();
+        for (language, expected) in [
+            (ResolvedInstructionLanguage::Ja, ja),
+            (ResolvedInstructionLanguage::En, en),
+        ] {
+            let source =
+                print_work_plan_with_numbers(&plan, language, &[], &[], &[], &[Some(written)]);
+            assert_eq!(source, expected, "{language:?}");
+            assert!(
+                work_plan_source_compiles_cleanly(&source, language),
+                "{language:?}: {source}"
+            );
+            let score = printed_score(&source, language);
+            let instruction = &score.instructions[0];
+            assert_eq!(instruction.rotation, written.turn, "{source}");
+            if let Some(cycle) = written.cycle {
+                assert_eq!(
+                    instruction.arrangement.as_ref().unwrap().color_cycle,
+                    cycle.to_vec(),
+                    "{source}"
+                );
+            }
+            if let Some(sides) = written.sides {
+                assert_eq!(instruction.primitive, inku_score::Primitive::Polygon);
+                assert_eq!(instruction.sides, Some(sides), "{source}");
+            }
+            scores.push(score);
+        }
+        assert_eq!(scores[0].instructions, scores[1].instructions, "{ja}");
     }
 }

@@ -1066,7 +1066,15 @@ fn apply_continuation_occurrence(
         OwnedSemanticOccurrence::Continuity(term) => {
             set_if_empty(&mut instruction.entity.continuity, term)
         }
-        OwnedSemanticOccurrence::Angle(term) => set_if_empty(&mut instruction.entity.angle, term),
+        // An angle word and a numeric angle each turn the marks; one never joins the other.
+        OwnedSemanticOccurrence::Angle(term) => {
+            instruction.entity.numeric_angle.is_none()
+                && set_if_empty(&mut instruction.entity.angle, term)
+        }
+        OwnedSemanticOccurrence::NumericAngle(value) => {
+            instruction.entity.angle.is_none()
+                && set_if_empty(&mut instruction.entity.numeric_angle, value)
+        }
         OwnedSemanticOccurrence::Surface(term) => {
             match (term.identity.category.as_str(), term.identity.id.as_str()) {
                 (
@@ -1264,6 +1272,7 @@ fn has_continuation_predicate(instruction: &SemanticInstruction) -> bool {
         || entity.numeric_position.is_some()
         || entity.numeric_range.is_some()
         || entity.numeric_segment.is_some()
+        || entity.numeric_angle.is_some()
         || entity.proportion.aspect.is_some()
         || entity.proportion.width_extent.is_some()
         || entity.proportion.arc_form.is_some()
@@ -1325,6 +1334,10 @@ fn predicate_is_compatible(
         && option_is_mergeable(&left.touch, &right.touch)
         && option_is_mergeable(&left.continuity, &right.continuity)
         && option_is_mergeable(&left.angle, &right.angle)
+        && option_is_mergeable(&left.numeric_angle, &right.numeric_angle)
+        // An angle word and a numeric angle cannot turn the same mark together.
+        && !(left.angle.is_some() && right.numeric_angle.is_some())
+        && !(left.numeric_angle.is_some() && right.angle.is_some())
         && option_is_mergeable(&left.surface.quality, &right.surface.quality)
         && option_is_mergeable(&left.surface.intensity, &right.surface.intensity)
         && option_is_mergeable(&left.fluctuation.amplitude, &right.fluctuation.amplitude)
@@ -1392,6 +1405,10 @@ fn merge_predicate(target: &mut SemanticInstruction, continuation: &SemanticInst
         &continuation.entity.continuity,
     );
     merge_option(&mut target.entity.angle, &continuation.entity.angle);
+    merge_option(
+        &mut target.entity.numeric_angle,
+        &continuation.entity.numeric_angle,
+    );
     merge_option(
         &mut target.entity.surface.quality,
         &continuation.entity.surface.quality,

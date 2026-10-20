@@ -2378,10 +2378,8 @@ impl Execution<'_> {
             copy.x = copy.x.max(bounds.max.x - bounds.min.x);
             copy.y = copy.y.max(bounds.max.y - bounds.min.y);
         }
-        let [x0, y0, _, _] =
-            crate::placement::region_in_short_side_units(*region, self.request.canvas);
         let origin =
-            crate::geometry::point_to_short_side_units(Point::new(x0, y0), self.request.canvas);
+            crate::placement::region_origin_in_short_side_units(*region, self.request.canvas);
         Ok(crate::placement::cells_centers(
             *domain,
             origin,

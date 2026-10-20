@@ -1,4 +1,5 @@
-//! Numeric position ranges and numeric segments written into a DDL position phrase.
+//! Numeric position ranges and numeric segments written into a DDL position phrase,
+//! and numeric angles written into a noun phrase.
 //!
 //! A segment (stage B-2a, the author's decision of 2026-10-19) gives the two
 //! points a row or a line runs between, read as one lexeme in its own language:
@@ -6,6 +7,12 @@
 //! `from horizontal 0.118, vertical 0.5 to horizontal 0.882, vertical 0.5`.
 //! Its values are read as a range's are, and whether its points lie on the
 //! canvas and differ is checked by the geometry analysis.
+//!
+//! An angle (stage B-4a) turns the marks by a number of degrees, read as one
+//! lexeme so that its whole number is not read as a count: Japanese `回転30度`
+//! and English `rotated 30 degrees`. Its value is a whole or decimal number
+//! without a sign or a fraction, and whether it is below 360 is checked by the
+//! geometry analysis.
 //!
 //! A range is read as one lexeme, and only in its own instruction language:
 //!
@@ -160,7 +167,66 @@ fn segment_lexeme(
     }
 }
 
+/// One numeric angle lexeme: the degrees the marks turn (clockwise, as the
+/// Score's rotation). `degrees` is `None` when its spelling cannot be
+/// represented within the value limits.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NumericAngleLexeme {
+    pub span: SourceSpan,
+    pub degrees: Option<ExactFraction>,
+    pub degrees_span: SourceSpan,
+}
+
+/// Read a numeric angle that starts exactly at `start`, or return `None`.
+pub(crate) fn numeric_angle_at(
+    source: &str,
+    start: usize,
+    language: ResolvedInstructionLanguage,
+) -> Option<NumericAngleLexeme> {
+    if !source.is_char_boundary(start) || start >= source.len() {
+        return None;
+    }
+    match language {
+        ResolvedInstructionLanguage::Ja => japanese_angle(source, start),
+        ResolvedInstructionLanguage::En => english_angle(source, start),
+    }
+}
+
+fn angle_lexeme(
+    start: usize,
+    end: usize,
+    degrees: Option<ExactFraction>,
+    degrees_span: SourceSpan,
+) -> NumericAngleLexeme {
+    NumericAngleLexeme {
+        span: SourceSpan {
+            start_byte: start,
+            end_byte: end,
+        },
+        degrees,
+        degrees_span,
+    }
+}
+
 // ----- Japanese -------------------------------------------------------------
+
+// `回転A度`, with optional spaces between the parts. The number has no sign and
+// no fraction.
+fn japanese_angle(source: &str, start: usize) -> Option<NumericAngleLexeme> {
+    if !japanese_keyword_left_boundary(source, start) {
+        return None;
+    }
+    let cursor = literal(source, start, "回転")?;
+    let (cursor, degrees, degrees_span) = number(
+        source,
+        skip_japanese_space(source, cursor),
+        japanese_digit,
+        |character| matches!(character, '.' | '．'),
+        |_| false,
+    )?;
+    let end = literal(source, skip_japanese_space(source, cursor), "度")?;
+    Some(angle_lexeme(start, end, degrees, degrees_span))
+}
 
 // `（画面の）横A、縦Bから横C、縦Dまで`, with optional spaces between the parts.
 fn japanese_segment(source: &str, start: usize) -> Option<NumericSegmentLexeme> {
@@ -389,6 +455,28 @@ fn followed_by_ni(source: &str, end: usize) -> bool {
 }
 
 // ----- English --------------------------------------------------------------
+
+// `rotated A degrees` (or `degree`), in any letter case. The number has no sign
+// and no fraction.
+fn english_angle(source: &str, start: usize) -> Option<NumericAngleLexeme> {
+    let cursor = english_word(source, start, "rotated")?;
+    let (cursor, degrees, degrees_span) = number(
+        source,
+        skip_english_space_required(source, cursor)?,
+        |character| {
+            character
+                .to_digit(10)
+                .filter(|_| character.is_ascii_digit())
+                .map(u64::from)
+        },
+        |character| character == '.',
+        |_| false,
+    )?;
+    let cursor = skip_english_space_required(source, cursor)?;
+    let end = english_word(source, cursor, "degrees")
+        .or_else(|| english_word(source, cursor, "degree"))?;
+    Some(angle_lexeme(start, end, degrees, degrees_span))
+}
 
 // `from horizontal A, vertical B to horizontal C, vertical D`.
 fn english_segment(source: &str, start: usize) -> Option<NumericSegmentLexeme> {
@@ -988,6 +1076,92 @@ mod tests {
             ),
         ] {
             assert_eq!(segment(source, start, en), None, "{source}");
+        }
+    }
+
+    fn angle(
+        source: &str,
+        start_text: &str,
+        language: ResolvedInstructionLanguage,
+    ) -> Option<NumericAngleLexeme> {
+        let start = source
+            .find(start_text)
+            .expect("the start text is in the source");
+        numeric_angle_at(source, start, language)
+    }
+
+    /// Stage B-4a: `回転A度` turns the marks; a whole number is part of the angle,
+    /// not a count. Spaces, full-width digits and a decimal point are read as a
+    /// range's are, and a value past the limits is kept as `None`.
+    #[test]
+    fn a_japanese_angle_reads_its_degrees() {
+        let ja = ResolvedInstructionLanguage::Ja;
+        let source = "画面の横0.5、縦0.5の位置に、一辺0.1の回転30度の赤い四角を1個置く。";
+        let lexeme = angle(source, "回転", ja).unwrap();
+        assert_eq!(lexeme.degrees, fraction(30, 1));
+        assert_eq!(
+            &source[lexeme.span.start_byte..lexeme.span.end_byte],
+            "回転30度"
+        );
+        assert_eq!(
+            &source[lexeme.degrees_span.start_byte..lexeme.degrees_span.end_byte],
+            "30"
+        );
+        assert!(source[lexeme.span.end_byte..].starts_with('の'));
+        assert_eq!(angle(source, "回転", ResolvedInstructionLanguage::En), None);
+        let loose = "回転 ３５９．５ 度の弧を1個置く。";
+        assert_eq!(
+            angle(loose, "回転", ja).unwrap().degrees,
+            fraction(7_190, 20)
+        );
+        let fine = "、回転12.3456789度の円を1個置く。";
+        assert_eq!(angle(fine, "回転", ja).unwrap().degrees, None);
+    }
+
+    /// The seeded angle word alone, a fraction, a sign, a missing 度 and an angle
+    /// in the middle of a word are not numeric angles.
+    #[test]
+    fn a_japanese_angle_word_without_degrees_is_not_a_numeric_angle() {
+        let ja = ResolvedInstructionLanguage::Ja;
+        for source in [
+            "回転の四角を1個置く。",
+            "回転1/3度の四角を1個置く。",
+            "回転-30度の四角を1個置く。",
+            "回転30の四角を1個置く。",
+            "赤い回転30度の四角を1個置く。",
+        ] {
+            assert_eq!(angle(source, "回転", ja), None, "{source}");
+        }
+    }
+
+    /// English: `rotated A degrees` or `rotated A degree`, in any letter case,
+    /// after the noun as a numeric size is.
+    #[test]
+    fn an_english_angle_reads_its_degrees() {
+        let en = ResolvedInstructionLanguage::En;
+        let source = "Place one red square side length 0.1 rotated 30 degrees at horizontal 0.5, vertical 0.5.";
+        let lexeme = angle(source, "rotated", en).unwrap();
+        assert_eq!(lexeme.degrees, fraction(30, 1));
+        assert!(source[lexeme.span.end_byte..].starts_with(" at"));
+        assert_eq!(
+            angle(source, "rotated", ResolvedInstructionLanguage::Ja),
+            None
+        );
+        let one = "Place one arc Rotated 1 Degree at horizontal 0.5, vertical 0.5.";
+        assert_eq!(angle(one, "Rotated", en).unwrap().degrees, fraction(1, 1));
+        let decimal = "Place one ellipse rotated 22.5 degrees at horizontal 0.5, vertical 0.5.";
+        assert_eq!(
+            angle(decimal, "rotated", en).unwrap().degrees,
+            fraction(45, 2)
+        );
+        for source in [
+            "Place one rotated square at horizontal 0.5, vertical 0.5.",
+            "Place one square rotated 30 at horizontal 0.5, vertical 0.5.",
+            "Place one square rotated 1/3 degrees at horizontal 0.5, vertical 0.5.",
+            "Place one square rotated 30degrees at horizontal 0.5, vertical 0.5.",
+            "Place one square unrotated 30 degrees at horizontal 0.5, vertical 0.5.",
+        ] {
+            assert_eq!(angle(source, "rotated", en), None, "{source}");
         }
     }
 }

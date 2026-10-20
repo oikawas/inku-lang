@@ -8,9 +8,13 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
-### 2026-10-21 — The AI refinement's visible-difference gate takes its share of the drawn cells
+### 2026-10-21 — The English print no longer ends a sentence in a whole number the reader cannot read
 
-The shared core's gate for the autonomous refinement (a child drawn by an AI move is kept only when it looks different from its parent) divided the changed cells by all the cells of the square (48×48). A drawing of dots or thin lines alone could move everything it drew and stay under a fifth (of the 51 laws-move children of the drawing trial, 14 passed). By the author's decision it now divides by the cells drawn in the before or the after drawing, still at a fifth. The ground colour is read from the cells along the edge of the before drawing, and neither the margin of a drawing that is not square nor a half-covered row at its edge counts as drawn. A cell that stays close to the ground in both drawings does not count even when it changes. The `measure` answer's `different` becomes `changed` (the drawn cells that changed) and gains `drawn` (the drawn cells). On the same 51 children, 48 pass. No app uses this gate yet, so the screens and drawings do not change.
+When the laws and color stages printed an English sentence in numbers, a numeric range or the ends of a line or row reaching the canvas edge could end the sentence in a whole number (`… vertical 0.333333 to 1.`). The numeric range reader takes a period right after a whole number for a decimal point, so the sentence did not read: a description run committed its composed document without laws, and the laws move stopped with `laws_compile`. A sentence that ends in its place's whole number now writes it with one decimal (`vertical 1.0.`). Prints that read today and the Japanese print do not change.
+
+### 2026-10-21 — Android: the camera's model chooser follows the model purposes, and Juxtapose's held reason matches Web
+
+At the author's decision, the camera's model chooser offers only the models set to be used for both LLM and Vision. The camera reads the photo and draws with the same model, so a model with only one of the two purposes stops partway. If the chosen model has only one, it has to be chosen again. Also, in the work-editing menu of a description-locked work, the reason under Juxtapose is now Web's "This work's DDL was edited. Drawing it from the description would lose the edits, so this is not offered. …". As the way to start again from the description, Android names Change the description in the same menu.
 
 ### 2026-10-20 — Android: choose whether a model is used for LLM or Vision in the settings
 
@@ -190,6 +194,18 @@ Added UUID search in Works, search from the canvas, UUID display and copy in gen
 Supported Anthropic Claude models receive 8,192 extra thinking tokens in normal drawing and Vision requests. A pipeline response cut off at `max_tokens` is rejected and diagnosed even when its content appears readable.
 
 Saved works also offer random or Vision autonomous refinement. The author sets the generation count, allowed color and layout changes, and Wild; each generation is saved from the preceding work. Intermediate generations appear only in lineage, while the last appears in the normal Works list too. Vision uses bounded advice about the work image and displays its observation and next direction. Images are attached only to this dedicated advice request, retaining existing connections and the ChatGPT-plan session pin.
+
+## v2.15.222 (2026-10-21 / Build 1298)
+
+### 2026-10-21 — The laws stage's retries carry the refused answer, and a semicircle no longer drops out of the print
+
+When the laws stage refuses an answer and asks again, the request now carries the refused answer as it was written along with the reason. Before, it carried the reason only, and the model mostly wrote a new answer that was often refused somewhere else. An answer too long to read is not repeated. This holds for the laws stage of a description run and for the laws move of the AI refinement; the color stage's retries still carry the reason only.
+
+When the laws or color stage printed a semicircle's size in numbers, its chord and sagitta were rounded apart, so the sagitta could pass half the chord by a hair and the compile dropped the arc (card C4's shrink, for one). The sagitta is now written at most half the written chord. Before, a description run committed its composed document without laws there, and the laws move stopped with `laws_compile`.
+
+### 2026-10-21 — The AI refinement's visible-difference gate takes its share of the drawn cells
+
+The shared core's gate for the autonomous refinement (a child drawn by an AI move is kept only when it looks different from its parent) divided the changed cells by all the cells of the square (48×48). A drawing of dots or thin lines alone could move everything it drew and stay under a fifth (of the 51 laws-move children of the drawing trial, 14 passed). By the author's decision it now divides by the cells drawn in the before or the after drawing, still at a fifth. The ground colour is read from the cells along the edge of the before drawing, and neither the margin of a drawing that is not square nor a half-covered row at its edge counts as drawn. A cell that stays close to the ground in both drawings does not count even when it changes. The `measure` answer's `different` becomes `changed` (the drawn cells that changed) and gains `drawn` (the drawn cells). On the same 51 children, 48 pass. No app uses this gate yet, so the screens and drawings do not change.
 
 ## v2.15.221 (2026-10-20 / Build 1297)
 

@@ -879,7 +879,8 @@ impl NumericSize {
             }
             Self::Side { side } => format!("一辺{}の", number(side)),
             Self::ChordSagitta { chord, sagitta } => {
-                format!("弦長{}、矢高{}の", number(chord), number(sagitta))
+                let (chord, sagitta) = written_chord_sagitta(chord, sagitta);
+                format!("弦長{chord}、矢高{sagitta}の")
             }
             Self::Length { length } => format!("長さ{}の", number(length)),
         }
@@ -893,7 +894,8 @@ impl NumericSize {
             }
             Self::Side { side } => format!("side length {}", number(side)),
             Self::ChordSagitta { chord, sagitta } => {
-                format!("chord {}, sagitta {}", number(chord), number(sagitta))
+                let (chord, sagitta) = written_chord_sagitta(chord, sagitta);
+                format!("chord {chord}, sagitta {sagitta}")
             }
             Self::Length { length } => format!("length {}", number(length)),
         }
@@ -969,6 +971,39 @@ pub fn number(value: f64) -> String {
     } else {
         text.to_owned()
     }
+}
+
+/// An arc's chord and sagitta as the laws stage writes them. An arc's compile
+/// takes a sagitta of at most half the chord, and a semicircle's sagitta, half
+/// its chord, can round above the half of the written chord when each number
+/// is rounded alone (chord `0.093457`, sagitta `0.046729`): the sagitta is then
+/// written as that half cut to six decimals (`0.046728`).
+fn written_chord_sagitta(chord: f64, sagitta: f64) -> (String, String) {
+    let (chord, sagitta) = (number(chord), number(sagitta));
+    match (millionths(&chord), millionths(&sagitta)) {
+        (Some(whole), Some(part)) if part > whole / 2 => {
+            let half = (whole / 2) as f64 / 1_000_000.0;
+            (chord, number(half))
+        }
+        _ => (chord, sagitta),
+    }
+}
+
+/// A number `number` wrote, in millionths; none for a negative one.
+fn millionths(written: &str) -> Option<i64> {
+    if written.starts_with('-') {
+        return None;
+    }
+    let (whole, fraction) = written.split_once('.').unwrap_or((written, ""));
+    let fraction = format!("{fraction:0<6}");
+    if fraction.len() != 6 {
+        return None;
+    }
+    whole
+        .parse::<i64>()
+        .ok()?
+        .checked_mul(1_000_000)?
+        .checked_add(fraction.parse::<i64>().ok()?)
 }
 
 fn print_layer_ja(
@@ -1198,8 +1233,24 @@ fn print_layer_en(
         out.push_str(", ");
         out.push_str(fade.written_en());
     }
+    // The numeric range reader takes a period right after a whole number for a
+    // decimal point (`vertical 1.`): a sentence that ends in its numeric place's
+    // whole number writes it with one decimal (`vertical 1.0.`).
+    let ends_in_place = cycle.is_none()
+        && numeric.is_some_and(|numeric| numeric.place.is_some() && numeric.fade.is_none());
+    if ends_in_place && ends_in_whole_number(&out) {
+        out.push_str(".0");
+    }
     out.push('.');
     out
+}
+
+/// Whether a sentence ends in a whole number (`vertical 1`), not in a decimal
+/// (`0.5`) or a fraction.
+fn ends_in_whole_number(text: &str) -> bool {
+    text.rsplit(' ')
+        .next()
+        .is_some_and(|word| !word.is_empty() && word.bytes().all(|byte| byte.is_ascii_digit()))
 }
 
 /// English items in a series: `a and b`, or `a, b, and c`.

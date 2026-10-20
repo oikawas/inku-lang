@@ -2581,19 +2581,30 @@ pub fn build_laws_prompt(
 }
 
 /// The request again with the tool's reply to the answer it refused: the
-/// original message and the latest reason only, as the prototype resent it.
+/// original message, the refused answer as it was written and the latest
+/// reason only. An answer too long to read is not repeated; without an answer
+/// (the color stage) the reply is the reason only, as the prototype resent it.
 pub(crate) fn with_laws_feedback(
     mut prompt: LlmPrompt,
     refusal: &Refusal,
+    answer: Option<&str>,
     limits: PromptLimits,
 ) -> Result<LlmPrompt, PromptError> {
+    let answer = answer.filter(|_| refusal.code != "too_long");
+    let shown = |label: &str| {
+        answer
+            .map(|answer| format!("{label}\n{}\n", answer.trim()))
+            .unwrap_or_default()
+    };
     let reply = match prompt.instruction_language {
         ResolvedInstructionLanguage::Ja => format!(
-            "\n\n## 前の答えへの道具の返事\n前の答えは使えなかった: {}\n直した答えを返す。",
+            "\n\n## 前の答えへの道具の返事\n{}前の答えは使えなかった: {}\n直した答えを返す。",
+            shown("前の答え:"),
             refusal.ja
         ),
         ResolvedInstructionLanguage::En => format!(
-            "\n\n## The tool's reply to the previous answer\nThe previous answer could not be used: {}\nReturn a corrected answer.",
+            "\n\n## The tool's reply to the previous answer\n{}The previous answer could not be used: {}\nReturn a corrected answer.",
+            shown("The previous answer:"),
             refusal.en
         ),
     };

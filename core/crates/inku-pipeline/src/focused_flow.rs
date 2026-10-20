@@ -2764,13 +2764,14 @@ fn a_refused_answer_is_asked_again_with_the_reason() {
     assert_eq!(again.identity.attempt, 2);
     assert_ne!(again.identity.action_id, first.action_id);
     let message = again.payload["prompt"]["message"].as_str().unwrap();
-    assert!(
-        message.ends_with(
-            "## The tool's reply to the previous answer\nThe previous answer could not be used: \
-             V2 takes two or three laws with the main law (now 1: B1)\nReturn a corrected answer."
-        ),
-        "{message}"
+    // The refused answer comes back as it was written, before the reason.
+    let reply = format!(
+        "## The tool's reply to the previous answer\nThe previous answer:\n{}\n\
+         The previous answer could not be used: \
+         V2 takes two or three laws with the main law (now 1: B1)\nReturn a corrected answer.",
+        one_law()
     );
+    assert!(message.ends_with(&reply), "{message}");
     let chosen = laws_answer(&refused.snapshot, &two_laws());
     assert!(
         event(&chosen, "laws_chosen").is_some(),

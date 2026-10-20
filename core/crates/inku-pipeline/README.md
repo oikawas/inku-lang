@@ -77,8 +77,9 @@ sentence per instruction, and a pair whose marks turn as its two marks. An
 arranged layer's marks are fitted to their spacing, but a layer that would shrink
 below the floor keeps its size. The printed document is compiled as the run
 compiles it before it is committed. An answer the core refuses is asked again
-with the reason as a new action within the same budget, also when a mark it
-places at a numeric point does not lie wholly on the canvas. `choose_colors`
+with that answer and the reason as a new action within the same budget, also
+when a mark it places at a numeric point does not lie wholly on the canvas. An
+arc's sagitta is printed at most half its printed chord. `choose_colors`
 runs only when the configuration has `colors`, once the laws stage ends for a
 composed plan (also when the laws fell back or the run has none): a reader
 chooses one or two of the eighteen color laws (B11, B13, B14, B16 to B20, C7 to
@@ -119,7 +120,7 @@ provider attempt, but not a delay already accounted for by the core.
 | Catalog selection exhausted or rejected | Resolve `default`, record `auto_fallback_default`, then construct Stage 1 |
 | Stage 1 exhausted or rejected | Fail without a new semantic artifact |
 | Composition reading exhausted or rejected | Place the layers from the default reading and commit; a plan that cannot be composed is committed as Stage 1 printed it |
-| Laws answer refused by the core's rules | Request the laws again with the original message and the reason, using a new logical action within the same laws `max_attempts` and `total_timeout_ms` budget |
+| Laws answer refused by the core's rules | Request the laws again with the original message, the refused answer as written (not one too long to read) and the reason, using a new logical action within the same laws `max_attempts` and `total_timeout_ms` budget |
 | Laws answer whose printed mark at a numeric point leaves the canvas | Request the laws again with the reason that names the layer and its laws, within the same budget |
 | Laws exhausted, or a laws document that compiles to no Score or to more diagnostics or omissions than the composed document | Commit the composed document as the composition printed it (`laws_fallback`) |
 | The laws stage from a saved work cannot start, is exhausted, or prints a document that fails its check | Fail with the reason (`laws_basis_stale`, `laws_without_basis`, `not_faithful`, `no_law`, `laws_refused`, `laws_compile`, `laws_unavailable` and the others of SPEC §12.6.4); never commit the base unchanged |

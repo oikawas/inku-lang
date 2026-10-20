@@ -20,6 +20,8 @@ internal data class JuxtaposeStrings(
     val tooFew: String,
     val unusable: (String) -> String,
     val failed: String,
+    /** Web `descriptionLockedReason`; the way back to the description is this menu's entry. */
+    val heldReason: (String) -> String,
 )
 
 internal fun juxtaposeStrings(language: UiLanguage): JuxtaposeStrings =
@@ -44,6 +46,7 @@ private val juxtaposeJa = JuxtaposeStrings(
     tooFew = "ほかの作品の記述が足りず、4つの一文を選べません。",
     unusable = { detail -> "AIの選んだ一文を使えませんでした（$detail）" },
     failed = "一文を選べませんでした。",
+    heldReason = { entry -> "DDLを編集した作品です。記述から描き直すとDDLの編集が失われるため、止めています。記述から作り直すときは、このメニューの「$entry」を使います。" },
 )
 
 private val juxtaposeEn = JuxtaposeStrings(
@@ -65,4 +68,5 @@ private val juxtaposeEn = JuxtaposeStrings(
     tooFew = "Your other works do not have enough sentences to pick four from.",
     unusable = { detail -> "The model's choices could not be used ($detail)" },
     failed = "The sentences could not be picked.",
+    heldReason = { entry -> "This work's DDL was edited. Drawing it from the description would lose the edits, so this is not offered. To start again from the description, use $entry in this menu." },
 )

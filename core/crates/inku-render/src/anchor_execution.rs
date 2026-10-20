@@ -2633,7 +2633,7 @@ fn resolve_impl(
             }
             let at = anchor.at.as_ref()?;
             let [x0, y0, x1, y1] =
-                crate::placement::region_in_short_side_units(at.region, request.canvas);
+                crate::placement::named_region_in_short_side_units(at.region, request.canvas);
             let seed = request.performance_seed.unwrap_or_default();
             Some(Point::new(
                 x0 + (x1 - x0) * crate::determinism::hash01(index as i64, seed, "anchor-region-x"),

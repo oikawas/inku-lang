@@ -259,6 +259,16 @@ pub fn region_in_short_side_units(region: [f64; 4], canvas: Option<CanvasSize>) 
     ]
 }
 
+/// The region kept proportional above, with its corners on the canvas's short
+/// side: the frame a named place or a named Anchor picks its point in.
+#[must_use]
+pub fn named_region_in_short_side_units(region: [f64; 4], canvas: Option<CanvasSize>) -> [f64; 4] {
+    let [x0, y0, x1, y1] = region_in_short_side_units(region, canvas);
+    let start = crate::geometry::point_to_short_side_units(Point::new(x0, y0), canvas);
+    let end = crate::geometry::point_to_short_side_units(Point::new(x1, y1), canvas);
+    [start.x, start.y, end.x, end.y]
+}
+
 /// A region's own top-left corner on the canvas's short side. A tile or a
 /// cells group lays its domain, which the compiler measures over the whole
 /// region, from this corner, not from the corner of the region kept

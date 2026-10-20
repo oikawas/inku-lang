@@ -643,7 +643,9 @@ fn translate(instruction: &mut Instruction, point: [f64; 2], units: Units) {
     }
 }
 
-/// A grid recipe over a region; the last row may be partly filled.
+/// A grid recipe over a region; the last row may be partly filled. Its cells
+/// and centroid are in short-edge units, the centroid measured from the
+/// domain's corner, as the core tiles them (`score_lowering.rs`).
 fn build_grid(
     instruction: &mut Instruction,
     region: [f64; 4],
@@ -653,11 +655,12 @@ fn build_grid(
 ) {
     let count = count_of(instruction);
     let [x0, y0, x1, y1] = region;
-    let (cw, ch) = ((x1 - x0) / columns as f64, (y1 - y0) / rows as f64);
+    let domain = inku_score::Point::new((x1 - x0) * units.x, (y1 - y0) * units.y);
+    let (cw, ch) = (domain.x / columns as f64, domain.y / rows as f64);
     let mut cells = Vec::new();
     for j in 0..rows {
         for i in 0..columns {
-            cells.push([x0 + cw * (i as f64 + 0.5), y0 + ch * (j as f64 + 0.5)]);
+            cells.push([cw * (i as f64 + 0.5), ch * (j as f64 + 0.5)]);
         }
     }
     cells.truncate(count as usize);
@@ -669,7 +672,7 @@ fn build_grid(
     instruction.at = Some(inku_score::AtRegion { region });
     if let Some(resolved) = resolved_mut(instruction) {
         resolved.anchor = ResolvedPlacementAnchor::Named { region };
-        resolved.domain = inku_score::Point::new((x1 - x0) * units.x, (y1 - y0) * units.y);
+        resolved.domain = domain;
         resolved.recipe = ResolvedPlacementRecipe::Grid {
             columns,
             rows,
@@ -5552,4 +5555,82 @@ pub fn apply_laws_without_count_rule(
 ) -> Result<Chosen, Refusal> {
     let answer = check(answer, context, false)?;
     apply(&answer, context, composed)
+}
+
+#[cfg(test)]
+mod tests {
+    use inku_ddl::NormalizedDdlDocument;
+
+    use super::*;
+    use crate::core_boundary::{CompilerOptions, compile_committed};
+
+    /// A grid the laws lay anew carries its cells and centroid as the core
+    /// tiles them: short-edge units, the centroid from the domain's corner.
+    #[test]
+    fn a_grid_laid_anew_carries_the_cells_the_core_tiles() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../tests/data/laws-port-v1.json")).unwrap();
+        let case = fixture["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|case| case["id"] == "ja-12-wide")
+            .unwrap();
+        let mut compiler = case["compiler"].clone();
+        compiler["host"]["canvas_format_id"] = json!("wide");
+        let compiler: CompilerOptions = serde_json::from_value(compiler).unwrap();
+        let document = NormalizedDdlDocument::new(
+            case["source"].as_str().unwrap(),
+            ResolvedInstructionLanguage::Ja,
+            Vec::new(),
+        )
+        .unwrap();
+        let score = compile_committed(document, &[], &compiler)
+            .unwrap()
+            .score
+            .unwrap();
+        let units = Units::of(compiler.host.canvas_format_id()).unwrap();
+        let compiled = score
+            .instructions
+            .iter()
+            .find(|instruction| {
+                matches!(
+                    recipe(instruction),
+                    Some(ResolvedPlacementRecipe::Grid { .. })
+                )
+            })
+            .unwrap();
+        let Some(ResolvedPlacementRecipe::Grid { columns, rows, .. }) = recipe(compiled).cloned()
+        else {
+            unreachable!("a grid was found");
+        };
+        let region = compiled.at.as_ref().unwrap().region;
+        let mut laid = compiled.clone();
+        build_grid(&mut laid, region, columns, rows, units);
+        let (want, got) = (resolved(compiled).unwrap(), resolved(&laid).unwrap());
+        let near = |a: f64, b: f64| assert!((a - b).abs() < 1e-12, "{a} != {b}");
+        near(got.domain.x, want.domain.x);
+        near(got.domain.y, want.domain.y);
+        let (
+            ResolvedPlacementRecipe::Grid {
+                cell_width: want_width,
+                cell_height: want_height,
+                centroid: want_centroid,
+                ..
+            },
+            ResolvedPlacementRecipe::Grid {
+                cell_width,
+                cell_height,
+                centroid,
+                ..
+            },
+        ) = (&want.recipe, &got.recipe)
+        else {
+            unreachable!("both are grids");
+        };
+        near(*cell_width, *want_width);
+        near(*cell_height, *want_height);
+        near(centroid.x, want_centroid.x);
+        near(centroid.y, want_centroid.y);
+    }
 }

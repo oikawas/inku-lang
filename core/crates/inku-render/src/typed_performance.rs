@@ -1235,21 +1235,11 @@ fn named_anchor(
     owner: usize,
     canvas: Option<crate::types::CanvasSize>,
 ) -> Point {
-    let [x0, y0, x1, y1] = named_region_in_short_side_units(region, canvas);
+    let [x0, y0, x1, y1] = crate::placement::named_region_in_short_side_units(region, canvas);
     Point::new(
         x0 + (x1 - x0) * crate::determinism::hash01(owner as i64, seed, "typed-anchor-x"),
         y0 + (y1 - y0) * crate::determinism::hash01(owner as i64, seed, "typed-anchor-y"),
     )
-}
-
-fn named_region_in_short_side_units(
-    region: [f64; 4],
-    canvas: Option<crate::types::CanvasSize>,
-) -> [f64; 4] {
-    let [x0, y0, x1, y1] = crate::placement::region_in_short_side_units(region, canvas);
-    let start = crate::geometry::point_to_short_side_units(Point::new(x0, y0), canvas);
-    let end = crate::geometry::point_to_short_side_units(Point::new(x1, y1), canvas);
-    [start.x, start.y, end.x, end.y]
 }
 
 fn resolved_anchor(

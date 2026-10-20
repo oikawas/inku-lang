@@ -632,3 +632,29 @@ fn closed_arc_pair_fill_requires_solid_and_a_successful_checked_touching() {
         !render_svg(failed, ScoreErrorPolicy::OmitAndContinue).contains("closed-arc-pair-fill-v1")
     );
 }
+
+#[test]
+fn a_named_anchor_on_a_non_square_canvas_is_measured_on_the_short_side_like_a_numeric_one() {
+    let canvas = CanvasSize::new(1200.0, 800.0);
+    let input = score(
+        r#"{"version":"0.6.0","instructions":[
+      {"primitive":"line","from":[0.1,0.1],"to":[0.2,0.1],
+       "relation":{"type":"connected","target_anchor_index":0,"position_authority":"named_movable"}},
+      {"primitive":"line","from":[0.1,0.8],"to":[0.2,0.8],
+       "relation":{"type":"connected","target_anchor_index":1,"position_authority":"named_movable"}}
+    ],"anchors":[{"at":{"region":[0.5,0.5,0.5,0.5]}},{"position":[0.5,0.5]}]}"#,
+    );
+    let performed = resolve_checked_performance(
+        PerformanceRequest {
+            score: &input,
+            performance_seed: Some(71),
+            composition_seed: Some(71),
+            canvas: Some(canvas),
+        },
+        ScoreErrorPolicy::Stop,
+    )
+    .unwrap();
+    // The canvas center is (0.75, 0.5) on a 1200 by 800 canvas's short side.
+    near(endpoints(&performed, 1, Some(canvas)).0, 0.75, 0.5);
+    near(endpoints(&performed, 0, Some(canvas)).0, 0.75, 0.5);
+}

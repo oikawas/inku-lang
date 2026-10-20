@@ -45,6 +45,7 @@ public enum InkuLocalization {
     private static let statusFormats: [StatusFormat] = [
         .init(pattern: #"^画像をコピーしました（Y軸 ([0-9]+)px）$"#, key: "画像をコピーしました（Y軸 %@px）"),
         .init(pattern: #"^モデルの応答待ち（期限 (.+)）$"#, key: "モデルの応答待ち（期限 %@）"),
+        .init(pattern: #"^モデルの答えを2回とも使えませんでした（(.+)）。$"#, key: "モデルの答えを2回とも使えませんでした（%@）。"),
         .init(pattern: #"^応答を受信中（([0-9]+) bytes）$"#, key: "応答を受信中（%@ bytes）"),
         .init(pattern: #"^比較候補のモデル応答待ち（期限 (.+)）$"#, key: "比較候補のモデル応答待ち（期限 %@）"),
         .init(pattern: #"^比較候補を受信中（([0-9]+) bytes）$"#, key: "比較候補を受信中（%@ bytes）"),

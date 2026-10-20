@@ -4,6 +4,7 @@ import Foundation
 public struct SavedAuthoringSummary: Sendable, Equatable {
     public let authority: String
     public let origin: String
+    public init(authority: String, origin: String) { self.authority = authority; self.origin = origin }
 }
 
 /// These local annotations never alter portable source, Score, SVG or identities.

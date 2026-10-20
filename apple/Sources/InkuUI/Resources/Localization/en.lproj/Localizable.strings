@@ -1534,3 +1534,8 @@
 "モデルを選んで描くと、候補をここに並べます。" = "Choose models and draw options to see them here.";
 "配色の候補を用意中" = "Preparing color arrangements";
 "支持体の候補を用意中" = "Preparing ground options";
+"一文を選べませんでした。" = "No sentences could be picked.";
+"ほかの作品の記述に、選べる一文が4つありません。" = "The other works' descriptions do not hold four sentences to choose from.";
+"この作品には記述がありません。" = "This work has no description.";
+"この作品には画がありません。" = "This work has no image.";
+"モデルの答えを2回とも使えませんでした（%@）。" = "The model's choices could not be used, twice (%@).";

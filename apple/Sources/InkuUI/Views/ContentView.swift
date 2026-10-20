@@ -60,13 +60,14 @@ private struct NewDdlSession {
 }
 
 private enum WorkDialog: Identifiable {
-    case export(ExportSession), edit(WorkEditSession), refinement(RefinementSession), replay(ReplaySession)
+    case export(ExportSession), edit(WorkEditSession), juxtapose(RefinementSession), refinement(RefinementSession), replay(ReplaySession)
     case ddl(DdlEditingSession), newDDL(NewDdlSession), comparison(ComparisonSession), tool(RefinementSession), advice(RefinementSession), colophon(RefinementSession), information(RefinementSession), drawingLogs
     case scoreVariant(SavedScoreVariantSession)
     var id: String {
         switch self {
         case .export(let session): session.id.uuidString
         case .edit(let session): session.id.uuidString
+        case .juxtapose(let session): session.id.uuidString
         case .refinement(let session): session.id.uuidString
         case .replay(let session): session.id.uuidString
         case .ddl(let session): session.id.uuidString
@@ -475,6 +476,11 @@ public struct ContentView: View {
             #else
             Text(model.display.localized("書き出し")).padding()
             #endif
+        case .juxtapose(let session):
+            JuxtaposeView(model: model, work: session.work, onCommitted: { closeLibrary() })
+                .id(session.id)
+                .environment(model.display)
+                .inkuDialogFrame(.juxtapose)
         case .edit(let session):
             WorkEditView(model: model, work: session.work, mode: session.mode, onCommitted: { closeLibrary() })
                 .id(session.id)
@@ -600,6 +606,9 @@ public struct ContentView: View {
         case "layout": openRefinement(work)
         case "description": openWorkEdit(work, .description)
         case "sketch": openWorkEdit(work, .sketch)
+        case "juxtapose":
+            guard canUseWork, !work.trashed else { return }
+            dialog = .juxtapose(RefinementSession(work: work))
         case "create":
             batchWorkspace.showHistory()
             Task { await model.selectWork(work); showCreation(tab: "artwork") }

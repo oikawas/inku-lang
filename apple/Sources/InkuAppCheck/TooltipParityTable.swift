@@ -7,6 +7,8 @@
 // 2026-10-18 (Web Build1260): the share controls the single-user Web hides and the held note, a paragraph, are excluded.
 // 2026-10-18 (Web Build1267, 6ce57e952): the 3D experiment's two sites, the 2D/3D switch's Tooltip and the viewer
 // frame's `title=`, are added with the app's 3D view: 170 sites.
+// 2026-10-20 (Web Build1294, fb2414e18): the juxtaposition menu item's `title=` (the held reason) is added with the
+// app's juxtaposition: 171 sites.
 
 /// One Web tooltip site and the Swift source that carries it, or why the single-user app has none.
 struct TooltipParityEntry {
@@ -190,4 +192,5 @@ let tooltipParityTable: [TooltipParityEntry] = [
     .init(web: "WorkActionMenu.svelte:128", swift: "SavedWorkActionState.swift", marker: "tooltip(\"記述を変える\") : reason"),
     .init(web: "WorkActionMenu.svelte:132", swift: "SavedWorkActionState.swift", marker: "tooltip(\"写生なし／ありで描き直す\") : reason"),
     .init(web: "WorkActionMenu.svelte:133", swift: "SavedWorkActionState.swift", marker: "tooltip(\"モデルを変える\") : reason"),
+    .init(web: "WorkActionMenu.svelte:147", swift: "SavedWorkActionState.swift", marker: "canReadDescription == true ? \"\" : reason"),
 ]

@@ -2,7 +2,7 @@
 
 このディレクトリは、macOS先行のnative SwiftUIクライアントとApple向け共通packageのworkspaceである。本書をSwift host固有の仕様正本とし、[SWIFT_SPEC.md](SWIFT_SPEC.md)を対応英語版とする。共有DDL、Score、prompt、authoring authority、pipeline状態遷移、seed、描画の意味は[製品仕様](../SPEC.ja.md)を正本とし、Serverを開発上のprimaryとして同じRust coreへ追随する。Swift側に意味処理を複製しない。
 
-最終更新: 2026-10-18。
+最終更新: 2026-10-20。
 
 binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。macOSアプリの版は`apple/VERSION`と`apple/BUILD_NUMBER`を正本とする独自の版で、Server／Webの版とは別に採番する（初回は1.0.0／Build 1）。対応するServerの版はアプリの「inkuについて」と変更履歴に併記する。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
 
@@ -17,6 +17,18 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 確定した実装変更と残る範囲は本書の日付付き節へ記し、製品の変更履歴は共通の[CHANGELOG.ja.md](../CHANGELOG.ja.md)／[CHANGELOG.md](../CHANGELOG.md)へ同期して記す。Swift専用CHANGELOGを分けない。
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
+
+## 2026-10-20 作品編集メニューの「取り合わせ」
+
+Webの「取り合わせ」（Build 1282。決まりはBuild 1294で共有coreへ移った）を入れた。Serverセッション-claudeの依頼で、作者の決定は「core機能を呼ぶ形にする」。
+
+- 「記述から描き直す」の群の最後（「モデルを変える」の後）に置き、「LLM」のバッジを付ける。押せない条件と理由は「記述を変える」と同じ。開くだけでは送らず、描かない。
+- 決まりはUniFFIの`juxtaposition`（`inku.juxtaposition.v1`）に任せ、Swiftに写さない。候補を集める`gather`、頼む文の`prompt`、答えを確かめて足した後の記述を返す`check`を、Serverの`juxtaposition.py`と同じ順に呼ぶ。Swiftは候補の元を集め、画を作り、Visionへ送り、子を描く。
+- 候補の元は、ゴミ箱でない、系譜だけでない（`history_visibility`が`normal`）、札が`DDL`・`[demo]`でない、コメントに`test data`が無い（大文字小文字を問わない）、記述がある、今の作品でない作品。記述が固定されているかは、メニューと同じ保存条件（Stage 1の生成で`description_authoritative`）で決める。記述のラベルはcoreで除く。系譜は根から今の作品までの記述（ラベルを除き、続けて同じものは1つ）と、辺の記録の`juxtaposition.sentence`を渡す。seedは要求ごとのUInt64を十進の文字列で渡す。候補の上限はServerの設定の初期値の400に決める（macOSに設定は置かない）。
+- Visionへは、作品の画（768×768のPNG、画像助言と同じ作り方）を添え、温度0.35、上限1200で送る。頼む言葉は画面の言葉。モデルは設定のVisionモデルが既定で、ダイアログで選ぶと設定にも保存する。coreが答えを断ったら、その理由を添えて1回だけ送り直し、2回目も断られたら理由を出して止まる。
+- 一文を選んで「この記述で描く」を押すと、coreの`joined`（保存した記述にラベルごと一文を足したもの）から、「記述を変える」と同じ道で子を描いて保存する。辺の記録は`edited_from_history_id`と、Webの`juxtapositionMetadata`と同じ`juxtaposition`の7欄（`sentence`・`history_ids`・`rank`・`reason`・`position`・`candidates`・`model`）。暴れる・色カタログ・キャンバスは親のまま。「選び直す」は、このダイアログで出した一文をすべて除いて頼み直す。
+- 同梱の`ui-reference.json`はBuild 1294から作り直した。取り合わせの鍵のほか、Webの履歴の絞り込みの札（「スターのみ」→「スター」、「推敲マークのみ」→「推敲」、「グループ共有のみ」→「共有」と、その吹き出し）の変化も入った。
+- 確かめ：`--shared-juxtaposition-only <cases>`は、共通の表`server/tests/data/juxtaposition-cases.json`のgather 5行・check 8行・prompt 2行を、Swiftの要求の組み立てを通してcoreに頼み、表と比べる。`--juxtaposition-only`は、候補の元の除き方、DBの読み出し、1回の送り直し、子の記録と系譜の下で同じ一文を出さないことを、偽の送り口と一時的なSQLiteで見る。
 
 ## 2026-10-18 3DのPNG・GLBの保存が始まらない不具合を直す
 
@@ -39,8 +51,8 @@ Web Build 1272（`60dfcf2db`）に合わせ、履歴帯のページ番号を、�
 Web（`cc0972a71`、Build 1271。群分けは Build 1269・1270）に合わせた。作者の依頼を Serverセッション-claude から受けた。
 
 - AI自動推敲プロセスの方式は「AI Visionによる自動推敲」だけにした。方式の選択（ランダム／AI Vision）を外し、Visionモデルの選択と方向性の欄は常に出す。ダイアログの冒頭には Web の `aiRefineVisionModeHint` を出す。世代の種類は Vision が返す `suggested_kind` だけで決め、乱数では選ばない（作者はサイコロを勝手に振る機能を望まない）。前に覚えた方式（`interface.json` の `aiRefine.visionMode`）は読み捨て、ほかの選択は保つ。前にランダムで作った世代の記録（`autonomous_refine_mode: random`）は読めるまま残す。色の世代で別の色カタログを無作為に選ぶ所は、Web と同じく残す。
-- 作品編集メニュー（作品ヘッダ、ライブラリ、系譜カードと詳細）は、軽い順に4つの群に分け、群ごとに見出しを置く。群の間の区切り線はメニューが引く。「色と質感」（色カタログ・配色・支持体・てざわり）、「形と指示書」（配置・指示書エディタ）、「記述から描き直す」（記述・写生なし／あり・モデル）、「AIに任せる」（AI自動推敲プロセス）の順とする。見出しは Web の `workActionGroup*` を引く。
-- いつも LLM を呼ぶ4項目（記述・写生・モデル・AI自動推敲）には、項目の右に「LLM」のバッジを付ける。読み上げは `workActionLlmMarkLabel`。配置と指示書エディタは、穴が残るときだけ LLM を呼ぶので付けない。DDLから直接描いた作品では、「記述から描き直す」の群を見出しごと出さない。
+- 作品編集メニュー（作品ヘッダ、ライブラリ、系譜カードと詳細）は、軽い順に4つの群に分け、群ごとに見出しを置く。群の間の区切り線はメニューが引く。「色と質感」（色カタログ・配色・支持体・てざわり）、「形と指示書」（配置・指示書エディタ）、「記述から描き直す」（記述・写生なし／あり・モデル。2026-10-20に取り合わせを足した。上の節）、「AIに任せる」（AI自動推敲プロセス）の順とする。見出しは Web の `workActionGroup*` を引く。
+- いつも LLM を呼ぶ4項目（記述・写生・モデル・AI自動推敲。2026-10-20 から取り合わせも）には、項目の右に「LLM」のバッジを付ける。読み上げは `workActionLlmMarkLabel`。配置と指示書エディタは、穴が残るときだけ LLM を呼ぶので付けない。DDLから直接描いた作品では、「記述から描き直す」の群を見出しごと出さない。
 - `ui-reference.json` を Build 1271 から作り直した。日英とも4鍵が消え、5鍵が増えた。ほかの文言の差は無い。
 - 確かめ：`--auxiliary-provenance-only`（Vision の2世代と助言の採用、記述ロック・DDL直接の親。乱数で要素を選ぶ道は無い）と、`--input-aids-only`（覚えた方式を読み捨てて、ほかの選択を保つ）。群の見出し・区切り・バッジの見え方は、作者が画面で確かめる。
 - AI自動推敲そのものは作り直しが計画されていて、macOS も段4で共有 core の上に作り直す予定。今回は廃止と並べ替えだけにした。群「AIに任せる」の名前と項目は変わる見込み。

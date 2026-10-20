@@ -8,6 +8,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ## Unreleased
 
+### 2026-10-20 — macOS: Juxtapose in the work edit menu
+
+Web's Juxtapose comes to macOS as the last item of the Redraw from the description group: a Vision model picks four sentences from the author's other works, and the one chosen is added after the description to draw a child. Gathering the candidates, the prompt, checking the answer and joining the sentence call the shared core's `juxtaposition`, as Web and Server do; Swift keeps no copy. The candidates come from the macOS works (leaving out the trash, works kept only in a lineage, the DDL and demo labels, works whose comment holds `test data`, works held by their DDL and the work itself), at most Server's default of 400. The child's lineage record is Web's `juxtaposition` field, so the same sentence is not offered again further down the lineage. The bundled `ui-reference.json` is regenerated from Build 1294 (the history filter labels Starred, Revision and Shared now match Web).
+
 ### 2026-10-19 — Android: 3D PNG and GLB saves carry Web's file name
 
 In the Android experimental 3D view, a saved PNG or GLB reached the share sheet as `<UUID>.png` or `<UUID>.bin`, and the GLB went with no known type: the web view's download notice never carries the link's name. The app now reads the format from the file's first bytes and hands it on as `inku-3d-<first 12 of the digest>.png` or `.glb`, typed `image/png` or `model/gltf-binary`, as Web names it.

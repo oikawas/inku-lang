@@ -20,6 +20,11 @@ struct AppCheck {
             try await runSharedSavedVariantChecks(casesURL: URL(fileURLWithPath: CommandLine.arguments[index + 1]),
                 folder: URL(fileURLWithPath: CommandLine.arguments[index + 2])); return
         }
+        if let index = CommandLine.arguments.firstIndex(of: "--shared-juxtaposition-only") {
+            guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Expected the shared juxtaposition cases") }
+            try runSharedJuxtapositionChecks(casesURL: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
+        }
+        if CommandLine.arguments.contains("--juxtaposition-only") { try await runJuxtapositionChecks(); return }
         if let index = CommandLine.arguments.firstIndex(of: "--saved-variants-inventory") {
             guard CommandLine.arguments.indices.contains(index + 3) else { throw CheckFailure.message("Expected disposable database, product root and fresh output") }
             try await runSavedVariantsInventory(databaseURL: URL(fileURLWithPath: CommandLine.arguments[index + 1]),

@@ -256,6 +256,12 @@ public enum InkuCore {
         InkuCoreBindings.providerWire(inputBytes: input)
     }
 
+    /// The juxtaposition (取り合わせ, `inku.juxtaposition.v1`): one JSON request with an `action` (`gather`, `prompt`,
+    /// `check`, `join`, `same`) in, one JSON answer out. Nothing is sent or saved by the core.
+    public static func juxtaposition(_ input: Data) -> Data {
+        InkuCoreBindings.juxtaposition(inputBytes: input)
+    }
+
     /// The experimental 3D viewer's input (`inku.ddl3d.v1`, Web `snapshot()`), shared with Android:
     /// `{"score": "<stored Score text>", "metadata": "<render metadata object text>"}` in, `{"json": "<input>"}` or
     /// `{"error": "<reason>"}` out.

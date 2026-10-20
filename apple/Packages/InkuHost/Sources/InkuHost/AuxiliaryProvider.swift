@@ -113,6 +113,32 @@ public actor AuxiliaryProvider {
         return try Self.parseAdvice(raw, kinds: kinds, model: model)
     }
 
+    /// Four sentences the model would add after the description, in its order (Server `suggest_juxtaposition`). An
+    /// answer the core cannot use is sent back once with why. `description` is what the model reads (labels removed);
+    /// `written` is the description as the work keeps it, which each choice is joined to.
+    public func juxtaposition(description: String, written: String, lineage: [String], candidates: [ExactJSON],
+                              png: Data, modelReference: String? = nil, language: String,
+                              settings: HostSettings) async throws -> Juxtaposition.Result {
+        guard candidates.count >= Juxtaposition.choices else { throw HostError("juxtaposition_not_enough_sentences") }
+        guard png.starts(with: [137, 80, 78, 71, 13, 10, 26, 10]) else { throw HostError("juxtaposition_source_has_no_image") }
+        let model = try Self.model(modelReference, settings: settings)
+        let run = try await transport.beginAuxiliaryRun(modelReference: model, settings: settings)
+        var reason: String?
+        for _ in 0..<2 {
+            let prompt = try Juxtaposition.prompt(language: language, description: description, lineage: lineage,
+                                                  candidates: candidates, resend: reason)
+            let raw = try await transport.performAuxiliary(prompt: AuxiliaryPrompt(system: prompt.system, message: prompt.text,
+                images: [Self.imageURL(png)], temperature: 0.35, maximumTokens: 1200), modelReference: model,
+                settings: settings, credentials: credentials, run: run, onBytes: { _ in })
+            try Task.checkCancellation()
+            switch try Juxtaposition.check(language: language, answer: raw, candidates: candidates, description: written) {
+            case .choices(let choices, let count): return Juxtaposition.Result(choices: choices, candidates: count, model: model)
+            case .refused(_, let detail): reason = detail
+            }
+        }
+        throw JuxtapositionAnswerError(detail: reason ?? "")
+    }
+
     /// Reads each prefix before the next one exists in a prompt, including deleted nodes.
     public func colophon(branch: LineageGraph, modelReference: String? = nil, language: String,
                          settings: HostSettings,

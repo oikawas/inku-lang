@@ -13,8 +13,8 @@ use crate::core_boundary::{
     ResolvedPaletteColorDto, ResolvedPaletteDto,
 };
 use crate::machine::{
-    AuthoringInput, CompositionConfig, LawsConfig, PipelineConfig, PipelineInput, PipelinePhase,
-    PipelineSnapshot, SketchRequest, SketchState, StepOutput,
+    AuthoringInput, ColorsConfig, CompositionConfig, LawsConfig, PipelineConfig, PipelineInput,
+    PipelinePhase, PipelineSnapshot, SketchRequest, SketchState, StepOutput,
 };
 use crate::prompts::PromptLimits;
 use crate::protocol::{
@@ -46,6 +46,7 @@ pub(crate) fn config() -> PipelineConfig {
             black,
             white,
             observations: None,
+            paints: None,
         },
     )
     .unwrap();
@@ -111,6 +112,8 @@ pub(crate) fn config() -> PipelineConfig {
         composition_retry: None,
         laws: None,
         laws_retry: None,
+        colors: None,
+        colors_retry: None,
     }
 }
 
@@ -2136,6 +2139,7 @@ fn observed_config(language: inku_ddl::ResolvedInstructionLanguage) -> PipelineC
             black: dto(palette.black()),
             white: dto(palette.white()),
             observations: palette.observations().map(|colours| colours.map(dto)),
+            paints: None,
         },
     )
     .unwrap();
@@ -2956,4 +2960,100 @@ fn a_run_without_laws_commits_the_composed_document_without_asking() {
     assert!(committed_source(&output.snapshot).contains(" (horizontal "));
     assert!(!tags(&output).iter().any(|tag| tag.starts_with("laws")));
     assert!(output.snapshot.laws.is_none());
+}
+
+// --- the color stage ---------------------------------------------------------------------------
+
+/// A description without color words, so that the tool keeps no layer's color.
+const UNCOLORED_DESCRIPTION: &str = "A circle above dots scattered at the bottom";
+
+fn started_with(pipeline_config: PipelineConfig, description: &str) -> PipelineSnapshot {
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "colors".into(),
+            authoring_nonce: "colors-1".into(),
+            config: Box::new(pipeline_config),
+            authority: VariationAuthorityState::new_description(),
+            authoring: AuthoringInput::Description {
+                description: description.into(),
+                auto_catalog: false,
+                sketch: SketchRequest::Off,
+            },
+        },
+    );
+    run(None, &start).snapshot
+}
+
+/// A run that composes from the default reading, asks for its laws when it has
+/// them, and then for its colors, with the default catalog's nine colors.
+fn colors_start(description: &str, laws: Option<LawsConfig>) -> PipelineSnapshot {
+    let mut pipeline_config = observed_config(inku_ddl::ResolvedInstructionLanguage::En);
+    pipeline_config.composition = Some(CompositionConfig { read: false });
+    pipeline_config.laws = laws;
+    pipeline_config.colors = Some(ColorsConfig::default());
+    started_with(pipeline_config, description)
+}
+
+fn colors_answer(state: &PipelineSnapshot, answer: &serde_json::Value) -> StepOutput {
+    let action = state.action.as_ref().unwrap();
+    assert_eq!(action.tag, "choose_colors");
+    let result = EffectResult::ColorsChosen {
+        identity: action.identity.clone(),
+        response: answer.to_string(),
+        elapsed_ms: DecimalU64::new(40),
+    };
+    run(
+        Some(state),
+        &envelope(Some(state), PipelineInput::EffectResult { result }),
+    )
+}
+
+#[test]
+fn a_run_with_colors_asks_for_them_and_commits_what_they_print() {
+    let asked = plan_answer(&colors_start(UNCOLORED_DESCRIPTION, None)).snapshot;
+    assert_eq!(asked.action.as_ref().unwrap().tag, "choose_colors");
+    assert!(asked.colors.is_some());
+    // The field is the main layer (no laws chose one); D2 makes it the vivid
+    // blue and turns the red circle, more vivid than half of it, neutral.
+    let chosen = colors_answer(
+        &asked,
+        &json!({"main_law": "D2", "laws": {"D2": {"vivid": "blue"}},
+                "reason": "“A circle” stands out."}),
+    );
+    let payload = event(&chosen, "colors_chosen").expect("colors chosen");
+    assert_eq!(payload["laws"], json!(["D2"]));
+    let source = committed_source(&chosen.snapshot);
+    let lines: Vec<&str> = source.lines().collect();
+    assert_eq!(
+        lines[2],
+        "Fill one blue pen dense flat large square at the whole canvas (horizontal 0 to 1, vertical 0 to 1).",
+        "{source}"
+    );
+    assert_eq!(
+        lines[3],
+        "Place one gray pen dense flat small circle at the center."
+    );
+    assert_eq!(
+        lines[4],
+        "Scatter 12 black pen dense very small points at the bottom."
+    );
+    assert!(chosen.snapshot.colors.is_none());
+}
+
+#[test]
+fn the_colors_come_after_the_laws_with_what_the_laws_decided() {
+    let asked = plan_answer(&colors_start(COMPOSED_DESCRIPTION, Some(LawsConfig {}))).snapshot;
+    let after_laws = laws_answer(&asked, &two_laws()).snapshot;
+    let action = after_laws.action.as_ref().unwrap();
+    assert_eq!(action.tag, "choose_colors");
+    let message = action.payload["prompt"]["message"].as_str().unwrap();
+    // The laws' main layer, the stated red circle and the dots in aerial
+    // perspective, whose color the laws decided.
+    assert!(
+        message.contains("## Main layer (decided by the previous stage): layer 1"),
+        "{message}"
+    );
+    assert!(message.contains("- layer 1: “red” (red)"), "{message}");
+    assert!(message.contains(r#""fixed":"B15""#), "{message}");
 }

@@ -20,6 +20,7 @@ use crate::authority::{
     AuthorityTransitionOutcome, AuthorityTransitionProposal, AuthorityTransitionResult,
     VariationAuthorityState,
 };
+use crate::colors::{self, ColorsContext, LawsHandoff, PrintedPlan};
 use crate::composition::{self, CheckedReading};
 use crate::composition_reading::{
     build_composition_reading_prompt, parse_composition_reading_response,
@@ -206,6 +207,38 @@ pub struct PipelineConfig {
     /// Budget for the laws; the catalog budget when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub laws_retry: Option<RetryPolicy>,
+    /// The color stage after the laws (2026-10-20): a reader chooses color laws
+    /// for the work, and the core prints the colors they change before the
+    /// commit. Absent, the document the laws left is committed as it is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub colors: Option<ColorsConfig>,
+    /// Budget for the colors; the catalog budget when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub colors_retry: Option<RetryPolicy>,
+}
+
+/// How a run chooses its colors: present, the run asks `choose_colors` once
+/// the laws are printed. The render seed is the one the host draws the work
+/// with, so that the stage's estimate of the drawing places a scatter's marks
+/// where the picture will.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ColorsConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub render_seed: Option<DecimalU64>,
+}
+
+/// A document waiting for its colors: the plan it was printed from, the
+/// document (committed as it is when the colors fail), the reason its commit
+/// carries and what the laws handed on.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PendingColors {
+    pub printed: PrintedPlan,
+    pub document: VisibleDocument,
+    pub reason: String,
+    #[serde(default)]
+    pub handoff: LawsHandoff,
 }
 
 /// How a run composes its Stage 1 plan: the layers whose place the description
@@ -493,6 +526,9 @@ pub struct PipelineSnapshot {
     /// A composed document waiting for its laws.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub laws: Option<PendingLaws>,
+    /// A document waiting for its colors.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub colors: Option<PendingColors>,
     /// The record of the ranges completions wrote into this work's DDL (A3):
     /// a host keeps it with each saved work and brings it back with a direct
     /// DDL from that work. Absent when there is none.
@@ -562,6 +598,7 @@ impl PipelineSnapshot {
             self.stage1_fallback.as_ref(),
             self.composition.as_ref().map(|pending| &pending.document),
             self.laws.as_ref().map(|pending| &pending.document),
+            self.colors.as_ref().map(|pending| &pending.document),
             phase_document,
         ]
         .into_iter()
@@ -591,6 +628,18 @@ impl PipelineSnapshot {
                 self.phase,
                 PipelinePhase::AwaitingLlm {
                     stage: LlmStage::ChooseLaws,
+                    ..
+                }
+            ) {
+                return Err(ProtocolError::InvalidState);
+            }
+        }
+        if let Some(pending) = &self.colors {
+            pending.document.document()?;
+            if !matches!(
+                self.phase,
+                PipelinePhase::AwaitingLlm {
+                    stage: LlmStage::ChooseColors,
                     ..
                 }
             ) {
@@ -818,6 +867,7 @@ impl PipelineSnapshot {
         self.stage1_fallback_plan = None;
         self.composition = None;
         self.laws = None;
+        self.colors = None;
         let payload = json!({
             "variation_id": self.variation_id,
             "document": document,
@@ -853,6 +903,10 @@ impl PipelineSnapshot {
                 .composition_retry
                 .unwrap_or(self.config.catalog_retry),
             LlmStage::ChooseLaws => self.config.laws_retry.unwrap_or(self.config.catalog_retry),
+            LlmStage::ChooseColors => self
+                .config
+                .colors_retry
+                .unwrap_or(self.config.catalog_retry),
         }
     }
 
@@ -981,6 +1035,9 @@ impl PipelineConfig {
             policy.validate()?;
         }
         if let Some(policy) = self.laws_retry {
+            policy.validate()?;
+        }
+        if let Some(policy) = self.colors_retry {
             policy.validate()?;
         }
         self.stage1_retry.validate()?;
@@ -1410,7 +1467,14 @@ impl PipelineSnapshot {
             Ok((document, composed)) if self.config.laws.is_some() => {
                 self.ask_laws(document, composed, reason, description, events)
             }
-            Ok((document, _)) => self.commit_stage1(document, reason, events),
+            Ok((document, composed)) => self.after_laws(
+                document,
+                PrintedPlan::composed(&composed),
+                LawsHandoff::default(),
+                reason,
+                description,
+                events,
+            ),
             Err(skipped) => {
                 self.event(events, "composition_skipped", json!({"reason": skipped}))?;
                 self.commit_stage1(candidate, reason, events)
@@ -1510,7 +1574,15 @@ impl PipelineSnapshot {
         });
         let Some(prompt) = prompt else {
             self.event(events, "laws_fallback", json!({"failure": "prompt"}))?;
-            return self.commit_stage1(document, reason, events);
+            let printed = PrintedPlan::composed(&composed);
+            return self.after_laws(
+                document,
+                printed,
+                LawsHandoff::default(),
+                reason,
+                description,
+                events,
+            );
         };
         self.laws = Some(PendingLaws {
             composed,
@@ -1610,7 +1682,16 @@ impl PipelineSnapshot {
             }),
         )?;
         self.laws_layers = record.filter(|record| !record.is_empty());
-        self.commit_stage1(document, &pending.reason, events)
+        let printed = PrintedPlan::laws(&chosen.print);
+        let handoff = LawsHandoff::of(&chosen, pending.composed.plan.plugins.len());
+        self.after_laws(
+            document,
+            printed,
+            handoff,
+            &pending.reason,
+            description,
+            events,
+        )
     }
 
     /// Ask for the laws again with the tool's reason for refusing the answer, as
@@ -1716,7 +1797,256 @@ impl PipelineSnapshot {
     ) -> Result<(), ProtocolError> {
         self.action = None;
         let pending = self.laws.take().ok_or(ProtocolError::InternalInvariant)?;
+        let description = match &self.phase {
+            PipelinePhase::AwaitingLlm { description, .. } => description.clone(),
+            _ => None,
+        };
         self.event(events, "laws_fallback", payload)?;
+        let printed = PrintedPlan::composed(&pending.composed);
+        self.after_laws(
+            pending.document,
+            printed,
+            LawsHandoff::default(),
+            &pending.reason,
+            description,
+            events,
+        )
+    }
+
+    /// Commit the document the laws stage left, or ask for its colors first
+    /// when the run has the color stage. The color stage runs also when the
+    /// laws fell back: colors are chosen apart from the places.
+    fn after_laws(
+        &mut self,
+        document: VisibleDocument,
+        printed: PrintedPlan,
+        handoff: LawsHandoff,
+        reason: &str,
+        description: Option<String>,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        if self.config.colors.is_none() {
+            return self.commit_stage1(document, reason, events);
+        }
+        let prompt = description.as_deref().and_then(|description| {
+            let (context, _) = self.colors_context(&document, &printed, &handoff, description)?;
+            colors::build_colors_prompt(
+                description,
+                &context,
+                self.config.language,
+                self.config.prompt_limits,
+            )
+            .ok()
+        });
+        let Some(prompt) = prompt else {
+            self.event(events, "colors_fallback", json!({"failure": "prompt"}))?;
+            return self.commit_stage1(document, reason, events);
+        };
+        self.colors = Some(PendingColors {
+            printed,
+            document,
+            reason: reason.to_owned(),
+            handoff,
+        });
+        self.begin_llm(prompt, description, Vec::new(), events)
+    }
+
+    /// What the colors read of the document the laws left: its Score as the
+    /// run compiles it, how it is drawn, and how much that compile diagnosed
+    /// or left out (`shortfalls`).
+    fn colors_context(
+        &self,
+        document: &VisibleDocument,
+        printed: &PrintedPlan,
+        handoff: &LawsHandoff,
+        description: &str,
+    ) -> Option<(ColorsContext, usize)> {
+        let compiled = self.compile_for_run(document)?;
+        let seeds = crate::appearance::Seeds {
+            render: self
+                .config
+                .colors
+                .and_then(|config| config.render_seed)
+                .map(|seed| i128::from(seed.get())),
+            composition: self
+                .config
+                .compiler
+                .composition_seed()
+                .ok()
+                .flatten()
+                .map(i128::from),
+        };
+        let context = ColorsContext::new(colors::ColorsInput {
+            score: compiled.score()?,
+            printed,
+            handoff,
+            palette: self.config.compiler.host.palette(),
+            canvas_format_id: self.config.compiler.host.canvas_format_id(),
+            seeds,
+            error_policy: self.config.compiler.error_policy,
+            description,
+        })?;
+        Some((context, shortfalls(&compiled)))
+    }
+
+    /// Read the colors reply, apply it and commit the document the colors
+    /// printed. A reply the tool refuses is asked again with the reason within
+    /// the stage's budget. When the budget is spent, or the printed document
+    /// does not compile to the colors chosen as the document before did, the
+    /// document the laws left is committed as it is.
+    fn colors_response(
+        &mut self,
+        response: &str,
+        spent_ms: u64,
+        description: Option<String>,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let pending = self
+            .colors
+            .as_ref()
+            .ok_or(ProtocolError::InternalInvariant)?;
+        let Some(text) = description.clone() else {
+            return self.colors_fallback(json!({"failure": "context"}), events);
+        };
+        let Some((context, before_shortfalls)) =
+            self.colors_context(&pending.document, &pending.printed, &pending.handoff, &text)
+        else {
+            return self.colors_fallback(json!({"failure": "context"}), events);
+        };
+        let chosen = match colors::choose_colors(response, &context, self.config.prompt_limits) {
+            Ok(chosen) => chosen,
+            Err(refusal) => {
+                return self.ask_colors_again(&context, &refusal, text, spent_ms, events);
+            }
+        };
+        let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
+        let Some((document, compiled)) =
+            self.laws_document(chosen.print.printed.source(self.config.language, &plugins))
+        else {
+            return self.colors_fallback(json!({"failure": "compile"}), events);
+        };
+        if compiled
+            .score()
+            .is_none_or(|score| !chosen.compiled_as_chosen(score))
+            || shortfalls(&compiled) > before_shortfalls
+        {
+            return self.colors_fallback(json!({"failure": "compile"}), events);
+        }
+        self.action = None;
+        let pending = self.colors.take().ok_or(ProtocolError::InternalInvariant)?;
+        self.event(
+            events,
+            "colors_chosen",
+            json!({
+                "laws": chosen.laws,
+                "main_law": chosen.main_law,
+                "main_layer": chosen.main_layer,
+                "notes": chosen.notes,
+            }),
+        )?;
+        if let Some(record) = &self.laws_layers {
+            let record = colors::reprinted_record(
+                record,
+                &chosen.print,
+                &pending.document.source,
+                &document.source,
+            );
+            self.laws_layers = Some(record).filter(|record| !record.is_empty());
+        }
+        self.commit_stage1(document, &pending.reason, events)
+    }
+
+    /// Ask for the colors again with the tool's reason for refusing the answer,
+    /// as the next attempt of the stage's budget; when it is spent, commit the
+    /// document the laws left.
+    fn ask_colors_again(
+        &mut self,
+        context: &ColorsContext,
+        refusal: &laws::Refusal,
+        description: String,
+        spent_ms: u64,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let PipelinePhase::AwaitingLlm { elapsed_ms, .. } = &self.phase else {
+            return Err(ProtocolError::InvalidState);
+        };
+        let total = elapsed_ms
+            .get()
+            .checked_add(spent_ms)
+            .ok_or(ProtocolError::InvalidPolicy)?;
+        // An answer that does not read as the requested shape is a schema
+        // violation; an answer the colors' rules refuse is a semantic one.
+        let failure = if matches!(
+            refusal.code,
+            "too_long"
+                | "not_json"
+                | "not_object"
+                | "missing"
+                | "not_array"
+                | "count"
+                | "not_integer"
+                | "not_string"
+                | "not_boolean"
+                | "not_a_choice"
+                | "out_of_range"
+        ) {
+            ProviderFailure::SchemaViolation
+        } else {
+            ProviderFailure::SemanticViolation
+        };
+        let attempt = self
+            .action
+            .as_ref()
+            .ok_or(ProtocolError::InvalidState)?
+            .identity
+            .attempt;
+        let next = self
+            .retry_policy(LlmStage::ChooseColors)
+            .next_budgeted_attempt(attempt, total);
+        let prompt = next.and_then(|_| {
+            colors::build_colors_prompt(
+                &description,
+                context,
+                self.config.language,
+                self.config.prompt_limits,
+            )
+            .and_then(|prompt| {
+                colors::with_colors_feedback(prompt, refusal, self.config.prompt_limits)
+            })
+            .ok()
+        });
+        let (Some(next), Some(prompt)) = (next, prompt) else {
+            return self
+                .colors_fallback(json!({"failure": failure, "detail": refusal.code}), events);
+        };
+        self.reissue(
+            LlmStage::ChooseColors,
+            prompt,
+            description,
+            total,
+            next,
+            events,
+        )?;
+        self.event(
+            events,
+            "retry_scheduled",
+            json!({
+                "identity": self.action.as_ref().unwrap().identity,
+                "failure": failure,
+                "detail": refusal.code,
+            }),
+        )
+    }
+
+    /// Commit the document the laws left without colors and say why.
+    fn colors_fallback(
+        &mut self,
+        payload: serde_json::Value,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        self.action = None;
+        let pending = self.colors.take().ok_or(ProtocolError::InternalInvariant)?;
+        self.event(events, "colors_fallback", payload)?;
         self.commit_stage1(pending.document, &pending.reason, events)
     }
 
@@ -2018,6 +2348,13 @@ impl PipelineSnapshot {
                     payload["detail"] = json!(detail);
                 }
                 self.laws_fallback(payload, events)
+            }
+            LlmStage::ChooseColors => {
+                let mut payload = json!({"failure": failure});
+                if let Some(detail) = detail {
+                    payload["detail"] = json!(detail);
+                }
+                self.colors_fallback(payload, events)
             }
         }
     }
@@ -2720,6 +3057,9 @@ impl PipelineSnapshot {
                 self.composition_response(&response, spent_ms, description, events)
             }
             LlmStage::ChooseLaws => self.laws_response(&response, spent_ms, description, events),
+            LlmStage::ChooseColors => {
+                self.colors_response(&response, spent_ms, description, events)
+            }
             LlmStage::CompleteVisibleDdlHoles => {
                 self.hole_response(&response, &hole_ids, spent_ms, events)
             }
@@ -2996,6 +3336,7 @@ fn advance_impl(
             stage1_fallback_plan: None,
             composition: None,
             laws: None,
+            colors: None,
             completion_ranges: None,
             laws_layers: None,
             snapshot_digest: String::new(),
@@ -3105,6 +3446,11 @@ impl PipelineSnapshot {
                 elapsed_ms,
                 ..
             } => self.llm_response(LlmStage::ChooseLaws, response, elapsed_ms.get(), events),
+            EffectResult::ColorsChosen {
+                response,
+                elapsed_ms,
+                ..
+            } => self.llm_response(LlmStage::ChooseColors, response, elapsed_ms.get(), events),
             EffectResult::ProviderFailed {
                 failure,
                 elapsed_ms,

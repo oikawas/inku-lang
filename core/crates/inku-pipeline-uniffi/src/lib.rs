@@ -350,6 +350,7 @@ pub fn resolve_palette(input_bytes: Vec<u8>) -> Vec<u8> {
             black: dto(palette.black()),
             white: dto(palette.white()),
             observations: palette.observations().map(|colors| colors.map(dto)),
+            paints: None,
         })
         .ok()
     }

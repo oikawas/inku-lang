@@ -32,10 +32,14 @@ const OPENAI_REASONING_ROOM_TOKENS: i64 = 25000;
 const OLLAMA_THINKING_ROOM_TOKENS: i64 = 8192;
 const OPENAI_API_HOST: &str = "api.openai.com";
 /// The composition reading is sent as the prototype measured it, with Stage 1's
-/// sampling (COMPOSITION-PRODUCT-DESIGN section 12), and so are the laws (their
-/// prototype's requests went as Stage 1's).
-const STAGE1_SAMPLED_ACTIONS: [&str; 3] =
-    ["generate_normalized_ddl", "read_composition", "choose_laws"];
+/// sampling (COMPOSITION-PRODUCT-DESIGN section 12), and so are the laws and
+/// the colors (their prototypes' requests went as Stage 1's).
+const STAGE1_SAMPLED_ACTIONS: [&str; 4] = [
+    "generate_normalized_ddl",
+    "read_composition",
+    "choose_laws",
+    "choose_colors",
+];
 /// A refusal body is read only this far, as Server read it.
 const REFUSAL_READ_BYTES: usize = 16384;
 

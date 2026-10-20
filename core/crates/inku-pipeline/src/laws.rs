@@ -109,7 +109,7 @@ const SQRT_2: f64 = std::f64::consts::SQRT_2;
 const SQRT_3: f64 = 1.732_050_807_568_877_2;
 const HALF_SQRT_3: f64 = 0.866_025_403_784_438_6;
 /// The nine colors in the order the request's table lists them.
-const COLORS: [Color; 9] = [
+pub(crate) const COLORS: [Color; 9] = [
     Color::White,
     Color::Black,
     Color::Blue,
@@ -123,7 +123,7 @@ const COLORS: [Color; 9] = [
 
 const LINE: [Primitive; 2] = [Primitive::Line, Primitive::FreeLine];
 /// The closed shapes and the arc: what subordination sizes.
-const SIZED: [Primitive; 7] = [
+pub(crate) const SIZED: [Primitive; 7] = [
     Primitive::Circle,
     Primitive::Ellipse,
     Primitive::Triangle,
@@ -133,21 +133,21 @@ const SIZED: [Primitive; 7] = [
     Primitive::Arc,
 ];
 
-fn is_line(primitive: Primitive) -> bool {
+pub(crate) fn is_line(primitive: Primitive) -> bool {
     LINE.contains(&primitive)
 }
 
 /// Python's `max(a, b)` and `min(a, b)`: the first argument unless the second
 /// is strictly larger (smaller). A signed zero is kept as Python keeps it.
-fn py_max(a: f64, b: f64) -> f64 {
+pub(crate) fn py_max(a: f64, b: f64) -> f64 {
     if b > a { b } else { a }
 }
 
-fn py_min(a: f64, b: f64) -> f64 {
+pub(crate) fn py_min(a: f64, b: f64) -> f64 {
     if b < a { b } else { a }
 }
 
-fn clamp_between(value: f64, low: f64, high: f64) -> f64 {
+pub(crate) fn clamp_between(value: f64, low: f64, high: f64) -> f64 {
     py_max(low, py_min(high, value))
 }
 
@@ -158,33 +158,33 @@ fn clamp(value: f64) -> f64 {
 
 /// Python's `round(value, 3)`: the binary value correctly rounded to three
 /// decimals, a tie to even (Rust's fixed-precision formatting does the same).
-fn round3(value: f64) -> f64 {
+pub(crate) fn round3(value: f64) -> f64 {
     format!("{value:.3}").parse().unwrap_or(value)
 }
 
 /// Python's `round(value, 2)`.
-fn round2(value: f64) -> f64 {
+pub(crate) fn round2(value: f64) -> f64 {
     format!("{value:.2}").parse().unwrap_or(value)
 }
 
 /// Python's `round(value)`: the nearest integer, a tie to even.
 #[allow(clippy::cast_possible_truncation)]
-fn round_int(value: f64) -> i64 {
+pub(crate) fn round_int(value: f64) -> i64 {
     value.round_ties_even() as i64
 }
 
 /// The canvas in short-edge units: the width and height over the short edge,
 /// with the canvas's integer ratio.
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct Units {
-    x: f64,
-    y: f64,
+pub(crate) struct Units {
+    pub(crate) x: f64,
+    pub(crate) y: f64,
     width: u32,
     height: u32,
 }
 
 impl Units {
-    fn of(canvas_format_id: &str) -> Option<Self> {
+    pub(crate) fn of(canvas_format_id: &str) -> Option<Self> {
         let format = lookup_canvas_format(canvas_format_id).ok()?;
         let short = f64::from(format.width_units.min(format.height_units));
         Some(Self {
@@ -257,15 +257,15 @@ pub(crate) fn layers(score: &Score) -> BTreeMap<usize, Vec<usize>> {
     found
 }
 
-fn resolved(instruction: &Instruction) -> Option<&inku_score::ResolvedArrangement> {
+pub(crate) fn resolved(instruction: &Instruction) -> Option<&inku_score::ResolvedArrangement> {
     instruction.arrangement.as_ref()?.resolved.as_ref()
 }
 
-fn recipe(instruction: &Instruction) -> Option<&ResolvedPlacementRecipe> {
+pub(crate) fn recipe(instruction: &Instruction) -> Option<&ResolvedPlacementRecipe> {
     resolved(instruction).map(|resolved| &resolved.recipe)
 }
 
-fn count_of(instruction: &Instruction) -> u32 {
+pub(crate) fn count_of(instruction: &Instruction) -> u32 {
     match instruction
         .arrangement
         .as_ref()
@@ -276,7 +276,7 @@ fn count_of(instruction: &Instruction) -> u32 {
     }
 }
 
-fn is_row_recipe(instruction: &Instruction) -> bool {
+pub(crate) fn is_row_recipe(instruction: &Instruction) -> bool {
     matches!(
         recipe(instruction),
         Some(
@@ -287,11 +287,11 @@ fn is_row_recipe(instruction: &Instruction) -> bool {
     )
 }
 
-fn is_row(instruction: &Instruction) -> bool {
+pub(crate) fn is_row(instruction: &Instruction) -> bool {
     is_row_recipe(instruction) && count_of(instruction) >= 2
 }
 
-fn is_scatter(instruction: &Instruction) -> bool {
+pub(crate) fn is_scatter(instruction: &Instruction) -> bool {
     matches!(
         recipe(instruction),
         Some(ResolvedPlacementRecipe::ScatterUniformWithCentroidTranslation)
@@ -299,7 +299,7 @@ fn is_scatter(instruction: &Instruction) -> bool {
 }
 
 /// The named region of the anchor, else the instruction's region.
-fn anchor_region(instruction: &Instruction) -> Option<[f64; 4]> {
+pub(crate) fn anchor_region(instruction: &Instruction) -> Option<[f64; 4]> {
     match resolved(instruction).map(|resolved| &resolved.anchor) {
         Some(ResolvedPlacementAnchor::Named { region }) => Some(*region),
         _ => instruction.at.as_ref().map(|at| at.region),
@@ -310,7 +310,7 @@ fn region_or_center(instruction: &Instruction) -> [f64; 4] {
     anchor_region(instruction).unwrap_or([0.5; 4])
 }
 
-fn center_of(instruction: &Instruction) -> [f64; 2] {
+pub(crate) fn center_of(instruction: &Instruction) -> [f64; 2] {
     let region = region_or_center(instruction);
     [(region[0] + region[2]) / 2.0, (region[1] + region[3]) / 2.0]
 }
@@ -320,7 +320,7 @@ fn domain_of(instruction: &Instruction) -> Option<[f64; 2]> {
 }
 
 /// Half the width and height of one mark, in short-edge units.
-fn extent(instruction: &Instruction, units: Units) -> (f64, f64) {
+pub(crate) fn extent(instruction: &Instruction, units: Units) -> (f64, f64) {
     if let Some(size) = instruction.size {
         return (size.x / 2.0, size.y / 2.0);
     }
@@ -336,7 +336,7 @@ fn extent(instruction: &Instruction, units: Units) -> (f64, f64) {
     (0.01, 0.01)
 }
 
-fn largest_extent(instruction: &Instruction, units: Units) -> f64 {
+pub(crate) fn largest_extent(instruction: &Instruction, units: Units) -> f64 {
     let (x, y) = extent(instruction, units);
     py_max(x, y)
 }
@@ -373,7 +373,7 @@ fn mark_box(instruction: &Instruction, units: Units) -> [f64; 4] {
 
 /// Where an instruction's marks are, in canvas fractions; `None` for a seeded
 /// arrangement (a scatter).
-fn mark_centers(instruction: &Instruction, units: Units) -> Option<Vec<[f64; 2]>> {
+pub(crate) fn mark_centers(instruction: &Instruction, units: Units) -> Option<Vec<[f64; 2]>> {
     let [x0, y0, x1, y1] = region_or_center(instruction);
     let (cx, cy) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
     let count = count_of(instruction);
@@ -468,11 +468,13 @@ fn line_length(instruction: &Instruction, units: Units) -> f64 {
 
 // --- writing a Score copy, as the prototype's tools wrote theirs ------------------------------
 
-fn resolved_mut(instruction: &mut Instruction) -> Option<&mut inku_score::ResolvedArrangement> {
+pub(crate) fn resolved_mut(
+    instruction: &mut Instruction,
+) -> Option<&mut inku_score::ResolvedArrangement> {
     instruction.arrangement.as_mut()?.resolved.as_mut()
 }
 
-fn set_point_region(instruction: &mut Instruction, x: f64, y: f64) {
+pub(crate) fn set_point_region(instruction: &mut Instruction, x: f64, y: f64) {
     let region = [x, y, x, y];
     instruction.at = Some(inku_score::AtRegion { region });
     if let Some(resolved) = resolved_mut(instruction) {
@@ -538,7 +540,7 @@ fn apply_line(instruction: &mut Instruction, from: [f64; 2], to: [f64; 2]) {
     instruction.rotation = Some(0.0);
 }
 
-fn scale_geometry(instruction: &mut Instruction, factor: f64) {
+pub(crate) fn scale_geometry(instruction: &mut Instruction, factor: f64) {
     #[allow(clippy::float_cmp)]
     if factor == 1.0 {
         return;
@@ -1318,7 +1320,7 @@ fn arranged_name(recipe: Option<&ResolvedPlacementRecipe>) -> Option<&'static st
     })
 }
 
-fn summaries(score: &Score, units: Units) -> Vec<LayerSummary> {
+pub(crate) fn summaries(score: &Score, units: Units) -> Vec<LayerSummary> {
     let mut out = Vec::new();
     for (index, positions) in layers(score) {
         let instructions: Vec<&Instruction> =
@@ -1420,7 +1422,7 @@ pub struct ColorRow {
 
 /// The CIELAB lightness (0 to 1), chroma and hue angle (degrees) of an sRGB
 /// color under D65, as the prototype measured it (`model.lch`).
-fn lch_of([r, g, b]: [u8; 3]) -> (f64, f64, f64) {
+pub(crate) fn lch_of([r, g, b]: [u8; 3]) -> (f64, f64, f64) {
     let linear = |channel: u8| {
         let c = f64::from(channel) / 255.0;
         if c <= 0.04045 {
@@ -2070,7 +2072,7 @@ const COUNT_RULE: [&str; 2] = [
     "## The rule of this answer (V2)\nChoose only one or two laws that support the main law. laws holds two or three laws, the main law included.",
 ];
 
-fn language_index(language: ResolvedInstructionLanguage) -> usize {
+pub(crate) fn language_index(language: ResolvedInstructionLanguage) -> usize {
     match language {
         ResolvedInstructionLanguage::Ja => 0,
         ResolvedInstructionLanguage::En => 1,
@@ -2526,11 +2528,11 @@ pub struct Refusal {
     pub en: String,
 }
 
-fn refusal(code: &'static str, ja: String, en: String) -> Refusal {
+pub(crate) fn refusal(code: &'static str, ja: String, en: String) -> Refusal {
     Refusal { code, ja, en }
 }
 
-fn shown(value: &Value) -> String {
+pub(crate) fn shown(value: &Value) -> String {
     match value {
         Value::String(text) => text.clone(),
         other => other.to_string(),
@@ -2538,7 +2540,7 @@ fn shown(value: &Value) -> String {
 }
 
 /// The answer against its schema: the transport may not hold a reply to it.
-fn conform(value: &Value, schema: &Value, path: &str) -> Result<(), Refusal> {
+pub(crate) fn conform(value: &Value, schema: &Value, path: &str) -> Result<(), Refusal> {
     match schema.get("type").and_then(Value::as_str) {
         Some("object") => {
             let Some(object) = value.as_object() else {
@@ -2665,7 +2667,7 @@ fn conform(value: &Value, schema: &Value, path: &str) -> Result<(), Refusal> {
     Ok(())
 }
 
-fn layer_number(value: &Value) -> usize {
+pub(crate) fn layer_number(value: &Value) -> usize {
     value
         .as_u64()
         .and_then(|layer| usize::try_from(layer).ok())
@@ -4848,7 +4850,7 @@ fn place_of(instruction: &Instruction) -> Placement<'_> {
 }
 
 /// A row's first and last mark centers, from its anchor and its step.
-fn row_ends(instruction: &Instruction, units: Units) -> Option<NumericPlace> {
+pub(crate) fn row_ends(instruction: &Instruction, units: Units) -> Option<NumericPlace> {
     let [cx, cy] = center_of(instruction);
     let n = f64::from(count_of(instruction));
     let (sx, sy) = match recipe(instruction)? {
@@ -4867,7 +4869,7 @@ fn row_ends(instruction: &Instruction, units: Units) -> Option<NumericPlace> {
 /// A line's two ends where it is drawn: its ends about their middle, turned by
 /// its rotation (clockwise, y down) in short-edge units, at its anchor, and
 /// cut where the canvas cuts it.
-fn line_ends(instruction: &Instruction, units: Units) -> Option<NumericPlace> {
+pub(crate) fn line_ends(instruction: &Instruction, units: Units) -> Option<NumericPlace> {
     let (from, to) = (instruction.from_?, instruction.to?);
     let (mx, my) = ((from.x + to.x) / 2.0, (from.y + to.y) / 2.0);
     let [cx, cy] = center_of(instruction);
@@ -4930,7 +4932,7 @@ fn on_canvas(from: [f64; 2], to: [f64; 2]) -> Option<([f64; 2], [f64; 2])> {
 }
 
 /// The range a grid or a scatter covers after a law moved it.
-fn moved_range(instruction: &Instruction, units: Units) -> Option<NumericPlace> {
+pub(crate) fn moved_range(instruction: &Instruction, units: Units) -> Option<NumericPlace> {
     let [x0, y0, x1, y1] = anchor_region(instruction)?;
     if is_scatter(instruction) {
         let [w, h] = domain_of(instruction)?;
@@ -4946,7 +4948,7 @@ fn moved_range(instruction: &Instruction, units: Units) -> Option<NumericPlace> 
 }
 
 /// The size an instruction is drawn at, in the form its shape reads.
-fn numeric_size(instruction: &Instruction, units: Units) -> Option<NumericSize> {
+pub(crate) fn numeric_size(instruction: &Instruction, units: Units) -> Option<NumericSize> {
     Some(match instruction.primitive {
         Primitive::Circle | Primitive::Point | Primitive::Polygon => NumericSize::Radius {
             radius: instruction.radius?,

@@ -66,6 +66,11 @@ pub struct ResolvedPaletteDto {
     pub black: ResolvedPaletteColorDto,
     pub white: ResolvedPaletteColorDto,
     pub observations: Option<[ResolvedPaletteColorDto; 9]>,
+    /// The catalog's names of the observed paints, in the observations' order
+    /// (a paint the catalog does not name is null). Only the color stage reads
+    /// them, to show the paints by name; Score lowering does not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paints: Option<Vec<Option<String>>>,
 }
 
 impl ResolvedPaletteDto {
